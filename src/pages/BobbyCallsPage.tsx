@@ -58,6 +58,9 @@ interface CallsPayload {
   calls: CallRow[];
 }
 
+// The protocol is Base-only: assets outside the Base universe stay on-chain but are not shown.
+const OUTSIDE_BASE = new Set(['OKB']);
+
 const RESULT_STYLE: Record<string, string> = {
   WIN: 'text-emerald-400 border-emerald-400/30 bg-emerald-400/10',
   LOSS: 'text-red-400 border-red-400/30 bg-red-400/10',
@@ -152,11 +155,15 @@ export default function BobbyCallsPage() {
     }
   };
 
+  const [omitted, setOmitted] = useState(0);
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/verified-calls', { cache: 'no-store' });
       if (!res.ok) throw new Error(String(res.status));
-      setData((await res.json()) as CallsPayload);
+      const payload = (await res.json()) as CallsPayload;
+      const calls = payload.calls.filter((c) => !OUTSIDE_BASE.has(c.symbol.toUpperCase()));
+      setOmitted(payload.calls.length - calls.length);
+      setData({ ...payload, calls });
       setError(false);
     } catch {
       setData(null);
@@ -178,6 +185,8 @@ export default function BobbyCallsPage() {
   }, [receipt.isSuccess, refresh]);
 
   const sc = data?.scorecard;
+  const shown = data?.calls ?? [];
+  const pendingShown = shown.filter((c) => c.result === 'PENDING').length;
   const activeChallenges = data?.calls.some(canChallenge) ?? false;
   const txUrl = (tx: string | null) => (tx && data ? `${data.explorer}/tx/${tx}` : undefined);
 
@@ -207,6 +216,7 @@ export default function BobbyCallsPage() {
           Every call commits BEFORE resolution with signed Pyth oracle evidence, and anyone can
           challenge a stop breach permissionlessly. VERIFIED (BTC/ETH/SOL, oracle-proven) and
           ATTESTED (self-reported) are separate ledgers that never mix.
+          {omitted > 0 && ` ${omitted} attested commitment${omitted === 1 ? '' : 's'} on an asset outside the Base universe ${omitted === 1 ? 'is' : 'are'} omitted here and remain${omitted === 1 ? 's' : ''} on-chain.`}
         </p>
 
         <a
@@ -216,7 +226,7 @@ export default function BobbyCallsPage() {
           className="mt-7 block rounded-2xl border border-[#0052ff]/40 bg-[#0052ff]/10 p-5 transition hover:border-[#7da6ff]"
         >
           <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Base mainnet · chain 8453</div>
-          <p className="mt-2 text-sm leading-6 text-white/65">The seven-contract proof layer is deployed. This table intentionally preserves the completed Sepolia canary evidence while mainnet writes remain frozen for Safe acceptance, verification and soak.</p>
+          <p className="mt-2 text-sm leading-6 text-white/65">The seven-contract proof layer is live on Base mainnet and owned by the 2-of-3 Safe; TrackRecordV2 holds the mainnet record. The table below preserves the completed Base Sepolia canary, where every call and its Pyth proof can be inspected and challenged.</p>
           <div className="mt-3 font-mono text-[11px] text-white/45">TrackRecord V2 · {BOBBY_BASE_MAINNET.contracts.trackRecord}</div>
         </a>
 
@@ -224,8 +234,8 @@ export default function BobbyCallsPage() {
           {[
             ['Verified win rate', sc && sc.verified.decided > 0 ? `${(sc.verified.winRateBps / 100).toFixed(1)}% (n=${sc.verified.decided})` : '—'],
             ['Verified resolved', sc ? String(sc.verified.resolved) : '—'],
-            ['Pending', sc ? String(sc.verified.pending + sc.attested.pending) : '—'],
-            ['Total commitments', sc ? String(sc.totalCommitments) : '—'],
+            ['Pending', data ? String(pendingShown) : '—'],
+            ['Commitments shown', data ? String(shown.length) : '—'],
           ].map(([label, value]) => (
             <div key={label} className="rounded-xl border border-white/10 bg-white/[0.03] p-4">
               <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
@@ -333,7 +343,7 @@ export default function BobbyCallsPage() {
             >
               Open contract on Basescan <ArrowUpRight className="h-3.5 w-3.5" />
             </a>
-            <p className="mt-3 text-xs text-white/35">This ledger preserves the completed Base Sepolia canary and its proof transactions. Mainnet challenges unlock with production writes.</p>
+            <p className="mt-3 text-xs text-white/35">This ledger preserves the completed Base Sepolia canary and its proof transactions. Mainnet commitments are read on the protocol page.</p>
           </div>
         </div>
 
@@ -435,7 +445,7 @@ export default function BobbyCallsPage() {
           <a href={`${data?.explorer || 'https://sepolia.basescan.org'}/address/${data?.contract || ''}`} target="_blank" rel="noreferrer" className="text-white/50 underline-offset-2 hover:underline">
             {data?.contract || '…'}
           </a>{' '}
-          on {data?.chain.name || 'Base Sepolia'} · preserved canary evidence — Base mainnet contracts are deployed with writes frozen during controlled activation.
+          on {data?.chain.name || 'Base Sepolia'} · preserved canary evidence — the Base mainnet record lives in TrackRecordV2 (link above).
           Analysis, not investment advice · <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
         </p>
       </div>
