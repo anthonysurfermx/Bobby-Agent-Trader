@@ -354,7 +354,7 @@ export default function BobbyDocsPage() {
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={Shield} label="TrackRecord V2 proof engine" right="Base mainnet · deployed" />
               <p className="mb-7 max-w-3xl text-sm leading-7 text-white/60">
-                V2 fixes the time of entry before its price exists, verifies entry and exit through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
+                V2 fixes the time of entry before its price exists, verifies the entry and exit prices through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
               </p>
 
               <div className="grid gap-3 md:grid-cols-3">
