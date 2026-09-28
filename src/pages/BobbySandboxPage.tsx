@@ -66,7 +66,7 @@ interface FeedRunFull extends FeedRun {
   error_message?: string | null;
 }
 
-const TICKER_PRESETS = ['BTC', 'ETH', 'SOL', 'OKB', 'BNB', 'XRP', 'DOGE'] as const;
+const TICKER_PRESETS = ['BTC', 'ETH', 'SOL', 'NVDA', 'BNB', 'XRP', 'DOGE'] as const;
 const RUN_COUNT_KEY = 'bobby_sandbox_runs';
 
 interface GuardrailCell {

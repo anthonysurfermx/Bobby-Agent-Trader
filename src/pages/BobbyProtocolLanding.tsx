@@ -33,7 +33,7 @@ interface ProtocolStats {
     agentRegistry?: { address?: string; type?: string; agents?: number };
   };
   protocolTotals?: { totalInteractions?: number; mcpPayments?: number };
-  onchainRecord?: { commitmentsCreated?: number; decisionsResolved?: number; pending?: number; winRate?: number | null };
+  onchainRecord?: { available?: boolean; commitmentsCreated?: number; decisionsResolved?: number; pending?: number; winRate?: number | null };
   debateActivity?: {
     totalDebates?: number;
     commitmentsCreated?: number;
@@ -42,10 +42,32 @@ interface ProtocolStats {
     pending?: number;
     wins?: number;
     losses?: number;
+    breakEven?: number;
     winRate?: number;
     resolutionRate?: number;
+    debatesRun?: number;
+    abstentions?: number;
+    lastDebateAt?: string;
+    latestDebate?: LatestDebate;
+  };
+  pipeline?: {
+    desk?: { endpoint?: string; model?: string; calls?: number; timeframe?: string };
+    cycle?: { endpoint?: string; schedule?: string; models?: { alpha?: string; redTeam?: string; cio?: string }; commitConvictionFloor?: number; horizonHours?: number };
+    resolver?: { endpoint?: string; schedule?: string; method?: string };
   };
   market?: { prices?: Price[] };
+}
+
+interface LatestDebate {
+  id?: string;
+  topic?: string;
+  created_at?: string;
+  symbol?: string | null;
+  direction?: string | null;
+  entry_price?: number | null;
+  stop_price?: number | null;
+  target_price?: number | null;
+  agents?: Array<{ agent: 'alpha' | 'redteam' | 'cio'; content: string; at?: string; verdict?: { action?: string; conviction?: number; symbol?: string; direction?: string } | null }>;
 }
 
 interface McpMeta {
@@ -84,6 +106,14 @@ const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
   const number = Number(value);
   return Number.isFinite(number) ? number.toLocaleString('en-US') : fallback;
+};
+
+const ago = (iso: string | undefined) => {
+  if (!iso) return null;
+  const minutes = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000));
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.round(minutes / 60);
+  return hours < 48 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
 };
 
 const price = (stats: ProtocolStats | null, symbol: string) =>
@@ -183,6 +213,66 @@ function Metric({ label, value, detail }: { label: string; value: string; detail
   );
 }
 
+const AGENT_LABEL: Record<string, { name: string; tone: string }> = {
+  alpha: { name: 'Alpha Hunter', tone: '#3FE0B5' },
+  redteam: { name: 'Red Team', tone: '#FF5A5F' },
+  cio: { name: 'CIO', tone: '#F6B94E' },
+};
+
+// The newest public debate, read live: each agent's own words, and the CIO's structured verdict.
+function LatestDebatePanel({ debate, when }: { debate?: LatestDebate; when: string | null }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const agents = debate?.agents ?? [];
+  const verdict = agents.find((a) => a.agent === 'cio')?.verdict;
+  const ruled = verdict
+    ? verdict.action === 'none' || verdict.direction === 'none'
+      ? `No call${typeof verdict.conviction === 'number' ? ` · conviction ${verdict.conviction}/10` : ''}`
+      : `${String(verdict.direction ?? '').toUpperCase()} ${verdict.symbol ?? ''}${typeof verdict.conviction === 'number' ? ` · conviction ${verdict.conviction}/10` : ''}`
+    : null;
+  return (
+    <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-7">
+      <div className="flex items-baseline justify-between gap-3">
+        <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Latest public debate</div>
+        {when && <div className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">{when}</div>}
+      </div>
+      {agents.length === 0 ? (
+        <p className="mt-6 text-sm leading-6 text-white/45">Loading the latest debate from the public ledger…</p>
+      ) : (
+        <>
+          <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.05em]">{debate?.topic}</h3>
+          <div className="mt-5 border-t border-white/10">
+            {agents.map((a) => {
+              const label = AGENT_LABEL[a.agent] ?? { name: a.agent, tone: '#fff' };
+              const long = a.content.length > 420;
+              const shown = open === a.agent || !long ? a.content : `${a.content.slice(0, 420).replace(/\s+\S*$/, '')}…`;
+              return (
+                <div key={a.agent} className="border-b border-white/[0.06] py-4">
+                  <div className="mb-2 flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em]" style={{ color: label.tone }}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: label.tone }} />{label.name}
+                  </div>
+                  <p className="whitespace-pre-line text-sm leading-6 text-white/70">{shown}</p>
+                  {long && (
+                    <button type="button" onClick={() => setOpen(open === a.agent ? null : a.agent)} className="mt-2 font-mono text-[10px] uppercase tracking-[0.14em] text-[#7da6ff] hover:text-white">
+                      {open === a.agent ? 'Show less' : 'Read all'}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {ruled && (
+            <div className="mt-5 flex items-center justify-between gap-3">
+              <span className="font-mono text-[10px] uppercase tracking-[0.16em] text-white/40">CIO verdict</span>
+              <span className="font-mono text-sm font-bold text-white">{ruled}</span>
+            </div>
+          )}
+          <a href="/record" className="mt-6 font-mono text-[11px] font-bold uppercase tracking-[0.14em] text-[#7da6ff] hover:text-white">Every debate and every call →</a>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
   const mcp = useMcpMeta();
@@ -229,7 +319,10 @@ export default function BobbyProtocolLanding() {
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
   const chainLabel = stats?.chain?.name || 'Base';
-  const provenanceNote = `Debates, decisions and win rate: public resolution ledger. MCP calls and interactions: AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} debates settled there so far)` : ''}.`;
+  const deskModel = stats?.pipeline?.desk?.model ?? 'gpt-4o-mini';
+  const debatesRun = publicRecord?.debatesRun;
+  const lastDebate = ago(publicRecord?.lastDebateAt);
+  const provenanceNote = `Source: the public debate ledger (Supabase, read live). A debate becomes a call only when the CIO commits entry, stop and target before the outcome; every call is graded on the 1H price path until it expires. Win rate counts break-evens against Bobby. Paid MCP settlements live separately in AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} so far)` : ''}.`;
   const nativeSymbol = stats?.chain?.nativeSymbol || 'ETH';
   const telemetryUpdatedAt = stats?.fetchedAt
     ? new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(stats.fetchedAt))
@@ -251,15 +344,15 @@ export default function BobbyProtocolLanding() {
       label: 'Public debate ledger',
       value: publicRecord ? `${formatNumber(publicRecord.decisionsResolved, '0')} resolved` : '—',
       detail: publicRecord
-        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.expired, '0')} expired · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L · ${publicRecord.winRate?.toFixed(1)}%`
+        ? `${formatNumber(publicRecord.pending, '0')} pending · ${formatNumber(publicRecord.wins, '0')}W / ${formatNumber(publicRecord.losses, '0')}L / ${formatNumber(publicRecord.breakEven, '0')} flat · ${publicRecord.winRate?.toFixed(1)}%${debatesRun ? ` · out of ${formatNumber(debatesRun)} debates` : ''}`
         : 'Waiting for the public resolution ledger.',
-      proof: 'Resolution ledger',
-      href: '#what-it-does',
+      proof: 'Every call, with its debate',
+      href: '/record',
     },
     {
       label: 'Adversarial bounties',
       value: formatNumber(c?.adversarialBounties?.totalPosted),
-      detail: 'Open bounties paid for breaking Bobby\u2019s own reasoning. Being wrong in public is part of the design.',
+      detail: 'Escrowed rewards for proving a verdict wrong. The contract is live and verified; no bounty has been posted yet.',
       proof: 'AdversarialBounties contract',
       href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
     },
@@ -293,17 +386,17 @@ export default function BobbyProtocolLanding() {
     ['Bobby is online', true],
     [btc ? `BTC $${btc.price.toLocaleString('en-US')}` : 'BTC —', false],
     [stats?.chain?.blockNumber ? `${chainLabel} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
-    ['In plain words: ChatGPT answers. Bobby checks the market first.', true],
-    ['Every answer is challenged before it ships', false],
-    ['Every call is written down before the outcome', false],
-    [`${formatNumber(totalTrades, '—')} decisions committed`, false],
+    [lastDebate ? `Last public debate ${lastDebate}` : 'Daily public debate at 12:00 UTC', true],
+    ['Alpha builds the case · Red Team attacks it · the CIO rules', false],
+    [debatesRun ? `${formatNumber(debatesRun)} public debates · ${formatNumber(totalTrades, '—')} became calls` : `${formatNumber(totalTrades, '—')} calls committed`, false],
+    ['A call is written down before the outcome', false],
   ] as const;
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
         <title>Bobby Protocol — Refuted before execution</title>
-        <meta name="description" content="The rules behind every answer Bobby gives about a market. Before you see an answer, a second system tries to break it, a risk check can block it, and the call is written down before the outcome." />
+        <meta name="description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and every public call is written down before the outcome." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -321,18 +414,18 @@ export default function BobbyProtocolLanding() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The rules behind every answer Bobby gives about a market <span aria-hidden>›</span>
               </a>
               <h1 className="max-w-4xl text-[clamp(2.4rem,5.2vw,5rem)] font-extrabold leading-[.96] tracking-[-0.085em]">No decision is approved<br />without being <span className="text-[#0052ff]">refuted.</span></h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">When an AI answers a question about an asset, this is what happens before you see it: a second system tries to break the answer, a risk check can block it, and the call is written down before the market settles it.</p>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">When Bobby answers a question about an asset, this is what happens before you see it: one agent builds the case, a second one tries to break it, a third one rules and can veto it. Every public call is written down before the market settles it.</p>
               <p className="mt-5 max-w-2xl border-l-2 border-[#0052ff] pl-4 text-sm leading-6 text-white/45 md:text-base">Bobby runs on the same models everyone else uses. The difference is not the model, it is the procedure around it.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/desk" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a verdict <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
                 <a href="#how-it-works" className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/10 px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-white backdrop-blur transition hover:bg-white/20">See the procedure <ChevronDown className="h-4 w-4" /></a>
               </div>
-              <div className="mt-14 grid max-w-xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
+              <div className="mt-14 grid max-w-2xl grid-cols-2 gap-x-10 gap-y-8 sm:grid-cols-4">
                 {[
-                  ['Debates', formatNumber(totalDebates)],
+                  ['Debates', formatNumber(debatesRun ?? totalDebates)],
+                  ['Calls', formatNumber(totalTrades)],
                   ['Resolved', formatNumber(publicRecord?.decisionsResolved)],
                   ['Win rate', formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)],
-                  ['Resolution', publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'],
                 ].filter(([, value]) => value !== '0').map(([label, value]) => (
                   <div key={label}>
                     <div className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-white/40">{label}</div>
@@ -364,13 +457,13 @@ export default function BobbyProtocolLanding() {
             <div className="mb-12 max-w-3xl">
               <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">01 / What it does</div>
               <h2 className="text-5xl font-extrabold leading-[.96] tracking-[-0.08em] md:text-7xl">It turns an idea<br />into a decision.</h2>
-              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a thesis. Bobby challenges it, checks the downside, and gives you one clear decision before the result.</p>
+              <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">Bring a question about a stock or a crypto. One agent builds the case, a second one attacks it, a third one rules — over the same live market data.</p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
               {[
                 { step: '01', title: 'Bring the idea', text: 'Start with a market thesis.' },
                 { step: '02', title: 'Test the downside', text: 'Opposing agents look for what breaks it.' },
-                { step: '03', title: 'Get the call', text: 'Pass, pause or block — with a public record.' },
+                { step: '03', title: 'Get the ruling', text: 'The CIO weighs both sides: review the idea, or wait.' },
               ].map((item) => (
                 <div key={item.step} className="rounded-2xl border border-white/10 bg-white/[0.035] p-7 transition duration-300 hover:-translate-y-1 hover:border-[#0052ff]/60 hover:bg-[#0052ff]/[0.08]">
                   <div className="mb-12 font-mono text-sm font-bold text-[#7da6ff]">{item.step}</div>
@@ -411,7 +504,7 @@ export default function BobbyProtocolLanding() {
                 <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">02 / The procedure</div>
                 <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">One procedure,<br />end to end.</h2>
               </div>
-              <p className="max-w-sm text-sm leading-6 text-white/45">Four checks before capital moves.</p>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Four steps, the same on every debate.</p>
             </div>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -445,22 +538,24 @@ export default function BobbyProtocolLanding() {
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
             >
-              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Before capital moves</div>
+              <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">03 / Before anything is approved</div>
               <h2 className="text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                No blind decisions.<br />
-                <span className="text-white/72">Just four checks.</span>
+                Most ideas<br />
+                <span className="text-white/72">do not survive.</span>
               </h2>
               <p className="mt-7 max-w-xl text-base leading-7 text-white/55 md:text-lg">
-                Every idea must survive its own refutation before it moves capital.
+                {debatesRun && totalTrades
+                  ? `Of ${formatNumber(debatesRun)} public debates, ${formatNumber(totalTrades)} ended in a call with entry, stop and target. The other ${formatNumber(Math.max(0, debatesRun - Number(totalTrades)))} ended in no call — the Red Team and the CIO held.`
+                  : 'Every idea must survive its own refutation before it becomes a call.'}
               </p>
             </motion.div>
 
             <div className="mt-14 grid grid-cols-2 gap-x-8 gap-y-7 md:grid-cols-4 lg:max-w-5xl">
               {[
-                ['Debates', formatNumber(totalDebates)],
-                ['Decisions', formatNumber(totalTrades)],
-                ['Agent calls', formatNumber(totalMcpCalls)],
-                ['Interactions', formatNumber(totalInteractions)],
+                ['Debates', formatNumber(debatesRun ?? totalDebates)],
+                ['Calls', formatNumber(totalTrades)],
+                ['No call', formatNumber(publicRecord?.abstentions)],
+                ['Paid MCP calls', formatNumber(totalMcpCalls)],
               ].filter(([, value]) => value !== '0').map(([label, value]) => (
                 <div key={label} className="border-l border-white/20 pl-4">
                   <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/45">{label}</div>
@@ -482,16 +577,16 @@ export default function BobbyProtocolLanding() {
                 ))}
               </div>
               <div className="flex w-fit items-center gap-3 rounded-md border border-white/10 bg-white/[0.07] px-4 py-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 backdrop-blur-md">
-                Live pipeline <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />
+                {lastDebate ? `Last run ${lastDebate}` : 'Live pipeline'} <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />
               </div>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {[
-                { icon: Bot, eyebrow: '01 / Thesis', title: 'Find the idea', text: 'A clear setup with a clear invalidation.', state: 'PROPOSED', step: '01' },
-                { icon: ShieldCheck, eyebrow: '02 / Debate', title: 'Attack the idea', text: 'Red Team looks for what can break it.', state: 'CHALLENGED', step: '02' },
-                { icon: CircleDollarSign, eyebrow: '03 / Risk veto', title: 'Protect the capital', text: 'Risk can pass, pause or block.', state: 'GATED', step: '03' },
-                { icon: Check, eyebrow: '04 / Public record', title: 'Leave the record', text: 'The decision is visible before the result.', state: 'RECORDED', step: '04' },
+                { icon: Bot, eyebrow: '01 / Alpha Hunter', title: 'Build the case', text: 'The strongest conditional idea the market data supports, and the evidence behind it.', state: 'PROPOSED', step: '01' },
+                { icon: ShieldCheck, eyebrow: '02 / Red Team', title: 'Attack the case', text: 'Reads Alpha\u2019s actual argument and goes after its weak assumptions, invalidation and missing evidence.', state: 'CHALLENGED', step: '02' },
+                { icon: CircleDollarSign, eyebrow: '03 / CIO', title: 'Rule on it', text: 'Weighs both arguments. The CIO can veto the indicator engine, never upgrade it. No finished debate, no approval.', state: 'GATED', step: '03' },
+                { icon: Check, eyebrow: '04 / Public record', title: 'Grade it in public', text: 'A call is written with entry, stop and target before the outcome, then graded on the real price path.', state: 'RECORDED', step: '04' },
               ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
                 <motion.article
                   key={title}
@@ -525,45 +620,45 @@ export default function BobbyProtocolLanding() {
           <div className="relative mx-auto max-w-[1440px] px-5 py-24 lg:px-8 lg:py-32">
             <div className="mb-14 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
               <div>
-                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / Capabilities</div>
+                <div className="mb-5 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">04 / The agents</div>
                 <h2 className="max-w-4xl text-5xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-7xl">
-                  Four checks.<br />One clear decision.
+                  How the agents<br />are kept honest.
                 </h2>
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">
-                Debate, risk, proof and a simple interface.
+                The same rules on the web, on iPhone and in the daily public cycle.
               </p>
             </div>
 
             <div className="grid gap-5 lg:grid-cols-2">
               {[
                 {
-                  title: 'Identity',
-                  description: 'Every decision has a named agent, signer and context. The record follows the agent.',
-                  image: '/images/protocol/agent-identity.jpg',
-                  alt: 'Synthetic human profile visible through textured cobalt glass',
-                  telemetry: ['identity.issue', 'signer  bobby.base.eth', 'reputation  portable', 'status  recorded'],
-                },
-                {
                   title: 'Adversarial debate',
-                  description: 'Alpha proposes the thesis. Red Team attacks the assumptions. CIO resolves both into one decision.',
+                  description: 'Three isolated model calls over the same evidence. Alpha Hunter argues the case, Red Team receives Alpha\u2019s argument and attacks it, the CIO receives both plus the original question and rules: review or wait.',
                   image: '/images/protocol/adversarial-debate.jpg',
                   alt: 'Three silhouettes debating behind illuminated blue glass',
-                  telemetry: ['debate.open  round_03', 'agents  alpha · red · cio', 'counterpoints  active', 'consensus  pending'],
+                  telemetry: ['POST /api/desk-debate', `model  ${deskModel}`, 'red.input  question · evidence · alpha', 'cio.input  question · evidence · alpha · red'],
                 },
                 {
-                  title: 'Risk gate',
-                  description: 'Bobby checks size, downside and invalidation before capital moves. Risk can pass, pause or block.',
+                  title: 'Veto, never upgrade',
+                  description: 'A deterministic indicator engine proposes direction, conviction and levels. The debate can only take that away: a call is shown only when the CIO rules review in the same direction. If the debate does not finish, nothing is approved.',
                   image: '/images/protocol/risk-gate.jpg',
                   alt: 'Human hand meeting a luminous blue glass barrier',
-                  telemetry: ['risk.inspect  intent', 'exposure  bounded', 'invalidation  signed', 'gate  pass · park · block'],
+                  telemetry: ['engine  1H indicators → direction · conviction · levels', 'cio  review | wait · long | short | none', 'show call  cio=review ∧ same direction', 'otherwise  no call'],
+                },
+                {
+                  title: 'Output guard',
+                  description: 'Every agent\u2019s text is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict fails the whole analysis. No verdict is substituted.',
+                  image: '/images/protocol/agent-identity.jpg',
+                  alt: 'Synthetic human profile visible through textured cobalt glass',
+                  telemetry: ['guard  guarantee · advice · verdict mismatch', 'on fail  503 analysis_failed', 'languages  en · es', 'fallback  none'],
                 },
                 {
                   title: 'Proof',
-                  description: 'The thesis and decision are committed on Base before the outcome. Confirmed swaps enter a chain-ordered receipt ledger with FIFO lots and wallet-scoped PnL.',
+                  description: 'The daily public debate stores every call with entry, stop, target and a 48-hour expiry before the outcome, and grades it on the real 1H price path. Calls the cycle commits live also go to TrackRecordV2 on Base with a Pyth price anchor.',
                   image: '/images/protocol/onchain-proof.jpg',
                   alt: 'Transparent cobalt glass monolith containing a sealed point of light',
-                  telemetry: ['proof.commit  thesis_hash', 'chain  base · 8453', 'outcome  unresolved', 'record  immutable'],
+                  telemetry: [`cycle  ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`, `resolver  ${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}`, 'grading  first touch · stop wins a tie', `chain  base · 8453 · ${formatNumber(onchainRecord?.commitmentsCreated, '0')} on-chain`],
                 },
               ].map((capability, index) => (
                 <motion.article
@@ -600,7 +695,6 @@ export default function BobbyProtocolLanding() {
                     <div className="mt-auto space-y-1 font-mono text-[10px] leading-5 text-white/38 md:text-[11px]">
                       <div className="mb-2 text-[#7da6ff]">&gt; {capability.telemetry[0]}</div>
                       {capability.telemetry.slice(1).map((line) => <div key={line}>&nbsp;&nbsp;{line}</div>)}
-                      <div className="pt-1 text-white/65">✓ system ready</div>
                     </div>
                   </div>
                 </motion.article>
@@ -609,11 +703,65 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
+        <section className="relative overflow-hidden border-b border-white/10 bg-[#050505]" id="runtimes">
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
+            <div className="mb-12 max-w-3xl">
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Where the agents run</div>
+              <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Two runtimes.<br />One procedure.</h2>
+              <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">Your question in the app is answered on demand and stays yours. The public record comes from a separate daily debate that anyone can audit.</p>
+            </div>
+            <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
+              <div className="space-y-5">
+                {[
+                  {
+                    eyebrow: 'On demand · web /desk and iPhone',
+                    title: 'The desk',
+                    rows: [
+                      ['Endpoint', stats?.pipeline?.desk?.endpoint ?? '/api/desk-debate'],
+                      ['Agents', `Alpha Hunter → Red Team → CIO · ${stats?.pipeline?.desk?.calls ?? 3} sequential calls · ${deskModel}`],
+                      ['Evidence', 'One instrument, 1H candles: OKX for crypto, Yahoo Finance for equities. At least 59 bars; refused if older than 3 h (crypto) or 5 days (equities).'],
+                      ['Engine', 'Deterministic 1H indicators (trend, RSI, ATR, EMA, support and resistance) give levels and conviction. The CIO can only veto them.'],
+                      ['Output', 'Review or wait, with each agent\u2019s argument. Reads are metered per device and account.'],
+                      ['Record', 'Private. A desk answer is not published to the public ledger.'],
+                    ],
+                  },
+                  {
+                    eyebrow: `Public · ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`,
+                    title: 'The daily cycle',
+                    rows: [
+                      ['Endpoint', stats?.pipeline?.cycle?.endpoint ?? '/api/bobby-cycle'],
+                      ['Agents', `Alpha ${stats?.pipeline?.cycle?.models?.alpha ?? 'gpt-4o-mini'} → Red Team ${stats?.pipeline?.cycle?.models?.redTeam ?? 'gpt-4o-mini'} → CIO ${stats?.pipeline?.cycle?.models?.cio ?? 'gpt-4o'} with a forced structured verdict: action, direction, entry, stop, target, invalidation, conviction 1–10.`],
+                      ['Evidence', 'OKX prices, funding, open interest and top-trader positioning, a technical pulse across indicators, Fear & Greed, Polymarket and the dollar index.'],
+                      ['Gate', `Conviction = 70% backend model + 30% CIO. A call is committed only when the CIO asks to act with complete levels and conviction ≥ ${stats?.pipeline?.cycle?.commitConvictionFloor ?? 0.35}.`],
+                      ['Grading', `${stats?.pipeline?.cycle?.horizonHours ?? 48} h expiry. ${stats?.pipeline?.resolver?.method ?? '1H candle path, first touch, stop wins a same-bar tie'} (${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}).`],
+                      ['Record', 'Public, with the full debate. Live commits also go to TrackRecordV2 on Base.'],
+                    ],
+                  },
+                ].map((runtime) => (
+                  <div key={runtime.title} className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-7">
+                    <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">{runtime.eyebrow}</div>
+                    <h3 className="mt-3 text-2xl font-extrabold tracking-[-0.05em]">{runtime.title}</h3>
+                    <dl className="mt-5 border-t border-white/10">
+                      {runtime.rows.map(([k, v]) => (
+                        <div key={k} className="grid grid-cols-[6.5rem_1fr] gap-3 border-b border-white/[0.06] py-3 text-sm">
+                          <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-white/35">{k}</dt>
+                          <dd className="leading-6 text-white/70">{v}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
+                ))}
+              </div>
+              <LatestDebatePanel debate={publicRecord?.latestDebate} when={lastDebate} />
+            </div>
+          </div>
+        </section>
+
         <section className="relative isolate overflow-hidden" id="for-agents">
           <SectionMedia name="nebula" className="opacity-50" />
           <div className="absolute inset-0 bg-gradient-to-b from-[#050505] via-[#050505]/60 to-[#050505]" />
           <div className="relative z-10 mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
-          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">05 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
+          <div className="mb-12 flex flex-col justify-between gap-5 md:flex-row md:items-end"><div><div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Integration</div><h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">Give any agent<br />a second layer.</h2></div><p className="max-w-sm text-sm leading-6 text-white/45">Connect over MCP.</p></div>
           <div className="grid items-start gap-5 md:grid-cols-[1.55fr_1fr]">
             <a
               href="/protocol/docs"
@@ -672,8 +820,8 @@ export default function BobbyProtocolLanding() {
                 </div>
                 <div className="mt-auto">
                   <div className="mb-3 font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">The app</div>
-                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">Bobby, on iPhone</h3>
-                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">The same record, in a voice you can talk to.</p>
+                  <h3 className="text-3xl font-extrabold tracking-[-0.06em] md:text-4xl">Bobby, on the web and iPhone</h3>
+                  <p className="mt-4 max-w-sm text-sm leading-6 text-white/65">The same three agents and the same veto, in a voice you can talk to.</p>
                   <div className="mt-8 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white">See the app →</div>
                 </div>
               </div>
@@ -687,10 +835,10 @@ export default function BobbyProtocolLanding() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(0,82,255,.1),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-12 max-w-3xl">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">06 / Track record</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The live protocol is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Identity, debates, risk proofs and the execution receipt ledger now share one Base-only architecture. Wallets stay self-custodial: Bobby prepares bounded calldata, records confirmed receipts and never holds funds or exchange credentials.
+                Seven contracts on Base, owned by a 2-of-3 Safe. The debate ledger is read live from the database; calls the cycle commits live are also anchored on-chain. Wallets stay self-custodial: on the web Bobby prepares bounded swap calldata on Base, records confirmed receipts and never holds funds or exchange credentials.
               </p>
             </div>
 
@@ -731,7 +879,7 @@ export default function BobbyProtocolLanding() {
         <section className="relative overflow-hidden border-t border-white/10 bg-[#08080a]" id="limits">
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
             <div className="mb-10">
-              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Scope and limits</div>
+              <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">08 / Scope and limits</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">What the protocol<br />does not do.</h2>
             </div>
             <ul className="border-t border-white/10">
@@ -767,20 +915,20 @@ export default function BobbyProtocolLanding() {
               </div>
               {([
                 ['Protocol', [
-                  ['Architecture', '/protocol/architecture'],
+                  ['Verified calls', '/protocol/calls'],
+                  ['Heartbeat', '/protocol/heartbeat'],
+                  ['Audits', '/protocol/audits'],
                   ['Console', '/protocol/console'],
                   ['Sandbox', '/protocol/sandbox'],
-                  ['Heartbeat', '/protocol/heartbeat'],
-                  ['Network', '/protocol/network'],
                 ]],
                 ['Build', [
                   ['Docs', '/protocol/docs'],
                   ['Playbooks', '/protocol/playbooks'],
                   ['Harness', '/protocol/harness'],
-                  ['MCP endpoint', '/protocol/docs'],
+                  ['MCP endpoint', '/protocol/docs#mcp'],
                 ]],
                 ['Bobby', [
-                  ['War Room', '/desk'],
+                  ['The desk', '/desk'],
                   ['Track record', '/record'],
                   ['Analytics', '/agentic-world/bobby/analytics'],
                   ['Agents', '/agentic-world/bobby/agents'],

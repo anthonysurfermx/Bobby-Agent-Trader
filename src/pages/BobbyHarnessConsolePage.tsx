@@ -136,10 +136,10 @@ export default function BobbyHarnessConsolePage() {
             Finance harness console
           </h1>
           <p className="font-mono text-[10px] text-white/40 uppercase tracking-[0.15em] mt-2">
-            Every decision. Every guardrail. Every proof. Auditable.
+            Every event of the public cycle. Every guardrail. Auditable.
           </p>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-white/60">
-            This is the raw audit trail behind every Bobby verdict. <span className="text-[#7da6ff]">Trace Layer</span> streams every event Bobby emits — signals received, debates run, guardrails fired, trades executed, MCP calls paid. <span className="text-[#7da6ff]">Memory Layer</span> shows how those traces distill into long-term episodes Bobby uses to sharpen the next debate. If you want to know <em>why</em> Bobby blocked a trade or charged an agent, it happened here first.
+            This is the raw audit trail behind the public daily cycle (app reads are private and are not streamed here). <span className="text-[#7da6ff]">Trace Layer</span> streams every event Bobby emits — signals received, debates run, guardrails fired, trades executed, MCP calls paid. <span className="text-[#7da6ff]">Memory Layer</span> shows how those traces distill into long-term episodes Bobby uses to sharpen the next debate. If you want to know <em>why</em> Bobby blocked a trade or charged an agent, it happened here first.
           </p>
         </motion.div>
 

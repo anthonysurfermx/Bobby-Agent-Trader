@@ -3,7 +3,7 @@
 // Base-native dark design
 // ============================================================
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import {
@@ -120,14 +120,14 @@ const TOOL_ICONS: Record<string, React.ElementType> = {
 };
 
 const PUBLIC_TOOLS = [
-  { name: 'bobby_analyze', desc: 'Full multi-source market analysis with AI synthesis' },
-  { name: 'bobby_debate', desc: '3-agent adversarial debate (Alpha Hunter vs Red Team vs CIO)' },
+  { name: 'bobby_analyze', desc: 'Full multi-source market analysis with AI synthesis · premium' },
+  { name: 'bobby_debate', desc: '3-agent adversarial debate (Alpha Hunter vs Red Team vs CIO) · premium' },
   { name: 'bobby_stats', desc: 'Track record, win rate, PnL — live performance metrics' },
   { name: 'bobby_ta', desc: 'Technical analysis with RSI, MACD, Bollinger Bands, SuperTrend' },
   { name: 'bobby_intel', desc: 'Full intelligence briefing from 10 real-time sources' },
   { name: 'bobby_wallet_balance', desc: 'Read-only balance for a Base wallet' },
-  { name: 'bobby_wallet_portfolio', desc: 'Read-only portfolio breakdown and analysis' },
-  { name: 'bobby_security_scan', desc: 'Token contract safety audit and risk scoring' },
+  { name: 'bobby_wallet_portfolio', desc: 'Read-only portfolio breakdown and analysis · premium' },
+  { name: 'bobby_security_scan', desc: 'Token contract safety audit and risk scoring · premium' },
   { name: 'bobby_dex_trending', desc: 'Trending tokens on-chain across DEXs' },
   { name: 'bobby_dex_signals', desc: 'Whale and KOL buy/sell signals' },
   { name: 'bobby_uniswap_quote', desc: 'Uniswap V3 quote on Base from Bobby\'s own quoter call' },
@@ -179,6 +179,25 @@ function ToolCard({ name, desc }: { name: string; desc: string }) {
   );
 }
 
+// The oracle is deployed; say plainly whether anything has been published to it yet.
+function OracleStatus() {
+  const [count, setCount] = useState<number | null>(null);
+  useEffect(() => {
+    fetch('/api/bobby-protocol-stats', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d) => { const n = Number(d?.contracts?.convictionOracle?.stats?.symbolCount); setCount(Number.isFinite(n) ? n : null); })
+      .catch(() => setCount(null));
+  }, []);
+  if (count === null) return null;
+  return (
+    <p className="mb-4 max-w-3xl font-mono text-[11px] leading-6 text-white/45">
+      {count > 0
+        ? `Live: ${count} symbol${count === 1 ? '' : 's'} published to the oracle.`
+        : 'Deployed and callable. No symbol has been published to it yet, so getConviction returns inactive (active = false) until the cycle writes one.'}
+    </p>
+  );
+}
+
 // --------------- Page ---------------
 
 export default function BobbyDocsPage() {
@@ -186,7 +205,7 @@ export default function BobbyDocsPage() {
 
   return (
     <KineticShell activeTab="docs" minimalNav nucleo>
-      <Helmet><title>AI Docs | Bobby Agent Trader</title></Helmet>
+      <Helmet><title>Docs | Bobby Protocol</title></Helmet>
 
       <div className="min-h-screen bg-[#050505] pb-20 md:pb-8">
         <div className="max-w-5xl mx-auto px-4 py-10 space-y-12 md:py-14 md:space-y-14">
@@ -200,13 +219,13 @@ export default function BobbyDocsPage() {
             className="text-center pt-4"
           >
             <div className="font-mono text-[10px] font-bold text-[#7da6ff] tracking-[0.22em] uppercase mb-4">
-              Bobby Agent Trader / AI Docs
+              Bobby Protocol / Docs
             </div>
             <h1 className="text-white text-3xl md:text-5xl font-extrabold tracking-[-0.07em] leading-[1.02] mb-4">
               Connect your AI agent to Bobby in one command
             </h1>
             <p className="text-sm md:text-base leading-7 text-white/60 max-w-xl mx-auto">
-              Base mainnet proofs, 11 MCP tools, self-custodial quotes and a chain-ordered receipt ledger
+              The three-agent debate, 11 MCP tools (20 on the streamable-HTTP endpoint), Base mainnet contracts and a self-custodial receipt ledger
             </p>
           </motion.div>
 
@@ -266,10 +285,56 @@ export default function BobbyDocsPage() {
             </GlassCard>
           </motion.div>
 
+          {/* ===== 2b. THE AGENTS ===== */}
+          <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible" id="agents">
+            <GlassCard glow accentBorder className="p-6 md:p-8">
+              <SectionLabel icon={MessageSquare} label="The agents" right="how a debate runs" />
+              <p className="mb-6 max-w-3xl text-sm leading-7 text-white/60">
+                Every answer is argued by three roles in isolated model calls. Alpha Hunter builds the strongest conditional case from the evidence. Red Team receives Alpha&apos;s argument and attacks its assumptions, invalidation and missing evidence. The CIO receives both plus the original question and rules <span className="font-mono text-[#7da6ff]">review</span> or <span className="font-mono text-[#7da6ff]">wait</span>, with a direction. A post-generation guard fails the whole analysis on a guaranteed-return claim, a personal buy or sell instruction, or a CIO whose text contradicts its own verdict.
+              </p>
+              <div className="grid gap-3 md:grid-cols-3">
+                {[
+                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app. Three sequential calls over one instrument\u2019s 1H candles (OKX or Yahoo Finance). The indicator engine gives levels and conviction; the CIO can only veto them. Origin-restricted and metered.'],
+                  ['PUBLIC · /api/bobby-cycle', 'Daily at 12:00 UTC. Alpha and Red Team, then a CIO with a forced structured verdict (entry, stop, target, invalidation, conviction). Calls are graded on the 1H price path after 48 h and listed with their debate on the record.'],
+                  ['AGENTS · MCP bobby_debate', 'The same three roles for other agents, through the conversational desk in debate mode. Premium: paid per call in ETH on Base through AgentEconomy.'],
+                ].map(([title, text]) => (
+                  <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">
+                    <div className="font-mono text-[10px] font-bold tracking-[0.15em] text-[#7da6ff]">{title}</div>
+                    <p className="mt-3 text-xs leading-6 text-white/60">{text}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-6">
+                <CopyBlock
+                  label="Desk verdict shape (/api/desk-debate → 200)"
+                  code={`{
+  "symbol": "BTC",
+  "provenance": { "provider": "OKX", "instrument": "BTC-USDT",
+                  "assetType": "crypto", "timeframe": "1H", "asOf": "<ISO time>" },
+  "technicals": { "price": …, "trend": …, "rsi14": …, "support": …, "resistance": … },
+  "agents": {
+    "alpha": "<Alpha Hunter's argument>",
+    "red":   "<Red Team's challenge to Alpha>",
+    "cio":   "<CIO's ruling on both>",
+    "verdict":   "wait" | "review",
+    "direction": "long" | "short" | "none"   // always "none" with wait
+  }
+}
+// Refusals carry a stable code: invalid_request, question_too_long (400),
+// daily_limit (429), desk_unavailable, analysis_failed (503). No verdict is substituted.`}
+                />
+              </div>
+              <a href="/protocol#runtimes" className="mt-5 inline-block font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff] hover:text-white">Models, evidence and the latest public debate →</a>
+            </GlassCard>
+          </motion.div>
+
           {/* ===== 3. MCP TOOLS GRID ===== */}
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
-              <SectionLabel icon={Cpu} label="11 public MCP tools" right="live schema via tools/list" />
+              <SectionLabel icon={Cpu} label="11 MCP tools" right="live schema via tools/list" />
+              <p className="mb-5 max-w-3xl text-sm leading-7 text-white/60" id="mcp">
+                <span className="font-mono text-[#7da6ff]">/api/mcp-bobby</span> (JSON-RPC) lists the 11 tools below. <span className="font-mono text-[#7da6ff]">/api/mcp-http</span> (streamable HTTP) adds 9 more — recommendation, brief, Judge Mode, adversarial bounties and b1nary wheel checks — for 20. Analysis, debate, security scan and wallet portfolio are premium: each call is paid on Base through AgentEconomy (<span className="font-mono">payMCPCall</span>, x402 challenge), priced by the contract&apos;s current fee.
+              </p>
 
               {/* Public tools */}
               <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-3">
@@ -419,6 +484,7 @@ pnl.scope = wallet
           <motion.div custom={sectionIndex++} variants={fadeUp} initial="hidden" animate="visible">
             <GlassCard className="p-6 md:p-8">
               <SectionLabel icon={Terminal} label="Solidity integration" right="Conviction oracle" />
+              <OracleStatus />
               <CopyBlock
                 label="ConvictionOracle interface"
                 code={`interface IBobbyOracle {
@@ -501,7 +567,7 @@ IBobbyOracle oracle = IBobbyOracle(
               <div className="flex items-center justify-center gap-6 font-mono text-[10px] text-white/35 tracking-[0.18em]">
                 <span>CHAIN: 8453</span>
                 <span className="w-1.5 h-1.5 rounded-full bg-[#0052ff]" />
-                <span>PUBLIC MCP TOOLS: 11</span>
+                <span>MCP TOOLS: 11 · 20 (HTTP)</span>
               </div>
 
               {/* Links */}

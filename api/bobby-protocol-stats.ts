@@ -29,6 +29,7 @@ import {
 } from './_lib/protocol-constants.js';
 import { trackRecordWinRateFunction } from './_lib/trackrecord-stats-adapter.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+import { COMMIT_CONVICTION_FLOOR } from './_lib/commit-policy.js';
 
 export const config = { maxDuration: 30 };
 
@@ -501,6 +502,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     bounties: recentBounties,
     bountySummary,
     debateActivity: debateStats,
+    // How the agents run, from the running configuration (the desk model is an env override).
+    pipeline: {
+      desk: { endpoint: '/api/desk-debate', model: process.env.BOBBY_DESK_MODEL || 'gpt-4o-mini', calls: 3, timeframe: '1H' },
+      cycle: { endpoint: '/api/bobby-cycle', schedule: 'daily 12:00 UTC', models: { alpha: 'gpt-4o-mini', redTeam: 'gpt-4o-mini', cio: 'gpt-4o' }, commitConvictionFloor: COMMIT_CONVICTION_FLOOR, horizonHours: 48 },
+      resolver: { endpoint: '/api/forum-resolve', schedule: 'daily 12:30 UTC', method: '1H candle path, first touch, stop wins a same-bar tie' },
+    },
     market: {
       prices: intel.prices,
       regime: intel.regime,

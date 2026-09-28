@@ -14,11 +14,11 @@ interface HeartbeatData {
 }
 
 const STEPS = [
-  { num: '01', label: 'REGISTER', desc: 'Your agent registers on HardnessRegistry and declares policy + endpoints' },
-  { num: '02', label: 'SUBMIT', desc: 'POST /api/orchestrate with a structured HardnessSpec' },
-  { num: '03', label: 'DEBATE', desc: 'Three agents attack your thesis in isolated sandbox' },
-  { num: '04', label: 'SCORE', desc: 'Judge Mode scores on 6 dimensions → hardness 0-100' },
-  { num: '05', label: 'PROVE', desc: 'Prediction committed on-chain. Signal published. Bounty eligible.' },
+  { num: '01', label: 'SUBMIT', desc: 'POST /api/orchestrate with a structured prediction: entry, stop, target, thesis, invalidation' },
+  { num: '02', label: 'DEBATE', desc: 'Alpha Hunter, Red Team and CIO argue your thesis in isolated model calls' },
+  { num: '03', label: 'SCORE', desc: 'Judge Mode scores 6 dimensions → hardness 0–100' },
+  { num: '04', label: 'DISPOSE', desc: 'The model proposes, the policy disposes: execute, reduce size, paper only, publish only or reject' },
+  { num: '05', label: 'PROVE', desc: 'A proof record is returned. The on-chain HardnessRegistry commit is operator-gated today.' },
 ];
 
 const CURL_EXAMPLE = `curl -X POST https://bobbyprotocol.xyz/api/orchestrate \\
@@ -78,7 +78,7 @@ export default function BobbyAgentConsolePage() {
           </h2>
           <p className="mx-auto max-w-2xl text-base leading-7 text-white/55">
             Bobby is not a trading agent. Bobby is the financial orchestration layer.
-            Submit a prediction. Get it stress-tested. Receive a hardness score. Publish proof on-chain.
+            Submit a prediction. Get it stress-tested by three agents and a judge. Receive a hardness score and a proof record.
           </p>
         </motion.div>
 
@@ -87,7 +87,7 @@ export default function BobbyAgentConsolePage() {
           className="rounded-2xl border border-[#0052ff]/40 bg-[#0b0b12]/80 p-6 backdrop-blur-xl">
           <div className="flex items-center gap-3 mb-6">
             <span className="h-2 w-2 animate-pulse rounded-full bg-[#0052ff] shadow-[0_0_16px_rgba(0,82,255,.9)]" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Bobby Protocol — first registered agent</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">Bobby Protocol — reference agent</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -96,7 +96,7 @@ export default function BobbyAgentConsolePage() {
             </div>
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">Revenue</div>
-              <div className="mt-2 font-mono text-xl font-bold tracking-[-0.04em] text-[#7da6ff]">{heartbeat ? `${parseFloat(heartbeat.revenue.totalVolumeNative).toFixed(4)} ${heartbeat.revenue.nativeSymbol || 'OKB'}` : '...'}</div>
+              <div className="mt-2 font-mono text-xl font-bold tracking-[-0.04em] text-[#7da6ff]">{heartbeat ? `${parseFloat(heartbeat.revenue.totalVolumeNative).toFixed(4)} ${heartbeat.revenue.nativeSymbol || 'ETH'}` : '...'}</div>
             </div>
             <div>
               <div className="font-mono text-[10px] uppercase tracking-[0.15em] text-white/40">Win rate</div>
