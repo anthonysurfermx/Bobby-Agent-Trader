@@ -14,9 +14,9 @@ export const config = { maxDuration: 95 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es']).default('en') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en') });
 
-type Lang = 'en' | 'es';
+type Lang = 'en' | 'es' | 'pt';
 const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
 
 /**
@@ -48,7 +48,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
-  const lang: Lang = (req.body as { language?: unknown } | undefined)?.language === 'es' ? 'es' : 'en';
+  const rawLang = (req.body as { language?: unknown } | undefined)?.language;
+  const lang: Lang = rawLang === 'es' || rawLang === 'pt' ? rawLang : 'en';
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));

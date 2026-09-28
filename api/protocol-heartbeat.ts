@@ -432,7 +432,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Health checks
     const blockAge = blockNumber > 0 ? 'healthy' : 'stale';
-    const cycleHealth = lastCycleAge !== null && lastCycleAge < 32400 ? 'healthy' : 'overdue'; // 9h tolerance
+    const cycleHealth = lastCycleAge !== null && lastCycleAge < 93600 ? 'healthy' : 'overdue'; // daily cron (12:00 UTC) + 2h tolerance
     const contractHealth = parseInt(totalMcpCalls) > 0 || totalBounties > 0 ? 'active' : 'dormant';
 
     const payload = {
@@ -485,7 +485,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         chain: blockAge,
         cycle: cycleHealth,
         contracts: contractHealth,
-        overall: blockAge === 'healthy' && contractHealth === 'active' && allSourcesOk ? 'operational' : 'degraded',
+        // Health, not usage: a contract nobody has paid yet is 'dormant' in its own badge,
+        // it does not make the running system degraded.
+        overall: blockAge === 'healthy' && cycleHealth === 'healthy' && allSourcesOk ? 'operational' : 'degraded',
       },
       recentTxs: recentTxs as OnChainTx[],
       contracts: {

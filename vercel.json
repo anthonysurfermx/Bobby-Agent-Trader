@@ -161,6 +161,10 @@
       "schedule": "45 12 * * *"
     },
     {
+      "path": "/api/forum-resolve",
+      "schedule": "30 12 * * *"
+    },
+    {
       "path": "/api/realtime-session?sweep=1",
       "schedule": "* * * * *"
     }

@@ -29,7 +29,7 @@ import NucleoProfile from './NucleoProfile';
 import NucleoRisk from './NucleoRisk';
 import LangMenu from './LangMenu';
 import {
-  AGENT_TONE, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money, noTradeReason, prettyName, resolveAsset, runDebate, topMovers,
+  AGENT_TONE, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money, noTradeReason, prettyName, resolveAsset, runAgents, runDebate, topMovers, type Agents,
   type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
 } from './deskData';
 
@@ -158,6 +158,8 @@ export default function NucleoDesk() {
   const requestRef = useRef<AbortController | null>(null);
   const revealRef = useRef<number | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
+  const [agents, setAgents] = useState<Agents | null>(null);
+  const questionRef = useRef<string>('');
   useEffect(() => () => { requestRef.current?.abort(); recognitionRef.current?.stop(); if (revealRef.current) clearTimeout(revealRef.current); }, []);
 
   const say = useCallback((text: string, essential = true) => {
@@ -180,15 +182,18 @@ export default function NucleoDesk() {
     setDeskError(null);
     setSnapshot(snap);
     setAnswer(null);
+    setAgents(null);
     setAward(null);
     setLandEvent(null);
     setSeries([]);
     setPhase('alpha');
     void candles(snap.symbol, snap.isEquity).then((rows) => { if (!signal.aborted) setSeries(rows); });
-    const stage = setTimeout(() => { if (!signal.aborted) setPhase('redTeam'); }, 900);
-    const stage2 = setTimeout(() => { if (!signal.aborted) setPhase('cio'); }, 1800);
+    // The stages follow the debate's real order (Alpha, then Red Team on Alpha, then the CIO);
+    // the model calls take a few seconds each.
+    const stage = setTimeout(() => { if (!signal.aborted) setPhase('redTeam'); }, 4000);
+    const stage2 = setTimeout(() => { if (!signal.aborted) setPhase('cio'); }, 9000);
     const a = await runDebate(snap.symbol, signal);
-    clearTimeout(stage); clearTimeout(stage2);
+    if (a.gate || isUnavailable(a)) { clearTimeout(stage); clearTimeout(stage2); }
     if (signal.aborted) return;
     if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
     if (a.gate) {
@@ -209,20 +214,26 @@ export default function NucleoDesk() {
       say(msg);
       return;
     }
+    // The metered read passed: now the three agents argue over the same evidence.
+    const question = questionRef.current || t(`How does ${snap.symbol} look?`, `¿Cómo se ve ${snap.symbol}?`, `Como está ${snap.symbol}?`);
+    const g = await runAgents(snap.symbol, snap.isEquity, question, signal);
+    clearTimeout(stage); clearTimeout(stage2);
+    if (signal.aborted) return;
+    setAgents(g);
     setAnswer(a);
     setReadSeq((n) => n + 1);
     // The three voices say their piece around the glass, then the verdict condenses on it.
     setPhase('reveal');
     revealRef.current = window.setTimeout(() => { if (!signal.aborted) setPhase('complete'); }, REVEAL_MS);
-    const text = debateFor(a).spoken;
+    const text = debateFor(a, g).spoken;
     setMessages((m) => [...m, { from: 'bobby', text }]);
     say(text);
-    const noTradeNow = isNoTrade(a);
+    const noTradeNow = isNoTrade(a, g);
     if (noTradeNow) sfxShield(); else sfxSuccess();
     // A full review earns discipline; respecting NO TRADE earns more. The number shown is what the
     // daily cap ACTUALLY granted. The verdict rides along as the thesis Trader Land reviews.
     const lvl = (v: number | null) => (v !== null && Number.isFinite(v) && v > 0 ? v : null);
-    const thesis: ThesisSnapshot = { symbol: snap.symbol, isEquity: snap.isEquity, direction: a.direction === 'long' ? 'long' : a.direction === 'short' ? 'short' : 'none', price: lvl(a.price), entry: lvl(a.entry), stop: lvl(a.stop), target: lvl(a.target) };
+    const thesis: ThesisSnapshot = { symbol: snap.symbol, isEquity: snap.isEquity, direction: noTradeNow ? 'none' : a.direction === 'long' ? 'long' : a.direction === 'short' ? 'short' : 'none', price: lvl(a.price), entry: lvl(a.entry), stop: lvl(a.stop), target: lvl(a.target) };
     const result = progressStore.awardDiscipline(noTradeNow ? 'no_trade_respected' : 'read_complete', new Date(), thesis);
     setAward({ xp: result.awarded, noTrade: noTradeNow });
     setLandEvent(result.eventId);
@@ -251,6 +262,7 @@ export default function NucleoDesk() {
     sfxTock();
     setInput('');
     setMessages((m) => [...m, { from: 'you', text: spoken ?? q }]);
+    questionRef.current = q;
     setPhase('resolving');
     window.scrollTo({ top: 0, behavior: 'smooth' });
     const r = await resolveAsset(q, controller.signal);
@@ -390,7 +402,7 @@ export default function NucleoDesk() {
   const openTraderLand = useCallback(() => { sfxTock(); navigate('/trader-land'); }, [navigate]);
 
   const desktop = useMediaQuery('(min-width: 1024px)');
-  const debate = useMemo(() => (answer ? debateFor(answer) : null), [answer]);
+  const debate = useMemo(() => (answer ? debateFor(answer, agents) : null), [answer, agents]);
   const attachments = useMemo(() => {
     const queued = new Set(drops.map((d) => `${d.companionId}-${d.tier}`));
     const items: Array<{ url: string; slot: string; spin?: boolean; glow?: string }> = wornGear(companion.id, progress.xp)
@@ -527,7 +539,7 @@ export default function NucleoDesk() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="n-card n-plan">
         <div className="flex items-baseline justify-between"><span className="n-label">{t('Thesis', 'Tesis', 'Tese')} · {snapshot.symbol}</span><span className="n-label" style={{ color: tone }}>{verdictSub}</span></div>
         <div className="n-display mt-3 text-[28px] leading-tight">{title}</div>
-        {!trade && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer)}</p>}
+        {!trade && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer, agents)}</p>}
         <div className="mt-4">
           {rows.map((r) => (
             <div key={r.k} className="n-kv"><span className="n-kv-k">{r.dot && <i style={{ background: r.dot }} />}{r.k}</span><span className="n-kv-v">{r.v}</span></div>
@@ -535,7 +547,7 @@ export default function NucleoDesk() {
         </div>
         {award && award.xp > 0 && <div className="n-xp mt-4">+{award.xp} {award.noTrade ? t('discipline XP for waiting', 'XP de disciplina por esperar', 'XP de disciplina por esperar') : t('discipline XP', 'XP de disciplina', 'XP de disciplina')}</div>}
         <p className="mt-4 text-[12px] leading-relaxed" style={{ color: '#8A8378' }}>
-          {t('Based on 1H market indicators. Reference only, not financial advice. ', 'Basado en indicadores de 1H. Solo referencia, no es asesoría financiera. ', 'Baseado em indicadores de 1H. Apenas referência, não é recomendação financeira. ')}
+          {t('1H indicators, argued by three agents. Reference only, not financial advice. ', 'Indicadores de 1H, debatidos por tres agentes. Solo referencia, no es asesoría financiera. ', 'Indicadores de 1H, debatidos por três agentes. Apenas referência, não é recomendação financeira. ')}
           <a href="/protocol" className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes', 'Atividade pública dos agentes')}</a>
         </p>
       </motion.div>

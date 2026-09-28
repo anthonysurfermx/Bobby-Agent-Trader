@@ -3,7 +3,7 @@
 // The MAIN artifact is the market analysis, NOT the trade.
 // Flow: Intel → Snapshot → Debate → Forum → Digest
 // Works for ALL users — with or without positions
-// Triggered by: cron (every 8h), droplet worker, or manual
+// Triggered by: cron (daily at 12:00 UTC), droplet worker, or manual
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';

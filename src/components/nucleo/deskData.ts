@@ -3,7 +3,7 @@
 // Moved out of the previous desk component unchanged; only the exports are new.
 import { deskJson } from '@/lib/desk-request';
 import { deskPrice as money } from '@/lib/desk-price';
-import { t } from '@/lib/companions/i18n';
+import { lang, t } from '@/lib/companions/i18n';
 import type { ChartLevel } from '@/components/adams/MarketCanvas';
 import { accessHeaders, type Access } from '@/lib/access-client';
 
@@ -78,16 +78,36 @@ export async function runDebate(symbol: string, signal: AbortSignal): Promise<An
   return a;
 }
 
+/** The three-agent debate: /api/desk-debate, three isolated model calls (Alpha, Red Team, CIO)
+ *  over the same 1H evidence. The same endpoint the iOS app uses. Null when it did not finish. */
+export interface Agents { alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none' }
+export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal): Promise<Agents | null> {
+  try {
+    const { ok, data } = await deskJson<{ agents?: Partial<Agents> }>('/api/desk-debate', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang() }) }, 95_000);
+    const g = data?.agents;
+    if (!ok || !g || typeof g.alpha !== 'string' || typeof g.red !== 'string' || typeof g.cio !== 'string') return null;
+    if (g.verdict !== 'wait' && g.verdict !== 'review') return null;
+    const direction = g.direction === 'long' || g.direction === 'short' ? g.direction : 'none';
+    return { alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction };
+  } catch { return null; }
+}
+
 export function isUnavailable(a: Answer) { return a.error || (a.price === null && a.trend === null && a.signal === null && a.direction === null && a.overview === null); }
-export function isNoTrade(a: Answer) {
+export function isNoTrade(a: Answer, g?: Agents | null) {
   if (isUnavailable(a)) return false;
+  // The debate can only veto the engine, never upgrade it: a trade needs the CIO to rule
+  // "review" in the engine's own direction. No finished debate, no approved idea.
+  if (g !== undefined && (!g || g.verdict !== 'review' || g.direction !== (a.direction ?? '').toLowerCase())) return true;
   const s = (a.signal ?? '').toLowerCase().replace(/-/g, '_');
   if (s.includes('no_trade') || s.includes('neutral') || s.includes('wait')) return true;
   if (!['long', 'short'].includes((a.direction ?? '').toLowerCase())) return true;
   if ((a.convictionPct ?? 0) < 55) return true;
   return a.entry === null || a.stop === null || a.target === null;
 }
-export function noTradeReason(a: Answer) {
+export function noTradeReason(a: Answer, g?: Agents | null) {
+  if (g === null) return t('The debate did not finish, so no idea was approved.', 'El debate no terminó, así que ninguna idea fue aprobada.', 'O debate não terminou, então nenhuma ideia foi aprovada.');
+  if (g && g.verdict === 'wait') return t('The CIO ruled wait: the evidence does not support a clear case.', 'El CIO dictó esperar: la evidencia no sostiene un caso claro.', 'O CIO decidiu esperar: a evidência não sustenta um caso claro.');
+  if (g && g.direction !== (a.direction ?? '').toLowerCase()) return t('The CIO and the indicator engine disagree on direction.', 'El CIO y el motor de indicadores no coinciden en la dirección.', 'O CIO e o motor de indicadores discordam na direção.');
   const s = (a.signal ?? '').toLowerCase();
   if (s.includes('neutral') || s.includes('wait')) return t('No clean directional signal passed the desk.', 'Ninguna señal direccional limpia pasó el desk.', 'Nenhum sinal direcional limpo passou pelo desk.');
   if (!a.direction) return t('The agents did not reach directional consensus.', 'Los agentes no llegaron a consenso direccional.', 'Os agentes não chegaram a um consenso de direção.');
@@ -107,19 +127,19 @@ export function localizedMomentum(raw: string) {
   if (s.includes('sobreventa') || s.includes('oversold')) return t('oversold', 'sobreventa', 'sobrevendido');
   return t('neutral', 'neutral', 'neutro');
 }
-// ---- The three agents, from one answer ----
-// The desk endpoint returns one technical read (price, trend, RSI, levels, a
-// plan with conviction). The three roles are cut from that same evidence the
-// way the voice desk's own instructions cut them: Alpha on the setup and its
-// trigger, Red Team on the level that breaks it, the CIO on the decision and
-// the target. One source for the spoken verdict, the rows and the chart.
+// ---- The three agents ----
+// Two sources, one rule. The indicator engine (/api/voice-tool run_debate) gives the
+// levels, the conviction and the chart. The debate (/api/desk-debate) gives each role's
+// words and the CIO's ruling, and it can only veto the engine: a trade shows only when
+// the CIO rules "review" in the engine's direction (iOS ARCHITECTURE.md R5). Without a
+// finished debate the lines fall back to the engine's own read and nothing is approved.
 export type AgentKey = 'alpha' | 'red' | 'cio';
 export interface Stance { key: AgentKey; name: string; line: string; score: number | null; level: { kind: ChartLevel['kind']; price: number; label: string; to?: number } | null }
 export interface Debate { stances: [Stance, Stance, Stance]; headline: string; spoken: string; noTrade: boolean; direction: 'long' | 'short' | 'none' }
 export const AGENT_TONE: Record<AgentKey, string> = { alpha: '#3FE0B5', red: '#FF5A5F', cio: '#F6B94E' };
 
-export function debateFor(a: Answer): Debate {
-  const noTrade = isNoTrade(a);
+export function debateFor(a: Answer, g?: Agents | null): Debate {
+  const noTrade = isNoTrade(a, g);
   const direction: Debate['direction'] = !noTrade && a.direction === 'long' ? 'long' : !noTrade && a.direction === 'short' ? 'short' : 'none';
   const withSide = direction !== 'none';
   const long = direction === 'long';
@@ -154,9 +174,20 @@ export function debateFor(a: Answer): Debate {
   const rr = a.rewardRisk !== null ? ` · R:R ${a.rewardRisk.toFixed(1)}` : '';
   const cio: Stance = withSide && a.target !== null
     ? { key: 'cio', name: 'CIO', score: conv, line: t(`${conv}% conviction · target ${money(a.target)}${rr}`, `${conv}% de convicción · objetivo ${money(a.target)}${rr}`, `${conv}% de convicção · alvo ${money(a.target)}${rr}`), level: { kind: 'target', price: a.target, label: t('target', 'objetivo', 'alvo'), to: zone(a.target, ahead) } }
-    : { key: 'cio', name: 'CIO', score: conv, line: noTradeReason(a), level: null };
+    : { key: 'cio', name: 'CIO', score: conv, line: noTradeReason(a, g), level: null };
 
   const headline = direction === 'none' ? 'NO TRADE' : `${direction.toUpperCase()}${conv !== null ? ` ${conv}%` : ''}`;
+  if (g) {
+    // The real debate: each role's own words. Levels, scores and the chart stay the engine's.
+    alpha = { ...alpha, line: g.alpha };
+    red = { ...red, line: g.red };
+    const cioReal: Stance = { ...cio, line: g.cio };
+    const close = direction === 'none'
+      ? t('My call: no trade.', 'Mi lectura: no operar.', 'Minha leitura: não operar.')
+      : t(`My call: ${direction}, ${conv}% conviction. Reference only.`, `Mi lectura: ${direction}, ${conv}% de convicción. Solo referencia.`, `Minha leitura: ${direction}, ${conv}% de convicção. Apenas referência.`);
+    const cioSpoken = g.cio.length > 600 ? `${g.cio.slice(0, 600).replace(/\s+\S*$/, '')}…` : g.cio;
+    return { stances: [alpha, red, cioReal], headline, spoken: `${cioSpoken} ${close}`, noTrade, direction };
+  }
   const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `, `${a.symbol} está em ${money(a.price)}. `) : '';
   const spoken = withSide && a.entry !== null && a.stop !== null && a.target !== null
     ? at + t(
@@ -165,9 +196,9 @@ export function debateFor(a: Answer): Debate {
       `Alpha Hunter vê um setup ${long ? 'de alta' : 'de baixa'}${read ? `: ${read}` : ''}, entrada em ${money(a.entry)}. Red Team: a tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}. CIO: viés ${long ? 'de alta' : 'de baixa'} com ${conv}% de convicção, alvo ${money(a.target)}. Apenas referência.`,
     )
     : at + t(
-      `Alpha Hunter finds no clean setup${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protected. ${noTradeReason(a)}`,
-      `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a)}`,
-      `Alpha Hunter não vê um setup limpo${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a)}`,
+      `Alpha Hunter finds no clean setup${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protected. ${noTradeReason(a, g)}`,
+      `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a, g)}`,
+      `Alpha Hunter não vê um setup limpo${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a, g)}`,
     );
   return { stances: [alpha, red, cio], headline, spoken, noTrade, direction };
 }
