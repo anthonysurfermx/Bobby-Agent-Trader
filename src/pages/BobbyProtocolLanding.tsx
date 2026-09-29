@@ -361,7 +361,7 @@ export default function BobbyProtocolLanding() {
     [stats?.chain?.blockNumber ? `${chainLabel} block ${formatNumber(stats.chain.blockNumber)}` : 'On-chain verification', false],
     [lastDebate ? `Last public debate ${lastDebate}` : 'Daily public debate at 12:00 UTC', true],
     ['Alpha builds the case · Red Team attacks it · the CIO rules', false],
-    [debatesRun ? `${formatNumber(debatesRun)} public debates · ${formatNumber(totalTrades, '—')} became calls` : `${formatNumber(totalTrades, '—')} calls committed`, false],
+    [debatesRun ? `${formatNumber(debatesRun)} public debates · ${formatNumber(totalTrades, '—')} became calls` : `${formatNumber(totalTrades, '—')} calls recorded`, false],
     ['A call is written down before the outcome', false],
   ] as const;
 
@@ -770,7 +770,7 @@ export default function BobbyProtocolLanding() {
               <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">07 / Track record</div>
               <h2 className="text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The record is public.<br />The live protocol is Base.</h2>
               <p className="mt-5 max-w-xl text-sm leading-6 text-white/45">
-                Seven contracts on Base, owned by a 2-of-3 Safe. The debate ledger is read live from the database; calls the cycle commits live are also anchored on-chain. Wallets stay self-custodial: on the web Bobby prepares bounded swap calldata on Base, records confirmed receipts and never holds funds or exchange credentials.
+                Seven contracts on Base, owned by a 2-of-3 Safe. The debate ledger is read live from the database; calls the cycle commits in live mode are also anchored on Base. Today the daily cycle runs in paper mode, so its calls are graded in the public ledger; the first mainnet commit and resolve on TrackRecordV2 landed on Aug 22, 2026. Wallets stay self-custodial: on the web Bobby prepares bounded swap calldata on Base, records confirmed receipts and never holds funds or exchange credentials.
               </p>
             </div>
 
@@ -830,7 +830,7 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
-        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Commitments" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="created" /><Metric label="Resolved" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisions" /><Metric label="Pending" value={formatNumber(publicRecord?.pending)} detail="no outcome yet" /><Metric label="Expired" value={formatNumber(publicRecord?.expired)} detail="never settled" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="decisive outcomes" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `small sample (n=${publicRecord.decisionsResolved})` : 'over resolved'} /><Metric label="Resolution" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="commitments with an outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="network" /></div></section>
+        <section className="border-t border-white/10 bg-[#0a0a0a]" aria-label="Protocol metrics"><div className="mx-auto grid max-w-7xl grid-cols-2 gap-8 px-5 py-14 md:grid-cols-4 lg:grid-cols-8 lg:px-8"><Metric label="Calls (ledger)" value={formatNumber(publicRecord?.commitmentsCreated ?? totalTrades)} detail="created" /><Metric label="Resolved" value={formatNumber(publicRecord?.decisionsResolved)} detail="decisions" /><Metric label="Pending" value={formatNumber(publicRecord?.pending)} detail="no outcome yet" /><Metric label="Expired" value={formatNumber(publicRecord?.expired)} detail="never settled" /><Metric label="Wins / losses" value={publicRecord ? `${publicRecord.wins} / ${publicRecord.losses}` : '—'} detail="decisive outcomes" /><Metric label="Win rate" value={formatWinRate(winRate, publicRecord?.decisionsResolved, publicRecord?.wins, publicRecord?.losses)} detail={publicRecord?.decisionsResolved && publicRecord.decisionsResolved < WIN_RATE_MIN_SAMPLE ? `small sample (n=${publicRecord.decisionsResolved})` : 'over resolved'} /><Metric label="Resolution" value={publicRecord ? `${Number(publicRecord.resolutionRate).toFixed(1)}%` : '—'} detail="commitments with an outcome" /><Metric label="Interactions" value={formatNumber(totalInteractions)} detail="network" /></div></section>
 
         <footer className="border-t border-white/10 bg-[#050505]">
           <div className="mx-auto flex max-w-7xl flex-col gap-12 px-5 py-16 lg:px-8">

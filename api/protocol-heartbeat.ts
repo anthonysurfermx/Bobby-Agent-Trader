@@ -22,6 +22,9 @@ import {
   PROTOCOL_RPC_URL,
 } from './_lib/protocol-constants.js';
 
+// Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
+const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
+
 export const config = { maxDuration: 25 };
 
 const XLAYER_RPC = PROTOCOL_RPC_FALLBACK_URL;
@@ -224,7 +227,7 @@ async function fetchRecentTxs(_blockNumber: number): Promise<OnChainTx[]> {
 
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=25&select=trade_tx,tool,symbol,reason,meta,created_at`,
+      `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&created_at=gte.${BASE_MAINNET_SINCE}&order=created_at.desc&limit=25&select=trade_tx,tool,symbol,reason,meta,created_at`,
       {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
         signal: AbortSignal.timeout(4000),

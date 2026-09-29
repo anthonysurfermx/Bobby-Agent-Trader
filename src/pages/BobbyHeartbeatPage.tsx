@@ -402,7 +402,7 @@ export default function BobbyHeartbeatPage() {
               </>
             ) : (
               <div className="text-sm font-mono text-white/30 py-4 text-center">
-                Scanning recent blocks for activity...
+                No recent protocol transactions on Base. The daily cycle runs in paper mode and is graded in the public ledger; the last mainnet commit and resolve on TrackRecordV2 were on Aug 22, 2026.
               </div>
             )}
           </motion.div>

@@ -33,6 +33,9 @@ import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import { COMMIT_CONVICTION_FLOOR } from './_lib/commit-policy.js';
 import { publicTextViolation } from './_lib/desk-debate.js';
 
+// Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
+const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
+
 export const config = { maxDuration: 30 };
 
 const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
@@ -427,7 +430,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Get latest on-chain tx timestamp to mark contracts as active
       const latestTxRes = await fetch(
-        `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=1&select=created_at`,
+        `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&created_at=gte.${BASE_MAINNET_SINCE}&order=created_at.desc&limit=1&select=created_at`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       ).then(r => r.ok ? r.json() : []).catch(() => []);
       const latestOnchainTx = (latestTxRes as Array<{ created_at: string }>)[0];
