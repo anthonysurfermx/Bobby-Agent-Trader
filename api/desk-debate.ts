@@ -129,6 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined });
+    // The reader left before the answer reached them (the last call was already in flight): nothing was
+    // delivered, so a premium use is given back.
+    if (left.signal.aborted) { await refundLevel(useId); return; }
     if (!live) return res.status(200).json(result);
     send({ type: 'final', data: result });
     return res.end();

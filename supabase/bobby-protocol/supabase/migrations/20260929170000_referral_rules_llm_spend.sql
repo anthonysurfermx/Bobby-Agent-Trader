@@ -2,6 +2,7 @@
 --   · a friend counts only for a NEW Apple/Google account: the date is auth.users.created_at (the real
 --     account), not the Bobby identity's, and the account must have an apple/google identity;
 --   · days given to an inviter who already pays accrue after the paid period, not on top of it;
+--   · a pair lock, so two friends claiming each other at the same moment cannot both be rewarded;
 --   · bobby_llm_spend(): today's and this month's desk spend from the ledger, for the spend guard.
 -- Service role only, like every function of 20260929150000.
 
@@ -29,6 +30,9 @@ begin
   if account_created is null or account_created < now() - make_interval(days => greatest(p_new_account_days, 1)) then
     return jsonb_build_object('ok', false, 'code', 'not_new');
   end if;
+  -- One claim per pair at a time, so A→B and B→A racing cannot both pass the two-way check; then the
+  -- inviter's lock bounds the five slots. Always pair first, inviter second: no lock cycle.
+  perform pg_advisory_xact_lock(hashtext('bobby_referral_pair:' || least(inviter, p_invitee)::text || greatest(inviter, p_invitee)::text));
   if exists (select 1 from bobby_referrals where invitee_id = p_invitee) then
     return jsonb_build_object('ok', false, 'code', 'already_claimed');
   end if;

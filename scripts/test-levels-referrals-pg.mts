@@ -151,6 +151,14 @@ try {
   eq(Number((await pool.query('select count(*) from public.bobby_referrals where inviter_id = $1', [inviter])).rows[0].count), 5, 'at most five friends');
   eq(days(await proUntil(inviter)), 150, 'five friends: 150 days of Pro');
 
+  // Two new friends claim each other at the same moment: exactly one swap direction can win.
+  for (let round = 0; round < 5; round++) {
+    const a = await person(); const b = await person();
+    const [ca, cb] = [await code(a), await code(b)];
+    const both = await Promise.all([claim(a, cb), claim(b, ca)]);
+    eq(both.filter((r) => r.code === 'claimed').length, 1, `A↔B race ${round + 1}: one reward, never two`);
+  }
+
   // A paying inviter's gift starts when the paid period ends.
   const payer = await person();
   await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'stripe', 'active', now() + interval '20 days')", [payer]);

@@ -94,7 +94,7 @@ export interface Agents {
 }
 export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
 /** failed: the agents did not finish (a premium use is given back by the server); budget_paused: the spend guard. */
-export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null }
+export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null; refunded?: boolean }
 export type DeskLiveEvent =
   | { type: 'accepted' }
   | { type: 'evidence'; timeframes: string[] }
@@ -154,7 +154,7 @@ export async function runAgents(symbol: string, isEquity: boolean, question: str
         let event: Record<string, any>;
         try { event = JSON.parse(line); } catch { continue; }
         if (event.type === 'final') return debateFrom(true, event.data, level);
-        if (event.type === 'error') return { agents: null, refusal: null, failure: 'failed' };
+        if (event.type === 'error') return { agents: null, refusal: null, failure: 'failed', refunded: event.refunded === true };
         if (event.type === 'accepted') onEvent?.({ type: 'accepted' });
         else if (event.type === 'evidence' && Array.isArray(event.timeframes)) onEvent?.({ type: 'evidence', timeframes: event.timeframes });
         else if (event.type === 'agent' && (event.role === 'alpha' || event.role === 'red' || event.role === 'rebuttal') && typeof event.text === 'string') onEvent?.({ type: 'agent', role: event.role, text: event.text });

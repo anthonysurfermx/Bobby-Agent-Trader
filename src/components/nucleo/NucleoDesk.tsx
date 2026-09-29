@@ -179,7 +179,7 @@ export default function NucleoDesk() {
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
-  const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string } | null>(null);
+  const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string; refunded: boolean } | null>(null);
   const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
   const [showDebate, setShowDebate] = useState(false);
   const questionRef = useRef<string>('');
@@ -238,6 +238,7 @@ export default function NucleoDesk() {
       // The server stopped this read: sign in first, or Bobby Pro. The question waits and runs after.
       agentsCtl.abort();
       holdQuestion();
+      setInput(questionRef.current);
       setSnapshot(null);
       setPhase('idle');
       setLimit({ kind: a.gate === 'signin_required' ? 'signin' : 'upgrade', level: 'rapido', resetsAt: a.access?.resetsAt ?? null });
@@ -258,6 +259,7 @@ export default function NucleoDesk() {
     if (run.refusal) {
       // The premium level's allowance ran out on the server: the pop-up, never a silent downgrade.
       if (run.refusal.code === 'signin_required') holdQuestion();
+      setInput(questionRef.current);
       setSnapshot(null);
       setPhase('idle');
       setLimit({ kind: run.refusal.code === 'signin_required' ? 'signin' : run.refusal.code === 'upgrade_required' ? 'upgrade' : 'exhausted', level: run.refusal.level, resetsAt: run.refusal.resetsAt });
@@ -267,7 +269,7 @@ export default function NucleoDesk() {
       // Refused before the level was accepted (spend guard, outage): nothing was spent, say so plainly.
       const msg = run.failure === 'budget_paused'
         ? t('Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.', 'Profundo e Máximo estão em pausa hoje. Rápido continua disponível.')
-        : t(`The agents did not finish for ${snap.symbol}. Nothing was used. Try again.`, `Los agentes no terminaron con ${snap.symbol}. No se descontó nada. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Nada foi descontado. Tente de novo.`);
+        : t(`The agents did not finish for ${snap.symbol}. Try again.`, `Los agentes no terminaron con ${snap.symbol}. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Tente de novo.`);
       setPhase('error');
       setDeskError(msg);
       setDeskRetry(run.failure === 'budget_paused' ? { symbol: snap.symbol, level: 'rapido' } : { symbol: snap.symbol, level: runLevel });
@@ -295,7 +297,7 @@ export default function NucleoDesk() {
     if (!g) {
       // The agents did not finish: the market read stays, clearly marked; no verdict, no XP. A premium
       // use was given back by the server.
-      setAgentsFailed({ level: runLevel, symbol: snap.symbol });
+      setAgentsFailed({ level: runLevel, symbol: snap.symbol, refunded: run.refunded === true });
       setPhase('complete');
       const msg = t('The agents did not finish this time, so there is no verdict. Here is the market read.', 'Los agentes no terminaron esta vez, así que no hay veredicto. Aquí está la lectura del mercado.', 'Os agentes não terminaram desta vez, então não há veredito. Aqui está a leitura do mercado.');
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
@@ -640,7 +642,7 @@ export default function NucleoDesk() {
         <div className="n-card n-synth n-failed mt-8" role="status">
           <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
           <p className="n-synth-head">{t('The agents did not finish, so nothing was decided. The market read below is data, not a thesis.', 'Los agentes no terminaron, así que no se decidió nada. La lectura de abajo son datos, no una tesis.', 'Os agentes não terminaram, então nada foi decidido. A leitura abaixo são dados, não uma tese.')}</p>
-          {agentsFailed.level !== 'rapido' && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
+          {agentsFailed.level !== 'rapido' && agentsFailed.refunded && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
           <button type="button" className="n-send mt-4" onClick={() => retry({ symbol: agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
         </div>
       ) : agents?.synthesis ? (
