@@ -311,6 +311,7 @@ final class AccountSession: ObservableObject {
             guard (200..<300).contains(status) else { return fail(data: data, status: status) }
             // A late deletion response must never sign out a different account.
             store?.forgetAccount(deletingUserId)
+            AppleGivenName.forget()
             guard generation == started else { return .deleted }
             let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             manualAppleRevocationRequired = answer?["appleRevocation"] as? String == "manual"
@@ -368,7 +369,9 @@ final class AccountSession: ObservableObject {
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = Self.randomNonce()
         currentNonce = nonce
-        request.requestedScopes = []
+        // The given name only greets the person in the profile ("Hola, Ana"). Apple shares it on
+        // the first authorization alone; it stays on this phone and never reaches the server.
+        request.requestedScopes = [.fullName]
         request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
@@ -385,12 +388,24 @@ final class AccountSession: ObservableObject {
                 var s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
                 guard generation == started else { return }
                 s.appleUserId = cred.user; s.provider = "apple"
+                AppleGivenName.remember(cred.fullName?.givenName, appleUserId: cred.user)
                 accept(s)
             } catch {
                 lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
             }
         }
     }
+
+#if DEBUG
+    /// `-qa-profile signed-in`: an in-memory Apple session (never the Keychain, never a real token)
+    /// so the profile sheet can be captured signed in. Nothing it holds can reach the server.
+    func acceptQAFixture(userId: String, appleUserId: String) {
+        generation = UUID()
+        session = StoredSession(accessToken: "qa-fixture", refreshToken: "qa-fixture", expiresAt: Date().addingTimeInterval(3600),
+                                userId: userId, appleUserId: appleUserId, provider: "apple")
+        lastError = nil
+    }
+#endif
 
     // MARK: - X (Twitter) via Supabase OAuth
     //
@@ -478,6 +493,33 @@ final class AccountSession: ObservableObject {
         var bytes = [UInt8](repeating: 0, count: length)
         _ = SecRandomCopyBytes(kSecRandomDefault, length, &bytes)
         return String(bytes.map { chars[Int($0) % chars.count] })
+    }
+}
+
+/// The given name Apple shared at the first Sign in with Apple, kept on this phone only (UserDefaults)
+/// and tied to that Apple ID: another account signing in never inherits it. Deleting the account forgets it.
+enum AppleGivenName {
+    static let key = "account.appleGivenName"
+    static let ownerKey = "account.appleGivenName.owner"
+
+    static func remember(_ name: String?, appleUserId: String, defaults: UserDefaults = .standard) {
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Apple sends the name once; a later sign-in (empty name) keeps what was stored for the same ID.
+        guard !trimmed.isEmpty else { return }
+        defaults.set(trimmed, forKey: key)
+        defaults.set(appleUserId, forKey: ownerKey)
+    }
+
+    /// The stored name when it belongs to `appleUserId`; nil otherwise.
+    static func name(for appleUserId: String?, defaults: UserDefaults = .standard) -> String? {
+        guard let appleUserId, defaults.string(forKey: ownerKey) == appleUserId,
+              let name = defaults.string(forKey: key), !name.isEmpty else { return nil }
+        return name
+    }
+
+    static func forget(defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key)
+        defaults.removeObject(forKey: ownerKey)
     }
 }
 

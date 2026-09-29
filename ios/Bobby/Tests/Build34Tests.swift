@@ -527,3 +527,20 @@ final class B34Stub: URLProtocol {
         return data
     }
 }
+
+/// The profile greeting: the given name Apple shares once stays on the phone, tied to that Apple ID.
+final class AppleGivenNameTests: XCTestCase {
+    func testTheGivenNameBelongsToItsAppleIDAndIsForgotten() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "apple-given-name-tests"))
+        defaults.removePersistentDomain(forName: "apple-given-name-tests")
+        AppleGivenName.remember("  Ana ", appleUserId: "001.a", defaults: defaults)
+        XCTAssertEqual(AppleGivenName.name(for: "001.a", defaults: defaults), "Ana")
+        XCTAssertNil(AppleGivenName.name(for: "002.b", defaults: defaults), "another Apple ID never inherits the name")
+        // Apple sends the name on the first authorization only: an empty one keeps what is stored.
+        AppleGivenName.remember(nil, appleUserId: "001.a", defaults: defaults)
+        AppleGivenName.remember("", appleUserId: "001.a", defaults: defaults)
+        XCTAssertEqual(AppleGivenName.name(for: "001.a", defaults: defaults), "Ana")
+        AppleGivenName.forget(defaults: defaults)
+        XCTAssertNil(AppleGivenName.name(for: "001.a", defaults: defaults))
+    }
+}

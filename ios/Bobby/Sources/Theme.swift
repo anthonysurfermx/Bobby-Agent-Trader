@@ -14,6 +14,13 @@ enum Theme {
     static let text = Color(red: 0.949, green: 0.957, blue: 0.973)      // #F2F4F8
     static let muted = Color.white.opacity(0.42)
     static let stroke = Color.white.opacity(0.075)
+
+    // Núcleo warm palette (the web profile drawer, src/styles/nucleo-desk.css).
+    static let cream = Color(red: 0.949, green: 0.929, blue: 0.894)      // #F2EDE4 — primary ink
+    static let warmMuted = Color(red: 0.639, green: 0.612, blue: 0.569)  // #A39C91 — secondary ink
+    static let warmDim = Color(red: 0.541, green: 0.514, blue: 0.471)    // #8A8378 — labels, details
+    static let warmFill = Color(red: 0.949, green: 0.929, blue: 0.894).opacity(0.05)   // row icon well
+    static let warmHair = Color(red: 0.949, green: 0.929, blue: 0.894).opacity(0.07)   // hairline separators
 }
 
 extension Font {

@@ -106,6 +106,8 @@ struct BobbyApp: App {
                     GearSkinQAFixtureView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-squad") {
                     SquadQAFixtureView()
+                } else if Self.argument(after: "-qa-profile") != nil {
+                    ProfileQAFixtureView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-locker") {
                     LockerQAFixtureView()
                 } else if let state = Self.argument(after: "-qa-harvest") {
