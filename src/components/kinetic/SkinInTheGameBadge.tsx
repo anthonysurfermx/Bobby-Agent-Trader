@@ -7,8 +7,9 @@
 // ============================================================
 
 import { Link } from 'react-router-dom';
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Shield } from 'lucide-react';
+import { useVisiblePoll } from '@/hooks/useVisiblePoll';
 
 interface PnlSummary {
   winRate: number;
@@ -22,32 +23,27 @@ export default function SkinInTheGameBadge() {
   const [summary, setSummary] = useState<PnlSummary | null>(null);
   const [error, setError] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    const load = async () => {
-      try {
-        const r = await fetch('/api/bobby-pnl');
-        const d = await r.json();
-        if (!alive) return;
-        if (d.ok && d.summary) {
-          setSummary({
-            winRate: d.summary.winRate ?? 0,
-            totalReturn: d.summary.totalReturn ?? 0,
-            totalTrades: d.summary.totalTrades ?? 0,
-            closedTrades: (d.summary.wins ?? 0) + (d.summary.losses ?? 0),
-          });
-          setError(false);
-        } else {
-          setError(true);
-        }
-      } catch {
-        if (alive) setError(true);
+  // Paused while the tab is hidden, refreshed on return (see useVisiblePoll).
+  useVisiblePoll(useCallback(async (signal: AbortSignal) => {
+    try {
+      const r = await fetch('/api/bobby-pnl', { signal });
+      const d = await r.json();
+      if (signal.aborted) return;
+      if (d.ok && d.summary) {
+        setSummary({
+          winRate: d.summary.winRate ?? 0,
+          totalReturn: d.summary.totalReturn ?? 0,
+          totalTrades: d.summary.totalTrades ?? 0,
+          closedTrades: (d.summary.wins ?? 0) + (d.summary.losses ?? 0),
+        });
+        setError(false);
+      } else {
+        setError(true);
       }
-    };
-    load();
-    const poll = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(poll); };
-  }, []);
+    } catch {
+      if (!signal.aborted) setError(true);
+    }
+  }, []));
 
   // A failed request is not evidence of an empty ledger.
   if (error || !summary || summary.totalTrades === 0) {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import {
@@ -21,6 +21,7 @@ import ProtocolJourney from '@/components/protocol/ProtocolJourney';
 import CapabilityCards from '@/components/protocol/CapabilityCards';
 import NucleoSphere from '@/components/companion/NucleoSphere';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
+import { useVisiblePoll } from '@/hooks/useVisiblePoll';
 
 type Price = { symbol: string; price: number; change24h: number };
 
@@ -92,16 +93,6 @@ function useMcpMeta() {
   return meta;
 }
 
-interface ActivityItem {
-  agent?: string;
-  tool?: string;
-  paid?: boolean;
-  timestamp?: string | null;
-  status?: string | null;
-  source?: 'commerce' | 'onchain' | 'bounty' | string;
-  txHash?: string | null;
-}
-
 // Where "The app" points. The lifestyle landing lives at /app-a while /app still
 // serves the previous one; change this one line when /app-a is promoted.
 const APP_LANDING_URL = '/'; // the app's landing is the home now
@@ -135,42 +126,9 @@ function useProtocolStats() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const interval = window.setInterval(refresh, 30_000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
+  useVisiblePoll(refresh);
 
   return stats;
-}
-
-function useActivity() {
-  const [activity, setActivity] = useState<ActivityItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(false);
-
-  const refresh = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const response = await fetch('/api/activity?limit=8', { cache: 'no-store' });
-      if (!response.ok) throw new Error(`Activity endpoint returned ${response.status}`);
-      const payload = (await response.json()) as { feed?: ActivityItem[] };
-      setActivity(payload.feed ?? []);
-      setError(false);
-    } catch {
-      setError(true);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const interval = window.setInterval(refresh, 30_000);
-    return () => window.clearInterval(interval);
-  }, [refresh]);
-
-  return { activity, isLoading, error, refresh };
 }
 
 // The Núcleo wordmark (Sora, like the home's footer): no badge, no glow.
@@ -282,9 +240,7 @@ function LatestDebatePanel({ debate, when, loaded }: { debate?: LatestDebate; wh
 export default function BobbyProtocolLanding() {
   const stats = useProtocolStats();
   const mcp = useMcpMeta();
-  const { activity, isLoading: isActivityLoading, error: activityError, refresh: refreshActivity } = useActivity();
   useNucleoPages();
-  const [activityFilter, setActivityFilter] = useState<'all' | 'settled' | 'recorded'>('all');
   // Deep links such as /protocol#rules arrive before this lazy page has rendered its sections,
   // so the browser's own jump finds nothing. Scroll once the section exists.
   useEffect(() => {
@@ -380,13 +336,6 @@ export default function BobbyProtocolLanding() {
     ['The app', APP_LANDING_URL],
     ['Docs', '/protocol/docs'],
   ] as const;
-
-  const filteredActivity = useMemo(() => {
-    const list = activityFilter === 'all'
-      ? activity
-      : activity.filter((item) => (activityFilter === 'settled' ? item.paid : !item.paid));
-    return list.slice(0, 6);
-  }, [activity, activityFilter]);
 
   const marqueeItems = [
     ['Bobby is online', true],
