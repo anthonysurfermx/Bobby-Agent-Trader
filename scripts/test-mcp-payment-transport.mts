@@ -27,15 +27,29 @@ emu.idType = 'uuid'; // the production column type, always
 const rpc = createRpcMock(BOBBY_AGENT_ECONOMY, FEE);
 let upstream: 'ok' | 'http500' | 'throw' = 'ok';
 let executions = 0;
+// Audit 2026-09-28: receipts are a real table here (tx_hash key, unique challenge_id) whose writes can fail.
+const receipts: Record<string, any>[] = [];
+let receiptWrites: 'ok' | 'http500' = 'ok';
+const ANALYSIS = 'NVDAc read: wait for the retest.';
 const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
 globalThis.fetch = (async (input: any, init?: any) => {
   const u = new URL(typeof input === 'string' ? input : input.url);
   if (u.pathname.includes('/rest/v1/mcp_payment_challenges')) return emu.handle(u, init);
-  if (u.pathname === '/api/bobby-wallet') {
+  if (u.pathname.includes('/rest/v1/mcp_payment_receipts')) {
+    if ((init?.method || 'GET').toUpperCase() === 'POST') {
+      if (receiptWrites === 'http500') return json({ message: 'upstream timeout' }, 500);
+      const r = JSON.parse(init.body);
+      if (receipts.some((x) => x.tx_hash === r.tx_hash || x.challenge_id === r.challenge_id)) return json({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
+      receipts.push(r); return new Response(null, { status: 201 });
+    }
+    const cid = u.searchParams.get('challenge_id')?.replace(/^eq\./, '');
+    return json(receipts.filter((x) => !cid || x.challenge_id === cid));
+  }
+  if (u.pathname === '/api/openclaw-chat') {
     executions += 1;
     if (upstream === 'throw') throw new Error('ECONNRESET');
     if (upstream === 'http500') return json({ error: 'upstream down' }, 500);
-    return json({ scan: 'clean', address: JSON.parse(init.body).params.address });
+    return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: ANALYSIS } }] })}\n\ndata: [DONE]\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
   }
   if (init?.body && typeof init.body === 'string' && init.body.includes('"jsonrpc"') && init.body.includes('"eth_')) return rpc.handle(JSON.parse(init.body));
   return json([]);
@@ -50,8 +64,9 @@ function recorder() {
   } as unknown as VercelResponse;
   return { res, state };
 }
-const TOOL = 'bobby_security_scan';
-const ARGS = { address: `0x${'11'.repeat(20)}`, chain: '1' };
+// bobby_security_scan was retired (2da495d); bobby_analyze is premium on both transports.
+const TOOL = 'bobby_analyze';
+const ARGS = { symbol: 'NVDAc', language: 'en' };
 type Handler = (req: VercelRequest, res: VercelResponse) => Promise<unknown>;
 async function call(handler: Handler, headers: Record<string, string>, args: Record<string, unknown> = ARGS, id = 1) {
   const { res, state } = recorder();
@@ -80,7 +95,7 @@ await check('challenge-id: uuid ↔ bytes32 is a strict inverse; a bytes32 witho
 });
 
 for (const [label, handler] of [['mcp-http', mcpHttp], ['mcp-bobby', mcpBobby]] as const) {
-  emu.reset(); emu.idType = 'uuid'; executions = 0; upstream = 'ok';
+  emu.reset(); emu.idType = 'uuid'; executions = 0; upstream = 'ok'; receipts.length = 0; receiptWrites = 'ok';
 
   let issued: { challengeId: string; clientSecret: string; challengeIdBytes32: string };
   await check(`${label}: the 402 issues a uuid challenge, a one-time secret and the bytes32 the contract takes`, async () => {
@@ -94,20 +109,42 @@ for (const [label, handler] of [['mcp-http', mcpHttp], ['mcp-bobby', mcpBobby]] 
   });
 
   let tx: { hash: string; payer: string };
+  let delivered: unknown;
   await check(`${label}: THE REPRODUCTION, fixed — pay with the published bytes32, retry as instructed → executed once and completed (was: 22P02, fee lost)`, async () => {
     tx = rpc.mint(issued.challengeIdBytes32, TOOL, '0xpayer000000000000000000000000000000000001');
     const b = await call(handler, { 'x-402-payment': tx.hash, 'x-challenge-id': issued.challengeId, 'x-challenge-secret': issued.clientSecret });
     assert.ok(b.result, JSON.stringify(b).slice(0, 300)); assert.equal(executions, 1);
+    delivered = b.result;
     const r = byId(issued.challengeId); assert.equal(r.status, 'completed'); assert.equal(r.tx_hash, tx.hash); assert.equal(r.payer_address, tx.payer);
     assert.equal(emu.calls.filter((c) => c.status === 400).length, 0, 'no 22P02 anywhere on the honest path');
+    // Audit 2026-09-28: the receipt is durable before the answer leaves, on the protocol chain's explorer.
+    assert.equal(receipts.length, 1); assert.equal(receipts[0].tx_hash, tx.hash); assert.equal(receipts[0].challenge_id, issued.challengeId);
+    assert.match(receipts[0].explorer_url, /^https:\/\/basescan\.org\/tx\//);
   });
 
   await check(`${label}: header-less retry also works (the id comes from the paid tx); replay returns the stored result with no re-execution`, async () => {
     const before = executions;
     const b = await call(handler, { 'x-402-payment': tx.hash, 'x-challenge-secret': issued.clientSecret });
     assert.ok(b.result); assert.equal(executions, before, 'replay, not a second execution');
+    assert.deepEqual(b.result, delivered, 'the replay is exactly what was delivered');
     const s = await call(handler, { 'x-402-payment': tx.hash, 'x-challenge-secret': 'c'.repeat(64) });
-    assert.equal(errOf(s).code, -32402); assert.ok(!JSON.stringify(s).includes('scan'), 'a stranger gets no result');
+    assert.equal(errOf(s).code, -32402); assert.ok(!JSON.stringify(s).includes(ANALYSIS), 'a stranger gets no result');
+  });
+
+  await check(`${label}: Audit 2026-09-28 — a receipt that cannot be written holds the answer back and keeps the payment redeemable`, async () => {
+    const iss = errOf(await call(handler, {})).data;
+    const t = rpc.mint(iss.challengeIdBytes32, TOOL, '0xpayer000000000000000000000000000000000004');
+    const hdr = { 'x-402-payment': t.hash, 'x-challenge-secret': iss.clientSecret };
+    receiptWrites = 'http500';
+    const held = await call(handler, hdr);
+    assert.equal(errOf(held)?.code, -32603, JSON.stringify(held).slice(0, 300)); assert.equal(errOf(held).data.retryable, true);
+    assert.ok(!JSON.stringify(held).includes(ANALYSIS), 'no paid content without a durable receipt');
+    assert.equal(byId(iss.challengeId).status, 'retryable_failure'); assert.equal(byId(iss.challengeId).result_json ?? null, null);
+    assert.equal(receipts.filter((x) => x.challenge_id === iss.challengeId).length, 0);
+    receiptWrites = 'ok';
+    const ok = await call(handler, hdr);
+    assert.ok(ok.result, JSON.stringify(ok).slice(0, 300)); assert.equal(byId(iss.challengeId).status, 'completed');
+    assert.equal(receipts.filter((x) => x.challenge_id === iss.challengeId).length, 1, 'one receipt for the one payment');
   });
 
   await check(`${label}: a paid tx whose bytes32 is not a Bobby challenge (no zero tail) is refused before any database read`, async () => {

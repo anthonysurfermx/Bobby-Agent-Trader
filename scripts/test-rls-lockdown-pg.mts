@@ -29,9 +29,14 @@ const q = (sql: string) => sql.replaceAll('public.', `${S}.`).replaceAll('set se
 const migration = q(readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000010_lock_down_public_reads.sql', 'utf8'));
 // BP-09: positive provenance — applied on top of 0010 exactly as production will see it.
 const migration0011 = q(readFileSync('supabase/bobby-protocol/supabase/migrations/20260903000011_cycle_provenance.sql', 'utf8'));
+// Audit 2026-09-28 P0: the shaped views become read-only for the browser roles.
+const migrationViewsReadOnly = q(readFileSync('supabase/bobby-protocol/supabase/migrations/20260928210000_public_views_select_only.sql', 'utf8'));
 
 // Stand-ins: the columns the views and the RPC touch, plus the identifiers the audit is about.
 const FIXTURE = `
+-- Supabase's default privileges in public (postgres: anon=arwdDxtm, authenticated=arwdDxtm):
+-- every relation created from here on — the views in 0010/0011 included — starts with ALL.
+alter default privileges in schema S__ grant all on tables to anon, authenticated, service_role;
 create table S.api_cache (cache_key text primary key, payload jsonb, expires_at timestamptz, updated_at timestamptz);
 create table S.agent_trades (id uuid primary key default gen_random_uuid(), cycle_id uuid, chain text, token_address text, token_symbol text, direction text,
   amount_usd numeric, entry_price numeric, stop_price numeric, target_price numeric, exit_price numeric, status text, outcome text, realized_pnl_pct numeric,
@@ -84,7 +89,7 @@ try {
   // Autocommit throughout, so a refused SELECT aborts nothing — no savepoint needed.
   const denied = async (sql: string, label: string) => {
     try { await asAnon(sql); } catch (e: any) { if (e.code !== '42501' && e.code !== '42703') throw e; return e.code; }
-    assert.fail(`${label}: anon read still succeeds`);
+    assert.fail(`${label}: the anon statement still succeeds`);
   };
 
   // 1. Optional historical baseline; remediation-only audits skip these reads.
@@ -135,6 +140,32 @@ try {
     }
   }
   console.log('post-migration effective privileges: both browser roles blocked from private tables and merge RPC; public views readable');
+
+  // Audit 2026-09-28 P0: 0010/0011 revoked from PUBLIC only, so the default
+  // privileges above left both browser roles INSERT/UPDATE/DELETE on the views.
+  // agent_cycles_public is auto-updatable and runs as its owner: an anonymous
+  // UPDATE reached agent_cycles past its RLS.
+  if (!postfixOnly) {
+    const tampered = await asAnon(`update S.agent_cycles_public set mood = 'tampered' where id = '${cronCycle}'`);
+    assert.equal(tampered.rowCount, 1, 'pre-fix: anon rewrites agent_cycles through the definer view');
+    await c.query(q(`update S.agent_cycles set mood = null where id = '${cronCycle}'`));
+    console.log('audit 2026-09-28 P0 reproduced: an anonymous UPDATE through agent_cycles_public rewrote agent_cycles');
+  }
+  await c.query(migrationViewsReadOnly);
+  for (const role of ['anon', 'authenticated']) {
+    for (const view of ['agent_trades_public', 'agent_cycles_public']) {
+      for (const privilege of ['INSERT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER']) {
+        const check = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${view}`, privilege]);
+        assert.equal(check.rows[0].allowed, false, `${role} still has ${privilege} on ${view}`);
+      }
+      const read = await c.query('select has_table_privilege($1, $2, $3) as allowed', [role, `${S}.${view}`, 'SELECT']);
+      assert.equal(read.rows[0].allowed, true, `${role} lost SELECT on ${view}`);
+    }
+  }
+  assert.equal(await denied(`update S.agent_cycles_public set mood = 'tampered'`, 'anon UPDATE through agent_cycles_public'), '42501');
+  assert.equal(await denied(`delete from S.agent_cycles_public`, 'anon DELETE through agent_cycles_public'), '42501');
+  assert.equal(await denied(`insert into S.agent_cycles_public (mood) values ('forged')`, 'anon INSERT through agent_cycles_public'), '42501');
+  console.log('audit 2026-09-28 P0: the browser roles read the shaped views and can write nothing through them (42501)');
 
   // 3. The same reads are refused.
   assert.equal(await denied(`select cache_key from S.api_cache`, 'P0-1'), '42501');

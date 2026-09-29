@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHistory';
-import { DEFAULT_CHAIN } from '@/config/chains';
+import { BOBBY_BASE_MAINNET, DEFAULT_CHAIN } from '@/config/chains';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
 
@@ -524,7 +524,7 @@ export default function BobbyHeartbeatPage() {
                 { name: 'AdversarialBounties', addr: data.contracts.bounties.address, extra: `${data.contracts.bounties.totalPosted} bounties` },
                 { name: 'TrackRecord', addr: data.contracts.trackRecord.address, extra: `${data.performance.totalTrades ?? 'n/a'} trades` },
                 { name: 'ConvictionOracle', addr: data.contracts.convictionOracle?.address, extra: 'real-time feed' },
-                { name: 'AgentRegistry', addr: (data.contracts as any).agentRegistry?.address || '0x823a1670f521a35d4fafe4502bdcb3a8148bba8b', extra: 'ERC-721 identity' },
+                { name: 'AgentRegistry', addr: (data.contracts as any).agentRegistry?.address || BOBBY_BASE_MAINNET.contracts.agentRegistry, extra: 'non-transferable identity' },
               ].filter(c => c.addr).map((contract) => (
                 <div key={contract.name} className="border border-white/10 bg-white/[0.02] rounded-xl p-3 transition hover:border-[#0052ff]/40">
                   <div className="flex items-center gap-2 mb-1">

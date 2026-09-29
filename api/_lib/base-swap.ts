@@ -28,7 +28,7 @@ import { BASE, UNISWAP_BASE } from './chains.js';
 import { rpcErrorMessage } from './rpc-redact.js';
 import { stockSwapCanaryReason } from './stock-swap-canary.js';
 import {
-  BASE_B20_ORACLE_REGISTRY, BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_BLOCKLIST, findBaseToken, stockCountryAllowed, type BaseSwapToken,
+  BASE_B20_ORACLE_REGISTRY, BASE_SWAP_CHAIN_ID, BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, BASE_USDC, BASE_WETH, STOCK_COUNTRY_BLOCKLIST, findBaseToken, stockCountryAllowed, swapSide, type BaseSwapToken,
 } from '../../src/lib/base-swap/tokens.js';
 
 export const SWAP_ROUTER02: Address = getAddress(UNISWAP_BASE.swapRouter02);
@@ -499,7 +499,8 @@ export interface BaseSwapInput {
   country?: string | null;
 }
 
-export interface BaseSwapLimits { maxTicketUsd: number; minTicketUsd: number; defaultSlippagePct: number; maxSlippagePct: number; maxPriceImpactPct: number; deadlineSec: number }
+/** maxTicketUsd / minTicketUsd bound entries; a sale (anything → a stablecoin) is bounded by maxSellUsd only. */
+export interface BaseSwapLimits { maxTicketUsd: number; minTicketUsd: number; maxSellUsd: number; defaultSlippagePct: number; maxSlippagePct: number; maxPriceImpactPct: number; deadlineSec: number }
 
 export interface BaseSwapTokenView {
   symbol: string;
@@ -552,6 +553,8 @@ export interface BaseSwapQuote {
   priceImpactPct: number | null;
   /** Ticket value in USD (stable leg, else a USDC quote of the input). null when unknown. */
   usdValue: number | null;
+  /** 'sell' = anything → a stablecoin, bounded by limits.maxSellUsd with no minimum; 'buy' = everything else. */
+  side: 'buy' | 'sell';
   slippagePct: number;
   deadline: number;
   route: { kind: RouteCandidate['kind']; fees: number[]; path: Hex | null; description: string; gasEstimate: string };
@@ -599,11 +602,29 @@ function isAddress(v: unknown): v is Address {
   return typeof v === 'string' && /^0x[a-fA-F0-9]{40}$/.test(v);
 }
 
+function codeTicketCap(tokens: BaseSwapToken[]): number {
+  return Math.min(BASE_SWAP_LIMITS.maxTicketUsd, ...tokens.map((t) => t.maxTicketUsd ?? BASE_SWAP_LIMITS.maxTicketUsd));
+}
+
 /** Env may LOWER the ticket cap (ops brake); it can never raise it above the code constant. */
 export function effectiveMaxTicketUsd(...tokens: BaseSwapToken[]): number {
   const env = Number(process.env.BASE_SWAP_MAX_TICKET_USD);
-  const codeCap = Math.min(BASE_SWAP_LIMITS.maxTicketUsd, ...tokens.map((t) => t.maxTicketUsd ?? BASE_SWAP_LIMITS.maxTicketUsd));
+  const codeCap = codeTicketCap(tokens);
   return Number.isFinite(env) && env > 0 ? Math.min(env, codeCap) : codeCap;
+}
+
+/**
+ * Audit 2026-09-28: a sale is not bounded by the entry limits. Under the $1–$1
+ * canary a sale had to come to exactly 1.000000 USDC, and no NVDAc amount
+ * does — a canary position could never be sold. A sale has no minimum and its
+ * own cap: BASE_SWAP_MAX_SELL_USD when ops set it, otherwise sellCapMultiple ×
+ * the entry cap; never above the code cap either way.
+ */
+export function effectiveMaxSellUsd(...tokens: BaseSwapToken[]): number {
+  const env = Number(process.env.BASE_SWAP_MAX_SELL_USD);
+  const codeCap = codeTicketCap(tokens);
+  if (Number.isFinite(env) && env > 0) return Math.min(env, codeCap);
+  return Math.min(codeCap, effectiveMaxTicketUsd(...tokens) * BASE_SWAP_LIMITS.sellCapMultiple);
 }
 
 async function readStockReference(stock: BaseSwapToken, executionUsdPerToken: number): Promise<StockReferenceView> {
@@ -663,7 +684,16 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
   const c = baseClient();
   const warnings: string[] = [];
   const txWithheld: string[] = [];
-  const limits: BaseSwapLimits = { ...BASE_SWAP_LIMITS, maxTicketUsd: effectiveMaxTicketUsd(tokenIn, tokenOut) };
+  const side = swapSide(tokenIn, tokenOut);
+  const limits: BaseSwapLimits = {
+    maxTicketUsd: effectiveMaxTicketUsd(tokenIn, tokenOut),
+    minTicketUsd: BASE_SWAP_LIMITS.minTicketUsd,
+    maxSellUsd: effectiveMaxSellUsd(tokenIn, tokenOut),
+    defaultSlippagePct: BASE_SWAP_LIMITS.defaultSlippagePct,
+    maxSlippagePct: BASE_SWAP_LIMITS.maxSlippagePct,
+    maxPriceImpactPct: BASE_SWAP_LIMITS.maxPriceImpactPct,
+    deadlineSec: BASE_SWAP_LIMITS.deadlineSec,
+  };
 
   const routes = await quoteRoutes(tokenIn, tokenOut, amountInRaw);
   if (!routes.length) throw new BaseSwapError(`no Uniswap V3 liquidity on Base for ${tokenIn.symbol} → ${tokenOut.symbol}`, 'no_route');
@@ -690,7 +720,9 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     usdValue = usdRoutes.length ? Number(formatUnits(usdRoutes[0].amountOut, usdc.decimals)) : null;
   }
   if (usdValue === null) txWithheld.push('ticket could not be valued in USD');
-  else {
+  else if (side === 'sell') {
+    if (usdValue > limits.maxSellUsd) txWithheld.push(`sale of $${usdValue.toFixed(2)} is above the $${limits.maxSellUsd} per-sale limit; sell it in smaller parts`);
+  } else {
     if (usdValue > limits.maxTicketUsd) txWithheld.push(`ticket $${usdValue.toFixed(2)} is above the $${limits.maxTicketUsd} per-trade limit`);
     if (usdValue < limits.minTicketUsd) txWithheld.push(`ticket $${usdValue.toFixed(2)} is below the $${limits.minTicketUsd} minimum`);
   }
@@ -843,6 +875,7 @@ export async function quoteBaseSwap(input: BaseSwapInput): Promise<BaseSwapQuote
     executionPrice,
     priceImpactPct,
     usdValue,
+    side,
     slippagePct,
     deadline,
     route: {

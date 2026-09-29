@@ -17,7 +17,7 @@ import {
 } from './_lib/protocol-payments.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { challengeIdToBytes32 } from './_lib/challenge-id.js';
-import { createChallenge, storeReceipt, getChallenge, claimChallenge, completeChallenge, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
+import { createChallenge, getChallenge, claimChallenge, settlePaidCall, failChallenge, requestHashFor } from './_lib/mcp-challenges.js';
 import { getUniswapCompatibleQuote } from './_lib/mcp-uniswap-quote.js';
 import { enforcePublicRateLimit, internalAuthHeaders } from './_lib/request-security.js';
 
@@ -331,7 +331,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (claimedChallengeId) await failChallenge(claimedChallengeId, error instanceof Error ? error.message : String(error));
       throw error;
     }
-    if (claimedChallengeId) await completeChallenge(claimedChallengeId, result);
+    // Audit 2026-09-28: nothing paid leaves before its receipt and its
+    // completion are confirmed. On failure the payment stays redeemable.
+    if (claimedChallengeId && verifiedPayment) {
+      try {
+        await settlePaidCall(claimedChallengeId, {
+          txHash: verifiedPayment.txHash,
+          challengeId: claimedChallengeId,
+          payerAddress: verifiedPayment.payer,
+          toolName: String((body.params as Record<string, unknown>)?.name || ''),
+          blockNumber: verifiedPayment.blockNumber,
+          valueWei: verifiedPayment.valueWei,
+          valueOkb: verifiedPayment.valueOkb,
+        }, result);
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        console.error('[mcp-bobby] paid result not recorded:', reason);
+        await failChallenge(claimedChallengeId, `result not recorded: ${reason}`);
+        return res.status(200).json({
+          jsonrpc: '2.0',
+          error: {
+            code: -32603,
+            message: 'Payment verified, but the result could not be recorded. Retry the identical request with the same payment headers; the payment stays redeemable.',
+            data: { protocol: 'x402', retryable: true, challengeId: claimedChallengeId, txHash: verifiedPayment.txHash },
+          },
+          id: body.id,
+        });
+      }
+    }
 
     if (body.method === 'tools/call') {
       const toolName = (body.params as Record<string, unknown>)?.name as string;
@@ -352,16 +379,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
       }
       if (toolName && PREMIUM_TOOLS.has(toolName) && verifiedPayment) {
-        // Store verified receipt for Judge Mode + audit trail
-        void storeReceipt({
-          txHash: verifiedPayment.txHash,
-          challengeId: verifiedPayment.challengeId,
-          payerAddress: verifiedPayment.payer,
-          toolName,
-          blockNumber: verifiedPayment.blockNumber,
-          valueWei: verifiedPayment.valueWei,
-          valueOkb: verifiedPayment.valueOkb,
-        });
+        // The receipt was stored (and confirmed) by settlePaidCall above.
         void logAgentCommerceEvent({
           source: 'mcp',
           tool_name: toolName,

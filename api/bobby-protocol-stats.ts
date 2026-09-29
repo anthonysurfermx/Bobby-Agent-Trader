@@ -485,6 +485,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       agentRegistry: {
         address: AGENT_REGISTRY,
         type: 'ERC-721',
+        // The contract answers to the ERC-721 interface id but has no transfer functions (audit 2026-09-28).
+        transferable: false,
         agents: agentCount,
       },
     },

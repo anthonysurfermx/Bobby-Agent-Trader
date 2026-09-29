@@ -131,7 +131,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!receipt.recorded && receipt.reason === 'intent already used') {
         return res.status(409).json({ ok: false, error: 'This intent already produced a confirmed swap; run a new cycle', code: 'intent_consumed' });
       }
-      if (!receipt.recorded) {
+      if (!receipt.recorded && receipt.reason === 'calldata already issued') {
+        // The same bytes already belong to another build (another intent, or
+        // already signed). Handing them out again could never be confirmed.
+        quote.txWithheld.push('identical calldata was already issued for another request; quote again for fresh calldata');
+        quote.tx = null;
+      } else if (!receipt.recorded) {
         // Fail closed: calldata that the store did not see cannot be confirmed
         // later, so it is not handed out. The quote itself stays visible.
         console.error('[BaseSwap] built swap not recorded:', receipt.reason);

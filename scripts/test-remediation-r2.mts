@@ -24,6 +24,7 @@ const calls: Rec[] = [];
 const THREAD_ID = '11111111-2222-4333-8444-555555555555';
 const thread = { id: THREAD_ID, scope: 'public', symbol: 'NVDAc', direction: 'long', conviction_score: 0.7, status: 'open', resolution: 'pending', entry_price: 100, stop_price: 90, target_price: 120, resolution_pnl_pct: null, created_at: new Date().toISOString(), trigger_reason: 'test', debate_quality: null, trigger_data: { technical: { rsi: 50 } } };
 let threadRows: () => unknown[] = () => [thread];
+let historyCandles: string[][] = [];
 const posts = ['alpha', 'redteam', 'cio'].map((agent, i) => ({ id: `p${i}`, thread_id: THREAD_ID, agent, agent_type: agent, agent_name: agent, role: agent, content: `${agent} says something`, body: `${agent} says something`, created_at: new Date().toISOString() }));
 const openai = { choices: [{ message: { content: JSON.stringify({ dimensions: { data_integrity: 3, adversarial_quality: 3, decision_logic: 3, risk_management: 3, calibration_alignment: 3, novelty: 3 }, biases_detected: [], conviction_assessment: 'reasonable', recommendation: 'pass', rationale: 'fine', red_flags: [] }) } }] };
 const AUTH_USER_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
@@ -42,6 +43,8 @@ globalThis.fetch = (async (input: any, init?: any) => {
   const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
   if (isHost(url, 'api.openai.com')) return json(openai);
   if (url.includes('okx.com/api/v5/market/ticker')) return json({ code: '0', data: [{ last: '125' }] }); // long from 100 → target 120 hit
+  // forum-resolve grades on the 1H candle path since 44bffc1 (api/_lib/path-resolution.ts): OKX shape, newest first.
+  if (url.includes('okx.com/api/v5/market/history-candles')) return json({ code: '0', data: historyCandles });
   if (url.includes('/api/protocol-record')) return json({ ok: true });
   if (url.endsWith('/auth/v1/user') && method === 'GET') return json({ id: AUTH_USER_ID, email: null, app_metadata: { provider: 'apple' } });
   if (url.includes('/auth/v1/admin/users/') && method === 'DELETE') return json({});
@@ -239,7 +242,8 @@ await check('P1-2 SwapConfirm decodes approval, swap and revoke before wallet su
   assert.match(src, /assertRevokeCalldata\([\s\S]{0,250}sendAndConfirm\(execution\.revokeTx\)/);
 });
 await check('P1 product copy describes the non-custodial Base swap flow truthfully', async () => {
-  const src = await readFile(new URL('../src/components/companion/RiskNotice.tsx', import.meta.url), 'utf8');
+  // The desk's risk notice moved to the Núcleo desk on 2026-09-27 (RiskNotice.tsx was deleted); same copy.
+  const src = await readFile(new URL('../src/components/nucleo/NucleoRisk.tsx', import.meta.url), 'utf8');
   assert.doesNotMatch(src, /This desk does not execute trades|Este desk no ejecuta operaciones/);
   assert.match(src, /prepare Base swap transaction data/);
   assert.match(src, /Tú revisas y firmas desde tu wallet/);
@@ -283,9 +287,15 @@ await check('C-03 mcp-http bobby_brief takes the same guard', async () => {
 
 // ---------- Codex r2 #1: forum-resolve resolves private threads but never records them on-chain ----------
 await check('C-01 forum-resolve: private cycle resolved off-chain only, public one recorded', async () => {
-  const pub = { ...thread, id: '11111111-2222-4333-8444-aaaaaaaaaaaa', scope: 'public', symbol: 'BTC', direction: 'long', entry_price: 100, target_price: 120, stop_price: 90, expires_at: new Date(Date.now() + 86_400_000).toISOString() };
+  // Called three hours ago; the second full 1H bar after the call tags the 120 target without touching the 90 stop.
+  const calledAt = Date.now() - 3 * 3_600_000;
+  const pub = { ...thread, id: '11111111-2222-4333-8444-aaaaaaaaaaaa', scope: 'public', symbol: 'BTC', direction: 'long', entry_price: 100, target_price: 120, stop_price: 90, created_at: new Date(calledAt).toISOString(), expires_at: new Date(Date.now() + 86_400_000).toISOString() };
   const priv = { ...pub, id: '11111111-2222-4333-8444-bbbbbbbbbbbb', scope: 'private' };
   threadRows = () => [pub, priv];
+  historyCandles = [
+    [String(calledAt + 2 * 3_600_000), '108', '125', '105', '122', '1', '1', '1', '1'],
+    [String(calledAt + 3_600_000), '101', '110', '99', '108', '1', '1', '1', '1'],
+  ];
   try {
     const n = since(); const { res, state } = recorder();
     await forumResolve.default(req('POST', {}, {}, { 'x-record-secret': 'test-record-secret' }), res);
@@ -299,7 +309,10 @@ await check('C-01 forum-resolve: private cycle resolved off-chain only, public o
     // and the track record it computes is pinned to public threads
     const trackReads = calls.slice(n).filter((c) => c.method === 'GET' && c.url.includes('resolution=neq.pending'));
     for (const c of trackReads) assert.ok(c.url.includes('scope=eq.public'), c.url);
-  } finally { threadRows = () => [thread]; }
+    // Graded on the path: a win at the target, stamped when the market settled it.
+    const graded = patches.map((p) => JSON.parse(p.body ?? '{}'));
+    for (const g of graded) assert.deepEqual([g.resolution, g.resolution_price, g.resolved_at], ['win', 120, new Date(calledAt + 3 * 3_600_000).toISOString()]);
+  } finally { threadRows = () => [thread]; historyCandles = []; }
 });
 
 // ---------- Codex r2 #1: repo-wide — every forum_threads read on a public path is pinned ----------
@@ -523,8 +536,69 @@ await check('BP-08 transports: both issue with the request hash + secret and red
     assert.match(src, /challengeIdBytes32: challengeIdToBytes32\(challengeId\)/, `${f}: the 402 publishes the bytes32 encoding`);
     assert.match(src, /claim\.outcome === 'replay'/, `${f}: replay path`);
     assert.match(src, /failChallenge\(claimedChallengeId/, `${f}: failure path`);
-    assert.match(src, /completeChallenge\(claimedChallengeId, result\)/, `${f}: completion path`);
+    // Audit 2026-09-28: completion goes through settlePaidCall (receipt, then completion, both confirmed) and is awaited.
+    assert.match(src, /await settlePaidCall\(claimedChallengeId, \{/, `${f}: completion path`);
+    assert.ok(!/void storeReceipt|completeChallenge\(/.test(src), `${f}: no fire-and-forget receipt, no completion outside settlePaidCall`);
   }
+});
+
+// ---------- Audit 2026-09-28 P2: nothing paid is released before its receipt and completion are confirmed ----------
+await check('Audit 2026-09-28 P2 settlement: receipt then completion, each confirmed; a failed write keeps the payment redeemable', async () => {
+  const ch = await import('../api/_lib/mcp-challenges.js');
+  const realFetch = globalThis.fetch;
+  const challenges: Record<string, any>[] = [];
+  const receipts: Record<string, any>[] = [];
+  let failReceiptWrites = 0; let failCompletions = 0;
+  const eq = (u: URL, k: string) => { const v = u.searchParams.get(k); return v?.startsWith('eq.') ? decodeURIComponent(v.slice(3)) : null; };
+  globalThis.fetch = (async (input: any, init?: any) => {
+    const u = new URL(typeof input === 'string' ? input : input.url); const method = (init?.method || 'GET').toUpperCase();
+    const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
+    if (u.pathname.endsWith('/mcp_payment_receipts')) {
+      if (method === 'POST') {
+        if (failReceiptWrites > 0) { failReceiptWrites -= 1; return json({ message: 'upstream timeout' }, 503); }
+        const r = JSON.parse(init.body);
+        // tx_hash is the primary key, challenge_id is unique — as in production.
+        if (receipts.some((x) => x.tx_hash === r.tx_hash || x.challenge_id === r.challenge_id)) return json({ code: '23505', message: 'duplicate key value violates unique constraint' }, 409);
+        receipts.push(r); return new Response(null, { status: 201 });
+      }
+      const cid = eq(u, 'challenge_id'); return json(receipts.filter((x) => !cid || x.challenge_id === cid));
+    }
+    if (u.pathname.endsWith('/mcp_payment_challenges')) {
+      const cid = eq(u, 'challenge_id'); const st = eq(u, 'status');
+      const hit = challenges.filter((x) => (!cid || x.challenge_id === cid) && (!st || x.status === st));
+      if (method === 'PATCH') {
+        const patch = JSON.parse(init.body);
+        if (patch.status === 'completed' && failCompletions > 0) { failCompletions -= 1; return json({ message: 'upstream timeout' }, 503); }
+        hit.forEach((x) => Object.assign(x, patch)); return json(hit);
+      }
+      return json(hit);
+    }
+    return json([]);
+  }) as typeof fetch;
+  try {
+    const id = crypto.randomUUID();
+    challenges.push({ challenge_id: id, status: 'in_progress' });
+    const receipt = { txHash: `0x${'ab'.repeat(32)}`, challengeId: id, payerAddress: '0xpayer', toolName: 'bobby_judge', blockNumber: 1, valueWei: '1000', valueOkb: '0.000000000000001' };
+    // 1. The receipt write fails: nothing is completed and the caller learns it.
+    failReceiptWrites = 1;
+    await assert.rejects(ch.settlePaidCall(id, receipt, { verdict: 'ok' }), /receipt not recorded/);
+    assert.equal(challenges[0].status, 'in_progress', 'no completion without a durable receipt'); assert.equal(receipts.length, 0);
+    assert.equal(await ch.failChallenge(id, 'result not recorded'), true); assert.equal(challenges[0].status, 'retryable_failure', 'the payment stays redeemable');
+    // 2. The same client re-claims (BP-08 covers the claim): receipt lands, completion fails → still not released.
+    challenges[0].status = 'in_progress'; failCompletions = 1;
+    await assert.rejects(ch.settlePaidCall(id, receipt, { verdict: 'ok' }), /completion not recorded/);
+    assert.equal(receipts.length, 1); assert.equal(challenges[0].status, 'in_progress');
+    // 3. Retry: the receipt of the same payment is idempotent; the completion is confirmed; one receipt per payment.
+    await ch.settlePaidCall(id, receipt, { verdict: 'ok' });
+    assert.equal(challenges[0].status, 'completed'); assert.deepEqual(challenges[0].result_json, { verdict: 'ok' }); assert.equal(receipts.length, 1);
+    assert.match(receipts[0].explorer_url, /^https:\/\/basescan\.org\/tx\/0x/, 'the protocol chain explorer, never a hardcoded X Layer one');
+    // 4. A completion that flips no in-progress row is not a success.
+    await assert.rejects(ch.completeChallenge(id, { verdict: 'again' }), /no longer in progress/);
+    // 5. The same challenge under another transaction is a conflict, never a silent pass.
+    await assert.rejects(ch.storeReceipt({ ...receipt, txHash: `0x${'cd'.repeat(32)}` }), /conflicts/);
+    // 6. A receipt for another challenge cannot settle this one.
+    await assert.rejects(ch.settlePaidCall(id, { ...receipt, challengeId: crypto.randomUUID() }, {}), /another challenge/);
+  } finally { globalThis.fetch = realFetch; }
 });
 
 // ---------- BP-10: a failed registry read never authorises a write; owner changes need a transfer ----------

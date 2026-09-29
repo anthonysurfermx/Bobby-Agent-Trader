@@ -34,6 +34,8 @@ interface QuotePreview {
   withheld: string[];
   /** The cap the server is enforcing right now (env can lower the code cap, e.g. the canary's $1). */
   maxTicketUsd: number | null;
+  /** The server's cap for a sale — separate from the entry cap, and a sale has no minimum. */
+  maxSellUsd: number | null;
   /** Ticket value in USD as the server sees it — for a sell, what the USDC leg is worth. */
   usdValue: number | null;
 }
@@ -50,7 +52,7 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
     setError(null);
     const id = window.setTimeout(async () => {
       try {
-        const { ok, data } = await deskJson<{ ok?: boolean; error?: string; quote?: { amountOut?: unknown; priceImpactPct?: unknown; txWithheld?: unknown; usdValue?: unknown; limits?: { maxTicketUsd?: unknown } } }>(`/api/base-swap?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${encodeURIComponent(amount)}`, { signal: controller.signal });
+        const { ok, data } = await deskJson<{ ok?: boolean; error?: string; quote?: { amountOut?: unknown; priceImpactPct?: unknown; txWithheld?: unknown; usdValue?: unknown; limits?: { maxTicketUsd?: unknown; maxSellUsd?: unknown } } }>(`/api/base-swap?tokenIn=${encodeURIComponent(tokenIn)}&tokenOut=${encodeURIComponent(tokenOut)}&amount=${encodeURIComponent(amount)}`, { signal: controller.signal });
         if (!active) return;
         if (!ok || !data.ok || !data.quote) { setError(data.error || t('Quote unavailable right now.', 'Cotización no disponible ahora.', 'Cotação indisponível no momento.')); return; }
         setPreview({
@@ -58,6 +60,7 @@ function useQuotePreview(tokenIn: string, tokenOut: string, amount: string | nul
           priceImpactPct: typeof data.quote.priceImpactPct === 'number' ? data.quote.priceImpactPct : null,
           withheld: Array.isArray(data.quote.txWithheld) ? data.quote.txWithheld.map(String) : [],
           maxTicketUsd: typeof data.quote.limits?.maxTicketUsd === 'number' ? data.quote.limits.maxTicketUsd : null,
+          maxSellUsd: typeof data.quote.limits?.maxSellUsd === 'number' ? data.quote.limits.maxSellUsd : null,
           usdValue: typeof data.quote.usdValue === 'number' ? data.quote.usdValue : null,
         });
       } catch {
@@ -99,6 +102,9 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
   // The server may be running a lower cap than the code (canary rollout). The
   // first quote reveals it; an untouched default follows it, a typed amount never does.
   const cap = preview?.maxTicketUsd !== null && preview?.maxTicketUsd !== undefined ? Math.min(codeCap, preview.maxTicketUsd) : codeCap;
+  // A sale answers to its own cap (and no minimum), so the entry cap never traps a position.
+  const sellCap = preview?.maxSellUsd !== null && preview?.maxSellUsd !== undefined ? Math.min(codeCap, preview.maxSellUsd) : codeCap;
+  const sideCap = side === 'buy' ? cap : sellCap;
   useEffect(() => {
     if (side === 'buy' && !touched && preview?.maxTicketUsd !== null && preview?.maxTicketUsd !== undefined && usd > preview.maxTicketUsd) setUsd(Math.max(BASE_SWAP_LIMITS.minTicketUsd, Math.floor(preview.maxTicketUsd)));
   }, [side, touched, preview, usd]);
@@ -113,10 +119,10 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
   const readyToPrepare = canPrepareDeskSwap({
     amount: amountForQuote, decimals: side === 'buy' ? 6 : token.decimals,
     balance: spendBalance?.raw ?? null, usdValue: side === 'buy' ? usd : preview?.usdValue ?? null,
-    cap, hasQuote: Boolean(preview) && !error,
+    cap: sideCap, hasQuote: Boolean(preview) && !error,
   });
   const insufficient = isConnected && spendBalance !== null && (side === 'buy' ? usd : qtyUnits) > spendBalance.units;
-  const overCap = (side === 'buy' ? usd : preview?.usdValue ?? 0) > cap;
+  const overCap = (side === 'buy' ? usd : preview?.usdValue ?? 0) > sideCap;
 
   const crypto = BUYABLE.filter((item) => !isStockToken(item));
   const stocks = BUYABLE.filter((item) => isStockToken(item));
@@ -207,7 +213,9 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
       {isConnected && valid && (insufficient || overCap || !spendBalance) && (
         <p role="status" className="text-xs text-amber-200">
           {insufficient ? t('Insufficient balance on Base for this amount.', 'Saldo insuficiente en Base para este monto.', 'Saldo insuficiente na Base para este valor.')
-            : overCap ? t(`The current ticket limit is $${cap}. Reduce the amount.`, `El límite actual es $${cap}. Reduce el monto.`, `O limite atual por ticket é $${cap}. Reduza o valor.`)
+            : overCap ? side === 'buy'
+              ? t(`The current ticket limit is $${cap}. Reduce the amount.`, `El límite actual es $${cap}. Reduce el monto.`, `O limite atual por ticket é $${cap}. Reduza o valor.`)
+              : t(`The current limit per sale is $${sellCap}. Sell it in smaller parts.`, `El límite actual por venta es $${sellCap}. Vende en partes más pequeñas.`, `O limite atual por venda é $${sellCap}. Venda em partes menores.`)
             : t('Waiting for your Base balance before preparing a swap.', 'Esperando tu saldo en Base antes de preparar el swap.', 'Aguardando seu saldo na Base antes de preparar o swap.')}
         </p>
       )}

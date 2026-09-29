@@ -101,7 +101,7 @@ const CONTRACTS = [
   { name: 'BobbyAgentEconomyV2', addr: BOBBY_BASE_MAINNET.contracts.agentEconomy, purpose: 'Native-fee protocol economy' },
   { name: 'BobbyAdversarialBounties', addr: BOBBY_BASE_MAINNET.contracts.adversarialBounties, purpose: 'On-chain rewards for breaking a thesis' },
   { name: 'HardnessRegistry', addr: BOBBY_BASE_MAINNET.contracts.hardnessRegistry, purpose: 'Difficulty-weighted decision scoring' },
-  { name: 'BobbyAgentRegistry', addr: BOBBY_BASE_MAINNET.contracts.agentRegistry, purpose: 'Staked on-chain agent identities' },
+  { name: 'BobbyAgentRegistry', addr: BOBBY_BASE_MAINNET.contracts.agentRegistry, purpose: 'Owner-minted agent identities; not transferable' },
   { name: 'BobbyIntentEscrow', addr: BOBBY_BASE_MAINNET.contracts.intentEscrow, purpose: 'Attested intent ledger, isolated from verified calls' },
 ];
 
@@ -354,13 +354,13 @@ export default function BobbyDocsPage() {
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={Shield} label="TrackRecord V2 proof engine" right="Base mainnet · deployed" />
               <p className="mb-7 max-w-3xl text-sm leading-7 text-white/60">
-                V2 fixes the time of entry before its price exists, verifies entry and exit through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
+                V2 fixes the time of entry before its price exists, verifies the entry and exit prices through Pyth/Hermes, and keeps price-verified outcomes separate from attested claims. Five adversarial rounds found and closed four P1 integrity issues before the release was frozen.
               </p>
 
               <div className="grid gap-3 md:grid-cols-3">
                 {[
                   ['01 · FUTURE ANCHOR', 'announceCommit fixes entryAt in the future. Same-block, tick-shopping and retrospective anchor selection revert.'],
-                  ['02 · ORACLE EVIDENCE', 'Unique Pyth updates prove the exact entry and exit instants. The recorder retries Hermes only inside the valid window.'],
+                  ['02 · ORACLE EVIDENCE', 'Unique Pyth updates prove the price at the entry and exit instants. The recorder declares the exit instant inside a bounded window and retries Hermes only there. The record grades the call against the market; it does not prove a swap closed then.'],
                   ['03 · OPEN RESOLUTION', 'Permissionless challenge, expiry and separate VERIFIED / ATTESTED ledgers prevent unproven claims from inflating the record.'],
                 ].map(([title, text]) => (
                   <div key={title} className="rounded-xl border border-[#0052ff]/25 bg-[#0052ff]/[0.07] p-5">

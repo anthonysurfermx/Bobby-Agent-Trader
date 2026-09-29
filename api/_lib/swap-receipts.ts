@@ -95,19 +95,32 @@ export async function recordBuiltSwap(row: BuiltSwapRow, fetchImpl: typeof fetch
       }),
     });
     if (res.ok) return { recorded: true };
-    if (res.status === 409) {
-      // Two unique keys can fire. The same calldata again (re-quote returned
-      // identical bytes) is fine; the same intent with different calldata is not.
-      const same = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${row.wallet.toLowerCase()}&calldata_hash=eq.${row.calldataHash}&select=id`), { headers: bobbyServiceHeaders() });
-      if (same.ok && ((await same.json()) as unknown[]).length) return { recorded: true, reason: 'already recorded' };
-      if (row.intentJti) return { recorded: false, reason: 'intent already used' };
-    }
     // 23503 = the cycle row is not there (a cycle whose log failed, or a stale
-    // id). The swap is still Bobby's; record it unlinked and say so.
+    // id). The swap is still Bobby's; record it unlinked and say so. Checked
+    // before the unique keys: PostgREST answers both with a 409.
     const text = await res.text().catch(() => '');
     if (row.cycleId && (res.status === 409 || res.status === 400) && /23503|foreign key|cycle_id/i.test(text)) {
       const again = await recordBuiltSwap({ ...row, cycleId: null }, fetchImpl);
       return again.recorded ? { recorded: true, reason: 'cycle not found; recorded unlinked' } : again;
+    }
+    if (res.status === 409) {
+      // Two unique keys can fire. The same calldata again (a re-quote in the
+      // same second returns identical bytes) is fine only when it is the SAME
+      // build: same intent, same cycle, still unsigned (audit 2026-09-28).
+      // Identical bytes under another intent would be confirmed against the
+      // first row's cycle; bytes already confirmed would execute a second time
+      // and that hash could never be recorded. Both are refused — a re-quote a
+      // second later carries a new deadline, so new bytes.
+      const existing = await fetchImpl(bobbyRest(`${SWAP_RECEIPTS_TABLE}?wallet_address=eq.${row.wallet.toLowerCase()}&calldata_hash=eq.${row.calldataHash}&select=intent_jti,cycle_id,status`), { headers: bobbyServiceHeaders() });
+      if (!existing.ok) return { recorded: false, reason: `db ${existing.status}` };
+      const [prior] = (await existing.json()) as Array<{ intent_jti: string | null; cycle_id: string | null; status: string }>;
+      if (prior) {
+        const sameBuild = (prior.intent_jti ?? null) === (row.intentJti ?? null) && (prior.cycle_id ?? null) === (row.cycleId ?? null);
+        if (sameBuild && prior.status === 'built') return { recorded: true, reason: 'already recorded' };
+        if (sameBuild && row.intentJti) return { recorded: false, reason: 'intent already used' };
+        return { recorded: false, reason: 'calldata already issued' };
+      }
+      if (row.intentJti) return { recorded: false, reason: 'intent already used' };
     }
     return { recorded: false, reason: `db ${res.status}` };
   } catch (error) {

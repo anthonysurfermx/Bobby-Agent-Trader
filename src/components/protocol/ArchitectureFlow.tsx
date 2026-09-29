@@ -37,7 +37,7 @@ const NODES: Node[] = [
   { id: 'resolver', col: 5, title: 'Resolver', sub: '12:30 UTC · 1H path', tone: 'ink', detail: 'Grades each call on the real 1H price path: first touch wins, a same-bar tie goes to the stop.' },
   { id: 'wallet', col: 5, title: 'Your wallet', sub: 'you sign', tone: 'ink', detail: 'The swap is reviewed and signed in your own wallet. Only confirmed receipts are recorded.' },
 
-  { id: 'track', col: 6, title: 'TrackRecordV2', sub: 'Pyth-anchored', tone: 'base', detail: 'Commitments fixed before the outcome and resolved with Pyth evidence. Verified and attested ledgers never mix.' },
+  { id: 'track', col: 6, title: 'TrackRecordV2', sub: 'Pyth-anchored', tone: 'base', detail: 'Commitments fixed before the outcome and graded with Pyth prices at the entry and a declared exit — a graded call, not proof of a swap. Verified and attested ledgers never mix.' },
   { id: 'econ', col: 6, title: 'AgentEconomy', sub: 'MCP fees', tone: 'base', detail: 'Settles the per-call fees agents pay for premium tools.' },
   { id: 'hard', col: 6, title: 'HardnessRegistry', sub: 'decision scores', tone: 'base', detail: 'Difficulty-weighted scores for external agents’ decisions (operator-gated commits).' },
   { id: 'uni', col: 6, title: 'Uniswap V3', sub: 'swap settles', tone: 'base', detail: 'The signed swap settles on Base; the receipt enters a chain-ordered ledger with FIFO PnL.' },
