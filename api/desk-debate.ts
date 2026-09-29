@@ -155,7 +155,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language);
     const asked = horizonOf(question);
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
@@ -166,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
     const remember = () => {
       if (summary && !summary.enabled) return;
-      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked) : false)).catch(() => false));
+      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked, evidence.technicals.price) : false)).catch(() => false));
     };
     if (!live) { res.status(200).json(body); remember(); return; }
     send({ type: 'final', data: body });

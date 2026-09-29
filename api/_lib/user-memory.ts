@@ -18,7 +18,7 @@ export type Experience = 'new' | 'some' | 'experienced';
 export type RiskPref = 'low' | 'medium' | 'high';
 export interface MemoryPrefs { horizon: MemoryHorizon | null; experience: Experience | null; risk: RiskPref | null }
 export interface MemoryAsset { symbol: string; asks: number; lastAskedAt: string; lastHorizon: AskedHorizon }
-export interface MemorySummary { enabled: boolean; prefs: MemoryPrefs; top: MemoryAsset[]; thisAsset: (Omit<MemoryAsset, 'symbol'> & { asksThisWeek: number }) | null }
+export interface MemorySummary { enabled: boolean; prefs: MemoryPrefs; top: MemoryAsset[]; thisAsset: (Omit<MemoryAsset, 'symbol'> & { asksThisWeek: number; lastPrice?: number | null }) | null }
 export interface MemoryList { enabled: boolean; prefs: MemoryPrefs; assets: MemoryAsset[]; retentionDays: number }
 export type PrefsPatch = Partial<MemoryPrefs> & { memoryEnabled?: boolean };
 
@@ -117,17 +117,17 @@ export async function memorySummary(identityId: string, symbol: string, timeoutM
     if (!raw || typeof raw !== 'object') return null;
     const top = Array.isArray(raw.top) ? raw.top.map(assetOf).filter((a): a is MemoryAsset => a !== null) : [];
     const thisRaw = raw.thisAsset ? assetOf({ ...(raw.thisAsset as Record<string, unknown>), symbol }) : null;
-    return { enabled: raw.enabled === true, prefs: prefsOf(raw.prefs), top, thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon, asksThisWeek: Math.max(0, Math.floor(Number((raw.thisAsset as Record<string, unknown>).asksThisWeek) || 0)) } : null };
+    return { enabled: raw.enabled === true, prefs: prefsOf(raw.prefs), top, thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon, asksThisWeek: Math.max(0, Math.floor(Number((raw.thisAsset as Record<string, unknown>).asksThisWeek) || 0)), lastPrice: positive((raw.thisAsset as Record<string, unknown>).lastPrice) } : null };
   } catch {
     return null;
   }
 }
 
 /** Record one answered ask. Best effort: false when it was not recorded (paused, not an account, storage down). */
-export async function recordAsk(identityId: string, symbol: string, horizon: AskedHorizon): Promise<boolean> {
+export async function recordAsk(identityId: string, symbol: string, horizon: AskedHorizon, price?: number | null): Promise<boolean> {
   if (!MEMORY_SYMBOL.test(symbol)) return false;
   try {
-    return (await rpc('bobby_memory_record', { p_identity: identityId, p_symbol: symbol, p_horizon: horizon }, 3000)) === true;
+    return (await rpc('bobby_memory_record', { p_identity: identityId, p_symbol: symbol, p_horizon: horizon, p_price: positive(price) }, 3000)) === true;
   } catch {
     return false;
   }
@@ -188,15 +188,24 @@ export interface ReaderContext {
   prefs?: { horizon?: MemoryHorizon; experience?: Experience; explainRiskDepth?: RiskPref };
   /** The asset asked about now, when asked before. */
   /** The asset asked about now, when asked before. `timesThisWeek` counts this question too (2 = "second time this week"). */
-  thisAsset?: { asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number };
+  thisAsset?: {
+    asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number;
+    /** The weekday of the last ask (UTC), in the answer's language, when it was 1–6 days ago. */
+    lastAskedOn?: string;
+    /** Price at the last ask and the change since, computed here from the evidence's price: quote, never recompute. */
+    priceThen?: number; changeSinceLastAskPct?: number;
+  };
   /** The reader's first name from their Apple/Google profile, when shared. */
   firstName?: string;
   /** Other assets asked about at least twice, most-weighted first. */
   oftenAsks?: Array<{ symbol: string; asks: number }>;
 }
 
+/** A usable price: finite and positive, else null. */
+const positive = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 1e12 ? n : null; };
+
 /** Compact the summary for the model; null when memory is off or holds nothing useful. */
-export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null): ReaderContext | null {
+export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: 'en' | 'es' | 'pt' = 'en'): ReaderContext | null {
   if (!summary?.enabled) return null;
   const ctx: ReaderContext = {};
   if (firstName) ctx.firstName = firstName;
@@ -208,6 +217,15 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
   if (summary.thisAsset) {
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
     ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
+    if (days >= 1 && days <= 6) {
+      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : language === 'pt' ? 'pt-BR' : 'en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
+    }
+    const then = summary.thisAsset.lastPrice ?? null;
+    // A callback only across days: the same-day move is just the chart.
+    if (then && positive(priceNow) && days >= 1) {
+      ctx.thisAsset.priceThen = then;
+      ctx.thisAsset.changeSinceLastAskPct = Math.round(((priceNow as number) / then - 1) * 1000) / 10;
+    }
   }
   // The asked asset is already in thisAsset; oftenAsks names the others the reader keeps coming back to.
   const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== symbol).slice(0, 5).map(({ symbol: s, asks }) => ({ symbol: s, asks }));
