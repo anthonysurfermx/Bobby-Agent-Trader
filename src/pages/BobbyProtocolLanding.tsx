@@ -849,7 +849,6 @@ export default function BobbyProtocolLanding() {
                 ['Protocol', [
                   ['Testnet canary (Sepolia)', '/protocol/calls'],
                   ['Heartbeat', '/protocol/heartbeat'],
-                  ['Audits', '/protocol/audits'],
                   ['Console', '/protocol/console'],
                   ['Sandbox', '/protocol/sandbox'],
                 ]],
