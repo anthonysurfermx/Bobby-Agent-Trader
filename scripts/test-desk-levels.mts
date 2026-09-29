@@ -115,7 +115,8 @@ try {
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).sufficiency.horizon === 'week'), 'every role receives the sufficiency note');
   ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
   const { pricePosition } = await import('../api/_lib/desk-debate.ts');
-  eq(pricePosition({ price: 357.5, ema50: 362.1, resistance: 345.3 }), { ema20: null, ema50: { level: 362.1, side: 'below', distancePct: 1.27 }, support: null, resistance: { level: 345.3, side: 'above', distancePct: 3.53 } }, 'the price position is computed, never left to the model');
+  eq(pricePosition({ price: 357.5, ema50: 362.1, resistance: 345.3 }), { ema20: null, ema50: { level: 362.1, where: 'above price', pctOfPrice: 1.29 }, support: null, resistance: { level: 345.3, where: 'below price', pctOfPrice: 3.41 } }, 'each level\'s place against the price is computed, never left to the model');
+  eq(pricePosition({ price: 715.6, support: 537.3 })!.support, { level: 537.3, where: 'below price', pctOfPrice: 24.92 }, 'distances are in % of the price, not of the level');
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).evidence.technicals.position !== undefined), 'every role receives the computed position');
   eq(quick.agents.direction, 'none', "'wait' keeps direction none");
   eq(quick.agents.synthesis, SYN, 'the CIO returns the synthesis the reader sees first');
