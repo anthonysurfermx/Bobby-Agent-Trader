@@ -43,7 +43,7 @@ export interface LevelPlan {
   budgetMs: number;
 }
 
-const luna = (): ModelSpec => ({ provider: 'openai', model: process.env.BOBBY_DESK_MODEL || 'gpt-6-luna', maxTokens: 1600, timeoutMs: 30_000 });
+const luna = (): ModelSpec => ({ provider: 'openai', model: process.env.BOBBY_DESK_MODEL || 'gpt-6-luna', maxTokens: 2400, timeoutMs: 30_000 });
 const sonnet = (effort: 'medium' | 'high'): ModelSpec => ({ provider: 'anthropic', model: 'claude-sonnet-5-5', effort, maxTokens: effort === 'high' ? 6000 : 4000, timeoutMs: effort === 'high' ? 70_000 : 55_000 });
 
 export function levelPlan(level: DeskLevel): LevelPlan {

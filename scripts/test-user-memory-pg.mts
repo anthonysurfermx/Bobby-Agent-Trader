@@ -23,7 +23,7 @@ const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 const q = async (sql: string, params: unknown[] = []) => (await pool.query(sql, params)).rows;
 
 const TABLES = ['bobby_user_assets', 'bobby_user_prefs'];
-const FUNCTIONS = ['public.bobby_memory_record(uuid, text, text)', 'public.bobby_memory_summary(uuid, text)', 'public.bobby_memory_forget(uuid, text)'];
+const FUNCTIONS = ['public.bobby_memory_record(uuid, text, text, numeric)', 'public.bobby_memory_summary(uuid, text)', 'public.bobby_memory_forget(uuid, text)'];
 
 const account = async () => (await q('insert into public.bobby_identities(auth_user_id) values ($1) returning id', [randomUUID()]))[0].id as string;
 const wallet = async () => (await q("insert into public.bobby_identities(wallet_address) values ('0x' || md5(gen_random_uuid()::text)) returning id"))[0].id as string;
@@ -40,13 +40,15 @@ const seed = (identity: string, symbol: string, asks: number, days: number, hori
      values ($1, $2, $3, now() - make_interval(days => $4 + 1), now() - make_interval(days => $4), $5)`, [identity, symbol, asks, days, horizon]);
 const count = async (identity: string) => Number((await q('select count(*) from public.bobby_user_assets where identity_id = $1', [identity]))[0].count);
 
-const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql', 'utf8');
+const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql', 'utf8')
+  + '\n' + readFileSync('supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql', 'utf8');
 
 try {
   // A clean slate in the scratch database, then Supabase's default ACLs (ALL on every new table and function
   // to anon and authenticated) while the migration runs, so its revokes are what is tested.
   await q(`drop table if exists public.bobby_user_assets, public.bobby_user_prefs cascade;
     drop function if exists public.bobby_memory_record(uuid, text, text);
+    drop function if exists public.bobby_memory_record(uuid, text, text, numeric);
     drop function if exists public.bobby_memory_summary(uuid, text);
     drop function if exists public.bobby_memory_forget(uuid, text);`);
   await q(`alter default privileges in schema public grant all on tables to anon, authenticated;
@@ -188,6 +190,12 @@ try {
   eq([weekView.thisAsset.asks, weekView.thisAsset.asksThisWeek], [2, 2], 'two asks this week; an older time is not counted');
   for (let i = 0; i < 25; i++) await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
   eq((await q("select cardinality(recent_asks) as n from public.bobby_user_assets where identity_id = $1 and symbol = 'AMD'", [weekly]))[0].n, 20, 'at most 20 ask times are kept');
+  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', 123.45)", [weekly]);
+  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'the price at the last ask is kept');
+  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
+  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'an ask without a price keeps the last known one');
+  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', -5)", [weekly]);
+  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'a nonsense price is ignored');
   eq([await count(reader), (await q('select count(*) from public.bobby_user_prefs where identity_id = $1', [reader]))[0].count], [0, '0'], '…assets and preferences');
   const pausedForget = await account();
   await seed(pausedForget, 'NVDA', 3, 0);

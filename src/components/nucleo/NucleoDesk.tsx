@@ -16,6 +16,7 @@ import { voiceScreenState } from '@/lib/realtime-context';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import { getSyncStatus } from '@/lib/companions/sync';
 import NucleoSphere, { type SphereVerdict } from '@/components/companion/NucleoSphere';
+import { useBobbyAccount } from '@/hooks/useBobbyAccount';
 import SignInPrompt, { recordAsk, shouldPromptAfterAsk, shouldPromptNow } from '@/components/companion/SignInPrompt';
 import { EvolutionOverlay, GearCatalog, ToolDetail, ToolUnlockOverlay } from '@/components/companion/CompanionOverlays';
 import LandSeedCard from '@/components/companion/LandSeedCard';
@@ -55,11 +56,12 @@ const WORKING: Phase[] = ['resolving', 'alpha', 'redTeam', 'rebuttal', 'cio'];
 const REVEAL_MS = 2600;
 const AGENT_NAME: Record<AgentKey, string> = { alpha: 'Alpha Hunter', red: 'Red Team', cio: 'CIO' };
 
-function greeting(): string {
+/** "Good afternoon, Anthony." once an Apple/Google account shared a first name; the plain greeting otherwise. */
+function greeting(name?: string | null): string {
   const h = new Date().getHours();
-  if (h < 5 || h >= 19) return t('Good evening.', 'Buenas noches.', 'Boa noite.');
-  if (h < 12) return t('Good morning.', 'Buenos días.', 'Bom dia.');
-  return t('Good afternoon.', 'Buenas tardes.', 'Boa tarde.');
+  const [en, es, pt] = h < 5 || h >= 19 ? ['Good evening', 'Buenas noches', 'Boa noite'] : h < 12 ? ['Good morning', 'Buenos días', 'Bom dia'] : ['Good afternoon', 'Buenas tardes', 'Boa tarde'];
+  const tail = name ? `, ${name}.` : '.';
+  return t(en + tail, es + tail, pt + tail);
 }
 const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(v >= 10 || v <= -10 ? 1 : 2)}%`;
 
@@ -144,6 +146,7 @@ export default function NucleoDesk() {
   const [inspected, setInspected] = useState<CompanionTool | null>(null);
   const [sheet, setSheet] = useState<Sheet>('none');
   const [signInPrompt, setSignInPrompt] = useState(false);
+  const { account } = useBobbyAccount();
   // Metered access (api/_lib/access.ts): 3 reads without an account, 10 a week with one, Bobby Pro unlimited.
   const [accessState, setAccessState] = useState<AccessState | null>(null);
   // The analysis level (Rápido / Profundo / Máximo) and the pop-up when an allowance runs out.
@@ -586,7 +589,7 @@ export default function NucleoDesk() {
         <NucleoSphere size={sphereBig} mode={listening ? 'listen' : 'idle'} tint={levelTint} tintAmount={0.35} />
         {planTag}
       </div>
-      <h1 className="n-display mt-14 text-center text-[40px] leading-[1.05] sm:text-[52px]">{greeting()}</h1>
+      <h1 className="n-display mt-14 text-center text-[40px] leading-[1.05] sm:text-[52px]">{greeting(account?.firstName)}</h1>
       <p className="mt-3 text-center text-[15px]" style={{ color: '#A39C91' }}>
         {movers.length
           ? movers.map((m, i) => <span key={m.symbol}>{i > 0 && <span style={{ color: '#5c564e' }}> · </span>}{m.symbol} <span style={{ color: m.changePct >= 0 ? '#3FE0B5' : '#FF5A5F' }}>{signedPct(m.changePct)}</span></span>)
