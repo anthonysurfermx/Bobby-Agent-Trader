@@ -1,0 +1,3 @@
+# Supabase publishable (public, shipped in the web bundle) key once inlined in the paired-eval script; removed in the next commit.
+1dfbc0fa366f9d315e43ae2917918e386dc1994e:scripts/eval/desk-levels-paired.mts:generic-api-key:24
+1dfbc0fa366f9d315e43ae2917918e386dc1994e:scripts/eval/desk-levels-paired.mts:generic-api-key:25

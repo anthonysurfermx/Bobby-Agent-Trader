@@ -1,6 +1,9 @@
 // ============================================================
 // /api/bobby-access — the reader's access to the desk, and Bobby Pro.
-//   GET                                   → { access, signedIn, subscription, payments }
+//   GET                                   → { access, signedIn, subscription, payments, levels, referral }
+//        levels: the Profundo / Máximo meters; referral: your invite link and friends (signed in only);
+//        plans: the allowances per plan and the invite terms
+//   POST { action: 'referral-claim', code } → { result, access, levels }  accept a friend's invitation
 //   POST { action: 'checkout' }           → { url }  Stripe Checkout, $5/month (web)
 //   POST { action: 'portal' }             → { url }  Stripe billing portal (manage / cancel)
 //   POST { action: 'revenuecat-sync' }   → { ok, access, subscription }  re-read the `pro` entitlement
@@ -14,7 +17,9 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { X509Certificate, createHash, verify as verifySignature } from 'node:crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
-import { getSubscription, publicSubscription, readAccess, upsertSubscription } from './_lib/access.js';
+import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, upsertSubscription } from './_lib/access.js';
+import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.js';
+import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
 
@@ -77,8 +82,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try { identity = await resolveIdentity(req); } catch { identity = null; }
     let subscription = null;
     try { subscription = identity ? await getSubscription(identity.id) : null; } catch { subscription = null; }
+    const [access, levels, referral] = await Promise.all([
+      readAccess(req, identity),
+      readLevels(req, identity),
+      identity ? referralStatus(identity.id, siteOrigin(req)).catch((e) => { console.error('[bobby-access] referral', e instanceof Error ? e.message : e); return null; }) : Promise.resolve(null),
+    ]);
     return res.status(200).json({
-      access: await readAccess(req, identity),
+      access, levels, referral,
+      // The terms the app shows (single source: api/_lib/desk-levels.ts).
+      // freeReadsPerWeek mirrors bobby_consume_read (20260927120000): null while the free weekly cap is off.
+      plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
       payments: { stripe: stripeReady(), apple: true, revenuecat: revenueCatReady() },
@@ -86,11 +99,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { action, signedTransaction } = (req.body ?? {}) as { action?: string; signedTransaction?: string };
+  const { action, signedTransaction, code } = (req.body ?? {}) as { action?: string; signedTransaction?: string; code?: string };
   const identity = await requireIdentity(req, res);
   if (!identity) return;
 
   try {
+    if (action === 'referral-claim') {
+      const normalized = typeof code === 'string' ? code.trim().toUpperCase() : '';
+      if (!isReferralCode(normalized)) return res.status(400).json({ error: 'That invite link is not valid.', result: 'invalid_code' });
+      const result = await claimReferral(identity.id, normalized);
+      const [access, levels] = await Promise.all([readAccess(req, identity), readLevels(req, identity)]);
+      return res.status(200).json({ result, access, levels });
+    }
+
     if (action === 'checkout') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id).catch(() => null);
@@ -156,6 +177,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
     console.error('[bobby-access]', action, e instanceof Error ? e.message : e);
-    return res.status(502).json({ error: 'Payments are temporarily unavailable. Try again.' });
+    return res.status(502).json({ error: action === 'referral-claim' ? 'Invitations are temporarily unavailable. Try again.' : 'Payments are temporarily unavailable. Try again.' });
   }
 }

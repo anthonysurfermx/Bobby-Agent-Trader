@@ -49,6 +49,8 @@ interface Props {
   /** A small line under the word (conviction, for instance). */
   sub?: string | null;
   tint?: string | null;
+  /** How strongly the tint washes the glass (the shader caps it at 0.35). Default 0.28, the companion tint. */
+  tintAmount?: number;
   /** While the desk debates: which voice is speaking. Null hides the three labels. */
   agents?: AgentFocus | 'all';
   agentNames?: { alpha: string; red: string; cio: string };
@@ -56,11 +58,11 @@ interface Props {
   agentsLayout?: 'around' | 'row';
 }
 
-export default function NucleoSphere({ size, mode, verdict = 'wait', word, sub, tint, agents = null, agentNames, agentsLayout = 'around' }: Props) {
+export default function NucleoSphere({ size, mode, verdict = 'wait', word, sub, tint, tintAmount = 0.28, agents = null, agentNames, agentsLayout = 'around' }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const apiRef = useRef<SphereApi | null>(null);
-  const modeRef = useRef({ mode, verdict, tint });
-  modeRef.current = { mode, verdict, tint };
+  const modeRef = useRef({ mode, verdict, tint, tintAmount });
+  modeRef.current = { mode, verdict, tint, tintAmount };
 
   useEffect(() => {
     let alive = true;
@@ -70,13 +72,13 @@ export default function NucleoSphere({ size, mode, verdict = 'wait', word, sub, 
       apiRef.current = api;
       const m = modeRef.current;
       api.set(m.mode, m.verdict);
-      if (m.tint) api.tint(m.tint, 0.28);
+      if (m.tint) api.tint(m.tint, m.tintAmount);
     }).catch(() => { /* the page still works without the glass */ });
     return () => { alive = false; apiRef.current?.destroy?.(); apiRef.current = null; };
   }, []);
 
   useEffect(() => { apiRef.current?.set(mode, verdict); }, [mode, verdict]);
-  useEffect(() => { if (apiRef.current) apiRef.current.tint(tint ?? '#B8C2D3', tint ? 0.28 : 0); }, [tint]);
+  useEffect(() => { if (apiRef.current) apiRef.current.tint(tint ?? '#B8C2D3', tint ? tintAmount : 0); }, [tint, tintAmount]);
 
   const canvas = Math.round(size * 1.9);
   const ring = verdict ? VERDICT_COLOR[verdict] : VERDICT_COLOR.wait;

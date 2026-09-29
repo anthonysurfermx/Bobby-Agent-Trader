@@ -3,7 +3,7 @@
 // to scale with only the levels the desk argued about, and the plan lands as cards. The web keeps
 // everything the iPhone cannot: the Base swap on a LONG, the wallet, and the rest of the desk
 // (sign-in, XP, gear, Trader Land) now living behind the avatar, in the profile.
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -23,11 +23,14 @@ import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
-import { fetchAccess, startBilling, type Access, type AccessState } from '@/lib/access-client';
+import { captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
 import NucleoChart from './NucleoChart';
 import NucleoProfile from './NucleoProfile';
 import NucleoRisk from './NucleoRisk';
 import LangMenu from './LangMenu';
+import LevelControl, { LEVEL_HUE, allowanceFor, levelName, storedLevel, storeLevel } from './LevelControl';
+import LimitDialog, { type LimitState } from './LimitDialog';
+import InvitePanel from './InvitePanel';
 import {
   AGENT_TONE, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money, noTradeReason, prettyName, resolveAsset, runAgents, runDebate, topMovers, type Agents,
   type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
@@ -40,12 +43,15 @@ interface BrowserRecognition {
   onend: (() => void) | null; onerror: (() => void) | null;
 }
 
-type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'rebuttal' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+type LiveArgs = { alpha?: string; red?: string; rebuttal?: string };
+/** The first sentence, for the voices around the glass; the whole text stays in the debate card. */
+const firstSentence = (text: string, max = 170) => { const m = text.match(/^.*?[.!?](?=\s|$)/); const one = (m ? m[0] : text).trim(); return one.length > max ? `${one.slice(0, max).replace(/\s+\S*$/, '')}…` : one; };
 const PENDING_ASK = 'bobby:pending-ask';
 type Sheet = 'none' | 'profile' | 'board' | 'risk' | 'catalog' | 'pet' | 'swap';
 interface Msg { from: 'bobby' | 'you'; text: string }
 
-const WORKING: Phase[] = ['resolving', 'alpha', 'redTeam', 'cio'];
+const WORKING: Phase[] = ['resolving', 'alpha', 'redTeam', 'rebuttal', 'cio'];
 const REVEAL_MS = 2600;
 const AGENT_NAME: Record<AgentKey, string> = { alpha: 'Alpha Hunter', red: 'Red Team', cio: 'CIO' };
 
@@ -140,10 +146,20 @@ export default function NucleoDesk() {
   const [signInPrompt, setSignInPrompt] = useState(false);
   // Metered access (api/_lib/access.ts): 3 reads without an account, 10 a week with one, Bobby Pro unlimited.
   const [accessState, setAccessState] = useState<AccessState | null>(null);
-  const [gate, setGate] = useState<'signin' | 'paywall' | null>(null);
+  // The analysis level (Rápido / Profundo / Máximo) and the pop-up when an allowance runs out.
+  const [deskLevel, setDeskLevelState] = useState<DeskLevel>(() => storedLevel());
+  const setDeskLevel = useCallback((l: DeskLevel) => { setDeskLevelState(l); storeLevel(l); }, []);
+  const deskLevelRef = useRef(deskLevel);
+  deskLevelRef.current = deskLevel;
+  const accessRef = useRef<AccessState | null>(null);
+  const [limit, setLimit] = useState<LimitState | null>(null);
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [inviteNotice, setInviteNotice] = useState<string | null>(null);
+  const [signinNote, setSigninNote] = useState<{ title: string; body: string } | null>(null);
   const [billing, setBilling] = useState<{ busy: boolean; error: string | null }>({ busy: false, error: null });
   const [proNotice, setProNotice] = useState<'welcome' | 'cancelled' | null>(() => (params.get('pro') === 'welcome' ? 'welcome' : params.get('pro') === 'cancelled' ? 'cancelled' : null));
   const meter: Access | null = accessState?.access ?? null;
+  accessRef.current = accessState;
   const [movers, setMovers] = useState<Mover[]>([]);
   const [readSeq, setReadSeq] = useState(0);
   useEffect(() => { if (shouldPromptNow(getSyncStatus() === 'synced')) setSignInPrompt(true); }, []);
@@ -161,6 +177,11 @@ export default function NucleoDesk() {
   const revealRef = useRef<number | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
+  // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
+  const [live, setLive] = useState<LiveArgs>({});
+  const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string; refunded: boolean } | null>(null);
+  const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
+  const [showDebate, setShowDebate] = useState(false);
   const questionRef = useRef<string>('');
   useEffect(() => () => { requestRef.current?.abort(); recognitionRef.current?.stop(); if (revealRef.current) clearTimeout(revealRef.current); }, []);
 
@@ -182,48 +203,107 @@ export default function NucleoDesk() {
     if (signal.aborted) return;
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
+    setDeskRetry(null);
     setSnapshot(snap);
     setAnswer(null);
     setAgents(null);
+    setAgentsFailed(null);
+    setLive({});
+    setShowDebate(false);
     setAward(null);
     setLandEvent(null);
     setSeries([]);
     setPhase('alpha');
     void candles(snap.symbol, snap.isEquity).then((rows) => { if (!signal.aborted) setSeries(rows); });
-    // The stages follow the debate's real order (Alpha, then Red Team on Alpha, then the CIO);
-    // the model calls take a few seconds each.
-    const stage = setTimeout(() => { if (!signal.aborted) setPhase('redTeam'); }, 4000);
-    const stage2 = setTimeout(() => { if (!signal.aborted) setPhase('cio'); }, 9000);
-    const a = await runDebate(snap.symbol, signal);
-    if (a.gate || isUnavailable(a)) { clearTimeout(stage); clearTimeout(stage2); }
-    if (signal.aborted) return;
-    if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
-    if (a.gate) {
+    const runLevel = deskLevelRef.current;
+    const question = questionRef.current || t(`How does ${snap.symbol} look?`, `¿Cómo se ve ${snap.symbol}?`, `Como está ${snap.symbol}?`);
+    const holdQuestion = () => { try { sessionStorage.setItem(PENDING_ASK, questionRef.current || snap.symbol); } catch { /* private mode */ } };
+    // The debate starts first and the stages follow its real events (no timers). The metered read starts
+    // once the server accepted the level, so a refused Profundo/Máximo never spends a read; Rápido has no
+    // level gate, so both start together.
+    const agentsCtl = new AbortController();
+    signal.addEventListener('abort', () => agentsCtl.abort(), { once: true });
+    let readRun: Promise<Answer> | null = runLevel === 'rapido' ? runDebate(snap.symbol, signal) : null;
+    const startRead = () => { readRun = readRun ?? runDebate(snap.symbol, signal); return readRun; };
+    const heard: LiveArgs = {};
+    const agentsRun = runAgents(snap.symbol, snap.isEquity, question, agentsCtl.signal, runLevel, (event) => {
+      if (signal.aborted) return;
+      if (event.type === 'accepted') { void startRead(); return; }
+      if (event.type !== 'agent') return;
+      heard[event.role] = event.text;
+      setLive({ ...heard });
+      setPhase(event.role === 'alpha' ? 'redTeam' : event.role === 'red' && runLevel === 'maximo' ? 'rebuttal' : 'cio');
+    });
+    const gateRead = (a: Answer) => {
       // The server stopped this read: sign in first, or Bobby Pro. The question waits and runs after.
-      try { sessionStorage.setItem(PENDING_ASK, snap.symbol); } catch { /* private mode */ }
+      agentsCtl.abort();
+      holdQuestion();
+      setInput(questionRef.current);
       setSnapshot(null);
-      setPhase('gate');
-      setGate(a.gate === 'signin_required' ? 'signin' : 'paywall');
-      if (a.gate === 'signin_required') setSignInPrompt(true);
+      setPhase('idle');
+      setLimit({ kind: a.gate === 'signin_required' ? 'signin' : 'upgrade', level: 'rapido', resetsAt: a.access?.resetsAt ?? null });
       void fetchAccess().then((st) => { if (st) setAccessState(st); });
+    };
+    const keepMeter = (a: Answer) => {
+      if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
+    };
+    if (readRun) {
+      const early = await readRun;
+      if (signal.aborted) return;
+      keepMeter(early);
+      if (early.gate) { gateRead(early); return; }
+    }
+    const run = await agentsRun;
+    if (signal.aborted) return;
+    if (runLevel !== 'rapido') void fetchAccess().then((st) => { if (st) setAccessState(st); });
+    if (run.refusal) {
+      // The premium level's allowance ran out on the server: the pop-up, never a silent downgrade.
+      if (run.refusal.code === 'signin_required') holdQuestion();
+      setInput(questionRef.current);
+      setSnapshot(null);
+      setPhase('idle');
+      setLimit({ kind: run.refusal.code === 'signin_required' ? 'signin' : run.refusal.code === 'upgrade_required' ? 'upgrade' : 'exhausted', level: run.refusal.level, resetsAt: run.refusal.resetsAt });
       return;
     }
-    if (isUnavailable(a)) {
+    if (run.failure && !readRun) {
+      // Refused before the level was accepted (spend guard, outage): nothing was spent, say so plainly.
+      const msg = run.failure === 'budget_paused'
+        ? t('Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.', 'Profundo e Máximo estão em pausa hoje. Rápido continua disponível.')
+        : t(`The agents did not finish for ${snap.symbol}. Try again.`, `Los agentes no terminaron con ${snap.symbol}. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Tente de novo.`);
       setPhase('error');
-      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
       setDeskError(msg);
+      setDeskRetry(run.failure === 'budget_paused' ? { symbol: snap.symbol, level: 'rapido' } : { symbol: snap.symbol, level: runLevel });
       setMessages((m) => [...m, { from: 'bobby', text: msg }]);
       say(msg);
       return;
     }
-    // The metered read passed: now the three agents argue over the same evidence.
-    const question = questionRef.current || t(`How does ${snap.symbol} look?`, `¿Cómo se ve ${snap.symbol}?`, `Como está ${snap.symbol}?`);
-    const g = await runAgents(snap.symbol, snap.isEquity, question, signal);
-    clearTimeout(stage); clearTimeout(stage2);
+    const a = await startRead();
     if (signal.aborted) return;
+    keepMeter(a);
+    if (a.gate) { gateRead(a); return; }
+    if (isUnavailable(a)) {
+      setPhase('error');
+      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
+      setDeskError(msg);
+      setDeskRetry({ symbol: snap.symbol, level: runLevel });
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      say(msg);
+      return;
+    }
+    const g = run.agents;
     setAgents(g);
     setAnswer(a);
     setReadSeq((n) => n + 1);
+    if (!g) {
+      // The agents did not finish: the market read stays, clearly marked; no verdict, no XP. A premium
+      // use was given back by the server.
+      setAgentsFailed({ level: runLevel, symbol: snap.symbol, refunded: run.refunded === true });
+      setPhase('complete');
+      const msg = t('The agents did not finish this time, so there is no verdict. Here is the market read.', 'Los agentes no terminaron esta vez, así que no hay veredicto. Aquí está la lectura del mercado.', 'Os agentes não terminaram desta vez, então não há veredito. Aqui está a leitura do mercado.');
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      say(msg);
+      return;
+    }
     // The three voices say their piece around the glass, then the verdict condenses on it.
     setPhase('reveal');
     revealRef.current = window.setTimeout(() => { if (!signal.aborted) setPhase('complete'); }, REVEAL_MS);
@@ -248,6 +328,15 @@ export default function NucleoDesk() {
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
     if (!q) return;
+    const lv = deskLevelRef.current;
+    const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
+    if (allowance && allowance.state !== 'open') {
+      const tier = accessRef.current?.levels?.tier ?? accessRef.current?.access.tier ?? 'anon';
+      // Without an account the question waits and runs by itself once the reader is signed in.
+      if (tier === 'anon') { try { sessionStorage.setItem(PENDING_ASK, q); } catch { /* private mode */ } }
+      setLimit({ kind: tier === 'anon' ? 'signin' : tier === 'free' ? 'upgrade' : 'exhausted', level: lv, resetsAt: allowance.resetsAt });
+      return;
+    }
     requestRef.current?.abort();
     const controller = new AbortController();
     requestRef.current = controller;
@@ -286,10 +375,23 @@ export default function NucleoDesk() {
   const retried = useRef(false);
   useEffect(() => {
     let alive = true;
+    captureReferral();
     const load = async (attempt = 0) => {
-      const st = await fetchAccess();
+      let st = await fetchAccess();
       if (!alive || !st) return;
       setAccessState(st);
+      // An invitation from a friend waits for this reader's account, then counts once.
+      if (pendingReferral()) {
+        if (!st.signedIn) setInviteNotice(t('A friend invited you. Create your free account to accept.', 'Un amigo te invitó. Crea tu cuenta gratis para aceptar.', 'Um amigo te convidou. Crie sua conta grátis para aceitar.'));
+        else {
+          const result = await claimPendingReferral();
+          if (result === 'claimed') setInviteNotice(t('Invitation accepted. Your friend just got Bobby Pro thanks to you.', 'Invitación aceptada. Tu amigo acaba de recibir Bobby Pro gracias a ti.', 'Convite aceito. Seu amigo acabou de ganhar Bobby Pro graças a você.'));
+          else if (result) setInviteNotice(null);
+          const fresh = await fetchAccess();
+          if (!alive) return;
+          if (fresh) { st = fresh; setAccessState(fresh); }
+        }
+      }
       if (proNotice === 'welcome' && st.access.tier !== 'pro' && attempt < 6) { window.setTimeout(() => void load(attempt + 1), 2500); return; }
       let pending: string | null = null;
       try { pending = sessionStorage.getItem(PENDING_ASK); } catch { pending = null; }
@@ -297,7 +399,7 @@ export default function NucleoDesk() {
       if (pending && canRead && !retried.current) {
         retried.current = true;
         try { sessionStorage.removeItem(PENDING_ASK); } catch { /* private mode */ }
-        setGate(null); setSignInPrompt(false);
+        setLimit(null); setSignInPrompt(false);
         void ask(pending);
       }
     };
@@ -316,7 +418,14 @@ export default function NucleoDesk() {
     if (revealRef.current) clearTimeout(revealRef.current);
     voice.stop();
     sfxTock();
-    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]); setGate(null);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
+    setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
+  };
+  // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
+  const retry = (r: { symbol: string; level: DeskLevel }) => {
+    sfxTock();
+    if (r.level !== deskLevelRef.current) { setDeskLevel(r.level); deskLevelRef.current = r.level; }
+    void ask(questionRef.current || r.symbol);
   };
 
   const chartSymbol = snapshot?.symbol ?? initialScreen.symbol;
@@ -419,11 +528,10 @@ export default function NucleoDesk() {
   // ---- derived view state ----
   const working = WORKING.includes(phase);
   const reading = working || phase === 'reveal';
-  const gated = phase === 'gate' && gate !== null;
   const done = phase === 'complete' && !!debate && !!answer && !!snapshot;
   const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
-  const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
-  const verdictSub = !debate ? null : debate.direction !== 'none' && answer?.convictionPct != null
+  const verdictWord = !debate ? null : agentsFailed ? t('No verdict', 'Sin veredicto', 'Sem veredito') : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
+  const verdictSub = !debate ? null : agentsFailed ? t('The agents did not finish', 'Los agentes no terminaron', 'Os agentes não terminaram') : debate.direction !== 'none' && answer?.convictionPct != null
     ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% convicción`, `${Math.round(answer.convictionPct)}% convicção`)
     : t('Capital protected', 'Capital protegido', 'Capital protegido');
   const lastYou = [...messages].reverse().find((m) => m.from === 'you')?.text ?? '';
@@ -435,7 +543,7 @@ export default function NucleoDesk() {
     return first > 0 ? ((last - first) / first) * 100 : null;
   }, [series]);
   const assetLine = snapshot ? [snapshot.symbol, answer?.price != null ? money(answer.price) : null, change !== null ? signedPct(change) : null].filter(Boolean).join(' · ') : '';
-  const activeAgent: AgentKey | null = phase === 'alpha' || phase === 'resolving' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : null;
+  const activeAgent: AgentKey | null = phase === 'alpha' || phase === 'resolving' || phase === 'rebuttal' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : null;
   const nextLevel = nextLevelFor(progress.xp);
   const xpArc = nextLevel ? Math.max(0.04, Math.min(1, (progress.xp - level.minXP) / (nextLevel.minXP - level.minXP))) : 1;
 
@@ -467,9 +575,17 @@ export default function NucleoDesk() {
   );
 
   const sphereBig = desktop ? 320 : 232;
+  const levelTint = deskLevel === 'rapido' ? null : LEVEL_HUE[deskLevel];
+  const planTier = accessState?.levels?.tier ?? accessState?.access.tier ?? null;
+  const planTag = planTier === 'free' || planTier === 'pro'
+    ? <span className={`n-plantag ${planTier}`} aria-label={planTier === 'pro' ? 'Bobby Pro' : t('Free account', 'Cuenta gratis', 'Conta grátis')}><i />{planTier === 'pro' ? 'Pro' : 'Free'}</span>
+    : null;
   const idleStage = (
     <div className="flex flex-col items-center">
-      <NucleoSphere size={sphereBig} mode={listening ? 'listen' : 'idle'} />
+      <div className="n-sphere-wrap" data-level={deskLevel} style={{ '--lv': LEVEL_HUE[deskLevel], '--sz': `${sphereBig}px` } as CSSProperties}>
+        <NucleoSphere size={sphereBig} mode={listening ? 'listen' : 'idle'} tint={levelTint} tintAmount={0.35} />
+        {planTag}
+      </div>
       <h1 className="n-display mt-14 text-center text-[40px] leading-[1.05] sm:text-[52px]">{greeting()}</h1>
       <p className="mt-3 text-center text-[15px]" style={{ color: '#A39C91' }}>
         {movers.length
@@ -481,16 +597,25 @@ export default function NucleoDesk() {
     </div>
   );
 
-  const alphaLine = phase === 'reveal' && debate ? debate.stances[0].line : null;
-  const redLine = phase === 'reveal' && debate ? debate.stances[1].line : null;
-  const cioLine = phase === 'reveal' && debate ? debate.stances[2].line : null;
+  // Around the glass, each voice's first sentence as soon as the server sent it; the CIO speaks at the reveal.
+  const alphaSaid = phase === 'reveal' && debate ? debate.stances[0].line : live.rebuttal ?? live.alpha ?? null;
+  const redSaid = phase === 'reveal' && debate ? debate.stances[1].line : live.red ?? null;
+  const alphaLine = alphaSaid ? firstSentence(alphaSaid) : null;
+  const redLine = redSaid ? firstSentence(redSaid) : null;
+  const cioLine = phase === 'reveal' && debate ? firstSentence(agents?.synthesis?.headline ?? debate.stances[2].line) : null;
+  const thinkStatus = phase === 'resolving' ? t('Finding the asset', 'Buscando el activo', 'Buscando o ativo')
+    : phase === 'alpha' ? t('Alpha Hunter looks for the case', 'Alpha Hunter busca el caso', 'Alpha Hunter busca o caso')
+    : phase === 'redTeam' ? t('Red Team attacks it', 'Red Team lo ataca', 'Red Team ataca')
+    : phase === 'rebuttal' ? t('Alpha answers · second round', 'Alpha responde · segunda ronda', 'Alpha responde · segunda rodada')
+    : phase === 'cio' ? t('The CIO decides', 'El CIO decide', 'O CIO decide')
+    : t('Verdict forming', 'Se forma el veredicto', 'Formando o veredicto');
   const thinkStage = (
     <div className="n-think">
       <div className="n-think-a"><Voice k="alpha" line={alphaLine} active={activeAgent === 'alpha'} align={desktop ? 'right' : 'left'} /></div>
-      <div className="n-think-s"><NucleoSphere size={desktop ? 280 : 196} mode="debate" /></div>
+      <div className="n-think-s"><NucleoSphere size={desktop ? 280 : 196} mode="debate" tint={levelTint} tintAmount={0.35} /></div>
       <div className="n-think-r"><Voice k="red" line={redLine} active={activeAgent === 'red'} align={desktop ? 'left' : 'right'} /></div>
       <div className="n-think-c"><Voice k="cio" line={cioLine} active={activeAgent === 'cio'} align="center" /></div>
-      <div className="n-think-st n-label">{phase === 'resolving' ? t('Finding the asset', 'Buscando el activo', 'Buscando o ativo') : phase === 'reveal' ? t('Verdict forming', 'Se forma el veredicto', 'Formando o veredicto') : t('Three agents debating', 'Tres agentes debatiendo', 'Três agentes debatendo')}</div>
+      <div className="n-think-st n-label" aria-live="polite">{thinkStatus}{deskLevel !== 'rapido' ? ` · ${levelName(deskLevel)}` : ''}</div>
     </div>
   );
 
@@ -513,16 +638,34 @@ export default function NucleoDesk() {
         </div>
         <div className="n-sats right">{sats.filter((_, i) => i % 2 === 1).map((s, i) => <Satellite key={s.k} {...s} delay={0.22 + i * 0.14} />)}</div>
       </div>
+      {agentsFailed ? (
+        <div className="n-card n-synth n-failed mt-8" role="status">
+          <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
+          <p className="n-synth-head">{t('The agents did not finish, so nothing was decided. The market read below is data, not a thesis.', 'Los agentes no terminaron, así que no se decidió nada. La lectura de abajo son datos, no una tesis.', 'Os agentes não terminaram, então nada foi decidido. A leitura abaixo são dados, não uma tese.')}</p>
+          {agentsFailed.level !== 'rapido' && agentsFailed.refunded && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
+          <button type="button" className="n-send mt-4" onClick={() => retry({ symbol: agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+        </div>
+      ) : agents?.synthesis ? (
+        <div className="n-synth mt-8 w-full">
+          <div className="flex min-h-[56px] w-full justify-center px-2"><Caption text={agents.synthesis.headline} run={readSeq} /></div>
+          <div className="n-synth-rows">
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.alpha }} /><span><b>{t('Why', 'Por qué', 'Por quê')}</b>{agents.synthesis.why}</span></div>
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.red }} /><span><b>{t('The risk', 'El riesgo', 'O risco')}</b>{agents.synthesis.risk}</span></div>
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.cio }} /><span><b>{t('Watch', 'Qué vigilar', 'O que vigiar')}</b>{agents.synthesis.watch}</span></div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 flex min-h-[64px] w-full justify-center px-2"><Caption text={debate.spoken} run={readSeq} /></div>
+      )}
       <div className="mt-8 w-full">
-        <NucleoChart series={series} answer={answer} debate={debate} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
+        <NucleoChart series={series} answer={answer} debate={agentsFailed ? null : debate} watch={agentsFailed ? null : agents?.synthesis?.watchLevel ?? null} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
       </div>
-      <div className="mt-8 flex min-h-[64px] w-full justify-center px-2"><Caption text={debate.spoken} run={readSeq} /></div>
     </div>
   ) : null;
 
   const thesisCard = done && debate && answer && snapshot ? (() => {
     const trade = debate.direction !== 'none';
-    const title = debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
+    const title = agentsFailed ? t(`${snapshot.symbol}: market read`, `${snapshot.symbol}: lectura del mercado`, `${snapshot.symbol}: leitura do mercado`) : debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
     const rows: Array<{ k: string; v: string; dot?: string }> = [];
     if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer', 'Preço na leitura'), v: money(answer.price) });
     if (trade) {
@@ -541,7 +684,7 @@ export default function NucleoDesk() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="n-card n-plan">
         <div className="flex items-baseline justify-between"><span className="n-label">{t('Thesis', 'Tesis', 'Tese')} · {snapshot.symbol}</span><span className="n-label" style={{ color: tone }}>{verdictSub}</span></div>
         <div className="n-display mt-3 text-[28px] leading-tight">{title}</div>
-        {!trade && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer, agents)}</p>}
+        {!trade && !agentsFailed && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer, agents)}</p>}
         <div className="mt-4">
           {rows.map((r) => (
             <div key={r.k} className="n-kv"><span className="n-kv-k">{r.dot && <i style={{ background: r.dot }} />}{r.k}</span><span className="n-kv-v">{r.v}</span></div>
@@ -549,17 +692,34 @@ export default function NucleoDesk() {
         </div>
         {award && award.xp > 0 && <div className="n-xp mt-4">+{award.xp} {award.noTrade ? t('discipline XP for waiting', 'XP de disciplina por esperar', 'XP de disciplina por esperar') : t('discipline XP', 'XP de disciplina', 'XP de disciplina')}</div>}
         <p className="mt-4 text-[12px] leading-relaxed" style={{ color: '#8A8378' }}>
-          {t('1H indicators, argued by three agents. Reference only, not financial advice. ', 'Indicadores de 1H, debatidos por tres agentes. Solo referencia, no es asesoría financiera. ', 'Indicadores de 1H, debatidos por três agentes. Apenas referência, não é recomendação financeira. ')}
+          {(() => {
+            const tfs = (agents?.evidenceUsed?.timeframes ?? ['1H']).join(' · ');
+            const lv = agents && agents.level !== 'rapido' ? ` · ${levelName(agents.level)}` : '';
+            return t(`${tfs} indicators, argued by three agents${lv}. Reference only, not financial advice. `, `Indicadores de ${tfs}, debatidos por tres agentes${lv}. Solo referencia, no es asesoría financiera. `, `Indicadores de ${tfs}, debatidos por três agentes${lv}. Apenas referência, não é recomendação financeira. `);
+          })()}
           <a href="/protocol" className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes', 'Atividade pública dos agentes')}</a>
         </p>
       </motion.div>
     );
   })() : null;
 
-  const debateCard = done && debate ? (
+  const debateCard = done && debate && agents && !agentsFailed ? (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="n-card n-plan">
-      <div className="flex items-baseline justify-between"><span className="n-label">{t('The debate', 'El debate', 'O debate')}</span><span className="n-label">{t('3 agents', '3 agentes', '3 agentes')}</span></div>
-      <div className="mt-2">
+      <div className="flex items-baseline justify-between"><span className="n-label">{t('The debate', 'El debate', 'O debate')}</span><span className="n-label">{agents?.rebuttal ? t('3 agents · 2 rounds', '3 agentes · 2 rondas', '3 agentes · 2 rodadas') : t('3 agents', '3 agentes', '3 agentes')}</span></div>
+      {!showDebate && (
+        <div className="mt-2">
+          {debate.stances.map((s, i) => (
+            <div key={s.key} className="n-debate-peek" style={{ borderTop: i ? '1px solid rgba(242,237,228,.07)' : 'none' }}>
+              <span className="n-voice-name" style={{ color: AGENT_TONE[s.key] }}><i />{AGENT_NAME[s.key]}</span>
+              <span className="n-debate-peek-line">{firstSentence(s.line, 120)}</span>
+            </div>
+          ))}
+          <button type="button" className="n-debate-more" aria-expanded={false} onClick={() => { sfxTock(); setShowDebate(true); }}>
+            {t('Read the full debate', 'Ver el debate completo', 'Ver o debate completo')}
+          </button>
+        </div>
+      )}
+      {showDebate && <div className="mt-2">
         {debate.stances.map((s, i) => (
           <div key={s.key} className="py-3.5" style={{ borderTop: i ? '1px solid rgba(242,237,228,.07)' : 'none' }}>
             <div className="flex items-center justify-between gap-2">
@@ -569,7 +729,26 @@ export default function NucleoDesk() {
             <div className="mt-1.5 text-[15px] leading-snug" style={{ color: '#F2EDE4' }}>{s.line}</div>
           </div>
         ))}
-      </div>
+        {agents?.rebuttal && (
+          <div className="py-3.5" style={{ borderTop: '1px solid rgba(242,237,228,.07)' }}>
+            <span className="n-voice-name" style={{ color: AGENT_TONE.alpha }}><i />{t('Alpha Hunter · second round', 'Alpha Hunter · segunda ronda', 'Alpha Hunter · segunda rodada')}</span>
+            <div className="mt-1.5 text-[15px] leading-snug" style={{ color: '#F2EDE4' }}>{agents.rebuttal}</div>
+          </div>
+        )}
+        {agents?.scenarios && (
+          <div className="n-scen">
+            <div className="n-label">{t('Scenarios', 'Escenarios', 'Cenários')}</div>
+            <div className="n-scen-row"><i style={{ background: AGENT_TONE.alpha }} /><span><b>{t('Confirms it', 'Lo confirma', 'Confirma')}</b>{agents.scenarios.confirm}</span></div>
+            <div className="n-scen-row"><i style={{ background: AGENT_TONE.red }} /><span><b>{t('Invalidates it', 'Lo invalida', 'Invalida')}</b>{agents.scenarios.invalidate}</span></div>
+          </div>
+        )}
+        {agents?.sufficiency && !agents.sufficiency.sufficient && agents.sufficiency.missing.length > 0 && (
+          <p className="mt-3 text-[13px]" style={{ color: '#A39C91' }}>{t(`For your horizon the desk is missing ${agents.sufficiency.missing.join(' · ')} data.`, `Para tu plazo faltan datos de ${agents.sufficiency.missing.join(' · ')}.`, `Para o seu prazo faltam dados de ${agents.sufficiency.missing.join(' · ')}.`)}</p>
+        )}
+        <button type="button" className="n-debate-more" aria-expanded onClick={() => { sfxTock(); setShowDebate(false); }}>
+          {t('Show less', 'Ver menos', 'Ver menos')}
+        </button>
+      </div>}
     </motion.div>
   ) : null;
 
@@ -606,35 +785,6 @@ export default function NucleoDesk() {
     const err = await startBilling('checkout');
     if (err) setBilling({ busy: false, error: err });
   };
-  const resetDate = meter?.resetsAt ? new Date(meter.resetsAt).toLocaleDateString(isPortuguese() ? 'pt-BR' : undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : null;
-  const gateStage = gated ? (
-    <div className="flex flex-col items-center text-center">
-      <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
-      {gate === 'signin' ? (
-        <>
-          <div className="n-label mt-12">{t('Free account', 'Cuenta gratis', 'Conta grátis')}</div>
-          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.', 'Crie sua conta grátis para continuar lendo.')}</h2>
-          <p className="mt-3 max-w-[44ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('10 free reads every week, and your XP and gear saved on the web and the iPhone app. Your question runs as soon as you are in.', '10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone. Tu pregunta corre en cuanto entres.', '10 leituras grátis por semana, com seu XP e seu equipamento salvos na web e no app de iPhone. Sua pergunta roda assim que você entrar.')}</p>
-          <button type="button" className="n-cta on mt-7 max-w-[320px]" onClick={() => { sfxTock(); setSignInPrompt(true); }}>{t('Continue with Apple or Google', 'Continuar con Apple o Google', 'Continuar com Apple ou Google')}</button>
-        </>
-      ) : (
-        <>
-          <div className="n-label mt-12">Bobby Pro</div>
-          <h2 className="n-display mt-3 max-w-[20ch] text-[32px] leading-[1.12] sm:text-[38px]">{t('Your 10 free reads this week are used.', 'Ya usaste tus 10 lecturas gratis de esta semana.', 'Você já usou suas 10 leituras grátis desta semana.')}</h2>
-          <p className="mt-3 max-w-[46ch] text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>
-            {t('Bobby Pro reads without limits for $5 a month. Cancel anytime.', 'Bobby Pro lee sin límites por $5 al mes. Cancela cuando quieras.', 'O Bobby Pro lê sem limites por $5 ao mês. Cancele quando quiser.')}
-            {resetDate ? t(` Or wait: your free reads come back ${resetDate}.`, ` O espera: tus lecturas gratis vuelven el ${resetDate}.`, ` Ou espere: suas leituras grátis voltam em ${resetDate}.`) : ''}
-          </p>
-          <button type="button" className="n-cta on mt-7 max-w-[320px]" disabled={billing.busy || !accessState?.payments.stripe} onClick={() => void subscribe()}>
-            {accessState?.payments.stripe ? (billing.busy ? t('Opening checkout…', 'Abriendo el pago…', 'Abrindo o pagamento…') : t('Get Bobby Pro · $5/month', 'Obtener Bobby Pro · $5/mes', 'Assinar o Bobby Pro · $5/mês')) : t('Card payments open very soon', 'Los pagos con tarjeta abren muy pronto', 'Os pagamentos com cartão abrem em breve')}
-          </button>
-          {billing.error && <p role="alert" className="mt-3 text-[13px]" style={{ color: '#FFB3B5' }}>{billing.error}</p>}
-          <p className="mt-4 text-[12px]" style={{ color: '#8A8378' }}>{t('On iPhone, Bobby Pro is sold through the App Store.', 'En iPhone, Bobby Pro se compra en la App Store.', 'No iPhone, o Bobby Pro é vendido pela App Store.')}</p>
-        </>
-      )}
-    </div>
-  ) : null;
-
   const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
     ? meter.tier === 'anon'
       ? t(`${meter.remaining} of ${meter.limit} reads left without an account`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas sin cuenta`, `${meter.remaining === 1 ? 'Resta' : 'Restam'} ${meter.remaining} de ${meter.limit} leituras sem conta`)
@@ -645,23 +795,32 @@ export default function NucleoDesk() {
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
       <p className="n-caption mt-12" role="alert">{deskError ?? lastBobby}</p>
+      {deskRetry && (
+        <button type="button" className="n-send mt-6" onClick={() => retry(deskRetry)}>
+          {deskRetry.level === deskLevel ? t('Try again', 'Reintentar', 'Tentar de novo') : t(`Continue with ${levelName(deskRetry.level)}`, `Seguir con ${levelName(deskRetry.level)}`, `Continuar com ${levelName(deskRetry.level)}`)}
+        </button>
+      )}
     </div>
   ) : null;
 
-  const suggestions = done && snapshot
-    ? [t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), ...progress.quickAccess.filter((s) => s !== snapshot.symbol).slice(0, 2).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`, `Como está ${s}?`))]
-    : progress.quickAccess.slice(0, 3).map((s) => t(`How does ${s} look?`, `¿Cómo se ve ${s}?`, `Como está ${s}?`));
-  const chips = !reading && !gated && phase !== 'confirm' ? (
+  // After a read: the CIO's own follow-up question first (it runs as a new question on the same asset),
+  // then another question of the reader's, then their other assets.
+  const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
+  const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
+  const suggestions: Array<{ label: string; go: () => void }> = done && snapshot
+    ? [
+      ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.toUpperCase().includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
+      { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
+      ...progress.quickAccess.filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
+    ]
+    : progress.quickAccess.slice(0, 3).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
+  const chips = !reading && phase !== 'confirm' ? (
     <div className="w-full">
       {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}
       <div className="n-label mb-3 text-center">{t('You might want to ask', 'Quizá quieras preguntar', 'Talvez você queira perguntar')}</div>
       <div className="n-chips">
-        {suggestions.map((s, i) => (
-          <button key={s} type="button" className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => {
-            if (done && snapshot && i === 0) { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); return; }
-            const sym = done && snapshot ? progress.quickAccess.filter((q) => q !== snapshot.symbol)[i - 1] : progress.quickAccess[i];
-            if (sym) void ask(sym, s);
-          }}>{s}</button>
+        {suggestions.map((c, i) => (
+          <button key={c.label} type="button" className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => { sfxTock(); c.go(); }}>{c.label}</button>
         ))}
         <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); setSheet('board'); }}>{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</button>
       </div>
@@ -672,6 +831,8 @@ export default function NucleoDesk() {
     <div className="n-dock">
       <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="n-ask mx-auto w-full max-w-[620px]">
         <input ref={inputRef} data-desk-input value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Ask about an asset', 'Pregunta por un activo', 'Pergunte sobre um ativo')} placeholder={listening ? t('Listening…', 'Escuchando…', 'Ouvindo…') : t('Ask about any stock or crypto…', 'Pregunta por una acción o cripto…', 'Pergunte sobre ação ou cripto…')} />
+        <LevelControl level={deskLevel} onChange={setDeskLevel} state={accessState} disabled={working}
+          onSignIn={() => { setSigninNote(null); setSignInPrompt(true); }} onInvite={() => { setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); }} />
         {input.trim() && !working && <button type="submit" className="n-send" aria-label={t('Ask', 'Preguntar', 'Perguntar')}><ArrowRight size={16} /></button>}
         <span className={`n-mic-wrap ${listening ? 'on' : ''}`}><span className="n-mic-glow" aria-hidden="true"><i /></span><button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar', 'Parar de ouvir') : t('Talk to Bobby', 'Hablar con Bobby', 'Falar com o Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button></span>
       </form>
@@ -692,10 +853,16 @@ export default function NucleoDesk() {
             <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setProNotice(null)}><X size={14} /></button>
           </div>
         )}
+        {inviteNotice && (
+          <div className="n-notice" role="status">
+            <span>{inviteNotice}</span>
+            <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setInviteNotice(null)}><X size={14} /></button>
+          </div>
+        )}
         <AnimatePresence mode="wait">
-          <motion.section key={reading ? 'think' : done ? 'result' : gated ? 'gate' : phase === 'confirm' ? 'confirm' : phase === 'error' ? 'error' : 'idle'}
+          <motion.section key={reading ? 'think' : done ? 'result' : phase === 'confirm' ? 'confirm' : phase === 'error' ? 'error' : 'idle'}
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.35 }} className="w-full">
-            {reading ? thinkStage : done ? resultStage : gated ? gateStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : idleStage}
+            {reading ? thinkStage : done ? resultStage : phase === 'confirm' ? confirmCard : phase === 'error' ? errorStage : idleStage}
           </motion.section>
         </AnimatePresence>
         {cards}
@@ -729,11 +896,18 @@ export default function NucleoDesk() {
                 void subscribe();
               },
             }}
+            invite={{
+              label: t('Invite friends', 'Invita amigos', 'Convide amigos'),
+              detail: accessState?.referral
+                ? t(`${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro for each friend`, `${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro por cada amigo`, `${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro por cada amigo`)
+                : t('Bobby Pro for each friend who joins', 'Bobby Pro por cada amigo que se une', 'Bobby Pro por cada amigo que entra'),
+              action: () => { setSheet('none'); setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); },
+            }}
             onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?', 'Zerar XP, equipamento e avatar neste navegador?'))) progressStore.reset(); }}
           />
         )}
         {sheet === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
-        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} required={gate === 'signin'} onClose={() => setSignInPrompt(false)} />}
+        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} note={signinNote ?? undefined} onClose={() => { setSignInPrompt(false); setSigninNote(null); }} />}
         {sheet === 'catalog' && <GearCatalog key="catalog" current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('profile')} />}
         {sheet === 'swap' && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
         {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
@@ -752,6 +926,30 @@ export default function NucleoDesk() {
         {/* A new tool: open the profile so the avatar is seen putting it on. */}
         {!evolution && drops[0] && <ToolUnlockOverlay key="drop" companion={companion} tool={drops[0]} onDone={() => { const tool = drops[0]; setDrops((d) => d.slice(1)); if (toolHasArt(tool)) { setSheet('profile'); setTimeout(() => setEquip((e) => ({ url: toolArt(tool), token: e.token + 1 })), 520); } }} />}
       </AnimatePresence>
+
+      <LimitDialog limit={limit} state={accessState} billing={billing} onClose={() => setLimit(null)}
+        onSignIn={() => {
+          const lv = limit?.level ?? 'rapido';
+          setSigninNote({
+            title: t('Create your free account to keep going.', 'Crea tu cuenta gratis para seguir.', 'Crie sua conta grátis para continuar.'),
+            body: lv === 'rapido'
+              ? t('Your question runs as soon as you are in.', 'Tu pregunta corre en cuanto entres.', 'Sua pergunta roda assim que você entrar.')
+              : t(`${levelName(lv)} is part of your free account.`, `${levelName(lv)} viene con tu cuenta gratis.`, `${levelName(lv)} vem com sua conta grátis.`),
+          });
+          setLimit(null); setSheet('none'); setSignInPrompt(true);
+        }}
+        onSubscribe={() => void subscribe()} onLevel={setDeskLevel} />
+      <Dialog.Root open={inviteOpen} onOpenChange={setInviteOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="n-dlg-overlay" />
+          <Dialog.Content className="n-dlg" aria-describedby={undefined}>
+            <Dialog.Close className="n-dlg-x" aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={15} /></Dialog.Close>
+            <div className="n-label">Bobby Pro</div>
+            <Dialog.Title className="n-dlg-title">{t('Invite friends, get Bobby Pro.', 'Invita amigos, gana Bobby Pro.', 'Convide amigos, ganhe Bobby Pro.')}</Dialog.Title>
+            <InvitePanel state={accessState} onSignIn={() => { setInviteOpen(false); setSigninNote(null); setSignInPrompt(true); }} />
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
     </div>
   );
 }
