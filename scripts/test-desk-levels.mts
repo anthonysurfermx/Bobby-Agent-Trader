@@ -114,6 +114,9 @@ try {
   eq([quick.level, quick.sufficiency.horizon, quick.sufficiency.sufficient, quick.sufficiency.missing], ['rapido', 'week', false, ['4H', '1D']], 'Rápido: the weekly question is flagged as missing 4H and 1D');
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).sufficiency.horizon === 'week'), 'every role receives the sufficiency note');
   ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
+  const { pricePosition } = await import('../api/_lib/desk-debate.ts');
+  eq(pricePosition({ price: 357.5, ema50: 362.1, resistance: 345.3 }), { ema20: null, ema50: { level: 362.1, side: 'below', distancePct: 1.27 }, support: null, resistance: { level: 345.3, side: 'above', distancePct: 3.53 } }, 'the price position is computed, never left to the model');
+  ok(calls.every((c) => JSON.parse(c.body.messages[1].content).evidence.technicals.position !== undefined), 'every role receives the computed position');
   eq(quick.agents.direction, 'none', "'wait' keeps direction none");
   eq(quick.agents.synthesis, SYN, 'the CIO returns the synthesis the reader sees first');
   mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, watchLevel: 5000 } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));

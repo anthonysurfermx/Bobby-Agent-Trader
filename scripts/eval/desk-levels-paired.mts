@@ -11,6 +11,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { execSync } from 'node:child_process';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const ENV_FILE = '/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.env.local';
@@ -28,6 +29,7 @@ Object.assign(process.env, {
 const desk = await import(`${ROOT}/api/_lib/desk-debate.ts`);
 const { loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate, reviewDeskOutput } = desk;
 
+const COMMIT = (() => { try { return execSync('git rev-parse --short HEAD', { cwd: ROOT }).toString().trim(); } catch { return null; } })();
 const OUT = process.env.EVAL_OUT || `${ROOT}/docs/ai/data/2026-09-29-levels-paired-eval.json`;
 const BUDGET = Number(process.env.EVAL_BUDGET_USD || 1.8);
 const ARMS = ['BASELINE', 'RAPIDO', 'PROFUNDO', 'MAXIMO'] as const;
@@ -192,7 +194,7 @@ const pct = (xs: number[], p: number) => { if (!xs.length) return null; const s 
 const frozen = process.env.EVAL_FROZEN && existsSync(process.env.EVAL_FROZEN) ? JSON.parse(readFileSync(process.env.EVAL_FROZEN, 'utf8')) : null;
 const results: any[] = [];
 const save = (extra: Record<string, unknown> = {}) => writeFileSync(OUT, JSON.stringify({
-  meta: { date: '2026-09-29', script: 'scripts/eval/desk-levels-paired.mts', branch: 'feat/analysis-levels-referrals',
+  meta: { date: '2026-09-29', script: 'scripts/eval/desk-levels-paired.mts', branch: 'feat/analysis-levels-referrals', commit: COMMIT,
     arms: { BASELINE: 'gpt-4o-mini ×3, old prompts, json_object, temperature 0.2, evidence v1 (+ output guard, as prod had)', RAPIDO: 'runDeskDebate level rapido, evidence v1', PROFUNDO: 'runDeskDebate level profundo, evidence v2', MAXIMO: 'runDeskDebate level maximo, evidence v2' },
     judges: ['claude-sonnet-5-5 (effort medium, json_schema)', 'gpt-6-sol (reasoning_effort medium, json_object)'], criteria: CRITERIA, spend },
   cases: results, ...extra }, null, 2));
