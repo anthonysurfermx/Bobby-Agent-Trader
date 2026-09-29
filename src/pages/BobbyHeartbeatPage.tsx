@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { useProtocolTxHistory, type OnChainTx } from '@/hooks/useProtocolTxHistory';
 import { BOBBY_BASE_MAINNET, DEFAULT_CHAIN } from '@/config/chains';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
+import { useVisiblePoll } from '@/hooks/useVisiblePoll';
 
 interface HeartbeatData {
   ok: boolean;
@@ -155,26 +156,24 @@ export default function BobbyHeartbeatPage() {
     fetchHistoricalTxs,
   } = useProtocolTxHistory();
 
-  const fetchHeartbeat = async () => {
+  const fetchHeartbeat = useCallback(async (signal?: AbortSignal) => {
     try {
-      const res = await fetch('/api/protocol-heartbeat');
+      const res = await fetch('/api/protocol-heartbeat', { signal });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const json = await res.json();
       setData(json);
       setError(null);
       setLastRefresh(new Date());
     } catch (err) {
+      if (signal?.aborted) return;
       setError(err instanceof Error ? err.message : 'Failed to fetch');
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchHeartbeat();
-    const interval = setInterval(fetchHeartbeat, 15000); // Poll every 15s
-    return () => clearInterval(interval);
   }, []);
+
+  // Every 2 min while the tab is visible (the route is CDN-cached for 60 s); refreshed on return.
+  useVisiblePoll(fetchHeartbeat);
 
   // Chain-aware labels — served by the API, fallback to the live chain (Base)
   const chainName = data?.chain?.name || DEFAULT_CHAIN.name;
