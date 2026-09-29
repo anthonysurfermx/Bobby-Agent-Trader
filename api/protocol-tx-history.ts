@@ -310,6 +310,70 @@ async function fetchHistoricalTxPage(
   };
 }
 
+// Base keeps a public index (Blockscout, Etherscan-compatible): one txlist call per protocol contract returns
+// every transaction sent to it, whoever signed it (the recorder wallet signs commits and resolves, not the
+// treasury). The first page of the archive comes from it, so the 2026-08-22 commit/resolve show up on open
+// instead of hundreds of 4,000-block pages back. The RPC log scan stays as the fallback and for cursors.
+const BLOCKSCOUT_API = DEFAULT_CHAIN.id === 8453 ? 'https://base.blockscout.com/api' : null;
+
+// Base (V2) selectors seen on the protocol contracts; the index does not always name the function. commitTrade
+// and resolveTrade take structs, so they are pinned from the 2026-08-22 txs (0xf36ae578…, 0xfb77d944…).
+const V2_METHODS: Record<string, string> = {
+  '0x7e3ef7aa': 'announceCommit',
+  '0xed7f6158': 'commitTrade',
+  '0x9ae2a9b8': 'resolveTrade',
+  '0xf2fde38b': 'transferOwnership',
+  '0x79ba5097': 'acceptOwnership',
+};
+
+type IndexedTx = { hash: string; blockNumber: string; timeStamp: string; to: string; value: string; input: string; isError?: string; functionName?: string };
+// The index is rate limited: one contract at a time, and a good answer is kept for 15 minutes per instance
+// (the CDN adds its own minute on top), so the archive costs a handful of index calls an hour.
+let indexCache: { at: number; lists: IndexedTx[][] } | null = null;
+const INDEX_TTL_MS = 15 * 60_000;
+
+async function fetchIndexedHistory(limit: number): Promise<OnChainTx[] | null> {
+  if (!BLOCKSCOUT_API) return null;
+  let lists: IndexedTx[][];
+  if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) {
+    lists = indexCache.lists;
+  } else {
+    lists = [];
+    for (const address of CONTRACT_ADDRESSES) {
+      const url = `${BLOCKSCOUT_API}?module=account&action=txlist&address=${address}&startblock=${PROTOCOL_ACTIVITY_START_BLOCK}&sort=desc&page=1&offset=100`;
+      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
+      // A partial archive would read as complete: any failure hands the page back to the RPC scan.
+      if (!r.ok) return null;
+      const body = await r.json() as { result?: unknown };
+      // "No transactions found" is status 0 with an empty list, not a failure.
+      if (!Array.isArray(body.result)) return null;
+      lists.push(body.result as IndexedTx[]);
+    }
+    indexCache = { at: Date.now(), lists };
+  }
+  const seen = new Set<string>();
+  const items: OnChainTx[] = [];
+  for (const list of lists) {
+    for (const tx of list) {
+      const to = String(tx.to || '').toLowerCase();
+      if (!CONTRACT_NAMES[to] || tx.isError === '1' || seen.has(tx.hash)) continue;
+      seen.add(tx.hash);
+      const named = String(tx.functionName || '').split('(')[0].trim();
+      items.push({
+        hash: tx.hash,
+        contract: to,
+        contractName: CONTRACT_NAMES[to],
+        method: named || V2_METHODS[String(tx.input || '').slice(0, 10).toLowerCase()] || identifyMethod(to, tx.input || '0x'),
+        blockNumber: Number(tx.blockNumber) || 0,
+        timestamp: Number(tx.timeStamp) || null,
+        valueNative: formatEther(BigInt(tx.value || '0')),
+      });
+    }
+  }
+  items.sort((a, b) => b.blockNumber - a.blockNumber);
+  return items.slice(0, limit);
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -331,7 +395,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const cursor = Number.isFinite(parsedCursor) ? Math.min(parsedCursor, latestBlock) : latestBlock;
     const cacheKey = `${cursor}:${limit}`;
 
-    const page = await fetchHistoricalTxPage(cursor, limit);
+    // The opening page reads the index; an explicit cursor (or an index outage) walks the RPC logs.
+    const indexed = typeof rawCursor === 'string' ? null : await fetchIndexedHistory(limit).catch(() => null);
+    const page = indexed
+      ? { items: indexed, nextCursor: null, done: true }
+      : await fetchHistoricalTxPage(cursor, limit);
     const payload = {
       ok: true,
       chain: {

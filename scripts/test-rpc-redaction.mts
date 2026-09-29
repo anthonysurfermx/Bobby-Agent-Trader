@@ -115,9 +115,11 @@ await check('reputation on Base requests V2 selectors only and reports real numb
   assert.equal(state.status, 200); assert.equal(b.ok, true); assert.equal(b.degraded, false);
   assert.deepEqual(b.sources, { trackRecord: 'ok', oracle: 'ok', economy: 'ok', bounties: 'ok' });
   assert.equal(b.chain.trackRecordVersion, 'v2'); assert.equal(b.reputation.ledger, 'verified');
-  assert.equal(b.reputation.winRate, 60); assert.equal(b.reputation.wins, 6); assert.equal(b.reputation.losses, 4); assert.equal(b.reputation.cumulativePnlPct, 2.5);
+  // 10 resolved < WIN_RATE_MIN_SAMPLE (20): the rate and the score built on it are withheld, the counts stay.
+  assert.equal(b.reputation.winRate, null); assert.equal(b.reputation.sample.sufficient, false); assert.equal(b.reputation.sample.label, '6 of 10 · insufficient sample');
+  assert.equal(b.reputation.wins, 6); assert.equal(b.reputation.losses, 4); assert.equal(b.reputation.cumulativePnlPct, 2.5);
   assert.equal(b.reputation.totalTrades, 10); assert.equal(b.protocolTotals.totalBounties, 3);
-  assert.equal(typeof b.trustScore.score, 'number');
+  assert.equal(b.trustScore.score, null); assert.ok(b.trustScore.unavailable.includes('insufficient_sample'));
   for (const sel of V1_SELECTORS) assert.ok(!requestedSelectors.has(sel), `v1 selector ${sel} must not be requested on a V2 deployment`);
   assert.equal(b.chain.rpc, 'https://mainnet.base.org', 'advertised RPC is the static public endpoint');
   assertNoSentinel('reputation ok', b);
@@ -128,7 +130,7 @@ await check('heartbeat on Base uses getVerifiedWinRate and reports it', async ()
   const b = state.body as any;
   assert.equal(b.ok, true, JSON.stringify(b).slice(0, 300)); assert.equal(b.trackRecordVersion, 'v2');
   assert.deepEqual(b.sources, { economy: 'ok', trackRecord: 'ok', bounties: 'ok' });
-  assert.equal(b.performance.winRate, 60); assert.equal(b.performance.totalTrades, 10);
+  assert.equal(b.performance.winRate, null); assert.match(b.performance.winRateNote, /10 resolved · insufficient sample/); assert.equal(b.performance.totalTrades, 10);
   assert.ok(!requestedSelectors.has(trackRecord.getFunction('getWinRate')!.selector), 'v1 getWinRate must not be requested');
   assertNoSentinel('heartbeat ok', b);
 });
