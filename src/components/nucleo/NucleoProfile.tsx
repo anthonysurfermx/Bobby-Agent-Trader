@@ -4,7 +4,7 @@
 // the way the iPhone app keeps them behind its header face.
 import { useState, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, ChevronRight, Compass, Globe, Grid2x2, Lock, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -12,6 +12,7 @@ import { LANG_NAME, lang, pick, t } from '@/lib/companions/i18n';
 import { sfxTock } from '@/lib/companions/sfx';
 import { ToolBelt } from '@/components/companion/CompanionOverlays';
 import ProgressSync from '@/components/companion/ProgressSync';
+import { useBobbyAccount } from '@/hooks/useBobbyAccount';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import { LangSegment } from './LangMenu';
 
@@ -38,6 +39,8 @@ interface Props {
   onExplore: () => void;
   onShare: () => void;
   onSignIn: () => void;
+  /** After sign-out: refresh access and meters. */
+  onSignedOut: () => void;
   onRisk: () => void;
   onToggleVoiceMode: () => void;
   onToggleSpeak: () => void;
@@ -66,6 +69,7 @@ function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; labe
 
 export default function NucleoProfile(p: Props) {
   const [locked, setLocked] = useState<Companion | null>(null);
+  const { account, signOut } = useBobbyAccount();
   const next = nextLevelFor(p.xp);
   const progress = next ? Math.max(0, Math.min(1, (p.xp - p.level.minXP) / (next.minXP - p.level.minXP))) : 1;
 
@@ -127,7 +131,26 @@ export default function NucleoProfile(p: Props) {
 
         <div className="mt-6 space-y-1">
           <div className="n-label mb-2">{t('Account', 'Cuenta', 'Conta')}</div>
-          <div className="n-row"><span className="n-row-ico"><Globe size={16} /></span><span className="flex-1 text-[15px]">{t('Save your progress', 'Guarda tu progreso', 'Salve seu progresso')}</span><ProgressSync onChoose={p.onSignIn} /></div>
+          {account ? (
+            <>
+              <div className="n-row">
+                <span className="n-row-ico"><Globe size={16} /></span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px]">{account.provider === 'apple' ? t('Signed in with Apple', 'Sesión con Apple', 'Conectado com Apple') : account.provider === 'google' ? t('Signed in with Google', 'Sesión con Google', 'Conectado com Google') : t('Signed in', 'Sesión iniciada', 'Conectado')}</span>
+                  {account.email && <span className="block truncate text-[12px]" style={{ color: '#8A8378' }}>{account.email}</span>}
+                </span>
+                <ProgressSync onChoose={p.onSignIn} />
+              </div>
+              <Row icon={<LogOut size={16} />} label={t('Sign out', 'Cerrar sesión', 'Sair')} detail={t('Your progress stays saved in your account', 'Tu progreso queda guardado en tu cuenta', 'Seu progresso fica salvo na sua conta')}
+                onClick={() => { if (window.confirm(t('Sign out of Bobby on this browser?', '¿Cerrar sesión de Bobby en este navegador?', 'Sair do Bobby neste navegador?'))) void signOut().then(p.onSignedOut); }} />
+            </>
+          ) : (
+            <>
+              <Row icon={<LogIn size={16} />} label={t('Sign in', 'Iniciar sesión', 'Entrar')} detail={t('Google or Apple · keeps your progress', 'Google o Apple · guarda tu progreso', 'Google ou Apple · salva seu progresso')} onClick={p.onSignIn} />
+              {/* ProgressSync wires the progress sync (wallet sessions too); it stays mounted, its pill hidden here. */}
+              <span className="hidden"><ProgressSync onChoose={p.onSignIn} /></span>
+            </>
+          )}
           <Row icon={<Sparkles size={16} />} label={p.pro.label} detail={p.pro.detail} onClick={p.pro.action} />
           <Row icon={<UserPlus size={16} />} label={p.invite.label} detail={p.invite.detail} onClick={p.invite.action} />
           <Row icon={<ArrowLeftRight size={16} />} label={t('Swap on Base', 'Swap en Base', 'Swap na Base')} detail={t('Your wallet signs every swap', 'Tu wallet firma cada swap', 'Sua carteira assina cada swap')} onClick={p.onSwap}>

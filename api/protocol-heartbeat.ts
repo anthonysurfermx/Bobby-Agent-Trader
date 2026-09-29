@@ -25,6 +25,8 @@ import {
 // Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
 const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
 
+import { WIN_RATE_MIN_SAMPLE, hasSample } from './_lib/sample.js';
+
 export const config = { maxDuration: 25 };
 
 const XLAYER_RPC = PROTOCOL_RPC_FALLBACK_URL;
@@ -404,7 +406,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Settlement is the real AgentEconomy on-chain volume.
     // Protocol totals keep bounty escrow separate from paid MCP settlement.
     const economyVolumeNative = parseFloat(formatEther(BigInt(totalVolumeWei)));
-    const winRate = winRateBps === null ? null : parseInt(winRateBps) / 100;
+    // No rate below WIN_RATE_MIN_SAMPLE resolved trades: 1 of 1 is not 100% skill.
+    const sampleOk = totalTrades !== null && hasSample(parseInt(totalTrades));
+    const winRate = winRateBps === null || !sampleOk ? null : parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
     const bountyEscrowNative = totalBounties * parseFloat(formatEther(BigInt(minBountyWei)));
     const protocolNotionalNative = economyVolumeNative + bountyEscrowNative;
@@ -473,6 +477,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       performance: {
         winRate,
+        winRateNote: sampleOk || totalTrades === null ? null : `${parseInt(totalTrades)} resolved · insufficient sample (needs ${WIN_RATE_MIN_SAMPLE})`,
         totalTrades: totalTrades === null ? null : parseInt(totalTrades),
         totalBounties: sources.bounties === 'ok' ? totalBounties : null,
       },

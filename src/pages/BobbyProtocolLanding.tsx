@@ -498,7 +498,7 @@ export default function BobbyProtocolLanding() {
                 ['Live debate', 'Alpha Hunter, then Red Team, then (on Max) the rebuttal stream in one by one; the CIO closes. Each argument is shown only after it passes the output guard.'],
                 ['Synthesis first', 'The CIO answers in plain words: a headline, why, the main risk and what to watch, with that level drawn on the chart, and a follow-up question. The full debate stays folded, one tap away.'],
                 ['Computed, then quoted', 'The server computes where the price sits against its EMAs, support and resistance, as a % of price. The models quote those distances; they never compute them.'],
-                ['Spend guard', 'Every desk model call goes to a cost ledger: tokens, list-price cost and latency, never prompts or answers. Deep and Max pause above a daily budget; the desk has a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
+                ['Spend guard', 'Every desk model call goes to a cost ledger: tokens, list-price cost and latency, never prompts or answers. Deep and Max pause above a daily budget and the desk pauses at a monthly cap. The guard covers the desk only (not voice or the daily cycle) and reads that same ledger: if the ledger cannot be read, calls go through. A failed or abandoned Deep or Max read is refunded.'],
               ].map(([title, text]) => (
                 <div key={title} className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-5">
                   <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">{title}</div>
@@ -682,7 +682,7 @@ export default function BobbyProtocolLanding() {
                       ['Evidence', 'Public market data for one instrument (crypto and equities): 1H candles on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on the asset on Deep and Max.'],
                       ['Engine', 'Deterministic indicators (trend, RSI, ATR, EMA, support and resistance). The server computes where the price sits against each level; the models only quote it.'],
                       ['Output', 'Synthesis first: headline, why, main risk, what to watch (drawn on the chart) and a follow-up question, then review or wait with the full debate.'],
-                      ['Spend', 'Each desk model call is logged to a cost ledger (numbers only). Deep and Max pause above a daily budget; the desk has a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
+                      ['Spend', 'Each desk model call is logged to a cost ledger (numbers only). Deep and Max pause above a daily budget and the desk pauses at a monthly cap. The guard covers the desk only (not voice or the daily cycle) and reads that same ledger: if the ledger cannot be read, calls go through. A failed or abandoned Deep or Max read is refunded.'],
                       ['Record', 'Private. A desk answer is not published to the public ledger.'],
                     ],
                   },

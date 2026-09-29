@@ -882,6 +882,7 @@ export default function NucleoDesk() {
             onTool={(tool) => setInspected(tool)} onPet={() => setSheet('pet')} onCatalog={() => setSheet('catalog')}
             onSwap={() => setSheet('swap')} onTraderLand={openTraderLand} onExplore={() => setSheet('board')}
             onShare={() => void shareSkin()} onSignIn={() => { setSheet('none'); setSignInPrompt(true); }} onRisk={() => setSheet('risk')}
+            onSignedOut={() => { setSheet('none'); void fetchAccess().then((st) => { if (st) setAccessState(st); }); }}
             onToggleVoiceMode={() => { voice.stop(); closeRecognition(); setFreeVoice((v) => !v); setVoiceNotice(''); }}
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
