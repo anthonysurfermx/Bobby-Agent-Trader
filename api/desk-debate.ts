@@ -6,6 +6,7 @@ import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
 import { consumeLevel, refundLevel } from './_lib/access.js';
+import { waitUntil } from '@vercel/functions';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
 
@@ -131,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
-    if (left.signal.aborted) { await refundLevel(useId); return; }
+    if (left.signal.aborted) { const refund = refundLevel(useId); waitUntil(refund); await refund; return; }
     if (!live) return res.status(200).json(result);
     send({ type: 'final', data: result });
     return res.end();
@@ -145,6 +146,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return refuse(res, 503, 'analysis_failed', failed);
   } finally {
-    await logLlmUsage(usage, { surface: 'desk', level });
+    // The response is already sent here and Vercel freezes the function once it has ended: the ledger
+    // write must be registered with waitUntil, or it only lands when the instance wakes for another request
+    // (seen in prod on 2026-09-29: a Rápido read was never recorded).
+    waitUntil(logLlmUsage(usage, { surface: 'desk', level }));
   }
 }
