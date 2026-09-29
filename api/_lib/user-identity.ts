@@ -19,6 +19,15 @@ export interface Identity {
   authUserId: string | null;
   wallet: string | null;
   via: 'wallet' | 'supabase';
+  /** First name from the Apple/Google profile (Supabase user_metadata), when the provider shared one. */
+  firstName?: string | null;
+}
+
+/** A plain first name from the provider profile: letters only, short, never an email or a handle. */
+export function firstNameOf(meta: Record<string, unknown> | undefined): string | null {
+  const raw = [meta?.given_name, meta?.first_name, meta?.full_name, meta?.name].find((v) => typeof v === 'string' && v.trim());
+  const first = typeof raw === 'string' ? raw.trim().split(/\s+/)[0] : '';
+  return /^[\p{L}][\p{L}'-]{0,23}$/u.test(first) ? first : null;
 }
 
 interface IdentityRow { id: string; auth_user_id: string | null; wallet_address: string | null }
@@ -35,16 +44,16 @@ function authBase(): { url: string; anon: string } | null {
   }
 }
 
-async function verifySupabaseToken(token: string): Promise<{ id: string; email: string | null; provider: string | null } | null> {
+async function verifySupabaseToken(token: string): Promise<{ id: string; email: string | null; provider: string | null; firstName: string | null } | null> {
   const base = authBase();
   if (!base) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
   try {
     const r = await fetch(`${base.url}/auth/v1/user`, { headers: { apikey: base.anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
     if ([400, 401, 403].includes(r.status)) return null;
     if (!r.ok) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
-    const user = (await r.json()) as { id?: string; email?: string; app_metadata?: { provider?: string } };
+    const user = (await r.json()) as { id?: string; email?: string; app_metadata?: { provider?: string }; user_metadata?: Record<string, unknown> };
     if (!user?.id || !/^[0-9a-f-]{36}$/i.test(user.id)) return null;
-    return { id: user.id, email: user.email ?? null, provider: user.app_metadata?.provider ?? null };
+    return { id: user.id, email: user.email ?? null, provider: user.app_metadata?.provider ?? null, firstName: firstNameOf(user.user_metadata) };
   } catch {
     console.warn('[user-identity] auth service unavailable');
     throw new IdentityUnavailableError('Authentication is temporarily unavailable');
@@ -84,7 +93,7 @@ export async function resolveIdentity(req: VercelRequest): Promise<Identity | nu
   const user = await verifySupabaseToken(token);
   if (!user) return null;
   const row = await upsertIdentity('auth_user_id', { auth_user_id: user.id, email: user.email, provider: user.provider });
-  return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'supabase' } : null;
+  return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'supabase', firstName: user.firstName } : null;
 }
 
 export async function requireIdentity(req: VercelRequest, res: VercelResponse): Promise<Identity | null> {

@@ -1,14 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { waitUntil } from '@vercel/functions';
 import { z } from 'zod';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
-import { DESK_QUESTION_MAX, DeskOutputRejected, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
+import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
-import { consumeLevel, refundLevel } from './_lib/access.js';
-import { waitUntil } from '@vercel/functions';
+import { clientPlatform, consumeLevel, refundLevel } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
+import type { Identity } from './_lib/user-identity.js';
+import { MEMORY_PLATFORMS, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -37,9 +39,24 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * Máximo's second round (each already through the guard), then {type:"final", data} with the same body the
  * JSON reply carries, or {type:"error", code, error}. Refusals stay plain JSON with their status. Clients
  * without the header (the iOS app) get the single JSON reply, unchanged.
+ *
+ * Memory (api/_lib/user-memory.ts): for a signed-in Apple/Google account with memory on, the CIO also sees a
+ * compact `reader` (explicit preferences, how often they asked), for framing only: sufficiency and the verdict
+ * depend on the question and the evidence alone. The reader never reaches the client: the body only says
+ * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on' (memoryPersonalizationOn). The ask is
+ * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
+ * make no memory call; neither does the iPhone app until it can show and delete memory (MEMORY_PLATFORMS).
  */
 function refuse(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ error, code, ...extra });
+}
+
+/** The promise's value, or null once `ms` have passed. Never rejects. */
+function within<T>(task: Promise<T | null>, ms: number): Promise<T | null> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(null), ms);
+    task.then((v) => { clearTimeout(timer); resolve(v); }, () => { clearTimeout(timer); resolve(null); });
+  });
 }
 
 /** Seconds until the exhausted quota window reopens; best effort, never blocks the answer. */
@@ -81,6 +98,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.on?.('close', () => { if (!res.writableFinished) left.abort(); });
   const usage: LlmUsage[] = [];
   let useId: number | null = null;
+  // undefined: not resolved yet; the premium meter resolves the caller and hands it over.
+  let knownIdentity: Identity | null | undefined;
   let streaming = false;
   try {
     if (!process.env.OPENAI_API_KEY || (needsAnthropic(level) && !process.env.ANTHROPIC_API_KEY)) return refuse(res, 503, 'desk_unavailable', unavailable);
@@ -118,6 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });
       }
       useId = gate.useId;
+      knownIdentity = gate.identity;
     }
     const send = (line: Record<string, unknown>) => { if (!res.writableEnded) res.write(`${JSON.stringify(line)}\n`); };
     if (live) {
@@ -128,14 +148,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.flushHeaders?.();
       send({ type: 'accepted', level });
     }
+    // Memory runs beside the evidence and never delays the answer by more than its timeout: a slow or failed
+    // lookup is simply no memory. No call at all without an Apple/Google session, nor from a platform whose app
+    // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
+    const memoryOwner = memoryPersonalizationOn() && MEMORY_PLATFORMS.has(clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
+    const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
-    const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined });
+    const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null);
+    const asked = horizonOf(question);
+    const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
     if (left.signal.aborted) { const refund = refundLevel(useId); waitUntil(refund); await refund; return; }
-    if (!live) return res.status(200).json(result);
-    send({ type: 'final', data: result });
-    return res.end();
+    const body = reader ? { ...result, personalized: true } : result;
+    // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
+    // summary was unavailable the database decides (it skips paused memories and non-accounts).
+    const remember = () => {
+      if (summary && !summary.enabled) return;
+      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked) : false)).catch(() => false));
+    };
+    if (!live) { res.status(200).json(body); remember(); return; }
+    send({ type: 'final', data: body });
+    res.end();
+    remember();
+    return;
   } catch (error) {
     await refundLevel(useId);
     // Never log private questions, model payloads, or provider credentials — only the rejection class.

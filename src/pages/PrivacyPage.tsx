@@ -17,7 +17,7 @@ import { lang } from '@/lib/companions/i18n';
 
 /** The policy exists in English and Spanish; a Portuguese reader gets the English text. */
 type PolicyLang = 'en' | 'es';
-const EFFECTIVE_DATE: Record<PolicyLang, string> = { en: 'September 22, 2026', es: '22 de septiembre de 2026' };
+const EFFECTIVE_DATE: Record<PolicyLang, string> = { en: 'September 29, 2026', es: '29 de septiembre de 2026' };
 const REPO_URL = 'https://github.com/anthonysurfermx/Bobby-Agent-Trader';
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
@@ -144,6 +144,22 @@ export default function PrivacyPage() {
             {tr(
               'We use this data only to run the product: to keep your progress through reinstalls and across your devices, including bobbyprotocol.xyz if you sign in there with the same Apple ID. Your island is private until you explicitly publish it. Publishing shares only its name, layout and districts.',
               'Usamos estos datos solo para que el producto funcione: para conservar tu progreso si reinstalas la app y en todos tus dispositivos, incluido bobbyprotocol.xyz si ahí entras con el mismo Apple ID. Tu isla es privada hasta que eliges publicarla. Publicar comparte solo su nombre, distribución y distritos.',
+            )}
+          </p>
+        </Section>
+
+        <Section title={tr('What Bobby remembers', 'Lo que Bobby recuerda')}>
+          <p>
+            <Scope>{tr('Website', 'Sitio web')}</Scope>
+            {tr(
+              'When you are signed in with Apple or Google and ask on the website’s desk, Bobby remembers, for each asset symbol you asked about, how many times you asked, when you last asked, and the time horizon your question named (such as today or weeks), if any. It also keeps the preferences you set yourself under “What Bobby remembers” in your profile: your usual horizon, your experience, and the level of risk you prefer explained. Bobby never infers these preferences or anything else about you, and it does not store your questions.',
+              'Si iniciaste sesión con Apple o Google y preguntas en el desk del sitio web, Bobby recuerda, por cada símbolo de activo que preguntaste, cuántas veces preguntaste, cuándo fue la última vez y el horizonte de tiempo que mencionó tu pregunta (como hoy o semanas), si lo hubo. También guarda las preferencias que tú eliges en “Lo que Bobby recuerda” dentro de tu perfil: tu horizonte habitual, tu experiencia y el nivel de riesgo que prefieres ver explicado. Bobby nunca deduce estas preferencias ni nada más sobre ti, y no guarda tus preguntas.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'Bobby uses this memory only to frame its answers for you: the analysis request then also carries a short summary of it (your first name from your Apple or Google profile when it shares one, your preferences and how often you asked about assets, including this week), never your email or account identifier. That summary is sent to the AI provider that writes the answer: OpenAI, or Anthropic for the Deep and Max levels. It never changes the verdict. It is not used for ads and is not shared or sold. An asset you do not ask about for 90 days is erased automatically. In your profile you can see all of it, correct your preferences, forget one asset or everything, or pause memory. Deleting your account deletes it too.',
+              'Bobby usa esta memoria solo para darle forma a sus respuestas para ti: la solicitud de análisis lleva entonces un resumen breve (tu nombre de pila de tu perfil de Apple o Google cuando lo comparte, tus preferencias y cuántas veces preguntaste por cada activo, incluida esta semana), nunca tu correo ni el identificador de tu cuenta. Ese resumen se envía al proveedor de IA que escribe la respuesta: OpenAI, o Anthropic en los niveles Profundo y Máximo. Nunca cambia el veredicto. No se usa para anuncios y no se comparte ni se vende. Un activo por el que no preguntas en 90 días se borra solo. En tu perfil puedes verla completa, corregir tus preferencias, olvidar un activo o todo, o pausar la memoria. Si borras tu cuenta, también se borra.',
             )}
           </p>
         </Section>
@@ -304,6 +320,7 @@ export default function PrivacyPage() {
             <li>{strong('Apple')} — {tr('Sign in with Apple (and, in earlier iPhone versions, speech recognition).', 'Iniciar sesión con Apple (y, en versiones anteriores para iPhone, reconocimiento de voz).')}</li>
             <li>{strong('Supabase')} — {tr('authentication, synced progress, Trader Land, and product records.', 'autenticación, progreso sincronizado, Trader Land y registros del producto.')}</li>
             <li>{strong('OpenAI')} — {tr('text analysis, optional speech generation and public-name moderation; on the website, also live voice.', 'análisis de texto, narración opcional y moderación de nombres públicos; en el sitio web, también la voz en vivo.')}</li>
+            <li>{strong('Anthropic')} — {tr('text analysis for the Deep and Max levels of the desk, including the short memory summary described above.', 'análisis de texto en los niveles Profundo y Máximo del desk, incluido el resumen breve de memoria descrito arriba.')}</li>
             <li>{strong('Vercel')} — {tr('hosts our backend and website, with standard, short-lived request logs.', 'aloja nuestro backend y el sitio web, con registros de solicitudes estándar y de corta duración.')}</li>
             <li>{strong(tr('Public market data sources', 'Fuentes públicas de datos de mercado'))} — {tr('prices and charts, requested with an asset symbol and timeframe only, without your account or wallet identifiers.', 'precios y gráficas, pedidos solo con el símbolo del activo y un plazo, sin identificadores de tu cuenta ni de tu wallet.')}</li>
             <li><Scope>{tr('Website', 'Sitio web')}</Scope>{strong('Google')} — {tr('optional sign-in.', 'inicio de sesión opcional.')}</li>

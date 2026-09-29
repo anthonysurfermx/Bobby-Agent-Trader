@@ -42,6 +42,7 @@ jobs:
       - run: npm run test:trader-land-api
       - run: npm run test:desk-audit
       - run: npm run test:desk-levels
+      - run: npm run test:user-memory
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
@@ -117,6 +118,7 @@ jobs:
       - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/test-trader-land-growth.sql
       - run: npm run test:progress-atomic-pg
       - run: npm run test:levels-referrals-pg
+      - run: npm run test:user-memory-pg
 
   contracts:
     runs-on: ubuntu-latest

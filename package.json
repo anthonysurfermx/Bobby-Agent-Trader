@@ -51,6 +51,8 @@
     "test:desk-debate": "tsx scripts/test-desk-debate.mts",
     "test:desk-levels": "tsx scripts/test-desk-levels.mts",
     "test:levels-referrals-pg": "tsx scripts/test-levels-referrals-pg.mts",
+    "test:user-memory": "tsx scripts/test-user-memory.mts",
+    "test:user-memory-pg": "tsx scripts/test-user-memory-pg.mts",
     "test:account-delete": "tsx scripts/test-account-delete.mts",
     "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts"
   },

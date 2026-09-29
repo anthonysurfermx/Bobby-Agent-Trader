@@ -4,7 +4,7 @@
 // the way the iPhone app keeps them behind its header face.
 import { useState, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, Brain, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -15,6 +15,7 @@ import ProgressSync from '@/components/companion/ProgressSync';
 import { useBobbyAccount } from '@/hooks/useBobbyAccount';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import { LangSegment } from './LangMenu';
+import MemoryDialog from './MemoryDialog';
 
 interface Props {
   companion: Companion;
@@ -69,6 +70,7 @@ function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; labe
 
 export default function NucleoProfile(p: Props) {
   const [locked, setLocked] = useState<Companion | null>(null);
+  const [memoryOpen, setMemoryOpen] = useState(false);
   const { account, signOut } = useBobbyAccount();
   const next = nextLevelFor(p.xp);
   const progress = next ? Math.max(0, Math.min(1, (p.xp - p.level.minXP) / (next.minXP - p.level.minXP))) : 1;
@@ -174,9 +176,12 @@ export default function NucleoProfile(p: Props) {
             <span className="n-pill-sm">{p.muted ? t('Off', 'No', 'Desligado') : t('On', 'Sí', 'Ligado')}</span>
           </Row>
           <Row icon={<Globe size={16} />} label={t('Language', 'Idioma', 'Idioma')} detail={LANG_NAME[lang()]}><LangSegment /></Row>
+          <Row icon={<Brain size={16} />} label={t('What Bobby remembers', 'Lo que Bobby recuerda', 'O que o Bobby lembra')} detail={t('See, correct or erase it', 'Velo, corrígelo o bórralo', 'Veja, corrija ou apague')} onClick={() => setMemoryOpen(true)} />
           <Row icon={<ShieldAlert size={16} />} label={t('Risk notice', 'Aviso de riesgo', 'Aviso de risco')} onClick={p.onRisk} />
           <Row icon={<RotateCcw size={16} />} label={t('Reset progress on this browser', 'Reiniciar progreso en este navegador', 'Zerar o progresso neste navegador')} onClick={p.onReset} />
         </div>
+        {/* Inside the drawer, so clicks in the dialog (a portal) bubble to the drawer, not the backdrop that closes it. */}
+        <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} onSignIn={() => { setMemoryOpen(false); p.onSignIn(); }} />
       </motion.aside>
     </motion.div>
   );

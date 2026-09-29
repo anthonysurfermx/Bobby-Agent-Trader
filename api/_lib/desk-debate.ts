@@ -4,6 +4,7 @@ import { isEquitySymbol } from '../../src/lib/voice-assets.js';
 import { completeJson, LlmHttpError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 import { levelPlan, type DeskLevel } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
+import type { ReaderContext } from './user-memory.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
@@ -144,7 +145,7 @@ export async function loadDeskEvidenceV2(symbol: string, assetType?: 'equity'|'c
   return { ...base, timeframes, derivatives, record };
 }
 
-type Horizon = 'intraday' | 'week' | 'month' | 'long' | 'unspecified';
+export type Horizon = 'intraday' | 'week' | 'month' | 'long' | 'unspecified';
 /** The horizon the user asked about, from plain words (EN/ES/PT). Unclear questions stay unspecified. */
 export function horizonOf(question: string): Horizon {
   const q = question.toLowerCase();
@@ -156,9 +157,12 @@ export function horizonOf(question: string): Horizon {
 }
 const HORIZON_NEEDS: Record<Horizon, string[]> = { intraday: ['1H'], week: ['4H', '1D'], month: ['1D', '1W'], long: ['1D', '1W'], unspecified: [] };
 
-/** L0: what the evidence covers against what the asked horizon needs, stated before any thesis. */
+/**
+ * L0: what the evidence covers against what the asked horizon needs, stated before any thesis. It depends on the
+ * question alone: a horizon the reader stored in their profile never changes it (nor, through it, the verdict).
+ */
 export function sufficiencyOf(question: string, available: string[]) {
-  const horizon = horizonOf(question);
+  const horizon: Horizon = horizonOf(question);
   const missing = HORIZON_NEEDS[horizon].filter(tf => !available.includes(tf));
   return { horizon, available, missing, sufficient: missing.length === 0 && horizon !== 'long' };
 }
@@ -343,6 +347,9 @@ export function pricePosition(t: Levels) {
 }
 const positioned = <T extends Levels>(t: T) => ({ ...t, position: pricePosition(t) });
 
+/** The CIO's rule for the reader's memory, sent only when there is one. */
+export const READER_RULE = "reader is this reader's explicit preferences and how often they asked about assets: use it only to frame the answer (their usual horizon as context, the depth of explanation for their stated experience, a brief 'you often look at NVDA' when it helps; when reader.firstName is present, open the headline or the why by that first name once, warmly and naturally; when reader.thisAsset.timesThisWeek is 2 or more, say it in one short clause, e.g. 'second time this week you ask about NVDA' — then answer as usual); never let it change the verdict, the direction or the sufficiency note, never judge suitability or give personalized advice, never infer anything else about the person. reader.prefs.explainRiskDepth (low, medium or high) sets only how much the answer explains risk (high: spell out the main risks and what would go wrong; low: one short risk line); it never sets suitability, position sizing or a recommendation, and never softens or hides the main risk.";
+
 /** What the desk says while it works: each argument as soon as it has passed the guard, never before. */
 export type DeskEvent =
   | { type: 'evidence'; timeframes: string[]; sufficiency: ReturnType<typeof sufficiencyOf> }
@@ -363,7 +370,7 @@ function cleared(text: string): string {
  */
 export async function runDeskDebate(
   question: string, evidence: DeskEvidence & Partial<Awaited<ReturnType<typeof loadDeskEvidenceV2>>>, language: 'en'|'es'|'pt',
-  opts: { level?: DeskLevel; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal } = {},
+  opts: { level?: DeskLevel; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | null } = {},
 ) {
   const level = opts.level ?? 'rapido';
   const plan = levelPlan(level);
@@ -388,10 +395,13 @@ export async function runDeskDebate(
   if (rebuttal) emit({ type: 'agent', role: 'rebuttal', text: cleared(rebuttal.analysis) });
   const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.`;
   const synthesisShape = '"synthesis":{"headline":"...","why":"...","risk":"...","watch":"...","watchLevel":0,"followUp":"..."}';
-  const cioInput = rebuttal ? { ...input, alpha, red, rebuttal } : { ...input, alpha, red };
+  // The reader's memory (api/_lib/user-memory.ts) reaches the CIO only, and only to frame the answer.
+  const reader = opts.reader ?? null;
+  const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}), ...(reader ? { reader } : {}) };
+  const readerRule = reader ? ` ${READER_RULE}` : '';
   const cio = plan.scenarios
-    ? await role(plan.cio, 'cio', `${cioPrompt} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
-    : await role(plan.cio, 'cio', `${cioPrompt} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
+    ? await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
+    : await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
   // "wait" carries no thesis to point at: a direction next to it would read as a trade.
   const agents = { alpha: alpha.analysis, red: red.analysis, cio: cio.analysis, verdict: cio.verdict, direction: cio.verdict === 'wait' ? 'none' as const : cio.direction };
   reviewDeskOutput(agents);
