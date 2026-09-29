@@ -437,7 +437,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   // Public aggregate snapshot, no per-user data: one CDN copy per minute serves every visitor.
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', trackRecordAvailable ? 's-maxage=60, stale-while-revalidate=300' : 's-maxage=5, stale-while-revalidate=30');
   return res.status(200).json({
     ok: trackRecordAvailable,
     degraded: !trackRecordAvailable,

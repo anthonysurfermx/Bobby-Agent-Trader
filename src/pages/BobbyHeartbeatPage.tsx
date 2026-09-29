@@ -218,7 +218,7 @@ export default function BobbyHeartbeatPage() {
           >
             <div className="mb-3 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">Live protocol health</div>
             <p className="text-sm leading-6 text-white/65">
-              Live {chainName} health for Bobby Protocol. Four signals — <span className="text-[#7da6ff]">{chainName} chain</span>, <span className="text-[#7da6ff]">debate cycle</span>, <span className="text-[#7da6ff]">on-chain contracts</span>, and <span className="text-[#7da6ff]">overall</span> — roll up below. Green = operational. Amber = degraded (watch). Red = halted (the cycle stops publishing until resolved). "Dormant" means a contract is deployed and healthy but has not been paid yet. Treasury balance, MCP settlements, and bounty escrow below update every 60s and back up the numbers you see on the landing page.
+              Live {chainName} health for Bobby Protocol. Four signals — <span className="text-[#7da6ff]">{chainName} chain</span>, <span className="text-[#7da6ff]">debate cycle</span>, <span className="text-[#7da6ff]">on-chain contracts</span>, and <span className="text-[#7da6ff]">overall</span> — roll up below. Green = operational. Amber = degraded (watch). Red = halted (the cycle stops publishing until resolved). "Dormant" means a contract is deployed and healthy but has not been paid yet. Treasury balance, MCP settlements, and bounty escrow below update about every 2 minutes and back up the numbers you see on the landing page.
             </p>
           </motion.div>
 
