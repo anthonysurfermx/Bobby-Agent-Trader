@@ -148,6 +148,22 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title={tr('What Bobby remembers', 'Lo que Bobby recuerda')}>
+          <p>
+            <Scope>{tr('Website', 'Sitio web')}</Scope>
+            {tr(
+              'When you are signed in with Apple or Google and ask on the website’s desk, Bobby remembers, for each asset symbol you asked about, how many times you asked, when you last asked, and the time horizon your question named (such as today or weeks), if any. It also keeps the preferences you set yourself under “What Bobby remembers” in your profile: your usual horizon, your experience, and the level of risk you prefer explained. Bobby never infers these preferences or anything else about you, and it does not store your questions.',
+              'Si iniciaste sesión con Apple o Google y preguntas en el desk del sitio web, Bobby recuerda, por cada símbolo de activo que preguntaste, cuántas veces preguntaste, cuándo fue la última vez y el horizonte de tiempo que mencionó tu pregunta (como hoy o semanas), si lo hubo. También guarda las preferencias que tú eliges en “Lo que Bobby recuerda” dentro de tu perfil: tu horizonte habitual, tu experiencia y el nivel de riesgo que prefieres ver explicado. Bobby nunca deduce estas preferencias ni nada más sobre ti, y no guarda tus preguntas.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'Bobby uses this memory only to frame its answers for you: the analysis request then also carries a short summary of it (your preferences and how often you asked about assets), never your account identifier. It never changes the verdict. It is not used for ads and is not shared or sold. An asset you do not ask about for 90 days is erased automatically. In your profile you can see all of it, correct your preferences, forget one asset or everything, or pause memory. Deleting your account deletes it too.',
+              'Bobby usa esta memoria solo para darle forma a sus respuestas para ti: la solicitud de análisis lleva entonces un resumen breve (tus preferencias y cuántas veces preguntaste por cada activo), nunca el identificador de tu cuenta. Nunca cambia el veredicto. No se usa para anuncios y no se comparte ni se vende. Un activo por el que no preguntas en 90 días se borra solo. En tu perfil puedes verla completa, corregir tus preferencias, olvidar un activo o todo, o pausar la memoria. Si borras tu cuenta, también se borra.',
+            )}
+          </p>
+        </Section>
+
         <Section title={tr('Questions and market analysis', 'Preguntas y análisis de mercado')}>
           <p>
             {tr(

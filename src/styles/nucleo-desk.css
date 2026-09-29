@@ -397,6 +397,27 @@ body.nucleo-ui .n-lvcard-name:focus:not(:focus-visible) { outline: none; }
   background: rgba(242, 237, 228, .06); color: var(--n-ink); font: 500 13px/1 var(--n-sans); }
 .n-invite-btn.on { background: var(--n-ink); color: #0B0A09; padding: 0 14px; }
 
+/* what Bobby remembers: the switch, three optional preferences, the assets */
+.n-mem-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 18px; padding: 12px 14px; border-radius: 16px;
+  background: rgba(242, 237, 228, .04); border: 1px solid var(--n-hair); font-size: 14.5px; color: var(--n-ink); }
+.n-mem-switch { flex: none; position: relative; width: 44px; height: 26px; min-height: 26px; border-radius: 999px; background: rgba(242, 237, 228, .12); transition: background .25s ease; }
+.n-mem-switch::after { content: ""; position: absolute; inset: -9px 0; } /* a 44px touch target around the 26px track */
+.n-mem-switch i { position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--n-ink2); transition: transform .25s ease, background .25s ease; }
+.n-mem-switch.on { background: var(--n-ink); }
+.n-mem-switch.on i { transform: translateX(18px); background: #0B0A09; }
+.n-mem-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--n-ink3); }
+.n-mem-pref { margin-top: 16px; }
+.n-mem-seg { display: flex; gap: 2px; margin-top: 8px; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .35); border: 1px solid var(--n-hair); }
+.n-mem-seg button { flex: 1 1 auto; height: 34px; padding: 0 7px; border-radius: 999px; font: 500 12px/1 var(--n-sans); color: var(--n-ink2); white-space: nowrap; }
+.n-mem-seg button[aria-pressed="true"] { background: var(--n-ink); color: #0B0A09; }
+.n-mem-list { margin: 8px 0 0; padding: 0; list-style: none; }
+.n-mem-list li { display: flex; align-items: center; gap: 10px; min-height: 48px; border-top: 1px solid var(--n-hair); }
+.n-mem-list b { display: block; font: 500 14px/1.2 var(--n-mono); color: var(--n-ink); }
+.n-mem-list small { display: block; margin-top: 2px; font-size: 12px; color: var(--n-ink3); }
+.n-mem-btn { flex: none; height: 32px; padding: 0 12px; border-radius: 999px; background: rgba(242, 237, 228, .06); color: var(--n-ink); font: 500 12.5px/1 var(--n-sans); }
+.n-mem-btn.danger { color: #FFB3B5; }
+.n-mem-btn:disabled, .n-mem-seg button:disabled, .n-mem-switch:disabled { opacity: .5; cursor: default; }
+
 /* Máximo: the scenarios under the debate */
 .n-scen { margin-top: 4px; padding-top: 14px; border-top: 1px solid rgba(242, 237, 228, .07); }
 .n-scen-row { display: grid; grid-template-columns: 8px 1fr; gap: 10px; align-items: baseline; margin-top: 10px; font-size: 14.5px; line-height: 1.45; color: var(--n-ink); }
