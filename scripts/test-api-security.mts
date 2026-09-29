@@ -42,6 +42,8 @@ const previousEnv = {
   liveKey: process.env.OKX_CEX_API_KEY,
   liveSecret: process.env.OKX_CEX_SECRET_KEY,
   livePassphrase: process.env.OKX_CEX_PASSPHRASE,
+  openai: process.env.OPENAI_API_KEY,
+  openclawGateway: process.env.OPENCLAW_GATEWAY_URL,
 };
 
 try {
@@ -155,6 +157,25 @@ try {
     assert.equal(fetchCalls, 0, 'rejected signals must not reach execution dependencies');
   }
 
+  // Lean pass 2026-09-29 — the x402 bypass: openclaw-chat runs the same debate the
+  // paid MCP tools sell. A caller with neither an allowed Origin (the web chat) nor
+  // internal auth (the MCP transports) is refused before any LLM work. No LLM key
+  // in this env, so a caller that passes the gate stops at 503, never at 401.
+  {
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.OPENCLAW_GATEWAY_URL;
+    const { default: chatHandler } = await import('../api/openclaw-chat.js');
+    const { response, state } = responseRecorder();
+    await chatHandler(request({ message: 'Should I long BTC?' }), response);
+    assert.equal(state.status, 401, 'openclaw-chat must refuse a caller with no allowed Origin and no internal auth');
+    assert.equal(fetchCalls, 0, 'a refused chat must not reach an LLM');
+    for (const headers of [{ origin: 'https://bobbyprotocol.xyz' }, { 'x-internal-secret': 'test-internal-secret' }]) {
+      const passed = responseRecorder();
+      await chatHandler(request({ message: 'Should I long BTC?' }, headers), passed.response);
+      assert.equal(passed.state.status, 503, `openclaw-chat must admit ${Object.keys(headers)[0]} callers past the gate`);
+    }
+  }
+
   const [
     orchestrateSource,
     registerSource,
@@ -226,7 +247,7 @@ try {
   assert.match(detectIntentSource, /const escapedKey = key\.replace/, 'dynamic regular-expression keys must be fully escaped');
   assert.match(blogServiceSource, /new DOMParser\(\)\.parseFromString/, 'blog excerpts must use an HTML parser instead of incomplete regex sanitization');
 
-  console.log('api-security: 47/47 checks passed');
+  console.log('api-security: 51/51 checks passed');
 } finally {
   globalThis.fetch = originalFetch;
   const restore = (name: string, value: string | undefined) => {
@@ -243,4 +264,6 @@ try {
   restore('OKX_CEX_API_KEY', previousEnv.liveKey);
   restore('OKX_CEX_SECRET_KEY', previousEnv.liveSecret);
   restore('OKX_CEX_PASSPHRASE', previousEnv.livePassphrase);
+  restore('OPENAI_API_KEY', previousEnv.openai);
+  restore('OPENCLAW_GATEWAY_URL', previousEnv.openclawGateway);
 }

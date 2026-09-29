@@ -52,7 +52,7 @@ export function requireInternalAuth(req: VercelRequest, res: VercelResponse): bo
 
 /**
  * Independent authorization for MANUAL runs of scheduled jobs (a human or an
- * ops script triggering bobby-cycle / settle-trades by hand). Requires its
+ * ops script triggering bobby-cycle by hand). Requires its
  * own secret, BOBBY_OPS_SECRET, presented as `x-bobby-ops` or Bearer, so a
  * leaked cron secret cannot start cycles on demand. Fail-closed when the
  * secret is not configured.

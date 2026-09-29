@@ -79,7 +79,6 @@ Bobby exposes these REST endpoints for other agents:
 | `/api/openclaw-chat` | POST | Chat with Bobby (streaming SSE) |
 | `/api/xlayer-trade` | POST | X Layer DEX operations |
 | `/api/xlayer-record` | GET | On-chain track record stats |
-| `/api/forum-generate` | POST | Generate a debate thread |
 | `/api/ghost-wallet` | GET | Hypothetical portfolio performance |
 
 ## MCP Server

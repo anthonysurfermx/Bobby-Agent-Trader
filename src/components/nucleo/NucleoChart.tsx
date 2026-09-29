@@ -138,7 +138,12 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
       if (red.level) levels.push({ key: 'stop', agent: 'red', price: red.level.price, label: t('Stop', 'Stop', 'Stop'), color: AGENT_TONE.red, dashed: true });
       if (cio.level) levels.push({ key: 'target', agent: 'cio', price: cio.level.price, label: t('Target', 'Objetivo', 'Alvo'), color: AGENT_TONE.cio });
     }
-    if (watch != null && Number.isFinite(watch) && watch > 0) levels.push({ key: 'watch', agent: null, price: watch, label: t('Watch', 'Vigilar', 'Vigiar'), color: '#F2EDE4', dashed: true });
+    if (watch != null && Number.isFinite(watch) && watch > 0) {
+      // The level to watch is often the resistance or support already drawn: name that line, don't draw it twice.
+      const same = levels.find((l) => Math.abs(l.price - watch) / watch < 0.0015);
+      if (same) { same.label = `${t('Watch', 'Vigilar', 'Vigiar')} · ${same.label}`; same.color = '#F2EDE4'; }
+      else levels.push({ key: 'watch', agent: null, price: watch, label: t('Watch', 'Vigilar', 'Vigiar'), color: '#F2EDE4', dashed: true });
+    }
     const closes = pts.map((p) => p.close);
     const emaVals = [...e20, ...e50].filter((v): v is number => v !== null);
     const values = [...closes, ...emaVals, ...levels.map((l) => l.price), ...levels.flatMap((l) => (l.to !== undefined ? [l.to] : []))];

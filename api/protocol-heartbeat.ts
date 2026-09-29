@@ -505,7 +505,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       storedAt: Date.now(),
     };
 
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=10');
+    // Public aggregate, no per-user data. A degraded answer keeps a short TTL so recovery shows fast.
+    res.setHeader('Cache-Control', allSourcesOk ? 's-maxage=60, stale-while-revalidate=300' : 's-maxage=5, stale-while-revalidate=30');
     return res.status(200).json(payload);
   } catch (error) {
     // BP-12: never echo a configured RPC URL (it may carry a key) to logs or clients.

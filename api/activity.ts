@@ -97,7 +97,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .sort((a, b) => (a.agoSeconds ?? 9999) - (b.agoSeconds ?? 9999))
     .slice(0, limit);
 
-  res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=60');
+  // Public aggregate feed, no per-user data: one CDN copy per minute serves every visitor.
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
   return res.status(200).json({
     ok: true,
     chain: {

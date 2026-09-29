@@ -27,6 +27,9 @@ emu.idType = 'uuid'; // the production column type, always
 const rpc = createRpcMock(BOBBY_AGENT_ECONOMY, FEE);
 let upstream: 'ok' | 'http500' | 'throw' = 'ok';
 let executions = 0;
+// Lean pass 2026-09-29: openclaw-chat refuses callers with no allowed Origin and
+// no internal auth, so the paid tool must present the internal secret.
+let chatHeaders: Record<string, string> = {};
 // Audit 2026-09-28: receipts are a real table here (tx_hash key, unique challenge_id) whose writes can fail.
 const receipts: Record<string, any>[] = [];
 let receiptWrites: 'ok' | 'http500' = 'ok';
@@ -47,6 +50,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
   }
   if (u.pathname === '/api/openclaw-chat') {
     executions += 1;
+    chatHeaders = { ...(init?.headers || {}) };
     if (upstream === 'throw') throw new Error('ECONNRESET');
     if (upstream === 'http500') return json({ error: 'upstream down' }, 500);
     return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: ANALYSIS } }] })}\n\ndata: [DONE]\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
@@ -114,6 +118,7 @@ for (const [label, handler] of [['mcp-http', mcpHttp], ['mcp-bobby', mcpBobby]] 
     tx = rpc.mint(issued.challengeIdBytes32, TOOL, '0xpayer000000000000000000000000000000000001');
     const b = await call(handler, { 'x-402-payment': tx.hash, 'x-challenge-id': issued.challengeId, 'x-challenge-secret': issued.clientSecret });
     assert.ok(b.result, JSON.stringify(b).slice(0, 300)); assert.equal(executions, 1);
+    assert.equal(chatHeaders['x-internal-secret'], 'test-internal-secret', 'the paid debate reaches openclaw-chat with internal auth');
     delivered = b.result;
     const r = byId(issued.challengeId); assert.equal(r.status, 'completed'); assert.equal(r.tx_hash, tx.hash); assert.equal(r.payer_address, tx.payer);
     assert.equal(emu.calls.filter((c) => c.status === 400).length, 0, 'no 22P02 anywhere on the honest path');

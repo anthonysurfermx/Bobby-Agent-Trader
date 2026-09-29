@@ -47,13 +47,9 @@ const EXEMPT: Record<string, string> = {
 };
 /** Helper functions whose only callers are a guarded handler in the same file. */
 const HELPERS_GUARDED_BY_HANDLER: Record<string, string[]> = {
-  'api/forum-generate.ts': ['insertThread', 'insertPost'],
   'api/forum-resolve.ts': ['*'],
-  'api/forum-morning.ts': ['*'],
-  'api/generate-activity.ts': ['*'],
   'api/agent-run.ts': ['*'],
   'api/bobby-cycle.ts': ['*'],
-  'api/settle-trades.ts': ['*'],
   'api/sandbox-run.ts': ['*'],
   'api/user-cycle.ts': ['*'],
   'api/telegram-deliver.ts': ['*'],
