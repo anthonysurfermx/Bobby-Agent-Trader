@@ -636,9 +636,6 @@ export default function NucleoDesk() {
         </div>
         <div className="n-sats right">{sats.filter((_, i) => i % 2 === 1).map((s, i) => <Satellite key={s.k} {...s} delay={0.22 + i * 0.14} />)}</div>
       </div>
-      <div className="mt-8 w-full">
-        <NucleoChart series={series} answer={answer} debate={debate} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
-      </div>
       {agentsFailed ? (
         <div className="n-card n-synth n-failed mt-8" role="status">
           <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
@@ -658,6 +655,9 @@ export default function NucleoDesk() {
       ) : (
         <div className="mt-8 flex min-h-[64px] w-full justify-center px-2"><Caption text={debate.spoken} run={readSeq} /></div>
       )}
+      <div className="mt-8 w-full">
+        <NucleoChart series={series} answer={answer} debate={agentsFailed ? null : debate} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
+      </div>
     </div>
   ) : null;
 
