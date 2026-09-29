@@ -31,6 +31,14 @@ export const MEMORY_MAX_ASSETS = 50;
  * cover this data. /api/memory itself serves every platform.
  */
 export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web']);
+/**
+ * Kill switch: the desk personalizes with memory and records asks only when BOBBY_MEMORY is exactly 'on'.
+ * Unset or anything else = off (no memory call from the desk at all). /api/memory (view, correct, delete)
+ * works either way, so people can always see and erase what was stored. Read per request, never cached.
+ */
+export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.BOBBY_MEMORY === 'on';
+}
 /** How long the desk waits for the summary before answering without it. */
 export const MEMORY_SUMMARY_TIMEOUT_MS = 800;
 /** An asset counts as one the reader "often" looks at from this many asks. */
@@ -173,7 +181,11 @@ export async function forgetMemory(identityId: string, symbol: string | null): P
 
 /** What the CIO may see about this reader: explicit preferences and how often they asked. Nothing else. */
 export interface ReaderContext {
-  prefs?: { horizon?: MemoryHorizon; experience?: Experience; risk?: RiskPref };
+  /**
+   * `explainRiskDepth` is the profile's "risk" choice, named for what it means in the UI: how much risk
+   * explanation the reader wants. Never a risk tolerance, suitability or sizing input.
+   */
+  prefs?: { horizon?: MemoryHorizon; experience?: Experience; explainRiskDepth?: RiskPref };
   /** The asset asked about now, when asked before. */
   thisAsset?: { asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon };
   /** Other assets asked about at least twice, most-weighted first. */
@@ -187,7 +199,7 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
   const prefs: NonNullable<ReaderContext['prefs']> = {};
   if (summary.prefs.horizon) prefs.horizon = summary.prefs.horizon;
   if (summary.prefs.experience) prefs.experience = summary.prefs.experience;
-  if (summary.prefs.risk) prefs.risk = summary.prefs.risk;
+  if (summary.prefs.risk) prefs.explainRiskDepth = summary.prefs.risk;
   if (Object.keys(prefs).length) ctx.prefs = prefs;
   if (summary.thisAsset) {
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));

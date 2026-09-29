@@ -4,9 +4,11 @@
 //     asset or everything through the right RPC; storage failures are a JSON 503 whose logs never pair a
 //     symbol with an identity;
 //   · the desk gives the reader to the CIO only, for a signed-in Apple/Google account, never to the client
-//     (only `personalized: true`); an unspecified horizon falls back to the one the reader set; the ask is
+//     (only `personalized: true`); a stored horizon never changes sufficiency (nor the verdict); the stored
+//     "risk" reaches the CIO only as explainRiskDepth, under a rule that forbids suitability and sizing; the ask is
 //     recorded only after a delivered answer, never on a refusal, an outage or a guard rejection; anonymous
-//     and wallet requests make no memory call at all, nor the iPhone app until it can show and delete memory.
+//     and wallet requests make no memory call at all, nor the iPhone app until it can show and delete memory;
+//   · kill switch: without BOBBY_MEMORY=on the desk makes no memory call at all, while /api/memory still works.
 import assert from 'node:assert/strict';
 
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
@@ -18,13 +20,14 @@ process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
 delete process.env.BOBBY_DESK_MODEL;
 delete process.env.BOBBY_AUTH_URL;
+process.env.BOBBY_MEMORY = 'on';
 
 // waitUntil (@vercel/functions) reads the request context from this symbol: capture what the handler defers.
 const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -114,8 +117,12 @@ try {
   eq(readerContext(summary({ enabled: false }), 'NVDA', now), null, 'memory off: nothing reaches the model');
   eq(readerContext(null, 'NVDA', now), null, 'no summary: nothing');
   eq(readerContext(summary({ prefs: { horizon: null, experience: null, risk: null }, top: [], thisAsset: null }), 'NVDA', now), null, 'an empty memory is no reader at all');
+  eq(readerContext(summary({ prefs: { horizon: null, experience: null, risk: 'high' }, top: [], thisAsset: null }), 'NVDA', now), { prefs: { explainRiskDepth: 'high' } }, 'the stored "risk" reaches the model as explainRiskDepth, never as "risk"');
   const keys = JSON.stringify(readerContext(summary(), 'NVDA', now));
   ok(!/lastAskedAt|firstAsked|identity|email|question/.test(keys), 'the reader carries no timestamps, identity or question');
+
+  // ---------- kill switch ----------
+  eq([memoryPersonalizationOn({ BOBBY_MEMORY: 'on' } as never), memoryPersonalizationOn({} as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'true' } as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'ON' } as never)], [true, false, false, false], "memory personalization is on only for BOBBY_MEMORY === 'on'");
 
   // ---------- /api/memory ----------
   const memReq = (method: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
@@ -171,6 +178,16 @@ try {
   const empty = response();
   await memoryHandler(memReq('GET', SIGNED_IN) as never, empty as never);
   eq([empty.body.enabled, empty.body.prefs], [true, { horizon: null, experience: null, risk: null }], 'no preferences row: memory on, nothing set');
+  delete process.env.BOBBY_MEMORY;
+  memMock();
+  const switchedOff = response();
+  await memoryHandler(memReq('GET', SIGNED_IN) as never, switchedOff as never);
+  eq([switchedOff.statusCode, switchedOff.body.enabled], [200, true], 'with the kill switch off, /api/memory still shows what is stored');
+  memMock();
+  const offDelete = response();
+  await memoryHandler(memReq('DELETE', SIGNED_IN) as never, offDelete as never);
+  eq([offDelete.statusCode, calls.some((c) => c.url.includes('rpc/bobby_memory_forget'))], [200, true], '…and still deletes it');
+  process.env.BOBBY_MEMORY = 'on';
 
   for (const [body, why] of [
     [{ horizon: 'forever' }, 'an unknown horizon'], [{ risk: 'reckless' }, 'an unknown risk'], [{ experience: 'guru' }, 'an unknown experience'],
@@ -274,12 +291,16 @@ try {
   const byRoleCalls = Object.fromEntries(models().map((c) => [byRole(c), c]));
   eq(inputOf(byRoleCalls.cio).reader, { prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 2, lastHorizon: 'week' }, oftenAsks: [{ symbol: 'BTC', asks: 4 }] }, 'the CIO receives the compact reader');
   ok(systemOf(byRoleCalls.cio).includes(READER_RULE), 'with the rule: frame only, never change the verdict or judge suitability');
+  ok(/explainRiskDepth/.test(READER_RULE) && /how much the answer explains risk/.test(READER_RULE) && /never sets suitability, position sizing or a recommendation/.test(READER_RULE), 'the rule says explainRiskDepth sets only how much risk is explained, never suitability, sizing or recommendations');
   ok(!('reader' in inputOf(byRoleCalls.alpha)) && !('reader' in inputOf(byRoleCalls.red)), 'Alpha and Red Team never see the reader');
   ok(!systemOf(byRoleCalls.alpha).includes('reader is this reader') && !systemOf(byRoleCalls.red).includes('reader is this reader'), '…nor its rule');
   const wire = JSON.stringify(served.body);
   ok(!/"reader"|oftenAsks|thisAsset|lastAskedDaysAgo|"experience"/.test(wire), 'the reader never reaches the client');
-  eq(served.body.sufficiency.horizon, 'month', 'an unspecified horizon uses the one the reader set');
-  eq(inputOf(byRoleCalls.alpha).sufficiency.horizon, 'month', '…for every role\'s sufficiency note');
+  eq(served.body.sufficiency.horizon, 'unspecified', 'a stored horizon preference never changes sufficiency');
+  eq([inputOf(byRoleCalls.alpha).sufficiency.horizon, inputOf(byRoleCalls.red).sufficiency.horizon, inputOf(byRoleCalls.cio).sufficiency.horizon], ['unspecified', 'unspecified', 'unspecified'], '…for any role');
+  eq([inputOf(byRoleCalls.alpha).reader, inputOf(byRoleCalls.red).reader], [undefined, undefined], 'alpha and red inputs carry no reader');
+  const servedAlpha = inputOf(byRoleCalls.alpha);
+  const servedAlphaSystem = systemOf(byRoleCalls.alpha);
   const summaryCall = calls.find((c) => c.url.includes('rpc/bobby_memory_summary'))!;
   eq(summaryCall.body, { p_identity: IDENT, p_symbol: 'NVDA' }, 'the summary is read for this account and asset');
   await settle();
@@ -288,6 +309,13 @@ try {
   eq(rec[0].body, { p_identity: IDENT, p_symbol: 'NVDA', p_horizon: 'unspecified' }, 'with the horizon the question named (none), not the preference');
   ok(calls.indexOf(rec[0]) > calls.indexOf(models().at(-1)!), 'after the last model call, never before');
   eq(authCalls().length, 1, 'the account is verified once');
+
+  // The same question without memory: sufficiency and the Alpha/Red inputs are the same as with it.
+  const plain = await run({ question: 'Is NVDA worth a look?' });
+  await settle();
+  const plainAlpha = models().find((c) => byRole(c) === 'alpha')!;
+  eq(plain.body.sufficiency, served.body.sufficiency, 'sufficiency is identical with and without a reader');
+  eq([inputOf(plainAlpha).question, inputOf(plainAlpha).sufficiency, systemOf(plainAlpha)], [servedAlpha.question, servedAlpha.sufficiency, servedAlphaSystem], 'Alpha gets the same question, sufficiency and prompt with and without a reader');
 
   // A question that names its horizon keeps it.
   const today = await run({ question: '¿Cómo ves NVDA para hoy?', language: 'es' }, SIGNED_IN);
@@ -320,6 +348,20 @@ try {
   const web = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
   await settle();
   eq([web.body.personalized, recorded().length], [true, 1], 'the same account on the web: personalized and recorded');
+
+  // Kill switch off (unset or not exactly 'on'): a signed-in web reader gets no memory call at all.
+  for (const value of [undefined, 'true']) {
+    if (value === undefined) delete process.env.BOBBY_MEMORY; else process.env.BOBBY_MEMORY = value;
+    const killed = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
+    await settle();
+    eq([killed.statusCode, 'personalized' in killed.body], [200, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer`);
+    eq([memoryCalls().length, authCalls().length, recorded().length], [0, 0, 0], `BOBBY_MEMORY=${value ?? 'unset'}: no memory read, no identity lookup, nothing recorded`);
+    ok(!models().some((c) => 'reader' in inputOf(c)), `BOBBY_MEMORY=${value ?? 'unset'}: no reader for any role`);
+  }
+  process.env.BOBBY_MEMORY = 'on';
+  const backOn = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  eq([backOn.body.personalized, recorded().length], [true, 1], "BOBBY_MEMORY=on: personalized and recorded again");
 
   // Storage down or slow: the read runs without memory, in time.
   storageDown = true;
