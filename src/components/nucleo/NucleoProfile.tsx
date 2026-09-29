@@ -4,7 +4,7 @@
 // the way the iPhone app keeps them behind its header face.
 import { useState, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, ChevronRight, Globe, Grid2x2, Lock, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronRight, Compass, Globe, Grid2x2, Lock, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -135,7 +135,7 @@ export default function NucleoProfile(p: Props) {
           </Row>
           <Row icon={<MapIcon size={16} />} label="Trader Land" detail={t('Every read plants something', 'Cada lectura planta algo', 'Cada leitura planta algo')} onClick={p.onTraderLand} />
           <Row icon={<Grid2x2 size={16} />} label={t('Gear', 'Equipo', 'Equipamento')} onClick={p.onCatalog} />
-          <Row icon={<Grid2x2 size={16} />} label={t('Explore markets', 'Explorar mercados', 'Explorar mercados')} onClick={p.onExplore} />
+          <Row icon={<Compass size={16} />} label={t('Explore markets', 'Explorar mercados', 'Explorar mercados')} onClick={p.onExplore} />
           <Row icon={<Share2 size={16} />} label={t('Share my avatar', 'Compartir mi avatar', 'Compartilhar meu avatar')} onClick={p.onShare} />
         </div>
 

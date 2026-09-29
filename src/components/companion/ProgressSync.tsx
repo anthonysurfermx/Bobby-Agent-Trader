@@ -43,10 +43,12 @@ export default function ProgressSync({ onChoose }: { onChoose?: () => void } = {
 
   useEffect(() => {
     if (!ready && !supabaseToken) { configureProgressSync(null); return; }
+    // Apple/Google first, like access and invites (src/lib/access-client.ts): with both a wallet and an
+    // account signed in, progress must land on the account the iPhone app reads.
     configureProgressSync(() => {
+      if (supabaseToken) return { Authorization: `Bearer ${supabaseToken}` };
       const h = headers();
-      if (h['x-bobby-session']) return h;
-      return supabaseToken ? { Authorization: `Bearer ${supabaseToken}` } : null;
+      return h['x-bobby-session'] ? h : null;
     });
     return () => configureProgressSync(null);
     // `headers` reads localStorage on every call, so only `ready` matters.
@@ -67,7 +69,7 @@ export default function ProgressSync({ onChoose }: { onChoose?: () => void } = {
     // Final audit P0-1: the "link the iOS app" code flow that lived here was
     // retired with /api/identity-link (Build 13 removed the phone side too).
     return (
-      <div title={wallet ? t(`Progress saved to ${short}`, `Progreso guardado en ${short}`, `Progresso salvo em ${short}`) : t('Progress saved to your account', 'Progreso guardado en tu cuenta', 'Progresso salvo na sua conta')} className="flex h-10 items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-300">
+      <div title={wallet && !supabaseToken ? t(`Progress saved to ${short}`, `Progreso guardado en ${short}`, `Progresso salvo em ${short}`) : t('Progress saved to your account', 'Progreso guardado en tu cuenta', 'Progresso salvo na sua conta')} className="flex h-10 items-center gap-1.5 rounded-full bg-white/[0.04] border border-white/[0.06] px-3 font-mono text-[10px] uppercase tracking-[0.14em] text-emerald-300">
         {status === 'syncing' || pending ? <LoaderCircle size={13} className="animate-spin" /> : <Cloud size={13} />}
         <span className="hidden sm:inline">{t('Saved', 'Guardado', 'Salvo')}</span>
       </div>
