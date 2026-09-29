@@ -1,0 +1,924 @@
+[
+  {
+    "case": "BTC",
+    "name": "A gpt-4o-mini (today)",
+    "calls": [
+      {
+        "model": "gpt-4o-mini",
+        "tin": 280,
+        "tout": 90,
+        "usd": 0.000096,
+        "ms": 2288,
+        "stop": "stop",
+        "text": "{\"analysis\":\"El precio de BTC es de 83,818.6, con un soporte en 82,556.6 y una resistencia en 84,374.2. El RSI de 58.3 indica que el activo está en una zona neutral, lo que sugiere que podría haber oportunidades tanto para entrar como para esperar. La tendencia es lateral, lo que implica que no hay una dirección clara en el corto plazo.\"}"
+      },
+      {
+        "model": "gpt-4o-mini",
+        "tin": 377,
+        "tout": 95,
+        "usd": 0.00011355,
+        "ms": 1372,
+        "stop": "stop",
+        "text": "{\"analysis\":\"La argumentación de Alpha asume que la neutralidad del RSI y la tendencia lateral son suficientes para justificar una decisión de compra o espera, pero no considera otros factores externos que podrían influir en el precio de BTC, como noticias del mercado o cambios regulatorios. Además, la falta de un impulso claro en la tendencia podría indicar que el precio podría moverse en cualquier dirección, lo que genera incertidumbre sobre la efectividad de entrar en este momento.\"}"
+      },
+      {
+        "model": "gpt-4o-mini",
+        "tin": 548,
+        "tout": 88,
+        "usd": 0.000135,
+        "ms": 1571,
+        "stop": "stop",
+        "text": "{\"analysis\":\"El análisis muestra que el precio de BTC está en una tendencia lateral con un RSI neutral, lo que sugiere que no hay una dirección clara en el corto plazo. Aunque hay soporte y resistencia definidos, la falta de impulso y la influencia de factores externos generan incertidumbre sobre si es un buen momento para entrar. Por lo tanto, se recomienda esperar antes de tomar una decisión.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "El precio de BTC es de 83,818.6, con un soporte en 82,556.6 y una resistencia en 84,374.2. El RSI de 58.3 indica que el activo está en una zona neutral, lo que sugiere que podría haber oportunidades tanto para entrar como para esperar. La tendencia es lateral, lo que implica que no hay una dirección clara en el corto plazo.",
+    "red": "La argumentación de Alpha asume que la neutralidad del RSI y la tendencia lateral son suficientes para justificar una decisión de compra o espera, pero no considera otros factores externos que podrían influir en el precio de BTC, como noticias del mercado o cambios regulatorios. Además, la falta de un impulso claro en la tendencia podría indicar que el precio podría moverse en cualquier dirección, lo que genera incertidumbre sobre la efectividad de entrar en este momento.",
+    "cio": {
+      "analysis": "El análisis muestra que el precio de BTC está en una tendencia lateral con un RSI neutral, lo que sugiere que no hay una dirección clara en el corto plazo. Aunque hay soporte y resistencia definidos, la falta de impulso y la influencia de factores externos generan incertidumbre sobre si es un buen momento para entrar. Por lo tanto, se recomienda esperar antes de tomar una decisión.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.00034455,
+    "ms": 5231,
+    "tin": 1205,
+    "tout": 273,
+    "judges": [
+      {
+        "grounding": 6,
+        "insight": 2,
+        "answers_question": 5,
+        "honesty": 3,
+        "clarity": 7,
+        "one_line": "The answer is clear and the lateral/neutral read matches the evidence. But it cites no numbers, invents vague 'external factors', and ignores that 1H data can't answer a weekly question. It also skips the obvious triggers (a break above 84,374 or below 82,557) and the very tight ATR of 0.45%. Its 'se recomienda esperar' reads as advice rather than analysis, with no caveats about missing data."
+      },
+      {
+        "grounding": 7,
+        "insight": 2,
+        "answers_question": 7,
+        "honesty": 4,
+        "clarity": 9,
+        "one_line": "Responde con claridad que esperaría, pero basa una decisión para toda la semana en datos de 1 hora sin advertir esa limitación ni explicar qué señal cambiaría la conclusión."
+      }
+    ],
+    "score": 5.199999999999999
+  },
+  {
+    "case": "BTC",
+    "name": "B gpt-6-luna",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "tin": 279,
+        "tout": 218,
+        "usd": 0.0001369,
+        "ms": 4479,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Con los datos disponibles, esperar una señal de ruptura o rechazo parece más sustentado que interpretar el movimiento actual como una entrada clara: BTC está lateral, con momentum neutral y cotiza entre el soporte (82.557) y la resistencia (84.374). El RSI de 58,3 y la proximidad a las EMA20 y EMA50 no muestran una confirmación direccional clara. Estos datos corresponden al marco de 1 hora al 29 de septiembre de 2026; no bastan para valorar toda la semana ni anticipar el próximo movimiento.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 405,
+        "tout": 269,
+        "usd": 0.000175,
+        "ms": 3370,
+        "stop": "stop",
+        "text": "{\"analysis\":\"La conclusión de que esperar una ruptura o rechazo es «más sustentado» no se desprende necesariamente de estos datos: un gráfico lateral de 1 hora no demuestra que esperar tenga ventaja, y no se definen señales ni criterios de confirmación. La lectura de rango quedaría en entredicho si el precio se sostiene fuera del soporte o la resistencia indicados, pero una sola observación no permite evaluar esa ruptura. Faltan historial de velas, volumen y contexto de marcos temporales más amplios; por tanto, estos datos no resuelven qué hacer durante toda la semana.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 606,
+        "tout": 196,
+        "usd": 0.0001586,
+        "ms": 3458,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Los argumentos coinciden en que los datos disponibles no muestran una señal direccional clara: BTC está lateral, con momentum neutral y cotiza entre el soporte de 82.556,6 y la resistencia de 84.374,2. Sin embargo, este único corte de 1 hora al 29 de septiembre de 2026 no demuestra que esperar tenga ventaja ni permite evaluar la semana completa; faltan historial de velas, volumen y contexto de otros marcos temporales.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "Con los datos disponibles, esperar una señal de ruptura o rechazo parece más sustentado que interpretar el movimiento actual como una entrada clara: BTC está lateral, con momentum neutral y cotiza entre el soporte (82.557) y la resistencia (84.374). El RSI de 58,3 y la proximidad a las EMA20 y EMA50 no muestran una confirmación direccional clara. Estos datos corresponden al marco de 1 hora al 29 de septiembre de 2026; no bastan para valorar toda la semana ni anticipar el próximo movimiento.",
+    "red": "La conclusión de que esperar una ruptura o rechazo es «más sustentado» no se desprende necesariamente de estos datos: un gráfico lateral de 1 hora no demuestra que esperar tenga ventaja, y no se definen señales ni criterios de confirmación. La lectura de rango quedaría en entredicho si el precio se sostiene fuera del soporte o la resistencia indicados, pero una sola observación no permite evaluar esa ruptura. Faltan historial de velas, volumen y contexto de marcos temporales más amplios; por tanto, estos datos no resuelven qué hacer durante toda la semana.",
+    "cio": {
+      "analysis": "Los argumentos coinciden en que los datos disponibles no muestran una señal direccional clara: BTC está lateral, con momentum neutral y cotiza entre el soporte de 82.556,6 y la resistencia de 84.374,2. Sin embargo, este único corte de 1 hora al 29 de septiembre de 2026 no demuestra que esperar tenga ventaja ni permite evaluar la semana completa; faltan historial de velas, volumen y contexto de otros marcos temporales.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.0004705,
+    "ms": 11307,
+    "tin": 1290,
+    "tout": 683,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 6,
+        "answers_question": 7,
+        "honesty": 9,
+        "clarity": 8,
+        "one_line": "Los precios, el soporte y la resistencia coinciden con la evidencia, y el análisis señala con acierto que un solo corte de 1 hora no sirve para decidir a una semana. Le falta insight: no dice qué cambiaría la visión (ruptura sobre 84.374 o bajo 82.556), omite la baja volatilidad (ATR 0,45%) y las EMAs pegadas al precio, y el veredicto 'wait' contradice un poco su propia frase de que esperar no tiene ventaja demostrada."
+      },
+      {
+        "grounding": 9,
+        "insight": 7,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 9,
+        "one_line": "Responde con prudencia y reconoce que una sola lectura de 1 hora no basta para decidir sobre toda la semana; faltó explicar qué señal justificaría entrar o seguir esperando."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "BTC",
+    "name": "E sonnet-5.5 low",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 458,
+        "tout": 364,
+        "usd": 0.004556,
+        "ms": 4325,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), no hay una ventaja clara para entrar ya: el precio (83.818,6) está pegado a las EMA20 (83.554,4) y EMA50 (83.693,3), la tendencia es lateral y el momentum neutral (RSI 58,3). La oportunidad condicional más fuerte sería una ruptura confirmada por encima de la resistencia en 84.374,2 (cierre sostenido), que sacaría al precio del rango; alternativamente, un rebote con confirmación cerca del soporte en 82.556,6 daría una relación riesgo/beneficio más definida. Perder ese soporte invalidaría el escenario alcista de corto plazo. Ten en cuenta que es solo un gráfico de 1 hora con ATR de 0,45%, insuficiente para juzgar toda la semana, y no incluye noticias, volumen ni tu perfil de riesgo; esto es análisis educativo, no una recomendación personalizada.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 833,
+        "tout": 478,
+        "usd": 0.006446,
+        "ms": 4893,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha acierta al no ver ventaja clara, pero su plan condicional tiene puntos débiles: no define qué es un 'cierre sostenido' (¿una vela de 1H, varias?) y en un rango tan estrecho (soporte 82.556,6 a resistencia 84.374,2, ~2,2%) una ruptura de 1H puede ser un falso quiebre, sobre todo sin datos de volumen que la confirmen. Además, el precio está más cerca de la resistencia que del soporte (~0,7% frente a ~1,5%), así que un 'rebote cerca del soporte' exigiría esperar una caída que puede no ocurrir, y entrar ahora ofrecería una relación riesgo/beneficio desfavorable; Alpha lo insinúa pero no lo cuantifica. También conviene matizar que el ATR de 0,45% es por vela de 1H, por lo que no dice mucho sobre la volatilidad semanal, y que el RSI de 58,3 y las EMA casi planas no permiten inferir dirección. La invalidación real es un cierre por debajo de 82.556,6 (o una ruptura al alza que revierta de inmediato dentro del rango); faltan marcos de 4H/diario, volumen, calendario macro y tu horizonte y tolerancia al riesgo, así que esto es solo lectura educativa, no una recomendación.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 1408,
+        "tout": 361,
+        "usd": 0.006426,
+        "ms": 3393,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), la evidencia no respalda una entrada clara esta semana: el precio (83.818,6) está pegado a las EMA20 y EMA50, la tendencia es lateral y el RSI de 58,3 marca momentum neutral. Red tiene razón en que el precio está más cerca de la resistencia (84.374,2) que del soporte (82.556,6), lo que da una relación riesgo/beneficio poco atractiva ahora, y en que una ruptura de 1H sin volumen ni marcos mayores puede ser un falso quiebre. Faltan gráficos de 4H/diario, volumen, calendario macro y tu horizonte y tolerancia al riesgo, así que esperar es la lectura más coherente; un cierre sostenido sobre la resistencia, o una pérdida del soporte, serían los niveles a vigilar. Es análisis educativo, no una recomendación personalizada.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), no hay una ventaja clara para entrar ya: el precio (83.818,6) está pegado a las EMA20 (83.554,4) y EMA50 (83.693,3), la tendencia es lateral y el momentum neutral (RSI 58,3). La oportunidad condicional más fuerte sería una ruptura confirmada por encima de la resistencia en 84.374,2 (cierre sostenido), que sacaría al precio del rango; alternativamente, un rebote con confirmación cerca del soporte en 82.556,6 daría una relación riesgo/beneficio más definida. Perder ese soporte invalidaría el escenario alcista de corto plazo. Ten en cuenta que es solo un gráfico de 1 hora con ATR de 0,45%, insuficiente para juzgar toda la semana, y no incluye noticias, volumen ni tu perfil de riesgo; esto es análisis educativo, no una recomendación personalizada.",
+    "red": "Alpha acierta al no ver ventaja clara, pero su plan condicional tiene puntos débiles: no define qué es un 'cierre sostenido' (¿una vela de 1H, varias?) y en un rango tan estrecho (soporte 82.556,6 a resistencia 84.374,2, ~2,2%) una ruptura de 1H puede ser un falso quiebre, sobre todo sin datos de volumen que la confirmen. Además, el precio está más cerca de la resistencia que del soporte (~0,7% frente a ~1,5%), así que un 'rebote cerca del soporte' exigiría esperar una caída que puede no ocurrir, y entrar ahora ofrecería una relación riesgo/beneficio desfavorable; Alpha lo insinúa pero no lo cuantifica. También conviene matizar que el ATR de 0,45% es por vela de 1H, por lo que no dice mucho sobre la volatilidad semanal, y que el RSI de 58,3 y las EMA casi planas no permiten inferir dirección. La invalidación real es un cierre por debajo de 82.556,6 (o una ruptura al alza que revierta de inmediato dentro del rango); faltan marcos de 4H/diario, volumen, calendario macro y tu horizonte y tolerancia al riesgo, así que esto es solo lectura educativa, no una recomendación.",
+    "cio": {
+      "analysis": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), la evidencia no respalda una entrada clara esta semana: el precio (83.818,6) está pegado a las EMA20 y EMA50, la tendencia es lateral y el RSI de 58,3 marca momentum neutral. Red tiene razón en que el precio está más cerca de la resistencia (84.374,2) que del soporte (82.556,6), lo que da una relación riesgo/beneficio poco atractiva ahora, y en que una ruptura de 1H sin volumen ni marcos mayores puede ser un falso quiebre. Faltan gráficos de 4H/diario, volumen, calendario macro y tu horizonte y tolerancia al riesgo, así que esperar es la lectura más coherente; un cierre sostenido sobre la resistencia, o una pérdida del soporte, serían los niveles a vigilar. Es análisis educativo, no una recomendación personalizada.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.017428000000000003,
+    "ms": 12611,
+    "tin": 2699,
+    "tout": 1203,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 7,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Every figure matches the evidence, and the risk/reward point is correct: price sits about 556 below resistance and about 1,262 above support. It rightly flags missing volume and higher-timeframe data. It notes the 1H-data vs. weekly-question horizon gap but leaves ATR (0.45%) unused. The unexplained internal reference to 'Red' will confuse a non-expert."
+      },
+      {
+        "grounding": 8,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Responde que conviene esperar y explica por qué, pero atribuye una opinión a «Red» sin contexto y usa datos de 1H para una decisión semanal, aunque reconoce esa limitación."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "BTC",
+    "name": "J gpt-6-luna high",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 279,
+        "tout": 224,
+        "usd": 0.0001399,
+        "ms": 3911,
+        "stop": "stop",
+        "text": "{\"analysis\":\"La evidencia de BTC-USDT en 1H al 29 de septiembre muestra un rango lateral y momentum neutral: el precio está apenas sobre las EMA20/50, con RSI 58,3, entre soporte en 82.557 y resistencia en 84.374. La oportunidad más clara sería condicional: esperar una ruptura sostenida de la resistencia, o que el soporte se mantenga tras un retroceso; entrar ahora queda expuesto a movimientos dentro del rango. Estos datos horarios no bastan para valorar toda la semana y no eliminan el riesgo de pérdida.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 406,
+        "tout": 350,
+        "usd": 0.00021559999999999998,
+        "ms": 4367,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Alpha identifica correctamente un rango, pero tratar una ruptura “sostenida” o un rebote en soporte como señales de entrada supone confirmaciones que la evidencia no define ni demuestra. Es una sola observación de 1H, sin volumen ni contexto de marcos mayores o de la semana, así que no permite estimar si BTC saldrá del rango ni concluir que esperar sea mejor que entrar ahora. Los niveles indicados no garantizan que el precio vaya a respetarlos.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 582,
+        "tout": 260,
+        "usd": 0.0001882,
+        "ms": 3765,
+        "stop": "stop",
+        "text": "{\"analysis\":\"BTC-USDT en 1H al 29 de septiembre está lateral y con momentum neutral; aunque cotiza apenas sobre las EMA20/50, sigue dentro del rango entre soporte y resistencia. Esperar una ruptura o un rebote sería una hipótesis, no una señal confirmada: esta única lectura horaria no permite evaluar la semana ni saber si esos niveles se mantendrán. La evidencia no ofrece un caso claro para entrar ahora ni para anticipar una dirección.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "La evidencia de BTC-USDT en 1H al 29 de septiembre muestra un rango lateral y momentum neutral: el precio está apenas sobre las EMA20/50, con RSI 58,3, entre soporte en 82.557 y resistencia en 84.374. La oportunidad más clara sería condicional: esperar una ruptura sostenida de la resistencia, o que el soporte se mantenga tras un retroceso; entrar ahora queda expuesto a movimientos dentro del rango. Estos datos horarios no bastan para valorar toda la semana y no eliminan el riesgo de pérdida.",
+    "red": "Alpha identifica correctamente un rango, pero tratar una ruptura “sostenida” o un rebote en soporte como señales de entrada supone confirmaciones que la evidencia no define ni demuestra. Es una sola observación de 1H, sin volumen ni contexto de marcos mayores o de la semana, así que no permite estimar si BTC saldrá del rango ni concluir que esperar sea mejor que entrar ahora. Los niveles indicados no garantizan que el precio vaya a respetarlos.",
+    "cio": {
+      "analysis": "BTC-USDT en 1H al 29 de septiembre está lateral y con momentum neutral; aunque cotiza apenas sobre las EMA20/50, sigue dentro del rango entre soporte y resistencia. Esperar una ruptura o un rebote sería una hipótesis, no una señal confirmada: esta única lectura horaria no permite evaluar la semana ni saber si esos niveles se mantendrán. La evidencia no ofrece un caso claro para entrar ahora ni para anticipar una dirección.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.0005437,
+    "ms": 12043,
+    "tin": 1267,
+    "tout": 834,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 6,
+        "answers_question": 7,
+        "honesty": 8,
+        "clarity": 7,
+        "one_line": "Accurate and properly cautious. It flags the mismatch between the 1H data and the weekly horizon, but it leaves out the actual support/resistance levels, low volatility (ATR 0.45%) and the concrete triggers that would change the view."
+      },
+      {
+        "grounding": 10,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 10,
+        "clarity": 9,
+        "one_line": "Responde «esperar» con base en los datos y reconoce que una sola lectura de 1H no basta para evaluar toda la semana; podría añadir qué cambio concreto alteraría esa postura."
+      }
+    ],
+    "score": 8.3
+  },
+  {
+    "case": "BTC",
+    "name": "K sonnet-5.5 medium",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 458,
+        "tout": 367,
+        "usd": 0.004586,
+        "ms": 4484,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), el precio de 83.818,6 está pegado a EMA20 (83.554) y EMA50 (83.693), con tendencia lateral y momentum neutral (RSI 58,3); no hay una ventaja direccional clara ahora. La oportunidad condicional más fuerte sería una ruptura confirmada por encima de la resistencia de 84.374 (aprox. +0,7%), que daría señal de continuación alcista, o un rebote validado cerca del soporte de 82.556 (aprox. -1,5%) con el rango intacto. Entrar en mitad del rango ofrece una relación riesgo/recompensa poco atractiva, y esperar la confirmación parece más coherente con la evidencia. Este análisis es solo educativo: cubre únicamente gráfico de 1 hora, sin noticias, volumen ni contexto de tu portafolio, y una semana excede el horizonte de estos datos, por lo que la incertidumbre es alta.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 836,
+        "tout": 516,
+        "usd": 0.006832,
+        "ms": 5459,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha acierta al ver un rango sin ventaja clara, pero su argumento tiene puntos débiles: (1) usa datos de 1H para una pregunta semanal, así que la 'ruptura confirmada' o el 'rebote validado' no tienen criterio definido (¿cierre de vela? ¿cuántas velas? ¿volumen?), y con un ATR de solo 0,45% una ruptura de +0,7% puede ser ruido o una falsa ruptura. (2) Afirma una relación riesgo/recompensa 'poco atractiva' sin calcularla: el precio está más cerca de la resistencia (~0,7%) que del soporte (~1,5%), lo que sugiere un sesgo asimétrico que Alpha no discute; además, un RSI de 58,3 con precio sobre ambas EMAs podría leerse como ligero sesgo alcista, no puramente neutral. (3) Invalidación ausente: no dice qué haría inválida la espera (p. ej., un cierre 1H bajo 82.556 anularía el rango y cambiaría el escenario) ni qué pasa si el precio se dispara sin retroceso. Falta evidencia clave: marcos temporales mayores (4H/diario), volumen, liquidez, calendario macro y noticias; sin ello, tanto 'entrar' como 'esperar' son hipótesis educativas, no una conclusión, y esperar tampoco elimina el riesgo de perder el movimiento o entrar tarde.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 1449,
+        "tout": 394,
+        "usd": 0.006838,
+        "ms": 4347,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), el precio (83.818,6) está pegado a las EMA20 y EMA50, con tendencia lateral, momentum neutral y RSI de 58,3: no hay una ventaja direccional clara. Red tiene razón en que Alpha no define qué es una \\\"ruptura confirmada\\\" y en que 1H no alcanza para una pregunta semanal; el sesgo ligeramente alcista (precio sobre ambas EMAs, más cerca de la resistencia en 84.374 que del soporte en 82.556) es débil y no basta para justificar una entrada. Faltan marcos 4H/diario, volumen, noticias y calendario macro, así que lo más coherente es esperar; una hipótesis alcista condicional solo merecería revisión si hubiera cierre sostenido sobre 84.374, y un cierre bajo 82.556 invalidaría el rango. Es un análisis educativo, no una recomendación, y esperar tampoco elimina el riesgo de perder un movimiento.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), el precio de 83.818,6 está pegado a EMA20 (83.554) y EMA50 (83.693), con tendencia lateral y momentum neutral (RSI 58,3); no hay una ventaja direccional clara ahora. La oportunidad condicional más fuerte sería una ruptura confirmada por encima de la resistencia de 84.374 (aprox. +0,7%), que daría señal de continuación alcista, o un rebote validado cerca del soporte de 82.556 (aprox. -1,5%) con el rango intacto. Entrar en mitad del rango ofrece una relación riesgo/recompensa poco atractiva, y esperar la confirmación parece más coherente con la evidencia. Este análisis es solo educativo: cubre únicamente gráfico de 1 hora, sin noticias, volumen ni contexto de tu portafolio, y una semana excede el horizonte de estos datos, por lo que la incertidumbre es alta.",
+    "red": "Alpha acierta al ver un rango sin ventaja clara, pero su argumento tiene puntos débiles: (1) usa datos de 1H para una pregunta semanal, así que la 'ruptura confirmada' o el 'rebote validado' no tienen criterio definido (¿cierre de vela? ¿cuántas velas? ¿volumen?), y con un ATR de solo 0,45% una ruptura de +0,7% puede ser ruido o una falsa ruptura. (2) Afirma una relación riesgo/recompensa 'poco atractiva' sin calcularla: el precio está más cerca de la resistencia (~0,7%) que del soporte (~1,5%), lo que sugiere un sesgo asimétrico que Alpha no discute; además, un RSI de 58,3 con precio sobre ambas EMAs podría leerse como ligero sesgo alcista, no puramente neutral. (3) Invalidación ausente: no dice qué haría inválida la espera (p. ej., un cierre 1H bajo 82.556 anularía el rango y cambiaría el escenario) ni qué pasa si el precio se dispara sin retroceso. Falta evidencia clave: marcos temporales mayores (4H/diario), volumen, liquidez, calendario macro y noticias; sin ello, tanto 'entrar' como 'esperar' son hipótesis educativas, no una conclusión, y esperar tampoco elimina el riesgo de perder el movimiento o entrar tarde.",
+    "cio": {
+      "analysis": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), el precio (83.818,6) está pegado a las EMA20 y EMA50, con tendencia lateral, momentum neutral y RSI de 58,3: no hay una ventaja direccional clara. Red tiene razón en que Alpha no define qué es una \"ruptura confirmada\" y en que 1H no alcanza para una pregunta semanal; el sesgo ligeramente alcista (precio sobre ambas EMAs, más cerca de la resistencia en 84.374 que del soporte en 82.556) es débil y no basta para justificar una entrada. Faltan marcos 4H/diario, volumen, noticias y calendario macro, así que lo más coherente es esperar; una hipótesis alcista condicional solo merecería revisión si hubiera cierre sostenido sobre 84.374, y un cierre bajo 82.556 invalidaría el rango. Es un análisis educativo, no una recomendación, y esperar tampoco elimina el riesgo de perder un movimiento.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.018256,
+    "ms": 14290,
+    "tin": 2743,
+    "tout": 1277,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 7,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 6,
+        "one_line": "All the figures are correct: price is above both EMAs and closer to resistance than support. The answer rightly flags that 1H data cannot settle a weekly question and gives clear invalidation levels. It never uses the 0.45% ATR to size the range, and the internal 'Red'/'Alpha' references plus jargon would confuse a non-expert."
+      },
+      {
+        "grounding": 8,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 8,
+        "one_line": "Responde que conviene esperar y explica bien el límite de usar datos de 1H para decidir sobre una semana; las referencias a «Red» y «Alpha» no están sustentadas y pueden confundir."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "BTC",
+    "name": "L sonnet-5.5 high",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 458,
+        "tout": 381,
+        "usd": 0.004726,
+        "ms": 4887,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), no hay una ventaja clara para entrar ya: el precio (83.818,6) está entre soporte (82.556,6) y resistencia (84.374,2), con tendencia lateral, momentum neutral y RSI 58,3. La oportunidad condicional más fuerte sería una ruptura con cierre sostenido sobre 84.374,2, apoyada por precio por encima de las EMA20/EMA50 (≈83.554/83.693, casi planas) y un RSI que siga subiendo sin sobrecompra; la alternativa sería esperar un retroceso hacia el soporte y observar si se sostiene. Si el precio pierde 82.556,6, el escenario alcista se debilita. Esto es solo lectura técnica de 1H: no incluye noticias, volumen, marcos mayores ni tu perfil de riesgo, así que no es una recomendación personalizada ni garantiza resultados; el ATR de 0,45% sugiere movimientos cortos y sensibles al ruido.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 850,
+        "tout": 463,
+        "usd": 0.00633,
+        "ms": 4368,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha acierta al no forzar una entrada, pero su plan condicional tiene puntos débiles: una ruptura sobre 84.374,2 está a solo ~0,66% del precio y el ATR de 0,45% en 1H es del mismo orden, así que una \\\"ruptura con cierre sostenido\\\" puede ser ruido y no confirmación; Alpha no define qué significa \\\"sostenido\\\" (cuántas velas, qué cierre). Además, el rango entre soporte y resistencia (~2,2%) es estrecho, y con EMA20/EMA50 casi idénticas y planas, el \\\"precio por encima de las EMA\\\" apenas discrimina; un RSI de 58,3 tampoco aporta ventaja direccional. Además, Alpha usa un gráfico de 1H para responder \\\"esta semana\\\": el horizonte no coincide, y faltan marcos diarios/4H, volumen, liquidez y calendario de eventos para saber si la ruptura tiene respaldo. La invalidación (pérdida de 82.556,6) está bien señalada, pero no se cuantifica la distancia (~1,5% de caída) frente al posible avance hasta resistencia (~0,66%), lo que sugiere una relación beneficio/riesgo poco atractiva al precio actual; esto es lectura educativa, no una recomendación.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 1410,
+        "tout": 347,
+        "usd": 0.00629,
+        "ms": 3334,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), la evidencia no respalda un caso claro para entrar ahora. El precio (83.818,6) está entre soporte (82.556,6) y resistencia (84.374,2), con tendencia lateral, momentum neutral, RSI 58,3 y EMA20/EMA50 casi planas. Red tiene razón en que el recorrido hacia la resistencia (~0,66%) es menor que la distancia hasta la invalidación (~1,5%), y en que un gráfico de 1H no cubre bien el horizonte de \\\"esta semana\\\"; además faltan marcos 4H/diario, volumen y calendario de eventos. Lo razonable es esperar: solo una ruptura confirmada sobre 84.374,2, o una reacción clara en el soporte, justificaría reabrir el análisis, sin garantía de resultado ni recomendación personalizada.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), no hay una ventaja clara para entrar ya: el precio (83.818,6) está entre soporte (82.556,6) y resistencia (84.374,2), con tendencia lateral, momentum neutral y RSI 58,3. La oportunidad condicional más fuerte sería una ruptura con cierre sostenido sobre 84.374,2, apoyada por precio por encima de las EMA20/EMA50 (≈83.554/83.693, casi planas) y un RSI que siga subiendo sin sobrecompra; la alternativa sería esperar un retroceso hacia el soporte y observar si se sostiene. Si el precio pierde 82.556,6, el escenario alcista se debilita. Esto es solo lectura técnica de 1H: no incluye noticias, volumen, marcos mayores ni tu perfil de riesgo, así que no es una recomendación personalizada ni garantiza resultados; el ATR de 0,45% sugiere movimientos cortos y sensibles al ruido.",
+    "red": "Alpha acierta al no forzar una entrada, pero su plan condicional tiene puntos débiles: una ruptura sobre 84.374,2 está a solo ~0,66% del precio y el ATR de 0,45% en 1H es del mismo orden, así que una \"ruptura con cierre sostenido\" puede ser ruido y no confirmación; Alpha no define qué significa \"sostenido\" (cuántas velas, qué cierre). Además, el rango entre soporte y resistencia (~2,2%) es estrecho, y con EMA20/EMA50 casi idénticas y planas, el \"precio por encima de las EMA\" apenas discrimina; un RSI de 58,3 tampoco aporta ventaja direccional. Además, Alpha usa un gráfico de 1H para responder \"esta semana\": el horizonte no coincide, y faltan marcos diarios/4H, volumen, liquidez y calendario de eventos para saber si la ruptura tiene respaldo. La invalidación (pérdida de 82.556,6) está bien señalada, pero no se cuantifica la distancia (~1,5% de caída) frente al posible avance hasta resistencia (~0,66%), lo que sugiere una relación beneficio/riesgo poco atractiva al precio actual; esto es lectura educativa, no una recomendación.",
+    "cio": {
+      "analysis": "Con los datos de BTC-USDT en 1H (corte 2026-09-29 09:00 UTC), la evidencia no respalda un caso claro para entrar ahora. El precio (83.818,6) está entre soporte (82.556,6) y resistencia (84.374,2), con tendencia lateral, momentum neutral, RSI 58,3 y EMA20/EMA50 casi planas. Red tiene razón en que el recorrido hacia la resistencia (~0,66%) es menor que la distancia hasta la invalidación (~1,5%), y en que un gráfico de 1H no cubre bien el horizonte de \"esta semana\"; además faltan marcos 4H/diario, volumen y calendario de eventos. Lo razonable es esperar: solo una ruptura confirmada sobre 84.374,2, o una reacción clara en el soporte, justificaría reabrir el análisis, sin garantía de resultado ni recomendación personalizada.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.017346,
+    "ms": 12589,
+    "tin": 2718,
+    "tout": 1191,
+    "judges": [
+      {
+        "grounding": 8,
+        "insight": 7,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The answer says 'esperar' and backs it with correct level math (~0.66% to resistance vs ~1.5% to support) and flags the gap between a 1H chart and a weekly horizon. It calls the EMAs 'casi planas' without slope data, skips the 0.45% ATR (a weekly move could easily clear both levels), and its mention of 'Red' will confuse the user."
+      },
+      {
+        "grounding": 7,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Responde que conviene esperar y explica bien la relación entre recorrido y riesgo, pero atribuye una opinión a «Red» sin respaldo e infiere que las medias están planas a partir de una sola lectura."
+      }
+    ],
+    "score": 8
+  },
+  {
+    "case": "BTC",
+    "name": "M luna debaters + sonnet medium CIO",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "tin": 279,
+        "tout": 258,
+        "usd": 0.00015690000000000002,
+        "ms": 5407,
+        "stop": "stop",
+        "text": "{\"analysis\":\"La señal más prudente es esperar: BTC está en rango lateral con momentum neutral, cotiza apenas por encima de las EMA20/50 y cerca de la resistencia de 84.374; no hay confirmación clara de ruptura. Una oportunidad condicional sería considerar el movimiento solo si supera y sostiene esa resistencia, o si prueba el soporte de 82.557 y lo mantiene; estos datos son del marco de 1 hora al 29-09-2026 09:00 UTC y no permiten anticipar por sí solos toda la semana.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 401,
+        "tout": 322,
+        "usd": 0.00020109999999999998,
+        "ms": 4060,
+        "stop": "stop",
+        "text": "{\"analysis\":\"La conclusión de que «lo más prudente es esperar» no se desprende necesariamente de un RSI neutral y un rango lateral: esos datos describen indecisión, no la dirección posterior. Los niveles de 84.374 y 82.557 son referencias técnicas sin metodología ni volumen aportados, y «superar y sostener» no define un criterio verificable; un movimiento sostenido fuera del rango debilitaría la tesis lateral. Además, una sola lectura de 1 hora no basta para valorar el resto de la semana y faltan contexto de marcos mayores y datos de mercado relevantes.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 982,
+        "tout": 309,
+        "usd": 0.005054,
+        "ms": 3334,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Con los datos disponibles no hay un caso claro: BTC-USDT en 1H (29-09-2026 09:00 UTC) está lateral, con momentum neutral y RSI de 58,3. El precio (83.819) queda casi pegado a las EMA20/50 y entre soporte (82.557) y resistencia (84.374), un rango estrecho donde la ventaja de entrar es difícil de justificar. Red acierta en que una sola lectura de 1 hora no permite valorar toda la semana y en que faltan marcos mayores, volumen y contexto de mercado; Alpha aporta condiciones útiles para vigilar, pero no un criterio verificable. Lo razonable es esperar y revisar si hay una ruptura sostenida del rango con confirmación adicional; esto es análisis educativo, no una recomendación personalizada.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "La señal más prudente es esperar: BTC está en rango lateral con momentum neutral, cotiza apenas por encima de las EMA20/50 y cerca de la resistencia de 84.374; no hay confirmación clara de ruptura. Una oportunidad condicional sería considerar el movimiento solo si supera y sostiene esa resistencia, o si prueba el soporte de 82.557 y lo mantiene; estos datos son del marco de 1 hora al 29-09-2026 09:00 UTC y no permiten anticipar por sí solos toda la semana.",
+    "red": "La conclusión de que «lo más prudente es esperar» no se desprende necesariamente de un RSI neutral y un rango lateral: esos datos describen indecisión, no la dirección posterior. Los niveles de 84.374 y 82.557 son referencias técnicas sin metodología ni volumen aportados, y «superar y sostener» no define un criterio verificable; un movimiento sostenido fuera del rango debilitaría la tesis lateral. Además, una sola lectura de 1 hora no basta para valorar el resto de la semana y faltan contexto de marcos mayores y datos de mercado relevantes.",
+    "cio": {
+      "analysis": "Con los datos disponibles no hay un caso claro: BTC-USDT en 1H (29-09-2026 09:00 UTC) está lateral, con momentum neutral y RSI de 58,3. El precio (83.819) queda casi pegado a las EMA20/50 y entre soporte (82.557) y resistencia (84.374), un rango estrecho donde la ventaja de entrar es difícil de justificar. Red acierta en que una sola lectura de 1 hora no permite valorar toda la semana y en que faltan marcos mayores, volumen y contexto de mercado; Alpha aporta condiciones útiles para vigilar, pero no un criterio verificable. Lo razonable es esperar y revisar si hay una ruptura sostenida del rango con confirmación adicional; esto es análisis educativo, no una recomendación personalizada.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.005412,
+    "ms": 12801,
+    "tin": 1662,
+    "tout": 889,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 7,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Every figure matches the evidence, and the answer rightly flags that one 1H snapshot can't judge a whole week and that other timeframes and volume are missing. It skips the ATR (0.45%) and the roughly 2% range width, which would sharpen the call. It also refers to internal agents (Red, Alpha) the user doesn't know."
+      },
+      {
+        "grounding": 8,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Responde que esperaría y explica por qué una lectura de 1H no basta para decidir sobre toda la semana; las referencias a «Red» y «Alpha» no están sustentadas en la evidencia y pueden confundir."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "NVDA",
+    "name": "A gpt-4o-mini (today)",
+    "calls": [
+      {
+        "model": "gpt-4o-mini",
+        "tin": 283,
+        "tout": 78,
+        "usd": 0.00008925,
+        "ms": 2084,
+        "stop": "stop",
+        "text": "{\"analysis\":\"NVDA is currently priced at 228.9, with an RSI of 67.2 indicating it is nearing overbought territory. However, the stock remains in an upward trend with support at 221.1 and resistance at 233.2, suggesting potential for further movement if it breaks through resistance. The momentum is neutral, indicating a possible consolidation phase.\"}"
+      },
+      {
+        "model": "gpt-4o-mini",
+        "tin": 368,
+        "tout": 97,
+        "usd": 0.00011339999999999999,
+        "ms": 1620,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Alpha's argument assumes that the current RSI of 67.2 definitively indicates an overbought condition, but this is not a strict rule and can vary by context. Additionally, while the upward trend and support/resistance levels are noted, the analysis lacks consideration of external market factors or news that could impact NVDA's price movement. The mention of neutral momentum does not provide a clear direction for future price action, leaving uncertainty about the stock's next move.\"}"
+      },
+      {
+        "model": "gpt-4o-mini",
+        "tin": 541,
+        "tout": 104,
+        "usd": 0.00014355,
+        "ms": 1711,
+        "stop": "stop",
+        "text": "{\"analysis\":\"NVDA is currently priced at 228.9 with an RSI of 67.2, suggesting it is nearing overbought territory, yet it remains in an upward trend with support at 221.1 and resistance at 233.2. The neutral momentum indicates potential consolidation, but the lack of external market context introduces uncertainty about future price movements. Therefore, while there are signs of strength, the situation is not definitive enough to warrant a clear action.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "NVDA is currently priced at 228.9, with an RSI of 67.2 indicating it is nearing overbought territory. However, the stock remains in an upward trend with support at 221.1 and resistance at 233.2, suggesting potential for further movement if it breaks through resistance. The momentum is neutral, indicating a possible consolidation phase.",
+    "red": "Alpha's argument assumes that the current RSI of 67.2 definitively indicates an overbought condition, but this is not a strict rule and can vary by context. Additionally, while the upward trend and support/resistance levels are noted, the analysis lacks consideration of external market factors or news that could impact NVDA's price movement. The mention of neutral momentum does not provide a clear direction for future price action, leaving uncertainty about the stock's next move.",
+    "cio": {
+      "analysis": "NVDA is currently priced at 228.9 with an RSI of 67.2, suggesting it is nearing overbought territory, yet it remains in an upward trend with support at 221.1 and resistance at 233.2. The neutral momentum indicates potential consolidation, but the lack of external market context introduces uncertainty about future price movements. Therefore, while there are signs of strength, the situation is not definitive enough to warrant a clear action.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.00034619999999999996,
+    "ms": 5415,
+    "tin": 1192,
+    "tout": 279,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 3,
+        "answers_question": 5,
+        "honesty": 6,
+        "clarity": 7,
+        "one_line": "The numbers match the evidence, but the answer never really says whether NVDA is overextended. Price sits only ~0.7% above the EMA20, and the 1H timeframe clashes with the question's 'ran hard lately'. It also ignores ATR, gives no risk/reward framing between support (~3.4% below) and resistance (~1.9% above), and names no trigger that would change the 'wait' verdict."
+      },
+      {
+        "grounding": 9,
+        "insight": 3,
+        "answers_question": 6,
+        "honesty": 8,
+        "clarity": 8,
+        "one_line": "Faithful to the indicators and appropriately cautious, but it mostly restates the data; it misses the 1-hour timeframe and does not explain what would make the setup attractive or overextended."
+      }
+    ],
+    "score": 6.4
+  },
+  {
+    "case": "NVDA",
+    "name": "B gpt-6-luna",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "tin": 282,
+        "tout": 256,
+        "usd": 0.0001562,
+        "ms": 3366,
+        "stop": "stop",
+        "text": "{\"analysis\":\"On the supplied 1-hour snapshot, NVDA still has a conditional bullish setup: price is above the 20- and 50-period EMAs, and the trend is marked bullish. RSI at 67.2 is elevated but below 70, so it suggests some extension without alone confirming an overbought reversal; momentum is neutral. Resistance is 233.2 and support is 221.1, making follow-through above resistance or a hold near support key evidence to watch. This snapshot is as of 2026-09-28 and cannot establish how much the stock has run or whether the move is overextended on other timeframes.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 424,
+        "tout": 248,
+        "usd": 0.0001664,
+        "ms": 4666,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Alpha’s bullish case leans too heavily on price being above two EMAs and a supplied “bullish” trend label; a single 1-hour snapshot does not establish durable follow-through. RSI below 70 does not rule out overextension, and the stated support/resistance levels are reference points, not evidence that either will hold or break. A move below the EMAs or toward/below 221.1 would weaken the setup, but the evidence lacks recent price history, volume, and higher-timeframe context to judge how extended the run is.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 615,
+        "tout": 161,
+        "usd": 0.000142,
+        "ms": 2771,
+        "stop": "stop",
+        "text": "{\"analysis\":\"The 1-hour snapshot is mildly constructive: price is above the 20- and 50-period EMAs, while RSI at 67.2 is elevated but not conclusive and momentum is neutral. It does not show how far NVDA has run or provide volume and higher-timeframe context, so it cannot establish whether the move is overextended or a durable setup; the cited support and resistance are only reference levels.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "On the supplied 1-hour snapshot, NVDA still has a conditional bullish setup: price is above the 20- and 50-period EMAs, and the trend is marked bullish. RSI at 67.2 is elevated but below 70, so it suggests some extension without alone confirming an overbought reversal; momentum is neutral. Resistance is 233.2 and support is 221.1, making follow-through above resistance or a hold near support key evidence to watch. This snapshot is as of 2026-09-28 and cannot establish how much the stock has run or whether the move is overextended on other timeframes.",
+    "red": "Alpha’s bullish case leans too heavily on price being above two EMAs and a supplied “bullish” trend label; a single 1-hour snapshot does not establish durable follow-through. RSI below 70 does not rule out overextension, and the stated support/resistance levels are reference points, not evidence that either will hold or break. A move below the EMAs or toward/below 221.1 would weaken the setup, but the evidence lacks recent price history, volume, and higher-timeframe context to judge how extended the run is.",
+    "cio": {
+      "analysis": "The 1-hour snapshot is mildly constructive: price is above the 20- and 50-period EMAs, while RSI at 67.2 is elevated but not conclusive and momentum is neutral. It does not show how far NVDA has run or provide volume and higher-timeframe context, so it cannot establish whether the move is overextended or a durable setup; the cited support and resistance are only reference levels.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.0004646,
+    "ms": 10803,
+    "tin": 1321,
+    "tout": 665,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 5,
+        "answers_question": 6,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The answer is accurately grounded and candid that a 1H snapshot can't show how far NVDA has run, but it misses the evidence that price sits only ~0.7% above the 20-EMA with resistance ~1.9% (~2 ATR) away, which bears directly on the overextension question, and it never says what would change the view."
+      },
+      {
+        "grounding": 10,
+        "insight": 6,
+        "answers_question": 8,
+        "honesty": 10,
+        "clarity": 9,
+        "one_line": "Well-grounded and appropriately cautious about a single 1-hour snapshot, but it offers little guidance on what would turn the levels into a setup."
+      }
+    ],
+    "score": 7.9
+  },
+  {
+    "case": "NVDA",
+    "name": "E sonnet-5.5 low",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 455,
+        "tout": 388,
+        "usd": 0.00479,
+        "ms": 3890,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the 1H chart (as of 2026-09-28 20:00 UTC), NVDA at 228.9 is not stretched by the supplied numbers: it sits only ~0.7% above the EMA20 (227.4) and ~1.6% above the EMA50 (225.2), with an alcista trend, RSI14 at 67.2 (firm but below the usual 70 overbought line) and neutral momentum. The strongest conditional setup is a continuation: a 1H close above resistance at 233.2 would confirm a breakout, while a pullback toward the EMA20/EMA50 zone (~225-227) that holds would offer a lower-risk retest, with support at 221.1 as the level where the bullish structure would be in question. ATR of 0.88% suggests small hourly ranges, so the distance to resistance (~1.9%) is a bit over two ATRs. Caveats: this is only a 1H view with no volume, news, earnings or higher-timeframe context, so 'ran hard lately' can't be verified beyond these indicators, and RSI near 67 means a stall or consolidation is plausible before any breakout. This is educational analysis, not advice.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 854,
+        "tout": 304,
+        "usd": 0.004748,
+        "ms": 3215,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha's 'not stretched' verdict rests on distance from the 1H EMAs, but that is a weak test of overextension because the user's 'ran hard lately' implies a multi-day move that a 1H snapshot cannot measure. RSI 67.2 is close to the 70 line, and in strong trends a stall or pullback is just as plausible as a breakout, so 'not overbought' is not the same as 'good setup'. The distance to resistance (~1.9%, roughly two ATRs) is also small versus the ~3.4% distance down to support at 221.1, so the reward/risk framing Alpha implies is not clearly favorable and depends on entry. Invalidation is a 1H close below the EMA50 (~225.2), and certainly below 221.1; missing evidence includes daily/weekly context, volume, and any catalyst, none of which are supplied. This is educational analysis, not advice.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "low",
+        "tin": 1255,
+        "tout": 314,
+        "usd": 0.00565,
+        "ms": 3393,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the supplied 1H data, NVDA (228.9 as of 2026-09-28 20:00 UTC) is not stretched: it is about 0.7% above the EMA20 and 1.6% above the EMA50, with RSI 67.2 below 70 and neutral momentum. Red is right that this cannot confirm or deny a multi-day 'ran hard' move, and that the ~1.9% room to resistance at 233.2 versus ~3.4% down to support at 221.1 is not clearly favorable from the current price. A conditional long idea merits research only on a 1H close above 233.2 or a hold of the 225-227 EMA zone, and a close below the EMA50 (~225.2), and especially below 221.1, would weaken it. Daily/weekly context, volume and catalysts are missing, so the evidence does not support a clear case yet. This is educational analysis, not advice.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "On the 1H chart (as of 2026-09-28 20:00 UTC), NVDA at 228.9 is not stretched by the supplied numbers: it sits only ~0.7% above the EMA20 (227.4) and ~1.6% above the EMA50 (225.2), with an alcista trend, RSI14 at 67.2 (firm but below the usual 70 overbought line) and neutral momentum. The strongest conditional setup is a continuation: a 1H close above resistance at 233.2 would confirm a breakout, while a pullback toward the EMA20/EMA50 zone (~225-227) that holds would offer a lower-risk retest, with support at 221.1 as the level where the bullish structure would be in question. ATR of 0.88% suggests small hourly ranges, so the distance to resistance (~1.9%) is a bit over two ATRs. Caveats: this is only a 1H view with no volume, news, earnings or higher-timeframe context, so 'ran hard lately' can't be verified beyond these indicators, and RSI near 67 means a stall or consolidation is plausible before any breakout. This is educational analysis, not advice.",
+    "red": "Alpha's 'not stretched' verdict rests on distance from the 1H EMAs, but that is a weak test of overextension because the user's 'ran hard lately' implies a multi-day move that a 1H snapshot cannot measure. RSI 67.2 is close to the 70 line, and in strong trends a stall or pullback is just as plausible as a breakout, so 'not overbought' is not the same as 'good setup'. The distance to resistance (~1.9%, roughly two ATRs) is also small versus the ~3.4% distance down to support at 221.1, so the reward/risk framing Alpha implies is not clearly favorable and depends on entry. Invalidation is a 1H close below the EMA50 (~225.2), and certainly below 221.1; missing evidence includes daily/weekly context, volume, and any catalyst, none of which are supplied. This is educational analysis, not advice.",
+    "cio": {
+      "analysis": "On the supplied 1H data, NVDA (228.9 as of 2026-09-28 20:00 UTC) is not stretched: it is about 0.7% above the EMA20 and 1.6% above the EMA50, with RSI 67.2 below 70 and neutral momentum. Red is right that this cannot confirm or deny a multi-day 'ran hard' move, and that the ~1.9% room to resistance at 233.2 versus ~3.4% down to support at 221.1 is not clearly favorable from the current price. A conditional long idea merits research only on a 1H close above 233.2 or a hold of the 225-227 EMA zone, and a close below the EMA50 (~225.2), and especially below 221.1, would weaken it. Daily/weekly context, volume and catalysts are missing, so the evidence does not support a clear case yet. This is educational analysis, not advice.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.015188,
+    "ms": 10498,
+    "tin": 2564,
+    "tout": 1006,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 7,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The numbers check out against the evidence: +0.7% vs EMA20, +1.6% vs EMA50, ~1.9% to resistance and ~3.4% to support, and the '225-227' zone is a fair rounding of the two EMAs. It directly addresses 'overextended' on the 1H data. It flags the horizon mismatch, since 1H data cannot confirm a multi-day run, and gives clear trigger and invalidation levels plus an honest note on missing daily context, volume and catalysts. It loses points for ignoring the ATR (0.88%), which would show the move is only about 2 ATRs from resistance. It also skips the bullish-trend label and uses the unexplained internal reference 'Red', which will confuse a non-expert."
+      },
+      {
+        "grounding": 8,
+        "insight": 8,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "It gives a useful conditional answer at the 1H horizon and acknowledges missing context, but “not stretched” is too confident with RSI near 70, and the unexplained “Red” reference hurts clarity."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "NVDA",
+    "name": "J gpt-6-luna high",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 282,
+        "tout": 277,
+        "usd": 0.00016669999999999999,
+        "ms": 4785,
+        "stop": "stop",
+        "text": "{\"analysis\":\"On the supplied 1-hour snapshot (as of 2026-09-28), NVDA still has a conditional bullish setup: price is above the 20- and 50-period EMAs, with trend marked bullish. It isn’t clearly overextended by RSI alone at 67.2, but neutral momentum and resistance near 233.2 make a clean break or continued hold above the EMAs important confirmation; a rejection could bring support near 221.1 into view. This is limited technical evidence from one timeframe, not a forecast.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 404,
+        "tout": 445,
+        "usd": 0.0002629,
+        "ms": 5564,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Alpha’s bullish read relies on one 1-hour snapshot and lagging EMA/trend signals; price being just above those averages does not establish continuation, especially with momentum marked neutral and resistance nearby. RSI 67.2 suggests the move may be getting stretched, but neither it nor this snapshot alone can determine whether NVDA is overextended; the recent run, volume, and higher-timeframe context are missing. A sustained break below the EMAs—and especially support at 221.1—would weaken the bullish case, while a hold alone would not confirm it.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "effort": "high",
+        "tin": 597,
+        "tout": 310,
+        "usd": 0.0002147,
+        "ms": 3536,
+        "stop": "stop",
+        "text": "{\"analysis\":\"On the supplied 1-hour snapshot as of 2026-09-28, NVDA is above its 20- and 50-period EMAs, which supports a tentative bullish setup, but resistance is nearby and momentum is neutral. RSI at 67.2 may indicate a stretched move, but this snapshot alone does not establish that it is overextended or likely to continue; higher-timeframe context, volume, and subsequent price action are missing. The evidence does not make a clear case either way.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "On the supplied 1-hour snapshot (as of 2026-09-28), NVDA still has a conditional bullish setup: price is above the 20- and 50-period EMAs, with trend marked bullish. It isn’t clearly overextended by RSI alone at 67.2, but neutral momentum and resistance near 233.2 make a clean break or continued hold above the EMAs important confirmation; a rejection could bring support near 221.1 into view. This is limited technical evidence from one timeframe, not a forecast.",
+    "red": "Alpha’s bullish read relies on one 1-hour snapshot and lagging EMA/trend signals; price being just above those averages does not establish continuation, especially with momentum marked neutral and resistance nearby. RSI 67.2 suggests the move may be getting stretched, but neither it nor this snapshot alone can determine whether NVDA is overextended; the recent run, volume, and higher-timeframe context are missing. A sustained break below the EMAs—and especially support at 221.1—would weaken the bullish case, while a hold alone would not confirm it.",
+    "cio": {
+      "analysis": "On the supplied 1-hour snapshot as of 2026-09-28, NVDA is above its 20- and 50-period EMAs, which supports a tentative bullish setup, but resistance is nearby and momentum is neutral. RSI at 67.2 may indicate a stretched move, but this snapshot alone does not establish that it is overextended or likely to continue; higher-timeframe context, volume, and subsequent price action are missing. The evidence does not make a clear case either way.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.0006443,
+    "ms": 13885,
+    "tin": 1283,
+    "tout": 1032,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 5,
+        "answers_question": 7,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The answer is accurately grounded and honest that a single 1H snapshot can't settle 'overextended', but it doesn't quantify the setup. Resistance is about 1.9% above (roughly 2 ATRs at 0.88%) and support about 3.4% below, a risk/reward skew that goes unmentioned. It also leaves RSI and EMA unexplained for non-experts."
+      },
+      {
+        "grounding": 10,
+        "insight": 6,
+        "answers_question": 8,
+        "honesty": 10,
+        "clarity": 9,
+        "one_line": "The answer is well grounded and appropriately cautious, but it could better explain what price action near resistance would confirm a setup or signal overextension."
+      }
+    ],
+    "score": 8
+  },
+  {
+    "case": "NVDA",
+    "name": "K sonnet-5.5 medium",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 455,
+        "tout": 343,
+        "usd": 0.00434,
+        "ms": 3591,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the 1H chart, NVDA at 228.9 is in an uptrend (price above EMA20 at 227.4 and EMA50 at 225.2) but not clearly stretched: it sits only about 0.7% above the EMA20, RSI is 67.2 (near but below the usual 70 overbought area), and momentum reads neutral. The strongest conditional setup is a breakout: a 1H close above resistance at 233.2 with momentum improving would support continuation, while a pullback toward the EMA20/EMA50 zone (roughly 225-227) that holds would be the lower-risk trend-following alternative. Invalidation would be a break below support at 221.1, which would undermine the uptrend structure. Caveats: this is only 1H data from a single snapshot, ATR is about 0.88% so moves can be quick, and there is no information on volume, news, earnings, or higher-timeframe trend, so 'overextended' cannot be judged on the daily or weekly view. This is educational analysis, not personalized advice.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 809,
+        "tout": 340,
+        "usd": 0.005018,
+        "ms": 4344,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha's 'not stretched' verdict rests on distance from a 1H EMA20, but the user asked about a recent hard run, and a 1H snapshot cannot show how large that run was. Being 0.7% above EMA20 with ATR at 0.88% mostly reflects a short-term pause, not whether the multi-day move is extended, and RSI 67.2 is close to overbought, so the 'below 70' comfort is thin. The breakout case lacks confirmation, since neutral momentum and no volume data make a close above 233.2 easy to fail, and the 225-227 pullback zone is only about 1.2-1.7% away, so a routine dip could test it without confirming anything. Invalidation at 221.1 is roughly 3.4% below price, wide relative to a 0.88% ATR, so 'lower-risk' is unproven. Missing evidence: daily/weekly trend, the size of the recent rally, volume, earnings or news catalysts, and market context. This is educational, not personalized advice.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 1246,
+        "tout": 280,
+        "usd": 0.005292,
+        "ms": 2922,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the 1H snapshot, NVDA at 228.9 is in an uptrend (above EMA20 227.4 and EMA50 225.2) and only about 0.7% above the EMA20, with RSI 67.2 and neutral momentum. That looks like a short-term pause, not clear extension. But Red is right that a 1H view cannot measure the size of the recent run, and there is no daily/weekly trend, volume, or catalyst data, so 'overextended' cannot be judged. A conditional long idea exists (a 1H close above 233.2 with improving momentum, or a hold in the 225-227 zone), yet the invalidation at 221.1 is about 3.4% away, wide versus ATR, so the risk case is unproven. Educational analysis only, not personalized advice.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "On the 1H chart, NVDA at 228.9 is in an uptrend (price above EMA20 at 227.4 and EMA50 at 225.2) but not clearly stretched: it sits only about 0.7% above the EMA20, RSI is 67.2 (near but below the usual 70 overbought area), and momentum reads neutral. The strongest conditional setup is a breakout: a 1H close above resistance at 233.2 with momentum improving would support continuation, while a pullback toward the EMA20/EMA50 zone (roughly 225-227) that holds would be the lower-risk trend-following alternative. Invalidation would be a break below support at 221.1, which would undermine the uptrend structure. Caveats: this is only 1H data from a single snapshot, ATR is about 0.88% so moves can be quick, and there is no information on volume, news, earnings, or higher-timeframe trend, so 'overextended' cannot be judged on the daily or weekly view. This is educational analysis, not personalized advice.",
+    "red": "Alpha's 'not stretched' verdict rests on distance from a 1H EMA20, but the user asked about a recent hard run, and a 1H snapshot cannot show how large that run was. Being 0.7% above EMA20 with ATR at 0.88% mostly reflects a short-term pause, not whether the multi-day move is extended, and RSI 67.2 is close to overbought, so the 'below 70' comfort is thin. The breakout case lacks confirmation, since neutral momentum and no volume data make a close above 233.2 easy to fail, and the 225-227 pullback zone is only about 1.2-1.7% away, so a routine dip could test it without confirming anything. Invalidation at 221.1 is roughly 3.4% below price, wide relative to a 0.88% ATR, so 'lower-risk' is unproven. Missing evidence: daily/weekly trend, the size of the recent rally, volume, earnings or news catalysts, and market context. This is educational, not personalized advice.",
+    "cio": {
+      "analysis": "On the 1H snapshot, NVDA at 228.9 is in an uptrend (above EMA20 227.4 and EMA50 225.2) and only about 0.7% above the EMA20, with RSI 67.2 and neutral momentum. That looks like a short-term pause, not clear extension. But Red is right that a 1H view cannot measure the size of the recent run, and there is no daily/weekly trend, volume, or catalyst data, so 'overextended' cannot be judged. A conditional long idea exists (a 1H close above 233.2 with improving momentum, or a hold in the 225-227 zone), yet the invalidation at 221.1 is about 3.4% away, wide versus ATR, so the risk case is unproven. Educational analysis only, not personalized advice.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.01465,
+    "ms": 10857,
+    "tin": 2510,
+    "tout": 963,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 8,
+        "answers_question": 7,
+        "honesty": 9,
+        "clarity": 6,
+        "one_line": "Accurate and well-hedged: all figures check out (0.7% above EMA20, 3.4% to 221.1 support), it rightly notes a 1H chart can't measure a multi-day run, and it gives a conditional 'wait', though unexplained jargon (EMA, ATR, RSI) and the internal reference to 'Red' will confuse a non-expert, and it never directly weighs the ~1.9% upside to resistance against the ~3.4% downside to support."
+      },
+      {
+        "grounding": 8,
+        "insight": 9,
+        "answers_question": 9,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The answer gives a useful conditional setup while acknowledging that a 1H snapshot cannot establish whether the recent run is overextended; the unexplained reference to “Red” and trading jargon detract from it."
+      }
+    ],
+    "score": 8.1
+  },
+  {
+    "case": "NVDA",
+    "name": "L sonnet-5.5 high",
+    "calls": [
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 455,
+        "tout": 334,
+        "usd": 0.00425,
+        "ms": 3876,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the 1H chart, NVDA at 228.9 is in an uptrend (price above EMA20 at 227.4 and EMA50 at 225.2), but it doesn't look stretched: RSI14 of 67.2 is elevated yet below 70, momentum reads neutral, and price sits only about 0.7% above the EMA20. The strongest conditional setup is a hold-and-break: a 1H close above resistance at 233.2 would confirm continuation, while a pullback toward the EMA20/EMA50 zone (roughly 225-227) that holds would be a lower-risk retest of the trend. If price loses support at 221.1, the bullish structure weakens and the 'overextended' concern gains weight. Caveats: ATR of 0.88% is small, so the 233.2 resistance is only about 1.9% away and moves can be quick, and this is a 1H view only, with no higher-timeframe, volume, or news context, so treat it as an educational read rather than a trade recommendation.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 800,
+        "tout": 295,
+        "usd": 0.00455,
+        "ms": 3720,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"Alpha's 'not stretched' call leans on a 1H window, yet the user asked whether NVDA 'ran hard lately', which needs daily or weekly context we don't have. RSI 67.2 is close to 70 and only a rule of thumb, and price being 0.7% above the EMA20 says little about how far it has run from a longer base. Alpha also calls the 225-227 retest 'lower-risk' without evidence it holds; the EMA20/EMA50 gap is only about 2.2 points, and with ATR at 0.88% (roughly 2 points) a normal swing could slice through both. Invalidation is a 1H close below 225, well before 221.1, and a rejection at 233.2 with fading momentum would favor the overextended view; volume, earnings and news catalysts, and higher-timeframe trend are all missing, so this is an educational read, not a setup.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "high",
+        "tin": 1192,
+        "tout": 280,
+        "usd": 0.005184,
+        "ms": 2702,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the 1H chart NVDA (228.9 as of 2026-09-28 20:00 UTC) is in an uptrend above its EMA20 (227.4) and EMA50 (225.2), with RSI 67.2 and neutral momentum. That is not obviously stretched, but Red is right that a 1H view cannot answer whether it 'ran hard lately', since daily/weekly context, volume and catalysts are missing. A conditional bullish idea merits research: a 1H close above resistance at 233.2 would support continuation, while a loss of 225 and then support at 221.1 would weaken it and favor the overextended view. With ATR around 0.88%, the EMA retest zone is narrow and a normal swing could pass through it, so this is an educational read, not a trade recommendation.\",\"verdict\":\"review\",\"direction\":\"long\"}"
+      }
+    ],
+    "alpha": "On the 1H chart, NVDA at 228.9 is in an uptrend (price above EMA20 at 227.4 and EMA50 at 225.2), but it doesn't look stretched: RSI14 of 67.2 is elevated yet below 70, momentum reads neutral, and price sits only about 0.7% above the EMA20. The strongest conditional setup is a hold-and-break: a 1H close above resistance at 233.2 would confirm continuation, while a pullback toward the EMA20/EMA50 zone (roughly 225-227) that holds would be a lower-risk retest of the trend. If price loses support at 221.1, the bullish structure weakens and the 'overextended' concern gains weight. Caveats: ATR of 0.88% is small, so the 233.2 resistance is only about 1.9% away and moves can be quick, and this is a 1H view only, with no higher-timeframe, volume, or news context, so treat it as an educational read rather than a trade recommendation.",
+    "red": "Alpha's 'not stretched' call leans on a 1H window, yet the user asked whether NVDA 'ran hard lately', which needs daily or weekly context we don't have. RSI 67.2 is close to 70 and only a rule of thumb, and price being 0.7% above the EMA20 says little about how far it has run from a longer base. Alpha also calls the 225-227 retest 'lower-risk' without evidence it holds; the EMA20/EMA50 gap is only about 2.2 points, and with ATR at 0.88% (roughly 2 points) a normal swing could slice through both. Invalidation is a 1H close below 225, well before 221.1, and a rejection at 233.2 with fading momentum would favor the overextended view; volume, earnings and news catalysts, and higher-timeframe trend are all missing, so this is an educational read, not a setup.",
+    "cio": {
+      "analysis": "On the 1H chart NVDA (228.9 as of 2026-09-28 20:00 UTC) is in an uptrend above its EMA20 (227.4) and EMA50 (225.2), with RSI 67.2 and neutral momentum. That is not obviously stretched, but Red is right that a 1H view cannot answer whether it 'ran hard lately', since daily/weekly context, volume and catalysts are missing. A conditional bullish idea merits research: a 1H close above resistance at 233.2 would support continuation, while a loss of 225 and then support at 221.1 would weaken it and favor the overextended view. With ATR around 0.88%, the EMA retest zone is narrow and a normal swing could pass through it, so this is an educational read, not a trade recommendation.",
+      "verdict": "review",
+      "direction": "long"
+    },
+    "validJson": true,
+    "usd": 0.013984,
+    "ms": 10298,
+    "tin": 2447,
+    "tout": 909,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 8,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "Every figure matches the evidence. It rightly flags that a 1H chart can't judge whether NVDA 'ran hard lately' and gives clear conditional triggers (233.2 up, 225/221.1 down). Clarity loses points for the unexplained 'Red' reference and undefined jargon (EMA, ATR, RSI)."
+      },
+      {
+        "grounding": 8,
+        "insight": 8,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 8,
+        "one_line": "A useful conditional 1H setup that acknowledges missing broader context; the unexplained reference to “Red” slightly weakens grounding and clarity."
+      }
+    ],
+    "score": 8.2
+  },
+  {
+    "case": "NVDA",
+    "name": "M luna debaters + sonnet medium CIO",
+    "calls": [
+      {
+        "model": "gpt-6-luna",
+        "tin": 282,
+        "tout": 203,
+        "usd": 0.00012969999999999998,
+        "ms": 2783,
+        "stop": "stop",
+        "text": "{\"analysis\":\"At the supplied 1-hour snapshot (2026-09-28), NVDA is above its 20- and 50-period EMAs with an upward trend, supporting a conditional bullish setup. However, RSI at 67.2 is elevated and momentum is neutral, so it may be stretched; a move above 233.2 or a pullback toward 221.1 would provide clearer evidence than chasing the current price. These levels describe only the supplied timeframe and do not establish what happened after the snapshot.\"}"
+      },
+      {
+        "model": "gpt-6-luna",
+        "tin": 397,
+        "tout": 286,
+        "usd": 0.0001827,
+        "ms": 4055,
+        "stop": "stop",
+        "text": "{\"analysis\":\"Alpha’s bullish case relies on the supplied 1-hour trend label and price being above the EMAs; without price history, volume, or higher-timeframe context, that is weak evidence that the recent run has further room. RSI 67.2 alone does not establish overextension, while neutral momentum leaves the setup ambiguous. The 233.2 resistance and 221.1 support are reference levels, not confirmed triggers, and this snapshot cannot establish conditions after 2026-09-28.\"}"
+      },
+      {
+        "model": "claude-sonnet-5-5",
+        "effort": "medium",
+        "tin": 901,
+        "tout": 287,
+        "usd": 0.004672,
+        "ms": 3165,
+        "stop": "end_turn",
+        "text": "{\"analysis\":\"On the supplied 1H snapshot, NVDA at 228.9 sits above its 20-EMA (227.4) and 50-EMA (225.2) with an upward trend label, so the structure is constructive rather than clearly broken. However, RSI of 67.2 is elevated but not extreme, momentum is neutral, and price is only about 0.7% above the 20-EMA, so the evidence neither confirms overextension nor a clean setup. Missing higher-timeframe context, volume, and the size of the recent run mean the 'ran hard' premise can't be verified; reference levels are resistance near 233.2 and support near 221.1, and a hold above support or a decisive move past resistance would be more informative than acting at the current price. This is educational analysis only, based on a snapshot as of 2026-09-28.\",\"verdict\":\"wait\",\"direction\":\"none\"}"
+      }
+    ],
+    "alpha": "At the supplied 1-hour snapshot (2026-09-28), NVDA is above its 20- and 50-period EMAs with an upward trend, supporting a conditional bullish setup. However, RSI at 67.2 is elevated and momentum is neutral, so it may be stretched; a move above 233.2 or a pullback toward 221.1 would provide clearer evidence than chasing the current price. These levels describe only the supplied timeframe and do not establish what happened after the snapshot.",
+    "red": "Alpha’s bullish case relies on the supplied 1-hour trend label and price being above the EMAs; without price history, volume, or higher-timeframe context, that is weak evidence that the recent run has further room. RSI 67.2 alone does not establish overextension, while neutral momentum leaves the setup ambiguous. The 233.2 resistance and 221.1 support are reference levels, not confirmed triggers, and this snapshot cannot establish conditions after 2026-09-28.",
+    "cio": {
+      "analysis": "On the supplied 1H snapshot, NVDA at 228.9 sits above its 20-EMA (227.4) and 50-EMA (225.2) with an upward trend label, so the structure is constructive rather than clearly broken. However, RSI of 67.2 is elevated but not extreme, momentum is neutral, and price is only about 0.7% above the 20-EMA, so the evidence neither confirms overextension nor a clean setup. Missing higher-timeframe context, volume, and the size of the recent run mean the 'ran hard' premise can't be verified; reference levels are resistance near 233.2 and support near 221.1, and a hold above support or a decisive move past resistance would be more informative than acting at the current price. This is educational analysis only, based on a snapshot as of 2026-09-28.",
+      "verdict": "wait",
+      "direction": "none"
+    },
+    "validJson": true,
+    "usd": 0.0049844,
+    "ms": 10003,
+    "tin": 1580,
+    "tout": 776,
+    "judges": [
+      {
+        "grounding": 9,
+        "insight": 6,
+        "answers_question": 8,
+        "honesty": 9,
+        "clarity": 7,
+        "one_line": "The answer is accurate, and every figure checks out: price is ~0.7% above the 20-EMA, RSI 67.2 is elevated but not extreme, and the levels match the evidence. It gives a clear 'neither overextended nor a clean setup' conclusion and honestly notes the missing higher-timeframe, volume and run-size data. It leaves out insight the evidence supports. It never uses the ATR (0.88%). It also misses the reward/risk asymmetry: resistance is ~4.3 points (~1.9%) above, while support is ~7.8 points (~3.4%) below, which would strengthen the 'wait' verdict. Its note on missing higher-timeframe context only partly addresses the mismatch between a 1H snapshot and a multi-day 'ran hard' question. Terms like EMA and RSI go unexplained for a non-expert."
+      },
+      {
+        "grounding": 10,
+        "insight": 7,
+        "answers_question": 9,
+        "honesty": 10,
+        "clarity": 9,
+        "one_line": "A well-grounded wait verdict that distinguishes a constructive 1H trend from a confirmed setup, though it could better explain the nearby resistance and risk relative to support."
+      }
+    ],
+    "score": 8.4
+  }
+]

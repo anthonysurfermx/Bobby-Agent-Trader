@@ -67,7 +67,15 @@ const CONFIGS: Record<string, { alpha: Spec; red: Spec; cio: Spec }> = {
   'G opus-5.5 medium': { alpha: { model: 'claude-opus-5-5', effort: 'medium' }, red: { model: 'claude-opus-5-5', effort: 'medium' }, cio: { model: 'claude-opus-5-5', effort: 'medium' } },
   'H hybrid luna + opus CIO': { alpha: { model: 'gpt-6-luna' }, red: { model: 'gpt-6-luna' }, cio: { model: 'claude-opus-5-5', effort: 'medium' } },
   'I hybrid sonnet low + opus CIO': { alpha: { model: 'claude-sonnet-5-5', effort: 'low' }, red: { model: 'claude-sonnet-5-5', effort: 'low' }, cio: { model: 'claude-opus-5-5', effort: 'medium' } },
+  // Analysis-level slider candidates (added after the brief's first draft).
+  'J gpt-6-luna high': { alpha: { model: 'gpt-6-luna', effort: 'high' }, red: { model: 'gpt-6-luna', effort: 'high' }, cio: { model: 'gpt-6-luna', effort: 'high' } },
+  'K sonnet-5.5 medium': { alpha: { model: 'claude-sonnet-5-5', effort: 'medium' }, red: { model: 'claude-sonnet-5-5', effort: 'medium' }, cio: { model: 'claude-sonnet-5-5', effort: 'medium' } },
+  'L sonnet-5.5 high': { alpha: { model: 'claude-sonnet-5-5', effort: 'high' }, red: { model: 'claude-sonnet-5-5', effort: 'high' }, cio: { model: 'claude-sonnet-5-5', effort: 'high' } },
+  'M luna debaters + sonnet medium CIO': { alpha: { model: 'gpt-6-luna' }, red: { model: 'gpt-6-luna' }, cio: { model: 'claude-sonnet-5-5', effort: 'medium' } },
 };
+// MATRIX_CONFIGS="J,K,L" runs a subset (matched by leading letter); MATRIX_OUT overrides the output file.
+const only = process.env.MATRIX_CONFIGS?.split(',').map(s => s.trim());
+for (const k of Object.keys(CONFIGS)) if (only && !only.includes(k.split(' ')[0])) delete CONFIGS[k];
 
 const CASES = [
   { symbol: 'BTC', question: '¿Conviene entrar a BTC esta semana o esperar?', language: 'Spanish' },
@@ -96,7 +104,7 @@ for (const c of CASES) {
     results.push({ case: c.symbol, ...run, judges: s, score });
   }
 }
-writeFileSync('docs/ai/data/2026-09-29-desk-model-matrix.json', JSON.stringify(results, null, 2));
+writeFileSync(process.env.MATRIX_OUT || 'docs/ai/data/2026-09-29-desk-model-matrix.json', JSON.stringify(results, null, 2));
 console.log(['case', 'config', 'score', 'usd', 'sec', 'in', 'out', 'json', 'stops'].join('\t'));
 for (const r of results) console.log(r.error ? `${r.case}\t${r.name}\tERROR ${r.error}` :
   [r.case, r.name, r.score?.toFixed(2), r.usd.toFixed(5), (r.ms / 1000).toFixed(1), r.tin, r.tout, r.validJson, r.calls.map((x: Call) => x.stop).join('/')].join('\t'));

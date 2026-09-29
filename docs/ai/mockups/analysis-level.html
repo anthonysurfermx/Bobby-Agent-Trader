@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nivel de análisis — mockup</title>
+<!-- Mockup for docs/ai/2026-09-29-bobby-intelligence-brief.md §4 L5. Uses the Núcleo tokens from src/styles/nucleo-desk.css. -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@200;300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --n-bg: #0B0A09; --n-ink: #F2EDE4; --n-inkb: #FFF8EC; --n-ink2: #A39C91; --n-ink3: #8A8378;
+  --n-hair: rgba(242,237,228,.08); --n-line: rgba(242,237,228,.12);
+  --n-card-a: #221E1B; --n-card-b: #171513;
+  --n-alpha: #3FE0B5; --n-cio: #F6B94E; --n-listen: #5CE1FF;
+  --n-display: 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --n-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --n-mono: 'Geist Mono', ui-monospace, Menlo, monospace;
+  --lvl: var(--n-ink2);
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--n-bg); color: var(--n-ink); font-family: var(--n-sans); }
+body { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 28px 16px 48px;
+  background: radial-gradient(900px 480px at 50% 18%, #15121C 0%, transparent 70%), var(--n-bg); }
+
+.meta { width: 100%; max-width: 620px; display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 64px; }
+.meta .t { font: 300 17px var(--n-display); letter-spacing: -.04em; }
+.who { display: inline-flex; padding: 3px; border-radius: 999px; border: 1px solid var(--n-line); background: rgba(0,0,0,.4); }
+.who button { font: 500 10px/1 var(--n-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--n-ink3); background: none; border: 0;
+  padding: 8px 12px; border-radius: 999px; cursor: pointer; }
+.who button[aria-pressed="true"] { background: var(--n-ink); color: #0B0A09; }
+
+.hero { text-align: center; margin-bottom: 40px; }
+.orb { width: 108px; height: 108px; margin: 0 auto 26px; border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #fff8ec 0%, var(--lvl) 34%, rgba(0,0,0,0) 72%);
+  filter: blur(.3px); box-shadow: 0 0 80px -10px var(--lvl); opacity: .9; transition: background .5s ease, box-shadow .5s ease; }
+.hero h1 { margin: 0; font: 200 34px/1.1 var(--n-display); letter-spacing: -.04em; }
+.hero p { margin: 10px 0 0; color: var(--n-ink2); font-size: 14px; }
+
+/* ---- the dock: level strip + ask pill ---- */
+.dock { width: 100%; max-width: 620px; }
+.level { display: flex; align-items: center; gap: 14px; padding: 0 10px 12px; }
+.level .lab { font: 500 10px/1 var(--n-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--n-ink3); white-space: nowrap; }
+.track { position: relative; flex: 1; height: 28px; display: flex; align-items: center; }
+.rail { position: absolute; left: 6px; right: 6px; height: 1px; background: var(--n-line); }
+.fill { position: absolute; left: 6px; height: 1px; background: linear-gradient(90deg, rgba(242,237,228,.2), var(--lvl)); transition: width .35s cubic-bezier(.2,.8,.2,1), background .35s; }
+.stops { position: absolute; inset: 0 0; display: flex; justify-content: space-between; align-items: center; }
+.stop { width: 12px; height: 12px; display: grid; place-items: center; background: none; border: 0; padding: 0; cursor: pointer; }
+.stop i { width: 5px; height: 5px; border-radius: 50%; background: var(--n-ink3); transition: all .25s; }
+.stop.on i { background: var(--n-ink2); }
+.stop.locked i { background: transparent; box-shadow: inset 0 0 0 1px var(--n-ink3); }
+.thumb { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--n-inkb);
+  box-shadow: 0 0 0 4px rgba(11,10,9,.9), 0 0 18px 2px var(--lvl); transition: left .35s cubic-bezier(.2,.8,.2,1), box-shadow .35s; pointer-events: none; }
+input[type=range] { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; margin: 0; }
+input[type=range]:focus-visible + .thumb { outline: 2px solid var(--n-listen); outline-offset: 4px; }
+.name { font: 400 13px var(--n-display); letter-spacing: -.02em; min-width: 72px; text-align: right; color: var(--n-ink); transition: color .3s; }
+
+.n-ask { display: flex; align-items: center; gap: 8px; padding: 6px; border-radius: 999px; background: rgba(20,18,16,.92); border: 1px solid var(--n-line);
+  box-shadow: 0 20px 60px -20px rgba(0,0,0,.8), inset 0 1px 0 rgba(255,255,255,.04); transition: border-color .3s, box-shadow .4s; }
+.n-ask:focus-within { border-color: rgba(242,237,228,.32); }
+.n-ask.max { box-shadow: 0 20px 60px -20px rgba(0,0,0,.8), 0 0 0 1px rgba(246,185,78,.18), 0 0 40px -12px rgba(246,185,78,.35); }
+.n-ask input { flex: 1; min-width: 0; height: 44px; padding: 0 14px; background: transparent; border: 0; outline: none; color: var(--n-ink); font: 400 15px var(--n-sans); }
+.n-ask input::placeholder { color: var(--n-ink3); }
+.send { height: 44px; width: 44px; border-radius: 999px; border: 0; background: var(--n-ink); color: #0B0A09; display: grid; place-items: center; cursor: pointer; }
+
+.detail { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 12px 16px 0; min-height: 44px; }
+.detail .what { color: var(--n-ink2); font-size: 12.5px; line-height: 1.45; }
+.detail .quota { font: 500 10px/1.3 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink3); white-space: nowrap; text-align: right; }
+.detail .quota b { color: var(--n-ink); font-weight: 500; }
+.detail .quota.lock { color: var(--n-cio); }
+
+/* ---- what the level changes: the thinking steps ---- */
+.steps { width: 100%; max-width: 620px; margin-top: 56px; }
+.steps .n-label { font: 500 10px/1.2 var(--n-mono); letter-spacing: .16em; text-transform: uppercase; color: var(--n-ink3); margin: 0 0 14px 4px; }
+.card { background: linear-gradient(180deg, var(--n-card-a), var(--n-card-b)); border: 1px solid var(--n-hair); border-radius: 22px; padding: 6px 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.row { display: flex; align-items: center; gap: 14px; padding: 14px 0; border-bottom: 1px solid var(--n-hair); transition: opacity .3s; }
+.row:last-child { border-bottom: 0; }
+.row .dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.row .txt { flex: 1; font-size: 13.5px; }
+.row .txt small { display: block; color: var(--n-ink3); font-size: 12px; margin-top: 2px; }
+.row .tag { font: 500 10px/1 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink3); }
+.row.off { opacity: .28; }
+.note { max-width: 620px; margin-top: 28px; color: var(--n-ink3); font: 400 11px/1.6 var(--n-mono); text-align: center; }
+@media (max-width: 480px) { .meta { flex-direction: column; align-items: flex-start; margin-bottom: 40px; } .level .lab { display: none; } .hero h1 { font-size: 28px; }
+  .detail { flex-direction: column; gap: 6px; } .detail .quota { text-align: left; } }
+</style>
+</head>
+<body>
+  <div class="meta">
+    <span class="t">bobby · mockup nivel de análisis</span>
+    <div class="who" role="group" aria-label="Tipo de usuario">
+      <button data-tier="anon" aria-pressed="false">Sin cuenta</button>
+      <button data-tier="free" aria-pressed="true">Gratis</button>
+      <button data-tier="pro" aria-pressed="false">Pro</button>
+    </div>
+  </div>
+
+  <section class="hero">
+    <div class="orb" aria-hidden="true"></div>
+    <h1>¿Qué quieres entender hoy?</h1>
+    <p>Tres agentes debaten. Tú decides qué tan a fondo.</p>
+  </section>
+
+  <div class="dock">
+    <div class="level">
+      <span class="lab">Análisis</span>
+      <div class="track">
+        <div class="rail"></div><div class="fill"></div>
+        <div class="stops"><button class="stop" data-i="0" aria-hidden="true" tabindex="-1"><i></i></button><button class="stop" data-i="1" aria-hidden="true" tabindex="-1"><i></i></button><button class="stop" data-i="2" aria-hidden="true" tabindex="-1"><i></i></button></div>
+        <input type="range" min="0" max="2" step="1" value="0" aria-label="Nivel de análisis" aria-valuetext="Rápido">
+        <div class="thumb"></div>
+      </div>
+      <span class="name">Rápido</span>
+    </div>
+    <form class="n-ask" onsubmit="return false">
+      <input placeholder="Pregunta por una acción o cripto…" aria-label="Pregunta por un activo">
+      <button class="send" aria-label="Preguntar"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+    </form>
+    <div class="detail"><span class="what"></span><span class="quota"></span></div>
+  </div>
+
+  <section class="steps">
+    <p class="n-label">Qué hace Bobby en este nivel</p>
+    <div class="card">
+      <div class="row" data-min="0"><span class="dot" style="background:var(--n-ink2)"></span><span class="txt">Lee el precio en velas de 1 hora<small>Tendencia, RSI, soporte y resistencia</small></span><span class="tag">todos</span></div>
+      <div class="row" data-min="0"><span class="dot" style="background:var(--n-alpha)"></span><span class="txt">Alpha, Red Team y CIO debaten<small>Tres agentes aislados, un veredicto</small></span><span class="tag">todos</span></div>
+      <div class="row" data-min="1"><span class="dot" style="background:var(--n-listen)"></span><span class="txt">Cruza 4 marcos de tiempo, derivados y macro<small>1H · 4H · diario · semanal, funding, régimen del mercado</small></span><span class="tag">profundo</span></div>
+      <div class="row" data-min="1"><span class="dot" style="background:var(--n-listen)"></span><span class="txt">Recuerda sus llamadas anteriores<small>«La última vez que marqué este nivel, pasó esto»</small></span><span class="tag">profundo</span></div>
+      <div class="row" data-min="2"><span class="dot" style="background:var(--n-cio)"></span><span class="txt">Busca datos por su cuenta<small>El CIO pide lo que le falta antes de decidir</small></span><span class="tag">máximo</span></div>
+      <div class="row" data-min="2"><span class="dot" style="background:var(--n-cio)"></span><span class="txt">Segunda ronda de debate y escenarios<small>Red Team responde; plan con qué lo confirmaría y qué lo invalidaría</small></span><span class="tag">máximo</span></div>
+    </div>
+  </section>
+  <p class="note">Mockup. Los tiempos y cupos son la propuesta del brief (sección 4b); no son los valores finales.</p>
+
+<script>
+const LEVELS = [
+  { name: 'Rápido', color: 'var(--n-ink2)', what: 'Lectura directa del precio y debate de tres agentes. ~10 s.' },
+  { name: 'Profundo', color: 'var(--n-listen)', what: 'Cruza cuatro marcos de tiempo, derivados y macro, y recuerda sus llamadas. ~15 s.' },
+  { name: 'Máximo', color: 'var(--n-cio)', what: 'Todo lo anterior: busca datos por su cuenta y debate dos rondas. ~40 s.' },
+];
+// Weekly allowance per level; null = locked, Infinity = no cap shown.
+const QUOTA = {
+  anon: [{ left: 2, of: 2, per: 'para probar' }, { left: 1, of: 1, per: 'para probar' }, null],
+  free: [{ left: 8, of: 10, per: 'esta semana' }, { left: 2, of: 3, per: 'esta semana' }, { left: 1, of: 1, per: 'esta semana' }],
+  pro: [{ left: Infinity }, { left: 87, of: 100, per: 'este mes' }, { left: 26, of: 30, per: 'este mes' }],
+};
+const LOCK = { anon: [null, null, 'Crea tu cuenta para Máximo'], free: [null, null, null], pro: [null, null, null] };
+let tier = 'free', level = 0;
+const $ = (s) => document.querySelector(s), range = $('input[type=range]');
+function render() {
+  const L = LEVELS[level], q = QUOTA[tier][level], lock = LOCK[tier][level];
+  document.documentElement.style.setProperty('--lvl', L.color);
+  const pct = level / 2;
+  $('.thumb').style.left = `calc(6px + (100% - 12px) * ${pct})`;
+  $('.fill').style.width = `calc((100% - 12px) * ${pct})`;
+  $('.name').textContent = L.name; $('.name').style.color = level === 2 ? 'var(--n-cio)' : 'var(--n-ink)';
+  range.setAttribute('aria-valuetext', L.name);
+  document.querySelectorAll('.stop').forEach((s, i) => { s.classList.toggle('on', i <= level); s.classList.toggle('locked', !!LOCK[tier][i]); });
+  $('.n-ask').classList.toggle('max', level === 2);
+  $('.what').textContent = L.what;
+  const quota = $('.quota');
+  quota.classList.toggle('lock', !!lock);
+  quota.innerHTML = lock ? lock : q.left === Infinity ? 'Pro · sin límite' : `<b>${q.left}</b> de ${q.of} ${q.per}`;
+  $('.send').disabled = !!lock; $('.send').style.opacity = lock ? .35 : 1;
+  document.querySelectorAll('.row').forEach((r) => r.classList.toggle('off', Number(r.dataset.min) > level));
+}
+range.addEventListener('input', () => { level = Number(range.value); render(); });
+document.querySelectorAll('.stop').forEach((s) => s.addEventListener('click', () => { level = Number(s.dataset.i); range.value = level; render(); }));
+document.querySelectorAll('.who button').forEach((b) => b.addEventListener('click', () => {
+  tier = b.dataset.tier; document.querySelectorAll('.who button').forEach((x) => x.setAttribute('aria-pressed', String(x === b))); render();
+}));
+render();
+</script>
+</body>
+</html>
