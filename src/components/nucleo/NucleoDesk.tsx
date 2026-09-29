@@ -151,7 +151,17 @@ export default function NucleoDesk() {
   const { account } = useBobbyAccount();
   // The name the reader asked Bobby to use ("call me Tony", or the memory screen), for this account only.
   const [preferredName, setPreferredName] = useState<string | null>(null);
+  const accountIdRef = useRef<string | null | undefined>(undefined);
   useEffect(() => {
+    // Signing out or switching accounts leaves nothing of the previous account on screen or in the voice.
+    const previous = accountIdRef.current;
+    accountIdRef.current = account?.id ?? null;
+    // (null → id is the first session load or a sign-in by the same person: nothing to clear.)
+    if (previous && previous !== (account?.id ?? null)) {
+      requestRef.current?.abort();
+      voice.stop();
+      setAgents(null); setAnswer(null); setSnapshot(null); setMessages([]); setPhase('idle');
+    }
     setPreferredName(null);
     if (!account?.id) return;
     let live = true;
@@ -190,6 +200,8 @@ export default function NucleoDesk() {
   const requestRef = useRef<AbortController | null>(null);
   const revealRef = useRef<number | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
+  // A short reply that is not a read ("call me Tony"), shown under the greeting until the next question.
+  const [notice, setNotice] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
@@ -342,25 +354,36 @@ export default function NucleoDesk() {
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
     if (!q) return;
-    // "Call me Tony" on its own is not a market question: save the name (an account only) and say so. With a
-    // question beside it, the read runs and the server stores the name once the answer was delivered.
+    // A message that is only "call me Tony" is not a market question: save the name (an account with memory
+    // on) and say so. A naming phrase inside a question is never a name ("call me crazy, but…").
     const naming = preferredNameAsk(q);
-    if (naming && naming.rest.replace(/[^\p{L}\p{N}]/gu, '').length < 2) {
+    if (naming) {
       setInput('');
       setMessages((m) => [...m, { from: 'you', text: q }]);
-      const saved = account?.id ? await patchMemory({ preferredName: naming.name }) : null;
-      const line = saved && 'state' in saved
-        ? (saved.state.enabled
-          ? t(`Done, ${naming.name}. That is what I will call you.`, `Listo, ${naming.name}. Así te voy a llamar.`, `Pronto, ${naming.name}. É assim que vou te chamar.`)
-          : t(`Saved, ${naming.name}. Memory is paused, so I will use it once you turn it back on.`, `Guardado, ${naming.name}. La memoria está en pausa: lo usaré cuando la vuelvas a activar.`, `Salvo, ${naming.name}. A memória está pausada: vou usar quando você reativar.`))
-        : account?.id
-          ? t('I could not save your name right now. Try again in a moment.', 'No pude guardar tu nombre ahora. Inténtalo en un momento.', 'Não consegui salvar seu nome agora. Tente de novo em instantes.')
-          : t('Sign in with Apple or Google so I can remember your name.', 'Inicia sesión con Apple o Google para que recuerde tu nombre.', 'Entre com Apple ou Google para eu lembrar seu nome.');
-      if (saved && 'state' in saved && saved.state.enabled) setPreferredName(saved.state.preferredName);
+      const owner = account?.id ?? null;
+      let line: string;
+      if (!owner) {
+        line = t('Sign in with Apple or Google so I can remember your name.', 'Inicia sesión con Apple o Google para que recuerde tu nombre.', 'Entre com Apple ou Google para eu lembrar seu nome.');
+      } else {
+        const current = await fetchMemory();
+        if (accountIdRef.current !== owner) return; // signed out or switched meanwhile: nothing to save or say
+        const saved = 'state' in current && current.state.enabled ? await patchMemory({ preferredName: naming.name }) : null;
+        if (accountIdRef.current !== owner) return;
+        if ('state' in current && !current.state.enabled) {
+          line = t('Memory is paused, so I did not save it. Turn it back on in your profile, under What Bobby remembers.', 'La memoria está en pausa, así que no lo guardé. Actívala en tu perfil, en Lo que Bobby recuerda.', 'A memória está pausada, então não salvei. Reative no seu perfil, em O que o Bobby lembra.');
+        } else if (saved && 'state' in saved) {
+          setPreferredName(saved.state.preferredName);
+          line = t(`Done, ${naming.name}. That is what I will call you.`, `Listo, ${naming.name}. Así te voy a llamar.`, `Pronto, ${naming.name}. É assim que vou te chamar.`);
+        } else {
+          line = t('I could not save your name right now. Try again in a moment.', 'No pude guardar tu nombre ahora. Inténtalo en un momento.', 'Não consegui salvar seu nome agora. Tente de novo em instantes.');
+        }
+      }
       setMessages((m) => [...m, { from: 'bobby', text: line }]);
+      setNotice(line);
       say(line, true);
       return;
     }
+    setNotice(null);
     const lv = deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
@@ -626,6 +649,7 @@ export default function NucleoDesk() {
           : t('Ask me about any stock or crypto.', 'Pregúntame por cualquier acción o cripto.', 'Me pergunte sobre qualquer ação ou cripto.')}
         {movers.length > 0 && <span style={{ color: '#8A8378' }}> {t('in 24h', 'en 24h', 'em 24h')}</span>}
       </p>
+      {notice && <p className="n-caption mt-4 text-center" role="status">{notice}</p>}
       {voiceNotice && <p className="mt-2 text-[13px]" style={{ color: '#8A8378' }}>{voiceNotice}</p>}
     </div>
   );
@@ -841,13 +865,14 @@ export default function NucleoDesk() {
   // then another question of the reader's, then their other assets.
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
   const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
+  const peerSymbols = done && snapshot ? (agents?.related?.peers ?? []).filter((p) => p.symbol !== snapshot.symbol) : [];
   const suggestions: Array<{ label: string; go: () => void }> = done && snapshot
     ? [
       ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.toUpperCase().includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
       // Peers the answer compared (a sector question): each opens its own read.
-      ...(agents?.related?.peers ?? []).map((p) => ({ label: `${p.symbol} · ${p.sharedExposure}`, go: () => { void ask(p.symbol, howLooks(p.symbol)); } })),
+      ...peerSymbols.map((p) => ({ label: p.sharedExposure ? `${p.symbol} · ${p.sharedExposure}` : p.symbol, go: () => { void ask(p.symbol, howLooks(p.symbol)); } })),
       { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
-      ...progress.quickAccess.filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
+      ...progress.quickAccess.filter((q) => q !== snapshot.symbol && !peerSymbols.some((p) => p.symbol === q)).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
     ]
     : progress.quickAccess.slice(0, 3).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
   const chips = !reading && phase !== 'confirm' ? (
@@ -914,6 +939,7 @@ export default function NucleoDesk() {
             voiceLevel={voice.speaking ? voice.level : null} attachments={attachments} equip={equip} stageRef={stageRef}
             freeVoice={freeVoice} muted={muted} speakEnabled={speakEnabled}
             onClose={() => setSheet('none')}
+            onMemoryState={(m) => setPreferredName(m && m.enabled ? m.preferredName : null)}
             onPickCompanion={(c) => { progressStore.setCompanion(c.id); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }}
             onTool={(tool) => setInspected(tool)} onPet={() => setSheet('pet')} onCatalog={() => setSheet('catalog')}
             onSwap={() => setSheet('swap')} onTraderLand={openTraderLand} onExplore={() => setSheet('board')}

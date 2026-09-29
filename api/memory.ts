@@ -3,7 +3,7 @@
 //   GET                          → { enabled, preferredName, prefs: {horizon, experience, risk},
 //                                    assets: [{symbol, asks, lastAskedAt, lastHorizon, lastPrice, lastPriceAt}] (≤ 50),
 //                                    reads: [{symbol, deliveredAt, verdict, direction, headline, why, risk, watch,
-//                                    level, language, price, priceAt}] (≤ 30, newest first), retentionDays }
+//                                    level, language, price, priceAt}] (≤ 50, all that is stored, newest first), retentionDays }
 //   PATCH { horizon?, experience?, risk?, memoryEnabled?, preferredName? } → the same body after the change.
 //        Explicit corrections only: each field is an enum (or a 1–40 letter name), null clears it.
 //   DELETE ?symbol=NVDA          → forget one asset and Bobby's stored answers on it.

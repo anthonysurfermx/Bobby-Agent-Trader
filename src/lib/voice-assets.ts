@@ -204,3 +204,21 @@ export function matchAssetInText(text: string): string | null {
     ?? CONTEXTUAL_HOMONYM_PATTERNS.find(([pattern]) => pattern.test(text))?.[1]
     ?? null;
 }
+
+/**
+ * Every asset named in `text`, in the order they appear (each once): the same spoken patterns as
+ * matchAssetInText, so ordinary words (HOMONYMS) never count unless marked as tickers ("$META", "acción de META").
+ */
+export function assetsInText(text: string): string[] {
+  if (!text) return [];
+  const hits: Array<[number, string]> = [];
+  // A ticker typed in capitals is meant as a ticker, homonyms included ("AMZN vs META").
+  const typed: Array<[RegExp, string]> = VOICE_ASSETS.filter((a) => a.symbol.length >= 2)
+    .map((a) => [new RegExp(`(?<![\\p{L}\\p{N}])${a.symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'u'), a.symbol]);
+  for (const [pattern, symbol] of [...SPOKEN_PATTERNS, ...CONTEXTUAL_HOMONYM_PATTERNS, ...typed]) {
+    const m = pattern.exec(text);
+    if (m && !hits.some(([, s]) => s === symbol)) hits.push([m.index, symbol]);
+  }
+  return hits.sort((a, b) => a[0] - b[0]).map(([, symbol]) => symbol);
+}
+

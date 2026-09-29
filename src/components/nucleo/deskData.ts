@@ -94,9 +94,9 @@ export interface Agents {
   /** What Bobby remembers, said before the answer: written after the verdict, never part of it (signed-in, memory on). */
   personal: { note: string; previousRead: boolean; priceChange: boolean } | null;
   /** Peers with current daily data, when the question asked about the sector or alternatives. */
-  related: { exposures: string[]; peers: RelatedPeer[]; unavailable: string[] } | null;
+  related: { exposures: string[]; peers: RelatedPeer[]; unavailable: string[]; noPeers: boolean } | null;
 }
-export interface RelatedPeer { symbol: string; name: string; sharedExposure: string; price: number; change5dPct: number | null; change1mPct: number | null; vsEma20: 'above' | 'below' | 'at'; asOf: string }
+export interface RelatedPeer { symbol: string; name: string; sharedExposure: string | null; named: boolean; price: number; change5dPct: number | null; change1mPct: number | null; vsEma20: 'above' | 'below' | 'at'; asOf: string }
 export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
 /** failed: the agents did not finish (a premium use is given back by the server); budget_paused: the spend guard. */
 export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null; refunded?: boolean }
@@ -135,8 +135,9 @@ function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLe
     personal: text(data!.personal?.note, 320) ? { note: text(data!.personal.note, 320)!, previousRead: data!.personal.basedOn?.previousRead === true, priceChange: data!.personal.basedOn?.priceChange === true } : null,
     related: data!.related && Array.isArray(data!.related.peers) ? {
       exposures: (Array.isArray(data!.related.exposures) ? data!.related.exposures : []).filter((e: unknown) => typeof e === 'string'),
-      peers: data!.related.peers.filter((p: any) => p && typeof p.symbol === 'string' && typeof p.sharedExposure === 'string' && typeof p.price === 'number').slice(0, 3),
+      peers: data!.related.peers.filter((p: any) => p && typeof p.symbol === 'string' && (typeof p.sharedExposure === 'string' || p.sharedExposure === null) && typeof p.price === 'number').slice(0, 3).map((p: any) => ({ ...p, named: p.named === true })),
       unavailable: (Array.isArray(data!.related.unavailable) ? data!.related.unavailable : []).filter((e: unknown) => typeof e === 'string'),
+      noPeers: data!.related.noPeers === true,
     } : null,
   } };
 }

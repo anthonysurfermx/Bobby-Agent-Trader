@@ -242,6 +242,14 @@ const ADVICE: RegExp[] = [
   /(?<![\p{L}])(?:voc[eê]\s+)?(?:deve(?:ria)?|precisa|tem\s+que)\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
   /(?<![\p{L}])(?:recomendo|aconselho|sugiro)\s+(?:que\s+)?(?:voc[eê]\s+)?(?:comprar|compre|vender|venda|abrir|abra)(?![\p{L}])/giu,
   /(?:(?<=^)|(?<=[.!?]\s*))(?:[Cc]ompre|[Vv]enda)\s+(?:(?:isso|tudo|mais|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:j[aá]|agora|hoje|imediatamente)(?![\p{L}])/gu,
+  // Rotation and ranking between assets (the sector comparison): "switch to MSFT", "rotate into GOOGL",
+  // "a better bet than", "cámbiate a", "rotar a", "mejor apuesta que", "trocar para", "melhor aposta que".
+  /\b(?:[Ss]witch(?:ing)?|[Rr]otat(?:e|ing)|[Mm]ov(?:e|ing)\s+(?:your\s+money|capital|funds))\s+(?:in)?to\s+[A-Z][A-Z0-9.-]{0,9}\b/gu,
+  /\b(?:a\s+)?better\s+(?:bet|buy|pick|investment|choice)\s+than\b/giu,
+  /(?<![\p{L}])(?:[Cc][aá]mbiate|[Cc]ambiarte|[Cc]ambiar(?:te)?\s+(?:tu\s+dinero\s+)?|[Rr]ota(?:r)?|[Mm]u[eé]vete|[Mm]over\s+tu\s+dinero)\s+a\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
+  /(?<![\p{L}])mejor\s+(?:apuesta|compra|opci[oó]n|inversi[oó]n)\s+que(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:[Tt]rocar|[Tt]roque|[Mm]igrar|[Mm]igre|[Mm]udar|[Mm]ude)\s+(?:para|pra)\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
+  /(?<![\p{L}])melhor\s+(?:aposta|compra|op[cç][aã]o|investimento)\s+(?:do\s+)?que(?![\p{L}])/giu,
 ];
 
 // Any of these up to eight words back in the same sentence negates a match…
@@ -383,15 +391,17 @@ export async function runDeskDebate(
   };
   // Peers with current data, only when the question asks for the sector or alternatives (api/_lib/desk-related.ts).
   const related = opts.related ?? null;
-  const input = { question, evidence: withPositions, sufficiency, ...(related ? { related } : {}) };
+  const baseInput = { question, evidence: withPositions, sufficiency };
+  const input = { ...baseInput, ...(related ? { related } : {}) };
   const relatedRule = related ? ` ${RELATED_RULE}` : '';
   emit({ type: 'evidence', timeframes: available, sufficiency });
-  const alpha = await role(plan.alpha, 'alpha', `${rules}${relatedRule} Your role is Alpha Hunter: identify the strongest conditional opportunity and what evidence supports it. Return {"analysis":"..."}.`, input, Argument, ARGUMENT_SCHEMA, ctx);
+  // Alpha looks for the opportunity in the asked asset only; the peers go to Red Team and the CIO.
+  const alpha = await role(plan.alpha, 'alpha', `${rules} Your role is Alpha Hunter: identify the strongest conditional opportunity and what evidence supports it. Return {"analysis":"..."}.`, baseInput, Argument, ARGUMENT_SCHEMA, ctx);
   emit({ type: 'agent', role: 'alpha', text: cleared(alpha.analysis) });
   const red = await role(plan.red, 'red', `${rules}${relatedRule} Your role is Red Team: challenge Alpha's actual argument, identify its weak assumptions, invalidation and missing evidence. Return {"analysis":"..."}.`, { ...input, alpha }, Argument, ARGUMENT_SCHEMA, ctx);
   emit({ type: 'agent', role: 'red', text: cleared(red.analysis) });
   const rebuttal = plan.rebuttal
-    ? await role(plan.rebuttal, 'rebuttal', `${rules}${relatedRule} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...input, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
+    ? await role(plan.rebuttal, 'rebuttal', `${rules} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...baseInput, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
     : null;
   if (rebuttal) emit({ type: 'agent', role: 'rebuttal', text: cleared(rebuttal.analysis) });
   const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.`;

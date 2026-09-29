@@ -197,12 +197,17 @@ try {
   const weekView = await summary(weekly, 'AMD');
   eq([weekView.thisAsset.asks, weekView.thisAsset.asksThisWeek], [2, 2], 'two asks this week; an older time is not counted');
   for (let i = 0; i < 25; i++) await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
-  eq((await q("select cardinality(recent_asks) as n from public.bobby_user_assets where identity_id = $1 and symbol = 'AMD'", [weekly]))[0].n, 20, 'at most 20 ask times are kept');
-  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', 123.45)", [weekly]);
-  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'the price at the last ask is kept');
+  const amd = await row(weekly, 'AMD');
+  eq([amd.recent_asks.length, amd.asks], [28, 28], 'ask times within 90 days are kept (up to 100) and asks is their count');
+  await q("update public.bobby_user_assets set recent_asks = recent_asks || (now() - interval '120 days'), first_asked_at = now() - interval '120 days' where identity_id = $1 and symbol = 'AMD'", [weekly]);
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
-  eq((await summary(weekly, 'AMD')).thisAsset.lastPrice, null, 'an ask without a price clears the old one: an older price is never tied to a newer ask');
-  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', -5)", [weekly]);
+  const trimmed = await row(weekly, 'AMD');
+  ok(trimmed.recent_asks.every((t: Date) => t.getTime() > Date.now() - 91 * 86_400_000) && trimmed.first_asked_at.getTime() > Date.now() - 91 * 86_400_000 && trimmed.asks === trimmed.recent_asks.length, 'an ask time older than 90 days leaves the history, the count and the first ask');
+  await q("select public.bobby_memory_record_v2($1, 'AMD', 'unspecified', 123.45, now() - interval '1 hour', 'Yahoo Finance', null)", [weekly]);
+  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'a dated price is kept');
+  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', 150)", [weekly]);
+  eq((await summary(weekly, 'AMD')).thisAsset.lastPrice, null, 'the v1 recorder has no observation time: it keeps no price and clears the old one');
+  await q("select public.bobby_memory_record_v2($1, 'AMD', 'unspecified', -5, now(), null, null)", [weekly]);
   eq((await summary(weekly, 'AMD')).thisAsset.lastPrice, null, 'a nonsense price is not a price');
   eq([await count(reader), (await q('select count(*) from public.bobby_user_prefs where identity_id = $1', [reader]))[0].count], [0, '0'], '…assets and preferences');
   const pausedForget = await account();
@@ -237,12 +242,12 @@ try {
   eq(await rec2(v2, 'NVDA', 185, observed, readOf({ headline: 'x'.repeat(500) })), true, 'an overlong line');
   eq((await reads(v2, 'NVDA'))[0].headline.length, 200, 'is cut to its column limit');
   for (let i = 0; i < 12; i++) await rec2(v2, 'NVDA', 185, observed, readOf({ headline: `Read ${i}` }));
-  eq([(await reads(v2, 'NVDA')).length, (await reads(v2, 'NVDA'))[0].headline], [10, 'Read 11'], 'the 10 newest answers per asset are kept');
+  eq([(await reads(v2, 'NVDA')).length, (await reads(v2, 'NVDA'))[0].headline], [5, 'Read 11'], 'the 5 newest answers per asset are kept');
   const lots = await account();
   for (let i = 0; i < 21; i++) await seed(lots, `A${i}`, 1, 0);
-  for (let i = 0; i < 21; i++) for (let k = 0; k < 10; k++) await q(`insert into public.bobby_user_reads(identity_id, symbol, verdict, direction, headline, why, risk, watch, delivered_at) values ($1, $2, 'wait', 'none', 'h', 'w', 'r', 'x', now() - make_interval(mins => $3))`, [lots, `A${i}`, i * 10 + k + 1]);
+  for (let i = 0; i < 21; i++) for (let k = 0; k < 5; k++) await q(`insert into public.bobby_user_reads(identity_id, symbol, verdict, direction, headline, why, risk, watch, delivered_at) values ($1, $2, 'wait', 'none', 'h', 'w', 'r', 'x', now() - make_interval(mins => $3))`, [lots, `A${i}`, i * 10 + k + 1]);
   await rec2(lots, 'NEWONE', 10, observed);
-  eq((await reads(lots)).length, 200, 'and at most 200 per account');
+  eq((await reads(lots)).length, 50, 'and at most 50 per account (all of them fit the memory screen)');
   eq((await reads(lots))[0].symbol, 'NEWONE', 'the newest stays');
 
   const s2 = await sum2(v2, 'NVDA');
@@ -265,7 +270,15 @@ try {
   // v1 callers (the code deployed before v2) go through v2: a price is stamped with the ask time.
   await q("select public.bobby_memory_record($1, 'SOL', 'unspecified', 150)", [v2]);
   const viaV1 = await row(v2, 'SOL');
-  ok(Number(viaV1.last_price) === 150 && viaV1.last_price_at instanceof Date, 'the v1 recorder stores a dated price');
+  eq([viaV1.asks, viaV1.last_price, viaV1.last_price_at], [1, null, null], 'the v1 recorder counts the ask and stores no undated price');
+
+  // Concurrent reads of one account on different assets at the 50 cap: the per-account lock keeps every read.
+  const busy = await account();
+  for (let i = 1; i <= 48; i++) await seed(busy, `B${String(i).padStart(2, '0')}`, 5, 0);
+  const results = await Promise.all(['X1', 'X2', 'X3', 'X4'].map((sym) => rec2(busy, sym, 10, observed)));
+  const busyRows = (await rows(busy)).map((r) => r.symbol);
+  const busyReads = (await reads(busy)).map((r) => r.symbol);
+  eq([results.every(Boolean), busyRows.length, busyReads.every((sym) => busyRows.includes(sym)), busyRows.filter((sym) => sym.startsWith('X')).every((sym) => busyReads.includes(sym))], [true, 50, true, true], 'four parallel reads at the cap: exactly 50 assets, every kept X asset with its answer, no answer without its asset');
 
   // Forgetting takes the answers with it.
   await rec2(v2, 'AMD', 150, observed);

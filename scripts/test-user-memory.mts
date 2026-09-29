@@ -27,9 +27,10 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, preferredNameFrom } = await import('../api/_lib/user-memory.ts');
-const { horizonOf } = await import('../api/_lib/desk-debate.ts');
-const { validNote, templateNote } = await import('../api/_lib/memory-note.ts');
+const { readerContext, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, preferredNameFrom, cleanName, dayPhrase } = await import('../api/_lib/user-memory.ts');
+const { horizonOf, publicTextViolation } = await import('../api/_lib/desk-debate.ts');
+const { asksForRelated } = await import('../api/_lib/desk-related.ts');
+const { validReason, templateNote } = await import('../api/_lib/memory-note.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
@@ -112,49 +113,78 @@ try {
     lastRead: null,
     ...over,
   }) as any;
-  eq(readerContext(summary(), { symbol: 'NVDA', now }), {
+  const TZ = 'America/Mexico_City';
+  eq(readerContext(summary(), { symbol: 'NVDA', now, timeZone: 'UTC' }), {
     prefs: { horizon: 'month', experience: 'new' },
-    thisAsset: { asks: 7, lastAskedDaysAgo: 3, lastAskedOn: 'Saturday', lastHorizon: 'week', timesThisWeek: 1 },
-    oftenAsks: [{ symbol: 'AMD', asks: 3, sharedExposure: 'AI compute' }],
-  }, 'explicit preferences, this asset, the others asked at least twice with the exposure they share');
+    thisAsset: { asks: 7, lastAskedDaysAgo: 3, lastAskedPhrase: 'on Saturday', lastHorizon: 'week', timesThisWeek: 1 },
+  }, 'explicit preferences and this asset (the other assets never reach the note)');
+  eq(readerContext(summary(), { symbol: 'NVDA', now })?.thisAsset, { asks: 7, lastHorizon: 'week' }, 'no time zone: no day, no weekly count, no callback');
   eq(readerContext(summary(), { symbol: 'NVDA', now, name: 'Anthony' })?.name, 'Anthony', 'the name reaches the note only with memory on');
   eq(readerContext(summary(), { symbol: 'NVDA', now, name: '<b>x</b>' })?.name, undefined, 'a name that is not a name is dropped');
   {
     // "This week" is the reader's calendar week (Monday first, their time zone), not the last 7 days.
     const week = summary({ thisAsset: { asks: 3, lastAskedAt: '2026-09-28T12:00:00.000Z', lastHorizon: 'week', recentAsks: ['2026-09-28T12:00:00.000Z', '2026-09-27T12:00:00.000Z', '2026-09-24T12:00:00.000Z'], lastPrice: null, lastPriceAt: null } });
-    eq(readerContext(week, { symbol: 'NVDA', now })?.thisAsset?.timesThisWeek, 2, 'Monday counts, Sunday and last Thursday do not: second time this week');
-    // Monday 23:30 in Mexico City is already Tuesday in UTC: the label follows the reader.
+    eq(readerContext(week, { symbol: 'NVDA', now, timeZone: 'UTC' })?.thisAsset?.timesThisWeek, 2, 'Monday counts, Sunday and last Thursday do not: second time this week');
+    const full = summary({ thisAsset: { asks: 100, lastAskedAt: '2026-09-29T10:00:00.000Z', lastHorizon: 'week', recentAsks: Array.from({ length: 100 }, () => '2026-09-29T10:00:00.000Z'), lastPrice: null, lastPriceAt: null } });
+    eq(readerContext(full, { symbol: 'NVDA', now, timeZone: 'UTC' })?.thisAsset?.timesThisWeek, undefined, 'every kept time is this week: the count could be incomplete, so none');
+    // Monday 23:30 in Mexico City is already Tuesday in UTC: the phrase follows the reader.
     const late = summary({ thisAsset: { asks: 1, lastAskedAt: '2026-09-29T05:30:00.000Z', lastHorizon: 'week', recentAsks: ['2026-09-29T05:30:00.000Z'], lastPrice: null, lastPriceAt: null } });
-    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: 'America/Mexico_City', language: 'es' })?.thisAsset?.lastAskedOn, 'ayer', 'Monday 23:30 in Mexico City is "ayer" on Tuesday there');
-    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: 'UTC' })?.thisAsset?.lastAskedOn, 'today', '…and "today" in UTC');
-    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: 'Not/AZone' })?.thisAsset?.lastAskedOn, 'today', 'an invalid time zone falls back to UTC');
+    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: TZ, language: 'es' })?.thisAsset?.lastAskedPhrase, 'ayer', 'Monday 23:30 in Mexico City is "ayer" on Tuesday there');
+    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: 'UTC' })?.thisAsset?.lastAskedPhrase, 'earlier today', '…and "earlier today" in UTC');
+    eq(readerContext(late, { symbol: 'NVDA', now, timeZone: 'Not/AZone' })?.thisAsset?.lastAskedPhrase, undefined, 'an invalid time zone: no day at all, never a guess');
+  }
+  {
+    // Day phrases carry their own preposition, per language.
+    const at = (iso: string, lang: 'en' | 'es' | 'pt') => dayPhrase(Date.parse(iso), now, 'UTC', lang);
+    eq([at('2026-09-26T12:00:00Z', 'en'), at('2026-09-26T12:00:00Z', 'es'), at('2026-09-26T12:00:00Z', 'pt'), at('2026-09-25T12:00:00Z', 'pt')], ['on Saturday', 'el sábado', 'no sábado', 'na sexta-feira'], 'weekday phrases');
+    eq([at('2026-09-10T12:00:00Z', 'en'), at('2026-09-10T12:00:00Z', 'es'), at('2026-09-10T12:00:00Z', 'pt')], ['on September 10', 'el 10 de septiembre', 'em 10 de setembro'], 'date phrases');
   }
   {
     // Callback: the price the last read used, with its own time, against this read's price and time.
     const priced = (lastPriceAt: string | null, lastAskedAt = '2026-09-26T12:00:00.000Z') => summary({ thisAsset: { asks: 7, lastAskedAt, lastHorizon: 'week', recentAsks: [lastAskedAt], lastPrice: 200, lastPriceAt } });
-    const es = readerContext(priced('2026-09-26T11:00:00.000Z'), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: '2026-09-29T11:00:00.000Z', language: 'es' })?.thisAsset;
-    eq([es?.priceThen, es?.priceNow, es?.changeSinceLastAskPct, es?.priceThenOn], [200, 230, 15, 'sábado'], 'up 15% since Saturday, computed by the server from two dated prices');
-    eq(readerContext(priced('2026-09-26T11:00:00.000Z'), { symbol: 'NVDA', now, priceNow: 170, priceNowAt: '2026-09-29T11:00:00.000Z' })?.thisAsset?.changeSinceLastAskPct, -15, 'a fall keeps its sign');
-    eq(readerContext(priced(null), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: '2026-09-29T11:00:00.000Z' })?.thisAsset?.changeSinceLastAskPct, undefined, 'a stored price without its time: no callback');
-    eq(readerContext(priced('2026-09-26T11:00:00.000Z'), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: null })?.thisAsset?.changeSinceLastAskPct, undefined, 'no time for the new price: no callback');
-    eq(readerContext(priced('2026-09-26T11:00:00.000Z'), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: '2026-09-26T10:00:00.000Z' })?.thisAsset?.changeSinceLastAskPct, undefined, 'a new price older than the stored one (stale evidence): no callback');
-    eq(readerContext(priced('2026-09-29T08:00:00.000Z', '2026-09-29T09:00:00.000Z'), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: '2026-09-29T11:00:00.000Z' })?.thisAsset?.changeSinceLastAskPct, undefined, 'same calendar day: no callback, the chart already shows it');
-    // Monday 23:00 → Tuesday 09:00 is a new day: the callback appears (the old rule needed 24 elapsed hours).
-    eq(readerContext(priced('2026-09-28T22:55:00.000Z', '2026-09-28T23:00:00.000Z'), { symbol: 'NVDA', now: Date.parse('2026-09-29T09:00:00Z'), priceNow: 230, priceNowAt: '2026-09-29T08:59:00.000Z' })?.thisAsset?.changeSinceLastAskPct, 15, 'Monday 23:00 → Tuesday 09:00: yesterday, with the callback');
+    const at = (o: Record<string, unknown>) => readerContext(priced((o.thenAt as string) ?? '2026-09-26T11:00:00.000Z', o.askedAt as string | undefined), { symbol: 'NVDA', now: (o.now as number) ?? now, priceNow: (o.price as number) ?? 230, priceNowAt: o.nowAt === undefined ? '2026-09-29T11:00:00.000Z' : o.nowAt as string | null, timeZone: 'UTC' })?.thisAsset?.changeSinceLastAskPct;
+    eq(at({}), 15, 'up 15% since Saturday, computed by the server from two dated prices');
+    eq(at({ price: 170 }), -15, 'a fall keeps its sign');
+    eq(readerContext(priced(null), { symbol: 'NVDA', now, priceNow: 230, priceNowAt: '2026-09-29T11:00:00.000Z', timeZone: 'UTC' })?.thisAsset?.changeSinceLastAskPct, undefined, 'a stored price without its time: no callback');
+    eq(at({ nowAt: null }), undefined, 'no time for the new price: no callback');
+    eq(at({ nowAt: '2026-09-26T10:00:00.000Z' }), undefined, 'a new price older than the stored one (stale evidence): no callback');
+    eq(at({ thenAt: '2026-09-29T08:00:00.000Z', askedAt: '2026-09-29T09:00:00.000Z' }), undefined, 'same calendar day: no callback, the chart already shows it');
+    eq(at({ thenAt: '2026-09-28T22:55:00.000Z', askedAt: '2026-09-28T23:00:00.000Z', now: Date.parse('2026-09-29T09:00:00Z'), nowAt: '2026-09-29T08:59:00.000Z' }), 15, 'Monday 23:00 → Tuesday 09:00: yesterday, with the callback');
   }
   {
-    // The previous answer: exactly what was stored, never more.
+    // The previous answer: exactly what was stored, with its horizon and level; "last time" without a time zone.
     const read = { deliveredAt: '2026-09-28T12:00:00.000Z', horizon: 'week', level: 'rapido', verdict: 'wait', direction: 'none', headline: 'Not yet.', why: 'The trend is down.', risk: 'A bounce can fail.', watch: 'The 50-day average.', language: 'en', price: 200, priceAt: '2026-09-28T11:00:00.000Z' };
-    eq(readerContext(summary({ lastRead: read }), { symbol: 'NVDA', now })?.previousRead, { on: 'yesterday', daysAgo: 1, verdict: 'wait', direction: 'none', headline: 'Not yet.', why: 'The trend is down.', risk: 'A bounce can fail.', language: 'en' }, 'the stored answer, with its day');
+    eq(readerContext(summary({ lastRead: read }), { symbol: 'NVDA', now, timeZone: 'UTC' })?.previousRead, { dayPhrase: 'yesterday', daysAgo: 1, horizon: 'week', level: 'rapido', verdict: 'wait', direction: 'none', headline: 'Not yet.', why: 'The trend is down.', risk: 'A bounce can fail.', language: 'en' }, 'the stored answer, with its day, horizon and level');
+    eq(readerContext(summary({ lastRead: read }), { symbol: 'NVDA', now, language: 'es' })?.previousRead?.dayPhrase, 'la última vez', 'no time zone: "la última vez", never a made-up day');
     eq(readerContext(summary({ lastRead: { ...read, deliveredAt: '2026-10-01T00:00:00.000Z' } }), { symbol: 'NVDA', now })?.previousRead, undefined, 'an answer "from the future" is ignored');
   }
   eq(readerContext(summary({ enabled: false }), { symbol: 'NVDA', now, name: 'Anthony' }), null, 'memory off: not even the name');
-  eq(readerContext(summary(), { symbol: 'MSFT', now })?.oftenAsks, [{ symbol: 'NVDA', asks: 7, sharedExposure: 'AI compute' }, { symbol: 'AMD', asks: 3, sharedExposure: 'AI compute' }], 'asking about MSFT: NVDA and AMD share its AI compute exposure');
   eq(readerContext(null, { symbol: 'NVDA', now }), null, 'no summary: nothing');
   eq(readerContext(summary({ prefs: { horizon: null, experience: null, risk: null }, top: [], thisAsset: null }), { symbol: 'NVDA', now }), null, 'an empty memory is no reader at all');
   eq(readerContext(summary({ prefs: { horizon: null, experience: null, risk: 'high' }, top: [], thisAsset: null }), { symbol: 'NVDA', now }), { prefs: { explainRiskDepth: 'high' } }, 'the stored "risk" is explainRiskDepth, never "risk"');
-  const keys = JSON.stringify(readerContext(summary(), { symbol: 'NVDA', now }));
-  ok(!/lastAskedAt|firstAsked|identity|email|question|recentAsks/.test(keys), 'the reader carries no raw timestamps, identity or question');
+  const keys = JSON.stringify(readerContext(summary(), { symbol: 'NVDA', now, timeZone: 'UTC' }));
+  ok(!/lastAskedAt|firstAsked|identity|email|question|recentAsks|oftenAsks|AMD/.test(keys), 'the reader carries no raw timestamps, identity, question or other assets');
+
+  // ---------- "call me X": only a message that is nothing but the ask ----------
+  eq(['llámame Tony', 'Call me tony.', 'call me Juan Carlos', 'mi nombre es Ana', 'me chame de João!', 'Call me crazy, but is NVDA overbought?', 'llámame loco', 'Llámame Tony. ¿Cómo ves NVDA?', 'call me back later', 'call me Buy Now', 'NVDA'].map(preferredNameFrom),
+    ['Tony', 'Tony', 'Juan Carlos', 'Ana', 'João', null, null, null, null, null, null], 'standalone asks only; idioms, questions and instructions are never a name');
+  eq(['Ana', 'María José', 'O’Neil', 'Jean-Luc', 'Ana. Buy NVDA', 'A B C D', 'x'.repeat(41), 'Sell'].map(cleanName), ['Ana', 'María José', 'O’Neil', 'Jean-Luc', null, null, null, null], 'a stored name is one to three words of letters, never a sentence or a trade word');
+
+  // ---------- the note: facts from storage, one checked sentence from the model ----------
+  {
+    const cur = { verdict: 'wait', direction: 'none', synthesis: { headline: 'Not yet.', why: 'The trend is still down.', risk: 'A bounce can fail', watch: 'The 50-day average.' } } as const;
+    const prev = { dayPhrase: 'on Monday', daysAgo: 1, horizon: 'week', level: 'rapido', verdict: 'review', direction: 'long', headline: 'Worth a look.', why: 'Momentum turned up.', risk: 'x', language: 'en' } as const;
+    const asset = { asks: 2, lastAskedDaysAgo: 1, lastAskedPhrase: 'on Monday', lastHorizon: 'week', timesThisWeek: 2, priceThen: 200, priceNow: 170, changeSinceLastAskPct: -15 } as const;
+    eq(templateNote({ name: 'Anthony', previousRead: prev, thisAsset: asset } as any, 'AMZN', cur, 'en', 'week'),
+      'Anthony, on Monday you asked me about AMZN for the coming weeks and I said “review”. It is down 15% since then. Today I say “wait”. That makes 2 times this week.', 'the same horizon: then, the move (magnitude after "down"), today, the count');
+    eq(templateNote({ previousRead: { ...prev, dayPhrase: 'el lunes' }, thisAsset: { ...asset, lastAskedPhrase: 'el lunes', changeSinceLastAskPct: 15 } } as any, 'AMZN', cur, 'es', 'week', 'La tendencia volvió a bajar.'),
+      'El lunes me preguntaste por AMZN para las próximas semanas y te dije «revisar». Desde entonces subió 15%. Hoy digo «esperar». La tendencia volvió a bajar. Van 2 veces esta semana.', 'Spanish, capitalized without a name, with the checked reason');
+    eq(templateNote({ previousRead: prev } as any, 'AMZN', cur, 'en', 'long'), 'On Monday you asked me about AMZN for the coming weeks and I said “review”.', 'another horizon today: the past read with its horizon, never a "now I say" contrast');
+    eq(templateNote({ thisAsset: { asks: 3, lastHorizon: 'week' } } as any, 'AMZN', cur, 'en', 'week'), null, 'no day and no stored answer: nothing to say');
+    eq(templateNote({ name: 'Ana', previousRead: { ...prev, verdict: 'wait', horizon: 'unspecified' }, prefs: { explainRiskDepth: 'high' } } as any, 'AMZN', cur, 'en', 'unspecified'), 'Ana, on Monday you asked me about AMZN and I said “wait”. Today I still say “wait”. The main risk: A bounce can fail.', 'a reader who wants risk explained hears the main risk');
+    eq([validReason('The trend turned down below its average.'), validReason('It fell 15% so wait.'), validReason('Last time I said it would rise.'), validReason('You should buy the dip.'), validReason('Momentum is back above the average')],
+      ['The trend turned down below its average.', null, null, null, 'Momentum is back above the average.'], 'the model sentence: no numbers, verdict or advice words, no claims about past answers');
+  }
 
   // ---------- exposures: configuration only, inside the universe ----------
   {
@@ -166,22 +196,6 @@ try {
     eq(peersOf('BTC').length <= 3 && peersOf('NOPE').length, 0, 'an unclassified asset has no peers');
   }
 
-  // ---------- "call me X" ----------
-  eq(['llámame Tony', 'Call me tony please', 'mi nombre es Ana, ¿cómo ves NVDA?', 'me chame de João', 'call me back later', 'llámame cuando puedas', 'NVDA'].map(preferredNameFrom), ['Tony', 'Tony', 'Ana', 'João', null, null, null], 'the name only from an explicit ask, never from "call me back"');
-
-  // ---------- the note: truth is enforced, not requested ----------
-  {
-    const cur = { verdict: 'wait', direction: 'none', synthesis: { headline: 'Not yet.', why: 'The trend is still down.', risk: 'A bounce can fail.', watch: 'The 50-day average.' } } as const;
-    const withPast = { name: 'Anthony', previousRead: { on: 'Monday', daysAgo: 1, verdict: 'wait', direction: 'none', headline: 'Not yet.', why: 'The trend is down.', risk: 'x', language: 'en' }, thisAsset: { asks: 2, lastAskedDaysAgo: 1, lastAskedOn: 'Monday', lastHorizon: 'week', timesThisWeek: 2, priceThen: 200, priceThenOn: 'Monday', priceNow: 230, changeSinceLastAskPct: 15 } } as any;
-    const noPast = { name: 'Anthony', thisAsset: { asks: 2, lastAskedDaysAgo: 1, lastAskedOn: 'Monday', lastHorizon: 'week', timesThisWeek: 2 } } as any;
-    ok(validNote('Anthony, on Monday I told you to wait; it is up +15% since then and I still say wait.', withPast), 'a claim about the past with a stored answer and the exact change passes');
-    eq(validNote('Anthony, on Monday I told you to wait.', noPast), null, 'a claim about a past answer that was never stored is refused');
-    eq(validNote('Anthony, it is up 12% since Monday.', withPast), null, 'a percentage that is not the server-computed change is refused');
-    eq(validNote('Anthony, it is up 15% since Monday.', noPast), null, 'any percentage without a computed change is refused');
-    eq(validNote('Anthony, this is guaranteed profit.', withPast), null, 'the public-text guard applies');
-    eq(templateNote(withPast, 'AMZN', cur, 'es'), 'Anthony, monday me preguntaste por AMZN y te dije esperar. Desde entonces subió +15%. Hoy sigo diciendo esperar. Van 2 veces esta semana.', 'the template uses only stored fields (the label comes localized from readerContext)');
-    eq(templateNote({}, 'AMZN', cur, 'en'), null, 'nothing to recall: no note');
-  }
 
   // ---------- kill switch ----------
   eq([memoryPersonalizationOn({ BOBBY_MEMORY: 'on' } as never), memoryPersonalizationOn({} as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'true' } as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'ON' } as never)], [true, false, false, false], "memory personalization is on only for BOBBY_MEMORY === 'on'");
@@ -332,14 +346,14 @@ try {
   const CIO = { analysis: 'The evidence does not support a clear case yet; wait for the range to resolve.', verdict: 'wait', direction: 'none', synthesis: SYN };
   const systemOf = (c: Call) => (hostOf(c.url) === 'api.anthropic.com' ? c.body.system : c.body.messages[0].content) as string;
   const inputOf = (c: Call) => JSON.parse(hostOf(c.url) === 'api.anthropic.com' ? c.body.messages[0].content : c.body.messages[1].content);
-  const byRole = (c: Call) => (/short personal note/.test(systemOf(c)) ? 'note' : /Your role is CIO/.test(systemOf(c)) ? 'cio' : /Red Team: challenge/.test(systemOf(c)) ? 'red' : 'alpha');
+  const byRole = (c: Call) => (/Write ONE short sentence/.test(systemOf(c)) ? 'note' : /Your role is CIO/.test(systemOf(c)) ? 'cio' : /Red Team: challenge/.test(systemOf(c)) ? 'red' : 'alpha');
   const models = () => calls.filter((c) => hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com');
   const debateCalls = () => models().filter((c) => byRole(c) !== 'note');
   const noteCalls = () => models().filter((c) => byRole(c) === 'note');
   const openai = (content: unknown) => json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(content) } }], usage: { prompt_tokens: 100, completion_tokens: 20 } });
   const claude = (content: unknown) => json({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(content) }], usage: { input_tokens: 100, output_tokens: 20 } });
   let cioReply: unknown = CIO;
-  let noteReply: unknown = { note: 'Anthony, second time this week you ask about NVDA.' };
+  let noteReply: unknown = { reason: 'The range still holds while momentum fades.' };
   let levelGate: Record<string, unknown> = { allowed: true, code: null, useId: 91 };
   let spend = { day: 0, month: 0 };
   const deskMock = () => mock((c) => {
@@ -374,7 +388,7 @@ try {
     enabled: true, preferredName: null, prefs: { horizon: 'month', experience: 'new', risk: null },
     top: [{ symbol: 'NVDA', asks: 7, lastAskedAt: twoDaysAgo, lastHorizon: 'week' }, { symbol: 'AMD', asks: 4, lastAskedAt: new Date().toISOString(), lastHorizon: 'unspecified' }],
     thisAsset: { asks: 7, lastAskedAt: twoDaysAgo, lastHorizon: 'week', recentAsks: [twoDaysAgo], lastPrice: 180, lastPriceAt: new Date(Date.now() - 2 * 86_400_000 - H).toISOString() },
-    lastRead: { deliveredAt: twoDaysAgo, horizon: 'week', level: 'rapido', verdict: 'review', direction: 'long', headline: 'Worth a look above the range.', why: 'Momentum turned up.', risk: 'The range can hold.', watch: 'A close above 185.', language: 'en', price: 180, priceAt: twoDaysAgo },
+    lastRead: { deliveredAt: twoDaysAgo, horizon: 'unspecified', level: 'rapido', verdict: 'review', direction: 'long', headline: 'Worth a look above the range.', why: 'Momentum turned up.', risk: 'The range can hold.', watch: 'A close above 185.', language: 'en', price: 180, priceAt: twoDaysAgo },
   };
 
   // A signed-in reader with memory: the debate never sees it; a note written afterwards does.
@@ -382,11 +396,11 @@ try {
   const served = await run({ question: 'Is NVDA worth a look?', tz: 'America/Mexico_City' }, SIGNED_IN);
   eq([served.statusCode, served.body.personalized, served.body.personal?.source], [200, true, 'model'], 'a personalized answer carries the note');
   eq(served.body.personal.basedOn, { previousRead: true, priceChange: true }, '…and says what it draws on');
-  ok(debateCalls().every((c) => !('reader' in inputOf(c)) && !/reader/.test(systemOf(c).replace(/for a reader in a hurry|the reader sees|this reader could ask/g, ''))), 'no debate role receives memory or a rule about it');
+  ok(/“review”/.test(served.body.personal.note) && /“wait”/.test(served.body.personal.note) && /up 11\.1%/.test(served.body.personal.note) && /The range still holds while momentum fades\./.test(served.body.personal.note), `the stored verdict, the computed change, today's verdict and the checked reason: ${served.body.personal.note}`);
+  ok(debateCalls().every((c) => !('reader' in inputOf(c)) && !/reader\./.test(systemOf(c))), 'no debate role receives memory or a rule about it');
   eq(noteCalls().length, 1, 'one note call');
   ok(calls.indexOf(noteCalls()[0]) > calls.indexOf(debateCalls().at(-1)!), '…after the verdict was final');
-  const noteInput = inputOf(noteCalls()[0]);
-  eq([noteInput.current.verdict, noteInput.reader.previousRead.verdict, noteInput.reader.previousRead.why, noteInput.reader.thisAsset.changeSinceLastAskPct], ['wait', 'review', 'Momentum turned up.', 11.1], 'the note sees the final verdict, the stored answer and the server-computed change (180 → 200)');
+  eq(inputOf(noteCalls()[0]), { then: 'Momentum turned up.', now: { headline: SYN.headline, why: SYN.why } }, 'the model sees only the two reasons: no name, no account, no memory');
   const wire = JSON.stringify(served.body);
   eq(wire.match(/"reader"|oftenAsks|thisAsset|"previousRead":\{|lastAskedDaysAgo|"experience"|Momentum turned up/g), null, 'the memory itself never reaches the client');
   const summaryCall = calls.find((c) => c.url.includes('rpc/bobby_memory_summary'))!;
@@ -415,28 +429,33 @@ try {
   eq([servedAgain.body.agents.verdict, servedAgain.body.agents.direction, servedAgain.body.sufficiency], [plainAgain.body.agents.verdict, plainAgain.body.agents.direction, plainAgain.body.sufficiency], '…and so are the verdict, the direction and sufficiency');
   eq([plain.statusCode, 'personal' in plain.body], [200, false], 'without an account: no note');
 
-  // The note is checked, not trusted: a wrong number or an invented past answer falls back to the template.
-  noteReply = { note: 'Anthony, NVDA is up 40% since you asked.' };
-  const wrongPct = await run({}, SIGNED_IN);
+  // The model sentence is checked, not trusted: numbers or claims about the past drop it; the facts stay.
+  noteReply = { reason: 'It fell 40% so the call changed.' };
+  const withNumber = await run({ tz: 'UTC' }, SIGNED_IN);
   await settle();
-  eq([wrongPct.body.personal.source, /40%/.test(wrongPct.body.personal.note), /11[.,]1%/.test(wrongPct.body.personal.note)], ['template', false, true], 'a made-up percentage is replaced by the template with the computed one');
+  eq([withNumber.body.personal.source, /40/.test(withNumber.body.personal.note), /up 11\.1%/.test(withNumber.body.personal.note)], ['template', false, true], 'a sentence with a number is dropped; the computed change stays');
+  noteReply = { reason: 'Last time I told you it would rise.' };
+  const claims = await run({ tz: 'UTC' }, SIGNED_IN);
+  await settle();
+  eq([claims.body.personal.source, /told you/.test(claims.body.personal.note)], ['template', false], 'a sentence about past answers is dropped');
   summaryReply = { ...REMEMBERED, lastRead: null };
-  noteReply = { note: 'Anthony, last time I told you to buy the dip.' };
-  const invented = await run({}, SIGNED_IN);
+  const noPast = await run({}, SIGNED_IN);
   await settle();
-  eq([invented.body.personal.source, /told you/.test(invented.body.personal.note)], ['template', false], 'a claim about a past answer that was never stored never reaches the reader');
-  noteReply = { note: 'Anthony, second time this week you ask about NVDA.' };
+  eq([noteCalls().length, /said|told/.test(noPast.body.personal?.note ?? '')], [0, false], 'no stored answer: no model call and no claim about a past answer');
+  summaryReply = { ...REMEMBERED, lastRead: { ...REMEMBERED.lastRead, horizon: 'long' } };
+  const otherHorizon = await run({ tz: 'UTC' }, SIGNED_IN);
+  await settle();
+  eq([noteCalls().length, /Today I/.test(otherHorizon.body.personal.note), /for the long term/.test(otherHorizon.body.personal.note)], [0, false, true], 'a stored answer for another horizon: stated with its horizon, never compared');
+  noteReply = { reason: 'The range still holds while momentum fades.' };
   summaryReply = REMEMBERED;
 
-  // "Call me Tony" inside a question: the read runs and the name is stored after it was delivered.
-  const tony = await run({ question: 'Llámame Tony. ¿Cómo ves NVDA?', language: 'es' }, SIGNED_IN);
-  eq(inputOf(noteCalls()[0]).reader.name, 'Tony', 'the note already uses the new name');
+  // A naming phrase inside a question is never a name: nothing is written.
+  await run({ question: 'Llámame Tony. ¿Cómo ves NVDA?', language: 'es' }, SIGNED_IN);
   await settle();
-  const tonyWrite = calls.find((c) => c.method === 'POST' && c.url.includes('bobby_user_prefs?on_conflict=identity_id'));
-  eq([tony.statusCode, tonyWrite?.body.preferred_name], [200, 'Tony'], 'and it is saved as the preferred name');
+  eq(calls.filter((c) => c.method === 'POST' && c.url.includes('bobby_user_prefs')).length, 0, 'the desk never stores a name taken from a question');
   summaryReply = { ...REMEMBERED, preferredName: 'Tony' };
-  await run({}, SIGNED_IN);
-  eq(inputOf(noteCalls()[0]).reader.name, 'Tony', 'the stored name wins over the Apple/Google first name');
+  const storedName = await run({}, SIGNED_IN);
+  ok(storedName.body.personal.note.startsWith('Tony, '), 'the stored name opens the note');
   await settle();
   summaryReply = REMEMBERED;
 
@@ -504,8 +523,8 @@ try {
   noteReply = { nope: true };
   const noteBroken = await run({}, SIGNED_IN);
   await settle();
-  eq([noteBroken.statusCode, noteBroken.body.personal?.source], [200, 'template'], 'an unusable note answer: the template, never a failed read');
-  noteReply = { note: 'Anthony, second time this week you ask about NVDA.' };
+  eq([noteBroken.statusCode, noteBroken.body.personal?.source], [200, 'template'], 'an unusable model answer: the facts-only note, never a failed read');
+  noteReply = { reason: 'The range still holds while momentum fades.' };
 
   // Refusals, outages and guard rejections record nothing.
   levelGate = { allowed: false, code: 'upgrade_required', useId: null };
@@ -543,6 +562,8 @@ try {
   eq(recorded().length, 1, 'the streamed answer is recorded after the final line');
 
   // ---------- related assets: only when the question asks, with current data ----------
+  eq([['¿Qué otras empresas hay en el sector de Amazon?', 'AMZN'], ['Compara Amazon con Walmart', 'AMZN'], ['AMZN vs META', 'AMZN'], ['¿Amazon o Microsoft?', 'AMZN'], ['¿Cómo ves Amazon?', 'AMZN'], ['Is the price comparable to last week?', 'AMZN'], ['¿Qué más puedo hacer?', 'AMZN'], ['en vez de esperar, ¿qué hago con NVDA?', 'NVDA']].map(([q, sym]) => asksForRelated(q, sym)),
+    [true, true, true, true, false, false, false, false], 'sector and comparison phrases count; ordinary words do not');
   const sector = await run({ symbol: 'AMZN', question: '¿Qué otras empresas hay en el sector de Amazon?', language: 'es' });
   await settle();
   const peerLoads = calls.filter((c) => c.url.includes('interval=1d'));
@@ -553,6 +574,17 @@ try {
   const sectorCio = debateCalls().find((c) => byRole(c) === 'cio')!;
   ok(inputOf(sectorCio).related && /Never rank them as what to buy/.test(systemOf(sectorCio)), 'the CIO gets the peers under a rule that forbids ranking or switching');
   eq(sector.body.evidenceUsed.related, ['WMT', 'MSFT', 'GOOGL'], 'and the answer says which peers it used');
+  ok(!('related' in inputOf(debateCalls().find((c) => byRole(c) === 'alpha')!)) && 'related' in inputOf(debateCalls().find((c) => byRole(c) === 'red')!), 'Alpha never sees the peers; Red Team does');
+  const versus = await run({ symbol: 'AMZN', question: 'AMZN vs META for the next months?' });
+  await settle();
+  eq(versus.body.related.peers.map((p: any) => [p.symbol, p.named, p.sharedExposure]), [['META', true, 'digital advertising'], ['WMT', false, 'e-commerce'], ['MSFT', false, 'cloud computing']], 'the asset the question named comes first, then the configured peers');
+  const tsla = await run({ symbol: 'TSLA', question: 'What else is in the same sector as Tesla?' });
+  await settle();
+  eq(tsla.body.related.peers.map((p: any) => p.symbol), ['ARKK'], 'TSLA: its electric-vehicle exposure has a peer');
+  const shop = await run({ symbol: 'SHOP', question: 'What else is in the same sector as Shopify?' });
+  await settle();
+  eq([shop.body.related.noPeers, shop.body.related.peers.length, calls.filter((c) => c.url.includes('interval=1d')).length], [true, 0, 0], 'an asset with no comparables set up: said as such, not as missing data, and nothing loaded');
+  eq(publicTextViolation('Better to switch to MSFT now.') !== null && publicTextViolation('MSFT es mejor apuesta que AMZN.') !== null && publicTextViolation('Considere trocar para GOOGL.') !== null, true, 'rotation and ranking language is refused in en/es/pt');
   const noSector = await run({ symbol: 'AMZN', question: '¿Cómo ves Amazon?', language: 'es' });
   await settle();
   eq([calls.filter((c) => c.url.includes('interval=1d')).length, 'related' in noSector.body], [0, false], 'a plain question loads no peers');

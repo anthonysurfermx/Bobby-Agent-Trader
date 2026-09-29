@@ -63,6 +63,7 @@ export const ASSET_EXPOSURES: Record<string, Exposure[]> = {
   BA: ['industrials'], CAT: ['industrials'], UBER: ['mobility_travel'], ABNB: ['mobility_travel'],
   // ETFs
   SPY: ['broad_index'], QQQ: ['broad_index'], DIA: ['broad_index'], IWM: ['broad_index'],
+  XLK: ['semiconductors', 'enterprise_software', 'consumer_devices'], ARKK: ['crypto_equities', 'electric_vehicles'],
   XLF: ['banks'], XLE: ['energy'], XLV: ['healthcare'], GLD: ['precious_metals'], SLV: ['precious_metals'],
   USO: ['energy'], TLT: ['bonds'], HYG: ['bonds'],
   // crypto

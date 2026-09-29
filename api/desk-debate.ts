@@ -10,7 +10,7 @@ import { clientPlatform, consumeLevel, refundLevel } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
-import { memoryPersonalizationOn, memoryPlatformAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, preferredNameFrom, readerContext, recordRead, updatePrefs, type MemorySummary } from './_lib/user-memory.js';
+import { memoryPersonalizationOn, memoryPlatformAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordRead, type MemorySummary } from './_lib/user-memory.js';
 import { personalNote, type CurrentRead, type PersonalNote } from './_lib/memory-note.js';
 import { asksForRelated, loadRelated } from './_lib/desk-related.js';
 
@@ -47,7 +47,7 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * the verdict from what Bobby remembers (name, past asks, the stored previous answer on this asset, the price
  * change since) and returned as `personal: {note, basedOn, source}` with `personalized: true`; the memory itself
  * never reaches the client. The read is recorded (price with its own time, and what Bobby answered) after it
- * was delivered, never on a refusal or a failure. "Call me X" in the question sets the preferred name. Off
+ * was delivered, never on a refusal or a failure. A name is never taken from a question (only /api/memory). Off
  * unless BOBBY_MEMORY === 'on'. Anonymous and wallet requests make no memory call; the iPhone app joins only
  * from a build that can show and delete memory (X-Bobby-Memory: 1).
  *
@@ -161,13 +161,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const platform = clientPlatform(req);
     const memoryOwner = memoryPersonalizationOn() && memoryPlatformAllowed(platform, req) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
-    const relatedTask = asksForRelated(question) ? loadRelated(symbol, language) : Promise.resolve(null);
+    const relatedTask = asksForRelated(question, symbol) ? loadRelated(symbol, language, question) : Promise.resolve(null);
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const [summary, related] = await Promise.all([within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS), relatedTask]);
-    const saidName = preferredNameFrom(question);
     const owner = summary?.enabled ? await memoryOwner.catch(() => null) : null;
     const reader = readerContext(summary, {
-      symbol, name: saidName ?? summary?.preferredName ?? owner?.firstName ?? null,
+      symbol, name: summary?.preferredName ?? owner?.firstName ?? null,
       priceNow: evidence.technicals.price, priceNowAt: evidence.provenance.asOf, language, timeZone: tz,
     });
     const asked = horizonOf(question);
@@ -176,8 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const said = result.agents.synthesis as CurrentRead['synthesis'];
     const plan = levelPlan('rapido');
     const personal: PersonalNote | null = reader
-      ? await personalNote(reader, symbol, { verdict: result.agents.verdict, direction: result.agents.direction, synthesis: said }, language,
-        { spec: plan.cio, fallback: plan.fallback, usage, signal: left.signal })
+      ? await personalNote(reader, symbol, { verdict: result.agents.verdict, direction: result.agents.direction, synthesis: said }, language, asked,
+        { spec: plan.cio, fallback: plan.fallback, usage, signal: left.signal, timeoutMs: 4000 })
       : null;
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
@@ -191,7 +190,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const s = said;
       waitUntil(memoryOwner.then(async (id) => {
         if (!id) return false;
-        if (saidName) await updatePrefs(id.id, { preferredName: saidName }).catch(() => undefined);
         return recordRead(id.id, symbol, asked, {
           price: evidence.technicals.price, priceAt: evidence.provenance.asOf, priceSource: evidence.provenance.provider,
           read: { verdict: result.agents.verdict, direction: result.agents.direction, headline: s.headline, why: s.why, risk: s.risk, watch: s.watch, level, language, platform },

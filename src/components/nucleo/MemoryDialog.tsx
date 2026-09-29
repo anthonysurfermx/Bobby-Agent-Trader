@@ -15,7 +15,7 @@ import {
   type MemoryPrefs, type MemoryResult, type MemoryState,
 } from '@/lib/memory-client';
 
-interface Props { open: boolean; onOpenChange: (open: boolean) => void; onSignIn: () => void }
+interface Props { open: boolean; onOpenChange: (open: boolean) => void; onSignIn: () => void; onState?: (state: MemoryState | null) => void }
 
 type Field = keyof MemoryPrefs;
 const OPTIONS: Record<Field, Array<[string, () => string]>> = {
@@ -43,7 +43,7 @@ const money = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigi
 const verdictWord = (v: 'wait' | 'review') => (v === 'wait' ? t('Wait', 'Esperar', 'Esperar') : t('Review', 'Revisar', 'Revisar'));
 const times = (n: number) => (n === 1 ? t('1 time', '1 vez', '1 vez') : t(`${n} times`, `${n} veces`, `${n} vezes`));
 
-export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
+export default function MemoryDialog({ open, onOpenChange, onSignIn, onState }: Props) {
   const { account } = useBobbyAccount();
   const accountId = account?.id ?? null;
   const [state, setState] = useState<MemoryState | null>(null);
@@ -57,8 +57,8 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
 
   const apply = (r: MemoryResult, gen: number) => {
     if (gen !== generation.current) return;
-    if ('state' in r) { setState(r.state); setNameDraft(r.state.preferredName ?? ''); setSignedOut(false); setFailed(false); }
-    else if (r.signedOut) { setSignedOut(true); setState(null); }
+    if ('state' in r) { setState(r.state); setNameDraft(r.state.preferredName ?? ''); setSignedOut(false); setFailed(false); onState?.(r.state); }
+    else if (r.signedOut) { setSignedOut(true); setState(null); onState?.(null); }
     else setFailed(true);
   };
   const run = async (task: () => Promise<MemoryResult>) => {
@@ -111,7 +111,7 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
                   <i />
                 </button>
               </div>
-              {!state.enabled && <p className="n-mem-note">{t('Paused: Bobby saves nothing new and does not personalize answers.', 'En pausa: Bobby no guarda nada nuevo ni personaliza respuestas.', 'Em pausa: o Bobby não salva nada novo nem personaliza respostas.')}</p>}
+              {!state.enabled && <p className="n-mem-note">{t('Paused: Bobby saves nothing new from your questions and does not personalize answers. What you change here is still saved.', 'En pausa: Bobby no guarda nada nuevo de tus preguntas ni personaliza respuestas. Lo que cambies aquí sí se guarda.', 'Em pausa: o Bobby não salva nada novo das suas perguntas nem personaliza respostas. O que você mudar aqui continua salvo.')}</p>}
 
               <div className="n-mem-pref">
                 <label className="n-label" htmlFor="n-mem-name">{t('What Bobby calls you', 'Cómo te llama Bobby', 'Como o Bobby te chama')}</label>
@@ -152,15 +152,19 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
               )}
               <div className="n-label mt-6">{t('What Bobby answered', 'Lo que Bobby te respondió', 'O que o Bobby respondeu')} · {state.reads.length}</div>
               {state.reads.length === 0 ? (
-                <p className="n-mem-note">{t('Each answer Bobby gives you is kept here, exactly as you saw it.', 'Cada respuesta que Bobby te da se guarda aquí, tal como la viste.', 'Cada resposta que o Bobby te dá fica aqui, exatamente como você viu.')}</p>
+                <p className="n-mem-note">{t('Each answer Bobby gives you is kept here as you saw it: the verdict and its four lines.', 'Cada respuesta que Bobby te da se guarda aquí tal como la viste: el veredicto y sus cuatro líneas.', 'Cada resposta que o Bobby te dá fica aqui como você viu: o veredito e suas quatro linhas.')}</p>
               ) : (
-                <ul className="n-mem-list">
-                  {state.reads.slice(0, 10).map((r) => (
+                <ul className="n-mem-reads">
+                  {state.reads.map((r) => (
                     <li key={`${r.symbol}-${r.deliveredAt}`}>
-                      <span className="min-w-0 flex-1">
-                        <b>{r.symbol} · {verdictWord(r.verdict)}</b>
-                        <small>{when(r.deliveredAt)} · {r.headline}</small>
-                      </span>
+                      <details>
+                        <summary><b>{r.symbol} · {verdictWord(r.verdict)}</b><small>{when(r.deliveredAt)}{r.price !== null && r.priceAt ? ` · ${money(r.price)}` : ''}</small><span>{r.headline}</span></summary>
+                        <dl>
+                          <dt>{t('Why', 'Por qué', 'Por quê')}</dt><dd>{r.why}</dd>
+                          <dt>{t('The risk', 'El riesgo', 'O risco')}</dt><dd>{r.risk}</dd>
+                          <dt>{t('Watch', 'Qué vigilar', 'O que vigiar')}</dt><dd>{r.watch}</dd>
+                        </dl>
+                      </details>
                     </li>
                   ))}
                 </ul>

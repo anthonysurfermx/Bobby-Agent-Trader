@@ -2,12 +2,17 @@
 --   · bobby_user_reads: what Bobby actually answered, per delivered read: asset, horizon, level, verdict,
 --     direction and the four synthesis lines the reader saw (headline, why, risk, watch), with the price the
 --     read used, that price's own timestamp and source. "Last time I said X" can only quote a row from here.
---     At most 10 per (account, asset) and 200 per account, 90-day retention.
+--     At most 5 per (account, asset) and 50 per account (all of them visible in the memory screen), 90 days.
 --   · bobby_user_assets.last_price_at: the price and its observation time are written together. A read
 --     without a price clears both, so an older price is never attributed to a newer question.
---   · bobby_user_prefs.preferred_name: the name the person asked to be called ("call me Anthony", or the
---     profile field). Never inferred.
+--   · bobby_user_prefs.preferred_name: the name the person asked to be called, set only by an explicit
+--     correction (/api/memory PATCH: the memory screen, or a message that is only "call me Anthony"). Never
+--     inferred, never taken from a market question.
 --   · bobby_memory_purge(): the 90-day retention as a daily pg_cron job, not only a sweep on the next ask.
+--   · Ask history keeps only the last 90 days: recent_asks holds the ask times within the window (newest 100),
+--     asks is their count and first_asked_at the oldest of them, so nothing older than 90 days survives.
+--   · Every write for one account (record, forget) takes a per-account advisory lock, so concurrent reads on
+--     different assets cannot race the caps.
 --   · bobby_memory_forget(): also forgets the stored answers (one asset, or all) and the preferred name.
 -- The 4-argument bobby_memory_record and bobby_memory_summary stay until the code that calls them is gone
 -- (drop them in a later migration). Every new table and function is service-only; Supabase's default
@@ -62,15 +67,22 @@ declare
 begin
   if p_identity is null or p_symbol is null or p_symbol !~ '^[A-Z0-9.^=-]{1,20}$' then return false; end if;
   if not exists (select 1 from bobby_identities where id = p_identity and auth_user_id is not null) then return false; end if;
+  -- One writer per account at a time: the caps below stay exact under concurrent reads.
+  perform pg_advisory_xact_lock(hashtextextended('bobby-memory:' || p_identity::text, 0));
   if exists (select 1 from bobby_user_prefs where identity_id = p_identity and not memory_enabled) then return false; end if;
 
   insert into bobby_user_assets as a (identity_id, symbol, asks, first_asked_at, last_asked_at, last_horizon, recent_asks, last_price, last_price_at)
     values (p_identity, p_symbol, 1, now(), now(), h, array[now()], px, pat)
     on conflict (identity_id, symbol) do update
-      set asks = least(a.asks + 1, 1000000), last_asked_at = now(), last_horizon = excluded.last_horizon,
-          recent_asks = (array[now()] || a.recent_asks)[1:20],
+      set last_asked_at = now(), last_horizon = excluded.last_horizon,
+          -- Only the last 90 days of ask times (newest 100); asks and first_asked_at follow from them below.
+          recent_asks = (array[now()] || array(select x from unnest(a.recent_asks) x where x >= now() - interval '90 days' order by x desc))[1:100],
           -- Together or not at all: a read without a price clears the old one.
           last_price = excluded.last_price, last_price_at = excluded.last_price_at;
+  update bobby_user_assets
+     set asks = greatest(cardinality(recent_asks), 1),
+         first_asked_at = coalesce((select min(x) from unnest(recent_asks) x), now())
+   where identity_id = p_identity and symbol = p_symbol;
 
   if p_read is not null
      and p_read->>'verdict' in ('wait', 'review')
@@ -83,13 +95,13 @@ begin
             case when p_read->>'verdict' = 'wait' then 'none' else p_read->>'direction' end,
             left(trim(p_read->>'headline'), 200), left(trim(p_read->>'why'), 260), left(trim(p_read->>'risk'), 260),
             left(trim(p_read->>'watch'), 260), lang, px, pat, src, plat);
-    -- Keep the 10 newest reads per asset and 200 per account.
+    -- Keep the 5 newest reads per asset and 50 per account: all of them fit the memory screen.
     delete from bobby_user_reads where id in (
       select id from bobby_user_reads where identity_id = p_identity and symbol = p_symbol
-      order by delivered_at desc, id desc offset 10);
+      order by delivered_at desc, id desc offset 5);
     delete from bobby_user_reads where id in (
       select id from bobby_user_reads where identity_id = p_identity
-      order by delivered_at desc, id desc offset 200);
+      order by delivered_at desc, id desc offset 50);
   end if;
 
   -- Retention for this account (the daily purge covers everyone).
@@ -109,11 +121,12 @@ begin
 end;
 $$;
 
--- The v1 recorder, still called by the code deployed before this migration, now goes through v2: its price is
--- stamped with the ask time (what v1 meant) and a read without a price clears the old one.
+-- The v1 recorder, still called by the code deployed before this migration, now goes through v2 without its
+-- price: the ask is counted and any older price is cleared.
 create or replace function public.bobby_memory_record(p_identity uuid, p_symbol text, p_horizon text, p_price numeric default null)
 returns boolean language sql volatile security invoker set search_path = public, pg_temp as $$
-  select public.bobby_memory_record_v2(p_identity, p_symbol, p_horizon, p_price, case when p_price is not null then now() end, null, null);
+  -- The old code has no observation time for its price, so none is kept (a made-up time would pass for a real one).
+  select public.bobby_memory_record_v2(p_identity, p_symbol, p_horizon, null, null, null, null);
 $$;
 
 -- What the desk reads before answering. Adds to v1: preferredName, the price's own time, the last 20 ask times
@@ -168,6 +181,7 @@ returns int language plpgsql volatile security invoker set search_path = public,
 declare n int := 0;
 begin
   if p_identity is null then return 0; end if;
+  perform pg_advisory_xact_lock(hashtextextended('bobby-memory:' || p_identity::text, 0));
   if p_symbol is null then
     delete from bobby_user_assets where identity_id = p_identity;
     get diagnostics n = row_count;
@@ -191,6 +205,14 @@ declare a int; r int;
 begin
   delete from bobby_user_assets where last_asked_at < now() - interval '90 days';
   get diagnostics a = row_count;
+  -- Ask times older than the window leave the assets that stay, with the count and the first ask they carried.
+  update bobby_user_assets
+     set recent_asks = array(select x from unnest(recent_asks) x where x >= now() - interval '90 days' order by x desc)
+   where exists (select 1 from unnest(recent_asks) x where x < now() - interval '90 days') or first_asked_at < now() - interval '90 days';
+  update bobby_user_assets
+     set asks = greatest(cardinality(recent_asks), 1),
+         first_asked_at = coalesce((select min(x) from unnest(recent_asks) x), last_asked_at)
+   where first_asked_at < now() - interval '90 days' or asks <> greatest(cardinality(recent_asks), 1);
   delete from bobby_user_reads where delivered_at < now() - interval '90 days';
   get diagnostics r = row_count;
   return jsonb_build_object('assets', a, 'reads', r);

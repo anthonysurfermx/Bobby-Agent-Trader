@@ -15,7 +15,6 @@
 import type { VercelRequest } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { resolveIdentity, type Identity } from './user-identity.js';
-import { EXPOSURE_LABEL, sharedExposures } from '../../src/lib/asset-exposures.js';
 import { cleanName, preferredNameFrom } from '../../src/lib/preferred-name.js';
 
 export { cleanName, preferredNameFrom };
@@ -56,7 +55,7 @@ export type PrefsPatch = Partial<MemoryPrefs> & { memoryEnabled?: boolean; prefe
 export const MEMORY_SYMBOL = /^[A-Z0-9.^=-]{1,20}$/;
 export const MEMORY_RETENTION_DAYS = 90;
 export const MEMORY_MAX_ASSETS = 50;
-export const MEMORY_LIST_READS = 30;
+export const MEMORY_LIST_READS = 50;
 /**
  * Platforms whose desk reads always use memory. The iPhone app joins per request: a build that has the memory
  * screen (view, pause, correct, delete) sends `X-Bobby-Memory: 1`; older builds never do.
@@ -77,8 +76,6 @@ export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): b
 }
 /** How long the desk waits for the summary before answering without it. */
 export const MEMORY_SUMMARY_TIMEOUT_MS = 800;
-/** An asset counts as one the reader "often" looks at from this many asks. */
-const OFTEN_MIN_ASKS = 2;
 
 const HORIZONS = ['intraday', 'week', 'month', 'long'] as const;
 const EXPERIENCES = ['new', 'some', 'experienced'] as const;
@@ -278,10 +275,10 @@ export async function forgetMemory(identityId: string, target: { symbol: string 
 }
 
 // ---------- calendar in the reader's time zone ----------
-/** A valid IANA time zone, else UTC. */
-export function readerTimeZone(tz: unknown): string {
-  if (typeof tz !== 'string' || tz.length > 64) return 'UTC';
-  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return tz; } catch { return 'UTC'; }
+/** A valid IANA time zone, or null: without one Bobby says no day and counts no week. */
+export function readerTimeZone(tz: unknown): string | null {
+  if (typeof tz !== 'string' || !tz || tz.length > 64) return null;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return tz; } catch { return null; }
 }
 /** Days since the epoch of the local calendar date of `ms` in `tz`. */
 function dayNumber(ms: number, tz: string): number {
@@ -293,15 +290,29 @@ export function calendarDaysBetween(fromMs: number, toMs: number, tz: string): n
   return dayNumber(toMs, tz) - dayNumber(fromMs, tz);
 }
 const LOCALE: Record<Lang, string> = { en: 'en-US', es: 'es-MX', pt: 'pt-BR' };
-/** "yesterday" / a weekday (2–6 days) / a date, in the reader's language and time zone; "today" for 0. */
-export function dayLabel(ms: number, now: number, tz: string, lang: Lang): string {
+/**
+ * When something happened, as the start of a sentence in the reader's language and time zone, with its own
+ * preposition and in lower case: "earlier today" / "yesterday" / "on Monday" / "on September 10";
+ * "hoy más temprano" / "ayer" / "el lunes" / "el 10 de septiembre"; "hoje mais cedo" / "ontem" /
+ * "na segunda-feira" / "no sábado" / "em 10 de setembro".
+ */
+export function dayPhrase(ms: number, now: number, tz: string, lang: Lang): string {
   const days = calendarDaysBetween(ms, now, tz);
-  if (days <= 1) return new Intl.RelativeTimeFormat(LOCALE[lang], { numeric: 'auto' }).format(-Math.max(0, days), 'day');
-  if (days <= 6) return new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'long', timeZone: tz }).format(new Date(ms));
-  return new Intl.DateTimeFormat(LOCALE[lang], { day: 'numeric', month: 'long', timeZone: tz }).format(new Date(ms));
+  const d = new Date(ms);
+  if (days <= 0) return lang === 'es' ? 'hoy más temprano' : lang === 'pt' ? 'hoje mais cedo' : 'earlier today';
+  if (days === 1) return lang === 'es' ? 'ayer' : lang === 'pt' ? 'ontem' : 'yesterday';
+  if (days <= 6) {
+    const weekday = new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'long', timeZone: tz }).format(d);
+    if (lang === 'es') return `el ${weekday}`;
+    if (lang === 'pt') return `${/^(s[aá]bado|domingo)/i.test(weekday) ? 'no' : 'na'} ${weekday}`;
+    return `on ${weekday}`;
+  }
+  const date = new Intl.DateTimeFormat(LOCALE[lang], { day: 'numeric', month: 'long', timeZone: tz }).format(d);
+  return lang === 'es' ? `el ${date}` : lang === 'pt' ? `em ${date}` : `on ${date}`;
 }
+const LAST_TIME: Record<Lang, string> = { en: 'last time', es: 'la última vez', pt: 'da última vez' };
 
-/** What the note writer may see about this reader: explicit choices, what they asked and what Bobby answered. */
+/** What the note is built from: explicit choices, the asset's past asks and what Bobby answered then. */
 export interface ReaderContext {
   /** The name to use: the one they asked to be called, else their Apple/Google first name. */
   name?: string;
@@ -313,33 +324,37 @@ export interface ReaderContext {
   /** The asset asked about now, when asked before. */
   thisAsset?: {
     asks: number;
-    /** Calendar days since the last ask, in the reader's time zone. */
-    lastAskedDaysAgo: number;
-    /** "yesterday", a weekday or a date, in the reader's language and time zone. */
-    lastAskedOn: string;
+    /** Calendar days since the last ask in the reader's time zone (absent without one). */
+    lastAskedDaysAgo?: number;
+    /** "yesterday" / "on Monday" / "el lunes"…, the start of a sentence (absent without a time zone). */
+    lastAskedPhrase?: string;
     lastHorizon: AskedHorizon;
-    /** Asks in the reader's current calendar week (Monday first), this one included. */
-    timesThisWeek: number;
-    /** The price the last read used, when it was observed, and the change to the price this read uses. */
-    priceThen?: number; priceThenOn?: string; priceNow?: number; changeSinceLastAskPct?: number;
+    /** Asks in the reader's calendar week (Monday first), this one included; absent when it cannot be exact. */
+    timesThisWeek?: number;
+    /** The price the last read used and the change to the price this read uses (both dated, a new day). */
+    priceThen?: number; priceNow?: number; changeSinceLastAskPct?: number;
   };
   /** The newest stored answer on this asset: exactly what the reader saw then. */
   previousRead?: {
-    on: string; daysAgo: number; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
+    /** When, as the start of a sentence ("on Monday"), or "last time" without a time zone. */
+    dayPhrase: string; daysAgo?: number;
+    horizon: AskedHorizon; level: ReadLevel;
+    verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
     headline: string; why: string; risk: string; language: Lang;
   };
-  /** Other assets asked about at least twice, most-weighted first, with the exposure they share with this one. */
-  oftenAsks?: Array<{ symbol: string; asks: number; sharedExposure?: string }>;
 }
 
 export interface ReaderOptions {
   symbol: string; now?: number; name?: string | null;
   /** The price this read uses and its own observation time (the evidence's asOf). */
   priceNow?: number | null; priceNowAt?: string | null;
-  language?: Lang; timeZone?: string;
+  language?: Lang; timeZone?: string | null;
 }
 
-/** Compact the summary for the note writer; null when memory is off or holds nothing useful. */
+/** The number of asks `recentAsks` can hold (bobby_memory_record_v2 keeps the newest 100 within 90 days). */
+const RECENT_ASKS_KEPT = 100;
+
+/** Compact the summary for the note; null when memory is off or holds nothing useful. */
 export function readerContext(summary: MemorySummary | null, opts: ReaderOptions): ReaderContext | null {
   if (!summary?.enabled) return null;
   const now = opts.now ?? Date.now();
@@ -356,21 +371,28 @@ export function readerContext(summary: MemorySummary | null, opts: ReaderOptions
   const t = summary.thisAsset;
   if (t) {
     const last = Date.parse(t.lastAskedAt);
-    const days = Math.max(0, calendarDaysBetween(last, now, tz));
-    const weekStart = dayNumber(now, tz) - ((new Date(dayNumber(now, tz) * 86_400_000).getUTCDay() + 6) % 7);
-    const thisWeek = t.recentAsks.filter((iso) => { const ms = Date.parse(iso); return ms <= now && dayNumber(ms, tz) >= weekStart; }).length;
-    ctx.thisAsset = { asks: t.asks, lastAskedDaysAgo: days, lastAskedOn: dayLabel(last, now, tz, lang), lastHorizon: t.lastHorizon, timesThisWeek: thisWeek + 1 };
-    // A callback needs both prices with their own times, the old one from an earlier calendar day than this
-    // ask and older than the new one; otherwise there is nothing honest to compare.
-    const then = t.lastPrice ?? null;
-    const thenAt = t.lastPriceAt ? Date.parse(t.lastPriceAt) : NaN;
-    const nowPrice = positive(opts.priceNow);
-    const nowAt = opts.priceNowAt ? Date.parse(opts.priceNowAt) : NaN;
-    if (then && nowPrice && Number.isFinite(thenAt) && Number.isFinite(nowAt) && nowAt > thenAt && calendarDaysBetween(last, now, tz) >= 1) {
-      ctx.thisAsset.priceThen = then;
-      ctx.thisAsset.priceThenOn = dayLabel(thenAt, now, tz, lang);
-      ctx.thisAsset.priceNow = nowPrice;
-      ctx.thisAsset.changeSinceLastAskPct = Math.round((nowPrice / then - 1) * 1000) / 10;
+    ctx.thisAsset = { asks: t.asks, lastHorizon: t.lastHorizon };
+    if (tz && Number.isFinite(last) && last <= now) {
+      const days = calendarDaysBetween(last, now, tz);
+      ctx.thisAsset.lastAskedDaysAgo = days;
+      ctx.thisAsset.lastAskedPhrase = dayPhrase(last, now, tz, lang);
+      const today = dayNumber(now, tz);
+      const weekStart = today - ((new Date(today * 86_400_000).getUTCDay() + 6) % 7);
+      const times = t.recentAsks.map((iso) => Date.parse(iso)).filter((ms) => Number.isFinite(ms) && ms <= now);
+      const inWeek = times.filter((ms) => dayNumber(ms, tz) >= weekStart).length;
+      // If every kept time is in this week, older ones this week may have been dropped: no exact count.
+      const exact = times.length < RECENT_ASKS_KEPT || inWeek < times.length;
+      if (exact) ctx.thisAsset.timesThisWeek = inWeek + 1;
+      // A callback needs both prices with their own times, the new one newer, from a later calendar day.
+      const then = t.lastPrice ?? null;
+      const thenAt = t.lastPriceAt ? Date.parse(t.lastPriceAt) : NaN;
+      const nowPrice = positive(opts.priceNow);
+      const nowAt = opts.priceNowAt ? Date.parse(opts.priceNowAt) : NaN;
+      if (then && nowPrice && Number.isFinite(thenAt) && Number.isFinite(nowAt) && nowAt > thenAt && days >= 1) {
+        ctx.thisAsset.priceThen = then;
+        ctx.thisAsset.priceNow = nowPrice;
+        ctx.thisAsset.changeSinceLastAskPct = Math.round((nowPrice / then - 1) * 1000) / 10;
+      }
     }
   }
   const r = summary.lastRead;
@@ -378,16 +400,12 @@ export function readerContext(summary: MemorySummary | null, opts: ReaderOptions
     const at = Date.parse(r.deliveredAt);
     if (Number.isFinite(at) && at <= now) {
       ctx.previousRead = {
-        on: dayLabel(at, now, tz, lang), daysAgo: Math.max(0, calendarDaysBetween(at, now, tz)),
+        dayPhrase: tz ? dayPhrase(at, now, tz, lang) : LAST_TIME[lang],
+        ...(tz ? { daysAgo: calendarDaysBetween(at, now, tz) } : {}),
+        horizon: r.horizon, level: r.level,
         verdict: r.verdict, direction: r.direction, headline: r.headline, why: r.why, risk: r.risk, language: r.language,
       };
     }
   }
-  // The asked asset is already in thisAsset; oftenAsks names the others the reader keeps coming back to.
-  const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== opts.symbol).slice(0, 5).map(({ symbol: s, asks }) => {
-    const shared = sharedExposures(opts.symbol, s)[0];
-    return shared ? { symbol: s, asks, sharedExposure: EXPOSURE_LABEL[shared][lang] } : { symbol: s, asks };
-  });
-  if (often.length) ctx.oftenAsks = often;
   return Object.keys(ctx).length ? ctx : null;
 }
