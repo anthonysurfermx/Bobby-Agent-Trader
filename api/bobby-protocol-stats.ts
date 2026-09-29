@@ -8,6 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { DESK_LEVELS, levelPlan } from './_lib/desk-levels.js';
 import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -511,7 +512,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     debateActivity: debateStats,
     // How the agents run, from the running configuration (the desk model is an env override).
     pipeline: {
-      desk: { endpoint: '/api/desk-debate', model: process.env.BOBBY_DESK_MODEL || 'gpt-4o-mini', calls: 3, timeframe: '1H' },
+      desk: {
+        endpoint: '/api/desk-debate', model: levelPlan('rapido').alpha.model, calls: 3, timeframe: '1H',
+        // The three analysis levels, straight from api/_lib/desk-levels.ts (the single source).
+        levels: DESK_LEVELS.map((level) => {
+          const p = levelPlan(level);
+          return { level, alpha: p.alpha.model, red: p.red.model, rebuttal: p.rebuttal?.model ?? null, cio: p.cio.model, evidence: p.evidence, scenarios: p.scenarios };
+        }),
+      },
       cycle: { endpoint: '/api/bobby-cycle', schedule: 'daily 12:00 UTC', models: { alpha: 'gpt-4o-mini', redTeam: 'gpt-4o-mini', cio: 'gpt-4o' }, commitConvictionFloor: COMMIT_CONVICTION_FLOOR, horizonHours: 48 },
       resolver: { endpoint: '/api/forum-resolve', schedule: 'daily 12:30 UTC', method: '1H candle path, first touch, stop wins a same-bar tie' },
     },

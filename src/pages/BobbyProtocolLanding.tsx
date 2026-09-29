@@ -56,7 +56,7 @@ interface ProtocolStats {
     latestDebate?: LatestDebate;
   };
   pipeline?: {
-    desk?: { endpoint?: string; model?: string; calls?: number; timeframe?: string };
+    desk?: { endpoint?: string; model?: string; calls?: number; timeframe?: string; levels?: DeskLevelInfo[] };
     cycle?: { endpoint?: string; schedule?: string; models?: { alpha?: string; redTeam?: string; cio?: string }; commitConvictionFloor?: number; horizonHours?: number };
     resolver?: { endpoint?: string; schedule?: string; method?: string };
   };
@@ -81,6 +81,23 @@ interface McpMeta {
     premium?: { tools?: string[]; price?: string; settlementContract?: string };
   };
 }
+
+interface DeskLevelInfo { level: string; alpha?: string; red?: string; rebuttal?: string | null; cio?: string; evidence?: string; scenarios?: boolean }
+
+// The three desk levels. Models come from /api/bobby-protocol-stats (api/_lib/desk-levels.ts); the scores are
+// the averages of the two blind judges in the paired eval of 2026-09-29 (docs/ai/2026-09-29-levels-paired-eval.md),
+// round 1 and round 2 (server-computed price positions), on the same 8 frozen cases.
+const DESK_LEVEL_COPY = [
+  { level: 'rapido', name: 'Quick', local: 'Rápido', evidence: '1H evidence, plus a note on what the question\u2019s horizon is missing.', scores: ['7.13', '7.38'] },
+  { level: 'profundo', name: 'Deep', local: 'Profundo', evidence: 'Evidence v2: more timeframes, crypto derivatives and Bobby\u2019s own record on the asset.', scores: ['8.38', '8.13'] },
+  { level: 'maximo', name: 'Max', local: 'Máximo', evidence: 'Evidence v2, a second round where Alpha answers Red Team, and confirm / invalidate scenarios.', scores: ['8.50', '8.44'] },
+] as const;
+const EVAL_BASELINE = ['4.88', '4.94'] as const;
+
+const levelModels = (info: DeskLevelInfo | undefined) => {
+  if (!info?.alpha || !info.cio) return '—';
+  return info.alpha === info.cio ? `${info.cio} · every role` : `${info.alpha} debaters → ${info.cio} CIO`;
+};
 
 function useMcpMeta() {
   const [meta, setMeta] = useState<McpMeta | null>(null);
@@ -281,7 +298,8 @@ export default function BobbyProtocolLanding() {
     return `${Number(rate).toFixed(1)}% (n=${resolved})`;
   };
   const chainLabel = stats?.chain?.name || 'Base';
-  const deskModel = stats?.pipeline?.desk?.model ?? 'gpt-4o-mini';
+  const deskModel = stats?.pipeline?.desk?.model ?? '—';
+  const deskLevels = stats?.pipeline?.desk?.levels;
   const debatesRun = publicRecord?.debatesRun;
   const lastDebate = ago(publicRecord?.lastDebateAt);
   const provenanceNote = `Source: the public debate ledger (Supabase, read live). A debate becomes a call only when the CIO commits entry, stop and target before the outcome; every call is graded on the 1H price path until it expires. Win rate counts break-evens against Bobby. Paid MCP settlements live separately in AgentEconomy on ${chainLabel}${liveChainDebates !== undefined ? ` (${formatNumber(liveChainDebates, '0')} so far)` : ''}.`;
@@ -451,6 +469,54 @@ export default function BobbyProtocolLanding() {
           </div>
         </section>
 
+        <section className="relative overflow-hidden border-b border-white/10 bg-[#08080a]" id="levels">
+          <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-24">
+            <div className="mb-10 flex flex-col justify-between gap-5 md:flex-row md:items-end">
+              <div>
+                <div className="mb-4 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">The desk · three levels</div>
+                <h2 className="max-w-xl text-4xl font-extrabold leading-[.98] tracking-[-0.07em] md:text-6xl">The answer first.<br />The debate on demand.</h2>
+              </div>
+              <p className="max-w-sm text-sm leading-6 text-white/45">Pick how hard the agents work. Every level runs the same procedure; the higher ones read more evidence and use stronger models.</p>
+            </div>
+            <div className="grid gap-4 md:grid-cols-3">
+              {DESK_LEVEL_COPY.map((item) => (
+                <div key={item.level} className="rounded-2xl border border-white/10 bg-white/[0.035] p-6">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <h3 className="text-2xl font-extrabold tracking-[-0.05em]">{item.name}</h3>
+                    <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/35">{item.local}</span>
+                  </div>
+                  <div className="mt-4 font-mono text-[11px] leading-5 text-[#7da6ff]">{levelModels(deskLevels?.find((l) => l.level === item.level))}</div>
+                  <p className="mt-3 text-sm leading-6 text-white/55">{item.evidence}</p>
+                  <div className="mt-5 border-t border-white/10 pt-4 font-mono text-[10px] uppercase tracking-[0.14em] text-white/40">
+                    Blind-judge score <span className="text-white/80">{item.scores[0]} · {item.scores[1]}</span> <span className="normal-case tracking-normal text-white/30">vs {EVAL_BASELINE[0]} · {EVAL_BASELINE[1]} before</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+              {[
+                ['Live debate', 'Alpha Hunter, then Red Team, then (on Max) the rebuttal stream in one by one; the CIO closes. Each argument is shown only after it passes the output guard.'],
+                ['Synthesis first', 'The CIO answers in plain words: a headline, why, the main risk and what to watch, with that level drawn on the chart, and a follow-up question. The full debate stays folded, one tap away.'],
+                ['Computed, then quoted', 'The server computes where the price sits against its EMAs, support and resistance, as a % of price. The models quote those distances; they never compute them.'],
+                ['Spend guard', 'Every model call goes to a cost ledger: tokens, list-price cost and latency, never prompts or answers. Deep and Max pause above a daily cap, everything at a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
+              ].map(([title, text]) => (
+                <div key={title} className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-5">
+                  <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">{title}</div>
+                  <p className="mt-3 text-sm leading-6 text-white/60">{text}</p>
+                </div>
+              ))}
+            </div>
+            <details className="group mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-5 text-sm leading-6 text-white/55">
+              <summary className="cursor-pointer list-none font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-white/45 transition group-open:text-[#7da6ff] hover:text-white">How the scores were measured, and access <span aria-hidden>›</span></summary>
+              <div className="mt-4 space-y-3">
+                <p>Paired eval, 2026-09-29: 8 real questions (four crypto, four stocks; Spanish and English) on evidence frozen once per case. The previous desk and the three levels answered the same evidence; two blind model judges scored each answer 1–10, in two rounds (the second after price positions moved server-side). The scores above are the judges&apos; average. Every level beat the previous desk on all 8 cases.</p>
+                <p>Limits: a small sample with no confidence intervals, and LLM judges. 31 of 32 answers were &ldquo;wait&rdquo;, so this measures the explanation, not the call. A third round looking for &ldquo;review&rdquo; cases found none in crypto and none short, so that check is still open.</p>
+                <p>Access: reads are free to start, an account is needed from the 4th, and Deep and Max are metered per plan. Inviting a friend adds Bobby Pro days only when they open a genuinely new Apple or Google account; it is capped per inviter and locked per pair.</p>
+              </div>
+            </details>
+          </div>
+        </section>
+
         <section className="relative overflow-hidden bg-[#050505]" id="architecture">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(0,82,255,.12),transparent_45%)]" />
           <div className="relative mx-auto max-w-7xl px-5 py-20 lg:px-8 lg:py-28">
@@ -574,8 +640,8 @@ export default function BobbyProtocolLanding() {
             <CapabilityCards items={[
                 {
                   title: 'Adversarial debate',
-                  description: 'Three isolated model calls over the same evidence. Alpha Hunter argues the case, Red Team receives Alpha\u2019s argument and attacks it, the CIO receives both plus the original question and rules: review or wait.',
-                  telemetry: ['POST /api/desk-debate', `model  ${deskModel}`, 'red.input  question · evidence · alpha', 'cio.input  question · evidence · alpha · red'],
+                  description: 'Isolated model calls over the same evidence. Alpha Hunter argues the case, Red Team receives Alpha\u2019s argument and attacks it; on Max, Alpha answers back. The CIO receives all of it plus the original question and rules: review or wait, synthesis first.',
+                  telemetry: ['POST /api/desk-debate · live NDJSON', 'levels  quick · deep · max', 'red.input  question · evidence · alpha', 'cio.input  question · evidence · alpha · red (· rebuttal)'],
                 },
                 {
                   title: 'Veto, never upgrade',
@@ -584,7 +650,7 @@ export default function BobbyProtocolLanding() {
                 },
                 {
                   title: 'Output guard',
-                  description: 'Every agent\u2019s text on the desk and in the daily public cycle is checked after generation. A guaranteed return, a risk-free claim, a personal buy or sell instruction or leverage fails it. On the desk the whole analysis fails with no substitute verdict; in the public cycle the agent gets one rewrite, then the text is withheld. The MCP conversational flow is separate and not covered.',
+                  description: 'Every agent\u2019s text on the desk and in the daily public cycle is checked after generation; on the live desk each argument is checked before it is shown. A guaranteed return, a risk-free claim, a personal buy or sell instruction or leverage fails it. On the desk the whole analysis fails with no substitute verdict; in the public cycle the agent gets one rewrite, then the text is withheld. The MCP conversational flow is separate and not covered.',
                   telemetry: ['guard  guarantee · advice · leverage · verdict mismatch', 'desk  503 analysis_failed, no substitute', 'cycle  one rewrite, then withheld (since 2026-09-29)', 'languages  en · es · pt'],
                 },
                 {
@@ -611,10 +677,12 @@ export default function BobbyProtocolLanding() {
                     title: 'The desk',
                     rows: [
                       ['Endpoint', stats?.pipeline?.desk?.endpoint ?? '/api/desk-debate'],
-                      ['Agents', `Alpha Hunter → Red Team → CIO · ${stats?.pipeline?.desk?.calls ?? 3} sequential calls · ${deskModel}`],
-                      ['Evidence', 'One instrument, 1H candles from public market data (crypto and equities). At least 59 bars; refused if older than 3 h (crypto) or 5 days (equities).'],
-                      ['Engine', 'Deterministic 1H indicators (trend, RSI, ATR, EMA, support and resistance) give levels and conviction. The CIO can only veto them.'],
-                      ['Output', 'Review or wait, with each agent\u2019s argument. Reads are metered per device and account.'],
+                      ['Agents', `Alpha Hunter → Red Team → (Max: rebuttal) → CIO, streamed as each clears the guard · Quick runs ${deskModel}`],
+                      ['Levels', deskLevels?.length ? deskLevels.map((l) => `${DESK_LEVEL_COPY.find((c) => c.level === l.level)?.name ?? l.level}: ${levelModels(l)}, evidence ${l.evidence ?? '—'}`).join(' · ') : '—'],
+                      ['Evidence', 'Public market data for one instrument (crypto and equities): 1H candles on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on the asset on Deep and Max.'],
+                      ['Engine', 'Deterministic indicators (trend, RSI, ATR, EMA, support and resistance). The server computes where the price sits against each level; the models only quote it.'],
+                      ['Output', 'Synthesis first: headline, why, main risk, what to watch (drawn on the chart) and a follow-up question, then review or wait with the full debate.'],
+                      ['Spend', 'Every call logged to a cost ledger (numbers only). Daily cap pauses Deep and Max; monthly hard cap pauses all. Failed or abandoned premium reads are refunded.'],
                       ['Record', 'Private. A desk answer is not published to the public ledger.'],
                     ],
                   },
