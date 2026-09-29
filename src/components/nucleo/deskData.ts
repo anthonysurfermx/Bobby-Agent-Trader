@@ -5,7 +5,7 @@ import { deskJson } from '@/lib/desk-request';
 import { deskPrice as money } from '@/lib/desk-price';
 import { lang, t } from '@/lib/companions/i18n';
 import type { ChartLevel } from '@/components/adams/MarketCanvas';
-import { accessHeaders, type Access } from '@/lib/access-client';
+import { accessHeaders, type Access, type DeskLevel } from '@/lib/access-client';
 
 export interface Snapshot { symbol: string; name?: string; isEquity: boolean }
 export interface Resolution { snapshot: Snapshot; needsConfirmation: boolean; confirmName: string; proxyNote: string | null }
@@ -78,18 +78,39 @@ export async function runDebate(symbol: string, signal: AbortSignal): Promise<An
   return a;
 }
 
-/** The three-agent debate: /api/desk-debate, three isolated model calls (Alpha, Red Team, CIO)
- *  over the same 1H evidence. The same endpoint the iOS app uses. Null when it did not finish. */
-export interface Agents { alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none' }
-export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal): Promise<Agents | null> {
+/** The three-agent debate: /api/desk-debate, three isolated model calls (Alpha, Red Team, CIO; four on
+ *  Máximo, with Alpha's second round) over the level's evidence. The same endpoint the iOS app uses.
+ *  A premium level the reader has used up comes back as a refusal, never as a silent downgrade. */
+export interface Agents {
+  alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
+  level: DeskLevel; rebuttal: string | null; scenarios: { confirm: string; invalidate: string } | null;
+  /** What the evidence covered against the horizon asked (the desk states it before any thesis). */
+  sufficiency: { horizon: string; available: string[]; missing: string[]; sufficient: boolean } | null;
+  evidenceUsed: { timeframes: string[]; derivatives: boolean; record: { resolvedCalls: number; wins: number; losses: number; breakEven: number } | null } | null;
+}
+export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
+export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null }
+const LEVEL_TIMEOUT: Record<DeskLevel, number> = { rapido: 95_000, profundo: 130_000, maximo: 175_000 };
+
+export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal, level: DeskLevel = 'rapido'): Promise<DebateRun> {
   try {
-    const { ok, data } = await deskJson<{ agents?: Partial<Agents> }>('/api/desk-debate', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang() }) }, 95_000);
+    const { ok, data } = await deskJson<Record<string, any>>('/api/desk-debate', { signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level }) }, LEVEL_TIMEOUT[level]);
+    if (!ok && (data?.code === 'signin_required' || data?.code === 'upgrade_required' || data?.code === 'level_exhausted')) {
+      return { agents: null, refusal: { code: data.code, level, resetsAt: typeof data.meter?.resetsAt === 'string' ? data.meter.resetsAt : null } };
+    }
     const g = data?.agents;
-    if (!ok || !g || typeof g.alpha !== 'string' || typeof g.red !== 'string' || typeof g.cio !== 'string') return null;
-    if (g.verdict !== 'wait' && g.verdict !== 'review') return null;
+    if (!ok || !g || typeof g.alpha !== 'string' || typeof g.red !== 'string' || typeof g.cio !== 'string') return { agents: null, refusal: null };
+    if (g.verdict !== 'wait' && g.verdict !== 'review') return { agents: null, refusal: null };
     const direction = g.direction === 'long' || g.direction === 'short' ? g.direction : 'none';
-    return { alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction };
-  } catch { return null; }
+    const scenarios = g.scenarios && typeof g.scenarios.confirm === 'string' && typeof g.scenarios.invalidate === 'string' ? { confirm: g.scenarios.confirm, invalidate: g.scenarios.invalidate } : null;
+    return { refusal: null, agents: {
+      alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction,
+      level: data.level === 'profundo' || data.level === 'maximo' ? data.level : 'rapido',
+      rebuttal: typeof g.rebuttal === 'string' ? g.rebuttal : null, scenarios,
+      sufficiency: data.sufficiency && Array.isArray(data.sufficiency.missing) ? data.sufficiency : null,
+      evidenceUsed: data.evidenceUsed && Array.isArray(data.evidenceUsed.timeframes) ? data.evidenceUsed : null,
+    } };
+  } catch { return { agents: null, refusal: null }; }
 }
 
 export function isUnavailable(a: Answer) { return a.error || (a.price === null && a.trend === null && a.signal === null && a.direction === null && a.overview === null); }

@@ -90,7 +90,7 @@ export function shouldPromptNow(alreadySignedIn: boolean): boolean {
 
 type Busy = 'apple' | 'google' | 'wallet' | null;
 
-export default function SignInPrompt({ xp, onClose, voiceAccess = false, required = false }: { xp: number; onClose: () => void; voiceAccess?: boolean; /** The free reads without an account are used: no "keep going" option. */ required?: boolean }) {
+export default function SignInPrompt({ xp, onClose, voiceAccess = false, required = false, note }: { xp: number; onClose: () => void; voiceAccess?: boolean; /** The free reads without an account are used: no "keep going" option. */ required?: boolean; /** Why an account is needed now (an allowance ran out): replaces the default copy. */ note?: { title: string; body: string } }) {
   // Seen once it is on screen; the scheduling side must not count as seeing it.
   useEffect(() => { if (!voiceAccess) markPromptShown(); }, [voiceAccess]);
   const { open } = useAppKit();
@@ -99,7 +99,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
   /** The provider URL Supabase built, kept so a blocked redirect can still be opened by a plain tap. */
   const [providerUrl, setProviderUrl] = useState<string | null>(null);
 
-  const close = () => { if (!voiceAccess && !required) dismissForever(); onClose(); };
+  const close = () => { if (!voiceAccess && !required && !note) dismissForever(); onClose(); };
 
   const oauth = async (provider: 'apple' | 'google') => {
     setBusy(provider);
@@ -171,12 +171,12 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
           <X size={15} />
         </button>
 
-        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : required ? t('Free account', 'Cuenta gratis', 'Conta grátis') : t('YOUR PROGRESS', 'TU PROGRESO', 'SEU PROGRESSO')}</div>
+        <div className="n-label">{voiceAccess ? 'BOBBY VOICE' : note || required ? t('Free account', 'Cuenta gratis', 'Conta grátis') : t('YOUR PROGRESS', 'TU PROGRESO', 'SEU PROGRESSO')}</div>
         <h2 id="signin-prompt-title" className="n-display mt-3 text-[28px] leading-tight text-white">
-          {voiceAccess ? t('3 voice minutes a day', '3 min de voz al día', '3 minutos de voz por dia') : required ? t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.', 'Crie sua conta grátis para continuar lendo.') : t('Want to keep your points?', '¿Quieres conservar tus puntos?', 'Quer guardar seus pontos?')}
+          {note ? note.title : voiceAccess ? t('3 voice minutes a day', '3 min de voz al día', '3 minutos de voz por dia') : required ? t('Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.', 'Crie sua conta grátis para continuar lendo.') : t('Want to keep your points?', '¿Quieres conservar tus puntos?', 'Quer guardar seus pontos?')}
         </h2>
         <p className="mt-3 text-sm leading-6 text-white/60">
-          {voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.', 'Entre na sua conta. Seu tempo é compartilhado entre a web e o iPhone.') : required ? t('You used your 3 reads without an account. With one: 10 free reads every week, and your XP and gear saved on the web and the iPhone app.', 'Ya usaste tus 3 lecturas sin cuenta. Con una: 10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone.', 'Você usou suas 3 leituras sem conta. Com uma conta: 10 leituras grátis por semana, com seu XP e seu equipamento salvos na web e no app de iPhone.') : t(
+          {note ? note.body : voiceAccess ? t('Sign in. Your time is shared across web and iPhone.', 'Inicia sesión. Tu tiempo se comparte entre web y iPhone.', 'Entre na sua conta. Seu tempo é compartilhado entre a web e o iPhone.') : required ? t('You used your 3 reads without an account. With one: 10 free reads every week, and your XP and gear saved on the web and the iPhone app.', 'Ya usaste tus 3 lecturas sin cuenta. Con una: 10 lecturas gratis cada semana, y tu XP y equipo guardados en la web y en la app de iPhone.', 'Você usou suas 3 leituras sem conta. Com uma conta: 10 leituras grátis por semana, com seu XP e seu equipamento salvos na web e no app de iPhone.') : t(
             `You have ${xp} XP on this device. Sign in and it follows you to the iPhone app and any other browser. Keep reading without an account if you prefer — nothing is locked.`,
             `Llevas ${xp} XP en este dispositivo. Entra y te siguen a la app de iPhone y a cualquier otro navegador. Si prefieres, sigue sin cuenta: aquí no se bloquea nada.`,
             `Você tem ${xp} XP neste dispositivo. Entre e ele vai com você para o app de iPhone e para qualquer outro navegador. Se preferir, continue sem conta — nada fica bloqueado.`,
@@ -207,7 +207,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
           </a>
         )}
 
-        {!required && (
+        {!required && !note && (
           <button onClick={close} className="mt-5 w-full py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-white/45 transition hover:text-white/75">
             {voiceAccess ? t('Continue with free voice', 'Seguir con voz gratis', 'Continuar com a voz grátis') : t('Keep going without an account', 'Seguir sin cuenta', 'Continuar sem conta')}
           </button>

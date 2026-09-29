@@ -12,6 +12,7 @@ import type { VercelRequest } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './rate-limit.js';
 import { resolveIdentity, type Identity } from './user-identity.js';
+import { LEVEL_LIMITS, type PremiumLevel } from './desk-levels.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
@@ -116,3 +117,53 @@ export async function upsertSubscription(row: Partial<SubscriptionRow> & { ident
 }
 
 export const publicSubscription = (s: SubscriptionRow | null) => s ? { provider: s.provider, status: s.status, currentPeriodEnd: s.current_period_end } : null;
+
+// ---- premium analysis levels (Profundo, Máximo): their own meter, per account or device ----
+// The allowances live in api/_lib/desk-levels.ts; bobby_consume_level (20260929150000) counts atomically.
+// Unlike the read meter these fail closed: a premium read is never served uncounted.
+
+export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null }
+export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
+export type LevelCode = 'signin_required' | 'upgrade_required' | 'level_exhausted';
+export interface LevelGate { allowed: boolean; code: LevelCode | null; useId: number | null; tier: Tier; used: number; limit: number; resetsAt: string | null }
+
+function meter(raw: unknown): LevelMeter {
+  const m = (raw ?? {}) as Record<string, unknown>;
+  const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
+  return { used: num(m.used), limit: num(m.limit), remaining: num(m.remaining), windowDays: num(m.windowDays), resetsAt: typeof m.resetsAt === 'string' ? new Date(m.resetsAt).toISOString() : null };
+}
+const tierOf = (v: unknown): Tier => (v === 'pro' || v === 'free' ? v : 'anon');
+
+/** Check and record one premium read. Null when storage is unreachable (the caller refuses the read). */
+export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symbol: string): Promise<(LevelGate & { identity: Identity | null }) | null> {
+  const identity = await who(req);
+  const row = await rpc('bobby_consume_level', {
+    p_identity: identity?.id ?? null, p_device: identity ? null : deviceHash(req), p_level: level,
+    p_symbol: symbol.slice(0, 24) || null, p_limits: LEVEL_LIMITS,
+  });
+  if (!row) return null;
+  const code = row.code === 'signin_required' || row.code === 'upgrade_required' || row.code === 'level_exhausted' ? row.code : null;
+  return {
+    allowed: row.allowed === true, code, useId: typeof row.useId === 'number' ? row.useId : null, tier: tierOf(row.tier),
+    used: typeof row.used === 'number' ? row.used : 0, limit: typeof row.limit === 'number' ? row.limit : 0,
+    resetsAt: typeof row.resetsAt === 'string' ? new Date(row.resetsAt).toISOString() : null, identity,
+  };
+}
+
+/** Give a premium read back when the analysis itself failed. */
+export async function refundLevel(useId: number | null): Promise<void> {
+  if (!useId) return;
+  try {
+    await fetch(bobbyRest(`bobby_level_uses?id=eq.${useId}`), { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
+  } catch { /* best effort */ }
+}
+
+/** The premium meters without consuming anything. */
+export async function readLevels(req: VercelRequest, identity?: Identity | null): Promise<LevelState | null> {
+  const id = identity === undefined ? await who(req) : identity;
+  const row = await rpc('bobby_level_state', { p_identity: id?.id ?? null, p_device: id ? null : deviceHash(req), p_limits: LEVEL_LIMITS });
+  if (!row) return null;
+  const levels = (row.levels ?? {}) as Record<string, unknown>;
+  return { tier: tierOf(row.tier), levels: { profundo: meter(levels.profundo), maximo: meter(levels.maximo) } };
+}
+

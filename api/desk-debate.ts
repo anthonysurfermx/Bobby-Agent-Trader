@@ -3,9 +3,14 @@ import { z } from 'zod';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
-import { DESK_QUESTION_MAX, DeskOutputRejected, loadDeskEvidence, runDeskDebate } from './_lib/desk-debate.js';
+import { DESK_QUESTION_MAX, DeskOutputRejected, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
+import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
+import { consumeLevel, refundLevel } from './_lib/access.js';
+import { logLlmUsage } from './_lib/llm-usage.js';
+import type { LlmUsage } from './_lib/llm.js';
 
-export const config = { maxDuration: 95 };
+// Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
+export const config = { maxDuration: 180 };
 
 /**
  * Mirrors bobby_consume_desk_quota (20260919200000). A refused call consumes
@@ -14,7 +19,7 @@ export const config = { maxDuration: 95 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
 
 type Lang = 'en' | 'es' | 'pt';
 const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
@@ -22,7 +27,8 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
 /**
  * Every refusal carries a stable `code` the app can switch on:
  * invalid_request / question_too_long (400), daily_limit (429),
- * desk_unavailable / analysis_failed (503).
+ * signin_required / upgrade_required / level_exhausted (403, a premium level's allowance; carries `level`
+ * and the meter), desk_unavailable / analysis_failed (503). A request without `level` is Rápido, as before.
  */
 function refuse(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ error, code, ...extra });
@@ -54,14 +60,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
   }
-  const { symbol, question, language, assetType } = parsed.data;
+  const { symbol, question, language, assetType, level } = parsed.data;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
     return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
   }
   const unavailable = copy(language, 'The analysis desk is temporarily unavailable.', 'La mesa de análisis no está disponible por ahora.');
+  const usage: LlmUsage[] = [];
+  let useId: number | null = null;
   try {
-    if (!process.env.OPENAI_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY || (needsAnthropic(level) && !process.env.ANTHROPIC_API_KEY)) return refuse(res, 503, 'desk_unavailable', unavailable);
     // Atomic, cross-instance, fail-closed limits. No model calls if storage fails.
     // Caller (IPv4 address / IPv6 /64) and network (/24 / /48) budgets keep a
     // handful of addresses from spending everyone's global budget.
@@ -77,10 +85,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
       return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
     }
-    return res.status(200).json(await runDeskDebate(question, await loadDeskEvidence(symbol, assetType), language));
+    // A premium level spends its own allowance before any model call; a failed analysis gives it back.
+    if (level !== 'rapido') {
+      const gate = await consumeLevel(req, level, symbol);
+      if (!gate) return refuse(res, 503, 'desk_unavailable', unavailable);
+      if (!gate.allowed) {
+        const meter = { tier: gate.tier, used: gate.used, limit: gate.limit, resetsAt: gate.resetsAt };
+        if (gate.code === 'signin_required') return refuse(res, 403, 'signin_required', copy(language, 'Create your free account to use this level.', 'Crea tu cuenta gratis para usar este nivel.'), { level, meter });
+        if (gate.code === 'upgrade_required') return refuse(res, 403, 'upgrade_required', copy(language, 'You used this level for now. Get Bobby Pro or invite a friend.', 'Ya usaste este nivel por ahora. Obtén Bobby Pro o invita a un amigo.'), { level, meter });
+        return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });
+      }
+      useId = gate.useId;
+    }
+    const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
+    return res.status(200).json(await runDeskDebate(question, evidence, language, { level, usage }));
   } catch (error) {
+    await refundLevel(useId);
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
     return refuse(res, 503, 'analysis_failed', copy(language, 'The analysis could not finish. Please retry. No verdict was issued.', 'El análisis no pudo terminar. Inténtalo de nuevo. No se emitió ningún veredicto.'));
+  } finally {
+    await logLlmUsage(usage, { surface: 'desk', level });
   }
 }

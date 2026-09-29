@@ -1,0 +1,232 @@
+// The desk's analysis levels and the invite system, without a network or a database:
+//   · the per-model adapter sends each family its own request shape (GPT-6: max_completion_tokens,
+//     no temperature; GPT-4o: max_tokens + temperature; Claude: output_config effort + json_schema),
+//     treats a token-limited answer as a failure and records tokens and cost;
+//   · Rápido / Profundo / Máximo route to the planned models, Máximo adds the second round and the
+//     scenarios, the guard covers them, and the horizon-sufficiency note reaches every role;
+//   · the endpoint spends a premium allowance before any model call, refuses with a stable code and the
+//     meter, gives the allowance back when the analysis fails, and writes only numbers to the cost ledger;
+//   · the invite code format, creation and claim parameters.
+import assert from 'node:assert/strict';
+
+process.env.BOBBY_SUPABASE_URL = 'https://db.test';
+process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
+process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
+process.env.OPENAI_API_KEY = 'test-openai';
+process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
+process.env.RATE_LIMIT_SALT = 'test-salt';
+delete process.env.BOBBY_DESK_MODEL;
+
+const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
+const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../api/_lib/desk-debate.ts');
+const { LEVEL_LIMITS, REFERRAL, levelPlan } = await import('../api/_lib/desk-levels.ts');
+const { default: deskHandler } = await import('../api/desk-debate.ts');
+const { isReferralCode, referralCode, claimReferral } = await import('../api/_lib/referrals.ts');
+
+const original = globalThis.fetch;
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+let checks = 0;
+const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
+const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
+const H = 3600_000;
+
+interface Call { url: string; body: any; headers: Record<string, string>; method: string }
+let calls: Call[] = [];
+type Reply = (call: Call) => Response | Promise<Response>;
+function mock(reply: Reply) {
+  calls = [];
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const call: Call = { url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])), method: init?.method ?? 'GET' };
+    calls.push(call);
+    return reply(call);
+  }) as typeof fetch;
+}
+const openai = (content: unknown, finish = 'stop') => json({ choices: [{ finish_reason: finish, message: { content: JSON.stringify(content) } }], usage: { prompt_tokens: 1000, completion_tokens: 200, prompt_tokens_details: { cached_tokens: 0 }, completion_tokens_details: { reasoning_tokens: 50 } } });
+const claude = (content: unknown, stop = 'end_turn') => json({ stop_reason: stop, content: [{ type: 'text', text: JSON.stringify(content) }], usage: { input_tokens: 2000, output_tokens: 500, cache_read_input_tokens: 0, output_tokens_details: { thinking_tokens: 120 } } });
+const schema = { name: 'x', schema: { type: 'object', properties: { analysis: { type: 'string' } }, required: ['analysis'], additionalProperties: false } };
+
+try {
+  // ---------- the adapter: one request shape per model family ----------
+  {
+    const usage: any[] = [];
+    mock(() => openai({ analysis: 'ok' }));
+    eq(await completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 1600, timeoutMs: 10_000, effort: 'low' }, 'sys', 'user', schema, { endpoint: 't', role: 'alpha', usage }), { analysis: 'ok' }, 'GPT-6 answer parsed');
+    const body = calls[0].body;
+    eq([body.max_completion_tokens, 'max_tokens' in body, 'temperature' in body, body.reasoning_effort], [1600, false, false, 'low'], 'GPT-6: max_completion_tokens, no max_tokens, no temperature');
+    eq([body.response_format.type, body.response_format.json_schema.strict], ['json_schema', true], 'GPT-6: strict JSON schema');
+    eq(body.messages.map((m: any) => m.role), ['system', 'user'], 'system + user messages');
+    eq([usage[0].model, usage[0].tokensIn, usage[0].tokensOut, usage[0].tokensReasoning, usage[0].ok, usage[0].role], ['gpt-6-luna', 1000, 200, 50, true, 'alpha'], 'usage recorded');
+    ok(Math.abs(usage[0].usd - (1000 * 0.10 + 200 * 0.50) / 1e6) < 1e-12, 'cost at list price');
+
+    mock(() => openai({ analysis: 'ok' }));
+    await completeJson({ provider: 'openai', model: 'gpt-4o-mini', maxTokens: 650, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' });
+    eq([calls[0].body.max_tokens, calls[0].body.temperature, 'max_completion_tokens' in calls[0].body], [650, 0.2, false], 'GPT-4o keeps max_tokens + temperature');
+
+    mock(() => claude({ analysis: 'ok' }));
+    await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'high', maxTokens: 6000, timeoutMs: 10_000 }, 'sys', 'user', schema, { endpoint: 't' });
+    const c = calls[0];
+    eq([c.url, c.headers['x-api-key'], c.headers['anthropic-version']], ['https://api.anthropic.com/v1/messages', 'test-anthropic', '2023-06-01'], 'Claude: endpoint and headers');
+    eq([c.body.max_tokens, c.body.system, c.body.output_config.effort, c.body.output_config.format.type], [6000, 'sys', 'high', 'json_schema'], 'Claude: effort + json_schema in output_config');
+    ok(!('temperature' in c.body), 'Claude: no temperature');
+
+    const cut: any[] = [];
+    mock(() => claude({ analysis: 'partial' }, 'max_tokens'));
+    await assert.rejects(completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 10, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't', usage: cut }), LlmIncompleteError); checks++;
+    eq([cut[0].ok, cut[0].stop, cut[0].tokensOut], [false, 'max_tokens', 500], 'a token-limited answer is a failure, still billed in the ledger');
+    mock(() => openai({ analysis: 'partial' }, 'length'));
+    await assert.rejects(completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 10, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), LlmIncompleteError); checks++;
+
+    let n = 0;
+    mock(() => (++n === 1 ? json({ error: 'overloaded' }, 529) : claude({ analysis: 'after retry' })));
+    eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'after retry' }, 'one retry on 529');
+    mock(() => json({ error: 'bad request' }, 400));
+    await assert.rejects(completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' })); checks++;
+    eq(calls.filter((c) => c.url.includes('api.openai.com')).length, 1, 'a 400 is not retried');
+    mock(() => json({ stop_reason: 'end_turn', content: [{ type: 'text', text: '```json\n{"analysis":"fenced"}\n```' }], usage: {} }));
+    eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'fenced' }, 'a stray code fence around valid JSON is tolerated');
+  }
+
+  // ---------- levels ----------
+  const evidence = { symbol: 'BTC', technicals: { price: 100, trend: 'lateral' }, provenance: { provider: 'OKX', instrument: 'BTC-USDT', assetType: 'crypto', timeframe: '1H', asOf: new Date().toISOString() } } as any;
+  const v2 = { ...evidence, timeframes: { '1H': evidence.technicals, '4H': { price: 100 }, '1D': { price: 100 } }, derivatives: { fundingRatePct: 0.01, nextFundingAt: null, openInterest: 5 }, record: { resolvedCalls: 10, wins: 6, losses: 3, breakEven: 1, lastResolved: [], latestCall: null } };
+  const ALPHA = 'The recent structure supports a conditional long if the range breaks.';
+  const RED = 'The break has not happened and the higher timeframes are still flat.';
+  const REBUTTAL = 'Red Team is right that the break is unconfirmed; the case only holds above the range.';
+  const CIO = { analysis: 'The evidence does not support a clear case yet; wait for the range to resolve.', verdict: 'wait', direction: 'none' };
+  const SCEN = { confirm: 'A daily close above the range high with rising volume.', invalidate: 'A 4H close back below the range low.' };
+  const byRole = (c: Call) => {
+    const text = c.url.includes('anthropic') ? c.body.system : c.body.messages[0].content;
+    return /second round/.test(text) ? 'rebuttal' : /Your role is CIO/.test(text) ? 'cio' : /Red Team: challenge/.test(text) ? 'red' : 'alpha';
+  };
+  const debateMock = (scenarios: unknown = SCEN) => mock((c) => {
+    const r = byRole(c);
+    const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : c.body.output_config?.format?.schema?.properties?.scenarios ? { ...CIO, scenarios } : CIO;
+    return c.url.includes('anthropic') ? claude(content) : openai(content);
+  });
+
+  debateMock();
+  const quick = await runDeskDebate('¿Conviene entrar a BTC esta semana?', evidence, 'es');
+  eq(calls.map((c) => [byRole(c), c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'gpt-6-luna']], 'Rápido: gpt-6-luna ×3');
+  eq([quick.level, quick.sufficiency.horizon, quick.sufficiency.sufficient, quick.sufficiency.missing], ['rapido', 'week', false, ['4H', '1D']], 'Rápido: the weekly question is flagged as missing 4H and 1D');
+  ok(calls.every((c) => JSON.parse(c.body.messages[1].content).sufficiency.horizon === 'week'), 'every role receives the sufficiency note');
+  ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
+  eq(quick.agents.direction, 'none', "'wait' keeps direction none");
+  ok(!('timeframes' in quick) && !('record' in quick), 'the raw v2 evidence is not echoed back');
+
+  debateMock();
+  const usage: any[] = [];
+  const deep = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'profundo', usage });
+  eq(calls.map((c) => [byRole(c), c.url.includes('anthropic') ? `${c.body.model}:${c.body.output_config.effort}` : c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'claude-sonnet-5-5:medium']], 'Profundo: luna debaters, Sonnet medium CIO');
+  eq([deep.sufficiency.sufficient, deep.evidenceUsed.timeframes, deep.evidenceUsed.derivatives, deep.evidenceUsed.record?.wins], [true, ['1H', '4H', '1D'], true, 6], 'Profundo: v2 evidence covers the weekly horizon');
+  ok(/evidence\.timeframes holds/.test(calls[0].body.messages[0].content) && JSON.parse(calls[0].body.messages[1].content).evidence.record.wins === 6, 'Profundo: the roles see the timeframes and Bobby\'s record');
+  eq(usage.map((u) => u.role), ['alpha', 'red', 'cio'], 'Profundo: one ledger row per call');
+
+  debateMock();
+  const max = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'maximo' });
+  eq(calls.map((c) => [byRole(c), `${c.body.model}:${c.body.output_config?.effort}`]), [['alpha', 'claude-sonnet-5-5:high'], ['red', 'claude-sonnet-5-5:high'], ['rebuttal', 'claude-sonnet-5-5:high'], ['cio', 'claude-sonnet-5-5:high']], 'Máximo: Sonnet high ×4 with the second round');
+  eq([max.agents.rebuttal, max.agents.scenarios], [REBUTTAL, SCEN], 'Máximo: second round and scenarios returned');
+  ok(JSON.parse(calls[3].body.messages[0].content).rebuttal.analysis === REBUTTAL, 'the CIO weighs the second round');
+  debateMock({ confirm: 'A close above the range means guaranteed profits for the week.', invalidate: SCEN.invalidate });
+  await assert.rejects(runDeskDebate('Is BTC good this week?', v2, 'en', { level: 'maximo' }), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee inside the scenarios fails the debate'); checks++;
+  // Rápido survives an account without access to the primary model; premium levels never fall back.
+  mock((c) => (c.body.model === 'gpt-6-luna' ? json({ error: { message: 'model not found' } }, 404) : openai(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED })));
+  const originalErr = console.error; console.error = () => {};
+  const fellBack = await runDeskDebate('Is this real?', evidence, 'en');
+  console.error = originalErr;
+  eq([fellBack.agents.verdict, calls.filter((c) => c.body.model === 'gpt-4o-mini').length], ['wait', 3], 'Rápido falls back to gpt-4o-mini on a model-access 404');
+  eq(calls.find((c) => c.body.model === 'gpt-4o-mini')!.body.max_tokens, 650, 'the fallback keeps its own request shape');
+  mock((c) => (c.url.includes('anthropic') ? json({ error: { message: 'invalid x-api-key' } }, 401) : openai({ analysis: byRole(c) === 'alpha' ? ALPHA : RED })));
+  console.error = () => {};
+  await assert.rejects(runDeskDebate('Is this real?', v2, 'en', { level: 'profundo' })); checks++;
+  console.error = originalErr;
+  ok(!calls.some((c) => c.url.includes('openai') && byRole(c) === 'cio'), 'Profundo never swaps its Sonnet CIO for another model');
+  eq(levelPlan('maximo').budgetMs <= 170_000, true, 'Máximo fits inside maxDuration');
+  eq(sufficiencyOf('Long term, is SOL worth holding for years?', ['1H', '4H', '1D', '1W']).sufficient, false, 'a multi-year horizon is never covered by the evidence');
+
+  // ---------- the endpoint: premium allowance, refusal, refund, ledger ----------
+  const candles = Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 }));
+  const request = (body: Record<string, unknown>, headers: Record<string, string> = {}) => ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.1', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body });
+  const response = () => ({ statusCode: 200, body: null as any, headers: {} as Record<string, string>, setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; return this; } });
+  let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
+  let modelFails = false;
+  const endpointMock = () => mock((c) => {
+    if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (c.url.includes('rpc/bobby_consume_level')) return json({ ...level, tier: 'anon', used: 1, limit: 1, resetsAt: new Date(Date.now() + 86_400_000).toISOString() });
+    if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
+    if (c.url.includes('bobby_llm_usage')) return json(null, 201);
+    if (c.url.includes('/api/okx-candles')) return json({ candles });
+    if (c.url.includes('okx.com/api/v5/public')) return json({ data: [] });
+    if (c.url.includes('forum_threads')) return json([]);
+    if (c.url.includes('api.openai.com') || c.url.includes('api.anthropic.com')) {
+      if (modelFails) return c.url.includes('anthropic') ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
+      return c.url.includes('anthropic') ? claude(content) : openai(content);
+    }
+    throw new Error(`Unexpected request ${c.url}`);
+  });
+
+  endpointMock();
+  const refused = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'profundo' }) as never, refused as never);
+  eq([refused.statusCode, refused.body.code, refused.body.level, refused.body.meter.limit], [403, 'upgrade_required', 'profundo', 1], 'an exhausted premium level: 403 upgrade_required with the meter');
+  ok(!calls.some((c) => /openai|anthropic/.test(c.url)), 'no model call on a refused level');
+  const consumeBody = calls.find((c) => c.url.includes('rpc/bobby_consume_level'))!.body;
+  eq([consumeBody.p_level, consumeBody.p_limits, consumeBody.p_identity], ['profundo', JSON.parse(JSON.stringify(LEVEL_LIMITS)), null], 'the meter gets the level, the single-source limits and no identity');
+  ok(/^[0-9a-f]{24,}$/.test(consumeBody.p_device) && !JSON.stringify(consumeBody).includes('device-1234567890abcdef'), 'only the salted device hash reaches the database');
+
+  level = { allowed: true, code: null, useId: 77 };
+  endpointMock();
+  const served = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is BTC good for the next few days?', level: 'profundo' }) as never, served as never);
+  eq([served.statusCode, served.body.level, served.body.agents.verdict], [200, 'profundo', 'wait'], 'an allowed Profundo read is served');
+  ok(calls.some((c) => c.url.includes('bar=4H')) && calls.some((c) => c.url.includes('bar=1W')), 'Profundo loads the higher timeframes');
+  const ledger = calls.find((c) => c.url.includes('bobby_llm_usage'))!;
+  eq([ledger.body.length, ledger.body.map((r: any) => r.level)], [3, ['profundo', 'profundo', 'profundo']], 'three ledger rows for three calls');
+  ok(!JSON.stringify(ledger.body).includes('next few days') && !JSON.stringify(ledger.body).includes(ALPHA), 'the ledger holds numbers, never questions or answers');
+  ok(!calls.some((c) => c.method === 'DELETE'), 'a served read is not refunded');
+
+  modelFails = true;
+  endpointMock();
+  const failed = response();
+  const originalError = console.error;
+  console.error = () => {};
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'profundo' }) as never, failed as never);
+  console.error = originalError;
+  eq([failed.statusCode, failed.body.code], [503, 'analysis_failed'], 'a failed premium analysis is analysis_failed');
+  ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_level_uses?id=eq.77')), 'and its allowance is given back');
+  ok(calls.some((c) => c.url.includes('bobby_llm_usage')), 'the failed calls are still in the cost ledger');
+  modelFails = false;
+
+  endpointMock();
+  const quickServed = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, quickServed as never);
+  eq([quickServed.statusCode, quickServed.body.level], [200, 'rapido'], 'no level: Rápido, as before');
+  ok(!calls.some((c) => c.url.includes('bobby_consume_level')), 'Rápido never touches the premium meter');
+
+  delete process.env.ANTHROPIC_API_KEY;
+  endpointMock();
+  const noKey = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, noKey as never);
+  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'Máximo without the Anthropic key is unavailable before any spend');
+  process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+
+  // ---------- invites ----------
+  eq(['ABCDEFGH', 'K7M9QRST', 'abcdefgh', 'ABCDEFG', 'ABCDEFGI', 'ABCDEF01'].map(isReferralCode), [true, true, false, false, false, false], 'invite codes: 8 of A–Z 2–9 without I, O, 0, 1');
+  let created = '';
+  mock((c) => {
+    if (c.method === 'POST' && c.url.includes('bobby_referral_codes')) { created = c.body.code; return json(null, 201); }
+    if (c.url.includes('bobby_referral_codes')) return json(created ? [{ code: created }] : []);
+    throw new Error(`Unexpected request ${c.url}`);
+  });
+  const codeNow = await referralCode('11111111-1111-4111-8111-111111111111');
+  ok(isReferralCode(codeNow) && codeNow === created, 'a missing code is created once and read back');
+  mock((c) => { if (c.url.includes('rpc/bobby_referral_claim')) return json({ ok: true, code: 'claimed' }); throw new Error('Unexpected'); });
+  eq(await claimReferral('22222222-2222-4222-8222-222222222222', codeNow), 'claimed', 'a claim returns the database verdict');
+  eq([calls[0].body.p_reward_days, calls[0].body.p_max, calls[0].body.p_new_account_days], [REFERRAL.rewardDays, 5, 7], 'claim parameters: reward days, five friends, new accounts only');
+  eq(REFERRAL.rewardDays, 30, 'one month of Pro per friend by default');
+
+  console.log(`desk-levels: ${checks} checks passed`);
+} finally {
+  globalThis.fetch = original;
+}
