@@ -155,12 +155,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null);
     const asked = horizonOf(question);
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
-    if (left.signal.aborted) { await refundLevel(useId); return; }
+    if (left.signal.aborted) { const refund = refundLevel(useId); waitUntil(refund); await refund; return; }
     const body = reader ? { ...result, personalized: true } : result;
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
@@ -183,6 +183,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return refuse(res, 503, 'analysis_failed', failed);
   } finally {
-    await logLlmUsage(usage, { surface: 'desk', level });
+    // The response is already sent here and Vercel freezes the function once it has ended: the ledger
+    // write must be registered with waitUntil, or it only lands when the instance wakes for another request
+    // (seen in prod on 2026-09-29: a Rápido read was never recorded).
+    waitUntil(logLlmUsage(usage, { surface: 'desk', level }));
   }
 }

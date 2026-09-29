@@ -5,12 +5,13 @@
 // ============================================================
 
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { ReactNode, useEffect, useState } from 'react';
+import { ReactNode, useCallback, useState } from 'react';
 import { TradingRoomProvider, useTradingRoom } from '@/hooks/useTradingRoom';
 import { Lock } from 'lucide-react';
 import SkinInTheGameBadge from './SkinInTheGameBadge';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
+import { MIN_POLL_MS, useVisiblePoll } from '@/hooks/useVisiblePoll';
 
 // V3 IA: 4 páginas core (Gemini). Rutas legacy quedan alcanzables por deep-link.
 const NAV_ITEMS = [
@@ -34,11 +35,11 @@ interface KineticShellProps {
   nucleo?: boolean;
 }
 
-// Shared ticker tape data — fetched on mount, then refreshed while mounted.
+// Shared ticker tape data — fetched on mount, then refreshed while mounted and visible.
 // The stats endpoint returns the feed under `market.prices`; reading a
 // top-level `prices` left the tape stuck on LOADING forever.
 const TICKER_LIMIT = 20;
-const TICKER_REFRESH_MS = 60_000;
+const TICKER_REFRESH_MS = MIN_POLL_MS;
 
 const formatTickerPrice = (value: number) =>
   value >= 1000 ? value.toLocaleString('en-US', { maximumFractionDigits: 0 })
@@ -48,31 +49,25 @@ const formatTickerPrice = (value: number) =>
 function TickerTape() {
   const [tickers, setTickers] = useState<Array<{ symbol: string; change24h: number; last: number }>>([]);
 
-  useEffect(() => {
-    let active = true;
-    const controller = new AbortController();
-    const load = () => {
-      fetch('/api/bobby-protocol-stats', { cache: 'no-store', signal: controller.signal })
-        .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
-        .then(d => {
-          const feed = d?.market?.prices ?? d?.prices;
-          const prices = Array.isArray(feed) ? feed : [];
-          const next = prices
-            .map((price: { symbol?: string; price?: number; change24h?: number }) => ({
-              symbol: String(price.symbol || ''),
-              last: Number(price.price || 0),
-              change24h: Number(price.change24h || 0),
-            }))
-            .filter((price: { symbol: string; last: number }) => price.symbol && Number.isFinite(price.last))
-            .slice(0, TICKER_LIMIT);
-          if (active && next.length > 0) setTickers(next);
-        })
-        .catch(() => { /* the tape keeps its last good values */ });
-    };
-    load();
-    const interval = window.setInterval(load, TICKER_REFRESH_MS);
-    return () => { active = false; controller.abort(); window.clearInterval(interval); };
-  }, []);
+  // Paused while the tab is hidden; the stats route is CDN-cached for 60 s (see useVisiblePoll).
+  useVisiblePoll(useCallback((signal: AbortSignal) => {
+    fetch('/api/bobby-protocol-stats', { cache: 'no-store', signal })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(d => {
+        const feed = d?.market?.prices ?? d?.prices;
+        const prices = Array.isArray(feed) ? feed : [];
+        const next = prices
+          .map((price: { symbol?: string; price?: number; change24h?: number }) => ({
+            symbol: String(price.symbol || ''),
+            last: Number(price.price || 0),
+            change24h: Number(price.change24h || 0),
+          }))
+          .filter((price: { symbol: string; last: number }) => price.symbol && Number.isFinite(price.last))
+          .slice(0, TICKER_LIMIT);
+        if (!signal.aborted && next.length > 0) setTickers(next);
+      })
+      .catch(() => { /* the tape keeps its last good values */ });
+  }, []), TICKER_REFRESH_MS);
 
   const items = tickers.length > 0
     ? tickers.map(t => `$${t.symbol} ${formatTickerPrice(t.last)} ${t.change24h >= 0 ? '+' : ''}${t.change24h}%`)

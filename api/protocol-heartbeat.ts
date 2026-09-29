@@ -22,6 +22,11 @@ import {
   PROTOCOL_RPC_URL,
 } from './_lib/protocol-constants.js';
 
+// Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
+const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
+
+import { WIN_RATE_MIN_SAMPLE, hasSample } from './_lib/sample.js';
+
 export const config = { maxDuration: 25 };
 
 const XLAYER_RPC = PROTOCOL_RPC_FALLBACK_URL;
@@ -224,7 +229,7 @@ async function fetchRecentTxs(_blockNumber: number): Promise<OnChainTx[]> {
 
   try {
     const res = await fetch(
-      `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=25&select=trade_tx,tool,symbol,reason,meta,created_at`,
+      `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&created_at=gte.${BASE_MAINNET_SINCE}&order=created_at.desc&limit=25&select=trade_tx,tool,symbol,reason,meta,created_at`,
       {
         headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` },
         signal: AbortSignal.timeout(4000),
@@ -401,7 +406,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Settlement is the real AgentEconomy on-chain volume.
     // Protocol totals keep bounty escrow separate from paid MCP settlement.
     const economyVolumeNative = parseFloat(formatEther(BigInt(totalVolumeWei)));
-    const winRate = winRateBps === null ? null : parseInt(winRateBps) / 100;
+    // No rate below WIN_RATE_MIN_SAMPLE resolved trades: 1 of 1 is not 100% skill.
+    const sampleOk = totalTrades !== null && hasSample(parseInt(totalTrades));
+    const winRate = winRateBps === null || !sampleOk ? null : parseInt(winRateBps) / 100;
     const totalBounties = Math.max(0, parseInt(nextBountyId) - 1);
     const bountyEscrowNative = totalBounties * parseFloat(formatEther(BigInt(minBountyWei)));
     const protocolNotionalNative = economyVolumeNative + bountyEscrowNative;
@@ -470,6 +477,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       },
       performance: {
         winRate,
+        winRateNote: sampleOk || totalTrades === null ? null : `${parseInt(totalTrades)} resolved · insufficient sample (needs ${WIN_RATE_MIN_SAMPLE})`,
         totalTrades: totalTrades === null ? null : parseInt(totalTrades),
         totalBounties: sources.bounties === 'ok' ? totalBounties : null,
       },
@@ -505,7 +513,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       storedAt: Date.now(),
     };
 
-    res.setHeader('Cache-Control', 's-maxage=15, stale-while-revalidate=10');
+    // Public aggregate, no per-user data. A degraded answer keeps a short TTL so recovery shows fast.
+    res.setHeader('Cache-Control', allSourcesOk ? 's-maxage=60, stale-while-revalidate=300' : 's-maxage=5, stale-while-revalidate=30');
     return res.status(200).json(payload);
   } catch (error) {
     // BP-12: never echo a configured RPC URL (it may carry a key) to logs or clients.

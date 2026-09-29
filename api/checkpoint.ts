@@ -1,13 +1,14 @@
 // ============================================================
 // GET /api/checkpoint — Public proof checkpoint
 // Consolidated status report: recent debates, trades, bounties,
-// risk decisions, and continuity metrics. Posted to Moltbook
-// every 4h via cron-activity instead of spamming each cycle.
+// risk decisions, and continuity metrics.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { BOBBY_PROTOCOL_BASE_URL } from './_lib/protocol-constants.js';
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
+
+import { WIN_RATE_MIN_SAMPLE as MIN_SAMPLE } from './_lib/sample.js';
 
 export const config = { maxDuration: 15 };
 
@@ -73,8 +74,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const stats = statsRes as StatsResponse | null;
 
   // Classify debates
-  const executed = threads.filter(t => t.status === 'executed' || t.status === 'active');
+  // The cycle marks a thread 'active' even when the CIO took no trade: a debate counts as executed only
+  // with evidence of a trade (a direction and complete entry/stop/target levels).
+  const isTrade = (t: CycleRow) => (t.status === 'executed' || t.status === 'active')
+    && !!t.direction && t.entry_price != null && t.stop_price != null && t.target_price != null;
+  const isStandAside = (t: CycleRow) => !isTrade(t) && t.status !== 'rejected' && t.status !== 'stale';
+  const executed = threads.filter(isTrade);
   const skipped = threads.filter(t => t.status === 'rejected' || t.status === 'stale');
+  const stoodAside = threads.filter(isStandAside);
   const resolved = threads.filter(t => t.resolution === 'win' || t.resolution === 'loss' || t.resolution === 'break_even');
   const wins = resolved.filter(t => t.resolution === 'win').length;
   const losses = resolved.filter(t => t.resolution === 'loss').length;
@@ -89,6 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     total_debates: threads.length,
     executed: executed.length,
     blocked: skipped.length,
+    stood_aside: stoodAside.length,
     block_rate_pct: threads.length > 0 ? Math.round((skipped.length / threads.length) * 100) : 0,
     avg_conviction: parseFloat((avgConviction * 10).toFixed(1)),
     max_conviction: parseFloat((maxConviction * 10).toFixed(1)),
@@ -103,8 +111,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     symbol: latest.symbol,
     direction: latest.direction,
     conviction: parseFloat((latest.conviction_score * 10).toFixed(1)),
-    decision: latest.status === 'executed' || latest.status === 'active' ? 'EXECUTE' : 'BLOCKED',
-    reason: latest.trigger_reason || (latest.conviction_score < 0.35 ? `Conviction ${(latest.conviction_score * 10).toFixed(1)}/10 below 3.5 threshold` : 'Passed all guardrails'),
+    decision: isTrade(latest) ? 'EXECUTE' : isStandAside(latest) ? 'STAND_ASIDE' : 'BLOCKED',
+    reason: isStandAside(latest) ? 'No trade: the debate did not produce a direction with complete levels.' : latest.trigger_reason || (latest.conviction_score < 0.35 ? `Conviction ${(latest.conviction_score * 10).toFixed(1)}/10 below 3.5 threshold` : 'Passed all guardrails'),
     quality_score: latest.debate_quality?.overall_score ?? null,
     time: latest.created_at,
   } : null;
@@ -115,7 +123,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     treasury_native: stats.treasury.balanceNative,
     total_commitments: Number(stats.contracts.trackRecord.stats.totalCommitments),
     total_trades: Number(stats.contracts.trackRecord.stats.totalTrades),
-    win_rate_pct: Number(stats.contracts.trackRecord.stats.winRateBps) / 100,
+    // A rate over fewer than MIN_SAMPLE resolved trades is not a performance signal.
+    win_rate_pct: Number(stats.contracts.trackRecord.stats.totalTrades) >= MIN_SAMPLE ? Number(stats.contracts.trackRecord.stats.winRateBps) / 100 : null,
+    win_rate_note: Number(stats.contracts.trackRecord.stats.totalTrades) >= MIN_SAMPLE ? null : `${Number(stats.contracts.trackRecord.stats.totalTrades)} resolved · insufficient sample (needs ${MIN_SAMPLE})`,
     total_bounties: stats.contracts.adversarialBounties.totalPosted,
     total_debates: Number(stats.contracts.agentEconomy.stats.totalDebates),
     protocol_volume_native: stats.protocolTotals.protocolNotionalNative,

@@ -19,8 +19,11 @@ create table if not exists public.bobby_user_assets (
   first_asked_at timestamptz not null default now(),
   last_asked_at timestamptz not null default now(),
   last_horizon text not null default 'unspecified' check (last_horizon in ('intraday', 'week', 'month', 'long', 'unspecified')),
+  -- The last 20 ask times, newest first: enough to say "second time this week", nothing more.
+  recent_asks timestamptz[] not null default '{}',
   primary key (identity_id, symbol)
 );
+alter table public.bobby_user_assets add column if not exists recent_asks timestamptz[] not null default '{}';
 create index if not exists bobby_user_assets_last_idx on public.bobby_user_assets (last_asked_at);
 
 create table if not exists public.bobby_user_prefs (
@@ -47,10 +50,11 @@ begin
   if not exists (select 1 from bobby_identities where id = p_identity and auth_user_id is not null) then return false; end if;
   if exists (select 1 from bobby_user_prefs where identity_id = p_identity and not memory_enabled) then return false; end if;
 
-  insert into bobby_user_assets as a (identity_id, symbol, asks, first_asked_at, last_asked_at, last_horizon)
-    values (p_identity, p_symbol, 1, now(), now(), h)
+  insert into bobby_user_assets as a (identity_id, symbol, asks, first_asked_at, last_asked_at, last_horizon, recent_asks)
+    values (p_identity, p_symbol, 1, now(), now(), h, array[now()])
     on conflict (identity_id, symbol) do update
-      set asks = least(a.asks + 1, 1000000), last_asked_at = now(), last_horizon = excluded.last_horizon;
+      set asks = least(a.asks + 1, 1000000), last_asked_at = now(), last_horizon = excluded.last_horizon,
+          recent_asks = (array[now()] || a.recent_asks)[1:20];
 
   -- Retention: this account's stale rows, plus a bounded sweep of everyone's.
   delete from bobby_user_assets where identity_id = p_identity and last_asked_at < now() - interval '90 days';
@@ -88,7 +92,8 @@ begin
              where identity_id = p_identity and last_asked_at >= now() - interval '90 days'
              order by score desc, last_asked_at desc, symbol
              limit 5) t;
-    select jsonb_build_object('asks', asks, 'lastAskedAt', last_asked_at, 'lastHorizon', last_horizon)
+    select jsonb_build_object('asks', asks, 'lastAskedAt', last_asked_at, 'lastHorizon', last_horizon,
+             'asksThisWeek', (select count(*) from unnest(recent_asks) x where x >= now() - interval '7 days'))
       into this
       from bobby_user_assets
      where identity_id = p_identity and symbol = p_symbol and last_asked_at >= now() - interval '90 days';

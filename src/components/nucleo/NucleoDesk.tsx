@@ -882,6 +882,7 @@ export default function NucleoDesk() {
             onTool={(tool) => setInspected(tool)} onPet={() => setSheet('pet')} onCatalog={() => setSheet('catalog')}
             onSwap={() => setSheet('swap')} onTraderLand={openTraderLand} onExplore={() => setSheet('board')}
             onShare={() => void shareSkin()} onSignIn={() => { setSheet('none'); setSignInPrompt(true); }} onRisk={() => setSheet('risk')}
+            onSignedOut={() => { setSheet('none'); void fetchAccess().then((st) => { if (st) setAccessState(st); }); }}
             onToggleVoiceMode={() => { voice.stop(); closeRecognition(); setFreeVoice((v) => !v); setVoiceNotice(''); }}
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
@@ -889,10 +890,14 @@ export default function NucleoDesk() {
               label: meter?.tier === 'pro' ? t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo') : 'Bobby Pro',
               detail: meter?.tier === 'pro'
                 ? (accessState?.subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone') : t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar'))
-                : meterLine ?? t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês'),
+                : meterLine ?? (accessState && !accessState.payments.stripe
+                  ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
+                  : t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês')),
               action: () => {
                 if (meter?.tier === 'pro') { if (accessState?.subscription?.provider === 'stripe') void startBilling('portal'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
+                // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.
+                if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); return; }
                 void subscribe();
               },
             }}

@@ -60,3 +60,63 @@ Tras la ronda 1, el servidor calcula dónde está el precio frente a EMA20, EMA5
 | MÁXIMO | 9.00 | 7.88 | **8.44** | +3.50 (8/0) | 7.94 | 6.63 | 9.13 | 21.0 / 27.0 s | $0.0432 |
 
 Lectura: la mejora de grounding de Máximo es pequeña (7.69 → 7.94) y dentro del ruido de 8 casos; la claridad sigue siendo su punto débil (la síntesis primero lo compensa en la interfaz). El costo sube ~10–30 % por los tokens de las posiciones. Datos: `docs/ai/data/2026-09-29-levels-paired-eval-r2.json`.
+
+## Ronda 3 — casos con veredicto review
+
+**Objetivo (gate de Codex):** 4 casos pareados con veredicto `review` (2 cripto, 2 acciones, al menos uno `short`). Deben mejorar frente al baseline en ≥3/4 y no tener ningún error material de precio o dirección.
+
+**Cómo se buscaron.** Se hicieron 15 screens solo con Profundo (≈$0.011 c/u) sobre evidencia v2, con preguntas que invitan a una idea condicional. Resultado:
+
+- **Cripto: 0/10 en `review`.** BTC, ETH ×2, SOL, LINK ×2, AVAX ×2, XRP y DOGE salieron todos en `wait`. En los que leí, el CIO cita el desacuerdo entre marcos (el 1W está lateral y sobrecomprado) o la falta de ruptura.
+- **Cortos: 0/6 en `review`.** TSLA, AMZN, ETH ×2 y AVAX ×2, todos `wait`.
+- **Acciones: 3/5 en `review/long`.** NVDA, MSFT y META.
+
+En acciones, las preguntas no mencionan semana ni mes a propósito. La evidencia v2 de acciones solo trae 1H y 1D, así que una pregunta a semanas marca suficiencia falsa y el CIO debe esperar.
+
+Los 4 brazos se volvieron a correr desde cero con los mismos jueces ciegos y el mismo formato que en las rondas 1–2. Verifiqué que la evidencia de las 3 acciones es idéntica en el screen y en la corrida pareada (última sesión, 2026-09-28 20:00 UTC). Quedó congelada en el JSON.
+
+| Caso | Pregunta | BASE | RÁPIDO | PROFUNDO | MÁXIMO |
+|---|---|---|---|---|---|
+| NVDA | Is there a setup on NVDA right now? | wait | review/long | review/long | wait |
+| MSFT | ¿Hay un setup en MSFT? | wait | wait | wait (en el screen fue review/long) | wait |
+| META | Is there a setup on META? | wait | review/long | review/long | wait |
+
+| Brazo | Sonnet | Sol | **Prom.** | Δ vs base | Victorias |
+|---|---|---|---|---|---|
+| BASELINE | 4.00 | 6.33 | **5.17** | — | — |
+| RÁPIDO | 6.33 | 7.67 | **7.00** | +1.83 | 3/3 |
+| PROFUNDO | 7.33 | 8.33 | **7.83** | +2.67 | 3/3 |
+| MÁXIMO | 9.00 | 8.00 | **8.50** | +3.33 | 3/3 |
+
+Las 4 respuestas `review` (Rápido y Profundo en NVDA y META) le ganan al baseline las cuatro veces.
+
+**Revisión de errores.** Revisé a mano, contra la evidencia congelada, cada nivel, lado y dirección que menciona cada brazo:
+
+- **Errores materiales: ninguno en ningún brazo.** Todos los niveles citados existen y todos los lados son correctos. Ninguna dirección contradice la evidencia.
+- **Menores:**
+  - BASELINE en MSFT llama "posible sobreventa" a un RSI de 37.8.
+  - Hay un problema sistemático de base del porcentaje. `pricePosition` calcula la distancia relativa al nivel. Esa cifra es correcta cuando el sujeto es el precio ("el precio está 8.23% bajo la resistencia"), pero no cuando el modelo pone al nivel como sujeto:
+    - Máximo en META dice "soporte diario 537.3, 33.18% abajo"; frente al precio es 24.9%.
+    - Profundo y Máximo en META dicen "resistencia 779.8, 8.23% arriba"; frente al precio es 8.97%.
+    - Los tres casos aparecen en el texto de Alpha, Red o del rebuttal. Nunca en el CIO ni en la síntesis. Sol los detectó.
+- **Posible arreglo:** dar también la distancia relativa al precio, o fijar la redacción con el precio como sujeto.
+
+**watchLevel y followUp: 10/10 correctos.**
+
+- Cada watchLevel es un nivel real de la evidencia (resistencia 1H/1D, soporte 1H o EMA50 1H) y está a 0.3–2% del precio.
+- Cada followUp nombra el activo, está en el idioma del lector y no pregunta qué comprar.
+
+**Gate: NO pasa.** Falla por composición de la muestra, no por calidad:
+
+- No hubo ningún caso cripto ni ningún corto en `review`.
+- En la corrida pareada, solo 2 casos tienen respuestas `review`.
+- MSFT pasó de review a wait sobre la misma evidencia, así que el veredicto es inestable en la frontera.
+- Máximo no dio ningún `review`.
+
+Con lo que hay, la mejora es de 3/3 y no hay errores materiales.
+
+**Hallazgo:** hoy, con evidencia cripto de 4 marcos, el desk prácticamente no llega a `review` en cripto.
+
+Gasto: screens $0.165 + brazos $0.144 + jueces $0.091 = **$0.40**. Datos: `docs/ai/data/2026-09-29-levels-paired-eval-review.json`.
+
+**Seguimiento de la ronda 3 (mismo día):** `pricePosition` pasó a expresar cada nivel respecto al precio actual (`where: below price / above price`, `pctOfPrice` en % del precio). En una corrida real de Máximo sobre META las distancias citadas coinciden con el precio (soporte 537.3 → 24.92 % debajo). El gate de Codex (4 casos `review`, 2 cripto, ≥1 corto) sigue pendiente: hoy el desk no emite `review` en cripto con cuatro marcos; se repetirá cuando el mercado ofrezca esos casos.

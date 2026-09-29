@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
+import { useVisiblePoll } from '@/hooks/useVisiblePoll';
 import { ArrowLeft, ArrowUpRight, ShieldCheck, Swords } from 'lucide-react';
 import { useAccount, useSwitchChain, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
 import { useAppKit } from '@reown/appkit/react';
@@ -173,11 +174,8 @@ export default function BobbyCallsPage() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const t = window.setInterval(refresh, 60_000);
-    return () => window.clearInterval(t);
-  }, [refresh]);
+  // Every 2 min while the tab is visible; refreshed on return (see useVisiblePoll).
+  useVisiblePoll(refresh);
 
   // A mined challenge changes the ledger — re-read it.
   useEffect(() => {

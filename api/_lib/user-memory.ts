@@ -18,7 +18,7 @@ export type Experience = 'new' | 'some' | 'experienced';
 export type RiskPref = 'low' | 'medium' | 'high';
 export interface MemoryPrefs { horizon: MemoryHorizon | null; experience: Experience | null; risk: RiskPref | null }
 export interface MemoryAsset { symbol: string; asks: number; lastAskedAt: string; lastHorizon: AskedHorizon }
-export interface MemorySummary { enabled: boolean; prefs: MemoryPrefs; top: MemoryAsset[]; thisAsset: Omit<MemoryAsset, 'symbol'> | null }
+export interface MemorySummary { enabled: boolean; prefs: MemoryPrefs; top: MemoryAsset[]; thisAsset: (Omit<MemoryAsset, 'symbol'> & { asksThisWeek: number }) | null }
 export interface MemoryList { enabled: boolean; prefs: MemoryPrefs; assets: MemoryAsset[]; retentionDays: number }
 export type PrefsPatch = Partial<MemoryPrefs> & { memoryEnabled?: boolean };
 
@@ -117,7 +117,7 @@ export async function memorySummary(identityId: string, symbol: string, timeoutM
     if (!raw || typeof raw !== 'object') return null;
     const top = Array.isArray(raw.top) ? raw.top.map(assetOf).filter((a): a is MemoryAsset => a !== null) : [];
     const thisRaw = raw.thisAsset ? assetOf({ ...(raw.thisAsset as Record<string, unknown>), symbol }) : null;
-    return { enabled: raw.enabled === true, prefs: prefsOf(raw.prefs), top, thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon } : null };
+    return { enabled: raw.enabled === true, prefs: prefsOf(raw.prefs), top, thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon, asksThisWeek: Math.max(0, Math.floor(Number((raw.thisAsset as Record<string, unknown>).asksThisWeek) || 0)) } : null };
   } catch {
     return null;
   }
@@ -187,15 +187,19 @@ export interface ReaderContext {
    */
   prefs?: { horizon?: MemoryHorizon; experience?: Experience; explainRiskDepth?: RiskPref };
   /** The asset asked about now, when asked before. */
-  thisAsset?: { asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon };
+  /** The asset asked about now, when asked before. `timesThisWeek` counts this question too (2 = "second time this week"). */
+  thisAsset?: { asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number };
+  /** The reader's first name from their Apple/Google profile, when shared. */
+  firstName?: string;
   /** Other assets asked about at least twice, most-weighted first. */
   oftenAsks?: Array<{ symbol: string; asks: number }>;
 }
 
 /** Compact the summary for the model; null when memory is off or holds nothing useful. */
-export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now()): ReaderContext | null {
+export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null): ReaderContext | null {
   if (!summary?.enabled) return null;
   const ctx: ReaderContext = {};
+  if (firstName) ctx.firstName = firstName;
   const prefs: NonNullable<ReaderContext['prefs']> = {};
   if (summary.prefs.horizon) prefs.horizon = summary.prefs.horizon;
   if (summary.prefs.experience) prefs.experience = summary.prefs.experience;
@@ -203,7 +207,7 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
   if (Object.keys(prefs).length) ctx.prefs = prefs;
   if (summary.thisAsset) {
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
-    ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon };
+    ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
   }
   // The asked asset is already in thisAsset; oftenAsks names the others the reader keeps coming back to.
   const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== symbol).slice(0, 5).map(({ symbol: s, asks }) => ({ symbol: s, asks }));

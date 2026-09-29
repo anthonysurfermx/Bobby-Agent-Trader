@@ -105,14 +105,17 @@ try {
       { symbol: 'BTC', asks: 3, lastAskedAt: '2026-09-20T12:00:00.000Z', lastHorizon: 'unspecified' },
       { symbol: 'SOL', asks: 1, lastAskedAt: '2026-09-29T10:00:00.000Z', lastHorizon: 'intraday' },
     ],
-    thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week' },
+    thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1 },
     ...over,
   }) as any;
   eq(readerContext(summary(), 'NVDA', now), {
     prefs: { horizon: 'month', experience: 'new' },
-    thisAsset: { asks: 7, lastAskedDaysAgo: 3, lastHorizon: 'week' },
+    thisAsset: { asks: 7, lastAskedDaysAgo: 3, lastHorizon: 'week', timesThisWeek: 2 },
     oftenAsks: [{ symbol: 'BTC', asks: 3 }],
   }, 'explicit preferences, this asset, and the others asked at least twice (not the asked one again)');
+  eq(readerContext(summary(), 'NVDA', now, 'Anthony')?.firstName, 'Anthony', 'the first name reaches the CIO only with memory on');
+  eq(readerContext(summary({ enabled: false }), 'NVDA', now, 'Anthony'), null, 'memory off: not even the name');
+  eq(readerContext(summary({ thisAsset: { asks: 1, lastAskedAt: '2026-09-28T12:00:00.000Z', lastHorizon: 'unspecified' } }), 'NVDA', now)?.thisAsset?.timesThisWeek, 1, 'a summary without the weekly count reads as this question only');
   eq(readerContext(summary(), 'AMD', now)?.oftenAsks, [{ symbol: 'NVDA', asks: 7 }, { symbol: 'BTC', asks: 3 }], 'asking about another asset: NVDA is one they often look at');
   eq(readerContext(summary({ enabled: false }), 'NVDA', now), null, 'memory off: nothing reaches the model');
   eq(readerContext(null, 'NVDA', now), null, 'no summary: nothing');
@@ -289,7 +292,7 @@ try {
   const served = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   eq([served.statusCode, served.body.personalized], [200, true], 'a personalized answer says so');
   const byRoleCalls = Object.fromEntries(models().map((c) => [byRole(c), c]));
-  eq(inputOf(byRoleCalls.cio).reader, { prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 2, lastHorizon: 'week' }, oftenAsks: [{ symbol: 'BTC', asks: 4 }] }, 'the CIO receives the compact reader');
+  eq(inputOf(byRoleCalls.cio).reader, { prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 2, lastHorizon: 'week', timesThisWeek: 1 }, oftenAsks: [{ symbol: 'BTC', asks: 4 }] }, 'the CIO receives the compact reader');
   ok(systemOf(byRoleCalls.cio).includes(READER_RULE), 'with the rule: frame only, never change the verdict or judge suitability');
   ok(/explainRiskDepth/.test(READER_RULE) && /how much the answer explains risk/.test(READER_RULE) && /never sets suitability, position sizing or a recommendation/.test(READER_RULE), 'the rule says explainRiskDepth sets only how much risk is explained, never suitability, sizing or recommendations');
   ok(!('reader' in inputOf(byRoleCalls.alpha)) && !('reader' in inputOf(byRoleCalls.red)), 'Alpha and Red Team never see the reader');

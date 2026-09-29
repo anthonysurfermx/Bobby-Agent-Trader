@@ -93,7 +93,8 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
     const res = await fetch(`${BASE_URL}/api/openclaw-chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // openclaw-chat refuses callers with neither an allowed Origin nor internal auth.
+      headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ message, language: args.language || 'en', history: [] }),
     });
     if (!res.ok) throw new Error(`Bobby analysis failed: ${res.status}`);
@@ -213,9 +214,10 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         expires: t.expires_at,
       } : null,
       record: {
-        trust_score: trust.score || 0,
+        trust_score: trust.score ?? null,
         commitments: rep.totalCommitments || 0,
         win_rate: rep.winRate ?? null, // third round: unavailable stays null, never a coerced zero
+        win_rate_note: (rep as { sample?: { label?: string | null } }).sample?.label ?? null,
       },
       guardrails: 'fail-closed: conviction>=3.5, mandatory stop, circuit breaker, 20% drawdown kill',
       mcp: `${BASE_URL}/api/mcp-http`,
@@ -312,6 +314,7 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
         wins: num(reputation.wins),
         losses: num(reputation.losses),
         win_rate_pct: num(reputation.winRate),
+        win_rate_note: (reputation as { sample?: { label?: string | null } }).sample?.label ?? null,
         cumulative_pnl_pct: num(reputation.cumulativePnlPct),
         pending_resolution: num(reputation.pendingResolution),
       },

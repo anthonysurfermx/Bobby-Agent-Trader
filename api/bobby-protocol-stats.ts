@@ -8,6 +8,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { formatEther, Interface } from 'ethers';
 import { countAgents } from './_lib/hardness-control-plane.js';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
+import { DESK_LEVELS, levelPlan } from './_lib/desk-levels.js';
 import { parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 import {
   BOBBY_ADVERSARIAL_BOUNTIES,
@@ -31,6 +32,9 @@ import { trackRecordWinRateFunction } from './_lib/trackrecord-stats-adapter.js'
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import { COMMIT_CONVICTION_FLOOR } from './_lib/commit-policy.js';
 import { publicTextViolation } from './_lib/desk-debate.js';
+
+// Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
+const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
 
 export const config = { maxDuration: 30 };
 
@@ -426,7 +430,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       // Get latest on-chain tx timestamp to mark contracts as active
       const latestTxRes = await fetch(
-        `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&order=created_at.desc&limit=1&select=created_at`,
+        `${SB_URL}/rest/v1/agent_events?event_type=eq.onchain_tx&created_at=gte.${BASE_MAINNET_SINCE}&order=created_at.desc&limit=1&select=created_at`,
         { headers: { apikey: SB_KEY, Authorization: `Bearer ${SB_KEY}` } }
       ).then(r => r.ok ? r.json() : []).catch(() => []);
       const latestOnchainTx = (latestTxRes as Array<{ created_at: string }>)[0];
@@ -436,7 +440,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } catch { /* non-critical */ }
   }
 
-  res.setHeader('Cache-Control', 's-maxage=30, stale-while-revalidate=120');
+  // Public aggregate snapshot, no per-user data: one CDN copy per minute serves every visitor.
+  res.setHeader('Cache-Control', trackRecordAvailable ? 's-maxage=60, stale-while-revalidate=300' : 's-maxage=5, stale-while-revalidate=30');
   return res.status(200).json({
     ok: trackRecordAvailable,
     degraded: !trackRecordAvailable,
@@ -510,7 +515,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     debateActivity: debateStats,
     // How the agents run, from the running configuration (the desk model is an env override).
     pipeline: {
-      desk: { endpoint: '/api/desk-debate', model: process.env.BOBBY_DESK_MODEL || 'gpt-4o-mini', calls: 3, timeframe: '1H' },
+      desk: {
+        endpoint: '/api/desk-debate', model: levelPlan('rapido').alpha.model, calls: 3, timeframe: '1H',
+        // The three analysis levels, straight from api/_lib/desk-levels.ts (the single source).
+        levels: DESK_LEVELS.map((level) => {
+          const p = levelPlan(level);
+          return { level, alpha: p.alpha.model, red: p.red.model, rebuttal: p.rebuttal?.model ?? null, cio: p.cio.model, evidence: p.evidence, scenarios: p.scenarios };
+        }),
+      },
       cycle: { endpoint: '/api/bobby-cycle', schedule: 'daily 12:00 UTC', models: { alpha: 'gpt-4o-mini', redTeam: 'gpt-4o-mini', cio: 'gpt-4o' }, commitConvictionFloor: COMMIT_CONVICTION_FLOOR, horizonHours: 48 },
       resolver: { endpoint: '/api/forum-resolve', schedule: 'daily 12:30 UTC', method: '1H candle path, first touch, stop wins a same-bar tie' },
     },

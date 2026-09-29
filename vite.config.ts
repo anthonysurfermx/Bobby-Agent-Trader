@@ -82,7 +82,10 @@ export default defineConfig({
           ],
           animation: ['framer-motion'],
           three: ['three'],
-          charts: ['recharts'],
+          // No 'charts' group for recharts: a manual chunk also swallows recharts' own
+          // dependencies (clsx), so the entry's cn() imported the whole chart chunk and
+          // every page, /desk included, modulepreloaded it. Left to Rollup, recharts
+          // ships only with the lazy pages that draw a chart.
           i18n: ['i18next', 'react-i18next', 'i18next-browser-languagedetector'],
           supabase: ['@supabase/supabase-js'],
           query: ['@tanstack/react-query'],

@@ -16,23 +16,23 @@ const NODES: Node[] = [
   { id: 'mcp', col: 0, title: 'Other agents', sub: 'MCP · HTTP', tone: 'ink', detail: 'Another AI agent calls Bobby over MCP: 6 JSON-RPC tools, 15 on streamable HTTP.' },
   { id: 'cron', col: 0, title: 'Daily cycle', sub: '12:00 UTC', tone: 'ink', detail: 'A scheduled job starts the public debate once a day.' },
 
-  { id: 'api', col: 1, title: 'API gateway', sub: 'access · limits', tone: 'ink', detail: 'Serverless API: origin check, rate limits, metered reads (sign-in, free weekly reads, Bobby Pro).' },
+  { id: 'api', col: 1, title: 'API gateway', sub: 'access · limits', tone: 'ink', detail: 'Serverless API: origin check, rate limits, metered reads and levels (Quick, Deep, Max), and a desk spend budget read from the LLM cost ledger before any model call.' },
   { id: 'x402', col: 1, title: 'x402 payment', sub: 'paid on Base', tone: 'base', detail: 'Premium MCP tools are paid per call in ETH on Base; the payment is checked against AgentEconomy.' },
 
-  { id: 'market', col: 2, title: 'Market intel', sub: 'prices · funding · OI', tone: 'ink', detail: 'Prices, 1H candles, funding, open interest, positioning, sentiment and prediction markets.' },
-  { id: 'engine', col: 2, title: 'Indicator engine', sub: 'deterministic 1H', tone: 'ink', detail: 'Trend, RSI, ATR, EMAs, support and resistance give direction, conviction and levels. No model.' },
+  { id: 'market', col: 2, title: 'Market intel', sub: 'public market data', tone: 'ink', detail: 'Public market data: prices and candles (1H on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on Deep and Max), plus funding, positioning and sentiment for the cycle.' },
+  { id: 'engine', col: 2, title: 'Indicator engine', sub: 'deterministic', tone: 'ink', detail: 'Trend, RSI, ATR, EMAs, support and resistance, and where the price sits against each as a % of price. No model: the agents quote these numbers, never compute them.' },
 
   { id: 'alpha', col: 3, title: 'Alpha Hunter', sub: 'builds the case', tone: 'alpha', detail: 'Isolated model call: the strongest conditional case the evidence supports.' },
-  { id: 'red', col: 3, title: 'Red Team', sub: 'attacks it', tone: 'red', detail: 'Receives Alpha’s argument and attacks its assumptions, invalidation and missing evidence.' },
-  { id: 'cio', col: 3, title: 'CIO', sub: 'rules', tone: 'cio', detail: 'Receives both arguments and the question. Rules review or wait (desk) or a structured verdict (cycle).' },
+  { id: 'red', col: 3, title: 'Red Team', sub: 'attacks it', tone: 'red', detail: 'Receives Alpha’s argument and attacks its assumptions, invalidation and missing evidence. On Max, Alpha answers back in a second round.' },
+  { id: 'cio', col: 3, title: 'CIO', sub: 'rules', tone: 'cio', detail: 'Receives the arguments and the question. Desk: review or wait, led by a plain-words synthesis (headline, why, risk, what to watch, a follow-up). Cycle: a structured verdict.' },
   { id: 'judge', col: 3, title: 'Judge', sub: 'scores the debate', tone: 'cio', detail: 'For external agents: scores the debate on six dimensions into a hardness score 0–100.' },
 
-  { id: 'guard', col: 4, title: 'Output guard', sub: 'no advice · no promises', tone: 'guard', detail: 'Rejects guarantees, personal buy/sell instructions and leverage. Desk: the read fails. Cycle: one rewrite, then withheld.' },
+  { id: 'guard', col: 4, title: 'Output guard', sub: 'no advice · no promises', tone: 'guard', detail: 'Rejects guarantees, personal buy/sell instructions and leverage. Desk: each argument is checked before it streams; a failure ends the read. Cycle: one rewrite, then withheld.' },
   { id: 'veto', col: 4, title: 'CIO veto', sub: 'veto, never upgrade', tone: 'guard', detail: 'The debate can only remove the engine’s idea: a call shows only if the CIO rules review in the same direction.' },
   { id: 'policy', col: 4, title: 'Commit gate', sub: 'conviction ≥ 0.35', tone: 'guard', detail: 'Conviction = 70% backend model + 30% CIO. A call needs complete levels to be committed; the policy disposes for agents.' },
   { id: 'calldata', col: 4, title: 'Bounded calldata', sub: 'allow-listed route', tone: 'guard', detail: 'Bobby quotes an allow-listed route and prepares bounded calldata. It never signs and never holds funds.' },
 
-  { id: 'answer', col: 5, title: 'Your answer', sub: 'private', tone: 'ink', detail: 'The verdict, levels and each agent’s argument go back to you. Desk reads are not published.' },
+  { id: 'answer', col: 5, title: 'Your answer', sub: 'private', tone: 'ink', detail: 'The synthesis first, with the level to watch drawn on the chart; the full debate folded underneath. Desk reads are not published.' },
   { id: 'ledger', col: 5, title: 'Public ledger', sub: 'debate + call', tone: 'ink', detail: 'Every public debate and call is stored with entry, stop, target and a 48 h expiry before the outcome.' },
   { id: 'resolver', col: 5, title: 'Resolver', sub: '12:30 UTC · 1H path', tone: 'ink', detail: 'Grades each call on the real 1H price path: first touch wins, a same-bar tie goes to the stop.' },
   { id: 'wallet', col: 5, title: 'Your wallet', sub: 'you sign', tone: 'ink', detail: 'The swap is reviewed and signed in your own wallet. Only confirmed receipts are recorded.' },
@@ -45,7 +45,7 @@ const NODES: Node[] = [
 ];
 
 const FLOWS: Flow[] = [
-  { id: 'desk', label: 'A desk read', caption: 'Web or iPhone: the question is answered on demand and stays private.', path: ['web', 'api', 'market', 'engine', 'alpha', 'red', 'cio', 'guard', 'veto', 'answer'] },
+  { id: 'desk', label: 'A desk read', caption: 'Web or iPhone: the debate streams live, the answer leads with the synthesis and stays private.', path: ['web', 'api', 'market', 'engine', 'alpha', 'red', 'cio', 'guard', 'veto', 'answer'] },
   { id: 'cycle', label: 'The daily public debate', caption: 'Once a day the agents debate in public; a call is committed before the outcome and graded after it.', path: ['cron', 'api', 'market', 'alpha', 'red', 'cio', 'guard', 'policy', 'ledger', 'resolver', 'track'] },
   { id: 'agent', label: 'Another agent over MCP', caption: 'An external agent pays per call on Base and gets a debate, a judge score and a policy decision.', path: ['mcp', 'x402', 'market', 'alpha', 'red', 'cio', 'judge', 'policy', 'hard'] },
   { id: 'swap', label: 'A swap on Base', caption: 'Bobby prepares the route; you sign in your wallet; the swap settles on Base.', path: ['web', 'api', 'calldata', 'wallet', 'uni'] },

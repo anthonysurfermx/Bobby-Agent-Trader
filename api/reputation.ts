@@ -30,6 +30,8 @@ import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { trackRecordSelectors } from './_lib/trackrecord-stats-adapter.js';
 import { configuredRpcUrls, parseRpcJson, rpcEndpointLabel, rpcErrorMessage, scrubRpcSecrets } from './_lib/rpc-redact.js';
 
+import { WIN_RATE_MIN_SAMPLE, hasSample } from './_lib/sample.js';
+
 export const config = { maxDuration: 15 };
 
 const CONVICTION_ORACLE = BOBBY_CONVICTION_ORACLE;
@@ -167,7 +169,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } = { score: null, components: null, unavailable: [...unavailable] };
   const nTrades = num(totalTrades);
   const nCommitments = num(totalCommitments);
-  if (allOk && winRate !== null && nTrades !== null && nCommitments !== null && totalBounties !== null && economyStats.ok) {
+  // Fewer than WIN_RATE_MIN_SAMPLE resolved trades: the rate is not a signal, so no score is built on it.
+  const sampleOk = hasSample(nTrades);
+  if (!sampleOk) trustScore.unavailable.push('insufficient_sample');
+  if (allOk && sampleOk && winRate !== null && nTrades !== null && nCommitments !== null && totalBounties !== null && economyStats.ok) {
     const nInteractions = Number(economyStats.value.totalPayments) + totalBounties;
     const trackScore = Math.min(winRate, 100);
     const activityScore = nCommitments > 0 ? Math.min(100, (Math.log10(nCommitments + 1) / Math.log10(101)) * 100) : 0;
@@ -226,8 +231,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     reputation: {
       ledger: SELECTORS.version === 'v2' ? 'verified' : 'combined',
-      winRate,
-      winRateRaw: winRateBps.ok ? winRateBps.value.toString() : null,
+      winRate: sampleOk ? winRate : null,
+      winRateRaw: sampleOk && winRateBps.ok ? winRateBps.value.toString() : null,
+      sample: {
+        resolved: nTrades,
+        minimum: WIN_RATE_MIN_SAMPLE,
+        sufficient: sampleOk,
+        label: sampleOk ? null : `${num(wins) ?? 0} of ${nTrades ?? 0} · insufficient sample`,
+      },
       totalTrades: nTrades,
       totalCommitments: nCommitments,
       pendingResolution: num(pendingCount),

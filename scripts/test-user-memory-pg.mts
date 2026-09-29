@@ -179,6 +179,15 @@ try {
   eq(await count(reader), 6, '…the others stay');
   eq(await forget(reader, 'DOGE'), 0, 'forgetting an asset never asked about is a no-op');
   eq(await forget(reader), 6, 'forget everything');
+  // "Second time this week": recorded asks keep their times (newest 20), the summary counts the last 7 days.
+  const weekly = await account();
+  await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
+  await q("select public.bobby_memory_record($1, 'AMD', 'week')", [weekly]);
+  await q("update public.bobby_user_assets set recent_asks = recent_asks || (now() - interval '9 days') where identity_id = $1", [weekly]);
+  const weekView = await summary(weekly, 'AMD');
+  eq([weekView.thisAsset.asks, weekView.thisAsset.asksThisWeek], [2, 2], 'two asks this week; an older time is not counted');
+  for (let i = 0; i < 25; i++) await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
+  eq((await q("select cardinality(recent_asks) as n from public.bobby_user_assets where identity_id = $1 and symbol = 'AMD'", [weekly]))[0].n, 20, 'at most 20 ask times are kept');
   eq([await count(reader), (await q('select count(*) from public.bobby_user_prefs where identity_id = $1', [reader]))[0].count], [0, '0'], '…assets and preferences');
   const pausedForget = await account();
   await seed(pausedForget, 'NVDA', 3, 0);
