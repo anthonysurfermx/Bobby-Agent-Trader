@@ -97,6 +97,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #micGlow{left:60px;top:731px;width:270px;height:78px;border-radius:40px;overflow:hidden;pointer-events:none;transform-origin:135px 39px;filter:blur(22px)}
 #micGlow i{position:absolute;left:-6px;top:-102px;width:282px;height:282px;transform-origin:141px 141px;
   background:conic-gradient(from 0deg,#4D6BFF,#9A5CFF,#FF6EC7,#5CE1FF,#4D6BFF)}
+#lvl{position:absolute;left:256px;top:756px;height:28px;padding:0 11px;border-radius:14px;background:#000;border:1px solid rgba(242,237,228,.10);
+  font:500 11px/26px var(--mono);letter-spacing:.04em;color:#E8DFD0;white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}
+#lvl.on{opacity:1;pointer-events:auto}
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
@@ -411,6 +414,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       <div class="c think" aria-hidden="true"><i style="background:#3FE0B5"></i><i style="background:#FF5A5F"></i><i style="background:#F6B94E"></i></div>
       <div class="c stop" aria-hidden="true"></div>
     </button>
+    <button id="lvl" type="button" data-hit="lvl"></button>
     <div id="ghost" class="a" aria-hidden="true"><div class="f"></div><div class="d"></div></div>
   </div>
   <div id="pauseTag" class="a" aria-hidden="true"><span>Paused</span></div>
@@ -446,7 +450,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
-    'session.changed', 'app.state', 'ask.stage',
+    'session.changed', 'app.state', 'ask.stage', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -551,7 +555,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'thesis.save': 'Save thesis', 'thesis.saved': 'Saved', 'thesis.savedLocal': 'Saved on this device',
       'xp.points': '+{points} discipline XP', 'xp.pointsWait': '+{points} discipline XP for waiting',
       'xp.capped': 'Saved · daily XP limit reached',
-      'debate.title': '{n} agents · {s} s', 'debate.header': 'THE DEBATE',
+      'debate.title': '{n} agents · {s} s', 'debate.header': 'THE DEBATE', 'debate.full': 'SEE THE FULL DEBATE ↓',
+      'syn.name': 'IN SHORT', 'syn.why': 'Why', 'syn.risk': 'The risk', 'syn.watch': 'What to watch',
+      'agent.rebuttal': 'SECOND ROUND', 'agent.scenarios': 'SCENARIOS', 'sc.confirm': 'Confirms it', 'sc.invalidate': 'Invalidates it',
+      'agent.missing': 'MISSING DATA', 'missing.line': 'Missing data for {h}: {list}.', 'missing.lineNoH': 'Missing data: {list}.',
+      'agent.evidence': 'EVIDENCE USED', 'ev.derivatives': 'derivatives', 'ev.record': 'record {w}/{n}',
       'meta': 'Educational read · not financial advice',
       'confirm.prompt': 'Did you mean {name} ({symbol})?', 'confirm.yes': 'Yes, {symbol}', 'confirm.no': 'Something else',
       'err.unknown': 'I couldn’t find an asset in that. Try the name or the ticker.',
@@ -595,7 +603,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'thesis.save': 'Guardar tesis', 'thesis.saved': 'Guardada', 'thesis.savedLocal': 'Guardada en este dispositivo',
       'xp.points': '+{points} XP de disciplina', 'xp.pointsWait': '+{points} XP de disciplina por esperar',
       'xp.capped': 'Guardada · límite diario de XP alcanzado',
-      'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE',
+      'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE', 'debate.full': 'VER EL DEBATE COMPLETO ↓',
+      'syn.name': 'EN CORTO', 'syn.why': 'Por qué', 'syn.risk': 'El riesgo', 'syn.watch': 'Qué vigilar',
+      'agent.rebuttal': 'SEGUNDA RONDA', 'agent.scenarios': 'ESCENARIOS', 'sc.confirm': 'Lo confirma', 'sc.invalidate': 'Lo invalida',
+      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Faltan datos de {h}: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'agent.evidence': 'EVIDENCIA USADA', 'ev.derivatives': 'derivados', 'ev.record': 'récord {w}/{n}',
       'meta': 'Lectura educativa · no es asesoría financiera',
       'confirm.prompt': '¿Te refieres a {name} ({symbol})?', 'confirm.yes': 'Sí, {symbol}', 'confirm.no': 'Otro activo',
       'err.unknown': 'No encontré un activo en eso. Prueba con el nombre o el ticker.',
@@ -813,13 +825,31 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     };
   }
 
+  /** Levels: the CIO's synthesis {headline, why, risk, watch} when the server sent one (strings only). */
+  function synthesisOf(r) {
+    var s = r && (r.synthesis || (r.agents && r.agents.synthesis));
+    if (!s || typeof s.headline !== 'string' || !s.headline.trim()) return null;
+    function str(v) { return typeof v === 'string' && v.trim() ? v.trim() : null; }
+    return { headline: s.headline.trim(), why: str(s.why), risk: str(s.risk), watch: str(s.watch) };
+  }
+
   function buildSpoken(r, lang) {
-    var cio = sentences(r.agents.cio);
-    var picked = [], used = 0;
-    for (var i = 0; i < cio.length; i++) {
-      if (picked.length && used + cio[i].length + 1 > 600) break;
-      picked.push(i === 0 && cio[i].length > 600 ? clipWords(cio[i], 600) : cio[i]);
-      used += cio[i].length + 1;
+    var syn = synthesisOf(r);
+    var picked = [], used = 0, i;
+    if (syn) {
+      /* SYNTHESIS FIRST: the headline and three short labeled lines; the full debate sits behind it (the debate card) */
+      picked.push(clipWords(syn.headline, 240));
+      [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].forEach(function (x) {
+        if (x[1]) picked.push(t(lang, 'syn.' + x[0]) + ': ' + clipWords(x[1], 200));
+      });
+    } else {
+      /* an older server (no synthesis): the CIO, clamped to about three lines */
+      var cio = sentences(r.agents.cio);
+      for (i = 0; i < cio.length; i++) {
+        if (picked.length && used + cio[i].length + 1 > 240) break;
+        picked.push(i === 0 && cio[i].length > 240 ? clipWords(cio[i], 240) : cio[i]);
+        used += cio[i].length + 1;
+      }
     }
     var close = t(lang, 'spoken.close.' + r.agents.verdict);
     var all = picked.concat([close]);
@@ -886,13 +916,48 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
         pill: sym + ' · ' + word.toUpperCase()
       },
       debate: {
-        header: t(lang, 'debate.header'),
+        header: synthesisOf(r) ? t(lang, 'debate.full') : t(lang, 'debate.header'),
         title: t(lang, 'debate.title', { n: 3, s: fin(r.elapsedMs) ? Math.max(1, Math.round(r.elapsedMs / 1000)) : '—' }),
-        entries: ['alpha', 'red', 'cio'].map(function (k) { return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], text: r.agents[k] }; })
+        entries: debateEntries(r, lang)
       },
       meta: t(lang, 'meta'),
       aria: t(lang, 'aria.verdict', { word: word }) + (ring.pct != null ? t(lang, 'aria.conviction', { pct: ring.pct }) : '')
     };
+  }
+
+  /** The debate card: the synthesis on top (when there is one), then Alpha, Red Team, the second round, the CIO,
+   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text. */
+  function debateEntries(r, lang) {
+    var out = [], syn = synthesisOf(r), a = r.agents || {};
+    if (syn) {
+      out.push({ id: 'syn', name: t(lang, 'syn.name'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
+        lines: [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].filter(function (x) { return x[1]; })
+          .map(function (x) { return { label: t(lang, 'syn.' + x[0]), text: x[1] }; }) });
+    }
+    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), hue: HUES.alpha, text: a.alpha });
+    out.push({ id: 'red', name: t(lang, 'agent.red'), hue: HUES.red, text: a.red });
+    if (typeof a.rebuttal === 'string' && a.rebuttal) out.push({ id: 'rebuttal', name: t(lang, 'agent.rebuttal'), hue: HUES.alpha, text: a.rebuttal });
+    out.push({ id: 'cio', name: t(lang, 'agent.cio'), hue: HUES.cio, text: a.cio });
+    var sc = a.scenarios;
+    if (sc && typeof sc.confirm === 'string' && typeof sc.invalidate === 'string') {
+      out.push({ id: 'scenarios', name: t(lang, 'agent.scenarios'), hue: '#9A5CFF', text: '',
+        lines: [{ label: t(lang, 'sc.confirm'), text: sc.confirm }, { label: t(lang, 'sc.invalidate'), text: sc.invalidate }] });
+    }
+    var su = r.sufficiency;
+    if (su && su.sufficient === false && Array.isArray(su.missing) && su.missing.length) {
+      var list = su.missing.filter(function (m) { return typeof m === 'string'; }).join(', ');
+      out.push({ id: 'missing', name: t(lang, 'agent.missing'), hue: 'rgba(242,237,228,.5)',
+        text: su.horizon ? t(lang, 'missing.line', { h: su.horizon, list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
+    }
+    var ev = r.evidenceUsed;
+    if (ev && typeof ev === 'object') {
+      var parts = (Array.isArray(ev.timeframes) ? ev.timeframes.filter(function (x) { return typeof x === 'string'; }) : []);
+      if (ev.derivatives === true) parts.push(t(lang, 'ev.derivatives'));
+      var rec = ev.record;
+      if (rec && fin(rec.resolvedCalls) && rec.resolvedCalls > 0) parts.push(t(lang, 'ev.record', { w: fin(rec.wins) ? rec.wins : 0, n: rec.resolvedCalls }));
+      if (parts.length) out.push({ id: 'evidence', name: t(lang, 'agent.evidence'), hue: 'rgba(242,237,228,.5)', text: parts.join(' · ') });
+    }
+    return out;
   }
 
   /** XP chip copy from the REAL awarded points (0 = daily cap). */
@@ -916,15 +981,22 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     lang = lang2(lang);
     switch (r && r.status) {
       case 'signin_required':
-        return { kind: 'signin', caption: t(lang, 'gate.signin'), sub: null, access: r.access || null,
+        return { kind: 'signin', caption: typeof r.caption === 'string' && r.caption ? r.caption : t(lang, 'gate.signin'), sub: null, access: r.access || null,
           chips: [{ label: t(lang, 'gate.signinCta'), action: { signIn: true, retry: r.token || null }, primary: true, style: 'apple' },
             { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'subscription_required':
         var day = resetDay(r.access && r.access.resetsAt, lang);
-        return { kind: 'subscription', caption: t(lang, 'gate.pro'), sub: day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
-          access: r.access || null,
-          chips: [{ label: t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' },
-            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
+        /* a level refusal (upgrade_required) carries native's own line, chip ("Invite a friend") and a lower-level fallback */
+        var proChips = [{ label: typeof r.cta === 'string' ? r.cta : t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' }];
+        if (r.fallback && typeof r.fallback.label === 'string' && r.fallback.token) proChips.push({ label: r.fallback.label, action: { token: r.fallback.token } });
+        proChips.push({ label: t(lang, 'gate.notNow'), action: { dismiss: true } });
+        return { kind: 'subscription',
+          caption: typeof r.caption === 'string' ? r.caption : t(lang, 'gate.pro'),
+          sub: typeof r.sub === 'string' ? r.sub : day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
+          access: r.access || null, chips: proChips };
+      case 'level_notice':
+        return { kind: 'level', caption: r.caption || '', sub: r.sub || null,
+          chips: [{ label: r.cta || '', action: { token: r.token }, primary: true }, { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'confirm':
         return { kind: 'confirm', caption: t(lang, 'confirm.prompt', { name: r.asset.name, symbol: r.asset.symbol }), sub: r.proxyNote || null,
           chips: [{ label: t(lang, 'confirm.yes', { symbol: r.asset.symbol }), action: { token: r.token }, primary: true },
@@ -2203,7 +2275,9 @@ function buildChart(ch, prov, receivedAt){
     att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
-  el.cX.textContent = tt('chart.x', { tf: src.timeframe || '', provider: src.provider || '', inst: src.instrument || '', when: whenLabel(src.asOf, receivedAt) }).toUpperCase();
+  /* the UI never names the exchange behind the candles (Base-only naming) */
+  var prov = /okx|okb|x ?layer/i.test(src.provider || '') ? '' : (src.provider || '');
+  el.cX.textContent = tt('chart.x', { tf: src.timeframe || '', provider: prov, inst: src.instrument || '', when: whenLabel(src.asOf, receivedAt) }).replace(/ ·\s+·/g, ' ·').toUpperCase();
   var lineL = 300, leadL = 320;
   try { lineL = el.cLine.getTotalLength(); leadL = el.cLead.getTotalLength(); } catch (e) {}
   CH = { n: n, nowY: nowY, lineL: lineL, leadL: leadL, band: band, bracket: !!br };
@@ -2225,8 +2299,12 @@ function fillCards(m){
   el.card0.lb.textContent = m.debate.header; el.card0.mt.textContent = m.debate.title; el.card0.disc.textContent = m.meta;
   el.card0.inn.textContent = '';
   m.debate.entries.forEach(function(e){
-    var ar = mk('div', 'ar'); ar.style.setProperty('--c', 'var(--' + (e.id === 'alpha' ? 'alpha' : e.id === 'red' ? 'red' : 'cio') + ')');
-    ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name)); d.appendChild(mk('p', null, e.text)); ar.appendChild(d);
+    var ar = mk('div', 'ar');
+    ar.style.setProperty('--c', e.id === 'alpha' || e.id === 'red' || e.id === 'cio' ? 'var(--' + e.id + ')' : (e.hue || 'var(--cio)'));
+    ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name));
+    if (e.text) d.appendChild(mk('p', null, e.text));
+    (e.lines || []).forEach(function(l){ var p = mk('p'), lb = mk('span', null, l.label + ': '); lb.style.fontWeight = '600'; lb.style.color = 'var(--ink)'; p.appendChild(lb); p.appendChild(D.createTextNode(l.text)); d.appendChild(p); });
+    ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
   A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - 250 + 12);
@@ -2366,7 +2444,7 @@ function go(name, data){
   LOG.push([Math.round(clk * 1000) / 1000, name]); if (LOG.length > 400) LOG.shift();
   var N = STATES[name];
   try { if (N && N.enter) N.enter(prev, ST.data); } catch (e) { logErr('enter ' + name, e); }
-  ariaState(); dirty = true;
+  ariaState(); dirty = true; lvlSync();
 }
 function inState(){ return clk - ST.t0; }
 function fsmEvent(name, p){ var s = STATES[ST.name]; if (s && s.on){ try { s.on(name, p); } catch (e) { logErr('on ' + name, e); } } }
@@ -2489,6 +2567,8 @@ function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
+  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
   var f = RMOD.failure(r.reply, LANG);
@@ -2566,6 +2646,7 @@ STATES.IDLE = {
     if (h === 'pill') return pillDown(p);
     if (h === 'avatar') return avatarG();
     if (h === 'wm' && DEV_BUILD) return wordmarkPress();
+    if (h === 'lvl') return tapG(function(){ tick('light'); openNative('levels'); });
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
     if (h === 'meri') return tapG(function(){ if (FACES.length > 1){ go('FACES'); faceSwing(1, 0); } });
     if (h === 'surface') return faceDragG();
@@ -4365,8 +4446,25 @@ function harnessFreeze(t){
    19. Boot: wire the bridge events, ask for the session, then wake.
    BOOT is black until session(); the page's first bridge call is session({page}).
    ===================================================================== */
+/* the analysis level pill: label and colour come from native (the level sheet owns the choice) */
+var LVL = null;
+function lvlApply(l){
+  if (!l || typeof l.label !== 'string') return;
+  LVL = l;
+  var b = D.getElementById('lvl'); if (!b) return;
+  b.textContent = l.label;
+  if (typeof l.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(l.color)) b.style.color = l.color;
+  b.setAttribute('aria-label', l.label);
+  lvlSync();
+}
+function lvlSync(){
+  var b = D.getElementById('lvl'); if (!b) return;
+  var on = !!LVL && ST && ST.name === 'IDLE';
+  if (b.classList.contains('on') !== on) b.classList.toggle('on', on);
+}
 function applySession(s, first){
   if (!s || typeof s !== 'object') return;
+  if (s.analysisLevel) lvlApply(s.analysisLevel);
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
@@ -4394,6 +4492,7 @@ function wire(){
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
   BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('analysis.level', lvlApply);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
   BR.on('speech.level', function(p){ SPEECH.lvl = clamp(+(p && p.level) || 0, 0, 1); SPEECH.at = clk; });
   BR.on('speech.partial', function(p){ fsmEvent('speech.partial', p); });

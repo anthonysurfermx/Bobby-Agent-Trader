@@ -32,6 +32,7 @@ struct AccountSheet: View {
     @State private var showDeleteConfirmation = false
     @State private var accountDeleted = false
     @State private var showAvatar = false
+    @State private var showInvite = false
     @Environment(\.openURL) private var openURL
 
     var body: some View {
@@ -118,6 +119,23 @@ struct AccountSheet: View {
                     .accessibilityIdentifier("account-error")
             }
             if showsLinks {
+                // Invite a friend: every friend who creates an account with the link earns Bobby Pro days.
+                Button { showInvite = true } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "person.2")
+                        Text(L.t("Invite friends", "Invita amigos"))
+                        Spacer()
+                        Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.muted)
+                    }
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(Theme.text)
+                    .padding(.horizontal, 14)
+                    .frame(height: 48)
+                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.card))
+                }
+                .accessibilityIdentifier("account-invite")
+            }
+            if showsLinks {
                 HStack(spacing: 18) {
                     Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
                         Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
@@ -144,6 +162,12 @@ struct AccountSheet: View {
         }
         .sheet(isPresented: $showAvatar) {
             MascotGalleryView(store: store, voice: voice, voiceId: profile.voiceId)
+        }
+        .sheet(isPresented: $showInvite) {
+            NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: false, reason: nil, onPro: nil) { showInvite = false }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.black)
         }
         .confirmationDialog(
             L.t("Delete your Bobby account?", "¿Borrar tu cuenta de Bobby?"),

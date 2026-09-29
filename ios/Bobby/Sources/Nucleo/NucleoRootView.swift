@@ -128,6 +128,17 @@ private struct NucleoStage: View {
             NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
                                afterSignIn: { await session.signedInFromSheet() },
                                onOutcome: { session.paywallOutcome($0) }) { session.sheet = nil }
+        case .levels:
+            NucleoLevelSheet(center: NucleoLevelCenter.shared) { session.sheet = nil }
+                .presentationDetents([.height(250)])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.black)
+        case .invite:
+            NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: session.proPurchasable, reason: session.inviteReason,
+                              onPro: { session.inviteChosePro() }) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Color.black)
         }
     }
 }

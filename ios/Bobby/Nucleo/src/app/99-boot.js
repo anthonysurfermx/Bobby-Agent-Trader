@@ -2,8 +2,25 @@
    19. Boot: wire the bridge events, ask for the session, then wake.
    BOOT is black until session(); the page's first bridge call is session({page}).
    ===================================================================== */
+/* the analysis level pill: label and colour come from native (the level sheet owns the choice) */
+var LVL = null;
+function lvlApply(l){
+  if (!l || typeof l.label !== 'string') return;
+  LVL = l;
+  var b = D.getElementById('lvl'); if (!b) return;
+  b.textContent = l.label;
+  if (typeof l.color === 'string' && /^#[0-9A-Fa-f]{6}$/.test(l.color)) b.style.color = l.color;
+  b.setAttribute('aria-label', l.label);
+  lvlSync();
+}
+function lvlSync(){
+  var b = D.getElementById('lvl'); if (!b) return;
+  var on = !!LVL && ST && ST.name === 'IDLE';
+  if (b.classList.contains('on') !== on) b.classList.toggle('on', on);
+}
 function applySession(s, first){
   if (!s || typeof s !== 'object') return;
+  if (s.analysisLevel) lvlApply(s.analysisLevel);
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
@@ -31,6 +48,7 @@ function wire(){
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
   BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('analysis.level', lvlApply);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
   BR.on('speech.level', function(p){ SPEECH.lvl = clamp(+(p && p.level) || 0, 0, 1); SPEECH.at = clk; });
   BR.on('speech.partial', function(p){ fsmEvent('speech.partial', p); });

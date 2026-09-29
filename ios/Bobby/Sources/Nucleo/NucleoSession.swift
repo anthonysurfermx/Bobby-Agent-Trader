@@ -42,10 +42,10 @@ enum NucleoPage: Equatable {
 /// Native screens shown as sheets over the page. `openNative` opens every route but `paywall`,
 /// which only the awaited `paywall` method presents (§8.4).
 enum NucleoRoute: String, Identifiable, CaseIterable {
-    case squad, locker, isla, account, riskNotice, paywall
+    case squad, locker, isla, account, riskNotice, paywall, levels, invite
     var id: String { rawValue }
 
-    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall }.map(\.rawValue))
+    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall && $0 != .invite }.map(\.rawValue))
 }
 
 /// Native → page events (the web controller in the app, a recorder in tests).
@@ -84,6 +84,7 @@ final class NucleoSession: ObservableObject {
     private var suggestionsCache: (at: Date, value: [String: Any])?
     private var vocabularyTask: Task<Void, Never>?
     private var bootSynced = false
+    private var levelsRequested = false
     private var tornDown = false
 
     init(fixtures: Bool,
@@ -105,6 +106,7 @@ final class NucleoSession: ObservableObject {
             desk.isSignedIn = { false }
             desk.userID = { nil }
             desk.meterAuth = .none
+            NucleoLevelCenter.shared.auth = .none
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
@@ -250,6 +252,7 @@ final class NucleoSession: ObservableObject {
             "muted": voice.isMuted, "reducedMotion": UIAccessibility.isReduceMotionEnabled,
             "mic": speech.permission().json, "hints": hints,
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
+            "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
         ]
     }
 
@@ -269,6 +272,10 @@ final class NucleoSession: ObservableObject {
                 let words = await BobbyAPI.dictationVocabulary()
                 self?.speech.vocabulary = words
             }
+        }
+        if !levelsRequested {
+            levelsRequested = true
+            Task { await NucleoLevelCenter.shared.refresh() }
         }
         guard !bootSynced, signedIn else { return }
         bootSynced = true
@@ -450,12 +457,31 @@ final class NucleoSession: ObservableObject {
         nucleoVoice.stop()
         speech.cancel()
         paywallStatus = "cancelled"
+        // A level refused for a free account (`upgrade_required`): invite a friend first.
+        let route: NucleoRoute = desk.inviteGate != nil ? .invite : .paywall
+        inviteReason = desk.inviteGate
+        desk.inviteGate = nil
         return await withCheckedContinuation { continuation in
             paywallContinuation = continuation
-            openSheet = .paywall
-            sheet = .paywall
-            emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
+            openSheet = route
+            sheet = route
+            emit("native.sheet", ["route": route.rawValue, "state": "open"])
         }
+    }
+
+    /// Why the invite sheet opened (the refusal's line); nil when opened from the profile.
+    private(set) var inviteReason: String?
+    /// The invite sheet's Bobby Pro card was tapped: the paywall follows once the invite sheet is gone.
+    private var inviteWantsPro = false
+
+    /// Bobby Pro can be bought in this build only when RevenueCat has the package and the server takes App Store payments.
+    var proPurchasable: Bool {
+        !fixtures && BobbyStore.shared.package != nil && BobbyAccessCenter.shared.applePayments == true
+    }
+
+    func inviteChosePro() {
+        inviteWantsPro = true
+        sheet = nil
     }
 
 #if DEBUG
@@ -520,6 +546,20 @@ final class NucleoSession: ObservableObject {
     private func sheetClosed(_ route: NucleoRoute) {
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
         if route == .paywall { finishPaywall() }
+        if route == .invite {
+            if inviteWantsPro, paywallContinuation != nil {
+                inviteWantsPro = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                    guard let self, self.sheet == nil, self.openSheet == nil else { self?.finishPaywall(); return }
+                    self.openSheet = .paywall
+                    self.sheet = .paywall
+                    self.emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
+                }
+            } else {
+                inviteWantsPro = false
+                finishPaywall()
+            }
+        }
         if route == .isla, signedIn {
             // A thesis closed on the island earns XP: bring the page up to date (as the classic desk does).
             Task { [weak self] in
@@ -579,7 +619,16 @@ final class NucleoSession: ObservableObject {
                 guard let self, !self.fixtures else { return }
                 if userId == nil { self.companions.unbind() }
                 self.sessionChanged()
+                // A new account has its own level allowance.
+                Task { await NucleoLevelCenter.shared.refresh() }
             }
+            .store(in: &cancellables)
+        // The level sheet changed the analysis level: the page's level pill follows.
+        NucleoLevelCenter.shared.$level
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in self?.emit("analysis.level", level.pageJSON) }
             .store(in: &cancellables)
         // A sync changed XP or streak (server wins): tell the page.
         Publishers.Merge(companions.$disciplineXP.map { _ in () }, companions.$disciplineStreak.map { _ in () })

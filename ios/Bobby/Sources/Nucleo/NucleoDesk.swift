@@ -79,11 +79,43 @@ enum NucleoDeskIO {
         }
     }
 
+    /// Levels (Profundo / Máximo): the CIO's short synthesis, shown first.
+    struct Synthesis: Sendable {
+        let headline: String, why: String?, risk: String?, watch: String?
+        var json: [String: Any] { ["headline": headline, "why": orNull(why), "risk": orNull(risk), "watch": orNull(watch)] }
+    }
+
+    struct Sufficiency: Sendable {
+        let horizon: String?, missing: [String], sufficient: Bool
+        var json: [String: Any] { ["horizon": orNull(horizon), "missing": missing, "sufficient": sufficient] }
+    }
+
+    struct Evidence: Sendable {
+        let timeframes: [String], derivatives: Bool
+        let resolvedCalls: Int?, wins: Int?, losses: Int?, breakEven: Int?
+        var json: [String: Any] {
+            ["timeframes": timeframes, "derivatives": derivatives,
+             "record": resolvedCalls.map { ["resolvedCalls": $0, "wins": wins ?? 0, "losses": losses ?? 0, "breakEven": breakEven ?? 0] as Any } ?? NSNull()]
+        }
+    }
+
     struct Debate: Sendable {
         let alpha: String, red: String, cio: String, verdict: String, direction: String
         let technicals: Technicals
         let provenance: Provenance
-        var agentsJSON: [String: Any] { ["alpha": alpha, "red": red, "cio": cio, "verdict": verdict, "direction": direction] }
+        var rebuttal: String? = nil
+        var confirm: String? = nil
+        var invalidate: String? = nil
+        var synthesis: Synthesis? = nil
+        var sufficiency: Sufficiency? = nil
+        var evidence: Evidence? = nil
+        var level: String? = nil
+        var agentsJSON: [String: Any] {
+            var a: [String: Any] = ["alpha": alpha, "red": red, "cio": cio, "verdict": verdict, "direction": direction]
+            if let rebuttal { a["rebuttal"] = rebuttal }
+            if let confirm, let invalidate { a["scenarios"] = ["confirm": confirm, "invalidate": invalidate] }
+            return a
+        }
     }
 
     enum DebateOutcome: Sendable {
@@ -91,8 +123,14 @@ enum NucleoDeskIO {
         case quota(retryAfter: Int?, message: String?)
         case tooLong(message: String?)
         case failed(code: String, message: String?)
+        /// 403 signin_required | upgrade_required | level_exhausted: this level is refused for this caller.
+        case levelRefused(code: String, meter: NucleoLevelMeter?)
+        /// 503 budget_paused: premium levels are paused for today (Rápido still works).
+        case budgetPaused
         case badResponse, timeout, network, cancelled
     }
+
+    static let levelRefusals: Set<String> = ["signin_required", "upgrade_required", "level_exhausted"]
 
     static let trend = ["alcista": "up", "bajista": "down", "lateral": "sideways", "up": "up", "down": "down", "sideways": "sideways"]
     static let momentum = ["sobrecompra": "overbought", "sobreventa": "oversold", "neutral": "neutral", "overbought": "overbought", "oversold": "oversold"]
@@ -235,12 +273,13 @@ enum NucleoDeskIO {
 
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// `headers`: the metered-read identity, sent along so the server may meter the desk itself too.
-    static func debate(symbol: String, question: String, isEquity: Bool, headers: [String: String] = [:]) async -> DebateOutcome {
+    static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
+                       headers: [String: String] = [:]) async -> DebateOutcome {
         do {
             let reply = try await BobbyAPI.responseWithHeaders("api/desk-debate", method: "POST",
                                                                body: ["symbol": symbol, "question": question, "language": L.ttsLang,
-                                                                      "assetType": isEquity ? "equity" : "crypto"],
-                                                               extraHeaders: headers)
+                                                                      "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue],
+                                                               extraHeaders: headers, timeout: level.timeout)
             return parseDebate(status: reply.status, json: reply.json, headers: reply.headers)
         } catch let error as URLError {
             switch error.code {
@@ -264,6 +303,8 @@ enum NucleoDeskIO {
             return .quota(retryAfter: seconds == 0 ? nil : seconds, message: message)
         }
         if status == 400, code == "question_too_long" { return .tooLong(message: message) }
+        if status == 403, let code, levelRefusals.contains(code) { return .levelRefused(code: code, meter: NucleoLevelMeter(json: body?["meter"])) }
+        if status == 503, code == "budget_paused" { return .budgetPaused }
         if status == 503, let code, code == "analysis_failed" || code == "desk_unavailable" { return .failed(code: code, message: message) }
         guard (200..<300).contains(status), let body, let agents = body["agents"] as? [String: Any],
               let alpha = agents["alpha"] as? String, !alpha.isEmpty,
@@ -274,7 +315,7 @@ enum NucleoDeskIO {
         let t = body["technicals"] as? [String: Any] ?? [:]
         let p = body["provenance"] as? [String: Any] ?? [:]
         let direction = agents["direction"] as? String ?? "none"
-        return .ok(Debate(
+        var debate = Debate(
             alpha: alpha, red: red, cio: cio, verdict: verdict,
             direction: ["long", "short", "none"].contains(direction) ? direction : "none",
             technicals: Technicals(price: num(t["price"]), rsi14: num(t["rsi14"]), ema20: num(t["ema20"]), ema50: num(t["ema50"]),
@@ -283,7 +324,32 @@ enum NucleoDeskIO {
                                    momentum: (t["momentum"] as? String).flatMap { momentum[$0] }),
             provenance: Provenance(provider: p["provider"] as? String, instrument: p["instrument"] as? String,
                                    assetType: p["assetType"] as? String, timeframe: p["timeframe"] as? String,
-                                   asOf: p["asOf"] as? String)))
+                                   asOf: p["asOf"] as? String))
+        func text(_ v: Any?) -> String? {
+            guard let s = (v as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !s.isEmpty else { return nil }
+            return String(s.prefix(1200))
+        }
+        debate.rebuttal = text(agents["rebuttal"])
+        if let sc = agents["scenarios"] as? [String: Any], let c = text(sc["confirm"]), let i = text(sc["invalidate"]) {
+            debate.confirm = c; debate.invalidate = i
+        }
+        if let sy = (agents["synthesis"] ?? body["synthesis"]) as? [String: Any], let headline = text(sy["headline"]) {
+            debate.synthesis = Synthesis(headline: headline, why: text(sy["why"]), risk: text(sy["risk"]), watch: text(sy["watch"]))
+        }
+        if let su = body["sufficiency"] as? [String: Any] {
+            debate.sufficiency = Sufficiency(horizon: text(su["horizon"]),
+                                             missing: Array((su["missing"] as? [Any] ?? []).compactMap { text($0) }.prefix(8)),
+                                             sufficient: su["sufficient"] as? Bool ?? true)
+        }
+        if let ev = body["evidenceUsed"] as? [String: Any] {
+            let rec = ev["record"] as? [String: Any]
+            debate.evidence = Evidence(timeframes: Array((ev["timeframes"] as? [Any] ?? []).compactMap { text($0) }.prefix(8)),
+                                       derivatives: ev["derivatives"] as? Bool ?? false,
+                                       resolvedCalls: BobbyReadAccess.count(rec?["resolvedCalls"]), wins: BobbyReadAccess.count(rec?["wins"]),
+                                       losses: BobbyReadAccess.count(rec?["losses"]), breakEven: BobbyReadAccess.count(rec?["breakEven"]))
+        }
+        debate.level = text(body["level"])
+        return .ok(debate)
     }
 }
 
@@ -346,8 +412,21 @@ final class NucleoDesk {
     var meterAuth: BobbyMeterAuth = .account
     /// Every access object the server sends lands here (the account sheet reads it).
     var accessChanged: (BobbyReadAccess) -> Void = { BobbyAccessCenter.shared.record($0) }
+    /// The analysis level the user picked (the level sheet), and the way a fallback chip changes it.
+    var currentLevel: () -> NucleoAnalysisLevel = { NucleoLevelCenter.shared.level }
+    var setLevel: (NucleoAnalysisLevel) -> Void = { NucleoLevelCenter.shared.level = $0 }
+    var meterChanged: (NucleoAnalysisLevel, NucleoLevelMeter?) -> Void = { level, meter in
+        NucleoLevelCenter.shared.meterUpdated(level, meter)
+        Task { await NucleoLevelCenter.shared.refresh() }
+    }
+    /// Set by an `upgrade_required` refusal: the page's Bobby Pro chip opens the invite sheet instead.
+    var inviteGate: String?
 
-    private struct TokenEntry { let asset: NucleoAsset; let question: String; let expires: Date }
+    private struct TokenEntry {
+        let asset: NucleoAsset; let question: String; let expires: Date
+        var level: NucleoAnalysisLevel? = nil
+        var persistLevel = false
+    }
     private final class Read {
         let requestId: String
         let result: [String: Any]
@@ -389,6 +468,7 @@ final class NucleoDesk {
         let asset: NucleoAsset?
         let generation: UUID
         let startedAt: Date
+        var level: NucleoAnalysisLevel = .rapido
     }
 
     private var tokens: [String: TokenEntry] = [:]
@@ -421,8 +501,45 @@ final class NucleoDesk {
     /// the same asset once the user has signed in or subscribed (single use, 10 min, like a confirm token).
     private func gated(_ status: String, message: String?, access: BobbyReadAccess?, job: Job, asset: NucleoAsset) -> [String: Any] {
         if let access { accessChanged(access) }
-        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question),
+        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question, level: job.level),
                 "message": NucleoDeskIO.orNull(message), "access": access.map { $0.json as Any } ?? NSNull()]
+    }
+
+    /// A level refusal or a premium failure: one calm line and a chip the user taps (never silent).
+    private func levelNotice(caption: String, sub: String?, cta: String, level: NucleoAnalysisLevel, persist: Bool,
+                             job: Job, asset: NucleoAsset) -> [String: Any] {
+        ["v": 1, "status": "level_notice", "caption": caption, "sub": NucleoDeskIO.orNull(sub), "cta": cta,
+         "token": issueToken(asset, question: job.question, level: level, persist: persist), "level": level.rawValue]
+    }
+
+    private func levelRefused(_ code: String, meter: NucleoLevelMeter?, job: Job, asset: NucleoAsset) -> [String: Any] {
+        let level = job.level
+        meterChanged(level, meter)
+        switch code {
+        case "signin_required":
+            inviteGate = nil
+            return ["v": 1, "status": "signin_required", "token": issueToken(asset, question: job.question, level: level),
+                    "message": NSNull(), "caption": L.t("\(level.name) needs a free account. Your question runs as soon as you’re in.",
+                                   "\(level.name) necesita tu cuenta gratis. Tu pregunta corre en cuanto entres."),
+                    "access": NSNull()]
+        case "upgrade_required":
+            let caption = L.t("You used this week’s \(level.name).", "Ya usaste tu \(level.name) de esta semana.")
+            inviteGate = caption
+            let lower = level.lower
+            return ["v": 1, "status": "subscription_required", "token": issueToken(asset, question: job.question, level: level),
+                    "caption": caption, "sub": L.t("Invite a friend to unlock more.", "Invita a un amigo para tener más."),
+                    "cta": L.t("Invite a friend", "Invita a un amigo"),
+                    "fallback": ["label": L.t("Continue with \(lower.name)", "Seguir con \(lower.name)"),
+                                 "token": issueToken(asset, question: job.question, level: lower, persist: true)],
+                    "message": NSNull(), "access": NSNull()]
+        default:
+            let day = meter?.resetsDate.map { BobbyAccessAPI.day($0) }
+            let lower = level.lower
+            return levelNotice(caption: day.map { L.t("Your \(level.name) comes back on \($0).", "Tu \(level.name) vuelve el \($0).") }
+                                   ?? L.t("You used your \(level.name) for now.", "Ya usaste tu \(level.name) por ahora."),
+                               sub: nil, cta: L.t("Continue with \(lower.name)", "Seguir con \(lower.name)"),
+                               level: lower, persist: true, job: job, asset: asset)
+        }
     }
 
     // MARK: - ask
@@ -466,14 +583,17 @@ final class NucleoDesk {
         case let .token(token):
             purgeTokens()
             guard let entry = tokens.removeValue(forKey: token), entry.expires > Date() else { throw NucleoFault.invalid("unknown or expired token") }
-            job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date())
+            // A fallback chip ("Continue with Quick") is the user's own choice of level: keep it.
+            if let level = entry.level, entry.persistLevel { setLevel(level) }
+            job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date(),
+                      level: entry.level ?? currentLevel())
         case let .followUp(previous, q):
             guard let read = reads.first(where: { $0.requestId == previous }) else { throw NucleoFault.invalid("unknown followUpOf") }
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
-                      generation: generation, startedAt: Date())
+                      generation: generation, startedAt: Date(), level: currentLevel())
         case let .question(q):
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
-                      generation: generation, startedAt: Date())
+                      generation: generation, startedAt: Date(), level: currentLevel())
         }
         // 4.
         emit("ask.stage", ["requestId": requestId, "stage": "resolving"])
@@ -502,10 +622,11 @@ final class NucleoDesk {
         current.continuation.resume(returning: result)
     }
 
-    private func issueToken(_ asset: NucleoAsset, question: String) -> String {
+    private func issueToken(_ asset: NucleoAsset, question: String, level: NucleoAnalysisLevel? = nil, persist: Bool = false) -> String {
         purgeTokens()
         let token = UUID().uuidString.lowercased()
-        tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime))
+        tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime),
+                                   level: level, persistLevel: persist)
         return token
     }
 
@@ -529,13 +650,13 @@ final class NucleoDesk {
                 if Task.isCancelled { return Self.cancelledResult }
                 let suggestions: [[String: Any]] = hits.map { hit in
                     let a = NucleoAsset(symbol: hit.symbol, name: hit.name, isEquity: hit.assetClass == "equity", assetClass: hit.assetClass)
-                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question)]
+                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question, level: job.level)]
                 }
                 return ["v": 1, "status": "unknown_asset", "query": job.question, "suggestions": suggestions]
             case let .resolved(resolved, needsConfirmation, matchKind, proxyNote):
                 if needsConfirmation {
                     // Never analyze an unconfirmed guess: the human confirms with this token.
-                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question),
+                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level),
                             "asset": resolved.jsonWithClass, "matchKind": NucleoDeskIO.orNull(matchKind),
                             "proxyNote": NucleoDeskIO.orNull(proxyNote)]
                 }
@@ -583,7 +704,8 @@ final class NucleoDesk {
         //     market and candles stages.
         let question = job.question
         let identity = BobbyAccessAPI.headers(bearer: await auth.bearer())
-        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, headers: identity)
+        let level = job.level
+        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level, headers: identity)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         if Task.isCancelled { pulseTask.cancel(); return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
@@ -611,11 +733,29 @@ final class NucleoDesk {
         if let access { accessChanged(access) }
 
         // 8. Map. Never a verdict on a failure.
+        //    A premium debate that did not finish says so plainly, and offers the same level again.
+        let premiumFailed: Bool
+        switch desk {
+        case .timeout, .network, .badResponse, .failed: premiumFailed = level.isPremium
+        default: premiumFailed = false
+        }
+        if premiumFailed {
+            meterChanged(level, nil)
+            return levelNotice(caption: L.t("The agents didn’t finish.", "Los agentes no terminaron."),
+                               sub: L.t("Your \(level.name) wasn’t used.", "No se descontó tu \(level.name)."),
+                               cta: L.t("Try again", "Reintentar"), level: level, persist: false, job: job, asset: asset)
+        }
         switch desk {
         case .cancelled: return Self.cancelledResult
         case .timeout: return Self.errorResult("timeout")
         case .network: return Self.errorResult("network")
         case .badResponse: return Self.errorResult("bad_response")
+        case let .levelRefused(code, meter):
+            return levelRefused(code, meter: meter, job: job, asset: asset)
+        case .budgetPaused:
+            return levelNotice(caption: L.t("\(level.name) is paused for today.", "\(level.name) está en pausa por hoy."),
+                               sub: L.t("Quick still works.", "Rápido sigue disponible."),
+                               cta: L.t("Continue with Quick", "Seguir con Rápido"), level: .rapido, persist: true, job: job, asset: asset)
         case let .quota(retryAfter, message):
             return ["v": 1, "status": "quota", "retryAfterSec": NucleoDeskIO.orNull(retryAfter), "message": NucleoDeskIO.orNull(message)]
         case let .tooLong(message):
@@ -640,6 +780,12 @@ final class NucleoDesk {
             ]
             // A metering server says how many reads are left; a legacy server says nothing (no key).
             if let access { result["access"] = access.json }
+            // Levels: the synthesis goes first; the rest of the debate sits behind it.
+            result["level"] = debate.level ?? level.rawValue
+            if let synthesis = debate.synthesis { result["synthesis"] = synthesis.json }
+            if let sufficiency = debate.sufficiency { result["sufficiency"] = sufficiency.json }
+            if let evidence = debate.evidence { result["evidenceUsed"] = evidence.json }
+            if level.isPremium { meterChanged(level, nil) }
             // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
             recordQuery(symbol, isEquity)
             reads.append(Read(requestId: job.requestId, result: result, asset: asset, generation: job.generation,

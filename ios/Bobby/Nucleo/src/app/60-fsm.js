@@ -15,7 +15,7 @@ function go(name, data){
   LOG.push([Math.round(clk * 1000) / 1000, name]); if (LOG.length > 400) LOG.shift();
   var N = STATES[name];
   try { if (N && N.enter) N.enter(prev, ST.data); } catch (e) { logErr('enter ' + name, e); }
-  ariaState(); dirty = true;
+  ariaState(); dirty = true; lvlSync();
 }
 function inState(){ return clk - ST.t0; }
 function fsmEvent(name, p){ var s = STATES[ST.name]; if (s && s.on){ try { s.on(name, p); } catch (e) { logErr('on ' + name, e); } } }
@@ -138,6 +138,8 @@ function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
+  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
   var f = RMOD.failure(r.reply, LANG);
@@ -215,6 +217,7 @@ STATES.IDLE = {
     if (h === 'pill') return pillDown(p);
     if (h === 'avatar') return avatarG();
     if (h === 'wm' && DEV_BUILD) return wordmarkPress();
+    if (h === 'lvl') return tapG(function(){ tick('light'); openNative('levels'); });
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
     if (h === 'meri') return tapG(function(){ if (FACES.length > 1){ go('FACES'); faceSwing(1, 0); } });
     if (h === 'surface') return faceDragG();
