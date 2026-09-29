@@ -91,7 +91,12 @@ export interface Agents {
   /** What the evidence covered against the horizon asked (the desk states it before any thesis). */
   sufficiency: { horizon: string; available: string[]; missing: string[]; sufficient: boolean } | null;
   evidenceUsed: { timeframes: string[]; derivatives: boolean; record: { resolvedCalls: number; wins: number; losses: number; breakEven: number } | null } | null;
+  /** What Bobby remembers, said before the answer: written after the verdict, never part of it (signed-in, memory on). */
+  personal: { note: string; previousRead: boolean; priceChange: boolean } | null;
+  /** Peers with current daily data, when the question asked about the sector or alternatives. */
+  related: { exposures: string[]; peers: RelatedPeer[]; unavailable: string[] } | null;
 }
+export interface RelatedPeer { symbol: string; name: string; sharedExposure: string; price: number; change5dPct: number | null; change1mPct: number | null; vsEma20: 'above' | 'below' | 'at'; asOf: string }
 export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
 /** failed: the agents did not finish (a premium use is given back by the server); budget_paused: the spend guard. */
 export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null; refunded?: boolean }
@@ -99,6 +104,10 @@ export type DeskLiveEvent =
   | { type: 'accepted' }
   | { type: 'evidence'; timeframes: string[] }
   | { type: 'agent'; role: 'alpha' | 'red' | 'rebuttal'; text: string };
+/** The reader's IANA time zone, so "Monday" and "this week" are theirs (memory), or undefined. */
+function readerTimeZone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined; } catch { return undefined; }
+}
 const LEVEL_TIMEOUT: Record<DeskLevel, number> = { rapido: 95_000, profundo: 130_000, maximo: 175_000 };
 const text = (v: unknown, max = 400): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
@@ -123,6 +132,12 @@ function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLe
     rebuttal: typeof g.rebuttal === 'string' ? g.rebuttal : null, scenarios, synthesis,
     sufficiency: data!.sufficiency && Array.isArray(data!.sufficiency.missing) ? data!.sufficiency : null,
     evidenceUsed: data!.evidenceUsed && Array.isArray(data!.evidenceUsed.timeframes) ? data!.evidenceUsed : null,
+    personal: text(data!.personal?.note, 320) ? { note: text(data!.personal.note, 320)!, previousRead: data!.personal.basedOn?.previousRead === true, priceChange: data!.personal.basedOn?.priceChange === true } : null,
+    related: data!.related && Array.isArray(data!.related.peers) ? {
+      exposures: (Array.isArray(data!.related.exposures) ? data!.related.exposures : []).filter((e: unknown) => typeof e === 'string'),
+      peers: data!.related.peers.filter((p: any) => p && typeof p.symbol === 'string' && typeof p.sharedExposure === 'string' && typeof p.price === 'number').slice(0, 3),
+      unavailable: (Array.isArray(data!.related.unavailable) ? data!.related.unavailable : []).filter((e: unknown) => typeof e === 'string'),
+    } : null,
   } };
 }
 
@@ -136,7 +151,7 @@ export async function runAgents(symbol: string, isEquity: boolean, question: str
     const response = await fetch('/api/desk-debate', {
       signal: controller.signal, method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json', ...(await accessHeaders()) },
-      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level }),
+      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level, tz: readerTimeZone() }),
     });
     // Refusals (and a server without the live desk) answer plain JSON.
     if (!(response.headers.get('content-type') ?? '').includes('ndjson') || !response.body) {
@@ -267,7 +282,7 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
       : t(`My call: ${direction}, ${conv}% conviction. Reference only.`, `Mi lectura: ${direction}, ${conv}% de convicción. Solo referencia.`, `Minha leitura: ${direction}, ${conv}% de convicção. Apenas referência.`);
     const cioSpoken = g.cio.length > 600 ? `${g.cio.slice(0, 600).replace(/\s+\S*$/, '')}…` : g.cio;
     // With the CIO's synthesis, Bobby says the answer and its reason, not the whole ruling.
-    const spoken = g.synthesis ? `${g.synthesis.headline} ${g.synthesis.why}` : `${cioSpoken} ${close}`;
+    const spoken = `${g.personal ? `${g.personal.note} ` : ''}${g.synthesis ? `${g.synthesis.headline} ${g.synthesis.why}` : `${cioSpoken} ${close}`}`;
     return { stances: [alpha, red, cioReal], headline, spoken, noTrade, direction };
   }
   const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `, `${a.symbol} está em ${money(a.price)}. `) : '';

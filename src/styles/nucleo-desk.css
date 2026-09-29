@@ -407,6 +407,10 @@ body.nucleo-ui .n-lvcard-name:focus:not(:focus-visible) { outline: none; }
 .n-mem-switch.on i { transform: translateX(18px); background: #0B0A09; }
 .n-mem-note { margin: 8px 0 0; font-size: 12.5px; line-height: 1.45; color: var(--n-ink3); }
 .n-mem-pref { margin-top: 16px; }
+.n-mem-name { display: flex; gap: 8px; margin-top: 8px; align-items: center; }
+.n-mem-name input { flex: 1; min-width: 0; height: 36px; padding: 0 12px; border-radius: 10px; background: rgba(242, 237, 228, .04); border: 1px solid rgba(242, 237, 228, .10); color: var(--n-ink); font: 400 14px/1 var(--n-sans); }
+.n-mem-name input::placeholder { color: var(--n-ink3); }
+.n-mem-name input:focus-visible { outline: 2px solid var(--n-ink); outline-offset: 2px; }
 .n-mem-seg { display: flex; gap: 2px; margin-top: 8px; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .35); border: 1px solid var(--n-hair); }
 .n-mem-seg button { flex: 1 1 auto; height: 34px; padding: 0 7px; border-radius: 999px; font: 500 12px/1 var(--n-sans); color: var(--n-ink2); white-space: nowrap; }
 .n-mem-seg button[aria-pressed="true"] { background: var(--n-ink); color: #0B0A09; }
@@ -435,6 +439,8 @@ body.nucleo-ui .n-lvcard-name:focus:not(:focus-visible) { outline: none; }
 .n-synth.n-failed { width: 100%; max-width: 560px; align-items: flex-start; padding: 18px 20px; }
 .n-synth-head { margin-top: 8px; font-size: 15.5px; line-height: 1.45; color: var(--n-ink); }
 .n-synth-note { margin-top: 6px; font-size: 13px; color: var(--n-ink3); }
+/* What Bobby remembers, said before the answer: quieter than the headline, never a card of its own. */
+.n-synth-memory { margin: 0 auto 10px; max-width: 46ch; text-align: center; font-size: 14px; line-height: 1.45; color: var(--n-ink2); }
 .n-debate-peek { display: grid; gap: 4px; padding: 11px 0; }
 .n-debate-peek-line { font-size: 14px; line-height: 1.4; color: var(--n-ink2, #CFC7BA); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .n-debate-more { margin-top: 10px; padding: 8px 0 2px; font: 500 11px/1.2 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink2, #CFC7BA); background: none; border: 0; cursor: pointer; }

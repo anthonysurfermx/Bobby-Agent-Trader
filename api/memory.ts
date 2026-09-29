@@ -1,20 +1,24 @@
 // ============================================================
 // /api/memory — what Bobby remembers about a signed-in Apple/Google account, to see, correct and delete.
-//   GET                          → { enabled, prefs: {horizon, experience, risk}, assets: [{symbol, asks,
-//                                    lastAskedAt, lastHorizon}] (≤ 50, newest first), retentionDays }
-//   PATCH { horizon?, experience?, risk?, memoryEnabled? } → the same body after the change. Explicit
-//        corrections only: each field is an enum, null clears it; nothing here is ever inferred.
-//   DELETE ?symbol=NVDA          → forget one asset; DELETE with no symbol → forget everything (assets and
-//        preferences; a paused memory stays paused). Answers the same body after the change.
+//   GET                          → { enabled, preferredName, prefs: {horizon, experience, risk},
+//                                    assets: [{symbol, asks, lastAskedAt, lastHorizon, lastPrice, lastPriceAt}] (≤ 50),
+//                                    reads: [{symbol, deliveredAt, verdict, direction, headline, why, risk, watch,
+//                                    level, language, price, priceAt}] (≤ 30, newest first), retentionDays }
+//   PATCH { horizon?, experience?, risk?, memoryEnabled?, preferredName? } → the same body after the change.
+//        Explicit corrections only: each field is an enum (or a 1–40 letter name), null clears it.
+//   DELETE ?symbol=NVDA          → forget one asset and Bobby's stored answers on it.
+//   DELETE ?all=1                → forget everything (assets, answers, preferences, name; a paused memory stays
+//        paused). Any other DELETE (no parameter, an empty or invalid symbol) is refused with 400: erasing
+//        everything is never a default.
 // Anonymous devices and wallet-only sessions have no memory: 401. Storage: api/_lib/user-memory.ts,
-// migration 20260929190000_user_memory.sql. Logs never pair a symbol with an identity.
+// migrations 20260929190000 / 200000 / 230000. Logs never pair a symbol with an identity.
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { z } from 'zod';
 import { requestOriginHost } from './_lib/origins.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { resolveIdentity, type Identity } from './_lib/user-identity.js';
-import { MEMORY_SYMBOL, MemoryUnavailableError, carriesAccountToken, forgetMemory, hasMemory, listMemory, updatePrefs } from './_lib/user-memory.js';
+import { MEMORY_SYMBOL, MemoryUnavailableError, carriesAccountToken, cleanName, forgetMemory, hasMemory, listMemory, updatePrefs } from './_lib/user-memory.js';
 
 export const config = { maxDuration: 15 };
 
@@ -23,6 +27,7 @@ const Patch = z.object({
   experience: z.enum(['new', 'some', 'experienced']).nullable().optional(),
   risk: z.enum(['low', 'medium', 'high']).nullable().optional(),
   memoryEnabled: z.boolean().optional(),
+  preferredName: z.string().max(80).nullable().optional().refine((v) => v === undefined || v === null || cleanName(v) !== null, 'invalid name'),
 }).strict().refine((p) => Object.keys(p).length > 0, 'empty patch');
 
 const LIMITS: Record<string, [number, number]> = { GET: [60, 60], PATCH: [30, 60], DELETE: [30, 60] };
@@ -58,13 +63,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     if (method === 'PATCH') {
       const parsed = Patch.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ error: 'Send horizon, experience, risk or memoryEnabled with an allowed value.', code: 'invalid_request' });
+      if (!parsed.success) return res.status(400).json({ error: 'Send horizon, experience, risk, memoryEnabled or preferredName with an allowed value.', code: 'invalid_request' });
       await updatePrefs(identity.id, parsed.data);
     } else if (method === 'DELETE') {
-      const raw = Array.isArray(req.query?.symbol) ? req.query.symbol[0] : req.query?.symbol;
-      const symbol = typeof raw === 'string' && raw.trim() ? raw.trim().toUpperCase() : null;
-      if (symbol !== null && !MEMORY_SYMBOL.test(symbol)) return res.status(400).json({ error: 'That asset symbol is not valid.', code: 'invalid_request' });
-      await forgetMemory(identity.id, symbol);
+      const one = (v: unknown) => (Array.isArray(v) ? v[0] : v);
+      const rawSymbol = one(req.query?.symbol);
+      const all = one(req.query?.all) === '1';
+      if (all && rawSymbol === undefined) {
+        await forgetMemory(identity.id, 'all');
+      } else {
+        const symbol = typeof rawSymbol === 'string' ? rawSymbol.trim().toUpperCase() : '';
+        if (all || !MEMORY_SYMBOL.test(symbol)) return res.status(400).json({ error: 'Name one asset to forget, or send all=1 to forget everything.', code: 'invalid_request' });
+        await forgetMemory(identity.id, { symbol });
+      }
     }
     return res.status(200).json(await listMemory(identity.id));
   } catch (e) {

@@ -4,7 +4,7 @@ import { isEquitySymbol } from '../../src/lib/voice-assets.js';
 import { completeJson, LlmHttpError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 import { levelPlan, type DeskLevel } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
-import type { ReaderContext } from './user-memory.js';
+import { RELATED_RULE, type RelatedEvidence } from './desk-related.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
@@ -43,7 +43,7 @@ export const DESK_QUESTION_MAX = 1200;
 const deskBase = () => process.env.BOBBY_PROTOCOL_BASE_URL || 'https://bobbyprotocol.xyz';
 
 /** Candles from one of the desk's own market endpoints, cleaned and in time order. */
-async function fetchCandles(path: string): Promise<Candle[]> {
+export async function fetchCandles(path: string): Promise<Candle[]> {
   const response = await fetch(`${deskBase()}${path}`, { signal: AbortSignal.timeout(12000) });
   if (!response.ok) throw new Error('Market evidence unavailable');
   const payload = await response.json() as { candles?: Array<Record<string, unknown>> };
@@ -347,8 +347,6 @@ export function pricePosition(t: Levels) {
 }
 const positioned = <T extends Levels>(t: T) => ({ ...t, position: pricePosition(t) });
 
-/** The CIO's rule for the reader's memory, sent only when there is one. */
-export const READER_RULE = "reader is this reader's explicit preferences and how often they asked about assets: use it only to frame the answer (their usual horizon as context, the depth of explanation for their stated experience, a brief 'you often look at NVDA' when it helps; when reader.firstName is present, open the headline or the why by that first name once, warmly and naturally; when reader.thisAsset.timesThisWeek is 2 or more, say it in one short clause, e.g. 'second time this week you ask about NVDA'; when reader.thisAsset.changeSinceLastAskPct is present, open with a short callback that quotes it exactly with its sign and the day (reader.thisAsset.lastAskedOn, else lastAskedDaysAgo days ago), e.g. 'Remember you asked me about AMZN on Monday? It is up 15% since then.' — a fact about the past, never proof the thesis was right or a reason to act — then answer as usual); never let it change the verdict, the direction or the sufficiency note, never judge suitability or give personalized advice, never infer anything else about the person. reader.prefs.explainRiskDepth (low, medium or high) sets only how much the answer explains risk (high: spell out the main risks and what would go wrong; low: one short risk line); it never sets suitability, position sizing or a recommendation, and never softens or hides the main risk.";
 
 /** What the desk says while it works: each argument as soon as it has passed the guard, never before. */
 export type DeskEvent =
@@ -370,7 +368,7 @@ function cleared(text: string): string {
  */
 export async function runDeskDebate(
   question: string, evidence: DeskEvidence & Partial<Awaited<ReturnType<typeof loadDeskEvidenceV2>>>, language: 'en'|'es'|'pt',
-  opts: { level?: DeskLevel; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | null } = {},
+  opts: { level?: DeskLevel; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; related?: RelatedEvidence | null } = {},
 ) {
   const level = opts.level ?? 'rapido';
   const plan = levelPlan(level);
@@ -383,25 +381,27 @@ export async function runDeskDebate(
     ...evidence, technicals: positioned(evidence.technicals),
     ...(evidence.timeframes ? { timeframes: Object.fromEntries(Object.entries(evidence.timeframes).map(([tf, block]) => [tf, positioned(block as Levels)])) } : {}),
   };
-  const input = { question, evidence: withPositions, sufficiency };
+  // Peers with current data, only when the question asks for the sector or alternatives (api/_lib/desk-related.ts).
+  const related = opts.related ?? null;
+  const input = { question, evidence: withPositions, sufficiency, ...(related ? { related } : {}) };
+  const relatedRule = related ? ` ${RELATED_RULE}` : '';
   emit({ type: 'evidence', timeframes: available, sufficiency });
-  const alpha = await role(plan.alpha, 'alpha', `${rules} Your role is Alpha Hunter: identify the strongest conditional opportunity and what evidence supports it. Return {"analysis":"..."}.`, input, Argument, ARGUMENT_SCHEMA, ctx);
+  const alpha = await role(plan.alpha, 'alpha', `${rules}${relatedRule} Your role is Alpha Hunter: identify the strongest conditional opportunity and what evidence supports it. Return {"analysis":"..."}.`, input, Argument, ARGUMENT_SCHEMA, ctx);
   emit({ type: 'agent', role: 'alpha', text: cleared(alpha.analysis) });
-  const red = await role(plan.red, 'red', `${rules} Your role is Red Team: challenge Alpha's actual argument, identify its weak assumptions, invalidation and missing evidence. Return {"analysis":"..."}.`, { ...input, alpha }, Argument, ARGUMENT_SCHEMA, ctx);
+  const red = await role(plan.red, 'red', `${rules}${relatedRule} Your role is Red Team: challenge Alpha's actual argument, identify its weak assumptions, invalidation and missing evidence. Return {"analysis":"..."}.`, { ...input, alpha }, Argument, ARGUMENT_SCHEMA, ctx);
   emit({ type: 'agent', role: 'red', text: cleared(red.analysis) });
   const rebuttal = plan.rebuttal
-    ? await role(plan.rebuttal, 'rebuttal', `${rules} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...input, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
+    ? await role(plan.rebuttal, 'rebuttal', `${rules}${relatedRule} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...input, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
     : null;
   if (rebuttal) emit({ type: 'agent', role: 'rebuttal', text: cleared(rebuttal.analysis) });
   const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.`;
   const synthesisShape = '"synthesis":{"headline":"...","why":"...","risk":"...","watch":"...","watchLevel":0,"followUp":"..."}';
-  // The reader's memory (api/_lib/user-memory.ts) reaches the CIO only, and only to frame the answer.
-  const reader = opts.reader ?? null;
-  const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}), ...(reader ? { reader } : {}) };
-  const readerRule = reader ? ` ${READER_RULE}` : '';
+  // Memory never reaches the debate: the verdict depends on the question and the evidence alone. The personal
+  // note is written afterwards from the finished verdict (api/_lib/memory-note.ts).
+  const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}) };
   const cio = plan.scenarios
-    ? await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
-    : await role(plan.cio, 'cio', `${cioPrompt}${readerRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
+    ? await role(plan.cio, 'cio', `${cioPrompt}${relatedRule} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
+    : await role(plan.cio, 'cio', `${cioPrompt}${relatedRule} Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape}}.`, cioInput, Verdict, VERDICT_SCHEMA, ctx);
   // "wait" carries no thesis to point at: a direction next to it would read as a trade.
   const agents = { alpha: alpha.analysis, red: red.analysis, cio: cio.analysis, verdict: cio.verdict, direction: cio.verdict === 'wait' ? 'none' as const : cio.direction };
   reviewDeskOutput(agents);
@@ -419,7 +419,7 @@ export async function runDeskDebate(
   const { timeframes, derivatives, record, ...core } = evidence;
   return {
     ...core, market: { price: evidence.technicals.price }, agents: { ...agents, synthesis, ...(rebuttal ? { rebuttal: rebuttal.analysis } : {}), ...(scenarios ? { scenarios } : {}) },
-    level, sufficiency,
-    evidenceUsed: { timeframes: available, derivatives: Boolean(derivatives), record: record ? { resolvedCalls: record.resolvedCalls, wins: record.wins, losses: record.losses, breakEven: record.breakEven } : null },
+    level, sufficiency, ...(related ? { related } : {}),
+    evidenceUsed: { timeframes: available, derivatives: Boolean(derivatives), related: related ? related.peers.map((p) => p.symbol) : [], record: record ? { resolvedCalls: record.resolvedCalls, wins: record.wins, losses: record.losses, breakEven: record.breakEven } : null },
   };
 }

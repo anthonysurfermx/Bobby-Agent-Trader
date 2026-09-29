@@ -1,7 +1,11 @@
-// What Bobby remembers: the assets you asked about (how many times, when last) and the preferences you set
-// yourself, to see, correct or delete. Nothing here is inferred; every value comes from /api/memory.
+// What Bobby remembers: the assets you asked about (how many times, when last, the price that read used), what
+// Bobby answered each time, the name you asked to be called and the preferences you set yourself, to see,
+// correct or delete. Nothing here is inferred; every value comes from /api/memory.
 // Only an Apple/Google account has memory: signed out, the dialog explains that and offers the sign-in.
-import { useEffect, useState } from 'react';
+// Every load is tied to the account it was made for: switching accounts clears the view first, and a reply
+// that arrives for a previous account is dropped.
+import { useEffect, useRef, useState } from 'react';
+import { useBobbyAccount } from '@/hooks/useBobbyAccount';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { isPortuguese, isSpanish, t } from '@/lib/companions/i18n';
@@ -32,32 +36,45 @@ function ago(iso: string): string {
     return new Intl.RelativeTimeFormat(isSpanish() ? 'es' : isPortuguese() ? 'pt-BR' : 'en', { numeric: 'auto' }).format(-days, 'day');
   } catch { return t(`${days} days ago`, `hace ${days} días`, `há ${days} dias`); }
 }
+function when(iso: string): string {
+  try { return new Intl.DateTimeFormat(isSpanish() ? 'es-MX' : isPortuguese() ? 'pt-BR' : 'en-US', { day: 'numeric', month: 'short' }).format(new Date(iso)); } catch { return iso.slice(0, 10); }
+}
+const money = (n: number) => `$${n.toLocaleString('en-US', { maximumFractionDigits: n >= 100 ? 2 : n >= 1 ? 4 : 8 })}`;
+const verdictWord = (v: 'wait' | 'review') => (v === 'wait' ? t('Wait', 'Esperar', 'Esperar') : t('Review', 'Revisar', 'Revisar'));
 const times = (n: number) => (n === 1 ? t('1 time', '1 vez', '1 vez') : t(`${n} times`, `${n} veces`, `${n} vezes`));
 
 export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
+  const { account } = useBobbyAccount();
+  const accountId = account?.id ?? null;
   const [state, setState] = useState<MemoryState | null>(null);
   const [signedOut, setSignedOut] = useState(false);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [nameDraft, setNameDraft] = useState('');
+  // Each request carries the generation it was made in; a reply from an older one (another account, a closed
+  // dialog) is dropped.
+  const generation = useRef(0);
 
-  const apply = (r: MemoryResult) => {
-    if ('state' in r) { setState(r.state); setSignedOut(false); setFailed(false); }
+  const apply = (r: MemoryResult, gen: number) => {
+    if (gen !== generation.current) return;
+    if ('state' in r) { setState(r.state); setNameDraft(r.state.preferredName ?? ''); setSignedOut(false); setFailed(false); }
     else if (r.signedOut) { setSignedOut(true); setState(null); }
     else setFailed(true);
   };
   const run = async (task: () => Promise<MemoryResult>) => {
     if (busy) return;
+    const gen = generation.current;
     setBusy(true);
-    try { apply(await task()); } finally { setBusy(false); }
+    try { apply(await task(), gen); } finally { setBusy(false); }
   };
 
   useEffect(() => {
+    // A new account (or a reopened dialog) starts from nothing, never from what the last one showed.
+    const gen = ++generation.current;
+    setState(null); setSignedOut(false); setFailed(false); setNameDraft('');
     if (!open) return;
-    setFailed(false);
-    let live = true;
-    void fetchMemory().then((r) => { if (live) apply(r); });
-    return () => { live = false; };
-  }, [open]);
+    void fetchMemory().then((r) => apply(r, gen));
+  }, [open, accountId]);
 
   const setPref = (field: Field, value: string | null) => { sfxTock(); void run(() => patchMemory({ [field]: value } as Partial<MemoryPrefs>)); };
   const loading = open && !state && !signedOut && !failed;
@@ -81,11 +98,11 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
           ) : !state ? (
             <>
               <p className="n-dlg-copy" role="alert">{t('Memory is unavailable right now.', 'La memoria no está disponible por ahora.', 'A memória não está disponível agora.')}</p>
-              <button type="button" className="n-mem-btn mt-4" onClick={() => { setFailed(false); void run(fetchMemory); }}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+              <button type="button" className="n-mem-btn mt-4" onClick={() => { setFailed(false); setState(null); void run(fetchMemory); }}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
             </>
           ) : (
             <>
-              <p className="n-dlg-copy">{t(`Only the assets you ask about and what you choose here. Anything untouched for ${state.retentionDays} days is erased.`, `Solo los activos que preguntas y lo que eliges aquí. Lo que no uses en ${state.retentionDays} días se borra.`, `Só os ativos que você pergunta e o que você escolhe aqui. O que ficar ${state.retentionDays} dias sem uso é apagado.`)}</p>
+              <p className="n-dlg-copy">{t(`The assets you ask about, what Bobby answered, the name you asked for and what you choose here. A daily cleanup erases anything older than ${state.retentionDays} days.`, `Los activos que preguntas, lo que Bobby te respondió, el nombre que pediste y lo que eliges aquí. Una limpieza diaria borra lo que tenga más de ${state.retentionDays} días.`, `Os ativos que você pergunta, o que o Bobby respondeu, o nome que você pediu e o que você escolhe aqui. Uma limpeza diária apaga o que tiver mais de ${state.retentionDays} dias.`)}</p>
 
               <div className="n-mem-toggle">
                 <span id="n-mem-switch-label">{t('Remember my assets', 'Recordar mis activos', 'Lembrar meus ativos')}</span>
@@ -95,6 +112,15 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
                 </button>
               </div>
               {!state.enabled && <p className="n-mem-note">{t('Paused: Bobby saves nothing new and does not personalize answers.', 'En pausa: Bobby no guarda nada nuevo ni personaliza respuestas.', 'Em pausa: o Bobby não salva nada novo nem personaliza respostas.')}</p>}
+
+              <div className="n-mem-pref">
+                <label className="n-label" htmlFor="n-mem-name">{t('What Bobby calls you', 'Cómo te llama Bobby', 'Como o Bobby te chama')}</label>
+                <form className="n-mem-name" onSubmit={(e) => { e.preventDefault(); const v = nameDraft.trim(); if (v === (state.preferredName ?? '')) return; sfxTock(); void run(() => patchMemory({ preferredName: v ? v : null })); }}>
+                  <input id="n-mem-name" value={nameDraft} maxLength={40} autoComplete="given-name" disabled={busy}
+                    placeholder={t('Your Apple/Google first name', 'Tu nombre de Apple/Google', 'Seu nome da Apple/Google')} onChange={(e) => setNameDraft(e.target.value)} />
+                  <button type="submit" className="n-mem-btn" disabled={busy || nameDraft.trim() === (state.preferredName ?? '')}>{t('Save', 'Guardar', 'Salvar')}</button>
+                </form>
+              </div>
 
               {(Object.keys(OPTIONS) as Field[]).map((field) => (
                 <div key={field} className="n-mem-pref">
@@ -117,15 +143,30 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
                     <li key={a.symbol}>
                       <span className="min-w-0 flex-1">
                         <b>{a.symbol}</b>
-                        <small>{times(a.asks)} · {ago(a.lastAskedAt)}</small>
+                        <small>{times(a.asks)} · {ago(a.lastAskedAt)}{a.lastPrice !== null && a.lastPriceAt ? ` · ${money(a.lastPrice)} (${when(a.lastPriceAt)})` : ''}</small>
                       </span>
                       <button type="button" className="n-mem-btn" disabled={busy} onClick={() => { sfxTock(); void run(() => forgetAsset(a.symbol)); }}>{t('Forget', 'Olvidar', 'Esquecer')}</button>
                     </li>
                   ))}
                 </ul>
               )}
+              <div className="n-label mt-6">{t('What Bobby answered', 'Lo que Bobby te respondió', 'O que o Bobby respondeu')} · {state.reads.length}</div>
+              {state.reads.length === 0 ? (
+                <p className="n-mem-note">{t('Each answer Bobby gives you is kept here, exactly as you saw it.', 'Cada respuesta que Bobby te da se guarda aquí, tal como la viste.', 'Cada resposta que o Bobby te dá fica aqui, exatamente como você viu.')}</p>
+              ) : (
+                <ul className="n-mem-list">
+                  {state.reads.slice(0, 10).map((r) => (
+                    <li key={`${r.symbol}-${r.deliveredAt}`}>
+                      <span className="min-w-0 flex-1">
+                        <b>{r.symbol} · {verdictWord(r.verdict)}</b>
+                        <small>{when(r.deliveredAt)} · {r.headline}</small>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
               <button type="button" className="n-mem-btn danger mt-5" disabled={busy}
-                onClick={() => { if (window.confirm(t('Erase every remembered asset and your preferences?', '¿Borrar todos los activos recordados y tus preferencias?', 'Apagar todos os ativos lembrados e suas preferências?'))) void run(forgetAllMemory); }}>
+                onClick={() => { if (window.confirm(t('Erase every remembered asset, every answer Bobby kept, your name and your preferences?', '¿Borrar todos los activos recordados, las respuestas guardadas, tu nombre y tus preferencias?', 'Apagar todos os ativos lembrados, as respostas guardadas, seu nome e suas preferências?'))) void run(forgetAllMemory); }}>
                 {t('Erase all', 'Borrar todo', 'Apagar tudo')}
               </button>
               {failed && <p role="alert" className="n-mem-note" style={{ color: '#FFB3B5' }}>{t('That did not save. Try again.', 'No se guardó. Inténtalo de nuevo.', 'Não foi salvo. Tente de novo.')}</p>}

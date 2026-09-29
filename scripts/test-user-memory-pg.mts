@@ -1,4 +1,5 @@
-// Actual PostgreSQL regressions for 20260929190000_user_memory.sql: service-only privileges (with Supabase's
+// Actual PostgreSQL regressions for 20260929190000_user_memory.sql (+ 200000 price, + 230000 v2: stored answers,
+// dated prices, preferred name, daily purge): service-only privileges (with Supabase's
 // default ACLs simulated), recording only for Apple/Google accounts with memory on, 90-day retention, the
 // 50-asset cap by decayed score, the summary's ranking and its exclusion of stale rows, forgetting one asset
 // or everything, the cascade when an identity is deleted, and an idempotent migration.
@@ -22,8 +23,9 @@ const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 const q = async (sql: string, params: unknown[] = []) => (await pool.query(sql, params)).rows;
 
-const TABLES = ['bobby_user_assets', 'bobby_user_prefs'];
-const FUNCTIONS = ['public.bobby_memory_record(uuid, text, text, numeric)', 'public.bobby_memory_summary(uuid, text)', 'public.bobby_memory_forget(uuid, text)'];
+const TABLES = ['bobby_user_assets', 'bobby_user_prefs', 'bobby_user_reads'];
+const FUNCTIONS = ['public.bobby_memory_record(uuid, text, text, numeric)', 'public.bobby_memory_summary(uuid, text)', 'public.bobby_memory_forget(uuid, text)',
+  'public.bobby_memory_record_v2(uuid, text, text, numeric, timestamptz, text, jsonb)', 'public.bobby_memory_summary_v2(uuid, text)', 'public.bobby_memory_purge()'];
 
 const account = async () => (await q('insert into public.bobby_identities(auth_user_id) values ($1) returning id', [randomUUID()]))[0].id as string;
 const wallet = async () => (await q("insert into public.bobby_identities(wallet_address) values ('0x' || md5(gen_random_uuid()::text)) returning id"))[0].id as string;
@@ -41,12 +43,16 @@ const seed = (identity: string, symbol: string, asks: number, days: number, hori
 const count = async (identity: string) => Number((await q('select count(*) from public.bobby_user_assets where identity_id = $1', [identity]))[0].count);
 
 const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql', 'utf8')
-  + '\n' + readFileSync('supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql', 'utf8');
+  + '\n' + readFileSync('supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql', 'utf8')
+  + '\n' + readFileSync('supabase/bobby-protocol/supabase/migrations/20260929230000_user_memory_v2.sql', 'utf8');
 
 try {
   // A clean slate in the scratch database, then Supabase's default ACLs (ALL on every new table and function
   // to anon and authenticated) while the migration runs, so its revokes are what is tested.
-  await q(`drop table if exists public.bobby_user_assets, public.bobby_user_prefs cascade;
+  await q(`drop table if exists public.bobby_user_assets, public.bobby_user_prefs, public.bobby_user_reads cascade;
+    drop function if exists public.bobby_memory_record_v2(uuid, text, text, numeric, timestamptz, text, jsonb);
+    drop function if exists public.bobby_memory_summary_v2(uuid, text);
+    drop function if exists public.bobby_memory_purge();
     drop function if exists public.bobby_memory_record(uuid, text, text);
     drop function if exists public.bobby_memory_record(uuid, text, text, numeric);
     drop function if exists public.bobby_memory_summary(uuid, text);
@@ -76,7 +82,7 @@ try {
     eq((await q('select has_function_privilege($1, $2, $3) as r', ['service_role', fn, 'execute']))[0].r, true, `service_role executes ${fn}`);
   }
   // …and an actual attempt as anon fails, not just the catalog answer.
-  for (const attempt of ['select * from public.bobby_user_assets', `select public.bobby_memory_summary('${randomUUID()}', 'NVDA')`]) {
+  for (const attempt of ['select * from public.bobby_user_assets', 'select * from public.bobby_user_reads', `select public.bobby_memory_summary_v2('${randomUUID()}', 'NVDA')`, 'select public.bobby_memory_purge()']) {
     const client = await pool.connect();
     try {
       await client.query('begin; set local role anon;');
@@ -133,7 +139,9 @@ try {
   eq([staleView.thisAsset, staleView.top.map((a: any) => a.symbol)], [null, ['KEEP']], 'the summary never shows a row older than 90 days');
   eq(await record(old, 'NEW', 'week'), true, 'a new ask…');
   eq((await rows(old)).map((r) => r.symbol), ['KEEP', 'NEW'], '…sweeps this account\'s stale rows');
-  eq(await count(other), 0, '…and stale rows of other accounts (bounded sweep)');
+  eq(await count(other), 1, "another account's stale row waits for the daily purge (no cross-account work on an ask)");
+  await q('select public.bobby_memory_purge()');
+  eq(await count(other), 0, '…which removes it');
 
   // ---------- the cap: 50 per account, lowest decayed score first ----------
   const heavy = await account();
@@ -193,9 +201,9 @@ try {
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', 123.45)", [weekly]);
   eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'the price at the last ask is kept');
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
-  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'an ask without a price keeps the last known one');
+  eq((await summary(weekly, 'AMD')).thisAsset.lastPrice, null, 'an ask without a price clears the old one: an older price is never tied to a newer ask');
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', -5)", [weekly]);
-  eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'a nonsense price is ignored');
+  eq((await summary(weekly, 'AMD')).thisAsset.lastPrice, null, 'a nonsense price is not a price');
   eq([await count(reader), (await q('select count(*) from public.bobby_user_prefs where identity_id = $1', [reader]))[0].count], [0, '0'], '…assets and preferences');
   const pausedForget = await account();
   await seed(pausedForget, 'NVDA', 3, 0);
@@ -204,11 +212,92 @@ try {
   const keptSwitch = (await q('select horizon, experience, risk, memory_enabled from public.bobby_user_prefs where identity_id = $1', [pausedForget]))[0];
   eq([await count(pausedForget), keptSwitch], [0, { horizon: null, experience: null, risk: null, memory_enabled: false }], 'a paused memory stays paused after "forget everything", with nothing else kept');
 
+  // ---------- v2: stored answers, dated prices, preferred name ----------
+  const v2 = await account();
+  const readOf = (over: Record<string, unknown> = {}) => ({ verdict: 'review', direction: 'long', headline: 'Worth a look.', why: 'Momentum turned up.', risk: 'The range can hold.', watch: 'A close above 185.', level: 'profundo', language: 'es', platform: 'web', ...over });
+  const rec2 = async (identity: string, symbol: string, price: number | null, priceAt: string | null, read: unknown = readOf(), source: string | null = 'Yahoo Finance') =>
+    (await q('select public.bobby_memory_record_v2($1, $2, $3, $4, $5, $6, $7) as r', [identity, symbol, 'week', price, priceAt, source, read === null ? null : JSON.stringify(read)]))[0].r as boolean;
+  const sum2 = async (identity: string, symbol: string) => (await q('select public.bobby_memory_summary_v2($1, $2) as r', [identity, symbol]))[0].r;
+  const reads = async (identity: string, symbol?: string) => q(`select * from public.bobby_user_reads where identity_id = $1 ${symbol ? 'and symbol = $2' : ''} order by delivered_at desc, id desc`, symbol ? [identity, symbol] : [identity]);
+  const observed = new Date(Date.now() - 3600_000).toISOString();
+  eq(await rec2(v2, 'NVDA', 181.5, observed), true, 'a delivered read with its dated price');
+  const a1 = await row(v2, 'NVDA');
+  eq([Number(a1.last_price), a1.last_price_at.toISOString()], [181.5, observed], 'the price and the time it was observed, together');
+  const r1 = (await reads(v2, 'NVDA'))[0];
+  eq([r1.verdict, r1.direction, r1.headline, r1.level, r1.language, Number(r1.price), r1.price_at.toISOString(), r1.price_source, r1.platform], ['review', 'long', 'Worth a look.', 'profundo', 'es', 181.5, observed, 'Yahoo Finance', 'web'], 'what Bobby answered, as delivered, with its evidence price');
+  eq(await rec2(v2, 'NVDA', 190, null), true, 'a price without its time…');
+  const a2 = await row(v2, 'NVDA');
+  eq([a2.last_price, a2.last_price_at], [null, null], '…is not stored, and the older price is cleared with it');
+  eq(await rec2(v2, 'NVDA', 190, new Date(Date.now() + 3600_000).toISOString()), true, 'a price "from the future"…');
+  eq((await row(v2, 'NVDA')).last_price, null, '…is not a price');
+  eq(await rec2(v2, 'NVDA', 185, observed, readOf({ verdict: 'wait', direction: 'long' })), true, 'a wait read');
+  eq((await reads(v2, 'NVDA'))[0].direction, 'none', 'a wait carries no direction');
+  eq(await rec2(v2, 'NVDA', 185, observed, readOf({ verdict: 'buy' })), true, 'an invalid answer…');
+  eq((await reads(v2, 'NVDA')).length, 4, '…updates the asset but stores no answer');
+  eq(await rec2(v2, 'NVDA', 185, observed, readOf({ headline: 'x'.repeat(500) })), true, 'an overlong line');
+  eq((await reads(v2, 'NVDA'))[0].headline.length, 200, 'is cut to its column limit');
+  for (let i = 0; i < 12; i++) await rec2(v2, 'NVDA', 185, observed, readOf({ headline: `Read ${i}` }));
+  eq([(await reads(v2, 'NVDA')).length, (await reads(v2, 'NVDA'))[0].headline], [10, 'Read 11'], 'the 10 newest answers per asset are kept');
+  const lots = await account();
+  for (let i = 0; i < 21; i++) await seed(lots, `A${i}`, 1, 0);
+  for (let i = 0; i < 21; i++) for (let k = 0; k < 10; k++) await q(`insert into public.bobby_user_reads(identity_id, symbol, verdict, direction, headline, why, risk, watch, delivered_at) values ($1, $2, 'wait', 'none', 'h', 'w', 'r', 'x', now() - make_interval(mins => $3))`, [lots, `A${i}`, i * 10 + k + 1]);
+  await rec2(lots, 'NEWONE', 10, observed);
+  eq((await reads(lots)).length, 200, 'and at most 200 per account');
+  eq((await reads(lots))[0].symbol, 'NEWONE', 'the newest stays');
+
+  const s2 = await sum2(v2, 'NVDA');
+  eq([s2.enabled, s2.preferredName, s2.lastRead.headline, s2.lastRead.verdict, Array.isArray(s2.thisAsset.recentAsks), s2.thisAsset.lastPriceAt !== undefined], [true, null, 'Read 11', 'review', true, true], 'the v2 summary: the newest stored answer, the ask times and the dated price');
+  eq((await sum2(v2, 'AMD')).lastRead, null, 'an asset with no stored answer has none');
+  await q("insert into public.bobby_user_prefs(identity_id, preferred_name) values ($1, 'Tony') on conflict (identity_id) do update set preferred_name = excluded.preferred_name", [v2]);
+  eq((await sum2(v2, 'NVDA')).preferredName, 'Tony', 'the name the person asked for');
+  await assert.rejects(q("update public.bobby_user_prefs set preferred_name = '' where identity_id = $1", [v2])); checks++;
+  await assert.rejects(q("update public.bobby_user_prefs set preferred_name = $2 where identity_id = $1", [v2, 'x'.repeat(41)])); checks++;
+  await q('update public.bobby_user_prefs set memory_enabled = false where identity_id = $1', [v2]);
+  const pausedV2 = await sum2(v2, 'NVDA');
+  eq([pausedV2.enabled, pausedV2.preferredName, pausedV2.lastRead, pausedV2.thisAsset], [false, null, null, null], 'paused: nothing is read, not even the name');
+  const before2 = (await reads(v2)).length;
+  eq(await rec2(v2, 'NVDA', 185, observed), false, 'paused: nothing is recorded');
+  eq((await reads(v2)).length, before2, '…no answer either');
+  await q('update public.bobby_user_prefs set memory_enabled = true where identity_id = $1', [v2]);
+  const w2 = await wallet();
+  eq([await rec2(w2, 'NVDA', 185, observed), (await reads(w2)).length], [false, 0], 'a wallet-only identity stores no answer');
+
+  // v1 callers (the code deployed before v2) go through v2: a price is stamped with the ask time.
+  await q("select public.bobby_memory_record($1, 'SOL', 'unspecified', 150)", [v2]);
+  const viaV1 = await row(v2, 'SOL');
+  ok(Number(viaV1.last_price) === 150 && viaV1.last_price_at instanceof Date, 'the v1 recorder stores a dated price');
+
+  // Forgetting takes the answers with it.
+  await rec2(v2, 'AMD', 150, observed);
+  eq(await forget(v2, 'NVDA'), 1, 'forget NVDA');
+  eq([(await reads(v2, 'NVDA')).length, (await reads(v2, 'AMD')).length], [0, 1], '…and its answers; AMD keeps its own');
+  await forget(v2);
+  eq([(await reads(v2)).length, (await q('select preferred_name from public.bobby_user_prefs where identity_id = $1', [v2]))[0]?.preferred_name ?? null], [0, null], 'forget everything: every answer and the name');
+
+  // The cap takes a dropped asset's answers with it.
+  const capped = await account();
+  for (let i = 1; i <= 50; i++) await seed(capped, `C${String(i).padStart(2, '0')}`, 50 + i, 0);
+  await q(`insert into public.bobby_user_reads(identity_id, symbol, verdict, direction, headline, why, risk, watch) values ($1, 'C01', 'wait', 'none', 'h', 'w', 'r', 'x')`, [capped]);
+  await rec2(capped, 'NEWER', 10, observed);
+  eq((await reads(capped, 'C01')).length, 0, 'an asset dropped by the 50 cap loses its answers too');
+
+  // ---------- the daily purge ----------
+  const stale2 = await account();
+  await seed(stale2, 'OLD', 2, 95);
+  await seed(stale2, 'NEW', 2, 1);
+  await q(`insert into public.bobby_user_reads(identity_id, symbol, verdict, direction, headline, why, risk, watch, delivered_at) values
+    ($1, 'OLD', 'wait', 'none', 'h', 'w', 'r', 'x', now() - interval '95 days'), ($1, 'NEW', 'wait', 'none', 'h', 'w', 'r', 'x', now() - interval '1 day')`, [stale2]);
+  const purged = (await q('select public.bobby_memory_purge() as r'))[0].r;
+  ok(purged.assets >= 1 && purged.reads >= 1, 'the purge removes what is older than 90 days, with no new ask needed');
+  eq([(await rows(stale2)).map((r) => r.symbol), (await reads(stale2)).map((r) => r.symbol)], [['NEW'], ['NEW']], '…and nothing newer');
+
   // ---------- deleting the identity (/api/account) ----------
   const leaving = await account();
   await record(leaving, 'NVDA', 'week');
   await q("insert into public.bobby_user_prefs(identity_id, horizon) values ($1, 'week')", [leaving]);
+  await q(`select public.bobby_memory_record_v2($1, 'NVDA', 'week', 1, now(), null, '{"verdict":"wait","direction":"none","headline":"h","why":"w","risk":"r","watch":"x"}'::jsonb)`, [leaving]);
   await q('delete from public.bobby_identities where id = $1', [leaving]);
+  eq((await q('select count(*) from public.bobby_user_reads where identity_id = $1', [leaving]))[0].count, '0', 'deleting the identity deletes its stored answers');
   eq([await count(leaving), (await q('select count(*) from public.bobby_user_prefs where identity_id = $1', [leaving]))[0].count], [0, '0'], 'deleting the identity deletes its memory');
 
   // ---------- idempotent over live data ----------
