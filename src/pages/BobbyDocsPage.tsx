@@ -289,7 +289,7 @@ export default function BobbyDocsPage() {
               </p>
               <div className="grid gap-3 md:grid-cols-3">
                 {[
-                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app, in three levels: Quick (1H evidence), Deep and Max (more timeframes, crypto derivatives, Bobby\u2019s record on the asset; Max adds a rebuttal round and scenarios). Live NDJSON stream: each argument is sent once it passes the guard. The server computes price positions; the models quote them. Metered, spend-capped, origin-restricted.'],
+                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app, in three levels: Quick (1H evidence), Deep and Max (more timeframes, crypto derivatives, Bobby\u2019s record on the asset; Max adds a rebuttal round and scenarios). Live NDJSON stream: each argument is sent once it passes the guard. The server computes price positions; the models quote them. Metered, with a desk spend budget, origin-restricted.'],
                   ['PUBLIC · /api/bobby-cycle', 'Daily at 12:00 UTC. Alpha and Red Team, then a CIO with a forced structured verdict (entry, stop, target, invalidation, conviction). Calls are graded on the 1H price path after 48 h and listed with their debate on the record.'],
                   ['AGENTS · MCP bobby_debate', 'Three roles for other agents, through a separate conversational debate flow. Premium: paid per call in ETH on Base through AgentEconomy.'],
                 ].map(([title, text]) => (
@@ -541,12 +541,12 @@ IBobbyOracle oracle = IBobbyOracle(
                     <ShoppingCart className="w-5 h-5 text-[#7da6ff]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Public proof ledger</div>
+                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Testnet canary · Base Sepolia</div>
                     <div className="text-lg md:text-xl text-white font-extrabold tracking-[-0.05em] mb-1.5">
-                      Inspect verified calls
+                      Inspect the verified-calls canary
                     </div>
                     <div className="text-sm leading-6 text-white/60">
-                      Committed before outcome, resolved with evidence, and anchored to Base.
+                      A frozen testnet ledger: committed before the outcome and resolved with evidence. The mainnet record is TrackRecord V2 above.
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#7da6ff]/60 group-hover:text-[#7da6ff] group-hover:translate-x-1 transition-all shrink-0" />

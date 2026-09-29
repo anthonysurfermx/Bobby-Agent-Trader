@@ -346,7 +346,7 @@ export default function BobbyProtocolLanding() {
   ];
 
   const navItems = [
-    ['Verified calls', '/protocol/calls'],
+    ['Testnet canary', '/protocol/calls'],
     ['The rules', '#rules'],
     ['The procedure', '#how-it-works'],
     ['Integration', '#for-agents'],
@@ -369,7 +369,7 @@ export default function BobbyProtocolLanding() {
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
       <Helmet>
         <title>Bobby Protocol — Refuted before execution</title>
-        <meta name="description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and every public call is written down before the outcome." />
+        <meta name="description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and eligible public theses are committed before the outcome." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
@@ -387,7 +387,7 @@ export default function BobbyProtocolLanding() {
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The rules behind every answer Bobby gives about a market <span aria-hidden>›</span>
               </a>
               <h1 className="max-w-4xl text-[clamp(2.4rem,5.2vw,5rem)] font-extrabold leading-[.96] tracking-[-0.085em]">No decision is approved<br />without being <span className="text-[#0052ff]">refuted.</span></h1>
-              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">When Bobby answers a question about an asset, this is what happens before you see it: one agent builds the case, a second one tries to break it, a third one rules and can veto it. Every public call is written down before the market settles it.</p>
+              <p className="mt-8 max-w-2xl text-lg leading-8 text-white/60 md:text-xl">When Bobby answers a question about an asset, this is what happens before you see it: one agent builds the case, a second one tries to break it, a third one rules and can veto it. Eligible public theses are committed on Base before the market settles them.</p>
               <p className="mt-5 max-w-2xl border-l-2 border-[#0052ff] pl-4 text-sm leading-6 text-white/45 md:text-base">Bobby runs on the same models everyone else uses. The difference is not the model, it is the procedure around it.</p>
               <div className="mt-10 flex flex-col gap-3 sm:flex-row">
                 <a href="/desk" className="group inline-flex items-center justify-center gap-3 rounded-lg bg-white px-8 py-4 font-mono text-sm font-bold uppercase tracking-[0.15em] text-black transition hover:bg-[#0052ff] hover:text-white">Inspect a verdict <ArrowRight className="h-4 w-4 transition group-hover:translate-x-1" /></a>
@@ -498,7 +498,7 @@ export default function BobbyProtocolLanding() {
                 ['Live debate', 'Alpha Hunter, then Red Team, then (on Max) the rebuttal stream in one by one; the CIO closes. Each argument is shown only after it passes the output guard.'],
                 ['Synthesis first', 'The CIO answers in plain words: a headline, why, the main risk and what to watch, with that level drawn on the chart, and a follow-up question. The full debate stays folded, one tap away.'],
                 ['Computed, then quoted', 'The server computes where the price sits against its EMAs, support and resistance, as a % of price. The models quote those distances; they never compute them.'],
-                ['Spend guard', 'Every model call goes to a cost ledger: tokens, list-price cost and latency, never prompts or answers. Deep and Max pause above a daily cap, everything at a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
+                ['Spend guard', 'Every desk model call goes to a cost ledger: tokens, list-price cost and latency, never prompts or answers. Deep and Max pause above a daily budget; the desk has a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
               ].map(([title, text]) => (
                 <div key={title} className="rounded-2xl border border-white/10 bg-[#0b0b12]/80 p-5">
                   <div className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-[#7da6ff]">{title}</div>
@@ -655,7 +655,7 @@ export default function BobbyProtocolLanding() {
                 },
                 {
                   title: 'Proof',
-                  description: 'The daily public debate stores every call with entry, stop, target and a 48-hour expiry before the outcome, and grades it on the real 1H price path. Calls the cycle commits live also go to TrackRecordV2 on Base with a Pyth price anchor.',
+                  description: 'The daily public debate stores every call with entry, stop, target and a 48-hour expiry before the outcome, and grades it on the real 1H price path. Eligible calls the cycle commits live also go to TrackRecordV2 on Base; price-verified and attested outcomes are kept apart.',
                   telemetry: [`cycle  ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`, `resolver  ${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}`, 'grading  first touch · stop wins a tie', `chain  base · 8453 · ${formatNumber(onchainRecord?.commitmentsCreated, '0')} on-chain`],
                 },
               ]} />
@@ -682,7 +682,7 @@ export default function BobbyProtocolLanding() {
                       ['Evidence', 'Public market data for one instrument (crypto and equities): 1H candles on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on the asset on Deep and Max.'],
                       ['Engine', 'Deterministic indicators (trend, RSI, ATR, EMA, support and resistance). The server computes where the price sits against each level; the models only quote it.'],
                       ['Output', 'Synthesis first: headline, why, main risk, what to watch (drawn on the chart) and a follow-up question, then review or wait with the full debate.'],
-                      ['Spend', 'Every call logged to a cost ledger (numbers only). Daily cap pauses Deep and Max; monthly hard cap pauses all. Failed or abandoned premium reads are refunded.'],
+                      ['Spend', 'Each desk model call is logged to a cost ledger (numbers only). Deep and Max pause above a daily budget; the desk has a monthly hard cap. A failed or abandoned Deep or Max read is refunded.'],
                       ['Record', 'Private. A desk answer is not published to the public ledger.'],
                     ],
                   },
@@ -847,7 +847,7 @@ export default function BobbyProtocolLanding() {
               </div>
               {([
                 ['Protocol', [
-                  ['Verified calls', '/protocol/calls'],
+                  ['Testnet canary (Sepolia)', '/protocol/calls'],
                   ['Heartbeat', '/protocol/heartbeat'],
                   ['Audits', '/protocol/audits'],
                   ['Console', '/protocol/console'],

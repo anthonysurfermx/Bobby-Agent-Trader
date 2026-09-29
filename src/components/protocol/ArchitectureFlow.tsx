@@ -16,7 +16,7 @@ const NODES: Node[] = [
   { id: 'mcp', col: 0, title: 'Other agents', sub: 'MCP · HTTP', tone: 'ink', detail: 'Another AI agent calls Bobby over MCP: 6 JSON-RPC tools, 15 on streamable HTTP.' },
   { id: 'cron', col: 0, title: 'Daily cycle', sub: '12:00 UTC', tone: 'ink', detail: 'A scheduled job starts the public debate once a day.' },
 
-  { id: 'api', col: 1, title: 'API gateway', sub: 'access · limits', tone: 'ink', detail: 'Serverless API: origin check, rate limits, metered reads and levels (Quick, Deep, Max), and a spend guard that reads the LLM cost ledger before any model call.' },
+  { id: 'api', col: 1, title: 'API gateway', sub: 'access · limits', tone: 'ink', detail: 'Serverless API: origin check, rate limits, metered reads and levels (Quick, Deep, Max), and a desk spend budget read from the LLM cost ledger before any model call.' },
   { id: 'x402', col: 1, title: 'x402 payment', sub: 'paid on Base', tone: 'base', detail: 'Premium MCP tools are paid per call in ETH on Base; the payment is checked against AgentEconomy.' },
 
   { id: 'market', col: 2, title: 'Market intel', sub: 'public market data', tone: 'ink', detail: 'Public market data: prices and candles (1H on Quick; more timeframes, crypto derivatives and Bobby\u2019s record on Deep and Max), plus funding, positioning and sentiment for the cycle.' },
