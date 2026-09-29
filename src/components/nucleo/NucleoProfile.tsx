@@ -4,7 +4,7 @@
 // the way the iPhone app keeps them behind its header face.
 import { useState, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, ChevronRight, Globe, Grid2x2, Lock, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, ChevronRight, Globe, Grid2x2, Lock, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -44,6 +44,8 @@ interface Props {
   onToggleSounds: () => void;
   onReset: () => void;
   pro: { label: string; detail: string; action: () => void };
+  /** Invite friends: five slots, Bobby Pro for each friend who joins. */
+  invite: { label: string; detail: string; action: () => void };
 }
 
 function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; label: string; detail?: string; onClick?: () => void; children?: ReactNode }) {
@@ -127,6 +129,7 @@ export default function NucleoProfile(p: Props) {
           <div className="n-label mb-2">{t('Account', 'Cuenta', 'Conta')}</div>
           <div className="n-row"><span className="n-row-ico"><Globe size={16} /></span><span className="flex-1 text-[15px]">{t('Save your progress', 'Guarda tu progreso', 'Salve seu progresso')}</span><ProgressSync onChoose={p.onSignIn} /></div>
           <Row icon={<Sparkles size={16} />} label={p.pro.label} detail={p.pro.detail} onClick={p.pro.action} />
+          <Row icon={<UserPlus size={16} />} label={p.invite.label} detail={p.invite.detail} onClick={p.invite.action} />
           <Row icon={<ArrowLeftRight size={16} />} label={t('Swap on Base', 'Swap en Base', 'Swap na Base')} detail={t('Your wallet signs every swap', 'Tu wallet firma cada swap', 'Sua carteira assina cada swap')} onClick={p.onSwap}>
             <span className="flex items-center gap-2"><WalletBalancePill onClick={p.onSwap} /><ChevronRight size={16} style={{ color: '#8A8378' }} /></span>
           </Row>

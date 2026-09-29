@@ -6,7 +6,21 @@ import { progressHeaders } from '@/lib/companions/sync';
 
 export type Tier = 'anon' | 'free' | 'pro';
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
-export interface AccessState { access: Access; signedIn: boolean; subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null; payments: { stripe: boolean; apple: boolean } }
+/** The analysis levels (api/_lib/desk-levels.ts). Rápido rides the read meter; Profundo and Máximo have their own. */
+export type DeskLevel = 'rapido' | 'profundo' | 'maximo';
+export type PremiumLevel = Exclude<DeskLevel, 'rapido'>;
+export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null }
+export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
+/** Your invite link: each friend who creates an account through it adds `rewardDays` of Bobby Pro, up to `max`. */
+export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; friends: Array<{ joinedAt: string }> }
+export interface AccessState {
+  access: Access; signedIn: boolean;
+  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null;
+  payments: { stripe: boolean; apple: boolean };
+  levels?: LevelState | null; referral?: Referral | null;
+  /** [uses, window days] per plan and premium level, and the invite terms (api/_lib/desk-levels.ts). */
+  plans?: { limits: Record<Tier, Record<PremiumLevel, [number, number]>>; referral: { maxFriends: number; rewardDays: number }; freeReadsPerWeek: number | null };
+}
 
 const DEVICE_KEY = 'bobby:device:v1';
 
@@ -51,3 +65,40 @@ export async function startBilling(action: 'checkout' | 'portal'): Promise<strin
     return body.error ?? 'Payments are temporarily unavailable.';
   } catch { return 'Payments are temporarily unavailable.'; }
 }
+
+// ---- invite a friend: the link carries ?ref=CODE; the code waits here until the friend has an account ----
+const REF_KEY = 'bobby:ref:v1';
+const isCode = (v: unknown): v is string => typeof v === 'string' && /^[A-HJ-NP-Z2-9]{8}$/.test(v);
+
+/** Keep an invite code from the URL (?ref=) and clean the address bar. Returns the stored code, if any. */
+export function captureReferral(): string | null {
+  try {
+    const url = new URL(window.location.href);
+    const fromUrl = url.searchParams.get('ref')?.trim().toUpperCase();
+    if (isCode(fromUrl)) localStorage.setItem(REF_KEY, fromUrl);
+    if (url.searchParams.has('ref')) { url.searchParams.delete('ref'); window.history.replaceState(window.history.state, '', url.toString()); }
+    const stored = localStorage.getItem(REF_KEY);
+    return isCode(stored) ? stored : null;
+  } catch { return null; }
+}
+export function pendingReferral(): string | null {
+  try { const v = localStorage.getItem(REF_KEY); return isCode(v) ? v : null; } catch { return null; }
+}
+function forgetReferral() { try { localStorage.removeItem(REF_KEY); } catch { /* private mode */ } }
+
+export type ClaimResult = 'claimed' | 'invalid_code' | 'self' | 'account_required' | 'not_new' | 'already_claimed' | 'inviter_full' | 'invalid_invitee';
+/** Accept the stored invitation for the signed-in account. Forgets the code on any final answer; keeps it on a transient failure. */
+export async function claimPendingReferral(): Promise<ClaimResult | null> {
+  const code = pendingReferral();
+  if (!code) return null;
+  try {
+    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action: 'referral-claim', code }) });
+    if (r.status === 401 || r.status >= 500) return null;
+    const body = (await r.json().catch(() => ({}))) as { result?: ClaimResult };
+    // A wallet session is not an account yet: the code waits for the Apple/Google sign-in.
+    if (body.result === 'account_required') return 'account_required';
+    forgetReferral();
+    return body.result ?? 'invalid_code';
+  } catch { return null; }
+}
+

@@ -41,7 +41,7 @@ try {
   globalThis.fetch=async(_input,init)=>{
     const body=JSON.parse(String(init?.body));prompts.push(body);
     return json({choices:[{finish_reason:'stop',message:{content:JSON.stringify(prompts.length===3
-      ? {analysis:'Both arguments are conditional. Wait for stronger confirmation.',verdict:'wait',direction:'none'}
+      ? {analysis:'Both arguments are conditional. Wait for stronger confirmation.',verdict:'wait',direction:'none',synthesis:{headline:'Wait for stronger confirmation.',why:'Both arguments are conditional.',risk:'The trend could fail without confirmation.',watch:'A close above resistance.',watchLevel:0,followUp:'What would confirm the NVDA trend?'}}
       : {analysis:prompts.length===1?'The recent trend supports a conditional opportunity.':'The trend could fail without further confirmation.'})}}]});
   };
   const question='Is the recent trend supported by this chart?';
@@ -53,7 +53,7 @@ try {
   globalThis.fetch=async()=>json({choices:[{finish_reason:'length',message:{content:'{}'}}]});
   await assert.rejects(runDeskDebate(question,evidence,'en'));checks++;
   for(const [quota,status] of [[json({},503),503],[json(false),429]] as const) {
-    let calls=0,model=0;globalThis.fetch=async(input)=>{if(String(input).includes('openai'))model++;if(String(input).includes('rpc/bobby_consume_desk_quota'))calls++;return String(input).includes('bobby_desk_quotas?')?json([]):quota;};
+    let calls=0,model=0;globalThis.fetch=async(input)=>{if(String(input).includes('openai'))model++;if(String(input).includes('rpc/bobby_consume_desk_quota'))calls++;return String(input).includes('bobby_desk_quotas?')?json([]):quota.clone();};
     const res=response();await deskHandler({...req,body:{symbol:'BTC',question}} as never,res as never);
     eq(res.statusCode,status);eq(calls,1);eq(model,0);eq(res.body.agents,undefined);
   }

@@ -1,0 +1,4030 @@
+{
+  "meta": {
+    "date": "2026-09-29",
+    "script": "scripts/eval/desk-levels-paired.mts",
+    "branch": "feat/analysis-levels-referrals",
+    "commit": "1dfbc0f",
+    "arms": {
+      "BASELINE": "gpt-4o-mini ×3, old prompts, json_object, temperature 0.2, evidence v1 (+ output guard, as prod had)",
+      "RAPIDO": "runDeskDebate level rapido, evidence v1",
+      "PROFUNDO": "runDeskDebate level profundo, evidence v2",
+      "MAXIMO": "runDeskDebate level maximo, evidence v2"
+    },
+    "judges": [
+      "claude-sonnet-5-5 (effort medium, json_schema)",
+      "gpt-6-sol (reasoning_effort medium, json_object)"
+    ],
+    "criteria": [
+      "answers_question",
+      "evidence_grounding",
+      "honesty_on_gaps",
+      "clarity_for_novice",
+      "decision_usefulness"
+    ],
+    "spend": {
+      "arms": 0.44899819999999996,
+      "judges": 0.26925200000000005
+    }
+  },
+  "cases": [
+    {
+      "id": "btc",
+      "symbol": "BTC",
+      "lang": "es",
+      "question": "¿Conviene entrar a BTC esta semana o esperar?",
+      "seed": 1000,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "BTC",
+          "technicals": {
+            "price": 84014.9,
+            "rsi14": 57.8,
+            "ema20": 83635.6,
+            "ema50": 83720.9,
+            "support": 82556.6,
+            "resistance": 84374.2,
+            "atrPct": 0.49,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "BTC-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "BTC",
+          "technicals": {
+            "price": 84014.9,
+            "rsi14": 57.8,
+            "ema20": 83635.6,
+            "ema50": 83720.9,
+            "support": 82556.6,
+            "resistance": 84374.2,
+            "atrPct": 0.49,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "BTC-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 84014.9,
+              "rsi14": 57.8,
+              "ema20": 83635.6,
+              "ema50": 83720.9,
+              "support": 82556.6,
+              "resistance": 84374.2,
+              "atrPct": 0.49,
+              "trend": "lateral",
+              "momentum": "neutral"
+            },
+            "4H": {
+              "price": 84033.1,
+              "rsi14": 46.3,
+              "ema20": 83855.8,
+              "ema50": 83387.2,
+              "support": 82556.6,
+              "resistance": 85258.8,
+              "atrPct": 1.02,
+              "trend": "alcista",
+              "momentum": "neutral",
+              "bars": 100,
+              "asOf": "2026-09-29T08:00:00.000Z"
+            },
+            "1D": {
+              "price": 84033.1,
+              "rsi14": 70.1,
+              "ema20": 81808.1,
+              "ema50": 77407.6,
+              "support": 74955.5,
+              "resistance": 87399,
+              "atrPct": 2.92,
+              "trend": "alcista",
+              "momentum": "sobrecompra",
+              "bars": 100,
+              "asOf": "2026-09-28T16:00:00.000Z"
+            },
+            "1W": {
+              "price": 84033.2,
+              "rsi14": 82,
+              "ema20": 74706.4,
+              "ema50": 82392.6,
+              "support": 57809.4,
+              "resistance": 87399,
+              "atrPct": 6.29,
+              "trend": "lateral",
+              "momentum": "sobrecompra",
+              "bars": 60,
+              "asOf": "2026-09-27T16:00:00.000Z"
+            }
+          },
+          "derivatives": {
+            "fundingRatePct": 0.0009,
+            "nextFundingAt": "2026-09-30T00:00:00.000Z",
+            "openInterest": 28329.571000000087
+          },
+          "record": {
+            "resolvedCalls": 145,
+            "wins": 67,
+            "losses": 35,
+            "breakEven": 43,
+            "lastResolved": [
+              {
+                "direction": "short",
+                "entry": 62884.5,
+                "target": 60921.9,
+                "stop": 64111.1,
+                "outcome": "win",
+                "calledAt": "2026-06-09T09:16:23.471984+00:00",
+                "resolvedAt": "2026-06-10T09:22:04.447+00:00"
+              },
+              {
+                "direction": "short",
+                "entry": 62790.6,
+                "target": 60977.8,
+                "stop": 63923.6,
+                "outcome": "win",
+                "calledAt": "2026-06-09T11:01:17.48534+00:00",
+                "resolvedAt": "2026-06-10T09:22:04.279+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 63507.7,
+                "target": 65060.1,
+                "stop": 61658.5,
+                "outcome": "loss",
+                "calledAt": "2026-06-08T10:02:19.512061+00:00",
+                "resolvedAt": "2026-06-09T14:37:05.606+00:00"
+              }
+            ],
+            "latestCall": {
+              "direction": null,
+              "entry": null,
+              "target": null,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-09-28T12:00:58.856868+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "4H",
+          "1D",
+          "1W"
+        ],
+        "derivatives": true,
+        "record": {
+          "resolvedCalls": 145
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4208,
+          "usd": 0.00032684999999999995,
+          "tokensIn": 1175,
+          "tokensOut": 251,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1754,
+              "usd": 0.00009059999999999999,
+              "tin": 280,
+              "tout": 81,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1206,
+              "usd": 0.000105,
+              "tin": 368,
+              "tout": 83,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1248,
+              "usd": 0.00013125,
+              "tin": 527,
+              "tout": 87,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "El precio de BTC es de 84014.9, con un RSI de 57.8, lo que indica un momentum neutral. La tendencia es lateral, y el soporte se encuentra en 82556.6 mientras que la resistencia está en 84374.2. Dado que el precio actual está cerca de la resistencia, podría ser prudente esperar antes de entrar.",
+            "red": "La argumentación de Alpha asume que la proximidad al nivel de resistencia sugiere esperar, pero no considera que el momentum neutral y la tendencia lateral podrían permitir movimientos de precio en ambas direcciones. Además, no se menciona el contexto del mercado más amplio ni otros factores que podrían influir en el precio de BTC, lo que genera incertidumbre en la decisión de esperar o entrar.",
+            "cio": "El precio de BTC es de 84014.9, con un RSI de 57.8 y una tendencia lateral. Aunque el análisis sugiere esperar debido a la proximidad a la resistencia, la falta de contexto sobre el mercado más amplio y la neutralidad del momentum generan incertidumbre. Por lo tanto, no hay una conclusión clara sobre si entrar o esperar.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 15260,
+          "usd": 0.0009396999999999999,
+          "tokensIn": 2327,
+          "tokensOut": 1414,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 4424,
+              "usd": 0.00025540000000000003,
+              "tin": 524,
+              "tout": 406,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 4503,
+              "usd": 0.0002461,
+              "tin": 656,
+              "tout": 361,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 6332,
+              "usd": 0.00043819999999999997,
+              "tin": 1147,
+              "tout": 647,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "week",
+            "available": [
+              "1H"
+            ],
+            "missing": [
+              "4H",
+              "1D"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Faltan datos de 4H y 1D para valorar adecuadamente un horizonte de una semana; la evidencia disponible es solo de 1H. En ese marco, BTC está lateral y el impulso es neutral: cotiza por encima de la EMA20 (0,45%), de la EMA50 (0,35%) y del soporte (1,77%), pero por debajo de la resistencia (0,43%). La oportunidad más clara sería condicional: esperar una confirmación por encima de la resistencia antes de considerar una entrada; estos datos por sí solos no confirman una señal semanal.",
+            "red": "Para valorar una decisión de una semana faltan datos de 4H y 1D; solo hay información de 1H. La propuesta de esperar una confirmación sobre la resistencia de 84.374,2 presupone que una ruptura en ese marco sería fiable, pero no define la confirmación ni aporta evidencia de seguimiento; BTC está lateral, con impulso neutral, y cotiza 0,43% por debajo de la resistencia, 0,45% por encima de la EMA20, 0,35% por encima de la EMA50 y 1,77% por encima del soporte. Sin marcos mayores, no se puede evaluar si esa ruptura se sostendría ni qué invalidaría la señal en el horizonte semanal.",
+            "cio": "Faltan datos de 4H y 1D para evaluar una semana; solo hay datos de mercado de 1H. BTC está lateral y con impulso neutral: está por encima de la EMA20 (0,45%), de la EMA50 (0,35%) y del soporte (1,77%), pero por debajo de la resistencia (0,43%). Esta evidencia no sustenta una conclusión clara para entrar esta semana.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Espera: los datos disponibles no bastan para valorar BTC durante esta semana.",
+              "why": "Solo hay marco 1H; BTC está lateral, con impulso neutral y cerca de resistencia.",
+              "risk": "Faltan 4H y 1D, así que no se evalúa la tendencia semanal ni su continuidad.",
+              "watch": "Observa si BTC supera la resistencia de 84.374,2.",
+              "watchLevel": 84374.2,
+              "followUp": "¿Qué señales de BTC confirmarían una ruptura esta semana?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 18232,
+          "usd": 0.0131048,
+          "tokensIn": 7256,
+          "tokensOut": 1567,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 6368,
+              "usd": 0.0003719,
+              "tin": 1634,
+              "tout": 417,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 7475,
+              "usd": 0.0005269,
+              "tin": 1829,
+              "tout": 688,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4389,
+              "usd": 0.012206,
+              "tin": 3793,
+              "tout": 462,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "week",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para el horizonte semanal no falta contexto temporal, pero la señal es mixta: 4H y 1D son alcistas, mientras 1W sigue lateral y sobrecomprado; la cotización está 3,85% por debajo de la resistencia semanal de 87.399. La oportunidad más clara es condicional: esperar confirmación por encima de 84.374,2 (1H, precio 0,43% por debajo) y observar si también supera 85.258,8 (4H, 1,44% por debajo); alternativamente, vigilar la zona de soporte 82.556,6, con el precio 1,79% por encima en 4H. El mercado de BTC-USDT disponible está fechado al 29-09-2026 10:00 UTC para 1H; la última tesis registrada no tenía dirección y sigue pendiente.",
+            "red": "La lógica de Alpha trata superar 84.374,2 y luego 85.258,8 como confirmación, pero el corte disponible solo muestra el precio por debajo de ambas: 0,43% bajo la resistencia 1H y 1,44% bajo la 4H; no aporta cierres posteriores que validen una ruptura, y esperar esos niveles también podría implicar entrar tras el movimiento. El sesgo no es uniforme: 1H está lateral y neutral, 4H y 1D son alcistas, pero 1D está sobrecomprado y 1W lateral y sobrecomprado; el precio sigue por encima del soporte 4H de 82.556,6 por 1,79%, lo cual no demuestra que vaya a sostenerse. Además, Alpha no define qué invalidaría su escenario, y la última tesis pública registrada no tenía dirección y sigue pendiente; el mercado disponible es BTC-USDT en 1H, con fecha 29-09-2026 10:00 UTC.",
+            "cio": "Para una semana hay datos suficientes, pero la señal es mixta: 4H y 1D son alcistas, mientras 1D y 1W están sobrecomprados y 1W sigue lateral. El precio (84.014,9) está 0,43% por debajo de la resistencia 1H de 84.374,2 y 3,85% por debajo de la semanal de 87.399, sin ruptura confirmada. El soporte de 82.556,6 queda 1,77% por debajo, así que el margen es estrecho en ambos sentidos; sin confirmación es más prudente esperar. La última tesis de Bobby no tenía dirección y sigue pendiente.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Por ahora es más prudente esperar que entrar a BTC esta semana.",
+              "why": "Tendencia alcista en 4H y 1D, pero sobrecompra en diario y semanal y precio bajo resistencias.",
+              "risk": "Una ruptura falsa o un giro desde sobrecompra podría devolver el precio hacia el soporte de 82.556,6.",
+              "watch": "Si el precio supera la resistencia de 84.374,2 con cierre confirmado en 1H.",
+              "watchLevel": 84374.2,
+              "followUp": "¿Qué pasaría con BTC si pierde el soporte de 82.556?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 27027,
+          "usd": 0.050749999999999997,
+          "tokensIn": 13985,
+          "tokensOut": 2278,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 5478,
+              "usd": 0.00946,
+              "tin": 2495,
+              "tout": 447,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 10217,
+              "usd": 0.011986,
+              "tin": 2953,
+              "tout": 608,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 5768,
+              "usd": 0.012612,
+              "tin": 3571,
+              "tout": 547,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5564,
+              "usd": 0.016692,
+              "tin": 4966,
+              "tout": 676,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "week",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para una semana la evidencia es suficiente (1H, 4H, 1D y 1W) y muestra un sesgo alcista con matices: en 1D la tendencia es alcista (precio 2.72% sobre la EMA20 y 8.56% sobre la EMA50), pero el RSI diario de 70.1 y el semanal de 82 marcan sobrecompra, mientras que 1H y 1W se califican como laterales y 4H tiene RSI 46.3 y momentum neutral. La oportunidad condicional más fuerte sería una ruptura confirmada de la resistencia de 84,374.2 (0.43% por encima del precio actual), con el siguiente obstáculo en 85,258.8 en 4H y 87,399 en 1D/1W (3.85% por encima); si el precio pierde el soporte de 82,556.6 (1.77% por debajo), esa lectura se debilita. Esperar una confirmación parece más coherente que entrar ahora, porque el precio está pegado a la resistencia, la sobrecompra en marcos altos sugiere riesgo de pausa o retroceso, y el funding de 0.0009% es casi neutro, sin señal de apalancamiento extremo; esto es contexto educativo, no una recomendación personalizada ni una garantía de resultado.",
+            "red": "Alpha concluye que esperar confirmación es más coherente, pero su lectura tiene flancos. Dice que el precio está 'pegado a la resistencia' de 84,374.2 (0.43% de distancia) cuando el ATR 1H es solo 0.49% y el 4H es 1.02%, así que una ruptura o un rechazo puede ocurrir en pocas horas y no define nada semanal; además Alpha no precisa qué cuenta como 'confirmación' (cierre 1H, 4H o 1D por encima), y sin ese criterio la espera no es falsable. Por otro lado, habla de un 'sesgo alcista' apoyado en 1D, pero pasa por alto que 1W tiene el precio 1.99% sobre la EMA50 con un RSI de 82, y que la EMA20 semanal (74,706.4) está 12.48% por debajo, lo que indica un movimiento muy extendido donde la sobrecompra puede persistir o dar un retroceso amplio; el soporte relevante de 1D está a 74,955.5 (12.11% por debajo), mucho más lejos que el 82,556.6 que Alpha usa como invalidación (1.77%), y perder ese nivel cercano no equivale a invalidar la tendencia mayor. Finalmente, el funding de 0.0009% y el open interest aislado son solo contexto de posicionamiento y no respaldan ni descartan nada, y el registro de Bobby (67 ganadas, 35 perdidas y 43 en equilibrio de 145 llamadas) no incluye resultados recientes en este rango de precio ni una dirección en la llamada pendiente, así que no debe usarse como aval; todo esto es educativo, no una recomendación personalizada ni garantía de resultado.",
+            "rebuttal": "Red tiene razón en tres puntos: con un ATR 1H de 0.49% y 4H de 1.02%, la resistencia de 84,374.2 (0.43% por encima del precio) puede romperse o rechazarse en horas, así que 'pegado a la resistencia' no define la semana; mi 'confirmación' no era falsable; y perder el soporte de 82,556.6 (1.77% por debajo) solo invalida el escenario táctico, no la tendencia mayor, cuyo soporte 1D está en 74,955.5 (12.11% por debajo). También concedo que el RSI semanal de 82 con la EMA20 semanal 12.48% por debajo indica un movimiento extendido donde la sobrecompra puede persistir o dar un retroceso amplio, y que ni el funding de 0.0009% ni el registro (67 ganadas, 35 perdidas, 43 en equilibrio de 145) ni la llamada pendiente sin dirección respaldan una dirección. Lo que sobrevive es un caso condicional más preciso: esperar un cierre 4H por encima de 84,374.2 (con 4H en tendencia alcista y precio 0.21% sobre su EMA20), con 85,258.8 (1.44% por encima) y 87,399 (3.85%) como obstáculos, y tratar un cierre 4H bajo 82,556.6 como señal de que ese escenario falló; sin cierre 4H, no hay ventaja clara y esperar es una opción razonable. Esto es contexto educativo, no una recomendación personalizada ni garantía de resultado.",
+            "cio": "Para una semana la evidencia es suficiente (1H, 4H, 1D y 1W), pero no hay una ventaja clara hoy: el precio está 0.43% bajo la resistencia de 84,374.2, el 1D es alcista (2.72% sobre su EMA20) pero con RSI 70.1, y el 1W tiene RSI 82, un movimiento muy extendido. Los marcos no coinciden del todo (1H y 1W laterales, 4H y 1D alcistas), el funding de 0.0009% es casi neutro y el registro de Bobby no respalda una dirección, así que esperar es lo más coherente. Un caso condicional alcista solo aparece con un cierre 4H sobre 84,374.2, con obstáculos en 85,258.8 (1.44% arriba) y 87,399 (3.85% arriba); es contexto educativo, no una recomendación personalizada ni garantía de resultado.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Por ahora esperar es más razonable: BTC no muestra una ventaja clara esta semana.",
+              "why": "Precio pegado a resistencia y sobrecompra en diario y semanal, con marcos temporales que no coinciden.",
+              "risk": "Un rechazo o retroceso amplio es posible porque el movimiento semanal está muy extendido (RSI 82).",
+              "watch": "Un cierre de 4H por encima de la resistencia en 84,374.2.",
+              "watchLevel": 84374.2,
+              "followUp": "¿Qué haría BTC si pierde el soporte de 82,556?"
+            },
+            "scenarios": {
+              "confirm": "Un cierre 4H de BTC por encima de 84,374.2 mantendría la tendencia alcista de 4H y abriría el camino hacia 85,258.8 y 87,399.",
+              "invalidate": "Un cierre 4H por debajo de 82,556.6 (1.77% bajo el precio) haría fallar el escenario alcista táctico."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "BASELINE",
+        "B": "RAPIDO",
+        "C": "PROFUNDO",
+        "D": "MAXIMO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.02027,
+          "ms": 4715,
+          "tin": 7485,
+          "tout": 530,
+          "stop": "end_turn",
+          "byArm": {
+            "BASELINE": {
+              "answers_question": 5,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 4,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Concluye esperar con solo datos de 1H, pero sin decir que falta contexto semanal ni dar niveles de confirmación o invalidación claros."
+            },
+            "RAPIDO": {
+              "answers_question": 6,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 5,
+              "overall": 6,
+              "reason": "Reconoce con franqueza que solo hay 1H y que no alcanza para una semana; los porcentajes son correctos, pero aporta poco más allá de vigilar la resistencia."
+            },
+            "PROFUNDO": {
+              "answers_question": 8,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 7,
+              "overall": 7,
+              "reason": "Usa todos los marcos temporales con cifras correctas, la señal mixta está bien explicada y hay riesgo y vigilancia, aunque sin invalidación explícita del escenario."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Análisis multi-timeframe completo y bien calculado; la Red Team afina el criterio, con confirmación e invalidación en cierre 4H, y aclara los límites del funding y del registro."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.016098,
+          "ms": 12724,
+          "tin": 4059,
+          "tout": 798,
+          "stop": "stop",
+          "byArm": {
+            "BASELINE": {
+              "answers_question": 7,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Responde con cautela y cifras correctas, pero no precisa qué señal cambiaría la decisión esta semana."
+            },
+            "RAPIDO": {
+              "answers_question": 9,
+              "evidence_grounding": 10,
+              "honesty_on_gaps": 10,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 9,
+              "reason": "Explica claramente por qué el marco 1H disponible no basta para decidir sobre una semana y qué resistencia vigilar."
+            },
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 9,
+              "overall": 8,
+              "reason": "Integra bien los marcos temporales y propone niveles a vigilar, pero introduce un nombre ausente de la evidencia."
+            },
+            "MAXIMO": {
+              "answers_question": 10,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 10,
+              "overall": 9,
+              "reason": "Da una respuesta semanal útil, con condiciones de confirmación e invalidación; es densa y añade un nombre no acreditado."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "eth",
+      "symbol": "ETH",
+      "lang": "es",
+      "question": "¿ETH para las próximas semanas, entro o espero?",
+      "seed": 1001,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "ETH",
+          "technicals": {
+            "price": 2711.6,
+            "rsi14": 61.2,
+            "ema20": 2689.1,
+            "ema50": 2684.4,
+            "support": 2635.7,
+            "resistance": 2735,
+            "atrPct": 0.68,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "ETH-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "ETH",
+          "technicals": {
+            "price": 2711.6,
+            "rsi14": 61.2,
+            "ema20": 2689.1,
+            "ema50": 2684.4,
+            "support": 2635.7,
+            "resistance": 2735,
+            "atrPct": 0.68,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "ETH-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 2711.6,
+              "rsi14": 61.2,
+              "ema20": 2689.1,
+              "ema50": 2684.4,
+              "support": 2635.7,
+              "resistance": 2735,
+              "atrPct": 0.68,
+              "trend": "alcista",
+              "momentum": "neutral"
+            },
+            "4H": {
+              "price": 2711.6,
+              "rsi14": 53.4,
+              "ema20": 2687,
+              "ema50": 2669,
+              "support": 2635.7,
+              "resistance": 2742.7,
+              "atrPct": 1.34,
+              "trend": "alcista",
+              "momentum": "neutral",
+              "bars": 100,
+              "asOf": "2026-09-29T08:00:00.000Z"
+            },
+            "1D": {
+              "price": 2711.7,
+              "rsi14": 72.6,
+              "ema20": 2610.7,
+              "ema50": 2427,
+              "support": 2356.7,
+              "resistance": 2807.7,
+              "atrPct": 3.52,
+              "trend": "alcista",
+              "momentum": "sobrecompra",
+              "bars": 100,
+              "asOf": "2026-09-28T16:00:00.000Z"
+            },
+            "1W": {
+              "price": 2711.6,
+              "rsi14": 92.5,
+              "ema20": 2294.7,
+              "ema50": 2679.9,
+              "support": 1504.4,
+              "resistance": 2807.7,
+              "atrPct": 7.77,
+              "trend": "lateral",
+              "momentum": "sobrecompra",
+              "bars": 60,
+              "asOf": "2026-09-27T16:00:00.000Z"
+            }
+          },
+          "derivatives": {
+            "fundingRatePct": 0.0071,
+            "nextFundingAt": "2026-09-30T00:00:00.000Z",
+            "openInterest": 610271.3180000014
+          },
+          "record": {
+            "resolvedCalls": 200,
+            "wins": 158,
+            "losses": 28,
+            "breakEven": 14,
+            "lastResolved": [
+              {
+                "direction": "long",
+                "entry": 1667.9,
+                "target": 1796.1,
+                "stop": 1611,
+                "outcome": "loss",
+                "calledAt": "2026-06-08T08:31:22.285801+00:00",
+                "resolvedAt": "2026-06-10T08:37:05.666+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 1645.2,
+                "target": 1765.1,
+                "stop": 1585.2,
+                "outcome": "break_even",
+                "calledAt": "2026-06-08T03:46:07.088446+00:00",
+                "resolvedAt": "2026-06-10T03:52:04.856+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 1683.1,
+                "target": 1883.7,
+                "stop": 1582.9,
+                "outcome": "loss",
+                "calledAt": "2026-06-08T02:46:14.402336+00:00",
+                "resolvedAt": "2026-06-10T02:52:05.426+00:00"
+              }
+            ],
+            "latestCall": {
+              "direction": null,
+              "entry": null,
+              "target": null,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-09-19T12:00:53.397832+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "4H",
+          "1D",
+          "1W"
+        ],
+        "derivatives": true,
+        "record": {
+          "resolvedCalls": 200
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4659,
+          "usd": 0.00037184999999999996,
+          "tokensIn": 1239,
+          "tokensOut": 310,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1992,
+              "usd": 0.00010829999999999999,
+              "tin": 278,
+              "tout": 111,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1281,
+              "usd": 0.0001152,
+              "tin": 396,
+              "tout": 93,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1386,
+              "usd": 0.00014835,
+              "tin": 565,
+              "tout": 106,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "El análisis técnico de ETH muestra una tendencia alcista con un precio actual de 2711.6 y un RSI de 61.2, lo que indica que el activo está en una zona neutral. El soporte se encuentra en 2635.7 y la resistencia en 2735, lo que sugiere que podría haber una oportunidad de compra si el precio se acerca al soporte. Sin embargo, la decisión de entrar o esperar depende de la gestión del riesgo y de la estrategia personal, ya que el momentum es neutral.",
+            "red": "El argumento de Alpha asume que la tendencia alcista y el RSI neutral son suficientes para justificar una entrada en ETH, pero ignora la posibilidad de una reversión de tendencia o un rompimiento del soporte. Además, el análisis no considera factores externos que podrían afectar el precio, como cambios en el mercado o noticias relevantes. La falta de contexto sobre la duración de la tendencia y la naturaleza del momentum también limita la validez de la conclusión.",
+            "cio": "El análisis técnico de ETH indica una tendencia alcista con un precio actual de 2711.6 y un RSI de 61.2, sugiriendo una posición neutral. Sin embargo, la posibilidad de una reversión de tendencia o un rompimiento del soporte debe ser considerada, lo que introduce incertidumbre en la decisión de entrar en el mercado. Por lo tanto, es recomendable esperar y observar cómo se desarrollan las condiciones del mercado antes de tomar una decisión.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 12054,
+          "usd": 0.0007551999999999999,
+          "tokensIn": 2332,
+          "tokensOut": 1044,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3808,
+              "usd": 0.000197,
+              "tin": 520,
+              "tout": 290,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 3923,
+              "usd": 0.00023569999999999998,
+              "tin": 662,
+              "tout": 339,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 4306,
+              "usd": 0.0003225,
+              "tin": 1150,
+              "tout": 415,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H"
+            ],
+            "missing": [
+              "1D",
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Para un horizonte de próximas semanas faltan datos diarios y semanales; solo hay mercado de 1H al 29-09-2026 10:00 UTC, insuficiente para evaluar ese plazo. En 1H el sesgo es alcista, aunque el momentum es neutral: el precio está sobre la EMA20 (+0,84%), la EMA50 (+1,01%) y el soporte (+2,88%), pero bajo la resistencia (−0,86%); la oportunidad más sólida es condicional a que confirme por encima de la resistencia o mantenga el soporte, sin que estos datos por sí solos determinen si entrar.",
+            "red": "Para evaluar próximas semanas faltan datos de 1D y 1W; lo disponible es únicamente mercado de 1H al 29-09-2026 10:00 UTC. La tesis de Alpha depende de una ruptura o de que se mantenga el soporte, pero no hay evidencia de confirmación: el momentum es neutral y el precio sigue bajo la resistencia de 2735 (0,86%); está sobre la EMA20 (0,84%), la EMA50 (1,01%) y el soporte de 2635,7 (2,88%). Perder el soporte debilitaría ese argumento, pero estos datos de 1H no bastan para decidir una entrada con horizonte de semanas.",
+            "cio": "Para las próximas semanas faltan datos diarios y semanales; solo hay mercado de 1H al 29-09-2026 10:00 UTC, insuficiente para ese horizonte. En 1H el sesgo es alcista, pero el momentum es neutral: ETH está por encima de la EMA20 (0,84%), la EMA50 (1,01%) y el soporte (2,88%), y por debajo de la resistencia (0,86%). Sin confirmación más amplia, la evidencia no sustenta una decisión clara de entrada.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Para ETH en las próximas semanas, la evidencia disponible favorece esperar.",
+              "why": "El sesgo de 1H es alcista, pero el momentum es neutral y ETH sigue bajo resistencia.",
+              "risk": "Faltan datos diarios y semanales para valorar un horizonte de semanas.",
+              "watch": "Observar si ETH supera la resistencia de 2735.",
+              "watchLevel": 2735,
+              "followUp": "¿Qué señales diarias confirmarían una tendencia en ETH?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 23474,
+          "usd": 0.0138546,
+          "tokensIn": 7198,
+          "tokensOut": 2056,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 7264,
+              "usd": 0.0004143,
+              "tin": 1623,
+              "tout": 504,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 11178,
+              "usd": 0.0006963,
+              "tin": 1833,
+              "tout": 1026,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5031,
+              "usd": 0.012744,
+              "tin": 3742,
+              "tout": 526,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para un horizonte de semanas, la evidencia disponible incluye marcos diarios y semanales; el mercado de ETH-USDT del 29 de septiembre a las 10:00 UTC muestra tendencia alcista en 1D, pero sobrecompra (RSI 72,6), mientras 1W está lateral y también sobrecomprado (RSI 92,5). En 4H el precio está por debajo de la resistencia 2742,7 por 1,13% y por encima del soporte 2635,7 por 2,88%; la lectura más sólida es condicionar una entrada a una ruptura confirmada de la resistencia o a que el soporte se mantenga tras un retroceso, no perseguir el precio justo bajo resistencia. En 1H y 4H el precio está sobre sus EMA20 por 0,84% y 0,92%, respectivamente, pero el impulso es neutral, así que la señal de continuación aún no está clara.",
+            "red": "Para varias semanas, la continuación no está tan clara como sugiere Alpha: el 1D es alcista pero está sobrecomprado (RSI 72,6), mientras el 1W es lateral y más sobrecomprado (RSI 92,5). En 4H el precio está por encima del soporte 2,88% y por debajo de la resistencia 1,13%; en 1D está por debajo de la resistencia 3,42%, así que una ruptura no equivale por sí sola a confirmación y Alpha no define qué cierre o seguimiento la validaría. Perder el soporte de 4H en 2635,7 invalidaría la idea de esperar un retroceso que lo mantenga; con estas señales mixtas, los datos no resuelven por sí mismos «entro o espero».",
+            "cio": "Para semanas, los datos cubren 1H a 1W y coinciden en sesgo alcista de corto plazo, pero no en fuerza: 1D está sobrecomprado (RSI 72,6) y 1W, lateral, está muy sobrecomprado (RSI 92,5). El precio (2711,6) está 0,86% bajo la resistencia de 1H en 2735 y 1,13% bajo la de 4H en 2742,7; el soporte de 4H en 2635,7 queda 2,88% debajo. Con impulso neutral y tan cerca de la resistencia, no hay un caso claro para entrar ahora; una idea larga solo merecería revisión tras una ruptura confirmada o un retroceso que respete el soporte. El financiamiento (0,0071%) es solo contexto de posicionamiento, no una señal.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Por ahora conviene esperar: ETH está pegado a resistencia y sobrecomprado.",
+              "why": "Tendencia alcista, pero RSI diario 72,6 y semanal 92,5, con impulso neutral en horas.",
+              "risk": "Perder el soporte de 2635,7 en 4H debilitaría la idea alcista de continuación.",
+              "watch": "Cierre en 4H sobre la resistencia 2742,7, o rebote sostenido en soporte 2635,7.",
+              "watchLevel": 2742.7,
+              "followUp": "¿Qué haría más sólida una ruptura de resistencia en ETH?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 26761,
+          "usd": 0.050844,
+          "tokensIn": 13947,
+          "tokensOut": 2295,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 6248,
+              "usd": 0.009848,
+              "tin": 2484,
+              "tout": 488,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 9362,
+              "usd": 0.011506,
+              "tin": 2983,
+              "tout": 554,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 5468,
+              "usd": 0.012474,
+              "tin": 3547,
+              "tout": 538,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5683,
+              "usd": 0.017016,
+              "tin": 4933,
+              "tout": 715,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "La oportunidad más sólida es condicional: ETH (ETH-USDT, datos de mercado al 29-sep-2026, 1H) está por encima de la EMA20 (2689,1; +0,84%) y la EMA50 (2684,4; +1,01%) en 1H, con tendencia alcista también en 4H y 1D, y ronda 2711,6 justo bajo la resistencia de 2735 (0,86% por debajo). Una entrada tendría más respaldo si cierra por encima de 2735-2742,7 con continuidad hacia 2807,7 (resistencia diaria y semanal, 3,42% por encima), o si retrocede hacia el soporte de 2635,7 (2,88% por debajo) y aguanta. Pero para semanas hay que ser prudente: el RSI diario es 72,6 y el semanal 92,5 (sobrecompra), y la semanal figura como lateral con la EMA50 en 2679,9, por lo que los plazos no coinciden del todo y el riesgo de una pausa o corrección es real. El funding es levemente positivo (0,0071%), sin señal por sí solo; el historial de Bobby (158 aciertos de 200 llamadas resueltas) no es una predicción, y esto es análisis educativo, no consejo personalizado: esperar confirmación o un retroceso ordenado tiene más apoyo que entrar ahora pegado a la resistencia.",
+            "red": "Alpha acierta al pedir cautela, pero su argumento tiene puntos débiles: presenta el retroceso hacia 2635,7 como alternativa con respaldo, cuando ese nivel es solo soporte de 1H/4H y el soporte diario está en 2356,7 (15,06% por debajo), así que perder 2635,7 no tiene un destino claro en los datos. Además, la ruptura de 2735-2742,7 es una confirmación débil: con ATR de 1H de 0,68% y 4H de 1,34%, ese nivel está a 0,86%-1,13% del precio y puede ser ruido, mientras la resistencia que importa para semanas es 2807,7 (3,42% por encima), y con RSI diario de 72,6 y semanal de 92,5 una ruptura puede ser un agotamiento tardío. Alpha cita el historial de 158 de 200 llamadas, pero las tres últimas resueltas fueron long con precios de 1645-1683 (dos pérdidas, un empate), muy lejos del nivel actual y sin llamada vigente (la última está pendiente y sin dirección), así que aporta poco aquí; tampoco pondera el funding de 0,0071% y el interés abierto de 610271 sin historial para comparar. La invalidación de la idea alcista sería un cierre por debajo de la EMA50 de 4H (2669) y luego de 2635,7, y falta evidencia de volumen, de contexto macro y de series más largas de funding, por lo que esperar es defendible, pero es análisis educativo, no consejo personalizado ni garantía de resultado.",
+            "rebuttal": "Red Team tiene razón en varios puntos: 2635,7 es solo soporte de 1H/4H y el diario está en 2356,7 (15,06% por debajo), así que aguantar ese nivel no basta como respaldo para semanas; la ruptura de 2735-2742,7 (0,86%-1,13% del precio, con ATR de 1H 0,68% y 4H 1,34%) puede ser ruido; y las tres últimas llamadas resueltas (dos pérdidas y un empate, con entradas en 1645-1683) y el 158/200 no sirven como argumento aquí. Lo que sobrevive es una tesis más estrecha: el precio 2711,6 está por encima de la EMA20 y la EMA50 en 1H, 4H y 1D (EMA50 de 4H en 2669, +1,6%), y el nivel que importa para semanas es 2807,7 (3,42% por encima), con RSI diario de 72,6 y semanal de 92,5 en sobrecompra y semanal lateral, así que los plazos no coinciden del todo. Por eso el caso condicional exige un cierre sostenido sobre 2742,7 con continuidad hacia 2807,7, y se invalida con un cierre bajo 2669 y luego 2635,7; mientras eso no ocurra, esperar es más defendible que entrar pegado a la resistencia, y faltan volumen, macro e historial de funding (0,0071%) y de interés abierto para dar más peso. Esto es análisis educativo, no consejo personalizado ni garantía de resultado.",
+            "cio": "Para un horizonte de semanas hay datos suficientes (1H, 4H, 1D y 1W), pero no coinciden del todo: ETH (2711,6) está sobre la EMA20 y la EMA50 en 1H, 4H y 1D, mientras la semanal figura lateral y el RSI diario (72,6) y semanal (92,5) marcan sobrecompra. El precio está a 0,86% bajo la resistencia de 2735 y a 3,42% bajo 2807,7, que es el nivel que importa para semanas; la ruptura cercana puede ser ruido con un ATR de 1H de 0,68%. El soporte de 2635,7 (2,88% por debajo) solo es de 1H/4H y el diario está en 2356,7 (15,06% por debajo), así que no hay un respaldo claro; faltan además volumen, contexto macro e historial de funding (0,0071%), por lo que esperar es más defendible que entrar pegado a la resistencia. Es análisis educativo, no consejo personalizado ni garantía de resultado.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Por ahora es más defendible esperar que entrar en ETH.",
+              "why": "Tendencia alcista, pero el precio está pegado a la resistencia y con sobrecompra diaria y semanal.",
+              "risk": "Una pausa o corrección tras la sobrecompra; faltan volumen, macro e historial de funding.",
+              "watch": "Un cierre sostenido sobre 2742,7 con continuidad hacia 2807,7.",
+              "watchLevel": 2742.7,
+              "followUp": "¿Qué pasaría con ETH si pierde la EMA50 de 4H?"
+            },
+            "scenarios": {
+              "confirm": "Un cierre sostenido por encima de 2742,7 con continuidad hacia la resistencia diaria y semanal de 2807,7 daría más respaldo a la idea alcista.",
+              "invalidate": "Un cierre por debajo de la EMA50 de 4H (2669) y después del soporte de 2635,7 invalidaría la idea alcista."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "RAPIDO",
+        "B": "PROFUNDO",
+        "C": "MAXIMO",
+        "D": "BASELINE"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.020732,
+          "ms": 4415,
+          "tin": 7676,
+          "tout": 538,
+          "stop": "end_turn",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 7,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 5,
+              "overall": 7,
+              "reason": "1H-only answer with correct numbers; it says plainly that daily and weekly data are missing for a horizon of weeks and concludes wait, but the watch levels are sparse."
+            },
+            "PROFUNDO": {
+              "answers_question": 8,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "Uses 1H to 1W correctly (RSI 72.6 and 92.5, resistance 2742.7), and the watch and risk items are concrete; it does not mention that volume and macro are missing."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 10,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 10,
+              "overall": 9,
+              "reason": "Most complete: multi-timeframe analysis, the level that matters for weeks (2807.7), confirm and invalidate scenarios, and explicit gaps (volume, macro, funding history). It is dense, and the section on the record is somewhat long."
+            },
+            "BASELINE": {
+              "answers_question": 4,
+              "evidence_grounding": 5,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 2,
+              "overall": 3,
+              "reason": "Generic; it calls RSI 61 neutral, never addresses the horizon of weeks or the missing data, and gives no watch levels or scenarios."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.016482,
+          "ms": 14294,
+          "tin": 4161,
+          "tout": 816,
+          "stop": "stop",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 10,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 9,
+              "reason": "Responde que conviene esperar, usa correctamente los datos de 1H y explica que ese marco no basta para evaluar semanas."
+            },
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Contrasta los plazos relevantes y señala niveles concretos que cambiarían la valoración, sin presentar una entrada como segura."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 5,
+              "decision_usefulness": 9,
+              "overall": 8,
+              "reason": "Ofrece escenarios útiles y reconoce límites, pero es densa, introduce «Bobby» sin respaldo y expresa de forma confusa algunas distancias porcentuales."
+            },
+            "BASELINE": {
+              "answers_question": 6,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 4,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 5,
+              "overall": 6,
+              "reason": "Es comprensible y prudente, pero no explica por qué los datos horarios son insuficientes para decidir sobre las próximas semanas ni precisa qué confirmaría un cambio."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "sol",
+      "symbol": "SOL",
+      "lang": "es",
+      "question": "¿Qué tal SOL para hoy?",
+      "seed": 1002,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "SOL",
+          "technicals": {
+            "price": 119.4,
+            "rsi14": 53.4,
+            "ema20": 118.9,
+            "ema50": 119.5,
+            "support": 116.4,
+            "resistance": 120.8,
+            "atrPct": 0.93,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "SOL-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "SOL",
+          "technicals": {
+            "price": 119.4,
+            "rsi14": 53.4,
+            "ema20": 118.9,
+            "ema50": 119.5,
+            "support": 116.4,
+            "resistance": 120.8,
+            "atrPct": 0.93,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "SOL-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 119.4,
+              "rsi14": 53.4,
+              "ema20": 118.9,
+              "ema50": 119.5,
+              "support": 116.4,
+              "resistance": 120.8,
+              "atrPct": 0.93,
+              "trend": "lateral",
+              "momentum": "neutral"
+            },
+            "4H": {
+              "price": 119.5,
+              "rsi14": 46.5,
+              "ema20": 119.6,
+              "ema50": 117.3,
+              "support": 113.1,
+              "resistance": 125,
+              "atrPct": 2.08,
+              "trend": "lateral",
+              "momentum": "neutral",
+              "bars": 100,
+              "asOf": "2026-09-29T08:00:00.000Z"
+            },
+            "1D": {
+              "price": 119.4,
+              "rsi14": 72.4,
+              "ema20": 112.3,
+              "ema50": 102.2,
+              "support": 95.79,
+              "resistance": 125,
+              "atrPct": 4.83,
+              "trend": "alcista",
+              "momentum": "sobrecompra",
+              "bars": 100,
+              "asOf": "2026-09-28T16:00:00.000Z"
+            },
+            "1W": {
+              "price": 119.4,
+              "rsi14": 78,
+              "ema20": 96.356,
+              "ema50": 116.9,
+              "support": 60.11,
+              "resistance": 125,
+              "atrPct": 9.36,
+              "trend": "lateral",
+              "momentum": "sobrecompra",
+              "bars": 60,
+              "asOf": "2026-09-27T16:00:00.000Z"
+            }
+          },
+          "derivatives": {
+            "fundingRatePct": 0.0067,
+            "nextFundingAt": "2026-09-30T00:00:00.000Z",
+            "openInterest": 2961672.1600000025
+          },
+          "record": {
+            "resolvedCalls": 200,
+            "wins": 114,
+            "losses": 74,
+            "breakEven": 12,
+            "lastResolved": [
+              {
+                "direction": "short",
+                "entry": 63.3,
+                "target": 61.1,
+                "stop": 65.2,
+                "outcome": "loss",
+                "calledAt": "2026-06-10T11:31:15.5324+00:00",
+                "resolvedAt": "2026-06-10T13:52:04.252+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 65.8,
+                "target": 69.42,
+                "stop": 63.99,
+                "outcome": "loss",
+                "calledAt": "2026-06-08T12:46:14.431761+00:00",
+                "resolvedAt": "2026-06-10T08:37:05.327+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 65.91,
+                "target": 69.77,
+                "stop": 63.98,
+                "outcome": "loss",
+                "calledAt": "2026-06-08T13:01:17.841351+00:00",
+                "resolvedAt": "2026-06-10T08:37:04.902+00:00"
+              }
+            ],
+            "latestCall": {
+              "direction": null,
+              "entry": null,
+              "target": null,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-09-27T12:00:52.271255+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "4H",
+          "1D",
+          "1W"
+        ],
+        "derivatives": true,
+        "record": {
+          "resolvedCalls": 200
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4253,
+          "usd": 0.0003315,
+          "tokensIn": 1162,
+          "tokensOut": 262,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1823,
+              "usd": 0.00009225,
+              "tin": 271,
+              "tout": 86,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1315,
+              "usd": 0.0001068,
+              "tin": 364,
+              "tout": 87,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1115,
+              "usd": 0.00013245,
+              "tin": 527,
+              "tout": 89,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "El análisis técnico de SOL muestra un precio de 119.4, con un soporte en 116.4 y una resistencia en 120.8, lo que indica un rango lateral. El RSI de 53.4 y la tendencia neutral sugieren que no hay un impulso claro en ninguna dirección, lo que podría implicar una oportunidad condicional si el precio supera la resistencia de 120.8.",
+            "red": "El argumento de Alpha asume que la ruptura de la resistencia de 120.8 es suficiente para generar una oportunidad de compra, pero no considera la posibilidad de que el precio pueda revertirse antes de alcanzar ese nivel. Además, la tendencia lateral y el momentum neutral sugieren que el mercado podría no tener la fuerza necesaria para superar la resistencia, lo que podría invalidar la premisa de una oportunidad condicional.",
+            "cio": "El análisis técnico de SOL indica un precio de 119.4, con soporte en 116.4 y resistencia en 120.8, lo que sugiere un rango lateral y un momentum neutral. Aunque hay una posibilidad condicional si el precio supera la resistencia, la tendencia lateral y la falta de impulso claro generan incertidumbre sobre la capacidad del precio para romper ese nivel.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 16132,
+          "usd": 0.0009372,
+          "tokensIn": 2232,
+          "tokensOut": 1428,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 5125,
+              "usd": 0.0002516,
+              "tin": 506,
+              "tout": 402,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 6872,
+              "usd": 0.00036219999999999997,
+              "tin": 627,
+              "tout": 599,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 4135,
+              "usd": 0.0003234,
+              "tin": 1099,
+              "tout": 427,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para el horizonte intradía hay datos de 1H disponibles. La oportunidad condicional más clara sería un impulso alcista si SOL supera la resistencia de 120.8; por ahora el precio es 119.4, está debajo de ella por 1.16% y el momentum es neutral. Está por encima de la EMA20 por 0.42% y del soporte por 2.58%, pero debajo de la EMA50 por 0.08%; con tendencia lateral, no hay confirmación de ruptura en estos datos.",
+            "red": "La tesis de Alpha depende de que superar 120.8 sea una ruptura válida, pero los datos no muestran cierre horario ni volumen que la confirmen; ahora SOL está por debajo de la resistencia por 1.16% y por encima del soporte de 116.4 por 2.58%. Un rechazo en 120.8 debilitaría la hipótesis alcista, y perder 116.4 la invalidaría más claramente; la tendencia lateral y el momentum neutral no aportan confirmación direccional. El marco de 1H corresponde al horizonte intradía, pero esta lectura puntual no confirma qué ocurrirá después.",
+            "cio": "Para el horizonte intradía hay datos de 1H, correspondientes al 29 de septiembre a las 10:00 UTC. SOL cotiza a 119.4: está por encima de la EMA20 por 0.42% y del soporte 116.4 por 2.58%, pero por debajo de la EMA50 por 0.08% y de la resistencia 120.8 por 1.16%. La tendencia lateral y el momentum neutral no dan una señal direccional clara; los datos tampoco confirman una ruptura de la resistencia.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "SOL no muestra una señal intradía clara por ahora.",
+              "why": "La tendencia es lateral y el momentum es neutral.",
+              "risk": "No hay confirmación de ruptura de la resistencia en los datos disponibles.",
+              "watch": "Observar si SOL supera la resistencia de 120.8.",
+              "watchLevel": 120.8,
+              "followUp": "¿Qué niveles intradía de SOL conviene vigilar?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 19101,
+          "usd": 0.0128049,
+          "tokensIn": 7107,
+          "tokensOut": 1643,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 5856,
+              "usd": 0.0003814,
+              "tin": 1574,
+              "tout": 448,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 8703,
+              "usd": 0.0005575,
+              "tin": 1770,
+              "tout": 761,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4541,
+              "usd": 0.011866,
+              "tin": 3763,
+              "tout": 434,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para hoy, la oportunidad más clara sería condicional: esperar una ruptura y consolidación sobre la resistencia de 120,8; el mercado está lateral y neutral en 1H/4H, con SOL-USDT a 119,4 en los datos de mercado del 29 de septiembre a las 10:00 UTC. En 1H está 0,42% por encima de la EMA20 y 0,08% por debajo de la EMA50; queda 1,16% bajo la resistencia y 2,58% sobre el soporte de 116,4, así que aún no hay confirmación de ruptura. El marco diario sigue alcista, pero marca sobrecompra y precio 4,48% bajo la resistencia de 125; eso aconseja cautela ante perseguir una subida, y el funding positivo es solo contexto de posicionamiento, no una señal por sí solo.",
+            "red": "La ruptura y consolidación sobre 120,8 es una condición propuesta por Alpha, no algo confirmado por los datos: el mercado de SOL-USDT a 1H del 29 de septiembre, 10:00 UTC, sigue lateral; 119,4 está por encima de la EMA20 (118,9) un 0,42%, por debajo de la EMA50 (119,5) un 0,08%, por encima del soporte (116,4) un 2,58% y por debajo de la resistencia (120,8) un 1,16%. Además, 4H también es lateral y neutral, mientras que 1D es alcista pero está en sobrecompra y 4,48% bajo la resistencia de 125: ese desacuerdo debilita cualquier lectura direccional simple para hoy. No se aportan cierres de velas ni volumen para comprobar una consolidación; si el argumento depende de sostener la ruptura, perder 116,4 lo debilitaría, y el funding positivo (0,0067%) solo aporta contexto de posicionamiento, no confirmación.",
+            "cio": "Para hoy, SOL-USDT está a 119,4 en un rango lateral y neutral en 1H y 4H: 1,16% bajo la resistencia de 120,8 y 2,58% sobre el soporte de 116,4, sin ruptura confirmada. El marco diario es alcista pero con sobrecompra (RSI 72,4) y el semanal también, lo que desaconseja perseguir subidas; los marcos no coinciden. El funding positivo (0,0067%) es solo contexto y no hay datos de volumen ni cierres que confirmen una consolidación, así que la evidencia no sostiene un caso claro.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Para hoy SOL no muestra una ventaja clara; conviene esperar confirmación.",
+              "why": "Rango lateral en 1H y 4H, sin ruptura, y el diario está en sobrecompra.",
+              "risk": "Sin volumen ni cierres de vela, una ruptura de 120,8 podría ser falsa.",
+              "watch": "Un cierre de vela sostenido sobre la resistencia de 120,8.",
+              "watchLevel": 120.8,
+              "followUp": "¿Qué pasaría con SOL si pierde el soporte de 116,4?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 21015,
+          "usd": 0.048374,
+          "tokensIn": 13552,
+          "tokensOut": 2127,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 5149,
+              "usd": 0.00952,
+              "tin": 2435,
+              "tout": 465,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 5622,
+              "usd": 0.011032,
+              "tin": 2911,
+              "tout": 521,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 4863,
+              "usd": 0.011624,
+              "tin": 3442,
+              "tout": 474,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5380,
+              "usd": 0.016198,
+              "tin": 4764,
+              "tout": 667,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para hoy (intradía), SOL-USDT en 1H está en 119.4, en rango sin ventaja clara: por encima de la EMA20 (118.9, +0.42%), apenas por debajo de la EMA50 (119.5, 0.08%), con RSI 53.4 neutral y ATR de solo 0.93%. La oportunidad condicional más fuerte sería alcista si rompe y se sostiene sobre la resistencia de 120.8 (1.16% por encima), con la resistencia de 4H/1D en 125 (4.4-4.48%) como siguiente zona; si pierde la EMA20 y el soporte de 116.4 (2.58% por debajo), el escenario se debilita. Los marcos no coinciden: 1D y 1W son alcistas o de sobrecompra (RSI 72.4 y 78) con el precio sobre sus EMA, lo que da sesgo de fondo positivo pero riesgo de agotamiento, mientras 4H y 1H son laterales y neutrales (RSI 4H 46.5). El funding es ligeramente positivo (0.0067%), sin señal por sí solo, y el registro de Bobby (114 aciertos de 200 llamadas resueltas) no predice hoy; la última llamada está pendiente y sin dirección, así que esto es contexto educativo, no una recomendación.",
+            "red": "Alpha plantea un escenario alcista condicionado a una ruptura de 120.8, pero ese nivel está solo 1.16% por encima con un ATR 1H de 0.93%: es poco más de una barra de rango normal, así que una ruptura no distingue señal de ruido. Además, el 4H tiene el precio ligeramente por debajo de la EMA20 (0.08%) y con RSI 46.5, y la resistencia 4H/1D en 125 está a 4.4-4.48%, por lo que el recorrido hasta ella es limitado; el «sesgo de fondo positivo» de 1D/1W (RSI 72.4 y 78, sobrecompra) es a la vez un argumento de riesgo de agotamiento, y Alpha no aclara cuál pesa más para hoy. Alpha tampoco fija una invalidación concreta: menciona la pérdida de la EMA20 (118.9, 0.42% por debajo del precio) y el soporte de 116.4 (2.58% por debajo) como si fueran equivalentes, cuando son umbrales muy distintos. Faltan datos de volumen y de si la ruptura se sostiene (cierre de 1H sobre 120.8); el funding de 0.0067% y el registro de 114/200 no aportan ventaja hoy, y las últimas tres llamadas resueltas mostradas fueron pérdidas a precios muy distintos (63-66), con lo que ese historial reciente tiene poca relevancia para el nivel actual de ~119.",
+            "rebuttal": "Red Team tiene razón en varios puntos: 120.8 está solo 1.16% por encima con un ATR 1H de 0.93%, así que una ruptura aislada no distingue señal de ruido, y por eso solo cuenta un cierre de 1H sostenido por encima, algo que no tenemos aún ni con datos de volumen. También concedo que la EMA20 de 1H (118.9, precio 0.42% por encima) y el soporte de 116.4 (2.58% por debajo) no son equivalentes: la EMA20 sería solo una primera señal de debilidad y el soporte la invalidación real del escenario. Sobre el sesgo de fondo, 1D y 1W con RSI 72.4 y 78 son a la vez apoyo y riesgo de agotamiento, y con 4H lateral (RSI 46.5, precio 0.08% bajo su EMA20) y resistencia en 125 a 4.4-4.48%, el recorrido es limitado, así que para hoy no hay ventaja clara. El caso alcista solo sobrevive como condicional y modesto: esperar un cierre de 1H sobre 120.8 y, si no llega o se pierde 118.9 y luego 116.4, quedarse al margen; el funding de 0.0067% y el historial de 114/200 no aportan ventaja, y esto es contexto educativo, no una recomendación.",
+            "cio": "Para hoy SOL-USDT está en 119.4 dentro de un rango sin ventaja clara en 1H: 0.42% sobre la EMA20 (118.9), 0.08% bajo la EMA50 (119.5), RSI 53.4 neutral y ATR de solo 0.93%. Los marcos no coinciden: 1D y 1W son alcistas pero en sobrecompra (RSI 72.4 y 78), mientras 4H y 1H son laterales (RSI 4H 46.5), y la resistencia en 125 queda a 4.4-4.48%, con recorrido limitado. Un caso alcista solo sería condicional, con un cierre de 1H sostenido sobre 120.8 (1.16% por encima), pero aún no hay confirmación ni datos de volumen; el funding (0.0067%) y el historial de Bobby no aportan ventaja, y esto es contexto educativo, no una recomendación.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Para hoy SOL está sin ventaja clara: lateral y a la espera de ruptura.",
+              "why": "En 1H y 4H está lateral y neutral; 1D y 1W alcistas pero sobrecomprados.",
+              "risk": "Una ruptura de 120.8 con ATR de 0.93% puede ser ruido; falta volumen.",
+              "watch": "Un cierre de 1H sostenido sobre la resistencia de 120.8.",
+              "watchLevel": 120.8,
+              "followUp": "¿Qué pasa con SOL si pierde el soporte de 116.4?"
+            },
+            "scenarios": {
+              "confirm": "Un cierre de 1H sostenido sobre 120.8 abriría el camino hacia la resistencia de 4H/1D en 125.",
+              "invalidate": "Perder la EMA20 de 1H (118.9) sería una primera señal de debilidad, y perder el soporte de 116.4 invalidaría el escenario alcista."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "PROFUNDO",
+        "B": "BASELINE",
+        "C": "MAXIMO",
+        "D": "RAPIDO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.019604,
+          "ms": 4885,
+          "tin": 7277,
+          "tout": 505,
+          "stop": "end_turn",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 8,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "Numbers are correct, it uses multiple timeframes, states that volume and candle closes are missing, and gives a clear watch level with a wait verdict."
+            },
+            "BASELINE": {
+              "answers_question": 6,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 4,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 4,
+              "overall": 5,
+              "reason": "Correct but generic; no invalidation level, no mention of missing data or other timeframes, and the Red Team argument is weak."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Most complete: it has confirm and invalidate scenarios, ATR-based noise reasoning, multi-timeframe conflict, and puts the record in context. It is dense for a novice, and the 4.4% figure is approximate but consistent with the evidence."
+            },
+            "RAPIDO": {
+              "answers_question": 7,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Accurate, clear 1H-only reading that admits the lack of volume and closes, but it is thin on scenarios and invalidation levels."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.014228,
+          "ms": 11185,
+          "tin": 3904,
+          "tout": 642,
+          "stop": "stop",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Responde al horizonte de hoy con niveles verificables, una condición clara y cautela sobre la falta de confirmación."
+            },
+            "BASELINE": {
+              "answers_question": 8,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 7,
+              "overall": 8,
+              "reason": "Es claro y se ciñe a los datos de 1H, aunque precisa poco qué confirmaría la ruptura o invalidaría la idea."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 9,
+              "overall": 7,
+              "reason": "Ofrece escenarios útiles, pero llama alcista al marco semanal, que figura lateral, e introduce «Bobby» sin respaldo en la evidencia."
+            },
+            "RAPIDO": {
+              "answers_question": 9,
+              "evidence_grounding": 10,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 8,
+              "overall": 9,
+              "reason": "Lectura intradía concisa y fiel a 1H; distingue bien entre superar una resistencia y confirmar una ruptura."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "nvda",
+      "symbol": "NVDA",
+      "lang": "en",
+      "question": "Is NVDA overextended after its recent run, or is there still a setup?",
+      "seed": 1003,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "NVDA",
+          "technicals": {
+            "price": 228.9,
+            "rsi14": 67.2,
+            "ema20": 227.4,
+            "ema50": 225.2,
+            "support": 221.1,
+            "resistance": 233.2,
+            "atrPct": 0.88,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "NVDA",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "NVDA",
+          "technicals": {
+            "price": 228.9,
+            "rsi14": 67.2,
+            "ema20": 227.4,
+            "ema50": 225.2,
+            "support": 221.1,
+            "resistance": 233.2,
+            "atrPct": 0.88,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "NVDA",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 228.9,
+              "rsi14": 67.2,
+              "ema20": 227.4,
+              "ema50": 225.2,
+              "support": 221.1,
+              "resistance": 233.2,
+              "atrPct": 0.88,
+              "trend": "alcista",
+              "momentum": "neutral"
+            },
+            "1D": {
+              "price": 228.9,
+              "rsi14": 53.8,
+              "ema20": 222.2,
+              "ema50": 215.8,
+              "support": 207.3,
+              "resistance": 234.8,
+              "atrPct": 2.26,
+              "trend": "alcista",
+              "momentum": "neutral",
+              "bars": 64,
+              "asOf": "2026-09-28T13:30:00.000Z"
+            }
+          },
+          "derivatives": null,
+          "record": {
+            "resolvedCalls": 5,
+            "wins": 4,
+            "losses": 1,
+            "breakEven": 0,
+            "lastResolved": [
+              {
+                "direction": "long",
+                "entry": 210,
+                "target": 222,
+                "stop": 212,
+                "outcome": "win",
+                "calledAt": "2026-05-28T22:53:57.044056+00:00",
+                "resolvedAt": "2026-05-30T23:07:04.969+00:00"
+              },
+              {
+                "direction": "short",
+                "entry": 214.25,
+                "target": 200,
+                "stop": 220,
+                "outcome": "loss",
+                "calledAt": "2026-05-28T22:21:20.639027+00:00",
+                "resolvedAt": "2026-05-30T22:22:04.821+00:00"
+              },
+              {
+                "direction": "long",
+                "entry": 173,
+                "target": 185,
+                "stop": 168,
+                "outcome": "win",
+                "calledAt": "2026-03-21T20:47:17.134709+00:00",
+                "resolvedAt": "2026-04-13T21:19:13.559+00:00"
+              }
+            ],
+            "latestCall": {
+              "direction": "short",
+              "entry": null,
+              "target": null,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-08-10T23:25:41.199454+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "1D"
+        ],
+        "derivatives": false,
+        "record": {
+          "resolvedCalls": 5
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4075,
+          "usd": 0.0003459,
+          "tokensIn": 1198,
+          "tokensOut": 277,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1530,
+              "usd": 0.0000981,
+              "tin": 282,
+              "tout": 93,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1340,
+              "usd": 0.00010290000000000001,
+              "tin": 382,
+              "tout": 76,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1205,
+              "usd": 0.00014489999999999997,
+              "tin": 534,
+              "tout": 108,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "NVDA is currently priced at 228.9, with an RSI of 67.2, indicating it is approaching overbought territory but not yet extreme. The price is above both the 20-period EMA (227.4) and the 50-period EMA (225.2), suggesting a bullish trend. Support is at 221.1 and resistance at 233.2, indicating potential for further movement if it breaks resistance.",
+            "red": "Alpha's argument assumes that the RSI nearing overbought levels does not indicate a reversal, which may not hold true in volatile markets. Additionally, while the price is above the EMAs, it does not account for potential market shifts or external factors that could impact momentum. The analysis lacks consideration of volume trends or broader market conditions that could invalidate the bullish outlook.",
+            "cio": "NVDA is currently showing a bullish trend with a price of 228.9, an RSI of 67.2, and is above both the 20-period and 50-period EMAs. However, the RSI indicates it is nearing overbought levels, which could suggest a potential reversal, and the analysis does not consider broader market conditions or volume trends that could affect momentum. Therefore, while there is potential for further movement if resistance is broken, the situation remains uncertain.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 16976,
+          "usd": 0.0010386,
+          "tokensIn": 2261,
+          "tokensOut": 1625,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 4600,
+              "usd": 0.0002482,
+              "tin": 517,
+              "tout": 393,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 4821,
+              "usd": 0.00028789999999999995,
+              "tin": 644,
+              "tout": 447,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 7540,
+              "usd": 0.0005025,
+              "tin": 1100,
+              "tout": 785,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "unspecified",
+            "available": [
+              "1H"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "On the available 1H market data, NVDA is not clearly overextended, but it is nearing resistance: price is above EMA20 by 0.66%, above EMA50 by 1.64%, and above support by 3.53%, while still below resistance by 1.84%. The rising trend supports a conditional continuation setup if resistance is cleared; momentum is neutral and RSI is 67.2, so a pause or pullback remains plausible. Your horizon is unspecified, and 1H data alone cannot establish whether the broader move is overextended.",
+            "red": "Alpha’s “not clearly overextended” is only a short-term read: the available evidence is 1H, and your horizon is unspecified, so it cannot establish whether the broader run is stretched. Price is above EMA20 by 0.66%, EMA50 by 1.64%, and support by 3.53%, but below resistance by 1.84%; neutral momentum and RSI 67.2 do not confirm a breakout or continuation. A move below the nearby averages or support would weaken the continuation case, while clearing resistance alone would still need confirmation.",
+            "cio": "On the 1H market data as of 2026-09-28, NVDA is above EMA20 by 0.66%, EMA50 by 1.64%, and support by 3.53%, but below resistance by 1.84%. The rising trend leaves a conditional long continuation idea for further review, though RSI 67.2 and neutral momentum do not confirm a breakout; with your horizon unspecified, this short-term view cannot establish whether the broader run is overextended.",
+            "verdict": "review",
+            "direction": "long",
+            "synthesis": {
+              "headline": "NVDA is not clearly overextended on the 1-hour view, but resistance is close.",
+              "why": "Price remains above EMA20 and EMA50, while the rising trend leaves conditional continuation in play.",
+              "risk": "Neutral momentum and RSI 67.2 leave pullback risk; the unspecified horizon limits broader assessment.",
+              "watch": "Watch whether price clears resistance at 233.2.",
+              "watchLevel": 233.2,
+              "followUp": "What would confirm a NVDA breakout?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 15609,
+          "usd": 0.010915300000000001,
+          "tokensIn": 5583,
+          "tokensOut": 1315,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 5750,
+              "usd": 0.0003286,
+              "tin": 1201,
+              "tout": 417,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 5719,
+              "usd": 0.00037670000000000005,
+              "tin": 1342,
+              "tout": 485,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4124,
+              "usd": 0.01021,
+              "tin": 3040,
+              "tout": 413,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "unspecified",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "NVDA looks somewhat extended in the near term: on the 1H view, RSI is 67.2 and price is 1.84% below resistance at 233.2, though it remains above EMA20 by 0.66% and EMA50 by 1.64%. The conditional setup is still bullish on the supplied 1H and 1D evidence—both trends are upward, and daily RSI is a milder 53.8—with a clearer case if price clears daily resistance at 234.8 or holds support on a pullback; the intended horizon is unspecified, so fit to that horizon is unclear.",
+            "red": "The “bullish setup” case is less clear-cut than Alpha suggests: market data as of 2026-09-28 show price above the 1H EMA20 by 0.66% and EMA50 by 1.64%, but also 1.84% below 1H resistance; on the daily view it is above EMA20 by 3.02% and below resistance by 2.51%. RSI is elevated on 1H at 67.2 but a milder 53.8 daily, so the evidence supports near-term stretch within an upward trend—not confirmation that resistance will break or support will hold; a move below 1H support at 221.1 would weaken the short-term case. The horizon is unspecified, and Bobby’s latest call is a pending short, which differs from the supplied upward trend readings but is not a reliable forecast.",
+            "cio": "NVDA is somewhat stretched short term but not extreme: 1H RSI is 67.2, while daily RSI is a milder 53.8, and both trends are upward with price above the 1H EMA20 (0.66%) and EMA50 (1.64%). Price sits 1.84% below 1H resistance at 233.2 and 2.51% below daily resistance at 234.8, so there is no confirmed breakout yet and no clear entry edge. A conditional bullish idea merits review only if resistance clears or support at 221.1 holds on a pullback; Bobby's latest call is a pending short, which conflicts with the trend readings but is not a forecast.",
+            "verdict": "review",
+            "direction": "long",
+            "synthesis": {
+              "headline": "NVDA looks a bit stretched short term, but the uptrend is intact.",
+              "why": "Both 1H and daily trends are up; daily RSI is only 53.8, hourly 67.2.",
+              "risk": "Price is still below resistance, so a breakout is unconfirmed and a pullback could deepen.",
+              "watch": "A move above daily resistance at 234.8 would strengthen the bullish case.",
+              "watchLevel": 234.8,
+              "followUp": "What would weaken the NVDA uptrend from here?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 18858,
+          "usd": 0.039948,
+          "tokensIn": 10949,
+          "tokensOut": 1805,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 5182,
+              "usd": 0.007638,
+              "tin": 1919,
+              "tout": 380,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 5227,
+              "usd": 0.00884,
+              "tin": 2310,
+              "tout": 422,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 3993,
+              "usd": 0.009364,
+              "tin": 2742,
+              "tout": 388,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4455,
+              "usd": 0.014106,
+              "tin": 3978,
+              "tout": 615,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "unspecified",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "NVDA doesn't look badly overextended on the evidence: on the daily chart RSI14 is 53.8 (neutral) and price at 228.9 is above the EMA20 (222.2, +3.02%) and EMA50 (215.8, +6.07%), while the 1H RSI of 67.2 is warm but not stretched, and the two timeframes agree on an uptrend. The conditional setup is a move through resistance, 1.84% away at 233.2 on 1H and 2.51% away at 234.8 on 1D, which would extend the trend, whereas a pullback toward the 1H EMA20 (227.4, 0.66% below) or EMA50 (225.2) would be the lower-risk area to watch for a hold. The bullish case weakens if price loses the 1H support at 221.1 (3.53% below), and the nearby resistance means chasing here has limited room until it clears. Bobby's record on NVDA is 4 wins and 1 loss over 5 resolved calls, and a short call from August is still pending with no levels recorded, so that history is context rather than a prediction, and the data has no derivatives or news input to add.",
+            "red": "Alpha's 'not overextended' read leans on daily RSI 53.8, but that is a lagging figure that says little about the 1H stretch: 1H RSI 67.2 sits near the upper zone, and price is only 1.84% below 1H resistance at 233.2 (2.51% below daily resistance at 234.8), so upside room is thin relative to the 3.53% drop to 1H support at 221.1. Alpha's invalidation is also loose: it names 221.1 as the level, yet the more likely failure is a loss of the 1H EMA20 (227.4, 0.66% below) and EMA50 (225.2, 1.64% below), which would show up well before support breaks and leaves the 'lower-risk pullback' idea untested. Missing evidence matters too: momentum is only 'neutral' on both timeframes, there is no volume, earnings/news or derivatives input, and Alpha does not reconcile the pending August short, with no recorded levels, against its bullish tone; the 4-of-5 record is a tiny sample and not evidence for this setup. Fair conclusion: the trend is up and not obviously stretched on daily, but a setup needs a resistance break or a confirmed hold of the 1H EMAs, and neither has been shown yet.",
+            "rebuttal": "Red is right on several points: the reward-to-risk is thin, with resistance 1.84% away on 1H (233.2) and 2.51% away on 1D (234.8) versus 3.53% down to 1H support at 221.1. I also concede that 221.1 is a loose invalidation, since a loss of the 1H EMA20 (227.4, 0.66% below) or EMA50 (225.2, 1.64% below) would be the earlier warning, and that momentum is only neutral on both timeframes, volume, news and derivatives are absent, and the 4-of-5 record is too small a sample to support this setup. What survives is the narrower claim that NVDA is not clearly overextended, because daily RSI is 53.8, price sits 3.02% above the daily EMA20 and 6.07% above the EMA50, and 1H RSI of 67.2 is warm rather than extreme. So the setup is conditional and not yet confirmed: it needs either a clean break above 233.2/234.8 or a hold of the 1H EMAs, and until one of those shows, chasing here has little room, while the pending August short with no recorded levels is a reason for caution, not a signal.",
+            "cio": "NVDA does not look clearly overextended: daily RSI14 is 53.8 with price 3.02% above the daily EMA20 (222.2) and 6.07% above the EMA50 (215.8), and 1H RSI of 67.2 is warm rather than extreme, with both timeframes in an uptrend. But there is no confirmed setup yet, since resistance sits 1.84% away at 233.2 (1H) and 2.51% away at 234.8 (1D) against 3.53% down to 1H support at 221.1, and momentum is neutral on both timeframes. A conditional long idea merits review only on a clean break above resistance or a hold of the 1H EMA20 (227.4) and EMA50 (225.2); volume, news and derivatives are missing, and Bobby's 4-of-5 record is a small sample, not a prediction.",
+            "verdict": "review",
+            "direction": "long",
+            "synthesis": {
+              "headline": "NVDA isn't clearly overextended, but there's no confirmed setup yet.",
+              "why": "Trend is up on both timeframes and daily RSI is neutral at 53.8, but resistance is close.",
+              "risk": "Upside room is thin, momentum is neutral, and volume, news and derivatives data are missing.",
+              "watch": "A clean break above 1H resistance at 233.2, or a hold of the 1H EMA20.",
+              "watchLevel": 233.2,
+              "followUp": "What would a pullback in NVDA need to look like to hold?"
+            },
+            "scenarios": {
+              "confirm": "Price breaks and holds above 1H resistance at 233.2 (daily 234.8), or pulls back and holds above the 1H EMA20 at 227.4 and EMA50 at 225.2.",
+              "invalidate": "Price loses the 1H EMA50 at 225.2 and then the 1H support at 221.1, which would break the uptrend structure."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "PROFUNDO",
+        "B": "MAXIMO",
+        "C": "BASELINE",
+        "D": "RAPIDO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.01818,
+          "ms": 5017,
+          "tin": 6380,
+          "tout": 542,
+          "stop": "end_turn",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 7,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 6,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Grounded on 1H and 1D numbers and answers 'somewhat stretched but uptrend intact'; the percentages check out. It flags the unspecified horizon, but no scenarios and the missing volume/news data are not mentioned."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Uses accurate numbers on both timeframes, debate concedes thin reward/risk and loose invalidation, lists missing volume/news/derivatives, gives clear confirm/invalidate levels."
+            },
+            "BASELINE": {
+              "answers_question": 4,
+              "evidence_grounding": 5,
+              "honesty_on_gaps": 5,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Generic and thin: only 1H numbers, no distances, no daily view, no levels to watch, and 'wait' with vague uncertainty. Says little about whether it is overextended."
+            },
+            "RAPIDO": {
+              "answers_question": 6,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Accurate 1H numbers and plainly states 1H data cannot establish whether the broader run is overextended; less depth and fewer concrete invalidation scenarios."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.014978,
+          "ms": 13243,
+          "tin": 3534,
+          "tout": 791,
+          "stop": "stop",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "Direct, balanced answer with useful levels, but it introduces an unsupported name for the pending call."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 8,
+              "reason": "Thorough conditional setup, though lengthy; it introduces an unsupported name and slightly misstates the percentage drop to support."
+            },
+            "BASELINE": {
+              "answers_question": 7,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 5,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 5,
+              "overall": 6,
+              "reason": "Grounded and readable, but it does not flag the unspecified horizon or give a clear level that would weaken the case."
+            },
+            "RAPIDO": {
+              "answers_question": 9,
+              "evidence_grounding": 10,
+              "honesty_on_gaps": 10,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 8,
+              "overall": 9,
+              "reason": "Clear, well-grounded short-term answer that explicitly limits what the 1H evidence can say about the broader run."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "tsla",
+      "symbol": "TSLA",
+      "lang": "es",
+      "question": "¿TSLA está cara o hay oportunidad este mes?",
+      "seed": 1004,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "TSLA",
+          "technicals": {
+            "price": 357.5,
+            "rsi14": 22.1,
+            "ema20": 366.2,
+            "ema50": 369.3,
+            "support": 356.8,
+            "resistance": 386.8,
+            "atrPct": 0.89,
+            "trend": "bajista",
+            "momentum": "sobreventa"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "TSLA",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "TSLA",
+          "technicals": {
+            "price": 357.5,
+            "rsi14": 22.1,
+            "ema20": 366.2,
+            "ema50": 369.3,
+            "support": 356.8,
+            "resistance": 386.8,
+            "atrPct": 0.89,
+            "trend": "bajista",
+            "momentum": "sobreventa"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "TSLA",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 357.5,
+              "rsi14": 22.1,
+              "ema20": 366.2,
+              "ema50": 369.3,
+              "support": 356.8,
+              "resistance": 386.8,
+              "atrPct": 0.89,
+              "trend": "bajista",
+              "momentum": "sobreventa"
+            },
+            "1D": {
+              "price": 357.5,
+              "rsi14": 41.8,
+              "ema20": 365,
+              "ema50": 362.1,
+              "support": 331.1,
+              "resistance": 386.8,
+              "atrPct": 3.12,
+              "trend": "lateral",
+              "momentum": "neutral",
+              "bars": 64,
+              "asOf": "2026-09-28T13:30:00.000Z"
+            }
+          },
+          "derivatives": null,
+          "record": null
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "1D"
+        ],
+        "derivatives": false,
+        "record": null
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 7459,
+          "usd": 0.00033015,
+          "tokensIn": 1173,
+          "tokensOut": 257,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 4719,
+              "usd": 0.0000855,
+              "tin": 278,
+              "tout": 73,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1301,
+              "usd": 0.0001155,
+              "tin": 358,
+              "tout": 103,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1439,
+              "usd": 0.00012915,
+              "tin": 537,
+              "tout": 81,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "TSLA muestra un precio actual de 357.5, con un RSI de 22.1 que indica sobreventa, lo que sugiere una posible oportunidad de compra. Sin embargo, la tendencia es bajista y el precio está cerca del soporte de 356.8, lo que añade incertidumbre sobre la dirección futura del precio.",
+            "red": "La afirmación de que TSLA podría ser una oportunidad de compra se basa en un RSI de 22.1, que indica sobreventa, pero ignora el contexto de la tendencia bajista y la proximidad al soporte. La tendencia bajista sugiere que el precio podría seguir cayendo, lo que contradice la idea de una oportunidad de compra. Además, no se proporciona evidencia sobre factores fundamentales que podrían influir en el precio, lo que añade incertidumbre a la evaluación.",
+            "cio": "TSLA muestra un precio actual de 357.5, con un RSI de 22.1 que indica sobreventa, lo que sugiere una posible oportunidad de compra. Sin embargo, la tendencia es bajista y el precio está cerca del soporte de 356.8, lo que añade incertidumbre sobre la dirección futura del precio.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 15320,
+          "usd": 0.0010014,
+          "tokensIn": 2369,
+          "tokensOut": 1529,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3808,
+              "usd": 0.0002178,
+              "tin": 518,
+              "tout": 332,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 3995,
+              "usd": 0.00024210000000000003,
+              "tin": 681,
+              "tout": 348,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 7516,
+              "usd": 0.0005415,
+              "tin": 1170,
+              "tout": 849,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H"
+            ],
+            "missing": [
+              "1D",
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Para evaluar el horizonte de este mes faltan datos de 1D y 1W; solo hay datos de 1H, así que no se puede determinar si TSLA está cara en términos de valoración ni confirmar una oportunidad mensual. En ese marco, la cotización está por debajo de la EMA20 (2,38%) y la EMA50 (3,2%), por encima del soporte (0,2%) y por debajo de la resistencia (7,57%); el RSI de 22,1 señala sobreventa, mientras la tendencia figura bajista. La oportunidad más sólida es condicional: un rebote si el soporte se mantiene y aparece recuperación; si cede, la sobreventa por sí sola no confirma un cambio de tendencia.",
+            "red": "Para evaluar este mes faltan datos de 1D y 1W; solo hay datos de mercado de 1H, insuficientes para determinar si TSLA está cara o si ofrece una oportunidad mensual. La tesis de rebote es débil: RSI 22,1 indica sobreventa, pero no confirma giro, y la tendencia figura bajista; el precio está por debajo de EMA20 (2,38%) y EMA50 (3,2%), apenas por encima del soporte (0,2%) y por debajo de la resistencia (7,57%). Mantener el soporte y ver recuperación serían condiciones, no evidencia de que vayan a ocurrir; tampoco hay datos de valoración fundamental para juzgar si está cara.",
+            "cio": "Para evaluar este mes faltan datos de 1D y 1W; el único dato disponible es de mercado en 1H, insuficiente para juzgar valoración o una oportunidad mensual. En 1H, la tendencia figura bajista y el RSI es 22,1; el precio está por debajo de EMA20 (2,38%) y EMA50 (3,2%), por encima del soporte (0,2%) y por debajo de la resistencia (7,57%). La sobreventa podría acompañar un rebote si el soporte se mantiene, pero no confirma un giro ni permite concluir que TSLA esté barata.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "No se puede saber si TSLA está cara ni si ofrece oportunidad este mes.",
+              "why": "La tendencia es bajista y la sobreventa no confirma un giro; cotiza apenas sobre soporte.",
+              "risk": "Faltan marcos 1D/1W y datos de valoración; el soporte podría ceder.",
+              "watch": "Vigilar si mantiene o pierde el soporte de 356.8.",
+              "watchLevel": 356.8,
+              "followUp": "¿Qué muestran los datos diarios y semanales de TSLA?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 17162,
+          "usd": 0.010582099999999999,
+          "tokensIn": 4778,
+          "tokensOut": 1372,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 5651,
+              "usd": 0.0002877,
+              "tin": 922,
+              "tout": 391,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 7182,
+              "usd": 0.0003804,
+              "tin": 1099,
+              "tout": 541,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4329,
+              "usd": 0.009914,
+              "tin": 2757,
+              "tout": 440,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Para valorar una oportunidad de este mes falta el marco semanal (1W), así que la evidencia disponible es incompleta para ese horizonte; además, estos datos técnicos no determinan si TSLA está cara por valoración. La posible oportunidad es un rebote condicionado: el precio está sobre el soporte de 356,8 por 0,2%, mientras el RSI horario está sobrevendido; pero la tendencia horaria es bajista y el precio sigue debajo de EMA20 por 2,38% y EMA50 por 3,2%. En diario el panorama es lateral y neutral, con el precio debajo de EMA20 por 2,05% y EMA50 por 1,27%; perder el soporte o no recuperar esas medias debilitaría la tesis de rebote, y el soporte no garantiza un piso.",
+            "red": "Para evaluar un horizonte mensual falta el marco semanal (1W); además, estos indicadores técnicos no permiten concluir si TSLA está cara por valoración. La tesis de rebote de Alpha es débil si se apoya solo en sobreventa: el mercado de TSLA en 1H al 28 de septiembre está sobre el soporte de 356,8 por 0,2%, pero sigue debajo de EMA20 por 2,38% y de EMA50 por 3,2%; en diario también está debajo de ambas medias, mientras el panorama cambia de bajista en 1H a lateral en 1D. Perder el soporte debilitaría esa tesis, pero sostenerlo tampoco confirma un rebote ni garantiza un piso.",
+            "cio": "Para un horizonte mensual falta el marco semanal (1W), y estos datos técnicos no dicen si TSLA está cara por valoración. Hay un posible rebote condicionado: el precio está sobre el soporte de 356,8 por 0,2% y el RSI horario (22,1) está en sobreventa, pero sigue debajo de EMA20 (2,38%) y EMA50 (3,2%) en 1H, y también debajo de ambas en diario. Los marcos discrepan (bajista en 1H, lateral en 1D), y la sobreventa sola no confirma un giro; sin evidencia completa lo prudente es esperar.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "No hay un caso claro: los datos no miden si TSLA está cara.",
+              "why": "Está sobre el soporte de 356,8 y sobrevendida, pero bajo sus medias y con tendencia bajista horaria.",
+              "risk": "Falta el marco semanal y perder el soporte debilitaría cualquier idea de rebote.",
+              "watch": "Si el precio mantiene el soporte de 356,8 o lo pierde.",
+              "watchLevel": 356.8,
+              "followUp": "¿Qué nivel confirmaría un cambio de tendencia en TSLA?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 22443,
+          "usd": 0.038532,
+          "tokensIn": 9631,
+          "tokensOut": 1927,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 4737,
+              "usd": 0.007438,
+              "tin": 1544,
+              "tout": 435,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 5378,
+              "usd": 0.00812,
+              "tin": 1990,
+              "tout": 414,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 6779,
+              "usd": 0.009038,
+              "tin": 2414,
+              "tout": 421,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5549,
+              "usd": 0.013936,
+              "tin": 3683,
+              "tout": 657,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Para un horizonte mensual falta la temporalidad semanal (1W), así que no puedo valorar si TSLA está cara en términos de valoración ni confirmar la tendencia de fondo; solo veo 1H y 1D con datos de mercado al 28-sep-2026. La oportunidad condicional más clara es un rebote técnico: en 1H el RSI está en 22,1 (sobreventa) y el precio (357,5) está 0,2% por encima del soporte de 356,8, mientras en 1D el soporte queda en 331,1 (7,97% por debajo) y el RSI de 41,8 es neutral. Para que la tesis de rebote gane fuerza haría falta que el soporte aguante y el precio recupere la EMA20 (366,2 en 1H, 2,38% por encima; 365 en 1D, 2,05% por encima) y luego la EMA50 (369,3 en 1H), con la resistencia de 386,8 (7,57% por encima) como objetivo lejano; si pierde 356,8, el riesgo pasa a 331,1. Los marcos discrepan (1H bajista y sobrevendido, 1D lateral), la sobreventa no garantiza rebote y esto es contexto educativo, no una recomendación personalizada.",
+            "red": "Alpha plantea un rebote técnico, pero su base es frágil: el RSI de 22,1 es solo de 1H, mientras que en 1D es 41,8 (neutral) y el precio (357,5) está bajo la EMA20 (365, a 2,05%) y la EMA50 (362,1, a 1,27%), así que la sobreventa horaria puede ser ruido intradía y no un suelo. El soporte de 356,8 está apenas 0,2% por debajo del precio, por lo que la invalidación es casi inmediata; un cierre por debajo abriría el camino hacia 331,1 (7,97% abajo) y el riesgo/recompensa queda mal definido frente a una resistencia de 386,8 a 7,57%. Además, Alpha reconoce que falta la temporalidad semanal (1W) y que no hay datos de valoración, derivados ni historial propio, así que no hay evidencia para responder si TSLA está 'cara' ni para sostener una tesis mensual; el ATR de 0,89% en 1H frente a 3,12% en 1D también sugiere que el movimiento horario dice poco sobre el mes. Es solo contexto educativo, no una recomendación.",
+            "rebuttal": "Red Team tiene razón en lo esencial: el RSI de 22,1 es solo de 1H, mientras en 1D es 41,8 (neutral) con el precio bajo la EMA20 (365, a 2,05%) y la EMA50 (362,1, a 1,27%), así que la sobreventa horaria puede ser ruido y no un suelo. También concedo que el soporte de 356,8 está apenas 0,2% del precio, que la invalidación es casi inmediata con 331,1 (7,97% abajo) como siguiente nivel, y que sin la temporalidad semanal (1W) ni datos de valoración no puedo decir si TSLA está 'cara' ni sostener una tesis mensual. Lo que sobrevive es solo una hipótesis condicional y de corto plazo: un rebote sería creíble si el soporte de 356,8 aguanta y el precio recupera la EMA20 (366,2 en 1H, 2,38% por encima), con la resistencia de 386,8 (7,57% por encima) como referencia lejana; sin eso, no hay evidencia de oportunidad este mes. Es contexto educativo, no una recomendación personalizada, y la sobreventa no garantiza rebote.",
+            "cio": "No hay base suficiente para decir si TSLA está cara ni si hay oportunidad este mes: falta la temporalidad semanal (1W) y no hay datos de valoración. Con lo disponible, en 1H el RSI de 22,1 indica sobreventa y el precio (357,5) está 0,2% por encima del soporte de 356,8, pero en 1D el RSI es 41,8 (neutral), el trend es lateral y el precio queda 2,05% bajo la EMA20 y 1,27% bajo la EMA50. La sobreventa horaria puede ser ruido y el soporte cercano implica una invalidación casi inmediata, con 331,1 (7,97% abajo) como siguiente nivel; es contexto educativo, no una recomendación.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "No se puede afirmar que TSLA esté cara ni que haya oportunidad mensual.",
+              "why": "Solo hay rebote técnico de corto plazo en 1H; en 1D el RSI es neutral y el precio queda bajo sus medias.",
+              "risk": "Falta la temporalidad semanal y datos de valoración; perder 356,8 abriría el camino hacia 331,1.",
+              "watch": "Que el soporte de 356,8 aguante y el precio recupere la EMA20 de 1H en 366,2.",
+              "watchLevel": 356.8,
+              "followUp": "¿Qué pasaría con TSLA si pierde el soporte de 356,8?"
+            },
+            "scenarios": {
+              "confirm": "Que TSLA mantenga el soporte de 356,8 y recupere la EMA20 (366,2 en 1H), luego la EMA50 de 369,3, apuntaría a un rebote técnico.",
+              "invalidate": "Una pérdida del soporte de 356,8 invalidaría el rebote y dejaría 331,1 (7,97% abajo) como siguiente nivel de referencia."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "RAPIDO",
+        "B": "PROFUNDO",
+        "C": "MAXIMO",
+        "D": "BASELINE"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.018016,
+          "ms": 4871,
+          "tin": 6448,
+          "tout": 512,
+          "stop": "end_turn",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 6,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 6,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 6,
+              "overall": 6,
+              "reason": "Numbers are correct and it says valuation can't be judged, but it wrongly claims 1D data is missing when 1D exists in the evidence."
+            },
+            "PROFUNDO": {
+              "answers_question": 7,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 7,
+              "overall": 7,
+              "reason": "Uses both 1H and 1D correctly, flags the missing 1W and valuation, and gives a clear support watch level, though with no explicit scenarios."
+            },
+            "MAXIMO": {
+              "answers_question": 8,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Precise and correct use of 1H and 1D, states the gaps (1W, valuation, derivatives), and gives explicit confirm/invalidate levels (356.8, 331.1, 366.2); somewhat dense for a novice."
+            },
+            "BASELINE": {
+              "answers_question": 4,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Generic; says oversold 'suggests a buying opportunity' with no mention of horizon gaps, no 1D use, and no levels or scenarios to watch."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.014492,
+          "ms": 12580,
+          "tin": 3266,
+          "tout": 796,
+          "stop": "stop",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 8,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "Distingue la sobreventa horaria de una oportunidad mensual y señala qué vigilar, sin pretender medir la valoración."
+            },
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 10,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Integra correctamente los datos horarios y diarios, y explica por qué aún no hay un caso mensual claro."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 7,
+              "reason": "Plantea escenarios útiles, pero repite porcentajes incorrectos al describir niveles por encima o por debajo del precio."
+            },
+            "BASELINE": {
+              "answers_question": 4,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 4,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "La sobreventa está respaldada, pero insinuar una compra no responde si está cara ni evalúa el horizonte mensual."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "aapl",
+      "symbol": "AAPL",
+      "lang": "en",
+      "question": "Is AAPL a buy on this dip for the next few weeks?",
+      "seed": 1005,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "AAPL",
+          "technicals": {
+            "price": 338.4,
+            "rsi14": 61.6,
+            "ema20": 339.1,
+            "ema50": 337.6,
+            "support": 334.3,
+            "resistance": 343,
+            "atrPct": 0.44,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "AAPL",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "AAPL",
+          "technicals": {
+            "price": 338.4,
+            "rsi14": 61.6,
+            "ema20": 339.1,
+            "ema50": 337.6,
+            "support": 334.3,
+            "resistance": 343,
+            "atrPct": 0.44,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "AAPL",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 338.4,
+              "rsi14": 61.6,
+              "ema20": 339.1,
+              "ema50": 337.6,
+              "support": 334.3,
+              "resistance": 343,
+              "atrPct": 0.44,
+              "trend": "lateral",
+              "momentum": "neutral"
+            },
+            "1D": {
+              "price": 338.4,
+              "rsi14": 76.3,
+              "ema20": 331.1,
+              "ema50": 323.9,
+              "support": 302.9,
+              "resistance": 345.3,
+              "atrPct": 2,
+              "trend": "alcista",
+              "momentum": "sobrecompra",
+              "bars": 64,
+              "asOf": "2026-09-28T13:30:00.000Z"
+            }
+          },
+          "derivatives": null,
+          "record": {
+            "resolvedCalls": 0,
+            "wins": 0,
+            "losses": 0,
+            "breakEven": 0,
+            "lastResolved": [],
+            "latestCall": {
+              "direction": null,
+              "entry": null,
+              "target": null,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-04-19T11:45:28.09893+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "1D"
+        ],
+        "derivatives": false,
+        "record": {
+          "resolvedCalls": 0
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4195,
+          "usd": 0.00032775,
+          "tokensIn": 1165,
+          "tokensOut": 255,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1385,
+              "usd": 0.00009015000000000001,
+              "tin": 277,
+              "tout": 81,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1382,
+              "usd": 0.00010394999999999999,
+              "tin": 365,
+              "tout": 82,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1427,
+              "usd": 0.00013365,
+              "tin": 523,
+              "tout": 92,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "AAPL is currently trading at 338.4, with a support level at 334.3 and resistance at 343. The RSI of 61.6 indicates that it is nearing overbought conditions, while the trend is lateral with neutral momentum. This suggests that while there may be potential for a bounce off support, the lack of strong upward momentum could limit immediate upside.",
+            "red": "Alpha's argument assumes that the current price near support will lead to a bounce, but it overlooks the neutral momentum and lateral trend, which indicate a lack of strong buying pressure. Additionally, the RSI nearing overbought conditions suggests potential for a pullback rather than a sustained rally. Without evidence of increased buying interest or a catalyst for upward movement, the assumption of a bounce may be weak.",
+            "cio": "AAPL is currently at 338.4, close to its support level of 334.3, but the neutral momentum and lateral trend suggest limited immediate upside potential. The RSI nearing overbought conditions raises concerns about a possible pullback rather than a rally. Therefore, while there is a chance for a bounce off support, the overall indicators do not strongly support a buy decision at this time.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 14175,
+          "usd": 0.0008923,
+          "tokensIn": 2323,
+          "tokensOut": 1320,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3670,
+              "usd": 0.000187,
+              "tin": 515,
+              "tout": 271,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 4141,
+              "usd": 0.0002644,
+              "tin": 659,
+              "tout": 397,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 6363,
+              "usd": 0.0004409,
+              "tin": 1149,
+              "tout": 652,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H"
+            ],
+            "missing": [
+              "1D",
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Daily and weekly market data are missing for assessing a horizon of the next few weeks; the available evidence is only 1H market data as of 2026-09-28 20:00 UTC. The strongest conditional case is a bounce near support: price is above support at 334.3 by 1.23% and above EMA50 at 337.6 by 0.24%, but it is below EMA20 at 339.1 by 0.21%, with resistance at 343 still 1.34% above. The trend is lateral and momentum neutral, so this evidence alone does not establish a buy on the dip.",
+            "red": "Daily and weekly market data are missing for judging a next-few-weeks horizon; the available evidence is only 1H market data as of 2026-09-28 20:00 UTC. Alpha’s bounce case assumes support will hold, but price is only shown above support at 334.3 by 1.23%, above EMA50 at 337.6 by 0.24%, below EMA20 at 339.1 by 0.21%, and below resistance at 343 by 1.34%; the lateral trend and neutral momentum do not confirm a bounce. A move below the cited support would undermine that setup, while this short timeframe cannot establish whether the dip is a buy over the coming weeks.",
+            "cio": "Daily and weekly market data are missing for judging a horizon of the next few weeks; the available evidence is 1H market data as of 2026-09-28. Price is below EMA20 at 339.1 by 0.21%, above EMA50 at 337.6 by 0.24%, above support at 334.3 by 1.23%, and below resistance at 343 by 1.34%. The lateral trend and neutral momentum do not confirm a rebound, so the available evidence does not establish a clear case.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "AAPL’s dip is not a clear buy based on the available evidence.",
+              "why": "Hourly data show a lateral trend and neutral momentum, not a confirmed rebound.",
+              "risk": "Daily and weekly data needed for a next-few-weeks view are missing.",
+              "watch": "Watch whether AAPL holds support at 334.3.",
+              "watchLevel": 334.3,
+              "followUp": "What would confirm an AAPL rebound?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 12970,
+          "usd": 0.010105900000000001,
+          "tokensIn": 4898,
+          "tokensOut": 1167,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3837,
+              "usd": 0.0002869,
+              "tin": 989,
+              "tout": 376,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 5192,
+              "usd": 0.000311,
+              "tin": 1160,
+              "tout": 390,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 3940,
+              "usd": 0.009508,
+              "tin": 2749,
+              "tout": 401,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "Weekly data is missing for judging a multiweek horizon, so the available hourly and daily evidence is incomplete for your question. The daily trend is upward, with price above the EMA20 (2.2% away) and EMA50 (4.48% away), but RSI is 76.3 and price is below resistance at 345.3 (2% away); hourly conditions are lateral and neutral, with price below the EMA20 (0.21% away), above the EMA50 (0.24% away), and above support at 334.3 (1.23% away). The clearest conditional opportunity is a pullback that holds support or a convincing move through resistance, but the conflicting short-term picture and missing weekly evidence do not establish that this dip is a buy.",
+            "red": "Weekly data is missing for a multiweek view, so the available evidence cannot establish whether this is a buy for the next few weeks. Alpha’s support-hold scenario is not confirmed: the hourly picture is lateral/neutral, with price below the EMA20 (0.21% away) and just 1.23% above hourly support, while the daily trend is upward but RSI is 76.3 and price is 2% below resistance. The evidence supports competing possibilities rather than a clear dip-buy case, and Bobby’s record has no resolved calls to validate the latest pending thesis.",
+            "cio": "Weekly data is missing, so a few-weeks view is only partly supported. The daily trend is up, with price above the EMA20 (2.2% away) and EMA50 (4.48% away), but daily RSI is 76.3 (overbought) and price sits 2% below resistance at 345.3. The hourly chart is lateral and neutral, and price is only 0.21% below its EMA20 and 1.23% above support at 334.3, so this is a small pause rather than a clear dip. Bobby has no resolved calls here to lean on, so the evidence does not make a clear buy case.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Not a clear buy yet; the evidence doesn't support calling this a dip.",
+              "why": "Daily trend is up, but RSI is overbought and hourly price is moving sideways near resistance.",
+              "risk": "Weekly data is missing, so the multiweek picture is incomplete and Bobby has no resolved calls here.",
+              "watch": "Whether price holds hourly support near 334.3 or breaks above daily resistance at 345.3.",
+              "watchLevel": 334.3,
+              "followUp": "How would a pullback to support change the AAPL outlook?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 19250,
+          "usd": 0.036198,
+          "tokensIn": 9679,
+          "tokensOut": 1684,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 4440,
+              "usd": 0.006574,
+              "tin": 1647,
+              "tout": 328,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 5112,
+              "usd": 0.008052,
+              "tin": 1986,
+              "tout": 408,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 4622,
+              "usd": 0.008708,
+              "tin": 2404,
+              "tout": 390,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 5075,
+              "usd": 0.012864,
+              "tin": 3642,
+              "tout": 558,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "For a multi-week horizon the weekly timeframe is missing, so I can't confirm the larger trend; I can only argue from 1H and 1D. The 'dip' is shallow: on 1H price is 338.4, 0.21% below the EMA20 (339.1) and 0.24% above the EMA50 (337.6), with neutral momentum and RSI 61.6, while the daily trend is up with price 2.2% above its EMA20 and 4.48% above its EMA50, but RSI 76.3 is overbought. The strongest conditional case is a hold of the 1H support at 334.3 (1.23% below) followed by a clean break of resistance at 343 (1.34% above) and then the daily resistance at 345.3 (2% above), which would show the daily uptrend resuming; failing support would weaken it, and overbought daily readings often precede consolidation. This is educational context, not a buy recommendation, and Bobby has no resolved calls on AAPL to lean on.",
+            "red": "Alpha is right that the weekly timeframe is missing, but it still builds a conditional bullish path from 1H and 1D alone, and the 'dip' framing is its weakest assumption: price is only 0.21% below the 1H EMA20 (339.1) and still 0.24% above the EMA50 (337.6), so there is barely a pullback, and a daily RSI of 76.3 says the stretch is already extended rather than discounted. Alpha also treats the 1H support at 334.3 (1.23% below) as the invalidation, but for a multi-week view the more meaningful daily support is 302.9, 11.72% below, so a stop-level decision is very different depending on which timeframe you use, and Alpha doesn't reconcile them. The 1H and 1D also disagree (lateral/neutral vs. uptrend/overbought), and the range between support 334.3 and resistance 343 is only about 2.6% wide against a 1H ATR of 0.44%, so a break in either direction could be noise. Missing evidence includes the weekly trend, any catalyst or earnings context, and volume, and Bobby's record has zero resolved AAPL calls, so nothing here supports calling this a buy; it is educational context only.",
+            "rebuttal": "Red Team is right on three points: the 'dip' is barely a dip (price 0.21% below the 1H EMA20 at 339.1 and 0.24% above the EMA50 at 337.6), daily RSI of 76.3 is overbought, and the weekly timeframe is missing, so the multi-week trend can't be confirmed. I also concede that the 1H support at 334.3 (1.23% below) and the daily support at 302.9 (11.72% below) imply very different invalidation levels, so any multi-week view has to say which one it uses; the 1H level only covers a short-term read, and the daily level is far enough away that the risk is much wider. What survives is narrower: the daily trend is up, with price 2.2% above its EMA20 (331.1) and 4.48% above its EMA50 (323.9), so the case is a conditional 'watch for resumption' rather than a buy, requiring a clean move through 1H resistance at 343 (1.34% above) and then daily resistance at 345.3 (2% above). Without weekly context, catalyst or volume data, and with no resolved Bobby calls on AAPL, this is educational context only and not a buy recommendation.",
+            "cio": "The weekly timeframe is missing, so a multi-week view can't be confirmed; only 1H and 1D are available. The 'dip' is shallow: price 338.4 is 0.21% below the 1H EMA20 (339.1) and 0.24% above the EMA50 (337.6), while the daily trend is up (2.2% above EMA20) but RSI 76.3 is overbought. The timeframes disagree (1H lateral/neutral vs. 1D uptrend/overbought), and there is no catalyst, volume, or resolved Bobby call to lean on, so the evidence does not support a clear buy case. At most, a conditional long idea needs a move through 343 and then 345.3.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Not a clear buy: the dip is shallow and the weekly view is missing.",
+              "why": "Daily trend is up, but daily RSI 76.3 is overbought and the hourly chart is sideways.",
+              "risk": "No weekly trend, catalyst or volume data; support is 334.3 on 1H but 302.9 on daily.",
+              "watch": "Whether price closes above hourly resistance at 343, then daily resistance at 345.3.",
+              "watchLevel": 343,
+              "followUp": "What would make AAPL's daily uptrend look weaker?"
+            },
+            "scenarios": {
+              "confirm": "A clean move above 1H resistance at 343 and then daily resistance at 345.3, while holding above support at 334.3, would show the daily uptrend resuming.",
+              "invalidate": "A drop below 1H support at 334.3 would weaken the idea, and a slide toward daily support at 302.9 would break the daily uptrend."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "BASELINE",
+        "B": "MAXIMO",
+        "C": "PROFUNDO",
+        "D": "RAPIDO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.01725,
+          "ms": 4392,
+          "tin": 5980,
+          "tout": 529,
+          "stop": "end_turn",
+          "byArm": {
+            "BASELINE": {
+              "answers_question": 5,
+              "evidence_grounding": 5,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Short and reaches wait, but calls RSI 61.6 'nearing overbought', says nothing about the missing weekly or daily data, and gives few watch levels."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 10,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Uses both 1H and 1D correctly, names the missing weekly, catalyst and volume data, and reconciles the two support levels. Gives clear confirm and invalidate levels and a wait verdict."
+            },
+            "PROFUNDO": {
+              "answers_question": 8,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 6,
+              "overall": 8,
+              "reason": "Uses the daily and hourly data well, flags the missing weekly data, and makes the sensible point that this is not really a dip. Watch levels are thinner and it has no scenarios."
+            },
+            "RAPIDO": {
+              "answers_question": 5,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 5,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 4,
+              "overall": 5,
+              "reason": "Numbers are accurate for 1H, but it wrongly says daily data is missing when the evidence has a 1D block. That misses the overbought daily RSI and the uptrend, so the view is limited."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.015504,
+          "ms": 12751,
+          "tin": 3222,
+          "tout": 906,
+          "stop": "stop",
+          "byArm": {
+            "BASELINE": {
+              "answers_question": 6,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 5,
+              "overall": 5,
+              "reason": "Gives a cautious answer, but calls RSI 61.6 nearly overbought and never explains that hourly evidence is insufficient for a few-weeks view."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Strong multi-week assessment with clear levels and gaps, though the lengthy debate and occasional jargon make it harder to follow."
+            },
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 8,
+              "overall": 9,
+              "reason": "Clearly explains why this is not yet a convincing dip-buy and identifies what to watch, while acknowledging the missing weekly view."
+            },
+            "RAPIDO": {
+              "answers_question": 8,
+              "evidence_grounding": 10,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 9,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "A sound, accessible answer based on its hourly evidence; it plainly states the horizon limitation and gives a support level to watch."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "doge",
+      "symbol": "DOGE",
+      "lang": "es",
+      "question": "¿DOGE sirve para un trade rápido hoy?",
+      "seed": 1006,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "DOGE",
+          "technicals": {
+            "price": 0.09502,
+            "rsi14": 57.3,
+            "ema20": 0.094217,
+            "ema50": 0.094776,
+            "support": 0.0915,
+            "resistance": 0.09589,
+            "atrPct": 1.13,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "DOGE-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "DOGE",
+          "technicals": {
+            "price": 0.09502,
+            "rsi14": 57.3,
+            "ema20": 0.094217,
+            "ema50": 0.094776,
+            "support": 0.0915,
+            "resistance": 0.09589,
+            "atrPct": 1.13,
+            "trend": "lateral",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "OKX",
+            "instrument": "DOGE-USDT",
+            "assetType": "crypto",
+            "timeframe": "1H",
+            "asOf": "2026-09-29T10:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 0.09502,
+              "rsi14": 57.3,
+              "ema20": 0.094217,
+              "ema50": 0.094776,
+              "support": 0.0915,
+              "resistance": 0.09589,
+              "atrPct": 1.13,
+              "trend": "lateral",
+              "momentum": "neutral"
+            },
+            "4H": {
+              "price": 0.09502,
+              "rsi14": 45.5,
+              "ema20": 0.095141,
+              "ema50": 0.094333,
+              "support": 0.0915,
+              "resistance": 0.09982,
+              "atrPct": 2.43,
+              "trend": "lateral",
+              "momentum": "neutral",
+              "bars": 100,
+              "asOf": "2026-09-29T08:00:00.000Z"
+            },
+            "1D": {
+              "price": 0.09502,
+              "rsi14": 63.3,
+              "ema20": 0.091513,
+              "ema50": 0.086253,
+              "support": 0.07831,
+              "resistance": 0.10589,
+              "atrPct": 6.62,
+              "trend": "alcista",
+              "momentum": "neutral",
+              "bars": 100,
+              "asOf": "2026-09-28T16:00:00.000Z"
+            },
+            "1W": {
+              "price": 0.09502,
+              "rsi14": 66.1,
+              "ema20": 0.088589,
+              "ema50": 0.11958,
+              "support": 0.06757,
+              "resistance": 0.11863,
+              "atrPct": 11.15,
+              "trend": "lateral",
+              "momentum": "neutral",
+              "bars": 60,
+              "asOf": "2026-09-27T16:00:00.000Z"
+            }
+          },
+          "derivatives": {
+            "fundingRatePct": 0.0099,
+            "nextFundingAt": "2026-09-30T00:00:00.000Z",
+            "openInterest": 1024071479.9999996
+          },
+          "record": null
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "4H",
+          "1D",
+          "1W"
+        ],
+        "derivatives": true,
+        "record": null
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4391,
+          "usd": 0.0003528,
+          "tokensIn": 1212,
+          "tokensOut": 285,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1688,
+              "usd": 0.00009735,
+              "tin": 281,
+              "tout": 92,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1278,
+              "usd": 0.000114,
+              "tin": 380,
+              "tout": 95,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1425,
+              "usd": 0.00014145,
+              "tin": 551,
+              "tout": 98,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "DOGE presenta un precio de 0.09502 con un RSI de 57.3, lo que indica un momentum neutral. La tendencia es lateral y el precio se encuentra cerca de la resistencia en 0.09589, lo que sugiere que podría haber una oportunidad de trade rápido si se supera esta resistencia. Sin embargo, el contexto actual es incierto y se debe considerar el soporte en 0.0915.",
+            "red": "La afirmación de que DOGE podría ofrecer una oportunidad de trade rápido se basa en la proximidad del precio a la resistencia y un RSI neutral. Sin embargo, la tendencia lateral y el momentum neutral sugieren que no hay una dirección clara, lo que podría invalidar la suposición de un movimiento ascendente. Además, no se considera el impacto de factores externos que podrían influir en el precio, lo que añade incertidumbre a la estrategia propuesta.",
+            "cio": "DOGE presenta un precio de 0.09502 con un RSI de 57.3, indicando un momentum neutral. Aunque está cerca de la resistencia en 0.09589, la tendencia lateral y la falta de una dirección clara sugieren que la oportunidad de un trade rápido es incierta. Se debe tener en cuenta el soporte en 0.0915, lo que añade más complejidad a la decisión.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 16946,
+          "usd": 0.0009883000000000001,
+          "tokensIn": 2253,
+          "tokensOut": 1526,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3301,
+              "usd": 0.000166,
+              "tin": 520,
+              "tout": 228,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 7191,
+              "usd": 0.0003843,
+              "tin": 628,
+              "tout": 643,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 6454,
+              "usd": 0.000438,
+              "tin": 1105,
+              "tout": 655,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para un trade intradía, el marco de 1H disponible es suficiente, aunque no asegura el resultado. La oportunidad más clara sería condicional a que DOGE supere la resistencia: el precio está 0,91% por debajo de ella, pese a cotizar por encima de la EMA20 (0,85%) y la EMA50 (0,26%); el mercado muestra tendencia lateral y momentum neutral, así que aún no hay confirmación direccional.",
+            "red": "La tesis de Alpha depende de una ruptura todavía no confirmada: en los datos de mercado de DOGE-USDT de 1H al 2026-09-29 10:00 UTC, el precio está por debajo de la resistencia de 0,09589 (0,91%) y por encima de la EMA20 (0,85%) y EMA50 (0,26%). Con tendencia lateral y momentum neutral, estar cerca de la resistencia no basta para concluir que hay una oportunidad; el argumento se debilitaría si el precio es rechazado allí o pierde las EMA, y no se aportan volumen ni señales intrahora para valorar la ruptura.",
+            "cio": "Para el horizonte intradía, el marco de 1H disponible es suficiente. En los datos de mercado de DOGE-USDT al 2026-09-29 10:00 UTC, el precio está encima de la EMA20 (0,85%) y la EMA50 (0,26%), y del soporte (3,85%), pero debajo de la resistencia (0,91%); la tendencia lateral y el momentum neutral no confirman dirección. Falta volumen y señal intrahora para valorar una ruptura, así que no hay una base clara para un trade rápido.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "No hay señal clara para un trade rápido hoy en DOGE.",
+              "why": "Precio cerca de resistencia, pero tendencia lateral y momentum neutral.",
+              "risk": "Falta volumen y confirmación intrahora de una posible ruptura.",
+              "watch": "Observar si DOGE supera la resistencia de 0,09589.",
+              "watchLevel": 0.09589,
+              "followUp": "¿Qué confirmaría una ruptura de DOGE por encima de 0,09589?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 22510,
+          "usd": 0.0125643,
+          "tokensIn": 6237,
+          "tokensOut": 1997,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 5777,
+              "usd": 0.0003373,
+              "tin": 1343,
+              "tout": 406,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 12688,
+              "usd": 0.000709,
+              "tin": 1535,
+              "tout": 1111,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4044,
+              "usd": 0.011518,
+              "tin": 3359,
+              "tout": 480,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para un trade intradía, DOGE ofrece una oportunidad condicional, no una señal clara: el mercado está lateral en 1H y 4H, aunque el diario mantiene tendencia alcista. En el marco 1H, el precio está por encima de la EMA20 (+0,85%) y la EMA50 (+0,26%), pero por debajo de la resistencia de 0,09589 (a 0,91%); la confirmación de una ruptura de esa resistencia sería el escenario más favorable, mientras que el 4H está apenas por debajo de su EMA20 (−0,13%). El soporte está debajo del precio a 3,85%, pero el momentum es neutral; el mercado puede moverse en ambos sentidos. La referencia es market data DOGE-USDT de 1H, al 29-09-2026 10:00 UTC.",
+            "red": "Alpha acierta al llamarla condicional, pero una ruptura de 0,09589 no está confirmada: DOGE sigue por debajo de esa resistencia a 0,91%, y el panorama inmediato no está alineado, pues está por encima de las EMA20 y EMA50 en 1H (0,85% y 0,26%) pero por debajo de la EMA20 en 4H (0,13%). El soporte está por debajo a 3,85%, bastante más lejos que la resistencia, así que no debe confundirse con un límite de riesgo estrecho; no sostener la ruptura y seguir bajo la EMA20 de 4H debilitaría la tesis alcista. El funding de 0,0099% y el interés abierto aportan contexto de posicionamiento, no confirmación direccional, y faltan volumen y costes de ejecución para juzgar el trade rápido.",
+            "cio": "Para un trade rápido hoy la evidencia no sostiene un caso claro: DOGE está lateral en 1H y 4H, con momentum neutral, y el precio sigue por debajo de la resistencia de 0,09589 (a 0,91%). El 1H está por encima de la EMA20 (+0,85%) y la EMA50 (+0,26%), pero el 4H queda por debajo de su EMA20 (0,13%), así que los marcos no coinciden; solo el diario es alcista. El soporte en 0,0915 está a 3,85%, mucho más lejos que la resistencia, y el funding de 0,0099% es solo contexto. Faltan volumen y costes de ejecución, por lo que lo prudente es esperar una ruptura confirmada.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Hoy DOGE no ofrece una señal clara para un trade rápido.",
+              "why": "Está lateral en 1H y 4H, con momentum neutral y bajo la resistencia.",
+              "risk": "Sin ruptura confirmada, el precio puede moverse en ambos sentidos; faltan volumen y costes.",
+              "watch": "Un cierre 1H sostenido sobre la resistencia de 0,09589.",
+              "watchLevel": 0.09589,
+              "followUp": "¿Qué haría más sólida una ruptura de DOGE sobre 0,09589?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 21443,
+          "usd": 0.044422,
+          "tokensIn": 11951,
+          "tokensOut": 2052,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 5383,
+              "usd": 0.008222,
+              "tin": 2101,
+              "tout": 402,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 5589,
+              "usd": 0.009718,
+              "tin": 2514,
+              "tout": 469,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 5520,
+              "usd": 0.011006,
+              "tin": 2993,
+              "tout": 502,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4951,
+              "usd": 0.015476,
+              "tin": 4343,
+              "tout": 679,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "intraday",
+            "available": [
+              "1H",
+              "4H",
+              "1D",
+              "1W"
+            ],
+            "missing": [],
+            "sufficient": true
+          },
+          "answer": {
+            "alpha": "Para un trade rápido, DOGE ofrece solo una oportunidad condicional: en 1H el precio (0.09502) está por encima de la EMA20 (0.85%) y de la EMA50 (0.26%) con RSI 57.3, pero la tendencia es lateral y el momentum neutral, y el margen hasta la resistencia de 0.09589 es de apenas 0.91%. Un cierre 1H que supere esa resistencia sería lo que da algo de recorrido; la siguiente referencia en 4H es 0.09982, a 4.81%, mientras que el soporte de 0.0915 queda a 3.85%. Los marcos no coinciden del todo: 4H está lateral con RSI 45.5 y el precio 0.13% por debajo de su EMA20, mientras que 1D es alcista (RSI 63.3, precio 3.83% sobre la EMA20). El funding de 0.0099% es positivo y bajo, contexto de posicionamiento y no una señal, y no hay historial propio de Bobby en DOGE; esto es análisis educativo, no una recomendación, y sin confirmación de ruptura la ventaja es limitada.",
+            "red": "Alpha acierta en que la ventaja es limitada, pero su escenario de ruptura tiene supuestos débiles: el recorrido hasta 0.09589 es de solo 0.91% frente a un ATR 1H de 1.13%, así que el ruido normal de una hora puede activar o invalidar la señal sin que signifique nada. Además, minimiza el conflicto de marcos: en 4H el precio está 0.13% bajo la EMA20 (0.095141) con RSI 45.5 y la tendencia lateral, y en 1W la tendencia también es lateral con el precio 20.54% bajo la EMA50, de modo que el sesgo alcista de 1D (3.83% sobre EMA20) no confirma un trade intradía. Alpha cita 0.09982 como objetivo a 4.81%, pero no aclara que perder la EMA20 de 1H (0.85% abajo) o la EMA50 (0.26% abajo) invalidaría rápidamente la idea, y con el soporte a 3.85% la relación riesgo/beneficio de una ruptura débil no está demostrada. Falta evidencia de volumen o de un cierre 1H por encima de la resistencia, y el funding de 0.0099% con interés abierto elevado es solo contexto de posicionamiento, no confirmación; esto es análisis educativo, no una recomendación.",
+            "rebuttal": "Red tiene razón en lo esencial: el margen hasta la resistencia de 0.09589 es de 0.91% frente a un ATR 1H de 1.13%, así que una ruptura sin cierre confirmado puede ser puro ruido; además 4H (precio 0.13% bajo la EMA20, RSI 45.5, lateral) y 1W (lateral, precio 20.54% bajo la EMA50) no respaldan el sesgo alcista de 1D (3.83% sobre la EMA20), y no hay datos de volumen que confirmen. También concedo que la invalidación está muy cerca: la EMA20 1H está 0.85% abajo y la EMA50 0.26% abajo, mientras que el soporte de 0.0915 queda a 3.85%, por lo que el riesgo/beneficio hacia 0.09982 (a 4.81%) no está demostrado. Lo que sobrevive es solo un caso estrictamente condicional: si hay un cierre 1H por encima de 0.09589 con el precio sosteniéndose sobre la EMA20 y la EMA50, DOGE podría tener recorrido corto, pero sin ese cierre la respuesta a 'trade rápido hoy' es que la ventaja es limitada y lo prudente es esperar confirmación. El funding de 0.0099% con interés abierto elevado es solo contexto de posicionamiento, no una señal, y esto es análisis educativo, no una recomendación.",
+            "cio": "Para un trade rápido hoy, la evidencia no respalda un caso claro: en 1H el precio (0.09502) está 0.85% sobre la EMA20 y 0.26% sobre la EMA50, pero la tendencia es lateral, el momentum neutral y la resistencia de 0.09589 está a solo 0.91%, menos que el ATR 1H de 1.13%. Los marcos no coinciden: 4H es lateral con RSI 45.5 y precio 0.13% bajo su EMA20, 1D es alcista (3.83% sobre la EMA20) y 1W es lateral con el precio 20.54% bajo la EMA50. El funding de 0.0099% es solo contexto de posicionamiento y no hay volumen ni historial de Bobby en DOGE; esto es análisis educativo, no una recomendación, y lo prudente es esperar un cierre 1H sobre la resistencia.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "Hoy DOGE no ofrece una ventaja clara para un trade rápido.",
+              "why": "Tendencia lateral en 1H y 4H, y la resistencia está a solo 0.91%.",
+              "risk": "Ruido normal de una hora puede activar o invalidar cualquier señal; falta volumen.",
+              "watch": "Un cierre de 1H por encima de la resistencia de 0.09589.",
+              "watchLevel": 0.09589,
+              "followUp": "¿Qué nivel de soporte mantiene el sesgo alcista diario de DOGE?"
+            },
+            "scenarios": {
+              "confirm": "Un cierre 1H por encima de 0.09589 con el precio sosteniéndose sobre las EMA20 y EMA50 daría recorrido corto hacia 0.09982.",
+              "invalidate": "Perder la EMA50 de 1H (0.094776) o la EMA20 (0.094217) dejaría sin sustento la idea de ruptura y apuntaría hacia el soporte de 0.0915."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "PROFUNDO",
+        "B": "MAXIMO",
+        "C": "BASELINE",
+        "D": "RAPIDO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.018756,
+          "ms": 4986,
+          "tin": 6833,
+          "tout": 509,
+          "stop": "end_turn",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 8,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 7,
+              "overall": 8,
+              "reason": "Clear wait verdict with correct percentages and multi-timeframe conflict; notes missing volume and costs; watch item is clear but there is no explicit invalidation."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Most complete: ATR vs distance to resistance, all timeframes, explicit confirm/invalidate scenarios, gaps flagged and educational disclaimer; somewhat dense for a novice."
+            },
+            "BASELINE": {
+              "answers_question": 5,
+              "evidence_grounding": 5,
+              "honesty_on_gaps": 4,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Generic and thin; RSI 57.3 is called 'neutral momentum', which is a loose reading; no distances, no watch trigger, and gaps are barely mentioned."
+            },
+            "RAPIDO": {
+              "answers_question": 7,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 7,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Correct 1H numbers, states the 1H frame is sufficient for intraday and flags missing volume; less depth and no invalidation level."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.014368,
+          "ms": 11051,
+          "tin": 3574,
+          "tout": 722,
+          "stop": "stop",
+          "byArm": {
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Responde al horizonte de hoy con una condición clara y señala los datos que faltan; la distancia porcentual al soporte está expresada de forma imprecisa."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 6,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 8,
+              "overall": 7,
+              "reason": "Ofrece escenarios útiles, pero introduce a «Bobby» y califica el interés abierto de elevado sin respaldo; además, mezcla bases para calcular distancias."
+            },
+            "BASELINE": {
+              "answers_question": 7,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 5,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 5,
+              "overall": 6,
+              "reason": "Es comprensible y se ciñe a los datos, pero no explica qué confirmación o información falta para evaluar un trade rápido."
+            },
+            "RAPIDO": {
+              "answers_question": 8,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 6,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 8,
+              "overall": 8,
+              "reason": "Da una respuesta clara y reconoce la falta de volumen y señales intrahora, aunque afirma con demasiada seguridad que el marco 1H basta."
+            }
+          },
+          "parsed": true
+        }
+      }
+    },
+    {
+      "id": "msft",
+      "symbol": "MSFT",
+      "lang": "en",
+      "question": "Where does MSFT go from here over a month?",
+      "seed": 1007,
+      "evidenceNote": "reused frozen evidence",
+      "evidence": {
+        "v1": {
+          "symbol": "MSFT",
+          "technicals": {
+            "price": 509.2,
+            "rsi14": 37.8,
+            "ema20": 508.6,
+            "ema50": 504,
+            "support": 491.2,
+            "resistance": 519.4,
+            "atrPct": 0.75,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "MSFT",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          }
+        },
+        "v2": {
+          "symbol": "MSFT",
+          "technicals": {
+            "price": 509.2,
+            "rsi14": 37.8,
+            "ema20": 508.6,
+            "ema50": 504,
+            "support": 491.2,
+            "resistance": 519.4,
+            "atrPct": 0.75,
+            "trend": "alcista",
+            "momentum": "neutral"
+          },
+          "provenance": {
+            "provider": "Yahoo Finance",
+            "instrument": "MSFT",
+            "assetType": "equity",
+            "timeframe": "1H",
+            "asOf": "2026-09-28T20:00:00.000Z"
+          },
+          "timeframes": {
+            "1H": {
+              "price": 509.2,
+              "rsi14": 37.8,
+              "ema20": 508.6,
+              "ema50": 504,
+              "support": 491.2,
+              "resistance": 519.4,
+              "atrPct": 0.75,
+              "trend": "alcista",
+              "momentum": "neutral"
+            },
+            "1D": {
+              "price": 509.2,
+              "rsi14": 59,
+              "ema20": 498.4,
+              "ema50": 469.4,
+              "support": 477.1,
+              "resistance": 519.4,
+              "atrPct": 2.21,
+              "trend": "alcista",
+              "momentum": "neutral",
+              "bars": 64,
+              "asOf": "2026-09-28T13:30:00.000Z"
+            }
+          },
+          "derivatives": null,
+          "record": {
+            "resolvedCalls": 0,
+            "wins": 0,
+            "losses": 0,
+            "breakEven": 0,
+            "lastResolved": [],
+            "latestCall": {
+              "direction": "long",
+              "entry": null,
+              "target": 520,
+              "stop": null,
+              "outcome": "pending",
+              "calledAt": "2026-08-10T23:21:08.023385+00:00",
+              "resolvedAt": null
+            }
+          }
+        },
+        "availableTimeframesV2": [
+          "1H",
+          "1D"
+        ],
+        "derivatives": false,
+        "record": {
+          "resolvedCalls": 0
+        }
+      },
+      "arms": {
+        "BASELINE": {
+          "arm": "BASELINE",
+          "totalMs": 4175,
+          "usd": 0.0003411,
+          "tokensIn": 1186,
+          "tokensOut": 272,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-4o-mini",
+              "ms": 1344,
+              "usd": 0.0000975,
+              "tin": 274,
+              "tout": 94,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-4o-mini",
+              "ms": 1397,
+              "usd": 0.00010784999999999999,
+              "tin": 375,
+              "tout": 86,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-4o-mini",
+              "ms": 1434,
+              "usd": 0.00013575,
+              "tin": 537,
+              "tout": 92,
+              "stop": "stop"
+            }
+          ],
+          "validJson": true,
+          "ok": true,
+          "failure": null,
+          "answer": {
+            "alpha": "MSFT is currently trading at 509.2 with a neutral momentum and an RSI of 37.8, suggesting it may be oversold. The support level is at 491.2, which could provide a floor for the price, while resistance is at 519.4, indicating potential upside. Given the bullish trend, if MSFT can maintain above the support level, it may have opportunities to test the resistance in the coming month.",
+            "red": "Alpha's argument assumes that the current neutral momentum and oversold RSI will lead to a price increase, but this overlooks the potential for further declines if market conditions worsen. The reliance on support and resistance levels does not account for external factors that could impact MSFT's performance, such as broader market trends or company-specific news. Additionally, the bullish trend mentioned lacks context regarding its sustainability, given the current technical indicators.",
+            "cio": "MSFT is currently at 509.2 with a neutral momentum and an RSI of 37.8, indicating it may be oversold. While there is potential for a price increase if it holds above the support level of 491.2, the bearish considerations regarding market conditions and the sustainability of the bullish trend suggest caution. Therefore, the evidence does not support a clear direction at this time.",
+            "verdict": "wait",
+            "direction": "none"
+          }
+        },
+        "RAPIDO": {
+          "arm": "RAPIDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 12751,
+          "usd": 0.0008003,
+          "tokensIn": 2263,
+          "tokensOut": 1148,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3777,
+              "usd": 0.00019769999999999998,
+              "tin": 512,
+              "tout": 293,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 3447,
+              "usd": 0.000203,
+              "tin": 645,
+              "tout": 277,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "gpt-6-luna",
+              "ms": 5524,
+              "usd": 0.0003996,
+              "tin": 1106,
+              "tout": 578,
+              "stop": "stop"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H"
+            ],
+            "missing": [
+              "1D",
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "For a one-month view, daily and weekly market data are missing, so the available 1H evidence cannot establish the monthly direction. As of 2026-09-28, MSFT was above EMA20 (0.12%), EMA50 (1.03%) and support (3.66%), but below resistance (1.96%); the reported trend is bullish, while momentum is neutral and RSI is 37.8. The strongest conditional opportunity is a rebound if price holds above the moving averages and support, but resistance remains nearby and this short-timeframe evidence does not confirm that move.",
+            "red": "Daily and weekly market data are missing, so the available 1H evidence cannot establish where MSFT is likely to go over a month. The bullish-rebound case is only conditional: price is above EMA20 by 0.12%, EMA50 by 1.03%, and support by 3.66%, but below resistance by 1.96%; momentum is neutral and RSI is 37.8. Alpha’s claim that a rebound is the “strongest” opportunity is not established by these indicators, and a move below the cited support would undermine its hold-above-support premise.",
+            "cio": "Daily and weekly market data are missing, so the available 1H timeframe cannot establish MSFT’s direction over a month. As of 2026-09-28, price was above EMA20 (0.12%), EMA50 (1.03%) and support (3.66%), but below resistance (1.96%); the reported trend was bullish, while momentum was neutral and RSI was 37.8. This mixed short-timeframe evidence does not establish a clear monthly case.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "MSFT’s direction over the next month is unclear from the available data.",
+              "why": "The 1H snapshot is mixed: bullish trend, neutral momentum, and nearby resistance.",
+              "risk": "Daily and weekly market data are missing, leaving the monthly outlook uncertain.",
+              "watch": "Watch whether MSFT holds above support at 491.2.",
+              "watchLevel": 491.2,
+              "followUp": "What daily and weekly signals should I watch for MSFT?"
+            }
+          }
+        },
+        "PROFUNDO": {
+          "arm": "PROFUNDO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 12776,
+          "usd": 0.009683400000000002,
+          "tokensIn": 4782,
+          "tokensOut": 1090,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "gpt-6-luna",
+              "ms": 3877,
+              "usd": 0.00028460000000000003,
+              "tin": 986,
+              "tout": 372,
+              "stop": "stop"
+            },
+            {
+              "role": "red",
+              "model": "gpt-6-luna",
+              "ms": 4432,
+              "usd": 0.0002828,
+              "tin": 1118,
+              "tout": 342,
+              "stop": "stop"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4467,
+              "usd": 0.009116,
+              "tin": 2678,
+              "tout": 376,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "A one-month view is missing weekly market data, so the available 1H and 1D evidence is not sufficient to assess that horizon confidently. The conditional bullish case is that MSFT holds above its daily EMA20 (above, 2.17% away) and advances through resistance at 519.4, which price is below by 1.96%; both timeframes show an upward trend, though momentum is neutral. A failure to clear resistance or a move below support would weaken that case; Bobby’s latest thesis is still pending, with a 520 target, not a resolved outcome.",
+            "red": "Weekly (1W) market data is missing, so the available 1H and 1D evidence is insufficient to assess a one-month horizon confidently. Alpha’s bullish case leans on a resistance break that has not happened: price is below 519.4 by 1.96%, while momentum is neutral; moreover, the cited support depends on timeframe—price is above 1H support 491.2 by 3.66% and daily support 477.1 by 6.73%. Bobby’s 520 target remains pending, not a resolved result, so it does not independently validate the bullish case.",
+            "cio": "A one-month view needs weekly market data, which is missing, so the 1H and 1D evidence can only support a tentative read. Both timeframes are in an uptrend with price above the daily EMA20 (2.17% away) and EMA50 (8.48% away), but momentum is neutral and price sits 1.96% below resistance at 519.4. Bobby's 520 target is still pending, so it adds no confirmation; the evidence does not yet support a clear monthly case, and a decisive break of 519.4 would be the trigger for further review.",
+            "verdict": "wait",
+            "direction": "none",
+            "synthesis": {
+              "headline": "MSFT leans upward, but a one-month call isn't well supported yet.",
+              "why": "Price is above its daily averages in an uptrend, but it is still below resistance at 519.4.",
+              "risk": "Weekly data is missing, and momentum is neutral, so the monthly picture is incomplete.",
+              "watch": "Whether price closes above resistance at 519.4, which is 1.96% above the current price.",
+              "watchLevel": 519.4,
+              "followUp": "What would weekly charts add to the MSFT monthly outlook?"
+            }
+          }
+        },
+        "MAXIMO": {
+          "arm": "MAXIMO",
+          "ok": true,
+          "failure": null,
+          "totalMs": 18579,
+          "usd": 0.036234,
+          "tokensIn": 9702,
+          "tokensOut": 1683,
+          "calls": [
+            {
+              "role": "alpha",
+              "model": "claude-sonnet-5-5",
+              "ms": 4436,
+              "usd": 0.007038,
+              "tin": 1639,
+              "tout": 376,
+              "stop": "end_turn"
+            },
+            {
+              "role": "red",
+              "model": "claude-sonnet-5-5",
+              "ms": 4689,
+              "usd": 0.007702,
+              "tin": 2026,
+              "tout": 365,
+              "stop": "end_turn"
+            },
+            {
+              "role": "rebuttal",
+              "model": "claude-sonnet-5-5",
+              "ms": 5137,
+              "usd": 0.008672,
+              "tin": 2401,
+              "tout": 387,
+              "stop": "end_turn"
+            },
+            {
+              "role": "cio",
+              "model": "claude-sonnet-5-5",
+              "ms": 4317,
+              "usd": 0.012822,
+              "tin": 3636,
+              "tout": 555,
+              "stop": "end_turn"
+            }
+          ],
+          "sufficiency": {
+            "horizon": "month",
+            "available": [
+              "1H",
+              "1D"
+            ],
+            "missing": [
+              "1W"
+            ],
+            "sufficient": false
+          },
+          "answer": {
+            "alpha": "The weekly timeframe is missing for a one-month horizon, so this rests only on 1H and 1D data as of the last market data close (2026-09-28 20:00 UTC) and can't confirm the larger trend. The strongest conditional opportunity is a bullish continuation: on the daily chart price of 509.2 sits above the EMA20 (498.4, +2.17%) and EMA50 (469.4, +8.48%) with RSI 59 and an uptrend, and the 1H also has price above its EMA20 (+0.12%) and EMA50 (+1.03%). The key test is resistance at 519.4, which is 1.96% above; a sustained move through it would support the case for higher levels, and Bobby's pending long call has a 520 target just past that level, though it has no resolved calls and is not a prediction. The risk is that the 1H RSI of 37.8 is soft and the move stalls under resistance, in which case support at 491.2 (3.66% below on 1H) and the daily 477.1 (6.73% below) become the levels to watch; the daily ATR of 2.21% shows a month can easily cover that range.",
+            "red": "Alpha's bullish continuation case leans on a daily RSI of 59 and price above the EMAs, but the daily momentum is labeled neutral, and the 1H RSI of 37.8 sits below price-above-EMA readings (0.12% over the EMA20), so the short-term picture is weaker than 'uptrend' suggests. Price is only 0.12% above the 1H EMA20, so a small dip would flip that side, and the case needs a sustained break of 519.4 (1.96% above), which Alpha never defines by close, volume or time. Alpha also cites the pending 520 long call as supportive, but that call dates from 2026-08-10, has no entry or stop recorded and no resolved calls behind it, so it adds no evidence and shows the target is barely above resistance. The main missing piece is the weekly timeframe, so the month view can't be checked against the larger trend. A rejection at 519.4 with a daily close below the EMA20 (498.4, 2.17% below) would invalidate the continuation thesis before the 477.1 daily support (6.73% below) is even tested.",
+            "rebuttal": "Red Team is right on several points: the weekly timeframe is missing, so a one-month view can't be checked against the larger trend; daily momentum is neutral, not strong; the 1H RSI of 37.8 is soft with price only 0.12% above the 1H EMA20; and the pending 520 long call (from 2026-08-10, no entry or stop, no resolved calls) adds no evidence, so I drop it as support. I also concede that 'sustained break' of 519.4 was undefined, so a workable version is a daily close above 519.4 (1.96% above price), not an intraday poke. The conditional case survives in narrower form: the daily chart still has price above the EMA20 (498.4, +2.17%) and EMA50 (469.4, +8.48%) with RSI 59, and Red's own invalidation, a rejection at 519.4 followed by a daily close below the EMA20, is a clear line that would end the thesis well before daily support at 477.1 (6.73% below). This stays a low-confidence, conditional read on partial timeframes, not a forecast, and a daily ATR of 2.21% means a month can easily cover either the upside or the downside range.",
+            "cio": "The weekly timeframe is missing, so a one-month view can't be checked against the larger trend; this rests on 1H and 1D market data as of 2026-09-28 20:00 UTC. The daily chart leans constructive, with price 509.2 above the EMA20 (498.4, +2.17%) and EMA50 (469.4, +8.48%) and RSI 59, but daily momentum is neutral and the 1H RSI of 37.8 is soft with price only 0.12% above its EMA20. The case hinges on a daily close above resistance at 519.4 (1.96% above), and the pending 520 long call adds no evidence. That leaves a low-confidence conditional long idea that is worth researching but not yet a clear case.",
+            "verdict": "review",
+            "direction": "long",
+            "synthesis": {
+              "headline": "MSFT leans mildly higher over a month, but the evidence is incomplete and unconfirmed.",
+              "why": "Daily price sits above both averages with RSI 59, but resistance at 519.4 hasn't broken.",
+              "risk": "Weekly data is missing, and short-term momentum is soft, with 1H RSI at 37.8.",
+              "watch": "A daily close above resistance at 519.4 would strengthen the upside case.",
+              "watchLevel": 519.4,
+              "followUp": "What would make MSFT's uptrend fail over the next month?"
+            },
+            "scenarios": {
+              "confirm": "A daily close above resistance at 519.4 with price holding above the daily EMA20 (498.4) would support the bullish continuation.",
+              "invalidate": "A rejection at 519.4 followed by a daily close below the daily EMA20 (498.4) would invalidate the continuation thesis."
+            }
+          }
+        }
+      },
+      "blind": {
+        "A": "RAPIDO",
+        "B": "PROFUNDO",
+        "C": "BASELINE",
+        "D": "MAXIMO"
+      },
+      "judges": {
+        "sonnet": {
+          "usd": 0.016716,
+          "ms": 4869,
+          "tin": 5843,
+          "tout": 503,
+          "stop": "end_turn",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 5,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 6,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 4,
+              "overall": 5,
+              "reason": "Accurate 1H numbers, but it wrongly says daily data is missing when 1D is in the evidence, so the monthly view is weak and the watch level is thin."
+            },
+            "PROFUNDO": {
+              "answers_question": 6,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 8,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 6,
+              "overall": 7,
+              "reason": "Uses 1H and 1D correctly and flags missing weekly data; the 519.4 trigger is clear, but there is no explicit invalidation scenario."
+            },
+            "BASELINE": {
+              "answers_question": 4,
+              "evidence_grounding": 4,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 6,
+              "decision_usefulness": 3,
+              "overall": 4,
+              "reason": "Calls RSI 37.8 oversold (a stretch), never names the missing timeframes, adds generic outside factors, and gives no clear triggers."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Uses 1H and 1D numbers accurately, states the weekly gap, handles the pending call sensibly, and gives explicit confirm/invalidate levels with a conditional review verdict."
+            }
+          },
+          "parsed": true
+        },
+        "sol": {
+          "usd": 0.013578,
+          "ms": 10882,
+          "tin": 3124,
+          "tout": 733,
+          "stop": "stop",
+          "byArm": {
+            "RAPIDO": {
+              "answers_question": 8,
+              "evidence_grounding": 9,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 7,
+              "overall": 8,
+              "reason": "Clearly explains why the available hourly snapshot cannot establish a monthly direction, though its watch level is limited to support."
+            },
+            "PROFUNDO": {
+              "answers_question": 9,
+              "evidence_grounding": 8,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 8,
+              "decision_usefulness": 9,
+              "overall": 9,
+              "reason": "Gives a well-qualified monthly read and a clear resistance level to watch; the attribution to “Bobby” is unsupported."
+            },
+            "BASELINE": {
+              "answers_question": 6,
+              "evidence_grounding": 5,
+              "honesty_on_gaps": 3,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 5,
+              "overall": 5,
+              "reason": "Offers a conditional view but does not explain the monthly evidence gap and misleadingly describes RSI 37.8 as potentially oversold."
+            },
+            "MAXIMO": {
+              "answers_question": 9,
+              "evidence_grounding": 7,
+              "honesty_on_gaps": 9,
+              "clarity_for_novice": 7,
+              "decision_usefulness": 10,
+              "overall": 8,
+              "reason": "Provides useful confirmation and invalidation tests, but overstates what daily ATR establishes and invents the “Bobby” attribution."
+            }
+          },
+          "parsed": true
+        }
+      }
+    }
+  ],
+  "summary": {
+    "BASELINE": {
+      "n": 8,
+      "answered": 8,
+      "guardRejections": [],
+      "errors": [],
+      "overall": {
+        "sonnet": 4,
+        "sol": 5.875,
+        "avg": 4.9375
+      },
+      "criteria": {
+        "answers_question": 5.5,
+        "evidence_grounding": 6.75,
+        "honesty_on_gaps": 4.1875,
+        "clarity_for_novice": 7.0625,
+        "decision_usefulness": 4.0625
+      },
+      "latencyMs": {
+        "p50": 4208,
+        "p95": 7459
+      },
+      "callLatencyMs": {
+        "p50": 1385,
+        "p95": 1992
+      },
+      "usdPerQuestion": 0.00034098749999999996,
+      "verdicts": {
+        "wait": 8,
+        "review": 0
+      },
+      "pairedOverallDeltaVsBaseline": null
+    },
+    "RAPIDO": {
+      "n": 8,
+      "answered": 8,
+      "guardRejections": [],
+      "errors": [],
+      "overall": {
+        "sonnet": 6.25,
+        "sol": 8.5,
+        "avg": 7.375
+      },
+      "criteria": {
+        "answers_question": 7.3125,
+        "evidence_grounding": 8.5,
+        "honesty_on_gaps": 8,
+        "clarity_for_novice": 7.625,
+        "decision_usefulness": 6.5625
+      },
+      "latencyMs": {
+        "p50": 15260,
+        "p95": 16976
+      },
+      "callLatencyMs": {
+        "p50": 4424,
+        "p95": 7516
+      },
+      "usdPerQuestion": 0.0009191250000000001,
+      "verdicts": {
+        "wait": 7,
+        "review": 1
+      },
+      "pairedOverallDeltaVsBaseline": {
+        "n": 8,
+        "mean": 2.4375,
+        "wins": 8,
+        "ties": 0,
+        "losses": 0
+      }
+    },
+    "PROFUNDO": {
+      "n": 8,
+      "answered": 8,
+      "guardRejections": [],
+      "errors": [],
+      "overall": {
+        "sonnet": 7.5,
+        "sol": 8.75,
+        "avg": 8.125
+      },
+      "criteria": {
+        "answers_question": 8.25,
+        "evidence_grounding": 8.375,
+        "honesty_on_gaps": 8.125,
+        "clarity_for_novice": 7.75,
+        "decision_usefulness": 7.8125
+      },
+      "latencyMs": {
+        "p50": 17162,
+        "p95": 23474
+      },
+      "callLatencyMs": {
+        "p50": 5192,
+        "p95": 11178
+      },
+      "usdPerQuestion": 0.011701912500000002,
+      "verdicts": {
+        "wait": 7,
+        "review": 1
+      },
+      "pairedOverallDeltaVsBaseline": {
+        "n": 8,
+        "mean": 3.1875,
+        "wins": 8,
+        "ties": 0,
+        "losses": 0
+      }
+    },
+    "MAXIMO": {
+      "n": 8,
+      "answered": 8,
+      "guardRejections": [],
+      "errors": [],
+      "overall": {
+        "sonnet": 9,
+        "sol": 7.875,
+        "avg": 8.4375
+      },
+      "criteria": {
+        "answers_question": 9,
+        "evidence_grounding": 7.9375,
+        "honesty_on_gaps": 9.0625,
+        "clarity_for_novice": 6.625,
+        "decision_usefulness": 9.125
+      },
+      "latencyMs": {
+        "p50": 21015,
+        "p95": 27027
+      },
+      "callLatencyMs": {
+        "p50": 5227,
+        "p95": 9362
+      },
+      "usdPerQuestion": 0.04316275,
+      "verdicts": {
+        "wait": 6,
+        "review": 2
+      },
+      "pairedOverallDeltaVsBaseline": {
+        "n": 8,
+        "mean": 3.5,
+        "wins": 8,
+        "ties": 0,
+        "losses": 0
+      }
+    }
+  },
+  "spendTotal": 0.7182502,
+  "wallSeconds": 77
+}
