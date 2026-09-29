@@ -285,11 +285,11 @@ export default function BobbyDocsPage() {
             <GlassCard glow accentBorder className="p-6 md:p-8">
               <SectionLabel icon={MessageSquare} label="The agents" right="how a debate runs" />
               <p className="mb-6 max-w-3xl text-sm leading-7 text-white/60">
-                Each desk answer is argued by three roles in isolated model calls. Alpha Hunter builds the strongest conditional case from the evidence. Red Team receives Alpha&apos;s argument and attacks its assumptions, invalidation and missing evidence. The CIO receives both plus the original question and rules <span className="font-mono text-[#7da6ff]">review</span> or <span className="font-mono text-[#7da6ff]">wait</span>, with a direction. A post-generation guard (EN/ES/PT) fails the desk analysis on a guaranteed-return claim, a personal buy or sell instruction, leverage, or a CIO whose text contradicts its own verdict. Since 2026-09-29 the same guard runs on every post of the daily public cycle: one rewrite, then the text is withheld. The MCP conversational flow is separate.
+                Each desk answer is argued by three roles in isolated model calls. Alpha Hunter builds the strongest conditional case from the evidence. Red Team receives Alpha&apos;s argument and attacks its assumptions, invalidation and missing evidence. On Max, Alpha answers Red Team in a second round. The CIO receives the arguments plus the original question, leads with a plain-words synthesis (headline, why, main risk, what to watch, a follow-up question) and rules <span className="font-mono text-[#7da6ff]">review</span> or <span className="font-mono text-[#7da6ff]">wait</span>, with a direction. A post-generation guard (EN/ES/PT) fails the desk analysis on a guaranteed-return claim, a personal buy or sell instruction, leverage, or a CIO whose text contradicts its own verdict. Since 2026-09-29 the same guard runs on every post of the daily public cycle: one rewrite, then the text is withheld. The MCP conversational flow is separate.
               </p>
               <div className="grid gap-3 md:grid-cols-3">
                 {[
-                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app. Three sequential calls over one instrument\u2019s 1H candles from public market data. The indicator engine gives levels and conviction; the CIO can only veto them. Origin-restricted and metered.'],
+                  ['APP · /api/desk-debate', 'Web /desk and the iPhone app, in three levels: Quick (1H evidence), Deep and Max (more timeframes, crypto derivatives, Bobby\u2019s record on the asset; Max adds a rebuttal round and scenarios). Live NDJSON stream: each argument is sent once it passes the guard. The server computes price positions; the models quote them. Metered, with a desk spend budget, origin-restricted.'],
                   ['PUBLIC · /api/bobby-cycle', 'Daily at 12:00 UTC. Alpha and Red Team, then a CIO with a forced structured verdict (entry, stop, target, invalidation, conviction). Calls are graded on the 1H price path after 48 h and listed with their debate on the record.'],
                   ['AGENTS · MCP bobby_debate', 'Three roles for other agents, through a separate conversational debate flow. Premium: paid per call in ETH on Base through AgentEconomy.'],
                 ].map(([title, text]) => (
@@ -312,11 +312,20 @@ export default function BobbyDocsPage() {
     "red":   "<Red Team's challenge to Alpha>",
     "cio":   "<CIO's ruling on both>",
     "verdict":   "wait" | "review",
-    "direction": "long" | "short" | "none"   // always "none" with wait
-  }
+    "direction": "long" | "short" | "none",  // always "none" with wait
+    "synthesis": { "headline": …, "why": …, "risk": …, "watch": …,
+                   "watchLevel": <price> | null, "followUp": … },
+    "rebuttal":  "<Max only: Alpha answers Red Team>",
+    "scenarios": { "confirm": …, "invalidate": … }   // Max only
+  },
+  "level": "rapido" | "profundo" | "maximo"
 }
-// Refusals carry a stable code: invalid_request, question_too_long (400),
-// daily_limit (429), desk_unavailable, analysis_failed (503). No verdict is substituted.`}
+// Send Accept: application/x-ndjson for the live stream: accepted, evidence,
+// agent (alpha, red, rebuttal; each already through the guard), then final or error.
+// Refusals carry a stable code: invalid_request, question_too_long (400), daily_limit (429),
+// signin_required, upgrade_required, level_exhausted (403), budget_paused,
+// desk_unavailable, analysis_failed (503). No verdict is substituted; a failed
+// Deep or Max read is refunded.`}
                 />
               </div>
               <a href="/protocol#runtimes" className="mt-5 inline-block font-mono text-[10px] uppercase tracking-[0.15em] text-[#7da6ff] hover:text-white">Models, evidence and the latest public debate →</a>
@@ -532,12 +541,12 @@ IBobbyOracle oracle = IBobbyOracle(
                     <ShoppingCart className="w-5 h-5 text-[#7da6ff]" />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Public proof ledger</div>
+                    <div className="font-mono text-[10px] text-[#7da6ff] tracking-[0.18em] uppercase mb-2">Testnet canary · Base Sepolia</div>
                     <div className="text-lg md:text-xl text-white font-extrabold tracking-[-0.05em] mb-1.5">
-                      Inspect verified calls
+                      Inspect the verified-calls canary
                     </div>
                     <div className="text-sm leading-6 text-white/60">
-                      Committed before outcome, resolved with evidence, and anchored to Base.
+                      A frozen testnet ledger: committed before the outcome and resolved with evidence. The mainnet record is TrackRecord V2 above.
                     </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#7da6ff]/60 group-hover:text-[#7da6ff] group-hover:translate-x-1 transition-all shrink-0" />
