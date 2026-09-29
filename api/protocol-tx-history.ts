@@ -310,6 +310,8 @@ async function fetchHistoricalTxPage(
   };
 }
 
+// No startblock: a contract has no transactions before it exists, and the configured scan start
+// (BASE_PROTOCOL_DEPLOYMENT_BLOCK) sits after the 2026-08-22 commit in prod.
 // Base keeps a public index (Blockscout, Etherscan-compatible): one txlist call per protocol contract returns
 // every transaction sent to it, whoever signed it (the recorder wallet signs commits and resolves, not the
 // treasury). The first page of the archive comes from it, so the 2026-08-22 commit/resolve show up on open
@@ -332,24 +334,37 @@ type IndexedTx = { hash: string; blockNumber: string; timeStamp: string; to: str
 let indexCache: { at: number; lists: IndexedTx[][] } | null = null;
 const INDEX_TTL_MS = 15 * 60_000;
 
+/** One txlist per protocol contract, one at a time, retrying a 429 once. Null when any list cannot be read. */
+async function readIndex(): Promise<IndexedTx[][] | null> {
+  const lists: IndexedTx[][] = [];
+  for (const address of CONTRACT_ADDRESSES) {
+    const url = `${BLOCKSCOUT_API}?module=account&action=txlist&address=${address}&sort=desc&page=1&offset=100`;
+    let body: { result?: unknown } | null = null;
+    for (let attempt = 0; attempt < 2 && !body; attempt++) {
+      if (attempt) await new Promise((r) => setTimeout(r, 1200));
+      try {
+        const r = await fetch(url, { signal: AbortSignal.timeout(3000) });
+        if (r.ok) body = await r.json() as { result?: unknown };
+        else if (r.status !== 429) return null;
+      } catch { return null; }
+    }
+    // "No transactions found" is status 0 with an empty list; a null result is a refusal (rate limit).
+    if (!body || !Array.isArray(body.result)) return null;
+    lists.push(body.result as IndexedTx[]);
+  }
+  return lists;
+}
+
 async function fetchIndexedHistory(limit: number): Promise<OnChainTx[] | null> {
   if (!BLOCKSCOUT_API) return null;
   let lists: IndexedTx[][];
   if (indexCache && Date.now() - indexCache.at < INDEX_TTL_MS) {
     lists = indexCache.lists;
   } else {
-    lists = [];
-    for (const address of CONTRACT_ADDRESSES) {
-      const url = `${BLOCKSCOUT_API}?module=account&action=txlist&address=${address}&startblock=${PROTOCOL_ACTIVITY_START_BLOCK}&sort=desc&page=1&offset=100`;
-      const r = await fetch(url, { signal: AbortSignal.timeout(5000) });
-      // A partial archive would read as complete: any failure hands the page back to the RPC scan.
-      if (!r.ok) return null;
-      const body = await r.json() as { result?: unknown };
-      // "No transactions found" is status 0 with an empty list, not a failure.
-      if (!Array.isArray(body.result)) return null;
-      lists.push(body.result as IndexedTx[]);
-    }
-    indexCache = { at: Date.now(), lists };
+    const fresh = await readIndex();
+    // A rate-limited refresh keeps serving the last good index (the archive only ever grows).
+    if (!fresh) { if (!indexCache) return null; lists = indexCache.lists; }
+    else { lists = fresh; indexCache = { at: Date.now(), lists }; }
   }
   const seen = new Set<string>();
   const items: OnChainTx[] = [];
