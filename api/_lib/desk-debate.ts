@@ -9,7 +9,7 @@ const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
 const Line = z.string().trim().min(6).max(240);
 /** The answer for a reader in a hurry: one line that answers the question, then why, the risk, what to watch. */
-const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line });
+const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line, watchLevel: z.number().finite().min(0), followUp: z.string().trim().min(6).max(160) });
 const Verdict = Argument.extend({ verdict: z.enum(['wait', 'review']), direction: z.enum(['long','short','none']), synthesis: Synthesis });
 const Scenario = z.string().trim().min(10).max(600);
 const VerdictWithScenarios = Verdict.extend({ scenarios: z.object({ confirm: Scenario, invalidate: Scenario }) });
@@ -18,7 +18,7 @@ export type DeskEvidence = Awaited<ReturnType<typeof loadDeskEvidence>>;
 // The same contracts as JSON schemas, so the providers return exactly this shape (structured outputs).
 const text = { type: 'string' };
 const ARGUMENT_SCHEMA: JsonSchemaSpec = { name: 'desk_argument', schema: { type: 'object', properties: { analysis: text }, required: ['analysis'], additionalProperties: false } };
-const SYNTHESIS_SCHEMA = { type: 'object', additionalProperties: false, required: ['headline', 'why', 'risk', 'watch'], properties: { headline: text, why: text, risk: text, watch: text } };
+const SYNTHESIS_SCHEMA = { type: 'object', additionalProperties: false, required: ['headline', 'why', 'risk', 'watch', 'watchLevel', 'followUp'], properties: { headline: text, why: text, risk: text, watch: text, watchLevel: { type: 'number' }, followUp: text } };
 const verdictProps = { analysis: text, verdict: { type: 'string', enum: ['wait', 'review'] }, direction: { type: 'string', enum: ['long', 'short', 'none'] }, synthesis: SYNTHESIS_SCHEMA };
 const VERDICT_SCHEMA: JsonSchemaSpec = { name: 'desk_verdict', schema: { type: 'object', properties: verdictProps, required: ['analysis', 'verdict', 'direction', 'synthesis'], additionalProperties: false } };
 const VERDICT_SCENARIOS_SCHEMA: JsonSchemaSpec = { name: 'desk_verdict_scenarios', schema: {
@@ -365,8 +365,8 @@ export async function runDeskDebate(
     ? await role(plan.rebuttal, 'rebuttal', `${rules} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...input, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
     : null;
   if (rebuttal) emit({ type: 'agent', role: 'rebuttal', text: cleared(rebuttal.analysis) });
-  const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words).`;
-  const synthesisShape = '"synthesis":{"headline":"...","why":"...","risk":"...","watch":"..."}';
+  const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.`;
+  const synthesisShape = '"synthesis":{"headline":"...","why":"...","risk":"...","watch":"...","watchLevel":0,"followUp":"..."}';
   const cioInput = rebuttal ? { ...input, alpha, red, rebuttal } : { ...input, alpha, red };
   const cio = plan.scenarios
     ? await role(plan.cio, 'cio', `${cioPrompt} Also return scenarios: confirm is one sentence naming the observable condition in the evidence that would confirm the conditional thesis, invalidate is one sentence naming the condition that would invalidate it. Return {"analysis":"...","verdict":"wait" or "review","direction":"long" or "short" or "none",${synthesisShape},"scenarios":{"confirm":"...","invalidate":"..."}}.`, cioInput, VerdictWithScenarios, VERDICT_SCENARIOS_SCHEMA, ctx)
@@ -375,8 +375,12 @@ export async function runDeskDebate(
   const agents = { alpha: alpha.analysis, red: red.analysis, cio: cio.analysis, verdict: cio.verdict, direction: cio.verdict === 'wait' ? 'none' as const : cio.direction };
   reviewDeskOutput(agents);
   const scenarios = 'scenarios' in cio ? (cio as z.infer<typeof VerdictWithScenarios>).scenarios : null;
-  const synthesis = cio.synthesis;
-  for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch]) {
+  // The level to watch is drawn on the chart: only a positive number near the evidence's price, never a
+  // stray figure (0 means the CIO named none).
+  const price = evidence.technicals.price;
+  const near = typeof price === 'number' && price > 0 && cio.synthesis.watchLevel > price * 0.5 && cio.synthesis.watchLevel < price * 1.5;
+  const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null };
+  for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch, synthesis.followUp]) {
     if (!extra) continue;
     const violation = publicTextViolation(extra);
     if (violation) throw new DeskOutputRejected(violation);

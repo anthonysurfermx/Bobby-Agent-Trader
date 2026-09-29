@@ -95,7 +95,7 @@ try {
   const ALPHA = 'The recent structure supports a conditional long if the range breaks.';
   const RED = 'The break has not happened and the higher timeframes are still flat.';
   const REBUTTAL = 'Red Team is right that the break is unconfirmed; the case only holds above the range.';
-  const SYN = { headline: 'Not yet: BTC is still inside its range.', why: 'Alpha needs a break the chart has not shown.', risk: 'The weekly view is flat, so a break can fail.', watch: 'A 4H close above the range high.' };
+  const SYN = { headline: 'Not yet: BTC is still inside its range.', why: 'Alpha needs a break the chart has not shown.', risk: 'The weekly view is flat, so a break can fail.', watch: 'A 4H close above the range high.', watchLevel: 104, followUp: 'What if BTC loses the range low?' };
   const CIO = { analysis: 'The evidence does not support a clear case yet; wait for the range to resolve.', verdict: 'wait', direction: 'none', synthesis: SYN };
   const SCEN = { confirm: 'A daily close above the range high with rising volume.', invalidate: 'A 4H close back below the range low.' };
   const byRole = (c: Call) => {
@@ -116,6 +116,10 @@ try {
   ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
   eq(quick.agents.direction, 'none', "'wait' keeps direction none");
   eq(quick.agents.synthesis, SYN, 'the CIO returns the synthesis the reader sees first');
+  mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, watchLevel: 5000 } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.synthesis.watchLevel, null, 'a watch level far from the price is never drawn');
+  mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, watchLevel: 0 } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.synthesis.watchLevel, null, '0 means no level to watch');
   ok(/"synthesis"/.test(JSON.stringify(calls[2].body.response_format.json_schema.schema.required)), 'the synthesis is required by the structured output');
 
   // The live desk: each argument is emitted once it passed the guard, in the debate's order.

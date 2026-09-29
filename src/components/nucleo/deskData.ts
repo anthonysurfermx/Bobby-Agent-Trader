@@ -82,7 +82,7 @@ export async function runDebate(symbol: string, signal: AbortSignal): Promise<An
  *  Máximo, with Alpha's second round) over the level's evidence. The same endpoint the iOS app uses.
  *  The web reads it live (NDJSON): each argument arrives as soon as its model answered and passed the guard.
  *  A premium level the reader has used up comes back as a refusal, never as a silent downgrade. */
-export interface Synthesis { headline: string; why: string; risk: string; watch: string }
+export interface Synthesis { headline: string; why: string; risk: string; watch: string; watchLevel: number | null; followUp: string | null }
 export interface Agents {
   alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
   level: DeskLevel; rebuttal: string | null; scenarios: { confirm: string; invalidate: string } | null;
@@ -114,7 +114,9 @@ function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLe
   const direction = g.direction === 'long' || g.direction === 'short' ? g.direction : 'none';
   const scenarios = g.scenarios && typeof g.scenarios.confirm === 'string' && typeof g.scenarios.invalidate === 'string' ? { confirm: g.scenarios.confirm, invalidate: g.scenarios.invalidate } : null;
   const sy = g.synthesis;
-  const synthesis = sy && text(sy.headline) && text(sy.why) && text(sy.risk) && text(sy.watch) ? { headline: text(sy.headline)!, why: text(sy.why)!, risk: text(sy.risk)!, watch: text(sy.watch)! } : null;
+  const synthesis = sy && text(sy.headline) && text(sy.why) && text(sy.risk) && text(sy.watch)
+    ? { headline: text(sy.headline)!, why: text(sy.why)!, risk: text(sy.risk)!, watch: text(sy.watch)!, watchLevel: typeof sy.watchLevel === 'number' && Number.isFinite(sy.watchLevel) && sy.watchLevel > 0 ? sy.watchLevel : null, followUp: text(sy.followUp, 160) }
+    : null;
   return { refusal: null, failure: null, agents: {
     alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction,
     level: data!.level === 'profundo' || data!.level === 'maximo' ? data!.level : 'rapido',

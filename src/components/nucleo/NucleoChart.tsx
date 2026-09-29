@@ -16,6 +16,8 @@ interface Props {
   isEquity: boolean;
   /** Changes on every new read so the line is exhaled again. */
   drawKey: string | number;
+  /** The level the CIO says to watch next (its synthesis), drawn as a dashed ivory line. */
+  watch?: number | null;
   height?: number;
 }
 
@@ -97,7 +99,7 @@ function agentClaims(debate: Debate | null, answer: Answer | null): Array<{ key:
   ];
 }
 
-export default function NucleoChart({ series, answer, debate, symbol, isEquity, drawKey, height = 230 }: Props) {
+export default function NucleoChart({ series, answer, debate, symbol, isEquity, drawKey, watch = null, height = 230 }: Props) {
   const wrap = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(0);
   const uid = useId().replace(/:/g, '');
@@ -136,6 +138,7 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
       if (red.level) levels.push({ key: 'stop', agent: 'red', price: red.level.price, label: t('Stop', 'Stop', 'Stop'), color: AGENT_TONE.red, dashed: true });
       if (cio.level) levels.push({ key: 'target', agent: 'cio', price: cio.level.price, label: t('Target', 'Objetivo', 'Alvo'), color: AGENT_TONE.cio });
     }
+    if (watch != null && Number.isFinite(watch) && watch > 0) levels.push({ key: 'watch', agent: null, price: watch, label: t('Watch', 'Vigilar', 'Vigiar'), color: '#F2EDE4', dashed: true });
     const closes = pts.map((p) => p.close);
     const emaVals = [...e20, ...e50].filter((v): v is number => v !== null);
     const values = [...closes, ...emaVals, ...levels.map((l) => l.price), ...levels.flatMap((l) => (l.to !== undefined ? [l.to] : []))];
@@ -188,7 +191,7 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
     const e20Last = [...e20].reverse().find((v) => v !== null) ?? null;
     const e50Last = [...e50].reverse().find((v) => v !== null) ?? null;
     return { levels, labeled, line, area, tail, ema20, ema50, volume, barW, rsiLine, rsiLast, rTop, rBot, ry, nowX, nowY, top, plotBottom, bottom, y, price, zones, ticks, asOf, len: pts.length, e20Last, e50Last };
-  }, [series, answer, debate, w, height]);
+  }, [series, answer, debate, watch, w, height]);
 
   const claims = useMemo(() => agentClaims(debate, answer), [debate, answer]);
   const source = isEquity ? `1H · ${symbol}` : `1H · ${symbol}-USDT`;
