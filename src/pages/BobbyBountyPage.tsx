@@ -72,7 +72,7 @@ export default function BobbyBountyPage() {
         <ul className="mt-4 list-disc space-y-2 pl-5 text-sm leading-7 text-white/60">
           <li><b className="text-white/85">In:</b> the frozen contracts (<code className="rounded bg-white/10 px-1.5 text-xs">contracts/src</code>, release 11532f4), the recorder pipeline, the verifiable-calls ledger and challenge scanner (spoofing counts).</li>
           <li><b className="text-white/85">Out:</b> public RPC outages, social engineering, findings already documented on the <a href="/protocol/risk" className="text-[#7da6ff] hover:text-white">risk page</a> as accepted trust assumptions, and testnet-only issues with no mainnet equivalent.</li>
-          <li>First valid report per finding wins. Duplicates split nothing — check the <a href="/protocol/audits" className="text-[#7da6ff] hover:text-white">audit trail</a> first: four P1s are already dead.</li>
+          <li>First valid report per finding wins. Duplicates split nothing.</li>
         </ul>
 
         <h2 className="mt-12 text-2xl font-extrabold tracking-[-0.04em]">How to report</h2>
@@ -91,7 +91,6 @@ export default function BobbyBountyPage() {
 
         <p className="mt-10 font-mono text-[11px] leading-5 text-white/30">
           See also: <a href="/protocol/calls" className="text-white/50 underline-offset-2 hover:underline">verifiable calls</a> ·{' '}
-          <a href="/protocol/audits" className="text-white/50 underline-offset-2 hover:underline">audit trail</a> ·{' '}
           <a href="/protocol/risk" className="text-white/50 underline-offset-2 hover:underline">risk & claims</a>
         </p>
       </div>

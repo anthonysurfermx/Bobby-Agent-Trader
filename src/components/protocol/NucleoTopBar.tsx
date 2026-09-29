@@ -9,7 +9,6 @@ const PROTOCOL_LINKS: ReadonlyArray<NavLink> = [
   ['Calls', '/protocol/calls'],
   ['Record', '/record'],
   ['Docs', '/protocol/docs'],
-  ['Audits', '/protocol/audits'],
   ['Heartbeat', '/protocol/heartbeat'],
 ];
 

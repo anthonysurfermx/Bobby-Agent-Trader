@@ -99,7 +99,6 @@ const BobbyMetacognitionPage = lazy(() => import('@/pages/BobbyMetacognitionPage
 const BobbyDocsPage = lazy(() => import('@/pages/BobbyDocsPage'));
 const BobbyCallsPage = lazy(() => import('@/pages/BobbyCallsPage'));
 const BobbyRiskPage = lazy(() => import('@/pages/BobbyRiskPage'));
-const BobbyAuditsPage = lazy(() => import('@/pages/BobbyAuditsPage'));
 const BobbyBountyPage = lazy(() => import('@/pages/BobbyBountyPage'));
 const BobbyHeartbeatPage = lazyWithRetry(() => import('@/pages/BobbyHeartbeatPage'), 'protocol-heartbeat');
 const BobbyAgentConsolePage = lazyWithRetry(() => import('@/pages/BobbyAgentConsolePage'), 'protocol-console');
@@ -398,12 +397,9 @@ const router = createBrowserRouter(
           ),
         },
         {
+          // The audit trail page was retired (2026-09-29); old links land on the protocol.
           path: 'protocol/audits',
-          element: (
-            <Suspense fallback={<PageLoader />}>
-              <BobbyAuditsPage />
-            </Suspense>
-          ),
+          element: <Navigate to="/protocol" replace />,
         },
         {
           path: 'protocol/bounty',
