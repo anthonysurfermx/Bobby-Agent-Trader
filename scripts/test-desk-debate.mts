@@ -202,9 +202,11 @@ try {
 
   // runDeskDebate: 'wait' carries no direction; a rejected answer is no answer.
   const evidence = { symbol: 'BTC', technicals: { price: 100 }, provenance: { provider: 'OKX', instrument: 'BTC-USDT', assetType: 'crypto', timeframe: '1H', asOf: new Date().toISOString() } } as never;
+  // The CIO's synthesis is part of its contract since 2026-09-29 (the reader sees it first).
+  const synthesis = { headline: 'Not yet: the trend still needs confirmation.', why: 'Support held but volume is thin.', risk: 'A close below support breaks the case.', watch: 'A 1H close above resistance.', watchLevel: 0, followUp: 'What would confirm the BTC trend?' };
   const model = (cio: Record<string, unknown>) => {
     let n = 0;
-    globalThis.fetch = (async () => json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(++n === 3 ? cio : { analysis: n === 1 ? base.alpha : base.red }) } }] })) as typeof fetch;
+    globalThis.fetch = (async () => json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(++n === 3 ? { synthesis, ...cio } : { analysis: n === 1 ? base.alpha : base.red }) } }] })) as typeof fetch;
   };
   model({ analysis: 'The evidence does not support a clear case yet; wait for confirmation.', verdict: 'wait', direction: 'long' });
   eq((await runDeskDebate('Is this trend real?', evidence, 'en')).agents.direction, 'none', "'wait' is returned with direction none");

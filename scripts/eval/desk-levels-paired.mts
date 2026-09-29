@@ -22,8 +22,9 @@ if (!env.OPENAI_API_KEY || !env.ANTHROPIC_API_KEY) throw new Error('OPENAI_API_K
 Object.assign(process.env, {
   OPENAI_API_KEY: env.OPENAI_API_KEY, ANTHROPIC_API_KEY: env.ANTHROPIC_API_KEY,
   BOBBY_SUPABASE_URL: 'https://qbvdqkknnuweatptjohi.supabase.co',
-  BOBBY_SUPABASE_SERVICE_ROLE_KEY: 'sb_publishable_OmdOOoZmg6tqd_8NTCJ5Bw_wSLp6-OB',
-  BOBBY_SUPABASE_ANON_KEY: 'sb_publishable_OmdOOoZmg6tqd_8NTCJ5Bw_wSLp6-OB',
+  // Public (publishable) key from the environment; only public rows are read.
+  BOBBY_SUPABASE_SERVICE_ROLE_KEY: env.VITE_BOBBY_SUPABASE_ANON_KEY ?? env.BOBBY_SUPABASE_ANON_KEY ?? '',
+  BOBBY_SUPABASE_ANON_KEY: env.VITE_BOBBY_SUPABASE_ANON_KEY ?? env.BOBBY_SUPABASE_ANON_KEY ?? '',
   BOBBY_PROTOCOL_BASE_URL: 'https://bobbyprotocol.xyz',
 });
 const desk = await import(`${ROOT}/api/_lib/desk-debate.ts`);

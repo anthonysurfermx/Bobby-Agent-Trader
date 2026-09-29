@@ -77,7 +77,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const live = String(req.headers.accept ?? '').includes('application/x-ndjson');
   // The reader closed the stream: the remaining model calls are not made for nobody.
   const left = new AbortController();
-  res.on('close', () => { if (!res.writableFinished) left.abort(); });
+  res.on?.('close', () => { if (!res.writableFinished) left.abort(); });
   const usage: LlmUsage[] = [];
   let useId: number | null = null;
   let streaming = false;
