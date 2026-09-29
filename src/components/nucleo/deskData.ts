@@ -132,7 +132,7 @@ function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLe
     rebuttal: typeof g.rebuttal === 'string' ? g.rebuttal : null, scenarios, synthesis,
     sufficiency: data!.sufficiency && Array.isArray(data!.sufficiency.missing) ? data!.sufficiency : null,
     evidenceUsed: data!.evidenceUsed && Array.isArray(data!.evidenceUsed.timeframes) ? data!.evidenceUsed : null,
-    personal: text(data!.personal?.note, 320) ? { note: text(data!.personal.note, 320)!, previousRead: data!.personal.basedOn?.previousRead === true, priceChange: data!.personal.basedOn?.priceChange === true } : null,
+    personal: text(data!.personal?.note, 600) ? { note: text(data!.personal.note, 600)!, previousRead: data!.personal.basedOn?.previousRead === true, priceChange: data!.personal.basedOn?.priceChange === true } : null,
     related: data!.related && Array.isArray(data!.related.peers) ? {
       exposures: (Array.isArray(data!.related.exposures) ? data!.related.exposures : []).filter((e: unknown) => typeof e === 'string'),
       peers: data!.related.peers.filter((p: any) => p && typeof p.symbol === 'string' && (typeof p.sharedExposure === 'string' || p.sharedExposure === null) && typeof p.price === 'number').slice(0, 3).map((p: any) => ({ ...p, named: p.named === true })),

@@ -351,8 +351,8 @@ export interface ReaderOptions {
   language?: Lang; timeZone?: string | null;
 }
 
-/** The number of asks `recentAsks` can hold (bobby_memory_record_v2 keeps the newest 100 within 90 days). */
-const RECENT_ASKS_KEPT = 100;
+/** History written before v2 kept only the newest 20 ask times; v2 keeps up to 100. */
+const RECENT_ASKS_TRUNCATED_AT = 20;
 
 /** Compact the summary for the note; null when memory is off or holds nothing useful. */
 export function readerContext(summary: MemorySummary | null, opts: ReaderOptions): ReaderContext | null {
@@ -380,8 +380,9 @@ export function readerContext(summary: MemorySummary | null, opts: ReaderOptions
       const weekStart = today - ((new Date(today * 86_400_000).getUTCDay() + 6) % 7);
       const times = t.recentAsks.map((iso) => Date.parse(iso)).filter((ms) => Number.isFinite(ms) && ms <= now);
       const inWeek = times.filter((ms) => dayNumber(ms, tz) >= weekStart).length;
-      // If every kept time is in this week, older ones this week may have been dropped: no exact count.
-      const exact = times.length < RECENT_ASKS_KEPT || inWeek < times.length;
+      // If the history may have been truncated (20+ times) and all of it falls in this week, older asks this week
+      // may be missing: no count rather than a wrong one.
+      const exact = times.length < RECENT_ASKS_TRUNCATED_AT || inWeek < times.length;
       if (exact) ctx.thisAsset.timesThisWeek = inWeek + 1;
       // A callback needs both prices with their own times, the new one newer, from a later calendar day.
       const then = t.lastPrice ?? null;

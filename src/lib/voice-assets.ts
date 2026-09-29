@@ -205,20 +205,38 @@ export function matchAssetInText(text: string): string | null {
     ?? null;
 }
 
-/**
- * Every asset named in `text`, in the order they appear (each once): the same spoken patterns as
- * matchAssetInText, so ordinary words (HOMONYMS) never count unless marked as tickers ("$META", "acción de META").
- */
-export function assetsInText(text: string): string[] {
-  if (!text) return [];
-  const hits: Array<[number, string]> = [];
-  // A ticker typed in capitals is meant as a ticker, homonyms included ("AMZN vs META").
-  const typed: Array<[RegExp, string]> = VOICE_ASSETS.filter((a) => a.symbol.length >= 2)
-    .map((a) => [new RegExp(`(?<![\\p{L}\\p{N}])${a.symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'u'), a.symbol]);
-  for (const [pattern, symbol] of [...SPOKEN_PATTERNS, ...CONTEXTUAL_HOMONYM_PATTERNS, ...typed]) {
-    const m = pattern.exec(text);
-    if (m && !hits.some(([, s]) => s === symbol)) hits.push([m.index, symbol]);
-  }
-  return hits.sort((a, b) => a[0] - b[0]).map(([, symbol]) => symbol);
-}
+/** Asset names that are also everyday words: they never count as an asset in assetsInText. */
+const WORDLIKE_NAMES = new Set(['STRATEGY', 'PLATA', 'ORO', 'GOLD', 'OIL', 'CRUDO', 'PETRÓLEO', 'BONOS', 'TREASURIES', 'SILVER',
+  'SALUD', 'ENERGÍA', 'TECNOLOGÍA', 'FINANCIERAS', 'HIGH YIELD', 'NEAR', 'DOW', 'ARK', 'SEI', 'TON', 'SUI', 'OP', 'UNI', 'ADA', 'CAT', 'ARM', 'USO', 'DIA', 'V', 'MA', 'BA', 'GS']);
+const escapeRe = (v: string) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/**
+ * Every asset named in `text`, in order, each once, with where it was found. Stricter than matchAssetInText,
+ * for comparisons: a company name or alias (Amazon, Nvidia; a name that is also a word, like Meta or Arm, only
+ * when capitalized), a ticker typed in capitals (AMZN, META; not the short homonyms MA, OP, V… unless written
+ * "$MA"), or any "$TICKER". A ticker written in lower case ("coin", "cost", "link") is a word, never an asset.
+ */
+export function assetsInText(text: string): Array<{ symbol: string; start: number; end: number }> {
+  if (!text) return [];
+  const hits: Array<{ symbol: string; start: number; end: number }> = [];
+  const add = (symbol: string, m: RegExpExecArray | null) => {
+    if (m && !hits.some((h) => h.symbol === symbol)) hits.push({ symbol, start: m.index, end: m.index + m[0].length });
+  };
+  for (const asset of VOICE_ASSETS) {
+    // "$MA", "$coin": an explicit ticker, whatever the case.
+    add(asset.symbol, new RegExp(`\\$${escapeRe(asset.symbol)}(?![\\p{L}\\p{N}])`, 'iu').exec(text));
+    // AMZN, META typed in capitals (not the short homonyms).
+    if (asset.symbol.length >= 2 && !WORDLIKE_NAMES.has(asset.symbol)) add(asset.symbol, new RegExp(`(?<![\\p{L}\\p{N}$])${escapeRe(asset.symbol)}(?![\\p{L}\\p{N}])`, 'u').exec(text));
+    for (const name of [asset.name, ...(asset.aliases ?? [])]) {
+      const upper = name.toUpperCase();
+      // A name equal to its ticker counts only as a capitalized homonym ("Meta"); in lower case it is a word.
+      if ((upper === asset.symbol && !HOMONYMS.has(upper)) || WORDLIKE_NAMES.has(upper) || name.length < 3) continue;
+      // A name that is also a word ("Meta", "Arm") counts only capitalized ("mi meta" is not Meta).
+      const pattern = HOMONYMS.has(upper)
+        ? new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(name.charAt(0).toUpperCase() + name.slice(1).toLowerCase())}(?![\\p{L}\\p{N}])`, 'u')
+        : new RegExp(`(?<![\\p{L}\\p{N}])${escapeRe(name)}(?![\\p{L}\\p{N}])`, 'iu');
+      add(asset.symbol, pattern.exec(text));
+    }
+  }
+  return hits.sort((x, y) => x.start - y.start);
+}

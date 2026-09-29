@@ -43,9 +43,9 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * without the header (the iOS app) get the single JSON reply, unchanged.
  *
  * Memory (api/_lib/user-memory.ts): the debate never sees it, so the verdict depends on the question and the
- * evidence alone. For a signed-in Apple/Google account with memory on, a short personal note is written AFTER
+ * evidence alone. For a signed-in Apple/Google account with memory on, a short personal note is assembled AFTER
  * the verdict from what Bobby remembers (name, past asks, the stored previous answer on this asset, the price
- * change since) and returned as `personal: {note, basedOn, source}` with `personalized: true`; the memory itself
+ * change since), with no model call, and returned as `personal: {note, basedOn}` with `personalized: true`; the memory itself
  * never reaches the client. The read is recorded (price with its own time, and what Bobby answered) after it
  * was delivered, never on a refusal or a failure. A name is never taken from a question (only /api/memory). Off
  * unless BOBBY_MEMORY === 'on'. Anonymous and wallet requests make no memory call; the iPhone app joins only
@@ -171,12 +171,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const asked = horizonOf(question);
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, related });
-    // The verdict is final here. The note is written from it and from memory; it cannot change it.
+    // The verdict is final here. The note is assembled from it and from memory (no model call); it cannot
+    // change it.
     const said = result.agents.synthesis as CurrentRead['synthesis'];
-    const plan = levelPlan('rapido');
     const personal: PersonalNote | null = reader
-      ? await personalNote(reader, symbol, { verdict: result.agents.verdict, direction: result.agents.direction, synthesis: said }, language, asked,
-        { spec: plan.cio, fallback: plan.fallback, usage, signal: left.signal, timeoutMs: 4000 })
+      ? personalNote(reader, symbol, { verdict: result.agents.verdict, direction: result.agents.direction, synthesis: said }, language, asked)
       : null;
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.

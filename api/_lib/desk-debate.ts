@@ -242,14 +242,13 @@ const ADVICE: RegExp[] = [
   /(?<![\p{L}])(?:voc[eê]\s+)?(?:deve(?:ria)?|precisa|tem\s+que)\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
   /(?<![\p{L}])(?:recomendo|aconselho|sugiro)\s+(?:que\s+)?(?:voc[eê]\s+)?(?:comprar|compre|vender|venda|abrir|abra)(?![\p{L}])/giu,
   /(?:(?<=^)|(?<=[.!?]\s*))(?:[Cc]ompre|[Vv]enda)\s+(?:(?:isso|tudo|mais|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:j[aá]|agora|hoje|imediatamente)(?![\p{L}])/gu,
-  // Rotation and ranking between assets (the sector comparison): "switch to MSFT", "rotate into GOOGL",
-  // "a better bet than", "cámbiate a", "rotar a", "mejor apuesta que", "trocar para", "melhor aposta que".
-  /\b(?:[Ss]witch(?:ing)?|[Rr]otat(?:e|ing)|[Mm]ov(?:e|ing)\s+(?:your\s+money|capital|funds))\s+(?:in)?to\s+[A-Z][A-Z0-9.-]{0,9}\b/gu,
-  /\b(?:a\s+)?better\s+(?:bet|buy|pick|investment|choice)\s+than\b/giu,
-  /(?<![\p{L}])(?:[Cc][aá]mbiate|[Cc]ambiarte|[Cc]ambiar(?:te)?\s+(?:tu\s+dinero\s+)?|[Rr]ota(?:r)?|[Mm]u[eé]vete|[Mm]over\s+tu\s+dinero)\s+a\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
-  /(?<![\p{L}])mejor\s+(?:apuesta|compra|opci[oó]n|inversi[oó]n)\s+que(?![\p{L}])/giu,
-  /(?<![\p{L}])(?:[Tt]rocar|[Tt]roque|[Mm]igrar|[Mm]igre|[Mm]udar|[Mm]ude)\s+(?:para|pra)\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
-  /(?<![\p{L}])melhor\s+(?:aposta|compra|op[cç][aã]o|investimento)\s+(?:do\s+)?que(?![\p{L}])/giu,
+  // Telling the reader to switch between assets (the sector comparison), second person or imperative only:
+  // descriptive flow ("capital is rotating into BTC", "la mejor opción que tienes es esperar") stays allowed.
+  /\byou\s+(?:should|could|might\s+want\s+to|need\s+to|ought\s+to)\s+(?:switch|rotate|move\s+(?:your\s+money|capital|funds))\s+(?:in)?to\b/giu,
+  /(?:(?<=^)|(?<=[.!?¡]\s*))(?:Switch|Rotate)\s+(?:in)?to\s+[A-Z][A-Z0-9.-]{0,9}\b/gu,
+  /(?<![\p{L}])(?:[Cc][aá]mbiate|[Mm]u[eé]vete|[Dd]eber[ií]as\s+(?:cambiarte|rotar|mover\s+tu\s+dinero))\s+a\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
+  /(?<![\p{L}])(?:[Tt]roque|[Mm]ude|[Vv]oc[eê]\s+deveria\s+(?:trocar|mudar))\s+(?:para|pra)\s+[A-Z][A-Z0-9.-]{0,9}(?![\p{L}])/gu,
+  /\b(?:a\s+)?better\s+bet\s+than\b|(?<![\p{L}])mejor\s+apuesta\s+que(?![\p{L}])|(?<![\p{L}])melhor\s+aposta\s+(?:do\s+)?que(?![\p{L}])/giu,
 ];
 
 // Any of these up to eight words back in the same sentence negates a match…

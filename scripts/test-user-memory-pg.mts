@@ -198,11 +198,11 @@ try {
   eq([weekView.thisAsset.asks, weekView.thisAsset.asksThisWeek], [2, 2], 'two asks this week; an older time is not counted');
   for (let i = 0; i < 25; i++) await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
   const amd = await row(weekly, 'AMD');
-  eq([amd.recent_asks.length, amd.asks], [28, 28], 'ask times within 90 days are kept (up to 100) and asks is their count');
+  eq([amd.recent_asks.length, amd.asks], [28, 27], 'ask times within 90 days are kept (up to 100); asks stays a plain counter');
   await q("update public.bobby_user_assets set recent_asks = recent_asks || (now() - interval '120 days'), first_asked_at = now() - interval '120 days' where identity_id = $1 and symbol = 'AMD'", [weekly]);
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified')", [weekly]);
   const trimmed = await row(weekly, 'AMD');
-  ok(trimmed.recent_asks.every((t: Date) => t.getTime() > Date.now() - 91 * 86_400_000) && trimmed.first_asked_at.getTime() > Date.now() - 91 * 86_400_000 && trimmed.asks === trimmed.recent_asks.length, 'an ask time older than 90 days leaves the history, the count and the first ask');
+  ok(trimmed.recent_asks.every((t: Date) => t.getTime() > Date.now() - 91 * 86_400_000) && trimmed.first_asked_at.getTime() > Date.now() - 91 * 86_400_000 && trimmed.asks === 28, 'an ask time older than 90 days leaves the history and the first ask; the counter keeps counting');
   await q("select public.bobby_memory_record_v2($1, 'AMD', 'unspecified', 123.45, now() - interval '1 hour', 'Yahoo Finance', null)", [weekly]);
   eq(Number((await summary(weekly, 'AMD')).thisAsset.lastPrice), 123.45, 'a dated price is kept');
   await q("select public.bobby_memory_record($1, 'AMD', 'unspecified', 150)", [weekly]);
@@ -303,6 +303,10 @@ try {
   const purged = (await q('select public.bobby_memory_purge() as r'))[0].r;
   ok(purged.assets >= 1 && purged.reads >= 1, 'the purge removes what is older than 90 days, with no new ask needed');
   eq([(await rows(stale2)).map((r) => r.symbol), (await reads(stale2)).map((r) => r.symbol)], [['NEW'], ['NEW']], '…and nothing newer');
+  await q("update public.bobby_user_assets set asks = 7, recent_asks = array[now() - interval '1 day', now() - interval '100 days'], first_asked_at = now() - interval '100 days' where identity_id = $1 and symbol = 'NEW'", [stale2]);
+  await q('select public.bobby_memory_purge()');
+  const kept2 = await row(stale2, 'NEW');
+  ok(kept2.recent_asks.length === 1 && kept2.first_asked_at.getTime() > Date.now() - 2 * 86_400_000 && kept2.asks === 7, 'the purge drops ask times older than 90 days from assets that stay, moves first_asked_at, keeps the counter');
 
   // ---------- deleting the identity (/api/account) ----------
   const leaving = await account();

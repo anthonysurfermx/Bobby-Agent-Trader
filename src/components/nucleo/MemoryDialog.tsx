@@ -102,7 +102,7 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn, onState }: 
             </>
           ) : (
             <>
-              <p className="n-dlg-copy">{t(`The assets you ask about, what Bobby answered, the name you asked for and what you choose here. A daily cleanup erases anything older than ${state.retentionDays} days.`, `Los activos que preguntas, lo que Bobby te respondió, el nombre que pediste y lo que eliges aquí. Una limpieza diaria borra lo que tenga más de ${state.retentionDays} días.`, `Os ativos que você pergunta, o que o Bobby respondeu, o nome que você pediu e o que você escolhe aqui. Uma limpeza diária apaga o que tiver mais de ${state.retentionDays} dias.`)}</p>
+              <p className="n-dlg-copy">{t(`The assets you ask about, what Bobby answered, the name you asked for and what you choose here. A daily cleanup erases assets and answers older than ${state.retentionDays} days; your name and choices stay until you change or erase them.`, `Los activos que preguntas, lo que Bobby te respondió, el nombre que pediste y lo que eliges aquí. Una limpieza diaria borra activos y respuestas con más de ${state.retentionDays} días; tu nombre y tus elecciones se quedan hasta que los cambies o borres.`, `Os ativos que você pergunta, o que o Bobby respondeu, o nome que você pediu e o que você escolhe aqui. Uma limpeza diária apaga ativos e respostas com mais de ${state.retentionDays} dias; seu nome e suas escolhas ficam até você mudar ou apagar.`)}</p>
 
               <div className="n-mem-toggle">
                 <span id="n-mem-switch-label">{t('Remember my assets', 'Recordar mis activos', 'Lembrar meus ativos')}</span>

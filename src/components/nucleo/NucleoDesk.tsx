@@ -161,6 +161,7 @@ export default function NucleoDesk() {
       requestRef.current?.abort();
       voice.stop();
       setAgents(null); setAnswer(null); setSnapshot(null); setMessages([]); setPhase('idle');
+      setNotice(null); setPendingName(null); setLive({}); setAgentsFailed(null); setDeskError(null); setDeskRetry(null);
     }
     setPreferredName(null);
     if (!account?.id) return;
@@ -202,6 +203,8 @@ export default function NucleoDesk() {
   const [deskError, setDeskError] = useState<string | null>(null);
   // A short reply that is not a read ("call me Tony"), shown under the greeting until the next question.
   const [notice, setNotice] = useState<string | null>(null);
+  // The name waiting for the reader's yes ("¿Te llamo «Tony»?").
+  const [pendingName, setPendingName] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
@@ -351,39 +354,49 @@ export default function NucleoDesk() {
     progressStore.setQuickAccess(qa);
   }, [say, progress.quickAccess]);
 
+  /** The reader said yes to "¿Te llamo «X»?": save it for this account, unless memory is paused. */
+  const confirmName = useCallback(async (name: string) => {
+    const owner = accountIdRef.current;
+    setPendingName(null);
+    if (!owner) return;
+    const current = await fetchMemory();
+    if (accountIdRef.current !== owner) return; // signed out or switched meanwhile: nothing to save or say
+    const saved = 'state' in current && current.state.enabled ? await patchMemory({ preferredName: name }) : null;
+    if (accountIdRef.current !== owner) return;
+    let line: string;
+    if ('state' in current && !current.state.enabled) {
+      line = t('Memory is paused, so I did not save it. Turn it back on in your profile, under What Bobby remembers.', 'La memoria está en pausa, así que no lo guardé. Actívala en tu perfil, en Lo que Bobby recuerda.', 'A memória está pausada, então não salvei. Reative no seu perfil, em O que o Bobby lembra.');
+    } else if (saved && 'state' in saved) {
+      setPreferredName(saved.state.preferredName);
+      line = t(`Done, ${name}. That is what I will call you.`, `Listo, ${name}. Así te voy a llamar.`, `Pronto, ${name}. É assim que vou te chamar.`);
+    } else {
+      line = t('I could not save your name right now. Try again in a moment.', 'No pude guardar tu nombre ahora. Inténtalo en un momento.', 'Não consegui salvar seu nome agora. Tente de novo em instantes.');
+    }
+    setMessages((m) => [...m, { from: 'bobby', text: line }]);
+    setNotice(line);
+    say(line, true);
+  }, [say]);
+
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
     if (!q) return;
-    // A message that is only "call me Tony" is not a market question: save the name (an account with memory
-    // on) and say so. A naming phrase inside a question is never a name ("call me crazy, but…").
+    // A message that is only "call me Tony" is not a market question: Bobby asks before saving the name (an
+    // account with memory on). A naming phrase inside a question is never a name ("call me crazy, but…").
     const naming = preferredNameAsk(q);
     if (naming) {
       setInput('');
       setMessages((m) => [...m, { from: 'you', text: q }]);
-      const owner = account?.id ?? null;
-      let line: string;
-      if (!owner) {
-        line = t('Sign in with Apple or Google so I can remember your name.', 'Inicia sesión con Apple o Google para que recuerde tu nombre.', 'Entre com Apple ou Google para eu lembrar seu nome.');
-      } else {
-        const current = await fetchMemory();
-        if (accountIdRef.current !== owner) return; // signed out or switched meanwhile: nothing to save or say
-        const saved = 'state' in current && current.state.enabled ? await patchMemory({ preferredName: naming.name }) : null;
-        if (accountIdRef.current !== owner) return;
-        if ('state' in current && !current.state.enabled) {
-          line = t('Memory is paused, so I did not save it. Turn it back on in your profile, under What Bobby remembers.', 'La memoria está en pausa, así que no lo guardé. Actívala en tu perfil, en Lo que Bobby recuerda.', 'A memória está pausada, então não salvei. Reative no seu perfil, em O que o Bobby lembra.');
-        } else if (saved && 'state' in saved) {
-          setPreferredName(saved.state.preferredName);
-          line = t(`Done, ${naming.name}. That is what I will call you.`, `Listo, ${naming.name}. Así te voy a llamar.`, `Pronto, ${naming.name}. É assim que vou te chamar.`);
-        } else {
-          line = t('I could not save your name right now. Try again in a moment.', 'No pude guardar tu nombre ahora. Inténtalo en un momento.', 'Não consegui salvar seu nome agora. Tente de novo em instantes.');
-        }
-      }
+      const line = account?.id
+        ? t(`Should I call you “${naming.name}”?`, `¿Te llamo «${naming.name}»?`, `Posso te chamar de “${naming.name}”?`)
+        : t('Sign in with Apple or Google so I can remember your name.', 'Inicia sesión con Apple o Google para que recuerde tu nombre.', 'Entre com Apple ou Google para eu lembrar seu nome.');
+      setPendingName(account?.id ? naming.name : null);
       setMessages((m) => [...m, { from: 'bobby', text: line }]);
       setNotice(line);
       say(line, true);
       return;
     }
     setNotice(null);
+    setPendingName(null);
     const lv = deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
@@ -650,6 +663,12 @@ export default function NucleoDesk() {
         {movers.length > 0 && <span style={{ color: '#8A8378' }}> {t('in 24h', 'en 24h', 'em 24h')}</span>}
       </p>
       {notice && <p className="n-caption mt-4 text-center" role="status">{notice}</p>}
+      {pendingName && (
+        <div className="mt-3 flex gap-2">
+          <button type="button" className="n-send" onClick={() => { sfxTock(); void confirmName(pendingName); }}>{t(`Yes, call me ${pendingName}`, `Sí, llámame ${pendingName}`, `Sim, me chame de ${pendingName}`)}</button>
+          <button type="button" className="n-mem-btn" onClick={() => { sfxTock(); setPendingName(null); setNotice(null); }}>{t('No', 'No', 'Não')}</button>
+        </div>
+      )}
       {voiceNotice && <p className="mt-2 text-[13px]" style={{ color: '#8A8378' }}>{voiceNotice}</p>}
     </div>
   );

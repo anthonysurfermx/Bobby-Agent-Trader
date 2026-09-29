@@ -9,8 +9,8 @@
 --     correction (/api/memory PATCH: the memory screen, or a message that is only "call me Anthony"). Never
 --     inferred, never taken from a market question.
 --   · bobby_memory_purge(): the 90-day retention as a daily pg_cron job, not only a sweep on the next ask.
---   · Ask history keeps only the last 90 days: recent_asks holds the ask times within the window (newest 100),
---     asks is their count and first_asked_at the oldest of them, so nothing older than 90 days survives.
+--   · Ask times are kept only for the last 90 days: recent_asks holds the ask times within the window (newest
+--     100) and first_asked_at is the oldest of them. asks stays a plain counter (never a time).
 --   · Every write for one account (record, forget) takes a per-account advisory lock, so concurrent reads on
 --     different assets cannot race the caps.
 --   · bobby_memory_forget(): also forgets the stored answers (one asset, or all) and the preferred name.
@@ -74,14 +74,13 @@ begin
   insert into bobby_user_assets as a (identity_id, symbol, asks, first_asked_at, last_asked_at, last_horizon, recent_asks, last_price, last_price_at)
     values (p_identity, p_symbol, 1, now(), now(), h, array[now()], px, pat)
     on conflict (identity_id, symbol) do update
-      set last_asked_at = now(), last_horizon = excluded.last_horizon,
+      set asks = least(a.asks + 1, 1000000), last_asked_at = now(), last_horizon = excluded.last_horizon,
           -- Only the last 90 days of ask times (newest 100); asks and first_asked_at follow from them below.
           recent_asks = (array[now()] || array(select x from unnest(a.recent_asks) x where x >= now() - interval '90 days' order by x desc))[1:100],
           -- Together or not at all: a read without a price clears the old one.
           last_price = excluded.last_price, last_price_at = excluded.last_price_at;
   update bobby_user_assets
-     set asks = greatest(cardinality(recent_asks), 1),
-         first_asked_at = coalesce((select min(x) from unnest(recent_asks) x), now())
+     set first_asked_at = coalesce((select min(x) from unnest(recent_asks) x), last_asked_at)
    where identity_id = p_identity and symbol = p_symbol;
 
   if p_read is not null
@@ -205,14 +204,11 @@ declare a int; r int;
 begin
   delete from bobby_user_assets where last_asked_at < now() - interval '90 days';
   get diagnostics a = row_count;
-  -- Ask times older than the window leave the assets that stay, with the count and the first ask they carried.
+  -- Ask times older than the window leave the assets that stay, and first_asked_at follows the oldest kept.
   update bobby_user_assets
-     set recent_asks = array(select x from unnest(recent_asks) x where x >= now() - interval '90 days' order by x desc)
-   where exists (select 1 from unnest(recent_asks) x where x < now() - interval '90 days') or first_asked_at < now() - interval '90 days';
-  update bobby_user_assets
-     set asks = greatest(cardinality(recent_asks), 1),
-         first_asked_at = coalesce((select min(x) from unnest(recent_asks) x), last_asked_at)
-   where first_asked_at < now() - interval '90 days' or asks <> greatest(cardinality(recent_asks), 1);
+     set recent_asks = array(select x from unnest(recent_asks) x where x >= now() - interval '90 days' order by x desc),
+         first_asked_at = coalesce((select min(x) from unnest(recent_asks) x where x >= now() - interval '90 days'), last_asked_at)
+   where first_asked_at < now() - interval '90 days';
   delete from bobby_user_reads where delivered_at < now() - interval '90 days';
   get diagnostics r = row_count;
   return jsonb_build_object('assets', a, 'reads', r);

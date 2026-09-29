@@ -13,33 +13,39 @@ import { fetchCandles } from './desk-debate.js';
 type Lang = 'en' | 'es' | 'pt';
 
 /**
- * The question asks about the sector, alternatives, competitors or a comparison, as a phrase (word-bounded; a
- * bare "compare" inside another word or "instead of" alone does not count).
+ * The question asks about the sector, alternatives, competitors or comparables, as a phrase. A bare "compare" or
+ * "similar" is not enough on its own ("compared to last quarter", "similar to 2021"): it counts only with
+ * another asset named (below).
  */
 const RELATED_INTENT = new RegExp([
   String.raw`\b(?:sector|setor|industry|industria|ind[uú]stria)\b`,
   String.raw`\b(?:alternativ(?:e|es|a|as|o|os))\b`,
-  String.raw`\b(?:similar(?:es)?|parecid[oa]s?|semelhantes?)\s+(?:a|to|com|companies|stocks|coins|empresas|acciones|a[cç][oõ]es)\b`,
-  String.raw`\b(?:competitors?|competidor(?:es)?|competidora?s?|concorrentes?|rivals?|rivales|peers?)\b`,
-  String.raw`\b(?:compite|compete|competem)\s+con\b|\bcompetes?\s+with\b`,
-  String.raw`\b(?:compar(?:e|es|ed|ing|ison|a|ar|ado|ación|ação|ando))\b`,
+  String.raw`\b(?:competitors?|competition|competidor(?:es)?|competidoras?|competencia|concorrentes?|concorr[eê]ncia|rivals?|rivales|peers?|comparables?|compar[aá]veis)\b`,
   String.raw`\bqu[eé]\s+m[aá]s\s+(?:hay|empresas|acciones|monedas|opciones|criptos?|activos)\b`,
-  String.raw`\bwhat\s+else\s+(?:is\s+)?(?:in|like|similar|compares)\b`,
+  String.raw`\bwhat\s+else\s+is\s+(?:there|in|like|similar)\b`,
   String.raw`\bo\s+que\s+mais\s+(?:tem|h[aá]|existe)\b`,
   String.raw`\b(?:other|another)\s+(?:companies|company|stocks?|coins?|assets?|names)\b`,
   String.raw`\botr[oa]s?\s+(?:empresas?|acci[oó]n(?:es)?|monedas?|criptos?|activos?)\b`,
   String.raw`\boutr[oa]s?\s+(?:empresas?|a[cç][aã]o|a[cç][oõ]es|moedas?|ativos?)\b`,
 ].join('|'), 'iu');
-/** "AMZN vs META", "Amazon o Microsoft", "NVDA or AMD": two assets and a comparison word between them. */
-const PAIR = /\b(?:vs\.?|versus|or|o|ou|contra|against)\b/iu;
+/** Comparison words that count when the question also names another asset. */
+const COMPARE = /\b(?:compar\w*|similar(?:es)?|parecid[oa]s?|semelhantes?|versus|vs\.?)\b/iu;
+/** Only a conjunction between two named assets: "AMZN vs META", "Amazon o Microsoft", "NVDA or AMD". */
+const BETWEEN = /^[\s,¿?¡!]*(?:vs\.?|versus|or|o|ou|contra|against)[\s,¿?¡!]*$/iu;
 
 /** Assets named in the question other than the asked one, in order (at most 3). */
-export const namedPeers = (question: string, symbol: string): string[] => assetsInText(question).filter((s) => s !== symbol).slice(0, 3);
+export const namedPeers = (question: string, symbol: string): string[] =>
+  assetsInText(question).map((h) => h.symbol).filter((s) => s !== symbol).slice(0, 3);
 
-/** Whether this question asks for related assets: a sector/alternatives phrase, or another asset named with vs/or. */
+/** Whether this question asks for related assets. */
 export function asksForRelated(question: string, symbol: string): boolean {
   if (RELATED_INTENT.test(question)) return true;
-  return namedPeers(question, symbol).length > 0 && PAIR.test(question);
+  const found = assetsInText(question);
+  const others = found.filter((h) => h.symbol !== symbol);
+  if (!others.length) return false;
+  if (COMPARE.test(question)) return true;
+  // Two assets side by side around "vs / or / o / ou".
+  return found.some((h, i) => i + 1 < found.length && BETWEEN.test(question.slice(h.end, found[i + 1].start)));
 }
 
 export interface DailyStats {
