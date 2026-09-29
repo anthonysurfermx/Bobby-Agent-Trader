@@ -157,16 +157,12 @@
       "schedule": "0 12 * * *"
     },
     {
-      "path": "/api/settle-trades",
-      "schedule": "45 12 * * *"
-    },
-    {
       "path": "/api/forum-resolve",
       "schedule": "30 12 * * *"
     },
     {
       "path": "/api/realtime-session?sweep=1",
-      "schedule": "* * * * *"
+      "schedule": "*/10 * * * *"
     }
   ],
   "functions": {
@@ -187,10 +183,6 @@
       "maxDuration": 60,
       "memory": 256
     },
-    "api/bobby-voice.ts": {
-      "maxDuration": 30,
-      "memory": 256
-    },
     "api/bobby-intel.ts": {
       "maxDuration": 30,
       "memory": 512
@@ -207,10 +199,6 @@
       "maxDuration": 10,
       "memory": 256
     },
-    "api/forum-generate.ts": {
-      "maxDuration": 120,
-      "memory": 512
-    },
     "api/technical-analysis.ts": {
       "maxDuration": 15,
       "memory": 256
@@ -222,14 +210,6 @@
     "api/forum-resolve.ts": {
       "maxDuration": 30,
       "memory": 256
-    },
-    "api/settle-trades.ts": {
-      "maxDuration": 60,
-      "memory": 256
-    },
-    "api/forum-morning.ts": {
-      "maxDuration": 120,
-      "memory": 512
     },
     "api/ghost-wallet.ts": {
       "maxDuration": 15,
@@ -262,14 +242,6 @@
     "api/judge-mode.ts": {
       "maxDuration": 60,
       "memory": 512
-    },
-    "api/generate-activity.ts": {
-      "maxDuration": 60,
-      "memory": 256
-    },
-    "api/cron-activity.ts": {
-      "maxDuration": 60,
-      "memory": 256
     },
     "api/realtime-session.ts": {
       "maxDuration": 240

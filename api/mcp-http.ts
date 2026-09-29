@@ -93,7 +93,8 @@ async function executeTool(name: string, args: Record<string, any>): Promise<{ c
 
     const res = await fetch(`${BASE_URL}/api/openclaw-chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      // openclaw-chat refuses callers with neither an allowed Origin nor internal auth.
+      headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
       body: JSON.stringify({ message, language: args.language || 'en', history: [] }),
     });
     if (!res.ok) throw new Error(`Bobby analysis failed: ${res.status}`);

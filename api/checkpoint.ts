@@ -1,8 +1,7 @@
 // ============================================================
 // GET /api/checkpoint — Public proof checkpoint
 // Consolidated status report: recent debates, trades, bounties,
-// risk decisions, and continuity metrics. Posted to Moltbook
-// every 4h via cron-activity instead of spamming each cycle.
+// risk decisions, and continuity metrics.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';

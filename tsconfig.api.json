@@ -57,7 +57,6 @@
     "api/seed-macro-calendar.ts",
     "api/feedback.ts",
     "api/sandbox-run.ts",
-    "api/settle-trades.ts",
     "api/bobby-health.ts",
     "api/_lib/origins.ts",
     "api/_lib/transcript-receipt.ts",

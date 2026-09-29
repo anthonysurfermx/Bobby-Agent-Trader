@@ -63,7 +63,8 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
 
         const res = await fetch(`${BASE_URL}/api/openclaw-chat`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          // openclaw-chat refuses callers with neither an allowed Origin nor internal auth.
+          headers: { 'Content-Type': 'application/json', ...internalAuthHeaders() },
           body: JSON.stringify({ message, language: args.language || 'en', history: [] }),
         });
 

@@ -8,7 +8,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAdviceMode, type AdviceMode } from '../src/lib/advice-mode.js';
 import { matchInvestorEdgeCasePolicy, type InvestorEdgeCasePolicy } from '../src/lib/investor-edge-cases.js';
-import { enforcePublicRateLimit } from './_lib/request-security.js';
+import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
+import { requestOriginHost } from './_lib/origins.js';
 import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
 import { walletSessionFromRequest } from './_lib/wallet-session.js';
 
@@ -916,7 +917,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
+  // x402 bypass (lean pass 2026-09-29): the paid MCP tools (bobby_analyze /
+  // bobby_debate on mcp-http and mcp-bobby) run this debate server-to-server
+  // with internalAuthHeaders(). Any other caller must be the web chat on an
+  // allowed origin (the voice-room text surface, reachable from /desk), which
+  // stays behind the public rate limit. A bare script with neither gets 401
+  // instead of a free debate.
+  const internal = isInternalRequest(req);
+  if (!internal && !requestOriginHost(req.headers)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!internal && !await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
 
   const { message, history, language } = req.body as {
     message: string;

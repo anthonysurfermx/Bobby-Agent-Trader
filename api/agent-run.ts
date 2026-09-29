@@ -80,7 +80,8 @@ async function callClaude(
 // ---- Dynamic conviction + Kelly sizing + risk gate extracted to ./_lib/risk-gate.ts ----
 
 // ---- Calculate win rate from recent cycles ----
-// Only uses real `trades_successful` (populated by /api/settle-trades from realized PnL).
+// Only uses real `trades_successful` (was populated by the since-deleted /api/settle-trades;
+// nothing writes it now, so new cycles carry no success data and count as neutral).
 // The old "any cycle with >=1 trade is a win" heuristic was removed — it masked losses
 // and mis-sized Kelly. Cycles without success data count as neutral (0.5) rather than
 // falsifying the metric.
@@ -395,7 +396,7 @@ async function fetchRecentCycles(limit = 10): Promise<Array<{ llm_reasoning: str
 }
 
 // ---- Circuit breaker: halt cycle on sustained losses ----
-// Reads from agent_trades (settled by /api/settle-trades) so the signal is
+// Reads settled agent_trades (Base SELLs are settled by confirm_swap_receipt) so the signal is
 // real realized PnL, not the old trades_successful proxy. Two halt rules:
 //   1. Rolling 24h realized drawdown > 10% of bankroll.
 //   2. >=3 consecutive settled losses with no intervening win.

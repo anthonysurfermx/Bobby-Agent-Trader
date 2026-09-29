@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import {
   BASE,
   BASE_SEPOLIA,
@@ -155,10 +155,17 @@ assert.match(
 
 // 2026-09-03: the X Layer activity generators are retired outright (410),
 // same shape as deploy-hardness — no signer, no provider, no contract call.
-for (const legacyWriter of ['api/generate-activity.ts', 'api/auto-bounty.ts']) {
+for (const legacyWriter of ['api/auto-bounty.ts']) {
   const src = readFileSync(legacyWriter, 'utf8');
   assert.match(src, /status\(410\)/);
   assert.doesNotMatch(src, /BOBBY_RECORDER_KEY|new ethers\.Wallet|sendTransaction|assertProviderChain|requireLegacyXLayerMode/);
+}
+// 2026-09-29 (lean pass): generate-activity and its cron-activity driver were
+// deleted outright. They must stay deleted and unreferenced by vercel.json.
+const vercelConfig = readFileSync('vercel.json', 'utf8');
+for (const deleted of ['api/generate-activity.ts', 'api/cron-activity.ts']) {
+  assert.equal(existsSync(deleted), false, `${deleted} must stay deleted`);
+  assert.equal(vercelConfig.includes(deleted), false, `vercel.json must not reference ${deleted}`);
 }
 
 const retiredDeploySource = readFileSync('api/deploy-hardness.ts', 'utf8');
