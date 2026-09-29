@@ -403,3 +403,19 @@ body.nucleo-ui .n-lvcard-name:focus:not(:focus-visible) { outline: none; }
 .n-scen-row i { width: 6px; height: 6px; border-radius: 50%; transform: translateY(-2px); }
 .n-scen-row b { display: block; font: 500 10px/1.2 var(--n-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--n-ink3); margin-bottom: 3px; }
 @media (prefers-reduced-motion: reduce) { .n-lvfill i, .n-lvcard, .n-dlg, .n-dlg-overlay, .n-plantag { animation: none !important; } .n-lvfill i { opacity: var(--o); } }
+
+/* Synthesis first (2026-09-29): the CIO's one-line answer, then why / the risk / what to watch; the whole
+   debate is one tap away. Three short rows, never a wall of text. */
+.n-synth { display: flex; flex-direction: column; align-items: center; }
+.n-synth-rows { width: 100%; max-width: 560px; margin-top: 18px; display: grid; gap: 12px; padding: 0 6px; }
+.n-synth-row { display: grid; grid-template-columns: 8px 1fr; gap: 12px; align-items: baseline; font-size: 15px; line-height: 1.45; color: var(--n-ink); }
+.n-synth-row i { width: 6px; height: 6px; border-radius: 50%; transform: translateY(-2px); }
+.n-synth-row b { display: block; font: 500 10px/1.2 var(--n-mono); letter-spacing: .14em; text-transform: uppercase; color: var(--n-ink3); margin-bottom: 3px; }
+.n-synth.n-failed { width: 100%; max-width: 560px; align-items: flex-start; padding: 18px 20px; }
+.n-synth-head { margin-top: 8px; font-size: 15.5px; line-height: 1.45; color: var(--n-ink); }
+.n-synth-note { margin-top: 6px; font-size: 13px; color: var(--n-ink3); }
+.n-debate-peek { display: grid; gap: 4px; padding: 11px 0; }
+.n-debate-peek-line { font-size: 14px; line-height: 1.4; color: var(--n-ink2, #CFC7BA); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.n-debate-more { margin-top: 10px; padding: 8px 0 2px; font: 500 11px/1.2 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink2, #CFC7BA); background: none; border: 0; cursor: pointer; }
+.n-debate-more:hover { color: var(--n-ink); }
+.n-debate-more:focus-visible { outline: 1px solid rgba(242, 237, 228, .5); outline-offset: 4px; border-radius: 4px; }

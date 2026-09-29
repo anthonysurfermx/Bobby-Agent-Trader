@@ -95,6 +95,8 @@ export async function claimPendingReferral(): Promise<ClaimResult | null> {
     const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action: 'referral-claim', code }) });
     if (r.status === 401 || r.status >= 500) return null;
     const body = (await r.json().catch(() => ({}))) as { result?: ClaimResult };
+    // A wallet session is not an account yet: the code waits for the Apple/Google sign-in.
+    if (body.result === 'account_required') return 'account_required';
     forgetReferral();
     return body.result ?? 'invalid_code';
   } catch { return null; }

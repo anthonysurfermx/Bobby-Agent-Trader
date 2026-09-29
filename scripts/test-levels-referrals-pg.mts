@@ -22,14 +22,23 @@ let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 
-async function person(opts: { wallet?: boolean; ageDays?: number } = {}) {
+// A person: a Bobby identity and, unless wallet-only, the Supabase account behind it (auth.users +
+// auth.identities stand-ins), whose own creation date is the one a referral checks.
+async function person(opts: { wallet?: boolean; ageDays?: number; provider?: string; identityAgeDays?: number } = {}) {
   const id = randomUUID();
+  const authId = opts.wallet ? null : randomUUID();
+  if (authId) {
+    await pool.query('insert into auth.users(id, created_at) values ($1, now() - make_interval(days => $2))', [authId, opts.ageDays ?? 0]);
+    await pool.query('insert into auth.identities(user_id, provider) values ($1, $2)', [authId, opts.provider ?? 'apple']);
+  }
   await pool.query(
     `insert into public.bobby_identities(id, auth_user_id, wallet_address, created_at) values ($1, $2, $3, now() - make_interval(days => $4))`,
-    [id, opts.wallet ? null : randomUUID(), opts.wallet ? `0x${randomUUID().replace(/-/g, '')}` : null, opts.ageDays ?? 0],
+    [id, authId, opts.wallet ? `0x${randomUUID().replace(/-/g, '')}` : null, opts.identityAgeDays ?? 0],
   );
   return id;
 }
+const ageAccount = (identity: string, days: number) =>
+  pool.query('update auth.users set created_at = now() - make_interval(days => $2) where id = (select auth_user_id from public.bobby_identities where id = $1)', [identity, days]);
 const consume = async (identity: string | null, device: string | null, level: string) =>
   (await pool.query('select public.bobby_consume_level($1, $2, $3, $4, $5) as r', [identity, device, level, 'BTC', JSON.stringify(LIMITS)])).rows[0].r;
 const state = async (identity: string | null, device: string | null) =>
@@ -47,10 +56,21 @@ const isPro = async (identity: string) => (await pool.query('select public.bobby
 const days = (d?: Date) => (d ? Math.round((d.getTime() - Date.now()) / 86_400_000) : null);
 
 try {
+  // Supabase's auth schema, reduced to what the referral rules read.
+  await pool.query(`create schema if not exists auth;
+    create table if not exists auth.users (id uuid primary key, created_at timestamptz not null default now());
+    create table if not exists auth.identities (user_id uuid not null references auth.users(id), provider text not null);`);
   await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20260927120000_access_reads_subscriptions.sql', 'utf8'));
   const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20260929150000_levels_referrals_usage.sql', 'utf8');
+  const rules = readFileSync('supabase/bobby-protocol/supabase/migrations/20260929170000_referral_rules_llm_spend.sql', 'utf8');
   await pool.query(migration);
   await pool.query(migration); // idempotent
+  await pool.query(rules);
+  await pool.query(rules); // idempotent
+  for (const fn of ['public.bobby_referral_claim(uuid, text, int, int, int)', 'public.bobby_llm_spend()']) {
+    for (const role of ['anon', 'authenticated']) eq((await pool.query('select has_function_privilege($1, $2, $3) as r', [role, fn, 'execute'])).rows[0].r, false, `${role} cannot execute ${fn}`);
+    eq((await pool.query('select has_function_privilege($1, $2, $3) as r', ['service_role', fn, 'execute'])).rows[0].r, true, `service_role executes ${fn}`);
+  }
 
   // ---------- privileges: service-only ----------
   for (const table of ['bobby_level_uses', 'bobby_referral_codes', 'bobby_referrals', 'bobby_pro_grants', 'bobby_llm_usage']) {
@@ -102,6 +122,8 @@ try {
   eq((await claim(inviter, invite)).code, 'self', 'nobody invites themselves');
   eq((await claim(await person({ wallet: true }), invite)).code, 'account_required', 'a wallet-only identity is not a new account');
   eq((await claim(await person({ ageDays: 30 }), invite)).code, 'not_new', 'an existing account does not count');
+  eq((await claim(await person({ ageDays: 30, identityAgeDays: 0 }), invite)).code, 'not_new', 'a fresh Bobby identity on an old account does not count: the account date decides');
+  eq((await claim(await person({ provider: 'email' }), invite)).code, 'account_required', 'only an Apple or Google account counts');
   eq(await isPro(inviter), false, 'no Pro before a friend joins');
 
   const friend1 = await person();
@@ -114,9 +136,9 @@ try {
   eq(read.tier, 'pro', 'Pro by referral reaches the read meter');
 
   const friendCode = await code(friend1);
-  await pool.query("update public.bobby_identities set created_at = now() - interval '30 days' where id = $1", [inviter]);
+  await ageAccount(inviter, 30);
   eq((await claim(inviter, friendCode)).code, 'not_new', 'an older inviter cannot be claimed back…');
-  await pool.query('update public.bobby_identities set created_at = now() where id = $1', [inviter]);
+  await ageAccount(inviter, 0);
   eq((await claim(inviter, friendCode)).code, 'self', '…and even when new, a two-way swap is refused');
 
   eq((await claim(await person(), invite)).code, 'claimed', 'second friend');
@@ -128,6 +150,17 @@ try {
   eq(last.filter((r) => r.code === 'inviter_full').length, 3, 'the rest see a full inviter');
   eq(Number((await pool.query('select count(*) from public.bobby_referrals where inviter_id = $1', [inviter])).rows[0].count), 5, 'at most five friends');
   eq(days(await proUntil(inviter)), 150, 'five friends: 150 days of Pro');
+
+  // A paying inviter's gift starts when the paid period ends.
+  const payer = await person();
+  await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'stripe', 'active', now() + interval '20 days')", [payer]);
+  eq((await claim(await person(), await code(payer))).code, 'claimed', 'a paying inviter can invite');
+  eq(days(await proUntil(payer)), 50, 'the 30 gifted days run after the 20 paid ones');
+
+  // The spend guard's sum: today and this month, from the ledger.
+  await pool.query("insert into public.bobby_llm_usage(surface, provider, model, usd, ok) values ('desk', 'openai', 'gpt-6-luna', 0.25, true), ('desk', 'anthropic', 'claude-sonnet-5-5', 0.5, true)");
+  const spend = (await pool.query('select public.bobby_llm_spend() as r')).rows[0].r;
+  ok(Number(spend.day) >= 0.75 && Number(spend.month) >= Number(spend.day), 'spend sums today and the month');
 
   // An expired grant is not Pro.
   const lapsed = await person();

@@ -80,37 +80,94 @@ export async function runDebate(symbol: string, signal: AbortSignal): Promise<An
 
 /** The three-agent debate: /api/desk-debate, three isolated model calls (Alpha, Red Team, CIO; four on
  *  Máximo, with Alpha's second round) over the level's evidence. The same endpoint the iOS app uses.
+ *  The web reads it live (NDJSON): each argument arrives as soon as its model answered and passed the guard.
  *  A premium level the reader has used up comes back as a refusal, never as a silent downgrade. */
+export interface Synthesis { headline: string; why: string; risk: string; watch: string }
 export interface Agents {
   alpha: string; red: string; cio: string; verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
   level: DeskLevel; rebuttal: string | null; scenarios: { confirm: string; invalidate: string } | null;
+  /** The CIO's answer for a reader in a hurry: shown first, the debate stays one tap away. */
+  synthesis: Synthesis | null;
   /** What the evidence covered against the horizon asked (the desk states it before any thesis). */
   sufficiency: { horizon: string; available: string[]; missing: string[]; sufficient: boolean } | null;
   evidenceUsed: { timeframes: string[]; derivatives: boolean; record: { resolvedCalls: number; wins: number; losses: number; breakEven: number } | null } | null;
 }
 export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
-export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null }
+/** failed: the agents did not finish (a premium use is given back by the server); budget_paused: the spend guard. */
+export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null }
+export type DeskLiveEvent =
+  | { type: 'accepted' }
+  | { type: 'evidence'; timeframes: string[] }
+  | { type: 'agent'; role: 'alpha' | 'red' | 'rebuttal'; text: string };
 const LEVEL_TIMEOUT: Record<DeskLevel, number> = { rapido: 95_000, profundo: 130_000, maximo: 175_000 };
+const text = (v: unknown, max = 400): string | null => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : null);
 
-export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal, level: DeskLevel = 'rapido'): Promise<DebateRun> {
+function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLevel): DebateRun {
+  const failed: DebateRun = { agents: null, refusal: null, failure: 'failed' };
+  if (!ok && (data?.code === 'signin_required' || data?.code === 'upgrade_required' || data?.code === 'level_exhausted')) {
+    return { agents: null, failure: null, refusal: { code: data.code, level, resetsAt: typeof data.meter?.resetsAt === 'string' ? data.meter.resetsAt : null } };
+  }
+  if (!ok && data?.code === 'budget_paused') return { agents: null, refusal: null, failure: 'budget_paused' };
+  const g = data?.agents;
+  if (!ok || !g || typeof g.alpha !== 'string' || typeof g.red !== 'string' || typeof g.cio !== 'string') return failed;
+  if (g.verdict !== 'wait' && g.verdict !== 'review') return failed;
+  const direction = g.direction === 'long' || g.direction === 'short' ? g.direction : 'none';
+  const scenarios = g.scenarios && typeof g.scenarios.confirm === 'string' && typeof g.scenarios.invalidate === 'string' ? { confirm: g.scenarios.confirm, invalidate: g.scenarios.invalidate } : null;
+  const sy = g.synthesis;
+  const synthesis = sy && text(sy.headline) && text(sy.why) && text(sy.risk) && text(sy.watch) ? { headline: text(sy.headline)!, why: text(sy.why)!, risk: text(sy.risk)!, watch: text(sy.watch)! } : null;
+  return { refusal: null, failure: null, agents: {
+    alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction,
+    level: data!.level === 'profundo' || data!.level === 'maximo' ? data!.level : 'rapido',
+    rebuttal: typeof g.rebuttal === 'string' ? g.rebuttal : null, scenarios, synthesis,
+    sufficiency: data!.sufficiency && Array.isArray(data!.sufficiency.missing) ? data!.sufficiency : null,
+    evidenceUsed: data!.evidenceUsed && Array.isArray(data!.evidenceUsed.timeframes) ? data!.evidenceUsed : null,
+  } };
+}
+
+export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal, level: DeskLevel = 'rapido', onEvent?: (event: DeskLiveEvent) => void): Promise<DebateRun> {
+  const controller = new AbortController();
+  const cancel = () => controller.abort();
+  if (signal.aborted) cancel();
+  signal.addEventListener('abort', cancel, { once: true });
+  const timer = setTimeout(cancel, LEVEL_TIMEOUT[level]);
   try {
-    const { ok, data } = await deskJson<Record<string, any>>('/api/desk-debate', { signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level }) }, LEVEL_TIMEOUT[level]);
-    if (!ok && (data?.code === 'signin_required' || data?.code === 'upgrade_required' || data?.code === 'level_exhausted')) {
-      return { agents: null, refusal: { code: data.code, level, resetsAt: typeof data.meter?.resetsAt === 'string' ? data.meter.resetsAt : null } };
+    const response = await fetch('/api/desk-debate', {
+      signal: controller.signal, method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json', ...(await accessHeaders()) },
+      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level }),
+    });
+    // Refusals (and a server without the live desk) answer plain JSON.
+    if (!(response.headers.get('content-type') ?? '').includes('ndjson') || !response.body) {
+      return debateFrom(response.ok, await response.json().catch(() => null), level);
     }
-    const g = data?.agents;
-    if (!ok || !g || typeof g.alpha !== 'string' || typeof g.red !== 'string' || typeof g.cio !== 'string') return { agents: null, refusal: null };
-    if (g.verdict !== 'wait' && g.verdict !== 'review') return { agents: null, refusal: null };
-    const direction = g.direction === 'long' || g.direction === 'short' ? g.direction : 'none';
-    const scenarios = g.scenarios && typeof g.scenarios.confirm === 'string' && typeof g.scenarios.invalidate === 'string' ? { confirm: g.scenarios.confirm, invalidate: g.scenarios.invalidate } : null;
-    return { refusal: null, agents: {
-      alpha: g.alpha, red: g.red, cio: g.cio, verdict: g.verdict, direction,
-      level: data.level === 'profundo' || data.level === 'maximo' ? data.level : 'rapido',
-      rebuttal: typeof g.rebuttal === 'string' ? g.rebuttal : null, scenarios,
-      sufficiency: data.sufficiency && Array.isArray(data.sufficiency.missing) ? data.sufficiency : null,
-      evidenceUsed: data.evidenceUsed && Array.isArray(data.evidenceUsed.timeframes) ? data.evidenceUsed : null,
-    } };
-  } catch { return { agents: null, refusal: null }; }
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) buffer += decoder.decode(value, { stream: !done });
+      let at: number;
+      while ((at = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, at).trim();
+        buffer = buffer.slice(at + 1);
+        if (!line) continue;
+        let event: Record<string, any>;
+        try { event = JSON.parse(line); } catch { continue; }
+        if (event.type === 'final') return debateFrom(true, event.data, level);
+        if (event.type === 'error') return { agents: null, refusal: null, failure: 'failed' };
+        if (event.type === 'accepted') onEvent?.({ type: 'accepted' });
+        else if (event.type === 'evidence' && Array.isArray(event.timeframes)) onEvent?.({ type: 'evidence', timeframes: event.timeframes });
+        else if (event.type === 'agent' && (event.role === 'alpha' || event.role === 'red' || event.role === 'rebuttal') && typeof event.text === 'string') onEvent?.({ type: 'agent', role: event.role, text: event.text });
+      }
+      if (done) break;
+    }
+    return { agents: null, refusal: null, failure: 'failed' };
+  } catch {
+    return { agents: null, refusal: null, failure: 'failed' };
+  } finally {
+    clearTimeout(timer);
+    signal.removeEventListener('abort', cancel);
+  }
 }
 
 export function isUnavailable(a: Answer) { return a.error || (a.price === null && a.trend === null && a.signal === null && a.direction === null && a.overview === null); }
@@ -207,7 +264,9 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
       ? t('My call: no trade.', 'Mi lectura: no operar.', 'Minha leitura: não operar.')
       : t(`My call: ${direction}, ${conv}% conviction. Reference only.`, `Mi lectura: ${direction}, ${conv}% de convicción. Solo referencia.`, `Minha leitura: ${direction}, ${conv}% de convicção. Apenas referência.`);
     const cioSpoken = g.cio.length > 600 ? `${g.cio.slice(0, 600).replace(/\s+\S*$/, '')}…` : g.cio;
-    return { stances: [alpha, red, cioReal], headline, spoken: `${cioSpoken} ${close}`, noTrade, direction };
+    // With the CIO's synthesis, Bobby says the answer and its reason, not the whole ruling.
+    const spoken = g.synthesis ? `${g.synthesis.headline} ${g.synthesis.why}` : `${cioSpoken} ${close}`;
+    return { stances: [alpha, red, cioReal], headline, spoken, noTrade, direction };
   }
   const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `, `${a.symbol} está em ${money(a.price)}. `) : '';
   const spoken = withSide && a.entry !== null && a.stop !== null && a.target !== null

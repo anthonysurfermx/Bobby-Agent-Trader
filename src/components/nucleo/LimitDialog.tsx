@@ -30,6 +30,8 @@ export default function LimitDialog({ limit, state, billing, onClose, onSignIn, 
   const back = date(limit?.resetsAt ?? null);
   const lower: DeskLevel = limit?.level === 'maximo' ? 'profundo' : 'rapido';
   const perWeek = state?.plans?.freeReadsPerWeek ?? null;
+  // Pro is offered only where it can be bought; until then the way to Pro is a friend.
+  const canBuy = !!state?.payments.stripe;
   const freeReads = perWeek ? t(`${perWeek} free reads a week`, `${perWeek} lecturas gratis por semana`, `${perWeek} leituras grátis por semana`) : t('unlimited reads', 'lecturas sin límite', 'leituras sem limite');
 
   return (
@@ -61,20 +63,22 @@ export default function LimitDialog({ limit, state, billing, onClose, onSignIn, 
                   : t(`You used your ${name} for this week.`, `Ya usaste tu ${name} de esta semana.`, `Você já usou seu ${name} desta semana.`)}
               </Dialog.Title>
               <p className="n-dlg-copy">
-                {t('Two ways to keep going.', 'Dos formas de seguir.', 'Duas formas de continuar.')}
+                {canBuy
+                  ? t('Two ways to keep going.', 'Dos formas de seguir.', 'Duas formas de continuar.')
+                  : t('Invite a friend and unlock Bobby Pro.', 'Invita a un amigo y desbloquea Bobby Pro.', 'Convide um amigo e desbloqueie o Bobby Pro.')}
                 {back ? t(` Or wait: it comes back ${back}.`, ` O espera: vuelve el ${back}.`, ` Ou espere: volta em ${back}.`) : ''}
               </p>
-              <div className="n-dlg-pro">
+              {canBuy && <><div className="n-dlg-pro">
                 <div>
                   <b>Bobby Pro · {t('$5/month', '$5/mes', '$5/mês')}</b>
                   <small>{pro ? t(`Unlimited reads, ${pro.profundo[0]} Deep and ${pro.maximo[0]} Max a month.`, `Lecturas sin límite, ${pro.profundo[0]} Profundo y ${pro.maximo[0]} Máximo al mes.`, `Leituras sem limite, ${pro.profundo[0]} Profundo e ${pro.maximo[0]} Máximo por mês.`) : ''}</small>
                 </div>
-                <button type="button" className="n-dlg-pro-btn" disabled={billing.busy || !state?.payments.stripe} onClick={onSubscribe}>
-                  {state?.payments.stripe ? (billing.busy ? t('Opening…', 'Abriendo…', 'Abrindo…') : t('Get Pro', 'Obtener Pro', 'Assinar')) : t('Very soon', 'Muy pronto', 'Em breve')}
+                <button type="button" className="n-dlg-pro-btn" disabled={billing.busy} onClick={onSubscribe}>
+                  {billing.busy ? t('Opening…', 'Abriendo…', 'Abrindo…') : t('Get Pro', 'Obtener Pro', 'Assinar')}
                 </button>
               </div>
               {billing.error && <p role="alert" className="mt-2 text-[13px]" style={{ color: '#FFB3B5' }}>{billing.error}</p>}
-              <div className="n-dlg-or"><span>{t('or', 'o', 'ou')}</span></div>
+              <div className="n-dlg-or"><span>{t('or', 'o', 'ou')}</span></div></>}
               <InvitePanel state={state} onSignIn={onSignIn} />
             </>
           )}

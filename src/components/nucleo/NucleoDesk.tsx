@@ -43,12 +43,15 @@ interface BrowserRecognition {
   onend: (() => void) | null; onerror: (() => void) | null;
 }
 
-type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+type Phase = 'idle' | 'resolving' | 'alpha' | 'redTeam' | 'rebuttal' | 'cio' | 'reveal' | 'complete' | 'error' | 'confirm' | 'gate';
+type LiveArgs = { alpha?: string; red?: string; rebuttal?: string };
+/** The first sentence, for the voices around the glass; the whole text stays in the debate card. */
+const firstSentence = (text: string, max = 170) => { const m = text.match(/^.*?[.!?](?=\s|$)/); const one = (m ? m[0] : text).trim(); return one.length > max ? `${one.slice(0, max).replace(/\s+\S*$/, '')}…` : one; };
 const PENDING_ASK = 'bobby:pending-ask';
 type Sheet = 'none' | 'profile' | 'board' | 'risk' | 'catalog' | 'pet' | 'swap';
 interface Msg { from: 'bobby' | 'you'; text: string }
 
-const WORKING: Phase[] = ['resolving', 'alpha', 'redTeam', 'cio'];
+const WORKING: Phase[] = ['resolving', 'alpha', 'redTeam', 'rebuttal', 'cio'];
 const REVEAL_MS = 2600;
 const AGENT_NAME: Record<AgentKey, string> = { alpha: 'Alpha Hunter', red: 'Red Team', cio: 'CIO' };
 
@@ -174,6 +177,11 @@ export default function NucleoDesk() {
   const revealRef = useRef<number | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
+  // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
+  const [live, setLive] = useState<LiveArgs>({});
+  const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string } | null>(null);
+  const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
+  const [showDebate, setShowDebate] = useState(false);
   const questionRef = useRef<string>('');
   useEffect(() => () => { requestRef.current?.abort(); recognitionRef.current?.stop(); if (revealRef.current) clearTimeout(revealRef.current); }, []);
 
@@ -195,59 +203,105 @@ export default function NucleoDesk() {
     if (signal.aborted) return;
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
+    setDeskRetry(null);
     setSnapshot(snap);
     setAnswer(null);
     setAgents(null);
+    setAgentsFailed(null);
+    setLive({});
+    setShowDebate(false);
     setAward(null);
     setLandEvent(null);
     setSeries([]);
     setPhase('alpha');
     void candles(snap.symbol, snap.isEquity).then((rows) => { if (!signal.aborted) setSeries(rows); });
-    // The stages follow the debate's real order (Alpha, then Red Team on Alpha, then the CIO);
-    // the model calls take a few seconds each.
     const runLevel = deskLevelRef.current;
-    const pace = runLevel === 'maximo' ? [9000, 24000] : runLevel === 'profundo' ? [5000, 11000] : [4000, 9000];
-    const stage = setTimeout(() => { if (!signal.aborted) setPhase('redTeam'); }, pace[0]);
-    const stage2 = setTimeout(() => { if (!signal.aborted) setPhase('cio'); }, pace[1]);
-    const a = await runDebate(snap.symbol, signal);
-    if (a.gate || isUnavailable(a)) { clearTimeout(stage); clearTimeout(stage2); }
-    if (signal.aborted) return;
-    if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
-    if (a.gate) {
+    const question = questionRef.current || t(`How does ${snap.symbol} look?`, `¿Cómo se ve ${snap.symbol}?`, `Como está ${snap.symbol}?`);
+    const holdQuestion = () => { try { sessionStorage.setItem(PENDING_ASK, questionRef.current || snap.symbol); } catch { /* private mode */ } };
+    // The debate starts first and the stages follow its real events (no timers). The metered read starts
+    // once the server accepted the level, so a refused Profundo/Máximo never spends a read; Rápido has no
+    // level gate, so both start together.
+    const agentsCtl = new AbortController();
+    signal.addEventListener('abort', () => agentsCtl.abort(), { once: true });
+    let readRun: Promise<Answer> | null = runLevel === 'rapido' ? runDebate(snap.symbol, signal) : null;
+    const startRead = () => { readRun = readRun ?? runDebate(snap.symbol, signal); return readRun; };
+    const heard: LiveArgs = {};
+    const agentsRun = runAgents(snap.symbol, snap.isEquity, question, agentsCtl.signal, runLevel, (event) => {
+      if (signal.aborted) return;
+      if (event.type === 'accepted') { void startRead(); return; }
+      if (event.type !== 'agent') return;
+      heard[event.role] = event.text;
+      setLive({ ...heard });
+      setPhase(event.role === 'alpha' ? 'redTeam' : event.role === 'red' && runLevel === 'maximo' ? 'rebuttal' : 'cio');
+    });
+    const gateRead = (a: Answer) => {
       // The server stopped this read: sign in first, or Bobby Pro. The question waits and runs after.
-      try { sessionStorage.setItem(PENDING_ASK, snap.symbol); } catch { /* private mode */ }
+      agentsCtl.abort();
+      holdQuestion();
       setSnapshot(null);
       setPhase('idle');
       setLimit({ kind: a.gate === 'signin_required' ? 'signin' : 'upgrade', level: 'rapido', resetsAt: a.access?.resetsAt ?? null });
       void fetchAccess().then((st) => { if (st) setAccessState(st); });
-      return;
+    };
+    const keepMeter = (a: Answer) => {
+      if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
+    };
+    if (readRun) {
+      const early = await readRun;
+      if (signal.aborted) return;
+      keepMeter(early);
+      if (early.gate) { gateRead(early); return; }
     }
-    if (isUnavailable(a)) {
-      setPhase('error');
-      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
-      setDeskError(msg);
-      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
-      say(msg);
-      return;
-    }
-    // The metered read passed: now the three agents argue over the same evidence.
-    const question = questionRef.current || t(`How does ${snap.symbol} look?`, `¿Cómo se ve ${snap.symbol}?`, `Como está ${snap.symbol}?`);
-    const run = await runAgents(snap.symbol, snap.isEquity, question, signal, runLevel);
-    clearTimeout(stage); clearTimeout(stage2);
+    const run = await agentsRun;
     if (signal.aborted) return;
     if (runLevel !== 'rapido') void fetchAccess().then((st) => { if (st) setAccessState(st); });
     if (run.refusal) {
       // The premium level's allowance ran out on the server: the pop-up, never a silent downgrade.
-      if (run.refusal.code === 'signin_required') { try { sessionStorage.setItem(PENDING_ASK, questionRef.current || snap.symbol); } catch { /* private mode */ } }
+      if (run.refusal.code === 'signin_required') holdQuestion();
       setSnapshot(null);
       setPhase('idle');
       setLimit({ kind: run.refusal.code === 'signin_required' ? 'signin' : run.refusal.code === 'upgrade_required' ? 'upgrade' : 'exhausted', level: run.refusal.level, resetsAt: run.refusal.resetsAt });
+      return;
+    }
+    if (run.failure && !readRun) {
+      // Refused before the level was accepted (spend guard, outage): nothing was spent, say so plainly.
+      const msg = run.failure === 'budget_paused'
+        ? t('Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.', 'Profundo e Máximo estão em pausa hoje. Rápido continua disponível.')
+        : t(`The agents did not finish for ${snap.symbol}. Nothing was used. Try again.`, `Los agentes no terminaron con ${snap.symbol}. No se descontó nada. Inténtalo de nuevo.`, `Os agentes não terminaram com ${snap.symbol}. Nada foi descontado. Tente de novo.`);
+      setPhase('error');
+      setDeskError(msg);
+      setDeskRetry(run.failure === 'budget_paused' ? { symbol: snap.symbol, level: 'rapido' } : { symbol: snap.symbol, level: runLevel });
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      say(msg);
+      return;
+    }
+    const a = await startRead();
+    if (signal.aborted) return;
+    keepMeter(a);
+    if (a.gate) { gateRead(a); return; }
+    if (isUnavailable(a)) {
+      setPhase('error');
+      const msg = t(`The desk did not answer for ${snap.symbol}. Try again in a moment.`, `El desk no respondió por ${snap.symbol}. Inténtalo de nuevo en un momento.`, `O desk não respondeu sobre ${snap.symbol}. Tente de novo em instantes.`);
+      setDeskError(msg);
+      setDeskRetry({ symbol: snap.symbol, level: runLevel });
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      say(msg);
       return;
     }
     const g = run.agents;
     setAgents(g);
     setAnswer(a);
     setReadSeq((n) => n + 1);
+    if (!g) {
+      // The agents did not finish: the market read stays, clearly marked; no verdict, no XP. A premium
+      // use was given back by the server.
+      setAgentsFailed({ level: runLevel, symbol: snap.symbol });
+      setPhase('complete');
+      const msg = t('The agents did not finish this time, so there is no verdict. Here is the market read.', 'Los agentes no terminaron esta vez, así que no hay veredicto. Aquí está la lectura del mercado.', 'Os agentes não terminaram desta vez, então não há veredito. Aqui está a leitura do mercado.');
+      setMessages((m) => [...m, { from: 'bobby', text: msg }]);
+      say(msg);
+      return;
+    }
     // The three voices say their piece around the glass, then the verdict condenses on it.
     setPhase('reveal');
     revealRef.current = window.setTimeout(() => { if (!signal.aborted) setPhase('complete'); }, REVEAL_MS);
@@ -363,6 +417,13 @@ export default function NucleoDesk() {
     voice.stop();
     sfxTock();
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]); setLimit(null);
+    setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
+  };
+  // "Retry" re-asks the same question, on the level that failed (or Rápido when the premium pause said so).
+  const retry = (r: { symbol: string; level: DeskLevel }) => {
+    sfxTock();
+    if (r.level !== deskLevelRef.current) { setDeskLevel(r.level); deskLevelRef.current = r.level; }
+    void ask(questionRef.current || r.symbol);
   };
 
   const chartSymbol = snapshot?.symbol ?? initialScreen.symbol;
@@ -467,8 +528,8 @@ export default function NucleoDesk() {
   const reading = working || phase === 'reveal';
   const done = phase === 'complete' && !!debate && !!answer && !!snapshot;
   const verdictKind: SphereVerdict = !debate ? 'wait' : debate.direction === 'long' ? 'ready' : debate.direction === 'short' ? 'pass' : 'wait';
-  const verdictWord = !debate ? null : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
-  const verdictSub = !debate ? null : debate.direction !== 'none' && answer?.convictionPct != null
+  const verdictWord = !debate ? null : agentsFailed ? t('No verdict', 'Sin veredicto', 'Sem veredito') : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
+  const verdictSub = !debate ? null : agentsFailed ? t('The agents did not finish', 'Los agentes no terminaron', 'Os agentes não terminaram') : debate.direction !== 'none' && answer?.convictionPct != null
     ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% convicción`, `${Math.round(answer.convictionPct)}% convicção`)
     : t('Capital protected', 'Capital protegido', 'Capital protegido');
   const lastYou = [...messages].reverse().find((m) => m.from === 'you')?.text ?? '';
@@ -480,7 +541,7 @@ export default function NucleoDesk() {
     return first > 0 ? ((last - first) / first) * 100 : null;
   }, [series]);
   const assetLine = snapshot ? [snapshot.symbol, answer?.price != null ? money(answer.price) : null, change !== null ? signedPct(change) : null].filter(Boolean).join(' · ') : '';
-  const activeAgent: AgentKey | null = phase === 'alpha' || phase === 'resolving' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : null;
+  const activeAgent: AgentKey | null = phase === 'alpha' || phase === 'resolving' || phase === 'rebuttal' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : null;
   const nextLevel = nextLevelFor(progress.xp);
   const xpArc = nextLevel ? Math.max(0.04, Math.min(1, (progress.xp - level.minXP) / (nextLevel.minXP - level.minXP))) : 1;
 
@@ -534,16 +595,25 @@ export default function NucleoDesk() {
     </div>
   );
 
-  const alphaLine = phase === 'reveal' && debate ? debate.stances[0].line : null;
-  const redLine = phase === 'reveal' && debate ? debate.stances[1].line : null;
-  const cioLine = phase === 'reveal' && debate ? debate.stances[2].line : null;
+  // Around the glass, each voice's first sentence as soon as the server sent it; the CIO speaks at the reveal.
+  const alphaSaid = phase === 'reveal' && debate ? debate.stances[0].line : live.rebuttal ?? live.alpha ?? null;
+  const redSaid = phase === 'reveal' && debate ? debate.stances[1].line : live.red ?? null;
+  const alphaLine = alphaSaid ? firstSentence(alphaSaid) : null;
+  const redLine = redSaid ? firstSentence(redSaid) : null;
+  const cioLine = phase === 'reveal' && debate ? firstSentence(agents?.synthesis?.headline ?? debate.stances[2].line) : null;
+  const thinkStatus = phase === 'resolving' ? t('Finding the asset', 'Buscando el activo', 'Buscando o ativo')
+    : phase === 'alpha' ? t('Alpha Hunter looks for the case', 'Alpha Hunter busca el caso', 'Alpha Hunter busca o caso')
+    : phase === 'redTeam' ? t('Red Team attacks it', 'Red Team lo ataca', 'Red Team ataca')
+    : phase === 'rebuttal' ? t('Alpha answers · second round', 'Alpha responde · segunda ronda', 'Alpha responde · segunda rodada')
+    : phase === 'cio' ? t('The CIO decides', 'El CIO decide', 'O CIO decide')
+    : t('Verdict forming', 'Se forma el veredicto', 'Formando o veredicto');
   const thinkStage = (
     <div className="n-think">
       <div className="n-think-a"><Voice k="alpha" line={alphaLine} active={activeAgent === 'alpha'} align={desktop ? 'right' : 'left'} /></div>
       <div className="n-think-s"><NucleoSphere size={desktop ? 280 : 196} mode="debate" tint={levelTint} tintAmount={0.35} /></div>
       <div className="n-think-r"><Voice k="red" line={redLine} active={activeAgent === 'red'} align={desktop ? 'left' : 'right'} /></div>
       <div className="n-think-c"><Voice k="cio" line={cioLine} active={activeAgent === 'cio'} align="center" /></div>
-      <div className="n-think-st n-label">{phase === 'resolving' ? t('Finding the asset', 'Buscando el activo', 'Buscando o ativo') : phase === 'reveal' ? t('Verdict forming', 'Se forma el veredicto', 'Formando o veredicto') : t('Three agents debating', 'Tres agentes debatiendo', 'Três agentes debatendo')}{deskLevel !== 'rapido' ? ` · ${levelName(deskLevel)}` : ''}</div>
+      <div className="n-think-st n-label" aria-live="polite">{thinkStatus}{deskLevel !== 'rapido' ? ` · ${levelName(deskLevel)}` : ''}</div>
     </div>
   );
 
@@ -569,13 +639,31 @@ export default function NucleoDesk() {
       <div className="mt-8 w-full">
         <NucleoChart series={series} answer={answer} debate={debate} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
       </div>
-      <div className="mt-8 flex min-h-[64px] w-full justify-center px-2"><Caption text={debate.spoken} run={readSeq} /></div>
+      {agentsFailed ? (
+        <div className="n-card n-synth n-failed mt-8" role="status">
+          <div className="n-label">{t('No verdict this time', 'Sin veredicto esta vez', 'Sem veredito desta vez')}</div>
+          <p className="n-synth-head">{t('The agents did not finish, so nothing was decided. The market read below is data, not a thesis.', 'Los agentes no terminaron, así que no se decidió nada. La lectura de abajo son datos, no una tesis.', 'Os agentes não terminaram, então nada foi decidido. A leitura abaixo são dados, não uma tese.')}</p>
+          {agentsFailed.level !== 'rapido' && <p className="n-synth-note">{t(`Your ${levelName(agentsFailed.level)} was not used.`, `No se descontó tu ${levelName(agentsFailed.level)}.`, `Seu ${levelName(agentsFailed.level)} não foi descontado.`)}</p>}
+          <button type="button" className="n-send mt-4" onClick={() => retry({ symbol: agentsFailed.symbol, level: agentsFailed.level })}>{t('Try again', 'Reintentar', 'Tentar de novo')}</button>
+        </div>
+      ) : agents?.synthesis ? (
+        <div className="n-synth mt-8 w-full">
+          <div className="flex min-h-[56px] w-full justify-center px-2"><Caption text={agents.synthesis.headline} run={readSeq} /></div>
+          <div className="n-synth-rows">
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.alpha }} /><span><b>{t('Why', 'Por qué', 'Por quê')}</b>{agents.synthesis.why}</span></div>
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.red }} /><span><b>{t('The risk', 'El riesgo', 'O risco')}</b>{agents.synthesis.risk}</span></div>
+            <div className="n-synth-row"><i style={{ background: AGENT_TONE.cio }} /><span><b>{t('Watch', 'Qué vigilar', 'O que vigiar')}</b>{agents.synthesis.watch}</span></div>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-8 flex min-h-[64px] w-full justify-center px-2"><Caption text={debate.spoken} run={readSeq} /></div>
+      )}
     </div>
   ) : null;
 
   const thesisCard = done && debate && answer && snapshot ? (() => {
     const trade = debate.direction !== 'none';
-    const title = debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
+    const title = agentsFailed ? t(`${snapshot.symbol}: market read`, `${snapshot.symbol}: lectura del mercado`, `${snapshot.symbol}: leitura do mercado`) : debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
     const rows: Array<{ k: string; v: string; dot?: string }> = [];
     if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer', 'Preço na leitura'), v: money(answer.price) });
     if (trade) {
@@ -594,16 +682,13 @@ export default function NucleoDesk() {
       <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="n-card n-plan">
         <div className="flex items-baseline justify-between"><span className="n-label">{t('Thesis', 'Tesis', 'Tese')} · {snapshot.symbol}</span><span className="n-label" style={{ color: tone }}>{verdictSub}</span></div>
         <div className="n-display mt-3 text-[28px] leading-tight">{title}</div>
-        {!trade && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer, agents)}</p>}
+        {!trade && !agentsFailed && <p className="mt-2 text-[14px]" style={{ color: '#A39C91' }}>{noTradeReason(answer, agents)}</p>}
         <div className="mt-4">
           {rows.map((r) => (
             <div key={r.k} className="n-kv"><span className="n-kv-k">{r.dot && <i style={{ background: r.dot }} />}{r.k}</span><span className="n-kv-v">{r.v}</span></div>
           ))}
         </div>
         {award && award.xp > 0 && <div className="n-xp mt-4">+{award.xp} {award.noTrade ? t('discipline XP for waiting', 'XP de disciplina por esperar', 'XP de disciplina por esperar') : t('discipline XP', 'XP de disciplina', 'XP de disciplina')}</div>}
-        {agents?.sufficiency && !agents.sufficiency.sufficient && agents.sufficiency.missing.length > 0 && (
-          <p className="mt-3 text-[13px]" style={{ color: '#A39C91' }}>{t(`For your horizon the desk is missing ${agents.sufficiency.missing.join(' · ')} data.`, `Para tu plazo faltan datos de ${agents.sufficiency.missing.join(' · ')}.`, `Para o seu prazo faltam dados de ${agents.sufficiency.missing.join(' · ')}.`)}</p>
-        )}
         <p className="mt-4 text-[12px] leading-relaxed" style={{ color: '#8A8378' }}>
           {(() => {
             const tfs = (agents?.evidenceUsed?.timeframes ?? ['1H']).join(' · ');
@@ -616,10 +701,23 @@ export default function NucleoDesk() {
     );
   })() : null;
 
-  const debateCard = done && debate ? (
+  const debateCard = done && debate && agents && !agentsFailed ? (
     <motion.div initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="n-card n-plan">
       <div className="flex items-baseline justify-between"><span className="n-label">{t('The debate', 'El debate', 'O debate')}</span><span className="n-label">{agents?.rebuttal ? t('3 agents · 2 rounds', '3 agentes · 2 rondas', '3 agentes · 2 rodadas') : t('3 agents', '3 agentes', '3 agentes')}</span></div>
-      <div className="mt-2">
+      {!showDebate && (
+        <div className="mt-2">
+          {debate.stances.map((s, i) => (
+            <div key={s.key} className="n-debate-peek" style={{ borderTop: i ? '1px solid rgba(242,237,228,.07)' : 'none' }}>
+              <span className="n-voice-name" style={{ color: AGENT_TONE[s.key] }}><i />{AGENT_NAME[s.key]}</span>
+              <span className="n-debate-peek-line">{firstSentence(s.line, 120)}</span>
+            </div>
+          ))}
+          <button type="button" className="n-debate-more" aria-expanded={false} onClick={() => { sfxTock(); setShowDebate(true); }}>
+            {t('Read the full debate', 'Ver el debate completo', 'Ver o debate completo')}
+          </button>
+        </div>
+      )}
+      {showDebate && <div className="mt-2">
         {debate.stances.map((s, i) => (
           <div key={s.key} className="py-3.5" style={{ borderTop: i ? '1px solid rgba(242,237,228,.07)' : 'none' }}>
             <div className="flex items-center justify-between gap-2">
@@ -642,7 +740,13 @@ export default function NucleoDesk() {
             <div className="n-scen-row"><i style={{ background: AGENT_TONE.red }} /><span><b>{t('Invalidates it', 'Lo invalida', 'Invalida')}</b>{agents.scenarios.invalidate}</span></div>
           </div>
         )}
-      </div>
+        {agents?.sufficiency && !agents.sufficiency.sufficient && agents.sufficiency.missing.length > 0 && (
+          <p className="mt-3 text-[13px]" style={{ color: '#A39C91' }}>{t(`For your horizon the desk is missing ${agents.sufficiency.missing.join(' · ')} data.`, `Para tu plazo faltan datos de ${agents.sufficiency.missing.join(' · ')}.`, `Para o seu prazo faltam dados de ${agents.sufficiency.missing.join(' · ')}.`)}</p>
+        )}
+        <button type="button" className="n-debate-more" aria-expanded onClick={() => { sfxTock(); setShowDebate(false); }}>
+          {t('Show less', 'Ver menos', 'Ver menos')}
+        </button>
+      </div>}
     </motion.div>
   ) : null;
 
@@ -689,6 +793,11 @@ export default function NucleoDesk() {
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
       <p className="n-caption mt-12" role="alert">{deskError ?? lastBobby}</p>
+      {deskRetry && (
+        <button type="button" className="n-send mt-6" onClick={() => retry(deskRetry)}>
+          {deskRetry.level === deskLevel ? t('Try again', 'Reintentar', 'Tentar de novo') : t(`Continue with ${levelName(deskRetry.level)}`, `Seguir con ${levelName(deskRetry.level)}`, `Continuar com ${levelName(deskRetry.level)}`)}
+        </button>
+      )}
     </div>
   ) : null;
 

@@ -21,6 +21,7 @@ delete process.env.BOBBY_DESK_MODEL;
 const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
 const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../api/_lib/desk-debate.ts');
 const { LEVEL_LIMITS, REFERRAL, levelPlan } = await import('../api/_lib/desk-levels.ts');
+const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { isReferralCode, referralCode, claimReferral } = await import('../api/_lib/referrals.ts');
 
@@ -30,6 +31,7 @@ let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 const H = 3600_000;
+const hostOf = (url: string) => { try { return new URL(url).hostname; } catch { return ''; } };
 
 interface Call { url: string; body: any; headers: Record<string, string>; method: string }
 let calls: Call[] = [];
@@ -82,7 +84,7 @@ try {
     eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'after retry' }, 'one retry on 529');
     mock(() => json({ error: 'bad request' }, 400));
     await assert.rejects(completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' })); checks++;
-    eq(calls.filter((c) => c.url.includes('api.openai.com')).length, 1, 'a 400 is not retried');
+    eq(calls.filter((c) => hostOf(c.url) === 'api.openai.com').length, 1, 'a 400 is not retried');
     mock(() => json({ stop_reason: 'end_turn', content: [{ type: 'text', text: '```json\n{"analysis":"fenced"}\n```' }], usage: {} }));
     eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'fenced' }, 'a stray code fence around valid JSON is tolerated');
   }
@@ -93,7 +95,8 @@ try {
   const ALPHA = 'The recent structure supports a conditional long if the range breaks.';
   const RED = 'The break has not happened and the higher timeframes are still flat.';
   const REBUTTAL = 'Red Team is right that the break is unconfirmed; the case only holds above the range.';
-  const CIO = { analysis: 'The evidence does not support a clear case yet; wait for the range to resolve.', verdict: 'wait', direction: 'none' };
+  const SYN = { headline: 'Not yet: BTC is still inside its range.', why: 'Alpha needs a break the chart has not shown.', risk: 'The weekly view is flat, so a break can fail.', watch: 'A 4H close above the range high.' };
+  const CIO = { analysis: 'The evidence does not support a clear case yet; wait for the range to resolve.', verdict: 'wait', direction: 'none', synthesis: SYN };
   const SCEN = { confirm: 'A daily close above the range high with rising volume.', invalidate: 'A 4H close back below the range low.' };
   const byRole = (c: Call) => {
     const text = c.url.includes('anthropic') ? c.body.system : c.body.messages[0].content;
@@ -102,7 +105,7 @@ try {
   const debateMock = (scenarios: unknown = SCEN) => mock((c) => {
     const r = byRole(c);
     const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : c.body.output_config?.format?.schema?.properties?.scenarios ? { ...CIO, scenarios } : CIO;
-    return c.url.includes('anthropic') ? claude(content) : openai(content);
+    return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
   });
 
   debateMock();
@@ -112,6 +115,26 @@ try {
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).sufficiency.horizon === 'week'), 'every role receives the sufficiency note');
   ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
   eq(quick.agents.direction, 'none', "'wait' keeps direction none");
+  eq(quick.agents.synthesis, SYN, 'the CIO returns the synthesis the reader sees first');
+  ok(/"synthesis"/.test(JSON.stringify(calls[2].body.response_format.json_schema.schema.required)), 'the synthesis is required by the structured output');
+
+  // The live desk: each argument is emitted once it passed the guard, in the debate's order.
+  debateMock();
+  const heard: any[] = [];
+  await runDeskDebate('Is this real?', evidence, 'en', { onEvent: (e) => heard.push(e) });
+  eq(heard.map((e) => e.type === 'agent' ? e.role : e.type), ['evidence', 'alpha', 'red'], 'live events: evidence, Alpha, Red Team');
+  eq(heard[1].text, ALPHA, 'the live argument is the model text');
+  mock((c) => openai(byRole(c) === 'alpha' ? { analysis: 'Buy BTC now, this setup is a sure thing for the week ahead.' } : byRole(c) === 'cio' ? CIO : { analysis: RED }));
+  const blocked: any[] = [];
+  await assert.rejects(runDeskDebate('Is this real?', evidence, 'en', { onEvent: (e) => blocked.push(e) }), (e: unknown) => e instanceof DeskOutputRejected, 'an argument that breaks the guard fails the debate'); checks++;
+  ok(!blocked.some((e) => e.type === 'agent'), 'and it is never streamed to the reader');
+  ok(!calls.some((c) => byRole(c) === 'red'), 'nor paid for past it');
+  mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, why: 'This breakout offers guaranteed profits for patient holders.' } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  await assert.rejects(runDeskDebate('Is this real?', evidence, 'en'), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee inside the synthesis fails the debate'); checks++;
+  const gone = new AbortController(); gone.abort();
+  debateMock();
+  await assert.rejects(runDeskDebate('Is this real?', evidence, 'en', { signal: gone.signal })); checks++;
+  eq(calls.filter((c) => hostOf(c.url) === 'api.openai.com').length, 0, 'a reader who left costs no model call');
   ok(!('timeframes' in quick) && !('record' in quick), 'the raw v2 evidence is not echoed back');
 
   debateMock();
@@ -147,21 +170,28 @@ try {
   // ---------- the endpoint: premium allowance, refusal, refund, ledger ----------
   const candles = Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 }));
   const request = (body: Record<string, unknown>, headers: Record<string, string> = {}) => ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.1', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body });
-  const response = () => ({ statusCode: 200, body: null as any, headers: {} as Record<string, string>, setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; return this; } });
+  const response = () => ({
+    statusCode: 200, body: null as any, headers: {} as Record<string, string>, chunks: [] as string[], writableEnded: false, writableFinished: false,
+    setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; this.writableEnded = true; this.writableFinished = true; return this; },
+    on() { return this; }, flushHeaders() {}, write(c: string) { this.chunks.push(c); return true; }, end() { this.writableEnded = true; this.writableFinished = true; return this; },
+    lines() { return this.chunks.join('').split('\n').filter(Boolean).map((l) => JSON.parse(l)); },
+  });
+  let spend = { day: 0, month: 0 };
   let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
   let modelFails = false;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (c.url.includes('rpc/bobby_llm_spend')) return json(spend);
     if (c.url.includes('rpc/bobby_consume_level')) return json({ ...level, tier: 'anon', used: 1, limit: 1, resetsAt: new Date(Date.now() + 86_400_000).toISOString() });
     if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
     if (c.url.includes('bobby_llm_usage')) return json(null, 201);
     if (c.url.includes('/api/okx-candles')) return json({ candles });
     if (c.url.includes('okx.com/api/v5/public')) return json({ data: [] });
     if (c.url.includes('forum_threads')) return json([]);
-    if (c.url.includes('api.openai.com') || c.url.includes('api.anthropic.com')) {
-      if (modelFails) return c.url.includes('anthropic') ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
+    if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
+      if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
       const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
-      return c.url.includes('anthropic') ? claude(content) : openai(content);
+      return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
     throw new Error(`Unexpected request ${c.url}`);
   });
@@ -203,6 +233,43 @@ try {
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, quickServed as never);
   eq([quickServed.statusCode, quickServed.body.level], [200, 'rapido'], 'no level: Rápido, as before');
   ok(!calls.some((c) => c.url.includes('bobby_consume_level')), 'Rápido never touches the premium meter');
+
+  // The live desk over the wire: NDJSON lines, the same final body, and an honest error line.
+  level = { allowed: true, code: null, useId: 78 };
+  endpointMock();
+  const streamed = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is BTC good for the next few days?', level: 'profundo' }, { accept: 'application/x-ndjson' }) as never, streamed as never);
+  const lines = streamed.lines();
+  eq([streamed.statusCode, streamed.headers['content-type']?.startsWith('application/x-ndjson')], [200, true], 'Accept ndjson: a streamed 200');
+  eq(lines.map((l: any) => l.type === 'agent' ? l.role : l.type), ['accepted', 'evidence', 'alpha', 'red', 'final'], 'accepted, evidence, Alpha, Red Team, then the final body');
+  eq([lines.at(-1).data.agents.synthesis.headline, lines.at(-1).data.level], [SYN.headline, 'profundo'], 'the final line carries the same body as the JSON reply');
+  modelFails = true;
+  endpointMock();
+  const streamFail = response();
+  console.error = () => {};
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'profundo' }, { accept: 'application/x-ndjson' }) as never, streamFail as never);
+  console.error = originalError;
+  eq([streamFail.lines().at(-1).type, streamFail.lines().at(-1).code, streamFail.lines().at(-1).refunded], ['error', 'analysis_failed', true], 'a failed live debate ends on an error line');
+  ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_level_uses?id=eq.78')), 'and gives the allowance back');
+  modelFails = false;
+
+  // The spend guard: premium pauses above the daily cap, everything at the monthly cap, before any spend.
+  resetLlmSpendCache(); spend = { day: 20, month: 20 };
+  endpointMock();
+  const paused = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, paused as never);
+  eq([paused.statusCode, paused.body.code], [503, 'budget_paused'], 'above the daily cap Máximo is paused');
+  ok(!calls.some((c) => c.url.includes('bobby_consume_level') || /openai|anthropic/.test(c.url)), 'before its meter or any model');
+  endpointMock();
+  const stillQuick = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, stillQuick as never);
+  eq(stillQuick.statusCode, 200, 'Rápido keeps working under the daily cap');
+  resetLlmSpendCache(); spend = { day: 0, month: 400 };
+  endpointMock();
+  const hardCap = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, hardCap as never);
+  eq([hardCap.statusCode, hardCap.body.code], [503, 'budget_paused'], 'at the monthly hard cap the whole desk pauses');
+  resetLlmSpendCache(); spend = { day: 0, month: 0 };
 
   delete process.env.ANTHROPIC_API_KEY;
   endpointMock();
