@@ -1,0 +1,28 @@
+{
+  "scope": "actual backend functions with mocked Supabase auth and RevenueCat HTTP; no real registrations or transactions; timings not production capacity",
+  "scenarios": [
+    {
+      "users": 10,
+      "checks": 70,
+      "mocked_http_calls": 210,
+      "elapsed_ms": 29,
+      "passed": true
+    },
+    {
+      "users": 100,
+      "checks": 700,
+      "mocked_http_calls": 2100,
+      "elapsed_ms": 21,
+      "passed": true
+    },
+    {
+      "users": 1000,
+      "checks": 7000,
+      "mocked_http_calls": 21000,
+      "elapsed_ms": 145,
+      "passed": true
+    }
+  ],
+  "invalid_token_rejected": true,
+  "database_failure_preserves_existing_subscription": true
+}

@@ -81,7 +81,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       access: await readAccess(req, identity),
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: true, revenuecat: revenueCatReady() },
+      payments: { stripe: stripeReady(), apple: revenueCatReady(), revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

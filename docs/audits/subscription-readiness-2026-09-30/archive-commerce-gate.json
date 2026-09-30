@@ -1,0 +1,8 @@
+{
+  "version": "1.5",
+  "build": "45",
+  "apple_sdk_key_configured": false,
+  "purchase_history_declared": false,
+  "local_paid_release_gate_passed": false,
+  "note": "Does not verify dashboard, server readiness, localized price or transactions. No key value is printed."
+}

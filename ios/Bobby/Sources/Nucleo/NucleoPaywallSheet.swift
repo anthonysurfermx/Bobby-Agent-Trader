@@ -184,7 +184,7 @@ struct NucleoPaywallSheet: View {
         }
     }
 
-    private var salesOpen: Bool { center.applePayments != false }
+    private var salesOpen: Bool { center.applePayments == true }
 
     private var subscribeButton: some View {
         Button(action: subscribe) {

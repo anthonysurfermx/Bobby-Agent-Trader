@@ -59,6 +59,50 @@ final class BobbyAccessTests: XCTestCase {
         if let key, !key.isEmpty { XCTAssertTrue(key.hasPrefix("test_") || key.hasPrefix("appl_"), key) }
     }
 
+    func testPurchasesRequireBothServerFlags() {
+        XCTAssertFalse(BobbyAccessCenter.paymentsReady(nil))
+        XCTAssertFalse(BobbyAccessCenter.paymentsReady(["apple": true]))
+        XCTAssertFalse(BobbyAccessCenter.paymentsReady(["apple": true, "revenuecat": false]))
+        XCTAssertFalse(BobbyAccessCenter.paymentsReady(["apple": false, "revenuecat": true]))
+        XCTAssertFalse(BobbyAccessCenter.paymentsReady(["apple": 1, "revenuecat": true]))
+        XCTAssertTrue(BobbyAccessCenter.paymentsReady(["apple": true, "revenuecat": true]))
+    }
+
+    func testMissingOrFreeAccessCannotConfirmPro() {
+        XCTAssertFalse(BobbyStore.serverConfirmedPro(.accepted(nil)))
+        XCTAssertFalse(BobbyStore.serverConfirmedPro(.accepted(BobbyReadAccess(tier: "free", used: 0, limit: 10, remaining: 10, resetsAt: nil, paywall: true))))
+        XCTAssertFalse(BobbyStore.serverConfirmedPro(.unreachable))
+        XCTAssertTrue(BobbyStore.serverConfirmedPro(.accepted(BobbyReadAccess(tier: "pro", used: 0, limit: nil, remaining: nil, resetsAt: nil, paywall: false))))
+    }
+
+    func testFailedSubscriptionSyncCanRetryTheSameExpiry() throws {
+        var state = BobbySubscriptionSyncState()
+        let key = BobbySubscriptionSyncState.Key(userID: "account-a", generation: UUID(), expiry: nil)
+        let first = try XCTUnwrap(state.begin(key))
+        XCTAssertNil(state.begin(key), "deduplicate while in flight")
+        state.finish(first, succeeded: false)
+        XCTAssertNil(state.confirmed)
+        let retry = try XCTUnwrap(state.begin(key), "a failed call must not suppress the next callback")
+        state.finish(retry, succeeded: true)
+        XCTAssertEqual(state.confirmed, key)
+        XCTAssertNil(state.begin(key), "only confirmed success is deduplicated")
+    }
+
+    func testOldAccountAndExpiryCallbacksCannotOverwriteNewSync() throws {
+        var state = BobbySubscriptionSyncState()
+        let old = try XCTUnwrap(state.begin(.init(userID: "account-a", generation: UUID(), expiry: nil)))
+        state.reset()
+        let current = try XCTUnwrap(state.begin(.init(userID: "account-a", generation: UUID(), expiry: Date())))
+        state.finish(old, succeeded: true)
+        XCTAssertNil(state.confirmed)
+        XCTAssertEqual(state.pending, current)
+        state.finish(current, succeeded: true)
+        XCTAssertEqual(state.confirmed, current.key)
+        let renewal = try XCTUnwrap(state.begin(.init(userID: current.key.userID, generation: current.key.generation, expiry: Date(timeIntervalSinceNow: 3600))))
+        state.finish(current, succeeded: true)
+        XCTAssertEqual(state.pending, renewal)
+    }
+
     func testThePeriodNames() {
         XCTAssertEqual(BobbyStore.periodName(value: 1, unit: .month, spanish: false), "month")
         XCTAssertEqual(BobbyStore.periodName(value: 1, unit: .month, spanish: true), "mes")

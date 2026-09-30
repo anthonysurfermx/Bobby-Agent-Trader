@@ -6,7 +6,7 @@
 //   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.
 // A client that sends no device id (iOS ≤ 1.5 build 42) is served as before.
 // Devices and networks are salted hashes; nothing readable is stored.
-// The meter never takes the desk down: if the database is unreachable the read is served.
+// A failed or malformed meter pauses analysis; an outage is never permission for unmetered AI use.
 // ============================================================
 import type { VercelRequest } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
@@ -15,7 +15,7 @@ import { resolveIdentity, type Identity } from './user-identity.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
-export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | null; readId: number | null; access: Access; identity: Identity | null }
+export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | 'meter_unavailable' | null; readId: number | null; access: Access; identity: Identity | null }
 
 export const paywallOn = () => process.env.BOBBY_PAYWALL === 'on';
 
@@ -77,7 +77,7 @@ export async function consumeRead(req: VercelRequest, symbol: string): Promise<R
     p_identity: identity?.id ?? null, p_device: device, p_network: network,
     p_platform: clientPlatform(req), p_symbol: symbol.slice(0, 24) || null, p_paywall: paywallOn(),
   });
-  if (!row) return { allowed: true, code: null, readId: null, access: OPEN, identity };
+  if (!row || typeof row.allowed !== 'boolean') return { allowed: false, code: 'meter_unavailable', readId: null, access: OPEN, identity };
   const code = row.code === 'signin_required' || row.code === 'subscription_required' ? row.code : null;
   return { allowed: row.allowed !== false, code, readId: typeof row.readId === 'number' ? row.readId : null, access: shape(row), identity };
 }

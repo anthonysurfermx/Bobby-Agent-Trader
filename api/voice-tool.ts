@@ -304,6 +304,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // The metered read: 3 without an account, 10 a week with one, unlimited with Bobby Pro.
         const gate = await consumeRead(req, String(args?.symbol ?? ''));
         if (!gate.allowed) {
+          if (gate.code === 'meter_unavailable') {
+            return res.status(503).json({ error: 'Bobby could not verify your access. Try again shortly.', code: gate.code });
+          }
           const signin = gate.code === 'signin_required';
           return res.status(signin ? 401 : 402).json({
             error: signin ? 'Create a free account to keep reading.' : 'Your free reads for this week are used. Bobby Pro reads without limits.',

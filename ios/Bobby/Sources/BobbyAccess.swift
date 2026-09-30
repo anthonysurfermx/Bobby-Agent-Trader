@@ -198,7 +198,7 @@ final class BobbyAccessCenter: ObservableObject {
 
     @Published private(set) var access: BobbyReadAccess?
     @Published private(set) var subscription: BobbySubscription?
-    /// `payments.apple` (nil = unknown): false means the server does not take App Store purchases right now.
+    /// Purchases require explicit Apple AND RevenueCat readiness; unknown is never permission to charge.
     @Published private(set) var applePayments: Bool?
 
     /// Whose snapshot this is (nil = signed out); a change of account clears it.
@@ -248,7 +248,10 @@ final class BobbyAccessCenter: ObservableObject {
         let generation = currentGeneration()
         guard let reply = try? await BobbyAccessAPI.send(BobbyAccessAPI.accessPath, method: "GET", auth: auth),
               (200..<300).contains(reply.status), let body = reply.json as? [String: Any],
-              currentUser() == started, currentGeneration() == generation else { return false }
+              currentUser() == started, currentGeneration() == generation else {
+            applePayments = false
+            return false
+        }
         apply(body)
         return true
     }
@@ -257,7 +260,17 @@ final class BobbyAccessCenter: ObservableObject {
         accountChanged()
         if let a = BobbyReadAccess(json: body["access"]) { access = a }
         if body.keys.contains("subscription") { subscription = BobbySubscription(json: body["subscription"]) }
-        if let payments = body["payments"] as? [String: Any], let apple = payments["apple"] as? Bool { applePayments = apple }
+        applePayments = Self.paymentsReady(body["payments"])
+    }
+
+    nonisolated static func paymentsReady(_ value: Any?) -> Bool {
+        guard let payments = value as? [String: Any] else { return false }
+        func enabled(_ key: String) -> Bool {
+            guard let n = payments[key] as? NSNumber,
+                  CFGetTypeID(n) == CFBooleanGetTypeID() else { return false }
+            return n.boolValue
+        }
+        return enabled("apple") && enabled("revenuecat")
     }
 
     enum ServerSync: Equatable {
