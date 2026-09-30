@@ -2,7 +2,7 @@
 
 ## Resumen
 
-Correcciones preparadas en la rama local `codex/subscription-readiness`. No se ha desplegado ni habilitado el cobro. RevenueCat ya está abierto y el catálogo de Test Store fue alineado y comprobado con el SDK. Sigue pendiente completar la credencial privada de Apple y configurar/probar el producto real en Apple Sandbox.
+Correcciones preparadas en la rama local `codex/subscription-readiness`. No se ha desplegado ni habilitado el cobro. Apple ya muestra credenciales válidas en RevenueCat. El producto mensual real fue creado como borrador en Apple y asociado a `pro` y `bobby_pro`; el usuario aprobó US$4.99/mes. La conexión real mediante Apple Sandbox y el candidato de pago siguen pendientes. Amplitude está preparado, sin activar mientras falta su proyecto y configuración.
 
 ## Changes
 
@@ -32,18 +32,21 @@ Correcciones preparadas en la rama local `codex/subscription-readiness`. No se h
 | Four native core contracts | Passed | Extracted actual Swift source + XCTest contract bodies; lightweight macOS assertion adapter, not an iOS XCTest run |
 | Native subscription XCTest suite | 12 tests passed, zero failures | Fresh simulator run after disk space was freed; no real payment or UI lifecycle test |
 | Archived build 1.5 (45) paid-release gate | Correctly failed | Actual archived Info.plist key empty; Purchase History omitted |
+| Apple public-key SDK catalog probe | RevenueCat login passed; StoreKit product fetch failed | Temporary simulator copy only; real Apple product not yet available to the SDK, no purchase |
 
 The concurrency regression uses 1,200 synthetic requests total. The PostgreSQL process was stopped after testing. Timings and synthetic account counts are not proof of production capacity or real Apple transactions.
 
 ## Remaining launch gates
 
-1. RevenueCat: the project is verified in Chrome, the pro entitlement and bobby_pro Test Store offering are saved, and the SDK loads the USD 4.99 test package. Complete the Apple app credentials and verify the real product `xyz.bobbyprotocol.bobby.pro.monthly`, monthly offering and entitlement `pro`. Confirm the localized price in App Store Connect. The fixture's USD 4.99 price is not a verified selling price.
+1. RevenueCat: Apple credentials are now valid. The real product `xyz.bobbyprotocol.bobby.pro.monthly` is saved as a monthly draft in App Store Connect at the user-approved USD 4.99 base price, with product/group localizations and 174 regions matching Bobby (China mainland excluded; automatic future-region expansion off). Apple product, entitlement `pro` and monthly offering `bobby_pro` associations were visibly verified. The real Apple public-key SDK probe connects to RevenueCat but cannot fetch the product from StoreKit. Complete review assets, check commercial agreements/propagation, configure Apple notifications and verify actual Sandbox availability. RevenueCat still shows store status **Could not check** without the separate App Store Connect API key.
 2. Configure the Apple **public** SDK key for the paid Release candidate. Server-only `REVENUECAT_SECRET_KEY` and webhook Authorization must stay outside source control. Keep the current free build disabled until the paid candidate is coherent.
 3. Declare linked Purchase History for App Functionality in the paid candidate manifest and App Store Connect, reconcile the SDK privacy report and update the public privacy policy as needed. Build 45 intentionally documents paid purchases as disabled; that document must change together with enabling payments.
 4. Apply the reviewed migration and backend changes through the normal release process. All current fixes remain local; published behavior is unchanged.
 5. Sandbox on the actual paid candidate: fresh/returning Apple login; purchase → entitlement → database → access; cancellation/pending; restore after reinstall and on second device; renewal, cancellation until expiry, expiry, refund/revocation; interrupted network after payment; authenticated webhook retries/idempotency. Do not charge a production subscription to test this.
 6. Resolve general free-read policy and margins. `BOBBY_PAYWALL` remains unchanged/off. The legacy no-device compatibility path remains unchanged and can bypass general-read counting; decide its retirement separately. Premium-level consumption and general-read-before-premium accounting still need end-to-end validation.
 7. Native subscription XCTest now passes after disk space was freed. A fresh paid archive and actual Sandbox lifecycle remain pending; the inspected archived build 45 still has payments disabled.
+8. **Verified Apple commercial blocker:** Paid Apps Agreement is **Pending User Info**, with bank account and U.S./Mexico tax questionnaires missing. User handoff requested; no bank/tax information entered by the agent. Activate the agreement and then repeat the real SDK/StoreKit probe, accounting for product propagation and remaining review metadata.
+9. **Amplitude:** default RevenueCat lifecycle event names prepared but integration unsaved. Await the user's Amplitude project/region, production key and separate Sandbox destination; confirm exact transaction telemetry transmission before activation. Subscriber attributes remain disabled. No Amplitude SDK or outgoing analytics has been enabled in the app.
 
 ## Reproduction
 
