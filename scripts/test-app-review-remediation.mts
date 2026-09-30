@@ -104,6 +104,18 @@ try {
   await voiceHandler(request({ text: 'A short reply.' }) as never, freeVoice as never);
   eq([freeVoice.statusCode, freeVoice.headers['x-tts-provider'], paidCalls().length], [200, 'edge', 0], 'exhausted budget retains free synthesis');
 
+  const personaBudget = response();
+  await voiceHandler(request({ text: 'A short reply.', voice: 'ballad', mode: 'persona' }) as never, personaBudget as never);
+  eq([personaBudget.statusCode, paidCalls().length, edgeCalls], [503, 0, 1], 'persona budget exhaustion never changes identity or spends paid budget');
+  mock(call => {
+    if (call.url.includes('/api_cache')) return call.method === 'GET' ? json([]) : json(null, 201);
+    if (call.url === 'https://api.openai.com/v1/audio/speech') return json({ error: 'provider unavailable' }, 503);
+    throw new Error(`Unexpected mocked request ${call.url}`);
+  });
+  const personaFailure = response();
+  await voiceHandler(request({ text: 'A short reply.', voice: 'ballad', mode: 'persona' }) as never, personaFailure as never);
+  eq([personaFailure.statusCode, paidCalls().length, edgeCalls], [502, 1, 0], 'persona provider failure stays explicit without Edge substitution');
+
   // Strict general access cannot be bypassed by removing a device header or exhausting a premium level.
   const candles = Array.from({ length: 100 }, (_, index) => ({ ts: Date.now() - (100 - index) * 3600000, open: 100 + index, high: 102 + index, low: 99 + index, close: 101 + index, volume: 5 }));
   function deskMock(options: { generalDenied?: boolean; generalStorageFailed?: boolean; levelDenied?: boolean; refundFailed?: boolean; failModel?: boolean } = {}) {

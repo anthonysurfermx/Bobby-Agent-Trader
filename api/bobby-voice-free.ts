@@ -54,9 +54,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // working but degrades to free Edge voices instead of paid synthesis
     const budget = await checkPersistentLimit('tts-global', 'global', 3000, 86400, { failClosed: true });
 
+    const preservePersona = body.mode === 'persona';
+    if (preservePersona && budget.limited) {
+      return res.status(503).json({ error: 'Companion voice temporarily unavailable' });
+    }
+
     // mp3: AVAudioPlayer/Safari can't play opus — apps always get MP3
     const speech = await generateSpeech(text, {
-      lang, voice, vibe, edgeVoice, format: 'mp3',
+      lang, voice, vibe, edgeVoice, format: 'mp3', preservePersona,
       // Free mode never retries a paid provider, even when Edge is unavailable.
       provider: body.mode === 'free' || budget.limited ? 'edge' : undefined,
     });
