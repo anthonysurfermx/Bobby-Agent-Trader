@@ -17,7 +17,7 @@ private final class AvatarVoiceProtocol: URLProtocol {
 
     func respond(_ data: Data, status: Int = 200) {
         let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "audio/mpeg"])!
+                                       headerFields: ["Content-Type": "audio/mpeg", "X-TTS-Provider": "openai"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -100,7 +100,7 @@ final class AvatarVoiceTests: XCTestCase {
             XCTAssertEqual(body?["text"], line)
             XCTAssertEqual(body?["voice"], "ash", "The avatar's identity wins over the profile default")
             XCTAssertEqual(body?["vibe"], "analytical")
-            XCTAssertNil(body?["mode"], "Keep the persona voice instead of forcing the generic free voice")
+            XCTAssertEqual(body?["mode"], "persona", "Keep the chosen voice even if the provider fails")
             XCTAssertEqual(body?["lang"], L.ttsLang)
             request.fulfill()
             stub.respond(data)
@@ -113,6 +113,68 @@ final class AvatarVoiceTests: XCTestCase {
         voice.stop()
         XCTAssertFalse(voice.speaking)
         XCTAssertEqual(voice.level, 0)
+    }
+
+    @MainActor func testTransportFailureRetriesTheSamePersonaAndPlaysNeuralAudio() async throws {
+        let data = try clip()
+        let retried = expectation(description: "transport retry")
+        var attempts = 0
+        AvatarVoiceProtocol.handler = { stub in
+            attempts += 1
+            XCTAssertEqual(try? stub.body()["voice"], "ballad")
+            XCTAssertEqual(stub.request.timeoutInterval, NeuralVoice.requestTimeoutSeconds)
+            if attempts == 1 {
+                stub.client?.urlProtocol(stub, didFailWithError: URLError(.timedOut))
+            } else { retried.fulfill(); stub.respond(data) }
+        }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.onFailure = { XCTFail("A recovered request must not report failure") }
+        voice.speak("Contexto de BTC", voiceId: "coral", persona: "ballad")
+        await fulfillment(of: [retried], timeout: 5)
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(voice.engine, .neural)
+    }
+
+    @MainActor func testFailedAnalysisEndsOnceWithoutAppleSpeech() async throws {
+        let ended = expectation(description: "honest voice failure")
+        var attempts = 0
+        var ends = 0
+        AvatarVoiceProtocol.handler = { stub in attempts += 1; stub.respond(Data(), status: 503) }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        let bridge = NucleoVoice(voice: voice)
+        defer { bridge.teardown() }
+        bridge.emit = { event, payload in
+            XCTAssertNotEqual(event, "voice.start", "Failed narration must not start a system voice")
+            if event == "voice.end" {
+                ends += 1
+                XCTAssertEqual(payload["id"] as? String, "failed-btc")
+                XCTAssertEqual(payload["reason"] as? String, "failed")
+                ended.fulfill()
+            }
+        }
+        XCTAssertEqual(bridge.speak(id: "failed-btc", text: "Contexto de BTC", voiceId: "ash", persona: "ash", vibe: "pro"), .queued)
+        await fulfillment(of: [ended], timeout: 5)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(ends, 1)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertFalse(bridge.isActive)
+        XCTAssertEqual(voice.engine, .neural)
+    }
+
+    @MainActor func testThrottleDoesNotRetryOrChangeTheCompanionVoice() async throws {
+        let failed = expectation(description: "throttled narration")
+        var attempts = 0
+        AvatarVoiceProtocol.handler = { stub in attempts += 1; stub.respond(Data(), status: 429) }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.onFailure = { failed.fulfill() }
+        voice.speak("Contexto de BTC", voiceId: "ash")
+        await fulfillment(of: [failed], timeout: 3)
+        XCTAssertEqual(attempts, 1)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.engine, .neural)
     }
 
     @MainActor func testMissingClipFallsBackToNarrationWithoutOpeningALiveSession() async throws {
@@ -186,7 +248,7 @@ final class AvatarVoiceTests: XCTestCase {
                     XCTAssertEqual(body?["voice"], companion.voicePersona)
                     XCTAssertEqual(body?["vibe"], NeuralVoice.serverVibe(vibe.rawValue))
                     XCTAssertEqual(body?["lang"], L.ttsLang)
-                    XCTAssertNil(body?["mode"])
+                    XCTAssertEqual(body?["mode"], "persona")
                     request.fulfill()
                     stub.respond(data)
                 }

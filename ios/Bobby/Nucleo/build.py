@@ -108,6 +108,14 @@ def build_page(page, release, companions_payload, fixtures_payload):
 
 
 def main():
+    global OUT
+    if "--output" in sys.argv:
+        OUT = sys.argv[sys.argv.index("--output") + 1]
+    if "--contract-only" in sys.argv:
+        os.makedirs(OUT, exist_ok=True)
+        companions = json.load(open(os.path.join(HERE, "companions.json")))
+        build_page("contract", False, js_json(companions), js_json(fixtures_blob()))
+        return
     release = "--release" in sys.argv[1:]
     os.makedirs(OUT, exist_ok=True)
     # The old scripted prototypes are not the app. NucleoPreview.swift still loads index.html until

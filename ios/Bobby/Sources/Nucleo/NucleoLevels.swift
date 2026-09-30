@@ -438,12 +438,17 @@ struct NucleoInviteSheet: View {
             Text(L.t("Invite a friend", "Invita a un amigo"))
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(Theme.cream)
+            if proPurchasable {
             Text(L.t("Every friend who creates an account with your link gives you \(days) days of Bobby Pro.",
                      "Cada amigo que crea su cuenta con tu link te da \(days) días de Bobby Pro."))
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.warmMuted)
                 .fixedSize(horizontal: false, vertical: true)
             slots
+            } else {
+                Text(L.t("Share Bobby with someone you know.", "Comparte Bobby con alguien que conoces."))
+                    .font(.system(size: 15)).foregroundStyle(Theme.warmMuted)
+            }
             if let referral = center.referral, let url = URL(string: referral.url) {
                 HStack(spacing: 10) {
                     ShareLink(item: url, message: Text(L.t("Bobby: three AI agents debate any stock or crypto before you decide.",
@@ -478,8 +483,8 @@ struct NucleoInviteSheet: View {
                 Text(L.t("Sign in to get your invite link.", "Entra con tu cuenta para tener tu link."))
                     .font(.system(size: 13)).foregroundStyle(Theme.warmDim)
             }
-            Divider().overlay(Theme.nucleoStroke)
             if proPurchasable, let onPro {
+                Divider().overlay(Theme.nucleoStroke)
                 Button(action: onPro) {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
@@ -493,9 +498,6 @@ struct NucleoInviteSheet: View {
                     .padding(14)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Theme.nucleoGlass))
                 }
-            } else {
-                Text(L.t("Bobby Pro is coming soon", "Bobby Pro llega pronto"))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmDim)
             }
             Spacer(minLength: 0)
         }

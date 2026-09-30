@@ -1855,6 +1855,7 @@ var STR = /*STRINGS-BEGIN*/{
     'face.squad.status': '{name} · Level {level} · {streak}-day streak', 'face.squad.statusNew': '{name} · Level {level}', 'face.squad.chip': 'Change companion',
     'face.theses.one': '1 saved', 'face.theses.many': '{n} saved', 'face.theses.chip': 'Open latest',
     'save.evolution': 'Level {n} · {name}', 'save.unlock': 'Unlocked · {name}',
+    'voice.failed': 'Bobby’s voice is unavailable. Your analysis is ready to read.',
     'save.stale': 'Account changed · this read was not saved', 'save.failed': 'Could not save this read',
     'isla.title': 'Your island', 'isla.pieces': 'Pieces', 'isla.seeds': 'Seeds growing', 'isla.ready': 'Ready to review', 'isla.cta': 'Visit Isla',
     'meta.asOf': 'as of {when}', 'chart.x': '{tf} · {provider} · {inst} · as of {when}',
@@ -1884,6 +1885,7 @@ var STR = /*STRINGS-BEGIN*/{
     'face.squad.status': '{name} · Nivel {level} · racha de {streak} días', 'face.squad.statusNew': '{name} · Nivel {level}', 'face.squad.chip': 'Cambiar compañero',
     'face.theses.one': '1 guardada', 'face.theses.many': '{n} guardadas', 'face.theses.chip': 'Abrir la última',
     'save.evolution': 'Nivel {n} · {name}', 'save.unlock': 'Desbloqueado · {name}',
+    'voice.failed': 'La voz de Bobby no está disponible. Tu análisis está listo para leer.',
     'save.stale': 'Cambió la cuenta · esta lectura no se guardó', 'save.failed': 'No se pudo guardar esta lectura',
     'isla.title': 'Tu isla', 'isla.pieces': 'Piezas', 'isla.seeds': 'Semillas creciendo', 'isla.ready': 'Listas para revisar', 'isla.cta': 'Visitar Isla',
     'meta.asOf': 'al {when}', 'chart.x': '{tf} · {provider} · {inst} · al {when}',
@@ -2668,9 +2670,13 @@ function pillDown(p, fromRead){
     return { move: noop, up: function(){ STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: function(){ STATES.LISTENING.release(false, true); } };
   }
   if (ms === 'undetermined'){
-    if (fromRead) go('RETURNING');
-    else go('PRE_PERMISSION');
-    return { move: noop, up: function(){ A.press.to(1, 'emit'); }, cancel: function(){ A.press.to(1, 'emit'); } };
+    // A short tap always types; voice permission belongs to the hold gesture.
+    return { move: noop, up: function(){
+      A.press.to(1, 'emit');
+      if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
+      else if (fromRead) go('RETURNING');
+      else go('PRE_PERMISSION');
+    }, cancel: function(){ A.press.to(1, 'emit'); } };
   }
   return { move: noop, up: function(){ A.press.to(1, 'emit'); openTyping({ fromRead: !!fromRead }); }, cancel: function(){ A.press.to(1, 'emit'); } };
 }
@@ -2876,8 +2882,7 @@ STATES.THINK_RESOLVE = {
   tick: function(){
     if (!this.done) return;
     if (VOICE.started || VOICE.silent) go('TALK_EVIDENCE');
-    /* a full read is ~600 chars: the persona voice can take 6–9 s to arrive (and the device fallback only starts after
-       NeuralVoice's 8 s timeout), so 6 s cancelled almost every read and Bobby was never heard. Native's own watchdog is 22 s. */
+    /* Allow both bounded persona requests and the native failure event to finish. */
     else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
   down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
@@ -2909,7 +2914,7 @@ function speakRead(){
   }, function(){ if (READ === r) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
-var VOICE_WAIT = 14;   /* s from speak() to voice.start before the read goes on silently */
+var VOICE_WAIT = 45;   /* s from speak() to voice.start before the read goes on silently */
 function sentStartT(si){ return kWordT(SENT0[si]).t0; }
 
 /* ---------- TALK_EVIDENCE: B4 satellites + karaoke ---------- */
@@ -4547,7 +4552,7 @@ function wire(){
     if (fin(p.t)){ var d = p.t - K.t; if (Math.abs(d) > 0.06) K.t = p.t; else K.t += d * 0.3; }
   });
   BR.on('voice.word', function(p){ if (!p || p.id !== VOICE.id) return; K.mode = 'word'; var w = K.wt[p.index | 0]; if (w && Math.abs(K.t - w.t0) > 0.08) K.t = w.t0; });
-  BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
+  BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (p.reason === 'failed') hint(tt('voice.failed')); if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
   BR.on('thesis.planted', function(){ var gen = OWNER_GEN; bcall('island').then(function(i){ if (gen === OWNER_GEN) ISLAND = i; }).catch(noop); });
   BR.on('native.sheet', function(p){ SHEET = !!(p && p.state === 'open'); last = -1; if (!SHEET) refreshCollections(); });
 }

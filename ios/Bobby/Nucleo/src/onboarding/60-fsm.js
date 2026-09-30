@@ -400,7 +400,7 @@ ENTER.THINK_RESOLVE = function(){
   var chartW = sp0.stageAt.chart != null ? wordIndexOfSentence(sp0.sentences, sp0.stageAt.chart) : null;
   var breaks = [closeStart]; if (chartW) breaks.push(chartW);
   W.chartDue = false; W.chartT = 0; W.evT = 0; W.talkPhase = 'evidence'; W.verdictShown = false;
-  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:14,   /* the persona voice for a full read can take 6–9 s: 6 s cancelled it */
+  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:45,   /* Covers both persona fetch attempts; keep the first read aligned with the desk. */
     top:function(){ return W.talkPhase === 'evidence' ? 488 : 592; } });
   if (M.chart){
     var cw = chartW != null ? chartW : Math.max(0, wordIndexOfSentence(sp0.sentences, 1) - 1);

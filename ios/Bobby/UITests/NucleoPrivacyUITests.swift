@@ -175,7 +175,7 @@ final class NucleoPrivacyUITests: XCTestCase {
         waitUntilHittable(fullNotice)
         capture("nucleo-risk-v5-disclosure-complete")
 
-        let agree = app.webViews.buttons["Ask Bobby, hold to talk"]
+        let agree = app.webViews.buttons["I agree to the risk notice and AI processing"]
         waitUntilHittable(agree)
         agree.tap()
         XCTAssertTrue(fullNotice.isHittable, "A short tap must not accept AI processing")

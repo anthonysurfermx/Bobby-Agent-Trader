@@ -104,7 +104,7 @@ function wire(){
     if (fin(p.t)){ var d = p.t - K.t; if (Math.abs(d) > 0.06) K.t = p.t; else K.t += d * 0.3; }
   });
   BR.on('voice.word', function(p){ if (!p || p.id !== VOICE.id) return; K.mode = 'word'; var w = K.wt[p.index | 0]; if (w && Math.abs(K.t - w.t0) > 0.08) K.t = w.t0; });
-  BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
+  BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (p.reason === 'failed') hint(tt('voice.failed')); if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
   BR.on('thesis.planted', function(){ var gen = OWNER_GEN; bcall('island').then(function(i){ if (gen === OWNER_GEN) ISLAND = i; }).catch(noop); });
   BR.on('native.sheet', function(p){ SHEET = !!(p && p.state === 'open'); last = -1; if (!SHEET) refreshCollections(); });
 }

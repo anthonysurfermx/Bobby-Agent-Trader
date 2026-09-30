@@ -63,6 +63,22 @@ final class AccountIsolationTests: XCTestCase {
         #"{"access_token":"\#(token)","refresh_token":"new-refresh","expires_in":3600,"user":{"id":"\#(user)"}}"#
     }
 
+    func testSuccessfulDeletionRemovesOnlyThatAccountsLocalTheses() async {
+        let account = account()
+        for owner in ["a", "b", "local"] {
+            defaults.set(Data(owner.utf8), forKey: NucleoLedger.key(owner: owner == "local" ? nil : owner))
+        }
+        IsolationHTTP.handler = { request in
+            request.respond(200, request.request.httpMethod == "GET"
+                ? #"{"appleAuthorizationRequired":false}"# : #"{"ok":true}"#)
+        }
+        let result = await account.deleteAccount()
+        XCTAssertEqual(result, .deleted)
+        XCTAssertNil(defaults.data(forKey: NucleoLedger.key(owner: "a")))
+        XCTAssertEqual(defaults.data(forKey: NucleoLedger.key(owner: "b")), Data("b".utf8))
+        XCTAssertEqual(defaults.data(forKey: NucleoLedger.key(owner: nil)), Data("local".utf8))
+    }
+
     func testRefreshCannotRestoreASignedOutSession() async {
         let account = account(expired: true)
         let started = expectation(description: "refresh is suspended")

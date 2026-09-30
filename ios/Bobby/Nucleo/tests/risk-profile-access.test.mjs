@@ -142,3 +142,18 @@ test('the release template contains a 44-point profile button hidden until the r
   assert.match(template, /#riskProfile\{[^}]*height:44px/);
   assert.match(realFunction(render, 'renderLines'), /renderRiskProfile\(\)/);
 });
+
+for (const ready of [false, true]) {
+  test('accessible consent activation is explicit and readiness guarded: ' + ready, () => {
+    const { ctx, listeners } = harness();
+    ctx.W.state = 'RISK'; ctx.W.agreeReady = ready; ctx.RISK_NOTICE = { version: 5 };
+    let accepted = 0; ctx.agreeComplete = () => { accepted++; ctx.W.agreeBusy = true; };
+    const target = { closest(selector) { return selector === '[data-hit]' ? { getAttribute: () => 'pill' } : null; } };
+    listeners['document.click']({ detail: 1, target });
+    assert.equal(accepted, 0, 'pointer click cannot bypass the hold');
+    listeners['document.click']({ detail: 0, target });
+    assert.equal(accepted, ready ? 1 : 0);
+    listeners['document.click']({ detail: 0, target });
+    assert.equal(accepted, ready ? 1 : 0, 'no repeated acceptance while busy');
+  });
+}

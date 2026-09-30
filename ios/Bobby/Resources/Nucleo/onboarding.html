@@ -1933,6 +1933,7 @@ var STR = {
     'risk.intro': 'Before I answer, one thing.',
     'risk.introOnly': 'One thing before we go on.',
     'risk.hold': 'Hold to agree',
+    'risk.activate': 'I agree to the risk notice and AI processing',
     'risk.notice': 'Read the full notice',
     'risk.profile': 'Profile',
     'risk.failed': 'That didn’t go through · Hold again',
@@ -1994,6 +1995,7 @@ var STR = {
     'risk.intro': 'Antes de responder, una cosa.',
     'risk.introOnly': 'Una cosa antes de seguir.',
     'risk.hold': 'Mantén para aceptar',
+    'risk.activate': 'Acepto el aviso de riesgo y el procesamiento con IA',
     'risk.notice': 'Leer el aviso completo',
     'risk.profile': 'Perfil',
     'risk.failed': 'No se registró · Mantén otra vez',
@@ -2118,6 +2120,7 @@ function tintTo(labc, amt){ to(W.tl, labc[0]); to(W.ta, labc[1]); to(W.tb, labc[
 function tintSnap(labc){ W.tl.x = W.tl.t = labc[0]; W.ta.x = W.ta.t = labc[1]; W.tb.x = W.tb.t = labc[2]; }
 function setHint(s){ if (W.hint === s) return; W.hintPrev = W.hint; W.hint = s; W.hintT = T; }
 function setPill(mode, label, width){
+  pill.setAttribute('aria-label', mode === 'agree' ? Ls('risk.activate') : Ls('aria.pill'));
   if (mode && mode !== W.pillMode){ W.pillModePrev = W.pillMode; W.pillMode = mode; W.pillModeT = T; }
   if (label != null && label !== W.pillLabel){ W.pillLabelPrev = W.pillLabel; W.pillLabel = label; W.pillLabelT = T; }
   if (width) to(W.pillW, width, 'pill');
@@ -2678,7 +2681,7 @@ ENTER.THINK_RESOLVE = function(){
   var chartW = sp0.stageAt.chart != null ? wordIndexOfSentence(sp0.sentences, sp0.stageAt.chart) : null;
   var breaks = [closeStart]; if (chartW) breaks.push(chartW);
   W.chartDue = false; W.chartT = 0; W.evT = 0; W.talkPhase = 'evidence'; W.verdictShown = false;
-  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:14,   /* the persona voice for a full read can take 6–9 s: 6 s cancelled it */
+  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:45,   /* Covers both persona fetch attempts; keep the first read aligned with the desk. */
     top:function(){ return W.talkPhase === 'evidence' ? 488 : 592; } });
   if (M.chart){
     var cw = chartW != null ? chartW : Math.max(0, wordIndexOfSentence(sp0.sentences, 1) - 1);
@@ -4054,7 +4057,10 @@ window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; r
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
   var h = hitOf(e.target); if (!h[0]) return;
-  if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
+  if (h[0] === 'pill' && W.state === 'RISK'){
+    if (W.agreeReady && !W.agreeBusy && RISK_NOTICE) agreeComplete();
+  }
+  else if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
   else action(h[0], h[1]);
 });
 // The scaled stage disables touch scrolling; keep the complete consent copy scrollable by pointer,

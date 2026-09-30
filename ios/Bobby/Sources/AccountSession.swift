@@ -373,6 +373,7 @@ final class AccountSession: ObservableObject {
             // A late deletion response must never sign out a different account.
             store?.forgetAccount(deletingUserId)
             DeskMemory.forgetOwner(deletingUserId, defaults: defaults)
+            NucleoLedger.forgetOwner(deletingUserId, defaults: defaults)
             guard generation == started else { return .deleted }
             AppleGivenName.forget(owner: session?.appleUserId, defaults: defaults)
             let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
