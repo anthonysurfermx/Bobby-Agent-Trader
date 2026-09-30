@@ -47,7 +47,8 @@ export async function referralStatus(identityId: string, origin: string): Promis
   ]);
   const until = grant[0]?.pro_until ? new Date(grant[0].pro_until) : null;
   return {
-    code, url: `${origin}/desk?ref=${code}`, accepted: friends.length, max: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays,
+    // A new URL lets messaging apps fetch the refreshed share card for an existing code.
+    code, url: `${origin}/desk?ref=${code}&v=2`, accepted: friends.length, max: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays,
     proUntil: until && until.getTime() > Date.now() ? until.toISOString() : null,
     friends: friends.map((f) => ({ joinedAt: new Date(f.created_at).toISOString() })),
   };
