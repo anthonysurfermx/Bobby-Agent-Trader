@@ -1,0 +1,281 @@
+Window: "App Store Connect", App: Google Chrome.
+0 ventana estándar App Store Connect - Google Chrome - Anthony, URL: appstoreconnect.apple.com/apps/6804460489/distribution/privacy, Secondary Actions: Raise
+	1 container App Store Connect - Google Chrome - Anthony, URL: appstoreconnect.apple.com/apps/6804460489/distribution/privacy
+		2 container
+			3 container
+				4 área de desplazamiento
+					5 Contenido HTML App Store Connect, URL: appstoreconnect.apple.com/apps/6804460489/distribution/privacy
+						6 container
+							7 container App Store Connect
+								8 container
+									9 encabezado App Store Connect, Value: 1
+										10 link App Store Connect, Value: appstoreconnect.apple.com/
+									11 container Global
+										12 lista de contenidos
+											13 link Apps, Value: appstoreconnect.apple.com/apps
+											14 link Xcode Cloud, Value: appstoreconnect.apple.com/teams/bccd998d-3e28-47e6-8e08-bf1894bc6070/xcode-cloud
+											15 link Trends, Value: appstoreconnect.apple.com/trends
+											16 link Reports, Value: appstoreconnect.apple.com/itc/payments_and_financial_reports
+											17 link Business, Value: appstoreconnect.apple.com/business
+											18 link Users and Access, Value: appstoreconnect.apple.com/access/users
+									19 botón Anthony Chavez GUILLERMO ANTHONY CHAVEZ Account name menu
+							20 container
+							21 container
+								22 botón desplegable Apps menu, Bobby: Think Before You Trade, selected
+									23 container
+										24 imagen Bobby: Think Before You Trade
+										25 texto Bobby: Think Before You Trade
+									26 imagen
+								27 container Apps
+									28 lista de contenidos
+										29 link Distribution, Value: appstoreconnect.apple.com/apps/6804460489/distribution
+										30 link Analytics, Value: appstoreconnect.apple.com/apps/6804460489/analytics
+										31 link TestFlight, Value: appstoreconnect.apple.com/teams/bccd998d-3e28-47e6-8e08-bf1894bc6070/apps/6804460489/testflight
+							32 container
+								33 container
+									34 container Distribution
+										35 lista de contenidos
+											36 container
+												37 encabezado iOS App, Value: 2
+													38 texto iOS App
+												39 lista de contenidos
+													40 link 1.5 Rejected, Help: Rejected, Value: appstoreconnect.apple.com/apps/6804460489/distribution/ios/version/inflight
+													41 link 1.4 Ready for Distribution, Help: Ready for Distribution, Value: appstoreconnect.apple.com/apps/6804460489/distribution/ios/version/deliverable
+												42 botón Add Platform
+											43 container
+												44 encabezado General, Value: 2
+													45 texto General
+												46 lista de contenidos
+													47 link App Information, Value: appstoreconnect.apple.com/apps/6804460489/distribution/info
+													48 link App Review, Value: appstoreconnect.apple.com/apps/6804460489/distribution/reviewsubmissions
+													49 link History, Value: appstoreconnect.apple.com/apps/6804460489/distribution/activity/ios/versions
+											50 container
+												51 encabezado App Store, Value: 2
+													52 texto App Store
+												53 encabezado TRUST & SAFETY, Value: 3
+													54 texto TRUST & SAFETY
+												55 lista de contenidos
+													56 link App Privacy, Value: appstoreconnect.apple.com/apps/6804460489/distribution/privacy
+													57 link App Accessibility, Value: appstoreconnect.apple.com/apps/6804460489/distribution/accessibility
+													58 link Ratings and Reviews, Value: appstoreconnect.apple.com/apps/6804460489/distribution/ratings/ios
+												59 encabezado GROWTH & MARKETING, Value: 3
+													60 texto GROWTH & MARKETING
+												61 lista de contenidos
+													62 link In-App Events, Value: appstoreconnect.apple.com/apps/6804460489/distribution/events
+													63 link Custom Product Pages, Value: appstoreconnect.apple.com/apps/6804460489/distribution/productpages
+													64 link Product Page Optimization, Value: appstoreconnect.apple.com/apps/6804460489/distribution/optimization
+													65 link Promo Codes, Value: appstoreconnect.apple.com/apps/6804460489/distribution/promo_codes/generate
+													66 link Game Center, Value: appstoreconnect.apple.com/apps/6804460489/distribution/gamecenter
+												67 encabezado MONETIZATION, Value: 3
+													68 texto MONETIZATION
+												69 lista de contenidos
+													70 link Pricing and Availability, Value: appstoreconnect.apple.com/apps/6804460489/distribution/pricing
+													71 link In-App Purchases, Value: appstoreconnect.apple.com/apps/6804460489/distribution/iaps
+													72 link Subscriptions, Value: appstoreconnect.apple.com/apps/6804460489/distribution/subscriptions
+												73 encabezado FEATURING, Value: 3
+													74 texto FEATURING
+												75 lista de contenidos
+													76 link Nominations, Value: appstoreconnect.apple.com/apps/6804460489/distribution/nominations
+									77 encabezado App Privacy, Value: 2
+										78 texto App Privacy
+									79 texto Published a few seconds ago by Anthony Chavez
+									80 divisor
+									81 encabezado Privacy Policy, Value: 3
+										82 texto Privacy Policy
+									83 botón Edit
+									84 container
+										85 botón desplegable English (U.S.)
+											86 texto English (U.S.)
+											87 imagen
+										88 botón ?
+									89 texto Privacy Policy URL
+									90 botón More information
+									91 texto https://bobbyprotocol.xyz/privacy
+									92 texto User Privacy Choices URL
+									93 botón More information
+									94 texto –
+									95 divisor
+									96 encabezado Product Page Preview, Value: 3
+										97 texto Product Page Preview
+									98 botón See Details
+									99 imagen
+									100 text Data Linked to You The following data may be collected and linked to your identity:
+									101 imagen
+									102 texto Financial Info
+									103 imagen
+									104 texto Identifiers
+									105 imagen
+									106 texto Usage Data
+									107 imagen
+									108 texto User Content
+									109 imagen
+									110 texto Contact Info
+									111 divisor
+									112 encabezado Data Types, Value: 3
+										113 texto Data Types
+									114 botón Edit
+									115 lista de contenidos
+										116 container
+											117 AXListMarker • 
+											118 text 8 data types collected from this app:  Other Financial Info ,  User ID ,  Product Interaction ,  Other User Content ,  Gameplay Content ,  Device ID ,  Customer Support ,  Email Address
+									119 divisor
+									120 imagen
+									121 texto Contact Info
+									122 texto Email Address
+									123 botón More information
+									124 botón Edit
+									125 lista de contenidos
+										126 container
+											127 AXListMarker • 
+											128 texto Used for App Functionality
+										129 container
+											130 AXListMarker • 
+											131 texto Linked to the user's identity
+									132 divisor
+									133 imagen
+									134 texto Financial Info
+									135 texto Other Financial Info
+									136 botón More information
+									137 botón Edit
+									138 lista de contenidos
+										139 container
+											140 AXListMarker • 
+											141 texto Used for App Functionality
+										142 container
+											143 AXListMarker • 
+											144 texto Linked to the user's identity
+									145 divisor
+									146 imagen
+									147 texto User Content
+									148 texto Gameplay Content
+									149 botón More information
+									150 botón Edit
+									151 lista de contenidos
+										152 container
+											153 AXListMarker • 
+											154 texto Used for App Functionality
+										155 container
+											156 AXListMarker • 
+											157 texto Linked to the user's identity
+									158 texto Customer Support
+									159 botón More information
+									160 botón Edit
+									161 lista de contenidos
+										162 container
+											163 AXListMarker • 
+											164 texto Used for App Functionality
+										165 container
+											166 AXListMarker • 
+											167 texto Linked to the user's identity
+									168 texto Other User Content
+									169 botón More information
+									170 botón Edit
+									171 lista de contenidos
+										172 container
+											173 AXListMarker • 
+											174 texto Used for App Functionality
+										175 container
+											176 AXListMarker • 
+											177 texto Linked to the user's identity
+									178 divisor
+									179 imagen
+									180 texto Identifiers
+									181 texto User ID
+									182 botón More information
+									183 botón Edit
+									184 lista de contenidos
+										185 container
+											186 AXListMarker • 
+											187 texto Used for App Functionality
+										188 container
+											189 AXListMarker • 
+											190 texto Linked to the user's identity
+									191 texto Device ID
+									192 botón More information
+									193 botón Edit
+									194 lista de contenidos
+										195 container
+											196 AXListMarker • 
+											197 texto Used for App Functionality
+										198 container
+											199 AXListMarker • 
+											200 texto Linked to the user's identity
+									201 divisor
+									202 imagen
+									203 texto Usage Data
+									204 texto Product Interaction
+									205 botón More information
+									206 botón Edit
+									207 lista de contenidos
+										208 container
+											209 AXListMarker • 
+											210 texto Used for App Functionality
+										211 container
+											212 AXListMarker • 
+											213 texto Linked to the user's identity
+							214 lista de contenidos
+								215 link App Store Connect, Value: appstoreconnect.apple.com/apps
+							216 lista de contenidos
+								217 container
+									218 text Copyright © 2026 Apple Inc. All rights reserved. |
+								219 container
+									220 link Terms of Service, Value: appstoreconnect.apple.com/WebObjects/iTunesConnect.woa/wa/termsOfService
+									221 texto |
+								222 container
+									223 link Privacy Policy, Value: apple.com/legal/privacy
+									224 texto |
+								225 link Contact Us, Value: appstoreconnect.apple.com/contact-us
+		226 container
+			227 container
+				228 barra de herramientas
+					229 botón Volver
+					230 botón (disabled) Adelante
+					231 botón Volver a cargar
+					232 container
+						233 botón desplegable Ver información del sitio
+						234 campo de texto (settable) Barra de direcciones y de búsqueda , Value: appstoreconnect.apple.com/apps/6804460489/distribution/privacy, Placeholder: Buscar en Google o escribir una URL
+						235 botón Instalar App Store Connect
+						236 botón Añadir esta pestaña a marcadores
+					237 container
+						238 botón desplegable Contraseñas en iCloud
+Tiene acceso a este sitio web
+						239 botón desplegable Open Claude
+Tiene acceso a este sitio web
+						240 botón desplegable Tab Suspender
+Tiene acceso a este sitio web
+						241 botón desplegable Loom – Screen Recorder & Screen Capture
+Tiene acceso a este sitio web
+						242 botón desplegable Sort Feed — Sort, Download & Transcribe. Works on Instagram, TikTok +2 more
+Quiere acceder a este sitio web
+						243 botón desplegable Uniswap Extension
+Tiene acceso a este sitio web
+						244 botón desplegable Zerion
+Tiene acceso a este sitio web
+						245 botón desplegable OKX Wallet
+Tiene acceso a este sitio web
+						246 botón desplegable Extensiones
+					247 botón Anthony
+					248 botón desplegable Chrome
+			249 container
+				250 botón desplegable Búsqueda de pestañas
+				251 grupo de pestañas
+					252 pestaña (settable, boolean) Build and Grow Your App Business | RevenueCat, Value: off
+						253 botón Cerrar
+					254 pestaña (settable, boolean) Amplitude Integration (Bobby: Think Before You Trade) | RevenueCat, Value: off
+						255 botón Cerrar
+					256 pestaña (selected, settable, boolean) App Store Connect, Value: on
+						257 botón Cerrar
+				258 botón Nueva pestaña
+259 menu bar
+	260 Chrome
+	261 Archivo
+	262 Edición
+	263 Visualización
+	264 Historial
+	265 Marcadores
+	266 Perfiles
+	267 Pestaña
+	268 Ventana
+	269 Ayuda
+
+The focused UI element is 5 Contenido HTML App Store Connect, URL: appstoreconnect.apple.com/apps/6804460489/distribution/privacy
