@@ -6,6 +6,8 @@
 //               crypto derivatives, Bobby's own record on the asset);
 //   · Máximo:   Claude Sonnet 5.5 at high effort for every role, evidence v2, a second round
 //               (Alpha answers Red Team) and scenarios. Opus is not used in the product.
+// A provider outage switches the current role to the other provider. BOBBY_DESK_PRIMARY_PROVIDER
+// can temporarily prioritize one provider across levels without changing the product's spend caps.
 // Rápido rides the existing read meter (bobby_consume_read); Profundo and Máximo have their own.
 // ============================================================
 import type { ModelSpec } from './llm.js';
@@ -32,9 +34,6 @@ export const REFERRAL = {
 
 export interface LevelPlan {
   alpha: ModelSpec; red: ModelSpec; cio: ModelSpec;
-  /** Rápido only: the model that answers if the account cannot use the primary one (401/403/404),
-   *  so the default desk never goes down on a key's model access. Premium levels never fall back. */
-  fallback: ModelSpec | null;
   /** Máximo: Alpha answers Red Team before the CIO decides. */
   rebuttal: ModelSpec | null;
   evidence: 'v1' | 'v2';
@@ -44,16 +43,26 @@ export interface LevelPlan {
 }
 
 const luna = (): ModelSpec => ({ provider: 'openai', model: process.env.BOBBY_DESK_MODEL || 'gpt-6-luna', maxTokens: 2400, timeoutMs: 30_000 });
-const sonnet = (effort: 'medium' | 'high'): ModelSpec => ({ provider: 'anthropic', model: 'claude-sonnet-5-5', effort, maxTokens: effort === 'high' ? 6000 : 4000, timeoutMs: effort === 'high' ? 70_000 : 55_000 });
+/** Retain the existing Rápido model-access fallback when Sonnet cannot answer either. */
+export const quickAccessFallback = (): ModelSpec => ({ provider: 'openai', model: 'gpt-4o-mini', maxTokens: 650, timeoutMs: 25_000 });
+const sol = (effort: 'medium' | 'high'): ModelSpec => ({ provider: 'openai', model: 'gpt-6-sol', effort, maxTokens: effort === 'high' ? 6000 : 4000, timeoutMs: effort === 'high' ? 70_000 : 55_000 });
+const sonnet = (effort: 'low' | 'medium' | 'high'): ModelSpec => ({
+  provider: 'anthropic', model: 'claude-sonnet-5-5', effort,
+  maxTokens: effort === 'high' ? 6000 : effort === 'medium' ? 4000 : 2400,
+  timeoutMs: effort === 'high' ? 70_000 : effort === 'medium' ? 55_000 : 22_000,
+});
+
+/** The other provider answers the same role with the same output schema. */
+export function alternateModel(level: DeskLevel, primary: ModelSpec): ModelSpec {
+  if (primary.provider === 'openai') return sonnet(level === 'rapido' ? 'low' : level === 'maximo' ? 'high' : 'medium');
+  return level === 'rapido' ? luna() : sol(level === 'maximo' ? 'high' : 'medium');
+}
 
 export function levelPlan(level: DeskLevel): LevelPlan {
   if (level === 'maximo') {
     const s = sonnet('high');
-    return { alpha: s, red: s, rebuttal: s, cio: s, fallback: null, evidence: 'v2', scenarios: true, budgetMs: 160_000 };
+    return { alpha: s, red: s, rebuttal: s, cio: s, evidence: 'v2', scenarios: true, budgetMs: 160_000 };
   }
-  if (level === 'profundo') return { alpha: luna(), red: luna(), rebuttal: null, cio: sonnet('medium'), fallback: null, evidence: 'v2', scenarios: false, budgetMs: 120_000 };
-  return { alpha: luna(), red: luna(), rebuttal: null, cio: luna(), fallback: { provider: 'openai', model: 'gpt-4o-mini', maxTokens: 650, timeoutMs: 25_000 }, evidence: 'v1', scenarios: false, budgetMs: 85_000 };
+  if (level === 'profundo') return { alpha: luna(), red: luna(), rebuttal: null, cio: sonnet('medium'), evidence: 'v2', scenarios: false, budgetMs: 120_000 };
+  return { alpha: luna(), red: luna(), rebuttal: null, cio: luna(), evidence: 'v1', scenarios: false, budgetMs: 85_000 };
 }
-
-/** Does this level need the Anthropic key? */
-export const needsAnthropic = (level: DeskLevel) => level !== 'rapido';

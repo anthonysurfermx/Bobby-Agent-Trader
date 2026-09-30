@@ -5,7 +5,7 @@ import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
-import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
+import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, type Access } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
@@ -108,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let knownIdentity: Identity | null | undefined;
   let streaming = false;
   try {
-    if (!process.env.OPENAI_API_KEY || (needsAnthropic(level) && !process.env.ANTHROPIC_API_KEY)) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();

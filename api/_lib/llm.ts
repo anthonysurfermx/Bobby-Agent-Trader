@@ -180,8 +180,10 @@ export interface LlmUsage {
   usd: number; latencyMs: number; stop: string | null; ok: boolean;
 }
 export class LlmIncompleteError extends Error {}
-/** The provider refused the request; `status` lets a caller tell a model-access problem (401/403/404) from an outage. */
-export class LlmHttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+/** Only provider availability and billing failures may switch the desk to its other provider. */
+export class LlmHttpError extends Error {
+  constructor(readonly status: number, message: string, readonly canFailover: boolean) { super(message); }
+}
 
 /** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. An unknown model logs $0. */
 export const MODEL_PRICES: Record<string, [number, number, number]> = {
@@ -195,6 +197,26 @@ export function modelCost(model: string, uncachedIn: number, cachedIn: number, o
 
 const legacyOpenAi = (model: string) => /^gpt-4/.test(model);
 const RETRY_STATUS = (s: number) => s === 429 || s === 529 || s >= 500;
+
+function providerErrorCode(detail: string): string {
+  try {
+    const body = JSON.parse(detail) as { error?: { code?: string; type?: string; details?: { error_code?: string } } };
+    return body.error?.details?.error_code ?? body.error?.code ?? body.error?.type ?? '';
+  } catch { return ''; }
+}
+
+function billingBlocked(provider: ModelSpec['provider'], status: number, detail: string): boolean {
+  const code = providerErrorCode(detail);
+  if (status === 402) return true;
+  if (provider === 'openai' && status === 429) return /^(insufficient_quota|credit_balance_exhausted|billing_hard_limit_reached)$/.test(code);
+  return provider === 'anthropic' && (status === 400 || status === 429) && (
+    code === 'enforced_spend_limit_reached' || /you have reached your specified api usage limits/i.test(detail)
+  );
+}
+
+function canFailover(provider: ModelSpec['provider'], status: number, detail: string): boolean {
+  return [401, 402, 403, 404, 429, 529].includes(status) || status >= 500 || billingBlocked(provider, status, detail);
+}
 
 /** Strict JSON first; a stray code fence around valid JSON is tolerated, prose is not. */
 function parseJson(text: string): unknown {
@@ -218,6 +240,7 @@ export async function completeJson(
   });
 
   let res: Response | null = null;
+  let errorDetail = '';
   for (let attempt = 0; attempt < 2; attempt++) {
     const left = spec.timeoutMs - (Date.now() - started);
     if (left < 2000) break;
@@ -248,16 +271,18 @@ export async function completeJson(
       note({ stop: timeout ? 'timeout' : 'network' });
       throw e;
     }
-    if (res.ok || !RETRY_STATUS(res.status) || attempt === 1) break;
+    if (res.ok) break;
+    errorDetail = (await res.text().catch(() => '')).slice(0, 2000);
+    // A depleted balance or spend cap cannot recover during this request.
+    if (billingBlocked(spec.provider, res.status, errorDetail) || !RETRY_STATUS(res.status) || attempt === 1) break;
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status });
     await sleep(BACKOFF_MS[0]);
   }
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
   if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: detail });
+    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: errorDetail });
     note({ stop: `http_${res.status}` });
-    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`);
+    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, canFailover(spec.provider, res.status, errorDetail));
   }
 
   if (spec.provider === 'openai') {

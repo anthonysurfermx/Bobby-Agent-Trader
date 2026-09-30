@@ -20,7 +20,7 @@ delete process.env.BOBBY_DESK_MODEL;
 
 const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
 const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../api/_lib/desk-debate.ts');
-const { LEVEL_LIMITS, REFERRAL, levelPlan } = await import('../api/_lib/desk-levels.ts');
+const { LEVEL_LIMITS, REFERRAL, alternateModel, levelPlan } = await import('../api/_lib/desk-levels.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { isReferralCode, referralCode, claimReferral } = await import('../api/_lib/referrals.ts');
@@ -41,6 +41,7 @@ function mock(reply: Reply) {
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const call: Call = { url: String(input), body: init?.body ? JSON.parse(String(init.body)) : null, headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])), method: init?.method ?? 'GET' };
     calls.push(call);
+    if (call.url.includes('/rest/v1/agent_events')) return json(null, 201);
     return reply(call);
   }) as typeof fetch;
 }
@@ -112,6 +113,9 @@ try {
   const quick = await runDeskDebate('¿Conviene entrar a BTC esta semana?', evidence, 'es');
   eq(calls.map((c) => [byRole(c), c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'gpt-6-luna']], 'Rápido: gpt-6-luna ×3');
   eq([quick.level, quick.sufficiency.horizon, quick.sufficiency.sufficient, quick.sufficiency.missing], ['rapido', 'week', false, ['4H', '1D']], 'Rápido: the weekly question is flagged as missing 4H and 1D');
+  const quickSonnet = alternateModel('rapido', levelPlan('rapido').alpha);
+  eq([quickSonnet.model, quickSonnet.effort, quickSonnet.timeoutMs], ['claude-sonnet-5-5', 'low', 22_000], 'Quick Sonnet uses its own bounded latency plan');
+  ok(quickSonnet.timeoutMs * 3 <= levelPlan('rapido').budgetMs - 10_000, 'three Quick Sonnet roles fit below the debate deadline with a buffer');
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).sufficiency.horizon === 'week'), 'every role receives the sufficiency note');
   ok(calls.every((c) => /Never name the data vendor or exchange/.test(c.body.messages[0].content)), 'no vendor names in answers');
   const { pricePosition } = await import('../api/_lib/desk-debate.ts');
@@ -160,18 +164,48 @@ try {
   ok(JSON.parse(calls[3].body.messages[0].content).rebuttal.analysis === REBUTTAL, 'the CIO weighs the second round');
   debateMock({ confirm: 'A close above the range means guaranteed profits for the week.', invalidate: SCEN.invalidate });
   await assert.rejects(runDeskDebate('Is BTC good this week?', v2, 'en', { level: 'maximo' }), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee inside the scenarios fails the debate'); checks++;
-  // Rápido survives an account without access to the primary model; premium levels never fall back.
-  mock((c) => (c.body.model === 'gpt-6-luna' ? json({ error: { message: 'model not found' } }, 404) : openai(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED })));
+  // A depleted OpenAI balance switches the same role to Sonnet, then keeps Sonnet for later roles.
+  mock((c) => {
+    if (c.url.includes('openai')) return json({ error: { code: 'insufficient_quota', message: 'No credits' } }, 429);
+    return claude(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED });
+  });
   const originalErr = console.error; console.error = () => {};
-  const fellBack = await runDeskDebate('Is this real?', evidence, 'en');
+  const fallbackUsage: any[] = [];
+  const fellBack = await runDeskDebate('Is this real?', evidence, 'en', { usage: fallbackUsage });
   console.error = originalErr;
-  eq([fellBack.agents.verdict, calls.filter((c) => c.body.model === 'gpt-4o-mini').length], ['wait', 3], 'Rápido falls back to gpt-4o-mini on a model-access 404');
-  eq(calls.find((c) => c.body.model === 'gpt-4o-mini')!.body.max_tokens, 650, 'the fallback keeps its own request shape');
-  mock((c) => (c.url.includes('anthropic') ? json({ error: { message: 'invalid x-api-key' } }, 401) : openai({ analysis: byRole(c) === 'alpha' ? ALPHA : RED })));
+  eq([fellBack.agents.verdict, calls.filter((c) => /api\.(openai|anthropic)\.com/.test(c.url)).map((c) => c.body.model)], ['wait', ['gpt-6-luna', 'claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5']], 'Rápido switches to Sonnet once on OpenAI billing 429');
+  eq(fallbackUsage.map((u) => [u.provider, u.role, u.stop]), [['openai', 'alpha', 'http_429'], ['anthropic', 'alpha', 'end_turn'], ['anthropic', 'red', 'end_turn'], ['anthropic', 'cio', 'end_turn']], 'each attempted provider is recorded under its own role');
+
+  // The reverse direction also keeps its healthy provider for the rest of the request.
+  process.env.BOBBY_DESK_PRIMARY_PROVIDER = 'anthropic';
+  mock((c) => c.url.includes('anthropic')
+    ? json({ type: 'error', error: { type: 'billing_error', message: 'Payment required' } }, 402)
+    : openai(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
   console.error = () => {};
-  await assert.rejects(runDeskDebate('Is this real?', v2, 'en', { level: 'profundo' })); checks++;
+  eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.verdict, 'wait', 'Anthropic billing 402 switches back to OpenAI');
   console.error = originalErr;
-  ok(!calls.some((c) => c.url.includes('openai') && byRole(c) === 'cio'), 'Profundo never swaps its Sonnet CIO for another model');
+  eq(calls.filter((c) => /api\.(openai|anthropic)\.com/.test(c.url)).map((c) => c.body.model), ['claude-sonnet-5-5', 'gpt-6-luna', 'gpt-6-luna', 'gpt-6-luna'], 'Anthropic is not retried for Red or CIO');
+  delete process.env.BOBBY_DESK_PRIMARY_PROVIDER;
+
+  mock((c) => c.url.includes('anthropic')
+    ? json({ type: 'error', error: { type: 'billing_error', message: 'Payment required' } }, 402)
+    : openai(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  console.error = () => {};
+  eq((await runDeskDebate('Is this real?', v2, 'en', { level: 'profundo' })).agents.verdict, 'wait', 'Profundo CIO switches to OpenAI when Sonnet billing fails');
+  console.error = originalErr;
+  eq(calls.filter((c) => /api\.(openai|anthropic)\.com/.test(c.url)).map((c) => c.body.model), ['gpt-6-luna', 'gpt-6-luna', 'claude-sonnet-5-5', 'gpt-6-sol'], 'Profundo preserves the first two agents before CIO failover');
+
+  mock((c) => c.url.includes('anthropic')
+    ? json({ error: { details: { error_code: 'enforced_spend_limit_reached' }, message: 'You have reached your specified API usage limits' } }, 400)
+    : openai(byRole(c) === 'cio' ? { ...CIO, scenarios: SCEN } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  console.error = () => {};
+  eq((await runDeskDebate('Is this real?', v2, 'en', { level: 'maximo' })).agents.verdict, 'wait', 'Máximo switches to OpenAI on Anthropic spend cap');
+  console.error = originalErr;
+  eq(calls.filter((c) => /api\.(openai|anthropic)\.com/.test(c.url)).map((c) => c.body.model), ['claude-sonnet-5-5', 'gpt-6-sol', 'gpt-6-sol', 'gpt-6-sol', 'gpt-6-sol'], 'Máximo keeps its four-role structure on the other provider');
+
+  mock((c) => c.url.includes('openai') ? json({ error: { message: 'Malformed request' } }, 400) : claude({ analysis: ALPHA }));
+  await assert.rejects(runDeskDebate('Is this real?', evidence, 'en')); checks++;
+  eq(calls.filter((c) => c.url.includes('anthropic')).length, 0, 'invalid model request does not switch providers');
   eq(levelPlan('maximo').budgetMs <= 170_000, true, 'Máximo fits inside maxDuration');
   eq(sufficiencyOf('Long term, is SOL worth holding for years?', ['1H', '4H', '1D', '1W']).sufficient, false, 'a multi-year horizon is never covered by the evidence');
 
@@ -187,6 +221,7 @@ try {
   let spend = { day: 0, month: 0 };
   let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
   let modelFails = false;
+  let providersUnfunded = false;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
     if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
@@ -199,8 +234,11 @@ try {
     if (c.url.includes('okx.com/api/v5/public')) return json({ data: [] });
     if (c.url.includes('forum_threads')) return json([]);
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
+      if (providersUnfunded) return hostOf(c.url) === 'api.anthropic.com'
+        ? json({ error: { type: 'billing_error', message: 'Payment required' } }, 402)
+        : json({ error: { code: 'insufficient_quota', message: 'No credits' } }, 429);
       if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
-      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : { ...CIO, scenarios: SCEN };
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
     throw new Error(`Unexpected request ${c.url}`);
@@ -240,6 +278,17 @@ try {
   ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_reads?id=eq.88')), 'failed premium also refunds its general read');
   ok(calls.some((c) => c.url.includes('bobby_llm_usage')), 'the failed calls are still in the cost ledger');
   modelFails = false;
+
+  providersUnfunded = true;
+  endpointMock();
+  const bothUnfunded = response();
+  console.error = () => {};
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, bothUnfunded as never);
+  console.error = originalError;
+  eq([bothUnfunded.statusCode, bothUnfunded.body.code], [503, 'analysis_failed'], 'both providers unfunded returns no verdict');
+  eq(calls.filter((c) => /api\.(openai|anthropic)\.com/.test(c.url)).map((c) => c.body.model), ['gpt-6-luna', 'claude-sonnet-5-5'], 'both providers are attempted only for Alpha');
+  ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_reads?id=eq.88')), 'failed dual-provider Quick read is refunded');
+  providersUnfunded = false;
 
   endpointMock();
   const quickServed = response();
@@ -285,10 +334,29 @@ try {
   resetLlmSpendCache(); spend = { day: 0, month: 0 };
 
   delete process.env.ANTHROPIC_API_KEY;
+  mock((c) => c.body.model === 'gpt-6-luna'
+    ? json({ error: { code: 'model_not_found' } }, 404)
+    : openai(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  console.error = () => {};
+  eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.verdict, 'wait', 'Rápido retains its gpt-4o-mini rescue when Sonnet is unconfigured');
+  console.error = originalErr;
+  eq(calls.filter((c) => c.url.includes('api.openai.com')).map((c) => c.body.model), ['gpt-6-luna', 'gpt-4o-mini', 'gpt-4o-mini', 'gpt-4o-mini'], 'model-specific OpenAI 404 is not retried for every role');
   endpointMock();
   const noKey = response();
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, noKey as never);
-  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'Máximo without the Anthropic key is unavailable before any spend');
+  eq([noKey.statusCode, noKey.body.agents.verdict], [200, 'wait'], 'Máximo can use OpenAI when Anthropic has no key');
+  ok(calls.filter((c) => c.url.includes('api.anthropic.com')).length === 0, 'no attempt is made with a missing key');
+  process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+  delete process.env.OPENAI_API_KEY;
+  mock((c) => claude(byRole(c) === 'cio' ? CIO : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+  eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.verdict, 'wait', 'Rápido can use Sonnet when OpenAI has no key');
+  eq(calls.filter((c) => c.url.includes('api.openai.com')).length, 0, 'no OpenAI attempt is made with a missing key');
+  delete process.env.ANTHROPIC_API_KEY;
+  endpointMock();
+  const neitherKey = response();
+  await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, neitherKey as never);
+  eq([neitherKey.statusCode, neitherKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'neither provider configured is rejected before any spend');
+  process.env.OPENAI_API_KEY = 'test-openai';
   process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 
   // ---------- invites ----------
