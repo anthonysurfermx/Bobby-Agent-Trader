@@ -189,6 +189,8 @@ try {
   let modelFails = false;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
+    if (c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE') return json([]);
     if (c.url.includes('rpc/bobby_llm_spend')) return json(spend);
     if (c.url.includes('rpc/bobby_consume_level')) return json({ ...level, tier: 'anon', used: 1, limit: 1, resetsAt: new Date(Date.now() + 86_400_000).toISOString() });
     if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
@@ -209,6 +211,7 @@ try {
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'profundo' }) as never, refused as never);
   eq([refused.statusCode, refused.body.code, refused.body.level, refused.body.meter.limit], [403, 'upgrade_required', 'profundo', 1], 'an exhausted premium level: 403 upgrade_required with the meter');
   ok(!calls.some((c) => /openai|anthropic/.test(c.url)), 'no model call on a refused level');
+  ok(!calls.some((c) => c.url.includes('rpc/bobby_consume_read')), 'a premium refusal does not spend a general read');
   const consumeBody = calls.find((c) => c.url.includes('rpc/bobby_consume_level'))!.body;
   eq([consumeBody.p_level, consumeBody.p_limits, consumeBody.p_identity], ['profundo', JSON.parse(JSON.stringify(LEVEL_LIMITS)), null], 'the meter gets the level, the single-source limits and no identity');
   ok(/^[0-9a-f]{24,}$/.test(consumeBody.p_device) && !JSON.stringify(consumeBody).includes('device-1234567890abcdef'), 'only the salted device hash reaches the database');
@@ -223,6 +226,7 @@ try {
   eq([ledger.body.length, ledger.body.map((r: any) => r.level)], [3, ['profundo', 'profundo', 'profundo']], 'three ledger rows for three calls');
   ok(!JSON.stringify(ledger.body).includes('next few days') && !JSON.stringify(ledger.body).includes(ALPHA), 'the ledger holds numbers, never questions or answers');
   ok(!calls.some((c) => c.method === 'DELETE'), 'a served read is not refunded');
+  eq(calls.filter(c => c.url.includes('rpc/bobby_consume_read')).length, 1, 'general read is debited once in desk');
 
   modelFails = true;
   endpointMock();
@@ -233,6 +237,7 @@ try {
   console.error = originalError;
   eq([failed.statusCode, failed.body.code], [503, 'analysis_failed'], 'a failed premium analysis is analysis_failed');
   ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_level_uses?id=eq.77')), 'and its allowance is given back');
+  ok(calls.some((c) => c.method === 'DELETE' && c.url.includes('bobby_reads?id=eq.88')), 'failed premium also refunds its general read');
   ok(calls.some((c) => c.url.includes('bobby_llm_usage')), 'the failed calls are still in the cost ledger');
   modelFails = false;
 
