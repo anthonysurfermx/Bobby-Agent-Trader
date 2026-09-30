@@ -47,6 +47,10 @@ final class NucleoBridgeTests: XCTestCase {
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
         let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
                                     ledger: NucleoLedger(defaults: defaults), defaults: defaults)
+        // These recorded bridge contracts are Quick reads. Do not inherit the simulator's
+        // selected premium level; premium ordering and refusals have their own injected tests.
+        session.desk.currentLevel = { .rapido }
+        session.desk.setLevel = { _ in }
         session.desk.clock = NucleoDesk.Clock(now: { NucleoFixtures.recordedAt(symbol: $0, kind: "candles") ?? Date() },
                                               receivedAt: { NucleoFixtures.recordedAt(symbol: $0, kind: "debate") ?? Date() })
         session.desk.generation = { [unowned self] in self.generation }
@@ -57,6 +61,24 @@ final class NucleoBridgeTests: XCTestCase {
     }
 
     // MARK: - Helpers
+
+    func testWithdrawingConsentClosesTheSheetOnceAndKeepsProfileAccessible() {
+        let (session, _, recorder) = make()
+        session.profile.onboarded = true
+        session.companions.companionId = "orb"
+        XCTAssertTrue(session.openNative(.account))
+        session.revokeRiskNoticeConsent()
+        XCTAssertFalse(session.profile.acceptedRiskNotice)
+        XCTAssertTrue(session.profile.onboarded)
+        XCTAssertEqual(session.companions.companionId, "orb")
+        XCTAssertEqual(session.page, .onboardingRisk, "a relaunch still requires renewed AI consent")
+        XCTAssertNil(session.sheet)
+        let states = recorder.events.filter { $0.name == "native.sheet" }.compactMap { $0.payload["state"] as? String }
+        XCTAssertEqual(states, ["open", "closed"], "the web page must resume rendering after withdrawal")
+        session.sheetDismissed()
+        XCTAssertEqual(recorder.events.filter { $0.name == "native.sheet" && $0.payload["state"] as? String == "closed" }.count, 1)
+        XCTAssertTrue(session.openNative(.account), "account management never requires AI consent")
+    }
 
     private func reply(_ bridge: NucleoBridge, _ method: String, _ params: [String: Any] = [:]) async -> [String: Any] {
         let (reply, error) = await bridge.handle(body: ["v": 1, "method": method, "params": params], trusted: true)
@@ -298,6 +320,24 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(r["status"] as? String, "too_long")
         XCTAssertEqual(r["maxLength"] as? Int, 1200)
         XCTAssertEqual(NucleoFixtures.log, [])
+    }
+
+    func testWithdrawingConsentClearsReadAndStopsAIWhileKeepingAccountAccess() async throws {
+        let (session, bridge, _) = make()
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(read["status"] as? String, "ok")
+        XCTAssertNotNil(session.desk.pendingRead())
+        session.revokeRiskNoticeConsent()
+        XCTAssertFalse(session.profile.acceptedRiskNotice)
+        XCTAssertNil(session.desk.pendingRead())
+        NucleoFixtures.clearLog()
+        let denied = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(denied["code"] as? String, "risk_not_accepted")
+        let speech = await result(bridge, "speak", ["id": "withdrawn", "text": "Hello."])
+        XCTAssertEqual(speech["status"] as? String, "muted")
+        XCTAssertTrue(session.openNative(.account), "Account settings/deletion remain available without AI consent")
+        XCTAssertEqual(session.sheet, .account)
+        XCTAssertTrue(NucleoFixtures.log.isEmpty)
     }
 
     // MARK: - saveThesis
@@ -575,6 +615,9 @@ final class NucleoBridgeTests: XCTestCase {
         case let .ok(d): return "ok:\(d.verdict):\(d.direction)"
         case let .quota(retry, message): return "quota:\(retry.map(String.init) ?? "-"):\(message ?? "-")"
         case .tooLong: return "too_long"
+        case let .gated(status, _, _): return status
+        case let .levelRefused(code, _): return code
+        case .budgetPaused: return "budget_paused"
         case let .failed(code, _): return code
         case .badResponse: return "bad_response"
         case .timeout: return "timeout"

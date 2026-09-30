@@ -86,6 +86,9 @@ final class NucleoSession: ObservableObject {
     private var bootSynced = false
     private var levelsRequested = false
     private var tornDown = false
+    private var accountGeneration: UUID?
+    private var accountUserID: String?
+    private var consentGeneration = UUID()
 
     init(fixtures: Bool,
          profile: AgentProfile = AgentProfile(),
@@ -107,6 +110,8 @@ final class NucleoSession: ObservableObject {
             desk.userID = { nil }
             desk.meterAuth = .none
             NucleoLevelCenter.shared.auth = .none
+        } else {
+            NucleoLevelCenter.shared.auth = .account
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
@@ -115,6 +120,7 @@ final class NucleoSession: ObservableObject {
         speech.willStart = { [weak self] in self?.nucleoVoice.stop() }
         nucleoVoice.emit = emit
         observeStores()
+        synchronizeAccountState()
     }
 
     var signedIn: Bool { !fixtures && AccountSession.shared.isSignedIn }
@@ -130,6 +136,7 @@ final class NucleoSession: ObservableObject {
 
     func dispatch(_ method: String, _ p: NucleoParams) async throws -> Any {
         guard !tornDown else { throw NucleoFault.internalError("torn down") }
+        synchronizeAccountState()
         switch method {
         case "session":
             let page = try p.string("page", required: false, oneOf: ["app", "onboarding", "contract"])
@@ -238,6 +245,7 @@ final class NucleoSession: ObservableObject {
     }
 
     func sessionJSON() -> [String: Any] {
+        synchronizeAccountState()
         let c = companions.companion
         let companion: Any = c.map { c -> Any in
             ["id": c.id, "webId": Self.webId(c.id), "label": c.label, "palette": Self.palette(webId: Self.webId(c.id)),
@@ -267,10 +275,12 @@ final class NucleoSession: ObservableObject {
     /// After consent only (R11): the dictation vocabulary, the account check and one sync.
     private func bootOnce() {
         guard profile.acceptedRiskNotice else { return }
+        let consent = consentGeneration
         if vocabularyTask == nil {
             vocabularyTask = Task { [weak self] in
                 let words = await BobbyAPI.dictationVocabulary()
-                self?.speech.vocabulary = words
+                guard !Task.isCancelled, let self, self.profile.acceptedRiskNotice, self.consentGeneration == consent else { return }
+                self.speech.vocabulary = words
             }
         }
         if !levelsRequested {
@@ -281,7 +291,7 @@ final class NucleoSession: ObservableObject {
         bootSynced = true
         Task { [weak self] in
             await AccountSession.shared.checkAppleCredential()
-            guard let self, self.signedIn else { return }
+            guard let self, self.signedIn, self.profile.acceptedRiskNotice, self.consentGeneration == consent else { return }
             await ProgressSync.shared.sync(store: self.companions, profile: self.profile)
         }
     }
@@ -337,6 +347,7 @@ final class NucleoSession: ObservableObject {
     // MARK: - Suggestions
 
     func suggestions() async -> [String: Any] {
+        let consent = consentGeneration
         let quick = DeskMemory().quickAccess(fallback: BobbyViewModel.defaultQuickAccess).map { ["symbol": $0] }
         // R11: before consent nothing reaches the network; the local row is all there is.
         guard profile.acceptedRiskNotice else { return ["quickAccess": quick, "movers": [Any]()] }
@@ -346,6 +357,9 @@ final class NucleoSession: ObservableObject {
             return value
         }
         let movers = await BobbyAPI.topMovers(limit: 3).map { ["symbol": $0.symbol, "name": $0.name, "changePct": $0.changePct] as [String: Any] }
+        guard profile.acceptedRiskNotice, consentGeneration == consent, !Task.isCancelled else {
+            return ["quickAccess": quick, "movers": [Any]()]
+        }
         let value: [String: Any] = ["quickAccess": quick, "movers": movers]
         suggestionsCache = (Date(), value)
         return value
@@ -389,6 +403,31 @@ final class NucleoSession: ObservableObject {
         return ["accepted": true, "version": RiskNotice.currentVersion]
     }
 
+    /// Withdraw AI permission without signing out: account management and deletion remain available.
+    func revokeRiskNoticeConsent() {
+        guard !tornDown else { return }
+        consentGeneration = UUID()
+        profile.riskNoticeVersion = 0
+        AccountSession.shared.cancelPendingSignIn()
+        desk.invalidatePending()
+        speech.cancel()
+        nucleoVoice.stop()
+        vocabularyTask?.cancel()
+        vocabularyTask = nil
+        suggestionsCache = nil
+        bootSynced = false
+        levelsRequested = false
+        NucleoLevelCenter.shared.accountChanged(force: true)
+        paywallStatus = "cancelled"
+        finishPaywall()
+        inviteWantsPro = false
+        inviteReason = nil
+        // Close through the bridge too: otherwise the page keeps its sheet pause forever.
+        sheetDismissed()
+        emit("consent.withdrawn", [:])
+        sessionChanged()
+    }
+
     // MARK: - Onboarding
 
     func finishOnboarding() -> [String: Any] {
@@ -423,12 +462,16 @@ final class NucleoSession: ObservableObject {
     func signIn() async -> String {
         guard !fixtures, profile.acceptedRiskNotice, appleSignIn == nil else { return "unavailable" }
         if AccountSession.shared.isSignedIn { return "signedIn" }
+        let consent = consentGeneration
+        let generation = AccountSession.shared.generation
         let flow = NucleoAppleSignIn()
         appleSignIn = flow
         let result = await flow.run()
         appleSignIn = nil
         let account = AccountSession.shared
+        guard profile.acceptedRiskNotice, consentGeneration == consent, account.generation == generation else { return "unavailable" }
         await account.completeApple(result)
+        guard profile.acceptedRiskNotice, consentGeneration == consent else { return "unavailable" }
         if account.isSignedIn {
             await ProgressSync.shared.sync(store: companions, profile: profile)
             sessionChanged()
@@ -610,17 +653,13 @@ final class NucleoSession: ObservableObject {
 
     private func observeStores() {
         // Signing out detaches the counters from the account (as ContentView does).
-        AccountSession.shared.$session
-            .map { $0?.userId }
-            .removeDuplicates()
-            .dropFirst()
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] userId in
+        NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)
+            .sink { [weak self] _ in
                 guard let self, !self.fixtures else { return }
-                if userId == nil { self.companions.unbind() }
+                self.synchronizeAccountState()
                 self.sessionChanged()
                 // A new account has its own level allowance.
-                Task { await NucleoLevelCenter.shared.refresh() }
+                if self.profile.acceptedRiskNotice { Task { await NucleoLevelCenter.shared.refresh() } }
             }
             .store(in: &cancellables)
         // The level sheet changed the analysis level: the page's level pill follows.
@@ -636,6 +675,26 @@ final class NucleoSession: ObservableObject {
             .debounce(for: .milliseconds(150), scheduler: DispatchQueue.main)
             .sink { [weak self] in self?.sessionChanged() }
             .store(in: &cancellables)
+    }
+
+    /// Also runs before every bridge call, so a request cannot observe A's XP while B's first sync is offline.
+    private func synchronizeAccountState() {
+        guard !fixtures, !tornDown else { return }
+        let account = AccountSession.shared
+        guard accountGeneration != account.generation else { return }
+        let wasAnonymous = accountUserID == nil
+        accountGeneration = account.generation
+        accountUserID = account.session?.userId
+        desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
+        speech.cancel()
+        nucleoVoice.stop()
+        if let userId = accountUserID { companions.bind(to: userId) } else { companions.unbind() }
+        DeskMemory.setOwner(accountUserID, defaults: defaults)
+        suggestionsCache = nil
+        bootSynced = false
+        NucleoLevelCenter.shared.accountChanged()
+        BobbyAccessCenter.shared.accountChanged()
+        emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }
 

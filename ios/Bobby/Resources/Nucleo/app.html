@@ -2,20 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0B0A09">
 <title>Bobby</title>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0B0A09; --ink:#F2EDE4; --inkb:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378; --ink4:rgba(242,237,228,.28);
   --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
   --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --pearl:#E8DFD0; --listen:#5CE1FF;
   --glass:rgba(22,19,17,.86);
-  --serif:'Sora',-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
-  --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+  --serif:-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{position:fixed;left:0;top:0;width:100%;height:100%;overflow:hidden;background:#0B0A09;overscroll-behavior:none;
@@ -223,7 +222,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #typeBox{position:fixed;left:0;top:0;z-index:40;visibility:hidden;opacity:0;border-radius:24px;background:#000;border:1px solid rgba(242,237,228,.12);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 #ta{display:block;width:100%;min-height:50px;max-height:116px;padding:14px 58px 14px 18px;border:0;outline:0;resize:none;background:transparent;color:#F2EDE4;
-  font:400 17px/22px 'Geist',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;letter-spacing:-.01em;caret-color:#F2EDE4;-webkit-user-select:text;user-select:text;overflow-y:auto}
+  font:400 17px/22px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;letter-spacing:-.01em;caret-color:#F2EDE4;-webkit-user-select:text;user-select:text;overflow-y:auto}
 #ta::placeholder{color:#8A8378}
 #taSend{position:absolute;right:7px;bottom:7px;width:36px;height:36px;border-radius:18px;background:#F2EDE4;color:#141210;display:grid;place-items:center;cursor:pointer}
 #taSend[disabled]{opacity:.3}
@@ -450,7 +449,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
-    'session.changed', 'app.state', 'ask.stage', 'analysis.level',
+    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -4472,7 +4471,7 @@ function applySession(s, first){
   var c = s.companion || null, id = c ? c.id : null;
   if (first || id !== prevId){
     ME.id = id; ME.webId = c ? c.webId : null; ME.art = c ? artFor(c.webId) : null; ME.label = c ? titleCase(c.label) : '';
-    ME.pal = c && GLASS[c.palette] ? c.palette : 'ghost'; ME.tint = hex(GLASS[ME.pal]); ME.cap = ME.pal === 'lava' ? 0.28 : 0.35;
+    ME.pal = c && GLASS[c.palette] ? c.palette : 'ghost'; ME.tint = hex('#A795EF'); ME.cap = ME.pal === 'lava' ? 0.28 : 0.35;
     TM = temper(ME.pal); applyTemperSprings(); if (U) tuneAmbient(false);
     buildAvatar(); loadCompanionArt();
     if (ROSTER) buildBelt(ROSTER.companions);
@@ -4482,14 +4481,49 @@ function applySession(s, first){
   att(el.close, 'aria-label', tt('aria.close'));
   setXpArc(s.level && s.level.progress);
 }
+// Reject replies started for a previous account, even when the new account is offline.
+var OWNER_GEN = 0;
 function refreshCollections(){
-  bcall('theses').then(function(r){ if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
-  bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
-  bcall('roster').then(function(r){ ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
+  var gen = OWNER_GEN;
+  bcall('theses').then(function(r){ if (gen !== OWNER_GEN) return; if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
+  bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
+  bcall('roster').then(function(r){ if (gen !== OWNER_GEN) return; ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
+  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+}
+function resetVisibleRead(preserveSignIn){
+  if (preserveSignIn) return;
+  GATE_BUSY = false;
+  if (ST.name !== 'BOOT') {
+    clearRead();
+    txReset(); showTypeBox(false);
+    el.ta.value = '';
+    // Saved cards must disappear immediately rather than fade under a different account.
+    A.rev.forEach(function(v){ v.set(0); });
+    A.satG.on = false;
+    go('RETURNING');
+  }
+  READ = null;
+}
+function accountChanged(p){
+  OWNER_GEN++;
+  var preserveSignIn = ST.name === 'SIGNIN_GATE' && p && !p.wasSignedIn && p.signedIn;
+  LEDGER = []; ISLAND = null; ROSTER = null; SUGG = null; SAVED = null; READS_DONE = 0;
+  HINTED = {};
+  resetVisibleRead(preserveSignIn);
+  if (ST.name !== 'BOOT'){ buildFaces(); setGreeting(); }
+  refreshCollections();
+}
+function consentWithdrawn(){
+  OWNER_GEN++;
+  SUGG = null;
+  resetVisibleRead(false);
+  if (SES) SES.riskAccepted = false;
 }
 function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
+  BR.on('account.changed', accountChanged);
+  BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('analysis.level', lvlApply);
@@ -4514,7 +4548,7 @@ function wire(){
   });
   BR.on('voice.word', function(p){ if (!p || p.id !== VOICE.id) return; K.mode = 'word'; var w = K.wt[p.index | 0]; if (w && Math.abs(K.t - w.t0) > 0.08) K.t = w.t0; });
   BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
-  BR.on('thesis.planted', function(){ bcall('island').then(function(i){ ISLAND = i; }).catch(noop); });
+  BR.on('thesis.planted', function(){ var gen = OWNER_GEN; bcall('island').then(function(i){ if (gen === OWNER_GEN) ISLAND = i; }).catch(noop); });
   BR.on('native.sheet', function(p){ SHEET = !!(p && p.state === 'open'); last = -1; if (!SHEET) refreshCollections(); });
 }
 /* fonts: measurements (caption pages, stance clamps, satellite widths) need the real faces */
@@ -4532,21 +4566,23 @@ function boot(){
   bcall('session', { page: 'app' }).then(function(s){
     applySession(s, true);
     buildState();
+    var gen = OWNER_GEN;
     var started = false;
     function start(){
       if (started) return; started = true;
       buildFaces();
-      var pr = SES && SES.pendingRead;
+      var pr = gen === OWNER_GEN && SES && SES.pendingRead;
       if (pr && pr.status === 'ok') go('RESTORE', { read: pr }); else go('WAKE');
     }
     Promise.all([bcall('theses').catch(noop), bcall('roster').catch(noop)]).then(function(r){
+      if (gen !== OWNER_GEN){ start(); return; }
       if (r[0] && Array.isArray(r[0].items)) LEDGER = r[0].items;
       if (r[1]){ ROSTER = r[1]; buildBelt(r[1].companions); }
       start();
     });
     at(0.5, start);
-    bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ SUGG = x; }).catch(noop);
+    bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
+    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

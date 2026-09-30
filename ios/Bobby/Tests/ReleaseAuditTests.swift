@@ -35,10 +35,27 @@ final class ReleaseAuditTests: XCTestCase {
     }
 
     @MainActor private func expiredAccount() -> AccountSession {
-        Keychain.write(StoredSession(accessToken: "audit-expired", refreshToken: "audit-refresh", expiresAt: Date(timeIntervalSince1970: 0), userId: "audit-user"), service: service)
-        let account = AccountSession()
-        XCTAssertNotNil(account.session, "Audit fixture must persist an expired synthetic session before testing")
+        let initial = StoredSession(accessToken: "audit-expired", refreshToken: "audit-refresh", expiresAt: Date(timeIntervalSince1970: 0), userId: "audit-user")
+        let account = AccountSession(initialSession: initial, usesKeychain: false)
+        XCTAssertNotNil(account.session, "The expired synthetic session must be installed without relying on host signing")
         return account
+    }
+
+    @MainActor func testVersionFourConsentRequiresAcknowledgingTheNewNotice() {
+        let defaults = UserDefaults.standard
+        let previous = defaults.object(forKey: "agent.riskNoticeVersion")
+        defer {
+            if let previous { defaults.set(previous, forKey: "agent.riskNoticeVersion") }
+            else { defaults.removeObject(forKey: "agent.riskNoticeVersion") }
+        }
+        let profile = AgentProfile()
+        XCTAssertGreaterThan(RiskNotice.currentVersion, 4)
+        profile.riskNoticeVersion = 4
+        XCTAssertFalse(profile.acceptedRiskNotice)
+        XCTAssertEqual(NucleoPage.route(onboarded: true, companionId: "byte", riskAccepted: profile.acceptedRiskNotice), .onboardingRisk)
+        profile.riskNoticeVersion = RiskNotice.currentVersion
+        XCTAssertTrue(profile.acceptedRiskNotice)
+        XCTAssertEqual(NucleoPage.route(onboarded: true, companionId: "byte", riskAccepted: profile.acceptedRiskNotice), .app)
     }
 
     @MainActor func testSignOutMustWinOverAnInflightRefresh() async {

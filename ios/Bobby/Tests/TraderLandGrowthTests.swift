@@ -212,8 +212,9 @@ final class TraderLandGrowthTests: XCTestCase {
         XCTAssertEqual(LandCore.standing(accountIsland: true, world: try decode(build31Payload)), .practice, "An older server's island: 3,3 awake")
         XCTAssertEqual(LandCore.standing(accountIsland: false, world: nil), .practice)
         XCTAssertEqual(LandCore.standing(accountIsland: false, world: try decode(fullPayload)), .practice, "The practice island never takes an account's core")
-        XCTAssertEqual(RuntimeBundle.fixture.core.col, LandCore.practice.col)
-        XCTAssertEqual(RuntimeBundle.fixture.core.row, LandCore.practice.row)
+        let fixture = try XCTUnwrap(RuntimeBundle.fixture)
+        XCTAssertEqual(fixture.core.col, LandCore.practice.col)
+        XCTAssertEqual(fixture.core.row, LandCore.practice.row)
     }
 
     /// Camera limits (GROWTH-v1 §4): max zoom scales by N/8, 12×12 and 16×16 start closer, and every
@@ -291,11 +292,145 @@ final class TraderLandGrowthTests: XCTestCase {
         XCTAssertEqual(LandHorizon.week.optionLabel, L.t("7\u{00A0}days · landmark 2×2", "7\u{00A0}días · monumento 2×2"))
     }
 
+    private func runtimeData() throws -> [String: Data] {
+        let resources = try RuntimeBundle.resources.get()
+        return [RuntimeBundle.manifestPath: try JSONEncoder().encode(resources.manifest),
+                RuntimeBundle.fixturePath: try JSONEncoder().encode(resources.fixture)]
+    }
+
+    private func replacingJSON(_ data: Data, change: (inout [String: Any]) -> Void) throws -> Data {
+        var json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        change(&json)
+        return try JSONSerialization.data(withJSONObject: json)
+    }
+
+    func testRuntimeResourcesLoadRealBundle() throws {
+        let data = try runtimeData()
+        let resources = try RuntimeBundle.load { try XCTUnwrap(data[$0]) }.get()
+        XCTAssertEqual(resources.items.count, resources.manifest.items.count)
+        XCTAssertEqual(resources.fixture.placements.count, 7)
+        XCTAssertNotNil(resources.items[resources.fixture.core.itemId])
+    }
+
+    func testRuntimeResourcesMissingFileReturnsFailure() throws {
+        let data = try runtimeData()
+        for path in [RuntimeBundle.manifestPath, RuntimeBundle.fixturePath] {
+            var reads: [String] = []
+            let result = RuntimeBundle.load { requested in
+                reads.append(requested)
+                if requested == path { throw CocoaError(.fileReadNoSuchFile) }
+                return try XCTUnwrap(data[requested])
+            }
+            guard case let .failure(error) = result else { return XCTFail("A missing resource cannot make a world") }
+            XCTAssertEqual(error, .unavailable(path))
+            if path == RuntimeBundle.manifestPath { XCTAssertEqual(reads, [path]) }
+        }
+    }
+
+    func testRuntimeResourcesMalformedJSONReturnsFailure() throws {
+        let data = try runtimeData()
+        for path in [RuntimeBundle.manifestPath, RuntimeBundle.fixturePath] {
+            let result = RuntimeBundle.load { $0 == path ? Data("{".utf8) : try XCTUnwrap(data[$0]) }
+            guard case let .failure(error) = result else { return XCTFail("Malformed JSON cannot make a world") }
+            XCTAssertEqual(error, .invalid(path))
+        }
+    }
+
+    func testRuntimeResourcesDuplicateItemIDsReturnFailure() throws {
+        var data = try runtimeData()
+        let item = try XCTUnwrap(try RuntimeBundle.resources.get().manifest.items.first)
+        data[RuntimeBundle.manifestPath] = try JSONEncoder().encode(LandManifest(items: [item, item]))
+        guard case let .failure(error) = RuntimeBundle.load(read: { try XCTUnwrap(data[$0]) }) else {
+            return XCTFail("Duplicate catalog IDs must not reach Dictionary initialization")
+        }
+        XCTAssertEqual(error, .invalid(RuntimeBundle.manifestPath))
+    }
+
+    func testRuntimeResourcesUnsafeGeometryReturnsFailure() throws {
+        let data = try runtimeData()
+        for invalidAnchor in [false, true] {
+            let malformed = try replacingJSON(try XCTUnwrap(data[RuntimeBundle.manifestPath])) { json in
+                var items = json["items"] as! [[String: Any]]
+                if invalidAnchor {
+                    var orientations = items[0]["orientations"] as! [String: [String: Any]]
+                    let orientationKey = orientations.keys.sorted()[0]
+                    var states = orientations[orientationKey]!["states"] as! [String: [String: Any]]
+                    let stateKey = states.keys.sorted()[0]
+                    states[stateKey]!["anchor"] = [0.5]
+                    orientations[orientationKey]!["states"] = states
+                    items[0]["orientations"] = orientations
+                } else { items[0]["footprint"] = ["cols": 0, "rows": 1] }
+                json["items"] = items
+            }
+            let result = RuntimeBundle.load { $0 == RuntimeBundle.manifestPath ? malformed : try XCTUnwrap(data[$0]) }
+            guard case let .failure(error) = result else { return XCTFail("Unsafe sprite geometry cannot enter rendering") }
+            XCTAssertEqual(error, .invalid(RuntimeBundle.manifestPath))
+        }
+    }
+
+    func testRuntimeResourcesInvalidPlacementReturnsFailure() throws {
+        let data = try runtimeData()
+        for mode in ["duplicate", "unknown", "overlap", "outside"] {
+            let malformed = try replacingJSON(try XCTUnwrap(data[RuntimeBundle.fixturePath])) { json in
+                var placements = json["placements"] as! [[String: Any]]
+                switch mode {
+                case "duplicate": placements.append(placements[0])
+                case "unknown": placements[0]["itemId"] = "missing-piece"
+                case "overlap": placements[0]["col"] = 3; placements[0]["row"] = 3
+                default: placements[0]["col"] = 8
+                }
+                json["placements"] = placements
+            }
+            let result = RuntimeBundle.load { $0 == RuntimeBundle.fixturePath ? malformed : try XCTUnwrap(data[$0]) }
+            guard case let .failure(error) = result else { return XCTFail("Invalid \(mode) placements cannot make a practice world") }
+            XCTAssertEqual(error, .invalid(RuntimeBundle.fixturePath))
+        }
+    }
+
 #if DEBUG
+    @MainActor func testAccountFixtureDecodeFailureHasNoWorldAndNoMutation() async {
+        let fixture = TraderLandAccountFixture(encodeWorld: { _ in Data("{}".utf8) })
+        XCTAssertThrowsError(try fixture.world())
+        let sync = TraderLandSync()
+        sync.useFixture(fixture)
+        XCTAssertNil(sync.world)
+        XCTAssertNotNil(sync.error)
+        await sync.load()
+        XCTAssertNil(sync.world)
+        let result = await sync.mutate(.publish(title: "Unavailable"))
+        XCTAssertNil(result)
+        XCTAssertFalse(sync.busy)
+    }
+
+    @MainActor func testAccountFixtureFailedMutationPreservesWorldAndRewards() async throws {
+        var failEncoding = false
+        let fixture = TraderLandAccountFixture(encodeWorld: { payload in
+            failEncoding ? Data("{}".utf8) : try JSONSerialization.data(withJSONObject: payload)
+        })
+        let sync = TraderLandSync()
+        sync.useFixture(fixture)
+        let before = try XCTUnwrap(sync.world)
+        failEncoding = true
+        let failed = await sync.mutate(.close(inventoryID: "fx-seed-ready"))
+        XCTAssertNil(failed)
+        XCTAssertEqual(sync.world?.xp, before.xp)
+        XCTAssertEqual(sync.world?.aura, before.aura)
+        XCTAssertNotNil(sync.error)
+        failEncoding = false
+        await sync.load()
+        XCTAssertNil(sync.error)
+        XCTAssertEqual(sync.world?.inventory.first { $0.id == "fx-seed-ready" }?.state, "seed")
+        XCTAssertEqual(sync.world?.xp, before.xp, "A failed fixture serialization cannot award XP")
+        let successful = await sync.mutate(.close(inventoryID: "fx-seed-ready"))
+        let retried = try XCTUnwrap(successful)
+        XCTAssertEqual(retried.xp, before.xp + 12)
+        XCTAssertEqual(retried.aura, before.aura + 3)
+    }
+
     /// The `-trader-land-account-fixture` world and its in-memory rules.
     @MainActor func testAccountFixtureWorldAndRules() throws {
         let fixture = TraderLandAccountFixture()
-        let world = fixture.world()
+        let world = try fixture.world()
         XCTAssertEqual(world.land.size, 10)
         XCTAssertEqual(world.core, LandCore(col: 6, row: 2, stage: 0))
         XCTAssertEqual(world.capabilities?.moveCore, true)

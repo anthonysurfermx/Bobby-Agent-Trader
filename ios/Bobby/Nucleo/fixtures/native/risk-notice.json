@@ -1,12 +1,12 @@
 {
  "v": 1,
- "source": "Sources/RiskNoticeView.swift statements (must move to enum RiskNotice; never retyped)",
- "version": 4,
+ "source": "Sources/RiskNoticeView.swift enum RiskNotice.statements; exported localized literals",
+ "version": 5,
  "statements": {
   "en": [
    {
     "title": "Allow AI processing of my questions.",
-    "body": "Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details."
+    "body": "Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation audio stays on your iPhone. Avoid personal or account details. You can withdraw AI consent here at any time."
    },
    {
     "title": "Not investment advice.",
@@ -24,7 +24,7 @@
   "es": [
    {
     "title": "Permito que la IA procese mis preguntas.",
-    "body": "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas."
+    "body": "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El audio del dictado permanece en tu iPhone. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras."
    },
    {
     "title": "No es asesoría de inversión.",

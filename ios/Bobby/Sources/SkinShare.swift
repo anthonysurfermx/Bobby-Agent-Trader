@@ -33,10 +33,10 @@ struct SkinShareSheet: View {
         VStack(spacing: 16) {
             HStack {
                 Text(L.t("SHARE MY SKIN", "COMPARTIR MI ESTILO"))
-                    .font(.mono(11, .bold)).kerning(2).foregroundStyle(Theme.muted)
+                    .font(.mono(11, .bold)).kerning(2).foregroundStyle(Theme.warmDim)
                 Spacer()
                 Button { dismiss() } label: {
-                    Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.muted)
+                    Image(systemName: "xmark").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.warmDim)
                         .frame(width: 32, height: 32)
                 }
                 .accessibilityLabel(L.t("Close", "Cerrar"))
@@ -48,27 +48,26 @@ struct SkinShareSheet: View {
                         .resizable()
                         .scaledToFit()
                         .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(companion.tint.opacity(0.35), lineWidth: 1))
-                        .shadow(color: companion.tint.opacity(0.25), radius: 20)
+                        .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.orbViolet.opacity(0.35), lineWidth: 1))
+                        .shadow(color: Theme.orbViolet.opacity(0.25), radius: 20)
                         .accessibilityLabel(L.t("Your skin card", "Tu tarjeta de estilo"))
                 } else {
-                    ProgressView().tint(companion.tint)
+                    ProgressView().tint(Theme.orbViolet)
                 }
             }
             .frame(maxHeight: .infinity)
 
             HStack(spacing: 10) {
                 destination("Instagram", mark: Image(systemName: "camera.fill"),
-                            fill: LinearGradient(colors: [Color(red: 0.51, green: 0.23, blue: 0.71), Color(red: 0.99, green: 0.35, blue: 0.27), Color(red: 0.99, green: 0.76, blue: 0.29)],
-                                                 startPoint: .topTrailing, endPoint: .bottomLeading)) {
+                            fill: LinearGradient(colors: [Theme.orbViolet.opacity(0.28), Theme.orbBlue.opacity(0.16)], startPoint: .topLeading, endPoint: .bottomTrailing)) {
                     shareToInstagram()
                 }
                 destination("WhatsApp", mark: Image(systemName: "bubble.left.fill"),
-                            fill: LinearGradient(colors: [Color(red: 0.15, green: 0.83, blue: 0.40)], startPoint: .top, endPoint: .bottom)) {
+                            fill: LinearGradient(colors: [Theme.orbViolet.opacity(0.28), Theme.orbBlue.opacity(0.16)], startPoint: .topLeading, endPoint: .bottomTrailing)) {
                     shareFeed()
                 }
                 destination("X", mark: Text("𝕏").font(.system(size: 22, weight: .bold)),
-                            fill: LinearGradient(colors: [Color.black], startPoint: .top, endPoint: .bottom)) {
+                            fill: LinearGradient(colors: [Theme.orbViolet.opacity(0.28), Theme.orbBlue.opacity(0.16)], startPoint: .topLeading, endPoint: .bottomTrailing)) {
                     shareFeed()
                 }
             }
@@ -77,11 +76,11 @@ struct SkinShareSheet: View {
                 shareFeed()
             } label: {
                 Label(L.t("More options", "Más opciones"), systemImage: "square.and.arrow.up")
-                    .font(.mono(11, .bold)).foregroundStyle(Theme.muted)
+                    .font(.mono(11, .bold)).foregroundStyle(Theme.warmDim)
             }
         }
         .padding(20)
-        .background(Theme.bg.ignoresSafeArea())
+        .background(Theme.nucleoSurface.ignoresSafeArea())
         .presentationDetents([.large])
         .onAppear { if feed == nil { feed = render(story: false) } }
         .sheet(item: $outgoing) { share in
@@ -99,17 +98,17 @@ struct SkinShareSheet: View {
             VStack(spacing: 8) {
                 mark
                     .font(.system(size: 20, weight: .bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Theme.cream)
                     .frame(width: 52, height: 52)
                     .background(Circle().fill(fill))
                     .overlay(Circle().stroke(Color.white.opacity(0.15), lineWidth: 1))
-                Text(name).font(.mono(10, .bold)).foregroundStyle(Theme.text)
+                Text(name).font(.mono(10, .bold)).foregroundStyle(Theme.cream)
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 12)
-            .background(Theme.card)
+            .background(Theme.nucleoGlass)
             .clipShape(RoundedRectangle(cornerRadius: 14))
-            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.stroke, lineWidth: 1))
+            .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.nucleoStroke, lineWidth: 1))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(L.t("Share to \(name)", "Compartir en \(name)"))

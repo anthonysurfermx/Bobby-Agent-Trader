@@ -24,6 +24,8 @@ struct AccountSheet: View {
     var voice: NeuralVoice? = nil
     /// Called after the voice switch flips (the Núcleo refreshes the page's `session.muted`).
     var onVoiceMutedChange: (() -> Void)? = nil
+    /// Stops future external AI requests while keeping account controls available.
+    var onAIConsentWithdraw: (() -> Void)? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @ObservedObject private var reads = BobbyAccessCenter.shared
@@ -120,11 +122,11 @@ struct AccountSheet: View {
 
     // MARK: - Frame
 
-    /// Near-black with the companion's own light rising behind the hero.
+    /// The same violet-blue light as the Núcleo, independent of avatar identity.
     private var backdrop: some View {
         ZStack {
             Theme.bg
-            RadialGradient(colors: [companion.tint.opacity(0.20), companion.tint.opacity(0.04), .clear],
+            RadialGradient(colors: [Theme.orbViolet.opacity(0.16), Theme.orbBlue.opacity(0.05), .clear],
                            center: UnitPoint(x: 0.5, y: 0.17), startRadius: 10, endRadius: 330)
         }
         .ignoresSafeArea()
@@ -171,12 +173,12 @@ struct AccountSheet: View {
     private var heroStage: some View {
         ZStack {
             Circle()
-                .fill(RadialGradient(colors: [companion.tint.opacity(0.28), .clear], center: .center, startRadius: 4, endRadius: 120))
+                .fill(RadialGradient(colors: [Theme.orbViolet.opacity(0.20), Theme.orbBlue.opacity(0.07), .clear], center: .center, startRadius: 4, endRadius: 120))
                 .frame(width: 240, height: 240)
                 .blur(radius: 6)
             if heroLoading || heroFailed {
                 CompanionPortrait(companion: companion, size: 150)
-                    .overlay(Circle().stroke(Theme.warmHair, lineWidth: 1))
+                    .overlay(Circle().stroke(Theme.nucleoStroke, lineWidth: 1))
                     .transition(.opacity)
             }
             MascotSceneView(
@@ -222,9 +224,9 @@ struct AccountSheet: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Theme.cream.opacity(0.08))
-                    Capsule().fill(Theme.cream)
+                    Capsule().fill(LinearGradient(colors: [Theme.orbViolet, Theme.orbCyan], startPoint: .leading, endPoint: .trailing))
                         .frame(width: max(3, geo.size.width * min(1, max(0, store.levelProgress))))
-                        .shadow(color: Theme.cream.opacity(0.35), radius: 4)
+                        .shadow(color: Theme.orbViolet.opacity(0.25), radius: 4)
                 }
             }
             .frame(height: 3)
@@ -249,8 +251,8 @@ struct AccountSheet: View {
             stat(L.t("Pieces", "Piezas"), shownPieces.map { "\($0)" } ?? "—", symbol: "square.stack.3d.up")
         }
         .padding(.vertical, 12)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.cream.opacity(0.03)))
-        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.warmHair, lineWidth: 1))
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.nucleoGlass))
+        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Theme.nucleoStroke, lineWidth: 1))
         .accessibilityIdentifier("account-stats")
     }
 
@@ -449,7 +451,7 @@ struct AccountSheet: View {
                     .animation(busy && !reduceMotion ? .linear(duration: 0.9).repeatForever(autoreverses: false) : .default, value: busy)
                     .frame(width: 34, height: 34)
                     .background(Circle().fill(Theme.warmFill))
-                    .overlay(Circle().stroke(Theme.warmHair, lineWidth: 1))
+                    .overlay(Circle().stroke(Theme.nucleoStroke, lineWidth: 1))
             }
             .disabled(busy)
             .accessibilityLabel(busy ? L.t("Syncing…", "Sincronizando…") : L.t("Sync now", "Sincronizar ahora"))
@@ -509,7 +511,7 @@ struct AccountSheet: View {
                         .font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.cream)
                         .frame(maxWidth: .infinity).frame(height: 44)
                         .background(Capsule().fill(Theme.warmFill))
-                        .overlay(Capsule().stroke(Theme.warmHair, lineWidth: 1))
+                        .overlay(Capsule().stroke(Theme.nucleoStroke, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
                 .disabled(busy)
@@ -529,30 +531,32 @@ struct AccountSheet: View {
             NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: false, reason: nil, onPro: nil) { route = nil }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Color.black)
+                .presentationBackground(Theme.nucleoSurface)
         case .locker:
             SquadLockerSheet(store: store)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.bg)
+                .presentationBackground(Theme.nucleoSurface)
         case .land:
             TraderLandGateHarnessView(focus: nil)
                 .presentationDetents([.large])
-                .presentationBackground(Theme.bg)
+                .presentationBackground(Theme.nucleoSurface)
         case .share(let card):
             SkinShareSheet(card: card, companion: companion, level: level,
                            gear: store.wornGear(for: companion.id), pet: store.wornPet(for: companion.id),
                            xp: store.disciplineXP)
         case .risk:
-            RiskNoticeView(profile: profile, readOnly: true) { route = nil }
+            RiskNoticeView(profile: profile, readOnly: true,
+                           onClose: { route = nil },
+                           onWithdraw: onAIConsentWithdraw.map { withdraw in { route = nil; withdraw() } })
         case .tool(let tool):
             ToolDetailSheet(companion: companion, tool: tool, store: store)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(Theme.bg)
+                .presentationBackground(Theme.nucleoSurface)
         case .pet:
             PetDetailSheet(companion: companion, store: store)
                 .presentationDetents([.medium, .large])
-                .presentationBackground(Theme.bg)
+                .presentationBackground(Theme.nucleoSurface)
         }
     }
 }
@@ -661,10 +665,10 @@ struct ReadsRow: Equatable {
         if access.isPro {
             let end = subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) }
             let canceled = ["canceled", "cancelled", "expired"].contains(subscription?.status ?? "")
-            let detail = end.map { canceled ? L.t("Unlimited reads · ends \($0)", "Lecturas ilimitadas · termina el \($0)", spanish: spanish)
-                                            : L.t("Unlimited reads · renews \($0)", "Lecturas ilimitadas · se renueva el \($0)", spanish: spanish) }
-                ?? L.t("Unlimited reads", "Lecturas ilimitadas", spanish: spanish)
-            return ReadsRow(title: "Bobby Pro", detail: detail, pro: true, manage: subscription?.managedByApple ?? true)
+            let detail = end.map { canceled ? L.t("Unlimited Quick reads · ends \($0)", "Lecturas Rápidas ilimitadas · termina el \($0)", spanish: spanish)
+                                            : L.t("Unlimited Quick reads · renews \($0)", "Lecturas Rápidas ilimitadas · se renueva el \($0)", spanish: spanish) }
+                ?? L.t("Unlimited Quick reads", "Lecturas Rápidas ilimitadas", spanish: spanish)
+            return ReadsRow(title: "Bobby Pro", detail: detail, pro: true, manage: subscription?.managedByApple ?? false)
         }
         guard let limit = access.limit else { return nil }
         let left = access.remaining ?? max(0, limit - access.used)
@@ -703,7 +707,7 @@ private struct VoiceSwitchRow: View {
                 }
             }
         }
-        .tint(Theme.accent)
+        .tint(Theme.orbViolet)
         .profileRowFrame()
         .accessibilityIdentifier("account-voice")
     }

@@ -101,7 +101,7 @@ def ok_result(slug, question, language="en"):
     agents = body["agents"]
     out = {
         "v": V, "status": "ok", "requestId": "00000000-0000-4000-8000-000000000000",
-        "question": question, "language": language,
+        "question": question, "language": language, "level": body.get("level") or "rapido",
         "asset": {k: asset[k] for k in ("symbol", "name", "isEquity")},
         "market": {"price": num(market["body"].get("price")), "changePct": num(market["body"].get("change_24h_pct"))},
         "technicals": {

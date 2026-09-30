@@ -1,19 +1,26 @@
-// Bobby visual language — the Kinetic terminal translated to a pocket desk.
+// Shared Núcleo visual language, drawn from Bobby's violet and blue orb.
 import SwiftUI
 
 enum Theme {
-    static let bg = Color(red: 0.010, green: 0.012, blue: 0.019)        // #030305
-    static let panel = Color(red: 0.018, green: 0.021, blue: 0.031)     // #050508
-    static let card = Color.white.opacity(0.035)
-    static let cardSoft = Color.white.opacity(0.065)
-    static let accent = Color(red: 0.129, green: 0.408, blue: 1.0)      // Base electric blue
-    static let accentSoft = Color(red: 0.49, green: 0.65, blue: 1.0)
+    static let bg = Color(red: 0.016, green: 0.012, blue: 0.025)       // #040306
+    static let panel = Color(red: 0.051, green: 0.043, blue: 0.082)    // #0D0B15
+    static let orbViolet = Color(red: 0.655, green: 0.584, blue: 0.937) // #A795EF
+    static let orbBlue = Color(red: 0.471, green: 0.525, blue: 0.980)   // #7886FA
+    static let orbCyan = Color(red: 0.502, green: 0.851, blue: 0.910)   // #80D9E8
+    static let orbGradient = LinearGradient(colors: [orbViolet, orbBlue, orbCyan], startPoint: .topLeading, endPoint: .bottomTrailing)
+    static let nucleoSurface = panel
+    static let nucleoGlass = Color(red: 0.655, green: 0.584, blue: 0.937).opacity(0.06)
+    static let nucleoStroke = Color(red: 0.655, green: 0.584, blue: 0.937).opacity(0.16)
+    static let card = nucleoGlass
+    static let cardSoft = orbViolet.opacity(0.10)
+    static let accent = orbViolet
+    static let accentSoft = orbCyan
     static let up = Color(red: 0.204, green: 0.827, blue: 0.600)        // #34D399
     static let down = Color(red: 1.0, green: 0.420, blue: 0.420)        // #FF6B6B
     static let cio = Color(red: 0.98, green: 0.78, blue: 0.18)
-    static let text = Color(red: 0.949, green: 0.957, blue: 0.973)      // #F2F4F8
-    static let muted = Color.white.opacity(0.42)
-    static let stroke = Color.white.opacity(0.075)
+    static let text = cream
+    static let muted = warmMuted
+    static let stroke = nucleoStroke
 
     // Núcleo warm palette (the web profile drawer, src/styles/nucleo-desk.css).
     static let cream = Color(red: 0.949, green: 0.929, blue: 0.894)      // #F2EDE4 — primary ink
@@ -36,8 +43,8 @@ struct CardBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Theme.card)
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.stroke, lineWidth: 1))
+            .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Theme.nucleoStroke, lineWidth: 1))
     }
 }
 

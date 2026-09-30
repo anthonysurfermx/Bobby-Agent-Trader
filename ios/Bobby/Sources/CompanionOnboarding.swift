@@ -21,7 +21,7 @@ struct CompanionOnboarding: View {
     @State private var auraCharge = 0
 
     private var starters: [Companion] { bobbyCompanions.filter { $0.requiredLevel == 1 } }
-    private var tint: Color { selected.tint }
+    private var tint: Color { Theme.orbViolet }
     /// The vibe only changes how the companion sounds: without voice it is a choice with no effect.
     private var showsVibeStep: Bool { Self.showsVibeStep(voiceEnabled: NeuralVoice.avatarNarrationEnabled) }
     static func showsVibeStep(voiceEnabled: Bool) -> Bool { voiceEnabled }
@@ -31,9 +31,9 @@ struct CompanionOnboarding: View {
 
     var body: some View {
         ZStack {
-            Theme.bg.ignoresSafeArea()
-            // The companion's identity light bleeds into the stage
-            RadialGradient(colors: [tint.opacity(0.16), .clear], center: .center, startRadius: 40, endRadius: 420)
+            Theme.nucleoSurface.ignoresSafeArea()
+            // A shared violet-blue stage keeps every companion inside the Núcleo.
+            RadialGradient(colors: [Theme.orbViolet.opacity(0.14), Theme.orbBlue.opacity(0.05), .clear], center: .center, startRadius: 40, endRadius: 420)
                 .ignoresSafeArea()
                 .animation(.easeOut(duration: 0.6), value: selected.id)
 
@@ -131,7 +131,7 @@ struct CompanionOnboarding: View {
         } label: {
             Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Theme.text.opacity(0.4))
+                .foregroundStyle(Theme.warmDim)
                 .frame(width: 44, height: 96)
                 .contentShape(Rectangle())
         }
@@ -197,17 +197,17 @@ struct CompanionOnboarding: View {
                          : L.t("BOBBY // PICK YOUR FRIEND", "BOBBY // ELIGE A TU AMIGO"))
                         .font(.mono(11, .bold))
                         .kerning(1.9)
-                        .foregroundStyle(Theme.text.opacity(0.78))
+                        .foregroundStyle(Theme.warmMuted)
                 }
                 Spacer()
                 Text("0\(beat) / 0\(beats)")
                     .font(.mono(10, .bold))
-                    .foregroundStyle(selected.tintSoft)
+                    .foregroundStyle(Theme.warmMuted)
                 AvatarVoiceToggle(voice: voice)
             }
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.cardSoft).frame(height: 2)
+                    Capsule().fill(Theme.nucleoStroke).frame(height: 2)
                     Capsule()
                         .fill(tint)
                         .frame(width: geometry.size.width * CGFloat(beat) / CGFloat(beats), height: 2)
@@ -225,16 +225,16 @@ struct CompanionOnboarding: View {
         VStack(spacing: 10) {
             VStack(spacing: 3) {
                 Text(selected.name(at: 1))
-                    .font(.mono(26, .black))
-                    .kerning(3)
-                    .foregroundStyle(tint)
+                    .font(.system(size: 30, weight: .light, design: .rounded))
+                    .tracking(-0.6)
+                    .foregroundStyle(Theme.cream)
                 Text(selected.role)
                     .font(.mono(10, .bold))
                     .kerning(1.6)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 Text(selected.personality)
                     .font(.rounded(13, .medium))
-                    .foregroundStyle(Theme.text.opacity(0.72))
+                    .foregroundStyle(Theme.warmMuted)
             }
             .animation(.easeOut(duration: 0.25), value: selected.id)
 
@@ -252,12 +252,12 @@ struct CompanionOnboarding: View {
                                     .clipShape(RoundedRectangle(cornerRadius: 13))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 13)
-                                            .stroke(comp.id == selected.id ? comp.tint : Theme.stroke, lineWidth: comp.id == selected.id ? 2 : 1)
+                                            .stroke(comp.id == selected.id ? Theme.orbViolet : Theme.nucleoStroke, lineWidth: comp.id == selected.id ? 2 : 1)
                                     )
                                 Text(comp.label)
                                     .font(.mono(8, .bold))
                                     .kerning(0.8)
-                                    .foregroundStyle(comp.id == selected.id ? comp.tintSoft : Theme.muted)
+                                    .foregroundStyle(comp.id == selected.id ? Theme.cream : Theme.warmDim)
                             }
                         }
                         .id(comp.id)
@@ -276,7 +276,7 @@ struct CompanionOnboarding: View {
                      "Desliza para conocerlos. Más amigos se desbloquean al subir de nivel."))
                 .font(.mono(9, .medium))
                 .kerning(0.6)
-                .foregroundStyle(Theme.muted.opacity(0.8))
+                .foregroundStyle(Theme.warmDim.opacity(0.8))
                 .multilineTextAlignment(.center)
         }
     }
@@ -292,12 +292,12 @@ struct CompanionOnboarding: View {
         VStack(spacing: 10) {
             Text(L.t("How should \(selected.name(at: 1)) talk to you?", "¿Cómo quieres que te hable \(selected.name(at: 1))?"))
                 .font(.rounded(20, .bold))
-                .foregroundStyle(Theme.text)
+                .foregroundStyle(Theme.cream)
                 .multilineTextAlignment(.center)
             Text(L.t("Choose your companion’s style.",
                      "Elige el estilo de tu compañero."))
                 .font(.rounded(12, .medium))
-                .foregroundStyle(Theme.muted)
+                .foregroundStyle(Theme.warmDim)
 
             VStack(spacing: 8) {
                 ForEach(AgentVibe.allCases) { vibe in
@@ -311,21 +311,21 @@ struct CompanionOnboarding: View {
                                 Text(vibe.label.uppercased())
                                     .font(.mono(11, .bold))
                                     .kerning(1.2)
-                                    .foregroundStyle(profile.vibeId == vibe.rawValue ? tint : Theme.text)
+                                    .foregroundStyle(profile.vibeId == vibe.rawValue ? Theme.cream : Theme.warmMuted)
                                 Text(vibe.desc)
                                     .font(.rounded(12, .medium))
-                                    .foregroundStyle(Theme.muted)
+                                    .foregroundStyle(Theme.warmDim)
                                     .lineLimit(1)
                             }
                             Spacer()
                             Image(systemName: profile.vibeId == vibe.rawValue ? "checkmark.circle.fill" : "waveform.circle")
-                                .foregroundStyle(profile.vibeId == vibe.rawValue ? Theme.up : Theme.muted)
+                                .foregroundStyle(profile.vibeId == vibe.rawValue ? Theme.orbCyan : Theme.warmDim)
                         }
                         .padding(.horizontal, 14)
                         .padding(.vertical, 11)
-                        .background(profile.vibeId == vibe.rawValue ? tint.opacity(0.07) : Theme.card)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(profile.vibeId == vibe.rawValue ? tint.opacity(0.55) : Theme.stroke, lineWidth: 1))
+                        .background(profile.vibeId == vibe.rawValue ? tint.opacity(0.07) : Theme.nucleoGlass)
+                        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(profile.vibeId == vibe.rawValue ? tint.opacity(0.55) : Theme.nucleoStroke, lineWidth: 1))
                     }
                     .accessibilityIdentifier("avatar-vibe-\(vibe.rawValue)")
                     .accessibilityAddTraits(profile.vibeId == vibe.rawValue ? [.isSelected] : [])
@@ -375,9 +375,9 @@ struct CompanionOnboarding: View {
             .foregroundStyle(.black)
             .padding(.horizontal, 18)
             .frame(height: 52)
-            .background(tint)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
-            .shadow(color: tint.opacity(0.30), radius: 14, y: 4)
+            .background(Theme.cream)
+            .clipShape(Capsule())
+            .shadow(color: Theme.orbViolet.opacity(0.18), radius: 14, y: 4)
             .opacity(step == .forge && !auraReady ? 0.45 : 1)
             .animation(.easeOut(duration: 0.3), value: auraReady)
         }

@@ -33,6 +33,11 @@ final class NucleoSpeech {
     private var finalTimeout: Task<Void, Never>?
     private var lastLevelAt: CFTimeInterval = 0
     private var observers: [NSObjectProtocol] = []
+    private let finalWait: Double
+
+    init(finalWait: Double? = nil) {
+        self.finalWait = finalWait ?? Self.finalWaitSeconds
+    }
 
     var isListening: Bool { listening }
 
@@ -179,6 +184,23 @@ final class NucleoSpeech {
     /// Pill released. Unless `cancel`, `speech.final` follows within 1.5 s ("" = nothing heard).
     @discardableResult
     func stop(cancel: Bool) -> StopStatus {
+        // A released pill is no longer listening, but recognition still owns a
+        // pending final. Background/cancellation must invalidate that final too.
+        if cancel {
+            let active = listening || awaitingFinal
+            session += 1
+            listening = false
+            latestText = ""
+            autoStop?.cancel()
+            autoStop = nil
+            stopObserving()
+            task?.cancel()
+            request?.endAudio()
+            closeMicrophone()
+            finishRecognition()
+            if active { emit("speech.state", ["state": "stopped"]) }
+            return active ? .stopped : .idle
+        }
         guard listening else { return .idle }
         listening = false
         autoStop?.cancel()
@@ -187,19 +209,21 @@ final class NucleoSpeech {
         request?.endAudio()
         closeMicrophone()
         emit("speech.state", ["state": "stopped"])
-        if cancel {
-            task?.cancel()
-            finishRecognition()
-            return .stopped
-        }
+        waitForFinal()
+        return .stopped
+    }
+
+    /// The microphone has closed; the recognizer gets a bounded finalization window.
+    func waitForFinal() {
+        finalTimeout?.cancel()
         awaitingFinal = true
         let token = session
         finalTimeout = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.finalWaitSeconds * 1_000_000_000))
-            guard !Task.isCancelled, let self, self.session == token else { return }
+            guard let self else { return }
+            try? await Task.sleep(nanoseconds: UInt64(self.finalWait * 1_000_000_000))
+            guard !Task.isCancelled, self.session == token else { return }
             self.deliverFinal()
         }
-        return .stopped
     }
 
     /// Background, teardown: the mic closes now, no final.

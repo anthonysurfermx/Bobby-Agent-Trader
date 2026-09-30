@@ -209,9 +209,9 @@ struct ToolBelt: View {
                 Button { onTap?(tool) } label: {
                     ZStack {
                         Circle()
-                            .fill(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26).opacity(0.16) : companion.tint.opacity(0.12)) : Theme.card)
+                            .fill(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26).opacity(0.16) : Theme.nucleoGlass) : Theme.nucleoGlass)
                         Circle()
-                            .stroke(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26).opacity(0.8) : companion.tint.opacity(0.6)) : Theme.stroke, lineWidth: 1)
+                            .stroke(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26).opacity(0.8) : Theme.orbViolet.opacity(0.35)) : Theme.nucleoStroke, lineWidth: 1)
                         if unlocked, tool.hasArt {
                             Image(tool.assetName)
                                 .resizable()
@@ -221,7 +221,7 @@ struct ToolBelt: View {
                         } else {
                             Image(systemName: unlocked ? tool.symbol : "lock.fill")
                                 .font(.system(size: 13, weight: .bold))
-                                .foregroundStyle(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26) : companion.tint) : Theme.muted.opacity(0.6))
+                                .foregroundStyle(unlocked ? (tool.isGolden ? Color(red: 0.96, green: 0.77, blue: 0.26) : Theme.orbViolet) : Theme.warmDim.opacity(0.6))
                         }
                     }
                     .frame(width: 38, height: 38)
@@ -238,11 +238,11 @@ struct ToolBelt: View {
                 let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
                 Button { onPet?() } label: {
                     ZStack {
-                        Circle().fill(has ? companion.tint.opacity(0.12) : Theme.card)
-                        Circle().stroke(has ? companion.tint.opacity(0.6) : Theme.stroke, lineWidth: 1)
+                        Circle().fill(Theme.nucleoGlass)
+                        Circle().stroke(has ? Theme.orbViolet.opacity(0.35) : Theme.nucleoStroke, lineWidth: 1)
                         if has, pet.hasArt { Image(pet.assetName).resizable().scaledToFit().frame(width: 30, height: 30) }
                         else if has { Text(pet.emoji).font(.system(size: 18)) } else {
-                            Image(systemName: "pawprint.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.muted.opacity(0.6))
+                            Image(systemName: "pawprint.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.warmDim.opacity(0.6))
                         }
                     }
                     .frame(width: 38, height: 38)
@@ -257,12 +257,12 @@ struct ToolBelt: View {
             let fresh = LockerSeen.unseen(ownId: companion.id, xp: xp, raw: lockerSeen).count
             Button { onPlus?() } label: {
                 ZStack {
-                    Circle().stroke(Theme.stroke, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.muted)
+                    Circle().stroke(Theme.nucleoStroke, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                    Image(systemName: "plus").font(.system(size: 13, weight: .bold)).foregroundStyle(Theme.warmDim)
                 }
                 .frame(width: 38, height: 38)
                 .overlay(alignment: .topTrailing) {
-                    if fresh > 0 { Circle().fill(companion.tint).frame(width: 7, height: 7).offset(x: -1, y: 1) }
+                    if fresh > 0 { Circle().fill(Theme.orbViolet).frame(width: 7, height: 7).offset(x: -1, y: 1) }
                 }
             }
             .buttonStyle(.plain)
@@ -275,11 +275,11 @@ struct ToolBelt: View {
                 ZStack {
                     Image("world_map").resizable().scaledToFill().frame(width: 38, height: 38).clipShape(Circle())
                     Circle().fill(Color.black.opacity(0.38))
-                    Circle().stroke(WorldMapSheet.gold.opacity(0.75), lineWidth: 1)
-                    Circle().stroke(WorldMapSheet.gold.opacity(0.7), lineWidth: 1)
+                    Circle().stroke(Theme.orbViolet.opacity(0.45), lineWidth: 1)
+                    Circle().stroke(Theme.orbViolet.opacity(0.35), lineWidth: 1)
                         .scaleEffect(worldPulse ? 1.5 : 1)
                         .opacity(worldPulse ? 0 : 0.8)
-                    Image(systemName: "map.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(WorldMapSheet.gold)
+                    Image(systemName: "map.fill").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.cream)
                 }
                 .frame(width: 38, height: 38)
             }
@@ -305,20 +305,20 @@ struct WorldMapSheet: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                Capsule().fill(Theme.nucleoStroke).frame(width: 36, height: 4).padding(.top, 8)
                 map
                     .padding(.horizontal, 16)
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(L.t("ALREADY COUNTED", "YA CUENTA")).font(.mono(10, .bold)).kerning(2).foregroundStyle(Theme.muted)
-                        Text("\(xp) XP · \(L.t("level", "nivel")) \(level)").font(.rounded(16, .bold)).foregroundStyle(Theme.text)
+                        Text(L.t("ALREADY COUNTED", "YA CUENTA")).font(.mono(10, .bold)).kerning(2).foregroundStyle(Theme.warmDim)
+                        Text("\(xp) XP · \(L.t("level", "nivel")) \(level)").font(.rounded(16, .bold)).foregroundStyle(Theme.cream)
                     }
                     Spacer()
                     Text(L.t("CARRIES OVER", "SE CONSERVA")).font(.mono(10, .bold)).kerning(1.5).foregroundStyle(Self.gold)
                 }
                 .padding(14)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.card))
-                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.stroke, lineWidth: 1))
+                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.nucleoGlass))
+                .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.nucleoStroke, lineWidth: 1))
                 .padding(.horizontal, 16)
                 LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
                     ForEach(Self.regions, id: \.self) { name in
@@ -327,10 +327,10 @@ struct WorldMapSheet: View {
                             Text(name).font(.mono(9, .bold)).kerning(1.2)
                             Spacer(minLength: 0)
                         }
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.warmDim)
                         .padding(.horizontal, 10).padding(.vertical, 9)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.card))
-                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.stroke, lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.nucleoGlass))
+                        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.nucleoStroke, lineWidth: 1))
                     }
                 }
                 .padding(.horizontal, 16)
@@ -369,17 +369,17 @@ struct WorldMapSheet: View {
                 .scaleEffect(breathe ? 1.06 : 1.0)
                 .animation(.easeInOut(duration: 0.85).repeatForever(autoreverses: true), value: breathe)
                 Text(L.t("Your world is built with discipline.", "Tu mundo se construye con disciplina."))
-                    .font(.rounded(24, .bold)).foregroundStyle(Theme.text)
+                    .font(.rounded(24, .bold)).foregroundStyle(Theme.cream)
                 Text(L.t("Every full read and every NO TRADE raises your base camp. Regions open with XP, never with volume.",
                          "Cada lectura completa y cada NO OPERAR levanta tu campamento. Las regiones se abren con XP, nunca con volumen."))
-                    .font(.rounded(13.5, .medium)).foregroundStyle(Theme.text.opacity(0.75))
+                    .font(.rounded(13.5, .medium)).foregroundStyle(Theme.warmMuted)
                     .fixedSize(horizontal: false, vertical: true)
             }
             .padding(18)
         }
         .aspectRatio(3/4, contentMode: .fit)
         .overlay(alignment: .topLeading) {
-            Text(L.t("TRADER LAND", "TRADER LAND")).font(.mono(10, .bold)).kerning(3).foregroundStyle(Theme.text)
+            Text(L.t("TRADER LAND", "TRADER LAND")).font(.mono(10, .bold)).kerning(3).foregroundStyle(Theme.cream)
                 .padding(.horizontal, 10).padding(.vertical, 5)
                 .background(Capsule().fill(Color.black.opacity(0.5)))
                 .padding(14)
@@ -398,7 +398,7 @@ struct ToolUnlockOverlay: View {
 
     @State private var shown = false
     private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
-    private var tint: Color { tool.isGolden ? gold : companion.tint }
+    private var tint: Color { tool.isGolden ? gold : Theme.orbViolet }
 
     var body: some View {
         ZStack {
@@ -429,20 +429,20 @@ struct ToolUnlockOverlay: View {
                 .rotationEffect(.degrees(shown ? 0 : -12))
                 .shadow(color: tint.opacity(0.5), radius: 30)
                 Text(tool.name)
-                    .font(.rounded(26, .bold))
-                    .foregroundStyle(Theme.text)
+                    .font(.system(size: 28, weight: .light, design: .rounded))
+                    .foregroundStyle(Theme.cream)
                 HStack(spacing: 8) {
                     CompanionThumb(companion: companion).frame(width: 26, height: 26).clipShape(Circle())
                     Text(L.t("for \(companion.name(at: 1))", "para \(companion.name(at: 1))"))
-                        .font(.rounded(13, .medium)).foregroundStyle(Theme.text.opacity(0.8))
+                        .font(.rounded(13, .medium)).foregroundStyle(Theme.warmMuted)
                 }
                 Text("\(tool.tierLabel) · \(tool.unlockXP) XP")
                     .font(.mono(10, .bold))
                     .kerning(1.4)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 Text(tool.lore)
                     .font(.rounded(14, .medium))
-                    .foregroundStyle(Theme.text.opacity(0.8))
+                    .foregroundStyle(Theme.warmMuted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
                 Button {
@@ -460,7 +460,7 @@ struct ToolUnlockOverlay: View {
                 }
                 .padding(.top, 6)
                 Button(L.t("KEEP FOR LATER", "GUARDAR PARA DESPUÉS")) { onDismiss(false) }
-                    .font(.mono(11, .bold)).foregroundStyle(Theme.text.opacity(0.8))
+                    .font(.mono(11, .bold)).foregroundStyle(Theme.warmMuted)
                     .frame(minHeight: 44).accessibilityIdentifier("gear-unlock-store")
             }
             .opacity(shown ? 1 : 0)
@@ -483,12 +483,12 @@ struct ToolDetailSheet: View {
 
     private var gold: Color { Color(red: 0.96, green: 0.77, blue: 0.26) }
     private var unlocked: Bool { CompanionToolkit.unlocked(tool, xp: xp) }
-    private var tint: Color { tool.isGolden ? gold : companion.tint }
+    private var tint: Color { tool.isGolden ? gold : Theme.orbViolet }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                Capsule().fill(Theme.nucleoStroke).frame(width: 36, height: 4).padding(.top, 8)
                 ZStack {
                     Circle().fill(tint.opacity(unlocked ? 0.12 : 0.04)).frame(width: 150, height: 150)
                     Circle().stroke(tint.opacity(unlocked ? 0.6 : 0.2), lineWidth: 1).frame(width: 150, height: 150)
@@ -497,26 +497,26 @@ struct ToolDetailSheet: View {
                     } else {
                         Image(systemName: unlocked ? tool.symbol : "lock.fill")
                             .font(.system(size: 44, weight: .bold))
-                            .foregroundStyle(unlocked ? tint : Theme.muted)
+                            .foregroundStyle(unlocked ? tint : Theme.warmDim)
                     }
                 }
                 .saturation(unlocked ? 1 : 0)
                 Text(unlocked ? tool.name : "???")
-                    .font(.rounded(22, .bold))
-                    .foregroundStyle(Theme.text)
+                    .font(.system(size: 24, weight: .light, design: .rounded))
+                    .foregroundStyle(Theme.cream)
                 Text(unlocked
                      ? "\(tool.tierLabel) · \(companion.name(at: 1))"
                      : L.t("\(tool.tierLabel) · UNLOCKS AT \(tool.unlockXP) XP · YOU HAVE \(xp)", "\(tool.tierLabel) · SE DESBLOQUEA A \(tool.unlockXP) XP · LLEVAS \(xp)"))
                     .font(.mono(10, .bold))
                     .kerning(1.3)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 Text(unlocked
                      ? tool.lore
                      : (tool.tier == 1
                         ? L.t("Drops after your first full read.", "Cae después de tu primera lectura completa.")
                         : L.t("Discipline only: reads and coming back. Never volume.", "Solo disciplina: lecturas y volver. Nunca volumen.")))
                     .font(.rounded(14, .medium))
-                    .foregroundStyle(Theme.text.opacity(0.8))
+                    .foregroundStyle(Theme.warmMuted)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 28)
                 if unlocked {
@@ -548,11 +548,11 @@ struct EquipmentControl: View {
                 Label(equipped ? L.t("UNEQUIP", "QUITAR") : L.t("EQUIP", "EQUIPAR"), systemImage: equipped ? "minus.circle" : "plus.circle")
                     .font(.mono(12, .bold)).frame(maxWidth: .infinity, minHeight: 48)
             }
-            .buttonStyle(.borderedProminent).tint(item.companion.tint).foregroundStyle(.black)
+            .buttonStyle(.borderedProminent).buttonBorderShape(.capsule).tint(Theme.cream).foregroundStyle(Theme.bg)
             .accessibilityIdentifier("equipment-toggle-\(item.id)")
             .accessibilityValue(equipped ? L.t("Equipped", "Equipado") : L.t("Stored", "Guardado"))
             Text(L.t("Stays in your collection. Your XP stays the same.", "Se queda en tu colección. Conservas tu XP."))
-                .font(.rounded(12, .medium)).foregroundStyle(Theme.muted).multilineTextAlignment(.center)
+                .font(.rounded(12, .medium)).foregroundStyle(Theme.warmDim).multilineTextAlignment(.center)
         }.padding(.horizontal, 24)
     }
 }
@@ -626,21 +626,21 @@ enum SkinCard {
         let dy: CGFloat = story ? 260 : 0          // everything below the header shifts down
         return UIGraphicsImageRenderer(size: size).image { ctx in
             let c = ctx.cgContext
-            UIColor(red: 0.01, green: 0.012, blue: 0.019, alpha: 1).setFill()
+            UIColor(Theme.bg).setFill()
             c.fill(CGRect(origin: .zero, size: size))
-            let tint = UIColor(hue: companion.hue, saturation: 0.7, brightness: 0.95, alpha: 1)
+            let tint = UIColor(Theme.orbViolet)
             let glowColors = [tint.withAlphaComponent(0.35).cgColor, tint.withAlphaComponent(0).cgColor] as CFArray
             if let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(), colors: glowColors, locations: [0, 1]) {
                 c.drawRadialGradient(gradient, startCenter: CGPoint(x: 540, y: 560 + dy), startRadius: 0, endCenter: CGPoint(x: 540, y: 560 + dy), endRadius: 620, options: [])
             }
             let mono = UIFont.monospacedSystemFont(ofSize: 30, weight: .bold)
-            let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI ESTILO"))", attributes: [.font: mono, .foregroundColor: UIColor.white.withAlphaComponent(0.75), .kern: 6])
+            let head = NSAttributedString(string: "BOBBY // \(L.t("MY SKIN", "MI ESTILO"))", attributes: [.font: mono, .foregroundColor: UIColor(Theme.warmMuted), .kern: 6])
             head.draw(at: CGPoint(x: 72, y: 72 + (story ? 200 : 0)))
             let aspect = snapshot.size.width / max(snapshot.size.height, 1)
             let shotH: CGFloat = 760
             let shotW = shotH * aspect
             snapshot.draw(in: CGRect(x: (size.width - shotW) / 2, y: 150 + dy, width: shotW, height: shotH))
-            let name = NSAttributedString(string: companion.name(at: level.number), attributes: [.font: UIFont.systemFont(ofSize: 76, weight: .bold), .foregroundColor: UIColor.white, .kern: 4])
+            let name = NSAttributedString(string: companion.name(at: level.number), attributes: [.font: UIFont.systemFont(ofSize: 76, weight: .light), .foregroundColor: UIColor(Theme.cream), .kern: -1])
             let nameW = name.size().width
             name.draw(at: CGPoint(x: (size.width - nameW) / 2, y: 930 + dy))
             let sub = NSAttributedString(string: "\(L.t("LEVEL", "NIVEL")) \(level.number) · \(level.name) · \(xp) XP", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 26, weight: .bold), .foregroundColor: tint, .kern: 4])
@@ -648,10 +648,10 @@ enum SkinCard {
             var line = gear.map { $0.name }
             if let pet { line.append(pet.name) }
             let gearText = line.isEmpty ? L.t("No accessories equipped.", "Sin accesorios equipados.") : line.joined(separator: " · ")
-            let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.8)])
+            let gearAttr = NSAttributedString(string: gearText, attributes: [.font: UIFont.systemFont(ofSize: 28, weight: .medium), .foregroundColor: UIColor(Theme.warmMuted)])
             let gearRect = CGRect(x: 90, y: 1090 + dy, width: size.width - 180, height: 120)
             gearAttr.draw(with: gearRect, options: [.usesLineFragmentOrigin], context: nil)
-            let foot = NSAttributedString(string: "bobbyprotocol.xyz · \(L.t("earned with discipline, never volume", "ganado con disciplina, nunca volumen"))", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 22, weight: .medium), .foregroundColor: UIColor.white.withAlphaComponent(0.4), .kern: 2])
+            let foot = NSAttributedString(string: "bobbyprotocol.xyz · \(L.t("earned with discipline, never volume", "ganado con disciplina, nunca volumen"))", attributes: [.font: UIFont.monospacedSystemFont(ofSize: 22, weight: .medium), .foregroundColor: UIColor(Theme.warmDim), .kern: 2])
             foot.draw(at: CGPoint(x: (size.width - foot.size().width) / 2, y: 1270 + dy))
         }
     }
@@ -676,17 +676,17 @@ struct PetDetailSheet: View {
         let has = CompanionToolkit.petUnlocked(companionId: companion.id, xp: xp)
         ScrollView {
             VStack(spacing: 12) {
-                Capsule().fill(Theme.stroke).frame(width: 36, height: 4).padding(.top, 8)
+                Capsule().fill(Theme.nucleoStroke).frame(width: 36, height: 4).padding(.top, 8)
                 if let pet, pet.hasArt {
                     Image(pet.assetName).resizable().scaledToFit().frame(width: 150, height: 150).saturation(has ? 1 : 0.15)
                 } else {
                     Text(pet?.emoji ?? "🐾").font(.system(size: 96)).saturation(has ? 1 : 0.15)
                 }
-                Text(pet?.name ?? "").font(.rounded(22, .bold)).foregroundStyle(Theme.text)
+                Text(pet?.name ?? "").font(.system(size: 24, weight: .light, design: .rounded)).foregroundStyle(Theme.cream)
                 Text(has
                      ? ((pet?.spins ?? false) ? L.t("Spins next to you on the desk.", "Gira a tu lado en la mesa.") : L.t("Lives at your companion's feet.", "Vive a los pies de tu amigo."))
                      : L.t("Unlocks at \(CompanionPet.unlockXP) XP · you have \(xp). Discipline only.", "Se desbloquea a \(CompanionPet.unlockXP) XP · llevas \(xp). Solo disciplina."))
-                    .font(.rounded(14, .medium)).foregroundStyle(Theme.text.opacity(0.75)).multilineTextAlignment(.center).padding(.horizontal, 28)
+                    .font(.rounded(14, .medium)).foregroundStyle(Theme.warmMuted).multilineTextAlignment(.center).padding(.horizontal, 28)
                 if has, let pet { EquipmentControl(store: store, item: .pet(pet, companion)) }
             }
             .frame(maxWidth: .infinity).padding(.bottom, 16)

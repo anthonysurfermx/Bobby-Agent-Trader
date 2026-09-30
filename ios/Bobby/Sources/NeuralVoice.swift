@@ -35,6 +35,12 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private var meterTimer: Timer?
     private let session: URLSession
 
+    /// Read the current consent at use time: gallery voices can outlive the consent sheet.
+    /// Bundled clips remain available without sending any text to an external provider.
+    private var allowsExternalSpeech: Bool {
+        defaults.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion
+    }
+
     init(session: URLSession = .shared, defaults: UserDefaults = .standard) {
         self.session = session
         self.defaults = defaults
@@ -79,7 +85,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// greetings, onboarding previews — retry once and then stay silent: a
     /// robotic voice breaking the companion's identity is worse than no voice.
     func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
-        guard Self.avatarNarrationEnabled, !isMuted else { return }
+        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech else { return }
         stop()
         generation += 1
         let gen = generation
@@ -91,6 +97,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 var attempt = 0
                 var payload: (Data, URLResponse)? = nil
                 while attempt < 2 {
+                    // A stop or withdrawal during the retry delay must never send a second POST.
+                    guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech, !Task.isCancelled else { return }
                     attempt += 1
                 var req = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/bobby-voice-free")!)
                 req.httpMethod = "POST"
@@ -109,19 +117,19 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
                 req.httpBody = try JSONSerialization.data(withJSONObject: body)
                     let result = try await session.data(for: req)
-                    guard gen == self.generation else { return }
+                    guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech else { return }
                     let status = (result.1 as? HTTPURLResponse)?.statusCode ?? 0
                     if status == 200 && result.0.count > 500 { payload = result; break }
                     // Throttled or a hiccup: one short retry before deciding.
                     if attempt < 2 { try? await Task.sleep(nanoseconds: 1_200_000_000) }
                 }
-                guard gen == self.generation else { return }
+                guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech else { return }
                 guard let (data, _) = payload, self.play(data, playbackRate: playbackRate) else {
                     if essential { self.speakFallback(text) } else { self.speaking = false }
                     return
                 }
             } catch {
-                if gen == self.generation {
+                if gen == self.generation, !self.isMuted, self.allowsExternalSpeech {
                     if essential { self.speakFallback(text) } else { self.speaking = false }
                 }
             }
@@ -130,7 +138,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     /// A clip bundled with the app, rendered offline by the same
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
-    /// A missing clip falls back to the network voice for `fallbackText`.
+    /// A missing or unplayable clip falls back to the network voice for `fallbackText` only
+    /// while the current external-processing consent permits it (checked centrally in speak).
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
         guard Self.avatarNarrationEnabled, !isMuted else { return }
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),

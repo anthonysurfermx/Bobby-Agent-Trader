@@ -1,6 +1,6 @@
 // App fixture mode, `-nucleo-fixtures [scenario]` (Nucleo/ARCHITECTURE.md §4.4). DEBUG only.
 // A URLProtocol answers every request of the app process from the recorded captures in
-// Bundle.main/Nucleo/fixtures (copied there by `build.py` in dev builds), so the real
+// Bundle.main/Nucleo/fixtures (embedded by the Debug-only build phase), so the real
 // native pipeline — asset search, preflight, market, pulse, desk, mapping — runs end to
 // end without spending desk quota and without a single request leaving the process.
 #if DEBUG

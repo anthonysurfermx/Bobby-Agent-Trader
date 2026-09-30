@@ -81,7 +81,7 @@ function moveSphere(cy, r, nm){
     W.pend = { t:T + 0.12, cy:cy, r:r, nm:nm };
   } else { W.pend = null; to(W.cy, cy, nm); to(W.r, r, nm); }
 }
-function companionTint(){ return CHOSEN_ART ? CHOSEN_ART.tintLab : lab('#B8C2D3'); }
+function companionTint(){ return lab('#A795EF'); }
 
 /* ---------- cues ---------- */
 function at(dt, fn){ W.cues.push({ t:T + dt, fn:fn, g:W.gen }); }      /* cancelled when the state changes */

@@ -10,6 +10,7 @@ function st(el, t, o, f){
   if (t != null && t !== el._t){ el._t = t; el.style.transform = t; }
   if (o != null){ o = o < 0.003 ? 0 : (o > 0.997 ? 1 : Math.round(o * 1000) / 1000); if (o !== el._o){ el._o = o; el.style.opacity = o; } }
   if (f != null && f !== el._f){ el._f = f; el.style.filter = f; }
+  if (el === linesEl && o != null){ sa(el, 'aria-hidden', o > 0.5 ? 'false' : 'true'); if (rbodyEl) rbodyEl.tabIndex = o > 0.5 ? 0 : -1; }
 }
 function sa(el, k, v){ if (el['_a' + k] !== v){ el['_a' + k] = v; el.setAttribute(k, v); } }
 function sc(el, k, v){ if (el['_c' + k] !== v){ el['_c' + k] = v; el.style[k] = v; } }
@@ -79,15 +80,22 @@ function buildRisk(statements){
   (statements || []).slice(0, 4).forEach(function(s){
     var d = document.createElement('div'); d.className = 'ln'; linesEl.appendChild(d); lineEls.push(d); lineW.push(spans(d, s.title));
   });
-  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb'; rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
+  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb';
+  rbodyEl.setAttribute('role', 'region'); rbodyEl.setAttribute('aria-label', statements && statements[0] ? statements[0].title : ''); rbodyEl.tabIndex = -1;
+  rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
   RISK_LAYOUT = null;
 }
 /* stack below the agree ring (ring bottom at cy + r + 14 = 436 for the risk sphere), 16 px clear */
 function layoutRisk(top){
   var y = top, tops = [];
   for (var i = 0; i < lineEls.length; i++){ tops.push(y); sc(lineEls[i], 'top', f1(y) + 'px'); y += (lineEls[i].offsetHeight || 26) + 4; }
-  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y; y += (rbodyEl.offsetHeight || 54) + 2;
-  RISK_LAYOUT = { tops:tops, body:by, notice:Math.min(y, 690) };
+  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y;
+  // Measure the complete copy before bounding its viewport above the full-notice button.
+  sc(rbodyEl, 'height', 'auto');
+  var naturalHeight = rbodyEl.scrollHeight || rbodyEl.offsetHeight || 54;
+  var bodyHeight = Math.min(naturalHeight, Math.max(0, 690 - by - 8));
+  sc(rbodyEl, 'height', f1(bodyHeight) + 'px'); rbodyEl.scrollTop = 0;
+  RISK_LAYOUT = { tops:tops, body:by, bodyHeight:bodyHeight, notice:Math.min(by + bodyHeight + 8, 690) };
   return RISK_LAYOUT;
 }
 

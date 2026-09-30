@@ -121,24 +121,27 @@ private struct NucleoStage: View {
         case .account:
             // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
-                         onVoiceMutedChange: { session.sessionChanged() }) { session.sheet = nil }
+                         onVoiceMutedChange: { session.sessionChanged() },
+                         onAIConsentWithdraw: { session.revokeRiskNoticeConsent() }) { session.sheet = nil }
         case .riskNotice:
-            RiskNoticeView(profile: session.profile, readOnly: true) { session.sheet = nil }
+            RiskNoticeView(profile: session.profile, readOnly: true,
+                           onClose: { session.sheet = nil },
+                           onWithdraw: { session.revokeRiskNoticeConsent() })
         case .paywall:
             NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
                                afterSignIn: { await session.signedInFromSheet() },
                                onOutcome: { session.paywallOutcome($0) }) { session.sheet = nil }
         case .levels:
             NucleoLevelSheet(center: NucleoLevelCenter.shared) { session.sheet = nil }
-                .presentationDetents([.height(250)])
+                .presentationDetents([.height(340), .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Color.black)
+                .presentationBackground(Theme.nucleoSurface)
         case .invite:
             NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: session.proPurchasable, reason: session.inviteReason,
                               onPro: { session.inviteChosePro() }) { session.sheet = nil }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(Color.black)
+                .presentationBackground(Theme.bg)
         }
     }
 }

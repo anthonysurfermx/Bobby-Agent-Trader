@@ -83,6 +83,13 @@ targets:
       - path: ../../public/land/v1/audio
         type: folder
         buildPhase: resources
+    postBuildScripts:
+      - name: Embed offline fixtures in Debug only
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$CONFIGURATION" = "Debug" ]; then
+            /usr/bin/ditto "$PROJECT_DIR/Nucleo/fixtures" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Nucleo/fixtures"
+          fi
     dependencies:
       - package: GLTFKit2
       - package: RevenueCat
@@ -125,7 +132,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.5"
-        CURRENT_PROJECT_VERSION: "44"
+        CURRENT_PROJECT_VERSION: "45"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
         # Test Store key; Release stays empty until the production appl_… key exists (BobbyStore also refuses

@@ -28,7 +28,7 @@ function applySession(s, first){
   var c = s.companion || null, id = c ? c.id : null;
   if (first || id !== prevId){
     ME.id = id; ME.webId = c ? c.webId : null; ME.art = c ? artFor(c.webId) : null; ME.label = c ? titleCase(c.label) : '';
-    ME.pal = c && GLASS[c.palette] ? c.palette : 'ghost'; ME.tint = hex(GLASS[ME.pal]); ME.cap = ME.pal === 'lava' ? 0.28 : 0.35;
+    ME.pal = c && GLASS[c.palette] ? c.palette : 'ghost'; ME.tint = hex('#A795EF'); ME.cap = ME.pal === 'lava' ? 0.28 : 0.35;
     TM = temper(ME.pal); applyTemperSprings(); if (U) tuneAmbient(false);
     buildAvatar(); loadCompanionArt();
     if (ROSTER) buildBelt(ROSTER.companions);
@@ -38,14 +38,49 @@ function applySession(s, first){
   att(el.close, 'aria-label', tt('aria.close'));
   setXpArc(s.level && s.level.progress);
 }
+// Reject replies started for a previous account, even when the new account is offline.
+var OWNER_GEN = 0;
 function refreshCollections(){
-  bcall('theses').then(function(r){ if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
-  bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
-  bcall('roster').then(function(r){ ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
+  var gen = OWNER_GEN;
+  bcall('theses').then(function(r){ if (gen !== OWNER_GEN) return; if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
+  bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
+  bcall('roster').then(function(r){ if (gen !== OWNER_GEN) return; ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
+  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+}
+function resetVisibleRead(preserveSignIn){
+  if (preserveSignIn) return;
+  GATE_BUSY = false;
+  if (ST.name !== 'BOOT') {
+    clearRead();
+    txReset(); showTypeBox(false);
+    el.ta.value = '';
+    // Saved cards must disappear immediately rather than fade under a different account.
+    A.rev.forEach(function(v){ v.set(0); });
+    A.satG.on = false;
+    go('RETURNING');
+  }
+  READ = null;
+}
+function accountChanged(p){
+  OWNER_GEN++;
+  var preserveSignIn = ST.name === 'SIGNIN_GATE' && p && !p.wasSignedIn && p.signedIn;
+  LEDGER = []; ISLAND = null; ROSTER = null; SUGG = null; SAVED = null; READS_DONE = 0;
+  HINTED = {};
+  resetVisibleRead(preserveSignIn);
+  if (ST.name !== 'BOOT'){ buildFaces(); setGreeting(); }
+  refreshCollections();
+}
+function consentWithdrawn(){
+  OWNER_GEN++;
+  SUGG = null;
+  resetVisibleRead(false);
+  if (SES) SES.riskAccepted = false;
 }
 function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
+  BR.on('account.changed', accountChanged);
+  BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('analysis.level', lvlApply);
@@ -70,7 +105,7 @@ function wire(){
   });
   BR.on('voice.word', function(p){ if (!p || p.id !== VOICE.id) return; K.mode = 'word'; var w = K.wt[p.index | 0]; if (w && Math.abs(K.t - w.t0) > 0.08) K.t = w.t0; });
   BR.on('voice.end', function(p){ if (!p || p.id !== VOICE.id) return; VOICE.ended = true; if (!VOICE.started || p.reason !== 'finished') VOICE.silent = true; fsmEvent('voice.end', p); });
-  BR.on('thesis.planted', function(){ bcall('island').then(function(i){ ISLAND = i; }).catch(noop); });
+  BR.on('thesis.planted', function(){ var gen = OWNER_GEN; bcall('island').then(function(i){ if (gen === OWNER_GEN) ISLAND = i; }).catch(noop); });
   BR.on('native.sheet', function(p){ SHEET = !!(p && p.state === 'open'); last = -1; if (!SHEET) refreshCollections(); });
 }
 /* fonts: measurements (caption pages, stance clamps, satellite widths) need the real faces */
@@ -88,21 +123,23 @@ function boot(){
   bcall('session', { page: 'app' }).then(function(s){
     applySession(s, true);
     buildState();
+    var gen = OWNER_GEN;
     var started = false;
     function start(){
       if (started) return; started = true;
       buildFaces();
-      var pr = SES && SES.pendingRead;
+      var pr = gen === OWNER_GEN && SES && SES.pendingRead;
       if (pr && pr.status === 'ok') go('RESTORE', { read: pr }); else go('WAKE');
     }
     Promise.all([bcall('theses').catch(noop), bcall('roster').catch(noop)]).then(function(r){
+      if (gen !== OWNER_GEN){ start(); return; }
       if (r[0] && Array.isArray(r[0].items)) LEDGER = r[0].items;
       if (r[1]){ ROSTER = r[1]; buildBelt(r[1].companions); }
       start();
     });
     at(0.5, start);
-    bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ SUGG = x; }).catch(noop);
+    bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
+    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

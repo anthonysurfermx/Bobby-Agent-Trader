@@ -413,6 +413,7 @@ enum BobbyAPI {
             throw URLError(.badURL)
         }
         var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.httpMethod = method
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
@@ -433,10 +434,15 @@ enum BobbyAPI {
             throw URLError(.badURL)
         }
         var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.httpMethod = method
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = timeout ?? (path == "api/desk-debate" ? 100 : 60)
         for (name, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: name) }
+        if extraHeaders.keys.contains(where: { $0.caseInsensitiveCompare("Authorization") == .orderedSame })
+            || extraHeaders[BobbyAccessAPI.deviceHeader] != nil {
+            req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)

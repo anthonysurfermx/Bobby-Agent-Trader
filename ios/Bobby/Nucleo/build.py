@@ -27,8 +27,8 @@ PAGES = ["app", "onboarding", "contract"]
 DEV_ONLY_PAGES = {"contract"}
 LEGACY = ["index.html", "nucleo-v2.html", "nucleo-onboarding.html"]
 MARKER = ".generated-by-nucleo-build"
-CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src https://fonts.gstatic.com data:; img-src data: blob:; media-src data: blob:; "
+CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+       "font-src data:; img-src data: blob:; media-src data: blob:; "
        "connect-src 'none'; base-uri 'none'; form-action 'none'")
 
 

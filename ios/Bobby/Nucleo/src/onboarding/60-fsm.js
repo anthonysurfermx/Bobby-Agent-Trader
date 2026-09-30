@@ -106,7 +106,7 @@ function route(s){
 function enterBorn(){
   W.birthT = T - 30; W.r.x = W.r.t = 120; W.birth.x = W.birth.t = 1; W.glow.x = W.glow.t = 1; W.birthMass = false; W.energy.x = W.energy.t = 0.35;
   tb('wmFly', T - 5); tb('pillIn', T - 0.3);
-  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(CHOSEN_ART.tintLab); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
+  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(companionTint()); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
   loadRoster().catch(noop);
 }
 
