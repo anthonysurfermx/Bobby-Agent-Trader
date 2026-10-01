@@ -1,9 +1,10 @@
-// "Economía unitaria": revenue, CAC, LTV, ROI and LTV:CAC from the server's /api/admin?view=lifecycle, each
-// with the formula it came from; the costs that feed them (register / delete) and the owner's assumptions.
+// "Economía unitaria": revenue, CAC and ROI observed from the server's /api/admin?view=lifecycle, each with the
+// formula it came from; LTV, LTV:CAC and payback, which are a projection from the owner's assumptions while no
+// account has ever paid (ltv.scenario); the costs that feed them (register / delete) and the assumptions.
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { adminAction, type AdminError, type CostKind, type CostRow, type Economics } from '@/lib/admin-client';
-import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Segmented, StaleBanner, TableScroll, Tag, TextInput, td, th, tr } from './ui';
+import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Note, Segmented, StaleBanner, TableScroll, Tag, TextInput, td, th, tr } from './ui';
 import { BigNumber, StatusBars, type StatusRow } from './charts';
 import { fmtDate, fmtDec, fmtInt, fmtUsd } from './format';
 import { toAdminError } from './useLoad';
@@ -21,9 +22,9 @@ function moneyInput(raw: string): string {
 
 /** One cell of the unit-economics strips: label, big mono value, details and the formula behind it. */
 function EconCell({ label, value, tone, details, formula, hint, tag }: {
-  label: string; value: ReactNode; tone?: 'green' | 'red' | 'amber'; details?: ReactNode[]; formula: string; hint?: string; tag?: ReactNode;
+  label: string; value: ReactNode; tone?: 'green' | 'red' | 'amber' | 'dim'; details?: ReactNode[]; formula: string; hint?: string; tag?: ReactNode;
 }) {
-  const color = tone === 'green' ? 'text-[#4ADE80]' : tone === 'red' ? 'text-[#F06A6A]' : tone === 'amber' ? 'text-[#F7A04B]' : 'text-[#EDEDED]';
+  const color = tone === 'green' ? 'text-[#4ADE80]' : tone === 'red' ? 'text-[#F06A6A]' : tone === 'amber' ? 'text-[#F7A04B]' : tone === 'dim' ? 'text-[#8B8B8B]' : 'text-[#EDEDED]';
   return (
     <div className="flex min-w-0 flex-col justify-between gap-4 p-5">
       <div className="min-w-0">
@@ -237,17 +238,24 @@ function Assumptions({ e, onSaved }: { e: Economics; onSaved: (text: string) => 
   );
 }
 
-export default function EconomicsSection({ e, costs, costsError, onCostsRetry, period, notify, onChanged }: {
+const PRICE_SOURCE: Record<Economics['revenue']['priceSource'], string> = { observed: 'último cobro real', assumed: 'supuesto tuyo', default: 'default del servidor' };
+const CHURN_SOURCE: Record<Economics['ltv']['churnSource'], string> = { observed: 'observado', assumed: 'supuesto tuyo', default: 'default del servidor' };
+
+export default function EconomicsSection({ e, costs, costsError, onCostsRetry, period, notify, onChanged, ledgerSurfaces }: {
   e: Economics; costs: CostRow[] | null; costsError: AdminError | null; onCostsRetry: () => void; period: number; notify: Notify; onChanged: () => void;
+  /** Surfaces that write the LLM ledger (overview.coverage); IA cost only covers those. */
+  ledgerSurfaces?: string[] | null;
 }) {
   const r = e.revenue, c = e.costs, acq = e.acquisition, l = e.ltv;
   const done = (text: string) => { notify(text); onChanged(); };
   const noMarketing = c.marketingUsd <= 0;
   const noPaying = acq.newPaying <= 0;
-  const cacHint = noMarketing ? 'registra gasto de marketing' : noPaying ? 'aún sin clientes de pago' : undefined;
+  const cacHint = noMarketing ? 'registra gasto de marketing' : noPaying ? 'sin pagadores en el periodo' : undefined;
   const ratio = l.ltvToCac;
   const capped = l.monthlyChurn > 0 && l.lifetimeMonths < 1 / l.monthlyChurn - 0.05;
-  const churnTag = l.churnSource === 'observed' ? <Tag tone="green">Observado</Tag> : l.churnSource === 'assumed' ? <Tag tone="orange">Supuesto</Tag> : <Tag>Default</Tag>;
+  const scenario = l.scenario;
+  const churnTag = l.churnSource === 'observed' ? <Tag tone="green">Churn observado</Tag> : l.churnSource === 'assumed' ? <Tag tone="orange">Churn supuesto</Tag> : <Tag>Churn default</Tag>;
+  const surfaces = ledgerSurfaces?.length ? ledgerSurfaces.join(', ') : null;
 
   const rows: StatusRow[] = [
     ...c.byChannel.map((ch) => ({ label: `Mkt · ${ch.channel}`, value: ch.usd, fill: 'orange' as const, display: fmtUsd(ch.usd) })),
@@ -257,6 +265,42 @@ export default function EconomicsSection({ e, costs, costsError, onCostsRetry, p
     { label: 'IA (ledger)', value: c.llmUsd, fill: 'blue', display: fmtUsd(c.llmUsd, true) },
   ];
   const breakdown = rows.filter((row) => row.value > 0);
+  const assumptionsLine = [
+    `precio ${fmtUsd(r.priceUsd)}/mes (${PRICE_SOURCE[r.priceSource]})`,
+    `comisión de tienda ${pct(1 - r.takehome)}`,
+    `churn ${pct(l.monthlyChurn)}/mes (${CHURN_SOURCE[l.churnSource]})`,
+    `vida ${fmtDec(l.lifetimeMonths)} meses${capped ? ' (tope)' : ''}`,
+    `IA ${fmtUsd(l.monthlyLlmPerUserUsd, true)}/usuario/mes`,
+  ].join(' · ');
+
+  const ltvCells = (
+    <>
+      <EconCell
+        label="LTV" value={fmtUsd(l.ltvUsd)} tone={scenario ? 'dim' : undefined} tag={scenario ? <Tag tone="orange">Proyección</Tag> : churnTag}
+        details={[
+          <>contribución mensual {fmtUsd(l.monthlyContributionUsd)} × vida {fmtDec(l.lifetimeMonths)} meses</>,
+          <>churn {pct(l.monthlyChurn)} / mes ({CHURN_SOURCE[l.churnSource]}){capped ? ` · tope ${fmtDec(l.lifetimeMonths)} m` : ''}</>,
+        ]}
+        formula={`LTV = (${fmtUsd(l.monthlyNetPerSubUsd)} − ${fmtUsd(l.monthlyLlmPerUserUsd, true)} IA/usuario) ÷ ${pct(l.monthlyChurn)} churn${capped ? ` (tope ${fmtDec(l.lifetimeMonths)} m)` : ''}`}
+      />
+      <EconCell
+        label="LTV : CAC" value={ratio != null ? `${fmtDec(ratio)}×` : '—'}
+        // A projection gets no good/bad color: there is nothing observed to judge yet.
+        tone={ratio == null ? undefined : scenario ? 'dim' : ratio >= 3 ? 'green' : ratio >= 1 ? 'amber' : 'red'}
+        hint={ratio == null ? cacHint : undefined}
+        tag={scenario ? <Tag tone="orange">Proyección</Tag> : undefined}
+        details={[<>meta habitual: 3× o más</>]}
+        formula="LTV:CAC = LTV ÷ CAC por pagador"
+      />
+      <EconCell
+        label="Payback" value={l.paybackMonths != null ? `${fmtDec(l.paybackMonths)} meses` : '—'} tone={scenario ? 'dim' : undefined}
+        hint={l.paybackMonths == null ? cacHint : undefined}
+        tag={scenario ? <Tag tone="orange">Proyección</Tag> : undefined}
+        details={[<>meses de contribución para recuperar lo que costó un pagador</>]}
+        formula="payback = CAC por pagador ÷ contribución mensual"
+      />
+    </>
+  );
 
   return (
     <section className="flex flex-col gap-4" aria-labelledby="econ-title">
@@ -267,52 +311,63 @@ export default function EconomicsSection({ e, costs, costsError, onCostsRetry, p
 
       <Split cols={3}>
         <EconCell
-          label="Neto estimado" value={fmtUsd(r.netUsd)}
+          label="Ingresos (observados)" value={fmtUsd(r.netUsd)}
           details={[
-            <>bruto {fmtUsd(r.grossUsd)} · reembolsos {fmtUsd(r.refundsUsd)}</>,
-            <>MRR neto <span className="text-[#EDEDED]">{fmtUsd(r.mrrNetUsd)}</span> · bruto {fmtUsd(r.mrrGrossUsd)}</>,
-            <>{fmtInt(r.activeSubscriptions)} suscripciones activas · {fmtInt(r.newPaying)} nuevas</>,
+            <>neto estimado · bruto {fmtUsd(r.grossUsd)} · reembolsos {fmtUsd(r.refundsUsd)}</>,
+            <>MRR neto <span className="text-[#EDEDED]">{fmtUsd(r.mrrNetUsd)}</span> · {fmtInt(r.activeSubscriptions)} suscripciones pagadas</>,
+            <>{fmtInt(r.trialing)} en prueba (no cuentan en el MRR)</>,
+            <>{fmtInt(r.newPaying)} nuevos pagadores · {fmtInt(r.payersEver)} han pagado alguna vez</>,
           ]}
-          formula={`neto estimado = bruto − comisión e impuestos de la tienda − reembolsos · MRR = ${fmtInt(r.activeSubscriptions)} × ${fmtUsd(r.priceUsd)} × ${pct(r.takehome)}`}
+          formula={`neto = bruto − comisión e impuestos de la tienda − reembolsos · MRR = ${fmtInt(r.activeSubscriptions)} pagadas × ${fmtUsd(r.priceUsd)} × ${pct(r.takehome)} · nuevo pagador = cuenta con un cobro positivo en el periodo`}
         />
         <EconCell
-          label="CAC" value={acq.cacPerPaying != null ? fmtUsd(acq.cacPerPaying) : '—'} hint={acq.cacPerPaying == null ? cacHint : undefined}
+          label="CAC por pagador" value={acq.cacPerPaying != null ? fmtUsd(acq.cacPerPaying) : '—'} hint={acq.cacPerPaying == null ? cacHint : undefined}
           details={[
             <>por cuenta {acq.cacPerAccount != null ? fmtUsd(acq.cacPerAccount) : '—'} · {fmtInt(acq.newAccounts)} cuentas nuevas</>,
-            <>marketing {fmtUsd(c.marketingUsd)} / {fmtInt(acq.newPaying)} nuevos de pago</>,
+            <>mezclado: todo el marketing entre todas las cuentas (orgánicas incluidas), no por canal</>,
           ]}
-          formula="CAC = marketing ÷ nuevos de pago"
+          formula={`CAC = marketing ${fmtUsd(c.marketingUsd)} ÷ ${fmtInt(acq.newPaying)} nuevos pagadores · por cuenta = marketing ÷ cuentas nuevas`}
         />
         <EconCell
-          label="LTV" value={fmtUsd(l.ltvUsd)} tag={churnTag}
+          label="ROI del periodo" value={e.roi.roi != null ? `${e.roi.roi >= 0 ? '+' : ''}${pct(e.roi.roi)}` : '—'}
+          tone={e.roi.roi == null ? undefined : e.roi.roi >= 0 ? 'green' : 'red'}
+          hint={e.roi.roi == null ? 'registra costos' : r.payersEver <= 0 ? 'sin pagadores: solo refleja el gasto' : undefined}
           details={[
-            <>contribución mensual {fmtUsd(l.monthlyContributionUsd)} × vida {fmtDec(l.lifetimeMonths)} meses</>,
-            <>churn {pct(l.monthlyChurn)} / mes{capped ? ` · tope ${fmtDec(l.lifetimeMonths)} m` : ''}</>,
+            <>resultado <span className={e.roi.profitUsd >= 0 ? 'text-[#4ADE80]' : 'text-[#F06A6A]'}>{fmtUsd(e.roi.profitUsd)}</span> = neto {fmtUsd(r.netUsd)} − costos registrados {fmtUsd(c.totalUsd)}</>,
           ]}
-          formula={`LTV = (${fmtUsd(l.monthlyNetPerSubUsd)} − ${fmtUsd(l.monthlyLlmPerUserUsd, true)} IA/usuario) ÷ ${pct(l.monthlyChurn)} churn${capped ? ` (tope ${fmtDec(l.lifetimeMonths)} m)` : ''}`}
+          formula="ROI = (neto − costos registrados) ÷ costos registrados"
         />
       </Split>
 
-      <Split cols={2}>
-        <EconCell
-          label="ROI" value={e.roi.roi != null ? `${e.roi.roi >= 0 ? '+' : ''}${pct(e.roi.roi)}` : '—'}
-          tone={e.roi.roi == null ? undefined : e.roi.roi >= 0 ? 'green' : 'red'} hint={e.roi.roi == null ? 'registra costos' : undefined}
-          details={[
-            <>ganancia <span className={e.roi.profitUsd >= 0 ? 'text-[#4ADE80]' : 'text-[#F06A6A]'}>{fmtUsd(e.roi.profitUsd)}</span> = neto {fmtUsd(r.netUsd)} − costos {fmtUsd(c.totalUsd)}</>,
-          ]}
-          formula="ROI = (neto − costos) ÷ costos"
-        />
-        <EconCell
-          label="LTV : CAC" value={ratio != null ? `${fmtDec(ratio)}×` : '—'}
-          tone={ratio == null ? undefined : ratio >= 3 ? 'green' : ratio >= 1 ? 'amber' : 'red'} hint={ratio == null ? cacHint : undefined}
-          details={[<>payback {l.paybackMonths != null ? `${fmtDec(l.paybackMonths)} meses` : '—'}</>, <>meta: 3× o más</>]}
-          formula="LTV:CAC = LTV ÷ CAC · payback = CAC ÷ contribución mensual"
-        />
-      </Split>
+      {scenario ? (
+        <Card padded={false}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-white/[0.06] px-5 pb-3 pt-5">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[13px] text-[#EDEDED]/90">Escenario (sin pagadores reales) <Tag tone="orange">Proyección</Tag></div>
+              <p className="m-0 mt-1 text-[12px] leading-snug text-[#8B8B8B]">
+                Nadie ha pagado todavía: estas cifras no son resultados, son lo que pasaría si los supuestos de abajo se cumplen.
+              </p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 divide-y divide-white/[0.06] sm:grid-cols-3 sm:divide-x sm:divide-y-0">{ltvCells}</div>
+          <div className="border-t border-white/[0.06] px-5 py-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">Supuestos: {assumptionsLine}</div>
+        </Card>
+      ) : (
+        <Split cols={3}>{ltvCells}</Split>
+      )}
+
+      {c.manualEntries === 0 && (
+        <Note tag="Costos incompletos" tone="orange">
+          No hay costos manuales en el periodo: CAC y ROI solo ven el gasto de IA del ledger. Registra marketing (anuncios, influencers) e infraestructura (Vercel, Supabase, Apple) para que signifiquen algo.
+        </Note>
+      )}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <BigNumber label="Costos del periodo" value={fmtUsd(c.totalUsd)} caption={`${period}d`} />
+          <BigNumber label="Costos registrados del periodo" value={fmtUsd(c.totalUsd)} caption={`${period}d`} />
+          <p className="-mt-2 mb-4 font-mono text-[11px] leading-relaxed text-[#5C5C5C]">
+            Registrados: IA (ledger, solo superficies que lo escriben{surfaces ? `: ${surfaces}` : ''}) + {fmtInt(c.manualEntries)} {c.manualEntries === 1 ? 'costo manual' : 'costos manuales'}.
+          </p>
           {c.totalUsd > 0 ? <StatusBars rows={breakdown} labelWidth={120} stackMobile /> : <Empty>Sin costos en el periodo</Empty>}
         </Card>
         <CostForm onSaved={done} />

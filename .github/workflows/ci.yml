@@ -124,6 +124,7 @@ jobs:
       - run: npm run test:admin-pg
       - run: npm run test:lifecycle-pg
       - run: npm run test:user-memory-pg
+      - run: npm run test:admin-truth-pg
 
   contracts:
     runs-on: ubuntu-latest

@@ -14,15 +14,24 @@ export interface AdminMe { admin: true; email: string | null; identityId: string
 
 export interface LlmProviderStats {
   today: number; week: number; month: number; calls: number; failures: number;
+  /** Spend over the selected period (the same window as calls/failures). */
+  period: number;
   balanceMark: { amount: number; at: string } | null;
   estimatedLeft: number | null;
   lastCreditAlert: string | null;
+  /** The alert's payload: which endpoint hit the exhausted credit and the provider's code. */
+  creditAlert: { code: string | null; endpoint: string | null } | null;
+  lastTopup: string | null;
+  lastOk: string | null;
+  lastFailure: { at: string; stop: string | null; surface: string | null } | null;
+  failures24h: number; calls24h: number;
 }
 
 /** Since when each source has data (null = no rows yet), and which surfaces write the LLM ledger. */
 export interface Coverage {
   eventsSince: string | null; devicesSince: string | null; readsSince: string | null; readerStatsSince: string | null;
   purchasesSince: string | null; ledgerSince: string | null; ledgerSurfaces: string[];
+  activitySince: string | null; outcomesSince: string | null; locatedSince: string | null;
 }
 
 export interface LlmSurfaceSpend { surface: string; provider: string; usd: number; calls: number; failures: number }
@@ -30,54 +39,68 @@ export interface LlmSurfaceSpend { surface: string; provider: string; usd: numbe
 export interface AdminOverview {
   days: string[];
   since: string;
-  accounts: { total: number; new: number; wallets: number; active7d: number; byProvider: Record<string, number>; daily: number[] };
+  /** False (the default): the team's accounts, installs, networks and purchases are left out of every figure. */
+  includeInternal: boolean;
+  accounts: { total: number; new: number; internal: number; wallets: number; active7d: number; byProvider: Record<string, number>; daily: number[] };
   activity: {
     reads: number;
+    readsInternal: number;
     readsDaily: { web: number[]; ios: number[]; android: number[] };
     levels: { profundo: number; maximo: number };
+    /** People (an account and its installs once) with a read in the last 7 days. */
     activeReaders7d: number;
-    activation: { accounts: number; activated: number; medianMinutes: number | null };
+    activeReaders7dSplit: { accounts: number; guests: number };
+    lastRead: Record<string, string>;
+    /** Accounts created once first reads were recorded (measuredSince); older ones are counted in beforeCoverage. */
+    activation: { accounts: number; activated: number; medianMinutes: number | null; measuredSince: string | null; beforeCoverage: number };
   };
   funnel: {
-    web: { visitors: number; deskVisitors: number; appStoreClicks: number; signinStarts: number; guestReaders: number; accounts: number; paywallViews: number; pro: number };
-    ios: { guestReaders: number; accounts: number; paywallViews: number; pro: number };
+    web: { visitors: number; deskVisitors: number; appStoreClicks: number; signinStarts: number; paywallViews: number };
+    ios: { paywallViews: number };
     visitsDaily: number[];
     topSurfaces: Array<{ surface: string; visitors: number }>;
     topReferrers: Array<{ referrer: string; visitors: number }>;
   };
-  subscriptions: { active: number; byStatus: Record<string, number>; byProvider: Record<string, number>; giftedPro: number };
+  subscriptions: { active: number; paid: number; trialing: number; byStatus: Record<string, number>; byProvider: Record<string, number>; giftedPro: number };
   revenue: {
     grossUsd: number; netUsd: number; refundsUsd: number;
-    newSubscriptions: number; renewals: number; cancellations: number; expirations: number; sandboxEvents: number;
+    newSubscriptions: number; newPaying: number; renewals: number; cancellations: number; expirations: number; sandboxEvents: number; internalEvents: number;
     daily: number[];
   };
   llm: {
     providers: Record<LlmProvider, LlmProviderStats>;
     daily: Array<{ anthropic: number; openai: number }>;
     bySurface: LlmSurfaceSpend[];
+    /** Desk analyses in the period: one ledger batch per run; finished = the CIO answered. */
+    deskRuns: { runs: number; finished: number; byDay: Array<{ day: string; runs: number; finished: number }> };
     /** The spend guard's own figures: desk only, UTC calendar day and month. */
     guard: { day: number; month: number } | null;
   };
-  coupons: { active: number; redemptions: number; giftedReadsLeft: number };
+  coupons: { active: number; redemptions: number; giftedReadsLeft: number; giftedLeft: { reads: number; profundo: number; maximo: number } };
   coverage: Coverage | null;
   /** Paths the server did not send ("revenue", "funnel.visitsDaily", …). */
   missing: string[];
 }
 
-export interface RevenueCatMetric { id: string; name: string; value: number; unit?: string; period?: string }
+export interface RevenueCatMetric { id: string; name: string; value: number; unit?: string; period?: string; description?: string; updatedAt?: string }
 
 export interface IntegrationsHealth {
   revenuecatWebhook: { configured: boolean; lastEventAt: string | null; events30d: number | null };
-  tracking: { lastEventAt: string | null; events24h: number | null };
+  stripe: { configured: boolean; webhook: boolean; lastEventAt: string | null };
+  /** Web visits (lastEventAt, events24h), the last failed write of /api/track, and the last read (any platform). */
+  tracking: { lastEventAt: string | null; events24h: number | null; lastErrorAt: string | null; lastError: string | null; lastReadAt: string | null };
   llmKeys: { anthropic: boolean; openai: boolean };
   vercelAnalytics: string;
 }
 
 export interface AdminIntegrations {
-  revenuecat: { configured: boolean; error?: string; metrics?: RevenueCatMetric[] };
+  revenuecat: { configured: boolean; error?: string; metrics?: RevenueCatMetric[]; fetchedAt?: string };
   appStore: {
     configured: boolean; error?: string; days?: string[]; downloads?: number[];
     totals?: { downloads: number; redownloads: number; updates: number; iap: number };
+    byCountry?: Array<{ country: string; downloads: number }>;
+    /** First and last day with a published report; recent days Apple has not published yet (never zeros). */
+    coveredFrom?: string | null; coveredTo?: string | null; pendingDays?: string[];
   };
   llmCaps: { dayUsd: number; monthUsd: number; alertUsd: number };
   /** Same as overview.llm.guard, as the caps compare it (null when the guard could not be read). */
@@ -87,19 +110,100 @@ export interface AdminIntegrations {
   missing: string[];
 }
 
-export interface OverviewResponse { overview: AdminOverview; integrations: AdminIntegrations }
+// ---- growth (bobby_admin_growth): people, cohorts in order, retention, outcomes, acquisition ----
+export interface RetentionCell { eligible: number; returned: number; read: number }
+/** Installs seen arriving in the period on one platform; each step is a subset of the one before it. */
+export interface GrowthCohort {
+  arrived: number; home: number; deskOrRead: number; read1: number; read2: number; read3: number; wall: number; signinStart: number;
+  account: number; accountNew: number; accountAfterRead: number; accountAfterWall: number; proAfterRead: number;
+  delivered: number; failed: number; medianMinutesToFirstRead: number | null; medianMinutesToAccount: number | null; oldestDays: number;
+  retention: { d1: RetentionCell; d7: RetentionCell; w1: RetentionCell; readersBack: RetentionCell };
+}
+export interface GrowthHistory { installs: number; readers: number; reads: number; read2: number; linked: number; since: string | null; until: string | null }
+export type PeopleStage = 'new' | 'active' | 'recurring' | 'pro' | 'atRisk' | 'lost';
+export interface AttentionAccount { identityId: string; email: string | null; provider: string | null; createdAt?: string | null; lastDay: string | null; reads?: number }
+export interface Growth {
+  days: number; since: string; today: string; includeInternal: boolean;
+  people: {
+    total: number; accounts: number; guests: number; wallets: number; excluded: { accounts: number; guests: number };
+    newInPeriod: number; active7d: number; active30d: number; readers7d: number; readers: number;
+    stages: Record<PeopleStage, number>; byPlatform: Record<string, number>; proInactive: number; accountsNeverRead: number;
+  };
+  cohorts: { web: GrowthCohort; ios: GrowthCohort };
+  history: { web: GrowthHistory; ios: GrowthHistory };
+  outcomes: {
+    consumed: number; consumedInternal: number; consumedTotal: number; byPlatform: Record<string, number>;
+    delivered: number; failed: number; wallSignin: number; wallSigninInstalls: number; wallPaywall: number; wallLevel: number;
+    blocked: Record<string, number>; byLevel: Record<string, number>; outcomesSince: string | null;
+  };
+  acquisition: {
+    sources: Array<{ source: string; installs: number; read1: number; account: number }>;
+    landing: Array<{ surface: string; installs: number; read1: number }>;
+    visits: number; visitors: number; visitsWithUtm: number; visitsWithReferrer: number; visitorDays: number[];
+  };
+  attention: { neverRead: AttentionAccount[]; quiet: AttentionAccount[] };
+  coverage: {
+    webObservedSince: string | null; iosObservedSince: string | null; activitySince: string | null; outcomesSince: string | null;
+    observedInstalls: number; backfillInstalls: number; internalInstalls: number; internalAccounts: number;
+  };
+}
+
+/** One finding of "Dónde mejorar" (api/_lib/admin-insights.ts): computed from the figures above, never invented. */
+export type InsightLevel = 'critical' | 'warn' | 'opportunity' | 'info';
+export type InsightArea = 'operacion' | 'medicion' | 'adquisicion' | 'activacion' | 'conversion' | 'retencion' | 'monetizacion';
+export interface Insight {
+  id: string; level: InsightLevel; area: InsightArea; title: string; detail: string; action: string;
+  evidence: string[]; sample: number | null; tab: string; impact: number;
+}
+
+/** "Plan de la semana" (api/_lib/admin-plan.ts): Claude orders the findings above; every priority cites real finding ids. */
+export interface GrowthPlan {
+  generatedAt: string; model: string; summary: string; cached: boolean; usd: number;
+  priorities: Array<{ title: string; why: string; steps: string[]; measure: string; findings: string[] }>;
+}
+
+export interface OverviewResponse {
+  overview: AdminOverview;
+  integrations: AdminIntegrations;
+  /** Null on the comparison request (and if the server could not build it: then `missing` holds 'growth'). */
+  growth: Growth | null;
+  searchConsole: SearchConsoleData | null;
+  insights: Insight[];
+}
 
 export interface AdminUser {
-  id: string; email: string | null; provider: string | null; wallet_only: boolean;
+  id: string; email: string | null; provider: string | null; wallet_only: boolean; wallet: string | null;
   created_at: string; last_seen_at: string | null;
   first_read_at: string | null; last_read_at: string | null; reads: number | null; platform: string | null;
+  /** Reads its paired installs made as a guest, before signing in. */
+  guest_reads: number;
+  /** The last UTC day the person used Bobby (opened it or read), not any API call. */
+  last_active_day: string | null;
+  /** Null for accounts created before first reads were recorded (nothing to measure). */
   activation_minutes: number | null;
   sub_provider: string | null; sub_status: string | null; current_period_end: string | null;
   pro_until: string | null; grant_source: string | null;
   bonus_reads: number | null; bonus_profundo: number | null; bonus_maximo: number | null;
-  is_admin: boolean; pro: boolean;
+  /** is_internal: marked by hand (the switch); is_team: left out of the figures for any reason (admin, mark, listed email). */
+  is_admin: boolean; is_internal: boolean; is_team: boolean; installs: number; pro: boolean;
 }
-export interface UsersResponse { total: number; users: AdminUser[] }
+export interface UsersResponse { total: number; accounts: number; wallets: number; internal: number; readsSince: string | null; users: AdminUser[] }
+
+// ---- internal traffic (view=internal) ----
+export interface InstallRow {
+  device: string; platform: string; source: 'observed' | 'backfill'; firstSeen: string; lastSeen: string | null;
+  firstSurface: string | null; referrer: string | null; utm: string | null; country: string | null;
+  /** Internal for any reason (marked, /admin, a team account, a team network); manualInternal = marked by hand. */
+  internal: boolean; manualInternal: boolean; adminSession: boolean; teamNetwork: boolean;
+  reads: number; delivered: number; account: string | null; accountId: string | null;
+}
+export interface InternalResponse {
+  devices: InstallRow[];
+  /** installs = installs the network leaves out; onlyByNetwork = of those, the ones nothing else marks as the team's. */
+  networks: Array<{ network: string; note: string | null; createdAt: string; lastSeenAt: string; installs: number; onlyByNetwork: number }>;
+  emails: string[];
+  marks: Array<{ identity_id: string; email: string | null; provider: string | null; note: string | null; created_at: string }>;
+}
 
 export type CouponStatus = 'active' | 'inactive' | 'expired' | 'exhausted';
 export interface AdminCoupon {
@@ -121,32 +225,23 @@ export interface MemberSubscription {
 export interface MemberGrant { identityId: string; email: string | null; source: string | null; proUntil: string | null; active: boolean }
 export interface MembersResponse { subscriptions: MemberSubscription[]; grants: MemberGrant[] }
 
-// ---- lifecycle funnel, Search Console and unit economics (view=lifecycle, view=costs) ----
-export interface Retention { eligible: number; returned: number }
-/** One platform's cohort: installs/browsers first seen in the window. */
-export interface CohortFunnel {
-  devices: number; home: number; desk: number; appStoreClick: number; read1: number; read2: number; read5: number;
-  signinStart: number; account: number; returned: number; paywall: number; pro: number;
-  /** Nested steps: each one is a subset of the one before it. */
-  engaged: number; accountAfterRead: number; proAfterRead: number; returnedAfterRead: number;
-  medianMinutesToFirstRead: number | null; medianMinutesToAccount: number | null;
-  retention: { d1: Retention; d7: Retention };
-}
-export interface LifecycleStages {
-  total: number; accounts: number; guests: number; new: number; activated: number; engaged: number; pro: number;
-  atRisk: number; lost: number; byPlatform: Record<string, number>;
-}
+// ---- Search Console and unit economics (view=lifecycle, view=costs) ----
 /** What the shipped clients report: an uninstrumented step means "not measured", never zero. */
-export interface Instrumentation { webVisits: boolean; webPaywall: boolean; iosVisits: boolean; iosPaywall: boolean; purchaseStart: boolean }
+export interface Instrumentation { webVisits: boolean; webPaywall: boolean; iosVisits: boolean; iosOpens: boolean; iosPaywall: boolean; purchaseStart: boolean; deskOutcomes: boolean }
 export type ChurnSource = 'observed' | 'assumed' | 'default';
 export interface Economics {
   days: number; since: string;
-  revenue: { grossUsd: number; netUsd: number; refundsUsd: number; mrrGrossUsd: number; mrrNetUsd: number; activeSubscriptions: number; newPaying: number; priceUsd: number; takehome: number };
-  costs: { marketingUsd: number; infraUsd: number; otherUsd: number; llmUsd: number; totalUsd: number; byChannel: Array<{ channel: string; usd: number }> };
+  revenue: {
+    grossUsd: number; netUsd: number; refundsUsd: number; mrrGrossUsd: number; mrrNetUsd: number; activeSubscriptions: number; trialing: number;
+    newPaying: number; payersEver: number; priceUsd: number; takehome: number; priceSource: 'observed' | 'assumed' | 'default';
+  };
+  costs: { marketingUsd: number; infraUsd: number; otherUsd: number; llmUsd: number; totalUsd: number; manualEntries: number; byChannel: Array<{ channel: string; usd: number }> };
   acquisition: { newAccounts: number; newPaying: number; cacPerAccount: number | null; cacPerPaying: number | null };
   ltv: {
     monthlyNetPerSubUsd: number; monthlyLlmPerUserUsd: number; monthlyContributionUsd: number; monthlyChurn: number; churnSource: ChurnSource;
     lifetimeMonths: number; ltvUsd: number; ltvToCac: number | null; paybackMonths: number | null;
+    /** True while no account has ever paid: the LTV is a scenario from price and churn, not an observation. */
+    scenario: boolean;
   };
   roi: { profitUsd: number; roi: number | null };
   assumptions: { monthlyChurn: number | null; priceUsd: number | null; storeFee: number | null; maxLifetimeMonths: number | null };
@@ -157,12 +252,11 @@ export interface SearchConsoleData {
   topQueries?: Array<{ query: string; clicks: number; impressions: number; ctr: number; position: number | null }>;
   topPages?: Array<{ page: string; clicks: number; impressions: number }>;
 }
+/** The funnel tab's economics and providers (the cohort itself is `growth`, on the overview). */
 export interface LifecycleResponse {
-  lifecycle: { since: string; web: CohortFunnel; ios: CohortFunnel; stages: LifecycleStages };
   economics: Economics;
   searchConsole: SearchConsoleData;
   appStore: AdminIntegrations['appStore'];
-  coverage: Coverage | null;
   instrumentation: Instrumentation;
   missing: string[];
 }
@@ -172,7 +266,13 @@ export interface GeoRegion { country: string; region: string; visitors: number; 
 export interface GeoPurchase { country: string; newPaying: number; grossUsd: number }
 export interface ProviderCountries<K extends string> { configured: boolean; error: string | null; countries: Array<{ country: string } & Record<K, number>> | null }
 export interface AudienceResponse {
-  geo: { since: string; days: number; locatedSince: string | null; web: { devices: number; located: number }; countries: GeoCountry[]; regions: GeoRegion[]; purchases: GeoPurchase[] };
+  geo: {
+    since: string; days: number; locatedSince: string | null;
+    /** devices: outside web installs new in the period; measurable: those that arrived once location was recorded. */
+    web: { devices: number; measurable: number; located: number; beforeLocation: number };
+    located: { total: number; withRegion: number };
+    countries: GeoCountry[]; regions: GeoRegion[]; purchases: GeoPurchase[];
+  };
   searchConsole: ProviderCountries<'clicks' | 'impressions'>;
   appStore: ProviderCountries<'downloads'>;
 }
@@ -190,7 +290,14 @@ export type AdminPostBody =
   | { action: 'add-cost'; kind: CostKind; channel?: string; amountUsd: number; spentOn?: string; note?: string }
   | { action: 'delete-cost'; id: number }
   // The server merges: an absent field keeps its value, null clears it back to the default.
-  | { action: 'set-assumptions'; monthlyChurn?: number | null; priceUsd?: number | null; storeFee?: number | null; maxLifetimeMonths?: number | null };
+  | { action: 'set-assumptions'; monthlyChurn?: number | null; priceUsd?: number | null; storeFee?: number | null; maxLifetimeMonths?: number | null }
+  | { action: 'set-internal'; identityId: string; internal: boolean; note?: string }
+  | { action: 'set-device-internal'; device: string; internal: boolean }
+  | { action: 'remove-internal-network'; network: string }
+  | { action: 'set-internal-emails'; emails: string[] }
+  | { action: 'growth-plan'; days: number; internal: boolean; force?: boolean }
+  | { action: 'preview-digest' }
+  | { action: 'send-digest' };
 
 export interface ProbeResult { ok: true; status: 'ok' | 'no_credit' | 'error'; httpStatus: number; code?: string }
 
@@ -249,6 +356,10 @@ const SERVER_ES: Array<[RegExp, string | ((m: RegExpExecArray) => string)]> = [
   [/^Invalid cost\.$/, 'Costo inválido.'],
   [/^The date cannot be in the future\.$/, 'La fecha no puede ser futura.'],
   [/^Cost not found\.$/, 'No se encontró el costo.'],
+  [/^Install not found\.$/, 'No se encontró la instalación.'],
+  [/^Network not found\.$/, 'No se encontró la red.'],
+  [/^Invalid email\.$/, 'Hay un email inválido.'],
+  [/^The sign-in could not be deleted, so nothing was changed\. Retry\.$/, 'No se pudo borrar el inicio de sesión, así que no se cambió nada. Vuelve a intentarlo.'],
   [/^Invalid (monthlyChurn|priceUsd|storeFee|maxLifetimeMonths)\.$/, (m) => `Valor inválido: ${({ monthlyChurn: 'churn mensual', priceUsd: 'precio', storeFee: 'comisión de tienda', maxLifetimeMonths: 'vida máxima' } as Record<string, string>)[m[1]]}.`],
 ];
 function translate(code: string): string | null {
@@ -354,11 +465,17 @@ function reader(missing: string[]) {
 function normalizeLlm(v: unknown): LlmProviderStats {
   const p = obj(v);
   const mark = obj(p.balanceMark);
+  const alert = isObj(p.creditAlert) ? p.creditAlert : null;
+  const fail = isObj(p.lastFailure) ? p.lastFailure : null;
   return {
-    today: num(p.today), week: num(p.week), month: num(p.month), calls: num(p.calls), failures: num(p.failures),
+    today: num(p.today), week: num(p.week), month: num(p.month), calls: num(p.calls), failures: num(p.failures), period: num(p.period),
     balanceMark: p.balanceMark ? { amount: num(mark.amount), at: str(mark.at) } : null,
     estimatedLeft: numOrNull(p.estimatedLeft),
     lastCreditAlert: strOrNull(p.lastCreditAlert),
+    creditAlert: alert ? { code: strOrNull(alert.code), endpoint: strOrNull(alert.endpoint) } : null,
+    lastTopup: strOrNull(p.lastTopup), lastOk: strOrNull(p.lastOk),
+    lastFailure: fail ? { at: str(fail.at), stop: strOrNull(fail.stop), surface: strOrNull(fail.surface) } : null,
+    failures24h: num(p.failures24h), calls24h: num(p.calls24h),
   };
 }
 
@@ -368,6 +485,7 @@ function normalizeCoverage(v: unknown): Coverage | null {
     eventsSince: strOrNull(v.eventsSince), devicesSince: strOrNull(v.devicesSince), readsSince: strOrNull(v.readsSince),
     readerStatsSince: strOrNull(v.readerStatsSince), purchasesSince: strOrNull(v.purchasesSince), ledgerSince: strOrNull(v.ledgerSince),
     ledgerSurfaces: Array.isArray(v.ledgerSurfaces) ? v.ledgerSurfaces.map(str).filter(Boolean) : [],
+    activitySince: strOrNull(v.activitySince), outcomesSince: strOrNull(v.outcomesSince), locatedSince: strOrNull(v.locatedSince),
   };
 }
 
@@ -380,6 +498,9 @@ function normalizeAppStore(v: unknown): AdminIntegrations['appStore'] {
     days: Array.isArray(as.days) ? as.days.map(str) : undefined,
     downloads: Array.isArray(as.downloads) ? nums(as.downloads) : undefined,
     totals: as.totals ? { downloads: num(totals.downloads), redownloads: num(totals.redownloads), updates: num(totals.updates), iap: num(totals.iap) } : undefined,
+    byCountry: Array.isArray(as.byCountry) ? as.byCountry.map((c) => ({ country: str(obj(c).country), downloads: num(obj(c).downloads) })) : undefined,
+    coveredFrom: strOrNull(as.coveredFrom), coveredTo: strOrNull(as.coveredTo),
+    pendingDays: Array.isArray(as.pendingDays) ? as.pendingDays.map(str) : undefined,
   };
 }
 
@@ -391,21 +512,27 @@ function normalizeIntegrations(raw: unknown, r: ReturnType<typeof reader>, expec
   const caps = obj(i.llmCaps);
   const guard = isObj(i.llmGuard) ? i.llmGuard : null;
   const h = isObj(i.health) ? i.health : null;
-  const wh = obj(h?.revenuecatWebhook), tr = obj(h?.tracking), keys = obj(h?.llmKeys);
+  const wh = obj(h?.revenuecatWebhook), tr = obj(h?.tracking), keys = obj(h?.llmKeys), st = obj(h?.stripe);
   return {
     revenuecat: {
       configured: Boolean(rc.configured),
       error: strOrNull(rc.error) ?? undefined,
       metrics: Array.isArray(rc.metrics)
-        ? rc.metrics.map((m) => { const x = obj(m); return { id: str(x.id), name: str(x.name), value: num(x.value), unit: strOrNull(x.unit) ?? undefined, period: strOrNull(x.period) ?? undefined }; })
+        ? rc.metrics.map((m) => {
+          const x = obj(m);
+          return { id: str(x.id), name: str(x.name), value: num(x.value), unit: strOrNull(x.unit) ?? undefined, period: strOrNull(x.period) ?? undefined,
+            description: strOrNull(x.description) ?? undefined, updatedAt: strOrNull(x.updatedAt) ?? undefined };
+        })
         : undefined,
+      fetchedAt: strOrNull(rc.fetchedAt) ?? undefined,
     },
     appStore: normalizeAppStore(i.appStore),
     llmCaps: { dayUsd: num(caps.dayUsd), monthUsd: num(caps.monthUsd), alertUsd: num(caps.alertUsd) },
     llmGuard: guard ? { dayUsd: num(guard.dayUsd), monthUsd: num(guard.monthUsd) } : null,
     health: h ? {
       revenuecatWebhook: { configured: Boolean(wh.configured), lastEventAt: strOrNull(wh.lastEventAt), events30d: numOrNull(wh.events30d) },
-      tracking: { lastEventAt: strOrNull(tr.lastEventAt), events24h: numOrNull(tr.events24h) },
+      stripe: { configured: Boolean(st.configured), webhook: Boolean(st.webhook), lastEventAt: strOrNull(st.lastEventAt) },
+      tracking: { lastEventAt: strOrNull(tr.lastEventAt), events24h: numOrNull(tr.events24h), lastErrorAt: strOrNull(tr.lastErrorAt), lastError: strOrNull(tr.lastError), lastReadAt: strOrNull(tr.lastReadAt) },
       llmKeys: { anthropic: Boolean(keys.anthropic), openai: Boolean(keys.openai) },
       vercelAnalytics: str(h.vercelAnalytics) || 'unverified',
     } : null,
@@ -445,48 +572,51 @@ export function normalizeOverview(raw: unknown, opts: { compare?: boolean } = {}
   const coverage = normalizeCoverage(o.coverage);
   if (!opts.compare && !coverage) r.mark('coverage');
 
+  const split = obj(act.activeReaders7dSplit);
+  const runs = obj(llm.deskRuns);
+  const gifted = obj(cp.giftedLeft);
   const overview: AdminOverview = {
     days,
     since: str(o.since),
+    includeInternal: o.includeInternal === true,
     accounts: {
-      total: r.n(acc, 'total', 'accounts.total'), new: r.n(acc, 'new', 'accounts.new'), wallets: r.n(acc, 'wallets', 'accounts.wallets'),
+      total: r.n(acc, 'total', 'accounts.total'), new: r.n(acc, 'new', 'accounts.new'), internal: num(acc.internal), wallets: r.n(acc, 'wallets', 'accounts.wallets'),
       active7d: r.n(acc, 'active7d', 'accounts.active7d'), byProvider: r.cnt(acc, 'byProvider', 'accounts.byProvider'), daily: r.arr(acc, 'daily', 'accounts.daily', n),
     },
     activity: {
       reads: r.n(act, 'reads', 'activity.reads'),
+      readsInternal: num(act.readsInternal),
       readsDaily: { web: r.arr(rd, 'web', 'activity.readsDaily.web', n), ios: r.arr(rd, 'ios', 'activity.readsDaily.ios', n), android: r.arr(rd, 'android', 'activity.readsDaily.android', n) },
       // Levels are only present when used: an absent level is a zero, not a gap.
       levels: { profundo: num(levels.profundo), maximo: num(levels.maximo) },
       activeReaders7d: r.n(act, 'activeReaders7d', 'activity.activeReaders7d'),
+      activeReaders7dSplit: { accounts: num(split.accounts), guests: num(split.guests) },
+      lastRead: Object.fromEntries(Object.entries(obj(act.lastRead)).map(([k, v]) => [k, str(v)])),
       activation: {
         accounts: r.n(activation, 'accounts', 'activity.activation.accounts'), activated: r.n(activation, 'activated', 'activity.activation.activated'),
-        medianMinutes: numOrNull(activation.medianMinutes),
+        medianMinutes: numOrNull(activation.medianMinutes), measuredSince: strOrNull(activation.measuredSince), beforeCoverage: num(activation.beforeCoverage),
       },
     },
     funnel: {
       web: {
         visitors: r.n(fw, 'visitors', 'funnel.web.visitors'), deskVisitors: r.n(fw, 'deskVisitors', 'funnel.web.deskVisitors'),
         appStoreClicks: r.n(fw, 'appStoreClicks', 'funnel.web.appStoreClicks'), signinStarts: r.n(fw, 'signinStarts', 'funnel.web.signinStarts'),
-        guestReaders: r.n(fw, 'guestReaders', 'funnel.web.guestReaders'), accounts: r.n(fw, 'accounts', 'funnel.web.accounts'),
-        paywallViews: r.n(fw, 'paywallViews', 'funnel.web.paywallViews'), pro: r.n(fw, 'pro', 'funnel.web.pro'),
+        paywallViews: r.n(fw, 'paywallViews', 'funnel.web.paywallViews'),
       },
-      ios: {
-        guestReaders: r.n(fi, 'guestReaders', 'funnel.ios.guestReaders'), accounts: r.n(fi, 'accounts', 'funnel.ios.accounts'),
-        paywallViews: r.n(fi, 'paywallViews', 'funnel.ios.paywallViews'), pro: r.n(fi, 'pro', 'funnel.ios.pro'),
-      },
+      ios: { paywallViews: r.n(fi, 'paywallViews', 'funnel.ios.paywallViews') },
       visitsDaily: r.arr(f, 'visitsDaily', 'funnel.visitsDaily', n),
       topSurfaces: (Array.isArray(f.topSurfaces) ? f.topSurfaces : (r.mark('funnel.topSurfaces'), [])).map((x) => ({ surface: str(obj(x).surface), visitors: num(obj(x).visitors) })),
       topReferrers: (Array.isArray(f.topReferrers) ? f.topReferrers : (r.mark('funnel.topReferrers'), [])).map((x) => ({ referrer: str(obj(x).referrer), visitors: num(obj(x).visitors) })),
     },
     subscriptions: {
-      active: r.n(subs, 'active', 'subscriptions.active'), byStatus: r.cnt(subs, 'byStatus', 'subscriptions.byStatus'),
+      active: r.n(subs, 'active', 'subscriptions.active'), paid: num(subs.paid), trialing: num(subs.trialing), byStatus: r.cnt(subs, 'byStatus', 'subscriptions.byStatus'),
       byProvider: r.cnt(subs, 'byProvider', 'subscriptions.byProvider'), giftedPro: r.n(subs, 'giftedPro', 'subscriptions.giftedPro'),
     },
     revenue: {
       grossUsd: r.n(rev, 'grossUsd', 'revenue.grossUsd'), netUsd: r.n(rev, 'netUsd', 'revenue.netUsd'), refundsUsd: r.n(rev, 'refundsUsd', 'revenue.refundsUsd'),
-      newSubscriptions: r.n(rev, 'newSubscriptions', 'revenue.newSubscriptions'), renewals: r.n(rev, 'renewals', 'revenue.renewals'),
+      newSubscriptions: r.n(rev, 'newSubscriptions', 'revenue.newSubscriptions'), newPaying: num(rev.newPaying), renewals: r.n(rev, 'renewals', 'revenue.renewals'),
       cancellations: r.n(rev, 'cancellations', 'revenue.cancellations'), expirations: r.n(rev, 'expirations', 'revenue.expirations'),
-      sandboxEvents: r.n(rev, 'sandboxEvents', 'revenue.sandboxEvents'), daily: r.arr(rev, 'daily', 'revenue.daily', n),
+      sandboxEvents: r.n(rev, 'sandboxEvents', 'revenue.sandboxEvents'), internalEvents: num(rev.internalEvents), daily: r.arr(rev, 'daily', 'revenue.daily', n),
     },
     llm: {
       providers: { anthropic: normalizeLlm(providers.anthropic), openai: normalizeLlm(providers.openai) },
@@ -495,13 +625,113 @@ export function normalizeOverview(raw: unknown, opts: { compare?: boolean } = {}
         const s = obj(x);
         return { surface: str(s.surface) || 'otro', provider: str(s.provider), usd: num(s.usd), calls: num(s.calls), failures: num(s.failures) };
       }),
+      deskRuns: {
+        runs: num(runs.runs), finished: num(runs.finished),
+        byDay: (Array.isArray(runs.byDay) ? runs.byDay : []).map((x) => ({ day: str(obj(x).day), runs: num(obj(x).runs), finished: num(obj(x).finished) })),
+      },
       guard: guard ? { day: num(guard.day), month: num(guard.month) } : null,
     },
-    coupons: { active: r.n(cp, 'active', 'coupons.active'), redemptions: r.n(cp, 'redemptions', 'coupons.redemptions'), giftedReadsLeft: r.n(cp, 'giftedReadsLeft', 'coupons.giftedReadsLeft') },
+    coupons: {
+      active: r.n(cp, 'active', 'coupons.active'), redemptions: r.n(cp, 'redemptions', 'coupons.redemptions'), giftedReadsLeft: r.n(cp, 'giftedReadsLeft', 'coupons.giftedReadsLeft'),
+      giftedLeft: { reads: num(gifted.reads), profundo: num(gifted.profundo), maximo: num(gifted.maximo) },
+    },
     coverage,
     missing,
   };
-  return { overview, integrations: normalizeIntegrations(root.integrations, r, !opts.compare) };
+  const growth = opts.compare ? null : normalizeGrowth(root.growth);
+  if (!opts.compare && !growth) r.mark('growth');
+  return {
+    overview, integrations: normalizeIntegrations(root.integrations, r, !opts.compare), growth,
+    searchConsole: opts.compare || !isObj(root.searchConsole) ? null : normalizeSearchConsole(root.searchConsole),
+    insights: Array.isArray(root.insights) ? root.insights.map(normalizeInsight).filter((i): i is Insight => i !== null) : [],
+  };
+}
+
+const LEVELS: InsightLevel[] = ['critical', 'warn', 'opportunity', 'info'];
+function normalizeInsight(v: unknown): Insight | null {
+  const x = obj(v);
+  if (!str(x.title)) return null;
+  return {
+    id: str(x.id), level: LEVELS.includes(x.level as InsightLevel) ? (x.level as InsightLevel) : 'info', area: (str(x.area) || 'medicion') as InsightArea,
+    title: str(x.title), detail: str(x.detail), action: str(x.action), evidence: Array.isArray(x.evidence) ? x.evidence.map(str).filter(Boolean) : [],
+    sample: numOrNull(x.sample), tab: str(x.tab) || 'resumen', impact: num(x.impact),
+  };
+}
+
+function normalizeCohortV2(v: unknown): GrowthCohort {
+  const c = obj(v);
+  const ret = obj(c.retention);
+  const cell = (x: unknown): RetentionCell => ({ eligible: num(obj(x).eligible), returned: num(obj(x).returned), read: num(obj(x).read) });
+  return {
+    arrived: num(c.arrived), home: num(c.home), deskOrRead: num(c.deskOrRead), read1: num(c.read1), read2: num(c.read2), read3: num(c.read3),
+    wall: num(c.wall), signinStart: num(c.signinStart), account: num(c.account), accountNew: num(c.accountNew),
+    accountAfterRead: num(c.accountAfterRead), accountAfterWall: num(c.accountAfterWall), proAfterRead: num(c.proAfterRead),
+    delivered: num(c.delivered), failed: num(c.failed),
+    medianMinutesToFirstRead: numOrNull(c.medianMinutesToFirstRead), medianMinutesToAccount: numOrNull(c.medianMinutesToAccount), oldestDays: num(c.oldestDays),
+    retention: { d1: cell(ret.d1), d7: cell(ret.d7), w1: cell(ret.w1), readersBack: cell(ret.readersBack) },
+  };
+}
+function normalizeHistory(v: unknown): GrowthHistory {
+  const h = obj(v);
+  return { installs: num(h.installs), readers: num(h.readers), reads: num(h.reads), read2: num(h.read2), linked: num(h.linked), since: strOrNull(h.since), until: strOrNull(h.until) };
+}
+function normalizeAttention(v: unknown): AttentionAccount[] {
+  return (Array.isArray(v) ? v : []).map((x) => {
+    const a = obj(x);
+    return { identityId: str(a.identityId), email: strOrNull(a.email), provider: strOrNull(a.provider), createdAt: strOrNull(a.createdAt), lastDay: strOrNull(a.lastDay), reads: num(a.reads) };
+  });
+}
+export function normalizeGrowth(v: unknown): Growth | null {
+  if (!isObj(v) || !isObj(v.people)) return null;
+  const p = obj(v.people), st = obj(p.stages), ex = obj(p.excluded), co = obj(v.cohorts), hi = obj(v.history), out = obj(v.outcomes);
+  const acq = obj(v.acquisition), att = obj(v.attention), cov = obj(v.coverage);
+  return {
+    days: num(v.days), since: str(v.since), today: str(v.today), includeInternal: v.includeInternal === true,
+    people: {
+      total: num(p.total), accounts: num(p.accounts), guests: num(p.guests), wallets: num(p.wallets),
+      excluded: { accounts: num(ex.accounts), guests: num(ex.guests) },
+      newInPeriod: num(p.newInPeriod), active7d: num(p.active7d), active30d: num(p.active30d), readers7d: num(p.readers7d), readers: num(p.readers),
+      stages: { new: num(st.new), active: num(st.active), recurring: num(st.recurring), pro: num(st.pro), atRisk: num(st.atRisk), lost: num(st.lost) },
+      byPlatform: counts(p.byPlatform), proInactive: num(p.proInactive), accountsNeverRead: num(p.accountsNeverRead),
+    },
+    cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios) },
+    history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios) },
+    outcomes: {
+      consumed: num(out.consumed), consumedInternal: num(out.consumedInternal), consumedTotal: num(out.consumedTotal), byPlatform: counts(out.byPlatform),
+      delivered: num(out.delivered), failed: num(out.failed), wallSignin: num(out.wallSignin), wallSigninInstalls: num(out.wallSigninInstalls),
+      wallPaywall: num(out.wallPaywall), wallLevel: num(out.wallLevel), blocked: counts(out.blocked), byLevel: counts(out.byLevel), outcomesSince: strOrNull(out.outcomesSince),
+    },
+    acquisition: {
+      sources: (Array.isArray(acq.sources) ? acq.sources : []).map((x) => ({ source: str(obj(x).source), installs: num(obj(x).installs), read1: num(obj(x).read1), account: num(obj(x).account) })),
+      landing: (Array.isArray(acq.landing) ? acq.landing : []).map((x) => ({ surface: str(obj(x).surface), installs: num(obj(x).installs), read1: num(obj(x).read1) })),
+      visits: num(acq.visits), visitors: num(acq.visitors), visitsWithUtm: num(acq.visitsWithUtm), visitsWithReferrer: num(acq.visitsWithReferrer),
+      visitorDays: Array.isArray(acq.visitorDays) ? nums(acq.visitorDays) : [],
+    },
+    attention: { neverRead: normalizeAttention(att.neverRead), quiet: normalizeAttention(att.quiet) },
+    coverage: {
+      webObservedSince: strOrNull(cov.webObservedSince), iosObservedSince: strOrNull(cov.iosObservedSince), activitySince: strOrNull(cov.activitySince),
+      outcomesSince: strOrNull(cov.outcomesSince), observedInstalls: num(cov.observedInstalls), backfillInstalls: num(cov.backfillInstalls),
+      internalInstalls: num(cov.internalInstalls), internalAccounts: num(cov.internalAccounts),
+    },
+  };
+}
+
+function normalizeSearchConsole(v: unknown): SearchConsoleData {
+  const g = obj(v);
+  const gt = obj(g.totals);
+  return {
+    configured: Boolean(g.configured),
+    error: strOrNull(g.error) ?? undefined,
+    site: strOrNull(g.site) ?? undefined,
+    days: Array.isArray(g.days) ? g.days.map(str) : undefined,
+    clicks: Array.isArray(g.clicks) ? nums(g.clicks) : undefined,
+    impressions: Array.isArray(g.impressions) ? nums(g.impressions) : undefined,
+    totals: g.totals ? { clicks: num(gt.clicks), impressions: num(gt.impressions), ctr: num(gt.ctr), position: numOrNull(gt.position) } : undefined,
+    topQueries: Array.isArray(g.topQueries)
+      ? g.topQueries.map((q) => { const x = obj(q); return { query: str(x.query), clicks: num(x.clicks), impressions: num(x.impressions), ctr: num(x.ctr), position: numOrNull(x.position) }; })
+      : undefined,
+    topPages: Array.isArray(g.topPages) ? g.topPages.map((q) => { const x = obj(q); return { page: str(x.page), clicks: num(x.clicks), impressions: num(x.impressions) }; }) : undefined,
+  };
 }
 
 function normalizeUser(v: unknown): AdminUser {
@@ -515,6 +745,8 @@ function normalizeUser(v: unknown): AdminUser {
     pro_until: strOrNull(u.pro_until), grant_source: strOrNull(u.grant_source),
     bonus_reads: numOrNull(u.bonus_reads), bonus_profundo: numOrNull(u.bonus_profundo), bonus_maximo: numOrNull(u.bonus_maximo),
     is_admin: Boolean(u.is_admin), pro: Boolean(u.pro),
+    wallet: strOrNull(u.wallet), guest_reads: num(u.guest_reads), last_active_day: strOrNull(u.last_active_day),
+    is_internal: Boolean(u.is_internal), is_team: Boolean(u.is_team) || Boolean(u.is_admin) || Boolean(u.is_internal), installs: num(u.installs),
   };
 }
 
@@ -530,82 +762,43 @@ function normalizeCoupon(v: unknown): AdminCoupon {
   };
 }
 
-function normalizeCohort(v: unknown, r: ReturnType<typeof reader>, path: string): CohortFunnel {
-  const f = r.sec({ v }, 'v', path);
-  const ret = obj(f.retention);
-  const ret1 = (x: unknown): Retention => ({ eligible: num(obj(x).eligible), returned: num(obj(x).returned) });
-  const k = (key: string) => r.n(f, key, `${path}.${key}`);
-  return {
-    devices: k('devices'), home: k('home'), desk: k('desk'), appStoreClick: k('appStoreClick'),
-    read1: k('read1'), read2: k('read2'), read5: k('read5'), signinStart: k('signinStart'), account: k('account'),
-    returned: k('returned'), paywall: k('paywall'), pro: k('pro'),
-    engaged: k('engaged'), accountAfterRead: k('accountAfterRead'), proAfterRead: k('proAfterRead'), returnedAfterRead: k('returnedAfterRead'),
-    medianMinutesToFirstRead: numOrNull(f.medianMinutesToFirstRead), medianMinutesToAccount: numOrNull(f.medianMinutesToAccount),
-    retention: { d1: ret1(ret.d1), d7: ret1(ret.d7) },
-  };
-}
-
-const INSTRUMENTATION_DEFAULT: Instrumentation = { webVisits: true, webPaywall: true, iosVisits: false, iosPaywall: false, purchaseStart: false };
+const INSTRUMENTATION_DEFAULT: Instrumentation = { webVisits: true, webPaywall: true, iosVisits: false, iosOpens: true, iosPaywall: false, purchaseStart: false, deskOutcomes: true };
 
 export function normalizeLifecycle(raw: unknown): LifecycleResponse {
   const missing: string[] = [];
   const r = reader(missing);
   const root = obj(raw);
-  const l = r.sec(root, 'lifecycle', 'lifecycle');
-  const st = r.sec(l, 'stages', 'lifecycle.stages');
   const e = r.sec(root, 'economics', 'economics');
   const rev = obj(e.revenue), co = obj(e.costs), acq = obj(e.acquisition), lt = obj(e.ltv), roi = obj(e.roi), asm = obj(e.assumptions);
-  const g = obj(root.searchConsole);
-  const gt = obj(g.totals);
   const ins = obj(root.instrumentation);
   const churnSource = lt.churnSource === 'observed' || lt.churnSource === 'assumed' ? lt.churnSource : 'default';
-  const s = (key: string) => r.n(st, key, `lifecycle.stages.${key}`);
-  const coverage = normalizeCoverage(root.coverage);
-  if (!coverage) r.mark('coverage');
+  const priceSource = rev.priceSource === 'observed' || rev.priceSource === 'assumed' ? rev.priceSource : 'default';
   return {
-    lifecycle: {
-      since: str(l.since), web: normalizeCohort(l.web, r, 'lifecycle.web'), ios: normalizeCohort(l.ios, r, 'lifecycle.ios'),
-      stages: {
-        total: s('total'), accounts: s('accounts'), guests: s('guests'), new: s('new'), activated: s('activated'),
-        engaged: s('engaged'), pro: s('pro'), atRisk: s('atRisk'), lost: s('lost'), byPlatform: counts(st.byPlatform),
-      },
-    },
     economics: {
       days: num(e.days), since: str(e.since),
       revenue: {
         grossUsd: num(rev.grossUsd), netUsd: num(rev.netUsd), refundsUsd: num(rev.refundsUsd), mrrGrossUsd: num(rev.mrrGrossUsd), mrrNetUsd: num(rev.mrrNetUsd),
-        activeSubscriptions: num(rev.activeSubscriptions), newPaying: num(rev.newPaying), priceUsd: num(rev.priceUsd), takehome: num(rev.takehome),
+        activeSubscriptions: num(rev.activeSubscriptions), trialing: num(rev.trialing), newPaying: num(rev.newPaying), payersEver: num(rev.payersEver),
+        priceUsd: num(rev.priceUsd), takehome: num(rev.takehome), priceSource,
       },
       costs: {
-        marketingUsd: num(co.marketingUsd), infraUsd: num(co.infraUsd), otherUsd: num(co.otherUsd), llmUsd: num(co.llmUsd), totalUsd: num(co.totalUsd),
+        marketingUsd: num(co.marketingUsd), infraUsd: num(co.infraUsd), otherUsd: num(co.otherUsd), llmUsd: num(co.llmUsd), totalUsd: num(co.totalUsd), manualEntries: num(co.manualEntries),
         byChannel: (Array.isArray(co.byChannel) ? co.byChannel : []).map((c) => ({ channel: str(obj(c).channel) || 'other', usd: num(obj(c).usd) })),
       },
       acquisition: { newAccounts: num(acq.newAccounts), newPaying: num(acq.newPaying), cacPerAccount: numOrNull(acq.cacPerAccount), cacPerPaying: numOrNull(acq.cacPerPaying) },
       ltv: {
         monthlyNetPerSubUsd: num(lt.monthlyNetPerSubUsd), monthlyLlmPerUserUsd: num(lt.monthlyLlmPerUserUsd), monthlyContributionUsd: num(lt.monthlyContributionUsd),
         monthlyChurn: num(lt.monthlyChurn), churnSource, lifetimeMonths: num(lt.lifetimeMonths), ltvUsd: num(lt.ltvUsd),
-        ltvToCac: numOrNull(lt.ltvToCac), paybackMonths: numOrNull(lt.paybackMonths),
+        ltvToCac: numOrNull(lt.ltvToCac), paybackMonths: numOrNull(lt.paybackMonths), scenario: lt.scenario !== false,
       },
       roi: { profitUsd: num(roi.profitUsd), roi: numOrNull(roi.roi) },
       assumptions: { monthlyChurn: numOrNull(asm.monthlyChurn), priceUsd: numOrNull(asm.priceUsd), storeFee: numOrNull(asm.storeFee), maxLifetimeMonths: numOrNull(asm.maxLifetimeMonths) },
     },
-    searchConsole: {
-      configured: Boolean(g.configured),
-      error: strOrNull(g.error) ?? undefined,
-      site: strOrNull(g.site) ?? undefined,
-      days: Array.isArray(g.days) ? g.days.map(str) : undefined,
-      clicks: Array.isArray(g.clicks) ? nums(g.clicks) : undefined,
-      impressions: Array.isArray(g.impressions) ? nums(g.impressions) : undefined,
-      totals: g.totals ? { clicks: num(gt.clicks), impressions: num(gt.impressions), ctr: num(gt.ctr), position: numOrNull(gt.position) } : undefined,
-      topQueries: Array.isArray(g.topQueries)
-        ? g.topQueries.map((q) => { const x = obj(q); return { query: str(x.query), clicks: num(x.clicks), impressions: num(x.impressions), ctr: num(x.ctr), position: numOrNull(x.position) }; })
-        : undefined,
-      topPages: Array.isArray(g.topPages) ? g.topPages.map((q) => { const x = obj(q); return { page: str(x.page), clicks: num(x.clicks), impressions: num(x.impressions) }; }) : undefined,
-    },
+    searchConsole: normalizeSearchConsole(root.searchConsole),
     appStore: normalizeAppStore(root.appStore),
-    coverage,
     instrumentation: isObj(root.instrumentation)
-      ? { webVisits: Boolean(ins.webVisits), webPaywall: Boolean(ins.webPaywall), iosVisits: Boolean(ins.iosVisits), iosPaywall: Boolean(ins.iosPaywall), purchaseStart: Boolean(ins.purchaseStart) }
+      ? { webVisits: Boolean(ins.webVisits), webPaywall: Boolean(ins.webPaywall), iosVisits: Boolean(ins.iosVisits), iosOpens: Boolean(ins.iosOpens),
+          iosPaywall: Boolean(ins.iosPaywall), purchaseStart: Boolean(ins.purchaseStart), deskOutcomes: Boolean(ins.deskOutcomes) }
       : INSTRUMENTATION_DEFAULT,
     missing,
   };
@@ -625,13 +818,35 @@ export async function fetchAdminMe(): Promise<AdminMe> {
 }
 
 /** `days` is the window (the dashboard also asks for twice it, for the comparison); the server allows 1–365. */
-export async function fetchAdminOverview(days: number, opts: { compare?: boolean } = {}): Promise<OverviewResponse> {
-  // The comparison request skips the integrations (RevenueCat, App Store) on the server.
-  return normalizeOverview(await get('overview', { days, ...(opts.compare ? { compare: 1 } : {}) }), opts);
+export async function fetchAdminOverview(days: number, opts: { compare?: boolean; internal?: boolean } = {}): Promise<OverviewResponse> {
+  // The comparison request skips the integrations (RevenueCat, App Store), the growth view and the diagnosis.
+  return normalizeOverview(await get('overview', { days, ...(opts.compare ? { compare: 1 } : {}), ...(opts.internal ? { internal: 1 } : {}) }), opts);
 }
 
-export async function fetchAdminLifecycle(days: number): Promise<LifecycleResponse> {
-  return normalizeLifecycle(await get('lifecycle', { days }));
+export async function fetchAdminLifecycle(days: number, internal = false): Promise<LifecycleResponse> {
+  return normalizeLifecycle(await get('lifecycle', { days, ...(internal ? { internal: 1 } : {}) }));
+}
+
+export async function fetchAdminInternal(): Promise<InternalResponse> {
+  const r = obj(await get('internal'));
+  return {
+    devices: (Array.isArray(r.devices) ? r.devices : []).map((v) => {
+      const x = obj(v);
+      return {
+        device: str(x.device), platform: str(x.platform) || 'web', source: x.source === 'backfill' ? 'backfill' : 'observed', firstSeen: str(x.firstSeen), lastSeen: strOrNull(x.lastSeen),
+        firstSurface: strOrNull(x.firstSurface), referrer: strOrNull(x.referrer), utm: strOrNull(x.utm), country: strOrNull(x.country),
+        internal: Boolean(x.internal), manualInternal: Boolean(x.manualInternal), adminSession: Boolean(x.adminSession), teamNetwork: Boolean(x.teamNetwork),
+        reads: num(x.reads), delivered: num(x.delivered),
+        account: strOrNull(x.account), accountId: strOrNull(x.accountId),
+      };
+    }),
+    networks: (Array.isArray(r.networks) ? r.networks : []).map((v) => {
+      const x = obj(v);
+      return { network: str(x.network), note: strOrNull(x.note), createdAt: str(x.createdAt), lastSeenAt: str(x.lastSeenAt), installs: num(x.installs), onlyByNetwork: num(x.onlyByNetwork) };
+    }),
+    emails: Array.isArray(r.emails) ? r.emails.map(str).filter(Boolean) : [],
+    marks: (Array.isArray(r.marks) ? r.marks : []).map((v) => { const x = obj(v); return { identity_id: str(x.identity_id), email: strOrNull(x.email), provider: strOrNull(x.provider), note: strOrNull(x.note), created_at: str(x.created_at) }; }),
+  };
 }
 
 function providerCountries<K extends string>(v: unknown, keys: K[]): ProviderCountries<K> {
@@ -644,14 +859,15 @@ function providerCountries<K extends string>(v: unknown, keys: K[]): ProviderCou
   };
 }
 
-export async function fetchAdminAudience(days: number): Promise<AudienceResponse> {
-  const r = obj(await get('audience', { days }));
+export async function fetchAdminAudience(days: number, internal = false): Promise<AudienceResponse> {
+  const r = obj(await get('audience', { days, ...(internal ? { internal: 1 } : {}) }));
   const g = obj(r.geo);
   const list = (v: unknown) => (Array.isArray(v) ? v.map(obj) : []);
   return {
     geo: {
       since: str(g.since), days: num(g.days), locatedSince: strOrNull(g.locatedSince),
-      web: { devices: num(obj(g.web).devices), located: num(obj(g.web).located) },
+      web: { devices: num(obj(g.web).devices), measurable: num(obj(g.web).measurable), located: num(obj(g.web).located), beforeLocation: num(obj(g.web).beforeLocation) },
+      located: { total: num(obj(g.located).total), withRegion: num(obj(g.located).withRegion) },
       countries: list(g.countries).map((x) => ({ country: str(x.country), visitors: num(x.visitors), readers: num(x.readers), accounts: num(x.accounts), pro: num(x.pro) })),
       regions: list(g.regions).map((x) => ({ country: str(x.country), region: str(x.region), visitors: num(x.visitors), readers: num(x.readers) })),
       purchases: list(g.purchases).map((x) => ({ country: str(x.country), newPaying: num(x.newPaying), grossUsd: num(x.grossUsd) })),
@@ -686,7 +902,7 @@ export async function fetchAdminMembers(): Promise<MembersResponse> {
 export async function fetchAdminUsers(opts: { q?: string; limit?: number; offset?: number } = {}): Promise<UsersResponse> {
   const r = obj(await get('users', { q: opts.q?.trim() || undefined, limit: opts.limit ?? 50, offset: opts.offset ?? 0 }));
   const users = Array.isArray(r.users) ? r.users.map(normalizeUser) : [];
-  return { total: Math.max(num(r.total), users.length), users };
+  return { total: Math.max(num(r.total), users.length), accounts: num(r.accounts), wallets: num(r.wallets), internal: num(r.internal), readsSince: strOrNull(r.readsSince), users };
 }
 
 export async function fetchAdminCoupons(): Promise<CouponsResponse> {

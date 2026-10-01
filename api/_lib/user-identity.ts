@@ -53,7 +53,7 @@ async function verifySupabaseToken(token: string): Promise<{ id: string; email: 
     if (!r.ok) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
     const user = (await r.json()) as { id?: string; email?: string; app_metadata?: { provider?: string }; user_metadata?: Record<string, unknown> };
     if (!user?.id || !/^[0-9a-f-]{36}$/i.test(user.id)) return null;
-    return { id: user.id, email: user.email ?? null, provider: user.app_metadata?.provider ?? null, firstName: firstNameOf(user.user_metadata) };
+    return { id: user.id, email: user.email || null, provider: user.app_metadata?.provider ?? null, firstName: firstNameOf(user.user_metadata) };
   } catch {
     console.warn('[user-identity] auth service unavailable');
     throw new IdentityUnavailableError('Authentication is temporarily unavailable');

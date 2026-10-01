@@ -12,6 +12,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { createLimiter, getClientIpKey, saltedKey } from './_lib/rate-limit.js';
 import { requestGeo } from './_lib/geo.js';
+import { callerHash } from './_lib/access.js';
 
 export const config = { maxDuration: 10 };
 
@@ -49,17 +50,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const row = normalizeEvent(raw);
   if (!row) return res.status(400).json({ error: 'Unknown event' });
   const geo = requestGeo(req);
+  let failure: string | null = null;
   try {
     const r = await fetch(bobbyRest('rpc/bobby_record_event'), {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
       body: JSON.stringify({
         p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source,
-        ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}),
+        ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
       }),
     });
-    if (!r.ok) console.error('[track] insert', r.status);
+    if (!r.ok) failure = `storage ${r.status}`;
   } catch (e) {
-    console.error('[track]', e instanceof Error ? e.message : e);
+    failure = e instanceof Error ? e.name : 'error';
   }
-  return res.status(204).end();
+  if (!failure) return res.status(204).end();
+  // A lost event is visible to the owner (Integraciones reads api_cache 'track-health'), never silent.
+  console.error('[track]', failure);
+  await fetch(bobbyRest('api_cache?on_conflict=cache_key'), {
+    method: 'POST', headers: { ...bobbyServiceHeaders(), Prefer: 'resolution=merge-duplicates,return=minimal' }, signal: AbortSignal.timeout(2000),
+    body: JSON.stringify({ cache_key: 'track-health', payload: { lastErrorAt: new Date().toISOString(), error: failure.slice(0, 40) },
+      expires_at: new Date(Date.now() + 30 * 86_400_000).toISOString(), updated_at: new Date().toISOString() }),
+  }).catch(() => null);
+  return res.status(503).end();
 }

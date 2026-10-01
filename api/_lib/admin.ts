@@ -12,8 +12,9 @@ import { gunzipSync } from 'node:zlib';
 import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './bobby-db.js';
 import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
-import { paywallOn } from './access.js';
+import { callerHash, deviceHash, paywallOn } from './access.js';
 import { countryCode, fromAlpha3 } from './geo.js';
+import { waitUntil } from '@vercel/functions';
 
 const TIMEOUT = 6000;
 
@@ -48,6 +49,9 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
   try {
     const rows = await rest<Array<{ identity_id: string }>>(`bobby_admins?identity_id=eq.${identity.id}&select=identity_id`);
     if (!rows?.length) { res.status(403).json({ error: 'not_admin' }); return null; }
+    // The browser and the address used for /admin are the team's own traffic: the dashboard leaves them out.
+    const device = deviceHash(req), network = callerHash(req);
+    if (device || network) waitUntil(rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null));
     return identity;
   } catch {
     res.status(503).json({ error: 'The admin check is unavailable. Try again.' });
@@ -171,7 +175,7 @@ export async function grant(body: Record<string, unknown>) {
   if (gift.p_reads + gift.p_profundo + gift.p_maximo + gift.p_pro_days === 0) throw new AdminError(400, 'Choose at least one gift.');
   const result = await rpc<{ ok: boolean; error?: string }>('bobby_admin_grant', { p_identity: row.id, ...gift });
   if (!result?.ok) throw new AdminError(404, 'Account not found.');
-  return { target: row.email ?? row.id, result };
+  return { target: row.email || row.id, result };
 }
 
 /** The account deletion of api/account.ts, without the user's Apple authorization code (revocation is manual). */
@@ -179,18 +183,20 @@ export async function deleteUser(admin: Identity, body: Record<string, unknown>)
   const row = await identityRow(body.identityId);
   if (row.id === admin.id) throw new AdminError(400, 'You cannot delete your own account from here.');
   const confirm = typeof body.confirm === 'string' ? body.confirm.trim().toLowerCase() : '';
-  if (confirm !== (row.email ?? row.id).toLowerCase()) throw new AdminError(400, 'Type the account email to confirm.');
-  await rest(`agent_trades?user_id=eq.${row.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: null }) });
-  await rest(`bobby_identities?id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  // Apple accounts that hide their email are confirmed by their id.
+  if (confirm !== (row.email || row.id).toLowerCase()) throw new AdminError(400, 'Type the account email to confirm.');
+  // The sign-in goes first: if it fails nothing is deleted yet, so a retry finds the account again.
   if (row.auth_user_id) {
     const url = (process.env.BOBBY_AUTH_URL || bobbyDbUrl()).replace(/\/+$/, '');
     const key = (process.env.BOBBY_AUTH_SERVICE_ROLE_KEY || bobbyServiceKey()).trim();
     const r = await fetch(`${url}/auth/v1/admin/users/${encodeURIComponent(row.auth_user_id)}`, {
       method: 'DELETE', headers: { apikey: key, Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(TIMEOUT),
     });
-    if (!r.ok && r.status !== 404) throw new AdminError(502, 'The Bobby data was deleted but the sign-in could not be. Retry.');
+    if (!r.ok && r.status !== 404) throw new AdminError(502, 'The sign-in could not be deleted, so nothing was changed. Retry.');
   }
-  return { target: row.email ?? row.id };
+  await rest(`agent_trades?user_id=eq.${row.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: null }) });
+  await rest(`bobby_identities?id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  return { target: row.email || row.id };
 }
 
 export async function setAdmin(admin: Identity, body: Record<string, unknown>) {
@@ -203,7 +209,69 @@ export async function setAdmin(admin: Identity, body: Record<string, unknown>) {
   } else {
     await rest(`bobby_admins?identity_id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   }
-  return { target: row.email ?? row.id };
+  return { target: row.email || row.id };
+}
+
+// ---------------- internal traffic ----------------
+/** An account the owner marks as the team's own (a test Apple ID, a colleague): left out of every metric. */
+export async function setInternal(body: Record<string, unknown>) {
+  const row = await identityRow(body.identityId);
+  if (typeof body.internal !== 'boolean') throw new AdminError(400, 'Invalid request.');
+  if (body.internal) {
+    await rest('bobby_internal_marks?on_conflict=identity_id', { method: 'POST', headers: { Prefer: 'resolution=ignore-duplicates,return=minimal' },
+      body: JSON.stringify({ identity_id: row.id, note: typeof body.note === 'string' ? body.note.trim().slice(0, 120) || null : null }) });
+  } else {
+    await rest(`bobby_internal_marks?identity_id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  }
+  return { target: row.email || row.id };
+}
+
+/** An install, by the 10-character prefix the installs list shows. */
+export async function setDeviceInternal(body: Record<string, unknown>) {
+  const prefix = typeof body.device === 'string' ? body.device : '';
+  if (!/^[A-Za-z0-9_-]{10}$/.test(prefix) || typeof body.internal !== 'boolean') throw new AdminError(400, 'Invalid request.');
+  const n = await rpc<number>('bobby_set_device_internal', { p_prefix: prefix, p_internal: body.internal });
+  if (n !== 1) throw new AdminError(404, 'Install not found.');
+  return { target: prefix };
+}
+
+export async function removeInternalNetwork(body: Record<string, unknown>) {
+  const prefix = typeof body.network === 'string' ? body.network : '';
+  if (!/^[A-Za-z0-9_-]{10}$/.test(prefix)) throw new AdminError(400, 'Invalid request.');
+  // Kept as ignored (not deleted), so the next /admin visit from that address does not add it back.
+  const n = await rpc<number>('bobby_ignore_internal_network', { p_prefix: prefix });
+  if (n !== 1) throw new AdminError(404, 'Network not found.');
+  return { target: prefix };
+}
+
+const EMAIL = /^[^\s@]{1,64}@[^\s@]{1,190}\.[a-z]{2,24}$/i;
+/** The owner's own sign-in emails: their accounts are internal, also the ones created later. */
+export async function setInternalEmails(body: Record<string, unknown>) {
+  const list = Array.isArray(body.emails) ? body.emails : null;
+  if (!list || list.length > 50) throw new AdminError(400, 'Invalid request.');
+  const emails = [...new Set(list.map((e) => (typeof e === 'string' ? e.trim().toLowerCase() : '')).filter(Boolean))];
+  if (emails.some((e) => !EMAIL.test(e))) throw new AdminError(400, 'Invalid email.');
+  await rest('bobby_admin_settings?on_conflict=key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ key: 'internal_emails', value: emails, updated_at: new Date().toISOString() }) });
+  return { emails };
+}
+
+/** Installs (newest first), the networks left out and the listed emails: what "internal" means right now. */
+export async function internalView() {
+  const [devices, networks, emails, marks] = await Promise.all([
+    rpc<unknown[]>('bobby_admin_devices', { p_limit: 200 }),
+    // Prefixes only and how many installs each network leaves out (bobby_admin_internal_networks).
+    rpc<unknown[]>('bobby_admin_internal_networks', {}),
+    rest<Array<{ value: unknown }>>('bobby_admin_settings?key=eq.internal_emails&select=value'),
+    rest<Array<{ identity_id: string; note: string | null; created_at: string; identity?: { email?: string | null; provider?: string | null } | null }>>(
+      'bobby_internal_marks?select=identity_id,note,created_at,identity:bobby_identities(email,provider)&order=created_at.desc'),
+  ]);
+  return {
+    devices: devices ?? [],
+    networks: networks ?? [],
+    emails: Array.isArray(emails?.[0]?.value) ? (emails![0].value as unknown[]).filter((e): e is string => typeof e === 'string') : [],
+    marks: (marks ?? []).map(({ identity, ...m }) => ({ ...m, email: identity?.email || null, provider: identity?.provider ?? null })),
+  };
 }
 
 // ---------------- LLM credit ----------------
@@ -239,7 +307,16 @@ export async function probeProvider(provider: unknown) {
   } else {
     throw new AdminError(400, 'Unknown provider.');
   }
-  if (res.ok) return { status: 'ok' as const, httpStatus: res.status };
+  if (res.ok) {
+    // A working provider ends any credit alert, and the successful call is evidence for the dashboard (lastOk).
+    await Promise.all([
+      rest(`api_cache?cache_key=eq.${encodeURIComponent(`provider-credit-alert:${provider}`)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null),
+      rest('bobby_llm_usage', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        surface: 'probe', provider, model: provider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini', role: 'probe',
+        tokens_in: 1, tokens_out: 1, tokens_cached: 0, tokens_reasoning: 0, usd: 0, latency_ms: 0, stop: 'ok', ok: true }) }).catch(() => null),
+    ]);
+    return { status: 'ok' as const, httpStatus: res.status };
+  }
   // Class only: the provider's message is never kept.
   const error = ((await res.json().catch(() => null)) as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null)?.error;
   const text = typeof error?.message === 'string' ? error.message : '';
@@ -249,19 +326,19 @@ export async function probeProvider(provider: unknown) {
 }
 
 // ---------------- integrations ----------------
-type Metric = { id: string; name: string; value: number; unit?: string; period?: string };
-let rcCache: { at: number; value: { configured: boolean; error?: string; metrics?: Metric[] } } | null = null;
+type Metric = { id: string; name: string; value: number; unit?: string; period?: string; description?: string; updatedAt?: string };
+let rcCache: { at: number; value: { configured: boolean; error?: string; metrics?: Metric[]; fetchedAt?: string } } | null = null;
 
 async function revenueCatMetrics() {
   const key = process.env.REVENUECAT_V2_SECRET_KEY?.trim();
   if (!key) return { configured: false };
-  if (rcCache && Date.now() - rcCache.at < 5 * 60_000) return rcCache.value;
+  if (rcCache && Date.now() - rcCache.at < (rcCache.value.error ? 60_000 : 5 * 60_000)) return rcCache.value;
   const get = async (path: string) => {
     const r = await fetch(`https://api.revenuecat.com/v2${path}`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(TIMEOUT) });
     if (!r.ok) throw new Error(`revenuecat ${r.status}`);
     return r.json() as Promise<Record<string, unknown>>;
   };
-  let value: { configured: boolean; error?: string; metrics?: Metric[] };
+  let value: { configured: boolean; error?: string; metrics?: Metric[]; fetchedAt?: string };
   try {
     let project = process.env.REVENUECAT_PROJECT_ID?.trim();
     if (!project) {
@@ -273,8 +350,10 @@ async function revenueCatMetrics() {
     const metrics = ((overview.metrics as Array<Record<string, unknown>> | undefined) ?? []).map((m) => ({
       id: String(m.id ?? ''), name: String(m.name ?? m.id ?? ''), value: Number(m.value ?? 0),
       unit: typeof m.unit === 'string' ? m.unit : undefined, period: typeof m.period === 'string' ? m.period : undefined,
+      description: typeof m.description === 'string' ? m.description.slice(0, 80) : undefined,
+      updatedAt: typeof m.last_updated_at_iso8601 === 'string' ? m.last_updated_at_iso8601 : typeof m.last_updated_at === 'number' ? new Date(m.last_updated_at).toISOString() : undefined,
     }));
-    value = { configured: true, metrics };
+    value = { configured: true, metrics, fetchedAt: new Date().toISOString() };
   } catch (e) {
     value = { configured: true, error: e instanceof Error ? e.message : 'revenuecat unavailable' };
   }
@@ -290,7 +369,7 @@ export const ascKeyId = (raw = process.env.ASC_KEY_ID) => raw?.match(/\b[A-Z0-9]
 export const ascIssuer = (raw = process.env.ASC_ISSUER_ID) => raw?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '';
 const ascConfigured = () => Boolean(ascKeyId() && ascIssuer() && process.env.ASC_PRIVATE_KEY?.trim() && ascVendor());
 // countries: first-time downloads by storefront country (ISO alpha-2).
-interface SalesDay { downloads: number; redownloads: number; updates: number; iap: number; countries?: Record<string, number> }
+interface SalesDay { downloads: number; redownloads: number; updates: number; iap: number; countries?: Record<string, number>; pending?: boolean }
 
 function ascToken(): string {
   const b64 = (v: string | Buffer) => Buffer.from(v).toString('base64url');
@@ -337,7 +416,9 @@ async function salesDay(date: string, token: string): Promise<SalesDay | null> {
   });
   const r = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/a-gzip' }, signal: AbortSignal.timeout(10000) });
   let day: SalesDay;
-  if (r.status === 404) day = { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {} };   // no sales that day, or not published yet
+  // 404: no sales that day — or, for the last days, a report Apple has not published yet (pending, never a zero).
+  const recent = Date.now() - new Date(`${date}T00:00:00Z`).getTime() <= 3 * 86_400_000;
+  if (r.status === 404) day = { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {}, ...(recent ? { pending: true } : {}) };
   else if (!r.ok) throw new Error(`appstore ${r.status}`);
   else day = parseSalesReport(gunzipSync(Buffer.from(await r.arrayBuffer())).toString('utf8'), APP_ID());
   // Settled days keep a year; the last two days are re-read (Apple publishes with a delay).
@@ -365,12 +446,15 @@ async function appStoreSales(days: string[]) {
     }
     const totals = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };
     const countries = new Map<string, number>();
+    const pendingDays = [...results.entries()].filter(([, v]) => v.pending).map(([d]) => d);
+    const reported = [...results.entries()].filter(([, v]) => !v.pending).map(([d]) => d).sort();
     for (const v of results.values()) {
       totals.downloads += v.downloads; totals.redownloads += v.redownloads; totals.updates += v.updates; totals.iap += v.iap;
       for (const [cc, n] of Object.entries(v.countries ?? {})) countries.set(cc, (countries.get(cc) ?? 0) + n);
     }
     const byCountry = [...countries].map(([country, downloads]) => ({ country, downloads })).sort((a, b) => b.downloads - a.downloads || a.country.localeCompare(b.country)).slice(0, 40);
-    return { configured: true, days, downloads: days.map((d) => results.get(d)?.downloads ?? 0), totals, byCountry };
+    return { configured: true, days, downloads: days.map((d) => results.get(d)?.downloads ?? 0), totals, byCountry,
+      coveredFrom: reported[0] ?? null, coveredTo: reported.at(-1) ?? null, pendingDays, excludedToday: today };
   } catch (e) {
     return { configured: true, error: e instanceof Error ? e.message : 'appstore unavailable' };
   }
@@ -386,12 +470,15 @@ export async function integrations(days: string[]) {
   // (Search Console is read by the lifecycle view, at the top of the web funnel.)
   const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const since24 = new Date(Date.now() - 86_400_000).toISOString();
-  const [revenuecat, appStore, spend, webhookLast, webhook30d, trackLast, track24h] = await Promise.all([
+  const [revenuecat, appStore, spend, webhookLast, webhook30d, stripeLast, trackLast, track24h, trackHealth, readsLast] = await Promise.all([
     revenueCatMetrics(), appStoreSales(days), llmSpend(),
-    latest('bobby_purchase_events?select=created_at&order=created_at.desc&limit=1'),
-    countRows(`bobby_purchase_events?select=id&created_at=gte.${encodeURIComponent(since30)}`),
-    latest('bobby_events?select=created_at&order=created_at.desc&limit=1'),
-    countRows(`bobby_events?select=id&created_at=gte.${encodeURIComponent(since24)}`),
+    latest('bobby_purchase_events?select=created_at&store=neq.STRIPE&order=created_at.desc&limit=1'),
+    countRows(`bobby_purchase_events?select=id&store=neq.STRIPE&created_at=gte.${encodeURIComponent(since30)}`),
+    latest('bobby_purchase_events?select=created_at&store=eq.STRIPE&order=created_at.desc&limit=1'),
+    latest('bobby_events?select=created_at&event=eq.visit&order=created_at.desc&limit=1'),
+    countRows(`bobby_events?select=id&event=eq.visit&created_at=gte.${encodeURIComponent(since24)}`),
+    rest<Array<{ payload: { lastErrorAt?: string; error?: string } }>>('api_cache?cache_key=eq.track-health&select=payload').catch(() => null),
+    latest('bobby_reads?select=created_at&order=created_at.desc&limit=1'),
   ]);
   const missing = [
     ...(process.env.REVENUECAT_V2_SECRET_KEY?.trim() ? [] : ['REVENUECAT_V2_SECRET_KEY']),
@@ -401,6 +488,7 @@ export async function integrations(days: string[]) {
   ];
   const has = (k: string) => Boolean(process.env[k]?.trim());
   missing.push(...['REVENUECAT_SECRET_KEY', 'REVENUECAT_WEBHOOK_AUTH', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'].filter((k) => !has(k)));
+  const stripe = { configured: has('STRIPE_SECRET_KEY') && has('STRIPE_PRICE_ID'), webhook: has('STRIPE_WEBHOOK_SECRET'), lastEventAt: stripeLast };
   return {
     revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing,
     // The spend guard's own figures: desk only, UTC calendar day and month (what the caps are compared to).
@@ -408,7 +496,8 @@ export async function integrations(days: string[]) {
     health: {
       // Configured = the secrets exist; delivery is only proven by events arriving.
       revenuecatWebhook: { configured: has('REVENUECAT_SECRET_KEY') && has('REVENUECAT_WEBHOOK_AUTH'), lastEventAt: webhookLast, events30d: webhook30d },
-      tracking: { lastEventAt: trackLast, events24h: track24h },
+      stripe,
+      tracking: { lastEventAt: trackLast, events24h: track24h, lastErrorAt: trackHealth?.[0]?.payload?.lastErrorAt ?? null, lastError: trackHealth?.[0]?.payload?.error ?? null, lastReadAt: readsLast },
       llmKeys: { anthropic: has('ANTHROPIC_API_KEY'), openai: has('OPENAI_API_KEY') },
       // Vercel Web Analytics has no read API here: its state is not verified by the dashboard.
       vercelAnalytics: 'unverified' as const,
@@ -497,9 +586,9 @@ export async function searchConsole(days: string[]) {
 // ---------------- unit economics ----------------
 interface EconomicsRaw {
   days: number; since: string;
-  revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
-  costs: { marketingUsd: number; infraUsd: number; otherUsd: number; byChannel: Array<{ channel: string; usd: number }> };
-  subscriptions: { active: number }; newAccounts: number; activeReaders30d: number; llmUsd: number; llm30dUsd: number;
+  revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; payersEver?: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
+  costs: { marketingUsd: number; infraUsd: number; otherUsd: number; entries?: number; byChannel: Array<{ channel: string; usd: number }> };
+  subscriptions: { active: number; trialing?: number }; newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
   assumptions: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number };
 }
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -509,7 +598,10 @@ const round = (v: number | null, digits = 2) => (v === null || !Number.isFinite(
 export function unitEconomics(raw: EconomicsRaw) {
   const a = raw.assumptions ?? {};
   const priceUsd = n(raw.revenue.lastPriceUsd) || n(a.priceUsd) || 4.99;
-  const takehome = n(raw.revenue.takehome) || 1 - (n(a.storeFee) || 0.15);
+  // A saved 0% fee is a real choice (a web sale with no store): only an absent value falls back to 15%.
+  const fee = typeof a.storeFee === 'number' && Number.isFinite(a.storeFee) ? a.storeFee : 0.15;
+  const takehome = n(raw.revenue.takehome) || 1 - fee;
+  const payersEver = n(raw.revenue.payersEver);
   const activeSubs = n(raw.subscriptions.active);
   // Monthly churn: expirations in the last 30 days over the subscriptions alive at its start, once there are
   // enough of them to mean something; until then the owner's assumption (default 10%).
@@ -517,7 +609,9 @@ export function unitEconomics(raw: EconomicsRaw) {
   const observed = base >= 5 ? n(raw.revenue.expirations30d) / base : null;
   const monthlyChurn = observed ?? (n(a.monthlyChurn) > 0 ? n(a.monthlyChurn) : 0.1);
   const churnSource = observed !== null ? 'observed' : n(a.monthlyChurn) > 0 ? 'assumed' : 'default';
-  const llmPerActiveReader = n(raw.activeReaders30d) > 0 ? n(raw.llm30dUsd) / n(raw.activeReaders30d) : 0;
+  // The ledger carries no account (the team's reads are in it): divide by every active reader, the team included.
+  const readers30 = n(raw.activeReaders30dAll) || n(raw.activeReaders30d);
+  const llmPerActiveReader = readers30 > 0 ? n(raw.llm30dUsd) / readers30 : 0;
   const monthlyContribution = priceUsd * takehome - llmPerActiveReader;
   const lifetimeMonths = Math.min(1 / Math.max(monthlyChurn, 0.0001), n(a.maxLifetimeMonths) || 36);
   const ltv = monthlyContribution * lifetimeMonths;
@@ -531,21 +625,26 @@ export function unitEconomics(raw: EconomicsRaw) {
     revenue: {
       grossUsd: round(n(raw.revenue.grossUsd)), netUsd: round(n(raw.revenue.netUsd)), refundsUsd: round(n(raw.revenue.refundsUsd)),
       mrrGrossUsd: round(activeSubs * priceUsd), mrrNetUsd: round(activeSubs * priceUsd * takehome),
-      activeSubscriptions: activeSubs, newPaying: n(raw.revenue.newPaying), priceUsd, takehome,
+      activeSubscriptions: activeSubs, trialing: n(raw.subscriptions.trialing), newPaying: n(raw.revenue.newPaying), payersEver, priceUsd, takehome,
+      priceSource: n(raw.revenue.lastPriceUsd) ? 'observed' : n(a.priceUsd) ? 'assumed' : 'default',
     },
     costs: {
       marketingUsd: round(marketing), infraUsd: round(n(raw.costs.infraUsd)), otherUsd: round(n(raw.costs.otherUsd)),
       llmUsd: round(n(raw.llmUsd), 4), totalUsd: round(totalCosts), byChannel: (raw.costs.byChannel ?? []).map((c) => ({ channel: c.channel, usd: round(n(c.usd)) })),
+      // Only the AI ledger is recorded automatically; the rest exists once the owner enters it.
+      manualEntries: n(raw.costs.entries),
     },
     acquisition: { newAccounts: n(raw.newAccounts), newPaying: n(raw.revenue.newPaying), cacPerAccount: round(cacPerAccount), cacPerPaying: round(cacPerPaying) },
     ltv: {
       monthlyNetPerSubUsd: round(priceUsd * takehome), monthlyLlmPerUserUsd: round(llmPerActiveReader, 4), monthlyContributionUsd: round(monthlyContribution),
       monthlyChurn: round(monthlyChurn, 4), churnSource, lifetimeMonths: round(lifetimeMonths, 1), ltvUsd: round(ltv),
+      // No account has ever paid: the LTV is a scenario built from the price and churn above, not an observation.
+      scenario: payersEver === 0,
       ltvToCac: cacPerPaying ? round(ltv / cacPerPaying) : null,
       paybackMonths: cacPerPaying && monthlyContribution > 0 ? round(cacPerPaying / monthlyContribution, 1) : null,
     },
     roi: { profitUsd: round(profit), roi: totalCosts > 0 ? round(profit / totalCosts, 4) : null },
-    assumptions: { monthlyChurn: n(a.monthlyChurn) || null, priceUsd: n(a.priceUsd) || null, storeFee: n(a.storeFee) || null, maxLifetimeMonths: n(a.maxLifetimeMonths) || null },
+    assumptions: { monthlyChurn: n(a.monthlyChurn) || null, priceUsd: n(a.priceUsd) || null, storeFee: typeof a.storeFee === 'number' ? a.storeFee : null, maxLifetimeMonths: n(a.maxLifetimeMonths) || null },
   };
 }
 
@@ -558,8 +657,8 @@ const daysFrom = (since: string) => {
 
 // Where the audience is: web devices by country/region (first-party), iOS downloads by storefront (App Store),
 // Google search by country (Search Console) and purchases by store country. Age and gender have no source yet.
-export async function audienceView(days: number) {
-  const geo = await rpc<{ since: string }>('bobby_admin_geo', { p_days: days });
+export async function audienceView(days: number, internal = false) {
+  const geo = await rpc<{ since: string }>('bobby_admin_geo', { p_days: days, p_internal: internal });
   const list = daysFrom(geo.since);
   const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
   const pick = (v: unknown, key: string) => {
@@ -569,19 +668,16 @@ export async function audienceView(days: number) {
   return { geo, searchConsole: pick(search, 'countries'), appStore: pick(appStore, 'countries') };
 }
 
-export async function lifecycleView(days: number) {
-  const [lifecycle, raw] = await Promise.all([
-    rpc<{ since: string }>('bobby_admin_lifecycle', { p_days: days }),
-    rpc<EconomicsRaw>('bobby_admin_economics', { p_days: days }),
-  ]);
-  const list = daysFrom(lifecycle.since);
+/** What the shipped clients report: a zero on an uninstrumented step means "not measured", not "nobody". The desk
+ *  outcomes (delivered, walls, blocks) come from the server for every client since the 20261001230000 deploy. */
+export const INSTRUMENTATION = { webVisits: true, webPaywall: true, iosVisits: false, iosOpens: true, iosPaywall: false, purchaseStart: false, deskOutcomes: true };
+
+/** The funnel tab's unit economics (the cohort itself travels with the overview, in `growth`). */
+export async function lifecycleView(days: number, internal = false) {
+  const raw = await rpc<EconomicsRaw & { since: string }>('bobby_admin_economics', { p_days: days, p_internal: internal });
+  const list = daysFrom(raw.since);
   const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
-  const coverage = await rpc('bobby_admin_coverage', {}).catch(() => null);
-  return {
-    lifecycle, economics: unitEconomics(raw), searchConsole: search, appStore, coverage,
-    // What the shipped clients actually report: a zero on an uninstrumented step means "not measured", not "nobody".
-    instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosPaywall: false, purchaseStart: false },
-  };
+  return { economics: unitEconomics(raw), searchConsole: search, appStore, instrumentation: INSTRUMENTATION };
 }
 
 // ---------------- costs and assumptions ----------------

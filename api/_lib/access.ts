@@ -37,6 +37,12 @@ export function deviceHash(req: VercelRequest): string | null {
   try { return saltedKey(`device:${id}`); } catch { return null; }
 }
 
+/** The caller's own address, salted as the rate limiter keys callers (exact IPv4, IPv6 /64) — never the IP itself.
+ *  Lets the owner leave out the address he opens /admin from ("mi IP"), without catching a whole /24. */
+export function callerHash(req: VercelRequest): string | null {
+  try { return getClientQuotaKeys(req)?.caller ?? null; } catch { return null; }
+}
+
 export function clientPlatform(req: VercelRequest): string {
   const p = header(req, 'x-bobby-platform').trim().toLowerCase();
   return p === 'ios' || p === 'web' || p === 'android' ? p : 'web';
@@ -77,12 +83,14 @@ async function who(req: VercelRequest): Promise<Identity | null> {
 /** Check and record one read. */
 export async function consumeRead(req: VercelRequest, symbol: string, options: { strict?: boolean; identity?: Identity | null } = {}): Promise<ReadGate> {
   const identity = options.identity === undefined ? await who(req) : options.identity;
-  const device = identity ? null : deviceHash(req);
+  // A signed-in read keeps its install too (the owner's funnel pairs install and account); the meter still counts
+  // accounts by account and guests by install (bobby_consume_read, 20261001230000).
+  const device = deviceHash(req);
   if (options.strict && !identity && !device) {
     return { allowed: false, code: 'signin_required', readId: null, access: OPEN, identity };
   }
   let network: string | null = null;
-  try { network = device ? getClientQuotaKeys(req)?.network ?? null : null; } catch { network = null; }
+  try { network = device && !identity ? getClientQuotaKeys(req)?.network ?? null : null; } catch { network = null; }
   const row = await rpc('bobby_consume_read', {
     p_identity: identity?.id ?? null, p_device: device, p_network: network,
     p_platform: clientPlatform(req), p_symbol: symbol.slice(0, 24) || null, p_paywall: paywallOn(),
@@ -102,8 +110,24 @@ export async function touchDevice(req: VercelRequest, identity: Identity | null)
   await rpc('bobby_touch_device', {
     p_device: device, p_platform: platform, p_surface: null, p_referrer: null, p_utm: null,
     p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
-    ...(geo ? { p_country: geo.country, p_region: geo.region } : {}),
+    ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
   });
+}
+
+export type DeskOutcome = 'read_done' | 'read_failed' | 'wall_signin' | 'wall_paywall' | 'wall_level' | 'desk_blocked';
+
+/** What the server saw happen at the desk, for the owner's funnel (bobby_events). Never throws, never delays. */
+export async function recordOutcome(req: VercelRequest, event: DeskOutcome, identity: Identity | null | undefined, detail: string | null = null): Promise<void> {
+  try {
+    const platform = clientPlatform(req);
+    const geo = platform === 'web' ? requestGeo(req) : null;
+    await rpc('bobby_record_outcome', {
+      p_event: event, p_platform: platform, p_device: deviceHash(req),
+      p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
+      p_detail: detail && /^[a-z0-9_-]{1,32}$/.test(detail) ? detail : null,
+      ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
+    });
+  } catch { /* the funnel never breaks a read */ }
 }
 
 /** Give a read back when the analysis itself failed (the user got nothing). */

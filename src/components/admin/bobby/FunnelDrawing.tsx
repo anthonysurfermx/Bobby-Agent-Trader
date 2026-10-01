@@ -1,9 +1,13 @@
 // The drawn funnel: stacked trapezoid bands whose width follows the count (with a floor so small stages stay
 // visible). The top band is the brightest orange and each later one fades toward grey; the hovered or tapped
 // band lights up and shows its detail. Aggregate bands (Google, App Store) are outlined: same funnel, not the
-// same cohort. Mono numbers on the sides: count, share of the top, step conversion and who left.
+// same cohort. Mono numbers on the sides: count, share of the top, step conversion and who left. Under 5 at the
+// base a percentage is noise, so the step reads "2/3" instead.
 import { useState, type KeyboardEvent } from 'react';
 import { fmtInt, fmtPct } from './format';
+
+const MIN_BASE = 5;
+const share = (a: number, b: number) => (b >= MIN_BASE ? fmtPct(a, b) : `${fmtInt(a)}/${fmtInt(b)}`);
 
 export interface FunnelStage {
   key: string;
@@ -49,14 +53,14 @@ export default function FunnelDrawing({ stages, idPrefix }: { stages: FunnelStag
   const step = (i: number): { conv: string | null; left: number | null; note?: string } => {
     if (i === 0) return { conv: null, left: null };
     const s = stages[i], p = stages[i - 1];
-    if (!!p.aggregate !== !!s.aggregate) return { conv: null, left: null, note: 'otra cohorte' };
-    if (s.value == null || p.value == null) return { conv: null, left: null };
-    return { conv: fmtPct(s.value, p.value), left: p.value - s.value };
+    if (!!p.aggregate !== !!s.aggregate) return { conv: null, left: null, note: 'otra población' };
+    if (s.value == null || p.value == null || !p.value) return { conv: null, left: null };
+    return { conv: share(s.value, p.value), left: p.value - s.value };
   };
   const shareOfTop = (s: FunnelStage, i: number) => {
     if (s.value == null) return '—';
-    if (s.aggregate) return i === 0 ? '100%' : stages[0].value ? fmtPct(s.value, stages[0].value) : '—';
-    return cohortTop ? fmtPct(s.value, cohortTop) : '—';
+    if (s.aggregate) return i === 0 ? '100%' : stages[0].value ? share(s.value, stages[0].value) : '—';
+    return cohortTop ? share(s.value, cohortTop) : '—';
   };
   const onKey = (e: KeyboardEvent, i: number) => {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setActive(active === i ? null : i); }

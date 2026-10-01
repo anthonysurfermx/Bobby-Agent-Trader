@@ -2,18 +2,12 @@ import { fetchAdminMembers, isMissing, type OverviewResponse } from '@/lib/admin
 import { Card, CardHead, Empty, ErrorState, KpiStrip, Loading, MissingNote, Note, StaleBanner, TableScroll, Tag, td, th, tr } from './ui';
 import { BigNumber, StatusBars } from './charts';
 import { windowDelta, type CompareSeries } from './deltas';
-import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtInt, fmtPeriod, fmtUsd, label, statusLabel } from './format';
+import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, fmtRelative, fmtUsd, label, statusLabel } from './format';
+import { rcMetricValue, rcMetricWindow } from './health';
 import { useLoad } from './useLoad';
 
 const CHURN = new Set(['canceled', 'cancelled', 'expired', 'billing_issue', 'past_due', 'unpaid', 'refunded']);
 const GRANT_SOURCE: Record<string, string> = { referral: 'Invitación', admin: 'Regalo del admin' };
-
-function metricValue(value: number, unit?: string): string {
-  if (!unit) return fmtInt(value);
-  if (unit === '$' || /^usd$/i.test(unit)) return fmtUsd(value);
-  if (unit === '%') return `${fmtInt(value)}%`;
-  return `${fmtInt(value)} ${unit}`;
-}
 
 export default function MembershipsTab({ data, period, refreshKey, cmp }: { data: OverviewResponse; period: number; refreshKey: number; cmp: CompareSeries | null }) {
   const { overview: o, integrations: i } = data;
@@ -28,48 +22,79 @@ export default function MembershipsTab({ data, period, refreshKey, cmp }: { data
   const totalSubs = statuses.reduce((a, [, v]) => a + v, 0);
   const subs = members.data?.subscriptions ?? [];
   const grants = members.data?.grants ?? [];
+  // No purchase event has ever arrived (not even a sandbox one): "no sales" and "webhook never delivered" look
+  // the same, so money is not shown as a $0 fact.
+  const purchasesSince = o.coverage?.purchasesSince ?? null;
+  const noPurchaseEvents = !!o.coverage && !purchasesSince;
+  const money = (path: string, v: number) => (noPurchaseEvents ? 'Sin medir' : show(path, fmtUsd(v)));
+  const count = (path: string, v: number) => (noPurchaseEvents ? 'Sin medir' : show(path, fmtInt(v)));
+  const since = purchasesSince ? `eventos desde ${fmtDate(purchasesSince)}` : null;
 
   return (
     <div className="flex flex-col gap-4">
-      <MissingNote missing={o.missing} sections={['subscriptions', 'revenue', 'integrations']} />
+      <MissingNote missing={o.missing} sections={['subscriptions', 'revenue', 'integrations', 'coverage']} />
+      {noPurchaseEvents && (
+        <Note tone="orange" tag="Sin medir">
+          Nunca ha llegado un evento de compra (ni de prueba): no se puede distinguir «sin ventas» de «webhook sin entregar».
+          Manda un evento de prueba desde RevenueCat y, cuando Stripe esté configurado, desde Stripe.
+        </Note>
+      )}
+      {r.internalEvents > 0 && (
+        <Note tag="Equipo">
+          {o.includeInternal
+            ? `Incluye ${fmtInt(r.internalEvents)} ${r.internalEvents === 1 ? 'evento de compra' : 'eventos de compra'} del equipo en el periodo.`
+            : `Sin el equipo: ${fmtInt(r.internalEvents)} ${r.internalEvents === 1 ? 'evento de compra quedó' : 'eventos de compra quedaron'} fuera de estas cifras.`}
+        </Note>
+      )}
       <KpiStrip
         items={[
-          { label: 'Membresías activas', value: show('subscriptions.active', fmtInt(s.active)), caption: 'pagadas · Apple + Stripe' },
-          { label: 'Pro regalado', value: show('subscriptions.giftedPro', fmtInt(s.giftedPro)), caption: 'invitaciones y regalos vigentes' },
-          { label: 'Ingresos brutos', value: show('revenue.grossUsd', fmtUsd(r.grossUsd)), delta: miss('revenue.daily') ? null : windowDelta(cmp?.revenue, period) },
+          { label: 'De pago', value: show('subscriptions.active', fmtInt(s.paid)), caption: 'ahora · Apple + Stripe, ya cobradas' },
+          { label: 'En prueba', value: show('subscriptions.active', fmtInt(s.trialing)), caption: 'ahora · aún no pagan' },
+          { label: 'Pro regalado', value: show('subscriptions.giftedPro', fmtInt(s.giftedPro)), caption: 'ahora · invitaciones y regalos vigentes (no pagan)' },
         ]}
       />
       <KpiStrip
         items={[
-          { label: 'Neto estimado', value: show('revenue.netUsd', fmtUsd(r.netUsd)), caption: `comisión e impuestos de la tienda, menos reembolsos · ${period}d` },
-          { label: 'Reembolsos', value: show('revenue.refundsUsd', fmtUsd(r.refundsUsd)), caption: `${period}d` },
-          { label: 'Suscripciones nuevas', value: show('revenue.newSubscriptions', fmtInt(r.newSubscriptions)), caption: `${show('revenue.renewals', fmtInt(r.renewals))} renovaciones` },
+          {
+            label: 'Ingresos brutos', value: money('revenue.grossUsd', r.grossUsd),
+            delta: noPurchaseEvents || miss('revenue.daily') ? undefined : windowDelta(cmp?.revenue, period),
+            caption: [`en el periodo · ${period}d`, since].filter(Boolean).join(' · '),
+          },
+          { label: 'Neto estimado', value: money('revenue.netUsd', r.netUsd), caption: `menos comisión e impuestos de la tienda y reembolsos · ${period}d` },
+          { label: 'Cuentas nuevas de pago', value: count('revenue.newPaying', r.newPaying), caption: `con un cobro positivo en el periodo · ${period}d` },
+        ]}
+      />
+      <KpiStrip
+        items={[
+          { label: 'Reembolsos', value: money('revenue.refundsUsd', r.refundsUsd), caption: `en el periodo · ${period}d` },
+          { label: 'Suscripciones nuevas', value: count('revenue.newSubscriptions', r.newSubscriptions), caption: `${noPurchaseEvents ? 'Sin medir' : show('revenue.renewals', fmtInt(r.renewals))} renovaciones · ${period}d` },
+          { label: 'Bajas', value: count('revenue.cancellations', r.cancellations + r.expirations), caption: noPurchaseEvents ? `en el periodo · ${period}d` : `${fmtInt(r.cancellations)} cancelaciones · ${fmtInt(r.expirations)} expiraciones · ${period}d` },
         ]}
       />
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
-          <BigNumber label="Por estado" value={show('subscriptions.byStatus', fmtInt(totalSubs))} caption="suscripciones" />
+          <BigNumber label="Por estado" value={show('subscriptions.byStatus', fmtInt(totalSubs))} caption="todas las registradas · histórico" />
           {miss('subscriptions.byStatus') ? <Empty>Dato no disponible</Empty> : statuses.length
             ? <StatusBars rows={statuses.map(([k, v]) => ({ label: statusLabel(k), value: v, fill: CHURN.has(k) ? 'orange' : 'blue' }))} />
             : <Empty>Sin suscripciones todavía</Empty>}
         </Card>
         <Card>
-          <BigNumber label="Por proveedor de pago" value={show('subscriptions.active', fmtInt(s.active))} caption="activas" />
+          <BigNumber label="Por proveedor de pago" value={show('subscriptions.active', fmtInt(s.active))} caption="activas ahora (pago + prueba)" />
           {miss('subscriptions.byProvider') ? <Empty>Dato no disponible</Empty> : providers.length
             ? <StatusBars rows={providers.map(([k, v], idx) => ({ label: label(k), value: v, fill: idx % 2 ? 'orange' : 'blue' }))} />
             : <Empty>Sin suscripciones activas</Empty>}
         </Card>
         <Card>
-          <BigNumber label="Movimientos" value={miss('revenue') ? DASH : fmtInt(r.newSubscriptions + r.renewals + r.cancellations + r.expirations)} caption={`eventos · ${period}d`} />
-          {miss('revenue') ? <Empty>Dato no disponible</Empty> : (
+          <BigNumber label="Movimientos" value={miss('revenue') || noPurchaseEvents ? DASH : fmtInt(r.newSubscriptions + r.renewals + r.cancellations + r.expirations)} caption={`eventos en el periodo · ${period}d`} />
+          {miss('revenue') ? <Empty>Dato no disponible</Empty> : noPurchaseEvents ? <Empty>Sin eventos de compra todavía</Empty> : (
             <StatusBars
               rows={[
                 { label: 'Nuevas', value: r.newSubscriptions, fill: 'blue' },
                 { label: 'Renovaciones', value: r.renewals, fill: 'blue' },
                 { label: 'Cancelaciones', value: r.cancellations, fill: 'orange' },
                 { label: 'Expiraciones', value: r.expirations, fill: 'orange' },
-                { label: 'Sandbox', value: r.sandboxEvents, fill: 'blue', sub: 'pruebas' },
+                { label: 'Sandbox', value: r.sandboxEvents, fill: 'blue', sub: 'pruebas, no cuentan' },
               ]}
             />
           )}
@@ -77,14 +102,22 @@ export default function MembershipsTab({ data, period, refreshKey, cmp }: { data
       </div>
 
       <Card padded={false}>
-        <div className="px-5 pt-5"><CardHead title="RevenueCat" count={rc.metrics?.length ? `${rc.metrics.length} métricas` : undefined} sub="Métricas del proyecto en RevenueCat" /></div>
+        <div className="px-5 pt-5">
+          <CardHead
+            title="RevenueCat"
+            count={rc.metrics?.length ? `${rc.metrics.length} métricas` : undefined}
+            sub={`Métricas del proyecto en RevenueCat, cada una con su propia ventana (no siguen el selector)${rc.fetchedAt ? ` · consultado ${fmtRelative(rc.fetchedAt)}` : ''}`}
+          />
+        </div>
         {rc.configured && rc.metrics?.length ? (
           <div className="grid grid-cols-1 gap-px overflow-hidden rounded-b-2xl border-t border-white/[0.06] bg-white/[0.06] sm:grid-cols-3">
             {rc.metrics.map((m) => (
               <div key={m.id} className="min-w-0 bg-[#141415] p-5">
-                <div className="truncate text-[13px] text-[#EDEDED]/90">{m.name}</div>
-                <div className="mt-2 truncate font-mono text-[22px] font-medium leading-none text-[#EDEDED]">{metricValue(m.value, m.unit)}</div>
-                {m.period && <div className="mt-2 font-mono text-[11px] uppercase text-[#5C5C5C]">{fmtPeriod(m.period)}</div>}
+                <div className="truncate text-[13px] text-[#EDEDED]/90" title={m.name}>{m.name}</div>
+                <div className="mt-2 truncate font-mono text-[22px] font-medium leading-none text-[#EDEDED]">{rcMetricValue(m)}</div>
+                <div className="mt-2 font-mono text-[11px] uppercase text-[#5C5C5C]">{rcMetricWindow(m.period) || 'sin ventana'}</div>
+                {m.description && <p className="m-0 mt-1.5 text-[11.5px] leading-snug text-[#8B8B8B]">{m.description}</p>}
+                {m.updatedAt && <div className="mt-1.5 font-mono text-[10.5px] text-[#5C5C5C]" title={fmtDateTime(m.updatedAt)}>actualizado {fmtRelative(m.updatedAt)}</div>}
               </div>
             ))}
             {Array.from({ length: (3 - (rc.metrics.length % 3)) % 3 }, (_, k) => <div key={`fill-${k}`} className="hidden bg-[#141415] sm:block" />)}

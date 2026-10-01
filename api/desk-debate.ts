@@ -6,7 +6,7 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
-import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, type Access } from './_lib/access.js';
+import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
@@ -107,12 +107,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // undefined: not resolved yet; the premium meter resolves the caller and hands it over.
   let knownIdentity: Identity | null | undefined;
   let streaming = false;
+  // What happened, for the owner's funnel (bobby_events): recorded after answering, never on the reader's time.
+  const outcome = (event: DeskOutcome, detail: string | null = null) => waitUntil(recordOutcome(req, event, knownIdentity ?? null, detail));
   try {
     if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();
     if (budget.allPaused || (level !== 'rapido' && budget.premiumPaused)) {
+      outcome('desk_blocked', budget.allPaused ? 'budget_paused' : 'premium_paused');
       return refuse(res, 503, 'budget_paused', level === 'rapido' || budget.allPaused
         ? copy(language, 'The desk is paused for now. Try again later.', 'El desk está en pausa por ahora. Inténtalo más tarde.')
         : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
@@ -125,6 +128,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!gate) return refuse(res, 503, 'desk_unavailable', unavailable);
       if (!gate.allowed) {
         const meter = { tier: gate.tier, used: gate.used, limit: gate.limit, resetsAt: gate.resetsAt };
+        knownIdentity = gate.identity;
+        // A guest asked to sign in is the sign-in wall, not a paying intent; only plan limits are wall_level.
+        if (gate.code === 'signin_required') outcome('wall_signin', level);
+        else outcome('wall_level', `${level}-${gate.code ?? 'refused'}`);
         if (gate.code === 'signin_required') return refuse(res, 403, 'signin_required', copy(language, 'Create your free account to use this level.', 'Crea tu cuenta gratis para usar este nivel.'), { level, meter });
         if (gate.code === 'upgrade_required') return refuse(res, 403, 'upgrade_required', copy(language, 'You used this level for now. Get Bobby Pro or invite a friend.', 'Ya usaste este nivel por ahora. Obtén Bobby Pro o invita a un amigo.'), { level, meter });
         return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });
@@ -137,6 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const read = await consumeRead(req, symbol, { strict: true, identity: knownIdentity });
     if (!read.allowed) {
       await refund();
+      knownIdentity = read.identity;
+      outcome(read.code === 'signin_required' ? 'wall_signin' : read.code === 'subscription_required' ? 'wall_paywall' : 'desk_blocked',
+        read.code === 'signin_required' || read.code === 'subscription_required' ? level : 'unavailable');
       if (read.code === 'access_unavailable') return refuse(res, 503, 'desk_unavailable', unavailable);
       return refuse(res, read.code === 'signin_required' ? 401 : 402, read.code ?? 'subscription_required',
         read.code === 'signin_required'
@@ -158,9 +168,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(5000),
       body: JSON.stringify({ p_caller: keys.caller, p_network: keys.network }),
     }).catch(() => null);
-    if (!quota?.ok) { await refund(); return refuse(res, 503, 'desk_unavailable', unavailable); }
+    if (!quota?.ok) { await refund(); outcome('desk_blocked', 'unavailable'); return refuse(res, 503, 'desk_unavailable', unavailable); }
     if (await quota.json() !== true) {
       await refund();
+      outcome('desk_blocked', 'daily_limit');
       // Caller, network and global windows are all 24 h: this is not "retry in a moment".
       res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
       return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
@@ -186,7 +197,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
-    if (left.signal.aborted) { const pendingRefund = refund(); waitUntil(pendingRefund); await pendingRefund; return; }
+    if (left.signal.aborted) { const pendingRefund = refund(); waitUntil(pendingRefund); outcome('read_failed', 'left'); await pendingRefund; return; }
     const body = { ...result, access, ...(reader ? { personalized: true } : {}) };
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
@@ -194,13 +205,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (summary && !summary.enabled) return;
       waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked, evidence.technicals.price) : false)).catch(() => false));
     };
-    if (!live) { res.status(200).json(body); remember(); return; }
+    if (!live) { res.status(200).json(body); remember(); outcome('read_done', level); return; }
     send({ type: 'final', data: body });
     res.end();
     remember();
+    outcome('read_done', level);
     return;
   } catch (error) {
     const refunded = await refund();
+    outcome('read_failed', error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error');
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
     // Readers always get the same plain failure; the provider detail stays in the log below and, for exhausted

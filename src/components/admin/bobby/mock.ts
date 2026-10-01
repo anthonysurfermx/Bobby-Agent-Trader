@@ -142,14 +142,18 @@ function llmProvider(p: 'anthropic' | 'openai') {
   const spentSinceMark = c.mark ? sum(series.filter((_, i) => new Date(ALL_DAYS[i]).getTime() >= new Date(c.mark!.at).getTime() - DAY)) : 0;
   return {
     today: String(series[SPAN - 1]), week: String(round2(sum(tail(series, 7)) * 1000) / 1000), month: String(round2(sum(tail(series, 30)) * 1000) / 1000),
-    calls: c.calls, failures: c.failures,
+    period: String(round2(sum(tail(series, 30)) * 1000) / 1000), calls: c.calls, failures: c.failures,
     balanceMark: c.mark, estimatedLeft: c.mark ? round2(c.mark.amount + c.topups - spentSinceMark) : null, lastCreditAlert: c.alert,
+    creditAlert: c.alert ? { code: 'insufficient_quota', endpoint: 'tts' } : null, lastTopup: null,
+    lastOk: iso(NOW - (c.alert ? 3 * DAY : 4 * MIN)), lastFailure: c.failures ? { at: iso(NOW - 2 * DAY), stop: 'http_429', surface: 'desk' } : null,
+    failures24h: c.alert ? 3 : 0, calls24h: c.alert ? 3 : 140,
   };
 }
 
 const COVERAGE = {
   eventsSince: iso(NOW - 6 * HOUR), devicesSince: iso(NOW - 6 * HOUR), readsSince: iso(NOW - 35 * DAY), readerStatsSince: iso(NOW - 6 * HOUR),
   purchasesSince: iso(NOW - 41 * DAY), ledgerSince: iso(NOW - 120 * DAY), ledgerSurfaces: ['desk', 'cycle', 'agent-run', 'explain'],
+  activitySince: localDay(NOW - 40 * DAY), outcomesSince: iso(NOW - 5 * HOUR), locatedSince: iso(NOW - 4 * HOUR),
 };
 const BARE_COVERAGE = { ...COVERAGE, purchasesSince: null, ledgerSurfaces: ['desk'] };
 
@@ -180,16 +184,18 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
     overview: {
       days: d,
       since: d[0],
+      includeInternal: false,
       accounts: {
-        total: USERS.filter((u) => !u.wallet_only).length, new: newAccounts, wallets: USERS.filter((u) => u.wallet_only).length, active7d: 96,
+        total: USERS.filter((u) => !u.wallet_only).length, new: newAccounts, internal: 2, wallets: USERS.filter((u) => u.wallet_only).length, active7d: 96,
         byProvider: { apple: USERS.filter((u) => u.provider === 'apple').length, google: USERS.filter((u) => u.provider === 'google').length },
         daily: accountsDaily,
       },
       activity: {
-        reads: String(reads), readsDaily: { web, ios, android },
+        reads: String(reads), readsInternal: Math.round(reads * 0.04), readsDaily: { web, ios, android },
         levels: { profundo: Math.round(reads * 0.09), maximo: Math.round(reads * 0.03) },
-        activeReaders7d: 143,
-        activation: { accounts: newAccounts, activated: Math.round(newAccounts * 0.72), medianMinutes: '6.4' },
+        activeReaders7d: 143, activeReaders7dSplit: { accounts: 61, guests: 82 },
+        lastRead: { web: iso(NOW - 7 * MIN), ios: iso(NOW - 2 * MIN) },
+        activation: { accounts: newAccounts, activated: Math.round(newAccounts * 0.72), medianMinutes: '6.4', measuredSince: iso(NOW - 35 * DAY), beforeCoverage: 0 },
       },
       funnel: {
         web: {
@@ -210,14 +216,14 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
         ],
       },
       subscriptions: {
-        active,
+        active, paid: Math.max(0, active - USERS.filter((u) => u.sub_status === 'trialing').length), trialing: USERS.filter((u) => u.sub_status === 'trialing').length,
         byStatus: USERS.reduce<Record<string, number>>((acc, u) => { if (u.sub_status) acc[u.sub_status] = (acc[u.sub_status] ?? 0) + 1; return acc; }, {}),
         byProvider: USERS.reduce<Record<string, number>>((acc, u) => { if (u.sub_provider && (u.sub_status === 'active' || u.sub_status === 'trialing')) acc[u.sub_provider] = (acc[u.sub_provider] ?? 0) + 1; return acc; }, {}),
         giftedPro: USERS.filter((u) => u.grant_source && u.pro).length,
       },
       revenue: {
         grossUsd: String(gross), netUsd: String(round2(gross * 0.85 - 4.99)), refundsUsd: '4.99',
-        newSubscriptions: Math.round(11 * scale), renewals: Math.round(19 * scale), cancellations: Math.round(4 * scale), expirations: Math.round(2 * scale), sandboxEvents: 7,
+        newSubscriptions: Math.round(11 * scale), newPaying: Math.round(9 * scale), renewals: Math.round(19 * scale), cancellations: Math.round(4 * scale), expirations: Math.round(2 * scale), sandboxEvents: 7, internalEvents: 1,
         daily: revenue.map(String),
       },
       llm: {
@@ -229,9 +235,10 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
           { surface: 'explain', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.08)), calls: Math.round(360 * scale), failures: 0 },
           { surface: 'agent-run', provider: 'openai', usd: String(round2(sum(tail(SERIES.openai, n)))), calls: Math.round(986 * scale), failures: 41 },
         ],
+        deskRuns: { runs: Math.round(3100 * scale), finished: Math.round(3020 * scale), byDay: d.slice(-3).map((day) => ({ day, runs: 90, finished: 88 })) },
         guard: GUARD,
       },
-      coupons: { active: COUPONS.filter((c) => couponStatus(c) === 'active').length, redemptions: REDEMPTIONS.length, giftedReadsLeft: 164 },
+      coupons: { active: COUPONS.filter((c) => couponStatus(c) === 'active').length, redemptions: REDEMPTIONS.length, giftedReadsLeft: 164, giftedLeft: { reads: 164, profundo: 12, maximo: 3 } },
       coverage: bare ? BARE_COVERAGE : COVERAGE,
     },
     integrations: compare ? null : bare
@@ -241,7 +248,8 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
         llmGuard: { dayUsd: GUARD.day, monthUsd: GUARD.month },
         health: {
           revenuecatWebhook: { configured: false, lastEventAt: null, events30d: 0 },
-          tracking: { lastEventAt: null, events24h: 0 },
+          stripe: { configured: false, webhook: false, lastEventAt: null },
+          tracking: { lastEventAt: null, events24h: 0, lastErrorAt: null, lastError: null, lastReadAt: iso(NOW - 2 * HOUR) },
           llmKeys: { anthropic: true, openai: false }, vercelAnalytics: 'unverified',
         },
         // what api/_lib/admin.ts reports when nothing is set up
@@ -262,16 +270,72 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
         appStore: {
           configured: true, days: appDays, downloads,
           totals: { downloads: sum(downloads), redownloads: Math.round(sum(downloads) * 0.11), updates: Math.round(sum(downloads) * 1.7), iap: Math.round(17 * scale) },
+          byCountry: [{ country: 'MX', downloads: Math.round(sum(downloads) * 0.46) }, { country: 'US', downloads: Math.round(sum(downloads) * 0.21) }, { country: 'FR', downloads: Math.round(sum(downloads) * 0.09) }],
+          coveredFrom: appDays[0], coveredTo: appDays.at(-2) ?? null, pendingDays: appDays.slice(-1),
         },
         llmCaps: { dayUsd: 15, monthUsd: 300, alertUsd: 100 }, paywall: false, missing: [],
         llmGuard: { dayUsd: GUARD.day, monthUsd: GUARD.month },
         health: partial ? undefined : {
           revenuecatWebhook: { configured: true, lastEventAt: iso(NOW - 5 * HOUR), events30d: 43 },
-          tracking: { lastEventAt: iso(NOW - 3 * MIN), events24h: 1840 },
+          stripe: { configured: true, webhook: true, lastEventAt: iso(NOW - 9 * HOUR) },
+          tracking: { lastEventAt: iso(NOW - 3 * MIN), events24h: 1840, lastErrorAt: null, lastError: null, lastReadAt: iso(NOW - 2 * MIN) },
           llmKeys: { anthropic: true, openai: true }, vercelAnalytics: 'unverified',
         },
       },
   };
+}
+
+// The growth view (bobby_admin_growth) for the fixture, at the fixture's scale.
+function growth(n: number, bare: boolean) {
+  const k = n / 30;
+  const r = (v: number) => (bare ? 0 : Math.round(v * k));
+  const cell = (e: number, ret: number, rd: number) => ({ eligible: r(e), returned: r(ret), read: r(rd) });
+  const cohort = (arrived: number, desk: number, read1: number) => ({
+    arrived: r(arrived), home: r(arrived * 0.6), deskOrRead: r(desk), read1: r(read1), read2: r(read1 * 0.52), read3: r(read1 * 0.3), wall: r(read1 * 0.24),
+    signinStart: r(read1 * 0.3), account: r(read1 * 0.14), accountNew: r(read1 * 0.11), accountAfterRead: r(read1 * 0.13), accountAfterWall: r(read1 * 0.07),
+    proAfterRead: r(read1 * 0.01), delivered: r(read1 * 1.9), failed: r(read1 * 0.04), medianMinutesToFirstRead: bare ? null : '3.8', medianMinutesToAccount: bare ? null : '41',
+    oldestDays: n - 1,
+    retention: { d1: cell(arrived * 0.95, arrived * 0.16, arrived * 0.09), d7: cell(arrived * 0.75, arrived * 0.06, arrived * 0.04), w1: cell(arrived * 0.75, arrived * 0.22, arrived * 0.12), readersBack: cell(read1 * 0.95, read1 * 0.31, read1 * 0.21) },
+  });
+  return {
+    days: n, since: tail(ALL_DAYS, n)[0], today: ALL_DAYS[SPAN - 1], includeInternal: false,
+    people: {
+      total: r(4120), accounts: r(128), guests: r(3992), wallets: 3, excluded: { accounts: 2, guests: 3 },
+      newInPeriod: r(3400), active7d: r(1210), active30d: r(2900), readers7d: r(640), readers: r(1700),
+      stages: { new: r(430), active: r(975), recurring: r(318), pro: r(24), atRisk: r(905), lost: r(1402) },
+      byPlatform: { web: r(3310), ios: r(790) }, proInactive: bare ? 0 : 2, accountsNeverRead: r(14),
+    },
+    cohorts: { web: cohort(3400, 1690, 690), ios: cohort(640, 512, 512) },
+    history: { web: { installs: 8, readers: 8, reads: 13, read2: 4, linked: 0, since: iso(NOW - 40 * DAY), until: iso(NOW - 36 * DAY) }, ios: { installs: 4, readers: 4, reads: 6, read2: 2, linked: 0, since: iso(NOW - 39 * DAY), until: iso(NOW - 36 * DAY) } },
+    outcomes: {
+      consumed: r(2700), consumedInternal: r(110), consumedTotal: r(2810), byPlatform: { web: r(1500), ios: r(1200) }, delivered: r(2600), failed: r(40),
+      wallSignin: r(210), wallSigninInstalls: r(170), wallPaywall: r(12), wallLevel: r(66), blocked: bare ? {} : { daily_limit: r(4) }, byLevel: { rapido: r(2300), profundo: r(220), maximo: r(80) },
+      outcomesSince: bare ? null : iso(NOW - 5 * HOUR),
+    },
+    acquisition: {
+      sources: bare ? [] : [
+        { source: 'direct', installs: r(1500), read1: r(280), account: r(30) }, { source: 't.co', installs: r(700), read1: r(170), account: r(19) },
+        { source: 'utm:tiktok', installs: r(520), read1: r(150), account: r(21) }, { source: 'google.com', installs: r(410), read1: r(62), account: r(6) },
+      ],
+      landing: bare ? [] : [{ surface: 'home', installs: r(2050), read1: r(380) }, { surface: 'desk', installs: r(1010), read1: r(270) }, { surface: 'protocol', installs: r(240), read1: r(30) }],
+      visits: r(5200), visitors: r(3400), visitsWithUtm: r(700), visitsWithReferrer: r(1900), visitorDays: tail(SERIES.visits, n).map((v) => (bare ? 0 : Math.round(v * 0.8))),
+    },
+    attention: {
+      neverRead: bare ? [] : USERS.filter((u) => !u.reads && !u.wallet_only).slice(0, 6).map((u) => ({ identityId: u.id, email: u.email, provider: u.provider, createdAt: u.created_at, lastDay: localDay(NOW - 3 * DAY) })),
+      quiet: bare ? [] : USERS.filter((u) => (u.reads ?? 0) > 2).slice(0, 4).map((u) => ({ identityId: u.id, email: u.email, provider: u.provider, reads: u.reads, lastDay: localDay(NOW - 12 * DAY) })),
+    },
+    coverage: { webObservedSince: iso(NOW - 6 * HOUR), iosObservedSince: iso(NOW - 4 * HOUR), activitySince: localDay(NOW - 40 * DAY), outcomesSince: bare ? null : iso(NOW - 5 * HOUR), observedInstalls: r(4040), backfillInstalls: 12, internalInstalls: 3, internalAccounts: 2 },
+  };
+}
+
+async function withGrowth(res: ReturnType<typeof overview>, days: number, bare: boolean) {
+  const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
+  const g = growth(n, bare);
+  const life = lifecycle(n, bare);
+  // The same diagnosis engine the server runs (pure TypeScript), fed with the fixture.
+  const { buildInsights } = await import('../../../../api/_lib/admin-insights');
+  const insights = buildInsights({ days: n, overview: res.overview, growth: g, integrations: res.integrations, searchConsole: life.searchConsole });
+  return { ...res, growth: g, searchConsole: life.searchConsole, insights };
 }
 
 /** ?mock=partial: the server omitted whole sections; the dashboard must say so instead of drawing zeros. */
@@ -285,10 +349,30 @@ function partialOverview(days: number) {
 
 function usersView(q: string, limit: number, offset: number) {
   const needle = q.trim().toLowerCase();
-  const all = needle ? USERS.filter((u) => (u.email ?? '').toLowerCase().includes(needle) || u.id.includes(needle)) : USERS;
+  const all = needle ? USERS.filter((u) => (u.email ?? '').toLowerCase().includes(needle) || u.id.startsWith(needle)) : USERS;
   // Postgres numerics arrive as strings; keep some that way on purpose.
-  const users = all.slice(offset, offset + limit).map((u) => ({ ...u, reads: u.reads == null ? null : String(u.reads), activation_minutes: u.activation_minutes == null ? null : String(u.activation_minutes) }));
-  return { total: all.length, users };
+  const users = all.slice(offset, offset + limit).map((u, i) => ({
+    ...u, reads: u.reads == null ? null : String(u.reads), activation_minutes: u.activation_minutes == null ? null : String(u.activation_minutes),
+    wallet: u.wallet_only ? '0x8f3a…91c2' : null, guest_reads: i % 3 === 0 ? 2 : 0, last_active_day: u.last_read_at ? u.last_read_at.slice(0, 10) : u.created_at.slice(0, 10),
+    is_internal: false, installs: u.wallet_only ? 0 : 1,
+  }));
+  return { total: all.length, accounts: all.filter((u) => !u.wallet_only).length, wallets: all.filter((u) => u.wallet_only).length, internal: 1, readsSince: iso(NOW - 35 * DAY), users };
+}
+
+const INTERNAL_EMAILS = ['owner@example.com', 'owner.second@example.com'];
+const INSTALLS = Array.from({ length: 14 }, (_, i) => ({
+  device: `d${String(i).padStart(2, '0')}abcdef1`.slice(0, 10), platform: i % 3 === 0 ? 'ios' : 'web', source: i < 4 ? 'backfill' : 'observed',
+  firstSeen: iso(NOW - (i + 1) * 9 * HOUR), lastSeen: iso(NOW - i * 2 * HOUR), firstSurface: i % 2 ? 'desk' : 'home', referrer: i % 4 === 1 ? 't.co' : null,
+  utm: i % 5 === 2 ? 'tiktok' : null, country: i % 3 === 0 ? null : 'MX', internal: i === 0 || i === 5, manualInternal: i === 5, reads: i % 4, delivered: i % 4,
+  account: i === 0 ? ME.email : null, accountId: i === 0 ? ME.id : null, adminSession: i === 0, teamNetwork: i === 1,
+}));
+function internalView() {
+  return {
+    devices: INSTALLS,
+    networks: [{ network: 'a1b2c3d4e5', note: 'admin session', createdAt: iso(NOW - 2 * DAY), lastSeenAt: iso(NOW - 5 * MIN), installs: 3, onlyByNetwork: 1 }],
+    emails: INTERNAL_EMAILS,
+    marks: [{ identity_id: USERS[3].id, email: null, provider: 'apple', note: 'iPhone de pruebas', created_at: iso(NOW - DAY) }],
+  };
 }
 
 // ---------------------------------------------------------------- lifecycle, economics, costs
@@ -339,13 +423,17 @@ function economics(n: number) {
   const net = gross * takehome;
   return {
     days: n, since,
-    revenue: { grossUsd: String(gross), netUsd: r2(net), refundsUsd: 4.99, mrrGrossUsd: r2(active * priceUsd), mrrNetUsd: r2(active * priceUsd * takehome), activeSubscriptions: active, newPaying, priceUsd, takehome },
-    costs: { marketingUsd: r2(marketing), infraUsd: r2(by('infra')), otherUsd: r2(by('other')), llmUsd: r2(llm, 4), totalUsd: r2(total), byChannel: [...channels].sort((a, b) => b[1] - a[1]).map(([channel, usd]) => ({ channel, usd })) },
+    revenue: {
+      grossUsd: String(gross), netUsd: r2(net), refundsUsd: 4.99, mrrGrossUsd: r2(active * priceUsd), mrrNetUsd: r2(active * priceUsd * takehome), activeSubscriptions: active,
+      trialing: USERS.filter((u) => u.sub_status === 'trialing').length, newPaying, payersEver: newPaying + 20, priceUsd, takehome, priceSource: LAST_PRICE_USD ? 'observed' : 'default',
+    },
+    costs: { marketingUsd: r2(marketing), infraUsd: r2(by('infra')), otherUsd: r2(by('other')), llmUsd: r2(llm, 4), totalUsd: r2(total), manualEntries: inWindow.length, byChannel: [...channels].sort((a, b) => b[1] - a[1]).map(([channel, usd]) => ({ channel, usd })) },
     acquisition: { newAccounts, newPaying, cacPerAccount: newAccounts ? r2(marketing / newAccounts) : null, cacPerPaying: r2(cacPaying) },
     ltv: {
       monthlyNetPerSubUsd: r2(priceUsd * takehome), monthlyLlmPerUserUsd: r2(llmPerReader, 4), monthlyContributionUsd: r2(contribution),
       monthlyChurn, churnSource, lifetimeMonths: r2(lifetime, 1), ltvUsd: r2(ltv),
       ltvToCac: cacPaying ? r2(ltv / cacPaying) : null, paybackMonths: cacPaying && contribution > 0 ? r2(cacPaying / contribution, 1) : null,
+      scenario: false,
     },
     roi: { profitUsd: r2(net - total), roi: total > 0 ? r2((net - total) / total, 4) : null },
     assumptions: { monthlyChurn: ASSUMPTIONS.monthlyChurn ?? null, priceUsd: ASSUMPTIONS.priceUsd ?? null, storeFee: ASSUMPTIONS.storeFee ?? null, maxLifetimeMonths: ASSUMPTIONS.maxLifetimeMonths ?? null },
@@ -375,14 +463,10 @@ function lifecycle(days: number, bare: boolean) {
   const impressions = clicks.map((c) => Math.round(c * between(16, 34)));
   const tc = sum(clicks), ti = sum(impressions);
   const downloads = dayList.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - n + i)));
+  void web; void ios;
   return {
-    lifecycle: {
-      since: iso(new Date(`${dayList[0]}T00:00:00`).getTime()), web, ios,
-      stages: { total: 4120, accounts: 128, guests: 3992, new: 430, activated: 975, engaged: 318, pro: 24, atRisk: 905, lost: 1402, byPlatform: { web: 3310, ios: 790, unknown: 20 } },
-    },
     economics: economics(n),
-    coverage: bare ? BARE_COVERAGE : COVERAGE,
-    instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosPaywall: false, purchaseStart: false },
+    instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosOpens: true, iosPaywall: false, purchaseStart: false, deskOutcomes: true },
     searchConsole: bare ? { configured: false } : {
       configured: true, site: 'https://bobbyprotocol.xyz/', days: dayList, clicks, impressions,
       totals: { clicks: tc, impressions: ti, ctr: ti ? tc / ti : 0, position: 14.6 },
@@ -549,6 +633,19 @@ function post(body: AdminPostBody): Record<string, unknown> {
       log('delete-cost', String(body.id), { cost: row });
       return { ok: true };
     }
+    case 'set-internal': log('set-internal', body.identityId, { internal: body.internal }); return { ok: true };
+    case 'set-device-internal': {
+      const d = INSTALLS.find((x) => x.device === body.device);
+      if (!d) throw new Refuse(404, 'Install not found.');
+      d.manualInternal = body.internal; d.internal = body.internal || d.account === ME.email;
+      return { ok: true };
+    }
+    case 'remove-internal-network': return { ok: true };
+    case 'growth-plan': return { ok: true, plan: { generatedAt: iso(NOW), model: 'claude-sonnet-5-5', summary: 'Fixture de desarrollo: el plan real lo escribe Claude en el servidor.', cached: false, usd: 0.012,
+      priorities: [{ title: 'Recargar OpenAI', why: 'Fixture.', steps: ['Recargar crédito'], measure: 'Fallos 24h en IA', findings: ['credit-openai'] }] } };
+    case 'preview-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito', text: 'Vista previa del resumen (fixture de desarrollo).', fresh: 1, urgent: 2, weekly: false };
+    case 'send-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito' };
+    case 'set-internal-emails': INTERNAL_EMAILS.splice(0, INTERNAL_EMAILS.length, ...body.emails.map((e) => e.trim().toLowerCase())); return { ok: true, emails: INTERNAL_EMAILS };
     case 'set-assumptions': {
       // Like the server: merge. Absent = keep, null = back to the default.
       const next: typeof ASSUMPTIONS = { ...ASSUMPTIONS };
@@ -587,7 +684,8 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
     case 'overview': {
       const days = Number(query?.get('days') ?? 30);
       const compare = query?.get('compare') === '1';
-      return json(partial && !compare ? partialOverview(days) : overview(days, bare, compare));
+      if (compare) return json(overview(days, bare, true));
+      return json(partial ? partialOverview(days) : await withGrowth(overview(days, bare), days, bare));
     }
     case 'users': return json(usersView(query?.get('q') ?? '', Number(query?.get('limit') ?? 50), Number(query?.get('offset') ?? 0)));
     case 'coupons': return json({ coupons: COUPONS.map((c) => ({ ...c, status: couponStatus(c) })), redemptions: REDEMPTIONS, totals: { coupons: COUPONS.length, redemptions: REDEMPTIONS.length + 120 } });
@@ -598,6 +696,7 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
       ? { ...audience(Number(query?.get('days') ?? 30), false), appStore: { configured: true, error: 'appstore 401', countries: null } }
       : audience(Number(query?.get('days') ?? 30), bare));
     case 'costs': return json({ costs: [...COSTS].sort((x, y) => y.spent_on.localeCompare(x.spent_on) || y.id - x.id) });
+    case 'internal': return json(internalView());
     default: return json({ error: 'unknown_view' }, 400);
   }
 }
