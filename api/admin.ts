@@ -36,6 +36,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (view === 'overview') {
         const days = Math.min(Math.max(Number(one(req.query.days)) || 30, 1), 365);
         const overview = await rpc<{ days: string[] }>('bobby_admin_overview', { p_days: days });
+        // compare=1: the dashboard's "vs previous period" request only needs the series.
+        if (one(req.query.compare) === '1') return res.status(200).json({ overview, integrations: null });
         return res.status(200).json({ overview, integrations: await integrations(overview.days ?? []) });
       }
       if (view === 'users') {

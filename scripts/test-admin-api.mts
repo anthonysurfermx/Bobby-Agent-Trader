@@ -102,6 +102,8 @@ try {
   eq([over.body.integrations.revenuecat.configured, over.body.integrations.appStore.configured], [false, false], 'integrations report what is missing');
   ok(over.body.integrations.missing.includes('REVENUECAT_V2_SECRET_KEY') && over.body.integrations.missing.includes('ASC_KEY_ID'), 'missing env names');
   eq(typeof over.body.integrations.llmCaps.dayUsd, 'number', 'LLM caps');
+  const cmp = await call('GET', 'Bearer admin-token', { view: 'overview', days: '60', compare: '1' });
+  eq([cmp.statusCode, cmp.body.integrations, cmp.body.overview.accounts.total], [200, null, 6], 'the comparison request only reads the series');
   await call('GET', 'Bearer admin-token', { view: 'users', q: 'ana', limit: '9999' });
   eq(calls.find((c) => c.url.includes('rpc/bobby_admin_users'))?.body, { p_query: 'ana', p_limit: 200, p_offset: 0 }, 'users: query and page size capped');
   eq((await call('GET', 'Bearer admin-token', { view: 'nope' })).statusCode, 400, 'unknown view');
