@@ -100,18 +100,22 @@ export function buildInsights(input: InsightInput): Insight[] {
   const runs = o(llm.deskRuns);
   const totalRuns = n(runs.runs), finished = n(runs.finished);
   if (totalRuns >= MIN_RATE_SAMPLE && (totalRuns - finished) / totalRuns >= 0.2) {
-    // Recent = the last two UTC days: a failure wave that already stopped is history, not an outage.
+    // A failure wave that already stopped is history, not an outage: healed when a provider answered after the last
+    // failed desk call (the ledger's own evidence), or when the last two UTC days finished at least 80%.
     const cutoff = new Date(now - 86_400_000).toISOString().slice(0, 10);
     const recent = a(runs.byDay).map(o).filter((d) => String(d.day) >= cutoff);
     const recentRuns = recent.reduce((t, d) => t + n(d.runs), 0), recentDone = recent.reduce((t, d) => t + n(d.finished), 0);
     const failedDays = [...new Set(a(runs.byDay).map(o).filter((d) => n(d.finished) < n(d.runs)).map((d) => String(d.day)))].sort();
-    const healed = recentRuns >= 2 && recentDone / recentRuns >= 0.8;
+    const stamps = (['anthropic', 'openai'] as const).map((p) => o(providers[p]));
+    const lastDeskFail = stamps.map((pr) => o(pr.lastFailure)).filter((f) => f.surface === 'desk' && s(f.at)).map((f) => Date.parse(String(f.at))).sort((x, y) => y - x)[0];
+    const lastOkAny = stamps.map((pr) => (s(pr.lastOk) ? Date.parse(String(pr.lastOk)) : 0)).sort((x, y) => y - x)[0] ?? 0;
+    const healed = (lastDeskFail != null && lastOkAny > lastDeskFail) || (recentRuns >= 2 && recentDone / recentRuns >= 0.8);
     add({
       id: 'desk-failures', level: healed ? 'info' : (totalRuns - finished) / totalRuns >= 0.4 ? 'critical' : 'warn', area: 'operacion', tab: 'ia', impact: healed ? 40 : 90, sample: totalRuns,
       title: healed
-        ? `${int(totalRuns - finished)} de ${int(totalRuns)} análisis fallaron en el periodo; los últimos ${int(recentRuns)} terminaron`
+        ? `${int(totalRuns - finished)} de ${int(totalRuns)} análisis fallaron en el periodo; desde la última falla el desk responde`
         : `${int(totalRuns - finished)} de ${int(totalRuns)} análisis del desk no terminaron (${pct(totalRuns - finished, totalRuns)})`,
-      detail: `${healed ? `Las fallas se concentran en ${failedDays.map((d) => dateOnly(d)).join(', ')}; desde entonces el desk responde. ` : 'Cada análisis sin terminar es un lector que vio "no disponible". '}Se cuenta un análisis por lote del ledger; terminado = el CIO respondió.${small(totalRuns)}`,
+      detail: `${healed ? `Las fallas se concentran en ${failedDays.map((d) => dateOnly(d)).join(', ')}${lastDeskFail != null ? ` (la última, ${day(new Date(lastDeskFail).toISOString())})` : ''}; después hubo llamadas correctas. ` : 'Cada análisis sin terminar es un lector que vio "no disponible". '}Se cuenta un análisis por lote del ledger; terminado = el CIO respondió.${small(totalRuns)}`,
       action: healed ? 'Nada urgente: confirma que el respaldo del proveedor que falló tenga crédito para la próxima vez.' : 'Abre IA para ver qué proveedor y qué rol fallan; con crédito y respaldo sanos esto debería bajar de 5%.',
       evidence: [`análisis ${period}d: ${int(totalRuns)}`, `terminados: ${int(finished)}`, `últimas 48 h: ${int(recentDone)}/${int(recentRuns)}`],
     });
