@@ -1,6 +1,6 @@
 // src/App.tsx - CON VERCEL ANALYTICS
-import React, { lazy, Suspense, useEffect } from 'react';
-import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate } from 'react-router-dom';
+import React, { lazy, Suspense } from 'react';
+import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react'; // ✅ PARA REACT (no Next.js)
@@ -21,20 +21,15 @@ const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
 
-// "/" is the Bobby app home: middleware.ts serves the static page in public/home before the SPA is involved.
-// The SPA only reaches the index route on a client-side navigation (a <Link to="/">), which needs a real page
-// load to get that page, or where the middleware does not run (local vite dev). The path the SPA booted on
-// tells the two apart, so the fallback renders the protocol landing instead of reloading forever.
-const SPA_BOOT_PATH = typeof window !== 'undefined' ? window.location.pathname : '/';
+// The middleware redirects a direct visit to "/desk". Keep SPA navigation and local Vite aligned.
 function HomeGate() {
-  const bootedHere = SPA_BOOT_PATH === '/';
-  useEffect(() => { if (!bootedHere) window.location.assign('/'); }, [bootedHere]);
-  if (!bootedHere) return <PageLoader />;
-  return (
-    <Suspense fallback={<PageLoader />}>
-      <BobbyProtocolLanding />
-    </Suspense>
-  );
+  const { search, hash } = useLocation();
+  const params = new URLSearchParams(search);
+  const callbackParams = ['code', 'access_token', 'refresh_token', 'error', 'error_description', 'token'];
+  const path = callbackParams.some((param) => params.has(param)) || /(?:^|[&#])(access_token|refresh_token|error_description)=/.test(hash)
+    ? '/auth/callback'
+    : '/desk';
+  return <Navigate to={`${path}${search}${hash}`} replace />;
 }
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
 // Direction A (lifestyle) was /app until 2026-09-24 and stays at /app-a, so a rollback is a route change;
