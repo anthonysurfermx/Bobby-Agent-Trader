@@ -77,6 +77,8 @@ final class NucleoSession: ObservableObject {
     var onRoute: ((NucleoPage) -> Void)?
 
     @Published var sheet: NucleoRoute?
+    /// The notch HUD that narrates a read while it runs.
+    let notch = NucleoNotch()
     @Published private(set) var classicRequested = false
 
     private(set) var currentPage: String?
@@ -115,6 +117,8 @@ final class NucleoSession: ObservableObject {
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
+        desk.debateStarted = { [weak self] level in self?.notch.debating(level) }
+        desk.askFinished = { [weak self] result in self?.notch.finished(result) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = emit
         speech.willStart = { [weak self] in self?.nucleoVoice.stop() }
@@ -129,6 +133,7 @@ final class NucleoSession: ObservableObject {
 
     func emit(_ name: String, _ payload: [String: Any]) {
         guard !tornDown else { return }
+        if name == "ask.stage" { notch.stage(payload) }
         emitter?.emit(name, payload)
     }
 

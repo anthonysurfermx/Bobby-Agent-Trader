@@ -468,6 +468,9 @@ final class NucleoDesk {
     var isSignedIn: () -> Bool = { AccountSession.shared.isSignedIn }
     var userID: () -> String? = { AccountSession.shared.session?.userId }
     var emit: (String, [String: Any]) -> Void = { _, _ in }
+    /// Native-only progress for the notch HUD: the debate went out, or the ask resolved (its result dictionary).
+    var debateStarted: (NucleoAnalysisLevel) -> Void = { _ in }
+    var askFinished: ([String: Any]) -> Void = { _ in }
     var sessionChanged: () -> Void = {}
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
@@ -688,6 +691,7 @@ final class NucleoDesk {
         guard let current = inflight else { return ["cancelled": false] }
         inflight = nil
         current.task.cancel()
+        askFinished(Self.cancelledResult)
         current.continuation.resume(returning: Self.cancelledResult)
         return ["cancelled": true]
     }
@@ -695,6 +699,7 @@ final class NucleoDesk {
     private func complete(_ requestId: String, _ result: [String: Any]) {
         guard let current = inflight, current.requestId == requestId else { return }
         inflight = nil
+        askFinished(result)
         current.continuation.resume(returning: result)
     }
 
@@ -797,6 +802,7 @@ final class NucleoDesk {
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
         let candles = bars.map(\.json)
         emit("ask.stage", ["requestId": job.requestId, "stage": "candles", "candles": candles, "provenance": NSNull()])
+        debateStarted(level)
         let desk = await deskRead
         guard isCurrent(job) else { return Self.cancelledResult }
         if case let .gated(status, message, access) = desk {
