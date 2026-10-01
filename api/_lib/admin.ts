@@ -246,14 +246,18 @@ async function revenueCatMetrics() {
 
 // App Store Connect daily sales reports (downloads), one cached row per day in api_cache.
 const APP_ID = () => process.env.ASC_APP_ID?.trim() || '6804460489';
-const ascConfigured = () => ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER'].every((k) => process.env[k]?.trim());
+// Values pasted from App Store Connect can carry surrounding text or line breaks: keep only the identifier.
+export const ascVendor = (raw = process.env.ASC_VENDOR_NUMBER) => raw?.match(/\d{5,12}/)?.[0] ?? '';
+export const ascKeyId = (raw = process.env.ASC_KEY_ID) => raw?.match(/\b[A-Z0-9]{10}\b/)?.[0] ?? '';
+export const ascIssuer = (raw = process.env.ASC_ISSUER_ID) => raw?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '';
+const ascConfigured = () => Boolean(ascKeyId() && ascIssuer() && process.env.ASC_PRIVATE_KEY?.trim() && ascVendor());
 interface SalesDay { downloads: number; redownloads: number; updates: number; iap: number }
 
 function ascToken(): string {
   const b64 = (v: string | Buffer) => Buffer.from(v).toString('base64url');
   const now = Math.floor(Date.now() / 1000);
-  const head = b64(JSON.stringify({ alg: 'ES256', kid: process.env.ASC_KEY_ID!.trim(), typ: 'JWT' }));
-  const body = b64(JSON.stringify({ iss: process.env.ASC_ISSUER_ID!.trim(), iat: now, exp: now + 1100, aud: 'appstoreconnect-v1' }));
+  const head = b64(JSON.stringify({ alg: 'ES256', kid: ascKeyId(), typ: 'JWT' }));
+  const body = b64(JSON.stringify({ iss: ascIssuer(), iat: now, exp: now + 1100, aud: 'appstoreconnect-v1' }));
   const key = createPrivateKey(process.env.ASC_PRIVATE_KEY!.replace(/\\n/g, '\n'));
   const sig = sign('sha256', Buffer.from(`${head}.${body}`), { key, dsaEncoding: 'ieee-p1363' });
   return `${head}.${body}.${b64(sig)}`;
@@ -285,7 +289,7 @@ async function salesDay(date: string, token: string): Promise<SalesDay | null> {
   if (cached?.[0]?.payload) return cached[0].payload;
   const params = new URLSearchParams({
     'filter[frequency]': 'DAILY', 'filter[reportDate]': date, 'filter[reportSubType]': 'SUMMARY',
-    'filter[reportType]': 'SALES', 'filter[vendorNumber]': process.env.ASC_VENDOR_NUMBER!.trim(), 'filter[version]': '1_1',
+    'filter[reportType]': 'SALES', 'filter[vendorNumber]': ascVendor(), 'filter[version]': '1_1',
   });
   const r = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/a-gzip' }, signal: AbortSignal.timeout(10000) });
   let day: SalesDay;
@@ -327,7 +331,8 @@ export async function integrations(days: string[]) {
   const [revenuecat, appStore] = await Promise.all([revenueCatMetrics(), appStoreSales(days)]);
   const missing = [
     ...(process.env.REVENUECAT_V2_SECRET_KEY?.trim() ? [] : ['REVENUECAT_V2_SECRET_KEY']),
-    ...['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER'].filter((k) => !process.env[k]?.trim()),
+    ...(ascKeyId() ? [] : ['ASC_KEY_ID']), ...(ascIssuer() ? [] : ['ASC_ISSUER_ID']),
+    ...(process.env.ASC_PRIVATE_KEY?.trim() ? [] : ['ASC_PRIVATE_KEY']), ...(ascVendor() ? [] : ['ASC_VENDOR_NUMBER']),
   ];
   return { revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing };
 }
