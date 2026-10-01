@@ -11,7 +11,7 @@ import { createPrivateKey, randomInt, sign } from 'node:crypto';
 import { gunzipSync } from 'node:zlib';
 import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './bobby-db.js';
 import { requireIdentity, type Identity } from './user-identity.js';
-import { llmCaps } from './llm-usage.js';
+import { llmCaps, llmSpend } from './llm-usage.js';
 import { paywallOn } from './access.js';
 
 const TIMEOUT = 6000;
@@ -23,6 +23,16 @@ async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 export async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
   return rest<T>(`rpc/${name}`, { method: 'POST', body: JSON.stringify(body) });
+}
+
+/** Exact row count of a PostgREST query (Content-Range), without reading the rows. */
+async function countRows(path: string): Promise<number | null> {
+  try {
+    const r = await fetch(bobbyRest(path), { headers: { ...bobbyServiceHeaders(), Prefer: 'count=exact', Range: '0-0' }, signal: AbortSignal.timeout(TIMEOUT) });
+    if (!r.ok && r.status !== 206) return null;
+    const total = Number((r.headers.get('content-range') ?? '').split('/')[1]);
+    return Number.isFinite(total) ? total : null;
+  } catch { return null; }
 }
 
 export class AdminError extends Error {
@@ -42,6 +52,21 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
     res.status(503).json({ error: 'The admin check is unavailable. Try again.' });
     return null;
   }
+}
+
+/** Every change is written before it runs: no audit row, no change. The outcome is added to the same row. */
+export async function auditStart(admin: Identity, action: string, target: string | null, detail: Record<string, unknown> | null = null) {
+  let rows: Array<{ id: number }> | null;
+  try {
+    rows = await rest<Array<{ id: number }>>('bobby_admin_actions', { method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ admin_id: admin.id, action, target, detail: { ...(detail ?? {}), status: 'started' } }) });
+  } catch { rows = null; }
+  const id = rows?.[0]?.id;
+  if (!id) throw new AdminError(503, 'The audit log is unavailable, so nothing was changed. Try again.');
+  return async (status: 'ok' | 'failed', extra: Record<string, unknown> = {}) => {
+    await rest(`bobby_admin_actions?id=eq.${id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' },
+      body: JSON.stringify({ target, detail: { ...(detail ?? {}), ...extra, status } }) }).catch((e) => console.error('[admin] audit finish failed', action, e instanceof Error ? e.message : e));
+  };
 }
 
 export async function logAction(admin: Identity, action: string, target: string | null, detail: Record<string, unknown> | null = null): Promise<void> {
@@ -104,16 +129,28 @@ export async function couponsView() {
     rest<Array<Record<string, unknown> & { identity?: { email?: string | null } | null }>>(
       'bobby_coupon_redemptions?select=code,identity_id,reads,profundo,maximo,created_at,identity:bobby_identities(email)&order=created_at.desc&limit=100'),
   ]);
+  const [couponsTotal, redemptionsTotal] = await Promise.all([countRows('bobby_coupons?select=code'), countRows('bobby_coupon_redemptions?select=id')]);
+  const now = Date.now();
   return {
-    coupons: coupons ?? [],
+    coupons: ((coupons ?? []) as Array<Record<string, unknown>>).map((c) => ({
+      ...c,
+      // One status the dashboard can show as is: a coupon at its cap or past its date is not redeemable.
+      status: !c.active ? 'inactive' : c.expires_at && new Date(String(c.expires_at)).getTime() <= now ? 'expired'
+        : c.max_redemptions !== null && Number(c.redeemed) >= Number(c.max_redemptions) ? 'exhausted' : 'active',
+    })),
     redemptions: (redemptions ?? []).map(({ identity, ...r }) => ({ ...r, email: identity?.email ?? null })),
+    totals: { coupons: couponsTotal, redemptions: redemptionsTotal },
   };
 }
 
 export async function actionsView() {
   const rows = await rest<Array<Record<string, unknown> & { admin?: { email?: string | null } | null }>>(
     'bobby_admin_actions?select=id,action,target,detail,created_at,admin:bobby_identities(email)&order=created_at.desc&limit=100');
-  return { actions: (rows ?? []).map(({ admin, ...a }) => ({ ...a, admin_email: admin?.email ?? null })) };
+  return { actions: (rows ?? []).map(({ admin, ...a }) => ({ ...a, admin_email: admin?.email ?? null })), total: await countRows('bobby_admin_actions?select=id') };
+}
+
+export async function membersView() {
+  return rpc<{ subscriptions: unknown[]; grants: unknown[] }>('bobby_admin_members', {});
 }
 
 // ---------------- accounts ----------------
@@ -263,18 +300,19 @@ function ascToken(): string {
   return `${head}.${body}.${b64(sig)}`;
 }
 
-export function parseSalesReport(tsv: string, appId: string): SalesDay {
+const IAP_IDS = () => new Set((process.env.ASC_IAP_IDS?.trim() || '6817775464').split(/[,\s]+/).filter(Boolean));
+export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string> = IAP_IDS()): SalesDay {
   const out: SalesDay = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };
   const lines = tsv.split(/\r?\n/).filter(Boolean);
   const cols = (lines.shift() ?? '').split('\t');
   const at = (name: string) => cols.indexOf(name);
   const [type, units, apple, parent] = [at('Product Type Identifier'), at('Units'), at('Apple Identifier'), at('Parent Identifier')];
-  if (type < 0 || units < 0) return out;
+  if (type < 0 || units < 0 || apple < 0) throw new Error('appstore report unreadable');
   for (const line of lines) {
     const f = line.split('\t');
     const t = (f[type] ?? '').trim(); const n = Number(f[units]) || 0;
     const ours = apple >= 0 && f[apple]?.trim() === appId;
-    if (/^(IA|FI)/.test(t)) { if (ours || (parent >= 0 && f[parent]?.trim())) out.iap += n; continue; }
+    if (/^(IA|FI)/.test(t)) { if (iapIds.has(f[apple]?.trim() ?? '')) out.iap += n; continue; }
     if (!ours) continue;
     if (/^(1|F1)/.test(t)) out.downloads += n;
     else if (/^3/.test(t)) out.redownloads += n;
@@ -327,16 +365,44 @@ async function appStoreSales(days: string[]) {
   }
 }
 
+async function latest(path: string): Promise<string | null> {
+  const rows = await rest<Array<Record<string, string>>>(path).catch(() => null);
+  const row = rows?.[0];
+  return row ? Object.values(row)[0] ?? null : null;
+}
+
 export async function integrations(days: string[]) {
   // (Search Console is read by the lifecycle view, at the top of the web funnel.)
-  const [revenuecat, appStore] = await Promise.all([revenueCatMetrics(), appStoreSales(days)]);
+  const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const since24 = new Date(Date.now() - 86_400_000).toISOString();
+  const [revenuecat, appStore, spend, webhookLast, webhook30d, trackLast, track24h] = await Promise.all([
+    revenueCatMetrics(), appStoreSales(days), llmSpend(),
+    latest('bobby_purchase_events?select=created_at&order=created_at.desc&limit=1'),
+    countRows(`bobby_purchase_events?select=id&created_at=gte.${encodeURIComponent(since30)}`),
+    latest('bobby_events?select=created_at&order=created_at.desc&limit=1'),
+    countRows(`bobby_events?select=id&created_at=gte.${encodeURIComponent(since24)}`),
+  ]);
   const missing = [
     ...(process.env.REVENUECAT_V2_SECRET_KEY?.trim() ? [] : ['REVENUECAT_V2_SECRET_KEY']),
     ...(ascKeyId() ? [] : ['ASC_KEY_ID']), ...(ascIssuer() ? [] : ['ASC_ISSUER_ID']),
     ...(process.env.ASC_PRIVATE_KEY?.trim() ? [] : ['ASC_PRIVATE_KEY']), ...(ascVendor() ? [] : ['ASC_VENDOR_NUMBER']),
     ...(process.env.GSC_SERVICE_ACCOUNT_JSON?.trim() ? [] : ['GSC_SERVICE_ACCOUNT_JSON']),
   ];
-  return { revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing };
+  const has = (k: string) => Boolean(process.env[k]?.trim());
+  missing.push(...['REVENUECAT_SECRET_KEY', 'REVENUECAT_WEBHOOK_AUTH', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'].filter((k) => !has(k)));
+  return {
+    revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing,
+    // The spend guard's own figures: desk only, UTC calendar day and month (what the caps are compared to).
+    llmGuard: spend ? { dayUsd: spend.day, monthUsd: spend.month } : null,
+    health: {
+      // Configured = the secrets exist; delivery is only proven by events arriving.
+      revenuecatWebhook: { configured: has('REVENUECAT_SECRET_KEY') && has('REVENUECAT_WEBHOOK_AUTH'), lastEventAt: webhookLast, events30d: webhook30d },
+      tracking: { lastEventAt: trackLast, events24h: track24h },
+      llmKeys: { anthropic: has('ANTHROPIC_API_KEY'), openai: has('OPENAI_API_KEY') },
+      // Vercel Web Analytics has no read API here: its state is not verified by the dashboard.
+      vercelAnalytics: 'unverified' as const,
+    },
+  };
 }
 
 // ---------------- Google Search Console (top of the web funnel) ----------------
@@ -476,7 +542,12 @@ export async function lifecycleView(days: number) {
   ]);
   const list = daysFrom(lifecycle.since);
   const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
-  return { lifecycle, economics: unitEconomics(raw), searchConsole: search, appStore };
+  const coverage = await rpc('bobby_admin_coverage', {}).catch(() => null);
+  return {
+    lifecycle, economics: unitEconomics(raw), searchConsole: search, appStore, coverage,
+    // What the shipped clients actually report: a zero on an uninstrumented step means "not measured", not "nobody".
+    instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosPaywall: false, purchaseStart: false },
+  };
 }
 
 // ---------------- costs and assumptions ----------------
@@ -505,10 +576,13 @@ export async function deleteCost(id: unknown) {
 }
 
 export async function setAssumptions(body: Record<string, unknown>) {
-  const value: Record<string, number> = {};
+  // Merge: a field that is absent keeps its value; null or '' clears it (back to the server default).
+  const current = await rest<Array<{ value: Record<string, number> }>>('bobby_admin_settings?key=eq.unit_economics&select=value').catch(() => null);
+  const value: Record<string, number> = { ...(current?.[0]?.value ?? {}) };
   const opt = (k: string, min: number, max: number) => {
+    if (!(k in body)) return;
     const v = body[k];
-    if (v === null || v === undefined || v === '') return;
+    if (v === null || v === undefined || v === '') { delete value[k]; return; }
     const x = Number(v);
     if (!Number.isFinite(x) || x < min || x > max) throw new AdminError(400, `Invalid ${k}.`);
     value[k] = x;

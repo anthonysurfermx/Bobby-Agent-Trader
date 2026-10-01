@@ -34,6 +34,7 @@ const TOKENS: Record<string, { auth: string; ident: string; email: string }> = {
 interface Call { url: string; body: any; method: string; headers: Record<string, string> }
 let calls: Call[] = [];
 let overrides: (c: Call) => Response | null = () => null;
+let auditSeq = 0;
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const raw = init?.body ? String(init.body) : '';
   let body: any = null;
@@ -59,7 +60,10 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes(`bobby_identities?id=eq.${USER}&select=id,email,auth_user_id`)) return json([{ id: USER, email: 'reader@example.com', auth_user_id: USER_AUTH }]);
   if (c.url.includes(`bobby_identities?id=eq.${ADMIN}&select=id,email,auth_user_id`)) return json([{ id: ADMIN, email: 'owner@example.com', auth_user_id: ADMIN_AUTH }]);
   if (c.url.includes('bobby_identities?id=eq.') && c.url.includes('select=id,email,auth_user_id')) return json([]);
-  if (c.url.includes('bobby_admin_actions') && c.method === 'POST') return new Response(null, { status: 201 });
+  if (c.url.includes('bobby_admin_actions') && c.method === 'POST') return json([{ id: ++auditSeq }], 201);
+  if (c.url.includes('bobby_admin_actions?id=eq.') && c.method === 'PATCH') return new Response(null, { status: 204 });
+  if (c.url.includes('rpc/bobby_admin_members')) return json({ subscriptions: [{ email: 'reader@example.com', active: true }], grants: [] });
+  if (c.url.includes('rpc/bobby_admin_coverage')) return json({ eventsSince: '2026-10-01T12:00:00Z', readsSince: '2026-09-27T00:00:00Z' });
   if (c.url.includes('bobby_coupons') && c.method === 'POST') return json([{ code: c.body.code, reads: c.body.reads }], 201);
   if (c.url.includes('rpc/bobby_admin_grant')) return json({ ok: true, bonus: { reads: c.body.p_reads, profundo: 0, maximo: 0 }, proUntil: null });
   if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
@@ -88,6 +92,7 @@ const call = async (method: string, auth: string | null, query: Record<string, s
   return res;
 };
 const audits = () => calls.filter((c) => c.url.includes('bobby_admin_actions') && c.method === 'POST').map((c) => c.body);
+const finishes = () => calls.filter((c) => c.url.includes('bobby_admin_actions?id=eq.') && c.method === 'PATCH').map((c) => c.body);
 
 try {
   // ---------- who gets in ----------
@@ -120,9 +125,17 @@ try {
   eq(made.statusCode, 200, 'create a coupon');
   ok(/^BOBBY-[A-HJ-NP-Z2-9]{5}$/.test(made.body.coupon.code), 'a generated code');
   eq(audits()[0]?.action, 'create-coupon', 'audited');
+  eq([audits()[0]?.detail.status, finishes()[0]?.detail.status, finishes()[0]?.detail.code], ['started', 'ok', made.body.coupon.code], 'written before, completed after');
+  ok(calls.findIndex((c) => c.url.includes('bobby_admin_actions') && c.method === 'POST') < calls.findIndex((c) => c.url.includes('bobby_coupons') && c.method === 'POST'), 'the audit row precedes the change');
+  overrides = (c) => (c.url.includes('bobby_admin_actions') && c.method === 'POST' ? json({ message: 'down' }, 500) : null);
+  const noAudit = await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 5 });
+  eq(noAudit.statusCode, 503, 'no audit row, no change');
+  ok(!calls.some((c) => c.url.includes('bobby_coupons') && c.method === 'POST'), 'nothing was created');
+  overrides = () => null;
   eq(audits()[0]?.admin_id, ADMIN, 'by whom');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', code: 'mi cupon', reads: 5 })).body.coupon.code, 'MICUPON', 'codes are normalized');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 0, profundo: 0, maximo: 0 })).statusCode, 400, 'an empty coupon');
+  eq(finishes().at(-1)?.detail.status, 'failed', 'a refused change is recorded as failed');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 5000 })).statusCode, 400, 'out of range');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 5, expiresAt: '2020-01-01' })).statusCode, 400, 'a past expiry');
   overrides = (c) => (c.url.includes('bobby_coupons') && c.method === 'POST' ? json({ code: '23505' }, 409) : null);
@@ -148,6 +161,8 @@ try {
   const order = calls.map((c) => `${c.method} ${c.url.replace(/^https:\/\/db\.test/, '')}`).filter((s) => /agent_trades|bobby_identities\?id|auth\/v1\/admin/.test(s));
   eq(order.map((s) => s.split('?')[0]), ['GET /rest/v1/bobby_identities', 'PATCH /rest/v1/agent_trades', 'DELETE /rest/v1/bobby_identities', 'DELETE /auth/v1/admin/users/' + USER_AUTH], 'trades de-linked, data, then sign-in');
   eq(audits().at(-1)?.action, 'delete-user', 'audited');
+  ok(!('confirm' in (audits().at(-1)?.detail ?? {})), 'the typed confirmation is not stored');
+  eq(finishes().at(-1)?.detail.account, 'reader@example.com', 'the outcome names the account');
 
   // ---------- admins, credit, probe ----------
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-admin', identityId: ADMIN, admin: false })).statusCode, 400, 'you cannot remove your own role');
@@ -166,13 +181,21 @@ try {
   // ---------- App Store sales report ----------
   const header = 'Provider\tProvider Country\tSKU\tDeveloper\tTitle\tVersion\tProduct Type Identifier\tUnits\tDeveloper Proceeds\tBegin Date\tEnd Date\tCustomer Currency\tCountry Code\tCurrency of Proceeds\tApple Identifier\tCustomer Price\tPromo Code\tParent Identifier';
   const row = (type: string, units: number, apple: string, parent = '') => ['APPLE', 'US', 'sku', 'dev', 'Bobby', '1.5', type, units, '0', '', '', 'USD', 'MX', 'USD', apple, '0', '', parent].join('\t');
-  const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1F', 9, '999'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'), row('IAY', 1, '6817775464', 'bobby.sku')].join('\n'), '6804460489');
-  eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; updates and subscriptions apart');
-  eq(parseSalesReport('garbage', '1'), { downloads: 0, redownloads: 0, updates: 0, iap: 0 }, 'an unreadable report');
+  const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1F', 9, '999'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'),
+    row('IAY', 1, '6817775464', 'bobby.sku'), row('IAY', 9, '555', 'other.app.sku')].join('\n'), '6804460489', new Set(['6817775464']));
+  eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; only our subscription counts as IAP');
+  assert.throws(() => parseSalesReport('garbage', '1')); checks++;
 
   // ---------- lifecycle and unit economics ----------
+  const members = await call('GET', 'Bearer admin-token', { view: 'members' });
+  eq([members.statusCode, members.body.subscriptions.length], [200, 1], 'members: every subscription, server side');
+  const over2 = await call('GET', 'Bearer admin-token', { view: 'overview', days: '7' });
+  eq([over2.body.integrations.health.vercelAnalytics, over2.body.integrations.health.llmKeys], ['unverified', { anthropic: true, openai: true }], 'health is reported, not assumed');
+  ok(over2.body.integrations.missing.includes('REVENUECAT_SECRET_KEY') && over2.body.integrations.missing.includes('REVENUECAT_WEBHOOK_AUTH'), 'webhook secrets are checked');
+  eq(over2.body.integrations.health.revenuecatWebhook.configured, false, 'webhook not configured without its secrets');
   const life = await call('GET', 'Bearer admin-token', { view: 'lifecycle', days: '30' });
   eq([life.statusCode, life.body.lifecycle.web.devices, life.body.searchConsole.configured, life.body.appStore.configured], [200, 3, false, false], 'lifecycle view');
+  eq([life.body.instrumentation.iosPaywall, life.body.coverage.eventsSince], [false, '2026-10-01T12:00:00Z'], 'what is measured and since when');
   const ue = life.body.economics;
   eq([ue.revenue.mrrGrossUsd, ue.revenue.mrrNetUsd, ue.acquisition.cacPerPaying, ue.acquisition.cacPerAccount], [49.9, 42.42, 10, 2.5], 'MRR and CAC (marketing / new payers, / new accounts)');
   eq([ue.ltv.monthlyChurn, ue.ltv.churnSource, ue.ltv.lifetimeMonths, ue.ltv.monthlyLlmPerUserUsd], [0.1, 'assumed', 10, 0.1], 'churn from the assumption until there are 5+ subscriptions at the start; LLM cost per active reader');

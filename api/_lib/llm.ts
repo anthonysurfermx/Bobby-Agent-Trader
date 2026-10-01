@@ -13,6 +13,8 @@
 
 import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
 import { alertProviderCredit } from './provider-alert.js';
+import { waitUntil } from '@vercel/functions';
+import { logLlmUsage } from './llm-usage.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const BACKOFF_MS = [500, 1500];
@@ -73,6 +75,13 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
   }
 
   let lastError: Error = new Error('LLM call failed');
+  // The cost ledger (bobby_llm_usage) sees every attempt of the cycle and agent-run calls too, under their
+  // endpoint as the surface; the desk's spend guard only sums surface 'desk'.
+  const started = Date.now();
+  const ledger: LlmUsage[] = [];
+  const row = (u: Partial<LlmUsage>) => ledger.push({ provider: 'openai', model, role: null, tokensIn: 0, tokensOut: 0, tokensCached: 0,
+    tokensReasoning: 0, usd: 0, latencyMs: Date.now() - started, stop: null, ok: false, ...u });
+  try {
   for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -88,6 +97,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
       });
 
       if (!res.ok) {
+        row({ stop: `http_${res.status}` });
         const errBody = await res.text().catch(() => '');
         recordLlmFailure({
           endpoint: opts.endpoint,
@@ -120,6 +130,9 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
           };
         }>;
       };
+      const usage = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } }).usage;
+      const inTok = usage?.prompt_tokens ?? 0, cachedTok = usage?.prompt_tokens_details?.cached_tokens ?? 0, outTok = usage?.completion_tokens ?? 0;
+      row({ tokensIn: inTok, tokensCached: cachedTok, tokensOut: outTok, usd: modelCost(model, inTok - cachedTok, cachedTok, outTok), stop: 'stop', ok: true });
       const message = data.choices?.[0]?.message;
       const text = message?.content || '';
       let toolInput: Record<string, unknown> | null = null;
@@ -128,6 +141,8 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
         try {
           toolInput = JSON.parse(args);
         } catch {
+          const last = ledger.at(-1);
+          if (last) { last.ok = false; last.stop = 'invalid_json'; }
           recordLlmFailure({
             endpoint: opts.endpoint,
             provider: 'openai',
@@ -142,6 +157,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
       const err = e as Error;
       if (err === lastError || err instanceof LlmHttpError) throw err; // non-retriable HTTP error re-thrown above
       const isTimeout = err.name === 'AbortError';
+      row({ stop: isTimeout ? 'timeout' : 'network' });
       lastError = isTimeout
         ? new Error(`LLM call timed out after ${timeoutMs}ms (${model})`)
         : err;
@@ -159,6 +175,9 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
     }
   }
   throw lastError;
+  } finally {
+    if (ledger.length) waitUntil(logLlmUsage(ledger.splice(0), { surface: opts.endpoint }));
+  }
 }
 
 // ============================================================
@@ -206,13 +225,23 @@ export class LlmHttpError extends Error {
   constructor(readonly status: number, message: string, readonly providerCode: ProviderRefusal | null = null) { super(message); }
 }
 
-/** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. An unknown model logs $0. */
+/** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. Dated ids match their family
+ *  (claude-haiku-4-5-20251001 → claude-haiku-4-5); an unknown model is costed at the dearest known price so the
+ *  ledger never under-reports. */
 export const MODEL_PRICES: Record<string, [number, number, number]> = {
   'gpt-6-luna': [0.10, 0.01, 0.50], 'gpt-6-sol': [2, 0.2, 10], 'gpt-4o-mini': [0.15, 0.075, 0.60], 'gpt-4o': [2.5, 1.25, 10],
   'claude-sonnet-5-5': [2, 0.2, 10], 'claude-haiku-4-5': [1, 0.1, 5], 'claude-opus-5-5': [4, 0.2, 20],
 };
+const DEAREST: [number, number, number] = Object.values(MODEL_PRICES).reduce((a, b) => (b[2] > a[2] ? b : a));
+const unpriced = new Set<string>();
+export function modelPrice(model: string): [number, number, number] {
+  const known = MODEL_PRICES[model] ?? Object.entries(MODEL_PRICES).sort((a, b) => b[0].length - a[0].length).find(([k]) => model.startsWith(k))?.[1];
+  if (known) return known;
+  if (!unpriced.has(model)) { unpriced.add(model); console.warn('[llm] no list price for', model, '— costed at the dearest known price'); }
+  return DEAREST;
+}
 export function modelCost(model: string, uncachedIn: number, cachedIn: number, out: number): number {
-  const [pIn, pCached, pOut] = MODEL_PRICES[model] ?? [0, 0, 0];
+  const [pIn, pCached, pOut] = modelPrice(model);
   return (uncachedIn * pIn + cachedIn * pCached + out * pOut) / 1e6;
 }
 
@@ -224,6 +253,15 @@ function parseJson(text: string): unknown {
   const trimmed = text.trim();
   try { return JSON.parse(trimmed); } catch { /* fall through */ }
   return JSON.parse(trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, ''));
+}
+
+/** A reply that is not the requested JSON is a failed call in the ledger, not a successful one. */
+function parseOrFail(text: string, usage: LlmUsage[] | undefined): unknown {
+  try { return parseJson(text); } catch (e) {
+    const last = usage?.at(-1);
+    if (last) { last.ok = false; last.stop = 'invalid_json'; }
+    throw e;
+  }
 }
 
 async function postJson(url: string, headers: Record<string, string>, body: unknown, timeoutMs: number): Promise<Response> {
@@ -277,6 +315,7 @@ export async function completeJson(
     if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') break;
     if (res.ok || !RETRY_STATUS(res.status) || attempt === 1) break;
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status });
+    note({ stop: `http_${res.status}` }); // the failed attempt is a call too
     await sleep(BACKOFF_MS[0]);
   }
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
@@ -300,7 +339,7 @@ export async function completeJson(
     note({ tokensIn: inTok, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.completion_tokens_details?.reasoning_tokens ?? 0,
       usd: modelCost(spec.model, inTok - cached, cached, outTok), stop, ok: stop === 'stop' });
     if (stop !== 'stop') throw new LlmIncompleteError(`${spec.model}: finished with ${stop}`);
-    return parseJson(choice?.message?.content ?? '');
+    return parseOrFail(choice?.message?.content ?? '', opts.usage);
   }
   const data = await res.json() as {
     stop_reason?: string; content?: Array<{ type: string; text?: string }>;
@@ -311,5 +350,5 @@ export async function completeJson(
   note({ tokensIn: inTok + cached, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.output_tokens_details?.thinking_tokens ?? 0,
     usd: modelCost(spec.model, inTok, cached, outTok), stop, ok: stop === 'end_turn' });
   if (stop !== 'end_turn') throw new LlmIncompleteError(`${spec.model}: finished with ${stop}`);
-  return parseJson((data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join(''));
+  return parseOrFail((data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join(''), opts.usage);
 }

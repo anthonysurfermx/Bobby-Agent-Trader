@@ -23,6 +23,7 @@ const MIGRATIONS = [
   '20261001160000_coupons_bonus_usage.sql',
   '20261001180000_admin_dashboard.sql',
   '20261001200000_lifecycle_funnel.sql',
+  '20261001210000_admin_audit_fixes.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
@@ -118,6 +119,8 @@ try {
   const lc = await lifecycle(30);
   eq([lc.web.devices, lc.web.home, lc.web.desk, lc.web.read1, lc.web.read2, lc.web.read5], [3, 3, 2, 2, 1, 0], 'web: visitors → desk → reads');
   eq([lc.web.account, lc.web.returned, lc.web.paywall, lc.web.pro], [1, 1, 1, 0], 'web: account, return, paywall, Pro');
+  eq([lc.web.devices, lc.web.engaged, lc.web.read1, lc.web.accountAfterRead, lc.web.proAfterRead], [3, 2, 2, 1, 0], 'the nested web funnel never grows');
+  eq([lc.ios.devices, lc.ios.engaged, lc.ios.read1, lc.ios.accountAfterRead, lc.ios.proAfterRead, lc.ios.returnedAfterRead], [2, 2, 2, 1, 1, 0], 'the nested iOS funnel');
   eq([lc.ios.devices, lc.ios.read1, lc.ios.read2, lc.ios.read5, lc.ios.account, lc.ios.pro], [2, 2, 1, 1, 1, 1], 'ios: opens → reads → account → Pro');
   eq([lc.web.retention.d1.eligible, lc.web.retention.d1.returned], [1, 1], 'D1: the device first seen two days ago came back a day later');
   eq(lc.ios.retention.d7.eligible, 0, 'nothing old enough for D7');
