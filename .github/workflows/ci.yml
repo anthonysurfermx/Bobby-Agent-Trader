@@ -47,6 +47,7 @@ jobs:
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
       - run: npm run test:mcp-payment-transport
+      - run: npm run test:admin-api
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --audit-level=high
@@ -119,6 +120,7 @@ jobs:
       - run: npm run test:progress-atomic-pg
       - run: npm run test:levels-referrals-pg
       - run: npm run test:coupons-pg
+      - run: npm run test:admin-pg
       - run: npm run test:user-memory-pg
 
   contracts:

@@ -1,0 +1,140 @@
+import type { AdminUser } from '@/lib/admin-client';
+
+// Formatting for the owner dashboard (/admin). One language (Spanish, es-MX) and one set of rules:
+// integers with thousands separators, USD with 2 decimals (LLM cents keep 3–4), short es-MX dates.
+
+const INT = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 0 });
+const DEC1 = new Intl.NumberFormat('es-MX', { maximumFractionDigits: 1 });
+const PCT = new Intl.NumberFormat('es-MX', { style: 'percent', maximumFractionDigits: 1 });
+const USD2 = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const DATE = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: '2-digit' });
+const DATE_TIME = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+const DAY = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
+const DAY_LONG = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+const REL = new Intl.RelativeTimeFormat('es-MX', { numeric: 'auto' });
+
+export const DASH = '—';
+
+export const fmtInt = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? DASH : INT.format(v));
+export const fmtDec = (v: number | null | undefined): string => (v == null || !Number.isFinite(v) ? DASH : DEC1.format(v));
+
+/** USD with 2 decimals. `precise` keeps LLM cents readable: $0.019, $0.0042. */
+export function fmtUsd(v: number | null | undefined, precise = false): string {
+  if (v == null || !Number.isFinite(v)) return DASH;
+  const abs = Math.abs(v);
+  const sign = v < 0 ? '-' : '';
+  if (precise && abs > 0 && abs < 1) {
+    const digits = abs < 0.01 ? 4 : 3;
+    return `${sign}$${abs.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: digits })}`;
+  }
+  return `${sign}$${USD2.format(abs)}`;
+}
+
+/** a / b as a percentage, or a dash when there is no base. */
+export function fmtPct(a: number, b: number): string {
+  if (!b || !Number.isFinite(a) || !Number.isFinite(b)) return DASH;
+  return PCT.format(a / b);
+}
+export const ratio = (a: number, b: number): number | null => (b > 0 && Number.isFinite(a) ? a / b : null);
+
+/** Minutes as the unit a human would say: 12 min, 3.5 h, 2.1 d. */
+export function fmtMinutes(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return DASH;
+  if (v < 1) return '<1 min';
+  if (v < 60) return `${INT.format(v)} min`;
+  if (v < 1440) return `${DEC1.format(v / 60)} h`;
+  return `${DEC1.format(v / 1440)} d`;
+}
+
+/** 'YYYY-MM-DD' as a local calendar day (never shifted by the UTC offset). */
+export function parseDay(day: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(day);
+}
+export const fmtDayShort = (day: string): string => DAY.format(parseDay(day));
+const MONTH = new Intl.DateTimeFormat('es-MX', { month: 'short' });
+/** Axis label in the dashboard's mono caps: "01 OCT". */
+export function fmtTick(day: string): string {
+  const d = parseDay(day);
+  return `${String(d.getDate()).padStart(2, '0')} ${MONTH.format(d).replace('.', '').toUpperCase()}`;
+}
+
+/** Big secondary numbers: 9,876 · 12.35k · 701.34m. */
+export function fmtCompact(v: number | null | undefined): string {
+  if (v == null || !Number.isFinite(v)) return DASH;
+  const abs = Math.abs(v);
+  if (abs < 10_000) return fmtInt(v);
+  if (abs < 1_000_000) return `${(v / 1_000).toFixed(2)}k`;
+  return `${(v / 1_000_000).toFixed(2)}m`;
+}
+export const fmtDayLong = (day: string): string => DAY_LONG.format(parseDay(day));
+
+function toDate(v: string | null | undefined): Date | null {
+  if (!v) return null;
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? parseDay(v) : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+export const fmtDate = (v: string | null | undefined): string => { const d = toDate(v); return d ? DATE.format(d) : DASH; };
+export const fmtDateTime = (v: string | null | undefined): string => { const d = toDate(v); return d ? DATE_TIME.format(d) : DASH; };
+
+/** "hace 3 horas", "ayer", "en 5 días". */
+export function fmtRelative(v: string | null | undefined, now = Date.now()): string {
+  const d = toDate(v);
+  if (!d) return DASH;
+  const sec = (d.getTime() - now) / 1000;
+  const abs = Math.abs(sec);
+  if (abs < 60) return 'ahora';
+  if (abs < 3600) return REL.format(Math.round(sec / 60), 'minute');
+  if (abs < 86400) return REL.format(Math.round(sec / 3600), 'hour');
+  if (abs < 86400 * 45) return REL.format(Math.round(sec / 86400), 'day');
+  if (abs < 86400 * 400) return REL.format(Math.round(sec / (86400 * 30)), 'month');
+  return REL.format(Math.round(sec / (86400 * 365)), 'year');
+}
+
+export const timeOf = (v: string | null | undefined): number | null => toDate(v)?.getTime() ?? null;
+
+/** ISO 8601 periods from RevenueCat ("P28D") in words. */
+export function fmtPeriod(p: string | undefined): string {
+  if (!p) return '';
+  const m = /^P(\d+)([DWMY])$/.exec(p);
+  if (!m) return p;
+  const n = Number(m[1]);
+  const unit = { D: n === 1 ? 'día' : 'días', W: n === 1 ? 'semana' : 'semanas', M: n === 1 ? 'mes' : 'meses', Y: n === 1 ? 'año' : 'años' }[m[2] as 'D' | 'W' | 'M' | 'Y'];
+  return `${n} ${unit}`;
+}
+
+/** Gifted uses in one short line: "20 lecturas · 3 Profundo · 1 Máximo". */
+export function fmtGift(reads?: number | null, profundo?: number | null, maximo?: number | null): string {
+  const parts: string[] = [];
+  if (reads) parts.push(`${fmtInt(reads)} ${reads === 1 ? 'lectura' : 'lecturas'}`);
+  if (profundo) parts.push(`${fmtInt(profundo)} Profundo`);
+  if (maximo) parts.push(`${fmtInt(maximo)} Máximo`);
+  return parts.length ? parts.join(' · ') : DASH;
+}
+
+export const PROVIDER_LABEL: Record<string, string> = {
+  apple: 'Apple', google: 'Google', wallet: 'Wallet', email: 'Email', stripe: 'Stripe', revenuecat: 'RevenueCat',
+  anthropic: 'Anthropic', openai: 'OpenAI', web: 'Web', ios: 'iOS', android: 'Android', unknown: 'Sin dato',
+};
+export const label = (k: string | null | undefined): string => (k ? PROVIDER_LABEL[k] ?? k : DASH);
+
+export const STATUS_LABEL: Record<string, string> = {
+  active: 'Activa', trialing: 'Prueba', canceled: 'Cancelada', cancelled: 'Cancelada', expired: 'Vencida',
+  past_due: 'Pago pendiente', billing_issue: 'Problema de cobro', paused: 'Pausada', incomplete: 'Incompleta',
+  unpaid: 'Sin pagar', refunded: 'Reembolsada', grace_period: 'Periodo de gracia',
+};
+export const statusLabel = (k: string | null | undefined): string => (k ? STATUS_LABEL[k] ?? k : DASH);
+
+/** Subscription states that count as a paying membership. */
+export const ACTIVE_SUB = new Set(['active', 'trialing']);
+
+export function lastActivity(u: AdminUser): string | null {
+  const a = timeOf(u.last_seen_at);
+  const b = timeOf(u.last_read_at);
+  if (a == null && b == null) return null;
+  return (a ?? 0) >= (b ?? 0) ? u.last_seen_at : u.last_read_at;
+}
+
+
+export type ValueFormat = 'int' | 'usd' | 'usd-precise';
+export const fmtValue = (v: number, f: ValueFormat): string => (f === 'int' ? fmtInt(v) : fmtUsd(v, f === 'usd-precise'));

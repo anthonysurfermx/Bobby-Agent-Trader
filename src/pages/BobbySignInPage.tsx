@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { bobbySupabase } from '@/lib/bobby-db-client';
+import { track } from '@/lib/track';
 
 /**
  * /signin — Apple / Google sign-in for the web, entered from the static home ("/").
@@ -24,6 +25,7 @@ export default function BobbySignInPage() {
 
   const start = useCallback(async (provider: Provider) => {
     setBusy(provider);
+    track('signin_start', 'signin');
     setError('');
     setProviderUrl(null);
     try {

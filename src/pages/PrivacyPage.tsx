@@ -208,6 +208,12 @@ export default function PrivacyPage() {
               'Nuestros proveedores de hosting y autenticación conservan por poco tiempo registros de solicitudes, errores y seguridad de inicio de sesión, que pueden incluir direcciones IP y datos del dispositivo. La app para iPhone no incluye SDKs de analítica, publicidad ni rastreo.',
             )}
           </p>
+          <p>
+            {tr(
+              'To understand how people find and use Bobby, the website records first-party usage events (page visits, App Store link clicks, sign-in starts and the free-limit screen) with the same salted install hash, the section of the site and the referring site’s domain. No cookies, advertising identifiers or third-party analytics SDKs are used; website traffic is also counted in aggregate by our host (Vercel Web Analytics). Account creation, read and subscription dates are reviewed in aggregate to measure activation and retention.',
+              'Para entender cómo la gente encuentra y usa Bobby, el sitio registra eventos de uso propios (visitas a páginas, clics al enlace de App Store, inicios de sesión y la pantalla de límite gratis) con el mismo hash con sal del identificador de instalación, la sección del sitio y el dominio del sitio de origen. No usamos cookies, identificadores publicitarios ni SDKs de analítica de terceros; nuestro proveedor de hosting también cuenta el tráfico del sitio de forma agregada (Vercel Web Analytics). Las fechas de creación de cuenta, lecturas y suscripción se revisan de forma agregada para medir activación y retención.',
+            )}
+          </p>
         </Section>
 
         <Section title={tr('Deleting your account', 'Cómo borrar tu cuenta')}>

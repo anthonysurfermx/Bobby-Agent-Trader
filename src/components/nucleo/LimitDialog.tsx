@@ -3,7 +3,9 @@
 //   · with a free account → Bobby Pro, or invite a friend (five slots, Pro days for each friend who joins);
 //   · Bobby Pro out of a level for the month → when it comes back, and the level below to keep going.
 // Every number is the server's (the meter and /api/bobby-access `plans`).
+import { useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
+import { track } from '@/lib/track';
 import { X } from 'lucide-react';
 import { isPortuguese, t } from '@/lib/companions/i18n';
 import type { AccessState, DeskLevel } from '@/lib/access-client';
@@ -23,6 +25,8 @@ interface Props {
 }
 
 export default function LimitDialog({ limit, state, billing, onClose, onSignIn, onSubscribe, onLevel }: Props) {
+  // The paywall (or the invite offer) was shown: one funnel event per opening.
+  useEffect(() => { if (limit) track('paywall_view', 'desk'); }, [limit]);
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(isPortuguese() ? 'pt-BR' : undefined, { weekday: 'long', month: 'short', day: 'numeric' }) : null);
   const free = state?.plans?.limits.free;
   const pro = state?.plans?.limits.pro;

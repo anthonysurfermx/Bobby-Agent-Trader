@@ -13,7 +13,6 @@ import { lazyWithRetry } from '@/lib/lazyWithRetry';
 
 // Layout components (no lazy loading para layouts)
 import MainLayout from '@/components/layout/MainLayout';
-import AdminLayout from '@/pages/admin/AdminLayout';
 import UserLayout from '@/pages/user/UserLayout';
 
 // Lazy load todas las páginas para mejor performance
@@ -118,20 +117,8 @@ const ResetPasswordPage = lazy(() => import('@/pages/ResetPasswordPage'));
 const CheckEmailPage = lazy(() => import('@/pages/CheckEmailPage'));
 const AuthCallback = lazy(() => import('@/pages/AuthCallback'));
 
-// Admin pages
-const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'));
-const ContentMachine = lazy(() => import('@/pages/admin/ContentMachine'));
-// Admin Blog y Academia removidos temporalmente
-const AdminBlog = lazy(() => import('@/pages/admin/AdminBlog'));
-// const AdminAcademia = lazy(() => import('@/pages/admin/AdminAcademia'));
-const AdminVideoTutorials = lazy(() => import('@/pages/admin/AdminVideoTutorials'));
-const AdminEvents = lazy(() => import('@/pages/admin/AdminEvents'));
-const AdminStartups = lazy(() => import('@/pages/admin/AdminStartups'));
-const AdminCommunities = lazy(() => import('@/pages/admin/AdminCommunities'));
-const AdminAdvocates = lazy(() => import('@/pages/admin/AdminAdvocates'));
-const AdminUsers = lazy(() => import('@/pages/admin/AdminUsers'));
-const AdminSettings = lazy(() => import('@/pages/admin/AdminSettings'));
-const AdminShortUrls = lazy(() => import('@/pages/admin/AdminShortUrls'));
+// Bobby owner dashboard (/admin). The DeFi México admin pages stay on disk without routes.
+const BobbyAdminPage = lazyWithRetry(() => import('@/pages/BobbyAdminPage'), 'bobby-admin');
 
 // User pages
 const UserDashboard = lazy(() => import('@/pages/user/UserDashboard'));
@@ -142,19 +129,8 @@ const ProposeStartup = lazy(() => import('@/pages/user/ProposeStartup'));
 const ProposeReferent = lazy(() => import('@/pages/user/ProposeReferent'));
 const ProposeJob = lazy(() => import('@/pages/user/ProposeJob'));
 
-// Admin Startup Forms
+// Startup form, still reachable by startup owners at /admin/startups/new (MainLayout route)
 const AdminStartupForm = lazy(() => import('@/pages/admin/AdminStartupForm'));
-
-// Admin Community Forms
-const AdminCommunityForm = lazy(() => import('@/pages/admin/AdminCommunityForm'));
-
-// Admin Jobs
-const AdminJobs = lazy(() => import('@/pages/admin/AdminJobs'));
-const AdminJobForm = lazy(() => import('@/pages/admin/AdminJobForm'));
-
-// Admin Blog Forms - REMOVIDOS TEMPORALMENTE
-const BlogNew = lazy(() => import('@/pages/admin/BlogNew'));
-const BlogEditPage = lazy(() => import('@/pages/admin/BlogEditPage'));
 
 // TikTok Feed Page
 const TikTokFeedPage = lazy(() => import('@/pages/TikTokFeedPage'));
@@ -1137,220 +1113,15 @@ const router = createBrowserRouter(
         },
 
         // ==========================================
-        // RUTAS ADMIN PROTEGIDAS
+        // BOBBY OWNER DASHBOARD (/admin) — auth is checked by /api/admin
         // ==========================================
         {
           path: 'admin',
           element: (
-            <ProtectedRoute requireAnyRole={['admin', 'editor']}>
-              <Suspense fallback={<PageLoader />}>
-                <AdminLayout />
-              </Suspense>
-            </ProtectedRoute>
+            <Suspense fallback={<PageLoader />}>
+              <BobbyAdminPage />
+            </Suspense>
           ),
-          errorElement: (
-            <ErrorBoundary>
-              <Suspense fallback={<PageLoader />}>
-                <NotFound />
-              </Suspense>
-            </ErrorBoundary>
-          ),
-          children: [
-            // Dashboard admin
-            {
-              index: true,
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminDashboard />
-                </Suspense>
-              ),
-            },
-
-            // ==========================================
-            // RUTAS ADMIN - STARTUPS
-            // ==========================================
-            {
-              path: 'startups',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminStartups />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'startups/new',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminStartupForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'startups/edit/:id',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminStartupForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'startups/:id/edit',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminStartupForm />
-                </Suspense>
-              ),
-            },
-
-            // ==========================================
-            // RUTAS ADMIN - BLOG
-            // ==========================================
-            {
-              path: 'blog',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminBlog />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'blog/new',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <BlogNew />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'blog/edit/:id',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <BlogEditPage />
-                </Suspense>
-              ),
-            },
-
-            // ==========================================
-            // RUTAS ADMIN - ACADEMIA - REMOVIDO TEMPORALMENTE
-            // ==========================================
-            // {
-            //   path: 'academia',
-            //   element: (
-            //     <Suspense fallback={<PageLoader />}>
-            //       <AdminAcademia />
-            //     </Suspense>
-            //   ),
-            // },
-            {
-              path: 'academia/videos',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminVideoTutorials />
-                </Suspense>
-              ),
-            },
-
-            // ==========================================
-            // OTRAS RUTAS ADMIN
-            // ==========================================
-            {
-              path: 'eventos',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminEvents />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'comunidades',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminCommunities />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'comunidades/new',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminCommunityForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'comunidades/edit/:id',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminCommunityForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'referentes',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminAdvocates />
-                </Suspense>
-              ),
-            },
-            // Admin Jobs Routes
-            {
-              path: 'jobs',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminJobs />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'jobs/new',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminJobForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'jobs/edit/:id',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminJobForm />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'short-urls',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminShortUrls />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'usuarios',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminUsers />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'settings',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <AdminSettings />
-                </Suspense>
-              ),
-            },
-            {
-              path: 'content-machine',
-              element: (
-                <Suspense fallback={<PageLoader />}>
-                  <ContentMachine />
-                </Suspense>
-              ),
-            },
-          ],
         },
 
         // ==========================================

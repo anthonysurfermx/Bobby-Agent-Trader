@@ -13,6 +13,7 @@ import { Apple, Loader2, Wallet, X } from 'lucide-react';
 import { useAppKit } from '@reown/appkit/react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { t } from '@/lib/companions/i18n';
+import { track } from '@/lib/track';
 
 
 /** Asset questions before the prompt appears. */
@@ -103,6 +104,7 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
 
   const oauth = async (provider: 'apple' | 'google') => {
     setBusy(provider);
+    track('signin_start');
     setError('');
     setProviderUrl(null);
     try {

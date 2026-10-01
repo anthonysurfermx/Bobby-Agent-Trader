@@ -1,0 +1,185 @@
+// /api/admin and /api/track with a mocked backend: only signed-in Apple/Google accounts in bobby_admins get in;
+// every change leaves an audit row; deletion needs the typed email and never deletes yourself; coupon and
+// grant input is validated; the App Store sales parser and the track normalizer keep only what they should.
+import assert from 'node:assert/strict';
+
+process.env.BOBBY_SUPABASE_URL = 'https://db.test';
+process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
+process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
+process.env.RATE_LIMIT_SALT = 'test-salt';
+process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+process.env.OPENAI_API_KEY = 'test-openai';
+delete process.env.BOBBY_AUTH_URL;
+delete process.env.REVENUECAT_V2_SECRET_KEY;
+for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER']) delete process.env[k];
+
+const { default: adminHandler } = await import('../api/admin.ts');
+const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
+const { parseSalesReport } = await import('../api/_lib/admin.ts');
+
+const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+let checks = 0;
+const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
+const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
+
+const ADMIN = '0b8f0a52-0000-4000-8000-00000000ad01';
+const ADMIN_AUTH = 'a11ce000-0000-4000-8000-0000000000a1';
+const USER = '0b8f0a52-0000-4000-8000-00000000c0de';
+const USER_AUTH = 'a11ce000-0000-4000-8000-000000000001';
+const TOKENS: Record<string, { auth: string; ident: string; email: string }> = {
+  'Bearer admin-token': { auth: ADMIN_AUTH, ident: ADMIN, email: 'owner@example.com' },
+  'Bearer user-token': { auth: USER_AUTH, ident: USER, email: 'reader@example.com' },
+};
+
+interface Call { url: string; body: any; method: string; headers: Record<string, string> }
+let calls: Call[] = [];
+let overrides: (c: Call) => Response | null = () => null;
+globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+  const raw = init?.body ? String(init.body) : '';
+  let body: any = null;
+  try { body = raw ? JSON.parse(raw) : null; } catch { body = raw; }
+  const c: Call = { url: String(input), body, method: init?.method ?? 'GET', headers: Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v])) };
+  calls.push(c);
+  const o = overrides(c);
+  if (o) return o;
+  if (c.url.includes('/rest/v1/api_cache')) return c.method === 'POST' ? json(null, 201) : json([]);
+  if (c.url.includes('/auth/v1/user')) {
+    const t = TOKENS[c.headers.authorization ?? ''];
+    return t ? json({ id: t.auth, email: t.email, app_metadata: { provider: 'google' } }) : json({ msg: 'bad token' }, 401);
+  }
+  if (c.url.includes('bobby_identities?on_conflict=auth_user_id')) {
+    const t = Object.values(TOKENS).find((x) => x.auth === c.body?.auth_user_id);
+    return json([{ id: t?.ident, auth_user_id: t?.auth, wallet_address: null }]);
+  }
+  if (c.url.includes(`bobby_admins?identity_id=eq.${ADMIN}`) && c.method === 'GET') return json([{ identity_id: ADMIN }]);
+  if (c.url.includes('bobby_admins?identity_id=eq.') && c.method === 'GET') return json([]);
+  if (c.url.includes('rpc/bobby_admin_overview')) return json({ days: ['2026-09-30', '2026-10-01'], accounts: { total: 6 } });
+  if (c.url.includes('rpc/bobby_admin_users')) return json({ total: 1, users: [] });
+  if (c.url.includes(`bobby_identities?id=eq.${ADMIN}&select=email`)) return json([{ email: 'owner@example.com' }]);
+  if (c.url.includes(`bobby_identities?id=eq.${USER}&select=id,email,auth_user_id`)) return json([{ id: USER, email: 'reader@example.com', auth_user_id: USER_AUTH }]);
+  if (c.url.includes(`bobby_identities?id=eq.${ADMIN}&select=id,email,auth_user_id`)) return json([{ id: ADMIN, email: 'owner@example.com', auth_user_id: ADMIN_AUTH }]);
+  if (c.url.includes('bobby_identities?id=eq.') && c.url.includes('select=id,email,auth_user_id')) return json([]);
+  if (c.url.includes('bobby_admin_actions') && c.method === 'POST') return new Response(null, { status: 201 });
+  if (c.url.includes('bobby_coupons') && c.method === 'POST') return json([{ code: c.body.code, reads: c.body.reads }], 201);
+  if (c.url.includes('rpc/bobby_admin_grant')) return json({ ok: true, bonus: { reads: c.body.p_reads, profundo: 0, maximo: 0 }, proUntil: null });
+  if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
+  if (c.url.includes('/auth/v1/admin/users/')) return json({});
+  if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events')) return new Response(null, { status: 201 });
+  return json({ message: `unexpected ${c.method} ${c.url}` }, 500);
+}) as typeof fetch;
+
+const response = () => ({
+  statusCode: 200, body: null as any, headers: {} as Record<string, string>,
+  setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; },
+  json(v: unknown) { this.body = v; return this; }, end() { return this; },
+});
+let ip = 10;
+const call = async (method: string, auth: string | null, query: Record<string, string> = {}, body: unknown = undefined) => {
+  calls = [];
+  const res = response();
+  await adminHandler({ method, query, body, headers: { 'x-forwarded-for': `10.0.0.${ip++}`, ...(auth ? { authorization: auth } : {}) } } as never, res as never);
+  return res;
+};
+const audits = () => calls.filter((c) => c.url.includes('bobby_admin_actions') && c.method === 'POST').map((c) => c.body);
+
+try {
+  // ---------- who gets in ----------
+  eq((await call('GET', null, { view: 'me' })).statusCode, 401, 'signed out');
+  const notAdmin = await call('GET', 'Bearer user-token', { view: 'overview' });
+  eq([notAdmin.statusCode, notAdmin.body.error], [403, 'not_admin'], 'a regular account is not an admin');
+  ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_overview')), 'and reads nothing');
+  overrides = (c) => (c.url.includes('bobby_admins?identity_id=eq.') ? json({ message: 'down' }, 500) : null);
+  eq((await call('GET', 'Bearer admin-token', { view: 'me' })).statusCode, 503, 'the admin check fails closed');
+  overrides = () => null;
+  const me = await call('GET', 'Bearer admin-token', { view: 'me' });
+  eq([me.statusCode, me.body.admin, me.body.identityId], [200, true, ADMIN], 'the owner is an admin');
+  eq(me.headers['cache-control'], 'private, no-store', 'never cached');
+
+  // ---------- views ----------
+  const over = await call('GET', 'Bearer admin-token', { view: 'overview', days: '9999' });
+  eq(over.statusCode, 200, 'overview');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 365 }, 'the window is capped');
+  eq([over.body.integrations.revenuecat.configured, over.body.integrations.appStore.configured], [false, false], 'integrations report what is missing');
+  ok(over.body.integrations.missing.includes('REVENUECAT_V2_SECRET_KEY') && over.body.integrations.missing.includes('ASC_KEY_ID'), 'missing env names');
+  eq(typeof over.body.integrations.llmCaps.dayUsd, 'number', 'LLM caps');
+  const cmp = await call('GET', 'Bearer admin-token', { view: 'overview', days: '60', compare: '1' });
+  eq([cmp.statusCode, cmp.body.integrations, cmp.body.overview.accounts.total], [200, null, 6], 'the comparison request only reads the series');
+  await call('GET', 'Bearer admin-token', { view: 'users', q: 'ana', limit: '9999' });
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_users'))?.body, { p_query: 'ana', p_limit: 200, p_offset: 0 }, 'users: query and page size capped');
+  eq((await call('GET', 'Bearer admin-token', { view: 'nope' })).statusCode, 400, 'unknown view');
+
+  // ---------- coupons ----------
+  const made = await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 20, profundo: 3, maximo: 0, maxRedemptions: 15, expiresAt: null });
+  eq(made.statusCode, 200, 'create a coupon');
+  ok(/^BOBBY-[A-HJ-NP-Z2-9]{5}$/.test(made.body.coupon.code), 'a generated code');
+  eq(audits()[0]?.action, 'create-coupon', 'audited');
+  eq(audits()[0]?.admin_id, ADMIN, 'by whom');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', code: 'mi cupon', reads: 5 })).body.coupon.code, 'MICUPON', 'codes are normalized');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 0, profundo: 0, maximo: 0 })).statusCode, 400, 'an empty coupon');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 5000 })).statusCode, 400, 'out of range');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', reads: 5, expiresAt: '2020-01-01' })).statusCode, 400, 'a past expiry');
+  overrides = (c) => (c.url.includes('bobby_coupons') && c.method === 'POST' ? json({ code: '23505' }, 409) : null);
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'create-coupon', code: 'TAKEN', reads: 5 })).statusCode, 409, 'a taken code');
+  overrides = () => null;
+  eq((await call('POST', 'Bearer user-token', {}, { action: 'create-coupon', reads: 5 })).statusCode, 403, 'a regular account cannot create coupons');
+
+  // ---------- grants ----------
+  const gift = await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 });
+  eq([gift.statusCode, gift.body.bonus.reads], [200, 10], 'a gift');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_grant'))?.body, { p_identity: USER, p_reads: 10, p_profundo: 0, p_maximo: 0, p_pro_days: 0 }, 'the grant call');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER })).statusCode, 400, 'an empty gift');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: 'nope', reads: 1 })).statusCode, 400, 'a malformed id');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: '0b8f0a52-0000-4000-8000-000000000000', reads: 1 })).statusCode, 404, 'an unknown account');
+
+  // ---------- deletion ----------
+  const wrong = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'someone@else.com' });
+  eq(wrong.statusCode, 400, 'deletion needs the typed email');
+  ok(!calls.some((c) => c.method === 'DELETE'), 'and deletes nothing');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: ADMIN, confirm: 'owner@example.com' })).statusCode, 400, 'never yourself');
+  const gone = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'Reader@Example.com' });
+  eq(gone.statusCode, 200, 'an account is deleted');
+  const order = calls.map((c) => `${c.method} ${c.url.replace(/^https:\/\/db\.test/, '')}`).filter((s) => /agent_trades|bobby_identities\?id|auth\/v1\/admin/.test(s));
+  eq(order.map((s) => s.split('?')[0]), ['GET /rest/v1/bobby_identities', 'PATCH /rest/v1/agent_trades', 'DELETE /rest/v1/bobby_identities', 'DELETE /auth/v1/admin/users/' + USER_AUTH], 'trades de-linked, data, then sign-in');
+  eq(audits().at(-1)?.action, 'delete-user', 'audited');
+
+  // ---------- admins, credit, probe ----------
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-admin', identityId: ADMIN, admin: false })).statusCode, 400, 'you cannot remove your own role');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'credit-mark', provider: 'openai', kind: 'balance', amountUsd: 15 })).statusCode, 200, 'a balance mark');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'credit-mark', provider: 'gemini', kind: 'balance', amountUsd: 15 })).statusCode, 400, 'unknown provider');
+  overrides = (c) => (c.url.includes('api.anthropic.com') ? json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API. PRIVATE' } }, 400) : null);
+  const probe = await call('POST', 'Bearer admin-token', {}, { action: 'probe-llm', provider: 'anthropic' });
+  eq([probe.body.status, probe.body.httpStatus, probe.body.code], ['no_credit', 400, 'insufficient_quota'], 'an exhausted provider');
+  ok(!JSON.stringify(probe.body).includes('PRIVATE'), 'the provider message is not echoed');
+  eq(calls.find((c) => c.url.includes('api.anthropic.com'))?.body.max_tokens, 1, 'a one-token probe');
+  overrides = (c) => (c.url.includes('api.openai.com') ? json({ id: 'x', choices: [] }) : null);
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'probe-llm', provider: 'openai' })).body.status, 'ok', 'a provider with credit');
+  overrides = () => null;
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'nope' })).statusCode, 400, 'unknown action');
+
+  // ---------- App Store sales report ----------
+  const header = 'Provider\tProvider Country\tSKU\tDeveloper\tTitle\tVersion\tProduct Type Identifier\tUnits\tDeveloper Proceeds\tBegin Date\tEnd Date\tCustomer Currency\tCountry Code\tCurrency of Proceeds\tApple Identifier\tCustomer Price\tPromo Code\tParent Identifier';
+  const row = (type: string, units: number, apple: string, parent = '') => ['APPLE', 'US', 'sku', 'dev', 'Bobby', '1.5', type, units, '0', '', '', 'USD', 'MX', 'USD', apple, '0', '', parent].join('\t');
+  const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1F', 9, '999'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'), row('IAY', 1, '6817775464', 'bobby.sku')].join('\n'), '6804460489');
+  eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; updates and subscriptions apart');
+  eq(parseSalesReport('garbage', '1'), { downloads: 0, redownloads: 0, updates: 0, iap: 0 }, 'an unreadable report');
+
+  // ---------- track ----------
+  const t = normalizeEvent({ event: 'visit', surface: 'desk', device: '0d6e4a52-7c1b-4f0e-9a51-2b7e1c9d3f10', referrer: 'https://www.X.com/some/path?q=secret', utm: 'Newsletter' })!;
+  eq([t.event, t.platform, t.surface, t.referrer, t.utm_source], ['visit', 'web', 'desk', 'x.com', 'newsletter'], 'host only, lowercase');
+  ok(t.device_hash && !t.device_hash.includes('0d6e4a52'), 'the install id is hashed');
+  eq(normalizeEvent({ event: 'visit', referrer: 'https://bobbyprotocol.xyz/desk' })!.referrer, null, 'own pages are not referrers');
+  eq(normalizeEvent({ event: 'drop table' }), null, 'unknown events');
+  eq(normalizeEvent({ event: 'visit', surface: '../../etc', device: 'short' })!.surface, null, 'bad surface dropped');
+  calls = [];
+  const tr = response();
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.1' } } as never, tr as never);
+  eq(tr.statusCode, 204, 'a beacon (text/plain body) is accepted');
+  eq(calls.find((c) => c.url.includes('bobby_events'))?.body.event, 'appstore_click', 'and stored');
+  const bad = response();
+  await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
+  eq(bad.statusCode, 400, 'unknown events are refused');
+
+  console.log(`admin-api: ${checks} checks passed`);
+} finally {
+  // nothing to restore: the process ends here
+}
