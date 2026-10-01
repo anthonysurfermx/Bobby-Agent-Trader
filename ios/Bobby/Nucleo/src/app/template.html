@@ -89,8 +89,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #meriHit{position:absolute;left:115px;top:462px;width:160px;height:44px;border-radius:22px;cursor:pointer}
 
 /* hint row */
-#hint{left:0;top:713px;width:390px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);white-space:nowrap;text-align:center;pointer-events:none}
+#hint{left:20px;top:713px;width:350px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);text-align:center;pointer-events:none}
 .roll span{position:absolute;left:0;right:0;top:0;white-space:nowrap}
+/* a failure or gate line may need two lines: it wraps and grows upward, never into the pill */
+#hint span{white-space:normal;text-wrap:balance;top:auto;bottom:0}
 
 /* pill */
 #micGlow{left:60px;top:731px;width:270px;height:78px;border-radius:40px;overflow:hidden;pointer-events:none;transform-origin:135px 39px;filter:blur(22px)}
@@ -99,6 +101,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #lvl{position:absolute;left:256px;top:756px;height:28px;padding:0 11px;border-radius:14px;background:#000;border:1px solid rgba(242,237,228,.10);
   font:500 11px/26px var(--mono);letter-spacing:.04em;color:#E8DFD0;white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}
 #lvl.on{opacity:1;pointer-events:auto}
+#lvl::before{content:'';position:absolute;inset:-9px -4px}   /* 28 pt to the eye, 44 pt to the finger */
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
@@ -223,8 +226,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 #ta{display:block;width:100%;min-height:50px;max-height:116px;padding:14px 58px 14px 18px;border:0;outline:0;resize:none;background:transparent;color:#F2EDE4;
   font:400 17px/22px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;letter-spacing:-.01em;caret-color:#F2EDE4;-webkit-user-select:text;user-select:text;overflow-y:auto}
-#ta::placeholder{color:#8A8378}
+#ta::placeholder{color:#8A8378;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #taSend{position:absolute;right:7px;bottom:7px;width:36px;height:36px;border-radius:18px;background:#F2EDE4;color:#141210;display:grid;place-items:center;cursor:pointer}
+#taSend::before{content:'';position:absolute;inset:-4px;border-radius:22px}   /* 44 pt hit area */
 #taSend[disabled]{opacity:.3}
 </style>
 </head>

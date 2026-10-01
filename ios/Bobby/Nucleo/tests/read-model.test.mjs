@@ -91,6 +91,34 @@ test('every non-ok golden maps to a caption and never to a verdict', () => {
   }
   assert.throws(() => RM.build(load('quota'), {}));
 });
+test('a transient failure with a native retry token offers Try again (same question) and Not now; without one, no chips', () => {
+  for (const k of ['timeout', 'failed', 'unavailable']) {
+    for (const lang of ['en', 'es']) {
+      const f = RM.failure({ ...load(k), retry: 'tok-1' }, lang);
+      assert.equal(f.kind, 'error');
+      assert.equal(f.chips.length, 2);
+      assert.deepEqual(f.chips[0].action, { token: 'tok-1' });
+      assert.equal(f.chips[0].label, RM.t(lang, 'err.retry'));
+      assert.ok(f.chips[0].primary);
+      assert.deepEqual(f.chips[1].action, { dismiss: true });
+    }
+    assert.deepEqual(RM.failure(load(k), 'en').chips, [], k + ': no token, no chip');
+  }
+});
+test('missing data names the horizon in words, never the raw enum; unspecified takes the plain line', () => {
+  const base = load('nvda');
+  const line = (horizon, lang) => {
+    const m = RM.build({ ...base, sufficiency: { horizon, missing: ['4H', '1D'], sufficient: false } }, { lang });
+    return m.debate.entries.find((e) => e.id === 'missing').text;
+  };
+  assert.equal(line('week', 'en'), 'Missing data for the next few weeks: 4H, 1D.');
+  assert.equal(line('week', 'es'), 'Para las próximas semanas faltan datos: 4H, 1D.');
+  assert.equal(line('month', 'en'), 'Missing data for the coming months: 4H, 1D.');
+  assert.equal(line('intraday', 'es'), 'Para hoy faltan datos: 4H, 1D.');
+  assert.equal(line('long', 'en'), 'Missing data for the long term: 4H, 1D.');
+  assert.equal(line('unspecified', 'en'), 'Missing data: 4H, 1D.');
+  assert.equal(line('fortnight', 'es'), 'Faltan datos: 4H, 1D.');
+});
 test('a read refused for consent routes to the risk beat, never the generic failure copy', () => {
   for (const lang of ['en', 'es']) {
     const f = RM.failure(load('risk'), lang);
@@ -126,8 +154,8 @@ test('subscription_required -> the Bobby Pro beat: reset day from access.resetsA
   const en = RM.failure(r, 'en'), es = RM.failure(r, 'es');
   assert.equal(en.kind, 'subscription');
   assert.equal(en.caption, RM.t('en', 'gate.pro'));
-  assert.equal(en.sub, 'They reset October 3. Bobby Pro has unlimited reads.');   // 2026-10-03T12:00Z is Oct 3 in every zone within ±11 h
-  assert.equal(es.sub, 'Se renuevan el 3 de octubre. Bobby Pro tiene lecturas ilimitadas.');
+  assert.equal(en.sub, 'They reset October 3. Bobby Pro has unlimited Quick reads.');   // 2026-10-03T12:00Z is Oct 3 in every zone within ±11 h
+  assert.equal(es.sub, 'Se renuevan el 3 de octubre. Bobby Pro tiene lecturas Rápidas ilimitadas.');
   assert.deepEqual(en.chips[0].action, { paywall: true, retry: r.token });
   assert.equal(en.chips[0].style, 'pro');
   assert.deepEqual(en.chips[1].action, { dismiss: true });

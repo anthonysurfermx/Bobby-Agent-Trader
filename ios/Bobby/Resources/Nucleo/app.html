@@ -89,8 +89,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #meriHit{position:absolute;left:115px;top:462px;width:160px;height:44px;border-radius:22px;cursor:pointer}
 
 /* hint row */
-#hint{left:0;top:713px;width:390px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);white-space:nowrap;text-align:center;pointer-events:none}
+#hint{left:20px;top:713px;width:350px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);text-align:center;pointer-events:none}
 .roll span{position:absolute;left:0;right:0;top:0;white-space:nowrap}
+/* a failure or gate line may need two lines: it wraps and grows upward, never into the pill */
+#hint span{white-space:normal;text-wrap:balance;top:auto;bottom:0}
 
 /* pill */
 #micGlow{left:60px;top:731px;width:270px;height:78px;border-radius:40px;overflow:hidden;pointer-events:none;transform-origin:135px 39px;filter:blur(22px)}
@@ -99,6 +101,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #lvl{position:absolute;left:256px;top:756px;height:28px;padding:0 11px;border-radius:14px;background:#000;border:1px solid rgba(242,237,228,.10);
   font:500 11px/26px var(--mono);letter-spacing:.04em;color:#E8DFD0;white-space:nowrap;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .25s ease}
 #lvl.on{opacity:1;pointer-events:auto}
+#lvl::before{content:'';position:absolute;inset:-9px -4px}   /* 28 pt to the eye, 44 pt to the finger */
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
@@ -223,8 +226,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;touch-action:manipulation;-webkit-user-select:text;user-select:text}
 #ta{display:block;width:100%;min-height:50px;max-height:116px;padding:14px 58px 14px 18px;border:0;outline:0;resize:none;background:transparent;color:#F2EDE4;
   font:400 17px/22px -apple-system,BlinkMacSystemFont,system-ui,sans-serif;letter-spacing:-.01em;caret-color:#F2EDE4;-webkit-user-select:text;user-select:text;overflow-y:auto}
-#ta::placeholder{color:#8A8378}
+#ta::placeholder{color:#8A8378;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #taSend{position:absolute;right:7px;bottom:7px;width:36px;height:36px;border-radius:18px;background:#F2EDE4;color:#141210;display:grid;place-items:center;cursor:pointer}
+#taSend::before{content:'';position:absolute;inset:-4px;border-radius:22px}   /* 44 pt hit area */
 #taSend[disabled]{opacity:.3}
 </style>
 </head>
@@ -558,6 +562,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'syn.name': 'IN SHORT', 'syn.why': 'Why', 'syn.risk': 'The risk', 'syn.watch': 'What to watch',
       'agent.rebuttal': 'SECOND ROUND', 'agent.scenarios': 'SCENARIOS', 'sc.confirm': 'Confirms it', 'sc.invalidate': 'Invalidates it',
       'agent.missing': 'MISSING DATA', 'missing.line': 'Missing data for {h}: {list}.', 'missing.lineNoH': 'Missing data: {list}.',
+      'hz.intraday': 'today', 'hz.week': 'the next few weeks', 'hz.month': 'the coming months', 'hz.long': 'the long term',
       'agent.evidence': 'EVIDENCE USED', 'ev.derivatives': 'derivatives', 'ev.record': 'record {w}/{n}',
       'meta': 'Educational read · not financial advice',
       'confirm.prompt': 'Did you mean {name} ({symbol})?', 'confirm.yes': 'Yes, {symbol}', 'confirm.no': 'Something else',
@@ -569,14 +574,15 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.network': 'No connection. Nothing was analyzed.',
       'err.timeout': 'The desk took too long. No verdict was issued.',
       'err.bad': 'The analysis did not come back. No verdict was issued.',
+      'err.retry': 'Try again',
       'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
       'err.riskCta': 'Open the risk notice',
       'gate.signin': 'Create your free account to keep reading — 10 free reads a week.',
       'gate.signinCta': 'Sign in with Apple', 'gate.notNow': 'Not now',
       'gate.signinUnavailable': 'Sign-in isn’t available right now. Your question was not sent.',
       'gate.signinFailed': 'Sign-in didn’t finish. Your question was not sent.',
-      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited reads.',
-      'gate.proNoDate': 'Bobby Pro has unlimited reads.', 'gate.proCta': 'See Bobby Pro',
+      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited Quick reads.',
+      'gate.proNoDate': 'Bobby Pro has unlimited Quick reads.', 'gate.proCta': 'See Bobby Pro',
       'gate.proPending': 'Waiting for the App Store to confirm Bobby Pro.', 'gate.proFailed': 'Bobby Pro isn’t confirmed yet. Your question was not sent.',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
@@ -605,7 +611,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE', 'debate.full': 'VER EL DEBATE COMPLETO ↓',
       'syn.name': 'EN CORTO', 'syn.why': 'Por qué', 'syn.risk': 'El riesgo', 'syn.watch': 'Qué vigilar',
       'agent.rebuttal': 'SEGUNDA RONDA', 'agent.scenarios': 'ESCENARIOS', 'sc.confirm': 'Lo confirma', 'sc.invalidate': 'Lo invalida',
-      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Faltan datos de {h}: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Para {h} faltan datos: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'hz.intraday': 'hoy', 'hz.week': 'las próximas semanas', 'hz.month': 'los próximos meses', 'hz.long': 'el largo plazo',
       'agent.evidence': 'EVIDENCIA USADA', 'ev.derivatives': 'derivados', 'ev.record': 'récord {w}/{n}',
       'meta': 'Lectura educativa · no es asesoría financiera',
       'confirm.prompt': '¿Te refieres a {name} ({symbol})?', 'confirm.yes': 'Sí, {symbol}', 'confirm.no': 'Otro activo',
@@ -617,14 +624,15 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'err.network': 'Sin conexión. No se analizó nada.',
       'err.timeout': 'La mesa tardó demasiado. No se emitió ningún veredicto.',
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
+      'err.retry': 'Reintentar',
       'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
       'err.riskCta': 'Abrir el aviso de riesgo',
       'gate.signin': 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.',
       'gate.signinCta': 'Iniciar sesión con Apple', 'gate.notNow': 'Ahora no',
       'gate.signinUnavailable': 'Ahora no se puede iniciar sesión. Tu pregunta no se envió.',
       'gate.signinFailed': 'No se completó el inicio de sesión. Tu pregunta no se envió.',
-      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas ilimitadas.',
-      'gate.proNoDate': 'Bobby Pro tiene lecturas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
+      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas Rápidas ilimitadas.',
+      'gate.proNoDate': 'Bobby Pro tiene lecturas Rápidas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
       'gate.proPending': 'Esperando a que la App Store confirme Bobby Pro.', 'gate.proFailed': 'Bobby Pro aún no está confirmado. Tu pregunta no se envió.',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
@@ -634,6 +642,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   var HUES = {
     alpha: '#3FE0B5', red: '#FF5A5F', cio: '#F6B94E'
   };
+  /* sufficiency.horizon values that read as words; 'unspecified' (or anything new) takes the no-horizon line */
+  var HORIZONS = { intraday: 1, week: 1, month: 1, long: 1 };
   var VERDICT = {
     wait: { hue: 'cio', color: HUES.cio, core: '#2A1C08', amb: '#19140D' },
     review: { hue: 'alpha', color: HUES.alpha, core: '#082A20', amb: '#0F1714' }
@@ -946,7 +956,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     if (su && su.sufficient === false && Array.isArray(su.missing) && su.missing.length) {
       var list = su.missing.filter(function (m) { return typeof m === 'string'; }).join(', ');
       out.push({ id: 'missing', name: t(lang, 'agent.missing'), hue: 'rgba(242,237,228,.5)',
-        text: su.horizon ? t(lang, 'missing.line', { h: su.horizon, list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
+        text: HORIZONS[su.horizon] ? t(lang, 'missing.line', { h: t(lang, 'hz.' + su.horizon), list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
     }
     var ev = r.evidenceUsed;
     if (ev && typeof ev === 'object') {
@@ -1018,7 +1028,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
             chips: [{ label: t(lang, 'err.riskCta'), action: { risk: true }, primary: true }] };
         }
         var key = r.code === 'network' ? 'err.network' : r.code === 'timeout' ? 'err.timeout' : 'err.bad';
-        return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: [] };
+        /* a read that failed after its asset was known carries a native `retry` token: the same question, one tap */
+        var retry = typeof r.retry === 'string' && r.retry ? [{ label: t(lang, 'err.retry'), action: { token: r.retry }, primary: true },
+          { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] : [];
+        return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: retry };
       default:
         return { kind: 'error', code: 'bad_reply', caption: t(lang, 'err.bad'), sub: null, chips: [] };
     }
@@ -1850,14 +1863,14 @@ var STR = /*STRINGS-BEGIN*/{
     'type.placeholder': 'Ask about a stock or a crypto…', 'type.send': 'Send question',
     'think.forming': 'Verdict forming',
     'chips.eyebrow': 'You might want to ask',
-    'face.desk': 'Desk', 'face.isla': 'Isla', 'face.squad': 'Squad', 'face.theses': 'Saved theses',
-    'face.isla.status': '{pieces} pieces · {seeds} seeds growing', 'face.isla.chip': 'Visit Isla',
+    'face.desk': 'Desk', 'face.isla': 'Island', 'face.squad': 'Squad', 'face.theses': 'Saved theses',
+    'face.isla.status': '{pieces} pieces · {seeds} seeds growing', 'face.isla.chip': 'Visit your island',
     'face.squad.status': '{name} · Level {level} · {streak}-day streak', 'face.squad.statusNew': '{name} · Level {level}', 'face.squad.chip': 'Change companion',
     'face.theses.one': '1 saved', 'face.theses.many': '{n} saved', 'face.theses.chip': 'Open latest',
     'save.evolution': 'Level {n} · {name}', 'save.unlock': 'Unlocked · {name}',
     'voice.failed': 'Bobby’s voice is unavailable. Your analysis is ready to read.',
     'save.stale': 'Account changed · this read was not saved', 'save.failed': 'Could not save this read',
-    'isla.title': 'Your island', 'isla.pieces': 'Pieces', 'isla.seeds': 'Seeds growing', 'isla.ready': 'Ready to review', 'isla.cta': 'Visit Isla',
+    'isla.title': 'Your island', 'isla.pieces': 'Pieces', 'isla.seeds': 'Seeds growing', 'isla.ready': 'Ready to review', 'isla.cta': 'Visit your island',
     'meta.asOf': 'as of {when}', 'chart.x': '{tf} · {provider} · {inst} · as of {when}',
     'aria.waking': 'Bobby is waking up', 'aria.idle': 'Bobby is idle', 'aria.listening': 'Bobby is listening', 'aria.sending': 'Sending your question',
     'aria.thinking': 'Three agents debating', 'aria.speaking': 'Bobby is speaking', 'aria.cards': 'Full read: debate and thesis cards',
@@ -1877,7 +1890,7 @@ var STR = /*STRINGS-BEGIN*/{
     'hint.empty': 'No te escuché · mantén y vuelve a intentar', 'hint.micStopped': 'El micrófono se detuvo · mantén para reintentar',
     'hint.micOff': 'Micrófono apagado · toca para escribir',
     'perm.title': 'Solo escucho mientras mantienes.', 'perm.body': 'iOS pedirá el micrófono y el reconocimiento de voz una vez.', 'perm.cta': 'Continuar',
-    'type.placeholder': 'Pregunta por una acción o una cripto…', 'type.send': 'Enviar pregunta',
+    'type.placeholder': 'Pregunta por una acción o cripto…', 'type.send': 'Enviar pregunta',
     'think.forming': 'Veredicto en formación',
     'chips.eyebrow': 'Quizá quieras preguntar',
     'face.desk': 'Escritorio', 'face.isla': 'Isla', 'face.squad': 'Escuadrón', 'face.theses': 'Tesis guardadas',
@@ -1888,7 +1901,7 @@ var STR = /*STRINGS-BEGIN*/{
     'voice.failed': 'La voz de Bobby no está disponible. Tu análisis está listo para leer.',
     'save.stale': 'Cambió la cuenta · esta lectura no se guardó', 'save.failed': 'No se pudo guardar esta lectura',
     'isla.title': 'Tu isla', 'isla.pieces': 'Piezas', 'isla.seeds': 'Semillas creciendo', 'isla.ready': 'Listas para revisar', 'isla.cta': 'Visitar Isla',
-    'meta.asOf': 'al {when}', 'chart.x': '{tf} · {provider} · {inst} · al {when}',
+    'meta.asOf': 'a las {when}', 'chart.x': '{tf} · {provider} · {inst} · a las {when}',
     'aria.waking': 'Bobby está despertando', 'aria.idle': 'Bobby está en reposo', 'aria.listening': 'Bobby está escuchando', 'aria.sending': 'Enviando tu pregunta',
     'aria.thinking': 'Tres agentes debatiendo', 'aria.speaking': 'Bobby está hablando', 'aria.cards': 'Lectura completa: debate y tesis',
     'aria.faces': 'Caras de la esfera', 'aria.noVerdict': 'No se emitió veredicto',
@@ -2578,6 +2591,8 @@ function routeReply(r){
   /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
   if (f.kind === 'signin'){ go('SIGNIN_GATE', { f: f }); return; }
   if (f.kind === 'subscription'){ go('PRO_GATE', { f: f, auto: r.retryOf !== 'paywall' }); return; }
+  /* a failed read native can re-ask (its `retry` token): the honest caption plus a Try again chip */
+  if (f.kind === 'error' && f.chips && f.chips.length){ go('CONFIRM_ASSET', { f: f }); return; }
   go('ERROR', { f: f });
 }
 function cancelRead(){

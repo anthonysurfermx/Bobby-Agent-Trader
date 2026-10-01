@@ -1,0 +1,18 @@
+Bobby 1.5 (51) replaces rejected build 38. Guideline 5 / China mainland: China mainland is excluded from Availability (174 storefronts available, 1 unavailable) and from the subscription's availability.
+
+Bobby provides educational stock and crypto market analysis. It does not execute trades, connect wallets, hold funds or private keys. No account or purchase is needed to try it: a new installation gets three Quick reads as a guest; Sign in with Apple then gives 10 reads per week.
+
+IN-APP PURCHASE (new in this build): Bobby Pro Monthly (xyz.bobbyprotocol.bobby.pro.monthly), an optional auto-renewable subscription. To find it without using up the free reads: tap the companion avatar (top right) to open Profile → "Bobby Pro". The paywall shows the localized price and period, auto-renewal terms, Terms of Use (Apple standard EULA) and Privacy Policy links, and Restore Purchases. "Restore Purchases" is also a row in Profile. Purchases are tied to the Bobby account, so the paywall asks to Sign in with Apple first if needed; use your Sandbox Apple Account for the purchase. Purchases are validated server-side through RevenueCat.
+
+Review steps:
+1. Tap the question button to type; hold it for optional on-device dictation. Declining microphone/speech permission keeps typing available.
+2. Read the AI/risk notice and accept by holding "Hold to agree" (VoiceOver/keyboard can activate the consent button). Questions and public market context are sent to Anthropic (Claude) for analysis; if Anthropic is unavailable or out of credit, OpenAI performs the same roles automatically. Account identifiers and microphone audio are never in that payload.
+3. Ask about Bitcoin or a supported stock (e.g. "Is NVDA worth a look this week?"). The sphere shows the analysis, chart, data timestamp and an educational Wait/Review outcome (never buy/sell). Pull down for the full three-agent debate.
+4. Profile → Bobby Pro / Restore Purchases (above). Profile also has Risk notice (withdraw AI consent), mute narration, Sign out and Delete account. If a Bobby Pro subscription is active, the deletion screen explains that Apple keeps billing until it is canceled and offers Manage subscription. Deletion removes the account, synced progress and Trader Land; if automatic Sign in with Apple revocation is unavailable the app shows Apple's manual steps.
+5. Trader Land publication is optional. Names are checked by moderation (fails closed); public islands offer Report and block creator; every report notifies the developer by email for review within 24 hours.
+
+The app interface is English/Spanish; the Portuguese description states this. Editorial screenshots are lifestyle photographs with captions; they do not depict customers.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en (Spanish: ?lang=es)
+Support: https://bobbyprotocol.xyz/support?lang=en
+Release is manual after approval.

@@ -25,4 +25,14 @@ enum L {
     /// What the TTS backend should pronounce — the companion's voice
     /// follows the device, so an English phone never gets Spanish audio.
     static var ttsLang: String { isSpanish ? "es" : "en" }
+
+    /// A bobbyprotocol.xyz page (privacy, support) in the app's language: `/privacy?lang=es`.
+    static func site(_ path: String) -> URL {
+        var c = URLComponents()
+        c.scheme = "https"
+        c.host = "bobbyprotocol.xyz"
+        c.path = "/" + path
+        c.queryItems = [URLQueryItem(name: "lang", value: ttsLang)]
+        return c.url!
+    }
 }

@@ -41,6 +41,19 @@ struct RiskNoticeView: View {
     private var statements: [(title: String, body: String)] { RiskNotice.statements(spanish: L.isSpanish) }
 
     private var allChecked: Bool { checks.allSatisfy { $0 } }
+    /// Read-only shows the statements as agreed only once they really were (the Núcleo onboarding can
+    /// open the notice before any consent): otherwise neutral marks and no "acknowledged" value.
+    private var agreed: Bool { readOnly && profile.acceptedRiskNotice }
+
+    private func mark(_ index: Int) -> (symbol: String, tint: Color) {
+        if readOnly { return agreed ? ("checkmark.circle.fill", Theme.orbCyan) : ("info.circle", Theme.muted) }
+        return checks[index] ? ("checkmark.circle.fill", Theme.orbCyan) : ("circle", Theme.muted)
+    }
+
+    private func value(_ index: Int) -> String {
+        if readOnly { return agreed ? L.t("acknowledged", "aceptado") : "" }
+        return checks[index] ? L.t("acknowledged", "aceptado") : L.t("not acknowledged", "sin aceptar")
+    }
 
     var body: some View {
         ZStack {
@@ -86,9 +99,9 @@ struct RiskNoticeView: View {
                                 withAnimation(.spring(duration: 0.3)) { checks[index].toggle() }
                             } label: {
                                 HStack(alignment: .top, spacing: 12) {
-                                    Image(systemName: readOnly || checks[index] ? "checkmark.circle.fill" : "circle")
+                                    Image(systemName: mark(index).symbol)
                                         .font(.system(size: 22, weight: .semibold))
-                                        .foregroundStyle(readOnly || checks[index] ? Theme.orbCyan : Theme.muted)
+                                        .foregroundStyle(mark(index).tint)
                                         .padding(.top, 1)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(item.title)
@@ -108,7 +121,7 @@ struct RiskNoticeView: View {
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(item.title)
-                            .accessibilityValue(readOnly || checks[index] ? L.t("acknowledged", "aceptado") : L.t("not acknowledged", "sin aceptar"))
+                            .accessibilityValue(value(index))
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -116,7 +129,7 @@ struct RiskNoticeView: View {
                                      "Bobby no publica tus preguntas."))
                                 .font(.mono(10, .medium))
                                 .foregroundStyle(Theme.muted)
-                            Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                            Link(destination: L.site("privacy")) {
                                 Text(L.t("Privacy Policy", "Aviso de privacidad"))
                                     .font(.mono(10, .medium))
                                     .underline()
@@ -157,7 +170,8 @@ struct RiskNoticeView: View {
                     .padding(.horizontal, 18)
                     .padding(.top, 8)
                     .padding(.bottom, 10)
-                } else if let onWithdraw {
+                } else if let onWithdraw, profile.acceptedRiskNotice {
+                    // Nothing to withdraw before consent was given.
                     Button(L.t("Withdraw AI consent", "Retirar consentimiento de IA"), role: .destructive) {
                         confirmsWithdrawal = true
                     }

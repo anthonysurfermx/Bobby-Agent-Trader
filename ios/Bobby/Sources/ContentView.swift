@@ -816,10 +816,10 @@ struct ContentView: View {
                     Button { showRiskNotice = true } label: {
                         Label(L.t("Risk notice", "Aviso de riesgo"), systemImage: "exclamationmark.triangle")
                     }
-                    Link(destination: URL(string: "https://bobbyprotocol.xyz/support")!) {
+                    Link(destination: L.site("support")) {
                         Label(L.t("Help and support", "Ayuda y soporte"), systemImage: "questionmark.circle")
                     }
-                    Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                    Link(destination: L.site("privacy")) {
                         Label(L.t("Privacy Policy", "Aviso de privacidad"), systemImage: "hand.raised")
                     }
                 }

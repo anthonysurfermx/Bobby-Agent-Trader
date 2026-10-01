@@ -124,9 +124,10 @@ private struct NucleoStage: View {
                          onVoiceMutedChange: { session.sessionChanged() },
                          onAIConsentWithdraw: { session.revokeRiskNoticeConsent() }) { session.sheet = nil }
         case .riskNotice:
+            // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,
                            onClose: { session.sheet = nil },
-                           onWithdraw: { session.revokeRiskNoticeConsent() })
+                           onWithdraw: session.profile.acceptedRiskNotice ? { session.revokeRiskNoticeConsent() } : nil)
         case .paywall:
             NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
                                afterSignIn: { await session.signedInFromSheet() },

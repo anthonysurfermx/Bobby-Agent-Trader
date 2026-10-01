@@ -577,6 +577,15 @@ final class NucleoDesk {
          "token": issueToken(asset, question: job.question, level: level, persist: persist), "level": level.rawValue]
     }
 
+    /// A read that failed after its asset was known (network, timeout, analysis_failed, desk_unavailable):
+    /// the honest error plus a single-use `retry` token — the same question, asset and level — so the page
+    /// offers "Try again" in one tap. The server refunds a read that failed (api/desk-debate.ts).
+    private func retryable(_ result: [String: Any], job: Job, asset: NucleoAsset) -> [String: Any] {
+        var out = result
+        out["retry"] = issueToken(asset, question: job.question, level: job.level)
+        return out
+    }
+
     private func levelRefused(_ code: String, meter: NucleoLevelMeter?, job: Job, asset: NucleoAsset) -> [String: Any] {
         let level = job.level
         meterChanged(level, meter)
@@ -754,7 +763,7 @@ final class NucleoDesk {
         switch candleRead {
         case let .failed(code):
             if code == .cancelled { return Self.cancelledResult }
-            return Self.errorResult(code == .timedOut ? "timeout" : "network")
+            return retryable(Self.errorResult(code == .timedOut ? "timeout" : "network"), job: job, asset: asset)
         case let .bars(rows):
             bars = rows
         }
@@ -827,15 +836,15 @@ final class NucleoDesk {
         if premiumFailed {
             meterChanged(level, nil)
             return levelNotice(caption: L.t("The agents didn’t finish.", "Los agentes no terminaron."),
-                               sub: L.t("Check your allowance before trying again.", "Revisa tu cupo antes de reintentar."),
+                               sub: L.t("Nothing was taken from your allowance.", "No se descontó nada de tu cupo."),
                                cta: L.t("Try again", "Reintentar"), level: level, persist: false, job: job, asset: asset)
         }
         switch desk {
         case .cancelled: return Self.cancelledResult
         case let .gated(status, message, access):
             return gated(status, message: message, access: access, job: job, asset: asset)
-        case .timeout: return Self.errorResult("timeout")
-        case .network: return Self.errorResult("network")
+        case .timeout: return retryable(Self.errorResult("timeout"), job: job, asset: asset)
+        case .network: return retryable(Self.errorResult("network"), job: job, asset: asset)
         case .badResponse: return Self.errorResult("bad_response")
         case let .levelRefused(code, meter):
             return levelRefused(code, meter: meter, job: job, asset: asset)
@@ -853,7 +862,8 @@ final class NucleoDesk {
         case let .tooLong(message):
             return ["v": 1, "status": "too_long", "maxLength": DeskQuestion.maxLength, "message": NucleoDeskIO.orNull(message)]
         case let .failed(code, message):
-            return Self.errorResult(code, message)
+            // Only the two transient desk codes reach here (parseDebate: analysis_failed, desk_unavailable).
+            return retryable(Self.errorResult(code, message), job: job, asset: asset)
         case let .ok(debate):
             guard isCurrent(job) else { return Self.cancelledResult }
             let receivedAt = clock.receivedAt(symbol)

@@ -120,6 +120,9 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #meta{left:20px;width:350px;text-align:center;font:400 12px/16px var(--sans);color:var(--ink3)}
 #hint{left:20px;width:350px;top:713px;text-align:center;color:var(--ink2);height:14px;opacity:1}
 #hint .roll>span{display:flex;justify-content:center;align-items:center;gap:6px}
+/* a failure line (a Sign in with Apple that did not finish) may need two lines: it wraps upward, never clipped */
+#hint .roll{height:14px}
+#hint .roll>span{white-space:normal;text-wrap:balance;flex-wrap:wrap;text-align:center;top:auto;bottom:0}
 #mer{width:390px;height:844px;opacity:1}
 #mer i{position:absolute;left:0;top:0;height:6px;width:6px;margin:-3px 0 0 -3px;border-radius:3px;background:var(--ink4);opacity:0}
 #pglow{width:270px;height:78px;border-radius:40px;background:conic-gradient(from var(--ga,0deg),#4D6BFF,#9A5CFF,#FF6EC7,#5CE1FF,#4D6BFF);filter:blur(22px);z-index:3}
@@ -207,7 +210,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #typeBox.on{display:flex}
 #typeIn{flex:1;min-height:36px;max-height:120px;resize:none;border:0;outline:0;background:transparent;color:#F2EDE4;font:400 17px/22px -apple-system,system-ui,sans-serif;
   padding:7px 0;-webkit-user-select:text;user-select:text;touch-action:auto;caret-color:#FFF8EC}
-#typeIn::placeholder{color:#8A8378}
+#typeIn::placeholder{color:#8A8378;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #typeSend{flex:none;width:40px;height:40px;border-radius:20px;background:#F2EDE4;color:#141210;display:grid;place-items:center;touch-action:manipulation}
 #typeSend[disabled]{opacity:.35}
 </style>

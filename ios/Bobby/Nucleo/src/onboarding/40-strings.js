@@ -87,7 +87,7 @@ var STR = {
     'hint.type': 'Escribe tu pregunta',
     'hint.sttEmpty': 'No te escuché · Mantén e intenta de nuevo',
     'hint.sttError': 'El micrófono se detuvo · Mantén para intentar',
-    'type.placeholder': 'Pregunta por una acción o una cripto',
+    'type.placeholder': 'Pregunta por una acción o cripto',
     'type.send': 'Enviar',
     'risk.intro': 'Antes de responder, una cosa.',
     'risk.introOnly': 'Una cosa antes de seguir.',

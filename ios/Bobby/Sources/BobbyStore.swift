@@ -120,6 +120,8 @@ final class BobbyStore: NSObject, ObservableObject {
         Purchases.shared.delegate = self
         configured = true
         Task { await reconcile() }
+        // Preload the monthly package so the price is ready when the Bobby Pro sheet opens.
+        Task { await loadProduct() }
         AccountSession.shared.$session
             .map { $0?.userId }
             .removeDuplicates()
@@ -159,6 +161,8 @@ final class BobbyStore: NSObject, ObservableObject {
     func loadProduct() async {
         guard configured else { productState = .notConfigured; return }
         if package != nil { productState = .loaded; return }
+        // The launch preload and the sheet's own call can overlap: one offerings request at a time.
+        guard productState != .loading else { return }
         productState = .loading
         do {
             let offerings = try await Purchases.shared.offerings()
@@ -254,8 +258,9 @@ final class BobbyStore: NSObject, ObservableObject {
         case let .accepted(access):
             guard access?.isPro == true else { return .failed(Copy.notLinked) }
             return .subscribed
-        case let .rejected(message):
-            return .failed(message ?? Copy.notLinked)
+        case .rejected:
+            // The server's refusal is logged there; the person sees Bobby's own words, in their language.
+            return .failed(Copy.notLinked)
         case .signedOut:
             return .needsSignIn
         case .unreachable:
@@ -294,11 +299,31 @@ final class BobbyStore: NSObject, ObservableObject {
         }
     }
 
+    /// Bobby Pro can actually be bought here: RevenueCat has the package and Bobby's server takes App
+    /// Store payments. The one gate for every Pro promise (invite rewards, the invite sheet's Pro card).
+    var proPurchasable: Bool { package != nil && access.applePayments == true }
+
     /// The price line: the package's localized price and its period ("$4.99 / month").
     func priceLine(spanish: Bool = L.isSpanish) -> String? {
         guard let package else { return nil }
         guard let period = periodName(spanish: spanish) else { return package.localizedPriceString }
         return package.localizedPriceString + " / " + period
+    }
+
+    /// Guideline 3.1.2, next to the price: how it renews and where to cancel, from the product's own period.
+    func renewsLine(spanish: Bool = L.isSpanish) -> String? {
+        guard let period = package?.storeProduct.subscriptionPeriod else { return nil }
+        return Self.renewsLine(value: period.value, unit: period.unit, spanish: spanish)
+    }
+
+    nonisolated static func renewsLine(value: Int, unit: SubscriptionPeriod.Unit, spanish: Bool) -> String {
+        let cancel = L.t("Cancel anytime in Settings › Apple Account › Subscriptions.",
+                         "Cancela cuando quieras en Configuración › Cuenta de Apple › Suscripciones.", spanish: spanish)
+        if value == 1, unit == .month {
+            return L.t("Renews monthly until you cancel.", "La suscripción se renueva cada mes hasta que la canceles.", spanish: spanish) + " " + cancel
+        }
+        let period = periodName(value: value, unit: unit, spanish: spanish)
+        return L.t("Renews every \(period) until you cancel.", "La suscripción se renueva cada \(period) hasta que la canceles.", spanish: spanish) + " " + cancel
     }
 
     /// "month" / "mes" for the renewal terms (nil when the product has no period).
@@ -328,6 +353,21 @@ final class BobbyStore: NSObject, ObservableObject {
         static var unreachable: String {
             L.t("Bobby couldn’t confirm your subscription right now. Tap Restore Purchases in a moment.",
                 "Bobby no pudo confirmar tu suscripción ahora. Toca Restaurar compras en un momento.")
+        }
+        /// The one Bobby Pro benefit statement (server LEVEL_LIMITS.pro; Quick rides the unmetered read).
+        static var benefits: String { benefits(spanish: L.isSpanish) }
+        static func benefits(spanish: Bool) -> String {
+            L.t("Unlimited Quick reads (fair use) · 60 Deep and 10 Max every 30 days",
+                "Lecturas Rápidas ilimitadas (uso justo) · 60 Profundo y 10 Máximo cada 30 días", spanish: spanish)
+        }
+        static var signInFirst: String { L.t("Sign in first: Bobby Pro belongs to your Bobby account.", "Primero inicia sesión: Bobby Pro queda en tu cuenta de Bobby.") }
+        static var restored: String { L.t("Bobby Pro is active on your account.", "Bobby Pro está activo en tu cuenta.") }
+        static var nothingToRestore: String {
+            L.t("No active Bobby Pro subscription on this Apple Account.", "No hay una suscripción activa de Bobby Pro en esta cuenta de Apple.")
+        }
+        static var pending: String {
+            L.t("Waiting for approval. Bobby Pro starts as soon as the App Store confirms it.",
+                "Esperando aprobación. Bobby Pro empieza en cuanto la App Store lo confirme.")
         }
     }
 

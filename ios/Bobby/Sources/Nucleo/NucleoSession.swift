@@ -518,9 +518,7 @@ final class NucleoSession: ObservableObject {
     private var inviteWantsPro = false
 
     /// Bobby Pro can be bought in this build only when RevenueCat has the package and the server takes App Store payments.
-    var proPurchasable: Bool {
-        !fixtures && BobbyStore.shared.package != nil && BobbyAccessCenter.shared.applePayments == true
-    }
+    var proPurchasable: Bool { !fixtures && BobbyStore.shared.proPurchasable }
 
     func inviteChosePro() {
         inviteWantsPro = true
