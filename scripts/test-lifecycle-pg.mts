@@ -1,7 +1,8 @@
 // Actual PostgreSQL regressions for 20261001200000_lifecycle_funnel.sql: device touches (first touch kept, a new
 // UTC day adds an active day, the account link is timed), events recorded with their device, guest reads touching
 // the device, the cohort funnel per platform with retention, and lifecycle stages per person. Needs the schema
-// prepared by scripts/test-trader-land-growth.sql.
+// prepared by scripts/test-trader-land-growth.sql. Also 20261001220000_audience_geo.sql: coarse web location on
+// events and devices, never on iOS, and the audience view by country, region and purchase country.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -24,6 +25,7 @@ const MIGRATIONS = [
   '20261001180000_admin_dashboard.sql',
   '20261001200000_lifecycle_funnel.sql',
   '20261001210000_admin_audit_fixes.sql',
+  '20261001220000_audience_geo.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
@@ -63,7 +65,7 @@ try {
   // ---------- privileges ----------
   for (const role of ['anon', 'authenticated']) {
     for (const priv of ['select', 'insert', 'update', 'delete']) eq((await pool.query('select has_table_privilege($1, $2, $3) as r', [role, 'public.bobby_devices', priv])).rows[0].r, false, `${role} has no ${priv} on bobby_devices`);
-    for (const fn of ['public.bobby_touch_device(text,text,text,text,text,uuid)', 'public.bobby_record_event(text,text,text,text,text,text)', 'public.bobby_admin_lifecycle(integer)']) {
+    for (const fn of ['public.bobby_touch_device(text,text,text,text,text,uuid,text,text)', 'public.bobby_record_event(text,text,text,text,text,text,text,text)', 'public.bobby_admin_lifecycle(integer)', 'public.bobby_admin_geo(integer)']) {
       eq((await pool.query('select has_function_privilege($1, $2, $3) as r', [role, fn, 'execute'])).rows[0].r, false, `${role} cannot execute ${fn}`);
     }
   }
@@ -154,6 +156,48 @@ try {
   // ---------- cascades ----------
   await pool.query('delete from public.bobby_identities where id = $1', [ana]);
   eq((await device(a)).identity_id, null, 'deleting the account unlinks the device');
+
+  // ---------- audience location ----------
+  eq((await pool.query("select count(*)::int n from pg_proc where proname in ('bobby_touch_device', 'bobby_record_event')")).rows[0].n, 2, 'one signature each (old 6-arg versions dropped)');
+  await pool.query('truncate public.bobby_devices, public.bobby_events, public.bobby_reader_stats, public.bobby_purchase_events restart identity cascade');
+  const geoEvent = (event: string, platform: string, d: string, country: string | null, region: string | null) =>
+    pool.query('select public.bobby_record_event($1, $2, $3, $4, null, null, $5, $6)', [event, platform, 'home', d, country, region]);
+  const g1 = dev(), g2 = dev(), g3 = dev(), g4 = dev(), gi = dev();
+  await geoEvent('visit', 'web', g1, 'mx', 'cmx');
+  const ev = (await pool.query('select country, region from public.bobby_events where device_hash = $1', [g1])).rows[0];
+  eq([ev.country, ev.region, (await device(g1)).country, (await device(g1)).region], ['MX', 'CMX', 'MX', 'CMX'], 'web visit keeps country + region, upper-cased');
+  await geoEvent('visit', 'web', g2, 'MX', 'JAL');
+  await geoEvent('visit', 'web', g3, 'XX', 'ABC');
+  eq([(await device(g3)).country, (await device(g3)).region], [null, null], 'unknown country (XX) is dropped with its region');
+  await geoEvent('visit', 'web', g4, 'US', 'toolong');
+  eq([(await device(g4)).country, (await device(g4)).region], ['US', null], 'a malformed region is dropped, the country kept');
+  await geoEvent('visit', 'ios', gi, 'MX', 'CMX');
+  const iosEv = (await pool.query('select country, region from public.bobby_events where device_hash = $1', [gi])).rows[0];
+  eq([iosEv.country, (await device(gi)).country], [null, null], 'iOS events never keep a location');
+  await pool.query('select public.bobby_touch_device($1, $2, null, null, null, null, $3, $4)', [g4, 'web', 'CA', 'QC']);
+  eq([(await device(g4)).country, (await device(g4)).region], ['CA', 'QC'], 'the latest known location wins');
+  await touch(g4, 'web');
+  eq([(await device(g4)).country, (await device(g4)).region], ['CA', 'QC'], 'a touch without location keeps the last one');
+  await guestRead(g1, 'web');
+  eq((await device(g1)).country, 'MX', 'a guest read (6-arg touch from the trigger) keeps the location');
+  const gAcct = await account();
+  await pool.query('select public.bobby_touch_device($1, $2, null, null, null, $3)', [g2, 'web', gAcct]);
+  await assert.rejects(pool.query("insert into public.bobby_events(event, platform, country) values ('visit', 'web', 'mex')"), /check/i, 'country must be alpha-2');
+  checks++;
+  await pool.query(`insert into public.bobby_purchase_events(id, type, environment, price_usd, event_at, country) values
+    ('g1', 'INITIAL_PURCHASE', 'PRODUCTION', 4.99, now(), 'MX'), ('g2', 'RENEWAL', 'PRODUCTION', 4.99, now(), 'MX'),
+    ('g3', 'INITIAL_PURCHASE', 'SANDBOX', 4.99, now(), 'US'), ('g4', 'INITIAL_PURCHASE', 'PRODUCTION', 4.99, now(), null),
+    ('g5', 'INITIAL_PURCHASE', 'PRODUCTION', 4.99, now() - interval '90 days', 'ES')`);
+  const geo = (await pool.query('select public.bobby_admin_geo(30) as r')).rows[0].r;
+  eq([geo.web.devices, geo.web.located], [4, 3], 'web cohort and how many have a location (iOS excluded)');
+  eq(geo.countries, [
+    { country: 'MX', visitors: 2, readers: 1, accounts: 1, pro: 0 },
+    { country: 'CA', visitors: 1, readers: 0, accounts: 0, pro: 0 },
+  ], 'countries: visitors, readers, accounts, Pro');
+  eq(geo.regions.map((r: { country: string; region: string; visitors: number }) => `${r.country}-${r.region}:${r.visitors}`), ['CA-QC:1', 'MX-CMX:1', 'MX-JAL:1'], 'regions');
+  eq(geo.purchases, [{ country: '??', newPaying: 1, grossUsd: 4.99 }, { country: 'MX', newPaying: 1, grossUsd: 9.98 }].sort((x, y) => y.newPaying - x.newPaying || x.country.localeCompare(y.country)),
+    'purchases by store country: production, in the window, unknown country as ??');
+  ok(geo.locatedSince, 'first located event time');
 
   console.log(`lifecycle-pg: ${checks} checks passed`);
 } finally {

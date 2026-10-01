@@ -15,6 +15,7 @@ import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './rate-limit.js';
 import { resolveIdentity, type Identity } from './user-identity.js';
 import { LEVEL_LIMITS, type PremiumLevel } from './desk-levels.js';
+import { requestGeo } from './geo.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
 /** `bonus`: reads gifted by coupons (bobby_usage_bonus), spent after the weekly allowance. Not part of `remaining`:
@@ -95,9 +96,13 @@ export async function consumeRead(req: VercelRequest, symbol: string, options: {
 export async function touchDevice(req: VercelRequest, identity: Identity | null): Promise<void> {
   const device = deviceHash(req);
   if (!device) return;
+  const platform = clientPlatform(req);
+  // Location only for the web: the iOS app's privacy label declares no location data.
+  const geo = platform === 'web' ? requestGeo(req) : null;
   await rpc('bobby_touch_device', {
-    p_device: device, p_platform: clientPlatform(req), p_surface: null, p_referrer: null, p_utm: null,
+    p_device: device, p_platform: platform, p_surface: null, p_referrer: null, p_utm: null,
     p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
+    ...(geo ? { p_country: geo.country, p_region: geo.region } : {}),
   });
 }
 

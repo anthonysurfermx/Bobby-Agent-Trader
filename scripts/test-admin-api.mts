@@ -16,6 +16,7 @@ for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_N
 const { default: adminHandler } = await import('../api/admin.ts');
 const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
 const { parseSalesReport, ascVendor, ascKeyId, ascIssuer } = await import('../api/_lib/admin.ts');
+const { requestGeo, fromAlpha3, countryCode } = await import('../api/_lib/geo.ts');
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 let checks = 0;
@@ -70,6 +71,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('/auth/v1/admin/users/')) return json({});
   if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
   if (c.url.includes('rpc/bobby_record_event')) return new Response(null, { status: 204 });
+  if (c.url.includes('rpc/bobby_admin_geo')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3, located: 2 }, countries: [{ country: 'MX', visitors: 2 }], regions: [], purchases: [] });
   if (c.url.includes('rpc/bobby_admin_lifecycle')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3 }, ios: { devices: 1 }, stages: { total: 4 } });
   if (c.url.includes('rpc/bobby_admin_economics')) return json({ days: 30, since: '2026-09-02T00:00:00Z',
     revenue: { grossUsd: 49.9, netUsd: 42.415, refundsUsd: 0, newPaying: 10, initialPurchases30d: 10, expirations30d: 0, lastPriceUsd: 4.99, takehome: 0.85 },
@@ -180,10 +182,10 @@ try {
 
   // ---------- App Store sales report ----------
   const header = 'Provider\tProvider Country\tSKU\tDeveloper\tTitle\tVersion\tProduct Type Identifier\tUnits\tDeveloper Proceeds\tBegin Date\tEnd Date\tCustomer Currency\tCountry Code\tCurrency of Proceeds\tApple Identifier\tCustomer Price\tPromo Code\tParent Identifier';
-  const row = (type: string, units: number, apple: string, parent = '') => ['APPLE', 'US', 'sku', 'dev', 'Bobby', '1.5', type, units, '0', '', '', 'USD', 'MX', 'USD', apple, '0', '', parent].join('\t');
-  const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1F', 9, '999'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'),
+  const row = (type: string, units: number, apple: string, parent = '', cc = 'MX') => ['APPLE', 'US', 'sku', 'dev', 'Bobby', '1.5', type, units, '0', '', '', 'USD', cc, 'USD', apple, '0', '', parent].join('\t');
+  const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1', 3, '6804460489', '', 'es'), row('1F', 9, '999', '', 'US'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'),
     row('IAY', 1, '6817775464', 'bobby.sku'), row('IAY', 9, '555', 'other.app.sku')].join('\n'), '6804460489', new Set(['6817775464']));
-  eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; only our subscription counts as IAP');
+  eq(sales, { downloads: 7, redownloads: 2, updates: 5, iap: 1, countries: { MX: 4, ES: 3 } }, 'downloads of this app only, by storefront country; only our subscription counts as IAP');
   assert.throws(() => parseSalesReport('garbage', '1')); checks++;
 
   // ---------- lifecycle and unit economics ----------
@@ -215,6 +217,17 @@ try {
   eq(ascKeyId('-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG\n-----END PRIVATE KEY-----'), '', 'a private key is not a key id');
   eq(ascIssuer(' bccd998d-3e28-47e6-8e08-bf1894bc6070 \n'), 'bccd998d-3e28-47e6-8e08-bf1894bc6070', 'the issuer id');
 
+  // ---------- audience location ----------
+  eq(requestGeo({ headers: { 'x-vercel-ip-country': 'mx', 'x-vercel-ip-country-region': 'cmx', 'x-vercel-ip-city': 'Coyoac%C3%A1n' } }), { country: 'MX', region: 'CMX' }, 'country + region from Vercel, never the city');
+  eq(requestGeo({ headers: { 'x-vercel-ip-country-region': 'CMX' } }), { country: null, region: null }, 'no region without a country');
+  eq(requestGeo({ headers: { 'x-vercel-ip-country': 'XX', 'x-vercel-ip-country-region': 'A' } }), { country: null, region: null }, 'unknown country');
+  eq([fromAlpha3('mex'), fromAlpha3('USA'), fromAlpha3('abw'), fromAlpha3('zzz'), fromAlpha3('x')], ['MX', 'US', 'ABW', null, null], 'Search Console alpha-3 → alpha-2, unknown passes through');
+  eq([countryCode('br'), countryCode('BRA'), countryCode(7)], ['BR', null, null], 'store country codes');
+  const aud = await call('GET', 'Bearer admin-token', { view: 'audience', days: '30' });
+  eq([aud.statusCode, aud.body.geo.web.located, aud.body.geo.countries[0].country], [200, 2, 'MX'], 'audience view: first-party location');
+  eq([aud.body.searchConsole.configured, aud.body.appStore.configured], [false, false], 'audience view: providers report whether they are connected');
+  eq((await call('GET', 'Bearer user-token', { view: 'audience' })).statusCode, 403, 'audience is admin only');
+
   // ---------- track ----------
   const t = normalizeEvent({ event: 'visit', surface: 'desk', device: '0d6e4a52-7c1b-4f0e-9a51-2b7e1c9d3f10', referrer: 'https://www.X.com/some/path?q=secret', utm: 'Newsletter' })!;
   eq([t.event, t.platform, t.surface, t.referrer, t.utm_source], ['visit', 'web', 'desk', 'x.com', 'newsletter'], 'host only, lowercase');
@@ -224,10 +237,15 @@ try {
   eq(normalizeEvent({ event: 'visit', surface: '../../etc', device: 'short' })!.surface, null, 'bad surface dropped');
   calls = [];
   const tr = response();
-  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.1' } } as never, tr as never);
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.1', 'x-vercel-ip-country': 'MX', 'x-vercel-ip-country-region': 'JAL' } } as never, tr as never);
   eq(tr.statusCode, 204, 'a beacon (text/plain body) is accepted');
   const stored = calls.find((c) => c.url.includes('rpc/bobby_record_event'))?.body;
-  eq([stored?.p_event, stored?.p_surface, stored?.p_platform], ['appstore_click', 'home', 'web'], 'stored with its device touch in one call');
+  eq([stored?.p_event, stored?.p_surface, stored?.p_platform, stored?.p_country, stored?.p_region], ['appstore_click', 'home', 'web', 'MX', 'JAL'], 'stored with its device touch and coarse location in one call');
+  ok(!JSON.stringify(stored).includes('10.1.1.1'), 'the IP is never stored');
+  calls = [];
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', platform: 'ios' }), headers: { 'x-forwarded-for': '10.1.1.3', 'x-vercel-ip-country': 'MX' } } as never, response() as never);
+  const iosStored = calls.find((c) => c.url.includes('rpc/bobby_record_event'))?.body;
+  eq([iosStored?.p_platform, 'p_country' in (iosStored ?? {})], ['ios', false], 'iOS events carry no location');
   const bad = response();
   await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
   eq(bad.statusCode, 400, 'unknown events are refused');

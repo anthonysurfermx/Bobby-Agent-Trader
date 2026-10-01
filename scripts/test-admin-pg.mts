@@ -24,6 +24,7 @@ const MIGRATIONS = [
   '20261001180000_admin_dashboard.sql',
   '20261001200000_lifecycle_funnel.sql',
   '20261001210000_admin_audit_fixes.sql',
+  '20261001220000_audience_geo.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;

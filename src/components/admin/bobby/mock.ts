@@ -407,6 +407,47 @@ function lifecycle(days: number, bare: boolean) {
   };
 }
 
+function audience(days: number, bare: boolean) {
+  const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
+  const k = n / 30;
+  const r = (v: number) => Math.round(v * k);
+  const since = iso(new Date(`${tail(ALL_DAYS, n)[0]}T00:00:00`).getTime());
+  if (bare) {
+    return { geo: { since, days: n, locatedSince: null, web: { devices: 0, located: 0 }, countries: [], regions: [], purchases: [] },
+      searchConsole: { configured: false, error: null, countries: null }, appStore: { configured: false, error: null, countries: null } };
+  }
+  const countries = [
+    { country: 'MX', visitors: r(1840), readers: r(402), accounts: r(58), pro: Math.max(1, r(3)) },
+    { country: 'US', visitors: r(520), readers: r(96), accounts: r(14), pro: Math.max(1, r(1)) },
+    { country: 'CO', visitors: r(310), readers: r(61), accounts: r(7), pro: 0 },
+    { country: 'AR', visitors: r(212), readers: r(38), accounts: r(5), pro: 0 },
+    { country: 'ES', visitors: r(168), readers: r(31), accounts: r(4), pro: 0 },
+    { country: 'CL', visitors: r(94), readers: r(17), accounts: r(2), pro: 0 },
+    { country: 'PE', visitors: r(71), readers: r(12), accounts: r(1), pro: 0 },
+  ];
+  return {
+    geo: {
+      since, days: n, locatedSince: '2026-10-01T21:00:00Z',
+      web: { devices: r(3400), located: sum(countries.map((c) => c.visitors)) },
+      countries,
+      regions: [
+        { country: 'MX', region: 'CMX', visitors: r(712), readers: r(164) }, { country: 'MX', region: 'JAL', visitors: r(301), readers: r(70) },
+        { country: 'MX', region: 'NLE', visitors: r(244), readers: r(51) }, { country: 'MX', region: 'MEX', visitors: r(198), readers: r(39) },
+        { country: 'US', region: 'TX', visitors: r(141), readers: r(27) }, { country: 'MX', region: 'PUE', visitors: r(96), readers: r(18) },
+        { country: 'US', region: 'CA', visitors: r(88), readers: r(15) }, { country: 'CO', region: 'DC', visitors: r(84), readers: r(16) },
+      ],
+      purchases: [{ country: 'MX', newPaying: Math.max(1, r(7)), grossUsd: r(64.87) }, { country: 'US', newPaying: Math.max(1, r(3)), grossUsd: r(24.95) }, { country: '??', newPaying: 1, grossUsd: 4.99 }],
+    },
+    searchConsole: { configured: true, error: null, countries: [
+      { country: 'MX', clicks: r(702), impressions: r(17640) }, { country: 'US', clicks: r(198), impressions: r(6120) },
+      { country: 'CO', clicks: r(121), impressions: r(3310) }, { country: 'ES', clicks: r(77), impressions: r(2804) }, { country: 'ARG', clicks: r(12), impressions: r(390) },
+    ] },
+    appStore: { configured: true, error: null, countries: [
+      { country: 'MX', downloads: r(241) }, { country: 'US', downloads: r(88) }, { country: 'CO', downloads: r(31) }, { country: 'ES', downloads: r(19) },
+    ] },
+  };
+}
+
 function members() {
   const subscriptions = USERS.filter((u) => u.sub_status).map((u) => ({
     identityId: u.id, email: u.email, provider: u.sub_provider, status: u.sub_status,
@@ -553,6 +594,9 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
     case 'actions': return json({ actions: ACTIONS, total: ACTIONS.length + 40 });
     case 'members': return json(members());
     case 'lifecycle': return json(lifecycle(Number(query?.get('days') ?? 30), bare));
+    case 'audience': return json(partial
+      ? { ...audience(Number(query?.get('days') ?? 30), false), appStore: { configured: true, error: 'appstore 401', countries: null } }
+      : audience(Number(query?.get('days') ?? 30), bare));
     case 'costs': return json({ costs: [...COSTS].sort((x, y) => y.spent_on.localeCompare(x.spent_on) || y.id - x.id) });
     default: return json({ error: 'unknown_view' }, 400);
   }

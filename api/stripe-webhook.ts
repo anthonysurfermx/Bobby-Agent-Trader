@@ -83,12 +83,14 @@ export async function POST(request: Request): Promise<Response> {
         id: event.id, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
         store: 'STRIPE', priceUsd: usd, takehome: usd !== null ? stripeTakehome(usd) : null, currency: String(obj.currency ?? '').toUpperCase() || null,
         priceLocal: Number(obj.amount_paid) / 100, identityId: await identityForSubscription(subscription), at: Number(obj.created) * 1000 || null,
+        country: (obj.customer_address as { country?: string } | null | undefined)?.country ?? null,
       });
     } else if (event.type === 'charge.refunded' && typeof event.id === 'string' && Number(obj.amount_refunded) > 0) {
       const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? -Number(obj.amount_refunded) / 100 : null;
       await recordPurchaseEvent({
         id: event.id, type: 'REFUND', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE', priceUsd: usd,
         takehome: 1, currency: String(obj.currency ?? '').toUpperCase() || null, priceLocal: -Number(obj.amount_refunded) / 100, at: Date.now(),
+        country: (obj.billing_details as { address?: { country?: string } } | null | undefined)?.address?.country ?? null,
       });
     }
   } catch (e) {

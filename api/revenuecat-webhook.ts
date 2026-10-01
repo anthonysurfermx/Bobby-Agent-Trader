@@ -25,7 +25,7 @@ interface RevenueCatEvent {
   id?: string; type?: string; app_user_id?: string; original_app_user_id?: string; aliases?: string[];
   transferred_to?: string[]; transferred_from?: string[]; environment?: string; store?: string; product_id?: string;
   price?: number | null; takehome_percentage?: number | null; commission_percentage?: number | null; tax_percentage?: number | null;
-  currency?: string | null; price_in_purchased_currency?: number | null; event_timestamp_ms?: number;
+  currency?: string | null; price_in_purchased_currency?: number | null; event_timestamp_ms?: number; country_code?: string | null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: event.id, type: event.type, environment: event.environment, store: event.store, productId: event.product_id,
         priceUsd: event.price, takehome: event.takehome_percentage, commissionPct: event.commission_percentage, taxPct: event.tax_percentage,
         currency: event.currency, priceLocal: event.price_in_purchased_currency, identityId: firstIdentity, at: event.event_timestamp_ms,
+        country: event.country_code,
       });
     }
   } catch (e) {

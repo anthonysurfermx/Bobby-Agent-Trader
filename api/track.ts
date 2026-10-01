@@ -5,11 +5,13 @@
 //   event: visit | appstore_click | signin_start | paywall_view | purchase_start
 // The install id is stored as the same salted hash the read meter uses (api/_lib/access.ts), so a visit and
 // a later guest read of the same browser line up; no IP, user agent, URL path beyond a short surface name,
-// or free text is kept. Referrers keep their host only.
+// or free text is kept. Referrers keep their host only. Web events keep the country and region Vercel derives
+// from the IP (api/_lib/geo.ts); the IP itself is not stored.
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { createLimiter, getClientIpKey, saltedKey } from './_lib/rate-limit.js';
+import { requestGeo } from './_lib/geo.js';
 
 export const config = { maxDuration: 10 };
 
@@ -46,10 +48,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   catch { return res.status(400).json({ error: 'Invalid JSON' }); }
   const row = normalizeEvent(raw);
   if (!row) return res.status(400).json({ error: 'Unknown event' });
+  const geo = requestGeo(req);
   try {
     const r = await fetch(bobbyRest('rpc/bobby_record_event'), {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
-      body: JSON.stringify({ p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source }),
+      body: JSON.stringify({
+        p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source,
+        ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}),
+      }),
     });
     if (!r.ok) console.error('[track] insert', r.status);
   } catch (e) {
