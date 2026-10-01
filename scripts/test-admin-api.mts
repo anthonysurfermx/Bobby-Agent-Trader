@@ -15,7 +15,7 @@ for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_N
 
 const { default: adminHandler } = await import('../api/admin.ts');
 const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
-const { parseSalesReport } = await import('../api/_lib/admin.ts');
+const { parseSalesReport, ascVendor, ascKeyId, ascIssuer } = await import('../api/_lib/admin.ts');
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 let checks = 0;
@@ -162,6 +162,13 @@ try {
   const sales = parseSalesReport([header, row('1F', 4, '6804460489'), row('1F', 9, '999'), row('3F', 2, '6804460489'), row('7F', 5, '6804460489'), row('IAY', 1, '6817775464', 'bobby.sku')].join('\n'), '6804460489');
   eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; updates and subscriptions apart');
   eq(parseSalesReport('garbage', '1'), { downloads: 0, redownloads: 0, updates: 0, iap: 0 }, 'an unreadable report');
+
+  // ---------- App Store env values pasted with extra text ----------
+  eq(ascVendor('GUILLERMO ANTHONY CHAVEZ\n89123456\n'), '89123456', 'the vendor number is the digits');
+  eq(ascVendor(''), '', 'no vendor number');
+  eq(ascKeyId('NY8UQFG6TM\n'), 'NY8UQFG6TM', 'the key id without a line break');
+  eq(ascKeyId('-----BEGIN PRIVATE KEY-----\nMIGTAgEAMBMG\n-----END PRIVATE KEY-----'), '', 'a private key is not a key id');
+  eq(ascIssuer(' bccd998d-3e28-47e6-8e08-bf1894bc6070 \n'), 'bccd998d-3e28-47e6-8e08-bf1894bc6070', 'the issuer id');
 
   // ---------- track ----------
   const t = normalizeEvent({ event: 'visit', surface: 'desk', device: '0d6e4a52-7c1b-4f0e-9a51-2b7e1c9d3f10', referrer: 'https://www.X.com/some/path?q=secret', utm: 'Newsletter' })!;
