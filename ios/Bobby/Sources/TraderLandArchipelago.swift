@@ -498,6 +498,7 @@ enum ArchipelagoFixture {
     /// Three of them have grown (10, 12, 16) with their pieces shifted like a server growth step,
     /// and two carry a moved core (one still dormant).
     static func islands(now: Date = Date()) -> [PublicIsland] {
+        guard let fixture = RuntimeBundle.fixture else { return [] }
         let titles: [String?] = ["Harbor of Patience", "Quiet Reef", nil, "Three Gates", "Night Ledger"]
         let sizes = [8, 8, 10, 12, 16]
         let cores: [PublicIsland.Core?] = [nil, .init(x: 3, y: 3, stage: 1), .init(x: 1, y: 6, stage: 0), .init(x: 8, y: 2, stage: 1), .init(x: 7, y: 7, stage: 1)]
@@ -524,7 +525,7 @@ enum ArchipelagoFixture {
                 placements.append(.init(item_id: id, x: col, y: row, rotation: rotation))
                 return true
             }
-            for placement in RuntimeBundle.fixture.placements.dropFirst(k == 4 ? 2 : 0) {
+            for placement in fixture.placements.dropFirst(k == 4 ? 2 : 0) {
                 let rotation = placement.orientation == .nwSE ? 90 : 0
                 switch k {
                 case 1: _ = place(placement.itemId, placement.row + shift, placement.col + shift, 90 - rotation)

@@ -1,0 +1,24 @@
+Window: "Unknown", App: Xcode.
+0 sheet Secondary Actions: Raise
+	1 button (disabled) Cancel
+	2 button Done
+	3 button (disabled) Previous
+	4 text Description: Distribution Step Title, Value: App upload complete:
+	5 image
+	6 text Bobby 1.5 (47) uploaded Show in App Store Connect
+	7 button Open App Store Connect
+	8 button Export…
+9 menu bar
+	10 Xcode
+	11 File
+	12 Edit
+	13 View
+	14 Find
+	15 Navigate
+	16 Editor
+	17 Product
+	18 Integrate
+	19 Window
+	20 Help
+
+The focused UI element is 0 sheet Secondary Actions: Raise

@@ -1,0 +1,39 @@
+Bobby 1.5 (build 45) is an educational market-analysis app for stocks and crypto. Its interactive sphere presents Alpha Hunter, Red Team and CIO perspectives, with Wait or Review outcomes. It does not execute trades, connect wallets, move funds, hold assets or private keys, or offer paid in-app purchases in this release.
+
+Accounts and access:
+- A limited Quick allowance, local saved theses, companion customization and local progress work without an account. The app displays remaining usage and explains when an account is required.
+- Sign in with Apple unlocks account-backed progress, Trader Land and the applicable Deep/Max allowances. Allowances and reset periods are shown in the analysis-level selector. This is not a promise of unlimited premium reads.
+- The optional Invite friends promotion can grant temporary Pro access after an eligible friend creates an account through the invitation link. Promotional Pro has an expiry and is not an Apple subscription. A person can continue with available lower analysis levels without inviting anyone.
+- Paid Apple/RevenueCat purchases are disabled in this build. No external payment or subscription purchase is required to use the available app features.
+
+First launch:
+1. Browse the companions in the sphere and choose one.
+2. Tap the question button to type, or hold it to dictate. The in-app explanation precedes the optional iOS microphone and speech-recognition prompts. Declining permission or unavailable on-device recognition keeps typed questions available.
+3. The risk notice identifies the data sent to external AI and the educational scope. Accept all four statements using Hold to agree. Build 45 requires renewed consent for the updated provider disclosure before processing analysis or generated speech.
+4. Ask “How is NVIDIA looking?” or “What should I watch in Bitcoin?”. Quick uses OpenAI; Deep uses OpenAI plus Anthropic; Max uses Anthropic. The backend sends question text and public market context, not microphone recordings, to these providers.
+5. The result includes market context, a chart, source timestamp and an educational verdict. A Wait result is expected when evidence does not support a clear conditional idea. Network failure or exhausted usage produces a visible explanation.
+6. Open the full debate and Save thesis. Signed-out saved theses stay on this device; an optional Apple sign-in prompt can be dismissed.
+
+Voice and consent:
+- Dictation requires on-device Apple recognition. Microphone audio is not uploaded or saved. Capture stops on release, backgrounding or the 60-second cap. If unsupported, type instead.
+- With narration enabled, reply text, language, avatar voice/style are sent to OpenAI or Microsoft to synthesize speech. Mute narration in Profile or Squad; the choice is remembered.
+- Tap the top-right companion avatar to open Profile. Risk notice lets a person withdraw AI consent. Future analysis and generated speech stop until consent is granted again; the account and saved local data are not deleted. The full notice includes privacy/support links.
+- The bundled interface uses system fonts and does not request Google Fonts.
+
+Account and deletion:
+- Profile offers Sign in with Apple as the only release sign-in method. It requests the name for a local greeting; the given name is account-scoped on this iPhone and is not uploaded by the app. The app does not request Apple’s email scope. Existing shared website account data can still include an email at the authentication service.
+- When signed in, Profile shows Sign out on this phone and Delete account. Confirm Delete account permanently. Apple may request renewed authorization for revocation. Successful deletion removes the account, synced progress and Trader Land; cancellation and service failure show an explanation. Signing out alone does not delete the account.
+
+Trader Land:
+- Open Isla in the sphere or Trader Land in Profile. Private construction is distinct from optional public publication.
+- Publish island explains OpenAI moderation of the island name. Offensive names and contact links are rejected; unavailable moderation does not publish unreviewed custom names.
+- While visiting a public island, use Report or block creator. Reports go to a private moderation queue; local blocking hides the creator’s island and persists across relaunch. Community safety offers unblock and rules/support links. The built-in Satoshi Nakamoto island is a product showcase, not a user account.
+- The support page includes a private support/privacy form, separate from public GitHub issues. It confirms submission only after persistence is acknowledged. Human moderation staffing and review response times are operational responsibilities; these notes do not claim a completed report-to-removal exercise.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en (Spanish: ?lang=es)
+Support: https://bobbyprotocol.xyz/support?lang=en (Spanish: ?lang=es)
+Languages: English and Spanish, following iOS app-language settings.
+
+China mainland (Guideline 5): this app should be excluded from the China mainland storefront because it uses external generative AI. Confirm the saved Availability selection before submission. Removing provider names from promotional metadata alone does not suppress the functionality.
+
+Authenticated reviewer access: the guest allowance covers Quick and local features only. Account-backed and premium-level review needs an Apple account and available allowance. Provide an authorized reviewer/demo account or an Apple-approved review method before submission; this document does not invent credentials or certify a completed physical-device authentication/deletion test.

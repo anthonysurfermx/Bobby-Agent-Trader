@@ -1,6 +1,6 @@
 // App fixture mode, `-nucleo-fixtures [scenario]` (Nucleo/ARCHITECTURE.md §4.4). DEBUG only.
 // A URLProtocol answers every request of the app process from the recorded captures in
-// Bundle.main/Nucleo/fixtures (copied there by `build.py` in dev builds), so the real
+// Bundle.main/Nucleo/fixtures (embedded by the Debug-only build phase), so the real
 // native pipeline — asset search, preflight, market, pulse, desk, mapping — runs end to
 // end without spending desk quota and without a single request leaving the process.
 #if DEBUG
@@ -8,7 +8,11 @@ import Foundation
 
 enum NucleoFixtures {
     static let scenarios: Set<String> = ["default", "slow", "hang", "quota", "too_long", "failed", "unavailable", "gateway_timeout", "offline",
-                                         "signin_required", "subscription_required"]
+                                         "signin_required", "subscription_required",
+                                         "levels", "upgrade_required", "level_exhausted", "budget_paused"]
+    /// Analysis levels (DEBUG QA): `levels` answers a premium desk with a synthesis, a second round, scenarios,
+    /// sufficiency and evidence; the other three refuse a premium level the way the server does.
+    static let levelScenarios: Set<String> = ["levels", "upgrade_required", "level_exhausted", "budget_paused"]
     static let refusals: Set<String> = ["quota", "too_long", "failed", "unavailable", "gateway_timeout"]
     /// Metered-read refusals (§8): voice-tool run_debate answers 401 / 402 from these captures.
     static let gates: Set<String> = ["signin_required", "subscription_required"]
@@ -173,6 +177,38 @@ enum NucleoFixtures {
         case "/api/desk-debate":
             if scenario == "hang" { return (.fail(.timedOut), 20) }
             let symbol = (json["symbol"] as? String ?? "").uppercased()
+            let level = json["level"] as? String ?? "rapido"
+            if levelScenarios.contains(scenario), level != "rapido" {
+                let meter: [String: Any] = ["used": level == "maximo" ? 1 : 3, "limit": level == "maximo" ? 1 : 3, "remaining": 0, "windowDays": 7,
+                                            "resetsAt": ISO8601DateFormatter().string(from: Date().addingTimeInterval(4 * 86_400))]
+                switch scenario {
+                case "upgrade_required", "level_exhausted":
+                    return (Self.json(403, ["error": "level refused", "code": scenario, "level": level, "meter": meter]), quick)
+                case "budget_paused":
+                    return (Self.json(503, ["error": "premium paused", "code": "budget_paused"]), quick)
+                default:
+                    guard let name = files(symbol: symbol)?["debate"], var body = raw(name)?["body"] as? [String: Any],
+                          var agents = body["agents"] as? [String: Any] else { return (Self.json(404, ["error": "not in fixtures"]), quick) }
+                    let es = (json["language"] as? String) == "es"
+                    agents["synthesis"] = [
+                        "headline": es ? "Tendencia firme, pero el precio ya está pegado a la resistencia." : "The trend is firm, but price is already pressed against resistance.",
+                        "why": es ? "Las medias de 4H y diario apuntan arriba y el funding está neutral." : "The 4H and daily averages point up and funding is neutral.",
+                        "risk": es ? "Un rechazo en la resistencia devuelve el precio al soporte de 1H." : "A rejection at resistance sends price back to the 1H support.",
+                        "watch": es ? "Un cierre de 4H por encima de la resistencia con volumen." : "A 4H close above resistance on volume.",
+                    ]
+                    if level == "maximo" {
+                        agents["rebuttal"] = es ? "Alpha responde: el rechazo ya se probó dos veces y el precio no perdió el soporte." : "Alpha answers: the rejection was tested twice and price never lost support."
+                        agents["scenarios"] = ["confirm": es ? "Cierre de 4H sobre la resistencia." : "A 4H close above resistance.",
+                                               "invalidate": es ? "Cierre de 4H bajo el soporte de 1H." : "A 4H close below the 1H support."]
+                    }
+                    body["agents"] = agents
+                    body["level"] = level
+                    body["sufficiency"] = ["horizon": "1w", "available": ["1H", "4H", "1D"], "missing": ["1W"], "sufficient": false]
+                    body["evidenceUsed"] = ["timeframes": ["1H", "4H", "1D"], "derivatives": true,
+                                            "record": ["resolvedCalls": 5, "wins": 3, "losses": 1, "breakEven": 1]]
+                    return (Self.json(200, body), min((raw(name)?["elapsedMs"] as? Double ?? 900) / 1000, 6))
+                }
+            }
             let served = refusals.contains(scenario) ? "desk-debate.\(scenario).json" : files(symbol: symbol)?["debate"]
             guard let served else { return (Self.json(404, ["error": "not in fixtures"]), quick) }
             // The recorded desk time, capped at 6 s (45 s under `slow`).
@@ -182,8 +218,20 @@ enum NucleoFixtures {
             // Fixture mode is signed out: the read of access answers from the scenario, a purchase needs an account.
             if method != "GET" { return (Self.json(401, ["error": "Sign in first.", "code": "signin_required"]), quick) }
             let gateBody = gates.contains(scenario) ? (raw("voice-tool.\(scenario).json")?["body"] as? [String: Any]) : nil
-            return (Self.json(200, ["access": gateBody?["access"] ?? NSNull(), "signedIn": false, "subscription": NSNull(),
-                                    "payments": ["stripe": false, "apple": true]]), quick)
+            var reply: [String: Any] = ["access": gateBody?["access"] ?? NSNull(), "signedIn": false, "subscription": NSNull(),
+                                        "payments": ["stripe": false, "apple": true]]
+            if levelScenarios.contains(scenario) {
+                let reset = ISO8601DateFormatter().string(from: Date().addingTimeInterval(4 * 86_400))
+                reply["levels"] = ["tier": "free", "levels": [
+                    "profundo": ["used": 1, "limit": 3, "remaining": 2, "windowDays": 7, "resetsAt": reset],
+                    "maximo": ["used": 0, "limit": 1, "remaining": 1, "windowDays": 7, "resetsAt": reset]]]
+                reply["referral"] = ["code": "BQ7K2MXP", "url": "https://bobbyprotocol.xyz/desk?ref=BQ7K2MXP", "accepted": 2, "max": 5,
+                                     "rewardDays": 30, "proUntil": NSNull()]
+                reply["plans"] = ["limits": ["anon": ["profundo": [1, 30], "maximo": [0, 30]], "free": ["profundo": [3, 7], "maximo": [1, 7]],
+                                             "pro": ["profundo": [60, 30], "maximo": [10, 30]]],
+                                  "referral": ["maxFriends": 5, "rewardDays": 30], "freeReadsPerWeek": NSNull()]
+            }
+            return (Self.json(200, reply), quick)
         case "/api/bobby-voice-free":
             // Puts NeuralVoice on the free on-device voice (no TTS spend in fixture mode).
             return (Self.json(503, ["error": "TTS failed"]), quick)

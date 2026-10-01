@@ -26,6 +26,23 @@ struct StoredSession: Codable {
     var provider: String? = nil
 }
 
+/// AccountSession always serializes its persisted state; tests can provide byte storage without
+/// depending on the simulator host's Keychain entitlement. Production uses the device Keychain.
+@MainActor
+struct AccountSessionStorage {
+    let read: () -> Data?
+    let write: (Data) -> Void
+    let clear: () -> Void
+
+    static func keychain(service: String) -> Self {
+        Self(read: { Keychain.readData(service: service) },
+             write: { Keychain.writeData($0, service: service) },
+             clear: { Keychain.delete(service: service) })
+    }
+
+    static var none: Self { Self(read: { nil }, write: { _ in }, clear: {}) }
+}
+
 /// The sign-in methods this build offers. 1.2 ships Sign in with Apple only: X is
 /// switched off in production Auth, so its button (and its copy) is compiled into
 /// Debug builds alone.
@@ -64,22 +81,40 @@ enum AccountDeletion: Equatable {
 @MainActor
 final class AccountSession: ObservableObject {
     static let shared = AccountSession()
+    /// Published session sends willSet; observers needing the new identity use this post-assignment event.
+    static let didChange = Notification.Name("BobbyAccountSessionDidChange")
     @Published private(set) var session: StoredSession?
     @Published var lastError: String?
     @Published var manualAppleRevocationRequired = false
     /// Where Apple explains how to stop using Sign in with Apple for an app (the server may name it).
     @Published private(set) var manualRevocationURL = AccountSession.defaultManualRevocationURL
     private var currentNonce: String?
+    private var appleRequestGeneration: UUID?
+    private var signInAttempt = UUID()
     /// Invalidates every pending request when the account changes or signs out.
     private(set) var generation = UUID()
     private var refreshTask: Task<StoredSession, Error>?
     private var revocationObserver: NSObjectProtocol?
-    private let keychainService = "xyz.bobbyprotocol.bobby.session"
+    private static let keychainService = "xyz.bobbyprotocol.bobby.session"
+    private let storage: AccountSessionStorage
+    private let authTransport: URLSession
+    private let defaults: UserDefaults
+    /// Tests can defer an OAuth callback without opening a real sign-in sheet.
+    var oauthAuthorization: @MainActor (URL) async throws -> URL = {
+        try await WebAuthPresenter.shared.run(url: $0, scheme: "bobbyprotocol")
+    }
     /// Apple's re-authorization for deletion; tests stand in for the sheet.
     var appleDeletionCode: @MainActor () async throws -> String = { try await AppleDeletionAuthorization.shared.authorize() }
 
-    init() {
-        session = Keychain.read(service: keychainService)
+    init(initialSession: StoredSession? = nil, usesKeychain: Bool = true,
+         authTransport: URLSession = .shared, defaults: UserDefaults = .standard,
+         storage: AccountSessionStorage? = nil) {
+        let storage = storage ?? (usesKeychain ? .keychain(service: Self.keychainService) : .none)
+        self.storage = storage
+        self.authTransport = authTransport
+        self.defaults = defaults
+        session = initialSession ?? storage.read().flatMap { try? JSONDecoder().decode(StoredSession.self, from: $0) }
+        DeskMemory.setOwner(session?.userId, defaults: defaults)
         revocationObserver = NotificationCenter.default.addObserver(forName: ASAuthorizationAppleIDProvider.credentialRevokedNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 guard let self, let s = self.session, s.provider != "twitter" else { return }
@@ -108,10 +143,12 @@ final class AccountSession: ObservableObject {
     /// check had nothing to ask Apple about. The account's own Auth record names both.
     func backfillIdentity() async {
         guard let s = session, s.appleUserId == nil, s.provider != "twitter" else { return }
+        let started = generation
         var request = URLRequest(url: SupabaseConfig.url.appendingPathComponent("auth/v1/user"))
         request.timeoutInterval = 15
         request.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         guard case let .answered(data, 200)? = try? await send(request),
+              generation == started,
               let user = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               user["id"] as? String == s.userId,
               var current = session, current.userId == s.userId else { return }
@@ -120,7 +157,7 @@ final class AccountSession: ObservableObject {
         current.provider = current.provider ?? identity.provider
         guard current.appleUserId != s.appleUserId || current.provider != s.provider else { return }
         session = current
-        Keychain.write(current, service: keychainService)
+        persist(current)
     }
 
     /// The Apple user ID (`identities[provider=apple].identity_data.sub`, the same value as
@@ -159,7 +196,7 @@ final class AccountSession: ObservableObject {
             // The refresh answer names the account's identities: a session saved before build 33 learns its Apple ID here.
             refreshed.appleUserId = s.appleUserId ?? refreshed.appleUserId
             refreshed.provider = s.provider ?? refreshed.provider
-            session = refreshed; Keychain.write(refreshed, service: keychainService)
+            session = refreshed; persist(refreshed)
             lastError = nil
             return refreshed.accessToken
         } catch let error as NSError where error.domain == Self.authHTTPDomain && [400, 401, 403].contains(error.code) {
@@ -179,17 +216,20 @@ final class AccountSession: ObservableObject {
     /// read and being checked (a slow drain, a long Apple sheet): the first 401 forces one
     /// refresh and one retry, so only a token the server still refuses after a refresh comes
     /// back as `answered(_, 401)`. Transport errors are thrown.
-    func send(_ request: URLRequest, via transport: URLSession = .shared) async throws -> AuthorizedResponse {
+    func send(_ request: URLRequest, via transport: URLSession? = nil) async throws -> AuthorizedResponse {
         let started = generation
+        let transport = transport ?? authTransport
         guard let token = await accessToken() else { return session == nil ? .signedOut : .unavailable }
         guard generation == started else { return .unavailable }
         let first = try await Self.data(for: request, token: token, via: transport)
+        guard generation == started else { return .unavailable }
         guard first.status == 401 else { return .answered(first.data, first.status) }
         guard generation == started else { return .unavailable }
         guard let fresh = await accessToken(replacing: token) else { return session == nil ? .signedOut : .unavailable }
         guard generation == started else { return .unavailable }
         guard fresh != token else { return .answered(first.data, first.status) }
         let second = try await Self.data(for: request, token: fresh, via: transport)
+        guard generation == started else { return .unavailable }
         return .answered(second.data, second.status)
     }
 
@@ -202,17 +242,38 @@ final class AccountSession: ObservableObject {
 
     func signOut(store: CompanionStore? = nil) {
         generation = UUID()
+        cancelPendingSignIn()
         refreshTask?.cancel(); refreshTask = nil
-        session = nil; Keychain.delete(service: keychainService)
+        session = nil
+        storage.clear()
+        DeskMemory.setOwner(nil, defaults: defaults)
         store?.unbind()
+        NotificationCenter.default.post(name: Self.didChange, object: self)
     }
 
     func accept(_ newSession: StoredSession) {
         generation = UUID()
+        cancelPendingSignIn()
         refreshTask?.cancel(); refreshTask = nil
         session = newSession
-        Keychain.write(newSession, service: keychainService)
+        persist(newSession)
+        DeskMemory.setOwner(newSession.userId, defaults: defaults)
+        manualAppleRevocationRequired = false
+        manualRevocationURL = Self.defaultManualRevocationURL
         lastError = nil
+        NotificationCenter.default.post(name: Self.didChange, object: self)
+    }
+
+    private func persist(_ value: StoredSession) {
+        guard let data = try? JSONEncoder().encode(value) else { return }
+        storage.write(data)
+    }
+
+    /// Stops a pending authorization without ending an existing account session.
+    func cancelPendingSignIn() {
+        signInAttempt = UUID()
+        currentNonce = nil
+        appleRequestGeneration = nil
     }
 
     // MARK: - Account deletion
@@ -311,7 +372,10 @@ final class AccountSession: ObservableObject {
             guard (200..<300).contains(status) else { return fail(data: data, status: status) }
             // A late deletion response must never sign out a different account.
             store?.forgetAccount(deletingUserId)
+            DeskMemory.forgetOwner(deletingUserId, defaults: defaults)
+            NucleoLedger.forgetOwner(deletingUserId, defaults: defaults)
             guard generation == started else { return .deleted }
+            AppleGivenName.forget(owner: session?.appleUserId, defaults: defaults)
             let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
             manualAppleRevocationRequired = answer?["appleRevocation"] as? String == "manual"
             manualRevocationURL = Self.manualRevocationURL(from: answer?["manualRevocationURL"])
@@ -319,6 +383,7 @@ final class AccountSession: ObservableObject {
             lastError = nil
             return .deleted
         } catch {
+            guard generation == started else { return .failed }
             if (error as? ASAuthorizationError)?.code == .canceled { lastError = nil; return .cancelled }
             lastError = L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
             return .failed
@@ -367,30 +432,61 @@ final class AccountSession: ObservableObject {
 
     func prepareAppleRequest(_ request: ASAuthorizationAppleIDRequest) {
         let nonce = Self.randomNonce()
+        signInAttempt = UUID()
+        appleRequestGeneration = generation
         currentNonce = nonce
-        request.requestedScopes = []
+        // The given name only greets the person in the profile ("Hola, Ana"). Apple shares it on
+        // the first authorization alone; it stays on this phone and never reaches the server.
+        request.requestedScopes = [.fullName]
         request.nonce = SHA256.hash(data: Data(nonce.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     func completeApple(_ result: Result<ASAuthorization, Error>) async {
-        let started = generation
+        guard appleRequestGeneration == generation else { return }
         switch result {
         case .failure(let error):
             lastError = Self.appleSignInFailure(error)
+            cancelPendingSignIn()
         case .success(let auth):
             guard let cred = auth.credential as? ASAuthorizationAppleIDCredential,
                   let tokenData = cred.identityToken, let idToken = String(data: tokenData, encoding: .utf8),
-                  let nonce = currentNonce else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return }
-            do {
-                var s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
-                guard generation == started else { return }
-                s.appleUserId = cred.user; s.provider = "apple"
-                accept(s)
-            } catch {
-                lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
-            }
+                  currentNonce != nil else { lastError = L.t("Apple returned no identity token", "Apple no devolvió un token de identidad"); return }
+            await completeAppleExchange(idToken: idToken, appleUserId: cred.user, givenName: cred.fullName?.givenName)
         }
     }
+
+    /// Exchanges the identity returned by the request prepared above. Both the request and its
+    /// network answer belong to that sign-in attempt; logout, consent withdrawal or another login wins.
+    func completeAppleExchange(idToken: String, appleUserId: String, givenName: String?) async {
+        guard let started = appleRequestGeneration, generation == started, let nonce = currentNonce else { return }
+        let attempt = signInAttempt
+        appleRequestGeneration = nil
+        currentNonce = nil
+        do {
+            var s = try await exchange(body: ["provider": "apple", "id_token": idToken, "nonce": nonce], grant: "id_token")
+            guard generation == started, signInAttempt == attempt else { return }
+            s.appleUserId = appleUserId; s.provider = "apple"
+            AppleGivenName.remember(givenName, appleUserId: appleUserId, defaults: defaults)
+            accept(s)
+        } catch {
+            guard generation == started, signInAttempt == attempt else { return }
+            lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
+        }
+    }
+
+#if DEBUG
+    /// `-qa-profile signed-in`: an in-memory Apple session (never the Keychain, never a real token)
+    /// so the profile sheet can be captured signed in. Nothing it holds can reach the server.
+    func acceptQAFixture(userId: String, appleUserId: String) {
+        generation = UUID()
+        cancelPendingSignIn()
+        session = StoredSession(accessToken: "qa-fixture", refreshToken: "qa-fixture", expiresAt: Date().addingTimeInterval(3600),
+                                userId: userId, appleUserId: appleUserId, provider: "apple")
+        lastError = nil
+        DeskMemory.setOwner(userId, defaults: defaults)
+        NotificationCenter.default.post(name: Self.didChange, object: self)
+    }
+#endif
 
     // MARK: - X (Twitter) via Supabase OAuth
     //
@@ -409,16 +505,20 @@ final class AccountSession: ObservableObject {
 
     func signInWithOAuth(provider: String) async {
         let started = generation
+        cancelPendingSignIn()
+        let attempt = signInAttempt
         var comps = URLComponents(url: SupabaseConfig.url.appendingPathComponent("auth/v1/authorize"), resolvingAgainstBaseURL: false)!
         comps.queryItems = [URLQueryItem(name: "provider", value: provider), URLQueryItem(name: "redirect_to", value: Self.oauthCallback)]
         guard let authURL = comps.url else { lastError = L.t("bad authorize URL", "URL de autorización no válida"); return }
         do {
-            let callback = try await WebAuthPresenter.shared.run(url: authURL, scheme: "bobbyprotocol")
+            let callback = try await oauthAuthorization(authURL)
+            guard generation == started, signInAttempt == attempt else { return }
             guard var s = Self.session(fromCallback: callback) else { lastError = L.t("Supabase returned no session", "Supabase no devolvió una sesión"); return }
             guard generation == started else { return }
             s.provider = provider
             accept(s)
         } catch {
+            guard generation == started, signInAttempt == attempt else { return }
             // The visitor closing the sheet is not an error worth showing.
             if (error as? ASWebAuthenticationSessionError)?.code == .canceledLogin { return }
             lastError = error.localizedDescription
@@ -457,7 +557,7 @@ final class AccountSession: ObservableObject {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.setValue(SupabaseConfig.anonKey, forHTTPHeaderField: "apikey")
         req.httpBody = try JSONSerialization.data(withJSONObject: body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await authTransport.data(for: req)
         guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
             let status = (response as? HTTPURLResponse)?.statusCode ?? 0
             let msg = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error_description"] as? String ?? "HTTP \(status)"
@@ -481,15 +581,50 @@ final class AccountSession: ObservableObject {
     }
 }
 
+/// The given name Apple shared at the first Sign in with Apple, kept on this phone only (UserDefaults)
+/// and tied to that Apple ID: another account signing in never inherits it. Deleting the account forgets it.
+enum AppleGivenName {
+    static let key = "account.appleGivenName"
+    static let ownerKey = "account.appleGivenName.owner"
+
+    static func remember(_ name: String?, appleUserId: String, defaults: UserDefaults = .standard) {
+        let trimmed = name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // Apple sends the name once; a later sign-in (empty name) keeps what was stored for the same ID.
+        guard !trimmed.isEmpty else { return }
+        defaults.set(trimmed, forKey: key)
+        defaults.set(appleUserId, forKey: ownerKey)
+    }
+
+    /// The stored name when it belongs to `appleUserId`; nil otherwise.
+    static func name(for appleUserId: String?, defaults: UserDefaults = .standard) -> String? {
+        guard let appleUserId, defaults.string(forKey: ownerKey) == appleUserId,
+              let name = defaults.string(forKey: key), !name.isEmpty else { return nil }
+        return name
+    }
+
+    static func forget(owner: String? = nil, defaults: UserDefaults = .standard) {
+        if let owner, defaults.string(forKey: ownerKey) != owner { return }
+        defaults.removeObject(forKey: key)
+        defaults.removeObject(forKey: ownerKey)
+    }
+}
+
 enum Keychain {
     static func read(service: String) -> StoredSession? {
+        guard let data = readData(service: service) else { return nil }
+        return try? JSONDecoder().decode(StoredSession.self, from: data)
+    }
+    static func readData(service: String) -> Data? {
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne]
         var out: AnyObject?
         guard SecItemCopyMatching(q as CFDictionary, &out) == errSecSuccess, let data = out as? Data else { return nil }
-        return try? JSONDecoder().decode(StoredSession.self, from: data)
+        return data
     }
     static func write(_ s: StoredSession, service: String) {
         guard let data = try? JSONEncoder().encode(s) else { return }
+        writeData(data, service: service)
+    }
+    static func writeData(_ data: Data, service: String) {
         delete(service: service)
         let q: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecValueData as String: data, kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
         SecItemAdd(q as CFDictionary, nil)

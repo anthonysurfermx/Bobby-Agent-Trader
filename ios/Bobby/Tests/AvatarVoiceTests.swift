@@ -15,9 +15,9 @@ private final class AvatarVoiceProtocol: URLProtocol {
     }
     override func stopLoading() {}
 
-    func respond(_ data: Data) {
-        let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: "HTTP/1.1",
-                                       headerFields: ["Content-Type": "audio/mpeg"])!
+    func respond(_ data: Data, status: Int = 200) {
+        let response = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: "HTTP/1.1",
+                                       headerFields: ["Content-Type": "audio/mpeg", "X-TTS-Provider": "openai"])!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)
@@ -50,6 +50,8 @@ final class AvatarVoiceTests: XCTestCase {
         super.setUp()
         defaultsSuite = "avatar-voice-tests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuite)!
+        // Every network-positive test explicitly uses current consent, independent of the test host.
+        defaults.set(RiskNotice.currentVersion, forKey: "agent.riskNoticeVersion")
         let config = URLSessionConfiguration.ephemeral
         config.protocolClasses = [AvatarVoiceProtocol.self]
         session = URLSession(configuration: config)
@@ -74,6 +76,7 @@ final class AvatarVoiceTests: XCTestCase {
     }
 
     @MainActor func testBundledAvatarClipPlaysAudibleSamplesAndFinishesWithoutNetwork() async throws {
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
         AvatarVoiceProtocol.handler = { _ in XCTFail("A bundled avatar clip must not make a network request") }
         let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
@@ -97,7 +100,7 @@ final class AvatarVoiceTests: XCTestCase {
             XCTAssertEqual(body?["text"], line)
             XCTAssertEqual(body?["voice"], "ash", "The avatar's identity wins over the profile default")
             XCTAssertEqual(body?["vibe"], "analytical")
-            XCTAssertNil(body?["mode"], "Keep the persona voice instead of forcing the generic free voice")
+            XCTAssertEqual(body?["mode"], "persona", "Keep the chosen voice even if the provider fails")
             XCTAssertEqual(body?["lang"], L.ttsLang)
             request.fulfill()
             stub.respond(data)
@@ -110,6 +113,68 @@ final class AvatarVoiceTests: XCTestCase {
         voice.stop()
         XCTAssertFalse(voice.speaking)
         XCTAssertEqual(voice.level, 0)
+    }
+
+    @MainActor func testTransportFailureRetriesTheSamePersonaAndPlaysNeuralAudio() async throws {
+        let data = try clip()
+        let retried = expectation(description: "transport retry")
+        var attempts = 0
+        AvatarVoiceProtocol.handler = { stub in
+            attempts += 1
+            XCTAssertEqual(try? stub.body()["voice"], "ballad")
+            XCTAssertEqual(stub.request.timeoutInterval, NeuralVoice.requestTimeoutSeconds)
+            if attempts == 1 {
+                stub.client?.urlProtocol(stub, didFailWithError: URLError(.timedOut))
+            } else { retried.fulfill(); stub.respond(data) }
+        }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.onFailure = { XCTFail("A recovered request must not report failure") }
+        voice.speak("Contexto de BTC", voiceId: "coral", persona: "ballad")
+        await fulfillment(of: [retried], timeout: 5)
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(voice.engine, .neural)
+    }
+
+    @MainActor func testFailedAnalysisEndsOnceWithoutAppleSpeech() async throws {
+        let ended = expectation(description: "honest voice failure")
+        var attempts = 0
+        var ends = 0
+        AvatarVoiceProtocol.handler = { stub in attempts += 1; stub.respond(Data(), status: 503) }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        let bridge = NucleoVoice(voice: voice)
+        defer { bridge.teardown() }
+        bridge.emit = { event, payload in
+            XCTAssertNotEqual(event, "voice.start", "Failed narration must not start a system voice")
+            if event == "voice.end" {
+                ends += 1
+                XCTAssertEqual(payload["id"] as? String, "failed-btc")
+                XCTAssertEqual(payload["reason"] as? String, "failed")
+                ended.fulfill()
+            }
+        }
+        XCTAssertEqual(bridge.speak(id: "failed-btc", text: "Contexto de BTC", voiceId: "ash", persona: "ash", vibe: "pro"), .queued)
+        await fulfillment(of: [ended], timeout: 5)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(ends, 1)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertFalse(bridge.isActive)
+        XCTAssertEqual(voice.engine, .neural)
+    }
+
+    @MainActor func testThrottleDoesNotRetryOrChangeTheCompanionVoice() async throws {
+        let failed = expectation(description: "throttled narration")
+        var attempts = 0
+        AvatarVoiceProtocol.handler = { stub in attempts += 1; stub.respond(Data(), status: 429) }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.onFailure = { failed.fulfill() }
+        voice.speak("Contexto de BTC", voiceId: "ash")
+        await fulfillment(of: [failed], timeout: 3)
+        XCTAssertEqual(attempts, 1)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.engine, .neural)
     }
 
     @MainActor func testMissingClipFallsBackToNarrationWithoutOpeningALiveSession() async throws {
@@ -183,7 +248,7 @@ final class AvatarVoiceTests: XCTestCase {
                     XCTAssertEqual(body?["voice"], companion.voicePersona)
                     XCTAssertEqual(body?["vibe"], NeuralVoice.serverVibe(vibe.rawValue))
                     XCTAssertEqual(body?["lang"], L.ttsLang)
-                    XCTAssertNil(body?["mode"])
+                    XCTAssertEqual(body?["mode"], "persona")
                     request.fulfill()
                     stub.respond(data)
                 }
@@ -226,6 +291,101 @@ final class AvatarVoiceTests: XCTestCase {
         relaunched.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
         try await waitUntil { relaunched.speaking && relaunched.level > 0.06 }
         XCTAssertFalse(defaults.bool(forKey: NeuralVoice.mutePreferenceKey))
+    }
+
+    @MainActor func testMissingOrStaleConsentBlocksExternalNarrationAndMissingClipFallback() async {
+        let unexpected = expectation(description: "no external text without current consent")
+        unexpected.isInverted = true
+        AvatarVoiceProtocol.handler = { stub in unexpected.fulfill(); stub.respond(Data(), status: 503) }
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.speak("Private question", voiceId: "ash")
+        voice.speakClip("missing-avatar-clip", fallbackText: "Private question", persona: "ash")
+        defaults.set(RiskNotice.currentVersion - 1, forKey: "agent.riskNoticeVersion")
+        voice.speak("Still no current consent", voiceId: "ash")
+        voice.speakClip("missing-avatar-clip", fallbackText: "Still no current consent", persona: "ash")
+        await fulfillment(of: [unexpected], timeout: 0.3)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.level, 0)
+    }
+
+    @MainActor func testConsentIsReadDynamicallyAfterVoiceInitialization() async throws {
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        let requested = expectation(description: "current consent enables external narration")
+        let data = try clip()
+        AvatarVoiceProtocol.handler = { stub in requested.fulfill(); stub.respond(data) }
+        defaults.set(RiskNotice.currentVersion, forKey: "agent.riskNoticeVersion")
+        voice.speak("Explicitly accepted", voiceId: "ash", essential: false)
+        await fulfillment(of: [requested], timeout: 3)
+        try await waitUntil { voice.speaking && voice.level > 0.06 }
+        voice.stop()
+        let unexpected = expectation(description: "same voice observes withdrawn consent")
+        unexpected.isInverted = true
+        AvatarVoiceProtocol.handler = { stub in unexpected.fulfill(); stub.respond(Data(), status: 503) }
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
+        voice.speak("Consent withdrawn", voiceId: "ash", essential: false)
+        await fulfillment(of: [unexpected], timeout: 0.3)
+        XCTAssertFalse(voice.speaking)
+    }
+
+    @MainActor func testWithdrawalDiscardsLateAudioAndDoesNotRetryALateFailure() async throws {
+        let first = expectation(description: "request sent with consent")
+        var pending: AvatarVoiceProtocol?
+        AvatarVoiceProtocol.handler = { stub in pending = stub; first.fulfill() }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.speak("Sent before withdrawal", voiceId: "ash", essential: false)
+        await fulfillment(of: [first], timeout: 3)
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
+        let unexpected = expectation(description: "late failure never retries after withdrawal")
+        unexpected.isInverted = true
+        AvatarVoiceProtocol.handler = { stub in unexpected.fulfill(); stub.respond(Data(), status: 503) }
+        try XCTUnwrap(pending).respond(Data(), status: 503)
+        await fulfillment(of: [unexpected], timeout: 1.5)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.level, 0)
+
+        // A successful response sent before withdrawal is discarded too.
+        defaults.set(RiskNotice.currentVersion, forKey: "agent.riskNoticeVersion")
+        let second = expectation(description: "another authorized request")
+        pending = nil
+        AvatarVoiceProtocol.handler = { stub in pending = stub; second.fulfill() }
+        voice.speak("Authorized before withdrawal", voiceId: "ash", essential: false)
+        await fulfillment(of: [second], timeout: 3)
+        defaults.set(0, forKey: "agent.riskNoticeVersion")
+        try XCTUnwrap(pending).respond(clip())
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(voice.speaking, "late external audio must not begin after withdrawal")
+    }
+
+    @MainActor private func verifyNoRetryAfterInvalidation(withdraw: Bool) async throws {
+        let first = expectation(description: "first request enters retry delay")
+        AvatarVoiceProtocol.handler = { stub in stub.respond(Data(), status: 503); first.fulfill() }
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        voice.speak("Retrying preview", voiceId: "ash", essential: false)
+        await fulfillment(of: [first], timeout: 3)
+        // Let the real 1.2-second retry delay begin, then invalidate during that delay.
+        try await Task.sleep(for: .milliseconds(100))
+        let unexpected = expectation(description: "invalidated voice sends no second POST")
+        unexpected.isInverted = true
+        AvatarVoiceProtocol.handler = { stub in unexpected.fulfill(); stub.respond(Data(), status: 503) }
+        if withdraw { defaults.set(0, forKey: "agent.riskNoticeVersion") }
+        else { voice.stop() }
+        await fulfillment(of: [unexpected], timeout: 1.5)
+        XCTAssertFalse(voice.speaking)
+        XCTAssertEqual(voice.level, 0)
+    }
+
+    @MainActor func testWithdrawalDuringRetryDelaySendsNoSecondRequest() async throws {
+        try await verifyNoRetryAfterInvalidation(withdraw: true)
+    }
+
+    @MainActor func testStopDuringRetryDelaySendsNoSecondRequest() async throws {
+        try await verifyNoRetryAfterInvalidation(withdraw: false)
     }
 
 }

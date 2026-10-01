@@ -647,7 +647,7 @@ struct ContentView: View {
             }
         }
         .sheet(isPresented: $showRiskNotice) {
-            RiskNoticeView(profile: vm.profile, readOnly: true) { showRiskNotice = false }
+            RiskNoticeView(profile: vm.profile, readOnly: true, onClose: { showRiskNotice = false })
         }
         .sheet(isPresented: $showAccount) {
             AccountSheet(store: vm.companions, profile: vm.profile, pieces: account.isSignedIn ? pulse.pieces : nil, voice: vm.voice) { showAccount = false }

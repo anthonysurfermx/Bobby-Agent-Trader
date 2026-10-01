@@ -36,7 +36,7 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   if (!r.ok) throw new Error(`revenuecat subscriber ${r.status}`);
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
-  const current = await getSubscription(identityId).catch(() => null);
+  const current = await getSubscription(identityId);
   if (!ent) {
     // Never erase a card subscription that did not come through RevenueCat.
     if (current && current.provider === 'apple' && ['active', 'trialing'].includes(current.status)) {

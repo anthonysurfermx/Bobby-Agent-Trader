@@ -61,7 +61,11 @@ struct MascotGalleryView: View {
 
     var body: some View {
         ZStack {
-            Theme.bg.ignoresSafeArea()
+            Theme.nucleoSurface.ignoresSafeArea()
+            RadialGradient(colors: [Theme.orbViolet.opacity(0.12), Theme.orbBlue.opacity(0.04), .clear],
+                           center: UnitPoint(x: 0.5, y: 0.3), startRadius: 20, endRadius: 360)
+                .ignoresSafeArea()
+                .accessibilityHidden(true)
             VStack(spacing: 0) {
                 header
                 stage
@@ -72,7 +76,7 @@ struct MascotGalleryView: View {
                     Text("LOAD \(metrics.loadMilliseconds)MS · ASSET \(megabytes(metrics.assetBytes))MB · ΔMEM \(megabytes(metrics.footprintDeltaBytes))MB · \(metrics.geometryCount) GEO")
                         .font(.mono(6.5, .semibold))
                         .kerning(0.5)
-                        .foregroundStyle(Theme.muted.opacity(0.55))
+                        .foregroundStyle(Theme.warmDim.opacity(0.55))
                         .lineLimit(1)
                         .padding(.horizontal, 16)
                 }
@@ -94,12 +98,12 @@ struct MascotGalleryView: View {
                     Spacer()
                     Text("\u{201C}\(phrase)\u{201D}")
                         .font(.mono(11, .semibold))
-                        .foregroundStyle(selected.tintSoft)
+                        .foregroundStyle(Theme.warmMuted)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 14)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.cardSoft))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(selected.tint.opacity(0.4), lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.nucleoGlass))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.orbViolet.opacity(0.4), lineWidth: 1))
                         .padding(.bottom, 220)
                         .transition(.scale(scale: 0.85).combined(with: .opacity))
                 }
@@ -116,18 +120,18 @@ struct MascotGalleryView: View {
 
     private var header: some View {
         HStack {
-            Text(L.t("BOBBY SQUAD // 3D", "EQUIPO BOBBY // 3D"))
+            Text(L.t("YOUR AVATAR", "TU AVATAR"))
                 .font(.mono(11, .bold))
                 .kerning(2.0)
-                .foregroundStyle(Theme.text.opacity(0.75))
+                .foregroundStyle(Theme.warmMuted)
             Spacer()
             if voiceEnabled { AvatarVoiceToggle(voice: voice, accessibilityID: "squad-voice-toggle") }
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                     .frame(width: 30, height: 30)
-                    .background(Circle().fill(Theme.card))
+                    .background(Circle().fill(Theme.nucleoGlass))
             }
             .accessibilityIdentifier("squad-close")
         }
@@ -169,17 +173,17 @@ struct MascotGalleryView: View {
 
             if stageLoading && !stageFailed {
                 ProgressView()
-                    .tint(selected.tint)
+                    .tint(Theme.orbViolet)
                     .scaleEffect(1.3)
             }
             if stageFailed {
                 VStack(spacing: 6) {
                     Image(systemName: "cube.transparent")
                         .font(.system(size: 34))
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.warmDim)
                     Text(L.t("Could not load the model", "No se pudo cargar el modelo"))
                         .font(.mono(10, .regular))
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.warmDim)
                 }
             }
 
@@ -195,7 +199,7 @@ struct MascotGalleryView: View {
                             .kerning(1.4)
                             .lineLimit(1)
                     }
-                    .foregroundStyle(Theme.text.opacity(0.82))
+                    .foregroundStyle(Theme.cream)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 7)
                     .background(Capsule().fill(Theme.bg.opacity(0.72)))
@@ -208,7 +212,7 @@ struct MascotGalleryView: View {
             }
 
             // Selection burst
-            SelectionBurst(trigger: burst, tint: selected.tint)
+            SelectionBurst(trigger: burst, tint: Theme.orbViolet)
                 .allowsHitTesting(false)
 
 #if DEBUG
@@ -242,23 +246,23 @@ struct MascotGalleryView: View {
         VStack(spacing: 4) {
             HStack(spacing: 8) {
                 Text(isActive ? selected.name(at: store.level.number) : selected.label)
-                    .font(.mono(22, .black))
-                    .kerning(3.0)
-                    .foregroundStyle(isUnlocked ? selected.tint : Theme.text.opacity(0.72))
+                    .font(.system(size: 30, weight: .light, design: .rounded))
+                    .tracking(-0.6)
+                    .foregroundStyle(isUnlocked ? Theme.cream : Theme.warmMuted)
                 if isActive {
                     Text("· \(store.level.name)")
                         .font(.mono(10, .bold))
                         .kerning(1.4)
-                        .foregroundStyle(selected.tintSoft)
+                        .foregroundStyle(Theme.warmMuted)
                 }
             }
             Text(selected.role)
                 .font(.mono(9, .semibold))
                 .kerning(2.2)
-                .foregroundStyle(Theme.muted)
+                .foregroundStyle(Theme.warmDim)
             Text(selected.personality)
                 .font(.mono(10, .regular))
-                .foregroundStyle(Theme.text.opacity(0.55))
+                .foregroundStyle(Theme.warmDim)
                 .padding(.top, 2)
 
             if isActive {
@@ -266,9 +270,9 @@ struct MascotGalleryView: View {
                 VStack(spacing: 3) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Theme.card)
+                            Capsule().fill(Theme.nucleoGlass)
                             Capsule()
-                                .fill(selected.tint)
+                                .fill(LinearGradient(colors: [Theme.orbViolet, Theme.orbCyan], startPoint: .leading, endPoint: .trailing))
                                 .frame(width: max(6, geo.size.width * store.levelProgress))
                         }
                     }
@@ -284,7 +288,7 @@ struct MascotGalleryView: View {
                     }
                     .font(.mono(7.5, .semibold))
                     .kerning(0.8)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 }
                 .padding(.horizontal, 52)
                 .padding(.top, 8)
@@ -293,9 +297,9 @@ struct MascotGalleryView: View {
                 VStack(spacing: 3) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            Capsule().fill(Theme.card)
+                            Capsule().fill(Theme.nucleoGlass)
                             Capsule()
-                                .fill(Theme.text.opacity(0.55))
+                                .fill(Theme.warmDim)
                                 .frame(width: max(6, geo.size.width * unlockProgress))
                         }
                     }
@@ -307,7 +311,7 @@ struct MascotGalleryView: View {
                     }
                     .font(.mono(7.5, .semibold))
                     .kerning(0.8)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 }
                 .padding(.horizontal, 52)
                 .padding(.top, 8)
@@ -316,7 +320,7 @@ struct MascotGalleryView: View {
             } else {
                 Text(L.t("Drag to spin · tap for a reaction · hold for a secret…", "Arrastra para girarlo · toca para su reacción · mantén presionado…"))
                     .font(.mono(8, .regular))
-                    .foregroundStyle(Theme.muted.opacity(0.6))
+                    .foregroundStyle(Theme.warmDim.opacity(0.6))
                     .padding(.top, 8)
             }
         }
@@ -343,12 +347,12 @@ struct MascotGalleryView: View {
                 .kerning(2.0)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .foregroundStyle(isActive ? selected.tint : (isUnlocked ? Theme.bg : Theme.muted))
+                .foregroundStyle(isActive ? Theme.cream : (isUnlocked ? Theme.bg : Theme.warmDim))
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isActive ? AnyShapeStyle(selected.tint.opacity(0.14)) : (isUnlocked ? AnyShapeStyle(selected.tint) : AnyShapeStyle(Theme.card)))
+                    Capsule()
+                        .fill(isActive ? AnyShapeStyle(Theme.orbViolet.opacity(0.14)) : (isUnlocked ? AnyShapeStyle(Theme.cream) : AnyShapeStyle(Theme.nucleoGlass)))
                 )
-                .overlay(RoundedRectangle(cornerRadius: 12).stroke(selected.tint.opacity(isActive ? 0.5 : 0), lineWidth: 1))
+                .overlay(Capsule().stroke(Theme.orbViolet.opacity(isActive ? 0.35 : 0), lineWidth: 1))
         }
         .disabled(!isUnlocked || isActive)
         .animation(.spring(duration: 0.3), value: justChosen)
@@ -362,11 +366,11 @@ struct MascotGalleryView: View {
                 Text(L.t("EARNED EMOTES", "GESTOS GANADOS"))
                     .font(.mono(8, .bold))
                     .kerning(1.4)
-                    .foregroundStyle(Theme.muted)
+                    .foregroundStyle(Theme.warmDim)
                 Spacer()
                 Text(L.t("DISCIPLINE, NOT SPEND", "DISCIPLINA, NO DINERO"))
                     .font(.mono(7, .semibold))
-                    .foregroundStyle(selected.tintSoft.opacity(0.62))
+                    .foregroundStyle(Theme.warmMuted.opacity(0.62))
             }
             HStack(spacing: 7) {
                 ForEach(CompanionEmote.allCases) { emote in
@@ -386,11 +390,11 @@ struct MascotGalleryView: View {
                                 .font(.mono(6.5, .bold))
                                 .lineLimit(1)
                         }
-                        .foregroundStyle(unlocked ? selected.tintSoft : Theme.muted.opacity(0.52))
+                        .foregroundStyle(unlocked ? Theme.warmMuted : Theme.warmDim.opacity(0.52))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 8)
-                        .background(RoundedRectangle(cornerRadius: 9).fill(unlocked ? selected.tint.opacity(0.08) : Theme.card))
-                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(unlocked ? selected.tint.opacity(0.28) : Theme.stroke, lineWidth: 1))
+                        .background(RoundedRectangle(cornerRadius: 9).fill(unlocked ? Theme.orbViolet.opacity(0.08) : Theme.nucleoGlass))
+                        .overlay(RoundedRectangle(cornerRadius: 9).stroke(unlocked ? Theme.orbViolet.opacity(0.28) : Theme.nucleoStroke, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
@@ -424,7 +428,7 @@ struct MascotGalleryView: View {
                                         if !unlocked {
                                             Image(systemName: "lock.fill")
                                                 .font(.system(size: 8, weight: .bold))
-                                                .foregroundStyle(Theme.text.opacity(0.9))
+                                                .foregroundStyle(Theme.cream)
                                                 .frame(width: 18, height: 18)
                                                 .background(Circle().fill(Theme.bg.opacity(0.8)))
                                                 .overlay(Circle().stroke(Color.white.opacity(0.18), lineWidth: 1))
@@ -433,13 +437,13 @@ struct MascotGalleryView: View {
                                     }
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 12)
-                                            .stroke(selectedId == c.id ? c.tint : (store.companionId == c.id ? c.tint.opacity(0.5) : Theme.stroke),
+                                            .stroke(selectedId == c.id ? Theme.orbViolet : (store.companionId == c.id ? Theme.orbViolet.opacity(0.5) : Theme.nucleoStroke),
                                                     lineWidth: selectedId == c.id ? 2 : 1)
                                     )
                                 if store.companionId == c.id {
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.system(size: 14))
-                                        .foregroundStyle(c.tint)
+                                        .foregroundStyle(Theme.orbViolet)
                                         .background(Circle().fill(Theme.bg))
                                         .offset(x: 4, y: 4)
                                 }
@@ -447,11 +451,11 @@ struct MascotGalleryView: View {
                             Text(c.label)
                                 .font(.mono(8.5, .bold))
                                 .kerning(1.0)
-                                .foregroundStyle(selectedId == c.id ? c.tint : Theme.text.opacity(0.5))
+                                .foregroundStyle(selectedId == c.id ? Theme.cream : Theme.warmDim)
                             Text(unlocked ? c.role : L.t("LEVEL \(c.requiredLevel)", "NIVEL \(c.requiredLevel)"))
                                 .font(.mono(6, .regular))
                                 .kerning(0.6)
-                                .foregroundStyle(Theme.muted.opacity(0.7))
+                                .foregroundStyle(Theme.warmDim.opacity(0.7))
                         }
                     }
                     .accessibilityIdentifier("squad-rail-\(c.id)")
@@ -779,7 +783,7 @@ struct MascotSceneView: UIViewRepresentable {
                 return (SCNVector3(Float(r * a.0), Float(r * a.1), Float(r * a.2)), r * a.3)
             }
             for tool in tools {
-                let tint = tool.isGolden ? UIColor(red: 0.96, green: 0.77, blue: 0.26, alpha: 1) : UIColor(hue: 0.415, saturation: 0.7, brightness: 0.95, alpha: 1)
+                let tint = tool.isGolden ? UIColor(red: 0.96, green: 0.77, blue: 0.26, alpha: 1) : UIColor(Theme.orbViolet)
                 // Cutout art (transparent PNG) when we have it; otherwise a small badge.
                 let art = UIImage(named: tool.assetName)
                 let image = art ?? Self.glyphImage(tool.symbol, tint: tint, symbolic: true)
@@ -1172,7 +1176,7 @@ struct GearSkinQAFixtureView: View {
     var body: some View {
         VStack(spacing: 12) {
             Text("SKIN QA // \(companion.id.uppercased()) // \(caseId.uppercased())")
-                .font(.mono(12, .bold)).kerning(1.4).foregroundStyle(companion.tintSoft)
+                .font(.mono(12, .bold)).kerning(1.4).foregroundStyle(Theme.warmMuted)
                 .padding(.top, 8)
 
             qaStage(label: "DESK · 206×208", width: 206, height: 208) { loading, didFail in
@@ -1187,7 +1191,7 @@ struct GearSkinQAFixtureView: View {
 
             Text(failed ? "FAILED" : (deskReady && previewReady ? "READY" : "LOADING"))
                 .font(.mono(11, .bold))
-                .foregroundStyle(failed ? Theme.down : Theme.up)
+                .foregroundStyle(failed ? Theme.down : Theme.orbCyan)
                 .accessibilityIdentifier(failed ? "qa-skin-failed" : (deskReady && previewReady ? "qa-skin-ready" : "qa-skin-loading"))
             Spacer(minLength: 4)
         }
@@ -1203,7 +1207,7 @@ struct GearSkinQAFixtureView: View {
         onLoading: @escaping (Bool, Bool) -> Void
     ) -> some View {
         VStack(spacing: 4) {
-            Text(label).font(.mono(9, .bold)).foregroundStyle(Theme.muted)
+            Text(label).font(.mono(9, .bold)).foregroundStyle(Theme.warmDim)
             MascotSceneView(
                 assetName: companion.id,
                 interactive: false,
@@ -1213,8 +1217,8 @@ struct GearSkinQAFixtureView: View {
                 staticPose: true
             )
             .frame(width: width, height: height)
-            .background(companion.tint.opacity(0.06))
-            .overlay(RoundedRectangle(cornerRadius: 16).stroke(companion.tint.opacity(0.30), lineWidth: 1))
+            .background(Theme.orbViolet.opacity(0.06))
+            .overlay(RoundedRectangle(cornerRadius: 16).stroke(Theme.orbViolet.opacity(0.30), lineWidth: 1))
             .clipShape(RoundedRectangle(cornerRadius: 16))
         }
         .frame(maxWidth: .infinity)
@@ -1241,27 +1245,27 @@ struct EvolutionOverlay: View {
                 Text(L.t("EVOLVED", "EVOLUCIONÓ"))
                     .font(.mono(10, .black))
                     .kerning(4.0)
-                    .foregroundStyle(companion.tintSoft)
+                    .foregroundStyle(Theme.warmMuted)
 
                 MascotSceneView(assetName: companion.id, interactive: false)
                     .frame(width: 240, height: 240)
                     .scaleEffect(appeared ? 1 : 0.5)
-                    .shadow(color: companion.tint.opacity(0.6), radius: 40)
+                    .shadow(color: Theme.orbViolet.opacity(0.6), radius: 40)
 
                 VStack(spacing: 6) {
                     Text(companion.name(at: level.number))
-                        .font(.mono(28, .black))
-                        .kerning(3.0)
-                        .foregroundStyle(companion.tint)
-                        .shadow(color: companion.tint.opacity(0.7), radius: 14)
+                        .font(.system(size: 32, weight: .light, design: .rounded))
+                        .tracking(-0.6)
+                        .foregroundStyle(Theme.cream)
+                        .shadow(color: Theme.orbViolet.opacity(0.7), radius: 14)
                     Text(L.t("LEVEL \(level.number) · \(level.name)", "NIVEL \(level.number) · \(level.name)"))
                         .font(.mono(10, .bold))
                         .kerning(2.4)
-                        .foregroundStyle(Theme.text.opacity(0.7))
+                        .foregroundStyle(Theme.warmMuted)
                     Text(L.t("Earned with discipline, never with volume.",
                              "Ganado con disciplina, nunca con volumen."))
                         .font(.mono(9, .regular))
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.warmDim)
                         .padding(.top, 4)
                 }
                 .opacity(appeared ? 1 : 0)
@@ -1274,7 +1278,7 @@ struct EvolutionOverlay: View {
                         .foregroundStyle(Theme.bg)
                         .padding(.horizontal, 34)
                         .padding(.vertical, 12)
-                        .background(Capsule().fill(companion.tint))
+                        .background(Capsule().fill(Theme.cream))
                 }
                 .padding(.top, 6)
                 .opacity(appeared ? 1 : 0)

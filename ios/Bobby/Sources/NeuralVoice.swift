@@ -1,5 +1,5 @@
 // One-way persona narration served by bobby-voice-free. Bundled previews and
-// generated answers use the same persona; AVSpeech is the offline fallback.
+// generated answers use the same persona; failures never switch to Apple speech.
 import Foundation
 @preconcurrency import AVFoundation
 
@@ -34,6 +34,12 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private var generation = 0
     private var meterTimer: Timer?
     private let session: URLSession
+
+    /// Read the current consent at use time: gallery voices can outlive the consent sheet.
+    /// Bundled clips remain available without sending any text to an external provider.
+    private var allowsExternalSpeech: Bool {
+        defaults.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion
+    }
 
     init(session: URLSession = .shared, defaults: UserDefaults = .standard) {
         self.session = session
@@ -70,67 +76,58 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
-    /// `persona` is the companion's own voice (coral/ballad/sage/ash) and wins
-    /// when present; `voiceId` is the persona picked in onboarding. No Edge
-    /// hint anymore — a valid `edgeVoice` would force the legacy robotic-ish
-    /// Edge chain server-side and silence the warm voices.
-    /// `essential` lines (an analysis the human is waiting for) may fall back
-    /// to the system voice when the network voice fails. Ambient lines —
-    /// greetings, onboarding previews — retry once and then stay silent: a
-    /// robotic voice breaking the companion's identity is worse than no voice.
-    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
-        guard Self.avatarNarrationEnabled, !isMuted else { return }
-        stop()
-        generation += 1
-        let gen = generation
-        fallbackPersona = persona ?? voiceId
-        fallbackPlaybackRate = playbackRate
+    /// Generated narration keeps the selected companion identity. Network failures
+    /// retry once and report failure; they never replace Bobby with a system voice.
+    static let requestTimeoutSeconds: TimeInterval = 20
+    static let maximumNarrationWaitSeconds: TimeInterval = requestTimeoutSeconds * 2 + 1.2
+    var onFailure: (() -> Void)?
+    private var narrationTask: Task<Void, Never>?
 
-        Task {
-            do {
-                var attempt = 0
-                var payload: (Data, URLResponse)? = nil
-                while attempt < 2 {
-                    attempt += 1
-                var req = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/bobby-voice-free")!)
-                req.httpMethod = "POST"
-                req.setValue("application/json", forHTTPHeaderField: "Content-Type")
-                req.timeoutInterval = 8
-                var body = [
-                    "text": text,
-                    "lang": L.ttsLang,
-                    "voice": persona ?? voiceId,
-                ]
-                // The onboarding promise is that the selected vibe changes
-                // how Bobby sounds, not only the preview sentence. The TTS
-                // endpoint already supports this delivery hint; keep sending
-                // it on every real answer after onboarding.
-                if free { body["mode"] = "free" }
-                if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
-                req.httpBody = try JSONSerialization.data(withJSONObject: body)
-                    let result = try await session.data(for: req)
-                    guard gen == self.generation else { return }
-                    let status = (result.1 as? HTTPURLResponse)?.statusCode ?? 0
-                    if status == 200 && result.0.count > 500 { payload = result; break }
-                    // Throttled or a hiccup: one short retry before deciding.
-                    if attempt < 2 { try? await Task.sleep(nanoseconds: 1_200_000_000) }
+    func speak(_ text: String, voiceId: String, persona: String? = nil, vibe: String? = nil, essential: Bool = true, playbackRate: Float = 1.0, free: Bool = false) {
+        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech else { return }
+        stop()
+        let gen = generation
+        narrationTask = Task {
+            for attempt in 0..<2 {
+                guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech, !Task.isCancelled else { return }
+                do {
+                    var req = URLRequest(url: URL(string: "https://bobbyprotocol.xyz/api/bobby-voice-free")!)
+                    req.httpMethod = "POST"
+                    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    req.timeoutInterval = Self.requestTimeoutSeconds
+                    var body = ["text": text, "lang": L.ttsLang, "voice": persona ?? voiceId]
+                    body["mode"] = free ? "free" : "persona"
+                    if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
+                    req.httpBody = try JSONSerialization.data(withJSONObject: body)
+                    let (data, response) = try await session.data(for: req)
+                    guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech, !Task.isCancelled else { return }
+                    let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                    let mime = response.mimeType ?? ""
+                    let provider = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "X-TTS-Provider")
+                    let matchingProvider = free || provider == "openai"
+                    if status == 200, matchingProvider, mime.hasPrefix("audio/"), data.count > 500,
+                       self.play(data, playbackRate: playbackRate) { return }
+                    // Invalid requests and throttling will not improve with an immediate retry.
+                    if (400..<500).contains(status) { break }
+                } catch {
+                    guard gen == self.generation, !Task.isCancelled else { return }
+                    // Transient transport errors get the same retry as failed HTTP responses.
                 }
-                guard gen == self.generation else { return }
-                guard let (data, _) = payload, self.play(data, playbackRate: playbackRate) else {
-                    if essential { self.speakFallback(text) } else { self.speaking = false }
-                    return
-                }
-            } catch {
-                if gen == self.generation {
-                    if essential { self.speakFallback(text) } else { self.speaking = false }
+                if attempt == 0 {
+                    do { try await Task.sleep(nanoseconds: 1_200_000_000) }
+                    catch { return }
                 }
             }
+            guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech, !Task.isCancelled else { return }
+            self.speaking = false
+            self.onFailure?()
         }
     }
 
     /// A clip bundled with the app, rendered offline by the same
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
-    /// A missing clip falls back to the network voice for `fallbackText`.
+    /// A missing or unplayable clip falls back to the network voice for `fallbackText` only
+    /// while the current external-processing consent permits it (checked centrally in speak).
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
         guard Self.avatarNarrationEnabled, !isMuted else { return }
         guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
@@ -139,8 +136,6 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
             return
         }
         stop()
-        fallbackPersona = persona
-        fallbackPlaybackRate = playbackRate
         if !play(data, playbackRate: playbackRate) {
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
         }
@@ -185,54 +180,6 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
-    /// Persona of the voice currently requested; the offline fallback picks a
-    /// system voice of the same gender so companions stay distinguishable even
-    /// when the network voice is unavailable.
-    private var fallbackPersona: String = "coral"
-    private var fallbackPlaybackRate: Float = 1.0
-
-    private static let feminineVoices: Set<String> = ["coral", "sage", "nova", "shimmer", "marin", "alloy", "fable", "female"]
-
-    /// Best on-device voice for the language: premium > enhanced > default,
-    /// gender-matched to the companion. Never the compact robotic default when
-    /// a natural one is installed.
-    private func bestSystemVoice() -> AVSpeechSynthesisVoice? {
-        let prefix = L.isSpanish ? "es" : "en"
-        let preferred = L.isSpanish ? "es-MX" : "en-US"
-        let wantsFeminine = Self.feminineVoices.contains(fallbackPersona)
-        let candidates = AVSpeechSynthesisVoice.speechVoices().filter { $0.language.hasPrefix(prefix) }
-        func rank(_ v: AVSpeechSynthesisVoice) -> Int {
-            var score = 0
-            switch v.quality {
-            case .premium: score += 300
-            case .enhanced: score += 200
-            default: score += 100
-            }
-            if v.language == preferred { score += 50 }
-            if v.gender == (wantsFeminine ? .female : .male) { score += 20 }
-            return score
-        }
-        return candidates.max { rank($0) < rank($1) }
-            ?? AVSpeechSynthesisVoice(language: preferred)
-            ?? AVSpeechSynthesisVoice(language: "en-US")
-    }
-
-    private func speakFallback(_ text: String) {
-        // The on-device voice needs the same spoken-audio session as play():
-        // restore spoken-audio mode after the forge's mixing session.
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
-        try? AVAudioSession.sharedInstance().setActive(true)
-        let u = AVSpeechUtterance(string: text)
-        u.voice = bestSystemVoice()
-        u.rate = min(AVSpeechUtteranceMaximumSpeechRate, max(AVSpeechUtteranceMinimumSpeechRate, 0.5 * fallbackPlaybackRate))
-        u.pitchMultiplier = Self.feminineVoices.contains(fallbackPersona) ? 1.05 : 0.95
-        fallbackUtterance = u
-        engine = .device
-        playback = nil
-        speaking = true
-        fallback.speak(u)
-    }
-
     private func startMetering(_ player: AVAudioPlayer) {
         meterTimer?.invalidate()
         // The timer fires on the main run loop; hop to the main actor explicitly
@@ -250,6 +197,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     func stop() {
         generation += 1
+        narrationTask?.cancel()
+        narrationTask = nil
         player?.stop()
         player = nil
         meterTimer?.invalidate()

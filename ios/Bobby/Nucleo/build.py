@@ -27,8 +27,8 @@ PAGES = ["app", "onboarding", "contract"]
 DEV_ONLY_PAGES = {"contract"}
 LEGACY = ["index.html", "nucleo-v2.html", "nucleo-onboarding.html"]
 MARKER = ".generated-by-nucleo-build"
-CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
-       "font-src https://fonts.gstatic.com data:; img-src data: blob:; media-src data: blob:; "
+CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; "
+       "font-src data:; img-src data: blob:; media-src data: blob:; "
        "connect-src 'none'; base-uri 'none'; form-action 'none'")
 
 
@@ -108,6 +108,14 @@ def build_page(page, release, companions_payload, fixtures_payload):
 
 
 def main():
+    global OUT
+    if "--output" in sys.argv:
+        OUT = sys.argv[sys.argv.index("--output") + 1]
+    if "--contract-only" in sys.argv:
+        os.makedirs(OUT, exist_ok=True)
+        companions = json.load(open(os.path.join(HERE, "companions.json")))
+        build_page("contract", False, js_json(companions), js_json(fixtures_blob()))
+        return
     release = "--release" in sys.argv[1:]
     os.makedirs(OUT, exist_ok=True)
     # The old scripted prototypes are not the app. NucleoPreview.swift still loads index.html until

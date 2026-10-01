@@ -130,6 +130,7 @@ function dropWords(ws, born, gone, dir, stag){
 }
 var titleEl = $('title'), subEl = $('sub'), cap2El = $('cap2'), promptEl = $('prompt'), wmBig = $('wmBig'), metaEl = $('meta');
 var wmEl = $('wm'), dqEl = $('dq'), closeEl = $('close'), avatarEl = $('avatar'), xpArcEl = $('xpArc'), noticeEl = $('notice'), pnameEl = $('pname'), pcountEl = $('pcount');
+var riskProfileEl = $('riskProfile');
 var titleW = [], subW = [], cap2W = [], cap2K = null, promptW = null;
 function renderTexts(){
   if (W.title && titleEl._k !== W.title[0] + '|' + W.title[1]){ titleEl._k = W.title[0] + '|' + W.title[1]; titleW = spans(titleEl, W.title[0]); subW = spans(subEl, W.title[1]); }
@@ -165,7 +166,7 @@ function renderTexts(){
     var dqo = T > dg ? 1 - c01((T - dg) / 0.16) : 1; st(dqEl, null, dqo); st(closeEl, null, c01((T - dk - 0.16) / 0.16) * dqo * c01(W.closeK.x));
   } else { st(dqEl, null, 0); st(closeEl, null, 0); }
   cls(closeEl, 'on', closeActive());
-  var ab = tmB('avaFly') + 0.48; st(avatarEl, null, T >= ab ? c01((T - ab) / 0.12) : 0);
+  var ab = tmB('avaFly') + 0.48; st(avatarEl, null, W.state !== 'RISK' && T >= ab ? c01((T - ab) / 0.12) : 0);
   var xpv = W.xpArc.x; sa(xpArcEl, 'stroke-dasharray', f1(94.25 * xpv) + ' 94.25'); sa(xpArcEl, 'opacity', xpv > 0.004 ? '1' : '0');
   /* meta line under the verdict caption */
   var mb = tmB('meta'), mg = tmG('meta'), mo = T >= mb ? c01((T - mb) / 0.24) * (T > mg ? 1 - c01((T - mg) / 0.2) : 1) : 0;
@@ -200,7 +201,17 @@ function renderPicker(){
 }
 
 /* ---------- risk notice: the 4 real titles, pulse-swept, then statement 1's body ---------- */
+function renderRiskProfile(){
+  // Withdrawing consent or upgrading its version must never hide account deletion behind AI consent.
+  var show = W.state === 'RISK' && !W.agreeBusy;
+  var label = Ls('risk.profile');
+  txt(riskProfileEl, label); sa(riskProfileEl, 'aria-label', label);
+  sa(riskProfileEl, 'aria-hidden', show ? 'false' : 'true');
+  riskProfileEl.disabled = !show; riskProfileEl.tabIndex = show ? 0 : -1;
+  st(riskProfileEl, null, show ? 1 : 0); cls(riskProfileEl, 'tap', show);
+}
 function renderLines(){
+  renderRiskProfile();
   var b = tmB('lines'), g = tmG('lines'), n = lineEls.length;
   if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); }
   else {

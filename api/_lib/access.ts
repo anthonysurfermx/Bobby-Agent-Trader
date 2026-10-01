@@ -6,7 +6,7 @@
 //   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.
 // A client that sends no device id (iOS ≤ 1.5 build 42) is served as before.
 // Devices and networks are salted hashes; nothing readable is stored.
-// The meter never takes the desk down: if the database is unreachable the read is served.
+// A failed or malformed meter pauses analysis; an outage is never permission for unmetered AI use.
 // ============================================================
 import type { VercelRequest } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
@@ -81,7 +81,7 @@ export async function consumeRead(req: VercelRequest, symbol: string, options: {
     p_identity: identity?.id ?? null, p_device: device, p_network: network,
     p_platform: clientPlatform(req), p_symbol: symbol.slice(0, 24) || null, p_paywall: paywallOn(),
   });
-  if (!row) return { allowed: !options.strict, code: options.strict ? 'access_unavailable' : null, readId: null, access: OPEN, identity };
+  if (!row || typeof row.allowed !== 'boolean') return { allowed: !options.strict, code: options.strict ? 'access_unavailable' : null, readId: null, access: OPEN, identity };
   const code = row.code === 'signin_required' || row.code === 'subscription_required' ? row.code : null;
   return { allowed: row.allowed !== false, code, readId: typeof row.readId === 'number' ? row.readId : null, access: shape(row), identity };
 }

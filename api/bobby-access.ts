@@ -96,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: true, revenuecat: revenueCatReady() },
+      payments: { stripe: stripeReady(), apple: revenueCatReady(), revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

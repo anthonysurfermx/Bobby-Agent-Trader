@@ -1,0 +1,128 @@
+[
+  {
+    "language": "en",
+    "position": 1,
+    "file": "docs/app-store/release-47/localized/en/01.png",
+    "sha256": "188e5e471b60abbb14c86f6cae134fb06ed7aa32aa80f77c0b67ad8ff38af0f3"
+  },
+  {
+    "language": "en",
+    "position": 2,
+    "file": "docs/app-store/release-47/localized/en/02.png",
+    "sha256": "90787518f349e92975eb404b0f664cbc4e80d4b419babc38b5b4d071ba236d10"
+  },
+  {
+    "language": "en",
+    "position": 3,
+    "file": "docs/app-store/release-47/localized/en/03.png",
+    "sha256": "05019adc933631d9b70afef66f1fcd62d52bf67efe161fe2f83a15f588fb67b5"
+  },
+  {
+    "language": "en",
+    "position": 4,
+    "file": "docs/app-store/release-47/localized/en/04.png",
+    "sha256": "2f3fd088507a19ac9eaeab31b6664a80d7e4d23e8e12226a5c4e0a27b2abb2d7"
+  },
+  {
+    "language": "en",
+    "position": 5,
+    "file": "docs/app-store/release-47/localized/en/05.png",
+    "sha256": "7198ba91b8a6d078df8d12c62d9854e833f3c93f586c0aa151a40651b17010ec"
+  },
+  {
+    "language": "en",
+    "position": 6,
+    "file": "docs/app-store/release-47/localized/en/06.png",
+    "sha256": "6ec13adab7c6c6f2171b92af76aef1426c9556a0e5b126d5105d81f4df56cdd5"
+  },
+  {
+    "language": "en",
+    "position": 7,
+    "file": "docs/app-store/release-47/localized/en/07.png",
+    "sha256": "717f1b342201a333c1fe2a59670134c1d8179e8d4dba1a6cb5964636d647e040"
+  },
+  {
+    "language": "es",
+    "position": 1,
+    "file": "docs/app-store/release-47/localized/es/01.png",
+    "sha256": "83b890a34c55b300bfef7e2a3683f094f4694d5a990e95bb99c61d4562c9e358"
+  },
+  {
+    "language": "es",
+    "position": 2,
+    "file": "docs/app-store/release-47/localized/es/02.png",
+    "sha256": "e2b1b7cf4e97570fc0663180900f1f5898caa21d5bdd58de673d809f96c11226"
+  },
+  {
+    "language": "es",
+    "position": 3,
+    "file": "docs/app-store/release-47/localized/es/03.png",
+    "sha256": "4b752d5b925e96ff240043815c78ce520b06fbb9872021794a505b8e221060ae"
+  },
+  {
+    "language": "es",
+    "position": 4,
+    "file": "docs/app-store/release-47/localized/es/04.png",
+    "sha256": "ce423a0d69c7db2fa76f2a2ecbe11f07303cc5fd9f70efd51016d636d77e8f8e"
+  },
+  {
+    "language": "es",
+    "position": 5,
+    "file": "docs/app-store/release-47/localized/es/05.png",
+    "sha256": "c32bcc1f6924543823cc4da3510cc451d942f29a52ce731b39a12661ebbdcb27"
+  },
+  {
+    "language": "es",
+    "position": 6,
+    "file": "docs/app-store/release-47/localized/es/06.png",
+    "sha256": "b5a92a0bbe87c43a22614a30fc910bd505d9f9375f2c191fd7e8b4d46827e0b8"
+  },
+  {
+    "language": "es",
+    "position": 7,
+    "file": "docs/app-store/release-47/localized/es/07.png",
+    "sha256": "640ce999e143f42ebe00531e51f3de42b84b7877cad7f964c6e262854cb8d814"
+  },
+  {
+    "language": "pt",
+    "position": 1,
+    "file": "docs/app-store/release-47/localized/pt/01.png",
+    "sha256": "b8ab4312dc676b48a11af08c86afcab3bf0bce16190bbc2f8e7c99076efdefb2"
+  },
+  {
+    "language": "pt",
+    "position": 2,
+    "file": "docs/app-store/release-47/localized/pt/02.png",
+    "sha256": "c77968b30c385d970ffd903249d3f0ea48e9894ff214d1f75204a4c7c8727a9d"
+  },
+  {
+    "language": "pt",
+    "position": 3,
+    "file": "docs/app-store/release-47/localized/pt/03.png",
+    "sha256": "c88fb1988d92be8b49b7ae4187185ad12dce7041da79f7f1588c66c75e54cdd3"
+  },
+  {
+    "language": "pt",
+    "position": 4,
+    "file": "docs/app-store/release-47/localized/pt/04.png",
+    "sha256": "b1fb65e7375251fdcd45ce0d5a9aef1ad513abe5ab5fc079df997421be717c4d"
+  },
+  {
+    "language": "pt",
+    "position": 5,
+    "file": "docs/app-store/release-47/localized/pt/05.png",
+    "sha256": "57ddbce10657ce9c7a6f7082ac11acf9ce17afc7fc2a03f772e3ae750b0477e7"
+  },
+  {
+    "language": "pt",
+    "position": 6,
+    "file": "docs/app-store/release-47/localized/pt/06.png",
+    "sha256": "037ec9712f3e9b7a47e44e639659ca686118d3a47159bf66d271d8ad788d4c52"
+  },
+  {
+    "language": "pt",
+    "position": 7,
+    "file": "docs/app-store/release-47/localized/pt/07.png",
+    "sha256": "f96e7e999f5b766061d7d3f78f0f2a4f397f3f2ea85305ad73ab31a3144038c8"
+  }
+]

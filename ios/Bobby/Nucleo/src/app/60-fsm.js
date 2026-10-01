@@ -15,7 +15,7 @@ function go(name, data){
   LOG.push([Math.round(clk * 1000) / 1000, name]); if (LOG.length > 400) LOG.shift();
   var N = STATES[name];
   try { if (N && N.enter) N.enter(prev, ST.data); } catch (e) { logErr('enter ' + name, e); }
-  ariaState(); dirty = true;
+  ariaState(); dirty = true; lvlSync();
 }
 function inState(){ return clk - ST.t0; }
 function fsmEvent(name, p){ var s = STATES[ST.name]; if (s && s.on){ try { s.on(name, p); } catch (e) { logErr('on ' + name, e); } } }
@@ -138,6 +138,8 @@ function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
   if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
+  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
   var f = RMOD.failure(r.reply, LANG);
@@ -215,6 +217,7 @@ STATES.IDLE = {
     if (h === 'pill') return pillDown(p);
     if (h === 'avatar') return avatarG();
     if (h === 'wm' && DEV_BUILD) return wordmarkPress();
+    if (h === 'lvl') return tapG(function(){ tick('light'); openNative('levels'); });
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
     if (h === 'meri') return tapG(function(){ if (FACES.length > 1){ go('FACES'); faceSwing(1, 0); } });
     if (h === 'surface') return faceDragG();
@@ -237,9 +240,13 @@ function pillDown(p, fromRead){
     return { move: noop, up: function(){ STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: function(){ STATES.LISTENING.release(false, true); } };
   }
   if (ms === 'undetermined'){
-    if (fromRead) go('RETURNING');
-    else go('PRE_PERMISSION');
-    return { move: noop, up: function(){ A.press.to(1, 'emit'); }, cancel: function(){ A.press.to(1, 'emit'); } };
+    // A short tap always types; voice permission belongs to the hold gesture.
+    return { move: noop, up: function(){
+      A.press.to(1, 'emit');
+      if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
+      else if (fromRead) go('RETURNING');
+      else go('PRE_PERMISSION');
+    }, cancel: function(){ A.press.to(1, 'emit'); } };
   }
   return { move: noop, up: function(){ A.press.to(1, 'emit'); openTyping({ fromRead: !!fromRead }); }, cancel: function(){ A.press.to(1, 'emit'); } };
 }
@@ -445,8 +452,7 @@ STATES.THINK_RESOLVE = {
   tick: function(){
     if (!this.done) return;
     if (VOICE.started || VOICE.silent) go('TALK_EVIDENCE');
-    /* a full read is ~600 chars: the persona voice can take 6–9 s to arrive (and the device fallback only starts after
-       NeuralVoice's 8 s timeout), so 6 s cancelled almost every read and Bobby was never heard. Native's own watchdog is 22 s. */
+    /* Allow both bounded persona requests and the native failure event to finish. */
     else if (clk - VOICE.reqT > VOICE_WAIT){ bcall('stopSpeaking').catch(noop); goSilent(); go('TALK_EVIDENCE'); }
   },
   down: function(h){ if (h === 'close') return tapG(function(){ go('RETURNING'); }); return null; }
@@ -478,7 +484,7 @@ function speakRead(){
   }, function(){ if (READ === r) goSilent(); });
 }
 function goSilent(){ VOICE.silent = true; VOICE.ended = true; }
-var VOICE_WAIT = 14;   /* s from speak() to voice.start before the read goes on silently */
+var VOICE_WAIT = 45;   /* s from speak() to voice.start before the read goes on silently */
 function sentStartT(si){ return kWordT(SENT0[si]).t0; }
 
 /* ---------- TALK_EVIDENCE: B4 satellites + karaoke ---------- */

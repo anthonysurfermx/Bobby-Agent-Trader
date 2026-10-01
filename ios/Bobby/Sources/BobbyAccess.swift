@@ -128,9 +128,12 @@ struct BobbyMeterAuth: Sendable {
     var bearer: @Sendable () async -> String?
     /// A fresh token after the server refused `stale` (nil = none to be had).
     var refresh: @Sendable (_ stale: String) async -> String?
+    /// Account epoch, including sign-out and signing back into the same account.
+    var owner: @Sendable () async -> UUID? = { nil }
 
     static let account = BobbyMeterAuth(bearer: { await AccountSession.shared.accessToken() },
-                                        refresh: { await AccountSession.shared.accessToken(replacing: $0) })
+                                        refresh: { await AccountSession.shared.accessToken(replacing: $0) },
+                                        owner: { await AccountSession.shared.generation })
     static let none = BobbyMeterAuth(bearer: { nil }, refresh: { _ in nil })
 }
 
@@ -150,11 +153,23 @@ enum BobbyAccessAPI {
     /// checked: a 401 on a signed-in request forces one refresh and one retry, so only a caller
     /// the server still refuses comes back as 401. Transport errors are thrown.
     static func send(_ path: String, method: String = "POST", body: [String: Any]? = nil,
-                     auth: BobbyMeterAuth) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+        let owner = await auth.owner()
         let bearer = await auth.bearer()
-        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer))
-        guard first.status == 401, let bearer, let fresh = await auth.refresh(bearer), fresh != bearer else { return first }
-        return try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh))
+        try Task.checkCancellation()
+        guard await auth.owner() == owner else { throw CancellationError() }
+        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer), timeout: timeout)
+        try Task.checkCancellation()
+        guard await auth.owner() == owner else { throw CancellationError() }
+        guard first.status == 401, let bearer else { return first }
+        let fresh = await auth.refresh(bearer)
+        try Task.checkCancellation()
+        guard await auth.owner() == owner else { throw CancellationError() }
+        guard let fresh, fresh != bearer else { return first }
+        let retried = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh), timeout: timeout)
+        try Task.checkCancellation()
+        guard await auth.owner() == owner else { throw CancellationError() }
+        return retried
     }
 
     /// "October 4" / "4 de octubre", in the app's language and the phone's time zone.
@@ -183,56 +198,79 @@ final class BobbyAccessCenter: ObservableObject {
 
     @Published private(set) var access: BobbyReadAccess?
     @Published private(set) var subscription: BobbySubscription?
-    /// `payments.apple` (nil = unknown): false means the server does not take App Store purchases right now.
+    /// Purchases require explicit Apple AND RevenueCat readiness; unknown is never permission to charge.
     @Published private(set) var applePayments: Bool?
 
     /// Whose snapshot this is (nil = signed out); a change of account clears it.
     private var owner: String?
+    private var ownerGeneration: UUID?
     private var cancellables = Set<AnyCancellable>()
     var auth: BobbyMeterAuth = .account
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
+    var currentGeneration: () -> UUID = { AccountSession.shared.generation }
 
     init(observeAccount: Bool = true) {
         owner = currentUser()
+        ownerGeneration = currentGeneration()
         guard observeAccount else { return }
         AccountSession.shared.$session
-            .map { $0?.userId }
-            .removeDuplicates()
             .dropFirst()
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] _ in self?.clear() }
+            .sink { [weak self] _ in self?.accountChanged() }
             .store(in: &cancellables)
     }
 
     func clear() {
         owner = currentUser()
+        ownerGeneration = currentGeneration()
         access = nil
         subscription = nil
+        applePayments = nil
+    }
+
+    func accountChanged() {
+        if owner != currentUser() || ownerGeneration != currentGeneration() { clear() }
     }
 
     /// Every metered reply carries the caller's access: keep the newest one for this account.
     func record(_ access: BobbyReadAccess?) {
         guard let access else { return }
-        if owner != currentUser() { clear() }
+        accountChanged()
         self.access = access
     }
 
     /// GET /api/bobby-access. False when the server could not be read (legacy servers answer 404).
     @discardableResult
     func refresh() async -> Bool {
+        accountChanged()
+        defer { accountChanged() }
         let started = currentUser()
+        let generation = currentGeneration()
         guard let reply = try? await BobbyAccessAPI.send(BobbyAccessAPI.accessPath, method: "GET", auth: auth),
               (200..<300).contains(reply.status), let body = reply.json as? [String: Any],
-              currentUser() == started else { return false }
+              currentUser() == started, currentGeneration() == generation else {
+            applePayments = false
+            return false
+        }
         apply(body)
         return true
     }
 
     private func apply(_ body: [String: Any]) {
-        if owner != currentUser() { clear() }
+        accountChanged()
         if let a = BobbyReadAccess(json: body["access"]) { access = a }
         if body.keys.contains("subscription") { subscription = BobbySubscription(json: body["subscription"]) }
-        if let payments = body["payments"] as? [String: Any], let apple = payments["apple"] as? Bool { applePayments = apple }
+        applePayments = Self.paymentsReady(body["payments"])
+    }
+
+    nonisolated static func paymentsReady(_ value: Any?) -> Bool {
+        guard let payments = value as? [String: Any] else { return false }
+        func enabled(_ key: String) -> Bool {
+            guard let n = payments[key] as? NSNumber,
+                  CFGetTypeID(n) == CFBooleanGetTypeID() else { return false }
+            return n.boolValue
+        }
+        return enabled("apple") && enabled("revenuecat")
     }
 
     enum ServerSync: Equatable {
@@ -250,7 +288,10 @@ final class BobbyAccessCenter: ObservableObject {
     /// RevenueCat for this account's entitlements (app_user_id = the Supabase auth user id) and answers
     /// with the account's access. RevenueCat's webhooks keep it current after that.
     func syncRevenueCat() async -> ServerSync {
+        accountChanged()
+        defer { accountChanged() }
         let started = currentUser()
+        let generation = currentGeneration()
         guard started != nil else { return .signedOut }
         let reply: (json: Any?, status: Int, headers: [String: String])
         do {
@@ -259,7 +300,7 @@ final class BobbyAccessCenter: ObservableObject {
         } catch {
             return .unreachable
         }
-        guard currentUser() == started else { return .unreachable }
+        guard currentUser() == started, currentGeneration() == generation else { return .unreachable }
         let body = reply.json as? [String: Any]
         switch reply.status {
         case 200..<300:

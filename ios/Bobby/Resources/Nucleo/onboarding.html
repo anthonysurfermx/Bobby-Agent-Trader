@@ -2,22 +2,19 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src data: blob:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; font-src data:; img-src data: blob:; media-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="theme-color" content="#0B0A09">
 <title>Bobby</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&family=Sora:wght@300;400&display=swap" rel="stylesheet">
 <style>
 :root{
   --bg:#0B0A09; --ink:#F2EDE4; --ink-b:#FFF8EC; --ink2:#A39C91; --ink3:#8A8378; --ink4:rgba(242,237,228,.28);
   --hair:rgba(242,237,228,.08); --line:rgba(242,237,228,.12);
   --alpha:#3FE0B5; --red:#FF5A5F; --cio:#F6B94E; --pearl:#E8DFD0; --listen:#5CE1FF;
   --vc:#F6B94E; --glass:rgba(22,19,17,.86);
-  --serif:'Sora',-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
-  --sans:'Geist',-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
-  --mono:'Geist Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  --serif:-apple-system,'SF Pro Display',system-ui,sans-serif;  /* display face, shared with bobbyprotocol.xyz */
+  --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif;
+  --mono:ui-monospace,'SF Mono',Menlo,monospace;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 /* A fixed, non-scrolling, non-zooming app surface: touch-action:none keeps pan, pinch and double-tap zoom away so every
@@ -65,6 +62,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #close.on{pointer-events:auto}
 #dq{position:absolute;left:75px;width:240px;top:12px;text-align:center;font:400 15px/20px var(--sans);color:var(--ink2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0}
 #avatar{position:absolute;left:338px;top:6px;width:32px;height:32px;opacity:0}
+#riskProfile{left:auto;right:20px;top:0;min-width:82px;height:44px;padding:0 14px;border-radius:22px;
+  background:rgba(167,149,239,.08);border:1px solid rgba(167,149,239,.22);font:500 14px/18px var(--sans);color:var(--ink)}
 #avatar .face,.bead{border-radius:50%;background-color:#2A2A2A;background-size:118% 118%;background-position:50% 42%;box-shadow:0 0 0 .5px rgba(242,237,228,.2)}
 #avatar .face{position:absolute;inset:3px}
 #avatar svg{position:absolute;inset:0;overflow:visible}
@@ -97,7 +96,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #agC .st .roll{height:42px}#agC .st .roll>span{white-space:normal}
 #lines{left:20px;width:350px;top:0;opacity:1}
 #lines .ln{position:absolute;left:0;width:350px;text-align:center;font:300 19px/22px var(--serif);letter-spacing:-.035em;text-wrap:balance}
-#lines .rb{position:absolute;left:10px;width:330px;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
+#lines .rb{position:absolute;left:10px;width:330px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(163,156,145,.45) transparent;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
 #notice.tap{pointer-events:auto}
 #notice{left:95px;width:200px;top:640px;height:44px;font:400 13px/16px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(163,156,145,.5)}
 .sat{min-width:100px;height:52px;border-radius:16px;padding:7px 12px;background:var(--glass);border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px -12px rgba(0,0,0,.7);white-space:nowrap}
@@ -206,7 +205,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   background:rgba(22,19,17,.94);border:.5px solid rgba(242,237,228,.16);box-shadow:0 20px 50px -18px rgba(0,0,0,.9);
   -webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);touch-action:auto;opacity:0;transform:translateY(20px)}
 #typeBox.on{display:flex}
-#typeIn{flex:1;min-height:36px;max-height:120px;resize:none;border:0;outline:0;background:transparent;color:#F2EDE4;font:400 17px/22px 'Geist',-apple-system,system-ui,sans-serif;
+#typeIn{flex:1;min-height:36px;max-height:120px;resize:none;border:0;outline:0;background:transparent;color:#F2EDE4;font:400 17px/22px -apple-system,system-ui,sans-serif;
   padding:7px 0;-webkit-user-select:text;user-select:text;touch-action:auto;caret-color:#FFF8EC}
 #typeIn::placeholder{color:#8A8378}
 #typeSend{flex:none;width:40px;height:40px;border-radius:20px;background:#F2EDE4;color:#141210;display:grid;place-items:center;touch-action:manipulation}
@@ -351,6 +350,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     <button id="close" data-hit="close" tabindex="0"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg></button>
     <div id="dq"></div>
     <div id="avatar"><div class="face" id="avaFace"></div><svg viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="16" cy="16" r="15" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 16 16)" stroke-dasharray="0 94.25"/></svg></div>
+    <button id="riskProfile" class="a" data-hit="profile" aria-hidden="true" tabindex="-1" disabled></button>
   </header>
 
   <div id="ghost" class="a"></div>
@@ -388,7 +388,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
-    'session.changed', 'app.state', 'ask.stage',
+    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -493,7 +493,11 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'thesis.save': 'Save thesis', 'thesis.saved': 'Saved', 'thesis.savedLocal': 'Saved on this device',
       'xp.points': '+{points} discipline XP', 'xp.pointsWait': '+{points} discipline XP for waiting',
       'xp.capped': 'Saved · daily XP limit reached',
-      'debate.title': '{n} agents · {s} s', 'debate.header': 'THE DEBATE',
+      'debate.title': '{n} agents · {s} s', 'debate.header': 'THE DEBATE', 'debate.full': 'SEE THE FULL DEBATE ↓',
+      'syn.name': 'IN SHORT', 'syn.why': 'Why', 'syn.risk': 'The risk', 'syn.watch': 'What to watch',
+      'agent.rebuttal': 'SECOND ROUND', 'agent.scenarios': 'SCENARIOS', 'sc.confirm': 'Confirms it', 'sc.invalidate': 'Invalidates it',
+      'agent.missing': 'MISSING DATA', 'missing.line': 'Missing data for {h}: {list}.', 'missing.lineNoH': 'Missing data: {list}.',
+      'agent.evidence': 'EVIDENCE USED', 'ev.derivatives': 'derivatives', 'ev.record': 'record {w}/{n}',
       'meta': 'Educational read · not financial advice',
       'confirm.prompt': 'Did you mean {name} ({symbol})?', 'confirm.yes': 'Yes, {symbol}', 'confirm.no': 'Something else',
       'err.unknown': 'I couldn’t find an asset in that. Try the name or the ticker.',
@@ -537,7 +541,11 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'thesis.save': 'Guardar tesis', 'thesis.saved': 'Guardada', 'thesis.savedLocal': 'Guardada en este dispositivo',
       'xp.points': '+{points} XP de disciplina', 'xp.pointsWait': '+{points} XP de disciplina por esperar',
       'xp.capped': 'Guardada · límite diario de XP alcanzado',
-      'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE',
+      'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE', 'debate.full': 'VER EL DEBATE COMPLETO ↓',
+      'syn.name': 'EN CORTO', 'syn.why': 'Por qué', 'syn.risk': 'El riesgo', 'syn.watch': 'Qué vigilar',
+      'agent.rebuttal': 'SEGUNDA RONDA', 'agent.scenarios': 'ESCENARIOS', 'sc.confirm': 'Lo confirma', 'sc.invalidate': 'Lo invalida',
+      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Faltan datos de {h}: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'agent.evidence': 'EVIDENCIA USADA', 'ev.derivatives': 'derivados', 'ev.record': 'récord {w}/{n}',
       'meta': 'Lectura educativa · no es asesoría financiera',
       'confirm.prompt': '¿Te refieres a {name} ({symbol})?', 'confirm.yes': 'Sí, {symbol}', 'confirm.no': 'Otro activo',
       'err.unknown': 'No encontré un activo en eso. Prueba con el nombre o el ticker.',
@@ -755,13 +763,31 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     };
   }
 
+  /** Levels: the CIO's synthesis {headline, why, risk, watch} when the server sent one (strings only). */
+  function synthesisOf(r) {
+    var s = r && (r.synthesis || (r.agents && r.agents.synthesis));
+    if (!s || typeof s.headline !== 'string' || !s.headline.trim()) return null;
+    function str(v) { return typeof v === 'string' && v.trim() ? v.trim() : null; }
+    return { headline: s.headline.trim(), why: str(s.why), risk: str(s.risk), watch: str(s.watch) };
+  }
+
   function buildSpoken(r, lang) {
-    var cio = sentences(r.agents.cio);
-    var picked = [], used = 0;
-    for (var i = 0; i < cio.length; i++) {
-      if (picked.length && used + cio[i].length + 1 > 600) break;
-      picked.push(i === 0 && cio[i].length > 600 ? clipWords(cio[i], 600) : cio[i]);
-      used += cio[i].length + 1;
+    var syn = synthesisOf(r);
+    var picked = [], used = 0, i;
+    if (syn) {
+      /* SYNTHESIS FIRST: the headline and three short labeled lines; the full debate sits behind it (the debate card) */
+      picked.push(clipWords(syn.headline, 240));
+      [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].forEach(function (x) {
+        if (x[1]) picked.push(t(lang, 'syn.' + x[0]) + ': ' + clipWords(x[1], 200));
+      });
+    } else {
+      /* an older server (no synthesis): the CIO, clamped to about three lines */
+      var cio = sentences(r.agents.cio);
+      for (i = 0; i < cio.length; i++) {
+        if (picked.length && used + cio[i].length + 1 > 240) break;
+        picked.push(i === 0 && cio[i].length > 240 ? clipWords(cio[i], 240) : cio[i]);
+        used += cio[i].length + 1;
+      }
     }
     var close = t(lang, 'spoken.close.' + r.agents.verdict);
     var all = picked.concat([close]);
@@ -828,13 +854,48 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
         pill: sym + ' · ' + word.toUpperCase()
       },
       debate: {
-        header: t(lang, 'debate.header'),
+        header: synthesisOf(r) ? t(lang, 'debate.full') : t(lang, 'debate.header'),
         title: t(lang, 'debate.title', { n: 3, s: fin(r.elapsedMs) ? Math.max(1, Math.round(r.elapsedMs / 1000)) : '—' }),
-        entries: ['alpha', 'red', 'cio'].map(function (k) { return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], text: r.agents[k] }; })
+        entries: debateEntries(r, lang)
       },
       meta: t(lang, 'meta'),
       aria: t(lang, 'aria.verdict', { word: word }) + (ring.pct != null ? t(lang, 'aria.conviction', { pct: ring.pct }) : '')
     };
+  }
+
+  /** The debate card: the synthesis on top (when there is one), then Alpha, Red Team, the second round, the CIO,
+   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text. */
+  function debateEntries(r, lang) {
+    var out = [], syn = synthesisOf(r), a = r.agents || {};
+    if (syn) {
+      out.push({ id: 'syn', name: t(lang, 'syn.name'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
+        lines: [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].filter(function (x) { return x[1]; })
+          .map(function (x) { return { label: t(lang, 'syn.' + x[0]), text: x[1] }; }) });
+    }
+    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), hue: HUES.alpha, text: a.alpha });
+    out.push({ id: 'red', name: t(lang, 'agent.red'), hue: HUES.red, text: a.red });
+    if (typeof a.rebuttal === 'string' && a.rebuttal) out.push({ id: 'rebuttal', name: t(lang, 'agent.rebuttal'), hue: HUES.alpha, text: a.rebuttal });
+    out.push({ id: 'cio', name: t(lang, 'agent.cio'), hue: HUES.cio, text: a.cio });
+    var sc = a.scenarios;
+    if (sc && typeof sc.confirm === 'string' && typeof sc.invalidate === 'string') {
+      out.push({ id: 'scenarios', name: t(lang, 'agent.scenarios'), hue: '#9A5CFF', text: '',
+        lines: [{ label: t(lang, 'sc.confirm'), text: sc.confirm }, { label: t(lang, 'sc.invalidate'), text: sc.invalidate }] });
+    }
+    var su = r.sufficiency;
+    if (su && su.sufficient === false && Array.isArray(su.missing) && su.missing.length) {
+      var list = su.missing.filter(function (m) { return typeof m === 'string'; }).join(', ');
+      out.push({ id: 'missing', name: t(lang, 'agent.missing'), hue: 'rgba(242,237,228,.5)',
+        text: su.horizon ? t(lang, 'missing.line', { h: su.horizon, list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
+    }
+    var ev = r.evidenceUsed;
+    if (ev && typeof ev === 'object') {
+      var parts = (Array.isArray(ev.timeframes) ? ev.timeframes.filter(function (x) { return typeof x === 'string'; }) : []);
+      if (ev.derivatives === true) parts.push(t(lang, 'ev.derivatives'));
+      var rec = ev.record;
+      if (rec && fin(rec.resolvedCalls) && rec.resolvedCalls > 0) parts.push(t(lang, 'ev.record', { w: fin(rec.wins) ? rec.wins : 0, n: rec.resolvedCalls }));
+      if (parts.length) out.push({ id: 'evidence', name: t(lang, 'agent.evidence'), hue: 'rgba(242,237,228,.5)', text: parts.join(' · ') });
+    }
+    return out;
   }
 
   /** XP chip copy from the REAL awarded points (0 = daily cap). */
@@ -858,15 +919,22 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     lang = lang2(lang);
     switch (r && r.status) {
       case 'signin_required':
-        return { kind: 'signin', caption: t(lang, 'gate.signin'), sub: null, access: r.access || null,
+        return { kind: 'signin', caption: typeof r.caption === 'string' && r.caption ? r.caption : t(lang, 'gate.signin'), sub: null, access: r.access || null,
           chips: [{ label: t(lang, 'gate.signinCta'), action: { signIn: true, retry: r.token || null }, primary: true, style: 'apple' },
             { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'subscription_required':
         var day = resetDay(r.access && r.access.resetsAt, lang);
-        return { kind: 'subscription', caption: t(lang, 'gate.pro'), sub: day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
-          access: r.access || null,
-          chips: [{ label: t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' },
-            { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
+        /* a level refusal (upgrade_required) carries native's own line, chip ("Invite a friend") and a lower-level fallback */
+        var proChips = [{ label: typeof r.cta === 'string' ? r.cta : t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' }];
+        if (r.fallback && typeof r.fallback.label === 'string' && r.fallback.token) proChips.push({ label: r.fallback.label, action: { token: r.fallback.token } });
+        proChips.push({ label: t(lang, 'gate.notNow'), action: { dismiss: true } });
+        return { kind: 'subscription',
+          caption: typeof r.caption === 'string' ? r.caption : t(lang, 'gate.pro'),
+          sub: typeof r.sub === 'string' ? r.sub : day ? t(lang, 'gate.proResets', { date: day }) : t(lang, 'gate.proNoDate'),
+          access: r.access || null, chips: proChips };
+      case 'level_notice':
+        return { kind: 'level', caption: r.caption || '', sub: r.sub || null,
+          chips: [{ label: r.cta || '', action: { token: r.token }, primary: true }, { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'confirm':
         return { kind: 'confirm', caption: t(lang, 'confirm.prompt', { name: r.asset.name, symbol: r.asset.symbol }), sub: r.proxyNote || null,
           chips: [{ label: t(lang, 'confirm.yes', { symbol: r.asset.symbol }), action: { token: r.token }, primary: true },
@@ -1531,6 +1599,7 @@ function st(el, t, o, f){
   if (t != null && t !== el._t){ el._t = t; el.style.transform = t; }
   if (o != null){ o = o < 0.003 ? 0 : (o > 0.997 ? 1 : Math.round(o * 1000) / 1000); if (o !== el._o){ el._o = o; el.style.opacity = o; } }
   if (f != null && f !== el._f){ el._f = f; el.style.filter = f; }
+  if (el === linesEl && o != null){ sa(el, 'aria-hidden', o > 0.5 ? 'false' : 'true'); if (rbodyEl) rbodyEl.tabIndex = o > 0.5 ? 0 : -1; }
 }
 function sa(el, k, v){ if (el['_a' + k] !== v){ el['_a' + k] = v; el.setAttribute(k, v); } }
 function sc(el, k, v){ if (el['_c' + k] !== v){ el['_c' + k] = v; el.style[k] = v; } }
@@ -1600,15 +1669,22 @@ function buildRisk(statements){
   (statements || []).slice(0, 4).forEach(function(s){
     var d = document.createElement('div'); d.className = 'ln'; linesEl.appendChild(d); lineEls.push(d); lineW.push(spans(d, s.title));
   });
-  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb'; rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
+  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb';
+  rbodyEl.setAttribute('role', 'region'); rbodyEl.setAttribute('aria-label', statements && statements[0] ? statements[0].title : ''); rbodyEl.tabIndex = -1;
+  rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
   RISK_LAYOUT = null;
 }
 /* stack below the agree ring (ring bottom at cy + r + 14 = 436 for the risk sphere), 16 px clear */
 function layoutRisk(top){
   var y = top, tops = [];
   for (var i = 0; i < lineEls.length; i++){ tops.push(y); sc(lineEls[i], 'top', f1(y) + 'px'); y += (lineEls[i].offsetHeight || 26) + 4; }
-  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y; y += (rbodyEl.offsetHeight || 54) + 2;
-  RISK_LAYOUT = { tops:tops, body:by, notice:Math.min(y, 690) };
+  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y;
+  // Measure the complete copy before bounding its viewport above the full-notice button.
+  sc(rbodyEl, 'height', 'auto');
+  var naturalHeight = rbodyEl.scrollHeight || rbodyEl.offsetHeight || 54;
+  var bodyHeight = Math.min(naturalHeight, Math.max(0, 690 - by - 8));
+  sc(rbodyEl, 'height', f1(bodyHeight) + 'px'); rbodyEl.scrollTop = 0;
+  RISK_LAYOUT = { tops:tops, body:by, bodyHeight:bodyHeight, notice:Math.min(by + bodyHeight + 8, 690) };
   return RISK_LAYOUT;
 }
 
@@ -1857,7 +1933,9 @@ var STR = {
     'risk.intro': 'Before I answer, one thing.',
     'risk.introOnly': 'One thing before we go on.',
     'risk.hold': 'Hold to agree',
+    'risk.activate': 'I agree to the risk notice and AI processing',
     'risk.notice': 'Read the full notice',
+    'risk.profile': 'Profile',
     'risk.failed': 'That didn’t go through · Hold again',
     'think.elapsed': '{s} s',
     'think.still': 'Still weighing · deep reads take up to a minute',
@@ -1917,7 +1995,9 @@ var STR = {
     'risk.intro': 'Antes de responder, una cosa.',
     'risk.introOnly': 'Una cosa antes de seguir.',
     'risk.hold': 'Mantén para aceptar',
+    'risk.activate': 'Acepto el aviso de riesgo y el procesamiento con IA',
     'risk.notice': 'Leer el aviso completo',
+    'risk.profile': 'Perfil',
     'risk.failed': 'No se registró · Mantén otra vez',
     'think.elapsed': '{s} s',
     'think.still': 'Sigue deliberando · una lectura a fondo tarda hasta un minuto',
@@ -2040,6 +2120,7 @@ function tintTo(labc, amt){ to(W.tl, labc[0]); to(W.ta, labc[1]); to(W.tb, labc[
 function tintSnap(labc){ W.tl.x = W.tl.t = labc[0]; W.ta.x = W.ta.t = labc[1]; W.tb.x = W.tb.t = labc[2]; }
 function setHint(s){ if (W.hint === s) return; W.hintPrev = W.hint; W.hint = s; W.hintT = T; }
 function setPill(mode, label, width){
+  pill.setAttribute('aria-label', mode === 'agree' ? Ls('risk.activate') : Ls('aria.pill'));
   if (mode && mode !== W.pillMode){ W.pillModePrev = W.pillMode; W.pillMode = mode; W.pillModeT = T; }
   if (label != null && label !== W.pillLabel){ W.pillLabelPrev = W.pillLabel; W.pillLabel = label; W.pillLabelT = T; }
   if (width) to(W.pillW, width, 'pill');
@@ -2054,7 +2135,7 @@ function moveSphere(cy, r, nm){
     W.pend = { t:T + 0.12, cy:cy, r:r, nm:nm };
   } else { W.pend = null; to(W.cy, cy, nm); to(W.r, r, nm); }
 }
-function companionTint(){ return CHOSEN_ART ? CHOSEN_ART.tintLab : lab('#B8C2D3'); }
+function companionTint(){ return lab('#A795EF'); }
 
 /* ---------- cues ---------- */
 function at(dt, fn){ W.cues.push({ t:T + dt, fn:fn, g:W.gen }); }      /* cancelled when the state changes */
@@ -2306,7 +2387,7 @@ function route(s){
 function enterBorn(){
   W.birthT = T - 30; W.r.x = W.r.t = 120; W.birth.x = W.birth.t = 1; W.glow.x = W.glow.t = 1; W.birthMass = false; W.energy.x = W.energy.t = 0.35;
   tb('wmFly', T - 5); tb('pillIn', T - 0.3);
-  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(CHOSEN_ART.tintLab); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
+  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(companionTint()); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
   loadRoster().catch(noop);
 }
 
@@ -2600,7 +2681,7 @@ ENTER.THINK_RESOLVE = function(){
   var chartW = sp0.stageAt.chart != null ? wordIndexOfSentence(sp0.sentences, sp0.stageAt.chart) : null;
   var breaks = [closeStart]; if (chartW) breaks.push(chartW);
   W.chartDue = false; W.chartT = 0; W.evT = 0; W.talkPhase = 'evidence'; W.verdictShown = false;
-  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:14,   /* the persona voice for a full read can take 6–9 s: 6 s cancelled it */
+  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:45,   /* Covers both persona fetch attempts; keep the first read aligned with the desk. */
     top:function(){ return W.talkPhase === 'evidence' ? 488 : 592; } });
   if (M.chart){
     var cw = chartW != null ? chartW : Math.max(0, wordIndexOfSentence(sp0.sentences, 1) - 1);
@@ -2967,7 +3048,7 @@ function sim(h){
   /* the picker drag fraction: the tint AND the temperament preview both follow it 1:1, blended between neighbours */
   var inPick = W.picker && !W.chosen && NPICK > 0, kf = 0, k0 = 0, k1 = 0;
   if (inPick){ kf = clamp(W.theta.x / DET, 0, NPICK - 1); k0 = Math.floor(kf); k1 = Math.min(NPICK - 1, k0 + 1); }
-  if (inPick) tintSnap(mixLabTo(TMP_LAB, PICKS[k0].art.tintLab, PICKS[k1].art.tintLab, kf - k0));
+  if (inPick) tintSnap(companionTint());
   else if (W.peekOn){
     var fr = clamp((W.theta.x - W.thBase) / DET, 0, 1); tintSnap(mixLabTo(TMP_LAB, companionTint(), ISLA_LAB, fr));
     to(W.nb, 0.25 + 0.75 * fr); to(W.wash, 0.12 * fr);
@@ -3555,6 +3636,7 @@ function dropWords(ws, born, gone, dir, stag){
 }
 var titleEl = $('title'), subEl = $('sub'), cap2El = $('cap2'), promptEl = $('prompt'), wmBig = $('wmBig'), metaEl = $('meta');
 var wmEl = $('wm'), dqEl = $('dq'), closeEl = $('close'), avatarEl = $('avatar'), xpArcEl = $('xpArc'), noticeEl = $('notice'), pnameEl = $('pname'), pcountEl = $('pcount');
+var riskProfileEl = $('riskProfile');
 var titleW = [], subW = [], cap2W = [], cap2K = null, promptW = null;
 function renderTexts(){
   if (W.title && titleEl._k !== W.title[0] + '|' + W.title[1]){ titleEl._k = W.title[0] + '|' + W.title[1]; titleW = spans(titleEl, W.title[0]); subW = spans(subEl, W.title[1]); }
@@ -3590,7 +3672,7 @@ function renderTexts(){
     var dqo = T > dg ? 1 - c01((T - dg) / 0.16) : 1; st(dqEl, null, dqo); st(closeEl, null, c01((T - dk - 0.16) / 0.16) * dqo * c01(W.closeK.x));
   } else { st(dqEl, null, 0); st(closeEl, null, 0); }
   cls(closeEl, 'on', closeActive());
-  var ab = tmB('avaFly') + 0.48; st(avatarEl, null, T >= ab ? c01((T - ab) / 0.12) : 0);
+  var ab = tmB('avaFly') + 0.48; st(avatarEl, null, W.state !== 'RISK' && T >= ab ? c01((T - ab) / 0.12) : 0);
   var xpv = W.xpArc.x; sa(xpArcEl, 'stroke-dasharray', f1(94.25 * xpv) + ' 94.25'); sa(xpArcEl, 'opacity', xpv > 0.004 ? '1' : '0');
   /* meta line under the verdict caption */
   var mb = tmB('meta'), mg = tmG('meta'), mo = T >= mb ? c01((T - mb) / 0.24) * (T > mg ? 1 - c01((T - mg) / 0.2) : 1) : 0;
@@ -3625,7 +3707,17 @@ function renderPicker(){
 }
 
 /* ---------- risk notice: the 4 real titles, pulse-swept, then statement 1's body ---------- */
+function renderRiskProfile(){
+  // Withdrawing consent or upgrading its version must never hide account deletion behind AI consent.
+  var show = W.state === 'RISK' && !W.agreeBusy;
+  var label = Ls('risk.profile');
+  txt(riskProfileEl, label); sa(riskProfileEl, 'aria-label', label);
+  sa(riskProfileEl, 'aria-hidden', show ? 'false' : 'true');
+  riskProfileEl.disabled = !show; riskProfileEl.tabIndex = show ? 0 : -1;
+  st(riskProfileEl, null, show ? 1 : 0); cls(riskProfileEl, 'tap', show);
+}
 function renderLines(){
+  renderRiskProfile();
   var b = tmB('lines'), g = tmG('lines'), n = lineEls.length;
   if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); }
   else {
@@ -3864,11 +3956,15 @@ function velocityOf(P){
   return [(h[n - 1][1] - h[j][1]) / dt, (h[n - 1][2] - h[j][2]) / dt];
 }
 function inDebate(x, y){ var ti = CARDS.indexOf(cardD); return ti >= 0 && Math.round(W.track.x) === ti && y > 286 && y < 610 && DSCROLL.max > 2; }
+function riskScrollMax(){ return rbodyEl ? Math.max(0, rbodyEl.scrollHeight - rbodyEl.clientHeight) : 0; }
+function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.body && y <= RISK_LAYOUT.body + RISK_LAYOUT.bodyHeight && riskScrollMax() > 0; }
+function scrollRisk(y){ if (rbodyEl) rbodyEl.scrollTop = clamp(y, 0, riskScrollMax()); }
 function inDown(hit, idx, x, y){
   if (PTR) return;
   PTR = { hit:hit, idx:idx, x0:x, y0:y, x:x, y:y, kind:null, hist:[[nowS(), x, y]], moved:false };
   var s = W.state;
   if (hit === 'pill'){ W.pr.pill = [T, 1e9]; pillDown(); return; }
+  if (!hit && inRiskBody(x, y)){ PTR.kind = 'risk-scroll'; PTR.scroll0 = rbodyEl.scrollTop; return; }
   if (hit){ W.pr[hit === 'chip' ? 'chip' + idx : hit] = [T, 1e9]; return; }
   if (s === 'HANDBACK' && y > 98 && y < 736) PTR.kind = 'pull?';
   else if (s === 'CARDS') PTR.kind = inDebate(x, y) ? 'card?' : 'track?';
@@ -3887,6 +3983,7 @@ function inMove(x, y){
   }
   if (P.kind === 'track' && W.drag) W.drag.x = x;
   else if (P.kind === 'scroll' && W.drag) W.drag.y = y;
+  else if (P.kind === 'risk-scroll' && W.state === 'RISK') scrollRisk(P.scroll0 - dy);
   else if (P.kind === 'pull') W.pullY = y;
 }
 function inUp(x, y, upHit, cancelled){
@@ -3929,6 +4026,7 @@ function action(hit, idx){
   if (hit === 'chip'){ if (s === 'ASK_TEACH' || s === 'ERROR') chipTap(idx); }
   else if (hit === 'perm') permContinue();
   else if (hit === 'notice'){ if (s === 'RISK' && isOn('notice')){ buzz('light', 0.3); fire('openNative', { route:'riskNotice' }); } }
+  else if (hit === 'profile'){ if (s === 'RISK' && !W.agreeBusy){ agreeRelease(); buzz('light', 0.3); fire('openNative', { route:'account' }); } }
   else if (hit === 'save') saveTap();
   else if (hit === 'close'){ if (closeActive()) closeTap(); }
   else if (hit === 'apple') appleTap();
@@ -3959,9 +4057,30 @@ window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; r
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
   var h = hitOf(e.target); if (!h[0]) return;
-  if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
+  if (h[0] === 'pill' && W.state === 'RISK'){
+    if (W.agreeReady && !W.agreeBusy && RISK_NOTICE) agreeComplete();
+  }
+  else if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
   else action(h[0], h[1]);
 });
+// The scaled stage disables touch scrolling; keep the complete consent copy scrollable by pointer,
+// keyboard and trackpad without routing any of these gestures through the hold-to-agree button.
+document.addEventListener('keydown', function(e){
+  if (e.target !== rbodyEl || W.state !== 'RISK') return;
+  var y = rbodyEl.scrollTop, page = rbodyEl.clientHeight * 0.8;
+  if (e.key === 'ArrowDown') y += 18;
+  else if (e.key === 'ArrowUp') y -= 18;
+  else if (e.key === 'PageDown' || e.key === ' ') y += page;
+  else if (e.key === 'PageUp') y -= page;
+  else if (e.key === 'Home') y = 0;
+  else if (e.key === 'End') y = riskScrollMax();
+  else return;
+  e.preventDefault(); scrollRisk(y);
+});
+window.addEventListener('wheel', function(e){
+  var p = toStage(e.clientX, e.clientY);
+  if (inRiskBody(p[0], p[1])) scrollRisk(rbodyEl.scrollTop + e.deltaY / FIT);
+}, { passive:true });
 ['gesturestart', 'gesturechange', 'dblclick'].forEach(function(k){ document.addEventListener(k, function(e){ e.preventDefault(); }, { passive:false }); });
 if (HARNESS) document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
 

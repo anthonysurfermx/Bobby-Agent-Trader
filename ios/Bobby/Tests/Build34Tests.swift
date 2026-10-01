@@ -24,9 +24,10 @@ final class Build34Tests: XCTestCase {
 
     @MainActor private func signedIn(_ user: String = "b34-user", token: String = "tok-old",
                                      apple: String? = "001.apple", provider: String? = "apple") -> AccountSession {
-        Keychain.write(StoredSession(accessToken: token, refreshToken: "ref-\(user)", expiresAt: Date().addingTimeInterval(3600),
-                                     userId: user, appleUserId: apple, provider: provider), service: service)
-        let account = AccountSession()
+        // Race and HTTP behavior must not depend on the unsigned simulator host's Keychain entitlements.
+        let initial = StoredSession(accessToken: token, refreshToken: "ref-\(user)", expiresAt: Date().addingTimeInterval(3600),
+                                    userId: user, appleUserId: apple, provider: provider)
+        let account = AccountSession(initialSession: initial, usesKeychain: false)
         XCTAssertEqual(account.session?.userId, user)
         return account
     }
@@ -188,8 +189,10 @@ final class Build34Tests: XCTestCase {
     @MainActor func testASignInFailureIsStoredAsTheWordedCopy() async {
         let account = AccountSession()
         XCTAssertNil(account.session)
+        account.prepareAppleRequest(ASAuthorizationAppleIDProvider().createRequest())
         await account.completeApple(.failure(ASAuthorizationError(.unknown)))
         XCTAssertEqual(account.lastError, AccountSession.appleSignInFailure(ASAuthorizationError(.unknown)))
+        account.prepareAppleRequest(ASAuthorizationAppleIDProvider().createRequest())
         await account.completeApple(.failure(ASAuthorizationError(.canceled)))
         XCTAssertNil(account.lastError, "a cancel clears the line instead of keeping an old error")
     }
@@ -298,7 +301,17 @@ final class Build34Tests: XCTestCase {
     // MARK: Sessions saved before build 33
 
     @MainActor func testALegacySessionLearnsItsAppleIDFromAuth() async throws {
-        let account = signedIn("legacy-user", token: "tok-legacy", apple: nil, provider: nil)
+        // Start from the actual pre-build-33 serialized schema, with both new identity fields absent.
+        let legacy = StoredSession(accessToken: "tok-legacy", refreshToken: "ref-legacy-user",
+                                   expiresAt: Date().addingTimeInterval(3600), userId: "legacy-user")
+        var persistedData: Data? = try JSONEncoder().encode(legacy)
+        let legacyJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(persistedData)) as? [String: Any])
+        XCTAssertNil(legacyJSON["appleUserId"])
+        XCTAssertNil(legacyJSON["provider"])
+        var writes = 0
+        let storage = AccountSessionStorage(read: { persistedData }, write: { persistedData = $0; writes += 1 }, clear: { persistedData = nil })
+        let account = AccountSession(storage: storage)
+        XCTAssertEqual(account.session?.userId, "legacy-user", "the first launch decodes the legacy bytes")
         B34Stub.install { seen in
             guard seen.path == "/auth/v1/user" else { return .fail }
             return .json(200, #"{"id":"legacy-user","app_metadata":{"provider":"apple","providers":["apple"]},"identities":[{"provider":"apple","id":"001.legacy","identity_data":{"sub":"001.legacy"}}]}"#)
@@ -306,7 +319,14 @@ final class Build34Tests: XCTestCase {
         await account.backfillIdentity()
         XCTAssertEqual(account.session?.appleUserId, "001.legacy")
         XCTAssertEqual(account.session?.provider, "apple")
-        XCTAssertEqual(Keychain.read(service: service)?.appleUserId, "001.legacy", "kept for the next launch")
+        XCTAssertEqual(writes, 1, "backfill persists the changed identity")
+        let savedJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(persistedData)) as? [String: Any])
+        XCTAssertEqual(savedJSON["appleUserId"] as? String, "001.legacy", "the serialized record contains the learned Apple ID")
+        XCTAssertEqual(savedJSON["provider"] as? String, "apple")
+        let reloaded = AccountSession(storage: storage)
+        XCTAssertEqual(reloaded.session?.appleUserId, "001.legacy", "kept for the next launch")
+        XCTAssertEqual(reloaded.session?.provider, "apple")
+        XCTAssertEqual(reloaded.session?.accessToken, "tok-legacy")
         let call = try XCTUnwrap(B34Stub.requests.first)
         XCTAssertEqual(call.bearer, "Bearer tok-legacy")
         XCTAssertEqual(call.request.value(forHTTPHeaderField: "apikey"), SupabaseConfig.anonKey)
@@ -525,5 +545,22 @@ final class B34Stub: URLProtocol {
             data.append(buffer, count: n)
         }
         return data
+    }
+}
+
+/// The profile greeting: the given name Apple shares once stays on the phone, tied to that Apple ID.
+final class AppleGivenNameTests: XCTestCase {
+    func testTheGivenNameBelongsToItsAppleIDAndIsForgotten() throws {
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: "apple-given-name-tests"))
+        defaults.removePersistentDomain(forName: "apple-given-name-tests")
+        AppleGivenName.remember("  Ana ", appleUserId: "001.a", defaults: defaults)
+        XCTAssertEqual(AppleGivenName.name(for: "001.a", defaults: defaults), "Ana")
+        XCTAssertNil(AppleGivenName.name(for: "002.b", defaults: defaults), "another Apple ID never inherits the name")
+        // Apple sends the name on the first authorization only: an empty one keeps what is stored.
+        AppleGivenName.remember(nil, appleUserId: "001.a", defaults: defaults)
+        AppleGivenName.remember("", appleUserId: "001.a", defaults: defaults)
+        XCTAssertEqual(AppleGivenName.name(for: "001.a", defaults: defaults), "Ana")
+        AppleGivenName.forget(defaults: defaults)
+        XCTAssertNil(AppleGivenName.name(for: "001.a", defaults: defaults))
     }
 }

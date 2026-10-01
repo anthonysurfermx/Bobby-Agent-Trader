@@ -227,7 +227,9 @@ function buildChart(ch, prov, receivedAt){
     att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
-  el.cX.textContent = tt('chart.x', { tf: src.timeframe || '', provider: src.provider || '', inst: src.instrument || '', when: whenLabel(src.asOf, receivedAt) }).toUpperCase();
+  /* the UI never names the exchange behind the candles (Base-only naming) */
+  var prov = /okx|okb|x ?layer/i.test(src.provider || '') ? '' : (src.provider || '');
+  el.cX.textContent = tt('chart.x', { tf: src.timeframe || '', provider: prov, inst: src.instrument || '', when: whenLabel(src.asOf, receivedAt) }).replace(/ ·\s+·/g, ' ·').toUpperCase();
   var lineL = 300, leadL = 320;
   try { lineL = el.cLine.getTotalLength(); leadL = el.cLead.getTotalLength(); } catch (e) {}
   CH = { n: n, nowY: nowY, lineL: lineL, leadL: leadL, band: band, bracket: !!br };
@@ -249,8 +251,12 @@ function fillCards(m){
   el.card0.lb.textContent = m.debate.header; el.card0.mt.textContent = m.debate.title; el.card0.disc.textContent = m.meta;
   el.card0.inn.textContent = '';
   m.debate.entries.forEach(function(e){
-    var ar = mk('div', 'ar'); ar.style.setProperty('--c', 'var(--' + (e.id === 'alpha' ? 'alpha' : e.id === 'red' ? 'red' : 'cio') + ')');
-    ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name)); d.appendChild(mk('p', null, e.text)); ar.appendChild(d);
+    var ar = mk('div', 'ar');
+    ar.style.setProperty('--c', e.id === 'alpha' || e.id === 'red' || e.id === 'cio' ? 'var(--' + e.id + ')' : (e.hue || 'var(--cio)'));
+    ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name));
+    if (e.text) d.appendChild(mk('p', null, e.text));
+    (e.lines || []).forEach(function(l){ var p = mk('p'), lb = mk('span', null, l.label + ': '); lb.style.fontWeight = '600'; lb.style.color = 'var(--ink)'; p.appendChild(lb); p.appendChild(D.createTextNode(l.text)); d.appendChild(p); });
+    ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
   A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - 250 + 12);

@@ -1,0 +1,28 @@
+Test Case '-[BobbyTests.BobbyAccessTests testAccessParsingIsLenientAndNeverInvents]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testAccessParsingIsLenientAndNeverInvents]' passed (0.006 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testFailedSubscriptionSyncCanRetryTheSameExpiry]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testFailedSubscriptionSyncCanRetryTheSameExpiry]' passed (0.001 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testMissingOrFreeAccessCannotConfirmPro]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testMissingOrFreeAccessCannotConfirmPro]' passed (0.001 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testOldAccountAndExpiryCallbacksCannotOverwriteNewSync]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testOldAccountAndExpiryCallbacksCannotOverwriteNewSync]' passed (0.003 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testPurchasesRequireBothServerFlags]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testPurchasesRequireBothServerFlags]' passed (0.000 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheAccessHeadersNameTheDeviceThePlatformAndTheBearerOnlyWhenSignedIn]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheAccessHeadersNameTheDeviceThePlatformAndTheBearerOnlyWhenSignedIn]' passed (0.003 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheAccountSheetReadsLine]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheAccountSheetReadsLine]' passed (0.004 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheDebugKeyIsATestStoreKeyAndReleaseShipsWithout]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheDebugKeyIsATestStoreKeyAndReleaseShipsWithout]' passed (0.000 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheDeviceIdIsOneStableRandomUUIDv4]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheDeviceIdIsOneStableRandomUUIDv4]' passed (0.001 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheMeteredReadMapping]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheMeteredReadMapping]' passed (0.001 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testThePeriodNames]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testThePeriodNames]' passed (0.000 seconds).
+Test Case '-[BobbyTests.BobbyAccessTests testTheRevenueCatKeyGuard]' started.
+Test Case '-[BobbyTests.BobbyAccessTests testTheRevenueCatKeyGuard]' passed (0.000 seconds).
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.020 (0.055) seconds
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.020 (0.055) seconds
+	 Executed 12 tests, with 0 failures (0 unexpected) in 0.020 (0.056) seconds
+** TEST SUCCEEDED **

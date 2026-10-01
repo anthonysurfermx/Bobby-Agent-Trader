@@ -233,8 +233,8 @@ struct SquadLockerSheet: View {
     var body: some View {
         let reachable = LockerLedger.reachable(current, ownId: ownId, xp: xp)
         ZStack {
-            Theme.bg.ignoresSafeArea()
-            RadialGradient(colors: [(reachable ? current.tint : Color.white).opacity(reachable ? 0.16 : 0.07), .clear],
+            Theme.nucleoSurface.ignoresSafeArea()
+            RadialGradient(colors: [Theme.orbViolet.opacity(reachable ? 0.14 : 0.06), Theme.orbBlue.opacity(0.05), .clear],
                            center: UnitPoint(x: 0.5, y: 0.34), startRadius: 30, endRadius: 380)
                 .ignoresSafeArea()
                 .animation(reduceMotion ? nil : .easeOut(duration: 0.6), value: pageId)
@@ -311,11 +311,11 @@ struct SquadLockerSheet: View {
         let count = LockerLedger.count(ownId: ownId, xp: xp)
         let complete = count.owned == count.total
         return HStack(spacing: 10) {
-            Circle().fill(current.tint).frame(width: 7, height: 7).shadow(color: current.tint, radius: 6)
+            Circle().fill(Theme.orbCyan).frame(width: 6, height: 6).shadow(color: Theme.orbCyan.opacity(0.5), radius: 6)
                 .accessibilityHidden(true)
-            Text(L.t("BOBBY // LOCKER", "BOBBY // VITRINA"))
+            Text(L.t("YOUR COLLECTION", "TU COLECCIÓN"))
                 .font(.mono(11, .bold)).kerning(1.9)
-                .foregroundStyle(Theme.text.opacity(0.78))
+                .foregroundStyle(Theme.warmMuted)
                 .accessibilityAddTraits(.isHeader)
             Spacer()
             HStack(spacing: 4) {
@@ -324,17 +324,17 @@ struct SquadLockerSheet: View {
                     .font(.mono(11, .bold))
                     .contentTransition(.numericText())
             }
-            .foregroundStyle(complete ? lockerGold : Theme.text.opacity(0.7))
+            .foregroundStyle(complete ? lockerGold : Theme.warmMuted)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(L.t("\(count.owned) of \(count.total) earned", "\(count.owned) de \(count.total) ganados"))
             .accessibilityIdentifier("locker-counter")
             Button { dismiss() } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(Theme.text.opacity(0.8))
+                    .foregroundStyle(Theme.cream)
                     .frame(width: 32, height: 32)
-                    .background(Circle().fill(Theme.card))
-                    .overlay(Circle().stroke(Theme.stroke, lineWidth: 1))
+                    .background(Circle().fill(Theme.nucleoGlass))
+                    .overlay(Circle().stroke(Theme.nucleoStroke, lineWidth: 1))
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
@@ -395,7 +395,7 @@ struct SquadLockerSheet: View {
         return Button { step(direction) } label: {
             Image(systemName: direction < 0 ? "chevron.left" : "chevron.right")
                 .font(.system(size: 18, weight: .semibold))
-                .foregroundStyle(Theme.text.opacity(0.4))
+                .foregroundStyle(Theme.warmDim)
                 .frame(width: 44, height: 96)
                 .contentShape(Rectangle())
         }
@@ -455,12 +455,12 @@ private struct LockerPage: View {
     @ViewBuilder
     private var chip: some View {
         if isOwn {
-            lockerChip(icon: "checkmark", text: L.t("WITH YOU", "CONTIGO"), color: companion.tint, stroke: companion.tint.opacity(0.45))
+            lockerChip(icon: "checkmark", text: L.t("WITH YOU", "CONTIGO"), color: Theme.cream, stroke: Theme.orbViolet.opacity(0.45))
                 .accessibilityIdentifier("locker-own-chip")
         } else if !reachable {
             let need = max(0, LockerLedger.minXP(forLevel: companion.requiredLevel) - xp)
             lockerChip(icon: "lock.fill", text: L.t("LEVEL \(companion.requiredLevel) · +\(need) XP", "NIVEL \(companion.requiredLevel) · +\(need) XP"),
-                       color: Theme.text.opacity(0.82), stroke: Color.white.opacity(0.16))
+                       color: Theme.cream, stroke: Color.white.opacity(0.16))
                 .accessibilityIdentifier("locker-lock-chip")
         } else {
             // Same height, nothing to say: keeps every page aligned.
@@ -568,26 +568,26 @@ private struct LockerPage: View {
             if let item = focused {
                 let state = LockerLedger.state(item, ownId: ownId, xp: xp)
                 Text(item.title)
-                    .font(.rounded(22, .bold))
-                    .foregroundStyle(Theme.text)
+                    .font(.system(size: 24, weight: .light, design: .rounded))
+                    .foregroundStyle(Theme.cream)
                     .lineLimit(1).minimumScaleFactor(0.7)
                 Text(statusLine(item, state))
                     .font(.mono(10, .bold)).kerning(1.4)
-                    .foregroundStyle(item.isGolden ? lockerGold : (reachable ? companion.tint : Theme.text.opacity(0.7)))
+                    .foregroundStyle(item.isGolden ? lockerGold : (reachable ? Theme.orbCyan : Theme.warmMuted))
                 if state != .owned {
                     Text(L.t("Earned by reading and coming back. Never bought.", "Se gana leyendo y volviendo. Nunca se compra."))
                         .font(.mono(9, .medium))
-                        .foregroundStyle(Theme.muted)
+                        .foregroundStyle(Theme.warmDim)
                         .lineLimit(1).minimumScaleFactor(0.7)
                 }
             } else {
                 Text(isOwn ? companion.name(at: LockerLedger.level(at: xp)) : companion.label)
-                    .font(.mono(26, .black)).kerning(3)
-                    .foregroundStyle(reachable ? companion.tint : Theme.text.opacity(0.72))
+                    .font(.system(size: 28, weight: .light, design: .rounded)).tracking(-0.6)
+                    .foregroundStyle(reachable ? Theme.cream : Theme.warmMuted)
                     .lineLimit(1).minimumScaleFactor(0.6)
                 Text(ownedCount == 4 ? L.t("SET COMPLETE", "SET COMPLETO") : companion.role)
                     .font(.mono(10, .bold)).kerning(1.6)
-                    .foregroundStyle(ownedCount == 4 ? lockerGold : Theme.muted)
+                    .foregroundStyle(ownedCount == 4 ? lockerGold : Theme.warmDim)
             }
         }
         .frame(height: 64)
@@ -613,7 +613,6 @@ private struct LockerPage: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { i, item in
                 LockerBox(item: item,
                           state: LockerLedger.state(item, ownId: ownId, xp: xp),
-                          tint: companion.tint,
                           isNew: unseen.contains(item.id),
                           focused: focus == item.id,
                           nextProgress: next?.id == item.id ? next?.progress : nil,
@@ -639,7 +638,6 @@ private struct LockerPage: View {
 private struct LockerBox: View {
     let item: CatalogItem
     let state: LockerState
-    let tint: Color
     let isNew: Bool
     let focused: Bool
     let nextProgress: Double?
@@ -652,7 +650,7 @@ private struct LockerBox: View {
     @State private var fill: Double = 0
 
     private var owned: Bool { state == .owned }
-    private var accent: Color { item.isGolden ? lockerGold : tint }
+    private var accent: Color { item.isGolden ? lockerGold : Theme.orbViolet }
     /// One rule for the bar and the chip above it, so they never drift apart.
     private var showsBar: Bool {
         guard let p = nextProgress else { return false }
@@ -663,11 +661,11 @@ private struct LockerBox: View {
         Button(action: action) {
             ZStack {
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(owned ? accent.opacity(item.isGolden ? 0.14 : 0.12) : Theme.card)
+                    .fill(owned && item.isGolden ? lockerGold.opacity(0.10) : Theme.nucleoGlass)
                 RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .stroke(focused ? accent : (owned ? accent.opacity(item.isGolden ? 0.85 : 0.6) : (item.isGolden ? lockerGold.opacity(0.35) : Theme.stroke)),
+                    .stroke(focused ? accent : (owned ? accent.opacity(item.isGolden ? 0.65 : 0.3) : (item.isGolden ? lockerGold.opacity(0.35) : Theme.nucleoStroke)),
                             lineWidth: focused ? 2 : (owned && item.isGolden ? 1.5 : 1))
-                ItemArt(item: item, size: 60, tint: owned ? accent : Theme.muted)
+                ItemArt(item: item, size: 60, tint: owned ? accent : Theme.warmDim)
                     .silverLocked(!owned)
                     .padding(8)
                 if owned && item.isGolden && !reduceMotion {
@@ -679,8 +677,8 @@ private struct LockerBox: View {
                         Spacer()
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Capsule().fill(Color.white.opacity(0.08))
-                                Capsule().fill(accent).frame(width: geo.size.width * fill)
+                                Capsule().fill(Theme.cream.opacity(0.08))
+                                Capsule().fill(LinearGradient(colors: [Theme.orbViolet, Theme.orbCyan], startPoint: .leading, endPoint: .trailing)).frame(width: geo.size.width * fill)
                             }
                         }
                         .frame(height: 3)
@@ -730,7 +728,7 @@ private struct LockerBox: View {
         VStack {
             HStack(alignment: .top) {
                 if item.isPet {
-                    Image(systemName: "pawprint.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.text.opacity(0.55))
+                    Image(systemName: "pawprint.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(Theme.warmDim)
                 } else if item.isGolden {
                     Image(systemName: "star.fill").font(.system(size: 9, weight: .bold)).foregroundStyle(lockerGold.opacity(owned ? 1 : 0.6))
                 }
@@ -745,7 +743,7 @@ private struct LockerBox: View {
                 } else if !owned {
                     Image(systemName: "lock.fill")
                         .font(.system(size: 7, weight: .bold))
-                        .foregroundStyle(Theme.text.opacity(0.85))
+                        .foregroundStyle(Theme.cream)
                         .frame(width: 16, height: 16)
                         .background(Circle().fill(Theme.bg.opacity(0.8)))
                 }
@@ -755,7 +753,7 @@ private struct LockerBox: View {
                 Text(chip)
                     .font(.mono(9, .bold))
                     .lineLimit(1).minimumScaleFactor(0.7)
-                    .foregroundStyle(item.isGolden ? lockerGold : Theme.text.opacity(0.9))
+                    .foregroundStyle(item.isGolden ? lockerGold : Theme.cream)
                     .padding(.horizontal, 6).padding(.vertical, 2)
                     .background(Capsule().fill(Theme.bg.opacity(0.85)))
                     .padding(.bottom, showsBar ? 8 : 0)
@@ -808,7 +806,7 @@ private struct LockerShowcase: View {
     @AccessibilityFocusState private var voiceOverFocus: Bool
 
     private var owned: Bool { state == .owned }
-    private var accent: Color { item.isGolden ? lockerGold : item.companion.tint }
+    private var accent: Color { item.isGolden ? lockerGold : Theme.orbViolet }
 
     var body: some View {
         VStack(spacing: 10) {
@@ -832,7 +830,7 @@ private struct LockerShowcase: View {
             }
             Text(item.lore)
                 .font(.rounded(12, .medium))
-                .foregroundStyle(Theme.text.opacity(0.7))
+                .foregroundStyle(Theme.warmMuted)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
                 .frame(width: 150)
@@ -914,16 +912,16 @@ private struct LockerStrip: View {
                         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         .silverLocked(!reachable)
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(c.id == pageId ? c.tint : Theme.stroke, lineWidth: c.id == pageId ? 2 : 1)
+                        .stroke(c.id == pageId ? Theme.orbViolet : Theme.nucleoStroke, lineWidth: c.id == pageId ? 2 : 1)
                 }
                 .frame(width: 52, height: 52)
                 .overlay(alignment: .topTrailing) {
                     if hasNew {
-                        Circle().fill(c.tint).frame(width: 8, height: 8).offset(x: 2, y: -2)
+                        Circle().fill(Theme.orbCyan).frame(width: 8, height: 8).offset(x: 2, y: -2)
                     } else if !reachable {
                         Image(systemName: "lock.fill")
                             .font(.system(size: 7, weight: .bold))
-                            .foregroundStyle(Theme.text.opacity(0.9))
+                            .foregroundStyle(Theme.cream)
                             .frame(width: 16, height: 16)
                             .background(Circle().fill(Theme.bg.opacity(0.85)))
                             .offset(x: 3, y: -3)
@@ -933,7 +931,7 @@ private struct LockerStrip: View {
                     if c.id == ownId {
                         Image(systemName: "checkmark.circle.fill")
                             .font(.system(size: 14))
-                            .foregroundStyle(c.tint)
+                            .foregroundStyle(Theme.orbCyan)
                             .background(Circle().fill(Theme.bg))
                             .offset(x: 4, y: 4)
                     }
@@ -942,8 +940,8 @@ private struct LockerStrip: View {
                     ForEach(items) { item in
                         let has = LockerLedger.state(item, ownId: ownId, xp: xp) == .owned
                         Circle()
-                            .fill(has ? (item.isGolden ? lockerGold : c.tint) : Color.clear)
-                            .overlay(Circle().stroke(has ? Color.clear : Theme.muted.opacity(0.5), lineWidth: 0.75))
+                            .fill(has ? (item.isGolden ? lockerGold : Theme.orbCyan) : Color.clear)
+                            .overlay(Circle().stroke(has ? Color.clear : Theme.warmDim.opacity(0.5), lineWidth: 0.75))
                             .frame(width: 4, height: 4)
                     }
                 }

@@ -1,0 +1,20 @@
+Meet Bobby, your companion for thinking through the market.
+
+Ask a question about a stock or crypto asset by typing or using optional on-device dictation. Bobby brings three perspectives to the discussion: an opportunity view, a risk challenge and a synthesis of the evidence.
+
+A READING YOU CAN REVISIT
+See market context, a chart, source timestamps and a conditional conclusion. Save a reading on your device and return to its reasoning later. A Wait result is a useful answer when the evidence is not sufficient.
+
+CHOOSE THE DEPTH
+Quick, Deep and Max offer different analysis depths. Guest readings and signed-in levels have usage limits; availability and remaining allowances appear in the app. Some levels require Sign in with Apple.
+
+YOUR COMPANION, YOUR PROGRESS
+Choose a companion, customize your profile and explore Trader Land. An optional Apple account synchronizes progress. Your island stays private until you choose to publish it. Public islands include reporting and creator blocking.
+
+YOUR CHOICE ABOUT AI
+External AI processing requires your permission. You can review the notice and withdraw permission from Profile. Dictation uses supported on-device Apple speech recognition; microphone audio is not uploaded. You can always type instead. Optional narration can be muted.
+
+Bobby is a market analysis and educational tool. The iPhone app does not connect wallets, execute trades or move funds. Analyses may be incomplete or incorrect, and market data may be delayed. Nothing in Bobby is a promise of returns or personalized investment advice. You decide what to do.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en
+Support: https://bobbyprotocol.xyz/support?lang=en

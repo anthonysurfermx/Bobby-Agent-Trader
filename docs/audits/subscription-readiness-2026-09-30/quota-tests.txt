@@ -1,0 +1,102 @@
+{
+  "scope": "local PostgreSQL only; synthetic requests; production untouched",
+  "cases": [
+    {
+      "case": "shared_network",
+      "repeat": 1,
+      "requests": 100,
+      "accepted": 15,
+      "expected": 15,
+      "passed": true
+    },
+    {
+      "case": "shared_network",
+      "repeat": 2,
+      "requests": 100,
+      "accepted": 15,
+      "expected": 15,
+      "passed": true
+    },
+    {
+      "case": "shared_network",
+      "repeat": 3,
+      "requests": 100,
+      "accepted": 15,
+      "expected": 15,
+      "passed": true
+    },
+    {
+      "case": "same_device",
+      "repeat": 1,
+      "requests": 100,
+      "accepted": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "case": "same_device",
+      "repeat": 2,
+      "requests": 100,
+      "accepted": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "case": "same_device",
+      "repeat": 3,
+      "requests": 100,
+      "accepted": 3,
+      "expected": 3,
+      "passed": true
+    },
+    {
+      "case": "different_networks",
+      "repeat": 1,
+      "requests": 100,
+      "accepted": 100,
+      "expected": 100,
+      "passed": true
+    },
+    {
+      "case": "different_networks",
+      "repeat": 2,
+      "requests": 100,
+      "accepted": 100,
+      "expected": 100,
+      "passed": true
+    },
+    {
+      "case": "different_networks",
+      "repeat": 3,
+      "requests": 100,
+      "accepted": 100,
+      "expected": 100,
+      "passed": true
+    },
+    {
+      "case": "signed_in_free",
+      "repeat": 1,
+      "requests": 100,
+      "accepted": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "case": "signed_in_free",
+      "repeat": 2,
+      "requests": 100,
+      "accepted": 10,
+      "expected": 10,
+      "passed": true
+    },
+    {
+      "case": "signed_in_free",
+      "repeat": 3,
+      "requests": 100,
+      "accepted": 10,
+      "expected": 10,
+      "passed": true
+    }
+  ],
+  "execute_permissions": "f|f|t"
+}

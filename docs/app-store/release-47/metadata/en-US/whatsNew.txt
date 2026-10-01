@@ -1,0 +1,1 @@
+A redesigned Bobby experience: choose your companion, compare analysis depths, revisit saved readings and manage AI permission from Profile. This update improves account isolation, voice cancellation and error recovery.

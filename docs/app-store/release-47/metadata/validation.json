@@ -1,0 +1,41 @@
+{
+  "passed": true,
+  "limits": {
+    "promotionalText": 170,
+    "subtitle": 30,
+    "description": 4000,
+    "whatsNew": 4000,
+    "keywordsUTF8Bytes": 100
+  },
+  "counts": {
+    "en-US": {
+      "promotionalText": 140,
+      "subtitle": 25,
+      "description": 1704,
+      "whatsNew": 264,
+      "keywordsUTF8Bytes": 78
+    },
+    "es-MX": {
+      "promotionalText": 151,
+      "subtitle": 24,
+      "description": 1860,
+      "whatsNew": 312,
+      "keywordsUTF8Bytes": 88
+    },
+    "pt-PT": {
+      "promotionalText": 142,
+      "subtitle": 28,
+      "description": 2019,
+      "whatsNew": 315,
+      "keywordsUTF8Bytes": 80
+    }
+  },
+  "appInterfaceLanguages": [
+    "en",
+    "es"
+  ],
+  "publicMetadataNamedAIProviderReferences": false,
+  "nvidiaOrNVDAReferences": false,
+  "savedInAppStoreConnect": false,
+  "languageQA": "English, Spanish (Mexico), European Portuguese reviewed; no unresolved material language corrections."
+}

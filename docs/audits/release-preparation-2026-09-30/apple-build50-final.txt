@@ -1,0 +1,23 @@
+Apple remote evidence observed through Chrome and Xcode Organizer, 2026-09-30.
+App: 6804460489, Bobby: Think Before You Trade.
+Xcode: App upload complete; Bobby 1.5 (50) uploaded.
+Apple Add Build: build 50, version 1.5 available; selected and Done.
+Version saved: build 50 link /testflight/ios/82112e4f-e511-4243-9647-6a33e10dfa10/metadata.
+Version status after save: 1.5 Prepare for Submission.
+Review notes begin Bobby 1.5 (50) replaces rejected build 38; saved readback verified.
+Manually release this version: selected (1).
+Update Review remains unclicked.
+Availability: 174 Available, 1 Not Available; unavailable popover explicitly China mainland.
+App Information subtitles saved:
+  EN: Three views of the market
+  ES: Tres miradas del mercado
+  PT: Três olhares sobre o mercado
+Media Manager, switched away and back to each locale after uploads:
+  English (U.S.): 7 screenshots, draggable order 01 02 03 04 05 06 07.
+  Spanish (Mexico): 7 screenshots, draggable order 01 02 03 04 05 06 07.
+  Portuguese (Portugal): 7 screenshots, draggable order 01 02 03 04 05 06 07.
+  Each 6.5-inch group inherits its own locale's 6.9-inch group.
+Original uploads: primary docs/app-store/nucleo-editorial-v2/localized/{en,es,pt}/01..07.png.
+No overlays or newly generated artwork uploaded. English owner-approved order retained.
+Portuguese upload processing completed 07 before 06; keyboard lift/move/drop restored 06 before 07, then locale-switch readback verified persistence.
+Physical device tests, real purchases, notification ownership and provider/data contracts remain external gates; this record does not claim Apple approval or production subscriptions.

@@ -2,7 +2,7 @@
 // over the app's NeuralVoice: the page queues a line by id and gets voice.start /
 // voice.level / voice.progress / voice.word / voice.end back. NeuralVoice keeps
 // `speaking` false while the TTS request is in flight, so start and end are found on
-// the edges of `speaking`, and a 22 s watchdog guarantees exactly one voice.end per id.
+// the edges of `speaking`, and a bounded watchdog guarantees exactly one voice.end per id.
 import Combine
 import Foundation
 import QuartzCore
@@ -11,9 +11,9 @@ import QuartzCore
 final class NucleoVoice {
     static let maxLength = 800
     static let idPattern = #"^[A-Za-z0-9_.:-]{1,64}$"#
-    /// Long enough for NeuralVoice's worst legitimate path (8 s request timeout, a 1.2 s pause and
-    /// one retry, then the device fallback): a slow network voice must not be cancelled before it plays.
-    static let watchdogSeconds: Double = 22
+    /// Allows both bounded persona requests to finish before ending the line.
+    static let watchdogSeconds: Double = NeuralVoice.maximumNarrationWaitSeconds + 2
+
 
     let voice: NeuralVoice
     var emit: (String, [String: Any]) -> Void = { _, _ in }
@@ -44,6 +44,7 @@ final class NucleoVoice {
         }.store(in: &cancellables)
         voice.$level.sink { [weak self] level in self?.levelChanged(level) }.store(in: &cancellables)
         voice.$playback.sink { [weak self] playback in self?.playbackChanged(playback) }.store(in: &cancellables)
+        voice.onFailure = { [weak self] in self?.finish(reason: "failed") }
         voice.onDeviceWord = { [weak self] range in self?.deviceWord(range) }
     }
 
@@ -77,6 +78,7 @@ final class NucleoVoice {
 
     func teardown() {
         stop()
+        voice.onFailure = nil
         voice.onDeviceWord = nil
         cancellables.removeAll()
     }
@@ -90,7 +92,7 @@ final class NucleoVoice {
         watchdog = Task { [weak self] in
             try? await Task.sleep(nanoseconds: UInt64(Self.watchdogSeconds * 1_000_000_000))
             guard !Task.isCancelled, let self, let line = self.current, line.id == id, !line.started else { return }
-            // Playback never started (network voice and fallback both failed): end it honestly.
+            // Persona playback never started: end it honestly without a system voice.
             self.voice.stop()
             self.finish(reason: "failed")
         }
