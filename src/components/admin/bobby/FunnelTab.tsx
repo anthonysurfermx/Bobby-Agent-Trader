@@ -23,7 +23,7 @@ type Notify = (text: string, ok?: boolean) => void;
 
 const MIN_BASE = 5;
 const NOT_MEASURED = 'Sin medir';
-const NO_OUTCOMES = 'Se registra desde el próximo deploy';
+const NO_OUTCOMES = 'Aún sin registros';
 /** a of b: a percentage only when the base can carry one. */
 const share = (a: number, b: number) => (!b ? '—' : b >= MIN_BASE ? fmtPct(a, b) : `${fmtInt(a)}/${fmtInt(b)}`);
 
@@ -283,7 +283,7 @@ function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outc
       />
       {!since ? (
         <Note tag="Sin datos aún">
-          Entregadas, fallidas, muros y bloqueos los registra el servidor desde el próximo deploy. Hoy no hay registros: no es cero, es que todavía no se mide.
+          Entregadas, fallidas, muros y bloqueos los registra el servidor en cada lectura del desk. Todavía no hay ninguno en este periodo.
         </Note>
       ) : (
         <>
@@ -381,7 +381,7 @@ function CoverageNote({ g, o }: { g: Growth; o: OverviewResponse['overview'] }) 
   const parts = [
     `Llegadas observadas desde ${cv.webObservedSince ? fmtDate(cv.webObservedSince) : 'sin datos'} (web)`,
     `iOS desde ${cv.iosObservedSince ? fmtDate(cv.iosObservedSince) : 'sin datos'} (instalaciones 1.5+)`,
-    `resultados del desk desde ${cv.outcomesSince ? fmtDate(cv.outcomesSince) : 'el próximo deploy'}`,
+    `resultados del desk ${cv.outcomesSince ? `desde ${fmtDate(cv.outcomesSince)}` : 'aún sin registros'}`,
     `${fmtInt(cv.backfillInstalls)} instalaciones reconstruidas aparte`,
     g.includeInternal
       ? `incluye al equipo (${fmtInt(cv.internalAccounts)} cuentas, ${fmtInt(cv.internalInstalls)} instalaciones)`

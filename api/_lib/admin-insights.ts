@@ -34,6 +34,8 @@ const n = (v: unknown): number => { const x = Number(v); return v == null || v =
 const s = (v: unknown): string | null => (typeof v === 'string' && v ? v : null);
 const pct = (num: number, den: number) => (den > 0 ? `${Math.round((num / den) * 100)}%` : '—');
 const int = (v: number) => new Intl.NumberFormat('es-MX').format(Math.round(v));
+/** "1 descarga" / "3 descargas": every counted noun agrees with its number. */
+const count = (v: number, one: string, many: string) => `${int(v)} ${Math.round(v) === 1 ? one : many}`;
 const usd = (v: number) => `$${v < 1 ? v.toFixed(3) : v.toFixed(2)}`;
 const day = (iso: string | null) => {
   if (!iso) return '—';
@@ -127,7 +129,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     const parts = Object.entries(blocked).map(([k, v]) => `${({ daily_limit: 'límite diario', budget_paused: 'presupuesto en pausa', premium_paused: 'Profundo/Máximo en pausa', unavailable: 'desk no disponible' } as Record<string, string>)[k] ?? k}: ${int(n(v))}`);
     add({
       id: 'desk-blocked', level: 'warn', area: 'operacion', tab: 'ia', impact: 80, sample: blockedTotal,
-      title: `${int(blockedTotal)} lecturas rechazadas por límites del servidor`,
+      title: `${count(blockedTotal, 'lectura rechazada', 'lecturas rechazadas')} por límites del servidor`,
       detail: `Gente que quiso leer y Bobby dijo que no por sus propios topes (${parts.join(' · ')}).`,
       action: 'Revisa los topes de gasto (IA) y la cuota diaria; un tope que corta usuarios reales es crecimiento perdido.',
       evidence: parts,
@@ -175,8 +177,8 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (store.configured && !store.error && downloads >= 3 && downloads > iosInstalls) {
     add({
       id: 'ios-gap', level: 'warn', area: 'medicion', tab: 'funnel', impact: 72, sample: downloads,
-      title: `Apple reporta ${int(downloads)} descargas; Bobby solo vio ${int(iosInstalls)} instalaciones iOS`,
-      detail: `${int(downloads - iosInstalls)} descargas (${pct(downloads - iosInstalls, downloads)}) no aparecen: no abrieron la app, o usan una versión que no envía id de instalación. Es la fuga más grande que se puede medir hoy en iOS.`,
+      title: `Apple reporta ${count(downloads, 'descarga', 'descargas')}; Bobby solo vio ${count(iosInstalls, 'instalación iOS', 'instalaciones iOS')}`,
+      detail: `${count(downloads - iosInstalls, 'descarga', 'descargas')} (${pct(downloads - iosInstalls, downloads)}) no aparecen: no abrieron la app, o usan una versión que no envía id de instalación. Es la fuga más grande que se puede medir hoy en iOS.`,
       action: 'Libera iOS 1.5 (envía id de instalación y vincula la cuenta) y revisa qué ve alguien en su primera apertura.',
       evidence: [`descargas Apple ${dateOnly(s(store.coveredFrom))}–${dateOnly(s(store.coveredTo))}: ${int(downloads)}`, `instalaciones iOS vistas: ${int(iosInstalls)}`],
     });
@@ -209,7 +211,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'utm-missing', level: 'opportunity', area: 'medicion', tab: 'funnel', impact: 60, sample: visits,
       title: 'Ninguna visita trae etiqueta de campaña (utm_source)',
-      detail: `${int(visits)} visitas web externas en ${period}d y 0 con utm_source: cuando publiques en TikTok, X o con un creador no sabrás cuál trajo gente que lee.`,
+      detail: `${count(visits, 'visita web externa', 'visitas web externas')} en ${period}d y 0 con utm_source: cuando publiques en TikTok, X o con un creador no sabrás cuál trajo gente que lee.`,
       action: 'Usa Funnel → Enlaces con UTM para cada post, bio y anuncio; el embudo por fuente se llena solo.',
       evidence: [`visitas: ${int(visits)}`, `con UTM: 0`, `con referrer: ${int(n(acq.visitsWithReferrer))}`],
     });
@@ -220,8 +222,8 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (visitors < LOW_TRAFFIC) {
     add({
       id: 'low-traffic', level: 'critical', area: 'adquisicion', tab: 'funnel', impact: 98, sample: visitors,
-      title: `Solo ${int(visitors)} visitantes web externos en ${period} días`,
-      detail: `Con tan pocas personas cualquier tasa del embudo es ruido: el cuello de botella hoy es que llegue gente, no la conversión.${downloads ? ` En iOS, Apple reporta ${int(downloads)} descargas en el mismo periodo.` : ''}`,
+      title: `Solo ${count(visitors, 'visitante web externo', 'visitantes web externos')} en ${period} días`,
+      detail: `Con tan pocas personas cualquier tasa del embudo es ruido: el cuello de botella hoy es que llegue gente, no la conversión.${downloads ? ` En iOS, Apple reporta ${count(downloads, 'descarga', 'descargas')} en el mismo periodo.` : ''}`,
       action: 'Prioriza traer tráfico con enlaces UTM (contenido, creadores, App Store) y mide de nuevo en 7 días antes de rediseñar pasos del embudo.',
       evidence: [`visitantes web externos: ${int(visitors)}`, `personas activas 7d: ${int(n(people.active7d))}`],
     });
@@ -341,7 +343,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'nobody-uses-3', level: 'info', area: 'conversion', tab: 'funnel', impact: 50, sample: readers,
       title: 'Nadie llega a 3 lecturas',
-      detail: `${int(readers)} instalaciones nuevas leyeron, ninguna llegó a 3 (el muro de registro está después de 3 lecturas como invitado). El registro no es el freno: la gente no vuelve a preguntar.`,
+      detail: `${readers === 1 ? '1 instalación nueva leyó y no llegó' : `${int(readers)} instalaciones nuevas leyeron, ninguna llegó`} a 3 (el muro de registro está después de 3 lecturas como invitado). El registro no es el freno: la gente no vuelve a preguntar.`,
       action: 'Trabaja la segunda lectura (sugerir el siguiente activo, recordatorio) antes que el muro de registro.',
       evidence: [`leyeron: ${int(readers)}`, `3+ lecturas: 0`],
     });
@@ -373,8 +375,8 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (quiet.length) {
     add({
       id: 'quiet-readers', level: 'opportunity', area: 'retencion', tab: 'usuarios', impact: 55, sample: quiet.length,
-      title: `${int(quiet.length)} cuentas que leyeron llevan 7+ días sin volver`,
-      detail: quiet.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)}: ${int(n(u.reads))} lecturas, última actividad ${dateOnly(s(u.lastDay))}`).join(' · '),
+      title: quiet.length === 1 ? '1 cuenta que leyó lleva 7+ días sin volver' : `${int(quiet.length)} cuentas que leyeron llevan 7+ días sin volver`,
+      detail: quiet.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)}: ${count(n(u.reads), 'lectura', 'lecturas')}, última actividad ${dateOnly(s(u.lastDay))}`).join(' · '),
       action: 'Regálales 1 Profundo desde Usuarios o escríbeles si tienen email.',
       evidence: [`en riesgo: ${int(quiet.length)}`],
     });
@@ -382,7 +384,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (n(people.proInactive) > 0) {
     add({
       id: 'pro-inactive', level: 'warn', area: 'retencion', tab: 'membresias', impact: 70, sample: n(o(people.stages).pro),
-      title: `${int(n(people.proInactive))} cuentas Pro sin usar Bobby en 14+ días`,
+      title: `${count(n(people.proInactive), 'cuenta Pro', 'cuentas Pro')} sin usar Bobby en 14+ días`,
       detail: 'Pagan (o tienen Pro regalado) y no lo usan: son las próximas cancelaciones.',
       action: 'Contáctalas antes de la renovación.',
       evidence: [`Pro inactivos: ${int(n(people.proInactive))}`],
@@ -414,7 +416,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (wallLevel + wallPay > 0) {
     add({
       id: 'upgrade-intent', level: 'opportunity', area: 'monetizacion', tab: 'membresias', impact: 64, sample: wallLevel + wallPay,
-      title: `${int(wallLevel + wallPay)} veces alguien quiso más de lo que su plan permite`,
+      title: `${count(wallLevel + wallPay, 'vez', 'veces')} alguien quiso más de lo que su plan permite`,
       detail: `${int(wallLevel)} pidieron Profundo/Máximo por encima de su límite y ${int(wallPay)} chocaron con el muro de pago: es intención de compra.`,
       action: 'En ese momento ofrece Bobby Pro (y en la web, que se pueda pagar).',
       evidence: [`límite de nivel: ${int(wallLevel)}`, `muro de pago: ${int(wallPay)}`],

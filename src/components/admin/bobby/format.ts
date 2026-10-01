@@ -152,5 +152,5 @@ export function coverageLine(c: Coverage | null | undefined): string {
   const since = (v: string | null, none: string) => (v ? fmtDate(v) : none);
   // bobby_reads keeps 35 days; the history is the shorter of that and the first recorded read.
   const readDays = c.readsSince ? Math.min(35, Math.max(1, Math.ceil((Date.now() - new Date(c.readsSince).getTime()) / 86_400_000))) : 0;
-  return `Visitas desde ${since(c.eventsSince, 'sin eventos')} · lecturas desde ${since(c.readsSince, 'sin lecturas')}${readDays ? ` (${readDays} ${readDays === 1 ? 'día' : 'días'} de historia)` : ''} · resultados del desk desde ${since(c.outcomesSince, 'el próximo deploy')} · compras ${c.purchasesSince ? `desde ${fmtDate(c.purchasesSince)}` : 'nunca recibidas'}`;
+  return `Visitas desde ${since(c.eventsSince, 'sin eventos')} · lecturas desde ${since(c.readsSince, 'sin lecturas')}${readDays ? ` (${readDays} ${readDays === 1 ? 'día' : 'días'} de historia)` : ''} · resultados del desk ${c.outcomesSince ? `desde ${fmtDate(c.outcomesSince)}` : 'aún sin registros'} · compras ${c.purchasesSince ? `desde ${fmtDate(c.purchasesSince)}` : 'nunca recibidas'}`;
 }
