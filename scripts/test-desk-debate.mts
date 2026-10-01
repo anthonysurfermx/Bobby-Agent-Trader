@@ -246,6 +246,9 @@ try {
     const url = String(input);
     if (url.includes('rpc/bobby_consume_desk_quota')) { quotaCalls++; quotaBodies.push(JSON.parse(String(init?.body))); return json(quotaAnswer.value); }
     if (url.includes('bobby_desk_quotas?')) return json(quotaAnswer.rows);
+    // The reader's own meter runs first; a daily-limit refusal gives that read back.
+    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 7, tier: 'anon', used: 1, limit: 3 });
+    if (url.includes('bobby_reads?id=eq.')) return new Response(null, { status: 204 });
     throw new Error(`Unexpected request ${url}`);
   }) as typeof fetch;
   eq(DESK_QUESTION_MAX, 1200, 'the app and the server share one limit');

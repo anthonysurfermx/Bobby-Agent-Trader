@@ -238,7 +238,7 @@ try {
     try { await deskHandler(request({ symbol: 'BTC', question: 'PRIVATE_QUESTION', language: 'es', level: 'rapido' }) as never, denied as never); }
     finally { console.error = previousError; }
     eq([denied.statusCode, denied.body.code], [503, 'analysis_failed'], 'provider refusal preserves the shipped iOS failure contract');
-    ok(denied.body.error.includes(reason === 'insufficient_quota' ? 'cuota del proveedor' : 'limitando'), 'provider refusal has an actionable localized message');
+    ok(denied.body.error.includes('El análisis no pudo terminar') && !/proveedor|cuota|provider|quota/i.test(denied.body.error), 'readers get the plain localized failure, never provider or quota wording');
     eq(calls.filter(c => hostOf(c.url) === 'api.openai.com').length, reason === 'insufficient_quota' ? 1 : 2, 'billing exhaustion is not retried; transient throttling is bounded');
     ok(calls.some(c => c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE'), 'failed provider call refunds the general read');
     ok(!calls.some(c => c.body?.model === 'gpt-4o-mini'), '429 never bypasses quota by swapping models');

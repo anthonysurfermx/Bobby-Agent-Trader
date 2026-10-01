@@ -15,6 +15,7 @@
 // ============================================================
 
 import { Communicate } from 'edge-tts-universal';
+import { alertProviderCredit } from './provider-alert.js';
 
 export interface SpeechResult {
   audio: Buffer;
@@ -239,7 +240,11 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
     body: JSON.stringify(body),
     signal: AbortSignal.timeout(12_000),
   });
-  if (!res.ok) throw new Error(`openai-tts ${res.status}: ${(await res.text()).slice(0, 180)}`);
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 400);
+    if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
+    throw new Error(`openai-tts ${res.status}: ${body.slice(0, 180)}`);
+  }
   const audio = Buffer.from(await res.arrayBuffer());
   if (audio.length === 0) throw new Error('openai-tts: empty audio');
   const isOpus = opts.format === 'opus';

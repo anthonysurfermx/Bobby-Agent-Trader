@@ -68,5 +68,25 @@ export function alertProviderCredit(provider: AlertProvider, code: string, endpo
   try { waitUntil(task); } catch { /* outside a request context the promise still runs */ }
 }
 
+/**
+ * A plain operational email to the owner (same sender and recipient as the credit alert). Fire-and-forget.
+ * Callers pass only what the owner needs to act — never questions, emails, wallets or free-text from users.
+ */
+export function notifyOwner(subject: string, text: string): void {
+  const apiKey = (process.env.RESEND_API_KEY || '').trim();
+  const to = (process.env.BOBBY_ALERT_EMAIL || process.env.WAITLIST_NOTIFY_EMAIL || '').trim();
+  if (!apiKey || !to) { console.error('[provider-alert] owner notice not sent: no alert email configured'); return; }
+  const task = fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: (process.env.BOBBY_ALERT_FROM || process.env.WAITLIST_NOTIFY_FROM || '').trim() || 'Bobby Alerts <onboarding@resend.dev>',
+      to: [to], subject, text,
+    }),
+    signal: AbortSignal.timeout(8000),
+  }).then((r) => { if (!r.ok) console.error('[provider-alert] owner notice failed', r.status); }).catch(() => undefined);
+  try { waitUntil(task); } catch { /* outside a request context the promise still runs */ }
+}
+
 /** Tests only: forget the per-instance window. */
 export function resetProviderAlerts(): void { lastSent.clear(); }

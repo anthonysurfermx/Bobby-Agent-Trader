@@ -46,7 +46,9 @@ begin
   else
     net_used := 0;
   end if;
-  if used >= 3 or net_used >= 15 then
+  -- 100 guest reads per network per week (was 15): carrier NAT, offices and App Review share one /24, and a
+  -- brand-new install there must still get its 3 free reads. Device rotation stays bounded by this pool.
+  if used >= 3 or net_used >= 100 then
     return jsonb_build_object('allowed', false, 'code', 'signin_required', 'readId', null, 'tier', 'anon', 'used', greatest(used, 3), 'limit', 3, 'resetsAt', null);
   end if;
   insert into bobby_reads(device_hash, network_hash, platform, symbol) values (p_device, p_network, p_platform, p_symbol) returning id into rid;

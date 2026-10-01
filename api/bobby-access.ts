@@ -151,6 +151,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'apple') {
+      // Retired: the iPhone app confirms purchases through RevenueCat (action 'revenuecat-sync'), which checks the
+      // receipt with Apple server-side. This raw-JWS path lacks Apple's receipt OIDs, environment and
+      // appAccountToken checks, so it stays off unless explicitly re-enabled after those checks exist.
+      if (process.env.BOBBY_APPLE_JWS_SYNC !== 'on') return res.status(410).json({ error: 'Use the in-app restore.', code: 'apple_sync_retired' });
       if (typeof signedTransaction !== 'string' || signedTransaction.length > 20000) return res.status(400).json({ error: 'signedTransaction required' });
       let tx: Record<string, unknown>;
       try { tx = verifyAppleJws(signedTransaction); }

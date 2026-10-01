@@ -268,6 +268,8 @@ try {
   const deskMock = () => mock((c) => {
     const r = backend(c); if (r) return r;
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, code: null, readId: 1, tier: 'free', used: 1, limit: 10 });
+    if (c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE') return json([]);
     if (c.url.includes('rpc/bobby_llm_spend')) return json(spend);
     if (c.url.includes('rpc/bobby_consume_level')) return json({ ...levelGate, tier: 'free', used: 1, limit: 3, resetsAt: null });
     if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
@@ -361,7 +363,8 @@ try {
   // The iPhone app sends its account token too, but cannot show or delete memory yet: nothing for it.
   const ios = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios' });
   await settle();
-  eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 0], 'an iPhone read: no memory call, no personalization (MEMORY_PLATFORMS)');
+  // One auth lookup remains: the desk meters the account's reads (consumeRead), not memory.
+  eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 1], 'an iPhone read: no memory call, no personalization (MEMORY_PLATFORMS); only the read meter resolves the account');
   const web = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
   await settle();
   eq([web.body.personalized, recorded().length], [true, 1], 'the same account on the web: personalized and recorded');
@@ -372,7 +375,8 @@ try {
     const killed = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
     await settle();
     eq([killed.statusCode, 'personalized' in killed.body], [200, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer`);
-    eq([memoryCalls().length, authCalls().length, recorded().length], [0, 0, 0], `BOBBY_MEMORY=${value ?? 'unset'}: no memory read, no identity lookup, nothing recorded`);
+    // The single auth lookup is the account's read meter; memory adds none.
+    eq([memoryCalls().length, authCalls().length, recorded().length], [0, 1, 0], `BOBBY_MEMORY=${value ?? 'unset'}: no memory read, only the meter's identity lookup, nothing recorded`);
     ok(!models().some((c) => 'reader' in inputOf(c)), `BOBBY_MEMORY=${value ?? 'unset'}: no reader for any role`);
   }
   process.env.BOBBY_MEMORY = 'on';

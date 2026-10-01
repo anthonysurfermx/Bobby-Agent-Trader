@@ -95,8 +95,9 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
           model,
           kind: classifyHttpStatus(res.status),
           httpStatus: res.status,
-          message: errBody.slice(0, 300),
+          message: `http_${res.status}`,
         });
+        console.error('[llm] provider error', 'openai', model, res.status, errBody.slice(0, 200));
         // Exhausted credit never recovers through a retry: alert the owner and stop.
         const refusal = refusalCode((() => { try { return JSON.parse(errBody); } catch { return null; } })());
         if (refusal === 'insufficient_quota' || refusal === 'billing_hard_limit_reached') {
@@ -281,7 +282,9 @@ export async function completeJson(
   if (!res.ok) {
     if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') alertProviderCredit(spec.provider, providerCode, opts.endpoint);
     const detail = (await res.text().catch(() => '')).slice(0, 300);
-    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: detail });
+    // The health log is readable through the public agent_events feed: class and status only, never the body.
+    console.error('[llm] provider error', spec.provider, spec.model, res.status, providerCode ?? '', detail.slice(0, 200));
+    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: providerCode ?? `http_${res.status}` });
     note({ stop: `http_${res.status}` });
     throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, providerCode);
   }

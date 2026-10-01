@@ -3,7 +3,7 @@ import { waitUntil } from '@vercel/functions';
 import { z } from 'zod';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { getClientQuotaKeys } from './_lib/rate-limit.js';
+import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, type Access } from './_lib/access.js';
@@ -117,21 +117,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         ? copy(language, 'The desk is paused for now. Try again later.', 'El desk está en pausa por ahora. Inténtalo más tarde.')
         : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
     }
-    // Atomic, cross-instance, fail-closed limits. No model calls if storage fails.
-    // Caller (IPv4 address / IPv6 /64) and network (/24 / /48) budgets keep a
-    // handful of addresses from spending everyone's global budget.
-    const keys = getClientQuotaKeys(req);
-    if (!keys) return refuse(res, 503, 'desk_unavailable', unavailable);
-    const quota = await fetch(bobbyRest('rpc/bobby_consume_desk_quota'), {
-      method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(5000),
-      body: JSON.stringify({ p_caller: keys.caller, p_network: keys.network }),
-    });
-    if (!quota.ok) return refuse(res, 503, 'desk_unavailable', unavailable);
-    if (await quota.json() !== true) {
-      // Caller, network and global windows are all 24 h: this is not "retry in a moment".
-      res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
-      return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
-    }
+    const addressKeys = getClientQuotaKeys(req);
+    if (!addressKeys) return refuse(res, 503, 'desk_unavailable', unavailable);
     // A premium level spends its own allowance before any model call; a failed analysis gives it back.
     if (level !== 'rapido') {
       const gate = await consumeLevel(req, level, symbol);
@@ -159,6 +146,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     readId = read.readId;
     access = read.access;
     knownIdentity = read.identity;
+    // Atomic, cross-instance, fail-closed daily limits, spent only once the reader's own meter allowed the
+    // read (a refused request never uses the shared budget). Caller (IPv4 / IPv6 /64) and network (/24 / /48)
+    // budgets keep a handful of addresses from spending everyone's global budget. A Bobby Pro account is keyed
+    // by the account instead, so a shared office or carrier network never caps a paying reader; the global
+    // ceiling still applies to everyone. No model calls if storage fails.
+    const keys = access?.tier === 'pro' && knownIdentity
+      ? { caller: saltedKey(`pro-caller:${knownIdentity.id}`), network: saltedKey(`pro-network:${knownIdentity.id}`) }
+      : addressKeys;
+    const quota = await fetch(bobbyRest('rpc/bobby_consume_desk_quota'), {
+      method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(5000),
+      body: JSON.stringify({ p_caller: keys.caller, p_network: keys.network }),
+    }).catch(() => null);
+    if (!quota?.ok) { await refund(); return refuse(res, 503, 'desk_unavailable', unavailable); }
+    if (await quota.json() !== true) {
+      await refund();
+      // Caller, network and global windows are all 24 h: this is not "retry in a moment".
+      res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
+      return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
+    }
     const send = (line: Record<string, unknown>) => { if (!res.writableEnded) res.write(`${JSON.stringify(line)}\n`); };
     if (live) {
       streaming = true;
@@ -197,13 +203,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const refunded = await refund();
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
-    const providerUnavailable = error instanceof LlmHttpError && (error.status === 429 || error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
-    const quotaUnavailable = providerUnavailable && (error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
-    const failureMessage = providerUnavailable
-      ? quotaUnavailable
-        ? copy(language, 'Analysis is temporarily unavailable. The service provider quota needs attention.', 'El análisis no está disponible por ahora. Debemos restablecer la cuota del proveedor.')
-        : copy(language, 'The analysis provider is temporarily limiting requests. Please try again later.', 'El proveedor de análisis está limitando las solicitudes. Inténtalo más tarde.')
-      : failed;
+    // Readers always get the same plain failure; the provider detail stays in the log below and, for exhausted
+    // credit, in the owner's alert email (api/_lib/provider-alert.ts).
+    const failureMessage = failed;
     // Safe diagnostics only: no question, bearer, account, raw provider error or generated text.
     console.error(JSON.stringify({ route: 'desk-debate', event: 'analysis_failed',
       providerStatus: error instanceof LlmHttpError ? error.status : null,
