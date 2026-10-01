@@ -181,7 +181,21 @@ export interface LlmUsage {
 }
 export class LlmIncompleteError extends Error {}
 /** The provider refused the request; `status` lets a caller tell a model-access problem (401/403/404) from an outage. */
-export class LlmHttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export type ProviderRefusal = 'insufficient_quota' | 'rate_limit_exceeded' | 'billing_hard_limit_reached';
+const providerRefusals = new Set<ProviderRefusal>(['insufficient_quota', 'rate_limit_exceeded', 'billing_hard_limit_reached']);
+/** Keep only known diagnostic codes; never retain the provider's prompt-bearing error message. */
+function refusalCode(body: unknown): ProviderRefusal | null {
+  const error = (body as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null)?.error;
+  // Anthropic reports exhausted credits as 400 invalid_request_error. Retain only the class.
+  if (error?.type === 'invalid_request_error' && typeof error.message === 'string' && /credit balance is too low/i.test(error.message)) return 'insufficient_quota';
+  for (const value of [error?.code, error?.type]) {
+    if (typeof value === 'string' && providerRefusals.has(value as ProviderRefusal)) return value as ProviderRefusal;
+  }
+  return null;
+}
+export class LlmHttpError extends Error {
+  constructor(readonly status: number, message: string, readonly providerCode: ProviderRefusal | null = null) { super(message); }
+}
 
 /** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. An unknown model logs $0. */
 export const MODEL_PRICES: Record<string, [number, number, number]> = {
@@ -218,6 +232,7 @@ export async function completeJson(
   });
 
   let res: Response | null = null;
+  let providerCode: ProviderRefusal | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const left = spec.timeoutMs - (Date.now() - started);
     if (left < 2000) break;
@@ -248,6 +263,9 @@ export async function completeJson(
       note({ stop: timeout ? 'timeout' : 'network' });
       throw e;
     }
+    providerCode = res.ok ? null : refusalCode(await res.clone().json().catch(() => null));
+    // Billing exhaustion cannot recover through a retry or a cheaper-model fallback.
+    if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') break;
     if (res.ok || !RETRY_STATUS(res.status) || attempt === 1) break;
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status });
     await sleep(BACKOFF_MS[0]);
@@ -257,7 +275,7 @@ export async function completeJson(
     const detail = (await res.text().catch(() => '')).slice(0, 300);
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: detail });
     note({ stop: `http_${res.status}` });
-    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`);
+    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, providerCode);
   }
 
   if (spec.provider === 'openai') {

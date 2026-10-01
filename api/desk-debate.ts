@@ -5,10 +5,10 @@ import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
-import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
+import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, type Access } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
-import type { LlmUsage } from './_lib/llm.js';
+import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { MEMORY_PLATFORMS, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
@@ -108,7 +108,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let knownIdentity: Identity | null | undefined;
   let streaming = false;
   try {
-    if (!process.env.OPENAI_API_KEY || (needsAnthropic(level) && !process.env.ANTHROPIC_API_KEY)) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();
@@ -197,11 +197,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const refunded = await refund();
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
+    const providerUnavailable = error instanceof LlmHttpError && (error.status === 429 || error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
+    const quotaUnavailable = providerUnavailable && (error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
+    const failureMessage = providerUnavailable
+      ? quotaUnavailable
+        ? copy(language, 'Analysis is temporarily unavailable. The service provider quota needs attention.', 'El análisis no está disponible por ahora. Debemos restablecer la cuota del proveedor.')
+        : copy(language, 'The analysis provider is temporarily limiting requests. Please try again later.', 'El proveedor de análisis está limitando las solicitudes. Inténtalo más tarde.')
+      : failed;
+    // Safe diagnostics only: no question, bearer, account, raw provider error or generated text.
+    console.error(JSON.stringify({ route: 'desk-debate', event: 'analysis_failed',
+      providerStatus: error instanceof LlmHttpError ? error.status : null,
+      providerCode: error instanceof LlmHttpError ? error.providerCode : null,
+      failureKind: error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error',
+      role: usage.at(-1)?.role ?? null, level, refunded }));
     if (streaming) {
-      if (!res.writableEnded) { res.write(`${JSON.stringify({ type: 'error', code: 'analysis_failed', error: failed, refunded: (useId !== null || readId !== null) && refunded })}\n`); res.end(); }
+      if (!res.writableEnded) { res.write(`${JSON.stringify({ type: 'error', code: 'analysis_failed', error: failureMessage, refunded: (useId !== null || readId !== null) && refunded })}\n`); res.end(); }
       return;
     }
-    return refuse(res, 503, 'analysis_failed', failed);
+    return refuse(res, 503, 'analysis_failed', failureMessage);
   } finally {
     // The response is already sent here and Vercel freezes the function once it has ended: the ledger
     // write must be registered with waitUntil, or it only lands when the instance wakes for another request

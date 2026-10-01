@@ -175,6 +175,24 @@ try {
   eq(levelPlan('maximo').budgetMs <= 170_000, true, 'Máximo fits inside maxDuration');
   eq(sufficiencyOf('Long term, is SOL worth holding for years?', ['1H', '4H', '1D', '1W']).sufficient, false, 'a multi-year horizon is never covered by the evidence');
 
+  // Credit exhaustion crosses providers once; later roles avoid the exhausted provider.
+  for (const direction of ['openai', 'anthropic']) {
+    const usage: any[] = [];
+    mock((c) => {
+      const fromOpenai = hostOf(c.url) === 'api.openai.com';
+      if ((direction === 'openai') === fromOpenai) return fromOpenai
+        ? json({ error: { code: 'insufficient_quota', message: 'credits exhausted' } }, 429)
+        : json({ error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } }, 400);
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : { ...CIO, scenarios: SCEN };
+      return fromOpenai ? openai(content) : claude(content);
+    });
+    const result = await runDeskDebate('Is this real?', direction === 'openai' ? evidence : v2, 'en', { level: direction === 'openai' ? 'rapido' : 'maximo', usage });
+    eq(result.agents.verdict, 'wait', 'credit failover still returns a validated verdict');
+    eq(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.openai.com' : 'api.anthropic.com')).length, 1, 'exhausted provider tried only once per debate');
+    eq(usage.filter(u => u.ok).length, direction === 'openai' ? 3 : 4, 'all roles run on the available provider, including Max rebuttal');
+    ok(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.anthropic.com' : 'api.openai.com')).every(c => direction === 'openai' ? c.body.model === 'claude-sonnet-5-5' : c.body.model === 'gpt-6-sol'), 'alternate model family matches the analysis level');
+  }
+
   // ---------- the endpoint: premium allowance, refusal, refund, ledger ----------
   const candles = Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 }));
   const request = (body: Record<string, unknown>, headers: Record<string, string> = {}) => ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.1', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body });
@@ -187,6 +205,7 @@ try {
   let spend = { day: 0, month: 0 };
   let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
   let modelFails = false;
+  let providerRefusal: string | null = null;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
     if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
@@ -199,6 +218,7 @@ try {
     if (c.url.includes('okx.com/api/v5/public')) return json({ data: [] });
     if (c.url.includes('forum_threads')) return json([]);
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
+      if (providerRefusal) return json({ error: { code: providerRefusal, message: 'private question must never be logged' } }, 429);
       if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
       const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
@@ -206,6 +226,26 @@ try {
     throw new Error(`Unexpected request ${c.url}`);
   });
 
+  for (const reason of ['insufficient_quota', 'rate_limit_exceeded', 'unknown-private-token']) {
+    providerRefusal = reason;
+    endpointMock();
+    const denied = response();
+    const logs: string[] = [];
+    const previousError = console.error;
+    console.error = (...args: unknown[]) => logs.push(args.map(String).join(' '));
+    try { await deskHandler(request({ symbol: 'BTC', question: 'PRIVATE_QUESTION', language: 'es', level: 'rapido' }) as never, denied as never); }
+    finally { console.error = previousError; }
+    eq([denied.statusCode, denied.body.code], [503, 'analysis_failed'], 'provider refusal preserves the shipped iOS failure contract');
+    ok(denied.body.error.includes(reason === 'insufficient_quota' ? 'cuota del proveedor' : 'limitando'), 'provider refusal has an actionable localized message');
+    eq(calls.filter(c => hostOf(c.url) === 'api.openai.com').length, reason === 'insufficient_quota' ? 1 : 2, 'billing exhaustion is not retried; transient throttling is bounded');
+    ok(calls.some(c => c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE'), 'failed provider call refunds the general read');
+    ok(!calls.some(c => c.body?.model === 'gpt-4o-mini'), '429 never bypasses quota by swapping models');
+    ok(!logs.join('').includes('PRIVATE_QUESTION') && !logs.join('').includes('private question') && !logs.join('').includes('unknown-private-token'), 'failure diagnostics omit question and arbitrary provider strings');
+    const diagnostic = logs.map(x => { try { return JSON.parse(x); } catch { return null; } }).find(x => x?.event === 'analysis_failed');
+    eq(diagnostic?.providerStatus, 429, 'safe diagnostic records provider status');
+    eq(diagnostic?.providerCode, reason === 'unknown-private-token' ? null : reason, 'only known provider diagnostic codes retained');
+  }
+  providerRefusal = null;
   endpointMock();
   const refused = response();
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'profundo' }) as never, refused as never);
@@ -285,11 +325,13 @@ try {
   resetLlmSpendCache(); spend = { day: 0, month: 0 };
 
   delete process.env.ANTHROPIC_API_KEY;
+  delete process.env.OPENAI_API_KEY;
   endpointMock();
   const noKey = response();
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, noKey as never);
-  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'Máximo without the Anthropic key is unavailable before any spend');
+  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'No provider keys means unavailable before any spend');
   process.env.ANTHROPIC_API_KEY = 'test-anthropic';
+  process.env.OPENAI_API_KEY = 'test-openai';
 
   // ---------- invites ----------
   eq(['ABCDEFGH', 'K7M9QRST', 'abcdefgh', 'ABCDEFG', 'ABCDEFGI', 'ABCDEF01'].map(isReferralCode), [true, true, false, false, false, false], 'invite codes: 8 of A–Z 2–9 without I, O, 0, 1');
