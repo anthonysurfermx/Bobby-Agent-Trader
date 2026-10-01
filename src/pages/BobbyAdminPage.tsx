@@ -14,6 +14,7 @@ import { toAdminError, useLoad } from '@/components/admin/bobby/useLoad';
 import Sidebar from '@/components/admin/bobby/Sidebar';
 import OverviewTab from '@/components/admin/bobby/OverviewTab';
 import FunnelTab from '@/components/admin/bobby/FunnelTab';
+import AudienceTab from '@/components/admin/bobby/AudienceTab';
 import UsersTab from '@/components/admin/bobby/UsersTab';
 import MembershipsTab from '@/components/admin/bobby/MembershipsTab';
 import CouponsTab from '@/components/admin/bobby/CouponsTab';
@@ -120,6 +121,7 @@ function headerCount(tab: TabId, d: OverviewResponse | null): string | null {
   switch (tab) {
     case 'resumen': case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas`;
     case 'funnel': return `${fmtInt(o.funnel.web.visitors)} visitantes`;
+    case 'audiencia': return null;
     case 'membresias': return `${fmtInt(o.subscriptions.active)} activas`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
     case 'ia': return `${fmtUsd(o.llm.providers.anthropic.month + o.llm.providers.openai.month)} 30d`;
@@ -241,6 +243,7 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
               )}
               {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} />}
               {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} />}
+              {tab === 'audiencia' && <AudienceTab period={period} refreshKey={refreshKey} />}
               {tab === 'usuarios' && <UsersTab me={me} refreshKey={refreshKey} notify={notify} onChanged={onChanged} focusSearch={focusSearch} onSearchFocused={onSearchFocused} />}
               {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} />}
               {tab === 'cupones' && <CouponsTab refreshKey={refreshKey} notify={notify} onChanged={onChanged} />}

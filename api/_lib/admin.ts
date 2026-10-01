@@ -13,6 +13,7 @@ import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './b
 import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
 import { paywallOn } from './access.js';
+import { countryCode, fromAlpha3 } from './geo.js';
 
 const TIMEOUT = 6000;
 
@@ -288,7 +289,8 @@ export const ascVendor = (raw = process.env.ASC_VENDOR_NUMBER) => raw?.match(/\d
 export const ascKeyId = (raw = process.env.ASC_KEY_ID) => raw?.match(/\b[A-Z0-9]{10}\b/)?.[0] ?? '';
 export const ascIssuer = (raw = process.env.ASC_ISSUER_ID) => raw?.match(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i)?.[0] ?? '';
 const ascConfigured = () => Boolean(ascKeyId() && ascIssuer() && process.env.ASC_PRIVATE_KEY?.trim() && ascVendor());
-interface SalesDay { downloads: number; redownloads: number; updates: number; iap: number }
+// countries: first-time downloads by storefront country (ISO alpha-2).
+interface SalesDay { downloads: number; redownloads: number; updates: number; iap: number; countries?: Record<string, number> }
 
 function ascToken(): string {
   const b64 = (v: string | Buffer) => Buffer.from(v).toString('base64url');
@@ -302,11 +304,11 @@ function ascToken(): string {
 
 const IAP_IDS = () => new Set((process.env.ASC_IAP_IDS?.trim() || '6817775464').split(/[,\s]+/).filter(Boolean));
 export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string> = IAP_IDS()): SalesDay {
-  const out: SalesDay = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };
+  const out: SalesDay = { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {} };
   const lines = tsv.split(/\r?\n/).filter(Boolean);
   const cols = (lines.shift() ?? '').split('\t');
   const at = (name: string) => cols.indexOf(name);
-  const [type, units, apple, parent] = [at('Product Type Identifier'), at('Units'), at('Apple Identifier'), at('Parent Identifier')];
+  const [type, units, apple, parent, country] = [at('Product Type Identifier'), at('Units'), at('Apple Identifier'), at('Parent Identifier'), at('Country Code')];
   if (type < 0 || units < 0 || apple < 0) throw new Error('appstore report unreadable');
   for (const line of lines) {
     const f = line.split('\t');
@@ -314,7 +316,11 @@ export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string>
     const ours = apple >= 0 && f[apple]?.trim() === appId;
     if (/^(IA|FI)/.test(t)) { if (iapIds.has(f[apple]?.trim() ?? '')) out.iap += n; continue; }
     if (!ours) continue;
-    if (/^(1|F1)/.test(t)) out.downloads += n;
+    if (/^(1|F1)/.test(t)) {
+      out.downloads += n;
+      const cc = countryCode(country >= 0 ? f[country] : null);
+      if (cc) out.countries![cc] = (out.countries![cc] ?? 0) + n;
+    }
     else if (/^3/.test(t)) out.redownloads += n;
     else if (/^7/.test(t)) out.updates += n;
   }
@@ -322,7 +328,7 @@ export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string>
 }
 
 async function salesDay(date: string, token: string): Promise<SalesDay | null> {
-  const key = `asc-sales:${date}`;
+  const key = `asc-sales-v2:${date}`;   // v2 adds downloads by country
   const cached = await rest<Array<{ payload: SalesDay }>>(`api_cache?cache_key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=payload`).catch(() => null);
   if (cached?.[0]?.payload) return cached[0].payload;
   const params = new URLSearchParams({
@@ -331,7 +337,7 @@ async function salesDay(date: string, token: string): Promise<SalesDay | null> {
   });
   const r = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/a-gzip' }, signal: AbortSignal.timeout(10000) });
   let day: SalesDay;
-  if (r.status === 404) day = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };   // no sales that day, or not published yet
+  if (r.status === 404) day = { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {} };   // no sales that day, or not published yet
   else if (!r.ok) throw new Error(`appstore ${r.status}`);
   else day = parseSalesReport(gunzipSync(Buffer.from(await r.arrayBuffer())).toString('utf8'), APP_ID());
   // Settled days keep a year; the last two days are re-read (Apple publishes with a delay).
@@ -358,8 +364,13 @@ async function appStoreSales(days: string[]) {
       batch.forEach((d, j) => { if (got[j]) results.set(d, got[j]!); });
     }
     const totals = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };
-    for (const v of results.values()) { totals.downloads += v.downloads; totals.redownloads += v.redownloads; totals.updates += v.updates; totals.iap += v.iap; }
-    return { configured: true, days, downloads: days.map((d) => results.get(d)?.downloads ?? 0), totals };
+    const countries = new Map<string, number>();
+    for (const v of results.values()) {
+      totals.downloads += v.downloads; totals.redownloads += v.redownloads; totals.updates += v.updates; totals.iap += v.iap;
+      for (const [cc, n] of Object.entries(v.countries ?? {})) countries.set(cc, (countries.get(cc) ?? 0) + n);
+    }
+    const byCountry = [...countries].map(([country, downloads]) => ({ country, downloads })).sort((a, b) => b.downloads - a.downloads || a.country.localeCompare(b.country)).slice(0, 40);
+    return { configured: true, days, downloads: days.map((d) => results.get(d)?.downloads ?? 0), totals, byCountry };
   } catch (e) {
     return { configured: true, error: e instanceof Error ? e.message : 'appstore unavailable' };
   }
@@ -457,10 +468,11 @@ export async function searchConsole(days: string[]) {
   try {
     const token = await googleToken();
     const range = { startDate: days[0], endDate: days.at(-1), dataState: 'all' };
-    const [byDate, queries, pages] = await Promise.all([
+    const [byDate, queries, pages, countries] = await Promise.all([
       gscQuery(token, { ...range, dimensions: ['date'], rowLimit: 500 }),
       gscQuery(token, { ...range, dimensions: ['query'], rowLimit: 10 }),
       gscQuery(token, { ...range, dimensions: ['page'], rowLimit: 10 }),
+      gscQuery(token, { ...range, dimensions: ['country'], rowLimit: 40 }),
     ]);
     const byDay = new Map(byDate.map((r) => [r.keys?.[0] ?? '', r]));
     const clicks = days.map((d) => byDay.get(d)?.clicks ?? 0);
@@ -472,6 +484,7 @@ export async function searchConsole(days: string[]) {
       totals: { clicks: totalClicks, impressions: totalImpressions, ctr: totalImpressions ? totalClicks / totalImpressions : 0, position: totalImpressions ? weighted / totalImpressions : null },
       topQueries: queries.map((r) => ({ query: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0, ctr: r.ctr ?? 0, position: r.position ?? null })),
       topPages: pages.map((r) => ({ page: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0 })),
+      byCountry: countries.flatMap((r) => { const country = fromAlpha3(r.keys?.[0]); return country ? [{ country, clicks: r.clicks ?? 0, impressions: r.impressions ?? 0 }] : []; }),
     };
   } catch (e) {
     value = { configured: true, error: e instanceof Error ? e.message : 'searchconsole unavailable' };
@@ -542,6 +555,19 @@ const daysFrom = (since: string) => {
   for (let t = start.getTime(); t <= Date.now(); t += 86_400_000) out.push(new Date(t).toISOString().slice(0, 10));
   return out;
 };
+
+// Where the audience is: web devices by country/region (first-party), iOS downloads by storefront (App Store),
+// Google search by country (Search Console) and purchases by store country. Age and gender have no source yet.
+export async function audienceView(days: number) {
+  const geo = await rpc<{ since: string }>('bobby_admin_geo', { p_days: days });
+  const list = daysFrom(geo.since);
+  const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
+  const pick = (v: unknown, key: string) => {
+    const o = (v ?? {}) as Record<string, unknown>;
+    return { configured: Boolean(o.configured), error: typeof o.error === 'string' ? o.error : null, [key]: Array.isArray(o.byCountry) ? o.byCountry : null };
+  };
+  return { geo, searchConsole: pick(search, 'countries'), appStore: pick(appStore, 'countries') };
+}
 
 export async function lifecycleView(days: number) {
   const [lifecycle, raw] = await Promise.all([

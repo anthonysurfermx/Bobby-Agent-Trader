@@ -9,7 +9,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import {
   AdminError, actionsView, addCost, auditStart, costsView, couponsView, createCoupon, creditMark, deleteCost, deleteUser, grant, integrations,
-  lifecycleView, membersView, probeProvider, requireAdmin, rpc, setAdmin, setAssumptions, setCouponActive,
+  audienceView, lifecycleView, membersView, probeProvider, requireAdmin, rpc, setAdmin, setAssumptions, setCouponActive,
 } from './_lib/admin.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
@@ -47,6 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json(await rpc('bobby_admin_users', { p_query: q || null, p_limit: limit, p_offset: offset }));
       }
       if (view === 'lifecycle') return res.status(200).json(await lifecycleView(Math.min(Math.max(Number(one(req.query.days)) || 30, 1), 365)));
+      if (view === 'audience') return res.status(200).json(await audienceView(Math.min(Math.max(Number(one(req.query.days)) || 30, 1), 365)));
       if (view === 'costs') return res.status(200).json(await costsView());
       if (view === 'members') return res.status(200).json(await membersView());
       if (view === 'coupons') return res.status(200).json(await couponsView());

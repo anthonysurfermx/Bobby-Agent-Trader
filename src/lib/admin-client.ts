@@ -166,6 +166,16 @@ export interface LifecycleResponse {
   instrumentation: Instrumentation;
   missing: string[];
 }
+// Where the audience is (view=audience). Location is coarse: country + first-level region, web only.
+export interface GeoCountry { country: string; visitors: number; readers: number; accounts: number; pro: number }
+export interface GeoRegion { country: string; region: string; visitors: number; readers: number }
+export interface GeoPurchase { country: string; newPaying: number; grossUsd: number }
+export interface ProviderCountries<K extends string> { configured: boolean; error: string | null; countries: Array<{ country: string } & Record<K, number>> | null }
+export interface AudienceResponse {
+  geo: { since: string; days: number; locatedSince: string | null; web: { devices: number; located: number }; countries: GeoCountry[]; regions: GeoRegion[]; purchases: GeoPurchase[] };
+  searchConsole: ProviderCountries<'clicks' | 'impressions'>;
+  appStore: ProviderCountries<'downloads'>;
+}
 export type CostKind = 'marketing' | 'infra' | 'other';
 export interface CostRow { id: number; kind: CostKind; channel: string | null; amount_usd: number; spent_on: string; note: string | null; created_at: string }
 
@@ -622,6 +632,33 @@ export async function fetchAdminOverview(days: number, opts: { compare?: boolean
 
 export async function fetchAdminLifecycle(days: number): Promise<LifecycleResponse> {
   return normalizeLifecycle(await get('lifecycle', { days }));
+}
+
+function providerCountries<K extends string>(v: unknown, keys: K[]): ProviderCountries<K> {
+  const o = obj(v);
+  return {
+    configured: Boolean(o.configured), error: strOrNull(o.error),
+    countries: Array.isArray(o.countries)
+      ? o.countries.map((c) => { const x = obj(c); return { country: str(x.country), ...Object.fromEntries(keys.map((k) => [k, num(x[k])])) } as { country: string } & Record<K, number>; })
+      : null,
+  };
+}
+
+export async function fetchAdminAudience(days: number): Promise<AudienceResponse> {
+  const r = obj(await get('audience', { days }));
+  const g = obj(r.geo);
+  const list = (v: unknown) => (Array.isArray(v) ? v.map(obj) : []);
+  return {
+    geo: {
+      since: str(g.since), days: num(g.days), locatedSince: strOrNull(g.locatedSince),
+      web: { devices: num(obj(g.web).devices), located: num(obj(g.web).located) },
+      countries: list(g.countries).map((x) => ({ country: str(x.country), visitors: num(x.visitors), readers: num(x.readers), accounts: num(x.accounts), pro: num(x.pro) })),
+      regions: list(g.regions).map((x) => ({ country: str(x.country), region: str(x.region), visitors: num(x.visitors), readers: num(x.readers) })),
+      purchases: list(g.purchases).map((x) => ({ country: str(x.country), newPaying: num(x.newPaying), grossUsd: num(x.grossUsd) })),
+    },
+    searchConsole: providerCountries(r.searchConsole, ['clicks', 'impressions']),
+    appStore: providerCountries(r.appStore, ['downloads']),
+  };
 }
 
 export async function fetchAdminCosts(): Promise<CostRow[]> {

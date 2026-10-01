@@ -4,11 +4,13 @@
 // retries — a purchase is never silently missing from revenue.
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
+import { countryCode } from './geo.js';
 
 export interface PurchaseEvent {
   id: string; type: string; environment?: string | null; store?: string | null; productId?: string | null;
   priceUsd?: number | null; takehome?: number | null; commissionPct?: number | null; taxPct?: number | null;
   currency?: string | null; priceLocal?: number | null; identityId?: string | null; at?: number | null;
+  country?: string | null;   // the store / billing country (ISO alpha-2)
 }
 
 const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
@@ -23,7 +25,7 @@ export async function recordPurchaseEvent(e: PurchaseEvent): Promise<void> {
     body: JSON.stringify({
       id, type: e.type.slice(0, 40), environment: text(e.environment, 20), store: text(e.store, 30), product_id: text(e.productId, 120),
       price_usd: num(e.priceUsd), takehome: share(e.takehome), commission_pct: share(e.commissionPct), tax_pct: share(e.taxPct),
-      currency: text(e.currency, 8), price_local: num(e.priceLocal), identity_id: e.identityId ?? null,
+      currency: text(e.currency, 8), price_local: num(e.priceLocal), identity_id: e.identityId ?? null, country: countryCode(e.country),
       event_at: new Date(num(e.at) ?? Date.now()).toISOString(),
     }),
   });
