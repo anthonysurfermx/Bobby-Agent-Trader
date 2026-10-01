@@ -93,7 +93,7 @@ struct LandCommunitySheet: View {
                 Section {
                     Text(L.t("Keep island names respectful. Hate, sexual content, threats, scams and harassment are not allowed. Reports are reviewed and abusive creators can lose publishing access.", "Usa nombres respetuosos. No se permite odio, contenido sexual, amenazas, estafas ni acoso. Revisamos los reportes y podemos retirar el acceso a publicar a quienes abusen."))
                         .font(.footnote)
-                    Link(L.t("Community rules and support", "Reglas de la comunidad y soporte"), destination: URL(string: "https://bobbyprotocol.xyz/support")!)
+                    Link(L.t("Community rules and support", "Reglas de la comunidad y soporte"), destination: L.site("support"))
                 }
             }
             .navigationTitle(L.t("Community safety", "Seguridad de la comunidad"))

@@ -69,10 +69,15 @@ function inUp(x, y, upHit, cancelled){
 /* the pill: hold to ask, hold to agree, tap to cancel / skip / open the read */
 function pillDown(){
   var s = W.state;
+  W.pressFrom = s;                                  /* what this press began as: its release belongs to that gesture */
   if (askCapable()) askPress();
   else if (s === 'RISK') agreePress();
 }
 function pillUp(cancelled){
+  /* a hold to agree that outlives the ring may already have started the first read (RESOLVING):
+     its release only ends the agree gesture, it never cancels that read */
+  if (W.pressFrom === 'RISK'){ W.pressFrom = null; agreeRelease(); return; }
+  W.pressFrom = null;
   var s = W.state;
   if (W.press){ askRelease(); return; }            /* the mic is live only between speech.start and speech.stop */
   if (s === 'RISK'){ agreeRelease(); return; }

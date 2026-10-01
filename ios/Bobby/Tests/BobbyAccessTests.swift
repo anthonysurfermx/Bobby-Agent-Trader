@@ -59,6 +59,33 @@ final class BobbyAccessTests: XCTestCase {
         if let key, !key.isEmpty { XCTAssertTrue(key.hasPrefix("test_") || key.hasPrefix("appl_"), key) }
     }
 
+    /// The screenshot override (`-qa-sales-open`) must never reach Release: every line that names it sits
+    /// inside an `#if DEBUG` branch of the app's sources.
+    func testTheSalesOpenOverrideIsDebugOnly() throws {
+        let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources")
+        let files = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+            .compactMap { $0 as? URL }.filter { $0.pathExtension == "swift" }
+        XCTAssertFalse(files.isEmpty, "app sources not found at \(sources.path)")
+        var seen = 0
+        for file in files {
+            var stack: [String] = []   // "debug" = inside `#if DEBUG`, "other" otherwise
+            for (n, raw) in try String(contentsOf: file, encoding: .utf8).components(separatedBy: .newlines).enumerated() {
+                let line = raw.trimmingCharacters(in: .whitespaces)
+                if line.hasPrefix("#if ") { stack.append(line == "#if DEBUG" ? "debug" : "other"); continue }
+                if line.hasPrefix("#elseif") || line.hasPrefix("#else") { if !stack.isEmpty { stack[stack.count - 1] = "other" }; continue }
+                if line.hasPrefix("#endif") { _ = stack.popLast(); continue }
+                guard raw.contains("-qa-sales-open") || raw.contains("qaSalesOpen") else { continue }
+                seen += 1
+                XCTAssertTrue(stack.contains("debug"), "\(file.lastPathComponent):\(n + 1) uses the sales-open override outside #if DEBUG")
+            }
+        }
+        XCTAssertGreaterThan(seen, 0, "the override was not found: update this guard if it was removed")
+#if DEBUG
+        XCTAssertFalse(BobbyAccessCenter.qaSalesOpen, "the unit-test host never launches with -qa-sales-open")
+#endif
+    }
+
     func testPurchasesRequireBothServerFlags() {
         XCTAssertFalse(BobbyAccessCenter.paymentsReady(nil))
         XCTAssertFalse(BobbyAccessCenter.paymentsReady(["apple": true]))
@@ -130,7 +157,9 @@ final class BobbyAccessTests: XCTestCase {
         let pro = BobbyReadAccess(tier: "pro", used: 12, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
         let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
         let proRow = try XCTUnwrap(ReadsRow.content(access: pro, subscription: apple, signedIn: true, spanish: false))
-        XCTAssertEqual(proRow.title, "Bobby Pro")
+        XCTAssertEqual(proRow.title, "Bobby Pro · Active")
+        XCTAssertTrue(proRow.detail?.hasPrefix("Unlimited Quick reads (fair use) · 60 Deep and 10 Max every 30 days") == true, proRow.detail ?? "")
+        XCTAssertEqual(ReadsRow.content(access: pro, subscription: apple, signedIn: true, spanish: true)?.title, "Bobby Pro · Activo")
         XCTAssertTrue(proRow.pro)
         XCTAssertTrue(proRow.manage, "an App Store subscription is managed from the phone")
         XCTAssertTrue(proRow.detail?.contains("renews") == true)

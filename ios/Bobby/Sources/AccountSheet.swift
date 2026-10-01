@@ -5,7 +5,8 @@
 // the account actions kept deliberately small at the foot (sync, sign out, delete).
 // Deletion stays one tap away from the foot on every detent (App Review 5.1.1(v)).
 // The reads the server meters (Nucleo/ARCHITECTURE.md §8.5): what is left this week, or
-// Bobby Pro with Manage subscription (Apple's own sheet).
+// Bobby Pro with Manage subscription (Apple's own sheet). Every non-Pro profile can open Bobby Pro
+// on its own, and Restore Purchases is always here, signed in or not (App Review 3.1.1).
 import AuthenticationServices
 import StoreKit
 import SwiftUI
@@ -30,11 +31,14 @@ struct AccountSheet: View {
     @ObservedObject private var account = AccountSession.shared
     @ObservedObject private var reads = BobbyAccessCenter.shared
     @ObservedObject private var invites = NucleoLevelCenter.shared
+    @ObservedObject private var purchases = BobbyStore.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
     @StateObject private var land = LandPulse()
     @State private var manageSubscription = false
     @State private var busy = false
     @State private var showDeleteConfirmation = false
+    @State private var restoring = false
+    @State private var restoreResult: String?
     @State private var accountDeleted = false
     @State private var route: ProfileRoute?
     @State private var heroLoading = true
@@ -86,6 +90,8 @@ struct AccountSheet: View {
         .sheet(item: $route, onDismiss: {
             // A thesis closed on the island or a piece planted: bring the pieces up to date.
             if pieces == nil, account.isSignedIn, profile.acceptedRiskNotice { Task { await land.refresh() } }
+            // Back from Bobby Pro (a purchase, a restore or a sign in): the reads line and the levels follow.
+            if profile.acceptedRiskNotice { Task { await reads.refresh(); await NucleoLevelCenter.shared.refresh() } }
         }) { destination in
             sheet(destination)
         }
@@ -94,6 +100,12 @@ struct AccountSheet: View {
             isPresented: $showDeleteConfirmation,
             titleVisibility: .visible
         ) {
+            if activeAppleSubscription {
+                // Deleting the account never cancels an App Store subscription: offer Apple's sheet first.
+                Button(L.t("Manage subscription", "Administrar suscripción")) {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { manageSubscription = true }
+                }
+            }
             Button(L.t("Delete account permanently", "Borrar cuenta permanentemente"), role: .destructive) {
                 busy = true
                 Task {
@@ -105,7 +117,13 @@ struct AccountSheet: View {
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
         } message: {
-            Text(AccountDeletionCopy.confirmation)
+            Text(AccountDeletionCopy.confirmation(activeAppleSubscription: activeAppleSubscription))
+        }
+        .alert(L.t("Restore Purchases", "Restaurar compras"),
+               isPresented: Binding(get: { restoreResult != nil }, set: { if !$0 { restoreResult = nil } })) {
+            Button("OK", role: .cancel) { restoreResult = nil }
+        } message: {
+            Text(restoreResult ?? "")
         }
         .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
             if account.manualAppleRevocationRequired {
@@ -137,9 +155,13 @@ struct AccountSheet: View {
             Text(L.t("Profile", "Perfil").uppercased()).font(.mono(11, .medium)).tracking(1.6).foregroundStyle(Theme.warmDim)
             Spacer()
             Button(action: onClose) {
+                // 30 pt to the eye, 44 pt to the finger (the bar keeps its 30 pt height).
                 Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmMuted)
                     .frame(width: 30, height: 30).background(Circle().fill(Theme.warmFill))
+                    .frame(width: 44, height: 44, alignment: .trailing)
+                    .contentShape(Rectangle())
             }
+            .padding(.vertical, -7)
             .accessibilityLabel(L.t("Close", "Cerrar"))
             .accessibilityIdentifier("account-close")
         }
@@ -316,12 +338,28 @@ struct AccountSheet: View {
         if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn) {
             readsRow(row)
         }
+        // Bobby Pro on the user's own initiative, not only after a refused read (signed out, the sheet asks to sign in).
+        if reads.access?.isPro != true {
+            ProfileRow(label: "Bobby Pro", detail: BobbyStore.Copy.benefits, action: { route = .pro }) {
+                ProfileIcon(symbol: "infinity", tint: Theme.cream)
+            }
+            .accessibilityIdentifier("account-pro")
+        }
+        ProfileRow(label: L.t("Restore Purchases", "Restaurar compras"),
+                   detail: L.t("Already subscribed with this Apple Account? Bring Bobby Pro back.",
+                               "¿Ya te suscribiste con esta cuenta de Apple? Recupera Bobby Pro."),
+                   trailing: restoring ? L.t("Restoring…", "Restaurando…") : nil,
+                   action: restorePurchases) { ProfileIcon(symbol: "arrow.clockwise") }
+            .disabled(restoring)
+            .accessibilityIdentifier("account-restore")
         if showsLinks {
-            // Invite a friend: every friend who creates an account with the link earns Bobby Pro days.
+            // Invite a friend: the Bobby Pro reward is promised only where Bobby Pro can be had (as the invite sheet).
             let days = invites.referral?.rewardDays ?? invites.rewardDays
             ProfileRow(label: L.t("Invite friends", "Invita amigos"),
-                       detail: days.map { L.t("\($0) days of Bobby Pro for each friend who joins", "\($0) días de Bobby Pro por cada amigo que se una") }
-                           ?? L.t("Bobby Pro for each friend who joins", "Bobby Pro por cada amigo que se una"),
+                       detail: !purchases.proPurchasable
+                           ? L.t("Share Bobby with someone you know.", "Comparte Bobby con alguien que conoces.")
+                           : days.map { L.t("\($0) days of Bobby Pro for each friend who joins", "\($0) días de Bobby Pro por cada amigo que se una") }
+                               ?? L.t("Bobby Pro for each friend who joins", "Bobby Pro por cada amigo que se una"),
                        action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
                 .accessibilityIdentifier("account-invite")
         }
@@ -368,6 +406,30 @@ struct AccountSheet: View {
         .accessibilityIdentifier("account-reads")
     }
 
+    /// An App Store subscription Apple keeps billing until it is cancelled in Settings.
+    private var activeAppleSubscription: Bool { reads.subscription?.activeOnApple == true }
+
+    /// Restore Purchases: signs in with Apple first when nobody is, then says what came back.
+    private func restorePurchases() {
+        guard !restoring else { return }
+        restoring = true
+        Task {
+            let outcome = await BobbyProRestore.run(afterSignIn: {
+                await ProgressSync.shared.sync(store: store, profile: profile)
+            })
+            restoring = false
+            if profile.acceptedRiskNotice { await reads.refresh() }
+            switch outcome {
+            case .subscribed: restoreResult = BobbyStore.Copy.restored
+            case .nothingToRestore: restoreResult = BobbyStore.Copy.nothingToRestore
+            case .pending: restoreResult = BobbyStore.Copy.pending
+            case .needsSignIn: restoreResult = BobbyStore.Copy.signInFirst
+            case let .failed(message): restoreResult = message
+            case .cancelled: break
+            }
+        }
+    }
+
     /// Share my avatar: the live 3D pose when the model is on stage, the portrait otherwise.
     private func shareAvatar() {
         if heroLoading || heroFailed {
@@ -411,12 +473,12 @@ struct AccountSheet: View {
             }
             if showsLinks {
                 HStack(spacing: 18) {
-                    Link(destination: URL(string: "https://bobbyprotocol.xyz/privacy")!) {
+                    Link(destination: L.site("privacy")) {
                         Text(L.t("Privacy Policy", "Aviso de privacidad"))
                     }
                     .accessibilityIdentifier("account-privacy")
                     Text("·").foregroundStyle(Theme.warmDim.opacity(0.6))
-                    Link(destination: URL(string: "https://bobbyprotocol.xyz/support")!) {
+                    Link(destination: L.site("support")) {
                         Text(L.t("Help and support", "Ayuda y soporte"))
                     }
                     .accessibilityIdentifier("account-support")
@@ -528,10 +590,19 @@ struct AccountSheet: View {
         case .avatar:
             MascotGalleryView(store: store, voice: voice, voiceId: profile.voiceId)
         case .invite:
-            NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: false, reason: nil, onPro: nil) { route = nil }
+            NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: purchases.proPurchasable, reason: nil,
+                              onPro: {
+                                  // The invite sheet's Bobby Pro card: the paywall follows once it is gone.
+                                  route = nil
+                                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { route = .pro }
+                              }) { route = nil }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .pro:
+            NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
+                               afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
+                               onOutcome: { _ in }) { route = nil }
         case .locker:
             SquadLockerSheet(store: store)
                 .presentationDetents([.large])
@@ -563,7 +634,7 @@ struct AccountSheet: View {
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet
+    case avatar, invite, locker, land, risk, pet, pro
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -575,6 +646,7 @@ enum ProfileRoute: Identifiable {
         case .land: return "land"
         case .risk: return "risk"
         case .pet: return "pet"
+        case .pro: return "pro"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
         }
@@ -665,10 +737,10 @@ struct ReadsRow: Equatable {
         if access.isPro {
             let end = subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) }
             let canceled = ["canceled", "cancelled", "expired"].contains(subscription?.status ?? "")
-            let detail = end.map { canceled ? L.t("Unlimited Quick reads · ends \($0)", "Lecturas Rápidas ilimitadas · termina el \($0)", spanish: spanish)
-                                            : L.t("Unlimited Quick reads · renews \($0)", "Lecturas Rápidas ilimitadas · se renueva el \($0)", spanish: spanish) }
-                ?? L.t("Unlimited Quick reads", "Lecturas Rápidas ilimitadas", spanish: spanish)
-            return ReadsRow(title: "Bobby Pro", detail: detail, pro: true, manage: subscription?.managedByApple ?? false)
+            let detail = BobbyStore.Copy.benefits(spanish: spanish) + (end.map { canceled ? L.t(" · ends \($0)", " · termina el \($0)", spanish: spanish)
+                                                        : L.t(" · renews \($0)", " · se renueva el \($0)", spanish: spanish) } ?? "")
+            return ReadsRow(title: L.t("Bobby Pro · Active", "Bobby Pro · Activo", spanish: spanish), detail: detail, pro: true,
+                            manage: subscription?.managedByApple ?? false)
         }
         guard let limit = access.limit else { return nil }
         let left = access.remaining ?? max(0, limit - access.used)
@@ -718,6 +790,16 @@ enum AccountDeletionCopy {
     static var confirmation: String {
         L.t("This deletes your Bobby account and synced XP, streak, gear and Trader Land. Limited security or audit records may remain.",
             "Esto borra tu cuenta de Bobby y tu XP, racha, accesorios y Trader Land sincronizados. Pueden conservarse registros limitados de seguridad o auditoría.")
+    }
+
+    /// An active App Store subscription outlives the account: say so before the delete button.
+    static var subscriptionWarning: String {
+        L.t("Deleting your account doesn’t cancel Bobby Pro. Apple keeps billing until you cancel it in Settings › Apple Account › Subscriptions.",
+            "Borrar tu cuenta no cancela Bobby Pro. Apple seguirá cobrándolo hasta que lo canceles en Configuración › Cuenta de Apple › Suscripciones.")
+    }
+
+    static func confirmation(activeAppleSubscription: Bool) -> String {
+        activeAppleSubscription ? confirmation + "\n\n" + subscriptionWarning : confirmation
     }
 
     static var manageAppleButton: String { L.t("Open Apple's steps", "Ver los pasos de Apple") }

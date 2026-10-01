@@ -533,7 +533,7 @@ private struct TraderLandUnavailableView: View {
                 .font(.body).foregroundStyle(Theme.warmMuted).multilineTextAlignment(.center)
             Button(L.t("Close", "Cerrar")) { dismiss() }
                 .buttonStyle(.borderedProminent).tint(Theme.orbBlue).accessibilityIdentifier("land-unavailable-close")
-            Link(L.t("Contact support", "Contactar a soporte"), destination: URL(string: "https://bobbyprotocol.xyz/support")!)
+            Link(L.t("Contact support", "Contactar a soporte"), destination: L.site("support"))
                 .foregroundStyle(Theme.orbCyan).accessibilityIdentifier("land-unavailable-support")
         }
         .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1810,7 +1810,7 @@ private struct TraderLandLoadedView: View {
                     .font(.subheadline).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
                 Text(L.t("By publishing, you allow OpenAI to check the island name for abusive content. Keep names respectful and omit personal information. Report or block creators from the archipelago.", "Al publicar, autorizas que OpenAI revise el nombre para detectar contenido abusivo. Usa nombres respetuosos y sin datos personales. Puedes reportar o bloquear creadores desde el archipiélago."))
                     .font(.footnote).foregroundStyle(Theme.muted)
-                Link(L.t("Community rules and support", "Reglas de la comunidad y soporte"), destination: URL(string: "https://bobbyprotocol.xyz/support")!)
+                Link(L.t("Community rules and support", "Reglas de la comunidad y soporte"), destination: L.site("support"))
                 TextField(L.t("Island name (optional)", "Nombre de la isla (opcional)"), text: $shareTitle)
                     .textFieldStyle(.roundedBorder).submitLabel(.done)
                     .accessibilityIdentifier("land-island-name")

@@ -121,6 +121,9 @@ struct BobbySubscription: Equatable, Sendable {
     var periodEnd: Date? { currentPeriodEnd.flatMap(BobbyAccessAPI.date) }
     /// Only an App Store subscription can be managed from the phone.
     var managedByApple: Bool { provider == nil || provider == "apple" }
+    /// A live App Store subscription: Apple keeps billing it until it is cancelled in Settings,
+    /// whatever happens to the Bobby account (the account deletion warning).
+    var activeOnApple: Bool { provider == "apple" && ["active", "trialing"].contains(status ?? "") }
 }
 
 /// Where a metered request gets its bearer. Fixture mode and tests use `.none` (signed out).
@@ -239,9 +242,19 @@ final class BobbyAccessCenter: ObservableObject {
         self.access = access
     }
 
+#if DEBUG
+    /// `-qa-sales-open` (DEBUG only, for the App Review subscription screenshot): the access read is
+    /// taken as "App Store sales open" without asking the server (a QA session has no real bearer).
+    /// Compiled out of Release; BobbyAccessTests fails if the flag ever leaves an `#if DEBUG` block.
+    nonisolated static var qaSalesOpen: Bool { ProcessInfo.processInfo.arguments.contains("-qa-sales-open") }
+#endif
+
     /// GET /api/bobby-access. False when the server could not be read (legacy servers answer 404).
     @discardableResult
     func refresh() async -> Bool {
+#if DEBUG
+        if Self.qaSalesOpen { applePayments = true; return true }
+#endif
         accountChanged()
         defer { accountChanged() }
         let started = currentUser()
@@ -278,8 +291,9 @@ final class BobbyAccessCenter: ObservableObject {
         case accepted(BobbyReadAccess?)
         /// Nobody is signed in (or the account's session is over).
         case signedOut
-        /// The server answered and refused (a definitive answer).
-        case rejected(String?)
+        /// The server answered and refused (a definitive answer). Carries the machine `code` only:
+        /// the server's English text is never shown (the app speaks its own localized copy).
+        case rejected(code: String?)
         /// Offline, a timeout or a server error: RevenueCat's webhook still reaches the server.
         case unreachable
     }
@@ -305,14 +319,14 @@ final class BobbyAccessCenter: ObservableObject {
         switch reply.status {
         case 200..<300:
             if let body { apply(body) }
-            guard body?["ok"] as? Bool != false else { return .rejected(body?["error"] as? String) }
+            guard body?["ok"] as? Bool != false else { return .rejected(code: body?["code"] as? String) }
             return .accepted(BobbyReadAccess(json: body?["access"]))
         case 401:
             return .signedOut
         case 408, 429, 500...:
             return .unreachable
         default:
-            return .rejected(body?["error"] as? String)
+            return .rejected(code: body?["code"] as? String)
         }
     }
 }

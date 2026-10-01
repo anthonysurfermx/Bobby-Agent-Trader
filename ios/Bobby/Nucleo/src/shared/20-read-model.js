@@ -34,6 +34,7 @@
       'syn.name': 'IN SHORT', 'syn.why': 'Why', 'syn.risk': 'The risk', 'syn.watch': 'What to watch',
       'agent.rebuttal': 'SECOND ROUND', 'agent.scenarios': 'SCENARIOS', 'sc.confirm': 'Confirms it', 'sc.invalidate': 'Invalidates it',
       'agent.missing': 'MISSING DATA', 'missing.line': 'Missing data for {h}: {list}.', 'missing.lineNoH': 'Missing data: {list}.',
+      'hz.intraday': 'today', 'hz.week': 'the next few weeks', 'hz.month': 'the coming months', 'hz.long': 'the long term',
       'agent.evidence': 'EVIDENCE USED', 'ev.derivatives': 'derivatives', 'ev.record': 'record {w}/{n}',
       'meta': 'Educational read · not financial advice',
       'confirm.prompt': 'Did you mean {name} ({symbol})?', 'confirm.yes': 'Yes, {symbol}', 'confirm.no': 'Something else',
@@ -45,14 +46,15 @@
       'err.network': 'No connection. Nothing was analyzed.',
       'err.timeout': 'The desk took too long. No verdict was issued.',
       'err.bad': 'The analysis did not come back. No verdict was issued.',
+      'err.retry': 'Try again',
       'err.risk': 'First, the risk notice.', 'err.riskSub': 'Bobby reads nothing until you agree to it. Your question was not sent.',
       'err.riskCta': 'Open the risk notice',
       'gate.signin': 'Create your free account to keep reading — 10 free reads a week.',
       'gate.signinCta': 'Sign in with Apple', 'gate.notNow': 'Not now',
       'gate.signinUnavailable': 'Sign-in isn’t available right now. Your question was not sent.',
       'gate.signinFailed': 'Sign-in didn’t finish. Your question was not sent.',
-      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited reads.',
-      'gate.proNoDate': 'Bobby Pro has unlimited reads.', 'gate.proCta': 'See Bobby Pro',
+      'gate.pro': 'You’ve used this week’s free reads.', 'gate.proResets': 'They reset {date}. Bobby Pro has unlimited Quick reads.',
+      'gate.proNoDate': 'Bobby Pro has unlimited Quick reads.', 'gate.proCta': 'See Bobby Pro',
       'gate.proPending': 'Waiting for the App Store to confirm Bobby Pro.', 'gate.proFailed': 'Bobby Pro isn’t confirmed yet. Your question was not sent.',
       'follow.another': 'Another question about {symbol}', 'follow.how': 'How is {symbol} looking?', 'follow.why': 'Why is {symbol} moving today?',
       'aria.verdict': 'Verdict: {word}', 'aria.conviction': ', {pct}% conviction'
@@ -81,7 +83,8 @@
       'debate.title': '{n} agentes · {s} s', 'debate.header': 'EL DEBATE', 'debate.full': 'VER EL DEBATE COMPLETO ↓',
       'syn.name': 'EN CORTO', 'syn.why': 'Por qué', 'syn.risk': 'El riesgo', 'syn.watch': 'Qué vigilar',
       'agent.rebuttal': 'SEGUNDA RONDA', 'agent.scenarios': 'ESCENARIOS', 'sc.confirm': 'Lo confirma', 'sc.invalidate': 'Lo invalida',
-      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Faltan datos de {h}: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'agent.missing': 'FALTAN DATOS', 'missing.line': 'Para {h} faltan datos: {list}.', 'missing.lineNoH': 'Faltan datos: {list}.',
+      'hz.intraday': 'hoy', 'hz.week': 'las próximas semanas', 'hz.month': 'los próximos meses', 'hz.long': 'el largo plazo',
       'agent.evidence': 'EVIDENCIA USADA', 'ev.derivatives': 'derivados', 'ev.record': 'récord {w}/{n}',
       'meta': 'Lectura educativa · no es asesoría financiera',
       'confirm.prompt': '¿Te refieres a {name} ({symbol})?', 'confirm.yes': 'Sí, {symbol}', 'confirm.no': 'Otro activo',
@@ -93,14 +96,15 @@
       'err.network': 'Sin conexión. No se analizó nada.',
       'err.timeout': 'La mesa tardó demasiado. No se emitió ningún veredicto.',
       'err.bad': 'El análisis no regresó. No se emitió ningún veredicto.',
+      'err.retry': 'Reintentar',
       'err.risk': 'Primero, el aviso de riesgo.', 'err.riskSub': 'Bobby no analiza nada hasta que lo aceptes. Tu pregunta no se envió.',
       'err.riskCta': 'Abrir el aviso de riesgo',
       'gate.signin': 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.',
       'gate.signinCta': 'Iniciar sesión con Apple', 'gate.notNow': 'Ahora no',
       'gate.signinUnavailable': 'Ahora no se puede iniciar sesión. Tu pregunta no se envió.',
       'gate.signinFailed': 'No se completó el inicio de sesión. Tu pregunta no se envió.',
-      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas ilimitadas.',
-      'gate.proNoDate': 'Bobby Pro tiene lecturas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
+      'gate.pro': 'Ya usaste tus lecturas gratis de esta semana.', 'gate.proResets': 'Se renuevan el {date}. Bobby Pro tiene lecturas Rápidas ilimitadas.',
+      'gate.proNoDate': 'Bobby Pro tiene lecturas Rápidas ilimitadas.', 'gate.proCta': 'Ver Bobby Pro',
       'gate.proPending': 'Esperando a que la App Store confirme Bobby Pro.', 'gate.proFailed': 'Bobby Pro aún no está confirmado. Tu pregunta no se envió.',
       'follow.another': 'Otra pregunta sobre {symbol}', 'follow.how': '¿Cómo se ve {symbol}?', 'follow.why': '¿Por qué se mueve {symbol} hoy?',
       'aria.verdict': 'Veredicto: {word}', 'aria.conviction': ', {pct}% de convicción'
@@ -110,6 +114,8 @@
   var HUES = {
     alpha: '#3FE0B5', red: '#FF5A5F', cio: '#F6B94E'
   };
+  /* sufficiency.horizon values that read as words; 'unspecified' (or anything new) takes the no-horizon line */
+  var HORIZONS = { intraday: 1, week: 1, month: 1, long: 1 };
   var VERDICT = {
     wait: { hue: 'cio', color: HUES.cio, core: '#2A1C08', amb: '#19140D' },
     review: { hue: 'alpha', color: HUES.alpha, core: '#082A20', amb: '#0F1714' }
@@ -422,7 +428,7 @@
     if (su && su.sufficient === false && Array.isArray(su.missing) && su.missing.length) {
       var list = su.missing.filter(function (m) { return typeof m === 'string'; }).join(', ');
       out.push({ id: 'missing', name: t(lang, 'agent.missing'), hue: 'rgba(242,237,228,.5)',
-        text: su.horizon ? t(lang, 'missing.line', { h: su.horizon, list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
+        text: HORIZONS[su.horizon] ? t(lang, 'missing.line', { h: t(lang, 'hz.' + su.horizon), list: list }) : t(lang, 'missing.lineNoH', { list: list }) });
     }
     var ev = r.evidenceUsed;
     if (ev && typeof ev === 'object') {
@@ -494,7 +500,10 @@
             chips: [{ label: t(lang, 'err.riskCta'), action: { risk: true }, primary: true }] };
         }
         var key = r.code === 'network' ? 'err.network' : r.code === 'timeout' ? 'err.timeout' : 'err.bad';
-        return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: [] };
+        /* a read that failed after its asset was known carries a native `retry` token: the same question, one tap */
+        var retry = typeof r.retry === 'string' && r.retry ? [{ label: t(lang, 'err.retry'), action: { token: r.retry }, primary: true },
+          { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] : [];
+        return { kind: 'error', code: r.code, caption: r.message || t(lang, key), sub: null, chips: retry };
       default:
         return { kind: 'error', code: 'bad_reply', caption: t(lang, 'err.bad'), sub: null, chips: [] };
     }

@@ -1,8 +1,9 @@
 // The Bobby Pro sheet (Nucleo/ARCHITECTURE.md §8.4): the Núcleo's warm charcoal, one price from
 // the App Store (through RevenueCat), Subscribe, Restore Purchases, the renewal terms and the two
-// legal links. It opens only when the server answered 402 (`paywall` bridge method) and reports how
-// it ended; the page re-asks its question only after `subscribed`, i.e. after Bobby's server confirmed
-// the account is Pro. Analysis only: nothing here buys, sells or holds an asset.
+// legal links. It opens when the server answered 402 (`paywall` bridge method), reporting how it
+// ended — the page re-asks its question only after `subscribed`, i.e. after Bobby's server confirmed
+// the account is Pro — and from the profile's Bobby Pro row, where nothing awaits it.
+// Analysis only: nothing here buys, sells or holds an asset.
 import AuthenticationServices
 import SwiftUI
 
@@ -19,10 +20,14 @@ struct NucleoPaywallSheet: View {
     @State private var note: String?
     @State private var noteIsError = false
     @State private var subscribed = false
+    /// The access read this sheet started has answered (until then a closed sale is only "unknown").
+    @State private var accessChecked = false
+    @State private var retrying = false
+    @State private var restoring = false
 
     /// Apple's standard Licensed Application EULA: bobbyprotocol.xyz has no /terms page of its own.
     static let termsURL = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
-    static let privacyURL = URL(string: "https://bobbyprotocol.xyz/privacy")!
+    static var privacyURL: URL { L.site("privacy") }
 
     enum Ink {
         static let bg = Theme.bg
@@ -44,10 +49,12 @@ struct NucleoPaywallSheet: View {
                     .foregroundStyle(Ink.ink)
                     .padding(.top, 28)
                     .accessibilityAddTraits(.isHeader)
-                Text(L.t("Unlimited Quick reads", "Lecturas Rápidas ilimitadas"))
-                    .font(.system(size: 20))
+                Text(BobbyStore.Copy.benefits)
+                    .font(.system(size: 18))
                     .foregroundStyle(Ink.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
                     .padding(.top, 4)
+                    .accessibilityIdentifier("paywall-benefits")
                 features.padding(.top, 26)
                 purchaseBlock.padding(.top, 26)
                 footer.padding(.top, 22)
@@ -65,6 +72,7 @@ struct NucleoPaywallSheet: View {
             store.start()
             await store.loadProduct()
             await center.refresh()
+            accessChecked = true
         }
         .accessibilityIdentifier("paywall")
     }
@@ -90,12 +98,8 @@ struct NucleoPaywallSheet: View {
 
     private var features: some View {
         VStack(alignment: .leading, spacing: 14) {
-            feature("infinity", L.t("Quick reads without a monthly allowance", "Lecturas Rápidas sin cupo mensual"))
-            feature("sparkles", L.t("Deep and Max have separate allowances shown in Analysis Level", "Profundo y Máximo tienen cupos propios en Nivel de análisis"))
             feature("person.3", L.t("The full three-agent debate on every read", "El debate completo de tres agentes en cada lectura"))
-            if store.configured {
-                feature("calendar", L.t("Monthly, cancel anytime in Settings", "Mensual, cancela cuando quieras en Configuración"))
-            }
+            feature("sparkles", L.t("Deep adds more data; Max adds a second round", "Profundo suma más datos; Máximo, una segunda ronda"))
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -120,12 +124,20 @@ struct NucleoPaywallSheet: View {
                     .accessibilityIdentifier("paywall-subscribed")
             } else {
                 priceRow
+                if store.productState == .loaded, let renews = store.renewsLine() {
+                    Text(renews)
+                        .font(.system(size: 13))
+                        .foregroundStyle(Ink.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("paywall-renews")
+                }
+                if salesClosed { unavailableRow }
                 if store.productState == .notConfigured {
                     EmptyView()
                 } else if account.isSignedIn {
                     subscribeButton
                 } else {
-                    Text(L.t("Sign in first: Bobby Pro belongs to your Bobby account.", "Primero inicia sesión: Bobby Pro queda en tu cuenta de Bobby."))
+                    Text(BobbyStore.Copy.signInFirst)
                         .font(.system(size: 13)).foregroundStyle(Ink.ink2)
                     SignInWithAppleButton(.signIn) { request in
                         account.prepareAppleRequest(request)
@@ -174,6 +186,7 @@ struct NucleoPaywallSheet: View {
             }
         case .missing, .failed:
             Text(BobbyStore.Copy.unavailable).font(.system(size: 14)).foregroundStyle(Ink.ink2)
+            unavailableRow
         case .notConfigured:
             Text(BobbyStore.Copy.comingSoon)
                 .font(.system(size: 17, weight: .semibold))
@@ -185,6 +198,46 @@ struct NucleoPaywallSheet: View {
     }
 
     private var salesOpen: Bool { center.applePayments == true }
+
+    /// The price is here but Bobby's server isn't taking App Store payments (or couldn't be read):
+    /// say so under the price instead of a silent grey button.
+    private var salesClosed: Bool { store.productState == .loaded && accessChecked && !salesOpen }
+
+    /// The unavailable line and a way to ask again (the product, then the server's payment readiness).
+    private var unavailableRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if store.productState == .loaded {
+                Text(BobbyStore.Copy.unavailable).font(.system(size: 14)).foregroundStyle(Ink.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Button(action: retry) {
+                HStack(spacing: 6) {
+                    if retrying { ProgressView().tint(Ink.ink).controlSize(.small) }
+                    Text(L.t("Try again", "Reintentar")).font(.system(size: 15, weight: .medium))
+                }
+                .foregroundStyle(Ink.ink)
+                .padding(.horizontal, 16)
+                .frame(minHeight: 44)
+                .background(Capsule().stroke(Ink.line, lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .disabled(retrying)
+            .accessibilityIdentifier("paywall-retry")
+        }
+        .accessibilityIdentifier("paywall-unavailable")
+    }
+
+    private func retry() {
+        retrying = true
+        note = nil
+        Task {
+            store.start()
+            await store.loadProduct()
+            await center.refresh()
+            accessChecked = true
+            retrying = false
+        }
+    }
 
     private var subscribeButton: some View {
         Button(action: subscribe) {
@@ -205,19 +258,24 @@ struct NucleoPaywallSheet: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if store.configured {
+            // Always offered (App Review 3.1.1): signed out, it signs in with Apple first.
             Button(action: restore) {
-                Text(L.t("Restore Purchases", "Restaurar compras"))
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Ink.ink)
+                HStack(spacing: 8) {
+                    Text(L.t("Restore Purchases", "Restaurar compras"))
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundStyle(Ink.ink)
+                    if restoring { ProgressView().tint(Ink.ink2).controlSize(.small) }
+                }
+                .frame(minHeight: 44)
             }
             .buttonStyle(.plain)
-            .disabled(store.busy || !account.isSignedIn || !store.configured)
+            .disabled(store.busy || restoring)
             .accessibilityIdentifier("paywall-restore")
-            Text(renewalTerms)
-                .font(.system(size: 11))
-                .foregroundStyle(Ink.ink3)
-                .fixedSize(horizontal: false, vertical: true)
+            if store.configured {
+                Text(renewalTerms)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Ink.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 18) {
                 Link(L.t("Terms of Use (EULA)", "Términos de uso (EULA)"), destination: Self.termsURL)
@@ -263,11 +321,14 @@ struct NucleoPaywallSheet: View {
     }
 
     private func restore() {
+        guard !restoring else { return }
         note = nil
+        restoring = true
         Task {
-            let outcome = await store.restore()
+            let outcome = await BobbyProRestore.run(afterSignIn: afterSignIn)
+            restoring = false
             if outcome == .nothingToRestore {
-                note = L.t("No active Bobby Pro subscription on this Apple Account.", "No hay una suscripción activa de Bobby Pro en esta cuenta de Apple.")
+                note = BobbyStore.Copy.nothingToRestore
                 noteIsError = false
                 return
             }
@@ -286,18 +347,43 @@ struct NucleoPaywallSheet: View {
             }
         case .pending:
             onOutcome("pending")
-            note = L.t("Waiting for approval. Bobby Pro starts as soon as the App Store confirms it.",
-                       "Esperando aprobación. Bobby Pro empieza en cuanto la App Store lo confirme.")
+            note = BobbyStore.Copy.pending
             noteIsError = false
         case .cancelled, .nothingToRestore:
             break
         case .needsSignIn:
-            note = L.t("Sign in first: Bobby Pro belongs to your Bobby account.", "Primero inicia sesión: Bobby Pro queda en tu cuenta de Bobby.")
+            note = BobbyStore.Copy.signInFirst
             noteIsError = false
         case let .failed(message):
             onOutcome("failed")
             note = message
             noteIsError = true
         }
+    }
+}
+
+/// Restore Purchases from the paywall or the profile. A purchase belongs to a Bobby account, so with
+/// nobody signed in it runs the same Sign in with Apple sheet the Núcleo uses (`NucleoAppleSignIn`)
+/// first, then asks RevenueCat to re-read this Apple Account's purchases. Never before consent (R11).
+@MainActor
+enum BobbyProRestore {
+    static func run(afterSignIn: () async -> Void) async -> BobbyStore.Outcome {
+        let store = BobbyStore.shared
+        store.start()
+        guard store.configured else { return .failed(BobbyStore.Copy.unavailable) }
+        let account = AccountSession.shared
+        if !account.isSignedIn {
+            let result = await NucleoAppleSignIn().run()
+            await account.completeApple(result)
+            guard account.isSignedIn else {
+                if case let .failure(error) = result, (error as? ASAuthorizationError)?.code == .canceled {
+                    account.lastError = nil
+                    return .cancelled
+                }
+                return .needsSignIn
+            }
+            await afterSignIn()
+        }
+        return await store.restore()
     }
 }

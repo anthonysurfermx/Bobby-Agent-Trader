@@ -151,9 +151,25 @@ final class NucleoBridgeTests: XCTestCase {
             NucleoFixtures.setScenario(scenario)
             let (_, bridge, _) = make()
             let r = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
-            try assertGolden(r, scenario)
+            try assertGolden(r, scenario, ignoring: ["retry"])
             XCTAssertNil(r["agents"], "\(scenario): never a verdict on a failure")
+            // analysis_failed / desk_unavailable are transient: one tap re-asks the same question.
+            let transient = ["failed", "unavailable"].contains(scenario)
+            XCTAssertEqual(r["retry"] is String, transient, "\(scenario): retry token only on a transient failure")
         }
+    }
+
+    func testATransientFailureRetriesTheSameQuestionOnce() async throws {
+        NucleoFixtures.setScenario("failed")
+        let (_, bridge, _) = make()
+        let failed = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let retry = try XCTUnwrap(failed["retry"] as? String)
+        NucleoFixtures.setScenario("default")
+        let read = await result(bridge, "ask", ["token": retry])
+        try assertGolden(read, "nvda", ignoring: ["question"])
+        XCTAssertEqual(read["question"] as? String, "Should I buy NVIDIA right now?", "the retry keeps the user's own question")
+        let again = await fault(bridge, "ask", ["token": retry])
+        XCTAssertEqual(again, "invalid_params", "a retry token is single use")
     }
 
     // MARK: - Metered reads (§8)
@@ -245,9 +261,13 @@ final class NucleoBridgeTests: XCTestCase {
     func testHangTimesOutAndOfflineIsANetworkError() async throws {
         NucleoFixtures.setScenario("hang")
         let (_, bridge, _) = make()
-        try assertGolden(await result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"]), "timeout")
+        let hung = await result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"])
+        try assertGolden(hung, "timeout", ignoring: ["retry"])
+        XCTAssertTrue(hung["retry"] is String, "a timed-out desk read can be asked again in one tap")
         NucleoFixtures.setScenario("offline")
-        try assertGolden(await result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"]), "network")
+        let offline = await result(bridge, "ask", ["question": "Is now a good time for Bitcoin?"])
+        try assertGolden(offline, "network")
+        XCTAssertNil(offline["retry"], "no asset was resolved offline: nothing to re-ask")
     }
 
     func testConfirmTokensAreSingleUseAndLeadToTheRead() async throws {

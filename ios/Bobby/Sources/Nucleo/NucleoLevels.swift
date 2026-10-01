@@ -419,6 +419,8 @@ struct NucleoInviteSheet: View {
     private var days: Int { center.referral?.rewardDays ?? center.rewardDays ?? 30 }
 
     var body: some View {
+        // Scrolls so the medium detent never clips the link on a small phone.
+        ScrollView {
         VStack(alignment: .leading, spacing: 16) {
             HStack {
                 Text(L.t("INVITE A FRIEND", "INVITA A UN AMIGO"))
@@ -489,8 +491,10 @@ struct NucleoInviteSheet: View {
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text("Bobby Pro").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.cream)
-                            Text(L.t("More Deep and Max every month", "Más Profundo y Máximo cada mes"))
+                            Text(BobbyStore.Copy.benefits)
                                 .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
+                                .multilineTextAlignment(.leading)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer()
                         Image(systemName: "chevron.right").foregroundStyle(Theme.warmDim)
@@ -499,12 +503,14 @@ struct NucleoInviteSheet: View {
                     .background(RoundedRectangle(cornerRadius: 14).fill(Theme.nucleoGlass))
                 }
             }
-            Spacer(minLength: 0)
         }
         .padding(.horizontal, 22)
         .padding(.top, 18)
         .padding(.bottom, 12)
         .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .scrollIndicators(.hidden)
+        .scrollBounceBehavior(.basedOnSize)
         .background(Theme.nucleoSurface.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task { await center.refresh() }

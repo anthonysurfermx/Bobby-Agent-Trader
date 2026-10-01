@@ -148,6 +148,8 @@ function routeReply(r){
   /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
   if (f.kind === 'signin'){ go('SIGNIN_GATE', { f: f }); return; }
   if (f.kind === 'subscription'){ go('PRO_GATE', { f: f, auto: r.retryOf !== 'paywall' }); return; }
+  /* a failed read native can re-ask (its `retry` token): the honest caption plus a Try again chip */
+  if (f.kind === 'error' && f.chips && f.chips.length){ go('CONFIRM_ASSET', { f: f }); return; }
   go('ERROR', { f: f });
 }
 function cancelRead(){
