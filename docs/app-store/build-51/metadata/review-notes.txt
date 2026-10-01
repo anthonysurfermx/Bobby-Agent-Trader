@@ -1,4 +1,4 @@
-Bobby 1.5 (51) replaces rejected build 38. Guideline 5 / China mainland: China mainland is excluded from Availability (174 storefronts available, 1 unavailable) and from the subscription's availability.
+Bobby 1.5 (52) replaces rejected build 38. Guideline 5 / China mainland: China mainland is excluded from Availability (174 storefronts available, 1 unavailable) and from the subscription's availability.
 
 Bobby provides educational stock and crypto market analysis. It does not execute trades, connect wallets, hold funds or private keys. No account or purchase is needed to try it: a new installation gets three Quick reads as a guest; Sign in with Apple then gives 10 reads per week.
 

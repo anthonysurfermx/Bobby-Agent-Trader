@@ -71,6 +71,8 @@ struct NucleoPaywallSheet: View {
         .task {
             store.start()
             await store.loadProduct()
+            // The access check carries the device id: only after the reader accepted the notice.
+            guard consented else { return }
             await center.refresh()
             accessChecked = true
         }
@@ -144,7 +146,12 @@ struct NucleoPaywallSheet: View {
                     } onCompletion: { result in
                         Task {
                             await account.completeApple(result)
-                            if account.isSignedIn { await afterSignIn() }
+                            if account.isSignedIn {
+                                await afterSignIn()
+                                // Signing in resets the account's purchase readiness: read it again so
+                                // Subscribe is live right away, not only after Try again.
+                                if consented { await center.refresh(); accessChecked = true }
+                            }
                         }
                     }
                     .signInWithAppleButtonStyle(.white)
@@ -198,6 +205,8 @@ struct NucleoPaywallSheet: View {
     }
 
     private var salesOpen: Bool { center.applePayments == true }
+    /// The risk notice (AI consent) was accepted; until then the sheet makes no access call.
+    private var consented: Bool { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
 
     /// The price is here but Bobby's server isn't taking App Store payments (or couldn't be read):
     /// say so under the price instead of a silent grey button.
@@ -233,7 +242,7 @@ struct NucleoPaywallSheet: View {
         Task {
             store.start()
             await store.loadProduct()
-            await center.refresh()
+            if consented { await center.refresh() }
             accessChecked = true
             retrying = false
         }
