@@ -76,7 +76,11 @@ export function captureReferral(): string | null {
     const url = new URL(window.location.href);
     const fromUrl = url.searchParams.get('ref')?.trim().toUpperCase();
     if (isCode(fromUrl)) localStorage.setItem(REF_KEY, fromUrl);
-    if (url.searchParams.has('ref')) { url.searchParams.delete('ref'); window.history.replaceState(window.history.state, '', url.toString()); }
+    if (url.searchParams.has('ref')) {
+      url.searchParams.delete('ref');
+      if (url.searchParams.get('v') === '2') url.searchParams.delete('v');
+      window.history.replaceState(window.history.state, '', url.toString());
+    }
     const stored = localStorage.getItem(REF_KEY);
     return isCode(stored) ? stored : null;
   } catch { return null; }
@@ -101,4 +105,3 @@ export async function claimPendingReferral(): Promise<ClaimResult | null> {
     return body.result ?? 'invalid_code';
   } catch { return null; }
 }
-
