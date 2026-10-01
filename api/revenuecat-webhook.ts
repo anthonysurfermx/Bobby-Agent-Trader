@@ -8,7 +8,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { timingSafeEqual } from 'node:crypto';
 import { identityForAuthUser, revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
-import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { recordPurchaseEvent } from './_lib/purchases.js';
 
 export const config = { maxDuration: 20 };
 
@@ -24,32 +24,8 @@ function authorized(req: VercelRequest): boolean {
 interface RevenueCatEvent {
   id?: string; type?: string; app_user_id?: string; original_app_user_id?: string; aliases?: string[];
   transferred_to?: string[]; transferred_from?: string[]; environment?: string; store?: string; product_id?: string;
-  price?: number | null; takehome_percentage?: number | null; currency?: string | null;
-  price_in_purchased_currency?: number | null; event_timestamp_ms?: number;
-}
-
-const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
-const text = (v: unknown, max: number) => (typeof v === 'string' && v ? v.slice(0, max) : null);
-
-/** Revenue for the owner dashboard (bobby_purchase_events). A failure here never fails the sync. */
-async function recordPurchaseEvent(event: RevenueCatEvent, identityId: string | null): Promise<void> {
-  const id = text(event.id, 80);
-  if (!id || !event.type) return;
-  const at = num(event.event_timestamp_ms);
-  try {
-    const r = await fetch(bobbyRest('bobby_purchase_events?on_conflict=id'), {
-      method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=ignore-duplicates,return=minimal' }), signal: AbortSignal.timeout(4000),
-      body: JSON.stringify({
-        id, type: event.type.slice(0, 40), environment: text(event.environment, 20), store: text(event.store, 30),
-        product_id: text(event.product_id, 120), price_usd: num(event.price), takehome: num(event.takehome_percentage),
-        currency: text(event.currency, 8), price_local: num(event.price_in_purchased_currency), identity_id: identityId,
-        event_at: new Date(at ?? Date.now()).toISOString(),
-      }),
-    });
-    if (!r.ok) console.error('[revenuecat-webhook] purchase event', r.status);
-  } catch (e) {
-    console.error('[revenuecat-webhook] purchase event', e instanceof Error ? e.message : e);
-  }
+  price?: number | null; takehome_percentage?: number | null; commission_percentage?: number | null; tax_percentage?: number | null;
+  currency?: string | null; price_in_purchased_currency?: number | null; event_timestamp_ms?: number;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -65,7 +41,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const identity = await identityForAuthUser(authUserId);
       if (identity) { firstIdentity ??= identity; await syncRevenueCat(authUserId, identity); }
     }
-    await recordPurchaseEvent(event, firstIdentity);
+    // Revenue for the owner dashboard; a failed write is retried by RevenueCat like a failed sync.
+    if (event.id && event.type) {
+      await recordPurchaseEvent({
+        id: event.id, type: event.type, environment: event.environment, store: event.store, productId: event.product_id,
+        priceUsd: event.price, takehome: event.takehome_percentage, commissionPct: event.commission_percentage, taxPct: event.tax_percentage,
+        currency: event.currency, priceLocal: event.price_in_purchased_currency, identityId: firstIdentity, at: event.event_timestamp_ms,
+      });
+    }
   } catch (e) {
     console.error('[revenuecat-webhook]', event.type, e instanceof Error ? e.message : e);
     return res.status(500).json({ error: 'retry' }); // RevenueCat retries failed deliveries

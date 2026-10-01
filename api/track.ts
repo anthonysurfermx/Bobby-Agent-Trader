@@ -1,6 +1,7 @@
 // ============================================================
 // /api/track — first-party funnel events for the owner dashboard (bobby_events, migration 20261001180000).
 // POST { event, surface?, device?, platform?, referrer?, utm? } (JSON, or text/plain from sendBeacon) → 204.
+// bobby_record_event stores the event and touches the device (bobby_devices: first touch, active days).
 //   event: visit | appstore_click | signin_start | paywall_view | purchase_start
 // The install id is stored as the same salted hash the read meter uses (api/_lib/access.ts), so a visit and
 // a later guest read of the same browser line up; no IP, user agent, URL path beyond a short surface name,
@@ -46,8 +47,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const row = normalizeEvent(raw);
   if (!row) return res.status(400).json({ error: 'Unknown event' });
   try {
-    const r = await fetch(bobbyRest('bobby_events'), {
-      method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(row), signal: AbortSignal.timeout(3000),
+    const r = await fetch(bobbyRest('rpc/bobby_record_event'), {
+      method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
+      body: JSON.stringify({ p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source }),
     });
     if (!r.ok) console.error('[track] insert', r.status);
   } catch (e) {

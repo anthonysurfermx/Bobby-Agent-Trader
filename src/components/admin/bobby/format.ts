@@ -1,4 +1,4 @@
-import type { AdminUser } from '@/lib/admin-client';
+import type { AdminUser, Coverage } from '@/lib/admin-client';
 
 // Formatting for the owner dashboard (/admin). One language (Spanish, es-MX) and one set of rules:
 // integers with thousands separators, USD with 2 decimals (LLM cents keep 3–4), short es-MX dates.
@@ -128,6 +128,13 @@ export const statusLabel = (k: string | null | undefined): string => (k ? STATUS
 /** Subscription states that count as a paying membership. */
 export const ACTIVE_SUB = new Set(['active', 'trialing']);
 
+/** The status to show: an "active" subscription whose period already ended is shown as expired. */
+export function effectiveSubStatus(status: string | null | undefined, periodEnd: string | null | undefined, now = Date.now()): string | null {
+  if (!status) return null;
+  const end = timeOf(periodEnd);
+  return ACTIVE_SUB.has(status) && end != null && end <= now ? 'expired' : status;
+}
+
 export function lastActivity(u: AdminUser): string | null {
   const a = timeOf(u.last_seen_at);
   const b = timeOf(u.last_read_at);
@@ -138,3 +145,10 @@ export function lastActivity(u: AdminUser): string | null {
 
 export type ValueFormat = 'int' | 'usd' | 'usd-precise';
 export const fmtValue = (v: number, f: ValueFormat): string => (f === 'int' ? fmtInt(v) : fmtUsd(v, f === 'usd-precise'));
+
+/** Since when each source has data, so no number implies an older history than there is. */
+export function coverageLine(c: Coverage | null | undefined): string {
+  if (!c) return 'Cobertura de datos no disponible.';
+  const since = (v: string | null, none: string) => (v ? fmtDate(v) : none);
+  return `Visitas desde ${since(c.eventsSince, 'sin eventos')} · lecturas desde ${since(c.readsSince, 'sin lecturas')} (35 días) · compras desde ${since(c.purchasesSince, 'sin eventos')}`;
+}

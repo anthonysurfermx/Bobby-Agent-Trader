@@ -2,7 +2,7 @@
 import type { AdminUser } from '@/lib/admin-client';
 import { Tag } from './ui';
 import { T } from './tokens';
-import { ACTIVE_SUB, DASH, fmtDate, fmtDateTime, fmtInt, label, lastActivity, statusLabel, timeOf } from './format';
+import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, label, lastActivity, statusLabel, timeOf } from './format';
 
 export function Identity({ u, self }: { u: AdminUser; self?: boolean }) {
   return (
@@ -26,24 +26,26 @@ export function ProviderCell({ u }: { u: AdminUser }) {
   );
 }
 
+/** Plan from the server's `pro` (the source of truth); the subscription status is shown as it really is now. */
 export function PlanCell({ u }: { u: AdminUser }) {
-  const paid = !!u.sub_status && ACTIVE_SUB.has(u.sub_status);
-  if (u.pro || paid) {
-    const source = u.sub_provider && paid
-      ? `${label(u.sub_provider)} · ${statusLabel(u.sub_status)}`
+  const status = effectiveSubStatus(u.sub_status, u.current_period_end);
+  const paidLive = !!status && ACTIVE_SUB.has(status);
+  if (u.pro) {
+    const source = paidLive && u.sub_provider
+      ? `${label(u.sub_provider)} · ${statusLabel(status)}`
       : u.grant_source ? `Regalo · ${u.grant_source}` : u.sub_provider ? label(u.sub_provider) : '';
-    const until = paid ? u.current_period_end : u.pro_until;
+    const until = paidLive ? u.current_period_end : u.pro_until;
     return (
       <div className="flex flex-col items-start gap-1">
         <span className="flex items-center gap-1.5"><Tag tone="orange">Pro</Tag><span className="font-mono text-[10.5px] uppercase text-[#8B8B8B]">{source}</span></span>
-        {until && <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]">{paid ? 'Renueva' : 'Hasta'} {fmtDate(until)}</span>}
+        {until && <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]">{paidLive ? 'Renueva' : 'Hasta'} {fmtDate(until)}</span>}
       </div>
     );
   }
   return (
     <div className="flex flex-col items-start gap-1">
       <Tag>Gratis</Tag>
-      {u.sub_status && <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]">{label(u.sub_provider)} · {statusLabel(u.sub_status)}</span>}
+      {status && <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]">{label(u.sub_provider)} · {statusLabel(status)}</span>}
     </div>
   );
 }

@@ -2,11 +2,14 @@
 // /api/stripe-webhook — Stripe tells us when a Bobby Pro subscription starts, renews, changes
 // or ends; bobby_subscriptions follows. The signature (Stripe-Signature, HMAC-SHA256 over the raw
 // body with STRIPE_WEBHOOK_SECRET, 5-minute tolerance) is checked before anything is read.
-// Events: checkout.session.completed, customer.subscription.created|updated|deleted.
+// Events: checkout.session.completed, customer.subscription.created|updated|deleted; invoice.paid and
+// charge.refunded become revenue rows (bobby_purchase_events) for the owner dashboard.
 // The identity rides in metadata.identity_id (set by /api/bobby-access checkout).
 // ============================================================
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { upsertSubscription } from './_lib/access.js';
+import { recordPurchaseEvent } from './_lib/purchases.js';
+import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 20 };
 
@@ -49,12 +52,22 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   });
 }
 
+async function identityForSubscription(subscriptionId: unknown): Promise<string | null> {
+  if (typeof subscriptionId !== 'string' || !subscriptionId) return null;
+  const r = await fetch(bobbyRest(`bobby_subscriptions?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=identity_id`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
+  if (!r.ok) throw new Error(`subscriptions ${r.status}`);
+  return ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id ?? null;
+}
+
+/** Stripe's standard card fee (2.9% + $0.30) as the store share of a USD charge. */
+const stripeTakehome = (usd: number) => (usd > 0 ? Math.max(0, (usd - (usd * 0.029 + 0.3)) / usd) : null);
+
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !process.env.STRIPE_SECRET_KEY) return json(503, { error: 'Stripe is not configured' });
   const raw = await request.text();
   if (!validSignature(raw, request.headers.get('stripe-signature'), secret)) return json(400, { error: 'bad signature' });
-  let event: { type?: string; data?: { object?: Record<string, unknown> } };
+  let event: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
   try { event = JSON.parse(raw); } catch { return json(400, { error: 'bad payload' }); }
   const obj = event.data?.object ?? {};
   try {
@@ -63,6 +76,20 @@ export async function POST(request: Request): Promise<Response> {
       await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
     } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
       await saveSubscription(obj);
+    } else if (event.type === 'invoice.paid' && typeof event.id === 'string' && Number(obj.amount_paid) > 0) {
+      const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? Number(obj.amount_paid) / 100 : null;
+      const subscription = obj.subscription ?? (obj.parent as { subscription_details?: { subscription?: string } } | undefined)?.subscription_details?.subscription;
+      await recordPurchaseEvent({
+        id: event.id, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
+        store: 'STRIPE', priceUsd: usd, takehome: usd !== null ? stripeTakehome(usd) : null, currency: String(obj.currency ?? '').toUpperCase() || null,
+        priceLocal: Number(obj.amount_paid) / 100, identityId: await identityForSubscription(subscription), at: Number(obj.created) * 1000 || null,
+      });
+    } else if (event.type === 'charge.refunded' && typeof event.id === 'string' && Number(obj.amount_refunded) > 0) {
+      const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? -Number(obj.amount_refunded) / 100 : null;
+      await recordPurchaseEvent({
+        id: event.id, type: 'REFUND', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE', priceUsd: usd,
+        takehome: 1, currency: String(obj.currency ?? '').toUpperCase() || null, priceLocal: -Number(obj.amount_refunded) / 100, at: Date.now(),
+      });
     }
   } catch (e) {
     console.error('[stripe-webhook]', event.type, e instanceof Error ? e.message : e);

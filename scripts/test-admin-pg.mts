@@ -22,6 +22,8 @@ const MIGRATIONS = [
   '20260930121932_serialize_guest_network_quota.sql',
   '20261001160000_coupons_bonus_usage.sql',
   '20261001180000_admin_dashboard.sql',
+  '20261001200000_lifecycle_funnel.sql',
+  '20261001210000_admin_audit_fixes.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
@@ -57,6 +59,7 @@ try {
     public.bobby_reader_stats, public.bobby_admin_actions, public.bobby_coupon_redemptions, public.bobby_usage_bonus, public.bobby_subscriptions,
     public.bobby_pro_grants, public.bobby_level_uses, public.bobby_reads restart identity cascade`);
   await pool.query('delete from public.bobby_coupons');
+  await pool.query('truncate public.bobby_devices, public.bobby_costs restart identity');
   await pool.query('delete from public.bobby_identities');
 
   // ---------- privileges ----------
@@ -135,7 +138,7 @@ try {
     [{ referrer: 'direct', visitors: 1 }, { referrer: 'x.com', visitors: 1 }], 'referrers by distinct visitor');
   eq([o.subscriptions.active, o.subscriptions.byProvider], [1, { apple: 1 }], 'memberships');
   near(o.revenue.grossUsd, 9.98, 'gross revenue, production only');
-  near(o.revenue.netUsd, 9.98 * 0.85, 'net revenue');
+  near(o.revenue.netUsd, (9.98 - 4.99) * 0.85, 'net revenue: refunds subtract');
   near(o.revenue.refundsUsd, 4.99, 'refunds');
   eq([o.revenue.newSubscriptions, o.revenue.renewals, o.revenue.sandboxEvents], [1, 1, 1], 'revenue events');
   near(o.llm.providers.openai.estimatedLeft, 20 + 15 - 1.25, 'openai credit: last balance + top-ups - spend since');
@@ -145,6 +148,34 @@ try {
   ok(o.llm.providers.openai.lastCreditAlert, 'the last credit alert');
   eq([o.coupons.active, o.coupons.giftedReadsLeft], [1, 7], 'coupons');
   eq((await overview(9999)).days.length, 365, 'the window is capped at a year');
+
+  // ---------- audit fixes ----------
+  await pool.query("insert into public.bobby_coupons(code, reads, max_redemptions, redeemed) values ('ADMIN-FULL1', 5, 2, 2)");
+  eq((await overview(30)).coupons.active, 1, 'a coupon at its cap is not active');
+  await pool.query(`insert into public.bobby_purchase_events(id, type, environment, price_usd, takehome, commission_pct, tax_pct, event_at) values
+    ('e5', 'RENEWAL', 'PRODUCTION', 10, 0.85, 0.15, 0.10, now())`);
+  near((await overview(30)).revenue.netUsd, (9.98 - 4.99) * 0.85 + 10 * 0.75, 'commission and tax from the event');
+  await pool.query("insert into public.bobby_llm_usage(surface, provider, model, usd, ok) values ('bobby-cycle', 'openai', 'gpt', 3, true)");
+  const g = (await overview(30)).llm;
+  ok(g.bySurface.some((x: { surface: string; usd: number }) => x.surface === 'bobby-cycle' && Number(x.usd) === 3), 'spend per surface');
+  const deskMonth = Number((await pool.query("select coalesce(sum(usd), 0) s from public.bobby_llm_usage where surface = 'desk' and created_at >= date_trunc('month', now())")).rows[0].s);
+  near(Number((await pool.query('select public.bobby_llm_spend() as r')).rows[0].r.month), deskMonth, 'the guard sums the desk only (the cycle spend stays out)');
+  ok(g.guard && 'month' in g.guard, 'the guard figure travels with the overview');
+  const cov = (await overview(30)).coverage;
+  ok(cov.readsSince && cov.eventsSince && cov.purchasesSince && cov.ledgerSurfaces.includes('bobby-cycle'), 'coverage per source');
+  const before = (await pool.query("select reads from public.bobby_reader_stats where reader = 'a:' || $1", [ana])).rows[0].reads;
+  const rid = (await pool.query("insert into public.bobby_reads(identity_id, platform, symbol) values ($1, 'web', 'BTC') returning id", [ana])).rows[0].id;
+  await pool.query('delete from public.bobby_reads where id = $1', [rid]);
+  eq((await pool.query("select reads from public.bobby_reader_stats where reader = 'a:' || $1", [ana])).rows[0].reads, before, 'a refunded read leaves the stats as they were');
+  const lone = `dev-${randomUUID()}`;
+  const lr = (await pool.query("insert into public.bobby_reads(device_hash, platform, symbol) values ($1, 'web', 'BTC') returning id", [lone])).rows[0].id;
+  await pool.query('delete from public.bobby_reads where id = $1', [lr]);
+  eq((await pool.query("select count(*)::int n from public.bobby_reader_stats where reader = 'd:' || $1", [lone])).rows[0].n, 0, 'a device whose only read was refunded has no stats');
+  const m = (await pool.query('select public.bobby_admin_members() as r')).rows[0].r;
+  eq([m.subscriptions.length, m.subscriptions[0].email, m.subscriptions[0].active], [1, 'ana@example.test', true], 'members: every subscription with its account');
+  for (const role of ['anon', 'authenticated']) for (const fn of ['public.bobby_admin_members()', 'public.bobby_admin_coverage()', 'public.bobby_llm_spend()']) {
+    eq((await pool.query('select has_function_privilege($1, $2, $3) as r', [role, fn, 'execute'])).rows[0].r, false, `${role} cannot execute ${fn}`);
+  }
 
   // ---------- users ----------
   const all = await users(null);

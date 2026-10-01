@@ -91,6 +91,16 @@ export async function consumeRead(req: VercelRequest, symbol: string, options: {
   return { allowed: row.allowed !== false, code, readId: typeof row.readId === 'number' ? row.readId : null, access: shape(row), identity };
 }
 
+/** The owner's lifecycle funnel (bobby_devices): this install was opened, and by which account. Never throws. */
+export async function touchDevice(req: VercelRequest, identity: Identity | null): Promise<void> {
+  const device = deviceHash(req);
+  if (!device) return;
+  await rpc('bobby_touch_device', {
+    p_device: device, p_platform: clientPlatform(req), p_surface: null, p_referrer: null, p_utm: null,
+    p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
+  });
+}
+
 /** Give a read back when the analysis itself failed (the user got nothing). */
 export async function refundRead(readId: number | null): Promise<boolean> {
   if (!readId) return true;
