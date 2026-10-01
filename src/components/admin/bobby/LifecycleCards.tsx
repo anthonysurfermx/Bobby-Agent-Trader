@@ -1,44 +1,59 @@
-// "Ciclo de vida" (everyone Bobby knows, by stage today) and the Search Console card of the Funnel tab.
+// "Personas" (everyone Bobby knows today, deduplicated, by stage) and the Search Console card of the Funnel tab.
 import { useState } from 'react';
-import type { LifecycleStages, SearchConsoleData } from '@/lib/admin-client';
+import type { Growth, PeopleStage, SearchConsoleData } from '@/lib/admin-client';
 import { Card, CardHead, Note, Segmented, TableScroll, Tag, td, th, tr } from './ui';
 import { BarsChart, BigNumber } from './charts';
 import { fmtCompact, fmtDec, fmtInt, fmtPct, label } from './format';
 
-const STAGES: Array<{ key: keyof Pick<LifecycleStages, 'new' | 'activated' | 'engaged' | 'pro' | 'atRisk' | 'lost'>; label: string; color: string }> = [
-  { key: 'new', label: 'Nuevos', color: '#6CC4FF' },
-  { key: 'activated', label: 'Activados', color: '#2E9BFF' },
-  { key: 'engaged', label: 'Comprometidos', color: '#4ADE80' },
-  { key: 'pro', label: 'Pro', color: '#F28C38' },
-  { key: 'atRisk', label: 'En riesgo', color: '#F06A6A' },
-  { key: 'lost', label: 'Perdidos', color: '#3A3A3C' },
+// Under this base a percentage is noise: show the counts instead.
+const MIN_BASE = 5;
+const share = (a: number, b: number) => (!b ? '—' : b >= MIN_BASE ? fmtPct(a, b) : `${fmtInt(a)}/${fmtInt(b)}`);
+
+const STAGES: Array<{ key: PeopleStage; label: string; color: string; def: string }> = [
+  { key: 'new', label: 'Sin activar', color: '#6CC4FF', def: 'activos en 7 días, nunca han leído' },
+  { key: 'active', label: 'Activos', color: '#2E9BFF', def: 'ya leyeron y estuvieron activos en 7 días' },
+  { key: 'recurring', label: 'Recurrentes', color: '#4ADE80', def: 'leyeron en 2+ días distintos de los últimos 14' },
+  { key: 'pro', label: 'Pro', color: '#F28C38', def: 'tienen Bobby Pro hoy' },
+  { key: 'atRisk', label: 'En riesgo', color: '#F06A6A', def: 'sin actividad de 8 a 30 días' },
+  { key: 'lost', label: 'Perdidos', color: '#3A3A3C', def: '30+ días sin actividad' },
 ];
 
-export function LifecycleCard({ stages }: { stages: LifecycleStages }) {
-  const classified = STAGES.reduce((s, x) => s + stages[x.key], 0);
-  const rest = Math.max(0, stages.total - classified);
-  const base = Math.max(stages.total, classified);
-  const platforms = Object.entries(stages.byPlatform).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+export function PeopleCard({ people, includeInternal }: { people: Growth['people']; includeInternal: boolean }) {
+  const p = people;
+  const classified = STAGES.reduce((s, x) => s + p.stages[x.key], 0);
+  const base = Math.max(p.total, classified);
+  const rest = Math.max(0, p.total - classified);
+  const platforms = Object.entries(p.byPlatform).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  const excluded = p.excluded.accounts + p.excluded.guests;
 
   return (
     <Card>
       <BigNumber
-        label="Ciclo de vida"
-        value={fmtInt(stages.total)}
-        caption={`personas · ${fmtInt(stages.accounts)} cuentas · ${fmtInt(stages.guests)} invitados`}
+        label="Personas"
+        value={fmtInt(p.total)}
+        caption={`${fmtInt(p.accounts)} cuentas + ${fmtInt(p.guests)} instalaciones sin cuenta`}
         right={platforms.length ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] uppercase text-[#5C5C5C]">
             {platforms.map(([k, v]) => <span key={k}>{label(k)} <span className="text-[#8B8B8B]">{fmtInt(v)}</span></span>)}
           </div>
         ) : undefined}
       />
+      <div className="-mt-3 mb-5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] text-[#5C5C5C]">
+        <span>una cuenta y sus instalaciones cuentan una vez; no son humanos únicos (una persona con dos navegadores sin cuenta cuenta dos)</span>
+        {!includeInternal && excluded > 0 && (
+          <span className="text-[#8B8B8B]">sin el equipo: −{fmtInt(p.excluded.accounts)} cuentas, −{fmtInt(p.excluded.guests)} instalaciones</span>
+        )}
+        {includeInternal && <span className="text-[#F7A04B]">incluye al equipo</span>}
+        {p.wallets > 0 && <span>{fmtInt(p.wallets)} identidades wallet, fuera</span>}
+      </div>
+
       {base > 0 ? (
         <>
           <div className="flex h-[18px] w-full gap-[2px] overflow-hidden rounded-full bg-[#1F1F20]" role="img"
-            aria-label={STAGES.map((x) => `${x.label} ${fmtInt(stages[x.key])}`).join(', ')}>
-            {STAGES.map((x) => stages[x.key] > 0 && (
-              <div key={x.key} className="h-full first:rounded-l-full last:rounded-r-full" title={`${x.label}: ${fmtInt(stages[x.key])}`}
-                style={{ width: `${(stages[x.key] / base) * 100}%`, background: x.color, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
+            aria-label={STAGES.map((x) => `${x.label} ${fmtInt(p.stages[x.key])}`).join(', ')}>
+            {STAGES.map((x) => p.stages[x.key] > 0 && (
+              <div key={x.key} className="h-full first:rounded-l-full last:rounded-r-full" title={`${x.label}: ${fmtInt(p.stages[x.key])}`}
+                style={{ width: `${(p.stages[x.key] / base) * 100}%`, background: x.color, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.25)' }} />
             ))}
           </div>
           <ul className="m-0 mt-4 grid list-none grid-cols-2 gap-x-4 gap-y-3 p-0 sm:grid-cols-3 lg:grid-cols-6">
@@ -47,15 +62,41 @@ export function LifecycleCard({ stages }: { stages: LifecycleStages }) {
                 <div className="flex items-center gap-1.5 text-[12px] text-[#8B8B8B]">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: x.color }} aria-hidden />{x.label}
                 </div>
-                <div className="mt-1 font-mono text-[15px] text-[#EDEDED]">{fmtInt(stages[x.key])} <span className="text-[11px] text-[#5C5C5C]">{fmtPct(stages[x.key], base)}</span></div>
+                <div className="mt-1 font-mono text-[15px] text-[#EDEDED]">
+                  {fmtInt(p.stages[x.key])} {base >= MIN_BASE && <span className="text-[11px] text-[#5C5C5C]">{fmtPct(p.stages[x.key], base)}</span>}
+                </div>
               </li>
             ))}
           </ul>
-          {rest > 0 && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">{fmtInt(rest)} sin clasificar (sin fecha de actividad)</p>}
+          {base < MIN_BASE && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">Muestra pequeña: con {fmtInt(base)} personas se muestran conteos, no porcentajes.</p>}
+          {rest > 0 && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">{fmtInt(rest)} sin clasificar</p>}
         </>
       ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay personas registradas.</p>}
+
+      {(p.proInactive > 0 || p.accountsNeverRead > 0) && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {p.proInactive > 0 && <Tag tone="red">{fmtInt(p.proInactive)} Pro sin usar Bobby en 14+ días</Tag>}
+          {p.accountsNeverRead > 0 && <Tag tone="orange">{fmtInt(p.accountsNeverRead)} {p.accountsNeverRead === 1 ? 'cuenta nunca ha leído' : 'cuentas nunca han leído'}</Tag>}
+        </div>
+      )}
+
+      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {[
+          ['Activas en 7 días', p.active7d, 'abrieron Bobby o leyeron'],
+          ['Leyeron en 7 días', p.readers7d, `de ${fmtInt(p.readers)} que han leído alguna vez`],
+          ['Activas en 30 días', p.active30d, `de ${fmtInt(p.total)}`],
+          ['Nuevas en el periodo', p.newInPeriod, 'vistas por primera vez'],
+        ].map(([k, v, sub]) => (
+          <div key={k as string} className="min-w-0 rounded-xl border border-white/[0.06] bg-[#1A1A1B] px-3 py-2.5 font-mono">
+            <div className="truncate text-[10.5px] text-[#8B8B8B]">{k}</div>
+            <div className="mt-1 text-[15px] text-[#EDEDED]">{fmtInt(v as number)}</div>
+            <div className="mt-0.5 truncate text-[10.5px] text-[#5C5C5C]" title={sub as string}>{sub}</div>
+          </div>
+        ))}
+      </div>
+
       <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-        nuevo = sin lectura aún · activado = 1–4 lecturas · comprometido = 5+ · los tres con actividad en 7 días · en riesgo = 7–30 días sin volver · perdido = 30+ · Pro aparte
+        {STAGES.map((x) => `${x.label.toLowerCase()} = ${x.def}`).join(' · ')} · Pro va primero aunque esté inactivo
       </p>
     </Card>
   );
@@ -105,7 +146,8 @@ export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; perio
           {[
             ['Impresiones', fmtCompact(t.impressions)],
             ['Clics', fmtCompact(t.clicks)],
-            ['CTR', fmtPct(t.ctr, 1)],
+            // Google's own CTR over its impressions; with few impressions it is noise.
+            ['CTR', t.impressions >= MIN_BASE ? fmtPct(t.ctr, 1) : share(t.clicks, t.impressions)],
             ['Posición media', t.position != null ? fmtDec(t.position) : '—'],
           ].map(([k, v]) => (
             <div key={k} className="min-w-[84px] rounded-xl border border-white/[0.06] bg-[#1A1A1B] px-3 py-2 font-mono">
@@ -116,6 +158,9 @@ export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; perio
         </div>
       </div>
       <BarsChart days={days} values={(metric === 'clicks' ? sc.clicks : sc.impressions) ?? []} height={180} emptyLabel="Sin datos de Google en el periodo" />
+      <p className="m-0 mt-3 font-mono text-[11px] leading-relaxed text-[#5C5C5C]">
+        Datos de Google: población distinta al embudo (búsquedas y clics, no personas ni instalaciones){days.length ? `; último día publicado: ${days[days.length - 1]}` : ''}.
+      </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="min-w-0">
@@ -128,7 +173,7 @@ export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; perio
                   <td className={td}><div className="max-w-[220px] truncate text-[12.5px]" title={q.query}>{q.query}</div></td>
                   <td className={`${td} text-right font-mono text-[12px]`}>{fmtInt(q.clicks)}</td>
                   <td className={`${td} text-right font-mono text-[12px] text-[#8B8B8B]`}>{fmtCompact(q.impressions)}</td>
-                  <td className={`${td} text-right font-mono text-[12px] text-[#8B8B8B]`}>{fmtPct(q.ctr, 1)}</td>
+                  <td className={`${td} text-right font-mono text-[12px] text-[#8B8B8B]`}>{q.impressions >= MIN_BASE ? fmtPct(q.ctr, 1) : share(q.clicks, q.impressions)}</td>
                   <td className={`${td} text-right font-mono text-[12px] text-[#8B8B8B]`}>{q.position != null ? fmtDec(q.position) : '—'}</td>
                 </tr>
               ))}

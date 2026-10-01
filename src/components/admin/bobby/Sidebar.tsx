@@ -38,7 +38,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 export default function Sidebar({ tab, onSelect, onSearch, collapsed, onToggleCollapse, email, onSignOut, platforms }: {
   tab: TabId; onSelect: (id: TabId) => void; onSearch: () => void; collapsed: boolean; onToggleCollapse?: () => void;
-  email: string; onSignOut: () => void; platforms: { web: number; ios: number } | null;
+  email: string; onSignOut: () => void; platforms: { web: number; ios: number; days: number } | null;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col font-sans">
@@ -104,7 +104,7 @@ export default function Sidebar({ tab, onSelect, onSearch, collapsed, onToggleCo
               ))}
             </ul>
 
-            <SectionLabel>Plataformas</SectionLabel>
+            <SectionLabel>{platforms ? `Lecturas · ${platforms.days}D` : 'Plataformas'}</SectionLabel>
             <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
               {([['Web', '#4FB3FF', platforms?.web], ['iOS', '#F28C38', platforms?.ios]] as const).map(([name, color, reads]) => (
                 <li key={name}>

@@ -39,8 +39,11 @@ function pctText(p: number): string {
   return `${s}%`;
 }
 
-/** "+25% ↑" green / "12.5% ↓" red (inverted for costs). Null pct: no base to compare with. */
+const plain = (v: number) => v.toLocaleString('es-MX', { maximumFractionDigits: Number.isInteger(v) ? 0 : 2 });
+
+/** "+25% ↑" green / "12.5% ↓" red (inverted for costs). A small base shows the counts ("3 vs 1"), never a %. */
 export function DeltaValue({ d, invert }: { d: Delta; invert?: boolean }) {
+  if (d.small) return <span className="text-[#8B8B8B]">{plain(d.cur)} vs {plain(d.prev)}</span>;
   if (d.pct == null) return <span className="text-[#8B8B8B]">{d.cur > 0 ? 'nuevo' : '0%'}</span>;
   if (Math.abs(d.pct) < 0.0005) return <span className="text-[#8B8B8B]">0% →</span>;
   const up = d.pct > 0;
@@ -53,7 +56,7 @@ export function DeltaLine({ d, invert, suffix = 'vs periodo anterior', fallback 
   return (
     <div className="flex flex-wrap items-baseline gap-x-2 font-mono text-[12px]">
       <DeltaValue d={d} invert={invert} />
-      <span className="text-[#8B8B8B]">{d.pct == null && d.prev === 0 ? 'sin periodo anterior' : suffix}</span>
+      <span className="text-[#8B8B8B]">{d.small ? `${suffix} · muestra pequeña` : d.pct == null && d.prev === 0 ? 'sin periodo anterior' : suffix}</span>
     </div>
   );
 }

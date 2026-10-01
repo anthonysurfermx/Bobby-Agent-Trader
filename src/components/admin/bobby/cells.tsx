@@ -2,17 +2,46 @@
 import type { AdminUser } from '@/lib/admin-client';
 import { Tag } from './ui';
 import { T } from './tokens';
-import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, label, lastActivity, statusLabel, timeOf } from './format';
+import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, label, statusLabel, timeOf } from './format';
 
-export function Identity({ u, self }: { u: AdminUser; self?: boolean }) {
+/** Apple lets people hide their email: such an account is told apart by its id. */
+export function identityName(u: AdminUser): string {
+  if (u.email) return u.email;
+  if (u.wallet_only) return u.wallet ?? 'Wallet sin dirección';
+  if (u.provider) return `${label(u.provider)} · ${u.id.slice(0, 8)}`;
+  return u.id.slice(0, 8);
+}
+
+/** The last day the person really used Bobby (opened it or read): never an API call such as /admin's own. */
+function lastActiveTime(u: AdminUser): number | null {
+  const day = timeOf(u.last_active_day);
+  const read = timeOf(u.last_read_at);
+  if (day == null && read == null) return null;
+  return Math.max(day ?? 0, read ?? 0);
+}
+
+/**
+ * `team`: the email is on the owner's list (internal by email, which the users list does not flag itself).
+ * Badges: Admin and Interna (by hand) and Equipo (by email) all leave the account out of every figure.
+ */
+export function Identity({ u, self, team }: { u: AdminUser; self?: boolean; team?: boolean }) {
+  const name = identityName(u);
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
-      <span className="flex items-center gap-1.5">
-        <span className="max-w-[184px] truncate text-[13px]" title={u.email ?? u.id}>{u.email ?? (u.wallet_only ? 'Cuenta de wallet' : 'Sin email')}</span>
-        {u.is_admin && <Tag tone="orange">Admin</Tag>}
-        {self && <Tag>Tú</Tag>}
+    <div className="flex min-w-0 flex-col gap-1">
+      <span className="flex flex-wrap items-center gap-1.5">
+        <span className={`max-w-[200px] truncate text-[13px] ${u.wallet_only && !u.email ? 'font-mono' : ''}`} title={u.email ?? u.id}>{name}</span>
+        {!u.email && !u.wallet_only && (
+          <span className="font-mono text-[10px] uppercase text-[#5C5C5C]" title={u.provider === 'apple' ? 'Apple oculta el email de esta persona' : 'La cuenta no tiene email'}>sin email</span>
+        )}
       </span>
-      <span className="max-w-[184px] truncate font-mono text-[10.5px] text-[#5C5C5C]" title={u.id}>{u.id}</span>
+      <span className="flex flex-wrap items-center gap-1">
+        {u.is_admin && <Tag tone="orange" title="Admin: queda fuera de todas las cifras">Admin</Tag>}
+        {u.is_internal && <Tag tone="blue" title="Marcada a mano como interna: queda fuera de todas las cifras">Interna</Tag>}
+        {team && !u.is_internal && <Tag tone="blue" title="Su email está en la lista del equipo: queda fuera de todas las cifras">Equipo</Tag>}
+        {u.pro && <Tag tone="green">Pro</Tag>}
+        {self && <Tag>Tú</Tag>}
+        <span className="max-w-[150px] truncate font-mono text-[10.5px] text-[#5C5C5C]" title={u.id}>{u.id}</span>
+      </span>
     </div>
   );
 }
@@ -21,7 +50,9 @@ export function ProviderCell({ u }: { u: AdminUser }) {
   return (
     <div className="flex flex-col items-start gap-1">
       <Tag>{u.wallet_only ? 'Wallet' : label(u.provider)}</Tag>
-      <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]">{u.platform ? label(u.platform) : DASH}</span>
+      <span className="font-mono text-[10.5px] uppercase text-[#5C5C5C]" title="Plataforma de su primera lectura con cuenta">
+        1.ª lectura: <span className="text-[#8B8B8B]">{u.platform ? label(u.platform) : DASH}</span>
+      </span>
     </div>
   );
 }
@@ -50,6 +81,7 @@ export function PlanCell({ u }: { u: AdminUser }) {
   );
 }
 
+/** What is left of what an admin or a coupon gave (not what was given). */
 export function GiftCell({ u }: { u: AdminUser }) {
   const parts: string[] = [];
   if (u.bonus_reads) parts.push(`${fmtInt(u.bonus_reads)} lect`);
@@ -58,18 +90,19 @@ export function GiftCell({ u }: { u: AdminUser }) {
   return <span className={`font-mono text-[11.5px] uppercase ${parts.length ? 'text-[#EDEDED]' : 'text-[#5C5C5C]'}`}>{parts.length ? parts.join(' · ') : DASH}</span>;
 }
 
-/** Created → first read → last activity on one line, scaled from the account's birth to now. */
+/** Created → first read → last real use on one line, scaled from the account's birth to now. */
 export function Lifecycle({ u, now }: { u: AdminUser; now: number }) {
   const t0 = timeOf(u.created_at);
   if (t0 == null) return null;
   const span = Math.max(now - t0, 60_000);
   const x = (t: number | null) => (t == null ? null : 4 + Math.min(1, Math.max(0, (t - t0) / span)) * 72);
+  const lastT = lastActiveTime(u);
   const first = x(timeOf(u.first_read_at));
-  const last = x(timeOf(lastActivity(u)));
+  const last = x(lastT);
   const title = [
     `Creada ${fmtDateTime(u.created_at)}`,
     u.first_read_at ? `primera lectura ${fmtDateTime(u.first_read_at)}` : 'sin lecturas',
-    lastActivity(u) ? `última actividad ${fmtDateTime(lastActivity(u))}` : null,
+    lastT != null ? `último uso ${fmtDate(new Date(lastT).toISOString())}` : null,
   ].filter(Boolean).join(' → ');
   return (
     <svg width="80" height="12" viewBox="0 0 80 12" role="img" aria-label={title} className="block">

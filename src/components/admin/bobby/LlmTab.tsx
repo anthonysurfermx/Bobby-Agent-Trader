@@ -3,7 +3,8 @@ import { Activity, ArrowUpRight, Plus, Wallet } from 'lucide-react';
 import { adminAction, isMissing, probeLlm, type LlmProvider, type LlmProviderStats, type OverviewResponse, type ProbeResult } from '@/lib/admin-client';
 import { Btn, Card, Field, FormMessage, MissingNote, Modal, Note, Row, Segmented, Tag, TextInput } from './ui';
 import { BarsChart, BigNumber, HeroCard, StatusBars } from './charts';
-import { growthWindows, windowDelta, type CompareSeries } from './deltas';
+import { growthWindows, MIN_BASE, windowDelta, type CompareSeries } from './deltas';
+import { LLM_NAME, llmProviderState } from './health';
 import { fmtDate, fmtDateTime, fmtInt, fmtPct, fmtRelative, fmtUsd } from './format';
 import { toAdminError } from './useLoad';
 
@@ -17,11 +18,18 @@ function moneyInput(raw: string): string {
   return rest.length ? `${whole}.${rest.join('').slice(0, 2)}` : whole;
 }
 
-const NAME: Record<LlmProvider, string> = { anthropic: 'Anthropic', openai: 'OpenAI' };
+const NAME = LLM_NAME;
 const CONSOLE: Record<LlmProvider, string> = {
   anthropic: 'https://console.anthropic.com/settings/billing',
   openai: 'https://platform.openai.com/settings/organization/billing/overview',
 };
+
+/** a of b: a percentage only with a base of MIN_BASE or more; under it the raw counts and "muestra pequeña". */
+function Share({ a, b }: { a: number; b: number }) {
+  if (!b) return <span className="text-[#5C5C5C]">—</span>;
+  if (b < MIN_BASE) return <span>{fmtInt(a)}/{fmtInt(b)} <span className="text-[#5C5C5C]">· muestra pequeña</span></span>;
+  return <span>{fmtPct(a, b)} <span className="text-[#5C5C5C]">· n={fmtInt(b)}</span></span>;
+}
 
 function ProbeLine({ result }: { result: ProbeResult | { error: string } | null }) {
   if (!result) return null;
@@ -33,12 +41,15 @@ function ProbeLine({ result }: { result: ProbeResult | { error: string } | null 
   return <p role="alert" className={`${base} text-[#F06A6A]`}>Falló la llamada · {detail}</p>;
 }
 
+const dim = (text: string) => <span className="text-[#5C5C5C]">{text}</span>;
+
 function ProviderCard({ provider, p, period, onMark, notify }: {
   provider: LlmProvider; p: LlmProviderStats; period: number; onMark: (kind: 'balance' | 'topup') => void; notify: Notify;
 }) {
   const [probing, setProbing] = useState(false);
   const [probe, setProbe] = useState<ProbeResult | { error: string } | null>(null);
-  const empty = p.estimatedLeft != null && p.estimatedLeft <= 0;
+  const state = llmProviderState(p);
+  const fail = p.lastFailure;
 
   const runProbe = async () => {
     setProbing(true); setProbe(null);
@@ -60,42 +71,62 @@ function ProviderCard({ provider, p, period, onMark, notify }: {
             Consola de facturación<ArrowUpRight className="h-3 w-3" aria-hidden />
           </a>
         </div>
-        {empty ? <Tag tone="red">Sin crédito</Tag> : p.estimatedLeft != null ? <Tag tone="green">Con crédito</Tag> : <Tag>Sin saldo registrado</Tag>}
+        <Tag tone={state.tone}>{state.label}</Tag>
       </div>
+      {state.detail && <p className={`m-0 px-5 pt-2 font-mono text-[11.5px] leading-snug ${state.tone === 'red' ? 'text-[#F06A6A]' : 'text-[#8B8B8B]'}`}>{state.detail}</p>}
 
-      <div className="mt-4 grid grid-cols-3 divide-x divide-white/[0.06] border-y border-white/[0.06]">
-        {([['Hoy', p.today], ['7 días', p.week], ['30 días', p.month]] as const).map(([k, v]) => (
+      <div className="mt-4 grid grid-cols-3 divide-x divide-white/[0.06] border-t border-white/[0.06]">
+        {([['Hoy (UTC)', p.today], ['Últimos 7 días', p.week], ['Últimos 30 días', p.month]] as const).map(([k, v]) => (
           <div key={k} className="min-w-0 px-5 py-4">
-            <div className="text-[12px] text-[#8B8B8B]">{k}</div>
+            <div className="truncate text-[12px] text-[#8B8B8B]">{k}</div>
             <div className="mt-1.5 truncate font-mono text-[20px] font-medium leading-none text-[#EDEDED]">{fmtUsd(v, true)}</div>
           </div>
         ))}
       </div>
+      <p className="m-0 border-b border-white/[0.06] px-5 pb-3 font-mono text-[10.5px] text-[#5C5C5C]">Ventanas fijas: no siguen el selector de periodo.</p>
 
       <div className="px-5 py-2">
-        <Row label={`Llamadas · ${period}d`} value={fmtInt(p.calls)} />
-        <Row label={`Fallos · ${period}d`} value={<span className={p.failures > 0 ? 'text-[#F06A6A]' : undefined}>{fmtInt(p.failures)}</span>} hint={p.calls ? fmtPct(p.failures, p.calls) : undefined} />
+        <Row label="Gasto en el periodo" hint={`${period}d`} value={fmtUsd(p.period, true)} />
+        <Row label="Llamadas en el periodo" hint={`${period}d`} value={fmtInt(p.calls)} />
+        <Row label="Fallos en el periodo" hint={<Share a={p.failures} b={p.calls} />} value={<span className={p.failures > 0 ? 'text-[#F06A6A]' : undefined}>{fmtInt(p.failures)}</span>} />
+        <Row label="Últimas 24 h" value={<span>{fmtInt(p.failures24h)} fallos / {fmtInt(p.calls24h)} llamadas</span>} />
+        <Row label="Última llamada OK" value={p.lastOk ? <span title={fmtDateTime(p.lastOk)}>{fmtRelative(p.lastOk)}</span> : dim('ninguna registrada')} />
+        <Row
+          label="Último fallo"
+          value={fail
+            ? <span title={fmtDateTime(fail.at)} className="text-[#F06A6A]">{fmtRelative(fail.at)}</span>
+            : dim('ninguno')}
+          hint={fail ? [fail.stop, fail.surface].filter(Boolean).join(' · ') || undefined : undefined}
+        />
         <Row
           label="Crédito estimado"
           value={p.estimatedLeft != null
-            ? <span className={empty ? 'text-[#F06A6A]' : 'text-[#EDEDED]'}>{fmtUsd(p.estimatedLeft)}</span>
+            ? <span className={p.estimatedLeft <= 0 ? 'text-[#F06A6A]' : 'text-[#EDEDED]'}>≈ {fmtUsd(p.estimatedLeft)}</span>
             : <button type="button" onClick={() => onMark('balance')} className="font-mono text-[12px] text-[#F7A04B] underline underline-offset-2">Registra tu saldo</button>}
         />
         <Row
           label="Último saldo"
-          value={p.balanceMark ? <span title={fmtDateTime(p.balanceMark.at)}>{fmtUsd(p.balanceMark.amount)} <span className="text-[11px] text-[#5C5C5C]">{fmtDate(p.balanceMark.at)}</span></span> : <span className="text-[#5C5C5C]">ninguno</span>}
+          value={p.balanceMark ? <span title={fmtDateTime(p.balanceMark.at)}>{fmtUsd(p.balanceMark.amount)} <span className="text-[11px] text-[#5C5C5C]">{fmtDate(p.balanceMark.at)}</span></span> : dim('ninguno')}
         />
+        <Row label="Última recarga" value={p.lastTopup ? <span title={fmtDateTime(p.lastTopup)}>{fmtDate(p.lastTopup)}</span> : dim('ninguna')} />
         <Row
           label="Aviso de crédito agotado"
-          value={p.lastCreditAlert ? <span className="text-[#F06A6A]" title={fmtDateTime(p.lastCreditAlert)}>{fmtRelative(p.lastCreditAlert)}</span> : <span className="text-[#5C5C5C]">ninguno</span>}
+          value={p.lastCreditAlert ? <span className={state.key === 'no_credit' ? 'text-[#F06A6A]' : 'text-[#8B8B8B]'} title={fmtDateTime(p.lastCreditAlert)}>{fmtRelative(p.lastCreditAlert)}</span> : dim('ninguno')}
+          hint={p.lastCreditAlert && p.creditAlert ? [p.creditAlert.endpoint, p.creditAlert.code].filter(Boolean).join(' · ') || undefined : undefined}
         />
       </div>
 
       <div className="flex flex-wrap gap-1 border-t border-white/[0.06] px-4 py-3">
         <Btn size="sm" variant="ghost" onClick={() => onMark('balance')}><Wallet className="h-3.5 w-3.5" aria-hidden />Registrar saldo</Btn>
-        <Btn size="sm" variant="ghost" onClick={() => onMark('topup')}><Plus className="h-3.5 w-3.5" aria-hidden />Registrar recarga</Btn>
+        <Btn
+          size="sm" variant="ghost" onClick={() => onMark('topup')} disabled={!p.balanceMark}
+          title={p.balanceMark ? undefined : 'Primero registra un saldo: la recarga se suma al último saldo registrado'}
+        >
+          <Plus className="h-3.5 w-3.5" aria-hidden />Registrar recarga
+        </Btn>
         <Btn size="sm" variant="ghost" onClick={() => void runProbe()} busy={probing}>{!probing && <Activity className="h-3.5 w-3.5" aria-hidden />}Probar ahora</Btn>
       </div>
+      {!p.balanceMark && <p className="m-0 px-5 pb-3 font-mono text-[10.5px] leading-snug text-[#5C5C5C]">La recarga se activa cuando haya un saldo registrado: sin él no hay a qué sumarla.</p>}
       {probe && <div className="px-5 pb-4"><ProbeLine result={probe} /></div>}
     </Card>
   );
@@ -157,16 +188,26 @@ function CreditDialog({ target, onClose, onDone }: {
 export default function LlmTab({ data, period, cmp, notify, onChanged }: { data: OverviewResponse; period: number; cmp: CompareSeries | null; notify: Notify; onChanged: () => void }) {
   const { overview: o, integrations: i } = data;
   const caps = i.llmCaps;
-  const guard = i.llmGuard;
+  // The overview's guard is read in the same transaction as the rest of the figures; integrations is the fallback.
+  const guard = o.llm.guard ? { dayUsd: o.llm.guard.day, monthUsd: o.llm.guard.month } : i.llmGuard;
   const [mark, setMark] = useState<{ provider: LlmProvider; kind: 'balance' | 'topup' } | null>(null);
   const [series, setSeries] = useState<Series>('total');
+  const llmMissing = isMissing(o.missing, 'llm');
   const dailyMissing = isMissing(o.missing, 'llm.daily');
   const values = o.llm.daily.map((d) => (series === 'total' ? d.anthropic + d.openai : d[series]));
   const cmpSeries = series === 'total' ? cmp?.llm : cmp?.[series];
   const periodTotal = values.reduce((a, b) => a + b, 0);
   const surfaces = o.llm.bySurface;
   const surfacesTotal = surfaces.reduce((a, s) => a + s.usd, 0);
-  const ledgerSurfaces = o.coverage?.ledgerSurfaces ?? [];
+  const cov = o.coverage;
+  const ledgerSurfaces = cov?.ledgerSurfaces ?? [];
+  const runs = o.llm.deskRuns;
+  const unfinished = Math.max(0, runs.runs - runs.finished);
+  const runsByDay = new Map(runs.byDay.map((d) => [d.day.slice(0, 10), d.runs]));
+  const runValues = o.days.map((d) => runsByDay.get(d) ?? 0);
+  const ledgerLine = cov
+    ? `Ledger desde ${cov.ledgerSince ? fmtDate(cov.ledgerSince) : 'sin registros todavía'} · superficies que lo escriben: ${ledgerSurfaces.length ? ledgerSurfaces.join(', ') : 'ninguna todavía'}`
+    : 'Cobertura del ledger no disponible';
 
   // The caps compare the spend guard's own figures: desk only, UTC calendar day and month.
   const capRow = (label: string, spent: number | null, cap: number) => {
@@ -181,7 +222,10 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
   return (
     <div className="flex flex-col gap-4">
       <MissingNote missing={o.missing} sections={['llm', 'coverage', 'integrations']} />
-      <Note tag="Saldo">Los proveedores no exponen el saldo por API: el estimado = último saldo registrado + recargas − gasto del ledger.</Note>
+      <Note tag="Cobertura">
+        {ledgerLine}. TTS (voces), Realtime y otras superficies de OpenAI todavía no escriben el ledger: todo el gasto de esta pestaña es un mínimo, el real es mayor.
+      </Note>
+      <Note tag="Saldo">Los proveedores no exponen el saldo por API: el estimado = último saldo registrado + recargas − gasto del ledger (por eso puede quedarse corto).</Note>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {(['anthropic', 'openai'] as const).map((p) => (
@@ -190,7 +234,7 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
       </div>
 
       <HeroCard
-        title="Gasto diario (ledger)"
+        title={`Gasto diario (ledger) · ${period}d`}
         toggle={(
           <Segmented<Series>
             label="Proveedor" value={series} onChange={setSeries}
@@ -201,11 +245,27 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
         delta={dailyMissing ? null : windowDelta(cmpSeries, period)}
         invert
         chips={dailyMissing ? [] : growthWindows(cmpSeries)}
+        note={cov?.ledgerSince ? `Días antes del ${fmtDate(cov.ledgerSince)} no tienen registro (no son $0).` : undefined}
       >
         <BarsChart days={o.days} values={values} format="usd-precise" emptyLabel={dailyMissing ? 'Dato no disponible' : 'Sin gasto en el periodo'} />
       </HeroCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
+        <Card>
+          <BigNumber label="Análisis del desk" value={llmMissing ? '—' : fmtInt(runs.runs)} caption={`en el periodo · ${period}d`} />
+          {llmMissing ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p> : (
+            <>
+              <Row label="Terminados" value={fmtInt(runs.finished)} hint={<Share a={runs.finished} b={runs.runs} />} />
+              <Row label="Sin terminar" value={<span className={unfinished > 0 ? 'text-[#F06A6A]' : undefined}>{fmtInt(unfinished)}</span>} hint={<Share a={unfinished} b={runs.runs} />} />
+              <div className="mt-4">
+                <BarsChart days={o.days} values={runValues} height={120} emptyLabel="Sin análisis en el periodo" />
+              </div>
+            </>
+          )}
+          <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
+            Un análisis = un lote del ledger; terminado = el CIO respondió. Los fallos de cada proveedor (arriba) son por llamada; aquí son por análisis completo.
+          </p>
+        </Card>
         <Card>
           <BigNumber label="Topes de gasto (desk)" value={guard ? fmtUsd(guard.monthUsd, true) : '—'} caption={guard ? 'este mes calendario (UTC)' : 'dato no disponible'} />
           <StatusBars
@@ -223,27 +283,28 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
             Los topes comparan solo el gasto del desk, por día y mes calendario UTC: lo mismo que mira el freno del servidor.
           </p>
         </Card>
-        <Card>
-          <BigNumber label="Gasto por superficie" value={isMissing(o.missing, 'llm.bySurface') ? '—' : fmtUsd(surfacesTotal, true)} caption={`${period}d · ledger`} />
-          {isMissing(o.missing, 'llm.bySurface') ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p>
-            : surfaces.length === 0 ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Sin gasto registrado en el periodo</p>
-            : (
-              <StatusBars
-                uppercase={false}
-                stackMobile
-                wrapLabels
-                labelWidth={150}
-                rows={surfaces.map((s, idx) => ({
-                  label: `${s.surface} · ${s.provider}`, value: s.usd, fill: idx === 0 ? 'orange' : 'blue',
-                  display: fmtUsd(s.usd, true), sub: `${fmtInt(s.calls)} llamadas${s.failures ? ` · ${fmtInt(s.failures)} fallos` : ''}`,
-                }))}
-              />
-            )}
-          <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-            El ledger cubre: {ledgerSurfaces.length ? ledgerSurfaces.join(', ') : 'sin registros todavía'}{o.coverage?.ledgerSince ? ` (desde ${fmtDate(o.coverage.ledgerSince)})` : ''}. TTS/voz no está incluido.
-          </p>
-        </Card>
       </div>
+
+      <Card>
+        <BigNumber label="Gasto por superficie" value={isMissing(o.missing, 'llm.bySurface') ? '—' : fmtUsd(surfacesTotal, true)} caption={`en el periodo · ${period}d · ledger`} />
+        {isMissing(o.missing, 'llm.bySurface') ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p>
+          : surfaces.length === 0 ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Sin gasto registrado en el periodo</p>
+          : (
+            <StatusBars
+              uppercase={false}
+              stackMobile
+              wrapLabels
+              labelWidth={150}
+              rows={surfaces.map((s, idx) => ({
+                label: `${s.surface} · ${s.provider}`, value: s.usd, fill: idx === 0 ? 'orange' : 'blue',
+                display: fmtUsd(s.usd, true), sub: `${fmtInt(s.calls)} llamadas${s.failures ? ` · ${fmtInt(s.failures)} fallos` : ''}`,
+              }))}
+            />
+          )}
+        <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
+          {ledgerLine}. Voces (TTS) y Realtime no aparecen aquí aunque gasten.
+        </p>
+      </Card>
 
       <CreditDialog target={mark} onClose={() => setMark(null)} onDone={(text) => { notify(text); onChanged(); }} />
     </div>

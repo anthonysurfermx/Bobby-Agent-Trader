@@ -15,7 +15,8 @@ for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_N
 
 const { default: adminHandler } = await import('../api/admin.ts');
 const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
-const { parseSalesReport, ascVendor, ascKeyId, ascIssuer } = await import('../api/_lib/admin.ts');
+const { parseSalesReport, ascVendor, ascKeyId, ascIssuer, unitEconomics } = await import('../api/_lib/admin.ts');
+const { buildInsights } = await import('../api/_lib/admin-insights.ts');
 const { requestGeo, fromAlpha3, countryCode } = await import('../api/_lib/geo.ts');
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -72,11 +73,19 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
   if (c.url.includes('rpc/bobby_record_event')) return new Response(null, { status: 204 });
   if (c.url.includes('rpc/bobby_admin_geo')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3, located: 2 }, countries: [{ country: 'MX', visitors: 2 }], regions: [], purchases: [] });
-  if (c.url.includes('rpc/bobby_admin_lifecycle')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3 }, ios: { devices: 1 }, stages: { total: 4 } });
+  if (c.url.includes('rpc/bobby_admin_growth')) return json({ days: 30, people: { accounts: 3, active7d: 2 }, cohorts: { web: { arrived: 3 }, ios: { arrived: 1 } }, outcomes: {}, acquisition: { visits: 4, visitors: 3, visitsWithUtm: 0 }, attention: { neverRead: [] }, coverage: {} });
+  if (c.url.includes('rpc/bobby_mark_admin_session')) return new Response(null, { status: 204 });
+  if (c.url.includes('rpc/bobby_admin_devices')) return json([{ device: 'abcdef1234', platform: 'ios', internal: false }]);
+  if (c.url.includes('rpc/bobby_set_device_internal')) return json(c.body.p_prefix === 'abcdef1234' ? 1 : 0);
+  if (c.url.includes('bobby_internal_networks') && c.method === 'GET') return json([{ network_hash: 'netprefix0-rest-of-the-hash', note: 'admin session', created_at: '2026-10-01T22:00:00Z', last_seen_at: '2026-10-01T22:00:00Z' }]);
+  if (c.url.includes('bobby_internal_marks') && c.method === 'GET') return json([]);
+  if (c.url.includes('bobby_internal_marks') || c.url.includes('bobby_internal_networks')) return new Response(null, { status: 201 });
+  if (c.url.includes('bobby_admin_settings?key=eq.internal_emails')) return json([{ value: ['me@example.com'] }]);
   if (c.url.includes('rpc/bobby_admin_economics')) return json({ days: 30, since: '2026-09-02T00:00:00Z',
     revenue: { grossUsd: 49.9, netUsd: 42.415, refundsUsd: 0, newPaying: 10, initialPurchases30d: 10, expirations30d: 0, lastPriceUsd: 4.99, takehome: 0.85 },
     costs: { marketingUsd: 100, infraUsd: 20, otherUsd: 0, byChannel: [{ channel: 'tiktok', usd: 100 }] },
     subscriptions: { active: 10 }, newAccounts: 40, activeReaders30d: 50, llmUsd: 5, llm30dUsd: 5, assumptions: { monthlyChurn: 0.1 } });
+  if (c.url.includes('bobby_purchase_events') || (c.url.includes('bobby_reads?select=created_at'))) return json([]);
   if (c.url.includes('bobby_admin_settings')) return new Response(null, { status: 201 });
   return json({ message: `unexpected ${c.method} ${c.url}` }, 500);
 }) as typeof fetch;
@@ -112,7 +121,10 @@ try {
   // ---------- views ----------
   const over = await call('GET', 'Bearer admin-token', { view: 'overview', days: '9999' });
   eq(over.statusCode, 200, 'overview');
-  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 365 }, 'the window is capped');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 365, p_internal: false }, 'the window is capped; the team is left out by default');
+  ok(Array.isArray(over.body.insights) && over.body.growth?.people?.accounts === 3, 'the overview carries the growth view and its diagnosis');
+  eq((await call('GET', 'Bearer admin-token', { view: 'overview', internal: '1' })).statusCode, 200, 'internal traffic on request');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_growth'))?.body, { p_days: 30, p_internal: true }, 'growth follows the same switch');
   eq([over.body.integrations.revenuecat.configured, over.body.integrations.appStore.configured], [false, false], 'integrations report what is missing');
   ok(over.body.integrations.missing.includes('REVENUECAT_V2_SECRET_KEY') && over.body.integrations.missing.includes('ASC_KEY_ID'), 'missing env names');
   eq(typeof over.body.integrations.llmCaps.dayUsd, 'number', 'LLM caps');
@@ -161,7 +173,7 @@ try {
   const gone = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'Reader@Example.com' });
   eq(gone.statusCode, 200, 'an account is deleted');
   const order = calls.map((c) => `${c.method} ${c.url.replace(/^https:\/\/db\.test/, '')}`).filter((s) => /agent_trades|bobby_identities\?id|auth\/v1\/admin/.test(s));
-  eq(order.map((s) => s.split('?')[0]), ['GET /rest/v1/bobby_identities', 'PATCH /rest/v1/agent_trades', 'DELETE /rest/v1/bobby_identities', 'DELETE /auth/v1/admin/users/' + USER_AUTH], 'trades de-linked, data, then sign-in');
+  eq(order.map((s) => s.split('?')[0]), ['GET /rest/v1/bobby_identities', 'DELETE /auth/v1/admin/users/' + USER_AUTH, 'PATCH /rest/v1/agent_trades', 'DELETE /rest/v1/bobby_identities'], 'sign-in first (a failure leaves everything for the retry), then trades de-linked, then data');
   eq(audits().at(-1)?.action, 'delete-user', 'audited');
   ok(!('confirm' in (audits().at(-1)?.detail ?? {})), 'the typed confirmation is not stored');
   eq(finishes().at(-1)?.detail.account, 'reader@example.com', 'the outcome names the account');
@@ -196,13 +208,18 @@ try {
   ok(over2.body.integrations.missing.includes('REVENUECAT_SECRET_KEY') && over2.body.integrations.missing.includes('REVENUECAT_WEBHOOK_AUTH'), 'webhook secrets are checked');
   eq(over2.body.integrations.health.revenuecatWebhook.configured, false, 'webhook not configured without its secrets');
   const life = await call('GET', 'Bearer admin-token', { view: 'lifecycle', days: '30' });
-  eq([life.statusCode, life.body.lifecycle.web.devices, life.body.searchConsole.configured, life.body.appStore.configured], [200, 3, false, false], 'lifecycle view');
-  eq([life.body.instrumentation.iosPaywall, life.body.coverage.eventsSince], [false, '2026-10-01T12:00:00Z'], 'what is measured and since when');
+  eq([life.statusCode, life.body.searchConsole.configured, life.body.appStore.configured], [200, false, false], 'lifecycle view: economics and the providers');
+  eq([life.body.instrumentation.iosPaywall, life.body.instrumentation.deskOutcomes], [false, true], 'what is measured');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_economics'))?.body, { p_days: 30, p_internal: false }, 'economics leaves the team out');
   const ue = life.body.economics;
   eq([ue.revenue.mrrGrossUsd, ue.revenue.mrrNetUsd, ue.acquisition.cacPerPaying, ue.acquisition.cacPerAccount], [49.9, 42.42, 10, 2.5], 'MRR and CAC (marketing / new payers, / new accounts)');
   eq([ue.ltv.monthlyChurn, ue.ltv.churnSource, ue.ltv.lifetimeMonths, ue.ltv.monthlyLlmPerUserUsd], [0.1, 'assumed', 10, 0.1], 'churn from the assumption until there are 5+ subscriptions at the start; LLM cost per active reader');
   eq([ue.ltv.monthlyContributionUsd, ue.ltv.ltvUsd, ue.ltv.ltvToCac, ue.ltv.paybackMonths], [4.14, 41.42, 4.14, 2.4], 'LTV = (net price - LLM per user) / churn; LTV:CAC; payback');
   eq([ue.costs.totalUsd, ue.roi.profitUsd, ue.roi.roi], [125, -82.58, -0.6607], 'ROI = (net revenue - all costs) / all costs');
+  eq(ue.ltv.scenario, true, 'no payer on record: the LTV is a scenario');
+  const zeroFee = unitEconomics({ days: 30, since: '2026-09-02T00:00:00Z', revenue: { grossUsd: 0, netUsd: 0, refundsUsd: 0, newPaying: 0, payersEver: 2, initialPurchases30d: 0, expirations30d: 0, lastPriceUsd: null, takehome: null },
+    costs: { marketingUsd: 0, infraUsd: 0, otherUsd: 0, byChannel: [] }, subscriptions: { active: 1, trialing: 1 }, newAccounts: 0, activeReaders30d: 0, llmUsd: 0, llm30dUsd: 0, assumptions: { storeFee: 0, priceUsd: 5 } });
+  eq([zeroFee.revenue.takehome, zeroFee.revenue.mrrGrossUsd, zeroFee.revenue.trialing, zeroFee.ltv.scenario, zeroFee.revenue.priceSource], [1, 5, 1, false, 'assumed'], 'a saved 0% fee stays 0%; trials are not MRR');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'add-cost', kind: 'marketing', channel: 'TikTok Ads', amountUsd: 50, spentOn: '2026-09-30' })).statusCode, 200, 'record a marketing cost');
   eq(calls.find((c) => c.url.includes('bobby_costs') && c.method === 'POST')?.body.channel, 'tiktok-ads', 'channel normalized');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'add-cost', kind: 'ads', amountUsd: 50 })).statusCode, 400, 'unknown cost kind');
@@ -249,6 +266,74 @@ try {
   const bad = response();
   await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
   eq(bad.statusCode, 400, 'unknown events are refused');
+  ok(stored?.p_network && !String(stored.p_network).includes('10.1.1'), 'the network travels as a salted hash');
+  overrides = (c) => (c.url.includes('rpc/bobby_record_event') ? json({ message: 'down' }, 500) : null);
+  calls = [];
+  const lost = response();
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.4' } } as never, lost as never);
+  eq(lost.statusCode, 503, 'a lost event is not reported as stored');
+  eq(calls.find((c) => c.url.includes('api_cache') && c.method === 'POST')?.body?.cache_key, 'track-health', 'and the owner can see it');
+  overrides = () => null;
+
+  // ---------- internal traffic ----------
+  const DEVICE = '0d6e4a52-7c1b-4f0e-9a51-2b7e1c9d3f10';
+  calls = [];
+  const resMark = response();
+  await adminHandler({ method: 'GET', query: { view: 'me' }, headers: { 'x-forwarded-for': '10.9.9.9', authorization: 'Bearer admin-token', 'x-bobby-device': DEVICE } } as never, resMark as never);
+  await new Promise((r) => setTimeout(r, 10));
+  const mark = calls.find((c) => c.url.includes('rpc/bobby_mark_admin_session'))?.body;
+  ok(mark?.p_device && mark?.p_network && !JSON.stringify(mark).includes(DEVICE) && !JSON.stringify(mark).includes('10.9.9'), 'an /admin session marks its install and network as internal, hashed');
+  const setInt = await call('POST', 'Bearer admin-token', {}, { action: 'set-internal', identityId: USER, internal: true });
+  eq([setInt.statusCode, audits().at(-1)?.action], [200, 'set-internal'], 'mark an account internal (audited)');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-device-internal', device: 'abcdef1234', internal: true })).statusCode, 200, 'mark an install by its prefix');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-device-internal', device: 'zzzzzzzzzz', internal: true })).statusCode, 404, 'an unknown install');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-device-internal', device: 'short', internal: true })).statusCode, 400, 'a malformed prefix');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-internal-emails', emails: ['not an email'] })).statusCode, 400, 'emails are validated');
+  const em = await call('POST', 'Bearer admin-token', {}, { action: 'set-internal-emails', emails: [' Me@Example.com ', 'me@example.com', 'you@example.org'] });
+  eq([em.statusCode, em.body.emails], [200, ['me@example.com', 'you@example.org']], 'emails normalized and deduplicated');
+  const iv = await call('GET', 'Bearer admin-token', { view: 'internal' });
+  eq([iv.statusCode, iv.body.networks[0].network, iv.body.emails], [200, 'netprefix0', ['me@example.com']], 'the internal view never exposes a full network hash');
+  eq((await call('GET', 'Bearer user-token', { view: 'internal' })).statusCode, 403, 'internal view is admin only');
+
+  // ---------- the daily digest ----------
+  process.env.CRON_SECRET = 'cron-test-secret';
+  const cronNoAuth = response();
+  await adminHandler({ method: 'GET', query: { cron: 'digest' }, headers: { 'x-forwarded-for': '10.7.7.1' } } as never, cronNoAuth as never);
+  eq(cronNoAuth.statusCode, 401, 'the digest cron needs the cron secret');
+  calls = [];
+  const cronOk = response();
+  await adminHandler({ method: 'GET', query: { cron: 'digest' }, headers: { 'x-forwarded-for': '10.7.7.2', authorization: 'Bearer cron-test-secret' } } as never, cronOk as never);
+  eq([cronOk.statusCode, typeof cronOk.body?.sent], [200, 'boolean'], 'the cron builds the digest from the dashboard figures');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 7, p_internal: false }, 'last 7 days, outside traffic');
+  const prev = await call('POST', 'Bearer admin-token', {}, { action: 'preview-digest' });
+  ok(prev.statusCode === 200 && typeof prev.body.text === 'string' && prev.body.text.includes('bobbyprotocol.xyz/admin'), 'an admin can preview the email');
+  delete process.env.CRON_SECRET;
+
+  // ---------- deletion is retry-safe ----------
+  overrides = (c) => (c.url.includes('/auth/v1/admin/users/') ? json({ msg: 'down' }, 500) : null);
+  const delFail = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'reader@example.com' });
+  eq(delFail.statusCode, 502, 'the sign-in could not be deleted');
+  ok(!calls.some((c) => c.url.includes(`bobby_identities?id=eq.${USER}`) && c.method === 'DELETE'), 'so the Bobby data was left in place for the retry');
+  overrides = () => null;
+
+  // ---------- the diagnosis ----------
+  const NOW = Date.parse('2026-10-02T09:00:00Z');
+  const ins = buildInsights({ days: 30, now: NOW,
+    overview: { llm: { providers: { openai: { lastCreditAlert: '2026-10-01T12:50:00Z', creditAlert: { code: 'insufficient_quota', endpoint: 'tts' }, lastOk: '2026-09-30T14:13:00Z', failures24h: 0, calls24h: 0 },
+      anthropic: { lastOk: '2026-10-01T17:30:00Z', calls24h: 4, failures24h: 0 } }, deskRuns: { runs: 24, finished: 15 } }, subscriptions: { paid: 0 }, revenue: { grossUsd: 0 } },
+    growth: { people: { accounts: 4, active7d: 6 }, cohorts: { web: { arrived: 3, deskOrRead: 1, read1: 1 }, ios: { arrived: 4 } }, history: { ios: { installs: 0 } },
+      outcomes: { consumedTotal: 27, consumedInternal: 5, blocked: {} }, acquisition: { visits: 4, visitors: 3, visitsWithUtm: 0 },
+      attention: { neverRead: [{ identityId: '868fbd4b-0000', provider: 'apple', createdAt: '2026-09-17T04:57:00Z' }], quiet: [] }, coverage: { webObservedSince: '2026-10-01T16:37:00Z' } },
+    integrations: { paywall: false, appStore: { configured: true, totals: { downloads: 15 }, byCountry: [{ country: 'FR', downloads: 8 }, { country: 'MX', downloads: 3 }], coveredFrom: '2026-09-02', coveredTo: '2026-09-30' },
+      health: { tracking: {}, revenuecatWebhook: { configured: true }, stripe: { configured: false } }, llmCaps: { monthUsd: 300 }, llmGuard: { monthUsd: 1 } },
+    searchConsole: { configured: false } });
+  const ids = ins.map((i) => i.id);
+  eq(ins[0].id, 'credit-openai', 'an exhausted provider comes first');
+  for (const id of ['desk-failures', 'low-traffic', 'ios-gap', 'accounts-never-read', 'utm-missing', 'appstore-country', 'web-cannot-pay', 'paywall-off', 'no-payers', 'coverage']) ok(ids.includes(id), `diagnosis: ${id}`);
+  ok(!ids.includes('internal-share'), 'internal share under 25% is not raised');
+  ok(ins.every((i) => i.title && i.action && Array.isArray(i.evidence)), 'every insight says what to do and why');
+  const topped = buildInsights({ days: 30, now: NOW, overview: { llm: { providers: { openai: { lastCreditAlert: '2026-10-01T12:50:00Z', lastTopup: '2026-10-01T14:00:00Z', lastOk: '2026-10-01T15:00:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
+  ok(!topped.some((i) => i.id === 'credit-openai'), 'a top-up after the alert clears it');
 
   console.log(`admin-api: ${checks} checks passed`);
 } finally {

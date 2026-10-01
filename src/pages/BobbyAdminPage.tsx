@@ -30,6 +30,7 @@ import IntegrationsTab from '@/components/admin/bobby/IntegrationsTab';
 const PERIODS: AdminPeriod[] = [7, 30, 90];
 const LOGO = '/favicon-bobby-orb-2026-09-30.png';
 const COLLAPSE_KEY = 'bobby:admin:sidebar-collapsed';
+const INTERNAL_KEY = 'bobby:admin:include-internal';
 
 type Gate =
   | { kind: 'loading' }
@@ -54,6 +55,9 @@ async function signOut() {
 }
 
 const readCollapsed = () => { try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; } };
+// The team's own traffic is left out unless the owner asks for it (a per-viewer convenience, default: out).
+const readInternal = () => { try { return localStorage.getItem(INTERNAL_KEY) === '1'; } catch { return false; } };
+const writeInternal = (v: boolean) => { try { localStorage.setItem(INTERNAL_KEY, v ? '1' : '0'); } catch { /* private mode */ } };
 const writeCollapsed = (v: boolean) => { try { localStorage.setItem(COLLAPSE_KEY, v ? '1' : '0'); } catch { /* private mode */ } };
 
 // ---------------------------------------------------------------- gates
@@ -115,17 +119,21 @@ function NotAdminGate({ email, onSignedOut }: { email: string | null; onSignedOu
 
 // ---------------------------------------------------------------- dashboard
 
-function headerCount(tab: TabId, d: OverviewResponse | null): string | null {
+function headerCount(tab: TabId, d: OverviewResponse | null, period: number): string | null {
   if (!d) return null;
   const o = d.overview;
   switch (tab) {
-    case 'resumen': case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas`;
-    case 'funnel': return `${fmtInt(o.funnel.web.visitors)} visitantes`;
+    case 'resumen': {
+      const urgent = d.insights.filter((x) => x.level === 'critical' || x.level === 'warn').length;
+      return d.growth ? `${fmtInt(d.growth.people.active7d)} personas activas 7d${urgent ? ` · ${urgent} por atender` : ''}` : null;
+    }
+    case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas externas`;
+    case 'funnel': return d.growth ? `${fmtInt(d.growth.cohorts.web.arrived + d.growth.cohorts.ios.arrived)} llegadas observadas · ${period}d` : null;
     case 'audiencia': return null;
-    case 'membresias': return `${fmtInt(o.subscriptions.active)} activas`;
+    case 'membresias': return `${fmtInt(o.subscriptions.paid)} pagando`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
-    case 'ia': return `${fmtUsd(o.llm.providers.anthropic.month + o.llm.providers.openai.month)} 30d`;
-    case 'integraciones': { const n = integrationProblems(d.integrations).length; return n ? `${n} pendientes` : 'todo conectado'; }
+    case 'ia': return `${fmtUsd(o.llm.providers.anthropic.period + o.llm.providers.openai.period, true)} · ${period}d`;
+    case 'integraciones': { const n = integrationProblems(d.integrations, d.searchConsole, o).length; return n ? `${n} pendientes` : 'todo conectado'; }
   }
 }
 
@@ -134,13 +142,14 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const [tab, setTab] = useState<TabId>(readTab);
   const [refreshKey, setRefreshKey] = useState(0);
   const [collapsed, setCollapsed] = useState(readCollapsed);
+  const [internal, setInternal] = useState(readInternal);
   const [drawer, setDrawer] = useState(false);
   const [focusSearch, setFocusSearch] = useState(false);
   const [flash, setFlash] = useState<{ id: number; text: string; ok: boolean } | null>(null);
   const flashId = useRef(0);
-  const overview = useLoad(() => fetchAdminOverview(period), `${period}|${refreshKey}`);
+  const overview = useLoad(() => fetchAdminOverview(period, { internal }), `${period}|${internal ? 'all' : 'ext'}|${refreshKey}`);
   // Twice the window, for "vs periodo anterior". Optional: if it fails the deltas just do not show.
-  const compare = useLoad(() => fetchAdminOverview(Math.min(period * 2, 365), { compare: true }), `cmp|${period}|${refreshKey}`);
+  const compare = useLoad(() => fetchAdminOverview(Math.min(period * 2, 365), { compare: true, internal }), `cmp|${period}|${internal ? 'all' : 'ext'}|${refreshKey}`);
 
   useEffect(() => {
     const onHash = () => setTab(readTab());
@@ -178,6 +187,7 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   }, [openSearch]);
 
   const toggleCollapse = () => setCollapsed((c) => { writeCollapsed(!c); return !c; });
+  const toggleInternal = () => setInternal((v) => { writeInternal(!v); return !v; });
   const notify = useCallback((text: string, ok = true) => setFlash({ id: ++flashId.current, text, ok }), []);
   const reloadOverview = overview.reload;
   const reloadCompare = compare.reload;
@@ -186,14 +196,16 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const doSignOut = useCallback(async () => { await signOut(); onSignedOut(); }, [onSignedOut]);
 
   const needsOverview = tab !== 'usuarios' && tab !== 'cupones';
-  const o = overview.data && overview.dataKey?.split('|')[0] === String(period) ? overview.data : null;
+  // Never mix modes either: data loaded with the team included is not shown under "sin equipo".
+  const o = overview.data && overview.dataKey?.split('|')[0] === String(period) && overview.dataKey?.split('|')[1] === (internal ? 'all' : 'ext') ? overview.data : null;
   // Never mix ranges: the comparison is used only when it was loaded for this exact period and refresh, and
   // the overview only while its data belongs to the selected period (a refresh may keep showing it).
   const cmp = compare.data && !compare.stale && !compare.error ? compareSeries(compare.data.overview) : null;
   const current = TABS.find((t) => t.id === tab)!;
-  const count = headerCount(tab, o);
+  const count = headerCount(tab, o, period);
   const reads = o?.overview.activity.readsDaily;
-  const platforms = reads ? { web: reads.web.reduce((a, b) => a + b, 0), ios: reads.ios.reduce((a, b) => a + b, 0) } : null;
+  // Outside reads in the selected period (the header switch decides whether the team's are in).
+  const platforms = reads ? { web: reads.web.reduce((a, b) => a + b, 0), ios: reads.ios.reduce((a, b) => a + b, 0), days: period } : null;
   const email = me.email ?? me.identityId;
 
   const sidebarProps = { tab, onSelect: selectTab, onSearch: () => { setDrawer(false); openSearch(); }, email, onSignOut: () => void doSignOut(), platforms };
@@ -226,6 +238,13 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
             {count && <span className="hidden truncate font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#5C5C5C] sm:inline">{count}</span>}
             {adminMockMode() && <span className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-[#F7A04B] sm:inline">mock</span>}
           </div>
+          <button
+            type="button" onClick={toggleInternal} aria-pressed={internal}
+            title={internal ? 'Incluye tus cuentas, instalaciones y redes. Toca para dejarlas fuera.' : 'Tus cuentas, instalaciones y redes están fuera de todas las cifras. Toca para incluirlas.'}
+            className={`h-8 shrink-0 rounded-lg border px-2.5 font-mono text-[10.5px] uppercase tracking-[0.06em] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F28C38] ${internal ? 'border-[#F28C38]/40 bg-[#F28C38]/10 text-[#F7A04B]' : 'border-white/[0.08] text-[#8B8B8B] hover:text-[#EDEDED]'}`}
+          >
+            {internal ? 'Con equipo' : 'Sin equipo'}
+          </button>
           <Segmented<AdminPeriod> label="Periodo" value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ value: p, label: `${p}D` }))} />
           <span className="hidden max-w-[220px] truncate font-mono text-[11px] text-[#5C5C5C] lg:inline" title={email}>{email}</span>
           <IconBtn label="Actualizar" onClick={() => setRefreshKey((k) => k + 1)} disabled={overview.loading && !!o}>
@@ -241,9 +260,9 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
               {needsOverview && overview.error && (
                 <div className="mb-4"><StaleBanner error={overview.error} onRetry={() => void overview.reload()} /></div>
               )}
-              {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} />}
-              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} />}
-              {tab === 'audiencia' && <AudienceTab period={period} refreshKey={refreshKey} />}
+              {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} onOpenTab={(id) => selectTab(id as TabId)} notify={notify} />}
+              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} internal={internal} />}
+              {tab === 'audiencia' && <AudienceTab period={period} refreshKey={refreshKey} internal={internal} data={o ?? undefined} />}
               {tab === 'usuarios' && <UsersTab me={me} refreshKey={refreshKey} notify={notify} onChanged={onChanged} focusSearch={focusSearch} onSearchFocused={onSearchFocused} />}
               {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} />}
               {tab === 'cupones' && <CouponsTab refreshKey={refreshKey} notify={notify} onChanged={onChanged} />}

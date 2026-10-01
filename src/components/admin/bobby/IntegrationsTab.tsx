@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import { fetchAdminActions, fetchAdminLifecycle, type OverviewResponse } from '@/lib/admin-client';
+import { fetchAdminActions, type OverviewResponse, type RevenueCatMetric } from '@/lib/admin-client';
 import { Card, CardHead, Empty, ErrorState, Loading, MissingNote, Note, StaleBanner, TableScroll, Tag, td, th, tr } from './ui';
-import { integrationProblems } from './health';
+import { integrationChecks, integrationIssues, rcMetricValue, rcMetricWindow, type IntegrationCheck, type IntegrationId, type IntegrationStatus } from './health';
 import { fmtDateTime, fmtInt, fmtRelative } from './format';
 import { useLoad } from './useLoad';
 
@@ -39,25 +39,58 @@ const ACTION_LABEL: Record<string, string> = {
   'add-cost': 'Registró un costo',
   'delete-cost': 'Borró un costo',
   'set-assumptions': 'Cambió supuestos',
+  'set-internal': 'Marcó una cuenta del equipo',
+  'set-device-internal': 'Marcó una instalación del equipo',
+  'remove-internal-network': 'Quitó una red del equipo',
+  'set-internal-emails': 'Cambió los emails del equipo',
 };
 
-type Status = 'ok' | 'warn' | 'error' | 'off';
-const STATUS_TONE: Record<Status, 'green' | 'orange' | 'red' | 'neutral'> = { ok: 'green', warn: 'orange', error: 'red', off: 'neutral' };
+const STATUS_TONE: Record<IntegrationStatus, 'green' | 'orange' | 'red' | 'neutral'> = { ok: 'green', warn: 'orange', error: 'red', off: 'neutral' };
+const SQUARE: Record<IntegrationId, string> = {
+  tracking: '#F28C38', reads: '#F28C38', rcWebhook: '#F25A5A', stripe: '#8B7CF6', rcMetrics: '#F25A5A', appStore: '#4FB3FF',
+  searchConsole: '#4ADE80', 'llm-anthropic': '#8B8B8B', 'llm-openai': '#8B8B8B', paywall: '#F28C38', vercel: '#EDEDED',
+};
+const HREF: Partial<Record<IntegrationId, string>> = { vercel: VERCEL_ANALYTICS };
 
-function IntegrationRow({ name, tag, status, children, href, square }: { name: string; tag: string; status: Status; children?: ReactNode; href?: string; square: string }) {
+function IntegrationRow({ check, children }: { check: IntegrationCheck; children?: ReactNode }) {
+  const href = HREF[check.id];
   return (
     <li className="flex gap-3 border-b border-white/[0.05] py-3.5 last:border-b-0">
-      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: square }} aria-hidden />
+      <span className="mt-1 h-2.5 w-2.5 shrink-0 rounded-[3px]" style={{ background: SQUARE[check.id] }} aria-hidden />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
           <span className="text-[13.5px] text-[#EDEDED]">
-            {href ? <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">{name}<ArrowUpRight className="h-3 w-3 text-[#5C5C5C]" aria-hidden /></a> : name}
+            {href ? <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 hover:underline">{check.name}<ArrowUpRight className="h-3 w-3 text-[#5C5C5C]" aria-hidden /></a> : check.name}
           </span>
-          <Tag tone={STATUS_TONE[status]}>{tag}</Tag>
+          <Tag tone={STATUS_TONE[check.status]}>{check.tag}</Tag>
         </div>
-        {children && <div className="mt-1 font-mono text-[11.5px] leading-snug text-[#8B8B8B]">{children}</div>}
+        <div className="mt-1 break-words font-mono text-[11.5px] leading-snug text-[#8B8B8B]">{check.detail}</div>
+        {children}
       </div>
     </li>
+  );
+}
+
+/** RevenueCat's key values, each with its own window and description (they do not follow the period selector). */
+function RcMetrics({ metrics, fetchedAt }: { metrics: RevenueCatMetric[]; fetchedAt?: string }) {
+  if (!metrics.length) return null;
+  return (
+    <div className="mt-2 flex flex-col gap-1.5">
+      <ul className="m-0 grid list-none grid-cols-1 gap-1.5 p-0 sm:grid-cols-2">
+        {metrics.map((m) => (
+          <li key={m.id} className="min-w-0 rounded-lg border border-white/[0.05] bg-[#0F0F10] px-2.5 py-2" title={m.description}>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="truncate text-[12px] text-[#BDBDBD]">{m.name}</span>
+              <span className="shrink-0 font-mono text-[13px] tabular-nums text-[#EDEDED]">{rcMetricValue(m)}</span>
+            </div>
+            <div className="mt-0.5 font-mono text-[10.5px] leading-snug text-[#5C5C5C]">
+              {[rcMetricWindow(m.period), m.description].filter(Boolean).join(' · ') || 'sin descripción'}
+            </div>
+          </li>
+        ))}
+      </ul>
+      {fetchedAt && <span className="font-mono text-[10.5px] text-[#5C5C5C]" title={fmtDateTime(fetchedAt)}>consultado {fmtRelative(fetchedAt)}</span>}
+    </div>
   );
 }
 
@@ -79,84 +112,52 @@ const ACTION_STATUS: Record<string, { label: string; tone: 'green' | 'red' | 'or
 export default function IntegrationsTab({ data, period, refreshKey }: { data: OverviewResponse; period: number; refreshKey: number }) {
   const { overview: o, integrations: i } = data;
   const actions = useLoad(fetchAdminActions, `actions|${refreshKey}`);
-  // Search Console lives in the lifecycle view; its error counts as a failing integration.
-  const lc = useLoad(() => fetchAdminLifecycle(period), `${period}|lc|${refreshKey}`);
-  const rc = i.revenuecat;
+  const sc = data.searchConsole;
+  // Rows, header and "Qué falla" all come from health.ts, so they can never disagree.
+  const checks = integrationChecks(i, sc, o);
+  const issues = integrationIssues(i, sc, o);
+  const nonEnv = issues.filter((p) => !p.id.startsWith('env-'));
+  const errors = issues.filter((p) => p.level === 'error').length;
   const store = i.appStore;
-  const h = i.health;
-  const sc = lc.data?.searchConsole ?? null;
-  const problems = integrationProblems(i, sc);
-  const wh = h?.revenuecatWebhook;
-  const tracking = h?.tracking;
-  const anyKeyMissing = h ? !h.llmKeys.anthropic || !h.llmKeys.openai : true;
 
   return (
     <div className="flex flex-col gap-4">
       <MissingNote missing={o.missing} sections={['integrations', 'coverage']} />
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <CardHead title="Integraciones" count={problems.length ? `${problems.length} pendientes` : 'todo conectado'} />
+          <CardHead
+            title="Integraciones"
+            count={issues.length ? `${issues.length} pendientes${errors && errors < issues.length ? ` · ${errors} fallan` : ''}` : 'todo conectado'}
+            sub={`Estado según la última entrega de cada fuente, no solo su configuración · periodo ${period}d donde aplica`}
+          />
           <ul className="m-0 list-none p-0">
-            <IntegrationRow
-              name="RevenueCat · métricas" square="#F25A5A"
-              status={rc.configured ? (rc.error ? 'error' : 'ok') : 'off'} tag={rc.configured ? (rc.error ? 'Con error' : 'Conectado') : 'Sin conectar'}
-            >
-              {rc.error ? rc.error : rc.configured ? `${fmtInt(rc.metrics?.length ?? 0)} métricas disponibles` : 'Necesita REVENUECAT_V2_SECRET_KEY'}
-            </IntegrationRow>
-            <IntegrationRow
-              name="Webhook RevenueCat" square="#F25A5A"
-              status={!wh ? 'off' : !wh.configured ? 'error' : wh.lastEventAt ? 'ok' : 'warn'}
-              tag={!wh ? 'Sin dato' : !wh.configured ? 'Sin configurar' : wh.lastEventAt ? 'Configurado' : 'Sin eventos'}
-            >
-              {!wh ? 'Estado no disponible'
-                : !wh.configured ? 'Faltan REVENUECAT_SECRET_KEY y/o REVENUECAT_WEBHOOK_AUTH'
-                : `Configurado · último evento ${wh.lastEventAt ? fmtRelative(wh.lastEventAt) : 'aún sin eventos'} · ${wh.events30d != null ? fmtInt(wh.events30d) : '—'} en 30 días`}
-            </IntegrationRow>
-            <IntegrationRow
-              name="App Store Connect · descargas" square="#4FB3FF"
-              status={store.configured ? (store.error ? 'error' : 'ok') : 'off'} tag={store.configured ? (store.error ? 'Con error' : 'Conectado') : 'Sin conectar'}
-            >
-              {store.error ? store.error : store.configured && store.totals ? `${fmtInt(store.totals.downloads)} descargas en el periodo` : 'Necesita la llave de App Store Connect API'}
-            </IntegrationRow>
-            <IntegrationRow
-              name="Google Search Console" square="#4ADE80"
-              status={!sc ? 'off' : !sc.configured ? 'off' : sc.error ? 'error' : 'ok'}
-              tag={!sc ? (lc.error ? 'Sin dato' : 'Revisando') : !sc.configured ? 'Sin conectar' : sc.error ? 'Con error' : 'Conectado'}
-            >
-              {!sc ? (lc.error ? lc.error.message : 'Consultando…') : sc.error ? sc.error : sc.configured ? `${fmtInt(sc.totals?.clicks ?? 0)} clics en el periodo` : 'Necesita GSC_SERVICE_ACCOUNT_JSON'}
-            </IntegrationRow>
-            <IntegrationRow
-              name="Eventos web (tracking)" square="#F28C38"
-              status={!tracking ? 'off' : (tracking.events24h ?? 0) > 0 ? 'ok' : tracking.lastEventAt ? 'warn' : 'error'}
-              tag={!tracking ? 'Sin dato' : (tracking.events24h ?? 0) > 0 ? 'Recibiendo' : tracking.lastEventAt ? 'Sin eventos hoy' : 'Sin eventos'}
-            >
-              {!tracking ? 'Estado no disponible'
-                : `último evento ${tracking.lastEventAt ? fmtRelative(tracking.lastEventAt) : 'nunca'} · ${tracking.events24h != null ? fmtInt(tracking.events24h) : '—'} en 24 h`}
-            </IntegrationRow>
-            <IntegrationRow
-              name="Llaves de IA" square="#8B8B8B"
-              status={!h ? 'off' : anyKeyMissing ? 'error' : 'ok'} tag={!h ? 'Sin dato' : anyKeyMissing ? 'Falta una' : 'Configuradas'}
-            >
-              {h ? `Anthropic ${h.llmKeys.anthropic ? 'sí' : 'no'} · OpenAI ${h.llmKeys.openai ? 'sí' : 'no'}` : 'Estado no disponible'}
-            </IntegrationRow>
-            <IntegrationRow name="Vercel Analytics" square="#EDEDED" status="off" tag="No verificable desde aquí" href={VERCEL_ANALYTICS}>
-              Sin API de lectura: revisa el panel de Vercel para confirmar que recibe visitas
-            </IntegrationRow>
-            <IntegrationRow name="Cobro (BOBBY_PAYWALL)" square="#F28C38" status={i.paywall ? 'ok' : 'warn'} tag={i.paywall ? 'Encendido' : 'Apagado'}>
-              {i.paywall ? 'Las cuentas gratis tienen su límite semanal de lecturas' : 'Las cuentas gratis tienen lecturas ilimitadas'}
-            </IntegrationRow>
+            {checks.map((c) => (
+              <IntegrationRow key={c.id} check={c}>
+                {c.id === 'rcMetrics' && i.revenuecat.configured && !i.revenuecat.error && i.revenuecat.metrics && (
+                  <RcMetrics metrics={i.revenuecat.metrics} fetchedAt={i.revenuecat.fetchedAt} />
+                )}
+                {c.id === 'appStore' && store.configured && !store.error && (
+                  <div className="mt-1 font-mono text-[10.5px] leading-snug text-[#5C5C5C]">Apple publica cada día con 1–2 días de retraso: los días pendientes no son ceros.</div>
+                )}
+              </IntegrationRow>
+            ))}
           </ul>
         </Card>
 
         <div className="flex min-w-0 flex-col gap-4">
           <Card>
-            <CardHead title="Qué falla" count={problems.length ? `${problems.length}` : undefined} />
-            {problems.length === 0 ? (
+            <CardHead title="Qué falla" count={issues.length ? `${issues.length}` : undefined} />
+            {issues.length === 0 ? (
               <p className="m-0 font-mono text-[12px] uppercase tracking-[0.06em] text-[#4ADE80]">Todo conectado</p>
             ) : (
-              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 font-mono text-[12px] text-[#F3B0B0]">
-                {problems.filter((p) => !p.startsWith('Falta ')).map((p) => <li key={p} className="break-words">· {p}</li>)}
-                {problems.every((p) => p.startsWith('Falta ')) && <li className="text-[#8B8B8B]">Solo faltan variables (abajo).</li>}
+              <ul className="m-0 flex list-none flex-col gap-1.5 p-0 font-mono text-[12px]">
+                {nonEnv.map((p) => (
+                  <li key={`${p.id}-${p.text}`} className={`break-words ${p.level === 'error' ? 'text-[#F3B0B0]' : 'text-[#F7A04B]'}`}>
+                    · {p.text}{p.level === 'warn' && <span className="text-[#5C5C5C]"> (aviso)</span>}
+                  </li>
+                ))}
+                {nonEnv.length === 0 && <li className="text-[#8B8B8B]">Solo faltan variables (abajo).</li>}
+                {nonEnv.length > 0 && i.missing.length > 0 && <li className="text-[#8B8B8B]">· y {fmtInt(i.missing.length)} variables sin configurar (abajo).</li>}
               </ul>
             )}
           </Card>
