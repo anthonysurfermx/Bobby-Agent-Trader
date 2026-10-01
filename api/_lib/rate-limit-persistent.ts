@@ -9,7 +9,7 @@ import { bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
 // overshoot the cap. That's fine: this blunts abuse, it is not a
 // strict quota.
 //
-// Fails open: if Supabase is unreachable, callers are not limited.
+// General callers fail open. Paid-provider budget callers opt into fail-closed.
 // ============================================================
 
 const SB_URL = bobbyDbUrlOptional();
@@ -41,9 +41,11 @@ export async function checkPersistentLimit(
   id: string,
   limit: number,
   windowSec: number,
+  options: { failClosed?: boolean } = {},
 ): Promise<PersistentLimitResult> {
   const openResult = { limited: false, remaining: limit, resetAt: Date.now() + windowSec * 1000 };
-  if (!SB_URL || !SB_KEY) return openResult;
+  const unavailable = options.failClosed ? { ...openResult, limited: true, remaining: 0 } : openResult;
+  if (!SB_URL || !SB_KEY) return unavailable;
 
   const key = `rl:${scope}:${id}`;
   try {
@@ -53,16 +55,19 @@ export async function checkPersistentLimit(
       `?cache_key=eq.${encodeURIComponent(key)}` +
       `&expires_at=gt.${encodeURIComponent(nowIso)}` +
       `&select=payload,expires_at&limit=1`;
-    const getRes = await fetch(getUrl, { headers: headers() });
-    if (!getRes.ok) return openResult;
+    const getRes = await fetch(getUrl, { headers: headers(), signal: AbortSignal.timeout(3000) });
+    if (!getRes.ok) return unavailable;
     const rows = (await getRes.json()) as Array<{ payload: { count?: number }; expires_at: string }>;
 
-    const row = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+    if (!Array.isArray(rows)) return unavailable;
+    const row = rows.length > 0 ? rows[0] : null;
+    if (row && (!Number.isSafeInteger(row.payload?.count) || Number(row.payload.count) < 0 || !Number.isFinite(Date.parse(row.expires_at)))) return unavailable;
     const count = (row?.payload?.count ?? 0) + 1;
     const expiresAt = row?.expires_at ?? new Date(Date.now() + windowSec * 1000).toISOString();
 
-    await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
+    const write = await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
       method: 'POST',
+      signal: AbortSignal.timeout(3000),
       headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({
         cache_key: key,
@@ -72,12 +77,13 @@ export async function checkPersistentLimit(
       }),
     });
 
+    if (!write.ok) return unavailable;
     return {
       limited: count > limit,
       remaining: Math.max(0, limit - count),
       resetAt: new Date(expiresAt).getTime(),
     };
   } catch {
-    return openResult;
+    return unavailable;
   }
 }

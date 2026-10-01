@@ -68,6 +68,11 @@ final class NucleoLedger {
         write(list, owner: owner)
     }
 
+    /// Remove only the deleted account; guest and other account records remain intact.
+    static func forgetOwner(_ userId: String, defaults: UserDefaults = .standard) {
+        defaults.removeObject(forKey: key(owner: userId))
+    }
+
     private func write(_ list: [NucleoThesis], owner: String?) {
         if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: Self.key(owner: owner)) }
     }

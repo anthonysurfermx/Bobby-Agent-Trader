@@ -106,7 +106,7 @@ function route(s){
 function enterBorn(){
   W.birthT = T - 30; W.r.x = W.r.t = 120; W.birth.x = W.birth.t = 1; W.glow.x = W.glow.t = 1; W.birthMass = false; W.energy.x = W.energy.t = 0.35;
   tb('wmFly', T - 5); tb('pillIn', T - 0.3);
-  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(CHOSEN_ART.tintLab); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
+  if (CHOSEN_ART){ tb('avaFly', T - 5); tintSnap(companionTint()); W.tintAmt.x = W.tintAmt.t = 0.35; W.chosen = true; }
   loadRoster().catch(noop);
 }
 
@@ -400,7 +400,7 @@ ENTER.THINK_RESOLVE = function(){
   var chartW = sp0.stageAt.chart != null ? wordIndexOfSentence(sp0.sentences, sp0.stageAt.chart) : null;
   var breaks = [closeStart]; if (chartW) breaks.push(chartW);
   W.chartDue = false; W.chartT = 0; W.evT = 0; W.talkPhase = 'evidence'; W.verdictShown = false;
-  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:14,   /* the persona voice for a full read can take 6–9 s: 6 s cancelled it */
+  W.readLine = sayLine({ id:M.requestId, exactId:true, noSplit:true, text:sp0.text, visible:false, hold:true, breaks:breaks, amberIdx:vIdx, watchdog:45,   /* Covers both persona fetch attempts; keep the first read aligned with the desk. */
     top:function(){ return W.talkPhase === 'evidence' ? 488 : 592; } });
   if (M.chart){
     var cw = chartW != null ? chartW : Math.max(0, wordIndexOfSentence(sp0.sentences, 1) - 1);

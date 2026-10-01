@@ -21,6 +21,7 @@
   var FX = window.NUCLEO_FIXTURES;
   if (!FX) { console.warn('[mock] no NUCLEO_FIXTURES (release build?)'); return; }
 
+  var riskNoticeVersion = FX.native.riskNotice.version;
   var q = new URLSearchParams(location.search);
   var scenario = q.get('scenario') || 'default';
   var lang = q.get('lang') === 'es' ? 'es' : 'en';
@@ -52,7 +53,7 @@
     /* a 402 comes to a signed-in free account: that scenario starts signed in */
     signedIn: q.get('signedIn') === '1' || scenario === 'subscription_required',
     pro: false,
-    riskVersion: q.get('risk') === '0' || q.get('first') === '1' ? 0 : 4,
+    riskVersion: q.get('risk') === '0' || q.get('first') === '1' ? 0 : riskNoticeVersion,
     muted: q.get('muted') === '1',
     companionId: q.get('first') === '1' ? null : (q.get('companion') || 'mira'),
     xp: +(q.get('xp') || (q.get('first') === '1' ? 0 : 120)),
@@ -85,7 +86,7 @@
       firstRun: state.firstRun, onboarded: !state.firstRun && !!state.companionId,
       language: lang, localHour: new Date().getHours(),
       companion: companion(), xp: state.xp, level: level(), streak: state.streak,
-      signedIn: state.signedIn, riskAccepted: state.riskVersion >= 4, riskVersion: 4,
+      signedIn: state.signedIn, riskAccepted: state.riskVersion >= riskNoticeVersion, riskVersion: riskNoticeVersion,
       muted: state.muted, reducedMotion: q.get('rm') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches,
       mic: micState(), hints: state.hints, pendingRead: null,
       fixtures: true, platform: 'web-mock', appVersion: 'mock'
@@ -135,7 +136,7 @@
       if (!hasQ) return Promise.resolve(fault('invalid_params', 'question required'));
     }
     if (state.inflight) return Promise.resolve(fault('busy', 'a read is already running'));
-    if (state.riskVersion < 4) return Promise.resolve(ok(clone(FX.ask.risk)));
+    if (state.riskVersion < riskNoticeVersion) return Promise.resolve(ok(clone(FX.ask.risk)));
     var question = hasQ ? p.question.trim() : '';
     if (!given(p.token) && codePoints(question) > 1200) return Promise.resolve(ok(clone(FX.ask.too_long)));
     var key;
@@ -264,7 +265,7 @@
     if (state.muted) return Promise.resolve(ok({ status: 'muted' }));
     // Native (R11): before the risk notice is accepted the network voice never runs; only the
     // bundled pick clips (previewVoice) play. The page then runs its silent reading clock.
-    if (state.riskVersion < 4 && !bundledClip) return Promise.resolve(ok({ status: 'muted' }));
+    if (state.riskVersion < riskNoticeVersion && !bundledClip) return Promise.resolve(ok({ status: 'muted' }));
     stopVoice('stopped');
     var RM = window.NucleoReadModel;
     var dur = Math.max(0.8, p.text.split(/\s+/).length / 2.6);
@@ -380,13 +381,13 @@
     'acceptRisk': function (p) {
       if (typeof p.version !== 'number' || !Number.isInteger(p.version)) return Promise.resolve(fault('invalid_params', 'version'));
       // A stale version is a result, not a fault: the page re-reads riskNotice().
-      if (p.version !== 4) return Promise.resolve(ok({ accepted: false, version: 4 }));
-      state.riskVersion = 4;
+      if (p.version !== riskNoticeVersion) return Promise.resolve(ok({ accepted: false, version: riskNoticeVersion }));
+      state.riskVersion = riskNoticeVersion;
       sessionChanged();
-      return Promise.resolve(ok({ accepted: true, version: 4 }));
+      return Promise.resolve(ok({ accepted: true, version: riskNoticeVersion }));
     },
     'signIn': function () {
-      if (state.riskVersion < 4) return Promise.resolve(ok({ status: 'unavailable' }));
+      if (state.riskVersion < riskNoticeVersion) return Promise.resolve(ok({ status: 'unavailable' }));
       var signedIn = q.get('signin') === 'ok';
       return delay(800, ok({ status: signedIn ? 'signedIn' : 'cancelled' })).then(function (r) {
         if (signedIn) { state.signedIn = true; sessionChanged(); }
@@ -395,7 +396,7 @@
     },
     /* the native Bobby Pro sheet (§8.4): opens, then answers how it ended when it closes */
     'paywall': function () {
-      if (state.riskVersion < 4 || state.paywallOpen) return Promise.resolve(ok({ status: 'unavailable', access: null }));
+      if (state.riskVersion < riskNoticeVersion || state.paywallOpen) return Promise.resolve(ok({ status: 'unavailable', access: null }));
       state.paywallOpen = true;
       B.emit('native.sheet', { route: 'paywall', state: 'open' });
       var subscribe = q.get('purchase') === 'ok' && state.signedIn;
@@ -417,7 +418,7 @@
     'finishOnboarding': function () {
       var missing = [];
       if (!state.companionId) missing.push('companion');
-      if (state.riskVersion < 4) missing.push('risk');
+      if (state.riskVersion < riskNoticeVersion) missing.push('risk');
       if (missing.length) return Promise.resolve(ok({ status: 'incomplete', missing: missing }));
       state.firstRun = false;
       return Promise.resolve(ok({ next: 'app' }));

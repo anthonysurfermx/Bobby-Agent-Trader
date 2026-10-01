@@ -1,0 +1,3 @@
+[RevenueCatProbe] configured · anonymous bobby-subscription-audit-20260930
+[RevenueCatProbe] logIn bobby-subscription-audit-20260930 created=false entitlements=[]
+[RevenueCatProbe] offerings: 2 · current: default [$rc_monthly=monthly US$9.99, $rc_annual=yearly US$79.99, $rc_lifetime=lifetime US$99.99] · state=loaded · price=US$4.99 / month

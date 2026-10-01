@@ -315,7 +315,7 @@ final class TraderLandSync: ObservableObject {
     func load() async {
         guard !busy else { return }
 #if DEBUG
-        if let fixture { error = nil; world = fixture.world(); return }
+        if let fixture { loadFixture(fixture); return }
 #endif
         if ownerID != AccountSession.shared.session?.userId { reset() }
         _ = await request(nil)
@@ -342,13 +342,25 @@ final class TraderLandSync: ObservableObject {
     func useFixture(_ fixture: TraderLandAccountFixture) {
         reset()
         self.fixture = fixture
-        world = fixture.world()
+        loadFixture(fixture)
+    }
+
+    private func loadFixture(_ fixture: TraderLandAccountFixture) {
+        do { world = try fixture.world(); error = nil }
+        catch {
+            world = nil
+            self.error = Self.failure(status: 503, serverError: "Fixture resources unavailable.")
+        }
     }
 #endif
 
     /// What the player reads when the server refuses a request. Known refusals match exact server strings.
     nonisolated static func failure(status: Int, serverError: String?) -> String {
         switch (status, serverError ?? "") {
+#if DEBUG
+        case (503, "Fixture resources unavailable."):
+            return L.t("The test island resources could not be loaded.", "No se pudieron cargar los recursos de la isla de prueba.")
+#endif
         case (422, "Choose a respectful island name without links or contact details."):
             return L.t("Choose a respectful name without links or contact details.", "Elige un nombre respetuoso, sin enlaces ni datos de contacto.")
         case (503, "Name review is temporarily unavailable. Try again."):
@@ -475,9 +487,12 @@ extension LandHorizon {
     private var isPublic = false
     private var xp = 180
     private var aura = 36
+    private let encodeWorld: ([String: Any]) throws -> Data
 
-    init(now: Date = Date(), startsPublic: Bool = TraderLandAccountFixture.startsPublic) {
+    init(now: Date = Date(), startsPublic: Bool = TraderLandAccountFixture.startsPublic,
+         encodeWorld: @escaping ([String: Any]) throws -> Data = { try JSONSerialization.data(withJSONObject: $0) }) {
         self.now = now
+        self.encodeWorld = encodeWorld
         isPublic = startsPublic
         let hour: TimeInterval = 3600
         rows = [
@@ -530,6 +545,7 @@ extension LandHorizon {
     }
 
     func apply(_ mutation: TraderLandMutation) -> Result<TraderLandWorld, Refusal> {
+        let before = (size: size, core: core, rows: rows, spots: spots, title: shareTitle, publicIsland: isPublic, xp: xp, aura: aura)
         var extra: [String: Any] = [:]
         switch mutation {
         case let .extend(id, hours):
@@ -583,7 +599,14 @@ extension LandHorizon {
         case .unpublish:
             isPublic = false
         }
-        return .success(world(extra))
+        do { return .success(try world(extra)) }
+        catch {
+            // A malformed QA reply did not commit: preserve the previous valid world and
+            // its in-memory fixture state so retrying cannot duplicate a reward or move.
+            size = before.size; core = before.core; rows = before.rows; spots = before.spots
+            shareTitle = before.title; isPublic = before.publicIsland; xp = before.xp; aura = before.aura
+            return .failure(Refusal(status: 503, error: "Fixture resources unavailable."))
+        }
     }
 
     /// The core wakes at five pieces; then the island grows a ring while it is full enough.
@@ -625,7 +648,8 @@ extension LandHorizon {
                 "extendTo": open ? [] : [72, 168].filter { $0 > row.hours }]
     }
 
-    func world(_ extra: [String: Any] = [:]) -> TraderLandWorld {
+    func world(_ extra: [String: Any] = [:]) throws -> TraderLandWorld {
+        _ = try RuntimeBundle.resources.get()
         let placedIDs = Set(spots.map(\.inventoryID))
         let inventory: [[String: Any]] = rows.map { row in
             var entry: [String: Any] = ["id": row.id, "item_id": row.itemID, "state": row.state, "source": "route",
@@ -656,11 +680,7 @@ extension LandHorizon {
             "share": ["public": isPublic, "code": Self.null(isPublic ? "qafixture" : nil), "title": Self.null(shareTitle), "publishedAt": NSNull()],
         ]
         payload.merge(extra) { _, new in new }
-        do {
-            return try JSONDecoder().decode(TraderLandWorld.self, from: JSONSerialization.data(withJSONObject: payload))
-        } catch {
-            fatalError("Trader Land account fixture does not decode: \(error)")
-        }
+        return try JSONDecoder().decode(TraderLandWorld.self, from: encodeWorld(payload))
     }
 }
 #endif

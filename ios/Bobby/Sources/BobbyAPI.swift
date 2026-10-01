@@ -413,6 +413,7 @@ enum BobbyAPI {
             throw URLError(.badURL)
         }
         var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.httpMethod = method
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
@@ -428,15 +429,20 @@ enum BobbyAPI {
     /// `retry-after` on a 429). Same URL, Origin header, timeouts and body as `response`.
     /// `extraHeaders` carries the metered-read identity (`BobbyAccessAPI.headers`).
     static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil,
-                                    extraHeaders: [String: String] = [:]) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                                    extraHeaders: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         guard let url = URL(string: base.absoluteString + "/" + path) else {
             throw URLError(.badURL)
         }
         var req = URLRequest(url: url)
+        req.cachePolicy = .reloadIgnoringLocalCacheData
         req.httpMethod = method
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
-        req.timeoutInterval = path == "api/desk-debate" ? 100 : 60
+        req.timeoutInterval = timeout ?? (path == "api/desk-debate" ? 100 : 60)
         for (name, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: name) }
+        if extraHeaders.keys.contains(where: { $0.caseInsensitiveCompare("Authorization") == .orderedSame })
+            || extraHeaders[BobbyAccessAPI.deviceHeader] != nil {
+            req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        }
         if let body {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)

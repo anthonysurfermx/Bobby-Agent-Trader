@@ -11,6 +11,36 @@ import Combine
 import Foundation
 import RevenueCat
 
+/// Tracks only confirmed server synchronization. Failed or stale attempts remain retryable.
+struct BobbySubscriptionSyncState {
+    struct Key: Equatable {
+        let userID: String
+        let generation: UUID
+        let expiry: Date?
+    }
+    struct Attempt: Equatable {
+        let id = UUID()
+        let key: Key
+    }
+    private(set) var confirmed: Key?
+    private(set) var pending: Attempt?
+
+    mutating func begin(_ key: Key) -> Attempt? {
+        guard confirmed != key, pending?.key != key else { return nil }
+        let attempt = Attempt(key: key)
+        pending = attempt
+        return attempt
+    }
+
+    mutating func finish(_ attempt: Attempt, succeeded: Bool) {
+        guard pending == attempt else { return }
+        pending = nil
+        if succeeded { confirmed = attempt.key }
+    }
+
+    mutating func reset() { confirmed = nil; pending = nil }
+}
+
 @MainActor
 final class BobbyStore: NSObject, ObservableObject {
     static let shared = BobbyStore()
@@ -45,7 +75,7 @@ final class BobbyStore: NSObject, ObservableObject {
     private(set) var configured = false
     private var cancellables = Set<AnyCancellable>()
     /// The last entitlement expiry the server was told about (renewals and purchases made elsewhere).
-    private var syncedExpiry: Date??
+    private var syncState = BobbySubscriptionSyncState()
 
     var access: BobbyAccessCenter { BobbyAccessCenter.shared }
 
@@ -89,6 +119,7 @@ final class BobbyStore: NSObject, ObservableObject {
         Purchases.configure(withAPIKey: key, appUserID: appUserID)
         Purchases.shared.delegate = self
         configured = true
+        Task { await reconcile() }
         AccountSession.shared.$session
             .map { $0?.userId }
             .removeDuplicates()
@@ -103,13 +134,26 @@ final class BobbyStore: NSObject, ObservableObject {
     /// Sign in → logIn(Supabase user id); sign out → logOut (an anonymous RevenueCat user stays as it is).
     func identify(_ userId: String?) async {
         guard configured else { return }
-        syncedExpiry = nil
+        syncState.reset()
         if let userId {
-            guard Purchases.shared.appUserID != userId else { return }
-            _ = try? await Purchases.shared.logIn(userId)
+            if Purchases.shared.appUserID != userId {
+                _ = try? await Purchases.shared.logIn(userId)
+            }
+            await reconcile()
         } else if !Purchases.shared.isAnonymous {
             _ = try? await Purchases.shared.logOut()
         }
+    }
+
+    /// Recover an active entitlement after launch or login without making another purchase.
+    private func reconcile() async {
+        guard configured, let userID = AccountSession.shared.session?.userId,
+              Purchases.shared.appUserID == userID else { return }
+        let generation = AccountSession.shared.generation
+        guard let info = try? await Purchases.shared.customerInfo(),
+              AccountSession.shared.session?.userId == userID,
+              AccountSession.shared.generation == generation else { return }
+        customerInfoChanged(pro: Self.isPro(info), expiry: info.entitlements[Self.entitlementID]?.expirationDate, appUserID: userID)
     }
 
     func loadProduct() async {
@@ -120,8 +164,7 @@ final class BobbyStore: NSObject, ObservableObject {
             let offerings = try await Purchases.shared.offerings()
             let current = offerings.current
             // The current offering's monthly package; else any package that sells the monthly product.
-            package = current?.monthly
-                ?? current?.availablePackages.first { $0.storeProduct.productIdentifier == Self.proMonthlyID }
+            package = current?.availablePackages.first { $0.storeProduct.productIdentifier == Self.proMonthlyID }
                 ?? offerings.all.values.flatMap(\.availablePackages).first { $0.storeProduct.productIdentifier == Self.proMonthlyID }
             productState = package == nil ? .missing : .loaded
             diagnostics = Self.describe(offerings)
@@ -140,14 +183,20 @@ final class BobbyStore: NSObject, ObservableObject {
     }
 
     func purchase() async -> Outcome {
-        guard configured, let package else { return .failed(Copy.unavailable) }
+        guard !busy, configured, let package,
+              package.storeProduct.productIdentifier == Self.proMonthlyID else { return .failed(Copy.unavailable) }
         guard let userId = AccountSession.shared.session?.userId else { return .needsSignIn }
         busy = true
         defer { busy = false }
-        guard await ensureIdentity(userId) else { return .failed(Copy.purchaseFailed) }
+        let generation = AccountSession.shared.generation
+        guard await access.refresh(), access.applePayments == true else { return .failed(Copy.unavailable) }
+        guard await ensureIdentity(userId), AccountSession.shared.session?.userId == userId,
+              AccountSession.shared.generation == generation else { return .needsSignIn }
         do {
             let result = try await Purchases.shared.purchase(package: package)
             if result.userCancelled { return .cancelled }
+            guard AccountSession.shared.session?.userId == userId,
+                  AccountSession.shared.generation == generation else { return .needsSignIn }
             guard Self.isPro(result.customerInfo) else { return .failed(Copy.notLinked) }
             return await confirmWithServer(result.customerInfo)
         } catch {
@@ -157,13 +206,17 @@ final class BobbyStore: NSObject, ObservableObject {
 
     /// Restore Purchases: RevenueCat re-reads the Apple Account's purchases for this Bobby account.
     func restore() async -> Outcome {
-        guard configured else { return .failed(Copy.unavailable) }
+        guard !busy, configured else { return .failed(Copy.unavailable) }
         guard let userId = AccountSession.shared.session?.userId else { return .needsSignIn }
         busy = true
         defer { busy = false }
-        guard await ensureIdentity(userId) else { return .failed(Copy.purchaseFailed) }
+        let generation = AccountSession.shared.generation
+        guard await ensureIdentity(userId), AccountSession.shared.session?.userId == userId,
+              AccountSession.shared.generation == generation else { return .needsSignIn }
         do {
             let info = try await Purchases.shared.restorePurchases()
+            guard AccountSession.shared.session?.userId == userId,
+                  AccountSession.shared.generation == generation else { return .needsSignIn }
             guard Self.isPro(info) else { return .nothingToRestore }
             return await confirmWithServer(info)
         } catch {
@@ -189,11 +242,17 @@ final class BobbyStore: NSObject, ObservableObject {
 
     /// Bobby's server re-reads RevenueCat for this account; only its word makes the page re-ask.
     private func confirmWithServer(_ info: CustomerInfo) async -> Outcome {
-        switch await access.syncRevenueCat() {
+        guard let userID = AccountSession.shared.session?.userId else { return .needsSignIn }
+        let key = BobbySubscriptionSyncState.Key(userID: userID, generation: AccountSession.shared.generation,
+                                                 expiry: info.entitlements[Self.entitlementID]?.expirationDate)
+        let attempt = syncState.begin(key)
+        let result = await access.syncRevenueCat()
+        guard AccountSession.shared.session?.userId == userID,
+              AccountSession.shared.generation == key.generation else { return .needsSignIn }
+        if let attempt { syncState.finish(attempt, succeeded: Self.serverConfirmedPro(result)) }
+        switch result {
         case let .accepted(access):
-            syncedExpiry = .some(info.entitlements[Self.entitlementID]?.expirationDate)
-            // A server that has not seen the entitlement yet reports another tier: say so, retry later.
-            if let access, !access.isPro { return .failed(Copy.notLinked) }
+            guard access?.isPro == true else { return .failed(Copy.notLinked) }
             return .subscribed
         case let .rejected(message):
             return .failed(message ?? Copy.notLinked)
@@ -206,11 +265,33 @@ final class BobbyStore: NSObject, ObservableObject {
 
     /// Renewals, Ask to Buy approvals and purchases made on another device reach the app as a new
     /// CustomerInfo: when `pro` is active with a new expiry, tell Bobby's server once.
+    nonisolated static func serverConfirmedPro(_ result: BobbyAccessCenter.ServerSync) -> Bool {
+        guard case let .accepted(access) = result else { return false }
+        return access?.isPro == true
+    }
+
     fileprivate func customerInfoChanged(pro: Bool, expiry: Date?, appUserID: String) {
-        guard pro, !busy, let userId = AccountSession.shared.session?.userId, userId == appUserID else { return }
-        if let synced = syncedExpiry, synced == expiry { return }
-        syncedExpiry = .some(expiry)
-        Task { _ = await access.syncRevenueCat() }
+        guard pro, !busy, let userID = AccountSession.shared.session?.userId, userID == appUserID else { return }
+        let key = BobbySubscriptionSyncState.Key(userID: userID, generation: AccountSession.shared.generation, expiry: expiry)
+        guard let attempt = syncState.begin(key) else { return }
+        Task {
+            // Retry transient failures without requiring a second purchase or a new expiry callback.
+            for retry in 0..<3 {
+                guard AccountSession.shared.session?.userId == key.userID,
+                      AccountSession.shared.generation == key.generation,
+                      syncState.pending == attempt else { return }
+                let result = await access.syncRevenueCat()
+                guard syncState.pending == attempt else { return }
+                if Self.serverConfirmedPro(result) {
+                    syncState.finish(attempt, succeeded: true)
+                    return
+                }
+                guard result == .unreachable, retry < 2 else { break }
+                do { try await Task.sleep(nanoseconds: UInt64(2 + retry * 3) * 1_000_000_000) }
+                catch { break }
+            }
+            syncState.finish(attempt, succeeded: false)
+        }
     }
 
     /// The price line: the package's localized price and its period ("$4.99 / month").
@@ -239,7 +320,7 @@ final class BobbyStore: NSObject, ObservableObject {
     enum Copy {
         static var unavailable: String { L.t("Bobby Pro isn’t available right now. Try again later.", "Bobby Pro no está disponible ahora. Inténtalo más tarde.") }
         static var comingSoon: String { L.t("Bobby Pro opens very soon.", "Bobby Pro abre muy pronto.") }
-        static var purchaseFailed: String { L.t("The App Store didn’t finish the purchase. Nothing was charged.", "La App Store no terminó la compra. No se hizo ningún cargo.") }
+        static var purchaseFailed: String { L.t("Bobby couldn’t verify the purchase. Check your App Store subscriptions before trying again.", "Bobby no pudo verificar la compra. Revisa tus suscripciones en la App Store antes de intentarlo de nuevo.") }
         static var notLinked: String {
             L.t("Your subscription is active, but Bobby couldn’t link it to your account yet. Tap Restore Purchases in a moment.",
                 "Tu suscripción está activa, pero Bobby aún no pudo vincularla a tu cuenta. Toca Restaurar compras en un momento.")

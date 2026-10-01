@@ -214,7 +214,7 @@ try {
   await assert.rejects(runDeskDebate('Is this trend real?', evidence, 'en'), (error: unknown) => error instanceof DeskOutputRejected, 'a guarantee in the CIO fails the debate'); checks++;
 
   // ---------- handler: codes, length in code points, quota ----------
-  const request = (body: Record<string, unknown>, ip: string) => ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': ip }, body });
+  const request = (body: Record<string, unknown>, ip: string) => ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': ip, 'x-bobby-device': 'device-1234567890abcdef' }, body });
   async function post(body: Record<string, unknown>, ip = '10.8.0.1') {
     const res = { statusCode: 200, body: null as any, headers: {} as Record<string, string>, setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; return this; } };
     await deskHandler(request(body, ip) as never, res as never);
@@ -246,6 +246,9 @@ try {
     const url = String(input);
     if (url.includes('rpc/bobby_consume_desk_quota')) { quotaCalls++; quotaBodies.push(JSON.parse(String(init?.body))); return json(quotaAnswer.value); }
     if (url.includes('bobby_desk_quotas?')) return json(quotaAnswer.rows);
+    // The reader's own meter runs first; a daily-limit refusal gives that read back.
+    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 7, tier: 'anon', used: 1, limit: 3 });
+    if (url.includes('bobby_reads?id=eq.')) return new Response(null, { status: 204 });
     throw new Error(`Unexpected request ${url}`);
   }) as typeof fetch;
   eq(DESK_QUESTION_MAX, 1200, 'the app and the server share one limit');
@@ -285,6 +288,8 @@ try {
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes('rpc/bobby_consume_desk_quota')) return json(true);
+    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
+    if (url.includes('bobby_reads?id=eq.') && init?.method === 'DELETE') return json([]);
     if (url.includes('/api/okx-candles')) return json({ candles: Array.from({ length: 100 }, (_, i) => ({ ts: Date.now() - (100 - i) * H * 1000, open: 100 + i, high: 102 + i, low: 99 + i, close: 101 + i, volume: 5 })) });
     return quotaOk(input, init);
   }) as typeof fetch;

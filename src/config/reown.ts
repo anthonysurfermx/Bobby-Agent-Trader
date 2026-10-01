@@ -31,7 +31,7 @@ export const metadata = {
   name: 'Bobby Protocol',
   description: 'Refuted before execution. Bobby never holds funds or keys.',
   url: appUrl,
-  icons: [`${appUrl}/apple-touch-icon-bobby-v3.png`],
+  icons: [`${appUrl}/apple-touch-icon-bobby-orb-2026-09-30.png`],
 };
 
 // 4. Create modal

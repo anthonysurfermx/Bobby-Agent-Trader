@@ -25,14 +25,14 @@ struct NucleoPaywallSheet: View {
     static let privacyURL = URL(string: "https://bobbyprotocol.xyz/privacy")!
 
     enum Ink {
-        static let bg = Color(red: 11 / 255, green: 10 / 255, blue: 9 / 255)           // #0B0A09
-        static let ink = Color(red: 242 / 255, green: 237 / 255, blue: 228 / 255)      // #F2EDE4
-        static let ink2 = Color(red: 163 / 255, green: 156 / 255, blue: 145 / 255)     // #A39C91
-        static let ink3 = Color(red: 138 / 255, green: 131 / 255, blue: 120 / 255)     // #8A8378
-        static let line = Color(red: 242 / 255, green: 237 / 255, blue: 228 / 255).opacity(0.12)
-        static let glass = Color(red: 242 / 255, green: 237 / 255, blue: 228 / 255).opacity(0.04)
-        static let mint = Color(red: 63 / 255, green: 224 / 255, blue: 181 / 255)      // #3FE0B5
-        static let coral = Color(red: 1, green: 90 / 255, blue: 95 / 255)              // #FF5A5F
+        static let bg = Theme.bg
+        static let ink = Theme.cream
+        static let ink2 = Theme.warmMuted
+        static let ink3 = Theme.warmDim
+        static let line = Theme.nucleoStroke
+        static let glass = Theme.nucleoGlass
+        static let accent = Theme.orbCyan
+        static let coral = Theme.down
     }
 
     var body: some View {
@@ -44,7 +44,7 @@ struct NucleoPaywallSheet: View {
                     .foregroundStyle(Ink.ink)
                     .padding(.top, 28)
                     .accessibilityAddTraits(.isHeader)
-                Text(L.t("Unlimited reads", "Lecturas ilimitadas"))
+                Text(L.t("Unlimited Quick reads", "Lecturas Rápidas ilimitadas"))
                     .font(.system(size: 20))
                     .foregroundStyle(Ink.ink2)
                     .padding(.top, 4)
@@ -90,9 +90,12 @@ struct NucleoPaywallSheet: View {
 
     private var features: some View {
         VStack(alignment: .leading, spacing: 14) {
-            feature("infinity", L.t("Ask as often as you want", "Pregunta cuantas veces quieras"))
+            feature("infinity", L.t("Quick reads without a monthly allowance", "Lecturas Rápidas sin cupo mensual"))
+            feature("sparkles", L.t("Deep and Max have separate allowances shown in Analysis Level", "Profundo y Máximo tienen cupos propios en Nivel de análisis"))
             feature("person.3", L.t("The full three-agent debate on every read", "El debate completo de tres agentes en cada lectura"))
-            feature("calendar", L.t("Monthly, cancel anytime in Settings", "Mensual, cancela cuando quieras en Configuración"))
+            if store.configured {
+                feature("calendar", L.t("Monthly, cancel anytime in Settings", "Mensual, cancela cuando quieras en Configuración"))
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -113,7 +116,7 @@ struct NucleoPaywallSheet: View {
             if subscribed {
                 Label(L.t("You’re on Bobby Pro.", "Ya tienes Bobby Pro."), systemImage: "checkmark.circle.fill")
                     .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(Ink.mint)
+                    .foregroundStyle(Ink.accent)
                     .accessibilityIdentifier("paywall-subscribed")
             } else {
                 priceRow
@@ -181,7 +184,7 @@ struct NucleoPaywallSheet: View {
         }
     }
 
-    private var salesOpen: Bool { center.applePayments != false }
+    private var salesOpen: Bool { center.applePayments == true }
 
     private var subscribeButton: some View {
         Button(action: subscribe) {
@@ -202,6 +205,7 @@ struct NucleoPaywallSheet: View {
 
     private var footer: some View {
         VStack(alignment: .leading, spacing: 14) {
+            if store.configured {
             Button(action: restore) {
                 Text(L.t("Restore Purchases", "Restaurar compras"))
                     .font(.system(size: 15, weight: .medium))
@@ -214,6 +218,7 @@ struct NucleoPaywallSheet: View {
                 .font(.system(size: 11))
                 .foregroundStyle(Ink.ink3)
                 .fixedSize(horizontal: false, vertical: true)
+            }
             HStack(spacing: 18) {
                 Link(L.t("Terms of Use (EULA)", "Términos de uso (EULA)"), destination: Self.termsURL)
                     .accessibilityIdentifier("paywall-terms")

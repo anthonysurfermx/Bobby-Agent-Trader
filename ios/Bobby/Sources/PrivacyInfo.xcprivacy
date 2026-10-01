@@ -10,6 +10,17 @@
   <array>
     <dict>
       <key>NSPrivacyCollectedDataType</key>
+      <string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+      <!-- Bobby Pro: RevenueCat and our server keep the subscription status with the account id. -->
+      <key>NSPrivacyCollectedDataTypeLinked</key>
+      <true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key>
+      <false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+    </dict>
+    <dict>
+      <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
       <!-- Linked: the Trader Land island name is saved with the account token.
            Typed desk questions stay unlinked in practice (sent without an account token),
@@ -66,9 +77,12 @@
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
     </dict>
+    <!-- Paid purchases are disabled in this release. Declare Purchase History again when
+         the production RevenueCat key and purchase paths are enabled. -->
     <dict>
-      <!-- Bobby Pro: the App Store subscription (through RevenueCat) is linked to the Bobby account. -->
-      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypePurchaseHistory</string>
+      <!-- Existing authentication grants can include an email retained by the backend,
+           even though the native Apple request does not request the email scope. -->
+      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeEmailAddress</string>
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
       <key>NSPrivacyCollectedDataTypeTracking</key><false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>

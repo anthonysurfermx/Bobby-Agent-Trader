@@ -67,6 +67,7 @@ function tintTo(labc, amt){ to(W.tl, labc[0]); to(W.ta, labc[1]); to(W.tb, labc[
 function tintSnap(labc){ W.tl.x = W.tl.t = labc[0]; W.ta.x = W.ta.t = labc[1]; W.tb.x = W.tb.t = labc[2]; }
 function setHint(s){ if (W.hint === s) return; W.hintPrev = W.hint; W.hint = s; W.hintT = T; }
 function setPill(mode, label, width){
+  pill.setAttribute('aria-label', mode === 'agree' ? Ls('risk.activate') : Ls('aria.pill'));
   if (mode && mode !== W.pillMode){ W.pillModePrev = W.pillMode; W.pillMode = mode; W.pillModeT = T; }
   if (label != null && label !== W.pillLabel){ W.pillLabelPrev = W.pillLabel; W.pillLabel = label; W.pillLabelT = T; }
   if (width) to(W.pillW, width, 'pill');
@@ -81,7 +82,7 @@ function moveSphere(cy, r, nm){
     W.pend = { t:T + 0.12, cy:cy, r:r, nm:nm };
   } else { W.pend = null; to(W.cy, cy, nm); to(W.r, r, nm); }
 }
-function companionTint(){ return CHOSEN_ART ? CHOSEN_ART.tintLab : lab('#B8C2D3'); }
+function companionTint(){ return lab('#A795EF'); }
 
 /* ---------- cues ---------- */
 function at(dt, fn){ W.cues.push({ t:T + dt, fn:fn, g:W.gen }); }      /* cancelled when the state changes */

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run check:api && vite build",
+    "build": "node scripts/prod-source-guard.mjs && npm run check:api && vite build",
     "build:dev": "vite build --mode development",
     "check:api": "tsc -p tsconfig.api.json",
     "lint": "eslint .",

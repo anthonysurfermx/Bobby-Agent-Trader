@@ -12,6 +12,7 @@
 // ============================================================
 
 import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
+import { alertProviderCredit } from './provider-alert.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const BACKOFF_MS = [500, 1500];
@@ -94,8 +95,15 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
           model,
           kind: classifyHttpStatus(res.status),
           httpStatus: res.status,
-          message: errBody.slice(0, 300),
+          message: `http_${res.status}`,
         });
+        console.error('[llm] provider error', 'openai', model, res.status, errBody.slice(0, 200));
+        // Exhausted credit never recovers through a retry: alert the owner and stop.
+        const refusal = refusalCode((() => { try { return JSON.parse(errBody); } catch { return null; } })());
+        if (refusal === 'insufficient_quota' || refusal === 'billing_hard_limit_reached') {
+          alertProviderCredit('openai', refusal, opts.endpoint);
+          throw new LlmHttpError(res.status, `OpenAI ${model}: ${res.status} ${refusal}`, refusal);
+        }
         const retriable = res.status === 429 || res.status >= 500;
         lastError = new Error(`OpenAI ${model}: ${res.status} ${errBody.slice(0, 200)}`);
         if (!retriable || attempt === BACKOFF_MS.length) throw lastError;
@@ -131,7 +139,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
       return { text, toolInput };
     } catch (e: unknown) {
       const err = e as Error;
-      if (err === lastError) throw err; // non-retriable HTTP error re-thrown above
+      if (err === lastError || err instanceof LlmHttpError) throw err; // non-retriable HTTP error re-thrown above
       const isTimeout = err.name === 'AbortError';
       lastError = isTimeout
         ? new Error(`LLM call timed out after ${timeoutMs}ms (${model})`)
@@ -181,7 +189,21 @@ export interface LlmUsage {
 }
 export class LlmIncompleteError extends Error {}
 /** The provider refused the request; `status` lets a caller tell a model-access problem (401/403/404) from an outage. */
-export class LlmHttpError extends Error { constructor(readonly status: number, message: string) { super(message); } }
+export type ProviderRefusal = 'insufficient_quota' | 'rate_limit_exceeded' | 'billing_hard_limit_reached';
+const providerRefusals = new Set<ProviderRefusal>(['insufficient_quota', 'rate_limit_exceeded', 'billing_hard_limit_reached']);
+/** Keep only known diagnostic codes; never retain the provider's prompt-bearing error message. */
+function refusalCode(body: unknown): ProviderRefusal | null {
+  const error = (body as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null)?.error;
+  // Anthropic reports exhausted credits as 400 invalid_request_error. Retain only the class.
+  if (error?.type === 'invalid_request_error' && typeof error.message === 'string' && /credit balance is too low/i.test(error.message)) return 'insufficient_quota';
+  for (const value of [error?.code, error?.type]) {
+    if (typeof value === 'string' && providerRefusals.has(value as ProviderRefusal)) return value as ProviderRefusal;
+  }
+  return null;
+}
+export class LlmHttpError extends Error {
+  constructor(readonly status: number, message: string, readonly providerCode: ProviderRefusal | null = null) { super(message); }
+}
 
 /** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. An unknown model logs $0. */
 export const MODEL_PRICES: Record<string, [number, number, number]> = {
@@ -218,6 +240,7 @@ export async function completeJson(
   });
 
   let res: Response | null = null;
+  let providerCode: ProviderRefusal | null = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     const left = spec.timeoutMs - (Date.now() - started);
     if (left < 2000) break;
@@ -248,16 +271,22 @@ export async function completeJson(
       note({ stop: timeout ? 'timeout' : 'network' });
       throw e;
     }
+    providerCode = res.ok ? null : refusalCode(await res.clone().json().catch(() => null));
+    // Billing exhaustion cannot recover through a retry or a cheaper-model fallback.
+    if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') break;
     if (res.ok || !RETRY_STATUS(res.status) || attempt === 1) break;
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status });
     await sleep(BACKOFF_MS[0]);
   }
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
   if (!res.ok) {
+    if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') alertProviderCredit(spec.provider, providerCode, opts.endpoint);
     const detail = (await res.text().catch(() => '')).slice(0, 300);
-    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: detail });
+    // The health log is readable through the public agent_events feed: class and status only, never the body.
+    console.error('[llm] provider error', spec.provider, spec.model, res.status, providerCode ?? '', detail.slice(0, 200));
+    recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: providerCode ?? `http_${res.status}` });
     note({ stop: `http_${res.status}` });
-    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`);
+    throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, providerCode);
   }
 
   if (spec.provider === 'openai') {

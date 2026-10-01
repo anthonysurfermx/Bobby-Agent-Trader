@@ -1,0 +1,23 @@
+{
+  "scope": "actual bundled handlers, mocked HTTP only; no real AI or payments",
+  "outage_cases": [
+    {
+      "case": "unavailable",
+      "blocked_before_ai": true,
+      "http_status": 503
+    },
+    {
+      "case": "transport",
+      "blocked_before_ai": true,
+      "http_status": 503
+    },
+    {
+      "case": "malformed",
+      "blocked_before_ai": true,
+      "http_status": 503
+    }
+  ],
+  "normal_gate_behavior_preserved": true,
+  "payment_readiness_contract_passed": true,
+  "external_ai_calls": 0
+}

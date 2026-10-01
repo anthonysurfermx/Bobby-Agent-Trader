@@ -11,11 +11,51 @@ struct WatchedAsset: Codable, Equatable {
 }
 
 final class DeskMemory {
-    private let defaults = UserDefaults.standard
+    private let defaults: UserDefaults
+    static let ownerKey = "desk.memory.owner.v2"
+    private static let migratedKey = "desk.memory.scoped.v2"
     private enum Key {
         static let streak = "desk.streak"
         static let lastActive = "desk.lastActiveAt"
         static let watchlist = "desk.watchlist"
+    }
+
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
+        Self.migrateLegacy(defaults: defaults)
+    }
+
+    private static func scoped(_ key: String, owner: String?) -> String {
+        key + ".v2." + (owner ?? "local")
+    }
+
+    private func key(_ value: String) -> String {
+        Self.scoped(value, owner: defaults.string(forKey: Self.ownerKey))
+    }
+
+    /// Attribute old device-wide history to its recorded progress owner, never a newly signed-in account.
+    private static func migrateLegacy(defaults: UserDefaults) {
+        guard !defaults.bool(forKey: migratedKey) else { return }
+        let owner = defaults.string(forKey: "companion.ownerUserId")
+        for key in [Key.streak, Key.lastActive, Key.watchlist] {
+            // A legacy sign-out removed its owner but kept these global keys. Unattributed
+            // history cannot safely be assigned to the next visitor, including a guest.
+            if let owner, let value = defaults.object(forKey: key) { defaults.set(value, forKey: scoped(key, owner: owner)) }
+            defaults.removeObject(forKey: key)
+        }
+        defaults.set(true, forKey: migratedKey)
+    }
+
+    static func setOwner(_ userId: String?, defaults: UserDefaults = .standard) {
+        migrateLegacy(defaults: defaults)
+        defaults.set(userId, forKey: ownerKey)
+    }
+
+    static func forgetOwner(_ userId: String, defaults: UserDefaults = .standard) {
+        for key in [Key.streak, Key.lastActive, Key.watchlist] {
+            defaults.removeObject(forKey: scoped(key, owner: userId))
+        }
+        if defaults.string(forKey: ownerKey) == userId { defaults.removeObject(forKey: ownerKey) }
     }
 
     // MARK: streak
@@ -25,8 +65,8 @@ final class DeskMemory {
     @discardableResult
     func recordVisit(now: Date = Date()) -> Int {
         let calendar = Calendar.current
-        var streak = defaults.integer(forKey: Key.streak)
-        if let last = defaults.object(forKey: Key.lastActive) as? Date {
+        var streak = defaults.integer(forKey: key(Key.streak))
+        if let last = defaults.object(forKey: key(Key.lastActive)) as? Date {
             if calendar.isDate(last, inSameDayAs: now) {
                 // same day — streak unchanged
             } else if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
@@ -38,22 +78,23 @@ final class DeskMemory {
         } else {
             streak = 1
         }
-        defaults.set(streak, forKey: Key.streak)
-        defaults.set(now, forKey: Key.lastActive)
+        defaults.set(streak, forKey: key(Key.streak))
+        defaults.set(now, forKey: key(Key.lastActive))
         return streak
     }
 
-    var streak: Int { defaults.integer(forKey: Key.streak) }
+    var streak: Int { defaults.integer(forKey: key(Key.streak)) }
 
     // MARK: implicit watchlist
 
-    private(set) lazy var watchlist: [WatchedAsset] = {
-        guard let data = defaults.data(forKey: Key.watchlist),
+    var watchlist: [WatchedAsset] {
+        guard let data = defaults.data(forKey: key(Key.watchlist)),
               let list = try? JSONDecoder().decode([WatchedAsset].self, from: data) else { return [] }
         return list
-    }()
+    }
 
     func recordQuery(symbol: String, isEquity: Bool, now: Date = Date()) {
+        var watchlist = watchlist
         let ticker = symbol.uppercased()
         if let index = watchlist.firstIndex(where: { $0.symbol == ticker }) {
             watchlist[index].lastAskedAt = now
@@ -64,7 +105,7 @@ final class DeskMemory {
         watchlist.sort { $0.lastAskedAt > $1.lastAskedAt }
         if watchlist.count > 12 { watchlist.removeLast(watchlist.count - 12) }
         if let data = try? JSONEncoder().encode(watchlist) {
-            defaults.set(data, forKey: Key.watchlist)
+            defaults.set(data, forKey: key(Key.watchlist))
         }
     }
 

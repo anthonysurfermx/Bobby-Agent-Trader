@@ -1,0 +1,22 @@
+{
+  "status": "local draft; not saved to App Store Connect",
+  "version": "1.5",
+  "build": "45",
+  "supportURL": "https://bobbyprotocol.xyz/support?lang=en",
+  "privacyURL": "https://bobbyprotocol.xyz/privacy?lang=en",
+  "privacyChoicesURL": "https://bobbyprotocol.xyz/support?lang=en#contact",
+  "locales": {
+    "en-US": {
+      "subtitle": 24,
+      "promotionalText": 110,
+      "description": 1687,
+      "whatsNew": 264
+    },
+    "es-MX": {
+      "subtitle": 23,
+      "promotionalText": 122,
+      "description": 1837,
+      "whatsNew": 310
+    }
+  }
+}

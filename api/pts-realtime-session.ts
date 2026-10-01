@@ -25,6 +25,9 @@ const PTS_INSTRUCTIONS = [
 ].join(' ');
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Demo relay, unauthenticated: it mints OpenAI Realtime secrets on Bobby's key, so it is off unless the demo
+  // is running (PTS_REALTIME_ENABLED=on in Vercel). Pitch was 2026-09-23.
+  if (process.env.PTS_REALTIME_ENABLED !== 'on') return res.status(404).json({ error: 'Not found' });
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!await enforcePublicRateLimit(req, res, 'pts-realtime-session', 6, 600)) return;
 

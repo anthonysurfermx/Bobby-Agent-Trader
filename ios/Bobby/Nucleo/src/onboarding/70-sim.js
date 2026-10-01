@@ -57,7 +57,7 @@ function sim(h){
   /* the picker drag fraction: the tint AND the temperament preview both follow it 1:1, blended between neighbours */
   var inPick = W.picker && !W.chosen && NPICK > 0, kf = 0, k0 = 0, k1 = 0;
   if (inPick){ kf = clamp(W.theta.x / DET, 0, NPICK - 1); k0 = Math.floor(kf); k1 = Math.min(NPICK - 1, k0 + 1); }
-  if (inPick) tintSnap(mixLabTo(TMP_LAB, PICKS[k0].art.tintLab, PICKS[k1].art.tintLab, kf - k0));
+  if (inPick) tintSnap(companionTint());
   else if (W.peekOn){
     var fr = clamp((W.theta.x - W.thBase) / DET, 0, 1); tintSnap(mixLabTo(TMP_LAB, companionTint(), ISLA_LAB, fr));
     to(W.nb, 0.25 + 0.75 * fr); to(W.wash, 0.12 * fr);

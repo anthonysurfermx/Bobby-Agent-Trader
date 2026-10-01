@@ -83,6 +83,15 @@ targets:
       - path: ../../public/land/v1/audio
         type: folder
         buildPhase: resources
+    postBuildScripts:
+      - name: Embed offline fixtures in Debug only
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$CONFIGURATION" = "Debug" ]; then
+            /usr/bin/ditto "$PROJECT_DIR/Nucleo/fixtures" "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Nucleo/fixtures"
+            export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+            /usr/bin/python3 "$PROJECT_DIR/Nucleo/build.py" --contract-only --output "$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Nucleo"
+          fi
     dependencies:
       - package: GLTFKit2
       - package: RevenueCat
@@ -125,12 +134,12 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.5"
-        CURRENT_PROJECT_VERSION: "43"
+        CURRENT_PROJECT_VERSION: "51"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
-        # Test Store key; Release stays empty until the production appl_… key exists (BobbyStore also refuses
-        # any test_ key outside DEBUG). Empty = no purchases, the Bobby Pro sheet says it opens soon.
+        # Test Store key; Release uses the App Store app's public key (RevenueCat → API keys → SDK API keys,
+        # "Bobby: Think Before You Trade (App Store)"). BobbyStore refuses any test_ key outside DEBUG.
         Debug:
           REVENUECAT_IOS_API_KEY: test_VxgXjDaVEnBXXAGIqrfZqfAzNod
         Release:
-          REVENUECAT_IOS_API_KEY: ""
+          REVENUECAT_IOS_API_KEY: appl_PTUeCLFEkmBVAkpFMdDmNRIbikp

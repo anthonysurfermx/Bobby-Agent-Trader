@@ -116,10 +116,11 @@
       if (missing.length) throw new Error('webId not in COMPANIONS: ' + missing.map(function (x) { return x.webId; }).join(','));
     });
   });
-  test('riskNotice(): version 4, four statements (same words as RiskNoticeView)', function () {
+  test('riskNotice(): current version, four statements (same words as RiskNoticeView)', function () {
     return B.api.riskNotice().then(function (r) {
       var e = check(r, { version: T.int, statements: arrayOf({ title: T.str, body: T.str }) });
       if (e.length) throw new Error(e.join('\n'));
+      ctx.riskNoticeVersion = r.version;
       if (r.statements.length !== 4) throw new Error('statements ' + r.statements.length);
       if (FX) {
         var want = FX.native.riskNotice.statements[ctx.session.language];
@@ -159,7 +160,7 @@
     if (ctx.session.riskAccepted) return Promise.resolve('skip: risk already accepted');
     return B.api.ask({ question: 'Should I buy NVIDIA right now?' }).then(function (r) {
       if (r.status !== 'error' || r.code !== 'risk_not_accepted') throw new Error(JSON.stringify(r));
-      return B.api.acceptRisk({ version: 4 });
+      return B.api.acceptRisk({ version: ctx.riskNoticeVersion });
     }).then(function (a) { if (!a.accepted) throw new Error('acceptRisk failed'); });
   });
   test('too_long is answered locally (1,201 code points)', function () {

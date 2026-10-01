@@ -1,0 +1,4 @@
+PASS: testPurchasesRequireBothServerFlags
+PASS: testMissingOrFreeAccessCannotConfirmPro
+PASS: testFailedSubscriptionSyncCanRetryTheSameExpiry
+PASS: testOldAccountAndExpiryCallbacksCannotOverwriteNewSync

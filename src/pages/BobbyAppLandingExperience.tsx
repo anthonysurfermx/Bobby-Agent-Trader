@@ -195,7 +195,7 @@ export default function BobbyAppLandingExperience() {
         <meta property="og:url" content="https://bobbyprotocol.xyz/app" />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={t('Everyone can ask an AI now. Bobby is what happens to the answer next.', 'Cualquiera le puede preguntar a una IA. Bobby es lo que le pasa después a esa respuesta.')} />
-        <meta property="og:image" content="https://bobbyprotocol.xyz/favicon-bobby-v3.png" />
+        <meta property="og:image" content="https://bobbyprotocol.xyz/bobby-share-orb-en-2026-09-30.png" />
       </Helmet>
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050706]/88 backdrop-blur-xl">

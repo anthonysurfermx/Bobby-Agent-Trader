@@ -22,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // burns ~15 in five minutes, and venue Wi-Fi shares one IP across phones.
   if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 60, 600)) return;
 
-  const body = req.body as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string; mode?: string };
+  const body = (req.body ?? {}) as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string; mode?: string };
   const text = body.text;
   // Whitelist every steering param — this endpoint is public. edgeVoice
   // (the iOS "Configura tu Bobby" menu) is validated inside the TTS layer
@@ -52,11 +52,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Global daily spend circuit breaker: past the budget the endpoint keeps
     // working but degrades to free Edge voices instead of paid synthesis
-    const budget = await checkPersistentLimit('tts-global', 'global', 3000, 86400);
+    const budget = await checkPersistentLimit('tts-global', 'global', 3000, 86400, { failClosed: true });
+
+    const preservePersona = body.mode === 'persona';
+    if (preservePersona && budget.limited) {
+      return res.status(503).json({ error: 'Companion voice temporarily unavailable' });
+    }
 
     // mp3: AVAudioPlayer/Safari can't play opus — apps always get MP3
     const speech = await generateSpeech(text, {
-      lang, voice, vibe, edgeVoice, format: 'mp3',
+      lang, voice, vibe, edgeVoice, format: 'mp3', preservePersona,
       // Free mode never retries a paid provider, even when Edge is unavailable.
       provider: body.mode === 'free' || budget.limited ? 'edge' : undefined,
     });

@@ -1,6 +1,7 @@
 {
  "v": 1,
  "status": "ok",
+ "level": "rapido",
  "requestId": "00000000-0000-4000-8000-000000000000",
  "question": "Should I buy NVIDIA right now?",
  "language": "en",

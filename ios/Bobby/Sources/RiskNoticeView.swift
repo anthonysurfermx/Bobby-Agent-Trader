@@ -1,21 +1,20 @@
 // First-launch risk notice. Nothing in Bobby is investment advice, and the
-// human has to say so themselves before the squad appears: three statements,
+// human has to say so themselves before the squad appears: four statements,
 // each acknowledged by hand, then one button. No swipe-to-dismiss, no
 // "skip". Re-readable any time from the desk menu.
 import SwiftUI
 
 enum RiskNotice {
     /// Bump when the wording changes materially; users re-acknowledge.
-    static let currentVersion = 4
+    static let currentVersion = 5
 
-    // Copy rule: every title fits one line and every body at most three,
-    // down to a 375 pt screen. Same three commitments, fewer words.
+    // Bodies expand in the scroll view so every recipient remains readable.
     // Shared by RiskNoticeView and the Núcleo risk beat (`riskNotice()`), so the
     // words the human agrees to are the same on both screens.
     static func statements(spanish: Bool) -> [(title: String, body: String)] {
         [
             (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas.", spanish: spanish),
-             L.t("Bobby sends your question and market data to OpenAI. When voice is on, reply text goes to OpenAI or Microsoft to create speech. Avoid personal or account details.", "Bobby envía tu pregunta y datos de mercado a OpenAI. Con voz activa, envía el texto de respuesta a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas.", spanish: spanish)),
+             L.t("Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation audio stays on your iPhone. Avoid personal or account details. You can withdraw AI consent here at any time.", "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El audio del dictado permanece en tu iPhone. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras.", spanish: spanish)),
             (L.t("Not investment advice.", "No es asesoría de inversión.", spanish: spanish),
              L.t("Verdicts, levels and stops are educational analysis made by software, not recommendations for you.",
                  "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti.", spanish: spanish)),
@@ -34,8 +33,10 @@ struct RiskNoticeView: View {
     /// Read-only mode from the menu: same text, a close button instead of the gate.
     var readOnly = false
     var onClose: (() -> Void)? = nil
+    var onWithdraw: (() -> Void)? = nil
 
     @State private var checks: [Bool] = [false, false, false, false]
+    @State private var confirmsWithdrawal = false
 
     private var statements: [(title: String, body: String)] { RiskNotice.statements(spanish: L.isSpanish) }
 
@@ -47,7 +48,7 @@ struct RiskNoticeView: View {
             VStack(spacing: 0) {
                 HStack {
                     HStack(spacing: 8) {
-                        Circle().fill(Theme.up).frame(width: 7, height: 7).shadow(color: Theme.up, radius: 7)
+                        Circle().fill(Theme.orbCyan).frame(width: 7, height: 7).shadow(color: Theme.orbCyan, radius: 7)
                         Text(L.t("BOBBY // BEFORE WE START", "BOBBY // ANTES DE EMPEZAR"))
                             .font(.mono(11, .bold))
                             .kerning(1.9)
@@ -59,7 +60,7 @@ struct RiskNoticeView: View {
                             Image(systemName: "xmark")
                                 .font(.system(size: 13, weight: .bold))
                                 .foregroundStyle(Theme.text.opacity(0.7))
-                                .frame(width: 32, height: 32)
+                                .frame(width: 44, height: 44)
                                 .background(Theme.card)
                                 .clipShape(Circle())
                         }
@@ -71,7 +72,7 @@ struct RiskNoticeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 18) {
                         Text(L.t("Read this once. It matters.", "Léelo una vez. Importa."))
-                            .font(.rounded(26, .bold))
+                            .font(.system(size: 28, weight: .light))
                             .foregroundStyle(Theme.text)
                         Text(L.t("Bobby is here to make you think, not to tell you what to do with your money.",
                                  "Bobby está para hacerte pensar, no para decirte qué hacer con tu dinero."))
@@ -87,7 +88,7 @@ struct RiskNoticeView: View {
                                 HStack(alignment: .top, spacing: 12) {
                                     Image(systemName: readOnly || checks[index] ? "checkmark.circle.fill" : "circle")
                                         .font(.system(size: 22, weight: .semibold))
-                                        .foregroundStyle(readOnly || checks[index] ? Theme.up : Theme.muted)
+                                        .foregroundStyle(readOnly || checks[index] ? Theme.orbCyan : Theme.muted)
                                         .padding(.top, 1)
                                     VStack(alignment: .leading, spacing: 4) {
                                         Text(item.title)
@@ -101,13 +102,13 @@ struct RiskNoticeView: View {
                                     Spacer(minLength: 0)
                                 }
                                 .padding(14)
-                                .background(checks[index] && !readOnly ? Theme.up.opacity(0.06) : Theme.card)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay(RoundedRectangle(cornerRadius: 12).stroke(checks[index] && !readOnly ? Theme.up.opacity(0.4) : Theme.stroke, lineWidth: 1))
+                                .background(checks[index] && !readOnly ? Theme.orbCyan.opacity(0.06) : Theme.card)
+                                .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+                                .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(checks[index] && !readOnly ? Theme.orbCyan.opacity(0.4) : Theme.stroke, lineWidth: 1))
                             }
                             .buttonStyle(.plain)
                             .accessibilityLabel(item.title)
-                            .accessibilityValue(checks[index] ? L.t("acknowledged", "aceptado") : L.t("not acknowledged", "sin aceptar"))
+                            .accessibilityValue(readOnly || checks[index] ? L.t("acknowledged", "aceptado") : L.t("not acknowledged", "sin aceptar"))
                         }
 
                         VStack(alignment: .leading, spacing: 6) {
@@ -146,19 +147,36 @@ struct RiskNoticeView: View {
                         .foregroundStyle(allChecked ? .black : Theme.text.opacity(0.55))
                         .padding(.horizontal, 18)
                         .frame(height: 52)
-                        .background(allChecked ? Theme.up : Theme.card)
+                        .background(allChecked ? Theme.orbCyan : Theme.card)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                         .overlay(RoundedRectangle(cornerRadius: 10).stroke(allChecked ? .clear : Theme.stroke, lineWidth: 1))
-                        .shadow(color: allChecked ? Theme.up.opacity(0.3) : .clear, radius: 14, y: 4)
+                        .shadow(color: allChecked ? Theme.orbCyan.opacity(0.3) : .clear, radius: 14, y: 4)
                     }
                     .disabled(!allChecked)
                     .animation(.easeOut(duration: 0.25), value: allChecked)
                     .padding(.horizontal, 18)
                     .padding(.top, 8)
                     .padding(.bottom, 10)
+                } else if let onWithdraw {
+                    Button(L.t("Withdraw AI consent", "Retirar consentimiento de IA"), role: .destructive) {
+                        confirmsWithdrawal = true
+                    }
+                    .font(.rounded(14, .semibold))
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("risk-withdraw-consent")
+                    .padding(.bottom, 10)
+                    .confirmationDialog(L.t("Stop AI processing?", "¿Detener el procesamiento de IA?"),
+                                        isPresented: $confirmsWithdrawal, titleVisibility: .visible) {
+                        Button(L.t("Withdraw consent", "Retirar consentimiento"), role: .destructive) { onWithdraw() }
+                        Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
+                    } message: {
+                        Text(L.t("New analyses and generated speech will stop. You can agree again before asking another question. This does not delete your account or data already sent; use Profile to delete your account.",
+                                 "Se detendrán nuevos análisis y la voz generada. Puedes volver a aceptar antes de hacer otra pregunta. Esto no borra tu cuenta ni datos ya enviados; usa Perfil para borrar tu cuenta."))
+                    }
                 }
             }
         }
+        .preferredColorScheme(.dark)
         .interactiveDismissDisabled(!readOnly)
         .onAppear {
             // First launch: parse the starters while the human reads, so the

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { guardWrite } from './_lib/write-guard.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { reporterHash } from './_lib/trader-land-moderation.js';
+import { notifyOwner } from './_lib/provider-alert.js';
 
 export const config = { maxDuration: 10 };
 const Report = z.object({
@@ -35,6 +36,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       body: JSON.stringify({ reporter_hash: reporterHash(installation), target_identity: island.identity_id, code, title: island.title, reason, details, status: 'open', reviewed_at: null }),
     });
     if (!saved.ok) throw new Error('Report could not be saved');
+    // A person reviews every report (App Review 1.2): the owner is told at once. The email carries the public
+    // island code and the reason class only — no reporter, no details text.
+    notifyOwner(`Bobby: nuevo reporte en Trader Land (${reason})`, [
+      `Alguien reportó la isla pública ${code} por "${reason}".`,
+      '',
+      'Revisa el reporte en la tabla tl_content_reports (status = open) de Supabase bobby-protocol y resuélvelo en menos de 24 horas.',
+      'Para ocultar la isla: tl_lands.community_blocked = true.',
+    ].join('\n'));
     return res.status(200).json({ ok: true });
   } catch {
     return res.status(503).json({ error: 'Report unavailable. Please try again.' });

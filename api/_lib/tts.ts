@@ -15,6 +15,7 @@
 // ============================================================
 
 import { Communicate } from 'edge-tts-universal';
+import { alertProviderCredit } from './provider-alert.js';
 
 export interface SpeechResult {
   audio: Buffer;
@@ -39,6 +40,8 @@ export interface SpeechOptions {
   /** Per-call provider override (e.g. degrade to free Edge when a global
    *  spend budget is exhausted). Beats TTS_PROVIDER and the key-based default. */
   provider?: 'openai' | 'edge';
+  /** Companion narration must never silently switch to an unrelated voice. */
+  preservePersona?: boolean;
 }
 
 // ---- Voice persona mapping ----
@@ -235,8 +238,13 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(12_000),
   });
-  if (!res.ok) throw new Error(`openai-tts ${res.status}: ${(await res.text()).slice(0, 180)}`);
+  if (!res.ok) {
+    const body = (await res.text()).slice(0, 400);
+    if (res.status === 429 && /insufficient_quota|billing_hard_limit/.test(body)) alertProviderCredit('openai', 'insufficient_quota', 'tts');
+    throw new Error(`openai-tts ${res.status}: ${body.slice(0, 180)}`);
+  }
   const audio = Buffer.from(await res.arrayBuffer());
   if (audio.length === 0) throw new Error('openai-tts: empty audio');
   const isOpus = opts.format === 'opus';
@@ -279,7 +287,9 @@ export async function generateSpeech(
   };
   // An explicit 'edge' override is a spend cap — never fall back to paid.
   // Otherwise a valid per-user Edge voice flips the order to edge-first.
-  const chain = opts.provider === 'edge'
+  const chain = opts.preservePersona
+    ? [makers.openai]
+    : opts.provider === 'edge'
     ? [makers.edge]
     : ttsProviderOrder(provider, resolved.edgeVoice).map((name) => makers[name]);
 

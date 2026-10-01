@@ -280,11 +280,16 @@ final class CompanionStore: ObservableObject {
         static let owner = "companion.ownerUserId"
         static let syncedCompanion = "companion.syncedCompanionId"
         static let unequipped = "companion.unequippedItems.v1"
+        static let selected = "companion.selected.v2"
     }
 
     @Published var companionId: String? {
-        didSet { defaults.set(companionId, forKey: Key.companion) }
+        didSet {
+            defaults.set(companionId, forKey: Key.companion)
+            defaults.set(companionId, forKey: selectedKey)
+        }
     }
+    private var selectedKey: String { Key.selected + "." + (ownerUserId ?? "local") }
     @Published private(set) var disciplineXP: Int {
         didSet { defaults.set(disciplineXP, forKey: Key.xp) }
     }
@@ -343,7 +348,8 @@ final class CompanionStore: ObservableObject {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
-        companionId = defaults.string(forKey: Key.companion)
+        companionId = defaults.string(forKey: Key.selected + "." + (defaults.string(forKey: Key.owner) ?? "local"))
+            ?? defaults.string(forKey: Key.companion)
         disciplineXP = defaults.integer(forKey: Key.xp)
         disciplineStreak = defaults.integer(forKey: Key.streak)
         ownerUserId = defaults.string(forKey: Key.owner)
@@ -386,6 +392,10 @@ final class CompanionStore: ObservableObject {
     /// the counters are cleared and the server fills them on the next sync.
     func bind(to userId: String) {
         if ownerUserId == userId { return }
+        defaults.set(companionId, forKey: selectedKey)
+        pendingEvolution = nil
+        pendingToolUnlocks = []
+        defaults.removeObject(forKey: Key.syncedCompanion)
         let previous = ownerUserId
         syncedAt = nil
         if previous == nil {
@@ -396,6 +406,7 @@ final class CompanionStore: ObservableObject {
             let saved = defaults.data(forKey: Key.pending + "." + userId)
                 .flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
             ownerUserId = userId
+            if let savedCompanion = defaults.string(forKey: selectedKey) { companionId = savedCompanion }
             unequippedItemIDs = defaults.stringArray(forKey: equipmentKey).map { Set($0) } ?? localOutfit
             defaults.removeObject(forKey: Key.unequipped + ".local")
             pendingAwards = saved + local.filter { award in !saved.contains { $0.id == award.id } }
@@ -403,6 +414,8 @@ final class CompanionStore: ObservableObject {
             return
         }
         ownerUserId = userId
+        companionId = defaults.string(forKey: selectedKey)
+            ?? defaults.string(forKey: Key.selected + ".local") ?? "orb"
         unequippedItemIDs = Set(defaults.stringArray(forKey: equipmentKey) ?? [])
         pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
@@ -412,7 +425,12 @@ final class CompanionStore: ObservableObject {
     /// Signing out keeps the device usable but detaches the counters from the account.
     func unbind() {
         guard ownerUserId != nil else { return }
+        defaults.set(companionId, forKey: selectedKey)
         ownerUserId = nil
+        companionId = defaults.string(forKey: selectedKey) ?? "orb"
+        pendingEvolution = nil
+        pendingToolUnlocks = []
+        defaults.removeObject(forKey: Key.syncedCompanion)
         unequippedItemIDs = Set(defaults.stringArray(forKey: equipmentKey) ?? [])
         pendingAwards = defaults.data(forKey: pendingKey).flatMap { try? JSONDecoder().decode([PendingAward].self, from: $0) } ?? []
         disciplineXP = 0; disciplineStreak = 0; aura = 0; routeIndex = 0; syncedAt = nil
@@ -423,6 +441,7 @@ final class CompanionStore: ObservableObject {
         if ownerUserId == userId { unbind() }
         defaults.removeObject(forKey: Key.pending + "." + userId)
         defaults.removeObject(forKey: Key.unequipped + "." + userId)
+        defaults.removeObject(forKey: Key.selected + "." + userId)
     }
 
     var companion: Companion? { bobbyCompanions.first { $0.id == companionId } }

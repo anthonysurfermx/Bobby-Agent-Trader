@@ -75,6 +75,8 @@ export function verifyAppleJws(jws: string): Record<string, unknown> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'Authorization, x-bobby-device, x-bobby-platform');
   if (!await enforcePublicRateLimit(req, res, 'bobby-access', 60, 60)) return;
 
   if (req.method === 'GET') {
@@ -94,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: true, revenuecat: revenueCatReady() },
+      payments: { stripe: stripeReady(), apple: revenueCatReady(), revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -149,6 +151,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (action === 'apple') {
+      // Retired: the iPhone app confirms purchases through RevenueCat (action 'revenuecat-sync'), which checks the
+      // receipt with Apple server-side. This raw-JWS path lacks Apple's receipt OIDs, environment and
+      // appAccountToken checks, so it stays off unless explicitly re-enabled after those checks exist.
+      if (process.env.BOBBY_APPLE_JWS_SYNC !== 'on') return res.status(410).json({ error: 'Use the in-app restore.', code: 'apple_sync_retired' });
       if (typeof signedTransaction !== 'string' || signedTransaction.length > 20000) return res.status(400).json({ error: 'signedTransaction required' });
       let tx: Record<string, unknown>;
       try { tx = verifyAppleJws(signedTransaction); }

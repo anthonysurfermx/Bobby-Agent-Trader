@@ -195,8 +195,24 @@ final class ProgressSync: ObservableObject {
     /// instead of being dropped (its bind and restore would otherwise wait for a later trigger).
     private var rerun: (store: CompanionStore, profile: AgentProfile, platform: String)?
     private let account: AccountSession
+    private var snapshotGeneration: UUID
+    private var accountObservation: AnyCancellable?
 
-    init(account: AccountSession? = nil) { self.account = account ?? .shared }
+    init(account: AccountSession? = nil) {
+        let account = account ?? .shared
+        self.account = account
+        snapshotGeneration = account.generation
+        accountObservation = account.$session.sink { [weak self] _ in self?.accountChanged() }
+    }
+
+    /// Outcomes and UI status belong to one session, even when the next session uses the same user ID.
+    private func accountChanged() {
+        guard snapshotGeneration != account.generation else { return }
+        snapshotGeneration = account.generation
+        outcomes = [:]
+        acknowledgedRounds = 0
+        status = .idle
+    }
 
     /// One round trip: POST when awards are pending (or never synced), GET otherwise.
     func sync(store: CompanionStore, profile: AgentProfile, platform: String = "ios") async {
@@ -212,9 +228,15 @@ final class ProgressSync: ObservableObject {
     }
 
     private func drain(store: CompanionStore, profile: AgentProfile, platform: String) async {
+        accountChanged()
         status = .syncing
         let generation = account.generation
-        guard await account.accessToken() != nil else {
+        let token = await account.accessToken()
+        guard account.generation == generation else {
+            if !account.isSignedIn { status = .unauthenticated }
+            return
+        }
+        guard token != nil else {
             status = account.isSignedIn ? .error : .unauthenticated
             return
         }
@@ -238,11 +260,13 @@ final class ProgressSync: ObservableObject {
     /// A sync already in flight carries it in its next round. nil = no answer
     /// (offline, signed out, server error): the award stays queued for later.
     func outcome(for eventID: String, store: CompanionStore, profile: AgentProfile, timeout: TimeInterval = 45) async -> AwardOutcome? {
+        let generation = account.generation
         await sync(store: store, profile: profile)
         let deadline = Date().addingTimeInterval(timeout)
-        while outcomes[eventID] == nil, inflight, Date() < deadline {
+        while account.generation == generation, outcomes[eventID] == nil, inflight, Date() < deadline {
             try? await Task.sleep(for: .milliseconds(250))
         }
+        guard account.generation == generation else { return nil }
         return outcomes[eventID]
     }
 
@@ -291,6 +315,7 @@ final class ProgressSync: ObservableObject {
             if !acked.isEmpty { acknowledgedRounds += 1 }
             return true
         } catch {
+            guard account.generation == generation, account.session?.userId == uid, store.ownerUserId == uid else { return false }
             status = .error
             return false
         }

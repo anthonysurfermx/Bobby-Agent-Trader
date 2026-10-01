@@ -124,18 +124,85 @@ struct LandWorldFixture: Codable {
 }
 private struct SavedWorld: Codable { let placements: [LandPlacement]; let focusLevel: Int }
 
-enum RuntimeBundle {
-    static let manifest: LandManifest = decode(path: "gate-A/asset-manifest.json")
-    static let fixture: LandWorldFixture = decode(path: "world-snapshot-v01.json")
-    static let items: [String: LandItem] = Dictionary(uniqueKeysWithValues: manifest.items.map { ($0.id, $0) })
+struct LandRuntimeResources {
+    let manifest: LandManifest
+    let fixture: LandWorldFixture
+    let items: [String: LandItem]
+}
 
-    private static func decode<T: Decodable>(path: String) -> T {
-        guard let url = Bundle.main.resourceURL?.appendingPathComponent(path),
-              let data = try? Data(contentsOf: url),
-              let value = try? JSONDecoder().decode(T.self, from: data) else {
-            fatalError("Trader Land runtime resource missing or invalid: \(path)")
+enum LandRuntimeResourceError: Error, Equatable {
+    case unavailable(String)
+    case invalid(String)
+}
+
+enum RuntimeBundle {
+    static let manifestPath = "gate-A/asset-manifest.json"
+    static let fixturePath = "world-snapshot-v01.json"
+    /// The screen opens only after both bundled contracts have been checked. A failed load
+    /// must not create an empty practice world or start account synchronization.
+    static let resources = load { path in
+        guard let root = Bundle.main.resourceURL else { throw LandRuntimeResourceError.unavailable(path) }
+        return try Data(contentsOf: root.appendingPathComponent(path))
+    }
+    static var fixture: LandWorldFixture? { try? resources.get().fixture }
+    static var items: [String: LandItem] { (try? resources.get().items) ?? [:] }
+
+    /// Injectable reads let tests cover broken/missing resources without modifying the app bundle.
+    static func load(read: (String) throws -> Data) -> Result<LandRuntimeResources, LandRuntimeResourceError> {
+        func decode<T: Decodable>(_ type: T.Type, path: String) throws -> T {
+            let data: Data
+            do { data = try read(path) } catch { throw LandRuntimeResourceError.unavailable(path) }
+            do { return try JSONDecoder().decode(type, from: data) }
+            catch { throw LandRuntimeResourceError.invalid(path) }
         }
-        return value
+        do {
+            let manifest = try decode(LandManifest.self, path: manifestPath)
+            var items: [String: LandItem] = [:]
+            guard !manifest.items.isEmpty else { throw LandRuntimeResourceError.invalid(manifestPath) }
+            for item in manifest.items {
+                guard !item.id.isEmpty, items[item.id] == nil,
+                      (1...8).contains(item.footprint.cols), (1...8).contains(item.footprint.rows),
+                      !item.orientations.isEmpty else { throw LandRuntimeResourceError.invalid(manifestPath) }
+                for orientation in item.orientations.values {
+                    guard !orientation.states.isEmpty else { throw LandRuntimeResourceError.invalid(manifestPath) }
+                    for state in orientation.states.values {
+                        guard state.anchor.count == 2, state.contentBounds.count == 4,
+                              state.anchor.allSatisfy({ $0.isFinite }), state.contentBounds.allSatisfy({ $0.isFinite }),
+                              !state.variants.isEmpty,
+                              state.variants.values.allSatisfy({ !$0.url.isEmpty && $0.w > 0 && $0.h > 0 }) else {
+                            throw LandRuntimeResourceError.invalid(manifestPath)
+                        }
+                    }
+                }
+                items[item.id] = item
+            }
+            let fixture = try decode(LandWorldFixture.self, path: fixturePath)
+            guard fixture.version == 1, fixture.gridSize == 8, (1...2).contains(fixture.focusLevel),
+                  let core = items[fixture.core.itemId], core.kind == "core",
+                  core.footprint.cols == 2, core.footprint.rows == 2,
+                  (0...6).contains(fixture.core.col), (0...6).contains(fixture.core.row) else {
+                throw LandRuntimeResourceError.invalid(fixturePath)
+            }
+            var ids = Set<String>()
+            var occupied = Set((0..<2).flatMap { x in (0..<2).map { y in "\(fixture.core.col + x):\(fixture.core.row + y)" } })
+            for placement in fixture.placements {
+                guard !placement.uid.isEmpty, ids.insert(placement.uid).inserted,
+                      let item = items[placement.itemId], item.kind != "core",
+                      (0..<8).contains(placement.col), (0..<8).contains(placement.row) else {
+                    throw LandRuntimeResourceError.invalid(fixturePath)
+                }
+                let footprint = landFootprint(item, placement.orientation)
+                let cells = landCells(item, placement)
+                guard placement.col + footprint.cols <= 8, placement.row + footprint.rows <= 8,
+                      occupied.isDisjoint(with: cells) else { throw LandRuntimeResourceError.invalid(fixturePath) }
+                occupied.formUnion(cells)
+            }
+            return .success(LandRuntimeResources(manifest: manifest, fixture: fixture, items: items))
+        } catch let error as LandRuntimeResourceError {
+            return .failure(error)
+        } catch {
+            return .failure(.invalid(manifestPath))
+        }
     }
 
     static func bundlePath(_ manifestURL: String) -> String {
@@ -439,6 +506,43 @@ private struct LandGestureSurface: UIViewRepresentable {
 }
 
 struct TraderLandGateHarnessView: View {
+    var focus: TraderLandFocus? = nil
+
+    static func growthHelp(accountIsland: Bool) -> String {
+        TraderLandLoadedView.growthHelp(accountIsland: accountIsland)
+    }
+
+    var body: some View {
+        switch RuntimeBundle.resources {
+        case let .success(resources): TraderLandLoadedView(focus: focus, resources: resources)
+        case .failure: TraderLandUnavailableView()
+        }
+    }
+}
+
+private struct TraderLandUnavailableView: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Image(systemName: "shippingbox").font(.system(size: 38, weight: .light)).foregroundStyle(Theme.orbViolet)
+            Text(L.t("Trader Land is unavailable", "Trader Land no está disponible"))
+                .font(.title2.weight(.medium)).foregroundStyle(Theme.cream)
+            Text(L.t("The island resources could not be loaded. Close this screen and contact support if it happens again.",
+                     "No se pudieron cargar los recursos de la isla. Cierra esta pantalla y contacta a soporte si vuelve a ocurrir."))
+                .font(.body).foregroundStyle(Theme.warmMuted).multilineTextAlignment(.center)
+            Button(L.t("Close", "Cerrar")) { dismiss() }
+                .buttonStyle(.borderedProminent).tint(Theme.orbBlue).accessibilityIdentifier("land-unavailable-close")
+            Link(L.t("Contact support", "Contactar a soporte"), destination: URL(string: "https://bobbyprotocol.xyz/support")!)
+                .foregroundStyle(Theme.orbCyan).accessibilityIdentifier("land-unavailable-support")
+        }
+        .padding(28).frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.nucleoSurface.ignoresSafeArea())
+        .accessibilityIdentifier("land-resource-unavailable")
+    }
+}
+
+private struct TraderLandLoadedView: View {
     private static let storageKey = "bobby.trader-land.runtime-v03"
     /// Below this zoom the map is the archipelago, not your island.
     private static let archipelagoZoom: CGFloat = 0.6
@@ -446,12 +550,11 @@ struct TraderLandGateHarnessView: View {
     private static let seaZoom: CGFloat = 0.75
     private static let visitZoom: CGFloat = 0.9
     private static let minZoom: CGFloat = 0.22
-    /// The practice island's core, from the bundled snapshot (3,3, awake).
-    private static let practiceCore = LandCore(col: RuntimeBundle.fixture.core.col, row: RuntimeBundle.fixture.core.row, stage: 1)
     /// Archipelago framing centres islands in the space above the bottom card.
     private static let archipelagoLift: CGFloat = 115
-    private let manifest = RuntimeBundle.manifest
-    private let fixture = RuntimeBundle.fixture
+    private let resources: LandRuntimeResources
+    private var manifest: LandManifest { resources.manifest }
+    private var fixture: LandWorldFixture { resources.fixture }
     private let districts = TraderLandCatalog.districts
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -578,10 +681,11 @@ struct TraderLandGateHarnessView: View {
     /// Where the desk asked the island to open (a piece to build, or the reviews).
     private let focus: TraderLandFocus?
 
-    init(focus: TraderLandFocus? = nil) {
+    init(focus: TraderLandFocus?, resources: LandRuntimeResources) {
         self.focus = focus
-        let fixture = RuntimeBundle.fixture
-        let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
+        self.resources = resources
+        let fixture = resources.fixture
+        let saved = Self.load(resources: resources) ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
         var signedIn = AccountSession.shared.isSignedIn
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") { signedIn = TraderLandAccountFixture.enabled }
@@ -591,7 +695,7 @@ struct TraderLandGateHarnessView: View {
         _core = State(initialValue: LandCore.standing(accountIsland: signedIn, world: nil))
     }
 
-    private var items: [String: LandItem] { RuntimeBundle.items }
+    private var items: [String: LandItem] { resources.items }
     private var selectedItem: LandItem? { selectedItemId.flatMap { items[$0] } }
     /// The core's standing placement: a 2×2 that moves like a piece but is never stored or rotated.
     private var corePlacement: LandPlacement? {
@@ -648,7 +752,7 @@ struct TraderLandGateHarnessView: View {
 #endif
                     await sync.load()
                 } else {
-                    let saved = Self.load() ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
+                    let saved = Self.load(resources: resources) ?? SavedWorld(placements: fixture.placements, focusLevel: fixture.focusLevel)
                     placements = saved.placements; focusLevel = saved.focusLevel
                 }
             }
@@ -1781,10 +1885,11 @@ struct TraderLandGateHarnessView: View {
     private func restore() { guard !accountIsland else { return }; checkpoint(); placements = fixture.placements; focusLevel = fixture.focusLevel; draft = nil; selectedPlacementId = nil; selectedItemId = nil; save(); notice = L.t("Trader Land restored.", "Trader Land restaurado."); help = false }
     private func reveal() { guard !accountIsland, focusLevel < 2 else { return }; checkpoint(); focusLevel = 2; save(); sound.play("fog_reveal"); notice = L.t("Full island revealed.", "Isla completa revelada."); help = false }
         private func save() { guard !accountIsland else { return }; if let data = try? JSONEncoder().encode(SavedWorld(placements: placements, focusLevel: focusLevel)) { UserDefaults.standard.set(data, forKey: Self.storageKey) } }
-    private static func load() -> SavedWorld? {
+    private static func load(resources: LandRuntimeResources) -> SavedWorld? {
         guard let data = UserDefaults.standard.data(forKey: storageKey),
               let saved = try? JSONDecoder().decode(SavedWorld.self, from: data) else { return nil }
-        let items = Dictionary(uniqueKeysWithValues: RuntimeBundle.manifest.items.map { ($0.id, $0) })
+        let items = resources.items
+        let practiceCore = LandCore(col: resources.fixture.core.col, row: resources.fixture.core.row, stage: 1)
         var occupied = practiceCore.cells
         var ids = Set<String>()
         let clean = saved.placements.filter { placement in
