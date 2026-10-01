@@ -12,6 +12,33 @@
 <meta name="theme-color" content="#0B0A09">
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
+<script>
+/* First-party funnel events for the owner dashboard (api/track.ts): the same install id the app uses (bobby:device:v1), no cookies. */
+(function () {
+  function dev() {
+    try {
+      var k = 'bobby:device:v1', v = localStorage.getItem(k);
+      if (v && /^[A-Za-z0-9-]{16,64}$/.test(v)) return v;
+      v = window.crypto && crypto.randomUUID ? crypto.randomUUID() : null;
+      if (v) localStorage.setItem(k, v);
+      return v;
+    } catch (e) { return null; }
+  }
+  function send(event) {
+    try {
+      if (/^(localhost|127\.)/.test(location.hostname)) return;
+      var p = new URLSearchParams(location.search);
+      var b = JSON.stringify({ event: event, surface: 'home', device: dev() || undefined, platform: 'web', referrer: document.referrer || undefined, utm: p.get('utm_source') || undefined });
+      if (!(navigator.sendBeacon && navigator.sendBeacon('/api/track', b))) fetch('/api/track', { method: 'POST', body: b, keepalive: true });
+    } catch (e) { /* analytics never breaks the page */ }
+  }
+  send('visit');
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest && e.target.closest('a[href*="apps.apple.com"]');
+    if (a) send('appstore_click');
+  }, true);
+})();
+</script>
 <link rel="icon" href="/favicon-bobby-orb-2026-09-30.png" type="image/png" sizes="512x512">
 <link rel="apple-touch-icon" href="/apple-touch-icon-bobby-orb-2026-09-30.png" sizes="180x180">
 <meta property="og:type" content="website">
