@@ -16,7 +16,7 @@ import { LEVEL_LIMITS, type PremiumLevel } from './desk-levels.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
-export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | null; readId: number | null; access: Access; identity: Identity | null }
+export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | 'access_unavailable' | null; readId: number | null; access: Access; identity: Identity | null }
 
 export const paywallOn = () => process.env.BOBBY_PAYWALL === 'on';
 
@@ -69,26 +69,34 @@ async function who(req: VercelRequest): Promise<Identity | null> {
 }
 
 /** Check and record one read. */
-export async function consumeRead(req: VercelRequest, symbol: string): Promise<ReadGate> {
-  const identity = await who(req);
+export async function consumeRead(req: VercelRequest, symbol: string, options: { strict?: boolean; identity?: Identity | null } = {}): Promise<ReadGate> {
+  const identity = options.identity === undefined ? await who(req) : options.identity;
   const device = identity ? null : deviceHash(req);
+  if (options.strict && !identity && !device) {
+    return { allowed: false, code: 'signin_required', readId: null, access: OPEN, identity };
+  }
   let network: string | null = null;
   try { network = device ? getClientQuotaKeys(req)?.network ?? null : null; } catch { network = null; }
   const row = await rpc('bobby_consume_read', {
     p_identity: identity?.id ?? null, p_device: device, p_network: network,
     p_platform: clientPlatform(req), p_symbol: symbol.slice(0, 24) || null, p_paywall: paywallOn(),
   });
-  if (!row) return { allowed: true, code: null, readId: null, access: OPEN, identity };
+  if (!row) return { allowed: !options.strict, code: options.strict ? 'access_unavailable' : null, readId: null, access: OPEN, identity };
   const code = row.code === 'signin_required' || row.code === 'subscription_required' ? row.code : null;
   return { allowed: row.allowed !== false, code, readId: typeof row.readId === 'number' ? row.readId : null, access: shape(row), identity };
 }
 
 /** Give a read back when the analysis itself failed (the user got nothing). */
-export async function refundRead(readId: number | null): Promise<void> {
-  if (!readId) return;
-  try {
-    await fetch(bobbyRest(`bobby_reads?id=eq.${readId}`), { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
-  } catch { /* best effort */ }
+export async function refundRead(readId: number | null): Promise<boolean> {
+  if (!readId) return true;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(bobbyRest(`bobby_reads?id=eq.${readId}`), { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
+      if (response.ok) return true;
+    } catch { /* Retry the idempotent delete once. */ }
+  }
+  console.error('[access] read refund unavailable');
+  return false;
 }
 
 /** The access state without consuming a read. */
@@ -151,11 +159,16 @@ export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symb
 }
 
 /** Give a premium read back when the analysis itself failed. */
-export async function refundLevel(useId: number | null): Promise<void> {
-  if (!useId) return;
-  try {
-    await fetch(bobbyRest(`bobby_level_uses?id=eq.${useId}`), { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
-  } catch { /* best effort */ }
+export async function refundLevel(useId: number | null): Promise<boolean> {
+  if (!useId) return true;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const response = await fetch(bobbyRest(`bobby_level_uses?id=eq.${useId}`), { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000) });
+      if (response.ok) return true;
+    } catch { /* Retry the idempotent delete once. */ }
+  }
+  console.error('[access] level refund unavailable');
+  return false;
 }
 
 /** The premium meters without consuming anything. */

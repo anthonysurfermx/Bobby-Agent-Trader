@@ -5,6 +5,7 @@
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { waitUntil } from '@vercel/functions';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
@@ -58,6 +59,7 @@ async function sendEmailNotification(feedback: Record<string, unknown>): Promise
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (!SB_KEY) return res.status(503).json({ error: 'Service-role key not configured (BOBBY_SUPABASE_SERVICE_ROLE_KEY)' });
   if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'POST') {
@@ -74,10 +76,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const feedback = {
     type: ['bug', 'feature', 'general'].includes(type) ? type : 'general',
     message: message.trim().slice(0, 2000),
-    page: page?.slice(0, 100) || null,
+    page: typeof page === 'string' ? page.slice(0, 100) : null,
     context: context ? JSON.stringify(context).slice(0, 5000) : null,
-    user_email: user_email?.slice(0, 200) || null,
-    wallet_address: wallet_address?.slice(0, 100) || null,
+    user_email: typeof user_email === 'string' ? user_email.slice(0, 200) : null,
+    wallet_address: typeof wallet_address === 'string' ? wallet_address.slice(0, 100) : null,
     status: 'new',
   };
 
@@ -102,8 +104,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     console.error('[Feedback] Supabase error:', e);
   }
 
-  // Send email notification (fire and forget)
-  sendEmailNotification(feedback);
-
-  return res.status(200).json({ ok: true, saved, message: 'Thanks for your feedback!' });
+  if (!saved) return res.status(503).json({ ok: false, saved: false, error: 'Your request could not be saved. Please retry.' });
+  // Only saved requests are acknowledged; keep the existing notification alive after response.
+  waitUntil(sendEmailNotification(feedback));
+  return res.status(200).json({ ok: true, saved: true, message: 'Thanks for your feedback!' });
 }

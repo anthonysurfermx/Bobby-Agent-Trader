@@ -57,3 +57,16 @@ export function levelPlan(level: DeskLevel): LevelPlan {
 
 /** Does this level need the Anthropic key? */
 export const needsAnthropic = (level: DeskLevel) => level !== 'rapido';
+
+/** Equivalent role on the other provider; the evidence, schemas and safety gates stay unchanged. */
+export function alternateProvider(spec: ModelSpec, level: DeskLevel): ModelSpec | null {
+  if (spec.provider === 'openai') {
+    if (!process.env.ANTHROPIC_API_KEY) return null;
+    return { ...sonnet(level === 'maximo' ? 'high' : 'medium'),
+      timeoutMs: level === 'rapido' ? 25_000 : spec.timeoutMs,
+      maxTokens: spec.maxTokens };
+  }
+  if (!process.env.OPENAI_API_KEY) return null;
+  return { provider: 'openai', model: level === 'maximo' ? 'gpt-6-sol' : luna().model,
+    effort: level === 'maximo' ? 'high' : undefined, maxTokens: spec.maxTokens, timeoutMs: spec.timeoutMs };
+}

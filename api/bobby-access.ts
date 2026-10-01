@@ -75,6 +75,8 @@ export function verifyAppleJws(jws: string): Record<string, unknown> {
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'private, no-store');
+  res.setHeader('Vary', 'Authorization, x-bobby-device, x-bobby-platform');
   if (!await enforcePublicRateLimit(req, res, 'bobby-access', 60, 60)) return;
 
   if (req.method === 'GET') {

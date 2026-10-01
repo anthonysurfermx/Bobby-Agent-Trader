@@ -5,10 +5,10 @@ import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
-import { levelPlan, needsAnthropic } from './_lib/desk-levels.js';
-import { clientPlatform, consumeLevel, refundLevel } from './_lib/access.js';
+import { levelPlan } from './_lib/desk-levels.js';
+import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, type Access } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
-import type { LlmUsage } from './_lib/llm.js';
+import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { MEMORY_PLATFORMS, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
@@ -98,18 +98,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.on?.('close', () => { if (!res.writableFinished) left.abort(); });
   const usage: LlmUsage[] = [];
   let useId: number | null = null;
+  let readId: number | null = null;
+  let access: Access | null = null;
+  const refund = async () => {
+    const results = await Promise.all([refundRead(readId), refundLevel(useId)]);
+    return results.every(Boolean);
+  };
   // undefined: not resolved yet; the premium meter resolves the caller and hands it over.
   let knownIdentity: Identity | null | undefined;
   let streaming = false;
   try {
-    if (!process.env.OPENAI_API_KEY || (needsAnthropic(level) && !process.env.ANTHROPIC_API_KEY)) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();
     if (budget.allPaused || (level !== 'rapido' && budget.premiumPaused)) {
       return refuse(res, 503, 'budget_paused', level === 'rapido' || budget.allPaused
         ? copy(language, 'The desk is paused for now. Try again later.', 'El desk está en pausa por ahora. Inténtalo más tarde.')
-        : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level });
+        : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
     }
     // Atomic, cross-instance, fail-closed limits. No model calls if storage fails.
     // Caller (IPv4 address / IPv6 /64) and network (/24 / /48) budgets keep a
@@ -139,6 +145,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       useId = gate.useId;
       knownIdentity = gate.identity;
     }
+    // One meter owner for all clients: a denied premium request never spends a general read.
+    // Missing device identity or unavailable storage cannot bypass the anonymous cap.
+    const read = await consumeRead(req, symbol, { strict: true, identity: knownIdentity });
+    if (!read.allowed) {
+      await refund();
+      if (read.code === 'access_unavailable') return refuse(res, 503, 'desk_unavailable', unavailable);
+      return refuse(res, read.code === 'signin_required' ? 401 : 402, read.code ?? 'subscription_required',
+        read.code === 'signin_required'
+          ? copy(language, 'Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.')
+          : copy(language, 'Your general read allowance is used for now.', 'Tu cupo de lecturas generales se agotó por ahora.'), { access: read.access });
+    }
+    readId = read.readId;
+    access = read.access;
+    knownIdentity = read.identity;
     const send = (line: Record<string, unknown>) => { if (!res.writableEnded) res.write(`${JSON.stringify(line)}\n`); };
     if (live) {
       streaming = true;
@@ -146,7 +166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders?.();
-      send({ type: 'accepted', level });
+      send({ type: 'accepted', level, access });
     }
     // Memory runs beside the evidence and never delays the answer by more than its timeout: a slow or failed
     // lookup is simply no memory. No call at all without an Apple/Google session, nor from a platform whose app
@@ -160,8 +180,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
-    if (left.signal.aborted) { const refund = refundLevel(useId); waitUntil(refund); await refund; return; }
-    const body = reader ? { ...result, personalized: true } : result;
+    if (left.signal.aborted) { const pendingRefund = refund(); waitUntil(pendingRefund); await pendingRefund; return; }
+    const body = { ...result, access, ...(reader ? { personalized: true } : {}) };
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
     const remember = () => {
@@ -174,14 +194,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     remember();
     return;
   } catch (error) {
-    await refundLevel(useId);
+    const refunded = await refund();
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
+    const providerUnavailable = error instanceof LlmHttpError && (error.status === 429 || error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
+    const quotaUnavailable = providerUnavailable && (error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
+    const failureMessage = providerUnavailable
+      ? quotaUnavailable
+        ? copy(language, 'Analysis is temporarily unavailable. The service provider quota needs attention.', 'El análisis no está disponible por ahora. Debemos restablecer la cuota del proveedor.')
+        : copy(language, 'The analysis provider is temporarily limiting requests. Please try again later.', 'El proveedor de análisis está limitando las solicitudes. Inténtalo más tarde.')
+      : failed;
+    // Safe diagnostics only: no question, bearer, account, raw provider error or generated text.
+    console.error(JSON.stringify({ route: 'desk-debate', event: 'analysis_failed',
+      providerStatus: error instanceof LlmHttpError ? error.status : null,
+      providerCode: error instanceof LlmHttpError ? error.providerCode : null,
+      failureKind: error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error',
+      role: usage.at(-1)?.role ?? null, level, refunded }));
     if (streaming) {
-      if (!res.writableEnded) { res.write(`${JSON.stringify({ type: 'error', code: 'analysis_failed', error: failed, refunded: useId !== null })}\n`); res.end(); }
+      if (!res.writableEnded) { res.write(`${JSON.stringify({ type: 'error', code: 'analysis_failed', error: failureMessage, refunded: (useId !== null || readId !== null) && refunded })}\n`); res.end(); }
       return;
     }
-    return refuse(res, 503, 'analysis_failed', failed);
+    return refuse(res, 503, 'analysis_failed', failureMessage);
   } finally {
     // The response is already sent here and Vercel freezes the function once it has ended: the ledger
     // write must be registered with waitUntil, or it only lands when the instance wakes for another request
