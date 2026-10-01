@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Gift, Search, Trash2 } from 'lucide-react';
 import { adminAction, fetchAdminUsers, type AdminMe, type AdminUser } from '@/lib/admin-client';
-import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Note, Switch, TableScroll, TextInput, td, tdWrap, th, tr } from './ui';
+import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, StaleBanner, Switch, TableScroll, TextInput, td, tdWrap, th, tr } from './ui';
 import { GiftCell, Identity, Lifecycle, PlanCell, ProviderCell } from './cells';
 import { fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtRelative, lastActivity } from './format';
 import { toAdminError, useLoad } from './useLoad';
@@ -70,7 +70,7 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
         <Loading label="Cargando cuentas" />
       ) : (
         <>
-          {error && <div className="mb-3"><Note tone="red">{error.message}</Note></div>}
+          {error && <div className="mb-3"><StaleBanner error={error} onRetry={() => void reload()} /></div>}
           {data.users.length === 0 ? (
             <Empty>{q ? `Nada coincide con “${q}”` : 'Todavía no hay cuentas'}</Empty>
           ) : (

@@ -75,7 +75,7 @@ export function KpiStrip({ items }: { items: KpiItem[] }) {
           {k.delta !== undefined || k.caption ? (
             <div className="flex min-w-0 flex-col gap-1">
               {k.delta !== undefined && <DeltaLine d={k.delta} invert={k.invert} fallback={!k.caption ? 'sin comparación' : undefined} />}
-              {k.caption && <div className="truncate font-mono text-[12px] text-[#8B8B8B]">{k.caption}</div>}
+              {k.caption && <div className="font-mono text-[12px] leading-snug text-[#8B8B8B]">{k.caption}</div>}
             </div>
           ) : null}
         </div>
@@ -255,7 +255,7 @@ export function CopyButton({ text, label = 'Copiar', size = 'sm', variant = 'gho
 /** Horizontal scroll for wide tables, contained in the card (bleeds to the card edge). */
 export function TableScroll({ children, minWidth = 720 }: { children: ReactNode; minWidth?: number }) {
   return (
-    <div className="-mx-5 overflow-x-auto overscroll-x-contain px-5">
+    <div className="relative -mx-5 overflow-x-auto overscroll-x-contain px-5">
       <table className="w-full border-collapse text-left text-[13px]" style={{ minWidth }}>{children}</table>
     </div>
   );
@@ -300,6 +300,30 @@ export function ErrorState({ message, onRetry }: { message: string; onRetry?: ()
       {onRetry && <Btn size="sm" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Reintentar</Btn>}
     </div>
   );
+}
+
+/** A refresh failed but older data is still on screen: say so, above that data, with a retry. */
+export function StaleBanner({ error, onRetry }: { error: { message: string } | null | undefined; onRetry: () => void }) {
+  if (!error) return null;
+  return (
+    <div role="alert" className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl border border-[#F06A6A]/30 bg-[#F06A6A]/[0.06] px-4 py-2.5 text-[13px] text-[#F3B0B0]">
+      <Tag tone="red">No actualizado</Tag>
+      <span className="min-w-0 flex-1">{error.message} Lo que ves abajo son los datos anteriores.</span>
+      <Btn size="sm" onClick={onRetry}><RefreshCw className="h-3.5 w-3.5" aria-hidden />Reintentar</Btn>
+    </div>
+  );
+}
+
+const SECTION_ES: Record<string, string> = {
+  overview: 'resumen', days: 'días', accounts: 'cuentas', activity: 'lecturas', funnel: 'funnel web', subscriptions: 'membresías',
+  revenue: 'ingresos', llm: 'gasto IA', coupons: 'cupones', coverage: 'cobertura de datos', integrations: 'integraciones',
+  lifecycle: 'embudo', economics: 'economía unitaria',
+};
+/** "Dato no disponible: ingresos, membresías" for the sections (top-level keys) the server did not send. */
+export function MissingNote({ missing, sections }: { missing: readonly string[]; sections?: string[] }) {
+  const tops = [...new Set(missing.map((m) => m.split('.')[0]))].filter((t) => !sections || sections.includes(t));
+  if (!tops.length) return null;
+  return <Note tag="Incompleto">Dato no disponible: {tops.map((t) => SECTION_ES[t] ?? t).join(', ')}. Se muestra «—» donde falta.</Note>;
 }
 
 export function Modal({ open, onOpenChange, title, description, children, footer, tone }: {

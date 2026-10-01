@@ -5,7 +5,8 @@ import { Menu as MenuIcon, RefreshCw } from 'lucide-react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { rememberReturn } from '@/lib/access-client';
 import { adminMockMode, fetchAdminMe, fetchAdminOverview, type AdminMe, type AdminPeriod, type OverviewResponse } from '@/lib/admin-client';
-import { ErrorState, IconBtn, Loading, Segmented } from '@/components/admin/bobby/ui';
+import { ErrorState, IconBtn, Loading, Segmented, StaleBanner } from '@/components/admin/bobby/ui';
+import { integrationProblems } from '@/components/admin/bobby/health';
 import { fmtInt, fmtUsd } from '@/components/admin/bobby/format';
 import { compareSeries } from '@/components/admin/bobby/deltas';
 import { TABS, type TabId } from '@/components/admin/bobby/nav';
@@ -122,7 +123,7 @@ function headerCount(tab: TabId, d: OverviewResponse | null): string | null {
     case 'membresias': return `${fmtInt(o.subscriptions.active)} activas`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
     case 'ia': return `${fmtUsd(o.llm.providers.anthropic.month + o.llm.providers.openai.month)} 30d`;
-    case 'integraciones': return d.integrations.missing.length ? `${d.integrations.missing.length} pendientes` : 'todo conectado';
+    case 'integraciones': { const n = integrationProblems(d.integrations).length; return n ? `${n} pendientes` : 'todo conectado'; }
   }
 }
 
@@ -183,8 +184,10 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const doSignOut = useCallback(async () => { await signOut(); onSignedOut(); }, [onSignedOut]);
 
   const needsOverview = tab !== 'usuarios' && tab !== 'cupones';
-  const o = overview.data;
-  const cmp = compare.data ? compareSeries(compare.data.overview) : null;
+  const o = overview.data && overview.dataKey?.split('|')[0] === String(period) ? overview.data : null;
+  // Never mix ranges: the comparison is used only when it was loaded for this exact period and refresh, and
+  // the overview only while its data belongs to the selected period (a refresh may keep showing it).
+  const cmp = compare.data && !compare.stale && !compare.error ? compareSeries(compare.data.overview) : null;
   const current = TABS.find((t) => t.id === tab)!;
   const count = headerCount(tab, o);
   const reads = o?.overview.activity.readsDaily;
@@ -234,15 +237,15 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
           ) : (
             <>
               {needsOverview && overview.error && (
-                <div className="mb-4"><ErrorState message={`No se pudo actualizar: ${overview.error.message}`} onRetry={() => void overview.reload()} /></div>
+                <div className="mb-4"><StaleBanner error={overview.error} onRetry={() => void overview.reload()} /></div>
               )}
               {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} />}
-              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} />}
+              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} />}
               {tab === 'usuarios' && <UsersTab me={me} refreshKey={refreshKey} notify={notify} onChanged={onChanged} focusSearch={focusSearch} onSearchFocused={onSearchFocused} />}
-              {tab === 'membresias' && o && <MembershipsTab data={o} period={period} me={me} refreshKey={refreshKey} cmp={cmp} />}
+              {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} />}
               {tab === 'cupones' && <CouponsTab refreshKey={refreshKey} notify={notify} onChanged={onChanged} />}
               {tab === 'ia' && o && <LlmTab data={o} period={period} cmp={cmp} notify={notify} onChanged={onChanged} />}
-              {tab === 'integraciones' && o && <IntegrationsTab data={o} refreshKey={refreshKey} />}
+              {tab === 'integraciones' && o && <IntegrationsTab data={o} period={period} refreshKey={refreshKey} />}
             </>
           )}
         </main>

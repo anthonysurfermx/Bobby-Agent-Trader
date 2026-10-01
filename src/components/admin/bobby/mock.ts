@@ -103,6 +103,7 @@ const ME: MockUser = {
 };
 USERS.push(ME);
 USERS[3].is_admin = true;
+Object.assign(USERS[5], { sub_provider: 'apple', sub_status: 'active', current_period_end: iso(NOW - 3 * DAY), pro: false, grant_source: null, pro_until: null });
 USERS.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
 // ---------------------------------------------------------------- coupons, actions, credit
@@ -121,11 +122,13 @@ const REDEMPTIONS = Array.from({ length: 14 }, (_, i) => {
 });
 let ACTION_SEQ = 0;
 const ACTIONS: Array<{ id: string; admin_email: string | null; action: string; target: string | null; detail: unknown; created_at: string }> = [
-  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'credit-mark', target: 'anthropic', detail: { kind: 'balance', amountUsd: 50 }, created_at: iso(NOW - 9 * DAY) },
-  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'create-coupon', target: 'AMIGOS20', detail: { reads: 20, maxRedemptions: 100 }, created_at: iso(NOW - 12 * DAY) },
-  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'grant', target: USERS[8].email, detail: { proDays: 30 }, created_at: iso(NOW - 2 * DAY) },
-  { id: String(++ACTION_SEQ), admin_email: USERS[3].email, action: 'set-coupon-active', target: 'PRENSA', detail: { active: false }, created_at: iso(NOW - 26 * HOUR) },
-  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'probe-llm', target: 'openai', detail: { status: 'no_credit', httpStatus: 429 }, created_at: iso(NOW - 3 * HOUR) },
+  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'create-coupon', target: 'AMIGOS20', detail: { reads: 20, maxRedemptions: 100, status: 'ok' }, created_at: iso(NOW - 12 * DAY) },
+  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'credit-mark', target: 'anthropic', detail: { kind: 'balance', amountUsd: 50, status: 'ok' }, created_at: iso(NOW - 9 * DAY) },
+  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'grant', target: USERS[8].email, detail: { proDays: 30, status: 'ok' }, created_at: iso(NOW - 2 * DAY) },
+  { id: String(++ACTION_SEQ), admin_email: USERS[3].email, action: 'delete-user', target: USERS[12].id, detail: { error: 'Type the account email to confirm.', status: 'failed' }, created_at: iso(NOW - 30 * HOUR) },
+  { id: String(++ACTION_SEQ), admin_email: USERS[3].email, action: 'set-coupon-active', target: 'PRENSA', detail: { active: false, status: 'ok' }, created_at: iso(NOW - 26 * HOUR) },
+  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'probe-llm', target: 'openai', detail: { result: 'no_credit', httpStatus: 429, status: 'ok' }, created_at: iso(NOW - 3 * HOUR) },
+  { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'add-cost', target: 'marketing', detail: { amountUsd: 60, status: 'started' }, created_at: iso(NOW - 20 * MIN) },
 ].reverse();
 const CREDIT: Record<'anthropic' | 'openai', { mark: { amount: number; at: string } | null; topups: number; alert: string | null; calls: number; failures: number }> = {
   anthropic: { mark: { amount: 50, at: iso(NOW - 9 * DAY) }, topups: 0, alert: null, calls: 4120, failures: 3 },
@@ -144,7 +147,20 @@ function llmProvider(p: 'anthropic' | 'openai') {
   };
 }
 
-function overview(days: number, bare: boolean) {
+const COVERAGE = {
+  eventsSince: iso(NOW - 6 * HOUR), devicesSince: iso(NOW - 6 * HOUR), readsSince: iso(NOW - 35 * DAY), readerStatsSince: iso(NOW - 6 * HOUR),
+  purchasesSince: iso(NOW - 41 * DAY), ledgerSince: iso(NOW - 120 * DAY), ledgerSurfaces: ['desk', 'cycle', 'agent-run', 'explain'],
+};
+const BARE_COVERAGE = { ...COVERAGE, purchasesSince: null, ledgerSurfaces: ['desk'] };
+
+function couponStatus(c: MockCoupon) {
+  if (!c.active) return 'inactive';
+  if (c.expires_at && new Date(c.expires_at).getTime() <= Date.now()) return 'expired';
+  if (c.max_redemptions != null && c.redeemed >= c.max_redemptions) return 'exhausted';
+  return 'active';
+}
+
+function overview(days: number, bare: boolean, compare = false, partial = false) {
   const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
   const d = tail(ALL_DAYS, n);
   const accountsDaily = tail(SERIES.accounts, n);
@@ -157,7 +173,7 @@ function overview(days: number, bare: boolean) {
   const newAccounts = sum(accountsDaily);
   const scale = n / 30;
   const visitors = Math.round(sum(visits) * 0.82);
-  const active = USERS.filter((u) => u.sub_status === 'active' || u.sub_status === 'trialing').length;
+  const active = USERS.filter((u) => (u.sub_status === 'active' || u.sub_status === 'trialing') && (!u.current_period_end || new Date(u.current_period_end).getTime() > Date.now())).length;
   const appDays = tail(ALL_DAYS, n);
   const downloads = appDays.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - n + i)));
   return {
@@ -207,14 +223,29 @@ function overview(days: number, bare: boolean) {
       llm: {
         providers: { anthropic: llmProvider('anthropic'), openai: llmProvider('openai') },
         daily: d.map((_, i) => ({ anthropic: tail(SERIES.anthropic, n)[i], openai: String(tail(SERIES.openai, n)[i]) })),
+        bySurface: bare ? [{ surface: 'desk', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)))), calls: 812, failures: 2 }] : [
+          { surface: 'desk', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.72)), calls: Math.round(2900 * scale), failures: 2 },
+          { surface: 'cycle', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.2)), calls: Math.round(860 * scale), failures: 1 },
+          { surface: 'explain', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.08)), calls: Math.round(360 * scale), failures: 0 },
+          { surface: 'agent-run', provider: 'openai', usd: String(round2(sum(tail(SERIES.openai, n)))), calls: Math.round(986 * scale), failures: 41 },
+        ],
+        guard: GUARD,
       },
-      coupons: { active: COUPONS.filter((c) => c.active).length, redemptions: REDEMPTIONS.length, giftedReadsLeft: 164 },
+      coupons: { active: COUPONS.filter((c) => couponStatus(c) === 'active').length, redemptions: REDEMPTIONS.length, giftedReadsLeft: 164 },
+      coverage: bare ? BARE_COVERAGE : COVERAGE,
     },
-    integrations: bare
+    integrations: compare ? null : bare
       ? {
         revenuecat: { configured: false }, appStore: { configured: false },
-        llmCaps: { dayUsd: 0, monthUsd: 0, alertUsd: 0 }, paywall: false,
-        missing: ['REVENUECAT_V2_SECRET_KEY', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER'], // what api/_lib/admin.ts reports
+        llmCaps: { dayUsd: 15, monthUsd: 300, alertUsd: 100 }, paywall: false,
+        llmGuard: { dayUsd: GUARD.day, monthUsd: GUARD.month },
+        health: {
+          revenuecatWebhook: { configured: false, lastEventAt: null, events30d: 0 },
+          tracking: { lastEventAt: null, events24h: 0 },
+          llmKeys: { anthropic: true, openai: false }, vercelAnalytics: 'unverified',
+        },
+        // what api/_lib/admin.ts reports when nothing is set up
+        missing: ['REVENUECAT_V2_SECRET_KEY', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER', 'GSC_SERVICE_ACCOUNT_JSON', 'REVENUECAT_SECRET_KEY', 'REVENUECAT_WEBHOOK_AUTH', 'OPENAI_API_KEY'],
       }
       : {
         revenuecat: {
@@ -232,9 +263,24 @@ function overview(days: number, bare: boolean) {
           configured: true, days: appDays, downloads,
           totals: { downloads: sum(downloads), redownloads: Math.round(sum(downloads) * 0.11), updates: Math.round(sum(downloads) * 1.7), iap: Math.round(17 * scale) },
         },
-        llmCaps: { dayUsd: 15, monthUsd: 250, alertUsd: 10 }, paywall: false, missing: [],
+        llmCaps: { dayUsd: 15, monthUsd: 300, alertUsd: 100 }, paywall: false, missing: [],
+        llmGuard: { dayUsd: GUARD.day, monthUsd: GUARD.month },
+        health: partial ? undefined : {
+          revenuecatWebhook: { configured: true, lastEventAt: iso(NOW - 5 * HOUR), events30d: 43 },
+          tracking: { lastEventAt: iso(NOW - 3 * MIN), events24h: 1840 },
+          llmKeys: { anthropic: true, openai: true }, vercelAnalytics: 'unverified',
+        },
       },
   };
+}
+
+/** ?mock=partial: the server omitted whole sections; the dashboard must say so instead of drawing zeros. */
+function partialOverview(days: number) {
+  const full = overview(days, false, false, true) as { overview: Record<string, unknown> & { funnel: Record<string, unknown> }; integrations: unknown };
+  delete full.overview.revenue;
+  delete full.overview.funnel.visitsDaily;
+  delete full.overview.coverage;
+  return full;
 }
 
 function usersView(q: string, limit: number, offset: number) {
@@ -245,6 +291,136 @@ function usersView(q: string, limit: number, offset: number) {
   return { total: all.length, users };
 }
 
+// ---------------------------------------------------------------- lifecycle, economics, costs
+interface MockCost { id: number; kind: 'marketing' | 'infra' | 'other'; channel: string | null; amount_usd: number; spent_on: string; note: string | null; created_at: string }
+let COST_SEQ = 0;
+const cost = (kind: MockCost['kind'], channel: string | null, usd: number, daysAgo: number, note: string | null): MockCost =>
+  ({ id: ++COST_SEQ, kind, channel, amount_usd: usd, spent_on: localDay(NOW - daysAgo * DAY), note, created_at: iso(NOW - daysAgo * DAY + HOUR) });
+const COSTS: MockCost[] = [
+  cost('other', 'apple', 99, 80, 'Apple Developer Program'),
+  cost('infra', 'vercel', 20, 26, 'Vercel Pro'),
+  cost('infra', 'supabase', 25, 25, null),
+  cost('marketing', 'tiktok', 120, 21, 'Campaña de lanzamiento'),
+  cost('marketing', 'influencer', 250, 12, 'Genera tu sueldo'),
+  cost('marketing', 'meta', 60, 5, null),
+];
+// The spend guard's own figures (desk only, UTC calendar day and month).
+const GUARD = { day: 2.18, month: 41.37 };
+const LAST_PRICE_USD: number | null = 4.99;
+let ASSUMPTIONS: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number } = {};
+
+/** The server's unitEconomics (api/_lib/admin.ts), on fixture inputs. */
+function economics(n: number) {
+  const since = tail(ALL_DAYS, n)[0];
+  const r2 = (v: number | null, d = 2) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 10 ** d) / 10 ** d);
+  const gross = round2(sum(tail(SERIES.revenue, n)));
+  // Like the server: the last real purchase sets the price; the store fee comes from the assumption until
+  // purchase events carry a take-home rate.
+  const priceUsd = LAST_PRICE_USD ?? ASSUMPTIONS.priceUsd ?? 4.99;
+  const takehome = 1 - (ASSUMPTIONS.storeFee ?? 0.15);
+  const active = USERS.filter((u) => u.sub_status === 'active' || u.sub_status === 'trialing').length;
+  const newPaying = Math.max(1, Math.round(11 * (n / 30)));
+  const monthlyChurn = ASSUMPTIONS.monthlyChurn ?? 0.1;
+  const churnSource = ASSUMPTIONS.monthlyChurn ? 'assumed' : 'default';
+  const llm = sum(tail(SERIES.anthropic, n)) + sum(tail(SERIES.openai, n));
+  const llm30 = sum(tail(SERIES.anthropic, 30)) + sum(tail(SERIES.openai, 30));
+  const llmPerReader = llm30 / 940;
+  const contribution = priceUsd * takehome - llmPerReader;
+  const lifetime = Math.min(1 / monthlyChurn, ASSUMPTIONS.maxLifetimeMonths ?? 36);
+  const ltv = contribution * lifetime;
+  const inWindow = COSTS.filter((c) => c.spent_on >= since);
+  const by = (k: MockCost['kind']) => inWindow.filter((c) => c.kind === k).reduce((a, c) => a + c.amount_usd, 0);
+  const marketing = by('marketing');
+  const channels = new Map<string, number>();
+  for (const c of inWindow.filter((x) => x.kind === 'marketing')) channels.set(c.channel ?? 'other', (channels.get(c.channel ?? 'other') ?? 0) + c.amount_usd);
+  const newAccounts = Math.round(26 * (n / 30));
+  const cacPaying = newPaying > 0 ? marketing / newPaying : null;
+  const total = marketing + by('infra') + by('other') + llm;
+  const net = gross * takehome;
+  return {
+    days: n, since,
+    revenue: { grossUsd: String(gross), netUsd: r2(net), refundsUsd: 4.99, mrrGrossUsd: r2(active * priceUsd), mrrNetUsd: r2(active * priceUsd * takehome), activeSubscriptions: active, newPaying, priceUsd, takehome },
+    costs: { marketingUsd: r2(marketing), infraUsd: r2(by('infra')), otherUsd: r2(by('other')), llmUsd: r2(llm, 4), totalUsd: r2(total), byChannel: [...channels].sort((a, b) => b[1] - a[1]).map(([channel, usd]) => ({ channel, usd })) },
+    acquisition: { newAccounts, newPaying, cacPerAccount: newAccounts ? r2(marketing / newAccounts) : null, cacPerPaying: r2(cacPaying) },
+    ltv: {
+      monthlyNetPerSubUsd: r2(priceUsd * takehome), monthlyLlmPerUserUsd: r2(llmPerReader, 4), monthlyContributionUsd: r2(contribution),
+      monthlyChurn, churnSource, lifetimeMonths: r2(lifetime, 1), ltvUsd: r2(ltv),
+      ltvToCac: cacPaying ? r2(ltv / cacPaying) : null, paybackMonths: cacPaying && contribution > 0 ? r2(cacPaying / contribution, 1) : null,
+    },
+    roi: { profitUsd: r2(net - total), roi: total > 0 ? r2((net - total) / total, 4) : null },
+    assumptions: { monthlyChurn: ASSUMPTIONS.monthlyChurn ?? null, priceUsd: ASSUMPTIONS.priceUsd ?? null, storeFee: ASSUMPTIONS.storeFee ?? null, maxLifetimeMonths: ASSUMPTIONS.maxLifetimeMonths ?? null },
+  };
+}
+
+function lifecycle(days: number, bare: boolean) {
+  const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
+  const k = n / 30;
+  const r = (v: number) => Math.round(v * k);
+  const web = {
+    devices: r(3400), home: r(2150), desk: r(1480), appStoreClick: r(128), read1: r(690), read2: r(372), read5: r(141),
+    signinStart: r(206), account: r(94), returned: r(262), paywall: r(108), pro: Math.max(1, r(5)),
+    engaged: r(1690), accountAfterRead: r(81), proAfterRead: Math.max(1, r(4)), returnedAfterRead: r(214),
+    medianMinutesToFirstRead: '4.2', medianMinutesToAccount: '38.5',
+    retention: { d1: { eligible: r(3260), returned: r(560) }, d7: { eligible: r(2540), returned: r(170) } },
+  };
+  const ios = {
+    devices: r(640), home: 0, desk: 0, appStoreClick: 0, read1: r(512), read2: r(361), read5: r(168),
+    signinStart: r(151), account: r(129), returned: r(302), paywall: 0, pro: Math.max(1, r(12)),
+    engaged: r(512), accountAfterRead: r(124), proAfterRead: Math.max(1, r(11)), returnedAfterRead: r(281),
+    medianMinutesToFirstRead: 1.6, medianMinutesToAccount: 22,
+    retention: { d1: { eligible: r(612), returned: r(221) }, d7: { eligible: r(470), returned: r(96) } },
+  };
+  const dayList = tail(ALL_DAYS, n);
+  const clicks = dayList.map((_, i) => (bare ? 0 : Math.round(between(18, 70) * ramp(SPAN - n + i))));
+  const impressions = clicks.map((c) => Math.round(c * between(16, 34)));
+  const tc = sum(clicks), ti = sum(impressions);
+  const downloads = dayList.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - n + i)));
+  return {
+    lifecycle: {
+      since: iso(new Date(`${dayList[0]}T00:00:00`).getTime()), web, ios,
+      stages: { total: 4120, accounts: 128, guests: 3992, new: 430, activated: 975, engaged: 318, pro: 24, atRisk: 905, lost: 1402, byPlatform: { web: 3310, ios: 790, unknown: 20 } },
+    },
+    economics: economics(n),
+    coverage: bare ? BARE_COVERAGE : COVERAGE,
+    instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosPaywall: false, purchaseStart: false },
+    searchConsole: bare ? { configured: false } : {
+      configured: true, site: 'https://bobbyprotocol.xyz/', days: dayList, clicks, impressions,
+      totals: { clicks: tc, impressions: ti, ctr: ti ? tc / ti : 0, position: 14.6 },
+      topQueries: [
+        { query: 'bobby ia trading', clicks: Math.round(tc * 0.22), impressions: Math.round(ti * 0.06), ctr: 0.18, position: 2.1 },
+        { query: 'bobby protocol', clicks: Math.round(tc * 0.17), impressions: Math.round(ti * 0.03), ctr: 0.31, position: 1.4 },
+        { query: 'analisis nvda con ia', clicks: Math.round(tc * 0.08), impressions: Math.round(ti * 0.11), ctr: 0.03, position: 9.8 },
+        { query: 'debate ia mercado', clicks: Math.round(tc * 0.05), impressions: Math.round(ti * 0.07), ctr: 0.04, position: 12.3 },
+        { query: 'app para invertir con ia', clicks: Math.round(tc * 0.04), impressions: Math.round(ti * 0.19), ctr: 0.01, position: 27.5 },
+      ],
+      topPages: [
+        { page: 'https://bobbyprotocol.xyz/', clicks: Math.round(tc * 0.58), impressions: Math.round(ti * 0.41) },
+        { page: 'https://bobbyprotocol.xyz/desk', clicks: Math.round(tc * 0.21), impressions: Math.round(ti * 0.22) },
+        { page: 'https://bobbyprotocol.xyz/protocol', clicks: Math.round(tc * 0.12), impressions: Math.round(ti * 0.24) },
+        { page: 'https://bobbyprotocol.xyz/app', clicks: Math.round(tc * 0.06), impressions: Math.round(ti * 0.09) },
+      ],
+    },
+    appStore: bare ? { configured: false } : {
+      configured: true, days: dayList, downloads,
+      totals: { downloads: sum(downloads), redownloads: Math.round(sum(downloads) * 0.11), updates: Math.round(sum(downloads) * 1.7), iap: Math.round(17 * k) },
+    },
+  };
+}
+
+function members() {
+  const subscriptions = USERS.filter((u) => u.sub_status).map((u) => ({
+    identityId: u.id, email: u.email, provider: u.sub_provider, status: u.sub_status,
+    productId: u.sub_provider === 'apple' ? 'bobby_pro_monthly' : 'price_bobby_pro_monthly',
+    currentPeriodEnd: u.current_period_end, updatedAt: u.last_seen_at,
+    active: (u.sub_status === 'active' || u.sub_status === 'trialing') && (!u.current_period_end || new Date(u.current_period_end).getTime() > Date.now()),
+  }));
+  const grants = USERS.filter((u) => u.grant_source).map((u) => ({
+    identityId: u.id, email: u.email, source: u.grant_source === 'coupon' ? 'admin' : u.grant_source, proUntil: u.pro_until,
+    active: !!u.pro_until && new Date(u.pro_until).getTime() > Date.now(),
+  }));
+  return { subscriptions, grants };
+}
+
 // ---------------------------------------------------------------- actions
 class Refuse extends Error {
   status: number;
@@ -252,7 +428,7 @@ class Refuse extends Error {
   constructor(status: number, code: string) { super(code); this.status = status; this.code = code; }
 }
 const log = (action: string, target: string | null, detail: unknown) => {
-  ACTIONS.unshift({ id: String(++ACTION_SEQ), admin_email: ME.email, action, target, detail, created_at: iso(Date.now()) });
+  ACTIONS.unshift({ id: String(++ACTION_SEQ), admin_email: ME.email, action, target, detail: { ...(detail as object), status: 'ok' }, created_at: iso(Date.now()) });
 };
 const findUser = (id: string) => { const u = USERS.find((x) => x.id === id); if (!u) throw new Refuse(404, 'user_not_found'); return u; };
 
@@ -314,6 +490,39 @@ function post(body: AdminPostBody): Record<string, unknown> {
       log('probe-llm', body.provider, r);
       return { ok: true, ...r };
     }
+    case 'add-cost': {
+      const today = localDay(Date.now());
+      const spentOn = body.spentOn && /^\d{4}-\d{2}-\d{2}$/.test(body.spentOn) ? body.spentOn : today;
+      if (!['marketing', 'infra', 'other'].includes(body.kind) || !(body.amountUsd > 0) || body.amountUsd > 1_000_000) throw new Refuse(400, 'Invalid cost.');
+      if (spentOn > today) throw new Refuse(400, 'The date cannot be in the future.');
+      const channel = body.channel?.trim() ? body.channel.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 32) : null;
+      const row: MockCost = { id: ++COST_SEQ, kind: body.kind, channel, amount_usd: Math.round(body.amountUsd * 100) / 100, spent_on: spentOn, note: body.note?.trim() || null, created_at: iso(Date.now()) };
+      COSTS.push(row);
+      log('add-cost', body.kind, { amountUsd: body.amountUsd, channel, spentOn });
+      return { ok: true, cost: row };
+    }
+    case 'delete-cost': {
+      const i = COSTS.findIndex((c) => c.id === body.id);
+      if (i < 0) throw new Refuse(404, 'Cost not found.');
+      const [row] = COSTS.splice(i, 1);
+      log('delete-cost', String(body.id), { cost: row });
+      return { ok: true };
+    }
+    case 'set-assumptions': {
+      // Like the server: merge. Absent = keep, null = back to the default.
+      const next: typeof ASSUMPTIONS = { ...ASSUMPTIONS };
+      const opt = (key: keyof typeof ASSUMPTIONS, min: number, max: number) => {
+        if (!(key in body)) return;
+        const v = body[key];
+        if (v == null) { delete next[key]; return; }
+        if (!Number.isFinite(v) || v < min || v > max) throw new Refuse(400, `Invalid ${key}.`);
+        next[key] = v;
+      };
+      opt('monthlyChurn', 0.001, 1); opt('priceUsd', 0.5, 1000); opt('storeFee', 0, 0.5); opt('maxLifetimeMonths', 1, 120);
+      ASSUMPTIONS = next;
+      log('set-assumptions', 'unit_economics', next);
+      return { ok: true, assumptions: next };
+    }
   }
 }
 
@@ -326,6 +535,7 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
   if (mode === '403') return json({ error: 'not_admin' }, 403);
   if (mode === '500') return json({ error: 'internal_error' }, 500);
   const bare = mode === 'bare';
+  const partial = mode === 'partial';
   if (method === 'POST') {
     if (!body) return json({ error: 'missing_body' }, 400);
     try { return json(post(body)); } catch (e) { return e instanceof Refuse ? json({ error: e.code }, e.status) : json({ error: 'internal_error' }, 500); }
@@ -333,10 +543,17 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
   const view = query?.get('view');
   switch (view) {
     case 'me': return json({ admin: true, email: ME.email, identityId: ME.id });
-    case 'overview': return json(overview(Number(query?.get('days') ?? 30), bare));
+    case 'overview': {
+      const days = Number(query?.get('days') ?? 30);
+      const compare = query?.get('compare') === '1';
+      return json(partial && !compare ? partialOverview(days) : overview(days, bare, compare));
+    }
     case 'users': return json(usersView(query?.get('q') ?? '', Number(query?.get('limit') ?? 50), Number(query?.get('offset') ?? 0)));
-    case 'coupons': return json({ coupons: COUPONS, redemptions: REDEMPTIONS });
-    case 'actions': return json({ actions: ACTIONS });
+    case 'coupons': return json({ coupons: COUPONS.map((c) => ({ ...c, status: couponStatus(c) })), redemptions: REDEMPTIONS, totals: { coupons: COUPONS.length, redemptions: REDEMPTIONS.length + 120 } });
+    case 'actions': return json({ actions: ACTIONS, total: ACTIONS.length + 40 });
+    case 'members': return json(members());
+    case 'lifecycle': return json(lifecycle(Number(query?.get('days') ?? 30), bare));
+    case 'costs': return json({ costs: [...COSTS].sort((x, y) => y.spent_on.localeCompare(x.spent_on) || y.id - x.id) });
     default: return json({ error: 'unknown_view' }, 400);
   }
 }

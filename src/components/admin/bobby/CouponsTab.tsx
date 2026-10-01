@@ -1,13 +1,17 @@
 import { useState, type FormEvent } from 'react';
 import { Plus } from 'lucide-react';
-import { adminAction, createCoupon, fetchAdminCoupons, type AdminCoupon } from '@/lib/admin-client';
-import { Btn, Card, CardHead, CopyButton, Empty, ErrorState, Field, FormMessage, Loading, Note, Switch, TableScroll, Tag, TextInput, td, th, tr } from './ui';
+import { adminAction, createCoupon, fetchAdminCoupons, type AdminCoupon, type CouponStatus } from '@/lib/admin-client';
+import { Btn, Card, CardHead, CopyButton, Empty, ErrorState, Field, FormMessage, Loading, Note, StaleBanner, Switch, TableScroll, Tag, TextInput, td, th, tr } from './ui';
 import { fmtDate, fmtDateTime, fmtGift, fmtInt, timeOf } from './format';
 import { toAdminError, useLoad } from './useLoad';
 
 type Notify = (text: string, ok?: boolean) => void;
 
 const REDEEM_BASE = 'https://bobbyprotocol.xyz/redeem?code=';
+const STATUS: Record<CouponStatus, { label: string; tone: 'green' | 'orange' | 'red' | 'neutral' }> = {
+  active: { label: 'Activo', tone: 'green' }, exhausted: { label: 'Agotado', tone: 'orange' },
+  expired: { label: 'Vencido', tone: 'red' }, inactive: { label: 'Inactivo', tone: 'neutral' },
+};
 const redeemLink = (code: string) => `${REDEEM_BASE}${encodeURIComponent(code)}`;
 const CODE_RE = /^[A-Z0-9][A-Z0-9-]{3,31}$/;
 const digits = (v: string) => v.replace(/\D/g, '').slice(0, 5);
@@ -109,7 +113,6 @@ function CreateCoupon({ onCreated }: { onCreated: (c: AdminCoupon) => void }) {
 export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshKey: number; notify: Notify; onChanged: () => void }) {
   const { data, error, loading, reload } = useLoad(fetchAdminCoupons, `coupons|${refreshKey}`);
   const [toggling, setToggling] = useState<string | null>(null);
-  const now = Date.now();
 
   const setActive = async (c: AdminCoupon, active: boolean) => {
     setToggling(c.code);
@@ -127,21 +130,27 @@ export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshK
     <div className="flex flex-col gap-4">
       <CreateCoupon onCreated={(c) => { notify(`Cupón ${c.code} creado.`); void reload(true); onChanged(); }} />
 
+      {data && error && <StaleBanner error={error} onRetry={() => void reload()} />}
+
       <Card>
-        <CardHead title="Cupones" count={data ? `${fmtInt(data.coupons.length)} creados` : undefined} />
+        <CardHead
+          title="Cupones"
+          count={data ? `${data.totals.coupons != null ? fmtInt(data.totals.coupons) : fmtInt(data.coupons.length)} creados${data.totals.coupons != null && data.totals.coupons > data.coupons.length ? ` · ${fmtInt(data.coupons.length)} mostrados` : ''}` : undefined}
+        />
         {error && !data ? <ErrorState message={error.message} onRetry={() => void reload()} />
           : !data ? <Loading label="Cargando cupones" />
           : data.coupons.length === 0 ? <Empty>Todavía no hay cupones</Empty>
           : (
             <div className={loading ? 'opacity-60' : undefined}>
-              <TableScroll minWidth={900}>
+              <TableScroll minWidth={980}>
                 <thead>
                   <tr>
                     <th className={th}>Código</th>
+                    <th className={th}>Estado</th>
                     <th className={th}>Regalo</th>
                     <th className={`${th} text-right`}>Canjes</th>
                     <th className={th}>Vence</th>
-                    <th className={th}>Activo</th>
+                    <th className={th}>Encendido</th>
                     <th className={th}>Link</th>
                     <th className={th}>Nota</th>
                     <th className={th}>Creado</th>
@@ -149,17 +158,11 @@ export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshK
                 </thead>
                 <tbody>
                   {data.coupons.map((c) => {
-                    const expired = c.expires_at != null && (timeOf(c.expires_at) ?? Infinity) < now;
-                    const exhausted = c.max_redemptions != null && c.redeemed >= c.max_redemptions;
+                    const st = STATUS[c.status];
                     return (
                       <tr key={c.code} className={tr}>
-                        <td className={td}>
-                          <span className="flex items-center gap-1.5">
-                            <span className="font-mono text-[12.5px]">{c.code}</span>
-                            {expired && <Tag tone="red">Vencido</Tag>}
-                            {!expired && exhausted && <Tag tone="orange">Agotado</Tag>}
-                          </span>
-                        </td>
+                        <td className={`${td} font-mono text-[12.5px]`}>{c.code}</td>
+                        <td className={td}><Tag tone={st.tone}>{st.label}</Tag></td>
                         <td className={`${td} font-mono text-[11.5px] uppercase text-[#8B8B8B]`}>{fmtGift(c.reads, c.profundo, c.maximo)}</td>
                         <td className={`${td} text-right font-mono text-[12.5px] tabular-nums`}>{fmtInt(c.redeemed)} <span className="text-[#5C5C5C]">/ {c.max_redemptions == null ? '∞' : fmtInt(c.max_redemptions)}</span></td>
                         <td className={`${td} font-mono text-[12px] text-[#8B8B8B]`}>{c.expires_at ? fmtDate(c.expires_at) : 'no vence'}</td>
@@ -179,7 +182,10 @@ export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshK
       </Card>
 
       <Card>
-        <CardHead title="Canjes recientes" count={data ? `${fmtInt(data.redemptions.length)}` : undefined} />
+        <CardHead
+          title="Canjes recientes"
+          count={data ? `${fmtInt(data.redemptions.length)} recientes${data.totals.redemptions != null ? ` · ${fmtInt(data.totals.redemptions)} en total` : ''}` : undefined}
+        />
         {!data ? (error ? null : <Loading />) : data.redemptions.length === 0 ? <Empty>Nadie ha canjeado un cupón todavía</Empty> : (
           <TableScroll minWidth={560}>
             <thead><tr><th className={th}>Fecha</th><th className={th}>Código</th><th className={th}>Cuenta</th><th className={th}>Regalo</th></tr></thead>

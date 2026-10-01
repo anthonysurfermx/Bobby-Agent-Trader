@@ -1,7 +1,7 @@
 // Charts in the dashboard's language: tall rounded grey bars with one orange highlight (no grid, no y-axis,
 // mono caps dates), thick rounded status bars on a dark track, and mono growth chips. Plain divs, so the
 // gradients, glow and radii match the reference exactly; every chart keeps a "Ver datos" table.
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Card, DeltaLine, DeltaValue, TableScroll, td, th } from './ui';
 import { GRAD, type Fill } from './tokens';
 import type { Delta } from './deltas';
@@ -142,20 +142,32 @@ export function GrowthChips({ chips, invert }: { chips: Array<{ w: number; delta
 export interface StatusRow { label: string; value: number; display?: ReactNode; fill?: Fill; sub?: ReactNode; missing?: ReactNode }
 
 /** Thick rounded horizontal bars on a dark track: mono label, bar, mono value (+ optional mono sub). */
-export function StatusBars({ rows, max, uppercase = true, labelWidth = 104 }: { rows: StatusRow[]; max?: number; uppercase?: boolean; labelWidth?: number }) {
+export function StatusBars({ rows, max, uppercase = true, labelWidth = 104, wrapLabels = false, stackMobile = false }: {
+  rows: StatusRow[]; max?: number; uppercase?: boolean; labelWidth?: number; wrapLabels?: boolean;
+  /** On phones, put label and value on one line and the bar under them (for long values). */
+  stackMobile?: boolean;
+}) {
   const top = max ?? Math.max(0, ...rows.map((r) => r.value));
+  const cols = `minmax(0, ${labelWidth}px) minmax(0, 1fr) auto`;
+  // One grid for all rows, so every track starts and ends at the same x whatever the value width.
+  // With stackMobile, below `sm` each row is its own two-line grid instead.
+  const ulClass = stackMobile
+    ? 'm-0 grid list-none grid-cols-1 gap-y-3.5 p-0 sm:items-center sm:gap-x-3 sm:[grid-template-columns:var(--sb-cols)]'
+    : 'm-0 grid list-none items-center gap-x-3 gap-y-3.5 p-0';
+  const liClass = stackMobile ? 'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 sm:contents' : 'contents';
   return (
-    // One grid for all rows, so every track starts and ends at the same x whatever the value width.
-    <ul className="m-0 grid list-none items-center gap-x-3 gap-y-3.5 p-0" style={{ gridTemplateColumns: `minmax(0, ${labelWidth}px) minmax(0, 1fr) auto` }}>
+    <ul className={ulClass} style={stackMobile ? ({ '--sb-cols': cols } as CSSProperties) : { gridTemplateColumns: cols }}>
       {rows.map((r) => {
         const pct = top > 0 && r.value > 0 ? Math.max(4, Math.min(100, (r.value / top) * 100)) : 0;
         return (
-          <li key={r.label} className="contents">
-            <span className={`truncate font-mono text-[11.5px] text-[#BDBDBD] ${uppercase ? 'uppercase tracking-[0.04em]' : ''}`} title={r.label}>{r.label}</span>
+          <li key={r.label} className={liClass}>
+            <span className={`${stackMobile ? 'order-1 sm:order-none' : ''} font-mono text-[11.5px] text-[#BDBDBD] ${wrapLabels ? 'leading-snug' : 'truncate'} ${uppercase ? 'uppercase tracking-[0.04em]' : ''}`} title={r.label}>{r.label}</span>
             {r.missing ? (
-              <span className="truncate font-mono text-[11px] text-[#5C5C5C]">{r.missing}</span>
+              <div className={`flex h-[18px] min-w-0 items-center rounded-full border border-dashed border-white/[0.14] px-2.5 ${stackMobile ? 'order-3 col-span-2 sm:order-none sm:col-span-1' : ''}`}>
+                <span className="truncate font-mono text-[10px] uppercase tracking-[0.06em] text-[#5C5C5C]">{r.missing}</span>
+              </div>
             ) : (
-              <div className="h-[18px] overflow-hidden rounded-full bg-[#1F1F20]">
+              <div className={`h-[18px] overflow-hidden rounded-full bg-[#1F1F20] ${stackMobile ? 'order-3 col-span-2 sm:order-none sm:col-span-1' : ''}`}>
                 {pct > 0 && (
                   <div
                     className="h-full rounded-full"
@@ -167,7 +179,7 @@ export function StatusBars({ rows, max, uppercase = true, labelWidth = 104 }: { 
                 )}
               </div>
             )}
-            <span className="flex items-baseline justify-end gap-2 whitespace-nowrap font-mono text-[12.5px] tabular-nums text-[#EDEDED]">
+            <span className={`flex items-baseline justify-end gap-2 whitespace-nowrap font-mono text-[12.5px] tabular-nums text-[#EDEDED] ${stackMobile ? 'order-2 sm:order-none' : ''}`}>
               {r.display ?? fmtInt(r.value)}
               {r.sub != null && <span className="text-[11px] text-[#5C5C5C]">{r.sub}</span>}
             </span>
