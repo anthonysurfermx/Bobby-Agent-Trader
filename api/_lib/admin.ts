@@ -328,11 +328,193 @@ async function appStoreSales(days: string[]) {
 }
 
 export async function integrations(days: string[]) {
+  // (Search Console is read by the lifecycle view, at the top of the web funnel.)
   const [revenuecat, appStore] = await Promise.all([revenueCatMetrics(), appStoreSales(days)]);
   const missing = [
     ...(process.env.REVENUECAT_V2_SECRET_KEY?.trim() ? [] : ['REVENUECAT_V2_SECRET_KEY']),
     ...(ascKeyId() ? [] : ['ASC_KEY_ID']), ...(ascIssuer() ? [] : ['ASC_ISSUER_ID']),
     ...(process.env.ASC_PRIVATE_KEY?.trim() ? [] : ['ASC_PRIVATE_KEY']), ...(ascVendor() ? [] : ['ASC_VENDOR_NUMBER']),
+    ...(process.env.GSC_SERVICE_ACCOUNT_JSON?.trim() ? [] : ['GSC_SERVICE_ACCOUNT_JSON']),
   ];
   return { revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing };
+}
+
+// ---------------- Google Search Console (top of the web funnel) ----------------
+// A service account added as a user of the property (GSC_SERVICE_ACCOUNT_JSON, GSC_SITE).
+const GSC_SITE = () => process.env.GSC_SITE?.trim() || 'https://bobbyprotocol.xyz/';
+let gscToken: { value: string; until: number } | null = null;
+const gscCache = new Map<string, { at: number; value: unknown }>();
+
+async function googleToken(): Promise<string> {
+  if (gscToken && gscToken.until > Date.now() + 60_000) return gscToken.value;
+  const creds = JSON.parse(process.env.GSC_SERVICE_ACCOUNT_JSON!) as { client_email?: string; private_key?: string };
+  if (!creds.client_email || !creds.private_key) throw new Error('searchconsole credentials incomplete');
+  const b64 = (v: string | Buffer) => Buffer.from(v).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const head = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const body = b64(JSON.stringify({ iss: creds.client_email, scope: 'https://www.googleapis.com/auth/webmasters.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
+  const sig = sign('RSA-SHA256', Buffer.from(`${head}.${body}`), createPrivateKey(creds.private_key.replace(/\\n/g, '\n')));
+  const r = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(TIMEOUT),
+    body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${body}.${b64(sig)}` }),
+  });
+  if (!r.ok) throw new Error(`searchconsole token ${r.status}`);
+  const t = (await r.json()) as { access_token?: string; expires_in?: number };
+  if (!t.access_token) throw new Error('searchconsole token missing');
+  gscToken = { value: t.access_token, until: Date.now() + (t.expires_in ?? 3600) * 1000 };
+  return t.access_token;
+}
+
+type GscRow = { keys?: string[]; clicks?: number; impressions?: number; ctr?: number; position?: number };
+async function gscQuery(token: string, body: Record<string, unknown>): Promise<GscRow[]> {
+  const r = await fetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE())}/searchAnalytics/query`, {
+    method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
+  });
+  if (!r.ok) throw new Error(`searchconsole ${r.status}`);
+  return ((await r.json()) as { rows?: GscRow[] }).rows ?? [];
+}
+
+export async function searchConsole(days: string[]) {
+  if (!process.env.GSC_SERVICE_ACCOUNT_JSON?.trim()) return { configured: false };
+  if (!days.length) return { configured: true, days, clicks: [], impressions: [] };
+  const key = `${days[0]}:${days.at(-1)}`;
+  const hit = gscCache.get(key);
+  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.value;
+  let value: unknown;
+  try {
+    const token = await googleToken();
+    const range = { startDate: days[0], endDate: days.at(-1), dataState: 'all' };
+    const [byDate, queries, pages] = await Promise.all([
+      gscQuery(token, { ...range, dimensions: ['date'], rowLimit: 500 }),
+      gscQuery(token, { ...range, dimensions: ['query'], rowLimit: 10 }),
+      gscQuery(token, { ...range, dimensions: ['page'], rowLimit: 10 }),
+    ]);
+    const byDay = new Map(byDate.map((r) => [r.keys?.[0] ?? '', r]));
+    const clicks = days.map((d) => byDay.get(d)?.clicks ?? 0);
+    const impressions = days.map((d) => byDay.get(d)?.impressions ?? 0);
+    const totalClicks = clicks.reduce((a, b) => a + b, 0), totalImpressions = impressions.reduce((a, b) => a + b, 0);
+    const weighted = byDate.reduce((a, r) => a + (r.position ?? 0) * (r.impressions ?? 0), 0);
+    value = {
+      configured: true, site: GSC_SITE(), days, clicks, impressions,
+      totals: { clicks: totalClicks, impressions: totalImpressions, ctr: totalImpressions ? totalClicks / totalImpressions : 0, position: totalImpressions ? weighted / totalImpressions : null },
+      topQueries: queries.map((r) => ({ query: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0, ctr: r.ctr ?? 0, position: r.position ?? null })),
+      topPages: pages.map((r) => ({ page: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0 })),
+    };
+  } catch (e) {
+    value = { configured: true, error: e instanceof Error ? e.message : 'searchconsole unavailable' };
+  }
+  gscCache.set(key, { at: Date.now(), value });
+  return value;
+}
+
+// ---------------- unit economics ----------------
+interface EconomicsRaw {
+  days: number; since: string;
+  revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
+  costs: { marketingUsd: number; infraUsd: number; otherUsd: number; byChannel: Array<{ channel: string; usd: number }> };
+  subscriptions: { active: number }; newAccounts: number; activeReaders30d: number; llmUsd: number; llm30dUsd: number;
+  assumptions: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number };
+}
+const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+const round = (v: number | null, digits = 2) => (v === null || !Number.isFinite(v) ? null : Math.round(v * 10 ** digits) / 10 ** digits);
+
+/** CAC, LTV and ROI from the raw sums. Every input is returned so the dashboard can show the formula. */
+export function unitEconomics(raw: EconomicsRaw) {
+  const a = raw.assumptions ?? {};
+  const priceUsd = n(raw.revenue.lastPriceUsd) || n(a.priceUsd) || 4.99;
+  const takehome = n(raw.revenue.takehome) || 1 - (n(a.storeFee) || 0.15);
+  const activeSubs = n(raw.subscriptions.active);
+  // Monthly churn: expirations in the last 30 days over the subscriptions alive at its start, once there are
+  // enough of them to mean something; until then the owner's assumption (default 10%).
+  const base = activeSubs + n(raw.revenue.expirations30d) - n(raw.revenue.initialPurchases30d);
+  const observed = base >= 5 ? n(raw.revenue.expirations30d) / base : null;
+  const monthlyChurn = observed ?? (n(a.monthlyChurn) > 0 ? n(a.monthlyChurn) : 0.1);
+  const churnSource = observed !== null ? 'observed' : n(a.monthlyChurn) > 0 ? 'assumed' : 'default';
+  const llmPerActiveReader = n(raw.activeReaders30d) > 0 ? n(raw.llm30dUsd) / n(raw.activeReaders30d) : 0;
+  const monthlyContribution = priceUsd * takehome - llmPerActiveReader;
+  const lifetimeMonths = Math.min(1 / Math.max(monthlyChurn, 0.0001), n(a.maxLifetimeMonths) || 36);
+  const ltv = monthlyContribution * lifetimeMonths;
+  const marketing = n(raw.costs.marketingUsd);
+  const cacPerPaying = n(raw.revenue.newPaying) > 0 ? marketing / n(raw.revenue.newPaying) : null;
+  const cacPerAccount = n(raw.newAccounts) > 0 ? marketing / n(raw.newAccounts) : null;
+  const totalCosts = marketing + n(raw.costs.infraUsd) + n(raw.costs.otherUsd) + n(raw.llmUsd);
+  const profit = n(raw.revenue.netUsd) - totalCosts;
+  return {
+    days: raw.days, since: raw.since,
+    revenue: {
+      grossUsd: round(n(raw.revenue.grossUsd)), netUsd: round(n(raw.revenue.netUsd)), refundsUsd: round(n(raw.revenue.refundsUsd)),
+      mrrGrossUsd: round(activeSubs * priceUsd), mrrNetUsd: round(activeSubs * priceUsd * takehome),
+      activeSubscriptions: activeSubs, newPaying: n(raw.revenue.newPaying), priceUsd, takehome,
+    },
+    costs: {
+      marketingUsd: round(marketing), infraUsd: round(n(raw.costs.infraUsd)), otherUsd: round(n(raw.costs.otherUsd)),
+      llmUsd: round(n(raw.llmUsd), 4), totalUsd: round(totalCosts), byChannel: (raw.costs.byChannel ?? []).map((c) => ({ channel: c.channel, usd: round(n(c.usd)) })),
+    },
+    acquisition: { newAccounts: n(raw.newAccounts), newPaying: n(raw.revenue.newPaying), cacPerAccount: round(cacPerAccount), cacPerPaying: round(cacPerPaying) },
+    ltv: {
+      monthlyNetPerSubUsd: round(priceUsd * takehome), monthlyLlmPerUserUsd: round(llmPerActiveReader, 4), monthlyContributionUsd: round(monthlyContribution),
+      monthlyChurn: round(monthlyChurn, 4), churnSource, lifetimeMonths: round(lifetimeMonths, 1), ltvUsd: round(ltv),
+      ltvToCac: cacPerPaying ? round(ltv / cacPerPaying) : null,
+      paybackMonths: cacPerPaying && monthlyContribution > 0 ? round(cacPerPaying / monthlyContribution, 1) : null,
+    },
+    roi: { profitUsd: round(profit), roi: totalCosts > 0 ? round(profit / totalCosts, 4) : null },
+    assumptions: { monthlyChurn: n(a.monthlyChurn) || null, priceUsd: n(a.priceUsd) || null, storeFee: n(a.storeFee) || null, maxLifetimeMonths: n(a.maxLifetimeMonths) || null },
+  };
+}
+
+const daysFrom = (since: string) => {
+  const out: string[] = [];
+  const start = new Date(since); start.setUTCHours(0, 0, 0, 0);
+  for (let t = start.getTime(); t <= Date.now(); t += 86_400_000) out.push(new Date(t).toISOString().slice(0, 10));
+  return out;
+};
+
+export async function lifecycleView(days: number) {
+  const [lifecycle, raw] = await Promise.all([
+    rpc<{ since: string }>('bobby_admin_lifecycle', { p_days: days }),
+    rpc<EconomicsRaw>('bobby_admin_economics', { p_days: days }),
+  ]);
+  const list = daysFrom(lifecycle.since);
+  const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
+  return { lifecycle, economics: unitEconomics(raw), searchConsole: search, appStore };
+}
+
+// ---------------- costs and assumptions ----------------
+export async function costsView() {
+  return { costs: (await rest<unknown[]>('bobby_costs?select=*&order=spent_on.desc,id.desc&limit=200')) ?? [] };
+}
+
+export async function addCost(body: Record<string, unknown>) {
+  const kind = body.kind === 'marketing' || body.kind === 'infra' || body.kind === 'other' ? body.kind : null;
+  const amount = Number(body.amountUsd);
+  const channel = typeof body.channel === 'string' && body.channel.trim() ? body.channel.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 32) : null;
+  const spentOn = typeof body.spentOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.spentOn) ? body.spentOn : new Date().toISOString().slice(0, 10);
+  if (!kind || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) throw new AdminError(400, 'Invalid cost.');
+  if (spentOn > new Date().toISOString().slice(0, 10)) throw new AdminError(400, 'The date cannot be in the future.');
+  const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 160) : null;
+  const rows = await rest<unknown[]>('bobby_costs', { method: 'POST', headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({ kind, channel, amount_usd: Math.round(amount * 100) / 100, spent_on: spentOn, note }) });
+  return rows?.[0] ?? null;
+}
+
+export async function deleteCost(id: unknown) {
+  if (typeof id !== 'number' || !Number.isInteger(id) || id <= 0) throw new AdminError(400, 'Invalid cost.');
+  const rows = await rest<unknown[]>(`bobby_costs?id=eq.${id}`, { method: 'DELETE', headers: { Prefer: 'return=representation' } });
+  if (!rows?.length) throw new AdminError(404, 'Cost not found.');
+  return rows[0];
+}
+
+export async function setAssumptions(body: Record<string, unknown>) {
+  const value: Record<string, number> = {};
+  const opt = (k: string, min: number, max: number) => {
+    const v = body[k];
+    if (v === null || v === undefined || v === '') return;
+    const x = Number(v);
+    if (!Number.isFinite(x) || x < min || x > max) throw new AdminError(400, `Invalid ${k}.`);
+    value[k] = x;
+  };
+  opt('monthlyChurn', 0.001, 1); opt('priceUsd', 0.5, 1000); opt('storeFee', 0, 0.5); opt('maxLifetimeMonths', 1, 120);
+  await rest('bobby_admin_settings?on_conflict=key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ key: 'unit_economics', value, updated_at: new Date().toISOString() }) });
+  return value;
 }

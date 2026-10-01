@@ -1,15 +1,15 @@
 // ============================================================
 // /api/admin — the owner dashboard (bobbyprotocol.xyz/admin). Signed-in Apple/Google accounts listed in
 // bobby_admins only (api/_lib/admin.ts). Every change is written to bobby_admin_actions.
-//   GET ?view=me | overview&days=N | users&q=&limit=&offset= | coupons | actions
+//   GET ?view=me | overview&days=N | lifecycle&days=N | users&q=&limit=&offset= | coupons | costs | actions
 //   POST { action: 'create-coupon' | 'set-coupon-active' | 'grant' | 'delete-user' | 'set-admin'
-//          | 'credit-mark' | 'probe-llm', ... }
+//          | 'credit-mark' | 'probe-llm' | 'add-cost' | 'delete-cost' | 'set-assumptions', ... }
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import {
-  AdminError, actionsView, couponsView, createCoupon, creditMark, deleteUser, grant, integrations, logAction,
-  probeProvider, requireAdmin, rpc, setAdmin, setCouponActive,
+  AdminError, actionsView, addCost, costsView, couponsView, createCoupon, creditMark, deleteCost, deleteUser, grant, integrations,
+  lifecycleView, logAction, probeProvider, requireAdmin, rpc, setAdmin, setAssumptions, setCouponActive,
 } from './_lib/admin.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
@@ -46,6 +46,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const offset = Math.max(Number(one(req.query.offset)) || 0, 0);
         return res.status(200).json(await rpc('bobby_admin_users', { p_query: q || null, p_limit: limit, p_offset: offset }));
       }
+      if (view === 'lifecycle') return res.status(200).json(await lifecycleView(Math.min(Math.max(Number(one(req.query.days)) || 30, 1), 365)));
+      if (view === 'costs') return res.status(200).json(await costsView());
       if (view === 'coupons') return res.status(200).json(await couponsView());
       if (view === 'actions') return res.status(200).json(await actionsView());
       return res.status(400).json({ error: 'Unknown view' });
@@ -89,6 +91,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const probe = await probeProvider(body.provider);
         await logAction(admin, 'probe-llm', String(body.provider), { status: probe.status, httpStatus: probe.httpStatus });
         return res.status(200).json({ ok: true, ...probe });
+      }
+      case 'add-cost': {
+        const cost = await addCost(body);
+        await logAction(admin, 'add-cost', String(body.kind), { amountUsd: body.amountUsd, channel: body.channel ?? null, spentOn: body.spentOn ?? null });
+        return res.status(200).json({ ok: true, cost });
+      }
+      case 'delete-cost': {
+        const cost = await deleteCost(body.id);
+        await logAction(admin, 'delete-cost', String(body.id), { cost });
+        return res.status(200).json({ ok: true });
+      }
+      case 'set-assumptions': {
+        const assumptions = await setAssumptions(body);
+        await logAction(admin, 'set-assumptions', 'unit_economics', assumptions);
+        return res.status(200).json({ ok: true, assumptions });
       }
       default:
         return res.status(400).json({ error: 'Unknown action' });

@@ -54,6 +54,7 @@
     "test:coupons-pg": "tsx scripts/test-coupons-pg.mts",
     "test:admin-pg": "tsx scripts/test-admin-pg.mts",
     "test:admin-api": "tsx scripts/test-admin-api.mts",
+    "test:lifecycle-pg": "tsx scripts/test-lifecycle-pg.mts",
     "test:user-memory": "tsx scripts/test-user-memory.mts",
     "test:user-memory-pg": "tsx scripts/test-user-memory-pg.mts",
     "test:account-delete": "tsx scripts/test-account-delete.mts",

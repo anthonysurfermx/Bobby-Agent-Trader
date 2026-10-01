@@ -64,7 +64,14 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('rpc/bobby_admin_grant')) return json({ ok: true, bonus: { reads: c.body.p_reads, profundo: 0, maximo: 0 }, proUntil: null });
   if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
   if (c.url.includes('/auth/v1/admin/users/')) return json({});
-  if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events')) return new Response(null, { status: 201 });
+  if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
+  if (c.url.includes('rpc/bobby_record_event')) return new Response(null, { status: 204 });
+  if (c.url.includes('rpc/bobby_admin_lifecycle')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3 }, ios: { devices: 1 }, stages: { total: 4 } });
+  if (c.url.includes('rpc/bobby_admin_economics')) return json({ days: 30, since: '2026-09-02T00:00:00Z',
+    revenue: { grossUsd: 49.9, netUsd: 42.415, refundsUsd: 0, newPaying: 10, initialPurchases30d: 10, expirations30d: 0, lastPriceUsd: 4.99, takehome: 0.85 },
+    costs: { marketingUsd: 100, infraUsd: 20, otherUsd: 0, byChannel: [{ channel: 'tiktok', usd: 100 }] },
+    subscriptions: { active: 10 }, newAccounts: 40, activeReaders30d: 50, llmUsd: 5, llm30dUsd: 5, assumptions: { monthlyChurn: 0.1 } });
+  if (c.url.includes('bobby_admin_settings')) return new Response(null, { status: 201 });
   return json({ message: `unexpected ${c.method} ${c.url}` }, 500);
 }) as typeof fetch;
 
@@ -163,6 +170,21 @@ try {
   eq(sales, { downloads: 4, redownloads: 2, updates: 5, iap: 1 }, 'downloads of this app only; updates and subscriptions apart');
   eq(parseSalesReport('garbage', '1'), { downloads: 0, redownloads: 0, updates: 0, iap: 0 }, 'an unreadable report');
 
+  // ---------- lifecycle and unit economics ----------
+  const life = await call('GET', 'Bearer admin-token', { view: 'lifecycle', days: '30' });
+  eq([life.statusCode, life.body.lifecycle.web.devices, life.body.searchConsole.configured, life.body.appStore.configured], [200, 3, false, false], 'lifecycle view');
+  const ue = life.body.economics;
+  eq([ue.revenue.mrrGrossUsd, ue.revenue.mrrNetUsd, ue.acquisition.cacPerPaying, ue.acquisition.cacPerAccount], [49.9, 42.42, 10, 2.5], 'MRR and CAC (marketing / new payers, / new accounts)');
+  eq([ue.ltv.monthlyChurn, ue.ltv.churnSource, ue.ltv.lifetimeMonths, ue.ltv.monthlyLlmPerUserUsd], [0.1, 'assumed', 10, 0.1], 'churn from the assumption until there are 5+ subscriptions at the start; LLM cost per active reader');
+  eq([ue.ltv.monthlyContributionUsd, ue.ltv.ltvUsd, ue.ltv.ltvToCac, ue.ltv.paybackMonths], [4.14, 41.42, 4.14, 2.4], 'LTV = (net price - LLM per user) / churn; LTV:CAC; payback');
+  eq([ue.costs.totalUsd, ue.roi.profitUsd, ue.roi.roi], [125, -82.58, -0.6607], 'ROI = (net revenue - all costs) / all costs');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'add-cost', kind: 'marketing', channel: 'TikTok Ads', amountUsd: 50, spentOn: '2026-09-30' })).statusCode, 200, 'record a marketing cost');
+  eq(calls.find((c) => c.url.includes('bobby_costs') && c.method === 'POST')?.body.channel, 'tiktok-ads', 'channel normalized');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'add-cost', kind: 'ads', amountUsd: 50 })).statusCode, 400, 'unknown cost kind');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'add-cost', kind: 'infra', amountUsd: 50, spentOn: '2999-01-01' })).statusCode, 400, 'a future date');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-assumptions', monthlyChurn: 0.08, storeFee: 0.15 })).statusCode, 200, 'assumptions');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'set-assumptions', monthlyChurn: 3 })).statusCode, 400, 'churn out of range');
+
   // ---------- App Store env values pasted with extra text ----------
   eq(ascVendor('GUILLERMO ANTHONY CHAVEZ\n89123456\n'), '89123456', 'the vendor number is the digits');
   eq(ascVendor(''), '', 'no vendor number');
@@ -181,7 +203,8 @@ try {
   const tr = response();
   await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.1' } } as never, tr as never);
   eq(tr.statusCode, 204, 'a beacon (text/plain body) is accepted');
-  eq(calls.find((c) => c.url.includes('bobby_events'))?.body.event, 'appstore_click', 'and stored');
+  const stored = calls.find((c) => c.url.includes('rpc/bobby_record_event'))?.body;
+  eq([stored?.p_event, stored?.p_surface, stored?.p_platform], ['appstore_click', 'home', 'web'], 'stored with its device touch in one call');
   const bad = response();
   await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
   eq(bad.statusCode, 400, 'unknown events are refused');

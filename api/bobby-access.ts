@@ -19,7 +19,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { X509Certificate, createHash, verify as verifySignature } from 'node:crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
-import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, upsertSubscription } from './_lib/access.js';
+import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, touchDevice, upsertSubscription } from './_lib/access.js';
+import { waitUntil } from '@vercel/functions';
 import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.js';
 import { isCouponCode, normalizeCoupon, redeemCoupon } from './_lib/coupons.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
@@ -87,6 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'GET') {
     let identity = null;
     try { identity = await resolveIdentity(req); } catch { identity = null; }
+    // The app or the desk opened: count the install (and link it to the account) after answering.
+    waitUntil(touchDevice(req, identity));
     let subscription = null;
     try { subscription = identity ? await getSubscription(identity.id) : null; } catch { subscription = null; }
     const [access, levels, referral] = await Promise.all([
