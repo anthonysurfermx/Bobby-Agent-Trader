@@ -21,15 +21,20 @@ const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
 
-// The middleware redirects a direct visit to "/desk". Keep SPA navigation and local Vite aligned.
+// A direct visit to "/" is served by middleware. Reload client-side navigation to reach that page.
+const SPA_BOOT_PATH = typeof window !== 'undefined' ? window.location.pathname : '/';
 function HomeGate() {
   const { search, hash } = useLocation();
   const params = new URLSearchParams(search);
   const callbackParams = ['code', 'access_token', 'refresh_token', 'error', 'error_description', 'token'];
-  const path = callbackParams.some((param) => params.has(param)) || /(?:^|[&#])(access_token|refresh_token|error_description)=/.test(hash)
-    ? '/auth/callback'
-    : '/desk';
-  return <Navigate to={`${path}${search}${hash}`} replace />;
+  const isCallback = callbackParams.some((param) => params.has(param)) || /(?:^|[&#])(access_token|refresh_token|error|error_description|token)=/.test(hash);
+  React.useEffect(() => {
+    if (isCallback) return;
+    if (SPA_BOOT_PATH === '/') window.location.replace(`/home/index.html${search}${hash}`);
+    else window.location.reload();
+  }, [isCallback, search, hash]);
+  if (isCallback) return <Navigate to={`/auth/callback${search}${hash}`} replace />;
+  return <PageLoader />;
 }
 const BobbyAppLanding = lazyWithRetry(() => import('@/pages/BobbyAppLandingExperience'), 'app-landing');
 // Direction A (lifestyle) was /app until 2026-09-24 and stays at /app-a, so a rollback is a route change;

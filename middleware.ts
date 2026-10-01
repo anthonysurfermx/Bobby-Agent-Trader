@@ -1,8 +1,8 @@
 /**
  * Routing Middleware (framework-agnostic, runs before the filesystem).
  *
- * Send the Bobby domain home straight to the interactive Núcleo desk.
- * The protocol and app landing pages remain available at /protocol and /app.
+ * Serve the animated Núcleo story at the Bobby domain root.
+ * Its App button opens the interactive desk at /desk.
  */
 export const config = { matcher: '/', runtime: 'nodejs' };
 
@@ -10,8 +10,13 @@ export default function middleware(request: Request): Response | undefined {
   const url = new URL(request.url);
   if (url.pathname !== '/' || !['GET', 'HEAD'].includes(request.method)) return undefined;
 
-  // Older email/OAuth links can still return to the root with a callback code.
+  // Older email/OAuth links can still return to the root with callback parameters.
   const callbackParams = ['code', 'access_token', 'refresh_token', 'error', 'error_description', 'token'];
-  url.pathname = callbackParams.some((param) => url.searchParams.has(param)) ? '/auth/callback' : '/desk';
-  return Response.redirect(url, 307);
+  if (callbackParams.some((param) => url.searchParams.has(param))) {
+    url.pathname = '/auth/callback';
+    return Response.redirect(url, 307);
+  }
+
+  url.pathname = '/home/index.html';
+  return new Response(null, { headers: { 'x-middleware-rewrite': url.toString() } });
 }
