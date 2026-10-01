@@ -12,7 +12,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { createLimiter, getClientIpKey, saltedKey } from './_lib/rate-limit.js';
 import { requestGeo } from './_lib/geo.js';
-import { networkHash } from './_lib/access.js';
+import { callerHash } from './_lib/access.js';
 
 export const config = { maxDuration: 10 };
 
@@ -56,7 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
       body: JSON.stringify({
         p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source,
-        ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}), p_network: networkHash(req),
+        ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
       }),
     });
     if (!r.ok) failure = `storage ${r.status}`;

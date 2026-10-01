@@ -77,7 +77,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('rpc/bobby_mark_admin_session')) return new Response(null, { status: 204 });
   if (c.url.includes('rpc/bobby_admin_devices')) return json([{ device: 'abcdef1234', platform: 'ios', internal: false }]);
   if (c.url.includes('rpc/bobby_set_device_internal')) return json(c.body.p_prefix === 'abcdef1234' ? 1 : 0);
-  if (c.url.includes('bobby_internal_networks') && c.method === 'GET') return json([{ network_hash: 'netprefix0-rest-of-the-hash', note: 'admin session', created_at: '2026-10-01T22:00:00Z', last_seen_at: '2026-10-01T22:00:00Z' }]);
+  if (c.url.includes('rpc/bobby_admin_internal_networks')) return json([{ network: 'netprefix0', note: 'admin session', createdAt: '2026-10-01T22:00:00Z', lastSeenAt: '2026-10-01T22:00:00Z', installs: 2, onlyByNetwork: 0 }]);
+  if (c.url.includes('rpc/bobby_ignore_internal_network')) return json(c.body.p_prefix === 'netprefix0' ? 1 : 0);
   if (c.url.includes('bobby_internal_marks') && c.method === 'GET') return json([]);
   if (c.url.includes('bobby_internal_marks') || c.url.includes('bobby_internal_networks')) return new Response(null, { status: 201 });
   if (c.url.includes('bobby_admin_settings?key=eq.internal_emails')) return json([{ value: ['me@example.com'] }]);
@@ -294,6 +295,9 @@ try {
   const iv = await call('GET', 'Bearer admin-token', { view: 'internal' });
   eq([iv.statusCode, iv.body.networks[0].network, iv.body.emails], [200, 'netprefix0', ['me@example.com']], 'the internal view never exposes a full network hash');
   eq((await call('GET', 'Bearer user-token', { view: 'internal' })).statusCode, 403, 'internal view is admin only');
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'remove-internal-network', network: 'netprefix0' })).statusCode, 200, 'remove a team network');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_ignore_internal_network'))?.body, { p_prefix: 'netprefix0' }, 'kept as ignored, so /admin does not add it back');
+  ok(!calls.some((c) => c.url.includes('bobby_internal_networks') && c.method === 'DELETE'), 'never deleted');
 
   // ---------- the daily digest ----------
   process.env.CRON_SECRET = 'cron-test-secret';

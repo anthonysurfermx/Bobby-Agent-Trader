@@ -178,7 +178,7 @@ export default function InsightsPanel({ insights, missing, onOpenTab, notify, pe
             {missing ? '—' : urgent ? `${fmtInt(urgent)} por atender` : insights.length ? 'Nada urgente' : 'Sin hallazgos'}
           </div>
           <p className="m-0 mt-2 max-w-[640px] text-[12px] leading-snug text-[#8B8B8B]">
-            Calculado con las mismas cifras de este panel, sin el tráfico del equipo; cada hallazgo muestra sus números y su muestra (n).
+            Calculado con las mismas cifras de este panel, {internal ? 'incluyendo al equipo' : 'sin el tráfico del equipo'}; cada hallazgo muestra sus números y su muestra (n).
           </p>
         </div>
         {counts.length > 0 && (

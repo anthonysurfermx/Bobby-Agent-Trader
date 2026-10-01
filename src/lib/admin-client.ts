@@ -194,11 +194,13 @@ export interface InstallRow {
   device: string; platform: string; source: 'observed' | 'backfill'; firstSeen: string; lastSeen: string | null;
   firstSurface: string | null; referrer: string | null; utm: string | null; country: string | null;
   /** Internal for any reason (marked, /admin, a team account, a team network); manualInternal = marked by hand. */
-  internal: boolean; manualInternal: boolean; reads: number; delivered: number; account: string | null; accountId: string | null;
+  internal: boolean; manualInternal: boolean; adminSession: boolean; teamNetwork: boolean;
+  reads: number; delivered: number; account: string | null; accountId: string | null;
 }
 export interface InternalResponse {
   devices: InstallRow[];
-  networks: Array<{ network: string; note: string | null; createdAt: string; lastSeenAt: string }>;
+  /** installs = installs the network leaves out; onlyByNetwork = of those, the ones nothing else marks as the team's. */
+  networks: Array<{ network: string; note: string | null; createdAt: string; lastSeenAt: string; installs: number; onlyByNetwork: number }>;
   emails: string[];
   marks: Array<{ identity_id: string; email: string | null; provider: string | null; note: string | null; created_at: string }>;
 }
@@ -833,11 +835,15 @@ export async function fetchAdminInternal(): Promise<InternalResponse> {
       return {
         device: str(x.device), platform: str(x.platform) || 'web', source: x.source === 'backfill' ? 'backfill' : 'observed', firstSeen: str(x.firstSeen), lastSeen: strOrNull(x.lastSeen),
         firstSurface: strOrNull(x.firstSurface), referrer: strOrNull(x.referrer), utm: strOrNull(x.utm), country: strOrNull(x.country),
-        internal: Boolean(x.internal), manualInternal: Boolean(x.manualInternal), reads: num(x.reads), delivered: num(x.delivered),
+        internal: Boolean(x.internal), manualInternal: Boolean(x.manualInternal), adminSession: Boolean(x.adminSession), teamNetwork: Boolean(x.teamNetwork),
+        reads: num(x.reads), delivered: num(x.delivered),
         account: strOrNull(x.account), accountId: strOrNull(x.accountId),
       };
     }),
-    networks: (Array.isArray(r.networks) ? r.networks : []).map((v) => { const x = obj(v); return { network: str(x.network), note: strOrNull(x.note), createdAt: str(x.createdAt), lastSeenAt: str(x.lastSeenAt) }; }),
+    networks: (Array.isArray(r.networks) ? r.networks : []).map((v) => {
+      const x = obj(v);
+      return { network: str(x.network), note: strOrNull(x.note), createdAt: str(x.createdAt), lastSeenAt: str(x.lastSeenAt), installs: num(x.installs), onlyByNetwork: num(x.onlyByNetwork) };
+    }),
     emails: Array.isArray(r.emails) ? r.emails.map(str).filter(Boolean) : [],
     marks: (Array.isArray(r.marks) ? r.marks : []).map((v) => { const x = obj(v); return { identity_id: str(x.identity_id), email: strOrNull(x.email), provider: strOrNull(x.provider), note: strOrNull(x.note), created_at: str(x.created_at) }; }),
   };

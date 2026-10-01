@@ -26,9 +26,12 @@ const MIGRATIONS = [
   '20261001210000_admin_audit_fixes.sql',
   '20261001220000_audience_geo.sql',
   '20261001230000_admin_truth.sql',
-  '20261001233000_admin_users_team.sql',
+  '20261001233000_admin_truth_review.sql',
 ];
 const TRUTH = 'supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql';
+const REVIEW = 'supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql';
+// Re-applying the first migration (to test its idempotent backfill) brings back its functions: the review goes on top.
+const reapply = async () => { await pool.query(readFileSync(TRUTH, 'utf8')); await pool.query(readFileSync(REVIEW, 'utf8')); };
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
@@ -58,17 +61,17 @@ try {
     create table if not exists auth.identities (user_id uuid not null references auth.users(id), provider text not null);
     create table if not exists public.api_cache (cache_key text primary key, payload jsonb, expires_at timestamptz, updated_at timestamptz default now());`);
   for (const file of MIGRATIONS) await pool.query(readFileSync(`supabase/bobby-protocol/supabase/migrations/${file}`, 'utf8'));
-  await pool.query(readFileSync(TRUTH, 'utf8')); // idempotent
+  await reapply(); // idempotent
   await pool.query(`truncate public.bobby_events, public.bobby_purchase_events, public.bobby_llm_credit_marks, public.bobby_llm_usage,
     public.bobby_reader_stats, public.bobby_admin_actions, public.bobby_coupon_redemptions, public.bobby_usage_bonus, public.bobby_subscriptions,
     public.bobby_pro_grants, public.bobby_level_uses, public.bobby_reads restart identity cascade`);
   await pool.query('delete from public.bobby_coupons');
-  await pool.query('truncate public.bobby_device_accounts, public.bobby_activity_days, public.bobby_internal_marks, public.bobby_internal_networks, public.bobby_devices, public.bobby_costs restart identity');
+  await pool.query('truncate public.bobby_device_networks, public.bobby_device_accounts, public.bobby_activity_days, public.bobby_internal_marks, public.bobby_internal_networks, public.bobby_devices, public.bobby_costs restart identity');
   await pool.query('delete from public.bobby_admins');
   await pool.query('delete from public.bobby_identities');
 
   // ---------- privileges ----------
-  for (const table of ['bobby_device_accounts', 'bobby_activity_days', 'bobby_internal_marks', 'bobby_internal_networks']) {
+  for (const table of ['bobby_device_accounts', 'bobby_activity_days', 'bobby_internal_marks', 'bobby_internal_networks', 'bobby_device_networks']) {
     for (const role of ['anon', 'authenticated']) for (const priv of ['select', 'insert', 'update', 'delete']) {
       eq((await one('select has_table_privilege($1, $2, $3) as r', [role, `public.${table}`, priv])).r, false, `${role} has no ${priv} on ${table}`);
     }
@@ -77,6 +80,7 @@ try {
   for (const fn of ['public.bobby_admin_growth(integer,boolean)', 'public.bobby_admin_device_facts()', 'public.bobby_admin_people_facts()',
     'public.bobby_record_outcome(text,text,text,uuid,text,text,text,text)', 'public.bobby_mark_admin_session(text,text)', 'public.bobby_identity_internal(uuid)',
     'public.bobby_device_internal(text)', 'public.bobby_traffic_internal(uuid,text)', 'public.bobby_touch_device(text,text,text,text,text,uuid,text,text,text)',
+    'public.bobby_internal_identity_ids()', 'public.bobby_internal_device_hashes()', 'public.bobby_ignore_internal_network(text)', 'public.bobby_admin_internal_networks()',
     'public.bobby_admin_devices(integer)', 'public.bobby_set_device_internal(text,boolean)']) {
     for (const role of ['anon', 'authenticated']) eq((await one('select has_function_privilege($1, $2, $3) as r', [role, fn, 'execute'])).r, false, `${role} cannot execute ${fn}`);
     eq((await one('select has_function_privilege($1, $2, $3) as r', ['service_role', fn, 'execute'])).r, true, `service_role executes ${fn}`);
@@ -90,7 +94,7 @@ try {
   await pool.query(`insert into public.bobby_devices(device_hash, platform, first_seen, last_seen) values ($1, 'web', timestamptz '2026-09-27 00:13:00+00', timestamptz '2026-09-27 00:20:00+00'),
     ($2, 'web', timestamptz '2026-10-01 19:01:11+00', timestamptz '2026-10-01 19:01:11+00')`, [rebuilt, seenOld]);
   await pool.query("insert into public.bobby_events(event, platform, surface, device_hash, created_at) values ('visit', 'web', 'auth', $1, timestamptz '2026-10-01 19:01:11+00')", [seenOld]);
-  await pool.query(readFileSync(TRUTH, 'utf8'));
+  await reapply();
   eq((await one('select source from public.bobby_devices where device_hash = $1', [rebuilt])).source, 'backfill', 'an install first seen at its first read (before the cutoff) was rebuilt');
   eq((await one('select source from public.bobby_devices where device_hash = $1', [seenOld])).source, 'observed', 'an install with an event at its first sighting was seen arriving');
   await pool.query('delete from public.bobby_events');
@@ -136,7 +140,7 @@ try {
 
   // ---------- the cohort, in order ----------
   await pool.query('truncate public.bobby_events, public.bobby_reads, public.bobby_reader_stats restart identity');
-  await pool.query('truncate public.bobby_device_accounts, public.bobby_activity_days, public.bobby_devices');
+  await pool.query('truncate public.bobby_device_networks, public.bobby_device_accounts, public.bobby_activity_days, public.bobby_devices');
   const A = dev('a'), B = dev('b'), E = dev('e'), G = dev('g'), OLD = dev('old');
   // A arrives on the web 3 days ago, opens the desk, reads 3 times, hits the wall and creates an account.
   await pool.query(`insert into public.bobby_devices(device_hash, platform, first_seen, last_seen, first_surface) values ($1, 'web', ${minsAgo(3 * DAY)}, ${minsAgo(3 * DAY)}, 'home')`, [A]);
@@ -201,19 +205,38 @@ try {
   const listed = await account({ email: 'Guillermos22@gmail.com', provider: 'google' });
   eq((await one('select public.bobby_identity_internal($1) as r', [listed])).r, true, 'a listed email is internal (case-insensitive), even for a new account');
   eq((await one('select public.bobby_identity_internal($1) as r', [cy])).r, false, 'an outside account is not');
-  const cafe = dev('cafe'), net = 'net-' + randomUUID().slice(0, 12);
-  await pool.query("insert into public.bobby_reads(device_hash, network_hash, platform, symbol) values ($1, $2, 'web', 'BTC')", [cafe, net]);
-  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, false, 'a guest on an unknown network is outside');
+  const cafe = dev('cafe'), net = 'net-' + randomUUID().slice(0, 12), net2 = 'net-' + randomUUID().slice(0, 12);
+  await pool.query("select public.bobby_record_event('visit', 'web', 'home', $1, null, null, 'MX', 'CMX', $2)", [cafe, net]);
+  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, false, 'an install on an address nobody marked is outside');
   await pool.query('select public.bobby_mark_admin_session(null, $1)', [net]);
-  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, true, 'an install that read from a network an admin used is internal');
+  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, true, 'once an admin uses that address, installs seen there before are internal too');
+  await pool.query("select public.bobby_record_event('visit', 'web', 'home', $1, null, null, 'MX', 'CMX', $2)", [cafe, net2]);
+  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, true, 'and stay internal on another network (history, not the latest address)');
   const later = dev('later');
   await pool.query("select public.bobby_record_event('visit', 'web', 'home', $1, null, null, 'MX', 'CMX', $2)", [later, net]);
-  eq((await one('select public.bobby_device_internal($1) as r', [later])).r, true, 'an install seen on that network later is internal too');
-  await pool.query('delete from public.bobby_internal_networks where network_hash = $1', [net]);
-  await pool.query('delete from public.bobby_identities where id = $1', [listed]);
-  await pool.query('delete from public.bobby_devices where device_hash = any($1)', [[cafe, later]]);
-  await pool.query('delete from public.bobby_reads where device_hash = $1', [cafe]);
+  eq((await one('select public.bobby_device_internal($1) as r', [later])).r, true, 'an install seen on that address later is internal');
+  const nets = (await one('select public.bobby_admin_internal_networks() as r')).r;
+  eq([nets.length, nets[0].installs, nets[0].onlyByNetwork, nets[0].network.length], [1, 2, 2, 10], 'the network list: prefix only, installs it leaves out');
+  const reads = "insert into public.bobby_reads(device_hash, network_hash, platform, symbol) values ($1, $2, 'web', 'BTC')";
+  const guest = dev('guest');
+  await pool.query(reads, [guest, net]);
+  eq((await one('select public.bobby_device_internal($1) as r', [guest])).r, false, "a read's /24 metering network never makes an install internal");
+  eq((await one('select public.bobby_ignore_internal_network($1) as n', [nets[0].network])).n, 1, 'the owner removes the network');
+  eq((await one('select public.bobby_device_internal($1) as r', [cafe])).r, false, 'removing it undoes exactly what it caused');
+  await pool.query('select public.bobby_mark_admin_session(null, $1)', [net]);
+  eq((await one('select public.bobby_device_internal($1) as r', [later])).r, false, 'and the next /admin visit does not add it back');
+  eq((await one('select public.bobby_admin_internal_networks() as r')).r.length, 0, 'a removed network is not listed');
+  // An account signed in on an install the owner uses for /admin is the team's, even without a listed email.
+  const owner = dev('owner'), apple = await account({ provider: 'apple' });
+  await pool.query('select public.bobby_mark_admin_session($1, null)', [owner]);
+  eq((await one('select public.bobby_identity_internal($1) as r', [apple])).r, false, 'an outside Apple account');
+  await pool.query("select public.bobby_touch_device($1, 'web', null, null, null, $2)", [owner, apple]);
+  eq((await one('select public.bobby_identity_internal($1) as r', [apple])).r, true, 'signed in on the /admin install: the team');
+  await pool.query('delete from public.bobby_internal_networks');
+  await pool.query('delete from public.bobby_identities where id = any($1)', [[listed, apple]]);
+  await pool.query('delete from public.bobby_reads where device_hash = any($1)', [[guest]]);
   await pool.query('delete from public.bobby_events where device_hash = any($1)', [[cafe, later]]);
+  await pool.query('delete from public.bobby_devices where device_hash = any($1)', [[cafe, later, guest, owner]]);
 
   // ---------- the overview, outside traffic only ----------
   const ov = async (internal = false) => (await one('select public.bobby_admin_overview(30, $1) as r', [internal])).r;
@@ -236,13 +259,32 @@ try {
   eq((await one("select count(*)::int n from pg_proc where proname = 'bobby_admin_overview'")).n, 1, 'one overview signature (no ambiguous overload)');
 
   // ---------- the users list agrees with the figures ----------
-  await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20261001233000_admin_users_team.sql', 'utf8'));
+  await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql', 'utf8'));
   const teamMate = await account({ email: 'anthony@rizoma.boutique', provider: 'google' });
   const ul = (await one('select public.bobby_admin_users(null, 200, 0) as r')).r;
   const row = (id: string) => ul.users.find((u: { id: string }) => u.id === id);
   eq([row(teamMate).is_team, row(teamMate).is_internal], [true, false], 'a listed email is team, not hand-marked');
   eq([row(boss).is_team, row(cy).is_team], [true, false], 'an admin is team; an outside account is not');
   eq(ul.internal, ul.users.filter((u: { is_team: boolean }) => u.is_team).length, 'the internas count is the same rule');
+
+  // ---------- it stays fast as the data grows ----------
+  const pc = await pool.connect();
+  try {
+    await pc.query('begin');
+    await pc.query(`insert into public.bobby_devices(device_hash, platform, first_seen, last_seen, reads, first_read_at)
+      select 'perf-dev-' || g, case when g % 3 = 0 then 'ios' else 'web' end, now() - make_interval(hours => g % 700), now(), g % 4, case when g % 4 > 0 then now() - make_interval(hours => g % 700) end
+      from generate_series(1, 2000) g`);
+    await pc.query(`insert into public.bobby_reads(device_hash, network_hash, platform, symbol, created_at)
+      select 'perf-dev-' || (g % 2000 + 1), 'perfnet-' || (g % 50), 'web', 'BTC', now() - make_interval(hours => g % 600) from generate_series(1, 6000) g`);
+    await pc.query(`insert into public.bobby_events(event, platform, surface, device_hash, created_at)
+      select 'visit', 'web', 'home', 'perf-dev-' || (g % 2000 + 1), now() - make_interval(hours => g % 600) from generate_series(1, 6000) g`);
+    await pc.query(`insert into public.bobby_device_networks(device_hash, network_hash) select 'perf-dev-' || g, 'caller-' || (g % 300) from generate_series(1, 2000) g`);
+    await pc.query("insert into public.bobby_internal_networks(network_hash, note) values ('caller-7', 'perf')");
+    const t0 = Date.now();
+    await pc.query('select public.bobby_admin_growth(30, false), public.bobby_admin_overview(30, false)');
+    const ms = Date.now() - t0;
+    ok(ms < 4000, `growth + overview with 2,000 installs, 6,000 reads and 6,000 events in ${ms} ms (under 4 s; the API aborts at 6 s)`);
+  } finally { await pc.query('rollback'); pc.release(); }
 
   console.log(`admin-truth-pg: ${checks} checks passed`);
 } finally {

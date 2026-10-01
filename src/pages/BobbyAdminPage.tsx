@@ -127,7 +127,7 @@ function headerCount(tab: TabId, d: OverviewResponse | null, period: number): st
       const urgent = d.insights.filter((x) => x.level === 'critical' || x.level === 'warn').length;
       return d.growth ? `${fmtInt(d.growth.people.active7d)} personas activas 7d${urgent ? ` · ${urgent} por atender` : ''}` : null;
     }
-    case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas externas`;
+    case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas ${o.includeInternal ? '(con el equipo)' : 'externas'}`;
     case 'funnel': return d.growth ? `${fmtInt(d.growth.cohorts.web.arrived + d.growth.cohorts.ios.arrived)} llegadas observadas · ${period}d` : null;
     case 'audiencia': return null;
     case 'membresias': return `${fmtInt(o.subscriptions.paid)} pagando`;

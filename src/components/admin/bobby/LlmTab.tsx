@@ -203,7 +203,9 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
   const ledgerSurfaces = cov?.ledgerSurfaces ?? [];
   const runs = o.llm.deskRuns;
   const unfinished = Math.max(0, runs.runs - runs.finished);
-  const runsByDay = new Map(runs.byDay.map((d) => [d.day.slice(0, 10), d.runs]));
+  // byDay carries one entry per analysis: sum them per day.
+  const runsByDay = new Map<string, number>();
+  for (const d of runs.byDay) runsByDay.set(d.day.slice(0, 10), (runsByDay.get(d.day.slice(0, 10)) ?? 0) + d.runs);
   const runValues = o.days.map((d) => runsByDay.get(d) ?? 0);
   const ledgerLine = cov
     ? `Ledger desde ${cov.ledgerSince ? fmtDate(cov.ledgerSince) : 'sin registros todavía'} · superficies que lo escriben: ${ledgerSurfaces.length ? ledgerSurfaces.join(', ') : 'ninguna todavía'}`

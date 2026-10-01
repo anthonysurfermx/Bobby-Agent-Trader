@@ -12,7 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './bobby-db.js';
 import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
-import { deviceHash, networkHash, paywallOn } from './access.js';
+import { callerHash, deviceHash, paywallOn } from './access.js';
 import { countryCode, fromAlpha3 } from './geo.js';
 import { waitUntil } from '@vercel/functions';
 
@@ -49,8 +49,8 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
   try {
     const rows = await rest<Array<{ identity_id: string }>>(`bobby_admins?identity_id=eq.${identity.id}&select=identity_id`);
     if (!rows?.length) { res.status(403).json({ error: 'not_admin' }); return null; }
-    // The browser and the network used for /admin are the team's own traffic: the dashboard leaves them out.
-    const device = deviceHash(req), network = networkHash(req);
+    // The browser and the address used for /admin are the team's own traffic: the dashboard leaves them out.
+    const device = deviceHash(req), network = callerHash(req);
     if (device || network) waitUntil(rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null));
     return identity;
   } catch {
@@ -238,9 +238,9 @@ export async function setDeviceInternal(body: Record<string, unknown>) {
 export async function removeInternalNetwork(body: Record<string, unknown>) {
   const prefix = typeof body.network === 'string' ? body.network : '';
   if (!/^[A-Za-z0-9_-]{10}$/.test(prefix)) throw new AdminError(400, 'Invalid request.');
-  const rows = await rest<Array<{ network_hash: string }>>(`bobby_internal_networks?network_hash=like.${encodeURIComponent(prefix)}*&select=network_hash`);
-  if (rows?.length !== 1) throw new AdminError(404, 'Network not found.');
-  await rest(`bobby_internal_networks?network_hash=eq.${encodeURIComponent(rows[0].network_hash)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  // Kept as ignored (not deleted), so the next /admin visit from that address does not add it back.
+  const n = await rpc<number>('bobby_ignore_internal_network', { p_prefix: prefix });
+  if (n !== 1) throw new AdminError(404, 'Network not found.');
   return { target: prefix };
 }
 
@@ -260,15 +260,15 @@ export async function setInternalEmails(body: Record<string, unknown>) {
 export async function internalView() {
   const [devices, networks, emails, marks] = await Promise.all([
     rpc<unknown[]>('bobby_admin_devices', { p_limit: 200 }),
-    rest<Array<{ network_hash: string; note: string | null; created_at: string; last_seen_at: string }>>('bobby_internal_networks?select=network_hash,note,created_at,last_seen_at&order=last_seen_at.desc'),
+    // Prefixes only and how many installs each network leaves out (bobby_admin_internal_networks).
+    rpc<unknown[]>('bobby_admin_internal_networks', {}),
     rest<Array<{ value: unknown }>>('bobby_admin_settings?key=eq.internal_emails&select=value'),
     rest<Array<{ identity_id: string; note: string | null; created_at: string; identity?: { email?: string | null; provider?: string | null } | null }>>(
       'bobby_internal_marks?select=identity_id,note,created_at,identity:bobby_identities(email,provider)&order=created_at.desc'),
   ]);
   return {
     devices: devices ?? [],
-    // Only a prefix leaves the server: enough to tell networks apart and remove one, never the full hash.
-    networks: (networks ?? []).map((n) => ({ network: n.network_hash.slice(0, 10), note: n.note, createdAt: n.created_at, lastSeenAt: n.last_seen_at })),
+    networks: networks ?? [],
     emails: Array.isArray(emails?.[0]?.value) ? (emails![0].value as unknown[]).filter((e): e is string => typeof e === 'string') : [],
     marks: (marks ?? []).map(({ identity, ...m }) => ({ ...m, email: identity?.email || null, provider: identity?.provider ?? null })),
   };
@@ -307,7 +307,16 @@ export async function probeProvider(provider: unknown) {
   } else {
     throw new AdminError(400, 'Unknown provider.');
   }
-  if (res.ok) return { status: 'ok' as const, httpStatus: res.status };
+  if (res.ok) {
+    // A working provider ends any credit alert, and the successful call is evidence for the dashboard (lastOk).
+    await Promise.all([
+      rest(`api_cache?cache_key=eq.${encodeURIComponent(`provider-credit-alert:${provider}`)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null),
+      rest('bobby_llm_usage', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
+        surface: 'probe', provider, model: provider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini', role: 'probe',
+        tokens_in: 1, tokens_out: 1, tokens_cached: 0, tokens_reasoning: 0, usd: 0, latency_ms: 0, stop: 'ok', ok: true }) }).catch(() => null),
+    ]);
+    return { status: 'ok' as const, httpStatus: res.status };
+  }
   // Class only: the provider's message is never kept.
   const error = ((await res.json().catch(() => null)) as { error?: { code?: unknown; type?: unknown; message?: unknown } } | null)?.error;
   const text = typeof error?.message === 'string' ? error.message : '';
@@ -579,7 +588,7 @@ interface EconomicsRaw {
   days: number; since: string;
   revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; payersEver?: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
   costs: { marketingUsd: number; infraUsd: number; otherUsd: number; entries?: number; byChannel: Array<{ channel: string; usd: number }> };
-  subscriptions: { active: number; trialing?: number }; newAccounts: number; activeReaders30d: number; llmUsd: number; llm30dUsd: number;
+  subscriptions: { active: number; trialing?: number }; newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
   assumptions: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number };
 }
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -600,7 +609,9 @@ export function unitEconomics(raw: EconomicsRaw) {
   const observed = base >= 5 ? n(raw.revenue.expirations30d) / base : null;
   const monthlyChurn = observed ?? (n(a.monthlyChurn) > 0 ? n(a.monthlyChurn) : 0.1);
   const churnSource = observed !== null ? 'observed' : n(a.monthlyChurn) > 0 ? 'assumed' : 'default';
-  const llmPerActiveReader = n(raw.activeReaders30d) > 0 ? n(raw.llm30dUsd) / n(raw.activeReaders30d) : 0;
+  // The ledger carries no account (the team's reads are in it): divide by every active reader, the team included.
+  const readers30 = n(raw.activeReaders30dAll) || n(raw.activeReaders30d);
+  const llmPerActiveReader = readers30 > 0 ? n(raw.llm30dUsd) / readers30 : 0;
   const monthlyContribution = priceUsd * takehome - llmPerActiveReader;
   const lifetimeMonths = Math.min(1 / Math.max(monthlyChurn, 0.0001), n(a.maxLifetimeMonths) || 36);
   const ltv = monthlyContribution * lifetimeMonths;

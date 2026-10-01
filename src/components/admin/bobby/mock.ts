@@ -364,12 +364,12 @@ const INSTALLS = Array.from({ length: 14 }, (_, i) => ({
   device: `d${String(i).padStart(2, '0')}abcdef1`.slice(0, 10), platform: i % 3 === 0 ? 'ios' : 'web', source: i < 4 ? 'backfill' : 'observed',
   firstSeen: iso(NOW - (i + 1) * 9 * HOUR), lastSeen: iso(NOW - i * 2 * HOUR), firstSurface: i % 2 ? 'desk' : 'home', referrer: i % 4 === 1 ? 't.co' : null,
   utm: i % 5 === 2 ? 'tiktok' : null, country: i % 3 === 0 ? null : 'MX', internal: i === 0 || i === 5, manualInternal: i === 5, reads: i % 4, delivered: i % 4,
-  account: i === 0 ? ME.email : null, accountId: i === 0 ? ME.id : null,
+  account: i === 0 ? ME.email : null, accountId: i === 0 ? ME.id : null, adminSession: i === 0, teamNetwork: i === 1,
 }));
 function internalView() {
   return {
     devices: INSTALLS,
-    networks: [{ network: 'a1b2c3d4e5', note: 'admin session', createdAt: iso(NOW - 2 * DAY), lastSeenAt: iso(NOW - 5 * MIN) }],
+    networks: [{ network: 'a1b2c3d4e5', note: 'admin session', createdAt: iso(NOW - 2 * DAY), lastSeenAt: iso(NOW - 5 * MIN), installs: 3, onlyByNetwork: 1 }],
     emails: INTERNAL_EMAILS,
     marks: [{ identity_id: USERS[3].id, email: null, provider: 'apple', note: 'iPhone de pruebas', created_at: iso(NOW - DAY) }],
   };

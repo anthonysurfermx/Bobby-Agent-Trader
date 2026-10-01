@@ -82,7 +82,8 @@ function afterReadRows(platform: Platform, c: GrowthCohort, outcomes: boolean): 
   const wallMissing = outcomes ? undefined : NO_OUTCOMES;
   return [
     ofRow('2+ lecturas', c.read2, c.read1),
-    ofRow('3 lecturas gratis usadas', c.read3, c.read1),
+    // Install reads include signed-in ones since the device is kept on them: this is "3+ reads", not the guest wall.
+    ofRow('3+ lecturas', c.read3, c.read1),
     ofRow('Chocaron con el muro de registro', c.wall, c.read1, wallMissing),
     ofRow('Cuenta tras el muro', c.accountAfterWall, c.wall, wallMissing),
     // The iOS app does not report the start of a sign-in (only the web does).

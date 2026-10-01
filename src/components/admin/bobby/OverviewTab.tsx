@@ -27,7 +27,10 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
   const rd = o.activity.readsDaily;
   const readsDaily = rd.web.map((v, k) => v + (rd.ios[k] ?? 0) + (rd.android[k] ?? 0));
   const llmPeriod = o.llm.providers.anthropic.period + o.llm.providers.openai.period;
-  const allReads = o.activity.reads + o.activity.readsInternal;
+  // The ledger carries no account, so cost per read uses every read; with the team included, reads already has them.
+  const allReads = o.includeInternal ? o.activity.reads : o.activity.reads + o.activity.readsInternal;
+  const who = o.includeInternal ? 'con el equipo' : 'externas';
+  const outcomesPartial = !!g?.outcomes.outcomesSince && new Date(g.outcomes.outcomesSince).getTime() > new Date(g.since).getTime();
   const act = o.activity.activation;
   const premium = o.activity.levels.profundo + o.activity.levels.maximo;
   const delivered = g?.outcomes.outcomesSince ? g.outcomes.delivered : null;
@@ -55,17 +58,17 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
           {
             label: 'Personas activas · 7 días', value: g ? fmtInt(g.people.active7d) : DASH,
             caption: g
-              ? `${fmtInt(g.people.readers7d)} leyeron · ${fmtInt(g.people.accounts)} cuentas + ${fmtInt(g.people.guests)} instalaciones sin cuenta${internalOut && (g.people.excluded.accounts + g.people.excluded.guests) ? ` · sin el equipo (−${fmtInt(g.people.excluded.accounts + g.people.excluded.guests)})` : ''}`
+              ? `${fmtInt(g.people.readers7d)} leyeron · de ${fmtInt(g.people.total)} personas (${fmtInt(g.people.accounts)} cuentas + ${fmtInt(g.people.guests)} instalaciones sin cuenta)${internalOut && (g.people.excluded.accounts + g.people.excluded.guests) ? ` · sin el equipo (−${fmtInt(g.people.excluded.accounts + g.people.excluded.guests)})` : ''}`
               : 'dato no disponible',
           },
           {
             label: `Lecturas · ${period}d`, value: show('activity.reads', fmtInt(o.activity.reads)),
             delta: delta('activity.readsDaily', cmp?.reads, READS_HISTORY_DAYS),
-            caption: `${delivered != null ? `${fmtInt(delivered)} respuestas entregadas · ` : ''}${internalOut && o.activity.readsInternal ? `sin ${fmtInt(o.activity.readsInternal)} del equipo` : 'todas las lecturas'}`,
+            caption: `${delivered != null ? `${fmtInt(delivered)} respuestas entregadas${outcomesPartial ? ` desde ${fmtDate(g!.outcomes.outcomesSince)} (parcial)` : ''} · ` : ''}${internalOut && o.activity.readsInternal ? `sin ${fmtInt(o.activity.readsInternal)} del equipo` : 'incluye las del equipo'}`,
           },
           {
             label: `Cuentas nuevas · ${period}d`, value: show('accounts.new', fmtInt(o.accounts.new)), delta: delta('accounts.daily', cmp?.accounts),
-            caption: `${show('accounts.total', fmtInt(o.accounts.total))} cuentas externas en total${internalOut && o.accounts.internal ? ` · ${fmtInt(o.accounts.internal)} del equipo fuera` : ''}`,
+            caption: `${show('accounts.total', fmtInt(o.accounts.total))} cuentas ${who} en total${internalOut && o.accounts.internal ? ` · ${fmtInt(o.accounts.internal)} del equipo fuera` : ''}`,
           },
         ]}
       />
@@ -127,18 +130,18 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
             <div className="mb-3 font-mono text-[10.5px] uppercase tracking-[0.08em] text-[#5C5C5C]">Nivel de las lecturas</div>
             <StatusBars
               rows={[
-                { label: 'Rápido', value: Math.max(0, o.activity.reads - premium), fill: 'blue', sub: fmtPct(Math.max(0, o.activity.reads - premium), o.activity.reads) },
-                { label: 'Profundo', value: o.activity.levels.profundo, fill: 'orange', sub: fmtPct(o.activity.levels.profundo, o.activity.reads) },
-                { label: 'Máximo', value: o.activity.levels.maximo, fill: 'orange', sub: fmtPct(o.activity.levels.maximo, o.activity.reads) },
+                { label: 'Rápido', value: Math.max(0, o.activity.reads - premium), fill: 'blue', sub: share(Math.max(0, o.activity.reads - premium), o.activity.reads) },
+                { label: 'Profundo', value: o.activity.levels.profundo, fill: 'orange', sub: share(o.activity.levels.profundo, o.activity.reads) },
+                { label: 'Máximo', value: o.activity.levels.maximo, fill: 'orange', sub: share(o.activity.levels.maximo, o.activity.reads) },
               ]}
             />
           </div>
         </Card>
         <Card>
-          <BigNumber label="Cuentas externas" value={show('accounts.total', fmtInt(o.accounts.total))} caption="Apple / Google" />
+          <BigNumber label={o.includeInternal ? 'Cuentas (con el equipo)' : 'Cuentas externas'} value={show('accounts.total', fmtInt(o.accounts.total))} caption="Apple / Google" />
           {miss('accounts.byProvider') ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p> : providers.length ? (
-            <StatusBars rows={providers.map(([k, v], idx) => ({ label: label(k), value: v, fill: (idx % 2 ? 'orange' : 'blue') as 'orange' | 'blue', sub: fmtPct(v, o.accounts.total) }))} />
-          ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay cuentas externas.</p>}
+            <StatusBars rows={providers.map(([k, v], idx) => ({ label: label(k), value: v, fill: (idx % 2 ? 'orange' : 'blue') as 'orange' | 'blue', sub: share(v, o.accounts.total) }))} />
+          ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay cuentas {who}.</p>}
           <div className="mt-5 border-t border-white/[0.06] pt-2">
             <Row label="Leyeron en los últimos 7 días" value={fmtInt(o.accounts.active7d)} />
             <Row label="Lectores 7d (personas)" value={fmtInt(o.activity.activeReaders7d)} hint={`${fmtInt(o.activity.activeReaders7dSplit.accounts)} cuentas · ${fmtInt(o.activity.activeReaders7dSplit.guests)} invitados`} />

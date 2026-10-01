@@ -202,7 +202,7 @@ function NetworksSection({ networks, busy, onRemove }: { networks: Network[]; bu
   return (
     <section>
       <SectionHead title="Redes del equipo" count={`${fmtInt(networks.length)}`}>
-        Se agregan solas cuando un admin abre /admin. Bobby no guarda IPs: solo un hash del rango de red (/24 o /48). Ojo: en datos móviles un mismo rango lo comparten muchas personas — si una red no es tuya, quítala.
+        Se agregan solas cuando un admin abre /admin: es la dirección desde la que entraste (IP exacta en IPv4, /64 en IPv6), guardada como hash, nunca la IP. Toda instalación vista alguna vez desde ahí queda fuera. Ojo: en datos móviles una misma IP la pueden compartir varias personas — si una red no es tuya, quítala (no se vuelve a agregar).
       </SectionHead>
       {networks.length === 0 ? (
         <Empty>Sin redes registradas</Empty>
@@ -217,7 +217,13 @@ function NetworksSection({ networks, busy, onRemove }: { networks: Network[]; bu
                 </span>
                 <span className="font-mono text-[10.5px] text-[#5C5C5C]">
                   <span title={fmtDateTime(n.createdAt)}>desde {fmtDate(n.createdAt)}</span> · <span title={fmtDateTime(n.lastSeenAt)}>última vez {fmtRelative(n.lastSeenAt, now)}</span>
+                  {' · '}deja fuera {fmtInt(n.installs)} {n.installs === 1 ? 'instalación' : 'instalaciones'}
                 </span>
+                {n.onlyByNetwork > 0 && (
+                  <span className="font-mono text-[10.5px] text-[#F7A04B]">
+                    {fmtInt(n.onlyByNetwork)} solo por esta red (sin cuenta ni marca del equipo): si no son tuyas, quita la red.
+                  </span>
+                )}
               </div>
               <Btn size="sm" variant="ghost" busy={busy === `net:${n.network}`} disabled={busy != null} onClick={() => onRemove(n)}>
                 <X className="h-3.5 w-3.5" aria-hidden />Quitar
@@ -321,7 +327,11 @@ function DevicesSection({ devices, busy, onToggle }: { devices: InstallRow[]; bu
                           : auto ? `La instalación ${d.device} ya es interna automáticamente; marcarla la deja fuera aunque eso cambie`
                           : `Marcar la instalación ${d.device} como interna`}
                       />
-                      {d.manualInternal ? <Tag tone="blue">Manual</Tag> : auto ? <Tag tone="blue" title="Abrió /admin, está ligada a una cuenta del equipo o se vio desde una red del equipo">Auto</Tag> : null}
+                      {d.manualInternal ? <Tag tone="blue">Manual</Tag> : auto ? (
+                        <Tag tone="blue" title={[d.adminSession && 'abrió /admin', d.teamNetwork && 'se vio desde una red del equipo'].filter(Boolean).join(' · ') || 'ligada a una cuenta del equipo'}>
+                          {d.adminSession ? '/admin' : d.teamNetwork ? 'Red' : 'Cuenta'}
+                        </Tag>
+                      ) : null}
                     </div>
                   </td>
                 </tr>

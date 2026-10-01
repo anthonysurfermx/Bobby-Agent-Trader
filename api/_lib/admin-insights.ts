@@ -55,6 +55,8 @@ export interface InsightInput {
   growth: unknown;
   integrations: unknown;
   searchConsole: unknown;
+  /** bobby_admin_internal_networks: team networks and the installs they leave out. */
+  networks?: unknown;
   now?: number;
 }
 
@@ -73,7 +75,8 @@ export function buildInsights(input: InsightInput): Insight[] {
     const pr = o(providers[p]);
     const alertAt = s(pr.lastCreditAlert), topupAt = s(pr.lastTopup), lastOk = s(pr.lastOk);
     const alert = o(pr.creditAlert);
-    const alertLive = alertAt && (!topupAt || new Date(topupAt) < new Date(alertAt)) && (!lastOk || new Date(lastOk) < new Date(alertAt) || n(pr.failures24h) > 0);
+    // A later successful call proves the credit is back; plain failures without an alert go to the failing rule below.
+    const alertLive = alertAt && (!topupAt || new Date(topupAt) < new Date(alertAt)) && (!lastOk || new Date(lastOk) < new Date(alertAt));
     const lastFail = o(pr.lastFailure);
     if (alertLive) {
       add({
@@ -163,7 +166,8 @@ export function buildInsights(input: InsightInput): Insight[] {
 
   const store = o(ig.appStore);
   const downloads = n(o(store.totals).downloads);
-  const iosInstalls = n(ios.arrived) + n(o(o(gr.history).ios).installs);
+  // Installs of the same window: observed arrivals plus rebuilt installs first seen in the period.
+  const iosInstalls = n(ios.arrived) + n(o(o(gr.history).ios).installsInPeriod);
   if (store.configured && !store.error && downloads >= 3 && downloads > iosInstalls) {
     add({
       id: 'ios-gap', level: 'warn', area: 'medicion', tab: 'funnel', impact: 72, sample: downloads,
@@ -182,6 +186,17 @@ export function buildInsights(input: InsightInput): Insight[] {
       detail: `${int(consumedInternal)} de ${int(consumedTotal)} lecturas vienen de cuentas, instalaciones o redes internas. Ya están fuera de todas las cifras; sin ellas quedan ${int(consumedTotal - consumedInternal)}.`,
       action: 'Si alguna cuenta Apple de prueba aún cuenta como externa, márcala en Usuarios → Interno.',
       evidence: [`internas: ${int(consumedInternal)}`, `externas: ${int(consumedTotal - consumedInternal)}`],
+    });
+  }
+
+  // A team network that leaves out installs nothing else ties to the team may be catching outside people.
+  for (const net of a(input.networks).map(o).filter((x) => n(x.onlyByNetwork) >= 3)) {
+    add({
+      id: `network-${String(net.network)}`, level: 'warn', area: 'medicion', tab: 'usuarios', impact: 62, sample: n(net.installs),
+      title: `Una red del equipo deja fuera ${int(n(net.onlyByNetwork))} instalaciones que no parecen tuyas`,
+      detail: `La red ${String(net.network)}… (agregada al abrir /admin) excluye ${int(n(net.installs))} instalaciones; ${int(n(net.onlyByNetwork))} no tienen cuenta, marca ni sesión del equipo. En datos móviles o una oficina, una misma IP la pueden compartir varias personas.`,
+      action: 'Revisa Usuarios → Tráfico interno → Redes; si no es tu red, quítala.',
+      evidence: [`instalaciones fuera: ${int(n(net.installs))}`, `solo por la red: ${int(n(net.onlyByNetwork))}`],
     });
   }
 
@@ -288,7 +303,8 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'accounts-never-read', level: 'warn', area: 'activacion', tab: 'usuarios', impact: 78, sample: n(people.accounts),
       title: `${int(neverRead.length)} de ${int(n(people.accounts))} cuentas externas se registraron y nunca leyeron`,
-      detail: `Crearon cuenta y no recibieron ni una lectura: ${neverRead.slice(0, 5).map((u) => `${s(u.email) ?? `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)}`} (${dateOnly(s(u.createdAt))})`).join(', ')}${neverRead.length > 5 ? '…' : ''}.${neverRead.every((u) => !s(u.email)) ? ' Ninguna tiene email visible (Apple lo oculta): no se les puede escribir.' : ''}`,
+      // Ids and providers only: this text also goes to the digest email and the plan model, never user emails.
+      detail: `Crearon cuenta y no recibieron ni una lectura: ${neverRead.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)} (${dateOnly(s(u.createdAt))})`).join(', ')}${neverRead.length > 5 ? '…' : ''}.${neverRead.every((u) => !s(u.email)) ? ' Ninguna tiene email visible (Apple lo oculta): no se les puede escribir.' : ' Los emails están en Usuarios.'}`,
       action: 'Revisa qué ve alguien justo después de iniciar sesión, y regálales 1 Profundo desde Usuarios (se gasta aunque el cobro esté apagado).',
       evidence: [`cuentas externas: ${int(n(people.accounts))}`, `sin lectura: ${int(neverRead.length)}`],
     });
@@ -320,8 +336,8 @@ export function buildInsights(input: InsightInput): Insight[] {
   } else if (readers >= MIN_RATE_SAMPLE && read3 === 0) {
     add({
       id: 'nobody-uses-3', level: 'info', area: 'conversion', tab: 'funnel', impact: 50, sample: readers,
-      title: 'Nadie llega a usar las 3 lecturas gratis',
-      detail: `${int(readers)} instalaciones nuevas leyeron, ninguna llegó a 3. El registro no es el freno: la gente no vuelve a preguntar.`,
+      title: 'Nadie llega a 3 lecturas',
+      detail: `${int(readers)} instalaciones nuevas leyeron, ninguna llegó a 3 (el muro de registro está después de 3 lecturas como invitado). El registro no es el freno: la gente no vuelve a preguntar.`,
       action: 'Trabaja la segunda lectura (sugerir el siguiente activo, recordatorio) antes que el muro de registro.',
       evidence: [`leyeron: ${int(readers)}`, `3+ lecturas: 0`],
     });
@@ -354,7 +370,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'quiet-readers', level: 'opportunity', area: 'retencion', tab: 'usuarios', impact: 55, sample: quiet.length,
       title: `${int(quiet.length)} cuentas que leyeron llevan 7+ días sin volver`,
-      detail: quiet.slice(0, 5).map((u) => `${s(u.email) ?? String(u.identityId).slice(0, 8)}: ${int(n(u.reads))} lecturas, última actividad ${dateOnly(s(u.lastDay))}`).join(' · '),
+      detail: quiet.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)}: ${int(n(u.reads))} lecturas, última actividad ${dateOnly(s(u.lastDay))}`).join(' · '),
       action: 'Regálales 1 Profundo desde Usuarios o escríbeles si tienen email.',
       evidence: [`en riesgo: ${int(quiet.length)}`],
     });

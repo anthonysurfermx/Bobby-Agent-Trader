@@ -37,9 +37,10 @@ export function deviceHash(req: VercelRequest): string | null {
   try { return saltedKey(`device:${id}`); } catch { return null; }
 }
 
-/** The salted /24 (IPv4) or /48 (IPv6) the read meter keys networks by; lets the owner leave his own networks out. */
-export function networkHash(req: VercelRequest): string | null {
-  try { return getClientQuotaKeys(req)?.network ?? null; } catch { return null; }
+/** The caller's own address, salted as the rate limiter keys callers (exact IPv4, IPv6 /64) — never the IP itself.
+ *  Lets the owner leave out the address he opens /admin from ("mi IP"), without catching a whole /24. */
+export function callerHash(req: VercelRequest): string | null {
+  try { return getClientQuotaKeys(req)?.caller ?? null; } catch { return null; }
 }
 
 export function clientPlatform(req: VercelRequest): string {
@@ -109,7 +110,7 @@ export async function touchDevice(req: VercelRequest, identity: Identity | null)
   await rpc('bobby_touch_device', {
     p_device: device, p_platform: platform, p_surface: null, p_referrer: null, p_utm: null,
     p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
-    ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: networkHash(req),
+    ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
   });
 }
 
@@ -124,7 +125,7 @@ export async function recordOutcome(req: VercelRequest, event: DeskOutcome, iden
       p_event: event, p_platform: platform, p_device: deviceHash(req),
       p_identity: identity?.via === 'supabase' && identity.authUserId ? identity.id : null,
       p_detail: detail && /^[a-z0-9_-]{1,32}$/.test(detail) ? detail : null,
-      ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: networkHash(req),
+      ...(geo ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
     });
   } catch { /* the funnel never breaks a read */ }
 }

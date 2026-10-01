@@ -22,14 +22,15 @@ const SCHEMA = {
     type: 'object', additionalProperties: false, required: ['summary', 'priorities'],
     properties: {
       summary: { type: 'string', description: 'Dos frases: el estado real y la apuesta de la semana.' },
+      // No maxItems: Anthropic's structured outputs reject array bounds over raw HTTP; the limits are applied after parsing.
       priorities: {
-        type: 'array', maxItems: 3,
+        type: 'array', description: 'Tres como máximo.',
         items: {
           type: 'object', additionalProperties: false, required: ['title', 'why', 'steps', 'measure', 'findings'],
           properties: {
             title: { type: 'string' },
             why: { type: 'string' },
-            steps: { type: 'array', maxItems: 4, items: { type: 'string' } },
+            steps: { type: 'array', description: 'Cuatro pasos como máximo.', items: { type: 'string' } },
             measure: { type: 'string', description: 'Qué cifra del panel mirar en 7 días para saber si funcionó.' },
             findings: { type: 'array', items: { type: 'string' }, description: 'ids de los hallazgos en los que se basa.' },
           },

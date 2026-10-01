@@ -129,7 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!gate.allowed) {
         const meter = { tier: gate.tier, used: gate.used, limit: gate.limit, resetsAt: gate.resetsAt };
         knownIdentity = gate.identity;
-        outcome('wall_level', `${level}-${gate.code ?? 'refused'}`);
+        // A guest asked to sign in is the sign-in wall, not a paying intent; only plan limits are wall_level.
+        if (gate.code === 'signin_required') outcome('wall_signin', level);
+        else outcome('wall_level', `${level}-${gate.code ?? 'refused'}`);
         if (gate.code === 'signin_required') return refuse(res, 403, 'signin_required', copy(language, 'Create your free account to use this level.', 'Crea tu cuenta gratis para usar este nivel.'), { level, meter });
         if (gate.code === 'upgrade_required') return refuse(res, 403, 'upgrade_required', copy(language, 'You used this level for now. Get Bobby Pro or invite a friend.', 'Ya usaste este nivel por ahora. Obtén Bobby Pro o invita a un amigo.'), { level, meter });
         return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });

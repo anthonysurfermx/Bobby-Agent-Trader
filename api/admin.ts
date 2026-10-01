@@ -25,12 +25,13 @@ import { growthPlan } from './_lib/admin-plan.js';
 /** The overview view in full: figures, integrations, growth, Search Console and the diagnosis built from them. */
 async function overviewBundle(days: number, internal: boolean) {
   const overview = await rpc<{ days: string[] } & Record<string, unknown>>('bobby_admin_overview', { p_days: days, p_internal: internal });
-  const [integ, growth, search] = await Promise.all([
+  const [integ, growth, search, networks] = await Promise.all([
     integrations(overview.days ?? []),
     rpc<Record<string, unknown>>('bobby_admin_growth', { p_days: days, p_internal: internal }),
     searchConsole(overview.days ?? []),
+    rpc<unknown[]>('bobby_admin_internal_networks', {}).catch(() => []),
   ]);
-  const insights = buildInsights({ days, overview, growth, integrations: integ, searchConsole: search });
+  const insights = buildInsights({ days, overview, growth, integrations: integ, searchConsole: search, networks });
   return { overview, integrations: integ, growth, searchConsole: search, insights };
 }
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';

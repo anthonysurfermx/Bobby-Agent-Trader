@@ -14,8 +14,8 @@ const STAGES: Array<{ key: PeopleStage; label: string; color: string; def: strin
   { key: 'active', label: 'Activos', color: '#2E9BFF', def: 'ya leyeron y estuvieron activos en 7 días' },
   { key: 'recurring', label: 'Recurrentes', color: '#4ADE80', def: 'leyeron en 2+ días distintos de los últimos 14' },
   { key: 'pro', label: 'Pro', color: '#F28C38', def: 'tienen Bobby Pro hoy' },
-  { key: 'atRisk', label: 'En riesgo', color: '#F06A6A', def: 'sin actividad de 8 a 30 días' },
-  { key: 'lost', label: 'Perdidos', color: '#3A3A3C', def: '30+ días sin actividad' },
+  { key: 'atRisk', label: 'En riesgo', color: '#F06A6A', def: 'última actividad hace 7 a 29 días' },
+  { key: 'lost', label: 'Perdidos', color: '#3A3A3C', def: 'última actividad hace 30+ días' },
 ];
 
 export function PeopleCard({ people, includeInternal }: { people: Growth['people']; includeInternal: boolean }) {
