@@ -17,6 +17,8 @@ process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
 delete process.env.BOBBY_DESK_MODEL;
+// The suite below pins the OpenAI-first plans; the Sonnet-first default is checked in its own block at the end.
+process.env.BOBBY_LLM_PRIMARY = 'openai';
 
 const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
 const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../api/_lib/desk-debate.ts');
@@ -347,6 +349,54 @@ try {
   eq(await claimReferral('22222222-2222-4222-8222-222222222222', codeNow), 'claimed', 'a claim returns the database verdict');
   eq([calls[0].body.p_reward_days, calls[0].body.p_max, calls[0].body.p_new_account_days], [REFERRAL.rewardDays, 5, 7], 'claim parameters: reward days, five friends, new accounts only');
   eq(REFERRAL.rewardDays, 30, 'one month of Pro per friend by default');
+
+  // ---------- Sonnet first (owner's rule, 2026-10-01), OpenAI when Sonnet is out of credit ----------
+  {
+    process.env.BOBBY_LLM_PRIMARY = 'anthropic';
+    const models = (l: 'rapido' | 'profundo' | 'maximo') => { const p = levelPlan(l); return [p.alpha.model, p.red.model, p.cio.model]; };
+    eq([models('rapido'), models('profundo'), models('maximo')], [['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5']], 'Sonnet answers every role first on every level');
+    eq([levelPlan('rapido').cio.effort, levelPlan('profundo').alpha.effort, levelPlan('profundo').cio.effort, levelPlan('maximo').cio.effort], ['low', 'low', 'medium', 'high'], 'effort grows with the level');
+    eq(levelPlan('rapido').fallback?.provider, 'openai', 'Rápido model-access fallback is on the other provider');
+
+    debateMock();
+    const sonnetFirst = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
+    eq(calls.map((c) => [byRole(c), hostOf(c.url), c.body.model]), [['alpha', 'api.anthropic.com', 'claude-sonnet-5-5'], ['red', 'api.anthropic.com', 'claude-sonnet-5-5'], ['cio', 'api.anthropic.com', 'claude-sonnet-5-5']], 'Rápido runs on Sonnet');
+    eq(calls.map((c) => c.body.output_config?.effort), ['low', 'low', 'low'], 'Rápido asks Sonnet for low effort');
+    eq(sonnetFirst.agents.verdict, 'wait', 'Sonnet-first returns a validated verdict');
+
+    // Sonnet out of credit: the role moves to OpenAI once, the later roles start there, and the owner gets one email.
+    (await import('../api/_lib/provider-alert.ts')).resetProviderAlerts();
+    process.env.RESEND_API_KEY = 'test-resend';
+    process.env.BOBBY_ALERT_EMAIL = 'owner@bobby.test';
+    const noCredit = () => json({ type: 'error', error: { type: 'invalid_request_error', message: 'Your credit balance is too low to access the Anthropic API.' } }, 400);
+    const failoverMock = () => mock((c) => {
+      const host = hostOf(c.url);
+      if (host === 'api.anthropic.com') return noCredit();
+      if (host === 'db.test') return c.method === 'GET' ? json([]) : new Response(null, { status: 201 });
+      if (host === 'api.resend.com') return json({ id: 'email-1' });
+      const r = byRole(c);
+      return openai(r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO);
+    });
+    failoverMock();
+    const failedOver = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
+    await new Promise((r) => setTimeout(r, 50));
+    const ai = calls.filter((c) => ['api.anthropic.com', 'api.openai.com'].includes(hostOf(c.url)));
+    eq(ai.map((c) => [byRole(c), hostOf(c.url)]), [['alpha', 'api.anthropic.com'], ['alpha', 'api.openai.com'], ['red', 'api.openai.com'], ['cio', 'api.openai.com']], 'one refused Sonnet call, then OpenAI for every role; no retry of exhausted credit');
+    eq(failedOver.agents.verdict, 'wait', 'the failed-over debate still returns a validated verdict');
+    const emails = calls.filter((c) => hostOf(c.url) === 'api.resend.com');
+    eq(emails.length, 1, 'exhausted credit sends one alert email');
+    eq([emails[0].body.to, /Anthropic/.test(emails[0].body.subject), /console\.anthropic\.com/.test(emails[0].body.text)], [['owner@bobby.test'], true, true], 'the alert names the provider and where to top it up');
+    ok(!/Is BTC worth/.test(JSON.stringify(emails[0].body)), 'the alert never carries the question');
+    ok(calls.some((c) => hostOf(c.url) === 'db.test' && c.method === 'POST' && c.body?.cache_key === 'provider-credit-alert:anthropic'), 'the alert window is claimed across instances');
+
+    failoverMock();
+    await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
+    await new Promise((r) => setTimeout(r, 50));
+    eq(calls.filter((c) => hostOf(c.url) === 'api.resend.com').length, 0, 'a second refusal inside the window sends no second email');
+
+    delete process.env.RESEND_API_KEY; delete process.env.BOBBY_ALERT_EMAIL;
+    process.env.BOBBY_LLM_PRIMARY = 'openai';
+  }
 
   console.log(`desk-levels: ${checks} checks passed`);
 } finally {

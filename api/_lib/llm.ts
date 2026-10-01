@@ -12,6 +12,7 @@
 // ============================================================
 
 import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
+import { alertProviderCredit } from './provider-alert.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const BACKOFF_MS = [500, 1500];
@@ -96,6 +97,12 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
           httpStatus: res.status,
           message: errBody.slice(0, 300),
         });
+        // Exhausted credit never recovers through a retry: alert the owner and stop.
+        const refusal = refusalCode((() => { try { return JSON.parse(errBody); } catch { return null; } })());
+        if (refusal === 'insufficient_quota' || refusal === 'billing_hard_limit_reached') {
+          alertProviderCredit('openai', refusal, opts.endpoint);
+          throw new LlmHttpError(res.status, `OpenAI ${model}: ${res.status} ${refusal}`, refusal);
+        }
         const retriable = res.status === 429 || res.status >= 500;
         lastError = new Error(`OpenAI ${model}: ${res.status} ${errBody.slice(0, 200)}`);
         if (!retriable || attempt === BACKOFF_MS.length) throw lastError;
@@ -131,7 +138,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
       return { text, toolInput };
     } catch (e: unknown) {
       const err = e as Error;
-      if (err === lastError) throw err; // non-retriable HTTP error re-thrown above
+      if (err === lastError || err instanceof LlmHttpError) throw err; // non-retriable HTTP error re-thrown above
       const isTimeout = err.name === 'AbortError';
       lastError = isTimeout
         ? new Error(`LLM call timed out after ${timeoutMs}ms (${model})`)
@@ -272,6 +279,7 @@ export async function completeJson(
   }
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
   if (!res.ok) {
+    if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') alertProviderCredit(spec.provider, providerCode, opts.endpoint);
     const detail = (await res.text().catch(() => '')).slice(0, 300);
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: detail });
     note({ stop: `http_${res.status}` });
