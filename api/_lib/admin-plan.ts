@@ -63,7 +63,7 @@ export async function growthPlan(insights: Insight[], metrics: Record<string, un
   const usage: LlmUsage[] = [];
   try {
     const raw = await completeJson(
-      { provider: 'anthropic', model: MODEL, effort: 'low', maxTokens: 2000, timeoutMs: 45_000 },
+      { provider: 'anthropic', model: MODEL, effort: 'low', maxTokens: 4000, timeoutMs: 45_000 },
       SYSTEM, JSON.stringify(input), SCHEMA, { endpoint: 'admin-plan', role: 'plan', usage },
     ) as { summary?: unknown; priorities?: unknown };
     const ids = new Set(insights.map((i) => i.id));
