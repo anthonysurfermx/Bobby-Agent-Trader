@@ -4,6 +4,8 @@
 //        levels: the Profundo / Máximo meters; referral: your invite link and friends (signed in only);
 //        plans: the allowances per plan and the invite terms
 //   POST { action: 'referral-claim', code } → { result, access, levels }  accept a friend's invitation
+//   POST { action: 'redeem-coupon', code }  → { result, granted, bonus, access, levels }  redeem a coupon that
+//        gifts extra reads / Profundo / Máximo (api/_lib/coupons.ts); 10 attempts per 10 minutes per network
 //   POST { action: 'checkout' }           → { url }  Stripe Checkout, $5/month (web)
 //   POST { action: 'portal' }             → { url }  Stripe billing portal (manage / cancel)
 //   POST { action: 'revenuecat-sync' }   → { ok, access, subscription }  re-read the `pro` entitlement
@@ -19,6 +21,7 @@ import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
 import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, upsertSubscription } from './_lib/access.js';
 import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.js';
+import { isCouponCode, normalizeCoupon, redeemCoupon } from './_lib/coupons.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
@@ -114,6 +117,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ result, access, levels });
     }
 
+    if (action === 'redeem-coupon') {
+      // Codes can be short words: bound guessing per network on top of the endpoint limit.
+      if (!await enforcePublicRateLimit(req, res, 'bobby-coupon', 10, 600)) return;
+      const normalized = normalizeCoupon(code);
+      if (!isCouponCode(normalized)) return res.status(400).json({ error: 'That coupon code is not valid.', result: 'invalid_code' });
+      const redemption = await redeemCoupon(identity.id, normalized);
+      const [access, levels] = await Promise.all([readAccess(req, identity), readLevels(req, identity)]);
+      return res.status(200).json({ ...redemption, access, levels });
+    }
+
     if (action === 'checkout') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id).catch(() => null);
@@ -183,6 +196,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
     console.error('[bobby-access]', action, e instanceof Error ? e.message : e);
-    return res.status(502).json({ error: action === 'referral-claim' ? 'Invitations are temporarily unavailable. Try again.' : 'Payments are temporarily unavailable. Try again.' });
+    const busy = action === 'referral-claim' ? 'Invitations are temporarily unavailable. Try again.'
+      : action === 'redeem-coupon' ? 'Coupons are temporarily unavailable. Try again.'
+      : 'Payments are temporarily unavailable. Try again.';
+    return res.status(502).json({ error: busy });
   }
 }

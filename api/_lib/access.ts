@@ -4,6 +4,8 @@
 //   · anonymous device (sends x-bobby-device): 3 reads → then sign-in is required;
 //   · signed in: 10 reads per rolling 7 days → then Bobby Pro, while BOBBY_PAYWALL=on;
 //   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.
+//   · coupon gifts (bobby_usage_bonus, 20261001160000): extra reads / Profundo / Máximo spent after the
+//     regular allowance runs out and never counted toward it (api/_lib/coupons.ts).
 // A client that sends no device id (iOS ≤ 1.5 build 42) is served as before.
 // Devices and networks are salted hashes; nothing readable is stored.
 // A failed or malformed meter pauses analysis; an outage is never permission for unmetered AI use.
@@ -15,7 +17,8 @@ import { resolveIdentity, type Identity } from './user-identity.js';
 import { LEVEL_LIMITS, type PremiumLevel } from './desk-levels.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
-export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
+/** `bonus`: reads gifted by coupons (bobby_usage_bonus), spent after the weekly allowance and included in `remaining`. */
+export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean; bonus: number }
 export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | 'access_unavailable' | null; readId: number | null; access: Access; identity: Identity | null }
 
 export const paywallOn = () => process.env.BOBBY_PAYWALL === 'on';
@@ -41,16 +44,17 @@ function shape(row: Record<string, unknown>): Access {
   const used = typeof row.used === 'number' ? row.used : null;
   const limit = typeof row.limit === 'number' ? row.limit : null;
   const tier = (row.tier === 'pro' || row.tier === 'free' ? row.tier : 'anon') as Tier;
+  const bonus = typeof row.bonus === 'number' && row.bonus > 0 ? row.bonus : 0;
   return {
-    tier, used, limit,
-    remaining: used !== null && limit !== null ? Math.max(0, limit - used) : null,
+    tier, used, limit, bonus,
+    remaining: used !== null && limit !== null ? Math.max(0, limit - used) + bonus : null,
     resetsAt: typeof row.resetsAt === 'string' ? new Date(row.resetsAt).toISOString() : null,
     // Anonymous reads always stop at the sign-in; the weekly cap only binds while the paywall is on.
     paywall: tier === 'free' ? paywallOn() : tier === 'anon' && limit !== null,
   };
 }
 
-const OPEN: Access = { tier: 'anon', used: null, limit: null, remaining: null, resetsAt: null, paywall: false };
+const OPEN: Access = { tier: 'anon', used: null, limit: null, remaining: null, resetsAt: null, paywall: false, bonus: 0 };
 
 async function rpc(name: string, body: Record<string, unknown>): Promise<Record<string, unknown> | null> {
   try {
@@ -130,7 +134,8 @@ export const publicSubscription = (s: SubscriptionRow | null) => s ? { provider:
 // The allowances live in api/_lib/desk-levels.ts; bobby_consume_level (20260929150000) counts atomically.
 // Unlike the read meter these fail closed: a premium read is never served uncounted.
 
-export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null }
+/** `bonus`: gifted uses of this level (coupons), already included in `remaining`. */
+export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null; bonus: number }
 export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
 export type LevelCode = 'signin_required' | 'upgrade_required' | 'level_exhausted';
 export interface LevelGate { allowed: boolean; code: LevelCode | null; useId: number | null; tier: Tier; used: number; limit: number; resetsAt: string | null }
@@ -138,7 +143,7 @@ export interface LevelGate { allowed: boolean; code: LevelCode | null; useId: nu
 function meter(raw: unknown): LevelMeter {
   const m = (raw ?? {}) as Record<string, unknown>;
   const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : 0);
-  return { used: num(m.used), limit: num(m.limit), remaining: num(m.remaining), windowDays: num(m.windowDays), resetsAt: typeof m.resetsAt === 'string' ? new Date(m.resetsAt).toISOString() : null };
+  return { used: num(m.used), limit: num(m.limit), remaining: num(m.remaining), windowDays: num(m.windowDays), resetsAt: typeof m.resetsAt === 'string' ? new Date(m.resetsAt).toISOString() : null, bonus: num(m.bonus) };
 }
 const tierOf = (v: unknown): Tier => (v === 'pro' || v === 'free' ? v : 'anon');
 

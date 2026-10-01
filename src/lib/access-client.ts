@@ -5,11 +5,12 @@ import { bobbySupabase } from '@/lib/bobby-db-client';
 import { progressHeaders } from '@/lib/companions/sync';
 
 export type Tier = 'anon' | 'free' | 'pro';
-export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean }
+/** `bonus`: reads gifted by coupons, spent after the weekly allowance (already included in `remaining`). */
+export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean; bonus?: number }
 /** The analysis levels (api/_lib/desk-levels.ts). Rápido rides the read meter; Profundo and Máximo have their own. */
 export type DeskLevel = 'rapido' | 'profundo' | 'maximo';
 export type PremiumLevel = Exclude<DeskLevel, 'rapido'>;
-export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null }
+export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null; bonus?: number }
 export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
 /** Your invite link: each friend who creates an account through it adds `rewardDays` of Bobby Pro, up to `max`. */
 export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; friends: Array<{ joinedAt: string }> }
@@ -103,5 +104,31 @@ export async function claimPendingReferral(): Promise<ClaimResult | null> {
     if (body.result === 'account_required') return 'account_required';
     forgetReferral();
     return body.result ?? 'invalid_code';
+  } catch { return null; }
+}
+
+// ---- coupons (api/_lib/coupons.ts): an Apple/Google account redeems a code once for extra reads ----
+export type RedeemResult = 'redeemed' | 'invalid_code' | 'expired' | 'exhausted' | 'already_redeemed' | 'account_required' | 'rate_limited' | 'unavailable';
+export interface UsageGift { reads: number; profundo: number; maximo: number }
+export async function redeemCoupon(code: string): Promise<{ result: RedeemResult; granted: UsageGift | null }> {
+  try {
+    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action: 'redeem-coupon', code }) });
+    if (r.status === 429) return { result: 'rate_limited', granted: null };
+    if (r.status === 401) return { result: 'account_required', granted: null };
+    const body = (await r.json().catch(() => ({}))) as { result?: RedeemResult; granted?: UsageGift | null };
+    if (r.status >= 500 || !body.result) return { result: 'unavailable', granted: null };
+    return { result: body.result, granted: body.granted ?? null };
+  } catch { return { result: 'unavailable', granted: null }; }
+}
+
+// After an Apple/Google sign-in started from /redeem, /auth/callback returns there instead of the desk.
+const RETURN_KEY = 'bobby:return:v1';
+const isReturnPath = (v: unknown): v is string => typeof v === 'string' && /^\/redeem(\?code=[A-Z0-9-]{4,32})?$/.test(v);
+export function rememberReturn(path: string) { try { if (isReturnPath(path)) sessionStorage.setItem(RETURN_KEY, path); } catch { /* private mode */ } }
+export function takeReturn(): string | null {
+  try {
+    const v = sessionStorage.getItem(RETURN_KEY);
+    sessionStorage.removeItem(RETURN_KEY);
+    return isReturnPath(v) ? v : null;
   } catch { return null; }
 }

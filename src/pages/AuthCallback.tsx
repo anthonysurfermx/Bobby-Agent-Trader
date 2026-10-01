@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useAuth } from '@/hooks/useAuth';
 import { bobbySupabase } from '@/lib/bobby-db-client';
+import { takeReturn } from '@/lib/access-client';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 
@@ -101,9 +102,10 @@ export default function AuthCallback() {
           const { data } = await bobbySupabase().auth.getSession();
           if (data.session) {
             setStatus('success');
-            setMessage('Sesión iniciada. Volviendo al desk…');
+            const back = takeReturn();
+            setMessage(back ? 'Sesión iniciada. Volviendo…' : 'Sesión iniciada. Volviendo al desk…');
             cleanUrl();
-            setTimeout(() => navigate('/desk', { replace: true }), 600);
+            setTimeout(() => navigate(back ?? '/desk', { replace: true }), 600);
             return;
           }
         }
