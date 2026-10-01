@@ -54,6 +54,7 @@ const paidCalls = () => calls.filter(call => /api\.openai\.com|api\.anthropic\.c
 
 try {
   console.error = () => {}; // Failure diagnostics are expected; assertions identify any regression.
+  // eslint-disable-next-line require-yield -- the mock Edge stream fails before producing audio.
   Communicate.prototype.stream = async function* () { edgeCalls++; throw new Error('mock Edge unavailable'); };
 
   // The paid TTS budget must fail closed, while unrelated callers retain the default policy.

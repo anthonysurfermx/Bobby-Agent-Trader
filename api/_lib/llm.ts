@@ -97,9 +97,10 @@ export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
           httpStatus: res.status,
           message: `http_${res.status}`,
         });
-        console.error('[llm] provider error', 'openai', model, res.status, errBody.slice(0, 200));
         // Exhausted credit never recovers through a retry: alert the owner and stop.
         const refusal = refusalCode((() => { try { return JSON.parse(errBody); } catch { return null; } })());
+        // Status and refusal class only: provider bodies can echo the reader's question.
+        console.error('[llm] provider error', 'openai', model, res.status, refusal ?? '');
         if (refusal === 'insufficient_quota' || refusal === 'billing_hard_limit_reached') {
           alertProviderCredit('openai', refusal, opts.endpoint);
           throw new LlmHttpError(res.status, `OpenAI ${model}: ${res.status} ${refusal}`, refusal);
@@ -281,9 +282,8 @@ export async function completeJson(
   if (!res) { note({ stop: 'deadline' }); throw new Error(`${spec.model}: no time left`); }
   if (!res.ok) {
     if (providerCode === 'insufficient_quota' || providerCode === 'billing_hard_limit_reached') alertProviderCredit(spec.provider, providerCode, opts.endpoint);
-    const detail = (await res.text().catch(() => '')).slice(0, 300);
-    // The health log is readable through the public agent_events feed: class and status only, never the body.
-    console.error('[llm] provider error', spec.provider, spec.model, res.status, providerCode ?? '', detail.slice(0, 200));
+    // Logs and the public agent_events feed get class and status only: provider bodies can echo the question.
+    console.error('[llm] provider error', spec.provider, spec.model, res.status, providerCode ?? '');
     recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(res.status), httpStatus: res.status, message: providerCode ?? `http_${res.status}` });
     note({ stop: `http_${res.status}` });
     throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, providerCode);

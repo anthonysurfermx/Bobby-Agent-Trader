@@ -53,9 +53,13 @@ try {
   globalThis.fetch=async()=>json({choices:[{finish_reason:'length',message:{content:'{}'}}]});
   await assert.rejects(runDeskDebate(question,evidence,'en'));checks++;
   for(const [quota,status] of [[json({},503),503],[json(false),429]] as const) {
-    let calls=0,model=0;globalThis.fetch=async(input)=>{if(String(input).includes('openai'))model++;if(String(input).includes('rpc/bobby_consume_desk_quota'))calls++;return String(input).includes('bobby_desk_quotas?')?json([]):quota.clone();};
-    const res=response();await deskHandler({...req,body:{symbol:'BTC',question}} as never,res as never);
-    eq(res.statusCode,status);eq(calls,1);eq(model,0);eq(res.body.agents,undefined);
+    // The reader's own meter runs first (a guest device here); the shared desk quota then fails or is spent.
+    let calls=0,model=0,refunds=0;globalThis.fetch=async(input,init)=>{const url=String(input);if(url.includes('openai'))model++;
+      if(url.includes('rpc/bobby_consume_read'))return json({allowed:true,code:null,readId:7,tier:'anon',used:1,limit:3,resetsAt:null});
+      if(url.includes('bobby_reads?id=eq.7')&&init?.method==='DELETE'){refunds++;return json([]);}
+      if(url.includes('rpc/bobby_consume_desk_quota'))calls++;return url.includes('bobby_desk_quotas?')?json([]):quota.clone();};
+    const res=response();await deskHandler({...req,headers:{...req.headers,'x-bobby-device':'ci-device-0123456789'},body:{symbol:'BTC',question}} as never,res as never);
+    eq(res.statusCode,status);eq(calls,1);eq(model,0);eq(res.body.agents,undefined);eq(refunds,1);
   }
 
   // Apple code exchange verifies signed subject/audience before revoking anything.
