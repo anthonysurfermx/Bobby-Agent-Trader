@@ -10,7 +10,9 @@ import { clientPlatform, consumeLevel, refundLevel } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import type { LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
-import { MEMORY_PLATFORMS, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
+import { memoryPersonalizationOn, memoryPlatformAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordRead, type MemorySummary } from './_lib/user-memory.js';
+import { personalNote, type CurrentRead, type PersonalNote } from './_lib/memory-note.js';
+import { asksForRelated, loadRelated } from './_lib/desk-related.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -22,7 +24,7 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido'), tz: z.string().max(64).optional() });
 
 type Lang = 'en' | 'es' | 'pt';
 const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
@@ -40,12 +42,17 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * JSON reply carries, or {type:"error", code, error}. Refusals stay plain JSON with their status. Clients
  * without the header (the iOS app) get the single JSON reply, unchanged.
  *
- * Memory (api/_lib/user-memory.ts): for a signed-in Apple/Google account with memory on, the CIO also sees a
- * compact `reader` (explicit preferences, how often they asked), for framing only: sufficiency and the verdict
- * depend on the question and the evidence alone. The reader never reaches the client: the body only says
- * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on' (memoryPersonalizationOn). The ask is
- * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
- * make no memory call; neither does the iPhone app until it can show and delete memory (MEMORY_PLATFORMS).
+ * Memory (api/_lib/user-memory.ts): the debate never sees it, so the verdict depends on the question and the
+ * evidence alone. For a signed-in Apple/Google account with memory on, a short personal note is assembled AFTER
+ * the verdict from what Bobby remembers (name, past asks, the stored previous answer on this asset, the price
+ * change since), with no model call, and returned as `personal: {note, basedOn}` with `personalized: true`; the memory itself
+ * never reaches the client. The read is recorded (price with its own time, and what Bobby answered) after it
+ * was delivered, never on a refusal or a failure. A name is never taken from a question (only /api/memory). Off
+ * unless BOBBY_MEMORY === 'on'. Anonymous and wallet requests make no memory call; the iPhone app joins only
+ * from a build that can show and delete memory (X-Bobby-Memory: 1).
+ *
+ * A question about the sector, alternatives or a comparison also loads a small peer set with current daily
+ * data (api/_lib/desk-related.ts), returned as `related`.
  */
 function refuse(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ error, code, ...extra });
@@ -85,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
   }
-  const { symbol, question, language, assetType, level } = parsed.data;
+  const { symbol, question, language, assetType, level, tz } = parsed.data;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
     return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
@@ -149,24 +156,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       send({ type: 'accepted', level });
     }
     // Memory runs beside the evidence and never delays the answer by more than its timeout: a slow or failed
-    // lookup is simply no memory. No call at all without an Apple/Google session, nor from a platform whose app
-    // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
-    const memoryOwner = memoryPersonalizationOn() && MEMORY_PLATFORMS.has(clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
+    // lookup is simply no memory. No call at all without an Apple/Google session, nor from an app build that
+    // cannot show and delete memory, nor while the kill switch is off (BOBBY_MEMORY).
+    const platform = clientPlatform(req);
+    const memoryOwner = memoryPersonalizationOn() && memoryPlatformAllowed(platform, req) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
+    const relatedTask = asksForRelated(question, symbol) ? loadRelated(symbol, language, question) : Promise.resolve(null);
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
-    const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language);
+    const [summary, related] = await Promise.all([within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS), relatedTask]);
+    const owner = summary?.enabled ? await memoryOwner.catch(() => null) : null;
+    const reader = readerContext(summary, {
+      symbol, name: summary?.preferredName ?? owner?.firstName ?? null,
+      priceNow: evidence.technicals.price, priceNowAt: evidence.provenance.asOf, language, timeZone: tz,
+    });
     const asked = horizonOf(question);
-    const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
+    const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, related });
+    // The verdict is final here. The note is assembled from it and from memory (no model call); it cannot
+    // change it.
+    const said = result.agents.synthesis as CurrentRead['synthesis'];
+    const personal: PersonalNote | null = reader
+      ? personalNote(reader, symbol, { verdict: result.agents.verdict, direction: result.agents.direction, synthesis: said }, language, asked)
+      : null;
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
     if (left.signal.aborted) { const refund = refundLevel(useId); waitUntil(refund); await refund; return; }
-    const body = reader ? { ...result, personalized: true } : result;
-    // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
-    // summary was unavailable the database decides (it skips paused memories and non-accounts).
+    const body = personal ? { ...result, personal, personalized: true } : result;
+    // Only a delivered answer is remembered: the price with its own time and source, and what Bobby said. A
+    // memory the summary showed paused is not even asked; when the summary was unavailable the database
+    // decides (it skips paused memories and non-accounts).
     const remember = () => {
       if (summary && !summary.enabled) return;
-      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked, evidence.technicals.price) : false)).catch(() => false));
+      const s = said;
+      waitUntil(memoryOwner.then(async (id) => {
+        if (!id) return false;
+        return recordRead(id.id, symbol, asked, {
+          price: evidence.technicals.price, priceAt: evidence.provenance.asOf, priceSource: evidence.provenance.provider,
+          read: { verdict: result.agents.verdict, direction: result.agents.direction, headline: s.headline, why: s.why, risk: s.risk, watch: s.watch, level, language, platform },
+        });
+      }).catch(() => false));
     };
     if (!live) { res.status(200).json(body); remember(); return; }
     send({ type: 'final', data: body });

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 
-export interface BobbyAccount { email: string | null; provider: 'apple' | 'google' | 'other'; firstName: string | null }
+export interface BobbyAccount { id: string; email: string | null; provider: 'apple' | 'google' | 'other'; firstName: string | null }
 
 /** A plain first name from the provider profile (same rule as the server's firstNameOf). */
 function firstNameOf(meta: Record<string, unknown> | undefined): string | null {
@@ -15,7 +15,7 @@ function firstNameOf(meta: Record<string, unknown> | undefined): string | null {
 const toAccount = (session: Session | null): BobbyAccount | null => {
   if (!session?.user) return null;
   const p = String(session.user.app_metadata?.provider ?? '');
-  return { email: session.user.email ?? null, provider: p === 'apple' || p === 'google' ? p : 'other', firstName: firstNameOf(session.user.user_metadata) };
+  return { id: session.user.id, email: session.user.email ?? null, provider: p === 'apple' || p === 'google' ? p : 'other', firstName: firstNameOf(session.user.user_metadata) };
 };
 
 export function useBobbyAccount() {

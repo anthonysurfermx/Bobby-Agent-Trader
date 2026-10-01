@@ -1,38 +1,73 @@
 // ============================================================
-// Per-user memory (migration 20260929190000_user_memory.sql): which assets an Apple/Google account asks
-// about (symbol, count, last date, the horizon its question named) and the preferences it set itself in the
-// profile. Nothing is inferred: horizon / experience / risk exist only when the person chose them.
+// Per-user memory (migrations 20260929190000 / 200000 / 230000): for an Apple/Google account, which assets it
+// asks about (symbol, count, when, the horizon its question named, the price that read used and that price's own
+// time), what Bobby answered on each delivered read (verdict, direction and the four synthesis lines the reader
+// saw), the preferences it set itself and the name it asked to be called. Nothing is inferred: horizon /
+// experience / risk / name exist only when the person chose or said them.
 //   · Only a verified Apple/Google session has memory. Anonymous devices and wallet-only sessions get none,
 //     and the desk makes no memory call for them at all (carriesAccountToken).
 //   · The desk reads a compact summary before answering (short timeout, fail-open = no memory) and records
-//     the ask only after an answer was delivered.
+//     the read only after an answer was delivered.
+//   · Memory never reaches the verdict: the debate runs without it; a separate note is written afterwards
+//     (api/_lib/memory-note.ts). "Last time I told you" can only quote a stored read.
 //   · Logs carry the RPC name and status only: never a symbol next to an identity.
 // ============================================================
 import type { VercelRequest } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { resolveIdentity, type Identity } from './user-identity.js';
+import { cleanName, preferredNameFrom } from '../../src/lib/preferred-name.js';
+
+export { cleanName, preferredNameFrom };
 
 export type MemoryHorizon = 'intraday' | 'week' | 'month' | 'long';
 export type AskedHorizon = MemoryHorizon | 'unspecified';
 export type Experience = 'new' | 'some' | 'experienced';
 export type RiskPref = 'low' | 'medium' | 'high';
+export type Lang = 'en' | 'es' | 'pt';
+export type ReadLevel = 'rapido' | 'profundo' | 'maximo';
 export interface MemoryPrefs { horizon: MemoryHorizon | null; experience: Experience | null; risk: RiskPref | null }
-export interface MemoryAsset { symbol: string; asks: number; lastAskedAt: string; lastHorizon: AskedHorizon }
-export interface MemorySummary { enabled: boolean; prefs: MemoryPrefs; top: MemoryAsset[]; thisAsset: (Omit<MemoryAsset, 'symbol'> & { asksThisWeek: number; lastPrice?: number | null }) | null }
-export interface MemoryList { enabled: boolean; prefs: MemoryPrefs; assets: MemoryAsset[]; retentionDays: number }
-export type PrefsPatch = Partial<MemoryPrefs> & { memoryEnabled?: boolean };
+export interface MemoryAsset {
+  symbol: string; asks: number; lastAskedAt: string; lastHorizon: AskedHorizon;
+  /** The price the last read used and when that price was observed (never the ask time). */
+  lastPrice?: number | null; lastPriceAt?: string | null;
+}
+/** One delivered answer, as the reader saw it. */
+export interface MemoryRead {
+  symbol?: string;
+  deliveredAt: string; horizon: AskedHorizon; level: ReadLevel;
+  verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
+  headline: string; why: string; risk: string; watch: string; language: Lang;
+  price: number | null; priceAt: string | null;
+}
+export interface MemorySummary {
+  enabled: boolean; preferredName: string | null; prefs: MemoryPrefs; top: MemoryAsset[];
+  thisAsset: (Omit<MemoryAsset, 'symbol'> & { recentAsks: string[] }) | null;
+  lastRead: MemoryRead | null;
+}
+export interface MemoryList {
+  enabled: boolean; preferredName: string | null; prefs: MemoryPrefs; assets: MemoryAsset[];
+  /** The newest stored answers across assets. */
+  reads: MemoryRead[];
+  retentionDays: number;
+}
+export type PrefsPatch = Partial<MemoryPrefs> & { memoryEnabled?: boolean; preferredName?: string | null };
 
 export const MEMORY_SYMBOL = /^[A-Z0-9.^=-]{1,20}$/;
 export const MEMORY_RETENTION_DAYS = 90;
 export const MEMORY_MAX_ASSETS = 50;
+export const MEMORY_LIST_READS = 50;
 /**
- * Platforms whose desk reads use memory: those whose app can show and delete it. The iPhone app already sends
- * its account token to the desk; it joins once it has the memory screen and its App Store privacy answers
- * cover this data. /api/memory itself serves every platform.
+ * Platforms whose desk reads always use memory. The iPhone app joins per request: a build that has the memory
+ * screen (view, pause, correct, delete) sends `X-Bobby-Memory: 1`; older builds never do.
  */
 export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web']);
+export function memoryPlatformAllowed(platform: string, req: VercelRequest): boolean {
+  if (MEMORY_PLATFORMS.has(platform)) return true;
+  const raw = req.headers['x-bobby-memory'];
+  return platform === 'ios' && (Array.isArray(raw) ? raw[0] : raw) === '1';
+}
 /**
- * Kill switch: the desk personalizes with memory and records asks only when BOBBY_MEMORY is exactly 'on'.
+ * Kill switch: the desk personalizes with memory and records reads only when BOBBY_MEMORY is exactly 'on'.
  * Unset or anything else = off (no memory call from the desk at all). /api/memory (view, correct, delete)
  * works either way, so people can always see and erase what was stored. Read per request, never cached.
  */
@@ -41,12 +76,11 @@ export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): b
 }
 /** How long the desk waits for the summary before answering without it. */
 export const MEMORY_SUMMARY_TIMEOUT_MS = 800;
-/** An asset counts as one the reader "often" looks at from this many asks. */
-const OFTEN_MIN_ASKS = 2;
 
 const HORIZONS = ['intraday', 'week', 'month', 'long'] as const;
 const EXPERIENCES = ['new', 'some', 'experienced'] as const;
 const RISKS = ['low', 'medium', 'high'] as const;
+const LEVELS = ['rapido', 'profundo', 'maximo'] as const;
 const oneOf = <T extends string>(list: readonly T[], v: unknown): T | null => (typeof v === 'string' && (list as readonly string[]).includes(v) ? v as T : null);
 
 /** A storage failure the memory endpoint reports (the desk never sees it: it fails open). */
@@ -95,6 +129,11 @@ async function rpc(name: string, body: Record<string, unknown>, timeoutMs: numbe
   return r.json();
 }
 
+/** A usable price: finite and positive, else null. */
+const positive = (v: unknown): number | null => { const n = Number(v); return v !== null && v !== '' && Number.isFinite(n) && n > 0 && n < 1e12 ? n : null; };
+/** An ISO timestamp, or null. */
+const isoOf = (v: unknown): string | null => { if (typeof v !== 'string') return null; const t = Date.parse(v); return Number.isFinite(t) ? new Date(t).toISOString() : null; };
+
 function prefsOf(raw: unknown): MemoryPrefs {
   const p = (raw ?? {}) as Record<string, unknown>;
   return { horizon: oneOf(HORIZONS, p.horizon), experience: oneOf(EXPERIENCES, p.experience), risk: oneOf(RISKS, p.risk) };
@@ -102,32 +141,83 @@ function prefsOf(raw: unknown): MemoryPrefs {
 
 function assetOf(raw: unknown): MemoryAsset | null {
   const a = (raw ?? {}) as Record<string, unknown>;
-  const at = a.lastAskedAt ?? a.last_asked_at;
+  const at = isoOf(a.lastAskedAt ?? a.last_asked_at);
   const asks = Number(a.asks);
-  if (typeof a.symbol !== 'string' || !MEMORY_SYMBOL.test(a.symbol) || !Number.isFinite(asks) || asks < 1 || typeof at !== 'string') return null;
-  const when = Date.parse(at);
-  if (!Number.isFinite(when)) return null;
-  return { symbol: a.symbol, asks: Math.floor(asks), lastAskedAt: new Date(when).toISOString(), lastHorizon: oneOf([...HORIZONS, 'unspecified'] as const, a.lastHorizon ?? a.last_horizon) ?? 'unspecified' };
+  if (typeof a.symbol !== 'string' || !MEMORY_SYMBOL.test(a.symbol) || !Number.isFinite(asks) || asks < 1 || !at) return null;
+  const price = positive(a.lastPrice ?? a.last_price);
+  const priceAt = price ? isoOf(a.lastPriceAt ?? a.last_price_at) : null;
+  return {
+    symbol: a.symbol, asks: Math.floor(asks), lastAskedAt: at,
+    lastHorizon: oneOf([...HORIZONS, 'unspecified'] as const, a.lastHorizon ?? a.last_horizon) ?? 'unspecified',
+    // A price without its own time is not usable.
+    lastPrice: price && priceAt ? price : null, lastPriceAt: price && priceAt ? priceAt : null,
+  };
+}
+
+function readOf(raw: unknown): MemoryRead | null {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const deliveredAt = isoOf(r.deliveredAt ?? r.delivered_at);
+  const verdict = oneOf(['wait', 'review'] as const, r.verdict);
+  const direction = oneOf(['long', 'short', 'none'] as const, r.direction);
+  const lines = ['headline', 'why', 'risk', 'watch'].map((k) => (typeof r[k] === 'string' ? (r[k] as string).trim() : ''));
+  if (!deliveredAt || !verdict || !direction || lines.some((l) => !l)) return null;
+  const price = positive(r.price);
+  const priceAt = price ? isoOf(r.priceAt ?? r.price_at) : null;
+  return {
+    ...(typeof r.symbol === 'string' && MEMORY_SYMBOL.test(r.symbol) ? { symbol: r.symbol } : {}),
+    deliveredAt, horizon: oneOf([...HORIZONS, 'unspecified'] as const, r.horizon) ?? 'unspecified',
+    level: oneOf(LEVELS, r.level) ?? 'rapido', verdict, direction: verdict === 'wait' ? 'none' : direction,
+    headline: lines[0], why: lines[1], risk: lines[2], watch: lines[3],
+    language: oneOf(['en', 'es', 'pt'] as const, r.language) ?? 'en',
+    price: price && priceAt ? price : null, priceAt: price && priceAt ? priceAt : null,
+  };
 }
 
 /** The summary the desk reads before answering. Null on any failure or timeout: the read runs without memory. */
 export async function memorySummary(identityId: string, symbol: string, timeoutMs = MEMORY_SUMMARY_TIMEOUT_MS): Promise<MemorySummary | null> {
   try {
-    const raw = (await rpc('bobby_memory_summary', { p_identity: identityId, p_symbol: symbol }, timeoutMs)) as Record<string, unknown> | null;
+    const raw = (await rpc('bobby_memory_summary_v2', { p_identity: identityId, p_symbol: symbol }, timeoutMs)) as Record<string, unknown> | null;
     if (!raw || typeof raw !== 'object') return null;
     const top = Array.isArray(raw.top) ? raw.top.map(assetOf).filter((a): a is MemoryAsset => a !== null) : [];
     const thisRaw = raw.thisAsset ? assetOf({ ...(raw.thisAsset as Record<string, unknown>), symbol }) : null;
-    return { enabled: raw.enabled === true, prefs: prefsOf(raw.prefs), top, thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon, asksThisWeek: Math.max(0, Math.floor(Number((raw.thisAsset as Record<string, unknown>).asksThisWeek) || 0)), lastPrice: positive((raw.thisAsset as Record<string, unknown>).lastPrice) } : null };
+    const recent = Array.isArray((raw.thisAsset as Record<string, unknown> | null)?.recentAsks)
+      ? ((raw.thisAsset as Record<string, unknown>).recentAsks as unknown[]).map(isoOf).filter((t): t is string => t !== null)
+      : [];
+    const enabled = raw.enabled === true;
+    return {
+      enabled,
+      preferredName: enabled ? cleanName(raw.preferredName) : null,
+      prefs: prefsOf(raw.prefs), top,
+      thisAsset: thisRaw ? { asks: thisRaw.asks, lastAskedAt: thisRaw.lastAskedAt, lastHorizon: thisRaw.lastHorizon, lastPrice: thisRaw.lastPrice, lastPriceAt: thisRaw.lastPriceAt, recentAsks: recent } : null,
+      lastRead: raw.lastRead ? readOf(raw.lastRead) : null,
+    };
   } catch {
     return null;
   }
 }
 
-/** Record one answered ask. Best effort: false when it was not recorded (paused, not an account, storage down). */
-export async function recordAsk(identityId: string, symbol: string, horizon: AskedHorizon, price?: number | null): Promise<boolean> {
+/** What a delivered read leaves in memory: the price it used (with that price's own time and source) and what Bobby said. */
+export interface ReadRecord {
+  price?: number | null; priceAt?: string | null; priceSource?: string | null;
+  read?: {
+    verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
+    headline: string; why: string; risk: string; watch: string;
+    level: ReadLevel; language: Lang; platform: string;
+  } | null;
+}
+
+/** Record one delivered read. Best effort: false when it was not recorded (paused, not an account, storage down). */
+export async function recordRead(identityId: string, symbol: string, horizon: AskedHorizon, record: ReadRecord = {}): Promise<boolean> {
   if (!MEMORY_SYMBOL.test(symbol)) return false;
+  const price = positive(record.price);
+  const priceAt = price ? isoOf(record.priceAt) : null;
   try {
-    return (await rpc('bobby_memory_record', { p_identity: identityId, p_symbol: symbol, p_horizon: horizon, p_price: positive(price) }, 3000)) === true;
+    return (await rpc('bobby_memory_record_v2', {
+      p_identity: identityId, p_symbol: symbol, p_horizon: horizon,
+      p_price: price && priceAt ? price : null, p_price_at: price && priceAt ? priceAt : null,
+      p_price_source: price && priceAt ? (record.priceSource ?? null) : null,
+      p_read: record.read ?? null,
+    }, 3000)) === true;
   } catch {
     return false;
   }
@@ -145,27 +235,31 @@ async function rest(path: string, init: RequestInit = {}): Promise<unknown> {
 
 /** Everything remembered for this account (GET /api/memory). Throws MemoryUnavailableError. */
 export async function listMemory(identityId: string): Promise<MemoryList> {
-  const cutoff = new Date(Date.now() - MEMORY_RETENTION_DAYS * 86_400_000).toISOString();
-  const [prefsRows, assetRows] = await Promise.all([
-    rest(`bobby_user_prefs?identity_id=eq.${identityId}&select=horizon,experience,risk,memory_enabled`),
-    rest(`bobby_user_assets?identity_id=eq.${identityId}&last_asked_at=gte.${encodeURIComponent(cutoff)}&select=symbol,asks,last_asked_at,last_horizon&order=last_asked_at.desc&limit=${MEMORY_MAX_ASSETS}`),
+  const cutoff = encodeURIComponent(new Date(Date.now() - MEMORY_RETENTION_DAYS * 86_400_000).toISOString());
+  const [prefsRows, assetRows, readRows] = await Promise.all([
+    rest(`bobby_user_prefs?identity_id=eq.${identityId}&select=horizon,experience,risk,memory_enabled,preferred_name`),
+    rest(`bobby_user_assets?identity_id=eq.${identityId}&last_asked_at=gte.${cutoff}&select=symbol,asks,last_asked_at,last_horizon,last_price,last_price_at&order=last_asked_at.desc&limit=${MEMORY_MAX_ASSETS}`),
+    rest(`bobby_user_reads?identity_id=eq.${identityId}&delivered_at=gte.${cutoff}&select=symbol,delivered_at,horizon,level,verdict,direction,headline,why,risk,watch,language,price,price_at&order=delivered_at.desc&limit=${MEMORY_LIST_READS}`),
   ]);
   const row = (Array.isArray(prefsRows) ? prefsRows[0] : null) as Record<string, unknown> | null;
   return {
     enabled: row ? row.memory_enabled !== false : true,
+    preferredName: cleanName(row?.preferred_name),
     prefs: prefsOf(row),
     assets: (Array.isArray(assetRows) ? assetRows : []).map(assetOf).filter((a): a is MemoryAsset => a !== null),
+    reads: (Array.isArray(readRows) ? readRows : []).map(readOf).filter((r): r is MemoryRead => r !== null),
     retentionDays: MEMORY_RETENTION_DAYS,
   };
 }
 
-/** An explicit correction from the profile: only the fields sent change; null clears one. */
+/** An explicit correction: only the fields sent change; null clears one. */
 export async function updatePrefs(identityId: string, patch: PrefsPatch): Promise<void> {
   const row: Record<string, unknown> = { identity_id: identityId, updated_at: new Date().toISOString() };
   if (patch.horizon !== undefined) row.horizon = patch.horizon;
   if (patch.experience !== undefined) row.experience = patch.experience;
   if (patch.risk !== undefined) row.risk = patch.risk;
   if (patch.memoryEnabled !== undefined) row.memory_enabled = patch.memoryEnabled;
+  if (patch.preferredName !== undefined) row.preferred_name = patch.preferredName === null ? null : cleanName(patch.preferredName);
   await rest('bobby_user_prefs?on_conflict=identity_id', {
     method: 'POST',
     headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -173,62 +267,146 @@ export async function updatePrefs(identityId: string, patch: PrefsPatch): Promis
   });
 }
 
-/** Forget one asset, or (symbol null) everything. Throws MemoryUnavailableError. */
-export async function forgetMemory(identityId: string, symbol: string | null): Promise<number> {
-  const n = await rpc('bobby_memory_forget', { p_identity: identityId, p_symbol: symbol }, 4000);
+/** Forget one asset (and its stored answers) or, only when asked explicitly, everything. Throws MemoryUnavailableError. */
+export async function forgetMemory(identityId: string, target: { symbol: string } | 'all'): Promise<number> {
+  if (target !== 'all' && !MEMORY_SYMBOL.test(target.symbol)) throw new MemoryUnavailableError('invalid symbol');
+  const n = await rpc('bobby_memory_forget', { p_identity: identityId, p_symbol: target === 'all' ? null : target.symbol }, 4000);
   return typeof n === 'number' ? n : 0;
 }
 
-/** What the CIO may see about this reader: explicit preferences and how often they asked. Nothing else. */
+// ---------- calendar in the reader's time zone ----------
+/** A valid IANA time zone, or null: without one Bobby says no day and counts no week. */
+export function readerTimeZone(tz: unknown): string | null {
+  if (typeof tz !== 'string' || !tz || tz.length > 64) return null;
+  try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return tz; } catch { return null; }
+}
+/** Days since the epoch of the local calendar date of `ms` in `tz`. */
+function dayNumber(ms: number, tz: string): number {
+  const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(ms));
+  return Math.floor(Date.parse(`${ymd}T00:00:00Z`) / 86_400_000);
+}
+/** Calendar days between two instants in `tz` (Mon 23:00 → Tue 09:00 is 1). */
+export function calendarDaysBetween(fromMs: number, toMs: number, tz: string): number {
+  return dayNumber(toMs, tz) - dayNumber(fromMs, tz);
+}
+const LOCALE: Record<Lang, string> = { en: 'en-US', es: 'es-MX', pt: 'pt-BR' };
+/**
+ * When something happened, as the start of a sentence in the reader's language and time zone, with its own
+ * preposition and in lower case: "earlier today" / "yesterday" / "on Monday" / "on September 10";
+ * "hoy más temprano" / "ayer" / "el lunes" / "el 10 de septiembre"; "hoje mais cedo" / "ontem" /
+ * "na segunda-feira" / "no sábado" / "em 10 de setembro".
+ */
+export function dayPhrase(ms: number, now: number, tz: string, lang: Lang): string {
+  const days = calendarDaysBetween(ms, now, tz);
+  const d = new Date(ms);
+  if (days <= 0) return lang === 'es' ? 'hoy más temprano' : lang === 'pt' ? 'hoje mais cedo' : 'earlier today';
+  if (days === 1) return lang === 'es' ? 'ayer' : lang === 'pt' ? 'ontem' : 'yesterday';
+  if (days <= 6) {
+    const weekday = new Intl.DateTimeFormat(LOCALE[lang], { weekday: 'long', timeZone: tz }).format(d);
+    if (lang === 'es') return `el ${weekday}`;
+    if (lang === 'pt') return `${/^(s[aá]bado|domingo)/i.test(weekday) ? 'no' : 'na'} ${weekday}`;
+    return `on ${weekday}`;
+  }
+  const date = new Intl.DateTimeFormat(LOCALE[lang], { day: 'numeric', month: 'long', timeZone: tz }).format(d);
+  return lang === 'es' ? `el ${date}` : lang === 'pt' ? `em ${date}` : `on ${date}`;
+}
+const LAST_TIME: Record<Lang, string> = { en: 'last time', es: 'la última vez', pt: 'da última vez' };
+
+/** What the note is built from: explicit choices, the asset's past asks and what Bobby answered then. */
 export interface ReaderContext {
+  /** The name to use: the one they asked to be called, else their Apple/Google first name. */
+  name?: string;
   /**
    * `explainRiskDepth` is the profile's "risk" choice, named for what it means in the UI: how much risk
    * explanation the reader wants. Never a risk tolerance, suitability or sizing input.
    */
   prefs?: { horizon?: MemoryHorizon; experience?: Experience; explainRiskDepth?: RiskPref };
   /** The asset asked about now, when asked before. */
-  /** The asset asked about now, when asked before. `timesThisWeek` counts this question too (2 = "second time this week"). */
   thisAsset?: {
-    asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number;
-    /** The weekday of the last ask (UTC), in the answer's language, when it was 1–6 days ago. */
-    lastAskedOn?: string;
-    /** Price at the last ask and the change since, computed here from the evidence's price: quote, never recompute. */
-    priceThen?: number; changeSinceLastAskPct?: number;
+    asks: number;
+    /** Calendar days since the last ask in the reader's time zone (absent without one). */
+    lastAskedDaysAgo?: number;
+    /** "yesterday" / "on Monday" / "el lunes"…, the start of a sentence (absent without a time zone). */
+    lastAskedPhrase?: string;
+    lastHorizon: AskedHorizon;
+    /** Asks in the reader's calendar week (Monday first), this one included; absent when it cannot be exact. */
+    timesThisWeek?: number;
+    /** The price the last read used and the change to the price this read uses (both dated, a new day). */
+    priceThen?: number; priceNow?: number; changeSinceLastAskPct?: number;
   };
-  /** The reader's first name from their Apple/Google profile, when shared. */
-  firstName?: string;
-  /** Other assets asked about at least twice, most-weighted first. */
-  oftenAsks?: Array<{ symbol: string; asks: number }>;
+  /** The newest stored answer on this asset: exactly what the reader saw then. */
+  previousRead?: {
+    /** When, as the start of a sentence ("on Monday"), or "last time" without a time zone. */
+    dayPhrase: string; daysAgo?: number;
+    horizon: AskedHorizon; level: ReadLevel;
+    verdict: 'wait' | 'review'; direction: 'long' | 'short' | 'none';
+    headline: string; why: string; risk: string; language: Lang;
+  };
 }
 
-/** A usable price: finite and positive, else null. */
-const positive = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 1e12 ? n : null; };
+export interface ReaderOptions {
+  symbol: string; now?: number; name?: string | null;
+  /** The price this read uses and its own observation time (the evidence's asOf). */
+  priceNow?: number | null; priceNowAt?: string | null;
+  language?: Lang; timeZone?: string | null;
+}
 
-/** Compact the summary for the model; null when memory is off or holds nothing useful. */
-export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: 'en' | 'es' | 'pt' = 'en'): ReaderContext | null {
+/** History written before v2 kept only the newest 20 ask times; v2 keeps up to 100. */
+const RECENT_ASKS_TRUNCATED_AT = 20;
+
+/** Compact the summary for the note; null when memory is off or holds nothing useful. */
+export function readerContext(summary: MemorySummary | null, opts: ReaderOptions): ReaderContext | null {
   if (!summary?.enabled) return null;
+  const now = opts.now ?? Date.now();
+  const lang = opts.language ?? 'en';
+  const tz = readerTimeZone(opts.timeZone);
   const ctx: ReaderContext = {};
-  if (firstName) ctx.firstName = firstName;
+  const name = cleanName(opts.name);
+  if (name) ctx.name = name;
   const prefs: NonNullable<ReaderContext['prefs']> = {};
   if (summary.prefs.horizon) prefs.horizon = summary.prefs.horizon;
   if (summary.prefs.experience) prefs.experience = summary.prefs.experience;
   if (summary.prefs.risk) prefs.explainRiskDepth = summary.prefs.risk;
   if (Object.keys(prefs).length) ctx.prefs = prefs;
-  if (summary.thisAsset) {
-    const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
-    ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
-    if (days >= 1 && days <= 6) {
-      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : language === 'pt' ? 'pt-BR' : 'en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
-    }
-    const then = summary.thisAsset.lastPrice ?? null;
-    // A callback only across days: the same-day move is just the chart.
-    if (then && positive(priceNow) && days >= 1) {
-      ctx.thisAsset.priceThen = then;
-      ctx.thisAsset.changeSinceLastAskPct = Math.round(((priceNow as number) / then - 1) * 1000) / 10;
+  const t = summary.thisAsset;
+  if (t) {
+    const last = Date.parse(t.lastAskedAt);
+    ctx.thisAsset = { asks: t.asks, lastHorizon: t.lastHorizon };
+    if (tz && Number.isFinite(last) && last <= now) {
+      const days = calendarDaysBetween(last, now, tz);
+      ctx.thisAsset.lastAskedDaysAgo = days;
+      ctx.thisAsset.lastAskedPhrase = dayPhrase(last, now, tz, lang);
+      const today = dayNumber(now, tz);
+      const weekStart = today - ((new Date(today * 86_400_000).getUTCDay() + 6) % 7);
+      const times = t.recentAsks.map((iso) => Date.parse(iso)).filter((ms) => Number.isFinite(ms) && ms <= now);
+      const inWeek = times.filter((ms) => dayNumber(ms, tz) >= weekStart).length;
+      // If the history may have been truncated (20+ times) and all of it falls in this week, older asks this week
+      // may be missing: no count rather than a wrong one.
+      const exact = times.length < RECENT_ASKS_TRUNCATED_AT || inWeek < times.length;
+      if (exact) ctx.thisAsset.timesThisWeek = inWeek + 1;
+      // A callback needs both prices with their own times, the new one newer, from a later calendar day.
+      const then = t.lastPrice ?? null;
+      const thenAt = t.lastPriceAt ? Date.parse(t.lastPriceAt) : NaN;
+      const nowPrice = positive(opts.priceNow);
+      const nowAt = opts.priceNowAt ? Date.parse(opts.priceNowAt) : NaN;
+      if (then && nowPrice && Number.isFinite(thenAt) && Number.isFinite(nowAt) && nowAt > thenAt && days >= 1) {
+        ctx.thisAsset.priceThen = then;
+        ctx.thisAsset.priceNow = nowPrice;
+        ctx.thisAsset.changeSinceLastAskPct = Math.round((nowPrice / then - 1) * 1000) / 10;
+      }
     }
   }
-  // The asked asset is already in thisAsset; oftenAsks names the others the reader keeps coming back to.
-  const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== symbol).slice(0, 5).map(({ symbol: s, asks }) => ({ symbol: s, asks }));
-  if (often.length) ctx.oftenAsks = often;
+  const r = summary.lastRead;
+  if (r) {
+    const at = Date.parse(r.deliveredAt);
+    if (Number.isFinite(at) && at <= now) {
+      ctx.previousRead = {
+        dayPhrase: tz ? dayPhrase(at, now, tz, lang) : LAST_TIME[lang],
+        ...(tz ? { daysAgo: calendarDaysBetween(at, now, tz) } : {}),
+        horizon: r.horizon, level: r.level,
+        verdict: r.verdict, direction: r.direction, headline: r.headline, why: r.why, risk: r.risk, language: r.language,
+      };
+    }
+  }
   return Object.keys(ctx).length ? ctx : null;
 }

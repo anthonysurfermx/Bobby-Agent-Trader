@@ -17,6 +17,8 @@ import { useCompanionVoice } from '@/hooks/useCompanionVoice';
 import { getSyncStatus } from '@/lib/companions/sync';
 import NucleoSphere, { type SphereVerdict } from '@/components/companion/NucleoSphere';
 import { useBobbyAccount } from '@/hooks/useBobbyAccount';
+import { fetchMemory, patchMemory } from '@/lib/memory-client';
+import { preferredNameAsk } from '@/lib/preferred-name';
 import SignInPrompt, { recordAsk, shouldPromptAfterAsk, shouldPromptNow } from '@/components/companion/SignInPrompt';
 import { EvolutionOverlay, GearCatalog, ToolDetail, ToolUnlockOverlay } from '@/components/companion/CompanionOverlays';
 import LandSeedCard from '@/components/companion/LandSeedCard';
@@ -147,6 +149,26 @@ export default function NucleoDesk() {
   const [sheet, setSheet] = useState<Sheet>('none');
   const [signInPrompt, setSignInPrompt] = useState(false);
   const { account } = useBobbyAccount();
+  // The name the reader asked Bobby to use ("call me Tony", or the memory screen), for this account only.
+  const [preferredName, setPreferredName] = useState<string | null>(null);
+  const accountIdRef = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    // Signing out or switching accounts leaves nothing of the previous account on screen or in the voice.
+    const previous = accountIdRef.current;
+    accountIdRef.current = account?.id ?? null;
+    // (null → id is the first session load or a sign-in by the same person: nothing to clear.)
+    if (previous && previous !== (account?.id ?? null)) {
+      requestRef.current?.abort();
+      voice.stop();
+      setAgents(null); setAnswer(null); setSnapshot(null); setMessages([]); setPhase('idle');
+      setNotice(null); setPendingName(null); setLive({}); setAgentsFailed(null); setDeskError(null); setDeskRetry(null);
+    }
+    setPreferredName(null);
+    if (!account?.id) return;
+    let live = true;
+    void fetchMemory().then((r) => { if (live && 'state' in r) setPreferredName(r.state.enabled ? r.state.preferredName : null); });
+    return () => { live = false; };
+  }, [account?.id]);
   // Metered access (api/_lib/access.ts): 3 reads without an account, 10 a week with one, Bobby Pro unlimited.
   const [accessState, setAccessState] = useState<AccessState | null>(null);
   // The analysis level (Rápido / Profundo / Máximo) and the pop-up when an allowance runs out.
@@ -179,6 +201,10 @@ export default function NucleoDesk() {
   const requestRef = useRef<AbortController | null>(null);
   const revealRef = useRef<number | null>(null);
   const [deskError, setDeskError] = useState<string | null>(null);
+  // A short reply that is not a read ("call me Tony"), shown under the greeting until the next question.
+  const [notice, setNotice] = useState<string | null>(null);
+  // The name waiting for the reader's yes ("¿Te llamo «Tony»?").
+  const [pendingName, setPendingName] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
   const [live, setLive] = useState<LiveArgs>({});
@@ -328,9 +354,49 @@ export default function NucleoDesk() {
     progressStore.setQuickAccess(qa);
   }, [say, progress.quickAccess]);
 
+  /** The reader said yes to "¿Te llamo «X»?": save it for this account, unless memory is paused. */
+  const confirmName = useCallback(async (name: string) => {
+    const owner = accountIdRef.current;
+    setPendingName(null);
+    if (!owner) return;
+    const current = await fetchMemory();
+    if (accountIdRef.current !== owner) return; // signed out or switched meanwhile: nothing to save or say
+    const saved = 'state' in current && current.state.enabled ? await patchMemory({ preferredName: name }) : null;
+    if (accountIdRef.current !== owner) return;
+    let line: string;
+    if ('state' in current && !current.state.enabled) {
+      line = t('Memory is paused, so I did not save it. Turn it back on in your profile, under What Bobby remembers.', 'La memoria está en pausa, así que no lo guardé. Actívala en tu perfil, en Lo que Bobby recuerda.', 'A memória está pausada, então não salvei. Reative no seu perfil, em O que o Bobby lembra.');
+    } else if (saved && 'state' in saved) {
+      setPreferredName(saved.state.preferredName);
+      line = t(`Done, ${name}. That is what I will call you.`, `Listo, ${name}. Así te voy a llamar.`, `Pronto, ${name}. É assim que vou te chamar.`);
+    } else {
+      line = t('I could not save your name right now. Try again in a moment.', 'No pude guardar tu nombre ahora. Inténtalo en un momento.', 'Não consegui salvar seu nome agora. Tente de novo em instantes.');
+    }
+    setMessages((m) => [...m, { from: 'bobby', text: line }]);
+    setNotice(line);
+    say(line, true);
+  }, [say]);
+
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
     if (!q) return;
+    // A message that is only "call me Tony" is not a market question: Bobby asks before saving the name (an
+    // account with memory on). A naming phrase inside a question is never a name ("call me crazy, but…").
+    const naming = preferredNameAsk(q);
+    if (naming) {
+      setInput('');
+      setMessages((m) => [...m, { from: 'you', text: q }]);
+      const line = account?.id
+        ? t(`Should I call you “${naming.name}”?`, `¿Te llamo «${naming.name}»?`, `Posso te chamar de “${naming.name}”?`)
+        : t('Sign in with Apple or Google so I can remember your name.', 'Inicia sesión con Apple o Google para que recuerde tu nombre.', 'Entre com Apple ou Google para eu lembrar seu nome.');
+      setPendingName(account?.id ? naming.name : null);
+      setMessages((m) => [...m, { from: 'bobby', text: line }]);
+      setNotice(line);
+      say(line, true);
+      return;
+    }
+    setNotice(null);
+    setPendingName(null);
     const lv = deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
@@ -370,7 +436,7 @@ export default function NucleoDesk() {
     }
     if (r.needsConfirmation) { setPending(r); setPhase('confirm'); return; }
     await analyze(r.snapshot, controller);
-  }, [analyze, voice]);
+  }, [analyze, voice, account?.id, say]);
 
   // The meter: on load, whenever the account changes, and after a Stripe checkout (the webhook can
   // lag a few seconds, so a welcome polls until the subscription shows up). A question the gate held
@@ -589,13 +655,20 @@ export default function NucleoDesk() {
         <NucleoSphere size={sphereBig} mode={listening ? 'listen' : 'idle'} tint={levelTint} tintAmount={0.35} />
         {planTag}
       </div>
-      <h1 className="n-display mt-14 text-center text-[40px] leading-[1.05] sm:text-[52px]">{greeting(account?.firstName)}</h1>
+      <h1 className="n-display mt-14 text-center text-[40px] leading-[1.05] sm:text-[52px]">{greeting(preferredName ?? account?.firstName)}</h1>
       <p className="mt-3 text-center text-[15px]" style={{ color: '#A39C91' }}>
         {movers.length
           ? movers.map((m, i) => <span key={m.symbol}>{i > 0 && <span style={{ color: '#5c564e' }}> · </span>}{m.symbol} <span style={{ color: m.changePct >= 0 ? '#3FE0B5' : '#FF5A5F' }}>{signedPct(m.changePct)}</span></span>)
           : t('Ask me about any stock or crypto.', 'Pregúntame por cualquier acción o cripto.', 'Me pergunte sobre qualquer ação ou cripto.')}
         {movers.length > 0 && <span style={{ color: '#8A8378' }}> {t('in 24h', 'en 24h', 'em 24h')}</span>}
       </p>
+      {notice && <p className="n-caption mt-4 text-center" role="status">{notice}</p>}
+      {pendingName && (
+        <div className="mt-3 flex gap-2">
+          <button type="button" className="n-send" onClick={() => { sfxTock(); void confirmName(pendingName); }}>{t(`Yes, call me ${pendingName}`, `Sí, llámame ${pendingName}`, `Sim, me chame de ${pendingName}`)}</button>
+          <button type="button" className="n-mem-btn" onClick={() => { sfxTock(); setPendingName(null); setNotice(null); }}>{t('No', 'No', 'Não')}</button>
+        </div>
+      )}
       {voiceNotice && <p className="mt-2 text-[13px]" style={{ color: '#8A8378' }}>{voiceNotice}</p>}
     </div>
   );
@@ -650,6 +723,7 @@ export default function NucleoDesk() {
         </div>
       ) : agents?.synthesis ? (
         <div className="n-synth mt-8 w-full">
+          {agents.personal && <p className="n-synth-memory">{agents.personal.note}</p>}
           <div className="flex min-h-[56px] w-full justify-center px-2"><Caption text={agents.synthesis.headline} run={readSeq} /></div>
           <div className="n-synth-rows">
             <div className="n-synth-row"><i style={{ background: AGENT_TONE.alpha }} /><span><b>{t('Why', 'Por qué', 'Por quê')}</b>{agents.synthesis.why}</span></div>
@@ -810,11 +884,14 @@ export default function NucleoDesk() {
   // then another question of the reader's, then their other assets.
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
   const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
+  const peerSymbols = done && snapshot ? (agents?.related?.peers ?? []).filter((p) => p.symbol !== snapshot.symbol) : [];
   const suggestions: Array<{ label: string; go: () => void }> = done && snapshot
     ? [
       ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.toUpperCase().includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
+      // Peers the answer compared (a sector question): each opens its own read.
+      ...peerSymbols.map((p) => ({ label: p.sharedExposure ? `${p.symbol} · ${p.sharedExposure}` : p.symbol, go: () => { void ask(p.symbol, howLooks(p.symbol)); } })),
       { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
-      ...progress.quickAccess.filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
+      ...progress.quickAccess.filter((q) => q !== snapshot.symbol && !peerSymbols.some((p) => p.symbol === q)).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
     ]
     : progress.quickAccess.slice(0, 3).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
   const chips = !reading && phase !== 'confirm' ? (
@@ -881,6 +958,7 @@ export default function NucleoDesk() {
             voiceLevel={voice.speaking ? voice.level : null} attachments={attachments} equip={equip} stageRef={stageRef}
             freeVoice={freeVoice} muted={muted} speakEnabled={speakEnabled}
             onClose={() => setSheet('none')}
+            onMemoryState={(m) => setPreferredName(m && m.enabled ? m.preferredName : null)}
             onPickCompanion={(c) => { progressStore.setCompanion(c.id); void voice.speak(pick(c.selectLine), { voice: c.voicePersona, essential: false }); }}
             onTool={(tool) => setInspected(tool)} onPet={() => setSheet('pet')} onCatalog={() => setSheet('catalog')}
             onSwap={() => setSheet('swap')} onTraderLand={openTraderLand} onExplore={() => setSheet('board')}

@@ -40,6 +40,8 @@ interface Props {
   onExplore: () => void;
   onShare: () => void;
   onSignIn: () => void;
+  /** Every memory state the dialog loads or changes, so the desk greeting follows the name at once. */
+  onMemoryState?: (state: import('@/lib/memory-client').MemoryState | null) => void;
   /** After sign-out: refresh access and meters. */
   onSignedOut: () => void;
   onRisk: () => void;
@@ -181,7 +183,7 @@ export default function NucleoProfile(p: Props) {
           <Row icon={<RotateCcw size={16} />} label={t('Reset progress on this browser', 'Reiniciar progreso en este navegador', 'Zerar o progresso neste navegador')} onClick={p.onReset} />
         </div>
         {/* Inside the drawer, so clicks in the dialog (a portal) bubble to the drawer, not the backdrop that closes it. */}
-        <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} onSignIn={() => { setMemoryOpen(false); p.onSignIn(); }} />
+        <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} onSignIn={() => { setMemoryOpen(false); p.onSignIn(); }} onState={p.onMemoryState} />
       </motion.aside>
     </motion.div>
   );
