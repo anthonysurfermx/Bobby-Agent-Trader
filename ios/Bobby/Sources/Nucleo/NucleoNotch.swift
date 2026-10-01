@@ -21,6 +21,10 @@ final class NucleoNotch: ObservableObject {
     @Published private(set) var tint: Color = Theme.cream
 
     private var symbol: String?
+    private var level: NucleoAnalysisLevel = .rapido
+    /// Live desk lines that beat the "debating" line here (the debate starts beside the market read).
+    private var pending: [[String: Any]] = []
+    private var debateOpen = false
     private var hideTask: Task<Void, Never>?
 
     func stage(_ payload: [String: Any]) {
@@ -29,6 +33,8 @@ final class NucleoNotch: ObservableObject {
         case "resolving":
             hideTask?.cancel()
             symbol = nil
+            pending = []
+            debateOpen = false
             previous = nil
             mood = .working
             tint = Theme.cream
@@ -55,12 +61,44 @@ final class NucleoNotch: ObservableObject {
 
     func debating(_ level: NucleoAnalysisLevel) {
         guard visible else { return }
+        self.level = level
+        defer {
+            debateOpen = true
+            let queued = pending
+            pending = []
+            queued.forEach(live)
+        }
         switch level {
         case .rapido: tint = Theme.cream
         case .profundo: tint = Theme.orbBlue
         case .maximo: tint = Theme.orbViolet
         }
         push(L.t("Alpha Hunter, Red Team and CIO debating", "Alpha Hunter, Red Team y CIO debaten"))
+    }
+
+    /// One line of the live desk stream (api/desk-debate NDJSON): evidence, then each argument as it lands.
+    func live(_ event: [String: Any]) {
+        guard visible else { return }
+        guard debateOpen else { pending.append(event); return }
+        switch event["type"] as? String {
+        case "evidence":
+            let frames = (event["timeframes"] as? [Any])?.compactMap { $0 as? String } ?? []
+            if !frames.isEmpty { push(L.t("Evidence · \(frames.joined(separator: " · "))", "Evidencia · \(frames.joined(separator: " · "))")) }
+        case "agent":
+            guard let text = event["text"] as? String else { return }
+            let snippet = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+            switch event["role"] as? String {
+            case "alpha": push("Alpha Hunter · \(snippet)")
+            case "red":
+                push("Red Team · \(snippet)")
+                if level != .maximo { push(L.t("CIO deciding", "El CIO decide")) }
+            case "rebuttal":
+                push(L.t("Second round · \(snippet)", "Segunda ronda · \(snippet)"))
+                push(L.t("CIO deciding", "El CIO decide"))
+            default: break
+            }
+        default: break
+        }
     }
 
     func finished(_ result: [String: Any]) {

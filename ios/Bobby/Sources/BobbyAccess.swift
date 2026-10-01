@@ -156,12 +156,13 @@ enum BobbyAccessAPI {
     /// checked: a 401 on a signed-in request forces one refresh and one retry, so only a caller
     /// the server still refuses comes back as 401. Transport errors are thrown.
     static func send(_ path: String, method: String = "POST", body: [String: Any]? = nil,
-                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil,
+                     onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         let owner = await auth.owner()
         let bearer = await auth.bearer()
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
-        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer), timeout: timeout)
+        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer), timeout: timeout, onEvent: onEvent)
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         guard first.status == 401, let bearer else { return first }
@@ -169,7 +170,7 @@ enum BobbyAccessAPI {
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         guard let fresh, fresh != bearer else { return first }
-        let retried = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh), timeout: timeout)
+        let retried = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh), timeout: timeout, onEvent: onEvent)
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         return retried

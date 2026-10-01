@@ -119,6 +119,7 @@ final class NucleoSession: ObservableObject {
         desk.emit = emit
         desk.debateStarted = { [weak self] level in self?.notch.debating(level) }
         desk.askFinished = { [weak self] result in self?.notch.finished(result) }
+        desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = emit
         speech.willStart = { [weak self] in self?.nucleoVoice.stop() }
