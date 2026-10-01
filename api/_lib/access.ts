@@ -17,7 +17,8 @@ import { resolveIdentity, type Identity } from './user-identity.js';
 import { LEVEL_LIMITS, type PremiumLevel } from './desk-levels.js';
 
 export type Tier = 'anon' | 'free' | 'pro';
-/** `bonus`: reads gifted by coupons (bobby_usage_bonus), spent after the weekly allowance and included in `remaining`. */
+/** `bonus`: reads gifted by coupons (bobby_usage_bonus), spent after the weekly allowance. Not part of `remaining`:
+ *  shipped clients (iOS 1.5) render `remaining` against `limit`. */
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean; bonus: number }
 export interface ReadGate { allowed: boolean; code: 'signin_required' | 'subscription_required' | 'access_unavailable' | null; readId: number | null; access: Access; identity: Identity | null }
 
@@ -47,7 +48,7 @@ function shape(row: Record<string, unknown>): Access {
   const bonus = typeof row.bonus === 'number' && row.bonus > 0 ? row.bonus : 0;
   return {
     tier, used, limit, bonus,
-    remaining: used !== null && limit !== null ? Math.max(0, limit - used) + bonus : null,
+    remaining: used !== null && limit !== null ? Math.max(0, limit - used) : null,
     resetsAt: typeof row.resetsAt === 'string' ? new Date(row.resetsAt).toISOString() : null,
     // Anonymous reads always stop at the sign-in; the weekly cap only binds while the paywall is on.
     paywall: tier === 'free' ? paywallOn() : tier === 'anon' && limit !== null,
@@ -134,7 +135,7 @@ export const publicSubscription = (s: SubscriptionRow | null) => s ? { provider:
 // The allowances live in api/_lib/desk-levels.ts; bobby_consume_level (20260929150000) counts atomically.
 // Unlike the read meter these fail closed: a premium read is never served uncounted.
 
-/** `bonus`: gifted uses of this level (coupons), already included in `remaining`. */
+/** `bonus`: gifted uses of this level (coupons), spent after `remaining` reaches 0 and not included in it. */
 export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null; bonus: number }
 export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
 export type LevelCode = 'signin_required' | 'upgrade_required' | 'level_exhausted';

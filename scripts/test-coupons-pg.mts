@@ -146,7 +146,7 @@ try {
   const deep = await level(alice, null, 'profundo');
   eq([deep.allowed, deep.used, deep.limit, deep.bonus], [true, 3, 3, 1], 'the 4th Profundo spends a gift');
   const state = await levelState(alice);
-  eq([state.levels.profundo.used, state.levels.profundo.remaining, state.levels.profundo.bonus], [3, 1, 1], 'gifted uses stay out of the window and show as remaining');
+  eq([state.levels.profundo.used, state.levels.profundo.remaining, state.levels.profundo.bonus], [3, 0, 1], 'gifted uses stay out of the window; the gift is reported apart from remaining');
   await pool.query('delete from public.bobby_level_uses where id = $1', [deep.useId]);
   eq((await bonus(alice)).profundo, 2, 'a refunded gifted Profundo comes back');
   eq((await level(alice, null, 'profundo')).allowed, true, 'gift 1');

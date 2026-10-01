@@ -51,7 +51,7 @@ Todos son del servidor: **cambiarlos no requiere actualizar la app**.
 
 ## Pendiente (1.6)
 
-- **Cupones** para regalar uso. Ver "Cupones" abajo.
+- Campo de cupón dentro de la app (1.6), mostrando el saldo de regalo en Profile.
 - Límites configurables sin migración: una tabla `bobby_config` para cambiarlos en segundos.
 - Voces fuera de OpenAI: que OpenAI quede solo para razonamiento. Requiere build 53, porque `NeuralVoice.swift:107` solo acepta audio con `X-TTS-Provider == "openai"`.
 - Portugués dentro de la app (854 strings `L.t`). La ficha PT dice que la interfaz es EN/ES.
@@ -60,21 +60,28 @@ Todos son del servidor: **cambiarlos no requiere actualizar la app**.
 - Apagar el proveedor de email de Supabase.
 - Dynamic Type.
 
-## Cupones (diseño propuesto, sin construir)
+## Cupones (LIVE, PR #118)
 
-- **Tablas**:
-  - `bobby_coupons`: `code`, `grants` (`reads` | `pro_days`), `amount`, `max_redemptions`, `expires_at`, `note`.
-  - `bobby_coupon_redemptions`: una por cuenta por cupón.
-- **Canje**:
-  - RPC atómica `bobby_redeem_coupon(identity, code)` y acción `redeem-coupon` en `/api/bobby-access`.
-  - Los Pro days reusan `bobby_pro_grants` con `source='coupon'`.
-  - Las lecturas extra requieren que `bobby_consume_read` sume un saldo de bonus.
-- **Dónde se canjea**:
-  - Web: `bobbyprotocol.xyz/redeem` con sesión iniciada. Como va ligado a la cuenta, aplica también en iOS.
-  - iOS: un campo en Profile en la 1.6.
-- **Apple (guideline 3.1.1)**: un campo propio que desbloquee funciones *de pago* dentro de la app iOS es riesgo de rechazo.
-  - Para regalar Bobby Pro en iOS lo seguro son los **Offer Codes** de App Store Connect, que RevenueCat ya reconoce.
-  - Regalar lecturas gratis canjeadas en la web es lo más defendible.
+- **Qué regalan**: lecturas extra, y opcionalmente Profundo y Máximo.
+  - Se gastan solo cuando se acaba lo normal: el tope semanal gratis, que aplica cuando `BOBBY_PAYWALL=on`, o la ventana de Profundo/Máximo.
+  - Nunca cuentan contra ese tope.
+  - Si un análisis falla, el regalo se devuelve.
+- **Dónde se canjean**: `bobbyprotocol.xyz/redeem?code=CODIGO`, con cuenta de Apple o Google, una vez por cuenta.
+  - Como el regalo vive en la cuenta, también aplica en el iPhone: la app 1.5 lo gasta a través del servidor, sin cambio en la app.
+- **Crear un cupón** (lo hago yo desde aquí con SQL en Supabase `qbvdqkknnuweatptjohi`):
+  ```sql
+  insert into bobby_coupons(code, reads, profundo, maximo, max_redemptions, expires_at, note)
+  values ('AMIGOS-7K2Q', 20, 3, 1, 50, '2026-12-31', 'amigos del lanzamiento');
+  ```
+  - Usar códigos con parte aleatoria, no solo palabras: así es más difícil adivinarlos.
+  - Para desactivarlo: `update bobby_coupons set active = false where code = '…'`.
+  - Para ver canjes: `select * from bobby_coupon_redemptions where code = '…'`.
+- **Límites anti-fuerza-bruta**: 10 intentos por hora por cuenta y 30 por red. Si el contador no está disponible, el canje se bloquea en vez de abrirse.
+- **Riesgo aceptado**: quien borra su cuenta y crea otra puede volver a canjear el mismo cupón. Es el mismo caso que el loop de referidos pendiente para la 1.6, y el tope del cupón (`max_redemptions`) lo limita.
+- **Apple (guideline 3.1.1)**: no hay campo de cupón dentro de la app iOS, y los cupones no regalan Bobby Pro. Para regalar Pro en iOS: Offer Codes de App Store Connect.
+- **Pantallas**: `remaining` conserva su significado (límite − usado). El regalo viaja aparte en `bonus`.
+  - La web lo muestra como "0/10 +20".
+  - La app 1.5 muestra el conteo normal y aun así puede gastar el regalo.
 
 ## Al retomar
 

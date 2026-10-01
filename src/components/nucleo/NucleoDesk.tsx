@@ -398,7 +398,7 @@ export default function NucleoDesk() {
       if (proNotice === 'welcome' && st.access.tier !== 'pro' && attempt < 6) { window.setTimeout(() => void load(attempt + 1), 2500); return; }
       let pending: string | null = null;
       try { pending = sessionStorage.getItem(PENDING_ASK); } catch { pending = null; }
-      const canRead = st.access.tier === 'pro' || (st.signedIn && !(st.access.paywall && (st.access.remaining ?? 1) <= 0));
+      const canRead = st.access.tier === 'pro' || (st.signedIn && !(st.access.paywall && (st.access.remaining ?? 1) + (st.access.bonus ?? 0) <= 0));
       if (pending && canRead && !retried.current) {
         retried.current = true;
         try { sessionStorage.removeItem(PENDING_ASK); } catch { /* private mode */ }

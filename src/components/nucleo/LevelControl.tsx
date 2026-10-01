@@ -33,6 +33,8 @@ export function storedLevel(): DeskLevel {
 }
 export function storeLevel(l: DeskLevel) { try { localStorage.setItem(LEVEL_KEY, l); } catch { /* private mode */ } }
 
+/** Coupon gifts (api/_lib/coupons.ts) are spent after the allowance: shown as "+N". */
+const gift = (n: number | undefined) => (n && n > 0 ? ` +${n}` : '');
 export interface Allowance { text: string; state: 'open' | 'locked' | 'empty'; resetsAt: string | null }
 /** What this level has left for this reader, from the server's meters. */
 export function allowanceFor(level: DeskLevel, s: AccessState | null): Allowance | null {
@@ -42,12 +44,12 @@ export function allowanceFor(level: DeskLevel, s: AccessState | null): Allowance
   if (level === 'rapido') {
     const a = s.access;
     if (a.tier === 'pro' || !a.paywall || a.remaining === null || a.limit === null) return { text: t('Unlimited', 'Sin límite', 'Sem limite'), state: 'open', resetsAt: null };
-    return { text: `${a.remaining}/${a.limit} · ${a.tier === 'anon' ? unit(30) : unit(7)}`, state: a.remaining > 0 ? 'open' : 'empty', resetsAt: a.resetsAt };
+    return { text: `${a.remaining}/${a.limit}${gift(a.bonus)} · ${a.tier === 'anon' ? unit(30) : unit(7)}`, state: a.remaining + (a.bonus ?? 0) > 0 ? 'open' : 'empty', resetsAt: a.resetsAt };
   }
   const m = s.levels?.levels[level];
   if (!m) return null;
   if (m.limit === 0) return { text: t('With your free account', 'Con tu cuenta gratis', 'Com sua conta grátis'), state: 'locked', resetsAt: null };
-  return { text: `${m.remaining}/${m.limit} · ${unit(m.windowDays)}`, state: m.remaining > 0 ? 'open' : 'empty', resetsAt: m.resetsAt };
+  return { text: `${m.remaining}/${m.limit}${gift(m.bonus)} · ${unit(m.windowDays)}`, state: m.remaining + (m.bonus ?? 0) > 0 ? 'open' : 'empty', resetsAt: m.resetsAt };
 }
 
 const STEPS: Array<{ min: number; title: () => string; sub: () => string }> = [

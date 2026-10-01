@@ -93,6 +93,8 @@ export default function AuthCallback() {
     processedRef.current = true;
 
     const processCallback = async () => {
+      // Read once whatever the outcome: a cancelled sign-in must not send a later one to /redeem.
+      const back = takeReturn();
       try {
         // Bobby's own auth project (Apple / Google from the desk) lands here with
         // the session in the URL hash. Its client parses that when it is created;
@@ -102,7 +104,6 @@ export default function AuthCallback() {
           const { data } = await bobbySupabase().auth.getSession();
           if (data.session) {
             setStatus('success');
-            const back = takeReturn();
             setMessage(back ? 'Sesión iniciada. Volviendo…' : 'Sesión iniciada. Volviendo al desk…');
             cleanUrl();
             setTimeout(() => navigate(back ?? '/desk', { replace: true }), 600);

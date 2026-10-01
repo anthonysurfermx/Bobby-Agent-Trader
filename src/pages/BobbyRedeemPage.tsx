@@ -35,6 +35,7 @@ const COPY = {
     pt: 'No iPhone, abra o Bobby com a mesma conta.',
   },
   loading: { en: 'Checking your account…', es: 'Revisando tu cuenta…', pt: 'Verificando sua conta…' },
+  retry: { en: 'Try again', es: 'Reintentar', pt: 'Tentar de novo' },
 } satisfies Record<string, Copy>;
 
 const RESULT: Record<Exclude<RedeemResult, 'redeemed'>, Copy> = {
@@ -73,12 +74,13 @@ export default function BobbyRedeemPage() {
   const [state, setState] = useState<AccessState | null | 'loading'>('loading');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [needsAccount, setNeedsAccount] = useState(false);
 
   const refresh = useCallback(async () => setState(await fetchAccess()), []);
   useEffect(() => { void refresh(); }, [refresh]);
 
   const signIn = (provider: 'apple' | 'google') => {
-    rememberReturn(validCode(code) ? `/redeem?code=${code}` : '/redeem');
+    rememberReturn(validCode(code) ? `/redeem?code=${code}&lang=${l}` : `/redeem?lang=${l}`);
     window.location.assign(`/signin?provider=${provider}`);
   };
 
@@ -96,11 +98,13 @@ export default function BobbyRedeemPage() {
       setCode('');
       void refresh();
     } else {
+      if (result === 'account_required') setNeedsAccount(true);
       setMessage({ ok: false, text: t(RESULT[result]) });
     }
   }
 
-  const signedIn = state !== 'loading' && state?.signedIn === true;
+  const unknown = state === null;
+  const signedIn = state !== 'loading' && state?.signedIn === true && !needsAccount;
   const balance: UsageGift | null = state && state !== 'loading' && state.signedIn
     ? { reads: state.access.bonus ?? 0, profundo: state.levels?.levels.profundo.bonus ?? 0, maximo: state.levels?.levels.maximo.bonus ?? 0 }
     : null;
@@ -123,7 +127,14 @@ export default function BobbyRedeemPage() {
 
         {state === 'loading' && <p className="m-0 text-[14px] text-[#8A8378]" role="status">{t(COPY.loading)}</p>}
 
-        {state !== 'loading' && (
+        {unknown && (
+          <div className="flex flex-col gap-3">
+            <p role="alert" className="m-0 text-[15px] text-[#FF5A5F]">{t(RESULT.unavailable)}</p>
+            <button type="button" onClick={() => { setState('loading'); void refresh(); }} className={secondary}>{t(COPY.retry)}</button>
+          </div>
+        )}
+
+        {state !== 'loading' && !unknown && (
           <form onSubmit={submit} className="flex flex-col gap-3">
             <label htmlFor="coupon" className="font-mono text-[11px] tracking-[0.16em] uppercase text-[#8A8378]">{t(COPY.label)}</label>
             <input

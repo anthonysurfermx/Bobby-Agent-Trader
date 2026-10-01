@@ -176,7 +176,8 @@ begin
 end;
 $$;
 
--- The premium meters (20260929150000) with the gifted balance per level: `remaining` includes it.
+-- The premium meters (20260929150000) with the gifted balance per level as `bonus`. `remaining` keeps its
+-- shipped meaning (limit - used): iOS 1.5 renders it as remaining/limit.
 create or replace function public.bobby_level_state(p_identity uuid, p_device text, p_limits jsonb)
 returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp as $$
 declare tier text := bobby_level_tier(p_identity); lv text; lim int; win int; used int; oldest timestamptz; extra int;
@@ -195,7 +196,7 @@ begin
       select count(*), min(created_at) into used, oldest from bobby_level_uses
         where identity_id is null and device_hash = p_device and level = lv and created_at > now() - make_interval(days => win);
     end if;
-    levels := levels || jsonb_build_object(lv, jsonb_build_object('used', used, 'limit', lim, 'remaining', greatest(lim - used, 0) + extra,
+    levels := levels || jsonb_build_object(lv, jsonb_build_object('used', used, 'limit', lim, 'remaining', greatest(lim - used, 0),
       'windowDays', win, 'resetsAt', case when used > 0 then oldest + make_interval(days => win) else null end, 'bonus', extra));
   end loop;
   return jsonb_build_object('tier', tier, 'levels', levels);

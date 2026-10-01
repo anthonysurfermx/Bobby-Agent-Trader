@@ -123,7 +123,8 @@ export async function redeemCoupon(code: string): Promise<{ result: RedeemResult
 
 // After an Apple/Google sign-in started from /redeem, /auth/callback returns there instead of the desk.
 const RETURN_KEY = 'bobby:return:v1';
-const isReturnPath = (v: unknown): v is string => typeof v === 'string' && /^\/redeem(\?code=[A-Z0-9-]{4,32})?$/.test(v);
+const isReturnPath = (v: unknown): v is string =>
+  typeof v === 'string' && /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt))?$/.test(v);
 export function rememberReturn(path: string) { try { if (isReturnPath(path)) sessionStorage.setItem(RETURN_KEY, path); } catch { /* private mode */ } }
 export function takeReturn(): string | null {
   try {
