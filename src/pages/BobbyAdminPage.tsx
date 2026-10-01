@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Menu as MenuIcon, RefreshCw } from 'lucide-react';
+import { Menu as MenuIcon, RefreshCw, UserCheck, UserX } from 'lucide-react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { rememberReturn } from '@/lib/access-client';
 import { adminMockMode, fetchAdminMe, fetchAdminOverview, type AdminMe, type AdminPeriod, type OverviewResponse } from '@/lib/admin-client';
@@ -241,9 +241,11 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
           <button
             type="button" onClick={toggleInternal} aria-pressed={internal}
             title={internal ? 'Incluye tus cuentas, instalaciones y redes. Toca para dejarlas fuera.' : 'Tus cuentas, instalaciones y redes están fuera de todas las cifras. Toca para incluirlas.'}
-            className={`h-8 shrink-0 rounded-lg border px-2.5 font-mono text-[10.5px] uppercase tracking-[0.06em] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F28C38] ${internal ? 'border-[#F28C38]/40 bg-[#F28C38]/10 text-[#F7A04B]' : 'border-white/[0.08] text-[#8B8B8B] hover:text-[#EDEDED]'}`}
+            aria-label={internal ? 'Con equipo: incluye tu tráfico' : 'Sin equipo: tu tráfico está fuera'}
+            className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 font-mono text-[10.5px] uppercase tracking-[0.06em] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F28C38] sm:px-2.5 ${internal ? 'border-[#F28C38]/40 bg-[#F28C38]/10 text-[#F7A04B]' : 'border-white/[0.08] text-[#8B8B8B] hover:text-[#EDEDED]'}`}
           >
-            {internal ? 'Con equipo' : 'Sin equipo'}
+            {internal ? <UserCheck className="h-3.5 w-3.5 sm:hidden" strokeWidth={1.8} aria-hidden /> : <UserX className="h-3.5 w-3.5 sm:hidden" strokeWidth={1.8} aria-hidden />}
+            <span className="hidden sm:inline">{internal ? 'Con equipo' : 'Sin equipo'}</span>
           </button>
           <Segmented<AdminPeriod> label="Periodo" value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ value: p, label: `${p}D` }))} />
           <span className="hidden max-w-[220px] truncate font-mono text-[11px] text-[#5C5C5C] lg:inline" title={email}>{email}</span>

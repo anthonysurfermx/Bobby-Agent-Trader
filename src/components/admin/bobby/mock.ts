@@ -633,19 +633,19 @@ function post(body: AdminPostBody): Record<string, unknown> {
       log('delete-cost', String(body.id), { cost: row });
       return { ok: true };
     }
-    case 'set-internal': log('set-internal', body.identityId, { internal: body.internal }); return {};
+    case 'set-internal': log('set-internal', body.identityId, { internal: body.internal }); return { ok: true };
     case 'set-device-internal': {
       const d = INSTALLS.find((x) => x.device === body.device);
       if (!d) throw new Refuse(404, 'Install not found.');
       d.manualInternal = body.internal; d.internal = body.internal || d.account === ME.email;
-      return {};
+      return { ok: true };
     }
-    case 'remove-internal-network': return {};
-    case 'growth-plan': return { plan: { generatedAt: iso(NOW), model: 'claude-sonnet-5-5', summary: 'Fixture de desarrollo: el plan real lo escribe Claude en el servidor.', cached: false, usd: 0.012,
+    case 'remove-internal-network': return { ok: true };
+    case 'growth-plan': return { ok: true, plan: { generatedAt: iso(NOW), model: 'claude-sonnet-5-5', summary: 'Fixture de desarrollo: el plan real lo escribe Claude en el servidor.', cached: false, usd: 0.012,
       priorities: [{ title: 'Recargar OpenAI', why: 'Fixture.', steps: ['Recargar crédito'], measure: 'Fallos 24h en IA', findings: ['credit-openai'] }] } };
-    case 'preview-digest': return { subject: 'Bobby: 1 urgente — OpenAI sin crédito', text: 'Vista previa del resumen (fixture de desarrollo).', fresh: 1, urgent: 2, weekly: false };
-    case 'send-digest': return { subject: 'Bobby: 1 urgente — OpenAI sin crédito' };
-    case 'set-internal-emails': INTERNAL_EMAILS.splice(0, INTERNAL_EMAILS.length, ...body.emails.map((e) => e.trim().toLowerCase())); return { emails: INTERNAL_EMAILS };
+    case 'preview-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito', text: 'Vista previa del resumen (fixture de desarrollo).', fresh: 1, urgent: 2, weekly: false };
+    case 'send-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito' };
+    case 'set-internal-emails': INTERNAL_EMAILS.splice(0, INTERNAL_EMAILS.length, ...body.emails.map((e) => e.trim().toLowerCase())); return { ok: true, emails: INTERNAL_EMAILS };
     case 'set-assumptions': {
       // Like the server: merge. Absent = keep, null = back to the default.
       const next: typeof ASSUMPTIONS = { ...ASSUMPTIONS };
