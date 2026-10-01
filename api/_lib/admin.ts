@@ -409,7 +409,7 @@ export async function integrations(days: string[]) {
 // A service account added as a user of the property (GSC_SERVICE_ACCOUNT_JSON, GSC_SITE).
 const GSC_SITE = () => process.env.GSC_SITE?.trim() || 'https://bobbyprotocol.xyz/';
 let gscToken: { value: string; until: number } | null = null;
-const gscCache = new Map<string, { at: number; value: unknown }>();
+const gscCache = new Map<string, { at: number; value: unknown; failed?: boolean }>();
 
 async function googleToken(): Promise<string> {
   if (gscToken && gscToken.until > Date.now() + 60_000) return gscToken.value;
@@ -436,7 +436,12 @@ async function gscQuery(token: string, body: Record<string, unknown>): Promise<G
   const r = await fetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE())}/searchAnalytics/query`, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
   });
-  if (!r.ok) throw new Error(`searchconsole ${r.status}`);
+  if (!r.ok) {
+    // Google's machine reason (SERVICE_DISABLED, forbidden…) tells setup problems apart; it carries no secrets.
+    const err = (await r.json().catch(() => null)) as { error?: { status?: string; errors?: Array<{ reason?: string }>; details?: Array<{ reason?: string }> } } | null;
+    const reason = err?.error?.details?.find((d) => d.reason)?.reason ?? err?.error?.errors?.[0]?.reason ?? err?.error?.status;
+    throw new Error(`searchconsole ${r.status}${reason ? ` ${String(reason).slice(0, 40)}` : ''}`);
+  }
   return ((await r.json()) as { rows?: GscRow[] }).rows ?? [];
 }
 
@@ -445,8 +450,10 @@ export async function searchConsole(days: string[]) {
   if (!days.length) return { configured: true, days, clicks: [], impressions: [] };
   const key = `${days[0]}:${days.at(-1)}`;
   const hit = gscCache.get(key);
-  if (hit && Date.now() - hit.at < 30 * 60_000) return hit.value;
+  // A failure is retried after a minute so a fixed setup (API enabled, user added) shows up quickly.
+  if (hit && Date.now() - hit.at < (hit.failed ? 60_000 : 30 * 60_000)) return hit.value;
   let value: unknown;
+  let failed = false;
   try {
     const token = await googleToken();
     const range = { startDate: days[0], endDate: days.at(-1), dataState: 'all' };
@@ -468,8 +475,9 @@ export async function searchConsole(days: string[]) {
     };
   } catch (e) {
     value = { configured: true, error: e instanceof Error ? e.message : 'searchconsole unavailable' };
+    failed = true;
   }
-  gscCache.set(key, { at: Date.now(), value });
+  gscCache.set(key, { at: Date.now(), value, failed });
   return value;
 }
 
