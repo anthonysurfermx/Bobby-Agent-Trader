@@ -32,6 +32,8 @@ struct AccountSheet: View {
     @ObservedObject private var reads = BobbyAccessCenter.shared
     @ObservedObject private var invites = NucleoLevelCenter.shared
     @ObservedObject private var purchases = BobbyStore.shared
+    /// The account's market briefing choices (the row detail); nil until read.
+    @ObservedObject private var briefings = BriefingsCenter.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
     @StateObject private var land = LandPulse()
     @State private var manageSubscription = false
@@ -86,12 +88,15 @@ struct AccountSheet: View {
             guard profile.acceptedRiskNotice else { return }
             await reads.refresh()
             if pieces == nil, account.isSignedIn { await land.refresh() }
+            if account.isSignedIn { await briefings.refresh() }
         }
         .sheet(item: $route, onDismiss: {
             // A thesis closed on the island or a piece planted: bring the pieces up to date.
             if pieces == nil, account.isSignedIn, profile.acceptedRiskNotice { Task { await land.refresh() } }
             // Back from Bobby Pro (a purchase, a restore or a sign in): the reads line and the levels follow.
             if profile.acceptedRiskNotice { Task { await reads.refresh(); await NucleoLevelCenter.shared.refresh() } }
+            // Back from the briefing settings (or Bobby Pro): the row detail follows the account's choices.
+            if profile.acceptedRiskNotice, account.isSignedIn { Task { await briefings.refresh() } }
         }) { destination in
             sheet(destination)
         }
@@ -363,6 +368,11 @@ struct AccountSheet: View {
                        action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
                 .accessibilityIdentifier("account-invite")
         }
+        // Bobby Pro market briefings: the account's three schedules, its consents and its inbox.
+        ProfileRow(label: L.t("Market briefings", "Resúmenes de mercado"),
+                   detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),
+                   action: { route = .briefings }) { ProfileIcon(symbol: "sun.horizon") }
+            .accessibilityIdentifier("account-briefings")
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
         }
@@ -374,6 +384,11 @@ struct AccountSheet: View {
                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                    }) { ProfileIcon(symbol: "globe") }
             .accessibilityIdentifier("account-language")
+        // What Bobby remembers about this account: see, correct, pause or delete it.
+        ProfileRow(label: L.t("Memory", "Memoria"),
+                   detail: L.t("What Bobby remembers about your assets and preferences", "Lo que Bobby recuerda de tus activos y preferencias"),
+                   action: { route = .memory }) { ProfileIcon(symbol: "brain") }
+            .accessibilityIdentifier("account-memory")
         ProfileRow(label: L.t("Risk notice", "Aviso de riesgo"),
                    detail: L.t("What Bobby is and is not", "Lo que Bobby es y lo que no"),
                    action: { route = .risk }) { ProfileIcon(symbol: "exclamationmark.shield") }
@@ -628,13 +643,28 @@ struct AccountSheet: View {
             PetDetailSheet(companion: companion, store: store)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Theme.nucleoSurface)
+        case .briefings:
+            BriefingsSettingsView(riskAccepted: profile.acceptedRiskNotice,
+                                  onShowPro: {
+                                      // Bobby Pro follows once this sheet is gone (as the invite sheet does).
+                                      route = nil
+                                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { route = .pro }
+                                  }) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memory:
+            MemoryView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         }
     }
 }
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet, pro
+    case avatar, invite, locker, land, risk, pet, pro, briefings, memory
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -647,6 +677,8 @@ enum ProfileRoute: Identifiable {
         case .risk: return "risk"
         case .pet: return "pet"
         case .pro: return "pro"
+        case .briefings: return "briefings"
+        case .memory: return "memory"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
         }

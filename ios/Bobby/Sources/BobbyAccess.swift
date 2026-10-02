@@ -155,8 +155,14 @@ enum BobbyAccessAPI {
     /// A request with the access headers. A bearer can expire between being read and being
     /// checked: a 401 on a signed-in request forces one refresh and one retry, so only a caller
     /// the server still refuses comes back as 401. Transport errors are thrown.
+    /// `extraHeaders` (briefings: If-Match, Idempotency-Key, installation proof) never replace the
+    /// access headers: the bearer always comes from `auth`.
     static func send(_ path: String, method: String = "POST", body: [String: Any]? = nil,
-                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil,
+                     extraHeaders: [String: String] = [:]) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+        func headers(bearer: String?) -> [String: String] {
+            Self.headers(bearer: bearer).merging(extraHeaders.filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }) { access, _ in access }
+        }
         let owner = await auth.owner()
         let bearer = await auth.bearer()
         try Task.checkCancellation()
