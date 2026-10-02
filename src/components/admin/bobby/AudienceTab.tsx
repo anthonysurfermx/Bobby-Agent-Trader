@@ -3,7 +3,7 @@ import { fetchAdminAudience, type AudienceResponse, type OverviewResponse, type 
 import { Card, CardHead, Empty, ErrorState, KpiStrip, Loading, Note, StaleBanner, TableScroll, td, th, tr } from './ui';
 import { BigNumber, StatusBars } from './charts';
 import { MIN_BASE } from './deltas';
-import { DASH, fmtDate, fmtInt, fmtPct, fmtUsd } from './format';
+import { DASH, fmtDate, fmtDateTime, fmtInt, fmtPct, fmtUsd } from './format';
 import { useLoad } from './useLoad';
 
 // First-level regions are ISO 3166-2 codes; Mexico's are named here (config, not data), others show their code.
@@ -64,7 +64,8 @@ function Content({ d, period, internal, data }: { d: AudienceResponse; period: n
   const top = g.countries[0];
   const locatedVisitors = g.countries.reduce((a, c) => a + c.visitors, 0);
   const purchaseTotal = g.purchases.reduce((a, p) => a + p.newPaying, 0);
-  const since = g.locatedSince ? fmtDate(g.locatedSince) : null;
+  // Date and time: location started mid-day, so visitors from earlier that same day also have none.
+  const since = g.locatedSince ? fmtDateTime(g.locatedSince) : null;
 
   // App Store reconciliation: only with the overview of the same period and the same team mode.
   const store = data?.integrations.appStore;
@@ -176,7 +177,7 @@ export default function AudienceTab({ period, refreshKey, internal = false, data
     <div className="flex flex-col gap-4">
       <Note tag="Ubicación">
         País y estado aproximados por la IP de cada visita web, sin guardar la IP.
-        {d?.geo.locatedSince ? ` Registrada desde el ${fmtDate(d.geo.locatedSince)}: quien llegó antes aparece sin ubicación.` : ' Empieza con las próximas visitas.'}
+        {d?.geo.locatedSince ? ` Registrada desde el ${fmtDateTime(d.geo.locatedSince)}: quien llegó antes aparece sin ubicación.` : ' Empieza con las próximas visitas.'}
         {' '}iOS no reporta ubicación; ahí cuentan las descargas por país de App Store.
         {internal ? ' Incluye al equipo.' : ' Sin el equipo (admins, cuentas marcadas, sus instalaciones y sus redes).'}
       </Note>

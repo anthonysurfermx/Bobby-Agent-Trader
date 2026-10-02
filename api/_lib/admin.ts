@@ -14,7 +14,6 @@ import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
 import { callerHash, deviceHash, paywallOn } from './access.js';
 import { countryCode, fromAlpha3 } from './geo.js';
-import { waitUntil } from '@vercel/functions';
 
 const TIMEOUT = 6000;
 
@@ -50,8 +49,9 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
     const rows = await rest<Array<{ identity_id: string }>>(`bobby_admins?identity_id=eq.${identity.id}&select=identity_id`);
     if (!rows?.length) { res.status(403).json({ error: 'not_admin' }); return null; }
     // The browser and the address used for /admin are the team's own traffic: the dashboard leaves them out.
+    // Awaited, not deferred: the very first view from a new browser must already exclude that browser.
     const device = deviceHash(req), network = callerHash(req);
-    if (device || network) waitUntil(rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null));
+    if (device || network) await rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null);
     return identity;
   } catch {
     res.status(503).json({ error: 'The admin check is unavailable. Try again.' });

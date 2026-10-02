@@ -338,6 +338,9 @@ try {
   ok(ins.every((i) => i.title && i.action && Array.isArray(i.evidence)), 'every insight says what to do and why');
   const topped = buildInsights({ days: 30, now: NOW, overview: { llm: { providers: { openai: { lastCreditAlert: '2026-10-01T12:50:00Z', lastTopup: '2026-10-01T14:00:00Z', lastOk: '2026-10-01T15:00:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
   ok(!topped.some((i) => i.id === 'credit-openai'), 'a top-up after the alert clears it');
+  const healedRun = buildInsights({ days: 30, now: NOW, overview: { llm: { deskRuns: { runs: 24, finished: 14, byDay: [{ day: '2026-09-30', runs: 1, finished: 0 }, { day: '2026-10-01', runs: 1, finished: 1 }] },
+    providers: { openai: { lastFailure: { at: '2026-10-01T10:27:00Z', stop: 'http_429', surface: 'desk' } }, anthropic: { lastOk: '2026-10-01T17:30:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
+  eq(healedRun.find((i) => i.id === 'desk-failures')?.level, 'info', 'failures followed by a successful call are history, not urgent');
 
   console.log(`admin-api: ${checks} checks passed`);
 } finally {

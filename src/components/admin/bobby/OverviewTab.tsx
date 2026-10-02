@@ -158,7 +158,7 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
           <div>
             <Row label="Llegadas web observadas desde" value={g?.coverage.webObservedSince ? fmtDateTime(g.coverage.webObservedSince) : DASH} />
             <Row label="Instalaciones iOS observadas desde" value={g?.coverage.iosObservedSince ? fmtDateTime(g.coverage.iosObservedSince) : DASH} hint="solo iOS 1.5+" />
-            <Row label="Resultados del desk desde" value={cov?.outcomesSince ? fmtDateTime(cov.outcomesSince) : 'próximo deploy'} />
+            <Row label="Resultados del desk desde" value={cov?.outcomesSince ? fmtDateTime(cov.outcomesSince) : 'aún sin registros'} />
             <Row label="Ubicación (web) desde" value={cov?.locatedSince ? fmtDateTime(cov.locatedSince) : DASH} />
           </div>
           <div>
