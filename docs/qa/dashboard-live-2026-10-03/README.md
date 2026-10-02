@@ -38,7 +38,7 @@ Client requests do not overlap. Period/team changes and unmount cancel requests;
 | App moment-to-moment | Server-observed iOS requests/outcomes and activity timestamps | Native open/presence/crash/build and rendered-response telemetry; installed-build/device verification |
 | Providers/cost | Source-specific timestamps/errors; recorded LLM spend | Provider publications remain delayed; unrecorded costs and balances cannot be inferred |
 
-A server `read_delivered` event means the server completed its response; it does not prove that the phone/browser rendered it. Observed accounts/devices are not verified unique humans or online presence. Zero recorded failures does not prove whole-app health. The UI states these limits explicitly.
+A server `read_delivered` event means the server completed its response; it does not prove that the phone/browser rendered it. Observed accounts/devices are not verified unique humans or online presence. Zero recorded failures does not prove whole-app health. The UI states these limits explicitly. Native follow-up pointers and physical-device acceptance are in [native-telemetry-next.md](native-telemetry-next.md).
 
 Production facts/timings: [live-truth.md](live-truth.md). SQL reconciliation/results: [sql-regression.md](sql-regression.md). Independent backend findings/retest: [backend-review.md](backend-review.md). Local synthetic timings are database samples, not production endpoint latency/capacity proof.
 
@@ -59,7 +59,7 @@ Screenshots use explicitly labelled fictitious data and prove local layout only:
 
 ## Publication sequence requiring production authorization
 
-1. Refresh the deployed commit and migration registry; rebase/reconcile if either changed. Confirm existing provider configuration, including explicit `REVENUECAT_PROJECT_ID`; never choose an arbitrary RevenueCat project.
+1. Refresh the deployed commit and migration registry; rebase/reconcile if either changed. Confirm existing provider configuration, including explicit `REVENUECAT_PROJECT_ID`; never choose an arbitrary RevenueCat project. Check Stripe refund event selection (`refund.created`/`refund.updated`, with `charge.refunded` reconciliation also supported) and refund-read permissions on the existing key. Remote environment values and webhook selection were not verified during this local pass.
 2. Through Supabase MCP, apply **only** `20261002231124_admin_truth_live_snapshot.sql` as the new migration. The five predecessor files were already applied in production; they reconcile Git history and must not be reapplied as new remote migrations. This preserves function signatures used by production, team graph/device optimizations and service-only privileges. NULL subscription classifications become explicit `unknown`, without revoking access.
 3. Publish the tested branch through the repository's Git/main deployment path; attach any created PR to this chat. Do not bypass the production-source guard with a CLI production deployment.
 4. Wait for the exact Git commit to serve on `bobbyprotocol.xyz`. Verify authenticated GET views/source metadata, team toggle, the operational windows, billing categories, all eight tabs and error/partial states against fresh read-only database aggregates. Record deployed API latency separately from local SQL timing.
