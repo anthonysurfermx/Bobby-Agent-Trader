@@ -24,7 +24,8 @@ import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
-import { captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
+import { accessHeaders, captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
+import { accessOwner, AccessResponseGate } from '@/lib/access-response-gate';
 import NucleoChart from './NucleoChart';
 import NucleoProfile from './NucleoProfile';
 import NucleoRisk from './NucleoRisk';
@@ -155,6 +156,7 @@ export default function NucleoDesk() {
   const deskLevelRef = useRef(deskLevel);
   deskLevelRef.current = deskLevel;
   const accessRef = useRef<AccessState | null>(null);
+  const accessGate = useRef(new AccessResponseGate());
   const [limit, setLimit] = useState<LimitState | null>(null);
   const [inviteOpen, setInviteOpen] = useState(false);
   const [inviteNotice, setInviteNotice] = useState<string | null>(null);
@@ -178,6 +180,23 @@ export default function NucleoDesk() {
   const booted = useRef(false);
   const requestRef = useRef<AbortController | null>(null);
   const revealRef = useRef<number | null>(null);
+  const invalidateAccess = useCallback(() => {
+    accessGate.current.invalidate();
+    accessRef.current = null;
+    setAccessState(null);
+    requestRef.current?.abort();
+  }, []);
+  const refreshAccess = useCallback(async (): Promise<AccessState | null> => {
+    const epoch = accessGate.current.revision;
+    const before = await accessHeaders();
+    if (!accessGate.current.sameEpoch(epoch)) return null;
+    const ticket = accessGate.current.start(accessOwner(before));
+    const fresh = await fetchAccess(before);
+    const after = await accessHeaders();
+    if (!fresh || !accessGate.current.accept(ticket, accessOwner(after))) return null;
+    setAccessState((previous) => accessGate.current.isCurrent(ticket) ? fresh : previous);
+    return fresh;
+  }, []);
   const [deskError, setDeskError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
@@ -200,10 +219,18 @@ export default function NucleoDesk() {
     void topMovers(3).then((m) => setMovers(m));
   }, []);
 
+  // A grant from /admin can arrive while the desk stays open. Re-read when Profile opens.
+  // All access responses, including this one, pass through the same owner and order gate.
+  useEffect(() => {
+    if (sheet !== 'profile') return;
+    void refreshAccess();
+  }, [sheet, refreshAccess]);
+
   const analyze = useCallback(async (snap: Snapshot, controller?: AbortController) => {
     if (!controller) { requestRef.current?.abort(); controller = new AbortController(); requestRef.current = controller; }
     const { signal } = controller;
     if (signal.aborted) return;
+    const readEpoch = accessGate.current.revision;
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
     setDeskRetry(null);
@@ -245,10 +272,14 @@ export default function NucleoDesk() {
       setSnapshot(null);
       setPhase('idle');
       setLimit({ kind: a.gate === 'signin_required' ? 'signin' : 'upgrade', level: 'rapido', resetsAt: a.access?.resetsAt ?? null });
-      void fetchAccess().then((st) => { if (st) setAccessState(st); });
+      void refreshAccess();
     };
     const keepMeter = (a: Answer) => {
-      if (a.access) setAccessState((prev) => (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } }));
+      if (!a.access || signal.aborted || !accessGate.current.sameEpoch(readEpoch)) return;
+      const ticket = accessGate.current.commitRead();
+      setAccessState((prev) => accessGate.current.isCurrent(ticket)
+        ? (prev ? { ...prev, access: a.access! } : { access: a.access!, signedIn: a.access!.tier !== 'anon', subscription: null, payments: { stripe: false, apple: true } })
+        : prev);
     };
     if (readRun) {
       const early = await readRun;
@@ -258,7 +289,7 @@ export default function NucleoDesk() {
     }
     const run = await agentsRun;
     if (signal.aborted) return;
-    if (runLevel !== 'rapido') void fetchAccess().then((st) => { if (st) setAccessState(st); });
+    if (runLevel !== 'rapido') void refreshAccess();
     if (run.refusal) {
       // The premium level's allowance ran out on the server: the pop-up, never a silent downgrade.
       if (run.refusal.code === 'signin_required') holdQuestion();
@@ -326,7 +357,7 @@ export default function NucleoDesk() {
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);
     const qa = [snap.symbol, ...progress.quickAccess.filter((s) => s !== snap.symbol)].slice(0, 3);
     progressStore.setQuickAccess(qa);
-  }, [say, progress.quickAccess]);
+  }, [say, progress.quickAccess, refreshAccess]);
 
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
@@ -380,19 +411,20 @@ export default function NucleoDesk() {
     let alive = true;
     captureReferral();
     const load = async (attempt = 0) => {
-      let st = await fetchAccess();
-      if (!alive || !st) return;
-      setAccessState(st);
+      const epoch = accessGate.current.revision;
+      let st = await refreshAccess();
+      if (!alive || !accessGate.current.sameEpoch(epoch) || !st) return;
       // An invitation from a friend waits for this reader's account, then counts once.
       if (pendingReferral()) {
         if (!st.signedIn) setInviteNotice(t('A friend invited you. Create your free account to accept.', 'Un amigo te invitó. Crea tu cuenta gratis para aceptar.', 'Um amigo te convidou. Crie sua conta grátis para aceitar.'));
         else {
           const result = await claimPendingReferral();
+          if (!alive || !accessGate.current.sameEpoch(epoch)) return;
           if (result === 'claimed') setInviteNotice(t('Invitation accepted. Your friend just got Bobby Pro thanks to you.', 'Invitación aceptada. Tu amigo acaba de recibir Bobby Pro gracias a ti.', 'Convite aceito. Seu amigo acabou de ganhar Bobby Pro graças a você.'));
           else if (result) setInviteNotice(null);
-          const fresh = await fetchAccess();
-          if (!alive) return;
-          if (fresh) { st = fresh; setAccessState(fresh); }
+          const fresh = await refreshAccess();
+          if (!alive || !accessGate.current.sameEpoch(epoch)) return;
+          if (fresh) st = fresh;
         }
       }
       if (proNotice === 'welcome' && st.access.tier !== 'pro' && attempt < 6) { window.setTimeout(() => void load(attempt + 1), 2500); return; }
@@ -409,12 +441,18 @@ export default function NucleoDesk() {
     void load();
     let unsub: (() => void) | null = null;
     try {
-      const { data } = bobbySupabase().auth.onAuthStateChange((event) => { if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') { retried.current = false; void load(); } });
+      const { data } = bobbySupabase().auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          retried.current = false;
+          invalidateAccess();
+          void load();
+        }
+      });
       unsub = () => data.subscription.unsubscribe();
     } catch { unsub = null; }
-    return () => { alive = false; unsub?.(); };
+    return () => { alive = false; accessGate.current.invalidate(); unsub?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [invalidateAccess, refreshAccess]);
 
   const reset = () => {
     requestRef.current?.abort();
@@ -793,6 +831,23 @@ export default function NucleoDesk() {
       ? t(`${meter.remaining} of ${meter.limit} reads left without an account`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas sin cuenta`, `${meter.remaining === 1 ? 'Resta' : 'Restam'} ${meter.remaining} de ${meter.limit} leituras sem conta`)
       : t(`${meter.remaining} of ${meter.limit} free reads left this week`, `Te quedan ${meter.remaining} de ${meter.limit} lecturas gratis esta semana`, `${meter.remaining === 1 ? 'Resta' : 'Restam'} ${meter.remaining} de ${meter.limit} leituras grátis nesta semana`)
     : null;
+  const subscription = accessState?.subscription;
+  const paidPro = !!subscription && ['active', 'trialing'].includes(subscription.status)
+    && (!subscription.currentPeriodEnd || Date.parse(subscription.currentPeriodEnd) > Date.now());
+  const grant = accessState?.referral;
+  const activeGrant = (grant?.proSource === 'admin' || grant?.proSource === 'referral')
+    && !!grant.proUntil && Date.parse(grant.proUntil) > Date.now();
+  const giftedPro = meter?.tier === 'pro' && !paidPro && activeGrant;
+  const grantExpiry = activeGrant && grant?.proUntil
+    ? new Date(grant.proUntil).toLocaleDateString(speechLocale(), { year: 'numeric', month: 'short', day: 'numeric' })
+    : null;
+  const scheduledGiftDetail = meter?.tier === 'pro' && paidPro && grantExpiry
+    ? t(` · gifted Pro through ${grantExpiry}`, ` · Pro regalado hasta el ${grantExpiry}`, ` · Pro presente até ${grantExpiry}`)
+    : '';
+  const quickGift = accessState?.access.bonus ?? 0;
+  const quickGiftDetail = quickGift > 0
+    ? t(` · ${quickGift} gifted Quick reads`, ` · ${quickGift} lecturas Rápido de regalo`, ` · ${quickGift} leituras Rápido de presente`)
+    : '';
 
   const errorStage = phase === 'error' ? (
     <div className="flex flex-col items-center">
@@ -835,7 +890,7 @@ export default function NucleoDesk() {
       <form onSubmit={(e) => { e.preventDefault(); void ask(input); }} className="n-ask mx-auto w-full max-w-[620px]">
         <input ref={inputRef} data-desk-input value={input} onChange={(e) => setInput(e.target.value)} aria-label={t('Ask about an asset', 'Pregunta por un activo', 'Pergunte sobre um ativo')} placeholder={listening ? t('Listening…', 'Escuchando…', 'Ouvindo…') : t('Ask about any stock or crypto…', 'Pregunta por una acción o cripto…', 'Pergunte sobre ação ou cripto…')} />
         <LevelControl level={deskLevel} onChange={setDeskLevel} state={accessState} disabled={working}
-          onSignIn={() => { setSigninNote(null); setSignInPrompt(true); }} onInvite={() => { setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); }} />
+          onSignIn={() => { setSigninNote(null); setSignInPrompt(true); }} onInvite={() => { setInviteOpen(true); void refreshAccess(); }} />
         {input.trim() && !working && <button type="submit" className="n-send" aria-label={t('Ask', 'Preguntar', 'Perguntar')}><ArrowRight size={16} /></button>}
         <span className={`n-mic-wrap ${listening ? 'on' : ''}`}><span className="n-mic-glow" aria-hidden="true"><i /></span><button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar', 'Parar de ouvir') : t('Talk to Bobby', 'Hablar con Bobby', 'Falar com o Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button></span>
       </form>
@@ -885,22 +940,28 @@ export default function NucleoDesk() {
             onTool={(tool) => setInspected(tool)} onPet={() => setSheet('pet')} onCatalog={() => setSheet('catalog')}
             onSwap={() => setSheet('swap')} onTraderLand={openTraderLand} onExplore={() => setSheet('board')}
             onShare={() => void shareSkin()} onSignIn={() => { setSheet('none'); setSignInPrompt(true); }} onRisk={() => setSheet('risk')}
-            onSignedOut={() => { setSheet('none'); void fetchAccess().then((st) => { if (st) setAccessState(st); }); }}
+            onSignedOut={() => { setSheet('none'); invalidateAccess(); void refreshAccess(); }}
             onToggleVoiceMode={() => { voice.stop(); closeRecognition(); setFreeVoice((v) => !v); setVoiceNotice(''); }}
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
             pro={{
-              label: meter?.tier === 'pro' ? t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo') : 'Bobby Pro',
+              label: meter?.tier === 'pro'
+                ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
+                  : t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo')
+                : 'Bobby Pro',
               detail: meter?.tier === 'pro'
-                ? (accessState?.subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone') : t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar'))
+                ? (giftedPro && grantExpiry ? t(`Gifted until ${grantExpiry}`, `Regalado hasta el ${grantExpiry}`, `Presente até ${grantExpiry}`)
+                  : paidPro && subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone')
+                    : paidPro && subscription?.provider === 'stripe' ? t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar')
+                      : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail + quickGiftDetail
                 : meterLine ?? (accessState && !accessState.payments.stripe
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
                   : t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês')),
-              action: () => {
-                if (meter?.tier === 'pro') { if (accessState?.subscription?.provider === 'stripe') void startBilling('portal'); return; }
+              action: meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
+                if (meter?.tier === 'pro') { void startBilling('portal'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.
-                if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); return; }
+                if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void refreshAccess(); return; }
                 void subscribe();
               },
             }}
@@ -909,7 +970,7 @@ export default function NucleoDesk() {
               detail: accessState?.referral
                 ? t(`${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro for each friend`, `${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro por cada amigo`, `${accessState.referral.accepted}/${accessState.referral.max} · Bobby Pro por cada amigo`)
                 : t('Bobby Pro for each friend who joins', 'Bobby Pro por cada amigo que se une', 'Bobby Pro por cada amigo que entra'),
-              action: () => { setSheet('none'); setInviteOpen(true); void fetchAccess().then((st) => { if (st) setAccessState(st); }); },
+              action: () => { setSheet('none'); setInviteOpen(true); void refreshAccess(); },
             }}
             onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?', 'Zerar XP, equipamento e avatar neste navegador?'))) progressStore.reset(); }}
           />

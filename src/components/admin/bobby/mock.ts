@@ -5,6 +5,7 @@
 //   ?mock          admin with every integration connected
 //   ?mock=bare     admin, nothing connected (empty states, missing env list)
 //   ?mock=401      not signed in      ?mock=403   signed in, not an admin      ?mock=500   server error
+//   ?mock=grant-lost  first gift commits to the fixture but its confirmation fails; same-key retry confirms once
 import type { AdminPostBody } from '@/lib/admin-client';
 
 // ---------------------------------------------------------------- deterministic randomness
@@ -121,6 +122,9 @@ const REDEMPTIONS = Array.from({ length: 14 }, (_, i) => {
   return { code: c.code, identity_id: u.id, email: u.email, reads: c.reads, profundo: c.profundo, maximo: c.maximo, created_at: iso(NOW - (i * 9 + between(0, 8)) * HOUR) };
 });
 let ACTION_SEQ = 0;
+// In-memory fixtures only. The production grant receipt lives in PostgreSQL.
+const GRANT_RECEIPTS = new Map<string, { payload: string; result: Record<string, unknown> }>();
+const LOST_GRANT_RESPONSES = new Set<string>();
 const ACTIONS: Array<{ id: string; admin_email: string | null; action: string; target: string | null; detail: unknown; created_at: string }> = [
   { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'create-coupon', target: 'AMIGOS20', detail: { reads: 20, maxRedemptions: 100, status: 'ok' }, created_at: iso(NOW - 12 * DAY) },
   { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'credit-mark', target: 'anthropic', detail: { kind: 'balance', amountUsd: 50, status: 'ok' }, created_at: iso(NOW - 9 * DAY) },
@@ -577,6 +581,14 @@ function post(body: AdminPostBody): Record<string, unknown> {
       return { ok: true };
     }
     case 'grant': {
+      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.operationId)) throw new Refuse(400, 'A valid grant operation id is required.');
+      const payload = JSON.stringify({ adminId: ME.id, identityId: body.identityId, reads: body.reads ?? 0,
+        profundo: body.profundo ?? 0, maximo: body.maximo ?? 0, proDays: body.proDays ?? 0 });
+      const prior = GRANT_RECEIPTS.get(body.operationId);
+      if (prior) {
+        if (prior.payload !== payload) throw new Refuse(409, 'This grant operation belongs to a different account, administrator or gift.');
+        return prior.result;
+      }
       const u = findUser(body.identityId);
       if (body.reads) u.bonus_reads = (u.bonus_reads ?? 0) + body.reads;
       if (body.profundo) u.bonus_profundo = (u.bonus_profundo ?? 0) + body.profundo;
@@ -585,8 +597,10 @@ function post(body: AdminPostBody): Record<string, unknown> {
         const from = Math.max(Date.now(), u.pro_until ? new Date(u.pro_until).getTime() : 0);
         u.pro_until = iso(from + body.proDays * DAY); u.pro = true; u.grant_source = u.grant_source ?? 'admin';
       }
-      log('grant', u.email ?? u.id, { reads: body.reads, profundo: body.profundo, maximo: body.maximo, proDays: body.proDays });
-      return { ok: true };
+      log('grant', u.email ?? u.id, { operationId: body.operationId, reads: body.reads, profundo: body.profundo, maximo: body.maximo, proDays: body.proDays });
+      const result = { ok: true, operationId: body.operationId, bonus: { reads: u.bonus_reads, profundo: u.bonus_profundo, maximo: u.bonus_maximo }, proUntil: u.pro_until };
+      GRANT_RECEIPTS.set(body.operationId, { payload, result });
+      return result;
     }
     case 'delete-user': {
       const u = findUser(body.identityId);
@@ -676,7 +690,16 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
   const partial = mode === 'partial';
   if (method === 'POST') {
     if (!body) return json({ error: 'missing_body' }, 400);
-    try { return json(post(body)); } catch (e) { return e instanceof Refuse ? json({ error: e.code }, e.status) : json({ error: 'internal_error' }, 500); }
+    try {
+      const result = post(body);
+      // Dev-only fault: commit the fixture gift, then lose the first confirmation. Reopening the
+      // dialog must reuse its saved operation and confirm exactly one addition/audit.
+      if (mode === 'grant-lost' && body.action === 'grant' && !LOST_GRANT_RESPONSES.has(body.operationId)) {
+        LOST_GRANT_RESPONSES.add(body.operationId);
+        return json({ error: 'The grant was not confirmed. Retry the same operation.' }, 502);
+      }
+      return json(result);
+    } catch (e) { return e instanceof Refuse ? json({ error: e.code }, e.status) : json({ error: 'internal_error' }, 500); }
   }
   const view = query?.get('view');
   switch (view) {

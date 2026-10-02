@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { ChevronLeft, ChevronRight, Gift, Search, Trash2 } from 'lucide-react';
-import { adminAction, fetchAdminUsers, type AdminMe, type AdminUser, type InternalResponse } from '@/lib/admin-client';
+import { adminAction, fetchAdminUsers, type AdminMe, type AdminUser, type AdminPostBody, type InternalResponse } from '@/lib/admin-client';
 import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Note, Segmented, StaleBanner, Switch, TableScroll, TextInput, td, tdWrap, th, tr } from './ui';
 import { GiftCell, Identity, Lifecycle, PlanCell, ProviderCell, identityName } from './cells';
 import { DASH, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtRelative, timeOf } from './format';
@@ -257,7 +257,7 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
         </>
       )}
 
-      <GrantDialog user={grantFor} onClose={() => setGrantFor(null)} onDone={done} />
+      <GrantDialog adminId={me.identityId} user={grantFor} onClose={() => setGrantFor(null)} onDone={done} />
       <DeleteDialog user={deleteFor} onClose={() => setDeleteFor(null)} onDone={done} />
       <AdminDialog user={adminFor} onClose={() => setAdminFor(null)} onDone={done} />
     </Card>
@@ -267,17 +267,42 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
 }
 
 const who = (u: AdminUser) => u.email ?? u.id;
-const intOrZero = (v: string) => { const n = Number(v); return Number.isFinite(n) ? Math.floor(n) : NaN; };
-const digits = (v: string) => v.replace(/\D/g, '').slice(0, 4);
+const intOrZero = (v: string) => { const n = Number(v); return /^\d+$/.test(v) && Number.isSafeInteger(n) ? n : NaN; };
 
-function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClose: () => void; onDone: (text: string) => void }) {
+type GrantIntent = Extract<AdminPostBody, { action: 'grant' }>;
+
+function GrantDialog({ adminId, user, onClose, onDone }: { adminId: string; user: AdminUser | null; onClose: () => void; onDone: (text: string) => void }) {
+  const inFlight = useRef(false);
+  const pending = useRef<GrantIntent | null>(null);
+  const [retained, setRetained] = useState(false);
+  const [storageError, setStorageError] = useState(false);
   const [reads, setReads] = useState('');
   const [profundo, setProfundo] = useState('');
   const [maximo, setMaximo] = useState('');
   const [proDays, setProDays] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  useEffect(() => { if (user) { setReads(''); setProfundo(''); setMaximo(''); setProDays(''); setMsg(null); } }, [user]);
+  const storageKey = user ? `bobby:admin-grant:${adminId}:${user.id}` : '';
+  useEffect(() => {
+    pending.current = null; setRetained(false); setStorageError(false); setMsg(null);
+    setReads(''); setProfundo(''); setMaximo(''); setProDays('');
+    if (!user) return;
+    try {
+      const saved = sessionStorage.getItem(storageKey);
+      if (!saved) return;
+      const intent = JSON.parse(saved) as GrantIntent;
+      const caps = { reads: 1000, profundo: 200, maximo: 100, proDays: 366 };
+      if (intent.action !== 'grant' || intent.identityId !== user.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(intent.operationId)
+        || Object.entries(caps).some(([field, cap]) => !Number.isInteger(intent[field as keyof typeof caps] ?? 0) || (intent[field as keyof typeof caps] ?? 0) < 0 || (intent[field as keyof typeof caps] ?? 0) > cap)
+        || !Object.keys(caps).some((field) => (intent[field as keyof typeof caps] ?? 0) > 0)) throw new Error('Invalid pending gift');
+      pending.current = intent; setRetained(true);
+      setReads(String(intent.reads ?? 0)); setProfundo(String(intent.profundo ?? 0)); setMaximo(String(intent.maximo ?? 0)); setProDays(String(intent.proDays ?? 0));
+      setMsg({ ok: false, text: 'Hay un regalo pendiente de confirmar. Reintentar confirma el mismo regalo sin sumarlo otra vez.' });
+    } catch {
+      setStorageError(true);
+      setMsg({ ok: false, text: 'No se pudo recuperar la confirmación pendiente. No envíes otro regalo hasta conciliarlo en el historial.' });
+    }
+  }, [user, storageKey]);
 
   const values = { reads: intOrZero(reads || '0'), profundo: intOrZero(profundo || '0'), maximo: intOrZero(maximo || '0'), proDays: intOrZero(proDays || '0') };
   const limits = { reads: 1000, profundo: 200, maximo: 100, proDays: 366 };
@@ -286,25 +311,35 @@ function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClos
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || invalid || empty) return;
+    if (!user || invalid || empty || storageError || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setMsg(null);
     try {
-      const body: { action: 'grant'; identityId: string; reads?: number; profundo?: number; maximo?: number; proDays?: number } = { action: 'grant', identityId: user.id };
-      if (values.reads) body.reads = values.reads;
-      if (values.profundo) body.profundo = values.profundo;
-      if (values.maximo) body.maximo = values.maximo;
-      if (values.proDays) body.proDays = values.proDays;
+      const body: GrantIntent = pending.current ?? { action: 'grant', operationId: crypto.randomUUID(), identityId: user.id, ...values };
+      // Persist before sending so closing/reopening or refreshing after an ambiguous failure still
+      // confirms the same intent. The payload stays locked until the server confirms it.
+      sessionStorage.setItem(storageKey, JSON.stringify(body));
+      pending.current = body; setRetained(true);
       await adminAction(body);
+      sessionStorage.removeItem(storageKey);
+      pending.current = null; setRetained(false);
       onClose();
       onDone(`Regalo enviado a ${identityName(user)}.`);
     } catch (err) {
-      setMsg({ ok: false, text: toAdminError(err).message });
-    } finally { setBusy(false); }
+      const failure = toAdminError(err);
+      if (failure.code === 'paid_period_end_unknown') {
+        // The SQL RPC explicitly committed no grant or receipt. Unlock this form so the owner
+        // can retry after the subscription has a known paid-period end.
+        sessionStorage.removeItem(storageKey);
+        pending.current = null; setRetained(false);
+      }
+      setMsg({ ok: false, text: failure.message });
+    } finally { inFlight.current = false; setBusy(false); }
   };
 
   return (
     <Modal
-      open={!!user} onOpenChange={(o) => { if (!o) onClose(); }}
+      open={!!user} onOpenChange={(o) => { if (!o && !inFlight.current) onClose(); }}
       title="Regalar a esta cuenta"
       description={user && (
         <div className="flex flex-col gap-2">
@@ -314,16 +349,16 @@ function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClos
       )}
     >
       <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <Field label="Lecturas" hint="0–1000"><TextInput mono inputMode="numeric" value={reads} onChange={(e) => setReads(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Profundo" hint="0–200"><TextInput mono inputMode="numeric" value={profundo} onChange={(e) => setProfundo(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Máximo" hint="0–100"><TextInput mono inputMode="numeric" value={maximo} onChange={(e) => setMaximo(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Días de Bobby Pro" hint="0–366"><TextInput mono inputMode="numeric" value={proDays} onChange={(e) => setProDays(digits(e.target.value))} placeholder="0" /></Field>
+        <Field label="Lecturas" hint="0–1000"><TextInput mono disabled={busy || retained || storageError} inputMode="numeric" value={reads} onChange={(e) => setReads(e.target.value)} placeholder="0" /></Field>
+        <Field label="Profundo" hint="0–200"><TextInput mono disabled={busy || retained || storageError} inputMode="numeric" value={profundo} onChange={(e) => setProfundo(e.target.value)} placeholder="0" /></Field>
+        <Field label="Máximo" hint="0–100"><TextInput mono disabled={busy || retained || storageError} inputMode="numeric" value={maximo} onChange={(e) => setMaximo(e.target.value)} placeholder="0" /></Field>
+        <Field label="Días de Bobby Pro" hint="0–366"><TextInput mono disabled={busy || retained || storageError} inputMode="numeric" value={proDays} onChange={(e) => setProDays(e.target.value)} placeholder="0" /></Field>
         <div className="col-span-2 flex flex-col gap-3">
           {invalid && <FormMessage message={{ ok: false, text: `Revisa el valor de ${{ reads: 'lecturas', profundo: 'Profundo', maximo: 'Máximo', proDays: 'días Pro' }[invalid]}.` }} />}
           <FormMessage message={msg} />
           <div className="flex justify-end gap-2">
-            <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
-            <Btn type="submit" variant="primary" busy={busy} disabled={!!invalid || empty}>Regalar</Btn>
+            <Btn variant="ghost" disabled={busy} onClick={onClose}>Cancelar</Btn>
+            <Btn type="submit" variant="primary" busy={busy} disabled={!!invalid || empty || storageError}>{retained ? 'Confirmar regalo pendiente' : 'Regalar'}</Btn>
           </div>
         </div>
       </form>

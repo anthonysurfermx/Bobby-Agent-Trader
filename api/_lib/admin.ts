@@ -169,12 +169,25 @@ async function identityRow(id: unknown): Promise<IdentityRow> {
   return rows[0];
 }
 
-export async function grant(body: Record<string, unknown>) {
+export async function grant(admin: Identity, body: Record<string, unknown>) {
+  const operationId = body.operationId;
+  if (typeof operationId !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(operationId)) {
+    throw new AdminError(400, 'A valid grant operation id is required.');
+  }
   const row = await identityRow(body.identityId);
   const gift = { p_reads: int(body.reads, 1000), p_profundo: int(body.profundo, 200), p_maximo: int(body.maximo, 100), p_pro_days: int(body.proDays, 366) };
   if (gift.p_reads + gift.p_profundo + gift.p_maximo + gift.p_pro_days === 0) throw new AdminError(400, 'Choose at least one gift.');
-  const result = await rpc<{ ok: boolean; error?: string }>('bobby_admin_grant', { p_identity: row.id, ...gift });
-  if (!result?.ok) throw new AdminError(404, 'Account not found.');
+  const result = await rpc<{ ok: boolean; error?: string }>('bobby_admin_grant_once', { p_operation: operationId, p_admin: admin.id, p_identity: row.id, ...gift });
+  if (!result?.ok) {
+    if (result?.error === 'operation_conflict') throw new AdminError(409, 'This grant operation belongs to a different account, administrator or gift.');
+    if (result?.error === 'not_admin') throw new AdminError(403, 'not_admin');
+    if (result?.error === 'not_found') throw new AdminError(404, 'Account not found.');
+    if (result?.error === 'paid_period_end_unknown') throw new AdminError(409, 'paid_period_end_unknown');
+    throw new AdminError(502, 'The grant was not confirmed. Retry the same operation.');
+  }
+  if ((result as { operationId?: string }).operationId?.toLowerCase() !== operationId.toLowerCase()) {
+    throw new AdminError(502, 'The grant was not confirmed. Retry the same operation.');
+  }
   return { target: row.email || row.id, result };
 }
 

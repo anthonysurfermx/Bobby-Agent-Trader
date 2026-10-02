@@ -429,7 +429,8 @@ enum BobbyAPI {
     /// `retry-after` on a 429). Same URL, Origin header, timeouts and body as `response`.
     /// `extraHeaders` carries the metered-read identity (`BobbyAccessAPI.headers`).
     static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil,
-                                    extraHeaders: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                                    extraHeaders: [String: String] = [:], timeout: TimeInterval? = nil,
+                                    onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         guard let url = URL(string: base.absoluteString + "/" + path) else {
             throw URLError(.badURL)
         }
@@ -439,6 +440,12 @@ enum BobbyAPI {
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = timeout ?? (path == "api/desk-debate" ? 100 : 60)
         for (name, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: name) }
+        // Never trust a caller-supplied opt-in header. Native adds it only to an authenticated desk POST
+        // whose bearer still belongs to the current account and whose local, account-scoped choice is on.
+        req.setValue(nil, forHTTPHeaderField: MemoryCenter.nativeOptInHeader)
+        if await shouldAffirmNativeMemory(path: path, method: method, headers: extraHeaders) {
+            req.setValue("1", forHTTPHeaderField: MemoryCenter.nativeOptInHeader)
+        }
         if extraHeaders.keys.contains(where: { $0.caseInsensitiveCompare("Authorization") == .orderedSame })
             || extraHeaders[BobbyAccessAPI.deviceHeader] != nil {
             req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
@@ -447,14 +454,62 @@ enum BobbyAPI {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
+        if let onEvent { return try await liveResponse(req, onEvent: onEvent) }
         let (data, response) = try await URLSession.shared.data(for: req)
         let http = response as? HTTPURLResponse
+        return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, lowercasedHeaders(http))
+    }
+
+    private static func shouldAffirmNativeMemory(path: String, method: String, headers: [String: String]) async -> Bool {
+        guard path == "api/desk-debate", method == "POST",
+              let authorization = headers.first(where: { $0.key.caseInsensitiveCompare("Authorization") == .orderedSame })?.value,
+              authorization.hasPrefix("Bearer ") else { return false }
+        let owner = await MainActor.run { (AccountSession.shared.session?.userId, AccountSession.shared.generation) }
+        guard let user = owner.0, let token = await AccountSession.shared.accessToken(),
+              authorization == "Bearer \(token)" else { return false }
+        return await MainActor.run {
+            AccountSession.shared.session?.userId == user && AccountSession.shared.generation == owner.1
+                && MemoryCenter.shared.allowsNativeCapture(user: user, generation: owner.1)
+        }
+    }
+
+    private static func lowercasedHeaders(_ http: HTTPURLResponse?) -> [String: String] {
         var headers: [String: String] = [:]
         for (key, value) in http?.allHeaderFields ?? [:] {
             guard let name = key as? String else { continue }
             headers[name.lowercased()] = value as? String ?? "\(value)"
         }
-        return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, headers)
+        return headers
+    }
+
+    /// The server's NDJSON desk stream. Gates remain ordinary JSON with their HTTP status.
+    /// A complete final line has the same body as the non-streaming response.
+    private static func liveResponse(_ request: URLRequest, onEvent: @Sendable ([String: Any]) -> Void) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+        var req = request
+        req.setValue("application/x-ndjson, application/json", forHTTPHeaderField: "Accept")
+        let (bytes, response) = try await URLSession.shared.bytes(for: req)
+        let http = response as? HTTPURLResponse
+        let headers = lowercasedHeaders(http)
+        let status = http?.statusCode ?? 0
+        guard headers["content-type"]?.lowercased().contains("ndjson") == true else {
+            var data = Data()
+            for try await byte in bytes { data.append(byte) }
+            return (try? JSONSerialization.jsonObject(with: data), status, headers)
+        }
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+            guard let event = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+                  let type = event["type"] as? String else { continue }
+            switch type {
+            case "final":
+                guard let data = event["data"] as? [String: Any] else { throw URLError(.cannotParseResponse) }
+                return (data, status, headers)
+            case "error":
+                return (["code": "analysis_failed", "error": event["error"] ?? NSNull(), "refunded": event["refunded"] ?? false], 503, headers)
+            default: onEvent(event)
+            }
+        }
+        throw URLError(.networkConnectionLost)
     }
 
     /// Words that carry no asset meaning in a natural question, es/en.
@@ -559,8 +614,9 @@ enum BobbyAPI {
 
     /// Shared technical evidence: regime, indicators, signal and risk plan.
     static func debate(_ symbol: String, question: String, isEquity: Bool = false) async -> BobbyAnswer {
-        guard let reply = try? await response("api/desk-debate", method: "POST",
-                                              body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"])
+        guard let reply = try? await BobbyAccessAPI.send("api/desk-debate", method: "POST",
+                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"],
+                                                         auth: .account, timeout: 100)
         else { return BobbyAnswer(symbol: symbol) }
         if let failure = DeskFailure(status: reply.status, body: reply.json) {
             var refused = BobbyAnswer(symbol: symbol)

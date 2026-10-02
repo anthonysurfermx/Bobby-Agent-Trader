@@ -10,7 +10,7 @@ import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, rec
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
-import { MEMORY_PLATFORMS, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
+import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -43,9 +43,9 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * Memory (api/_lib/user-memory.ts): for a signed-in Apple/Google account with memory on, the CIO also sees a
  * compact `reader` (explicit preferences, how often they asked), for framing only: sufficiency and the verdict
  * depend on the question and the evidence alone. The reader never reaches the client: the body only says
- * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on' (memoryPersonalizationOn). The ask is
- * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
- * make no memory call; neither does the iPhone app until it can show and delete memory (MEMORY_PLATFORMS).
+ * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'. iOS also needs an explicit
+ * opt-in affirmation on this request. The ask is recorded after the answer was delivered, never on a
+ * refusal or a failure. Anonymous and wallet requests make no memory call.
  */
 function refuse(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ error, code, ...extra });
@@ -186,9 +186,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       send({ type: 'accepted', level, access });
     }
     // Memory runs beside the evidence and never delays the answer by more than its timeout: a slow or failed
-    // lookup is simply no memory. No call at all without an Apple/Google session, nor from a platform whose app
-    // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
-    const memoryOwner = memoryPersonalizationOn() && MEMORY_PLATFORMS.has(clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
+    // lookup is simply no memory. The gate runs before any memory auth/summary work, including for a
+    // native read whose meter resolved an account asynchronously. The account preference is checked by
+    // the summary and record RPCs; a paused account is never personalized or recorded.
+    const memoryOwner = memoryDeskAllowed(req, clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);

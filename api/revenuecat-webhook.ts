@@ -7,7 +7,7 @@
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { timingSafeEqual } from 'node:crypto';
-import { identityForAuthUser, revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { identityForAuthUser, revenueCatReady, syncRevenueCat, type RevenueCatPaidEvent } from './_lib/revenuecat.js';
 import { recordPurchaseEvent } from './_lib/purchases.js';
 
 export const config = { maxDuration: 20 };
@@ -21,11 +21,11 @@ function authorized(req: VercelRequest): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-interface RevenueCatEvent {
+interface RevenueCatEvent extends RevenueCatPaidEvent {
   id?: string; type?: string; app_user_id?: string; original_app_user_id?: string; aliases?: string[];
-  transferred_to?: string[]; transferred_from?: string[]; environment?: string; store?: string; product_id?: string;
+  transferred_to?: string[]; transferred_from?: string[];
   price?: number | null; takehome_percentage?: number | null; commission_percentage?: number | null; tax_percentage?: number | null;
-  currency?: string | null; price_in_purchased_currency?: number | null; event_timestamp_ms?: number; country_code?: string | null;
+  event_timestamp_ms?: number; country_code?: string | null;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -39,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let firstIdentity: string | null = null;
     for (const authUserId of ids) {
       const identity = await identityForAuthUser(authUserId);
-      if (identity) { firstIdentity ??= identity; await syncRevenueCat(authUserId, identity); }
+      if (identity) { firstIdentity ??= identity; await syncRevenueCat(authUserId, identity, event); }
     }
     // Revenue for the owner dashboard; a failed write is retried by RevenueCat like a failed sync.
     if (event.id && event.type) {
