@@ -1,6 +1,6 @@
 # Bobby build 53: weekly update and test-candidate handoff
 
-2 October 2026. The first tested candidate was 1.5 (53). App Store Connect now confirms 1.5 already ready for distribution, so the signed test/update candidate is being prepared as **1.6 (53)**; build number stays 53. Apple [requires an incremental App Store version](https://developer.apple.com/help/app-store-connect/update-your-app/create-a-new-version/) for a new version. Working branch `feat/pro-briefings-b53` at Claude base `2f81cfbf` plus uncommitted local integration. **Local test candidate; NO-GO to activate briefings in production.** No deployment, remote migration, provider spend, push, purchase, publication or additional distribution occurred.
+2 October 2026. The first tested candidate was 1.5 (53). App Store Connect now confirms 1.5 already ready for distribution, so the signed test/update candidate is being prepared as **1.6 (53)**; build number stays 53. Apple [requires an incremental App Store version](https://developer.apple.com/help/app-store-connect/update-your-app/create-a-new-version/) for a new version. Working branch `feat/pro-briefings-b53` at Claude base `2f81cfbf` plus local integration checkpoint `d0632c00` (no push/deploy). **Local test candidate; NO-GO to activate briefings in production.** No deployment, remote migration, provider spend, push, purchase, publication or additional distribution occurred.
 
 ## Current product behavior
 
@@ -67,3 +67,9 @@ Upload was started by root through Xcode export with `destination=upload`, prese
 The human extended the test-delivery target to approximately 12:31:47 UTC. Apple processing duration is external; upload acceptance and readiness are separate gates. The requested production gift test remains pending a separate Bobby admin sign-in and explicitly identified QA account/finite grant; it does not block test signing/upload.
 
 Portal evidence at approximately 12:25 UTC: uploaded **1.6 (53)** is visible under Build Uploads with state **Processing**, Apple build id `0019457a-e534-47b6-b10e-f4165bc4ab7c`. The existing **Founder** group is internal, has one existing tester (Anthony), and automatic distribution for Xcode builds. No new testers/groups/settings were added or changed. Before claiming installation availability, confirm this exact build appears in Founder's builds as Testing after processing.
+
+## Physical iPhone smoke for this test build
+
+Once TestFlight enables 1.6 (53), first verify the installed version/build, then run a single Quick BTC/NVDA reading and observe live Thinking stages and disappearance at completion. Cancel and start a new query; stale events must not return. Mute narration and background the app; audio must stop. Check Profile, save/reopen a reading and sign-out/account-switch isolation. Record actual observed results, never infer them from the simulator suites.
+
+Gift display/spend needs the explicitly designated QA account and finite gift authorization still requested. Weekly backend, real paid-proof adapter, native query capture and macro delivery remain off/incomplete, so this test package does not establish an end-to-end Monday briefing. Do not purchase or delete a real account as part of the smoke.
