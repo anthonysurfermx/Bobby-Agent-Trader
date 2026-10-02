@@ -35,6 +35,8 @@ import { requestOriginHost } from './_lib/origins.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity } from './_lib/user-identity.js';
 import { getSubscription } from './_lib/access.js';
+import { cancelAllFor } from './_lib/stripe-api.js';
+import { notifyOwner } from './_lib/provider-alert.js';
 import { AppleRevocationError, appleRevocationReady, revokeAppleAuthorization, APPLE_MANUAL_REVOCATION_URL } from './_lib/apple-revocation.js';
 
 export const config = { maxDuration: 45 };
@@ -66,6 +68,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!identity) return;
   if (identity.via !== 'supabase' || !identity.authUserId) {
     return res.status(403).json({ error: 'A signed-in account is required' });
+  }
+
+  // Every Stripe subscription of this account is cancelled before anything is deleted or revoked: once the account is
+  // gone, the user could neither reach the billing portal nor stop the charges (payments security audit 2026-10-02,
+  // STRIPE-02). Stripe itself is asked (customer + metadata), whatever our row says, and it runs before the Apple
+  // revocation, which cannot be undone. If a cancellation cannot be confirmed, nothing changes and the user retries.
+  if (req.method !== 'GET') {
+    try {
+      const sub = await getSubscription(identity.id);
+      const hasStripe = Boolean(sub?.stripe_subscription_id || sub?.stripe_customer_id);
+      if (hasStripe || (process.env.STRIPE_SECRET_KEY || '').trim()) {
+        await cancelAllFor(identity.id, sub?.stripe_customer_id, sub?.stripe_subscription_id);
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[account-delete] card subscription not cancelled', detail);
+      notifyOwner('Bobby: no se pudo cancelar una suscripción de tarjeta al borrar una cuenta',
+        `Un usuario intentó borrar su cuenta y Stripe no confirmó la cancelación, así que no se borró nada.\nDetalle: ${detail.slice(0, 200)}\nRevisa STRIPE_SECRET_KEY y el estado de Stripe.`);
+      return res.status(503).json({ error: 'Your card subscription could not be cancelled, so nothing was deleted. Please try again.' });
+    }
   }
 
   let auth: { url: string; key: string };
@@ -105,24 +127,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } catch (error) {
     console.error('[account-delete] server configuration unavailable', error);
     return res.status(503).json({ error: 'Account deletion is temporarily unavailable' });
-  }
-
-  // A card subscription is cancelled at Stripe before anything is deleted: once the account is gone, the user could
-  // neither reach the billing portal nor stop the charges (payments security audit 2026-10-02, STRIPE-02). If the
-  // cancellation cannot be confirmed, nothing is deleted and the user can retry.
-  try {
-    const sub = await getSubscription(identity.id);
-    if (sub?.provider === 'stripe' && sub.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(sub.status)) {
-      const key = (process.env.STRIPE_SECRET_KEY || '').trim();
-      if (!key) throw new Error('stripe not configured');
-      const cancel = await fetch(`https://api.stripe.com/v1/subscriptions/${encodeURIComponent(sub.stripe_subscription_id)}`, {
-        method: 'DELETE', headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(10000),
-      });
-      if (!cancel.ok && cancel.status !== 404) throw new Error(`stripe cancel ${cancel.status}`);
-    }
-  } catch (error) {
-    console.error('[account-delete] card subscription not cancelled', error instanceof Error ? error.message : error);
-    return res.status(503).json({ error: 'Your card subscription could not be cancelled, so nothing was deleted. Please try again.' });
   }
 
   try {

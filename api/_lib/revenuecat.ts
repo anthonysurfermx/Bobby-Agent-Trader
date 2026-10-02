@@ -39,7 +39,7 @@ async function alertRejectedKey(status: number): Promise<void> {
 
 interface RcSubscriber {
   entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
-  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null; is_sandbox?: boolean; period_type?: string }>;
+  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null; is_sandbox?: boolean; period_type?: string; grace_period_expires_date?: string | null }>;
 }
 
 /** Stores whose purchases are real money sold through RevenueCat. Stripe is handled by its own webhook. */
@@ -48,8 +48,8 @@ const PRO_STORES = new Set(['app_store', 'mac_app_store']);
 /** Apple sandbox (TestFlight, App Review) grants Pro to everyone unless BOBBY_SANDBOX_PRO_UIDS lists the auth user ids
  *  allowed to (comma separated). Unset keeps App Review working; set it once the reviewer account is known. */
 function sandboxProAllowed(authUserId: string): boolean {
-  const list = (process.env.BOBBY_SANDBOX_PRO_UIDS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  return list.length === 0 || list.includes(authUserId);
+  const list = (process.env.BOBBY_SANDBOX_PRO_UIDS || '').split(/[\s,;]+/).map((s) => s.replace(/^["']|["']$/g, '').trim().toLowerCase()).filter(Boolean);
+  return list.length === 0 || list.includes(authUserId.toLowerCase());
 }
 
 /** The bobby_identities row behind a RevenueCat app_user_id (a Supabase auth user id). */
@@ -79,17 +79,28 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   // never presumed to be the App Store (payments security audit 2026-10-02, RC-01).
   // The entitlement names only its latest product; a real App Store subscription may sit beside a Test Store one,
   // so every eligible record is considered and the one that runs longest wins.
+  // Apple's billing grace period keeps access after a failed renewal until grace_period_expires_date.
+  const until = (s: { expires_date?: string | null; grace_period_expires_date?: string | null }) => {
+    if (!s.expires_date) return null;
+    const grace = s.grace_period_expires_date && Date.parse(s.grace_period_expires_date) > Date.parse(s.expires_date) ? s.grace_period_expires_date : null;
+    return grace ?? s.expires_date;
+  };
   const records = Object.entries(subscriber?.subscriptions ?? {})
     .filter(([, s]) => PRO_STORES.has(String(s?.store)) && !s?.refunded_at && (s?.is_sandbox !== true || sandboxProAllowed(authUserId)))
-    .sort(([, x], [, y]) => (y.expires_date ? Date.parse(y.expires_date) : Infinity) - (x.expires_date ? Date.parse(x.expires_date) : Infinity));
+    .sort(([, x], [, y]) => (until(y) ? Date.parse(until(y)!) : Infinity) - (until(x) ? Date.parse(until(x)!) : Infinity));
   const [product, sub] = ent && records.length ? records[0] : [null, undefined];
-  const expires = sub?.expires_date ?? null;
+  const expires = sub ? until(sub) : null;
   const sandbox = sub?.is_sandbox === true;
   const eligible = Boolean(ent && sub);
   const active = eligible && (expires === null || Date.parse(expires) > Date.now());
-  // A row this sync owns: an Apple row, or one an earlier sync wrote for a non-Apple store (no Stripe subscription
-  // id). A card subscription written by the Stripe webhook is never touched here.
-  const ownedRow = Boolean(current && (current.provider === 'apple' || !current.stripe_subscription_id));
+  // A row that carries a Stripe subscription still able to charge belongs to the Stripe webhook: never rewrite it
+  // (relabelling it 'apple' would hide the card plan from account deletion, checkout and the portal). Pro is then
+  // whichever of the two is live. A row this sync owns has no Stripe subscription id.
+  if (current?.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(current.status)) {
+    const cardLive = ['active', 'trialing'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
+    return Boolean(cardLive || (ent && sub && (expires === null || Date.parse(expires) > Date.now())));
+  }
+  const ownedRow = Boolean(current && !current.stripe_subscription_id);
   if (!eligible) {
     // Revoke what an earlier sync granted from an ineligible source (e.g. a Test Store row granted before this fix).
     if (ownedRow && ['active', 'trialing'].includes(current!.status)) {

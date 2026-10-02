@@ -7,7 +7,8 @@
 // The identity rides in metadata.identity_id (set by /api/bobby-access checkout).
 // ============================================================
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { upsertSubscription } from './_lib/access.js';
+import { getSubscription, upsertSubscription } from './_lib/access.js';
+import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
 import { recordPurchaseEvent } from './_lib/purchases.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
@@ -44,18 +45,38 @@ function periodEnd(sub: Record<string, unknown>): string | null {
 async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?: string | null) {
   const identity = String((sub.metadata as Record<string, string> | undefined)?.identity_id ?? fallbackIdentity ?? '');
   if (!/^[0-9a-f-]{36}$/i.test(identity)) { console.error('[stripe-webhook] subscription without identity', sub.id); return; }
+  // A test-mode subscription never touches production accounts (audit 2026-10-02, SEC-CFG-04).
+  if (sub.livemode === false && process.env.VERCEL_ENV === 'production') { console.error('[stripe-webhook] test-mode subscription ignored', sub.id); return; }
+  const status = String(sub.status ?? 'incomplete');
+  const incomingLive = ['active', 'trialing', 'past_due'].includes(status);
+  // One row per account is shared with the App Store and with older subscriptions: a non-live state for this
+  // subscription never overwrites a different plan that is still live (a late retry for an old subscription, or an
+  // active Apple plan). STRIPE-01 / STRIPE-03.
+  const current = await getSubscription(identity);
+  if (current && !incomingLive) {
+    const currentLive = ['active', 'trialing', 'past_due'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
+    const otherPlan = current.provider === 'apple' || (current.stripe_subscription_id && current.stripe_subscription_id !== sub.id);
+    if (currentLive && otherPlan) { console.error('[stripe-webhook] stale state for another plan ignored', sub.id); return; }
+  }
   const price = ((sub.items as { data?: Array<{ price?: { id?: string } }> } | undefined)?.data ?? [])[0]?.price?.id ?? null;
   try {
     await upsertSubscription({
-      identity_id: identity, provider: 'stripe', status: String(sub.status ?? 'incomplete'), product_id: price,
+      identity_id: identity, provider: 'stripe', status, product_id: price,
       current_period_end: periodEnd(sub), stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : null,
       stripe_subscription_id: typeof sub.id === 'string' ? sub.id : null,
       environment: sub.livemode === true ? 'production' : sub.livemode === false ? 'sandbox' : null,
     });
   } catch (e) {
-    // The account was deleted (foreign key): there is nobody to grant Pro to, and retrying for three days changes
-    // nothing. Account deletion cancels the subscription first (api/account.ts).
-    if (e instanceof Error && /subscription upsert (409|23503)/.test(e.message)) { console.error('[stripe-webhook] subscription for a deleted account', sub.id); return; }
+    // Foreign key: the account was deleted. Nobody can use this plan any more, so a subscription that can still
+    // charge is cancelled at Stripe before acknowledging (otherwise it would bill a deleted account for ever).
+    if (e instanceof Error && /"code"\s*:\s*"23503"/.test(e.message)) {
+      if (typeof sub.id === 'string' && !STRIPE_TERMINAL.has(status)) {
+        try { await stripeApi('DELETE', `subscriptions/${encodeURIComponent(sub.id)}`); }
+        catch (c) { if (!(c instanceof StripeError && c.status === 404)) throw c; }
+      }
+      console.error('[stripe-webhook] subscription for a deleted account cancelled', sub.id);
+      return;
+    }
     throw e;
   }
 }

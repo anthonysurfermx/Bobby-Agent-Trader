@@ -28,6 +28,7 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { customerFor, stripeApi } from './_lib/stripe-api.js';
 
 export const config = { maxDuration: 20 };
 
@@ -150,9 +151,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(409).json({ code: 'already_pro', provider: existing.provider,
           error: existing.provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
       }
+      // Stripe is the source of truth for "already paying": one customer per identity, refuse while any of its
+      // subscriptions can still charge, and reuse a checkout that is still open instead of opening a second one
+      // (two tabs or a double click would otherwise create two paid plans). Audit 2026-10-02, STRIPE-04.
+      let customer: string;
+      try {
+        customer = await customerFor(identity.id, existing?.stripe_customer_id);
+        const subsAtStripe = await stripeApi<{ data?: Array<{ status: string }> }>('GET', `subscriptions?customer=${encodeURIComponent(customer)}&status=all&limit=20`);
+        if ((subsAtStripe.data ?? []).some((s) => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(s.status))) {
+          return res.status(409).json({ code: 'already_pro', provider: 'stripe', error: 'You already have Bobby Pro. Manage it from your account.' });
+        }
+        const open = await stripeApi<{ data?: Array<{ url?: string }> }>('GET', `checkout/sessions?customer=${encodeURIComponent(customer)}&status=open&limit=1`);
+        if (open.data?.[0]?.url) return res.status(200).json({ url: open.data[0].url });
+      } catch (error) {
+        console.error('[bobby-access] checkout preflight', error instanceof Error ? error.message : error);
+        return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
+      }
       const origin = siteOrigin(req);
       const form: Record<string, string> = {
         mode: 'subscription',
+        customer,
+        expires_at: String(Math.floor(Date.now() / 1000) + 30 * 60),
         'line_items[0][price]': String(process.env.STRIPE_PRICE_ID),
         'line_items[0][quantity]': '1',
         success_url: `${origin}/desk?pro=welcome`,
@@ -162,7 +181,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
-      if (existing?.stripe_customer_id) form.customer = existing.stripe_customer_id;
       const session = await stripe('checkout/sessions', form);
       return res.status(200).json({ url: session.url });
     }

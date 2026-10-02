@@ -350,73 +350,16 @@ async function legitimatePath(): Promise<void> {
     return { status: r.status, transcript, receipt, publishable, reason, contentType: r.headers.get('content-type') || '' };
   };
 
-  const walletB = await signInThrowaway();
-  line(Boolean(walletB), 'second throw-away wallet (B) signed in for the cross-wallet check', walletB ? walletB.wallet : 'sign-in failed');
-  // Ask Bobby as wallet A. A debate that is not publishable (fields incomplete) is retried once.
-  let debate = await debateFor(authed);
-  if (!(debate.receipt && debate.publishable)) debate = await debateFor(authed);
-  line(debate.status === 200 && debate.contentType.includes('text/event-stream') && debate.transcript.length > 200, 'POST /api/openclaw-chat streams a three-agent debate for the session wallet', `HTTP ${debate.status} ${debate.contentType} ${debate.transcript.length} chars`);
-  line(Boolean(debate.receipt) && debate.publishable, 'stream ends with a single-use receipt marked publishable (issued by the server, never by this gate)', debate.receipt ? `receipt ${debate.receipt.slice(0, 12)}… publishable=${debate.publishable}` : `no receipt (${debate.reason || 'none'})`);
+  // Payments security audit 2026-10-02 (OMR-1): /api/openclaw-chat answers internal callers only (an Origin header is
+  // not a credential), so no browser can obtain a debate or a forum receipt from it any more. The gate proves the
+  // refusal; the forum receipt rules are still enforced by forum-publish (a forged receipt is refused).
+  const debate = await debateFor(authed);
+  line(debate.status === 403 && debate.transcript.length === 0, 'POST /api/openclaw-chat with a browser wallet session → 403 (internal callers only)', `HTTP ${debate.status}`);
   const guestDebate = await debateFor(base);
-  line(!guestDebate.receipt && guestDebate.reason === 'no-wallet-session', 'the same request WITHOUT a session gets no receipt (guest debates are never publishable)', `receipt=${Boolean(guestDebate.receipt)} reason=${guestDebate.reason || 'none'}`);
-
-  if (debate.receipt && debate.publishable && walletB) {
-    const transcript = debate.transcript;
-    const receipt = debate.receipt;
-    // Pre-flight the persisted window: five forum-publish calls follow and every one must land.
-    const win = await forumPublishWindow();
-    if (win && win.count > 0 && win.resetAt > Date.now()) {
-      console.log(`     persisted limiter shows ${win.count} forum-publish hit(s) in the current window`);
-      await waitForWindow(win.resetAt, 'api_cache');
-    } else if (!win) {
-      console.log('     could not resolve the persisted forum-publish window (IP/salt) — relying on Retry-After');
-    }
-    const publish = (headers: Record<string, string>, body: unknown) => fetch(`${API}/api/forum-publish`, { method: 'POST', headers, body: JSON.stringify(body) });
-    // 1. wallet B tries to publish A's receipt
-    let pubB = await publish(walletB.headers, { language: 'en', transcript, receipt });
-    if (pubB.status === 429) {
-      const retryAfter = Number(pubB.headers.get('retry-after') || 0);
-      const ok = await waitForWindow(Date.now() + Math.max(1, retryAfter) * 1000, `Retry-After ${retryAfter}s`);
-      if (ok) pubB = await publish(walletB.headers, { language: 'en', transcript, receipt });
-    }
-    line(pubB.status === 403, "wallet B publishing wallet A's receipt → 403", `HTTP ${pubB.status}`);
-    // 2. wallet A publishes its own debate
-    const pubA = await publish(authed, { language: 'en', transcript, receipt });
-    const pubAJson = (await pubA.json().catch(() => ({}))) as { threadId?: string; receiptId?: string; error?: string };
-    line(pubA.ok && Boolean(pubAJson.threadId), 'wallet A publishing its own receipt → thread created atomically', `HTTP ${pubA.status} ${pubAJson.error || ''}`);
-    if (pubAJson.threadId) {
-      const stored = await fetch(`${URL_}/rest/v1/forum_threads?id=eq.${pubAJson.threadId}&select=conviction_score,owner_wallet,scope,symbol`, { headers: svcHeaders });
-      const row = ((await stored.json().catch(() => [])) as Array<{ conviction_score: number; owner_wallet: string; scope: string; symbol: string }>)[0];
-      line(Boolean(row) && typeof row.conviction_score === 'number' && row.conviction_score >= 0 && row.conviction_score <= 1, 'stored conviction is on the protocol scale 0..1', `stored=${row?.conviction_score} symbol=${row?.symbol}`);
-      line(Boolean(row) && row.owner_wallet === wallet && row.scope === 'public', 'thread owned by wallet A, public scope', `owner=${row?.owner_wallet}`);
-    }
-    // 3. replay
-    const replay = await publish(authed, { language: 'en', transcript, receipt });
-    line(replay.status === 409, 'SAME receipt again → 409 (single use)', `HTTP ${replay.status}`);
-    // 4. edited transcript with the consumed receipt's signature
-    const edited = await publish(authed, { language: 'en', transcript: transcript + ' (edited)', receipt });
-    line(edited.status === 403, 'edited transcript with the old receipt → 403', `HTTP ${edited.status}`);
-    // 5. malformed receipt (right prefix, garbage MAC) and missing receipt
-    const forged = await publish(authed, { language: 'en', transcript, receipt: `${receipt.split('.').slice(0, 2).join('.')}.${randomBytes(32).toString('base64url')}` });
-    line(forged.status === 403, 'receipt with a forged signature → 403', `HTTP ${forged.status}`);
-    const missing = await publish(authed, { language: 'en', transcript });
-    line(missing.status === 400, 'missing receipt → 400 (schema)', `HTTP ${missing.status}`);
-    // 6. conviction out of range: production never signs it, so prove the last line of defence directly at the RPC
-    const badRpc = await fetch(`${URL_}/rest/v1/rpc/bobby_publish_debate`, { method: 'POST', headers: svcHeaders, body: JSON.stringify({ p_receipt_id: '00000000-0000-4000-8000-0000000000c1', p_wallet: wallet, p_thread: { topic: `${MARK} bad conviction`, conviction_score: 7, symbol: 'RLSTEST', scope: 'public', language: 'en' }, p_posts: [{ agent: 'alpha', content: MARK }, { agent: 'cio', content: MARK }] }) });
-    const badRpcText = await badRpc.text().catch(() => '');
-    line(badRpc.status >= 400 && /within 0\.\.1|22023/.test(badRpcText), 'RPC bobby_publish_debate refuses conviction 7 (must be within 0..1)', `HTTP ${badRpc.status} ${badRpcText.slice(0, 80)}`);
-    const badRpcResidue = await fetch(`${URL_}/rest/v1/forum_publish_receipts?receipt_id=eq.00000000-0000-4000-8000-0000000000c1&select=receipt_id`, { headers: svcHeaders });
-    const badRows = (await badRpcResidue.json().catch(() => [])) as unknown[];
-    line(Array.isArray(badRows) && badRows.length === 0, 'refused RPC call left no receipt row (transaction rolled back)', `rows=${Array.isArray(badRows) ? badRows.length : 'n/a'}`);
-    // cleanup: thread, posts, consumed receipt
-    if (pubAJson.threadId) {
-      await fetch(`${URL_}/rest/v1/forum_posts?thread_id=eq.${pubAJson.threadId}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
-      await fetch(`${URL_}/rest/v1/forum_threads?id=eq.${pubAJson.threadId}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
-      if (pubAJson.receiptId) await fetch(`${URL_}/rest/v1/forum_publish_receipts?receipt_id=eq.${pubAJson.receiptId}`, { method: 'DELETE', headers: { ...svcHeaders, Prefer: 'return=minimal' } });
-    }
-  } else {
-    line(false, 'forum-publish single-use proof', 'no publishable receipt from /api/openclaw-chat (or wallet B unavailable) — the browser flow could not be exercised');
-  }
+  line(guestDebate.status === 403 && guestDebate.transcript.length === 0, 'POST /api/openclaw-chat without a session → 403', `HTTP ${guestDebate.status}`);
+  const forgedReceipt = `v1.${randomBytes(12).toString('base64url')}.${randomBytes(32).toString('base64url')}`;
+  const forgedPublish = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript: `${MARK} forged`, receipt: forgedReceipt }) });
+  line([400, 403, 429].includes(forgedPublish.status), 'forum-publish with a forged receipt is refused', `HTTP ${forgedPublish.status}`);
   const threads = await fetch(`${API}/api/my-threads?limit=1`, { headers: authed });
   line(threads.ok, 'GET /api/my-threads with session → 200', `HTTP ${threads.status}`);
   const del = await fetch(`${API}/api/agent-messages`, { method: 'DELETE', headers: authed, body: JSON.stringify({ wallet: CANARY_WALLET }) });
