@@ -28,6 +28,7 @@ const MIGRATIONS = [
   '20261001230000_admin_truth.sql',
   '20261001233000_admin_truth_review.sql',
   '20261002120000_admin_codex_review.sql',
+  '20261002130000_admin_device_facts_join.sql',
 ];
 const TRUTH = 'supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql';
 const REVIEW = 'supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql';
@@ -38,6 +39,7 @@ const DROP_NEW = 'drop function if exists public.bobby_admin_people_facts(); dro
 const reapply = async () => {
   await pool.query(DROP_NEW);
   await pool.query(readFileSync(TRUTH, 'utf8')); await pool.query(readFileSync(REVIEW, 'utf8')); await pool.query(readFileSync(CODEX, 'utf8'));
+  await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20261002130000_admin_device_facts_join.sql', 'utf8'));
 };
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
