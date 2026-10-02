@@ -21,6 +21,26 @@
       "destination": "/api/trader-land-share?code=:code"
     },
     {
+      "source": "/api/briefing-settings",
+      "destination": "/api/briefings?op=settings"
+    },
+    {
+      "source": "/api/briefing-device",
+      "destination": "/api/briefings?op=device"
+    },
+    {
+      "source": "/api/briefing",
+      "destination": "/api/briefings?op=report"
+    },
+    {
+      "source": "/api/briefing-voice",
+      "destination": "/api/briefings?op=voice"
+    },
+    {
+      "source": "/api/briefing-audio",
+      "destination": "/api/briefings?op=audio"
+    },
+    {
       "source": "/nucleo",
       "destination": "/nucleo/index.html"
     },
@@ -180,6 +200,10 @@
     {
       "path": "/api/admin?cron=amplitude",
       "schedule": "*/15 * * * *"
+    },
+    {
+      "path": "/api/briefing-worker",
+      "schedule": "*/5 * * * *"
     }
   ],
   "functions": {

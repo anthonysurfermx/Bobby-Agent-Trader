@@ -18,6 +18,22 @@ export const config = { maxDuration: 30 };
 import { createLimiter, getClientIpKey } from './_lib/rate-limit.js';
 import { getCache, setCache } from './_lib/api-cache.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
+// Read-only market fetchers live in market-snapshot.ts so the briefing worker reuses them (same code, same output).
+import {
+  detectRegime,
+  fetchDXY,
+  fetchFearGreed,
+  fetchFundingRates,
+  fetchLivePrices,
+  fetchOpenInterest,
+  fetchTopStocks,
+  fetchTopTradersLSRatio,
+  type FearGreedData,
+  type FundingRate,
+  type LongShortRatio,
+  type MarketRegime,
+  type OpenInterestData,
+} from './_lib/market-snapshot.js';
 
 // Full-snapshot TTL: a cache hit answers from one Supabase read instead
 // of fanning out to 18 external sources. 5 min is fresh enough for a
@@ -227,16 +243,6 @@ function calculateDynamicConviction(
 
   const raw = (okxScore * okxWeight) + (polyConsensus * polyWeight) - latencyPenalty;
   return Math.max(0, Math.min(1, raw));
-}
-
-// ---- Market Regime Detection ----
-type MarketRegime = 'high_vol' | 'low_vol' | 'normal';
-
-function detectRegime(btcChange24h: number): { regime: MarketRegime; label: string } {
-  const abs = Math.abs(btcChange24h);
-  if (abs > 5) return { regime: 'high_vol', label: `HIGH VOLATILITY (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
-  if (abs < 2) return { regime: 'low_vol', label: `LOW VOLATILITY (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
-  return { regime: 'normal', label: `NORMAL (BTC ${btcChange24h > 0 ? '+' : ''}${btcChange24h.toFixed(1)}%)` };
 }
 
 function calculateLatencyPenalty(latencyMs: number): number {
@@ -549,166 +555,6 @@ async function fetchCalibrationCurve(): Promise<CalibrationData> {
   } catch { return defaultData; }
 }
 
-// ---- OKX CEX Prices (spot + commodities) ----
-async function fetchLivePrices(): Promise<Array<{ symbol: string; price: number; change24h: number }>> {
-  const instruments = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'OKB-USDT', 'XAUT-USDT', 'PAXG-USDT'];
-  try {
-    const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
-    if (!res.ok) return [];
-    const json = await res.json() as { code: string; data: Array<{ instId: string; last: string; open24h: string }> };
-    if (json.code !== '0') return [];
-
-    const tickerMap = new Map(json.data.map(t => [t.instId, t]));
-    const prices = instruments.map(inst => {
-      const t = tickerMap.get(inst);
-      if (!t) return null;
-      const last = parseFloat(t.last);
-      const open = parseFloat(t.open24h);
-      return {
-        symbol: inst.split('-')[0],
-        price: last,
-        change24h: open > 0 ? parseFloat((((last - open) / open) * 100).toFixed(2)) : 0,
-      };
-    }).filter(Boolean) as Array<{ symbol: string; price: number; change24h: number }>;
-
-    // Also fetch silver (SWAP only)
-    try {
-      const swapRes = await fetch('https://www.okx.com/api/v5/market/ticker?instId=XAG-USDT-SWAP');
-      const swapJson = await swapRes.json() as { code: string; data: Array<{ last: string; open24h: string }> };
-      if (swapJson.code === '0' && swapJson.data?.[0]) {
-        const s = swapJson.data[0];
-        const last = parseFloat(s.last);
-        const open = parseFloat(s.open24h);
-        prices.push({
-          symbol: 'XAG',
-          price: last,
-          change24h: open > 0 ? parseFloat((((last - open) / open) * 100).toFixed(2)) : 0,
-        });
-      }
-    } catch { /* non-critical */ }
-
-    return prices;
-  } catch { return []; }
-}
-
-// ---- Funding Rates (Long/Short Squeeze Detection) ----
-// Critical CIO-level data: high positive funding = everyone long → squeeze risk
-interface FundingRate { symbol: string; rate: number; annualized: number; nextFundingTime: string }
-
-async function fetchFundingRates(): Promise<FundingRate[]> {
-  const instruments = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', 'SOL-USDT-SWAP'];
-  try {
-    const results = await Promise.all(instruments.map(async (instId) => {
-      try {
-        const res = await fetch(`https://www.okx.com/api/v5/public/funding-rate?instId=${instId}`);
-        if (!res.ok) return null;
-        const json = await res.json() as { code: string; data: Array<{ instId: string; fundingRate: string; nextFundingRate: string; nextFundingTime: string }> };
-        if (json.code !== '0' || !json.data?.[0]) return null;
-        const d = json.data[0];
-        const rate = parseFloat(d.fundingRate);
-        return {
-          symbol: instId.split('-')[0],
-          rate,
-          annualized: parseFloat((rate * 3 * 365 * 100).toFixed(1)), // 3 settlements/day × 365
-          nextFundingTime: d.nextFundingTime,
-        };
-      } catch { return null; }
-    }));
-    return results.filter(Boolean) as FundingRate[];
-  } catch { return []; }
-}
-
-// ---- Open Interest (Crowded Trade Detection) ----
-interface OpenInterestData { symbol: string; oi: number; oiCcy: number }
-
-async function fetchOpenInterest(): Promise<OpenInterestData[]> {
-  const instruments = ['BTC-USDT-SWAP', 'ETH-USDT-SWAP', 'SOL-USDT-SWAP'];
-  try {
-    const results = await Promise.all(instruments.map(async (instId) => {
-      try {
-        const res = await fetch(`https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=${instId}`);
-        if (!res.ok) return null;
-        const json = await res.json() as { code: string; data: Array<{ instId: string; oi: string; oiCcy: string; ts: string }> };
-        if (json.code !== '0' || !json.data?.[0]) return null;
-        return {
-          symbol: instId.split('-')[0],
-          oi: parseInt(json.data[0].oi),
-          oiCcy: parseFloat(json.data[0].oiCcy),
-        };
-      } catch { return null; }
-    }));
-    return results.filter(Boolean) as OpenInterestData[];
-  } catch { return []; }
-}
-
-// ---- Top Traders Long/Short Ratio (Smart Money Positioning) ----
-interface LongShortRatio { symbol: string; longRatio: number; shortRatio: number; ts: string }
-
-async function fetchTopTradersLSRatio(): Promise<LongShortRatio[]> {
-  const instruments = [
-    { symbol: 'BTC', instId: 'BTC-USDT-SWAP' },
-    { symbol: 'ETH', instId: 'ETH-USDT-SWAP' },
-    { symbol: 'SOL', instId: 'SOL-USDT-SWAP' },
-  ];
-  try {
-    const results = await Promise.all(instruments.map(async ({ symbol, instId }) => {
-      try {
-        const res = await fetch(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=1H`);
-        if (!res.ok) return null;
-        const json = await res.json() as { code: string; data: string[][] };
-        if (json.code !== '0' || !json.data?.[0]) return null;
-        const latest = json.data[0]; // [timestamp, ratio]
-        const ratio = parseFloat(latest[1]);
-        // ratio > 1 means more longs, < 1 means more shorts
-        const longPct = parseFloat((ratio / (1 + ratio) * 100).toFixed(1));
-        const shortPct = parseFloat((100 - longPct).toFixed(1));
-        return {
-          symbol,
-          longRatio: longPct,
-          shortRatio: shortPct,
-          ts: latest[0],
-        };
-      } catch { return null; }
-    }));
-    return results.filter(Boolean) as LongShortRatio[];
-  } catch { return []; }
-}
-
-// ---- Fear & Greed Index (Market Sentiment) ----
-interface FearGreedData { value: number; classification: string }
-
-async function fetchFearGreed(): Promise<FearGreedData | null> {
-  try {
-    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
-    if (!res.ok) return null;
-    const json = await res.json() as { data: Array<{ value: string; value_classification: string }> };
-    if (!json.data?.[0]) return null;
-    return {
-      value: parseInt(json.data[0].value),
-      classification: json.data[0].value_classification,
-    };
-  } catch { return null; }
-}
-
-// ---- DXY (US Dollar Index — calculated from ECB forex rates) ----
-async function fetchDXY(): Promise<{ dxy: number } | null> {
-  try {
-    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF');
-    if (!res.ok) return null;
-    const json = await res.json() as { rates: { EUR: number; JPY: number; GBP: number; CAD: number; SEK: number; CHF: number } };
-    const r = json.rates;
-    // ICE DXY formula: 50.14348112 × (1/EUR)^0.576 × JPY^0.136 × (1/GBP)^0.119 × CAD^0.091 × SEK^0.042 × CHF^0.036
-    const dxy = 50.14348112
-      * Math.pow(1 / r.EUR, 0.576)
-      * Math.pow(r.JPY, 0.136)
-      * Math.pow(1 / r.GBP, 0.119)
-      * Math.pow(r.CAD, 0.091)
-      * Math.pow(r.SEK, 0.042)
-      * Math.pow(r.CHF, 0.036);
-    return { dxy: parseFloat(dxy.toFixed(2)) };
-  } catch { return null; }
-}
-
 // ---- OKX DEX Signal Leaderboard (Top On-Chain Traders) ----
 interface DexLeaderEntry { address: string; pnl: number; winRate: number; tradeCount: number; chain: string }
 
@@ -915,33 +761,6 @@ async function fetchTrenchTokens(): Promise<TrenchToken[]> {
       isMigrated: t.isMigrated === true || t.isMigrated === 'true',
       liquidity: parseFloat(String(t.liquidity || '0')),
     }));
-  } catch { return []; }
-}
-
-// ---- Yahoo Finance (Top Stocks Integration) ----
-async function fetchTopStocks(): Promise<Array<{ symbol: string; price: number; change24h: number }>> {
-  try {
-    // 12 names, which puts the shell ticker at ~19 symbols alongside the
-    // crypto and metals quotes. One request either way — Yahoo takes the
-    // whole list in a single spark call.
-    const url = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=NVDA,AAPL,TSLA,META,MSFT,COIN,SPY,GOOGL,AMZN,AMD,MSTR,QQQ&range=1d&interval=1d';
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
-    if (!response.ok) return [];
-    const data = await response.json() as Record<string, unknown>;
-    const spark = data.spark as { result?: Array<{ symbol: string; response: Array<{ meta: Record<string, unknown> }> }> } | undefined;
-    const quotes: Array<{ symbol: string; price: number; change24h: number }> = [];
-    for (const item of spark?.result || []) {
-      const meta = item.response?.[0]?.meta;
-      if (!meta) continue;
-      const price = Number(meta.regularMarketPrice || 0);
-      const prev = Number(meta.chartPreviousClose || meta.previousClose || 0);
-      quotes.push({
-        symbol: item.symbol,
-        price,
-        change24h: prev > 0 ? parseFloat((((price - prev) / prev) * 100).toFixed(2)) : 0
-      });
-    }
-    return quotes;
   } catch { return []; }
 }
 

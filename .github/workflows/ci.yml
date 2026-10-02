@@ -49,6 +49,7 @@ jobs:
       - run: npm run test:mcp-payment-transport
       - run: npm run test:admin-api
       - run: npm run test:llm-ledger
+      - run: npm run test:briefings
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --audit-level=high
@@ -125,6 +126,11 @@ jobs:
       - run: npm run test:lifecycle-pg
       - run: npm run test:user-memory-pg
       - run: npm run test:admin-truth-pg
+      - run: |
+          psql "$DATABASE_URL" -c 'create database briefings_pg' -c 'create database briefings_api' -c 'create database briefings_worker'
+      - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_pg npm run test:briefings-pg
+      - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_api npm run test:briefings-api
+      - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_worker npm run test:briefings-worker
 
   contracts:
     runs-on: ubuntu-latest

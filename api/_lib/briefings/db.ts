@@ -7,6 +7,7 @@
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
 import type { BriefSettings, Cadence, ComposerMemory, DeviceEnvironment, FrozenSettings, PermissionState } from './types.js';
+import { COMPANION_VOICES, voiceForCompanion } from './config.js';
 
 export class BriefingStorageError extends Error {
   constructor(readonly rpc: string, readonly status: number | null) {
@@ -125,9 +126,19 @@ export async function neededAssets(cadence: Cadence, periodKey: string, language
   return Array.isArray(r.symbols) ? r.symbols.filter((s): s is string => typeof s === 'string') : [];
 }
 
+/** Languages of the period's open (pending/preparing) reports: the worker writes a shared narrative only for these. */
+export async function openLanguages(cadence: Cadence, periodKey: string): Promise<Array<'en' | 'es'>> {
+  const r = obj(await rpc('bobby_brief_open_languages', { p_cadence: cadence, p_period_key: periodKey }), 'bobby_brief_open_languages');
+  return Array.isArray(r.languages) ? r.languages.filter((l): l is 'en' | 'es' => l === 'en' || l === 'es') : [];
+}
+
 export interface ClaimedBrief { id: string; identityId: string; fence: number; frozen: FrozenSettings; memory: ComposerMemory | null }
 export async function claimBriefs(cadence: Cadence, periodKey: string, worker: string, leaseSeconds: number, limit: number): Promise<ClaimedBrief[]> {
-  const r = obj(await rpc('bobby_brief_claim', { p_cadence: cadence, p_period_key: periodKey, p_worker: worker, p_lease_seconds: leaseSeconds, p_limit: limit }, 10_000), 'bobby_brief_claim');
+  // The companion→voice map lives only in config.ts; the claim freezes the voice from it (FrozenSettings.voice).
+  const r = obj(await rpc('bobby_brief_claim', {
+    p_cadence: cadence, p_period_key: periodKey, p_worker: worker, p_lease_seconds: leaseSeconds, p_limit: limit,
+    p_voices: COMPANION_VOICES, p_default_voice: voiceForCompanion(null),
+  }, 10_000), 'bobby_brief_claim');
   return Array.isArray(r.items) ? (r.items as ClaimedBrief[]) : [];
 }
 export type PublishResult = { ok: true } | { ok: false; code: 'stale_fence' | 'not_pro' | 'opted_out' | 'privacy_changed' };
