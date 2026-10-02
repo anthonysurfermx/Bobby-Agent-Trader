@@ -59,7 +59,8 @@ export function supabaseAudioStore(fetchImpl?: typeof fetch): AudioStore {
       const r = await send('put', `${base()}/object/${AUDIO_BUCKET}/${objectPath(path)}`, {
         method: 'POST',
         headers: { ...auth(), 'Content-Type': mime, 'x-upsert': 'true', 'Cache-Control': 'no-store' },
-        body: bytes,
+        // Copy to an ArrayBuffer-backed view accepted by both Node and DOM fetch types.
+        body: new Uint8Array(bytes),
       });
       if (!r.ok) {
         console.error('[briefings-audio] put', r.status);

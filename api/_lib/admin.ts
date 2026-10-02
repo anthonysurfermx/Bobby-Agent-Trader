@@ -474,9 +474,10 @@ async function appStoreSales(days: string[]) {
 }
 
 async function latest(path: string): Promise<string | null> {
-  const rows = await rest<Array<Record<string, string>>>(path).catch(() => null);
+  const rows = await rest<Array<Record<string, unknown>>>(path).catch(() => null);
   const row = rows?.[0];
-  return row ? Object.values(row)[0] ?? null : null;
+  const value = row ? Object.values(row)[0] : null;
+  return typeof value === 'string' ? value : null;
 }
 
 export async function integrations(days: string[]) {
