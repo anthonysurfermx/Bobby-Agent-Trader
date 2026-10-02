@@ -6,7 +6,7 @@
 //   POST { action: 'referral-claim', code } → { result, access, levels }  accept a friend's invitation
 //   POST { action: 'redeem-coupon', code }  → { result, granted, bonus, access, levels }  redeem a coupon that
 //        gifts extra reads / Profundo / Máximo (api/_lib/coupons.ts); 10 attempts per hour per account, 30 per network
-//   POST { action: 'checkout' }           → { url }  Stripe Checkout, $5/month (web)
+//   POST { action: 'checkout' }           → { url }  Stripe Checkout, US$4.90/month (web)
 //   POST { action: 'portal' }             → { url }  Stripe billing portal (manage / cancel)
 //   POST { action: 'revenuecat-sync' }   → { ok, access, subscription }  re-read the `pro` entitlement
 //        from RevenueCat for this account (after a purchase or restore in the app).
@@ -28,7 +28,8 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
-import { customerFor, stripeApi } from './_lib/stripe-api.js';
+import { customerFor, expireCheckoutSession, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
+import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
 
 export const config = { maxDuration: 20 };
 
@@ -92,7 +93,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The app or the desk opened: count the install (and link it to the account) after answering.
     waitUntil(touchDevice(req, identity));
     let subscription = null;
-    try { subscription = identity ? await getSubscription(identity.id) : null; } catch { subscription = null; }
+    let subscriptionAvailable = true;
+    try { subscription = identity ? await getSubscription(identity.id) : null; } catch { subscription = null; subscriptionAvailable = false; }
     const [access, levels, referral] = await Promise.all([
       readAccess(req, identity),
       readLevels(req, identity),
@@ -105,7 +107,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: revenueCatReady(), revenuecat: revenueCatReady() },
+      payments: { stripe: stripeReady(), apple: revenueCatReady() && Boolean(identity) && subscriptionAvailable && !(
+        subscription?.stripe_subscription_id && !STRIPE_TERMINAL.has(subscription.status)
+      ), revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -145,43 +149,79 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try { existing = await getSubscription(identity.id); } catch { return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' }); }
       // One plan per account: never sell a second subscription to someone who already has Bobby Pro (double billing,
       // and cancelling either one would drop Pro while the other keeps charging). Audit 2026-10-02, STRIPE-04.
-      const live = existing && ['active', 'trialing', 'past_due'].includes(existing.status)
-        && (!existing.current_period_end || Date.parse(existing.current_period_end) > Date.now());
+      const live = existing && ((existing.stripe_subscription_id && !STRIPE_TERMINAL.has(existing.status))
+        || (existing.provider === 'apple' && ['active', 'trialing'].includes(existing.status)
+          && (!existing.current_period_end || Date.parse(existing.current_period_end) > Date.now()))
+        || (['active', 'trialing'].includes(existing.apple_status ?? '')
+          && (!existing.apple_current_period_end || Date.parse(existing.apple_current_period_end) > Date.now())));
       if (live) {
-        return res.status(409).json({ code: 'already_pro', provider: existing.provider,
-          error: existing.provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
+        const provider = ['active', 'trialing'].includes(existing.apple_status ?? '') ? 'apple' : existing.provider;
+        return res.status(409).json({ code: 'already_pro', provider,
+          error: provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
       }
       // Stripe is the source of truth for "already paying": one customer per identity, refuse while any of its
       // subscriptions can still charge, and reuse a checkout that is still open instead of opening a second one
       // (two tabs or a double click would otherwise create two paid plans). Audit 2026-10-02, STRIPE-04.
       let customer: string;
+      let openSession: { id?: string; url?: string } | undefined;
       try {
         customer = await customerFor(identity.id, existing?.stripe_customer_id);
         const subsAtStripe = await stripeApi<{ data?: Array<{ status: string }> }>('GET', `subscriptions?customer=${encodeURIComponent(customer)}&status=all&limit=20`);
-        if ((subsAtStripe.data ?? []).some((s) => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(s.status))) {
+        if ((subsAtStripe.data ?? []).some((s) => !STRIPE_TERMINAL.has(s.status))) {
           return res.status(409).json({ code: 'already_pro', provider: 'stripe', error: 'You already have Bobby Pro. Manage it from your account.' });
         }
-        const open = await stripeApi<{ data?: Array<{ url?: string }> }>('GET', `checkout/sessions?customer=${encodeURIComponent(customer)}&status=open&limit=1`);
-        if (open.data?.[0]?.url) return res.status(200).json({ url: open.data[0].url });
+        const open = await stripeApi<{ data?: Array<{ id?: string; url?: string }> }>('GET', `checkout/sessions?customer=${encodeURIComponent(customer)}&status=open&limit=1`);
+        openSession = open.data?.[0];
       } catch (error) {
         console.error('[bobby-access] checkout preflight', error instanceof Error ? error.message : error);
         return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
       }
-      const origin = siteOrigin(req);
+      let claim: Awaited<ReturnType<typeof claimCheckout>>;
+      try { claim = await claimCheckout(identity.id, customer, String(process.env.STRIPE_PRICE_ID), siteOrigin(req)); }
+      catch (error) {
+        console.error('[bobby-access] checkout reservation', error instanceof Error ? error.message : error);
+        return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
+      }
+      if (claim.state === 'blocked') return res.status(409).json({ code: 'already_pro', error: 'You already have Bobby Pro.' });
+      if (claim.state === 'deleting') return res.status(409).json({ code: 'account_deleting', error: 'Account deletion is in progress.' });
+      if (claim.state === 'pending') { res.setHeader('Retry-After', '2'); return res.status(503).json({ error: 'Checkout is being prepared. Try again in a moment.' }); }
+      if (claim.state === 'ready') {
+        const session = await stripeApi<{ status?: string; url?: string }>('GET', `checkout/sessions/${encodeURIComponent(claim.sessionId)}`);
+        if (session.status !== 'open' || session.url !== claim.url) {
+          // Stripe may cache a failed idempotent response or a session may expire
+          // before our reservation. Wait for its safe rotation, never reuse a dead URL.
+          res.setHeader('Retry-After', String(Math.max(2, claim.expiresAt + 60 - Math.floor(Date.now() / 1000))));
+          return res.status(503).json({ error: 'Checkout is no longer available. Try again later.' });
+        }
+        return res.status(200).json({ url: claim.url });
+      }
+      if (openSession?.id && openSession.url) {
+        try { await completeCheckout(identity.id, claim.attemptId, openSession.url, openSession.id); }
+        catch (error) { await expireCheckoutSession(openSession.id); throw error; }
+        return res.status(200).json({ url: openSession.url });
+      }
       const form: Record<string, string> = {
         mode: 'subscription',
-        customer,
-        expires_at: String(Math.floor(Date.now() / 1000) + 30 * 60),
-        'line_items[0][price]': String(process.env.STRIPE_PRICE_ID),
+        customer: claim.customer,
+        expires_at: String(claim.expiresAt),
+        'line_items[0][price]': claim.price,
         'line_items[0][quantity]': '1',
-        success_url: `${origin}/desk?pro=welcome`,
-        cancel_url: `${origin}/desk?pro=cancelled`,
+        success_url: `${claim.origin}/desk?pro=welcome`,
+        cancel_url: `${claim.origin}/desk?pro=cancelled`,
         client_reference_id: identity.id,
         'metadata[identity_id]': identity.id,
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
-      const session = await stripe('checkout/sessions', form);
+      const session = await stripeApi<{ id?: string; url?: string }>('POST', 'checkout/sessions', form, `bobby-checkout-${claim.attemptId}`);
+      if (typeof session.id !== 'string' || typeof session.url !== 'string') throw new Error('Stripe checkout has no id or URL');
+      try { await completeCheckout(identity.id, claim.attemptId, session.url, session.id); }
+      catch (error) {
+        // Account deletion may have removed the reservation while Stripe was creating the session.
+        // Do not leave a payable orphan Checkout behind.
+        await expireCheckoutSession(session.id);
+        throw error;
+      }
       return res.status(200).json({ url: session.url });
     }
 

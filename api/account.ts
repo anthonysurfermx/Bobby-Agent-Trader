@@ -35,7 +35,8 @@ import { requestOriginHost } from './_lib/origins.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity } from './_lib/user-identity.js';
 import { getSubscription } from './_lib/access.js';
-import { cancelAllFor } from './_lib/stripe-api.js';
+import { cancelAllFor, expireCheckoutSession } from './_lib/stripe-api.js';
+import { blockCheckoutForDeletion } from './_lib/checkout-attempt.js';
 import { notifyOwner } from './_lib/provider-alert.js';
 import { AppleRevocationError, appleRevocationReady, revokeAppleAuthorization, APPLE_MANUAL_REVOCATION_URL } from './_lib/apple-revocation.js';
 
@@ -76,10 +77,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // revocation, which cannot be undone. If a cancellation cannot be confirmed, nothing changes and the user retries.
   if (req.method !== 'GET') {
     try {
+      const checkout = await blockCheckoutForDeletion(identity.id);
       const sub = await getSubscription(identity.id);
       const hasStripe = Boolean(sub?.stripe_subscription_id || sub?.stripe_customer_id);
-      if (hasStripe || (process.env.STRIPE_SECRET_KEY || '').trim()) {
-        await cancelAllFor(identity.id, sub?.stripe_customer_id, sub?.stripe_subscription_id);
+      if (hasStripe || checkout.customer || (process.env.STRIPE_SECRET_KEY || '').trim()) {
+        await cancelAllFor(identity.id, sub?.stripe_customer_id, sub?.stripe_subscription_id, checkout.customer);
+        if (checkout.sessionId) await expireCheckoutSession(checkout.sessionId);
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);

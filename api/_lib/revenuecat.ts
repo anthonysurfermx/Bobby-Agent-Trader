@@ -61,6 +61,22 @@ export async function identityForAuthUser(authUserId: string): Promise<string | 
   return rows[0]?.id ?? null;
 }
 
+/** Update only Apple's mirror: never replay a stale Stripe status over its webhook. */
+async function storeAppleMirror(identityId: string, stripeSubscriptionId: string, row: {
+  status: string; expires: string | null; product: string | null; environment: 'sandbox' | 'production' | null; periodType: string | null;
+}): Promise<void> {
+  const path = `bobby_subscriptions?identity_id=eq.${encodeURIComponent(identityId)}&stripe_subscription_id=eq.${encodeURIComponent(stripeSubscriptionId)}&select=identity_id`;
+  const r = await fetch(bobbyRest(path), {
+    method: 'PATCH', headers: bobbyServiceHeaders({ Prefer: 'return=representation' }),
+    body: JSON.stringify({ apple_status: row.status, apple_current_period_end: row.expires,
+      apple_product_id: row.product, apple_environment: row.environment, apple_period_type: row.periodType,
+      updated_at: new Date().toISOString() }), signal: AbortSignal.timeout(4000),
+  });
+  if (!r.ok) throw new Error(`apple mirror ${r.status}`);
+  const rows = (await r.json()) as Array<{ identity_id: string }>;
+  if (rows.length !== 1) throw new Error('apple mirror owner changed');
+}
+
 /** Mirror the subscriber's `pro` entitlement into bobby_subscriptions; returns whether it is active. */
 export async function syncRevenueCat(authUserId: string, identityId: string): Promise<boolean> {
   if (!revenueCatReady()) throw new Error('RevenueCat is not configured');
@@ -93,12 +109,17 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   const sandbox = sub?.is_sandbox === true;
   const eligible = Boolean(ent && sub);
   const active = eligible && (expires === null || Date.parse(expires) > Date.now());
-  // A row that carries a Stripe subscription still able to charge belongs to the Stripe webhook: never rewrite it
-  // (relabelling it 'apple' would hide the card plan from account deletion, checkout and the portal). Pro is then
-  // whichever of the two is live. A row this sync owns has no Stripe subscription id.
-  if (current?.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(current.status)) {
+  const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
+  if (current?.stripe_subscription_id) {
+    // A Stripe-owned row keeps its card references even after cancellation. Apple's
+    // independent state is persisted for bobby_is_pro and cleared on refunds/expiry.
+    const refunded = Object.values(subscriber?.subscriptions ?? {}).some((s) => PRO_STORES.has(String(s?.store)) && s?.refunded_at);
+    await storeAppleMirror(identityId, current.stripe_subscription_id, {
+      status: active ? periodType === 'trial' ? 'trialing' : 'active' : refunded ? 'refunded' : 'expired',
+      expires, product, environment: eligible ? sandbox ? 'sandbox' : 'production' : null, periodType,
+    });
     const cardLive = ['active', 'trialing'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
-    return Boolean(cardLive || (ent && sub && (expires === null || Date.parse(expires) > Date.now())));
+    return Boolean(cardLive || active);
   }
   const ownedRow = Boolean(current && !current.stripe_subscription_id);
   if (!eligible) {
@@ -109,8 +130,6 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
     }
     return Boolean(current && !ownedRow && ['active', 'trialing'].includes(current.status));
   }
-  if (current?.provider === 'stripe' && current.stripe_subscription_id && ['active', 'trialing'].includes(current.status) && !active) return true;
-  const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
   await upsertSubscription({
     identity_id: identityId, provider: 'apple', status: sub?.refunded_at ? 'refunded' : !active ? 'expired' : periodType === 'trial' ? 'trialing' : 'active',
     product_id: product, current_period_end: expires, environment: sandbox ? 'sandbox' : 'production', period_type: periodType,

@@ -16,7 +16,7 @@ export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMete
 export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; friends: Array<{ joinedAt: string }> }
 export interface AccessState {
   access: Access; signedIn: boolean;
-  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null;
+  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null; cardPlan?: boolean; appleActive?: boolean } | null;
   payments: { stripe: boolean; apple: boolean };
   levels?: LevelState | null; referral?: Referral | null;
   /** [uses, window days] per plan and premium level, and the invite terms (api/_lib/desk-levels.ts). */

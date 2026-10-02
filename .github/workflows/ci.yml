@@ -121,6 +121,7 @@ jobs:
       - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/test-trader-land-growth.sql
       - run: npm run test:progress-atomic-pg
       - run: npm run test:levels-referrals-pg
+      - run: npm run test:payments-guards-pg
       - run: npm run test:coupons-pg
       - run: npm run test:admin-pg
       - run: npm run test:lifecycle-pg

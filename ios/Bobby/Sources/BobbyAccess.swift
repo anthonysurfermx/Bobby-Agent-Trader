@@ -106,24 +106,27 @@ struct BobbySubscription: Equatable, Sendable {
     let provider: String?
     let status: String?
     let currentPeriodEnd: String?
+    let appleActive: Bool
 
     init?(json: Any?) {
         guard let o = json as? [String: Any] else { return nil }
         provider = o["provider"] as? String
         status = o["status"] as? String
         currentPeriodEnd = o["currentPeriodEnd"] as? String
+        appleActive = o["appleActive"] as? Bool ?? (provider == "apple" && ["active", "trialing"].contains(status ?? ""))
     }
 
     init(provider: String?, status: String?, currentPeriodEnd: String?) {
         self.provider = provider; self.status = status; self.currentPeriodEnd = currentPeriodEnd
+        self.appleActive = provider == "apple" && ["active", "trialing"].contains(status ?? "")
     }
 
     var periodEnd: Date? { currentPeriodEnd.flatMap(BobbyAccessAPI.date) }
     /// Only an App Store subscription can be managed from the phone.
-    var managedByApple: Bool { provider == nil || provider == "apple" }
+    var managedByApple: Bool { provider == nil || provider == "apple" || appleActive }
     /// A live App Store subscription: Apple keeps billing it until it is cancelled in Settings,
     /// whatever happens to the Bobby account (the account deletion warning).
-    var activeOnApple: Bool { provider == "apple" && ["active", "trialing"].contains(status ?? "") }
+    var activeOnApple: Bool { appleActive }
 }
 
 /// Where a metered request gets its bearer. Fixture mode and tests use `.none` (signed out).

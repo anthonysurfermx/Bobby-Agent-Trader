@@ -3,13 +3,13 @@
 // or ends; bobby_subscriptions follows. The signature (Stripe-Signature, HMAC-SHA256 over the raw
 // body with STRIPE_WEBHOOK_SECRET, 5-minute tolerance) is checked before anything is read.
 // Events: checkout.session.completed, customer.subscription.created|updated|deleted; invoice.paid and
-// charge.refunded become revenue rows (bobby_purchase_events) for the owner dashboard.
+// charge.refunded and refund.created|updated become revenue rows (bobby_purchase_events) for the owner dashboard.
 // The identity rides in metadata.identity_id (set by /api/bobby-access checkout).
 // ============================================================
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import { getSubscription, upsertSubscription } from './_lib/access.js';
 import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
-import { recordPurchaseEvent } from './_lib/purchases.js';
+import { linkPurchaseIdentityIfMissing, recordPurchaseEvent } from './_lib/purchases.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 20 };
@@ -56,7 +56,11 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   if (current && !incomingLive) {
     const currentLive = ['active', 'trialing', 'past_due'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
     const otherPlan = current.provider === 'apple' || (current.stripe_subscription_id && current.stripe_subscription_id !== sub.id);
-    if (currentLive && otherPlan) { console.error('[stripe-webhook] stale state for another plan ignored', sub.id); return; }
+    // A nonterminal card plan must still be visible for portal/deletion and to
+    // block another Apple purchase, even while an existing Apple plan is live.
+    if (currentLive && otherPlan && (STRIPE_TERMINAL.has(status) || current.provider === 'stripe')) {
+      console.error('[stripe-webhook] stale state for another plan ignored', sub.id); return;
+    }
   }
   const price = ((sub.items as { data?: Array<{ price?: { id?: string } }> } | undefined)?.data ?? [])[0]?.price?.id ?? null;
   try {
@@ -85,7 +89,56 @@ async function identityForSubscription(subscriptionId: unknown): Promise<string 
   if (typeof subscriptionId !== 'string' || !subscriptionId) return null;
   const r = await fetch(bobbyRest(`bobby_subscriptions?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=identity_id`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`subscriptions ${r.status}`);
-  return ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id ?? null;
+  const stored = ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id;
+  if (stored) return stored;
+  const sub = await stripeApi<{ metadata?: { identity_id?: string } }>('GET', `subscriptions/${encodeURIComponent(subscriptionId)}`);
+  return existingIdentity(sub.metadata?.identity_id);
+}
+
+async function existingIdentity(id: unknown): Promise<string | null> {
+  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null;
+  const r = await fetch(bobbyRest(`bobby_identities?id=eq.${encodeURIComponent(id)}&select=id&limit=1`),
+    { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
+  if (!r.ok) throw new Error(`identity ${r.status}`);
+  return ((await r.json()) as Array<{ id: string }>)[0]?.id ?? null;
+}
+
+async function identityForCustomer(customerId: unknown): Promise<string | null> {
+  if (typeof customerId !== 'string' || !/^cus_[A-Za-z0-9]+$/.test(customerId)) return null;
+  const r = await fetch(bobbyRest(`bobby_subscriptions?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=identity_id&limit=1`),
+    { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
+  if (!r.ok) throw new Error(`subscriptions ${r.status}`);
+  const stored = ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id;
+  if (stored) return stored;
+  const customer = await stripeApi<{ metadata?: { identity_id?: string } }>('GET', `customers/${encodeURIComponent(customerId)}`);
+  return existingIdentity(customer.metadata?.identity_id);
+}
+
+async function recordStripeRefunds(charge: Record<string, unknown>): Promise<void> {
+  const chargeId = charge.id;
+  if (typeof chargeId !== 'string' || !/^ch_[A-Za-z0-9]+$/.test(chargeId)) throw new Error('refund without charge');
+  const identityId = await identityForCustomer(charge.customer);
+  const country = (charge.billing_details as { address?: { country?: string } } | null | undefined)?.address?.country ?? null;
+  let after: string | null = null;
+  for (let page = 0; page < 100; page++) {
+    const path = `refunds?charge=${encodeURIComponent(chargeId)}&limit=100${after ? `&starting_after=${encodeURIComponent(after)}` : ''}`;
+    const list = await stripeApi<{ data?: Array<{ id: string; status?: string; amount?: number; currency?: string; created?: number; charge?: string }>; has_more?: boolean }>('GET', path);
+    const refunds = list.data ?? [];
+    for (const refund of refunds) {
+      if (refund.status !== 'succeeded' || !/^re_[A-Za-z0-9]+$/.test(refund.id) || refund.charge !== chargeId || !Number.isSafeInteger(refund.amount) || (refund.amount ?? 0) <= 0) continue;
+      const currency = String(refund.currency ?? charge.currency ?? '').toLowerCase();
+      await recordPurchaseEvent({
+        id: `stripe-refund-${refund.id}`, type: 'REFUND', environment: charge.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE',
+        priceUsd: currency === 'usd' ? -refund.amount! / 100 : null, takehome: 1,
+        currency: currency.toUpperCase() || null, priceLocal: -refund.amount! / 100,
+        identityId, at: typeof refund.created === 'number' ? refund.created * 1000 : null, country,
+      });
+    }
+    if (!list.has_more) return;
+    if (!refunds.length) throw new Error('Stripe refund pagination stalled');
+    after = refunds[refunds.length - 1].id;
+  }
+  throw new Error('Stripe refund pagination limit');
 }
 
 /** Stripe's standard card fee (2.9% + $0.30) as the store share of a USD charge. */
@@ -108,22 +161,25 @@ export async function POST(request: Request): Promise<Response> {
       // so a late or retried event cannot revive a cancelled plan or drop a paid one (audit 2026-10-02, STRIPE-01).
       const live = typeof obj.id === 'string' ? await stripeGet(`subscriptions/${obj.id}`) : obj;
       await saveSubscription(live);
-    } else if (event.type === 'invoice.paid' && typeof event.id === 'string' && Number(obj.amount_paid) > 0) {
+    } else if (event.type === 'invoice.paid' && typeof obj.id === 'string' && /^in_[A-Za-z0-9]+$/.test(obj.id) && Number(obj.amount_paid) > 0) {
+      // Two Stripe Event objects may refer to the same invoice. Key the ledger
+      // to the invoice, then repair a missing identity on a later replay.
+      const purchaseId = `stripe-invoice-${obj.id}`;
       const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? Number(obj.amount_paid) / 100 : null;
       const subscription = obj.subscription ?? (obj.parent as { subscription_details?: { subscription?: string } } | undefined)?.subscription_details?.subscription;
+      const identityId = await identityForSubscription(subscription);
       await recordPurchaseEvent({
-        id: event.id, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
+        id: purchaseId, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
         store: 'STRIPE', priceUsd: usd, takehome: usd !== null ? stripeTakehome(usd) : null, currency: String(obj.currency ?? '').toUpperCase() || null,
-        priceLocal: Number(obj.amount_paid) / 100, identityId: await identityForSubscription(subscription), at: Number(obj.created) * 1000 || null,
+        priceLocal: Number(obj.amount_paid) / 100, identityId, at: Number(obj.created) * 1000 || null,
         country: (obj.customer_address as { country?: string } | null | undefined)?.country ?? null,
       });
-    } else if (event.type === 'charge.refunded' && typeof event.id === 'string' && Number(obj.amount_refunded) > 0) {
-      const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? -Number(obj.amount_refunded) / 100 : null;
-      await recordPurchaseEvent({
-        id: event.id, type: 'REFUND', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE', priceUsd: usd,
-        takehome: 1, currency: String(obj.currency ?? '').toUpperCase() || null, priceLocal: -Number(obj.amount_refunded) / 100, at: Date.now(),
-        country: (obj.billing_details as { address?: { country?: string } } | null | undefined)?.address?.country ?? null,
-      });
+      await linkPurchaseIdentityIfMissing(purchaseId, identityId);
+    } else if (event.type === 'charge.refunded' && typeof obj.id === 'string') {
+      await recordStripeRefunds(obj);
+    } else if ((event.type === 'refund.created' || event.type === 'refund.updated') && typeof obj.charge === 'string') {
+      const charge = await stripeGet(`charges/${encodeURIComponent(obj.charge)}`);
+      await recordStripeRefunds(charge);
     }
   } catch (e) {
     console.error('[stripe-webhook]', event.type, e instanceof Error ? e.message : e);
