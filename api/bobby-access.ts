@@ -30,6 +30,7 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
 import { customerFor, expireCheckoutSession, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
 import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
+import { recordCheckoutOpened } from './_lib/funnel.js';
 
 export const config = { maxDuration: 20 };
 
@@ -39,6 +40,12 @@ const APPLE_PRODUCT_IDS = new Set(['xyz.bobbyprotocol.bobby.pro.monthly']);
 const APPLE_ROOT_G3_SHA256 = '63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179';
 
 const stripeReady = () => Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+
+function observeCheckout(req: VercelRequest, identity: Parameters<typeof recordCheckoutOpened>[1], sessionId: string): void {
+  // Funnel storage must never turn a valid Stripe Checkout into a failed sale.
+  try { waitUntil(recordCheckoutOpened(req, identity, sessionId)); }
+  catch { console.error('[bobby-access] checkout telemetry unavailable'); }
+}
 
 function siteOrigin(req: VercelRequest): string {
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '');
@@ -193,11 +200,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           res.setHeader('Retry-After', String(Math.max(2, claim.expiresAt + 60 - Math.floor(Date.now() / 1000))));
           return res.status(503).json({ error: 'Checkout is no longer available. Try again later.' });
         }
+        observeCheckout(req, identity, claim.sessionId);
         return res.status(200).json({ url: claim.url });
       }
       if (openSession?.id && openSession.url) {
         try { await completeCheckout(identity.id, claim.attemptId, openSession.url, openSession.id); }
         catch (error) { await expireCheckoutSession(openSession.id); throw error; }
+        observeCheckout(req, identity, openSession.id);
         return res.status(200).json({ url: openSession.url });
       }
       const form: Record<string, string> = {
@@ -222,6 +231,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         await expireCheckoutSession(session.id);
         throw error;
       }
+      observeCheckout(req, identity, session.id);
       return res.status(200).json({ url: session.url });
     }
 

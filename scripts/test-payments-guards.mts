@@ -34,6 +34,7 @@ let sessionStatus = 'open';
 const attempts = new Map<string, { id: string; customer: string; price: string; origin: string; expiresAt: number; retryAt: number; url: string | null; sessionId: string | null }>();
 const blockedForDeletion = new Set<string>();
 const purchases = new Map<string, Record<string, unknown>>();
+const checkoutEvents = new Map<string, Record<string, unknown>>();
 let refunds: Array<Record<string, unknown>> = [];
 let charge: Record<string, unknown> = {};
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
@@ -100,6 +101,11 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const a = attempts.get(b.p_identity);
     return Response.json({ customer: a?.customer ?? null, sessionId: a?.sessionId ?? null });
   }
+  if (u.pathname === '/rest/v1/rpc/bobby_record_checkout_opened') {
+    const b = JSON.parse(String(init?.body));
+    if (!checkoutEvents.has(b.p_session)) checkoutEvents.set(b.p_session, b);
+    return new Response(null, { status: 204 });
+  }
   if (u.pathname === '/rest/v1/bobby_subscriptions') {
     if (init?.method === 'POST') {
       if (upsertStatus !== 204) return new Response(upsertStatus === 409 ? '{"code":"23503","message":"fk"}' : '{"code":"23505"}', { status: upsertStatus });
@@ -126,7 +132,7 @@ const { syncRevenueCat } = await import('../api/_lib/revenuecat.ts');
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const later = new Date(Date.now() + 60 * 86_400_000).toISOString();
 const ent = (product = 'p') => ({ pro: { expires_date: future, product_identifier: product } });
-const reset = () => { subs.clear(); writes = []; stripeCalls = []; stripeQueries = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; sessionForms = []; sessionKeys = []; sessionGate = null; failSessionOnce = false; failComplete = false; sessionStatus = 'open'; attempts.clear(); blockedForDeletion.clear(); purchases.clear(); refunds = []; charge = {}; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
+const reset = () => { subs.clear(); writes = []; stripeCalls = []; stripeQueries = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; sessionForms = []; sessionKeys = []; sessionGate = null; failSessionOnce = false; failComplete = false; sessionStatus = 'open'; attempts.clear(); blockedForDeletion.clear(); purchases.clear(); checkoutEvents.clear(); refunds = []; charge = {}; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
 const UID = '00000000-0000-4000-8000-000000000001';
 
 // ---------------- RC-01 ----------------
@@ -237,7 +243,7 @@ type Res = { statusCode: number; body: any; status(c: number): Res; json(b: unkn
 let ip = 0;
 const call = async () => {
   const res: Res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, setHeader() {} };
-  await access({ method: 'POST', body: { action: 'checkout' }, query: {}, headers: { authorization: 'Bearer user-token', 'x-forwarded-for': `10.9.0.${++ip}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
+  await access({ method: 'POST', body: { action: 'checkout' }, query: {}, headers: { authorization: 'Bearer user-token', 'x-bobby-device': '123e4567-e89b-12d3-a456-426614174000', 'x-forwarded-for': `10.9.0.${++ip}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
   return res;
 };
 const accessGet = async () => {
@@ -267,6 +273,9 @@ reset();
 openSessions = [{ id: 'cs_test_open', url: 'https://checkout.stripe.com/open' }];
 r = await call();
 eq([r.statusCode, r.body?.url, stripeCalls.includes('POST /v1/checkout/sessions')], [200, 'https://checkout.stripe.com/open', false], 'an open checkout is reused, never a second one');
+await new Promise((resolve) => setTimeout(resolve, 0));
+eq([checkoutEvents.get('cs_test_open')?.p_identity, typeof checkoutEvents.get('cs_test_open')?.p_device], ['id-buyer', 'string'],
+  'reused Checkout is observed with canonical account and salted install');
 reset();
 stripeDown = true;
 r = await call();
@@ -288,12 +297,17 @@ eq([second.statusCode, stripeCalls.filter((c) => c === 'POST /v1/checkout/sessio
 releaseSession();
 r = await first;
 eq([r.statusCode, r.body?.url, sessionKeys[0]?.startsWith('bobby-checkout-')], [200, 'https://checkout.stripe.com/s', true], 'first checkout completes with an idempotency key');
+await new Promise((resolve) => setTimeout(resolve, 0));
+eq(checkoutEvents.has('cs_test_session'), true, 'new valid Checkout is observed');
 const third = await call();
 eq([third.statusCode, third.body?.url, sessionKeys.length], [200, 'https://checkout.stripe.com/s', 1], 'subsequent checkout reuses persisted URL');
+await new Promise((resolve) => setTimeout(resolve, 0));
+eq(checkoutEvents.size, 1, 'reopened session is deduplicated by durable session key');
 sessionStatus = 'expired';
 const expired = await call();
 eq([expired.statusCode, expired.body?.url, stripeCalls.filter((c) => c === 'POST /v1/checkout/sessions').length], [503, undefined, 1],
   'an expired cached Checkout URL is refused without opening a second session');
+eq(checkoutEvents.size, 1, 'expired Checkout does not emit another opening');
 reset();
 failSessionOnce = true;
 r = await call();
