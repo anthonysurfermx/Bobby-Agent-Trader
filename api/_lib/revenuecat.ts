@@ -15,6 +15,12 @@ import { notifyOwner } from './provider-alert.js';
 export const PRO_ENTITLEMENT = 'pro';
 const secretKey = () => (process.env.REVENUECAT_SECRET_KEY || '').trim();
 export const revenueCatReady = () => Boolean(secretKey());
+// These are Bobby's verified API resource IDs, not the shorter dashboard project ID. Never choose
+// the first project or accept a customer/project/app supplied by a client during paid reconciliation.
+const BOBBY_RC_PROJECT = 'proj2d9c569b';
+const BOBBY_RC_APP = 'app25c54ce720';
+const BOBBY_RC_PRODUCT = 'xyz.bobbyprotocol.bobby.pro.monthly';
+const PAID_HISTORY_LIMIT = 20;
 
 const KEY_ALERT_WINDOW_SEC = 6 * 3600;
 let keyAlertAt = 0;
@@ -167,6 +173,72 @@ export function paidPeriodFromRevenueCat(identityId: string, authUserId: string,
   };
 }
 
+/** Recover a previously delivered purchase from provider history, with the same guards as a webhook.
+ * The revenue ledger alone lacks transaction/period fields and must never supply a fabricated event.
+ * Recent history is bounded to 20 events; ambiguous duplicates or missing fields fail closed. */
+export function paidPeriodFromRevenueCatHistory(identityId: string, authUserId: string,
+                                               subscriber: RcSubscriber | undefined, history: unknown,
+                                               now = new Date()): PaidPeriod | null {
+  const live = currentPaidSubscription(subscriber);
+  if (!live || live.provider !== 'apple' || live.product !== BOBBY_RC_PRODUCT) return null;
+  if (!history || typeof history !== 'object' || Array.isArray(history)) return null;
+  const list = history as { object?: unknown; items?: unknown };
+  if (list.object !== 'list' || !Array.isArray(list.items) || list.items.length > PAID_HISTORY_LIMIT) return null;
+  const matches: PaidPeriod[] = [];
+  for (const item of list.items) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
+    const row = item as { object?: unknown; id?: unknown; app_id?: unknown; type?: unknown; body?: unknown };
+    if (row.object !== 'customer.event' || row.app_id !== BOBBY_RC_APP || typeof row.id !== 'string' ||
+        row.id.length === 0 || row.id.length > 160 || !row.body || typeof row.body !== 'object' || Array.isArray(row.body)) continue;
+    const type = row.type === 'PURCHASES_INITIAL_PURCHASE' ? 'INITIAL_PURCHASE' :
+                 row.type === 'PURCHASES_RENEWAL' ? 'RENEWAL' : null;
+    if (!type) continue;
+    const body = row.body as Record<string, unknown>;
+    // A wrapper cannot repair a contradictory payload. Nullable deprecated entitlement fields are
+    // allowed, but malformed arrays must not reach the webhook adapter's string-array operations.
+    if ((body.type !== undefined && body.type !== type) ||
+        (body.id !== undefined && (typeof body.id !== 'string' || body.id.toLowerCase() !== row.id.toLowerCase())) ||
+        (body.entitlement_id != null && typeof body.entitlement_id !== 'string') ||
+        (body.entitlement_ids != null && (!Array.isArray(body.entitlement_ids) || body.entitlement_ids.some(id => typeof id !== 'string'))) ||
+        typeof body.app_user_id !== 'string' || typeof body.environment !== 'string' ||
+        typeof body.store !== 'string' || typeof body.product_id !== 'string' || typeof body.period_type !== 'string' ||
+        typeof body.is_family_share !== 'boolean' ||
+        (typeof body.transaction_id !== 'string' && typeof body.transaction_id !== 'number') ||
+        typeof body.purchased_at_ms !== 'number' || typeof body.expiration_at_ms !== 'number' ||
+        typeof body.price_in_purchased_currency !== 'number' || typeof body.currency !== 'string') continue;
+    const event: RevenueCatPaidEvent = {
+      id: row.id, type, app_user_id: body.app_user_id, environment: body.environment,
+      store: body.store, product_id: body.product_id, period_type: body.period_type,
+      is_family_share: body.is_family_share, transaction_id: body.transaction_id,
+      purchased_at_ms: body.purchased_at_ms, expiration_at_ms: body.expiration_at_ms,
+      price_in_purchased_currency: body.price_in_purchased_currency, currency: body.currency,
+      entitlement_id: typeof body.entitlement_id === 'string' ? body.entitlement_id : undefined,
+      entitlement_ids: Array.isArray(body.entitlement_ids) ? body.entitlement_ids as string[] : undefined,
+    };
+    const proof = paidPeriodFromRevenueCat(identityId, authUserId, subscriber, event, now);
+    if (proof) matches.push(proof);
+  }
+  return matches.length === 1 ? matches[0] : null;
+}
+
+async function paidPeriodFromHistory(identityId: string, authUserId: string,
+                                     subscriber: RcSubscriber | undefined): Promise<PaidPeriod | null> {
+  const key = process.env.REVENUECAT_V2_SECRET_KEY?.trim();
+  const live = currentPaidSubscription(subscriber);
+  if (!key || !/^[0-9a-f-]{36}$/i.test(authUserId) || !live || live.provider !== 'apple' || live.product !== BOBBY_RC_PRODUCT) return null;
+  try {
+    const response = await fetch(`https://api.revenuecat.com/v2/projects/${BOBBY_RC_PROJECT}/customers/${encodeURIComponent(authUserId)}/events?environment=production&limit=${PAID_HISTORY_LIMIT}`, {
+      headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      redirect: 'error',
+      signal: AbortSignal.timeout(2500),
+    });
+    // No arbitrary pagination or redirected URL is followed. Optional proof recovery never denies
+    // basic Pro when V2 is unavailable or its existing key lacks customer read permission.
+    if (!response.ok) return null;
+    return paidPeriodFromRevenueCatHistory(identityId, authUserId, subscriber, await response.json());
+  } catch { return null; }
+}
+
 function existingProofMatches(row: PaidPeriod, subscriber: RcSubscriber | undefined): boolean {
   const live = currentPaidSubscription(subscriber);
   return !!live && row.provider === live.provider && row.product_id === live.product &&
@@ -181,7 +253,9 @@ async function reconcilePaidPeriod(identityId: string, authUserId: string, subsc
   const read = await fetch(`${url}&select=*`, { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!read.ok) throw new Error(`paid period read ${read.status}`);
   const existing = ((await read.json()) as PaidPeriod[])[0];
-  const fresh = paidPeriodFromRevenueCat(identityId, authUserId, subscriber, event);
+  const fresh = paidPeriodFromRevenueCat(identityId, authUserId, subscriber, event) ??
+    (!event && (!existing || !existingProofMatches(existing, subscriber))
+      ? await paidPeriodFromHistory(identityId, authUserId, subscriber) : null);
   if (fresh) {
     const write = await fetch(bobbyRest('bobby_brief_paid_periods?on_conflict=identity_id'), {
       method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
