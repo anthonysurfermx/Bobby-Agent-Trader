@@ -27,7 +27,8 @@ export async function stripeApi<T = Record<string, unknown>>(method: 'GET' | 'PO
   return json;
 }
 
-const q = (s: string) => s.replace(/'/g, "\\'");
+// Stripe Search uses backslashes to escape characters inside quoted values.
+const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
 /** The identity's Stripe customer: the stored one, else one found by metadata, else a new one (idempotent per identity). */
 export async function customerFor(identityId: string, stored: string | null | undefined, email?: string | null): Promise<string> {

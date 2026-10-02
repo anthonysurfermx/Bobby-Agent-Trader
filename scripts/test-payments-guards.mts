@@ -17,6 +17,7 @@ const subs = new Map<string, Record<string, unknown>>();
 let subscriber: Record<string, unknown> = {};
 let writes: Array<Record<string, unknown>> = [];
 let stripeCalls: string[] = [];
+let stripeQueries: string[] = [];
 let stripeSubscription: Record<string, unknown> = {};
 let subscriptionReadFails = false;
 let upsertStatus = 204;
@@ -30,6 +31,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (u.hostname === 'api.stripe.com') {
     const m = init?.method ?? 'GET';
     stripeCalls.push(`${m} ${u.pathname}`);
+    if (u.pathname === '/v1/customers/search' || u.pathname === '/v1/subscriptions/search') stripeQueries.push(u.searchParams.get('query') ?? '');
     if (stripeDown) return Response.json({ error: { message: 'down' } }, { status: 500 });
     if (u.pathname === '/v1/customers/search') return Response.json({ data: [] });
     if (u.pathname === '/v1/customers' && m === 'POST') return Response.json({ id: 'cus_new' });
@@ -58,7 +60,7 @@ const { syncRevenueCat } = await import('../api/_lib/revenuecat.ts');
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const later = new Date(Date.now() + 60 * 86_400_000).toISOString();
 const ent = (product = 'p') => ({ pro: { expires_date: future, product_identifier: product } });
-const reset = () => { subs.clear(); writes = []; stripeCalls = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
+const reset = () => { subs.clear(); writes = []; stripeCalls = []; stripeQueries = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
 const UID = '00000000-0000-4000-8000-000000000001';
 
 // ---------------- RC-01 ----------------
@@ -147,6 +149,12 @@ delete process.env.BOBBY_SANDBOX_PRO_UIDS;
 
 // ---------------- STRIPE-04 ----------------
 process.env.STRIPE_SECRET_KEY = 'sk_test_x'; process.env.STRIPE_PRICE_ID = 'price_x';
+const { customerFor, subscriptionsFor } = await import('../api/_lib/stripe-api.ts');
+reset();
+const quotedIdentity = String.raw`id\'quoted`;
+await customerFor(quotedIdentity, null);
+await subscriptionsFor(quotedIdentity, null, null);
+eq(stripeQueries, [String.raw`metadata['identity_id']:'id\\\'quoted'`, String.raw`metadata['identity_id']:'id\\\'quoted'`], 'Stripe customer and subscription searches escape backslashes before quotes');
 const { default: access } = await import('../api/bobby-access.ts');
 type Res = { statusCode: number; body: any; status(c: number): Res; json(b: unknown): Res; setHeader(): void };
 let ip = 0;
