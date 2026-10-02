@@ -1,0 +1,1534 @@
+{
+  "project": "qbvdqkknnuweatptjohi",
+  "checkedAt": "2026-10-02 23:08:42.807174+00",
+  "aggregate": {
+    "checked_at": "2026-10-02 23:08:23.884782+00",
+    "metrics": {
+      "llm": [
+        {
+          "ok": true,
+          "count": 1,
+          "last_at": "2026-10-01T23:18:15.342687+00:00",
+          "sum_usd": 0.021764,
+          "surface": "admin",
+          "count24h": 1,
+          "provider": "anthropic"
+        },
+        {
+          "ok": true,
+          "count": 4,
+          "last_at": "2026-10-02T12:01:18.097246+00:00",
+          "sum_usd": 0.007039,
+          "surface": "bobby-cycle",
+          "count24h": 4,
+          "provider": "openai"
+        },
+        {
+          "ok": true,
+          "count": 62,
+          "last_at": "2026-10-02T20:02:16.795984+00:00",
+          "sum_usd": 0.506764,
+          "surface": "desk",
+          "count24h": 42,
+          "provider": "anthropic"
+        },
+        {
+          "ok": false,
+          "count": 10,
+          "last_at": "2026-10-01T10:27:28.101018+00:00",
+          "sum_usd": 0,
+          "surface": "desk",
+          "count24h": 0,
+          "provider": "openai"
+        },
+        {
+          "ok": true,
+          "count": 23,
+          "last_at": "2026-09-30T14:13:18.916922+00:00",
+          "sum_usd": 0.008153,
+          "surface": "desk",
+          "count24h": 0,
+          "provider": "openai"
+        }
+      ],
+      "reads": [
+        {
+          "count": 22,
+          "last_at": "2026-10-02T20:02:02.681214+00:00",
+          "count24h": 13,
+          "first_at": "2026-09-29T12:40:11.8038+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 19,
+          "last_at": "2026-10-01T23:15:37.300733+00:00",
+          "count24h": 1,
+          "first_at": "2026-09-27T00:13:07.899947+00:00",
+          "platform": "web"
+        }
+      ],
+      "events": [
+        {
+          "count": 13,
+          "event": "read_done",
+          "count5m": 0,
+          "last_at": "2026-10-02T20:02:16.784879+00:00",
+          "count24h": 13,
+          "first_at": "2026-10-02T05:50:50.02404+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 4,
+          "event": "wall_level",
+          "count5m": 0,
+          "last_at": "2026-10-02T06:53:15.855428+00:00",
+          "count24h": 4,
+          "first_at": "2026-10-02T06:48:22.314489+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 1,
+          "event": "wall_signin",
+          "count5m": 0,
+          "last_at": "2026-10-02T06:48:10.350236+00:00",
+          "count24h": 1,
+          "first_at": "2026-10-02T06:48:10.350236+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 7,
+          "event": "appstore_click",
+          "count5m": 0,
+          "last_at": "2026-10-02T22:50:55.411817+00:00",
+          "count24h": 7,
+          "first_at": "2026-10-01T23:33:31.457564+00:00",
+          "platform": "web"
+        },
+        {
+          "count": 1,
+          "event": "read_done",
+          "count5m": 0,
+          "last_at": "2026-10-01T23:15:50.614817+00:00",
+          "count24h": 1,
+          "first_at": "2026-10-01T23:15:50.614817+00:00",
+          "platform": "web"
+        },
+        {
+          "count": 8,
+          "event": "signin_start",
+          "count5m": 1,
+          "last_at": "2026-10-02T23:06:57.244721+00:00",
+          "count24h": 5,
+          "first_at": "2026-10-01T16:42:34.469919+00:00",
+          "platform": "web"
+        },
+        {
+          "count": 61,
+          "event": "visit",
+          "count5m": 2,
+          "last_at": "2026-10-02T23:07:00.893476+00:00",
+          "count24h": 49,
+          "first_at": "2026-10-01T16:37:36.459368+00:00",
+          "platform": "web"
+        }
+      ],
+      "devices": [
+        {
+          "count": 4,
+          "source": "backfill",
+          "last_at": "2026-10-02T22:31:20.920431+00:00",
+          "first_at": "2026-09-29T12:40:11.8038+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 8,
+          "source": "observed",
+          "last_at": "2026-10-02T21:57:08.953945+00:00",
+          "first_at": "2026-10-02T05:50:31.808217+00:00",
+          "platform": "ios"
+        },
+        {
+          "count": 8,
+          "source": "backfill",
+          "last_at": "2026-10-02T23:07:00.893476+00:00",
+          "first_at": "2026-09-27T00:13:07.899947+00:00",
+          "platform": "web"
+        },
+        {
+          "count": 17,
+          "source": "observed",
+          "last_at": "2026-10-02T22:50:55.411817+00:00",
+          "first_at": "2026-10-01T16:42:34.350636+00:00",
+          "platform": "web"
+        }
+      ],
+      "coverage": {
+        "readsSince": "2026-09-27T00:13:07.899947+00:00",
+        "eventsSince": "2026-10-01T16:37:36.459368+00:00",
+        "ledgerSince": "2026-09-29T12:03:27.495983+00:00",
+        "devicesSince": "2026-09-27T00:13:07.899947+00:00",
+        "ledgerSurfaces": [
+          "admin",
+          "bobby-cycle",
+          "desk"
+        ],
+        "purchasesSince": "2026-10-02T06:54:36.392+00:00",
+        "readerStatsSince": "2026-09-27T00:13:07.899947+00:00"
+      },
+      "purchases": [
+        {
+          "type": "INITIAL_PURCHASE",
+          "count": 1,
+          "store": "APP_STORE",
+          "last_at": "2026-10-02T06:54:36.392+00:00",
+          "sum_usd": 5.406,
+          "first_at": "2026-10-02T06:54:36.392+00:00",
+          "unmapped": 0,
+          "environment": "PRODUCTION"
+        }
+      ],
+      "subscriptions": [
+        {
+          "count": 1,
+          "status": "active",
+          "last_at": "2026-10-02T22:30:17.3+00:00",
+          "provider": "apple",
+          "environment": null,
+          "period_live": 1,
+          "period_type": null
+        }
+      ]
+    }
+  },
+  "rpcs": {
+    "checked_at": "2026-10-02 23:08:42.807174+00",
+    "overview": {
+      "llm": {
+        "daily": [
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0
+          },
+          {
+            "openai": 0.005041,
+            "anthropic": 0.062822
+          },
+          {
+            "openai": 0.003112,
+            "anthropic": 0
+          },
+          {
+            "openai": 0,
+            "anthropic": 0.150504
+          },
+          {
+            "openai": 0.007039,
+            "anthropic": 0.315202
+          }
+        ],
+        "guard": {
+          "day": 0.315202,
+          "month": 0.443942
+        },
+        "deskRuns": {
+          "runs": 38,
+          "byDay": [
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-29",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-09-30",
+              "runs": 1,
+              "finished": 0
+            },
+            {
+              "day": "2026-10-02",
+              "runs": 1,
+              "finished": 1
+            },
+            {
+              "day": "2026-10-01",
+              "runs": 1,
+              "finished": 1
+            }
+          ],
+          "finished": 28,
+          "lastFinishedAt": "2026-10-02T20:02:16.795984+00:00",
+          "lastUnfinishedAt": "2026-10-01T10:27:28.101018+00:00"
+        },
+        "bySurface": [
+          {
+            "usd": 0.506764,
+            "calls": 62,
+            "surface": "desk",
+            "failures": 0,
+            "provider": "anthropic"
+          },
+          {
+            "usd": 0.021764,
+            "calls": 1,
+            "surface": "admin",
+            "failures": 0,
+            "provider": "anthropic"
+          },
+          {
+            "usd": 0.008153,
+            "calls": 33,
+            "surface": "desk",
+            "failures": 10,
+            "provider": "openai"
+          },
+          {
+            "usd": 0.007039,
+            "calls": 4,
+            "surface": "bobby-cycle",
+            "failures": 0,
+            "provider": "openai"
+          }
+        ],
+        "providers": {
+          "openai": {
+            "week": 0.015192,
+            "calls": 37,
+            "month": 0.015192,
+            "today": 0.007039,
+            "lastOk": "2026-10-02T12:01:18.097246+00:00",
+            "period": 0.015192,
+            "calls24h": 4,
+            "failures": 10,
+            "lastTopup": null,
+            "balanceMark": null,
+            "creditAlert": {
+              "at": "2026-10-01T12:50:20.791Z",
+              "code": "insufficient_quota",
+              "endpoint": "tts"
+            },
+            "failures24h": 0,
+            "lastFailure": {
+              "at": "2026-10-01T10:27:28.101018+00:00",
+              "stop": "http_429",
+              "surface": "desk"
+            },
+            "estimatedLeft": null,
+            "lastCreditAlert": "2026-10-01T12:50:20.791+00:00"
+          },
+          "anthropic": {
+            "week": 0.528528,
+            "calls": 63,
+            "month": 0.528528,
+            "today": 0.315202,
+            "lastOk": "2026-10-02T20:02:16.795984+00:00",
+            "period": 0.528528,
+            "calls24h": 43,
+            "failures": 0,
+            "lastTopup": null,
+            "balanceMark": null,
+            "creditAlert": null,
+            "failures24h": 0,
+            "lastFailure": null,
+            "estimatedLeft": null,
+            "lastCreditAlert": null
+          }
+        }
+      },
+      "days": [
+        "2026-09-03",
+        "2026-09-04",
+        "2026-09-05",
+        "2026-09-06",
+        "2026-09-07",
+        "2026-09-08",
+        "2026-09-09",
+        "2026-09-10",
+        "2026-09-11",
+        "2026-09-12",
+        "2026-09-13",
+        "2026-09-14",
+        "2026-09-15",
+        "2026-09-16",
+        "2026-09-17",
+        "2026-09-18",
+        "2026-09-19",
+        "2026-09-20",
+        "2026-09-21",
+        "2026-09-22",
+        "2026-09-23",
+        "2026-09-24",
+        "2026-09-25",
+        "2026-09-26",
+        "2026-09-27",
+        "2026-09-28",
+        "2026-09-29",
+        "2026-09-30",
+        "2026-10-01",
+        "2026-10-02"
+      ],
+      "since": "2026-09-03T00:00:00+00:00",
+      "funnel": {
+        "ios": {
+          "paywallViews": 0
+        },
+        "web": {
+          "visitors": 13,
+          "deskVisitors": 0,
+          "paywallViews": 0,
+          "signinStarts": 0,
+          "appStoreClicks": 3
+        },
+        "topSurfaces": [
+          {
+            "surface": "home",
+            "visitors": 9
+          },
+          {
+            "surface": "other",
+            "visitors": 3
+          },
+          {
+            "surface": "protocol",
+            "visitors": 1
+          }
+        ],
+        "visitsDaily": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          12
+        ],
+        "topReferrers": [
+          {
+            "referrer": "direct",
+            "visitors": 13
+          }
+        ]
+      },
+      "coupons": {
+        "active": 2,
+        "giftedLeft": {
+          "reads": 2,
+          "maximo": 1,
+          "profundo": 2
+        },
+        "redemptions": 0,
+        "giftedReadsLeft": 2
+      },
+      "revenue": {
+        "daily": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "netUsd": 0,
+        "grossUsd": 0,
+        "renewals": 0,
+        "newPaying": 0,
+        "refundsUsd": 0,
+        "expirations": 0,
+        "cancellations": 0,
+        "sandboxEvents": 0,
+        "internalEvents": 1,
+        "newSubscriptions": 0
+      },
+      "accounts": {
+        "new": 8,
+        "daily": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
+          0,
+          0,
+          5
+        ],
+        "total": 8,
+        "wallets": 2,
+        "active7d": 1,
+        "internal": 3,
+        "byProvider": {
+          "apple": 8
+        }
+      },
+      "activity": {
+        "reads": 19,
+        "levels": {
+          "profundo": 1
+        },
+        "lastRead": {
+          "ios": "2026-10-02T20:02:02.681214+00:00",
+          "web": "2026-09-29T16:06:13.944615+00:00"
+        },
+        "activation": {
+          "accounts": 6,
+          "activated": 1,
+          "measuredSince": "2026-09-27T00:13:07.899947+00:00",
+          "medianMinutes": null,
+          "beforeCoverage": 2
+        },
+        "readsDaily": {
+          "ios": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2,
+            6
+          ],
+          "web": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4,
+            1,
+            6,
+            0,
+            0,
+            0
+          ],
+          "android": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        },
+        "readsInternal": 22,
+        "activeReaders7d": 14,
+        "activeReaders7dSplit": {
+          "guests": 9,
+          "accounts": 5
+        }
+      },
+      "coverage": {
+        "readsSince": "2026-09-27T00:13:07.899947+00:00",
+        "eventsSince": "2026-10-01T16:37:36.459368+00:00",
+        "ledgerSince": "2026-09-29T12:03:27.495983+00:00",
+        "devicesSince": "2026-09-27T00:13:07.899947+00:00",
+        "locatedSince": "2026-10-01T21:09:50.369926+00:00",
+        "activitySince": "2026-09-07",
+        "outcomesSince": "2026-10-01T23:15:50.614817+00:00",
+        "ledgerSurfaces": [
+          "admin",
+          "bobby-cycle",
+          "desk"
+        ],
+        "purchasesSince": "2026-10-02T06:54:36.392+00:00",
+        "readerStatsSince": "2026-09-27T00:13:07.899947+00:00"
+      },
+      "subscriptions": {
+        "paid": 0,
+        "active": 0,
+        "sandbox": 0,
+        "byStatus": {},
+        "trialing": 0,
+        "giftedPro": 0,
+        "byProvider": {},
+        "unverified": 0
+      },
+      "includeInternal": false
+    },
+    "economics": {
+      "days": 30,
+      "costs": {
+        "entries": 0,
+        "infraUsd": 0,
+        "otherUsd": 0,
+        "byChannel": [],
+        "marketingUsd": 0
+      },
+      "since": "2026-09-03T00:00:00+00:00",
+      "llmUsd": 0.54372,
+      "revenue": {
+        "netUsd": 0,
+        "grossUsd": 0,
+        "takehome": null,
+        "newPaying": 0,
+        "payersEver": 0,
+        "refundsUsd": 0,
+        "lastPriceUsd": null,
+        "expirations30d": 0,
+        "initialPurchases30d": 0
+      },
+      "llm30dUsd": 0.54372,
+      "assumptions": {},
+      "newAccounts": 8,
+      "subscriptions": {
+        "active": 0,
+        "sandbox": 0,
+        "trialing": 0,
+        "unverified": 0
+      },
+      "activeReaders30d": 14,
+      "activeReaders30dAll": 18
+    },
+    "growth": {
+      "days": 30,
+      "since": "2026-09-03T00:00:00+00:00",
+      "today": "2026-10-02",
+      "people": {
+        "total": 31,
+        "guests": 23,
+        "stages": {
+          "new": 15,
+          "pro": 0,
+          "lost": 0,
+          "active": 14,
+          "atRisk": 2,
+          "recurring": 0
+        },
+        "readers": 14,
+        "wallets": 2,
+        "accounts": 8,
+        "active7d": 29,
+        "excluded": {
+          "guests": 4,
+          "accounts": 3
+        },
+        "active30d": 31,
+        "readers7d": 14,
+        "byPlatform": {
+          "ios": 9,
+          "web": 20,
+          "unknown": 2
+        },
+        "newInPeriod": 31,
+        "proInactive": 0,
+        "accountsNeverRead": 3
+      },
+      "cohorts": {
+        "ios": {
+          "home": 0,
+          "wall": 0,
+          "read1": 5,
+          "read2": 1,
+          "read3": 0,
+          "failed": 0,
+          "account": 6,
+          "arrived": 7,
+          "abandoned": 0,
+          "delivered": 6,
+          "retention": {
+            "d1": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "d7": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "w1": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "readersBack": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            }
+          },
+          "accountNew": 5,
+          "deskOrRead": 5,
+          "oldestDays": 0,
+          "signinStart": 0,
+          "proAfterRead": 0,
+          "accountAfterRead": 5,
+          "accountAfterWall": 0,
+          "medianMinutesToAccount": 2.6,
+          "medianMinutesToFirstRead": 0.1
+        },
+        "web": {
+          "home": 9,
+          "wall": 0,
+          "read1": 0,
+          "read2": 0,
+          "read3": 0,
+          "failed": 0,
+          "account": 0,
+          "arrived": 13,
+          "abandoned": 0,
+          "delivered": 0,
+          "retention": {
+            "d1": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "d7": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "w1": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            },
+            "readersBack": {
+              "read": 0,
+              "eligible": 0,
+              "returned": 0
+            }
+          },
+          "accountNew": 0,
+          "deskOrRead": 0,
+          "oldestDays": 1,
+          "signinStart": 0,
+          "proAfterRead": 0,
+          "accountAfterRead": 0,
+          "accountAfterWall": 0,
+          "medianMinutesToAccount": null,
+          "medianMinutesToFirstRead": null
+        }
+      },
+      "history": {
+        "ios": {
+          "read2": 0,
+          "reads": 2,
+          "since": "2026-10-01T12:49:46.730211+00:00",
+          "until": "2026-10-01T17:30:25.946995+00:00",
+          "linked": 0,
+          "readers": 2,
+          "installs": 2,
+          "installsInPeriod": 2
+        },
+        "web": {
+          "read2": 3,
+          "reads": 11,
+          "since": "2026-09-27T00:13:07.899947+00:00",
+          "until": "2026-09-29T16:06:13.944615+00:00",
+          "linked": 0,
+          "readers": 7,
+          "installs": 7,
+          "installsInPeriod": 7
+        }
+      },
+      "coverage": {
+        "activitySince": "2026-09-07",
+        "outcomesSince": "2026-10-01T23:15:50.614817+00:00",
+        "backfillInstalls": 12,
+        "internalAccounts": 3,
+        "internalInstalls": 8,
+        "iosObservedSince": "2026-10-01T20:45:03+00:00",
+        "observedInstalls": 25,
+        "webObservedSince": "2026-10-01T16:37:36.459368+00:00"
+      },
+      "outcomes": {
+        "failed": 0,
+        "blocked": {},
+        "byLevel": {
+          "rapido": 6
+        },
+        "consumed": 19,
+        "failedBy": {},
+        "abandoned": 0,
+        "delivered": 6,
+        "wallLevel": 0,
+        "byPlatform": {
+          "ios": 8,
+          "web": 11
+        },
+        "wallSignin": 0,
+        "wallPaywall": 0,
+        "consumedTotal": 41,
+        "outcomesSince": "2026-10-01T23:15:50.614817+00:00",
+        "consumedInternal": 22,
+        "wallSigninInstalls": 0
+      },
+      "acquisition": {
+        "visits": 17,
+        "landing": [
+          {
+            "read1": 0,
+            "surface": "home",
+            "installs": 9
+          },
+          {
+            "read1": 0,
+            "surface": "other",
+            "installs": 3
+          },
+          {
+            "read1": 0,
+            "surface": "protocol",
+            "installs": 1
+          }
+        ],
+        "sources": [
+          {
+            "read1": 0,
+            "source": "direct",
+            "account": 0,
+            "installs": 13
+          }
+        ],
+        "visitors": 13,
+        "visitorDays": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          2,
+          12
+        ],
+        "visitsWithUtm": 0,
+        "visitsWithReferrer": 0
+      },
+      "includeInternal": false
+    }
+  },
+  "checks": {
+    "checked_at": "2026-10-02 23:09:31.578817+00",
+    "db_timezone": "UTC",
+    "audit": {
+      "revenueAll": {
+        "daily": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          5.406
+        ],
+        "netUsd": 3.262521,
+        "grossUsd": 5.406,
+        "renewals": 0,
+        "newPaying": 1,
+        "refundsUsd": 0,
+        "expirations": 0,
+        "cancellations": 0,
+        "sandboxEvents": 0,
+        "internalEvents": 0,
+        "newSubscriptions": 1
+      },
+      "overviewAll": {
+        "paid": 0,
+        "active": 1,
+        "sandbox": 0,
+        "byStatus": {
+          "active": 1
+        },
+        "trialing": 0,
+        "giftedPro": 2,
+        "byProvider": {
+          "apple": 1
+        },
+        "unverified": 1
+      },
+      "economicsAll": {
+        "active": 0,
+        "sandbox": 0,
+        "trialing": 0,
+        "unverified": 1
+      },
+      "activityCounts": [
+        {
+          "rows": 25,
+          "reads": 28,
+          "last_day": "2026-10-02",
+          "platform": "ios",
+          "first_day": "2026-09-29",
+          "anon_reads": 13
+        },
+        {
+          "rows": 7,
+          "reads": 0,
+          "last_day": "2026-09-30",
+          "platform": null,
+          "first_day": "2026-09-07",
+          "anon_reads": 0
+        },
+        {
+          "rows": 34,
+          "reads": 19,
+          "last_day": "2026-10-02",
+          "platform": "web",
+          "first_day": "2026-09-27",
+          "anon_reads": 14
+        }
+      ],
+      "internalCounts": {
+        "a": 3,
+        "d": 8
+      },
+      "eventMissingDevice": 1,
+      "purchaseUnknownEnvironment": 0,
+      "subscriptionUnknownEnvironment": 1
+    }
+  },
+  "timings": [
+    {
+      "name": "overview",
+      "Plan": {
+        "Node Type": "Result",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 0,
+        "Total Cost": 0.26,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 49.818,
+        "Actual Total Time": 49.819,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 4421,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.046,
+      "Triggers": [],
+      "Execution Time": 49.885
+    },
+    {
+      "name": "growth",
+      "Plan": {
+        "Node Type": "Result",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 0,
+        "Total Cost": 0.26,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 57.624,
+        "Actual Total Time": 57.624,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 3508,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.05,
+      "Triggers": [],
+      "Execution Time": 57.711
+    },
+    {
+      "name": "economics",
+      "Plan": {
+        "Node Type": "Result",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 0,
+        "Total Cost": 0.26,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 28.009,
+        "Actual Total Time": 28.009,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 3003,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.048,
+      "Triggers": [],
+      "Execution Time": 28.122
+    },
+    {
+      "name": "geo",
+      "Plan": {
+        "Node Type": "Result",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 0,
+        "Total Cost": 0.26,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 17.833,
+        "Actual Total Time": 17.834,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 2620,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.05,
+      "Triggers": [],
+      "Execution Time": 17.911
+    },
+    {
+      "name": "users",
+      "Plan": {
+        "Node Type": "Result",
+        "Parallel Aware": false,
+        "Async Capable": false,
+        "Startup Cost": 0,
+        "Total Cost": 0.26,
+        "Plan Rows": 1,
+        "Plan Width": 32,
+        "Actual Startup Time": 17.745,
+        "Actual Total Time": 17.745,
+        "Actual Rows": 1,
+        "Actual Loops": 1,
+        "Shared Hit Blocks": 2363,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning": {
+        "Shared Hit Blocks": 0,
+        "Shared Read Blocks": 0,
+        "Shared Dirtied Blocks": 0,
+        "Shared Written Blocks": 0,
+        "Local Hit Blocks": 0,
+        "Local Read Blocks": 0,
+        "Local Dirtied Blocks": 0,
+        "Local Written Blocks": 0,
+        "Temp Read Blocks": 0,
+        "Temp Written Blocks": 0
+      },
+      "Planning Time": 0.051,
+      "Triggers": [],
+      "Execution Time": 17.941
+    }
+  ]
+}

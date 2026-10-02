@@ -2,7 +2,7 @@
 // human can act on. Single source for the header count, the Integraciones rows, "Qué falla" and the LLM
 // provider state, so a row can never say "Conectado" while the header counts it as a problem.
 import type { AdminIntegrations, AdminOverview, LlmProvider, LlmProviderStats, RevenueCatMetric, SearchConsoleData } from '@/lib/admin-client';
-import { fmtDate, fmtDateTime, fmtInt, fmtPeriod, fmtRelative, fmtUsd, timeOf } from './format';
+import { fmtDate, fmtDateTime, fmtDays, fmtInt, fmtPeriod, fmtRelative, fmtUsd, timeOf } from './format';
 
 const HOUR = 3_600_000;
 export const LLM_NAME: Record<LlmProvider, string> = { anthropic: 'Anthropic', openai: 'OpenAI' };
@@ -14,15 +14,17 @@ export type LlmStateKey = 'no_credit' | 'failing' | 'depleted' | 'credit' | 'unk
 export interface LlmState { key: LlmStateKey; tone: 'red' | 'green' | 'neutral'; label: string; detail: string | null }
 
 /**
- * A provider's state, by priority: a credit alert newer than the last top-up / balance mark with no OK call
- * after it; then half or more of the last 24 h failing (at least 3 calls); then the estimate from a balance
- * mark; otherwise nothing is known. Spend in the ledger is a floor, so an estimate at or below $0 is empty.
+ * A provider's state, by priority: a credit alert newer than the last top-up (more than $0) with no OK call or
+ * probe after it — a balance mark never heals it, whatever its amount; then half or more of the last 24 h failing
+ * (at least 3 calls); then the estimate from a balance mark; otherwise nothing is known. Spend in the ledger is a
+ * floor, so an estimate at or below $0 is empty.
  */
 export function llmProviderState(p: LlmProviderStats): LlmState {
   const alertAt = timeOf(p.lastCreditAlert);
-  const resetAt = Math.max(timeOf(p.lastTopup) ?? -Infinity, timeOf(p.balanceMark?.at) ?? -Infinity);
+  const resetAt = timeOf(p.lastTopup) ?? -Infinity;
   const okAt = timeOf(p.lastOk);
-  if (alertAt != null && alertAt > resetAt && (okAt == null || okAt <= alertAt)) {
+  // Healed only by a top-up or an OK strictly after the alert (same rule as the "Dónde mejorar" insight).
+  if (alertAt != null && alertAt >= resetAt && (okAt == null || okAt <= alertAt)) {
     const where = [p.creditAlert?.endpoint, p.creditAlert?.code].filter(Boolean).join(', ');
     return { key: 'no_credit', tone: 'red', label: 'Sin crédito', detail: `Sin crédito desde ${fmtDateTime(p.lastCreditAlert)}${where ? ` (${where})` : ''}` };
   }
@@ -83,7 +85,7 @@ export function integrationChecks(i: AdminIntegrations, sc?: SearchConsoleData |
     const t = h.tracking;
     const lastEvent = timeOf(t.lastEventAt), lastError = timeOf(t.lastErrorAt), lastRead = timeOf(t.lastReadAt);
     const base = `última visita ${t.lastEventAt ? fmtRelative(t.lastEventAt, now) : 'nunca'} · ${t.events24h != null ? fmtInt(t.events24h) : '—'} en 24 h`;
-    const errorLine = t.lastErrorAt ? ` · último fallo al guardar ${fmtRelative(t.lastErrorAt, now)}${t.lastError ? ` (${t.lastError})` : ''}` : ' · sin fallos al guardar';
+    const errorLine = t.lastErrorAt ? ` · último fallo al guardar ${fmtRelative(t.lastErrorAt, now)}${t.lastError ? ` (${t.lastError})` : ''}` : ' · sin fallos registrados al guardar';
     const silentButReading = lastRead != null && (lastEvent == null ? true : now - lastEvent > 48 * HOUR && lastRead > lastEvent);
     if (lastError != null && now - lastError < 24 * HOUR) {
       rows.push({ id: 'tracking', name: 'Eventos web', status: 'error', tag: 'Falla al guardar', detail: base + errorLine,
@@ -131,7 +133,9 @@ export function integrationChecks(i: AdminIntegrations, sc?: SearchConsoleData |
     ? { id: 'rcMetrics', name: 'RevenueCat · métricas', status: 'off', tag: 'Sin conectar', detail: 'Necesita REVENUECAT_V2_SECRET_KEY', problem: null }
     : rc.error
       ? { id: 'rcMetrics', name: 'RevenueCat · métricas', status: 'error', tag: 'Con error', detail: rc.error, problem: err(`RevenueCat: ${rc.error}`) }
-      : { id: 'rcMetrics', name: 'RevenueCat · métricas', status: 'ok', tag: 'Conectado', detail: `${fmtInt(rc.metrics?.length ?? 0)} métricas${rc.fetchedAt ? ` · consultado ${fmtRelative(rc.fetchedAt, now)}` : ''}`, problem: null });
+      : !rc.metrics || !rc.fetchedAt
+        ? { id: 'rcMetrics', name: 'RevenueCat · métricas', status: 'warn', tag: 'Configurado', detail: 'Falta una consulta confirmada; la configuración no demuestra entrega de métricas.', problem: null }
+        : { id: 'rcMetrics', name: 'RevenueCat · métricas', status: 'ok', tag: 'Con datos', detail: `${fmtInt(rc.metrics.length)} métricas · consultado ${fmtRelative(rc.fetchedAt, now)}`, problem: null });
 
   const as = i.appStore;
   if (!as.configured) rows.push({ id: 'appStore', name: 'App Store Connect', status: 'off', tag: 'Sin conectar', detail: 'Necesita la llave de App Store Connect API', problem: null });
@@ -140,14 +144,18 @@ export function integrationChecks(i: AdminIntegrations, sc?: SearchConsoleData |
     const range = as.coveredFrom ? `reportes del ${fmtDate(as.coveredFrom)} al ${fmtDate(as.coveredTo)}` : 'sin reportes publicados en el periodo';
     const pending = as.pendingDays?.length ? ` · Apple aún no publica: ${as.pendingDays.map(fmtDate).join(', ')}` : '';
     const dl = as.totals ? ` · ${fmtInt(as.totals.downloads)} descargas` : '';
-    rows.push({ id: 'appStore', name: 'App Store Connect', status: 'ok', tag: 'Conectado', detail: range + dl + pending, problem: null });
+    // Out of time budget: the totals cover the loaded days only (not a broken integration, but not complete either).
+    const missingDays = as.missingDays ?? [];
+    const partial = as.partial ? ` · carga parcial: faltan ${fmtInt(missingDays.length)} ${missingDays.length === 1 ? 'día' : 'días'}${missingDays.length ? ` (${fmtDays(missingDays)})` : ''}` : '';
+    rows.push({ id: 'appStore', name: 'App Store Connect', status: as.partial ? 'warn' : 'ok', tag: as.partial ? 'Parcial' : 'Conectado', detail: range + dl + pending + partial, problem: null });
   }
 
   if (sc === undefined) rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'off', tag: 'Revisando', detail: 'Consultando…', problem: null });
   else if (sc === null) rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'off', tag: 'Sin dato', detail: 'El servidor no envió Search Console', problem: null });
   else if (!sc.configured) rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'off', tag: 'Sin conectar', detail: 'Necesita GSC_SERVICE_ACCOUNT_JSON', problem: null });
   else if (sc.error) rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'error', tag: 'Con error', detail: sc.error, problem: err(`Search Console: ${sc.error}`) });
-  else rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'ok', tag: 'Conectado', detail: `${sc.site ? `${sc.site} · ` : ''}${fmtInt(sc.totals?.clicks ?? 0)} clics · ${fmtInt(sc.totals?.impressions ?? 0)} impresiones en el periodo`, problem: null });
+  else if (!sc.totals) rows.push({ id: 'searchConsole', name: 'Google Search Console', status: 'warn', tag: 'Sin reporte', detail: 'Google no devolvió reportes publicados; el total no se puede afirmar como cero.', problem: null });
+  else rows.push({ id: 'searchConsole', name: 'Google Search Console', status: sc.partial ? 'warn' : 'ok', tag: sc.partial ? 'Parcial' : 'Con reporte', detail: `${sc.site ? `${sc.site} · ` : ''}${fmtInt(sc.totals.clicks)} clics · ${fmtInt(sc.totals.impressions)} impresiones${sc.partial ? ` · faltan ${sc.missingDays?.length ?? 0} días; ${sc.incompleteDays?.length ?? 0} provisionales` : ' en el periodo'}`, problem: null });
 
   // LLM keys: configured is not enough, the provider has to be answering (same rule as the IA tab).
   for (const p of ['anthropic', 'openai'] as const) {
@@ -160,11 +168,14 @@ export function integrationChecks(i: AdminIntegrations, sc?: SearchConsoleData |
       continue;
     }
     const stats = overview?.llm.providers[p];
-    if (!stats) { rows.push({ id: `llm-${p}`, name, status: 'ok', tag: 'Llave configurada', detail: 'Sin datos de uso para confirmar que responde', problem: null }); continue; }
+    if (!stats) { rows.push({ id: `llm-${p}`, name, status: 'warn', tag: 'Llave configurada', detail: 'Sin datos de uso para confirmar que responde', problem: null }); continue; }
     const s = llmProviderState(stats);
     const last = `última llamada OK ${stats.lastOk ? fmtRelative(stats.lastOk, now) : 'nunca registrada'}`;
     if (s.tone === 'red') rows.push({ id: `llm-${p}`, name, status: 'error', tag: s.label, detail: `${s.detail ?? s.label} · ${last}`, problem: err(`${name}: ${s.detail ?? s.label}`) });
-    else rows.push({ id: `llm-${p}`, name, status: s.key === 'credit' ? 'ok' : 'warn', tag: s.key === 'credit' ? 'Responde' : 'Sin saldo registrado', detail: `${last}${s.key === 'credit' ? ` · ${s.label}` : ''}`, problem: null });
+    else {
+      const recentOk = timeOf(stats.lastOk) != null && now - timeOf(stats.lastOk)! < 24 * HOUR;
+      rows.push({ id: `llm-${p}`, name, status: recentOk ? 'ok' : 'warn', tag: recentOk ? 'Respuesta observada' : 'Sin respuesta reciente', detail: `${last} · ${s.key === 'credit' ? s.label : 'sin saldo registrado'}`, problem: null });
+    }
   }
 
   rows.push({

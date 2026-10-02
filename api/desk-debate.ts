@@ -6,7 +6,7 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
-import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, type Access, type DeskOutcome } from './_lib/access.js';
+import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, resolveCaller, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
@@ -43,9 +43,14 @@ const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
  * Memory (api/_lib/user-memory.ts): for a signed-in Apple/Google account with memory on, the CIO also sees a
  * compact `reader` (explicit preferences, how often they asked), for framing only: sufficiency and the verdict
  * depend on the question and the evidence alone. The reader never reaches the client: the body only says
- * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'. iOS also needs an explicit
- * opt-in affirmation on this request. The ask is recorded after the answer was delivered, never on a
- * refusal or a failure. Anonymous and wallet requests make no memory call.
+ * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'; iOS also requires an explicit opt-in on this request. The ask is
+ * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
+ * make no memory call; the iPhone app also needs its per-request memory opt-in.
+ *
+ * Outcomes (bobby_events, the owner's funnel): every request that passes validation records exactly one, with the
+ * caller resolved before any gate (a budget pause by a signed-in account carries that account). A 405, a foreign
+ * origin or a 400 is not a desk attempt and records none. A reader who closes the request before the answer
+ * reaches them is `read_abandoned`, never `read_failed`.
  */
 function refuse(res: VercelResponse, status: number, code: string, error: string, extra: Record<string, unknown> = {}) {
   return res.status(status).json({ error, code, ...extra });
@@ -104,13 +109,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const results = await Promise.all([refundRead(readId), refundLevel(useId)]);
     return results.every(Boolean);
   };
-  // undefined: not resolved yet; the premium meter resolves the caller and hands it over.
-  let knownIdentity: Identity | null | undefined;
+  // Resolved once, before any gate, and handed to both meters and every outcome. An auth outage counts as
+  // anonymous, as on every desk read (never throws).
+  const knownIdentity: Identity | null = await resolveCaller(req);
   let streaming = false;
-  // What happened, for the owner's funnel (bobby_events): recorded after answering, never on the reader's time.
-  const outcome = (event: DeskOutcome, detail: string | null = null) => waitUntil(recordOutcome(req, event, knownIdentity ?? null, detail));
+  // What happened, for the owner's funnel: at most once per request, recorded after answering and never on the
+  // reader's time. Registered with waitUntil and awaited in `finally`, once the response is already sent.
+  let pending: Promise<void> | null = null;
+  const outcome = (event: DeskOutcome, detail: string | null = null) => {
+    if (pending) return;
+    pending = recordOutcome(req, event, knownIdentity, detail);
+    waitUntil(pending);
+  };
+  // The reader left before the answer reached them: nothing was delivered, so the read and a premium use are
+  // given back.
+  // The ledger marks the run as abandoned too, so the dashboard never counts it as a failed analysis.
+  let abandoned = false;
+  const abandon = async () => { abandoned = true; const pendingRefund = refund(); waitUntil(pendingRefund); outcome('read_abandoned', 'left'); await pendingRefund; };
   try {
-    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) { outcome('desk_blocked', 'no_provider_keys'); return refuse(res, 503, 'desk_unavailable', unavailable); }
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();
@@ -121,14 +138,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
     }
     const addressKeys = getClientQuotaKeys(req);
-    if (!addressKeys) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!addressKeys) { outcome('desk_blocked', 'no_address'); return refuse(res, 503, 'desk_unavailable', unavailable); }
     // A premium level spends its own allowance before any model call; a failed analysis gives it back.
     if (level !== 'rapido') {
-      const gate = await consumeLevel(req, level, symbol);
-      if (!gate) return refuse(res, 503, 'desk_unavailable', unavailable);
+      const gate = await consumeLevel(req, level, symbol, { identity: knownIdentity });
+      if (!gate) { outcome('desk_blocked', 'level_unavailable'); return refuse(res, 503, 'desk_unavailable', unavailable); }
       if (!gate.allowed) {
         const meter = { tier: gate.tier, used: gate.used, limit: gate.limit, resetsAt: gate.resetsAt };
-        knownIdentity = gate.identity;
         // A guest asked to sign in is the sign-in wall, not a paying intent; only plan limits are wall_level.
         if (gate.code === 'signin_required') outcome('wall_signin', level);
         else outcome('wall_level', `${level}-${gate.code ?? 'refused'}`);
@@ -137,14 +153,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });
       }
       useId = gate.useId;
-      knownIdentity = gate.identity;
     }
     // One meter owner for all clients: a denied premium request never spends a general read.
     // Missing device identity or unavailable storage cannot bypass the anonymous cap.
     const read = await consumeRead(req, symbol, { strict: true, identity: knownIdentity });
     if (!read.allowed) {
       await refund();
-      knownIdentity = read.identity;
       outcome(read.code === 'signin_required' ? 'wall_signin' : read.code === 'subscription_required' ? 'wall_paywall' : 'desk_blocked',
         read.code === 'signin_required' || read.code === 'subscription_required' ? level : 'unavailable');
       if (read.code === 'access_unavailable') return refuse(res, 503, 'desk_unavailable', unavailable);
@@ -155,7 +169,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     readId = read.readId;
     access = read.access;
-    knownIdentity = read.identity;
     // Atomic, cross-instance, fail-closed daily limits, spent only once the reader's own meter allowed the
     // read (a refused request never uses the shared budget). Caller (IPv4 / IPv6 /64) and network (/24 / /48)
     // budgets keep a handful of addresses from spending everyone's global budget. A Bobby Pro account is keyed
@@ -186,9 +199,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       send({ type: 'accepted', level, access });
     }
     // Memory runs beside the evidence and never delays the answer by more than its timeout: a slow or failed
-    // lookup is simply no memory. The gate runs before any memory auth/summary work, including for a
-    // native read whose meter resolved an account asynchronously. The account preference is checked by
-    // the summary and record RPCs; a paused account is never personalized or recorded.
+    // lookup is simply no memory. No call at all without an Apple/Google session, nor from a platform whose app
+    // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
     const memoryOwner = memoryDeskAllowed(req, clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
@@ -196,9 +208,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language);
     const asked = horizonOf(question);
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
-    // The reader left before the answer reached them (the last call was already in flight): nothing was
-    // delivered, so a premium use is given back.
-    if (left.signal.aborted) { const pendingRefund = refund(); waitUntil(pendingRefund); outcome('read_failed', 'left'); await pendingRefund; return; }
+    // The reader left while the last call was already in flight.
+    if (left.signal.aborted) { await abandon(); return; }
     const body = { ...result, access, ...(reader ? { personalized: true } : {}) };
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
@@ -213,6 +224,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     outcome('read_done', level);
     return;
   } catch (error) {
+    // The reader left and the next role refused to start for nobody ('Desk request closed'): abandoned, not failed.
+    if (left.signal.aborted) { await abandon(); return; }
     const refunded = await refund();
     outcome('read_failed', error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error');
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
@@ -235,6 +248,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The response is already sent here and Vercel freezes the function once it has ended: the ledger
     // write must be registered with waitUntil, or it only lands when the instance wakes for another request
     // (seen in prod on 2026-09-29: a Rápido read was never recorded).
-    waitUntil(logLlmUsage(usage, { surface: 'desk', level }));
+    waitUntil(logLlmUsage(usage, { surface: 'desk', level, abandoned }));
+    if (!pending) { console.error('[desk-debate] exit without outcome'); outcome('read_failed', 'unsettled'); }
+    await pending;
   }
 }

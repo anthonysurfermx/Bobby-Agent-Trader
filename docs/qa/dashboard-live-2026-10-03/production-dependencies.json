@@ -1,0 +1,311 @@
+{
+  "project": "qbvdqkknnuweatptjohi",
+  "definitions": [
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_anon_reads_check",
+      "args": "bobby_activity_days",
+      "definition": "CHECK ((anon_reads >= 0))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_anon_touches_check",
+      "args": "bobby_activity_days",
+      "definition": "CHECK ((anon_touches >= 0))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_pkey",
+      "args": "bobby_activity_days",
+      "definition": "PRIMARY KEY (subject, day)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_reads_check",
+      "args": "bobby_activity_days",
+      "definition": "CHECK ((reads >= 0))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_subject_check",
+      "args": "bobby_activity_days",
+      "definition": "CHECK ((subject ~ '^[ad]:.{8,128}$'::text))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_activity_days_touches_check",
+      "args": "bobby_activity_days",
+      "definition": "CHECK ((touches >= 0))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_device_accounts_device_hash_fkey",
+      "args": "bobby_device_accounts",
+      "definition": "FOREIGN KEY (device_hash) REFERENCES bobby_devices(device_hash) ON DELETE CASCADE"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_device_accounts_identity_id_fkey",
+      "args": "bobby_device_accounts",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE CASCADE"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_device_accounts_pkey",
+      "args": "bobby_device_accounts",
+      "definition": "PRIMARY KEY (device_hash, identity_id)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_active_days_check",
+      "args": "bobby_devices",
+      "definition": "CHECK ((active_days >= 1))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_country_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((country IS NULL) OR (country ~ '^[A-Z]{2}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_device_hash_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((length(device_hash) >= 8) AND (length(device_hash) <= 128)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_first_surface_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((first_surface IS NULL) OR (first_surface ~ '^[a-z0-9_-]{1,32}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_identity_id_fkey",
+      "args": "bobby_devices",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE SET NULL"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_network_hash_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((network_hash IS NULL) OR ((length(network_hash) >= 8) AND (length(network_hash) <= 128))))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_pkey",
+      "args": "bobby_devices",
+      "definition": "PRIMARY KEY (device_hash)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_platform_check",
+      "args": "bobby_devices",
+      "definition": "CHECK ((platform = ANY (ARRAY['web'::text, 'ios'::text, 'android'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_reads_check",
+      "args": "bobby_devices",
+      "definition": "CHECK ((reads >= 0))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_referrer_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((referrer IS NULL) OR (referrer ~ '^[a-z0-9.-]{1,80}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_region_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((region IS NULL) OR (region ~ '^[A-Z0-9]{1,3}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_source_check",
+      "args": "bobby_devices",
+      "definition": "CHECK ((source = ANY (ARRAY['observed'::text, 'backfill'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_devices_utm_source_check",
+      "args": "bobby_devices",
+      "definition": "CHECK (((utm_source IS NULL) OR (utm_source ~ '^[a-z0-9_.-]{1,40}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_country_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((country IS NULL) OR (country ~ '^[A-Z]{2}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_detail_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((detail IS NULL) OR (detail ~ '^[a-z0-9_-]{1,32}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_device_hash_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((device_hash IS NULL) OR ((length(device_hash) >= 8) AND (length(device_hash) <= 128))))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_event_check",
+      "args": "bobby_events",
+      "definition": "CHECK ((event = ANY (ARRAY['visit'::text, 'appstore_click'::text, 'signin_start'::text, 'paywall_view'::text, 'purchase_start'::text, 'read_done'::text, 'read_failed'::text, 'wall_signin'::text, 'wall_paywall'::text, 'wall_level'::text, 'desk_blocked'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_identity_id_fkey",
+      "args": "bobby_events",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE SET NULL"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_pkey",
+      "args": "bobby_events",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_platform_check",
+      "args": "bobby_events",
+      "definition": "CHECK ((platform = ANY (ARRAY['web'::text, 'ios'::text, 'android'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_referrer_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((referrer IS NULL) OR (referrer ~ '^[a-z0-9.-]{1,80}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_region_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((region IS NULL) OR (region ~ '^[A-Z0-9]{1,3}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_surface_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((surface IS NULL) OR (surface ~ '^[a-z0-9_-]{1,32}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_events_utm_source_check",
+      "args": "bobby_events",
+      "definition": "CHECK (((utm_source IS NULL) OR (utm_source ~ '^[a-z0-9_.-]{1,40}$'::text)))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_reader_stats_identity_id_fkey",
+      "args": "bobby_reader_stats",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE CASCADE"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_reader_stats_pkey",
+      "args": "bobby_reader_stats",
+      "definition": "PRIMARY KEY (reader)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_reads_identity_id_fkey",
+      "args": "bobby_reads",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE CASCADE"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_reads_pkey",
+      "args": "bobby_reads",
+      "definition": "PRIMARY KEY (id)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_apple_original_transaction_id_key",
+      "args": "bobby_subscriptions",
+      "definition": "UNIQUE (apple_original_transaction_id)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_environment_check",
+      "args": "bobby_subscriptions",
+      "definition": "CHECK ((environment = ANY (ARRAY['production'::text, 'sandbox'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_identity_id_fkey",
+      "args": "bobby_subscriptions",
+      "definition": "FOREIGN KEY (identity_id) REFERENCES bobby_identities(id) ON DELETE CASCADE"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_period_type_check",
+      "args": "bobby_subscriptions",
+      "definition": "CHECK ((period_type = ANY (ARRAY['normal'::text, 'trial'::text, 'intro'::text, 'prepaid'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_pkey",
+      "args": "bobby_subscriptions",
+      "definition": "PRIMARY KEY (identity_id)"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_provider_check",
+      "args": "bobby_subscriptions",
+      "definition": "CHECK ((provider = ANY (ARRAY['stripe'::text, 'apple'::text])))"
+    },
+    {
+      "type": "constraint",
+      "name": "bobby_subscriptions_stripe_subscription_id_key",
+      "args": "bobby_subscriptions",
+      "definition": "UNIQUE (stripe_subscription_id)"
+    },
+    {
+      "type": "function",
+      "name": "bobby_admin_device_facts",
+      "args": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_admin_device_facts()\n RETURNS TABLE(device_hash text, platform text, source text, first_seen timestamp with time zone, last_seen timestamp with time zone, first_surface text, referrer text, utm_source text, country text, internal boolean, home boolean, desk boolean, signin_at timestamp with time zone, wall_at timestamp with time zone, delivered integer, failed integer, abandoned integer, first_read_at timestamp with time zone, reads integer, link_identity uuid, link_email text, link_at timestamp with time zone, account_new boolean, pro boolean, d1 boolean, d1_read boolean, d7 boolean, d7_read boolean, w1 boolean, w1_read boolean)\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with links as (\n    select distinct on (l.device_hash) l.device_hash, l.identity_id, l.first_at, b.created_at as identity_created, b.email\n    from bobby_device_accounts l join bobby_identities b on b.id = l.identity_id and b.auth_user_id is not null\n    order by l.device_hash, l.first_at\n  ), ev as (\n    select e.device_hash,\n      bool_or(e.event = 'visit' and e.surface = 'home') as home,\n      bool_or(e.event = 'visit' and e.surface = 'desk') as desk,\n      min(e.created_at) filter (where e.event = 'signin_start') as signin_at,\n      min(e.created_at) filter (where e.event = 'wall_signin') as wall_at,\n      count(*) filter (where e.event = 'read_done')::int as delivered,\n      count(*) filter (where e.event = 'read_failed' and e.detail is distinct from 'left')::int as failed,\n      count(*) filter (where e.event = 'read_failed' and e.detail = 'left')::int as abandoned\n    from bobby_events e where e.device_hash is not null group by 1\n  ), days as (\n    select dv.device_hash, (dv.first_seen at time zone 'utc')::date as d0, a.day, a.reads\n    from bobby_devices dv join bobby_activity_days a on a.subject = 'd:' || dv.device_hash\n    union all\n    select dv.device_hash, (dv.first_seen at time zone 'utc')::date, a.day, a.reads\n    from bobby_devices dv join links lk on lk.device_hash = dv.device_hash join bobby_activity_days a on a.subject = 'a:' || lk.identity_id::text\n  ), act as (\n    select device_hash,\n      bool_or(day = d0 + 1) as d1, bool_or(day = d0 + 1 and reads > 0) as d1_read,\n      bool_or(day = d0 + 7) as d7, bool_or(day = d0 + 7 and reads > 0) as d7_read,\n      bool_or(day between d0 + 1 and d0 + 7) as w1, bool_or(day between d0 + 1 and d0 + 7 and reads > 0) as w1_read\n    from days group by device_hash\n  )\n  select dv.device_hash, dv.platform, dv.source, dv.first_seen, dv.last_seen, dv.first_surface, dv.referrer, dv.utm_source, dv.country,\n    coalesce(dv.device_hash in (select bobby_internal_device_hashes()), false),\n    coalesce(ev.home, false), coalesce(ev.desk, false), ev.signin_at, ev.wall_at, coalesce(ev.delivered, 0), coalesce(ev.failed, 0), coalesce(ev.abandoned, 0),\n    dv.first_read_at, dv.reads, lk.identity_id, lk.email, lk.first_at,\n    lk.identity_id is not null and lk.identity_created >= dv.first_seen - interval '2 minutes',\n    lk.identity_id is not null and bobby_is_pro(lk.identity_id),\n    coalesce(act.d1, false), coalesce(act.d1_read, false), coalesce(act.d7, false), coalesce(act.d7_read, false),\n    coalesce(act.w1, false), coalesce(act.w1_read, false)\n  from bobby_devices dv\n  left join ev on ev.device_hash = dv.device_hash\n  left join links lk on lk.device_hash = dv.device_hash\n  left join act on act.device_hash = dv.device_hash;\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_admin_members",
+      "args": "p_internal boolean",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_admin_members(p_internal boolean DEFAULT true)\n RETURNS jsonb\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with team as (select bobby_internal_identity_ids() as id)\n  select jsonb_build_object(\n    'includeInternal', coalesce(p_internal, true),\n    'subscriptions', coalesce((select jsonb_agg(jsonb_build_object('identityId', s.identity_id, 'email', b.email, 'provider', s.provider,\n        'status', s.status, 'productId', s.product_id, 'currentPeriodEnd', s.current_period_end, 'updatedAt', s.updated_at,\n        'environment', s.environment, 'periodType', s.period_type, 'internal', s.identity_id in (select id from team),\n        'active', s.status in ('active', 'trialing') and (s.current_period_end is null or s.current_period_end > now()))\n        order by s.updated_at desc) from bobby_subscriptions s left join bobby_identities b on b.id = s.identity_id\n        where coalesce(p_internal, true) or s.identity_id not in (select id from team)), '[]'::jsonb),\n    'grants', coalesce((select jsonb_agg(jsonb_build_object('identityId', g.identity_id, 'email', b.email, 'source', g.source,\n        'proUntil', g.pro_until, 'active', g.pro_until > now(), 'internal', g.identity_id in (select id from team)) order by g.pro_until desc)\n        from bobby_pro_grants g left join bobby_identities b on b.id = g.identity_id\n        where coalesce(p_internal, true) or g.identity_id not in (select id from team)), '[]'::jsonb));\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_admin_people_facts",
+      "args": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_admin_people_facts()\n RETURNS TABLE(person text, kind text, identity_id uuid, email text, provider text, platform text, internal boolean, first_seen timestamp with time zone, reads integer, pro boolean, last_day date, read_days_14 integer, read_7 boolean, first_read_at timestamp with time zone, last_read_day date)\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with paired as (\n    select distinct on (l.device_hash) l.device_hash, l.identity_id\n    from bobby_device_accounts l join bobby_identities b on b.id = l.identity_id and b.auth_user_id is not null\n    order by l.device_hash, l.first_at\n  ), people as (\n    select 'a:' || b.id::text as person, 'account'::text as kind, b.id as identity_id, b.email, b.provider,\n      coalesce((select dv.platform from paired p join bobby_devices dv on dv.device_hash = p.device_hash where p.identity_id = b.id order by dv.first_seen limit 1), s.platform) as platform,\n      coalesce(b.id in (select bobby_internal_identity_ids()), false) as internal, b.created_at as first_seen,\n      (coalesce(s.reads, 0) + coalesce((select sum(g.reads) from paired p join bobby_reader_stats g on g.reader = 'd:' || p.device_hash where p.identity_id = b.id), 0))::int as reads,\n      bobby_is_pro(b.id) as pro,\n      least(s.first_read_at, (select min(g.first_read_at) from paired p join bobby_reader_stats g on g.reader = 'd:' || p.device_hash where p.identity_id = b.id)) as first_read_at\n    from bobby_identities b left join bobby_reader_stats s on s.reader = 'a:' || b.id::text\n    where b.auth_user_id is not null\n    union all\n    select 'd:' || dv.device_hash, 'guest', null, null, null, dv.platform, coalesce(dv.device_hash in (select bobby_internal_device_hashes()), false), dv.first_seen, coalesce(g.reads, 0), false, g.first_read_at\n    from bobby_devices dv left join bobby_reader_stats g on g.reader = 'd:' || dv.device_hash\n    where not exists (select 1 from paired p where p.device_hash = dv.device_hash)\n  ), days as (\n    select p.person, a.day, a.reads from people p join bobby_activity_days a on a.subject = p.person\n    union all\n    select 'a:' || pr.identity_id::text, a.day, a.anon_reads from paired pr join bobby_activity_days a on a.subject = 'd:' || pr.device_hash\n    where a.anon_touches > 0 or a.anon_reads > 0\n  ), agg as (\n    select person, max(day) as last_day,\n      count(distinct day) filter (where reads > 0 and day > (now() at time zone 'utc')::date - 14)::int as read_days_14,\n      bool_or(reads > 0 and day > (now() at time zone 'utc')::date - 7) as read_7,\n      max(day) filter (where reads > 0) as last_read_day\n    from days group by person\n  )\n  select p.person, p.kind, p.identity_id, p.email, p.provider, p.platform, p.internal, p.first_seen, p.reads, p.pro,\n    greatest(agg.last_day, (p.first_seen at time zone 'utc')::date), coalesce(agg.read_days_14, 0), coalesce(agg.read_7, false), p.first_read_at,\n    greatest(agg.last_read_day, (p.first_read_at at time zone 'utc')::date)\n  from people p left join agg on agg.person = p.person;\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_internal_device_hashes",
+      "args": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_internal_device_hashes()\n RETURNS SETOF text\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select id from bobby_internal_subjects(true) where kind = 'd';\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_internal_identity_ids",
+      "args": "",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_internal_identity_ids()\n RETURNS SETOF uuid\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select id::uuid from bobby_internal_subjects(true) where kind = 'a';\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_internal_subjects",
+      "args": "p_with_networks boolean",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_internal_subjects(p_with_networks boolean DEFAULT true)\n RETURNS TABLE(kind text, id text)\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  with recursive seeds(aid, did) as (\n    select identity_id, null::text from bobby_admins\n    union select identity_id, null from bobby_internal_marks\n    union select b.id, null from bobby_identities b join bobby_admin_settings s on s.key = 'internal_emails'\n      where nullif(b.email, '') is not null and s.value ? lower(b.email)\n    union select null::uuid, device_hash from bobby_devices where internal or admin_session\n    union select null::uuid, dn.device_hash from bobby_device_networks dn\n      join bobby_internal_networks n on n.network_hash = dn.network_hash and not n.ignored\n      where coalesce(p_with_networks, true)\n  ), walk(aid, did) as (\n    select aid, did from seeds\n    union\n    select case when w.aid is null then l.identity_id end, case when w.aid is not null then l.device_hash end\n    from walk w join bobby_device_accounts l on l.identity_id = w.aid or l.device_hash = w.did\n  )\n  select case when aid is not null then 'a' else 'd' end, coalesce(aid::text, did) from walk;\n$function$\n"
+    },
+    {
+      "type": "function",
+      "name": "bobby_is_pro",
+      "args": "p_identity uuid",
+      "definition": "CREATE OR REPLACE FUNCTION public.bobby_is_pro(p_identity uuid)\n RETURNS boolean\n LANGUAGE sql\n STABLE\n SET search_path TO 'public', 'pg_temp'\nAS $function$\n  select exists (\n    select 1 from bobby_subscriptions s\n    where s.identity_id = p_identity\n      and s.status in ('active', 'trialing')\n      and (s.current_period_end is null or s.current_period_end > now())\n  ) or exists (\n    select 1 from bobby_pro_grants g where g.identity_id = p_identity and g.pro_until > now()\n  );\n$function$\n"
+    }
+  ]
+}

@@ -77,14 +77,14 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<Record<
   }
 }
 
-/** Who is asking; an expired or bad token counts as anonymous, an auth outage too (served, never blocked). */
-async function who(req: VercelRequest): Promise<Identity | null> {
+/** Who is asking; an expired or bad token counts as anonymous, an auth outage too (served, never blocked). Never throws. */
+export async function resolveCaller(req: VercelRequest): Promise<Identity | null> {
   try { return await resolveIdentity(req); } catch { return null; }
 }
 
 /** Check and record one read. */
 export async function consumeRead(req: VercelRequest, symbol: string, options: { strict?: boolean; identity?: Identity | null } = {}): Promise<ReadGate> {
-  const identity = options.identity === undefined ? await who(req) : options.identity;
+  const identity = options.identity === undefined ? await resolveCaller(req) : options.identity;
   // A signed-in read keeps its install too (the owner's funnel pairs install and account); the meter still counts
   // accounts by account and guests by install (bobby_consume_read, 20261001230000).
   const device = deviceHash(req);
@@ -116,7 +116,8 @@ export async function touchDevice(req: VercelRequest, identity: Identity | null)
   });
 }
 
-export type DeskOutcome = 'read_done' | 'read_failed' | 'wall_signin' | 'wall_paywall' | 'wall_level' | 'desk_blocked';
+/** `read_abandoned`: the reader closed the request before the answer reached them (not a failure of the desk). */
+export type DeskOutcome = 'read_done' | 'read_failed' | 'read_abandoned' | 'wall_signin' | 'wall_paywall' | 'wall_level' | 'desk_blocked';
 
 /** What the server saw happen at the desk, for the owner's funnel (bobby_events). Never throws, never delays. */
 export async function recordOutcome(req: VercelRequest, event: DeskOutcome, identity: Identity | null | undefined, detail: string | null = null): Promise<void> {
@@ -147,12 +148,17 @@ export async function refundRead(readId: number | null): Promise<boolean> {
 
 /** The access state without consuming a read. */
 export async function readAccess(req: VercelRequest, identity?: Identity | null): Promise<Access> {
-  const id = identity === undefined ? await who(req) : identity;
+  const id = identity === undefined ? await resolveCaller(req) : identity;
   const row = await rpc('bobby_read_access', { p_identity: id?.id ?? null, p_device: id ? null : deviceHash(req), p_paywall: paywallOn() });
   return row ? shape(row) : OPEN;
 }
 
-export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null }
+export type SubscriptionEnvironment = 'production' | 'sandbox' | 'unknown';
+export type SubscriptionPeriodType = 'normal' | 'trial' | 'intro' | 'prepaid' | 'unknown';
+/** `environment` / `period_type` / `store_checked_at` (20261002120000) are what the store last reported, for the
+ *  owner's commercial classification only; access never depends on them. Optional: a row read before that
+ *  migration has none. */
+export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: SubscriptionEnvironment; period_type?: SubscriptionPeriodType; store_checked_at?: string | null }
 
 export async function getSubscription(identityId: string): Promise<SubscriptionRow | null> {
   const r = await fetch(bobbyRest(`bobby_subscriptions?identity_id=eq.${identityId}&select=*`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
@@ -189,9 +195,10 @@ function meter(raw: unknown): LevelMeter {
 }
 const tierOf = (v: unknown): Tier => (v === 'pro' || v === 'free' ? v : 'anon');
 
-/** Check and record one premium read. Null when storage is unreachable (the caller refuses the read). */
-export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symbol: string): Promise<(LevelGate & { identity: Identity | null }) | null> {
-  const identity = await who(req);
+/** Check and record one premium read. Null when storage is unreachable (the caller refuses the read).
+ *  `identity`: the caller already resolved by the endpoint (undefined: resolve it here). */
+export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symbol: string, opts: { identity?: Identity | null } = {}): Promise<(LevelGate & { identity: Identity | null }) | null> {
+  const identity = opts.identity === undefined ? await resolveCaller(req) : opts.identity;
   const row = await rpc('bobby_consume_level', {
     p_identity: identity?.id ?? null, p_device: identity ? null : deviceHash(req), p_level: level,
     p_symbol: symbol.slice(0, 24) || null, p_limits: LEVEL_LIMITS,
@@ -220,7 +227,7 @@ export async function refundLevel(useId: number | null): Promise<boolean> {
 
 /** The premium meters without consuming anything. */
 export async function readLevels(req: VercelRequest, identity?: Identity | null): Promise<LevelState | null> {
-  const id = identity === undefined ? await who(req) : identity;
+  const id = identity === undefined ? await resolveCaller(req) : identity;
   const row = await rpc('bobby_level_state', { p_identity: id?.id ?? null, p_device: id ? null : deviceHash(req), p_limits: LEVEL_LIMITS });
   if (!row) return null;
   const levels = (row.levels ?? {}) as Record<string, unknown>;

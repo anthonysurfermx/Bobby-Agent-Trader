@@ -8,9 +8,10 @@
 // ============================================================
 import { createHash } from 'node:crypto';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
-import { getSubscription, upsertSubscription } from './access.js';
-import { getCache, setCache } from './api-cache.js';
-import { notifyOwner } from './provider-alert.js';
+import { getSubscription, upsertSubscription, type SubscriptionPeriodType, type SubscriptionRow } from './access.js';
+import { claimCache, releaseCache, setCache } from './api-cache.js';
+import { waitUntil } from '@vercel/functions';
+import { sendOwnerEmail, type EmailResult } from './provider-alert.js';
 
 export const PRO_ENTITLEMENT = 'pro';
 const secretKey = () => (process.env.REVENUECAT_SECRET_KEY || '').trim();
@@ -22,18 +23,27 @@ const BOBBY_RC_APP = 'app25c54ce720';
 const BOBBY_RC_PRODUCT = 'xyz.bobbyprotocol.bobby.pro.monthly';
 const PAID_HISTORY_LIMIT = 20;
 
+/** RevenueCat answered with an HTTP error (`status`), or did not answer in time / at all (`status` 0). */
+export class RevenueCatError extends Error {
+  constructor(public status: number, public kind: 'key_rejected' | 'not_found' | 'unavailable') { super(`revenuecat subscriber ${status || kind}`); }
+}
+
+const KEY_ALERT_KEY = 'revenuecat-key-alert';
 const KEY_ALERT_WINDOW_SEC = 6 * 3600;
+const KEY_ALERT_RETRY_SEC = 10 * 60;   // an email Resend did not accept is tried again after this, not after 6 h
 let keyAlertAt = 0;
 
-/** RevenueCat refused the secret key: every purchase stays unlinked until it is replaced, so tell the owner. */
-async function alertRejectedKey(status: number): Promise<void> {
-  if (Date.now() - keyAlertAt < KEY_ALERT_WINDOW_SEC * 1000) return;
+/** RevenueCat refused the secret key: every purchase stays unlinked until it is replaced, so tell the owner.
+ *  The window is claimed atomically across instances and only kept when Resend accepted the email: a refused email,
+ *  or no recipient configured, releases it (nothing is marked as told). Never throws. */
+export async function alertRejectedKey(status: number): Promise<{ claimed: boolean; email: EmailResult | null }> {
+  if (Date.now() - keyAlertAt < KEY_ALERT_WINDOW_SEC * 1000) return { claimed: false, email: null };
   keyAlertAt = Date.now();
-  try {
-    if (await getCache('revenuecat-key-alert')) return;
-    await setCache('revenuecat-key-alert', { status, at: new Date().toISOString() }, KEY_ALERT_WINDOW_SEC);
-  } catch { /* the per-instance guard still holds */ }
-  notifyOwner('Bobby: RevenueCat rechazó la llave secreta — las compras no se vinculan', [
+  const fact = { status, at: new Date().toISOString() };
+  // false: another instance holds this window. null: storage is down — still email (the per-instance guard limits it).
+  const claim = await claimCache(KEY_ALERT_KEY, KEY_ALERT_WINDOW_SEC, fact);
+  if (claim === false) return { claimed: false, email: null };
+  const email = await sendOwnerEmail('Bobby: RevenueCat rechazó la llave secreta — las compras no se vinculan', [
     `RevenueCat respondió ${status} a GET /v1/subscribers con REVENUECAT_SECRET_KEY.`,
     '',
     'Mientras tanto Apple cobra, pero Bobby no puede confirmar Bobby Pro: la app muestra "no pudo confirmar tu suscripción" y el webhook falla (RevenueCat lo reintenta).',
@@ -42,7 +52,17 @@ async function alertRejectedKey(status: number): Promise<void> {
     '',
     'No vuelvo a avisar en las próximas 6 horas.',
   ].join('\n'));
+  if (email.accepted) {
+    if (claim) await setCache(KEY_ALERT_KEY, { ...fact, email }, KEY_ALERT_WINDOW_SEC);
+  } else {
+    if (claim) await releaseCache(KEY_ALERT_KEY);
+    keyAlertAt = Date.now() - (KEY_ALERT_WINDOW_SEC - KEY_ALERT_RETRY_SEC) * 1000;
+  }
+  return { claimed: Boolean(claim), email };
 }
+
+/** Tests only: forget the per-instance window. */
+export function resetKeyAlert(): void { keyAlertAt = 0; }
 
 interface RcSubscription {
   store?: string;
@@ -96,6 +116,10 @@ interface PaidPeriod {
   verification_state: 'confirmed';
   verified_at: string;
 }
+
+
+const PERIOD_TYPES: readonly string[] = ['normal', 'trial', 'intro', 'prepaid'];
+export const liveSubscription = (row: SubscriptionRow | null) => Boolean(row && ['active', 'trialing'].includes(row.status) && (!row.current_period_end || Date.parse(row.current_period_end) > Date.now()));
 
 const paidEventTypes = new Set(['INITIAL_PURCHASE', 'RENEWAL']);
 const storeProvider = (store: string | undefined): 'apple' | 'stripe' | null => {
@@ -278,17 +302,27 @@ export async function identityForAuthUser(authUserId: string): Promise<string | 
 }
 
 /** Mirror the subscriber's `pro` entitlement into bobby_subscriptions; returns whether it is active. */
-export async function syncRevenueCat(authUserId: string, identityId: string, paidEvent?: RevenueCatPaidEvent): Promise<boolean> {
+export async function syncRevenueCat(authUserId: string, identityId: string, paidEventOrOptions?: RevenueCatPaidEvent | { keepAccess?: boolean }): Promise<boolean> {
+  const opts = paidEventOrOptions && 'keepAccess' in paidEventOrOptions ? paidEventOrOptions as { keepAccess?: boolean } : {};
+  const paidEvent = paidEventOrOptions && !('keepAccess' in paidEventOrOptions) ? paidEventOrOptions as RevenueCatPaidEvent : undefined;
   if (!revenueCatReady()) throw new Error('RevenueCat is not configured');
   const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(authUserId)}`, {
     headers: { Authorization: `Bearer ${secretKey()}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(8000),
-  });
-  if (r.status === 401 || r.status === 403) await alertRejectedKey(r.status);
-  if (!r.ok) throw new Error(`revenuecat subscriber ${r.status}`);
+  }).catch(() => null);
+  if (!r) throw new RevenueCatError(0, 'unavailable');
+  if (r.status === 401 || r.status === 403) {
+    const alert = alertRejectedKey(r.status).catch(() => undefined);
+    try { waitUntil(alert); } catch { /* outside a request context */ }
+    throw new RevenueCatError(r.status, 'key_rejected');
+  }
+  if (r.status === 404) throw new RevenueCatError(404, 'not_found');
+  if (!r.ok) throw new RevenueCatError(r.status, 'unavailable');
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
   const current = await getSubscription(identityId);
+  const checkedAt = new Date().toISOString();
+  const keep = Boolean(opts.keepAccess) && liveSubscription(current);
   // A separate card subscription is owned by Stripe's webhook. RevenueCat cannot overwrite it or use its
   // payment proof as this feature's RevenueCat proof.
   if (current?.provider === 'stripe' && current.stripe_subscription_id && ['active', 'trialing'].includes(current.status) &&
@@ -300,7 +334,7 @@ export async function syncRevenueCat(authUserId: string, identityId: string, pai
     // This row was mirrored from RevenueCat, including RevenueCat Web Billing (provider=stripe, no
     // stripe_subscription_id). It must expire when the entitlement disappears.
     if (current && ['active', 'trialing'].includes(current.status)) {
-      await upsertSubscription({ identity_id: identityId, provider: current.provider, status: 'expired' });
+      await upsertSubscription({ identity_id: identityId, provider: current.provider, status: keep ? current.status : 'expired', store_checked_at: checkedAt });
     }
     await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent);
     return false;
@@ -311,9 +345,17 @@ export async function syncRevenueCat(authUserId: string, identityId: string, pai
   const active = !sub?.refunded_at && (expires === null || Date.parse(expires) > Date.now());
   const store = sub?.store ?? 'app_store';
   const provider: 'apple' | 'stripe' = store === 'app_store' || store === 'mac_app_store' ? 'apple' : 'stripe';
+  const environment = sub?.is_sandbox === true ? 'sandbox' : sub?.is_sandbox === false ? 'production' : 'unknown';
+  const period = String(sub?.period_type ?? '').toLowerCase();
+  const periodType = (PERIOD_TYPES.includes(period) ? period : 'unknown') as SubscriptionPeriodType;
+  if (keep && !active) {
+    await upsertSubscription({ identity_id: identityId, provider: current!.provider, status: current!.status, store_checked_at: checkedAt });
+    await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent);
+    return false;
+  }
   await upsertSubscription({
-    identity_id: identityId, provider, status: sub?.refunded_at ? 'refunded' : active ? 'active' : 'expired',
-    product_id: product, current_period_end: expires,
+    identity_id: identityId, provider, status: sub?.refunded_at ? 'refunded' : active ? (periodType === 'trial' ? 'trialing' : 'active') : 'expired',
+    product_id: product, current_period_end: expires, environment, period_type: periodType, store_checked_at: checkedAt,
   });
   await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent);
   return active;

@@ -7,6 +7,8 @@ import { adminAction, fetchAdminInternal, type AdminPostBody, type InstallRow, t
 import { Btn, Card, CardHead, Empty, ErrorState, Loading, Note, Segmented, StaleBanner, Switch, TableScroll, Tag, TextInput, td, tdWrap, th, tr } from './ui';
 import { DASH, fmtDate, fmtDateTime, fmtInt, fmtRelative, label } from './format';
 import { toAdminError, useLoad } from './useLoad';
+import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 type Notify = (text: string, ok?: boolean) => void;
 type DeviceFilter = 'all' | 'internal' | 'outside';
@@ -31,7 +33,7 @@ export default function InternalTrafficCard({ refreshKey, notify, onChanged, onL
   onLoaded?: (r: InternalResponse) => void;
   meEmail?: string | null;
 }) {
-  const { data, error, loading, reload } = useLoad(fetchAdminInternal, `internal|${refreshKey}`);
+  const { data, error, loading, reload, updatedAt } = useLoad(fetchAdminInternal, `internal|${refreshKey}`, { intervalMs: CORE_REFRESH_MS });
   const [busy, setBusy] = useState<string | null>(null);
 
   useEffect(() => { if (data) onLoaded?.(data); }, [data, onLoaded]);
@@ -53,10 +55,11 @@ export default function InternalTrafficCard({ refreshKey, notify, onChanged, onL
 
   return (
     <Card>
+      <div className="mb-4"><SourceFreshness meta={sourceMetaForError(data?.meta, error?.message)} maxAgeMs={CORE_STALE_MS} label="Filtro de tráfico interno · cada 30 s" fallbackAt={updatedAt} /></div>
       <CardHead
         title="Tráfico interno"
         count={data ? `${fmtInt(data.emails.length)} emails · ${fmtInt(data.marks.length)} cuentas · ${fmtInt(data.networks.length)} redes · ${fmtInt(data.devices.filter((d) => d.internal).length)} instalaciones` : undefined}
-        sub="Todo lo de aquí queda fuera de las cifras del panel (salvo que arriba cambies a «Con equipo»). Revisa que solo estés tú y tu equipo: así cada número es gente de fuera."
+        sub="Todo lo de aquí queda fuera de las cifras del panel (salvo que arriba cambies a «Con equipo»), y también lo ligado a ello en cadena: una cuenta del equipo arrastra sus instalaciones, y una instalación del equipo, las cuentas con las que se usó. Revisa que solo estés tú y tu equipo: así cada número es gente de fuera."
       />
       {error && !data ? (
         <ErrorState message={error.message} onRetry={() => void reload()} />
@@ -202,7 +205,7 @@ function NetworksSection({ networks, busy, onRemove }: { networks: Network[]; bu
   return (
     <section>
       <SectionHead title="Redes del equipo" count={`${fmtInt(networks.length)}`}>
-        Se agregan solas cuando un admin abre /admin: es la dirección desde la que entraste (IP exacta en IPv4, /64 en IPv6), guardada como hash, nunca la IP. Toda instalación vista alguna vez desde ahí queda fuera. Ojo: en datos móviles una misma IP la pueden compartir varias personas — si una red no es tuya, quítala (no se vuelve a agregar).
+        Se agregan solas cuando un admin abre /admin: es la dirección desde la que entraste (IP exacta en IPv4, /64 en IPv6), guardada como hash, nunca la IP. Toda instalación vista alguna vez desde ahí queda fuera, con las cuentas ligadas a ella. Ojo: en datos móviles una misma IP la pueden compartir varias personas — si una red no es tuya, quítala (no se vuelve a agregar).
       </SectionHead>
       {networks.length === 0 ? (
         <Empty>Sin redes registradas</Empty>
@@ -219,9 +222,9 @@ function NetworksSection({ networks, busy, onRemove }: { networks: Network[]; bu
                   <span title={fmtDateTime(n.createdAt)}>desde {fmtDate(n.createdAt)}</span> · <span title={fmtDateTime(n.lastSeenAt)}>última vez {fmtRelative(n.lastSeenAt, now)}</span>
                   {' · '}deja fuera {fmtInt(n.installs)} {n.installs === 1 ? 'instalación' : 'instalaciones'}
                 </span>
-                {n.onlyByNetwork > 0 && (
+                {(n.onlyByNetwork > 0 || n.accountsOnlyByNetwork > 0) && (
                   <span className="font-mono text-[10.5px] text-[#F7A04B]">
-                    {fmtInt(n.onlyByNetwork)} solo por esta red (sin cuenta ni marca del equipo): si no son tuyas, quita la red.
+                    {fmtInt(n.onlyByNetwork)} {n.onlyByNetwork === 1 ? 'instalación' : 'instalaciones'} y {fmtInt(n.accountsOnlyByNetwork)} {n.accountsOnlyByNetwork === 1 ? 'cuenta' : 'cuentas'} solo por esta red (sin otra marca del equipo): si no son tuyas, quita la red.
                   </span>
                 )}
               </div>
@@ -277,7 +280,7 @@ function DevicesSection({ devices, busy, onToggle }: { devices: InstallRow[]; bu
               <th className={th}>Llegó a</th>
               <th className={th}>Referencia · utm</th>
               <th className={`${th} text-right`}>Lecturas</th>
-              <th className={`${th} text-right`} title="Lecturas del desk entregadas completas (se registran desde el deploy de esta versión)">Entregadas</th>
+              <th className={`${th} text-right`} title="Respuestas completas emitidas por el servidor; recepción del cliente sin medir">Emitidas</th>
               <th className={th}>Cuenta</th>
               <th className={th}>Interna</th>
             </tr>

@@ -5,6 +5,8 @@ import { Card, CardHead, Empty, ErrorState, Loading, MissingNote, Note, StaleBan
 import { integrationChecks, integrationIssues, rcMetricValue, rcMetricWindow, type IntegrationCheck, type IntegrationId, type IntegrationStatus } from './health';
 import { fmtDateTime, fmtInt, fmtRelative } from './format';
 import { useLoad } from './useLoad';
+import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 const VERCEL_ANALYTICS = 'https://vercel.com/anthonysurfermxs-projects/bobby-agent-trader/analytics';
 const VERCEL_ENV_HINT = 'Todas van en Vercel → Settings → Environment Variables (Production). Después vuelve a desplegar: el servidor solo las lee al arrancar.';
@@ -111,7 +113,7 @@ const ACTION_STATUS: Record<string, { label: string; tone: 'green' | 'red' | 'or
 
 export default function IntegrationsTab({ data, period, refreshKey }: { data: OverviewResponse; period: number; refreshKey: number }) {
   const { overview: o, integrations: i } = data;
-  const actions = useLoad(fetchAdminActions, `actions|${refreshKey}`);
+  const actions = useLoad(fetchAdminActions, `actions|${refreshKey}`, { intervalMs: CORE_REFRESH_MS });
   const sc = data.searchConsole;
   // Rows, header and "Qué falla" all come from health.ts, so they can never disagree.
   const checks = integrationChecks(i, sc, o);
@@ -120,6 +122,8 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
   const errors = issues.filter((p) => p.level === 'error').length;
   const store = i.appStore;
 
+  if (!data.providersLoaded) return <Note tag="Pendiente de consulta">Las fuentes externas y el estado de integraciones todavía no tienen una respuesta confirmada. Los datos Bobby se consultan cada 30 segundos; Apple, Google y RevenueCat, cada 5 minutos.</Note>;
+
   return (
     <div className="flex flex-col gap-4">
       <MissingNote missing={o.missing} sections={['integrations', 'coverage']} />
@@ -127,7 +131,7 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
         <Card>
           <CardHead
             title="Integraciones"
-            count={issues.length ? `${issues.length} pendientes${errors && errors < issues.length ? ` · ${errors} fallan` : ''}` : 'todo conectado'}
+            count={issues.length ? `${issues.length} pendientes${errors && errors < issues.length ? ` · ${errors} fallan` : ''}` : 'estado de fuentes'}
             sub={`Estado según la última entrega de cada fuente, no solo su configuración · periodo ${period}d donde aplica`}
           />
           <ul className="m-0 list-none p-0">
@@ -137,7 +141,10 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
                   <RcMetrics metrics={i.revenuecat.metrics} fetchedAt={i.revenuecat.fetchedAt} />
                 )}
                 {c.id === 'appStore' && store.configured && !store.error && (
-                  <div className="mt-1 font-mono text-[10.5px] leading-snug text-[#5C5C5C]">Apple publica cada día con 1–2 días de retraso: los días pendientes no son ceros.</div>
+                  <div className="mt-1 font-mono text-[10.5px] leading-snug text-[#5C5C5C]">
+                    Apple publica cada día con 1–2 días de retraso: los días pendientes no son ceros.
+                    {store.partial && ' Carga parcial: se acabó el tiempo antes de los días más viejos; lo cargado queda guardado y la siguiente carga sigue con lo que falta.'}
+                  </div>
                 )}
               </IntegrationRow>
             ))}
@@ -148,7 +155,7 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
           <Card>
             <CardHead title="Qué falla" count={issues.length ? `${issues.length}` : undefined} />
             {issues.length === 0 ? (
-              <p className="m-0 font-mono text-[12px] uppercase tracking-[0.06em] text-[#4ADE80]">Todo conectado</p>
+              <p className="m-0 font-mono text-[12px] text-[#8B8B8B]">Sin fallos detectados con la evidencia disponible. Revisa cada fuente: configuración y recepción son pruebas distintas.</p>
             ) : (
               <ul className="m-0 flex list-none flex-col gap-1.5 p-0 font-mono text-[12px]">
                 {nonEnv.map((p) => (
@@ -181,6 +188,7 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
       </div>
 
       {actions.data && actions.error && <StaleBanner error={actions.error} onRetry={() => void actions.reload()} />}
+      <SourceFreshness meta={sourceMetaForError(actions.data?.meta, actions.error?.message)} maxAgeMs={CORE_STALE_MS} label="Historial del admin · cada 30 s" fallbackAt={actions.updatedAt} />
       <Card>
         <CardHead
           title="Actividad del admin"

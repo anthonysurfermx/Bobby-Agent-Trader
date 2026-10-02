@@ -1,10 +1,12 @@
 import type { ReactNode } from 'react';
-import { fetchAdminAudience, type AudienceResponse, type OverviewResponse, type ProviderCountries } from '@/lib/admin-client';
+import { fetchAdminAudience, isMissing, type AudienceResponse, type OverviewResponse, type ProviderCountries } from '@/lib/admin-client';
 import { Card, CardHead, Empty, ErrorState, KpiStrip, Loading, Note, StaleBanner, TableScroll, td, th, tr } from './ui';
 import { BigNumber, StatusBars } from './charts';
 import { MIN_BASE } from './deltas';
-import { DASH, fmtDate, fmtDateTime, fmtInt, fmtPct, fmtUsd } from './format';
+import { DASH, fmtDate, fmtDateTime, fmtDays, fmtInt, fmtPct, fmtUsd, geoText, shareText } from './format';
 import { useLoad } from './useLoad';
+import { composeAudience, CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 // First-level regions are ISO 3166-2 codes; Mexico's are named here (config, not data), others show their code.
 const MX_STATES: Record<string, string> = {
@@ -28,27 +30,25 @@ const flag = (code: string) => (/^[A-Z]{2}$/.test(code) ? String.fromCodePoint(.
 const place = (code: string) => `${flag(code)} ${countryName(code)}`.trim();
 const regionName = (country: string, region: string) => (country === 'MX' && MX_STATES[region] ? MX_STATES[region] : `${region} · ${countryName(country)}`);
 
-/** a of b as text: a percentage only with a base of MIN_BASE or more, else the raw counts. */
-function shareText(a: number, b: number): string {
-  if (!b) return DASH;
-  return b < MIN_BASE ? `${fmtInt(a)}/${fmtInt(b)} (muestra pequeña)` : `${fmtPct(a, b)} (n=${fmtInt(b)})`;
-}
+/** Third-party aggregates cannot leave the team out: said on each one while the header says "Sin equipo". */
+const SOURCE_TEAM = 'incluye al equipo (la fuente no lo separa)';
 function ShareCell({ a, b }: { a: number; b: number }) {
   if (!b) return <>{DASH}</>;
   if (b < MIN_BASE) return <span title="Muestra pequeña: menos de 5">{fmtInt(a)}/{fmtInt(b)}</span>;
   return <>{fmtPct(a, b)}</>;
 }
 
-/** A provider's per-country list, or why it is not there. */
-function ProviderCard<K extends string>({ title, sub, data, valueKey, caption, notConnected, footer }: {
-  title: string; sub: string; data: ProviderCountries<K>; valueKey: K; caption: string; notConnected: string; footer?: ReactNode;
+/** A provider's per-country list, or why it is not there (`absent`: the server did not send the block). */
+function ProviderCard<K extends string>({ title, sub, data, valueKey, caption, notConnected, footer, absent }: {
+  title: string; sub: string; data: ProviderCountries<K>; valueKey: K; caption: string; notConnected: string; footer?: ReactNode; absent?: boolean;
 }) {
   const rows = data.countries ?? [];
   const total = rows.reduce((a, r) => a + r[valueKey], 0);
   return (
     <Card>
-      <BigNumber label={title} value={data.configured && !data.error && data.countries ? fmtInt(total) : DASH} caption={caption} />
-      {!data.configured ? <Empty>{notConnected}</Empty>
+      <BigNumber label={title} value={!absent && data.configured && !data.error && data.countries ? fmtInt(total) : DASH} caption={caption} />
+      {absent ? <Empty>Dato no disponible</Empty>
+        : !data.configured ? <Empty>{notConnected}</Empty>
         : data.error ? <Note tone="red" tag="Con error">{data.error}</Note>
         : !rows.length ? <Empty>Sin datos en el periodo</Empty>
         : <StatusBars uppercase={false} labelWidth={150} rows={rows.slice(0, 10).map((r, i) => ({ label: place(r.country), value: r[valueKey], fill: i ? 'blue' : 'orange', sub: total >= MIN_BASE ? fmtPct(r[valueKey], total) : undefined }))} />}
@@ -60,17 +60,25 @@ function ProviderCard<K extends string>({ title, sub, data, valueKey, caption, n
 
 function Content({ d, period, internal, data }: { d: AudienceResponse; period: number; internal: boolean; data?: OverviewResponse | null }) {
   const g = d.geo;
+  // A value the server did not send is "—", never a zero.
+  const miss = (path: string) => isMissing(d.missing, path);
+  const show = (path: string, text: string) => (miss(path) ? DASH : text);
   const who = internal ? 'visitantes' : 'visitantes externos';
   const top = g.countries[0];
   const locatedVisitors = g.countries.reduce((a, c) => a + c.visitors, 0);
   const purchaseTotal = g.purchases.reduce((a, p) => a + p.newPaying, 0);
+  const purchasesUnknown = miss('geo.purchases') || miss('geo.purchasesSince');
+  const purchasesUnmeasured = !purchasesUnknown && g.purchasesSince == null;
   // Date and time: location started mid-day, so visitors from earlier that same day also have none.
   const since = g.locatedSince ? fmtDateTime(g.locatedSince) : null;
+  const geo = geoText(g, miss, period, since);
 
   // App Store reconciliation: only with the overview of the same period and the same team mode.
   const store = data?.integrations.appStore;
   const range = store?.coveredFrom ? `reportes publicados del ${fmtDate(store.coveredFrom)} al ${fmtDate(store.coveredTo)}` : null;
   const pending = store?.pendingDays?.length ? `Apple aún no publica: ${store.pendingDays.map(fmtDate).join(', ')}` : null;
+  // Apple's load ran out of time: the list covers the loaded days only.
+  const partial = d.appStore.partial ? `parcial: faltan ${fmtInt(d.appStore.missingDays.length)} ${d.appStore.missingDays.length === 1 ? 'día' : 'días'} (${fmtDays(d.appStore.missingDays)})` : null;
   const growth = data?.growth && data.growth.days === period && data.growth.includeInternal === internal ? data.growth : null;
   const downloads = d.appStore.configured && !d.appStore.error && d.appStore.countries ? d.appStore.countries.reduce((a, c) => a + c.downloads, 0) : null;
 
@@ -79,26 +87,24 @@ function Content({ d, period, internal, data }: { d: AudienceResponse; period: n
       <KpiStrip
         items={[
           {
-            label: 'Visitantes web ubicados', value: fmtInt(g.web.located),
-            caption: g.web.measurable
-              ? `${shareText(g.web.located, g.web.measurable)} de los que llegaron${since ? ` desde el ${since}` : ''} · ${period}d`
-              : since ? `nadie llegó desde el ${since} · ${period}d` : 'la ubicación aún no se registra',
+            label: 'Visitantes web ubicados', value: show('geo.web.located', fmtInt(g.web.located)),
+            caption: geo.located,
           },
           {
-            label: 'Sin ubicación', value: fmtInt(g.web.beforeLocation),
-            caption: since ? `llegaron antes del ${since}, cuando aún no se registraba · de ${fmtInt(g.web.devices)} nuevos` : `de ${fmtInt(g.web.devices)} instalaciones web nuevas · ${period}d`,
+            label: 'Sin ubicación', value: show('geo.web.beforeLocation', fmtInt(g.web.beforeLocation)),
+            caption: geo.noLocation,
           },
           {
             label: 'País principal', value: top && locatedVisitors ? place(top.country) : DASH,
-            caption: top && locatedVisitors ? `${shareText(top.visitors, locatedVisitors)} de los ubicados` : `aún no hay ${who} ubicados`,
+            caption: miss('geo.countries') ? 'dato no disponible' : top && locatedVisitors ? `${shareText(top.visitors, locatedVisitors)} de los ubicados` : `aún no hay ${who} ubicados`,
           },
         ]}
       />
 
       <Card padded={false}>
-        <div className="px-5 pt-5"><CardHead title="Por país · web" count={`${fmtInt(g.countries.length)} países · n=${fmtInt(locatedVisitors)}`} sub="Instalaciones web nuevas del periodo con ubicación y qué tan lejos llegaron" /></div>
+        <div className="px-5 pt-5"><CardHead title="Por país · web" count={geo.countriesCount} sub="Instalaciones web nuevas del periodo con ubicación y qué tan lejos llegaron" /></div>
         <div className="px-5 pb-4">
-          {!g.countries.length || !g.web.located ? (
+          {miss('geo.countries') ? <Empty>Dato no disponible</Empty> : !g.countries.length || !g.web.located ? (
             <Empty>{g.locatedSince ? `Aún no hay ${who} ubicados en el periodo` : 'La ubicación empieza a registrarse con las próximas visitas'}</Empty>
           ) : (
             <TableScroll minWidth={600}>
@@ -125,31 +131,38 @@ function Content({ d, period, internal, data }: { d: AudienceResponse; period: n
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
-          <BigNumber label="Por estado · con estado identificado" value={fmtInt(g.located.withRegion)} caption={`de ${fmtInt(g.located.total)} ubicados`} />
-          {g.regions.length
+          <BigNumber label="Por estado · con estado identificado" value={show('geo.located.withRegion', fmtInt(g.located.withRegion))} caption={`de ${show('geo.located.total', fmtInt(g.located.total))} ubicados`} />
+          {miss('geo.regions') ? <Empty>Dato no disponible</Empty> : g.regions.length
             ? <StatusBars uppercase={false} labelWidth={170} stackMobile rows={g.regions.slice(0, 12).map((r, i) => ({ label: `${flag(r.country)} ${regionName(r.country, r.region)}`, value: r.visitors, fill: i ? 'blue' : 'orange', sub: `${fmtInt(r.readers)} leyeron` }))} />
             : <Empty>{g.located.total ? 'Ningún ubicado con estado identificado' : `Aún no hay ${who} ubicados`}</Empty>}
         </Card>
         <Card>
-          <BigNumber label="Compras por país de la tienda" value={fmtInt(purchaseTotal)} caption={`cuentas nuevas de pago · ${period}d`} />
-          {g.purchases.length
-            ? <StatusBars uppercase={false} labelWidth={150} rows={g.purchases.map((p, i) => ({ label: place(p.country), value: p.newPaying, fill: i ? 'blue' : 'orange', sub: fmtUsd(p.grossUsd) }))} />
-            : <Empty>Sin compras en el periodo</Empty>}
-          <p className="m-0 mt-4 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">Cuentas distintas con un cobro positivo, por el país que reportan RevenueCat (App Store) y Stripe; bruto en USD.</p>
+          {/* Never an observed zero without coverage: no purchase event ever received is "Sin medir". */}
+          <BigNumber label="Compras por país de la tienda" value={purchasesUnknown || purchasesUnmeasured ? DASH : fmtInt(purchaseTotal)} caption={`nuevos pagadores verificados (primer cobro) · ${period}d`} />
+          {purchasesUnknown ? <Empty>Dato no disponible</Empty>
+            : purchasesUnmeasured ? <Empty>Sin medir: nunca ha llegado un evento de compra</Empty>
+            : g.purchases.length
+              ? <StatusBars uppercase={false} labelWidth={150} rows={g.purchases.map((p, i) => ({ label: place(p.country), value: p.newPaying, fill: i ? 'blue' : 'orange', sub: fmtUsd(p.grossUsd) }))} />
+              : <Empty>Sin compras verificadas en el periodo</Empty>}
+          <p className="m-0 mt-4 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
+            Pagadores verificados (membresía de producción, sin periodo de prueba) con su primer cobro en el periodo, por país de la tienda (RevenueCat para App Store, Stripe para la web); bruto en USD de sus cobros del periodo. Los cobros de membresías sin verificar, sandbox y entorno desconocido no cuentan aquí.
+            {g.purchasesSince ? ` Eventos de compra desde el ${fmtDate(g.purchasesSince)}.` : ''}
+          </p>
         </Card>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <ProviderCard title="Google · clics por país" data={d.searchConsole} valueKey="clicks" caption={`clics · ${period}d`}
+        <ProviderCard title="Google · clics por país" data={d.searchConsole} valueKey="clicks" caption={`clics · ${period}d${internal ? '' : ` · ${SOURCE_TEAM}`}`} absent={miss('searchConsole')}
           notConnected="Conecta Search Console" sub="Otra población: búsquedas en Google, agregadas. No es la misma gente que la tabla web de arriba." />
         <ProviderCard
-          title="App Store · descargas por país" data={d.appStore} valueKey="downloads" caption={`descargas nuevas · ${period}d`}
+          title="App Store · descargas por país" data={d.appStore} valueKey="downloads" caption={`descargas nuevas · ${period}d${partial ? ' · parcial' : ''}${internal ? '' : ` · ${SOURCE_TEAM}`}`} absent={miss('appStore')}
           notConnected="Conecta App Store Connect"
-          sub={['Reportes de ventas de Apple por tienda; Apple los publica con 1–2 días de retraso y la app no reporta ubicación', range, pending].filter(Boolean).join(' · ') + '.'}
+          sub={['Reportes de ventas de Apple por tienda; Apple los publica con 1–2 días de retraso y la app no reporta ubicación', partial, range, pending].filter(Boolean).join(' · ') + '.'}
           footer={downloads != null && growth ? (
             <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[11.5px] leading-snug text-[#BDBDBD]">
-              App Store: {fmtInt(downloads)} descargas · Bobby vio {fmtInt(growth.cohorts.ios.arrived)} instalaciones iOS
+              App Store: {fmtInt(downloads)} descargas{partial ? ' (parcial)' : ''} · Bobby vio {fmtInt(growth.cohorts.ios.arrived)} instalaciones iOS
               <span className="text-[#5C5C5C]">{growth.coverage.iosObservedSince ? ` (observadas desde el ${fmtDate(growth.coverage.iosObservedSince)})` : ' (aún sin observar)'}</span>
+              {!internal && <span className="block text-[#5C5C5C]">Apple cuenta también las descargas del equipo (no las separa); las instalaciones de Bobby ya las dejan fuera.</span>}
             </p>
           ) : undefined}
         />
@@ -168,18 +181,26 @@ function Content({ d, period, internal, data }: { d: AudienceResponse; period: n
 }
 
 /** `data` (optional, the page's overview) adds the App Store covered range and the iOS install reconciliation. */
-export default function AudienceTab({ period, refreshKey, internal = false, data }: { period: number; refreshKey: number; internal?: boolean; data?: OverviewResponse | null }) {
+export default function AudienceTab({ period, refreshKey, internal = false, data, markFailed = false }: {
+  period: number; refreshKey: number; internal?: boolean; data?: OverviewResponse | null;
+  /** The overview's load could not mark this browser as the team's; this view's own flag counts too. */
+  markFailed?: boolean;
+}) {
   const mode = `${period}|${internal ? 'all' : 'ext'}`;
-  const a = useLoad(() => fetchAdminAudience(period, internal), `${mode}|aud|${refreshKey}`);
+  const a = useLoad((signal) => fetchAdminAudience(period, internal, signal), `${mode}|aud|${refreshKey}`, { intervalMs: CORE_REFRESH_MS });
   // Data from another period or team mode is never shown under this one's label.
-  const d = a.data && a.dataKey?.startsWith(`${mode}|`) ? a.data : null;
+  const d = a.data && a.dataKey?.startsWith(`${mode}|`) ? composeAudience(a.data, data) : null;
+  const unverified = !internal && (markFailed || !!d?.internalMarkFailed);
   return (
     <div className="flex flex-col gap-4">
+      <SourceFreshness meta={sourceMetaForError(d?.meta, a.error?.message)} maxAgeMs={CORE_STALE_MS} label="Audiencia · actualización cada 30 s" fallbackAt={a.updatedAt} />
       <Note tag="Ubicación">
         País y estado aproximados por la IP de cada visita web, sin guardar la IP.
         {d?.geo.locatedSince ? ` Registrada desde el ${fmtDateTime(d.geo.locatedSince)}: quien llegó antes aparece sin ubicación.` : ' Empieza con las próximas visitas.'}
         {' '}iOS no reporta ubicación; ahí cuentan las descargas por país de App Store.
-        {internal ? ' Incluye al equipo.' : ' Sin el equipo (admins, cuentas marcadas, sus instalaciones y sus redes).'}
+        {internal ? ' Incluye al equipo.' : unverified
+          ? ' Sin el equipo · sin verificar: esta carga no pudo marcar tu navegador, así que puede incluir tu propio tráfico.'
+          : ' Sin el equipo (admins, cuentas marcadas, sus instalaciones y sus redes), salvo App Store y Google, que no lo separan.'}
       </Note>
       {d && a.error && <StaleBanner error={a.error} onRetry={() => void a.reload()} />}
       {a.error && !d ? <ErrorState message={a.error.message} onRetry={() => void a.reload()} />

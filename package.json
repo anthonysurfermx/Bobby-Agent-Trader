@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/prod-source-guard.mjs && npm run check:api && vite build",
+    "build": "node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && vite build",
     "build:dev": "vite build --mode development",
     "check:api": "tsc -p tsconfig.api.json",
     "lint": "eslint .",
@@ -64,7 +64,10 @@
     "test:briefings": "tsx scripts/test-briefings-calendar.mts && tsx scripts/test-briefings-content.mts && tsx scripts/test-briefings-core.mts && tsx scripts/test-briefings-macro.mts && tsx scripts/test-briefings-revenuecat.mts && tsx scripts/test-briefings-stripe.mts",
     "test:briefings-api": "tsx scripts/test-briefings-api.mts",
     "test:briefings-worker": "tsx scripts/test-briefings-worker.mts",
-    "test:briefings-pg": "tsx scripts/test-briefings-pg.mts"
+    "test:briefings-pg": "tsx scripts/test-briefings-pg.mts",
+    "test:admin-live": "node --import tsx scripts/test-admin-live-api.mts && node --import tsx scripts/test-admin-live-ui.mts && node --import tsx scripts/test-admin-r2-desk.mts && node --import tsx scripts/test-admin-r2-insights.mts && node --import tsx scripts/test-admin-stripe-truth.mts",
+    "test:admin-live-pg": "node --import tsx scripts/test-admin-r2-pg.mts",
+    "check:admin": "tsc -p tsconfig.admin.json"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

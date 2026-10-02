@@ -67,13 +67,15 @@ function InsightCard({ i, open, onToggle, onOpenTab }: { i: Insight; open: boole
 /** "Plan de la semana": Claude orders the findings into ≤3 priorities (api/_lib/admin-plan.ts), on demand. */
 function WeeklyPlan({ insights, period, internal, notify }: { insights: Insight[]; period: number; internal: boolean; notify: (text: string, ok?: boolean) => void }) {
   const [plan, setPlan] = useState<GrowthPlan | null>(null);
+  // The plan's own load could not mark this browser: its figures may include the owner's traffic (the model was told).
+  const [planMarkFailed, setPlanMarkFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const titles = new Map(insights.map((i) => [i.id, i.title]));
   const run = async (force: boolean) => {
     setBusy(true);
     try {
-      const r = await adminAction<{ plan?: GrowthPlan }>({ action: 'growth-plan', days: period, internal, force });
-      if (r.plan && r.plan.priorities.length) setPlan(r.plan);
+      const r = await adminAction<{ plan?: GrowthPlan; internalMarkFailed?: unknown }>({ action: 'growth-plan', days: period, internal, force });
+      if (r.plan && r.plan.priorities.length) { setPlan(r.plan); setPlanMarkFailed(!internal && r.internalMarkFailed === true); }
       else notify('El modelo no devolvió un plan apoyado en los hallazgos. Intenta de nuevo.', false);
     } catch (e) {
       notify(toAdminError(e).message, false);
@@ -90,6 +92,9 @@ function WeeklyPlan({ insights, period, internal, notify }: { insights: Insight[
       </div>
       {plan && (
         <div className="mt-3 flex flex-col gap-3">
+          {planMarkFailed && (
+            <p className="m-0 font-mono text-[11px] text-[#F7A04B]">Sin verificar: este plan se calculó sin poder marcar este navegador como del equipo; sus cifras pueden incluir tu propio tráfico.</p>
+          )}
           {plan.summary && <p className="m-0 text-[13px] leading-relaxed text-[#EDEDED]">{plan.summary}</p>}
           <ol className="m-0 flex list-none flex-col gap-2 p-0">
             {plan.priorities.map((p, k) => (
@@ -120,6 +125,13 @@ function WeeklyPlan({ insights, period, internal, notify }: { insights: Insight[
   );
 }
 
+/** The manual send's result in words. Resend accepting an email is not its delivery to the inbox. */
+function digestSendMessage(r: { accepted?: unknown; emailId?: unknown; emailError?: unknown }): { text: string; ok: boolean } {
+  if (r.accepted === true) return { text: `Resend aceptó el resumen${typeof r.emailId === 'string' && r.emailId ? ` (id ${r.emailId})` : ''}. Su entrega a tu bandeja no se confirma aquí.`, ok: true };
+  if (r.emailError === 'not_configured') return { text: 'No hay destinatario configurado (BOBBY_ALERT_EMAIL).', ok: false };
+  return { text: `Resend no aceptó el correo (${typeof r.emailError === 'string' && r.emailError ? r.emailError : 'sin detalle'}).`, ok: false };
+}
+
 /** The daily email (api/_lib/admin-digest.ts): what it would say right now, and a manual send. */
 function DigestControls({ notify }: { notify: (text: string, ok?: boolean) => void }) {
   const [busy, setBusy] = useState<'preview' | 'send' | null>(null);
@@ -131,9 +143,10 @@ function DigestControls({ notify }: { notify: (text: string, ok?: boolean) => vo
         const r = await adminAction<{ subject?: string; text?: string; fresh?: number; weekly?: boolean }>({ action: 'preview-digest' });
         setPreview({ subject: String(r.subject ?? ''), text: String(r.text ?? ''), fresh: Number(r.fresh ?? 0), weekly: Boolean(r.weekly) });
       } else {
-        await adminAction({ action: 'send-digest' });
-        notify('Resumen enviado a tu correo de alertas.');
-        setPreview(null);
+        const r = await adminAction<{ accepted?: unknown; emailId?: unknown; emailError?: unknown }>({ action: 'send-digest' });
+        const m = digestSendMessage(r);
+        notify(m.text, m.ok);
+        if (m.ok) setPreview(null);
       }
     } catch (e) {
       notify(toAdminError(e).message, false);
@@ -142,7 +155,7 @@ function DigestControls({ notify }: { notify: (text: string, ok?: boolean) => vo
   return (
     <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-white/[0.06] pt-3">
       <p className="m-0 min-w-0 flex-1 text-[12px] leading-snug text-[#8B8B8B]">
-        Te aviso por email cada día a las 13:00 UTC si aparece algo urgente o por atender que no te haya mandado en 7 días; los lunes, un resumen semanal.
+        Te aviso por email cada día a las 13:00 UTC si aparece algo urgente o por atender que no te haya mandado esta semana (lunes a domingo, UTC); los lunes, un resumen semanal. Solo se da por avisado cuando Resend acepta el correo.
       </p>
       <Btn size="sm" variant="ghost" busy={busy === 'preview'} onClick={() => void run('preview')}>Vista previa</Btn>
       <Modal
@@ -157,9 +170,11 @@ function DigestControls({ notify }: { notify: (text: string, ok?: boolean) => vo
   );
 }
 
-export default function InsightsPanel({ insights, missing, onOpenTab, notify, period, internal }: {
+export default function InsightsPanel({ insights, missing, onOpenTab, notify, period, internal, markFailed = false }: {
   insights: Insight[]; missing?: boolean; onOpenTab?: (tab: string) => void; notify?: (text: string, ok?: boolean) => void;
   period?: number; internal?: boolean;
+  /** This load could not mark the owner's browser as the team's (the exclusion is not verified). */
+  markFailed?: boolean;
 }) {
   const urgent = insights.filter((i) => i.level === 'critical' || i.level === 'warn').length;
   const [showAll, setShowAll] = useState(false);
@@ -178,7 +193,7 @@ export default function InsightsPanel({ insights, missing, onOpenTab, notify, pe
             {missing ? '—' : urgent ? `${fmtInt(urgent)} por atender` : insights.length ? 'Nada urgente' : 'Sin hallazgos'}
           </div>
           <p className="m-0 mt-2 max-w-[640px] text-[12px] leading-snug text-[#8B8B8B]">
-            Calculado con las mismas cifras de este panel, {internal ? 'incluyendo al equipo' : 'sin el tráfico del equipo'}; cada hallazgo muestra sus números y su muestra (n).
+            Calculado con las mismas cifras de este panel, {internal ? 'incluyendo al equipo' : markFailed ? 'sin el tráfico del equipo · sin verificar (este navegador no se pudo marcar: puede incluir tu propio tráfico)' : 'sin el tráfico del equipo'}; cada hallazgo muestra sus números y su muestra (n).
           </p>
         </div>
         {counts.length > 0 && (
