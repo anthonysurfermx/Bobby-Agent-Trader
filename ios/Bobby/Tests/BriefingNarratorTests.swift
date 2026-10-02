@@ -57,6 +57,7 @@ final class BriefingNarratorTests: XCTestCase {
     private var mic = false
     private var busy = false
     private var otherAudio = false
+    private var active = true
     private var pageStops = 0
     private var consentLoads = 0
     private var voiceCalls: [(brief: String, version: Int, segment: Int, voice: String, language: String, key: String)] = []
@@ -68,11 +69,15 @@ final class BriefingNarratorTests: XCTestCase {
     /// Suspends the voice request of a segment until the test resumes it.
     private var voiceGate: [Int: CheckedContinuation<Void, Never>] = [:]
     private var gatedSegments: Set<Int> = []
+    /// Deliberately ignores cancellation so late consent responses exercise the lifecycle fence.
+    private var gateConsent = false
+    private var consentGates: [CheckedContinuation<Bool?, Never>] = []
 
     override func setUp() async throws {
         output = RecordingOutput()
         user = "user-a"; generation = UUID(); risk = true; consent = true; loadedConsent = true
-        mic = false; busy = false; otherAudio = false; pageStops = 0; consentLoads = 0
+        mic = false; busy = false; otherAudio = false; active = true; pageStops = 0; consentLoads = 0
+        gateConsent = false; consentGates = []
         voiceCalls = []; audioCalls = []; sleeps = []; audioAnswers = [:]; voiceGate = [:]; gatedSegments = []
         voiceAnswer = { BriefingVoiceState(state: .ready, audioId: BriefingNarratorTests.audioId($0)) }
     }
@@ -104,12 +109,16 @@ final class BriefingNarratorTests: XCTestCase {
             audioConsent: { [unowned self] in self.consent },
             loadAudioConsent: { [unowned self] in
                 self.consentLoads += 1
-                self.consent = self.loadedConsent
-                return self.loadedConsent
+                let loaded = self.gateConsent
+                    ? await withCheckedContinuation { self.consentGates.append($0) }
+                    : self.loadedConsent
+                self.consent = loaded
+                return loaded
             },
             micActive: { [unowned self] in self.mic },
             analysisBusy: { [unowned self] in self.busy },
             otherAudioPlaying: { [unowned self] in self.otherAudio },
+            appActive: { [unowned self] in self.active },
             stopPageVoice: { [unowned self] in self.pageStops += 1 },
             sleep: { [unowned self] seconds in self.sleeps.append(seconds); await Task.yield() })
         return BriefingNarrator(output: output, environment: env, observe: false)
@@ -510,6 +519,128 @@ final class BriefingNarratorTests: XCTestCase {
         fresh.autoplay(report: report(segments: 1))
         try await waitUntil { output.played.count == 2 }
         XCTAssertEqual(consentLoads, 2)
+    }
+
+    func testStopBeforeAutoplayConsentStartsMakesNoRequests() async throws {
+        consent = nil
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        n.stop()
+        try await settle()
+        XCTAssertEqual(consentLoads, 0)
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+    }
+
+    func testClosingReportRejectsLateAutoplayConsent() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        n.stop() // BriefingReportView.onDisappear uses this same cancellation.
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(audioCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+        XCTAssertEqual(pageStops, 0)
+    }
+
+    func testAutoplayScheduledBeforeAnAccountEpochChangeNeverLoadsConsent() async throws {
+        consent = nil
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        generation = UUID() // Even signing back into the same account creates a new epoch.
+        try await settle()
+        XCTAssertEqual(consentLoads, 0)
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+    }
+
+    func testLateConsentCannotStartAudioWhileTheAppIsInactive() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        active = false // The request can return before the lifecycle notification is delivered.
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+        active = true
+        n.stop()
+    }
+
+    func testBackgroundRejectsLateAutoplayEvenAfterReturningToForeground() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        active = false
+        n.appDidEnterBackground()
+        active = true
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(audioCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+    }
+
+    func testAutoplayCannotStartForAReportLoadedInBackground() async throws {
+        active = false; consent = nil
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await settle()
+        XCTAssertEqual(consentLoads, 0)
+        XCTAssertTrue(voiceCalls.isEmpty)
+        active = true
+        try await settle()
+        XCTAssertTrue(output.played.isEmpty, "Returning to the foreground does not replay a consumed tap")
+    }
+
+    func testAccountSwitchRejectsLateAutoplayForThePreviousAccount() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        user = "user-b"; generation = UUID()
+        n.accountChanged()
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(audioCalls.isEmpty)
+        XCTAssertTrue(output.played.isEmpty)
+    }
+
+    func testNewAutoplaySupersedesAConsentResponseFromThePreviousReport() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        n.autoplay(report: report(Self.otherBrief, segments: 1))
+        try await waitUntil { consentGates.count == 2 }
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty, "The replaced report must not take the voice")
+        consentGates[1].resume(returning: true)
+        try await waitUntil { output.played.count == 1 }
+        XCTAssertEqual(voiceCalls.map(\.brief), [Self.otherBrief])
+        n.stop()
+    }
+
+    func testManualPlaySupersedesPendingAutoplay() async throws {
+        consent = nil; gateConsent = true
+        let n = narrator()
+        n.autoplay(report: report(segments: 1))
+        try await waitUntil { consentGates.count == 1 }
+        consent = true
+        n.play(report: report(Self.otherBrief, segments: 1))
+        try await waitUntil { output.played.count == 1 }
+        consentGates[0].resume(returning: true)
+        try await settle()
+        XCTAssertEqual(voiceCalls.map(\.brief), [Self.otherBrief])
+        XCTAssertEqual(output.played.count, 1)
+        n.stop()
     }
 
     func testNoVoiceOrNoSegmentsHidesTheBar() {

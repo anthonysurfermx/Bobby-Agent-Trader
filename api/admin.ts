@@ -104,6 +104,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'set-internal', 'set-device-internal', 'remove-internal-network', 'set-internal-emails', 'preview-digest', 'send-digest', 'growth-plan'];
     const action = typeof body.action === 'string' && ACTIONS.includes(body.action) ? body.action : null;
     if (!action) return res.status(400).json({ error: 'Unknown action' });
+    // Grant receipt, balance and audit must commit together. A lost HTTP/DB response is retried with
+    // the same operation id; the generic per-request audit below would incorrectly duplicate it.
+    if (action === 'grant') {
+      const { result } = await grant(admin, body);
+      return res.status(200).json(result);
+    }
     // The audit row is written first (no row, no change); the outcome is added after.
     const target = typeof body.identityId === 'string' ? body.identityId : typeof body.code === 'string' ? body.code.toUpperCase()
       : typeof body.provider === 'string' ? body.provider : typeof body.id === 'number' ? String(body.id)
@@ -131,10 +137,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return { body: { coupon }, audit: { code: coupon?.code ?? null } };
       }
       case 'set-coupon-active': return { body: { coupon: await setCouponActive(body.code, body.active) } };
-      case 'grant': {
-        const { target: email, result } = await grant(body);
-        return { body: { ...result }, audit: { account: email } };
-      }
       case 'delete-user': {
         const { target: email } = await deleteUser(admin!, body);
         return { body: {}, audit: { account: email } };

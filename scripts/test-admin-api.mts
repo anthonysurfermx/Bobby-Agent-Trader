@@ -2,6 +2,7 @@
 // every change leaves an audit row; deletion needs the typed email and never deletes yourself; coupon and
 // grant input is validated; the App Store sales parser and the track normalizer keep only what they should.
 import assert from 'node:assert/strict';
+import { randomUUID } from 'node:crypto';
 
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
@@ -38,6 +39,17 @@ interface Call { url: string; body: any; method: string; headers: Record<string,
 let calls: Call[] = [];
 let overrides: (c: Call) => Response | null = () => null;
 let auditSeq = 0;
+const giftReceipts = new Map<string, { payload: string; result: Record<string, unknown> }>();
+let giftedReads = 0, grantAudits = 0;
+const grantRpc = (c: Call) => {
+  const payload = JSON.stringify({ ...c.body, p_operation: undefined });
+  const existing = giftReceipts.get(c.body.p_operation);
+  if (existing) return json(existing.payload === payload ? existing.result : { ok: false, error: 'operation_conflict' });
+  giftedReads += c.body.p_reads; grantAudits++;
+  const result = { ok: true, operationId: c.body.p_operation, bonus: { reads: giftedReads, profundo: 0, maximo: 0 }, proUntil: null };
+  giftReceipts.set(c.body.p_operation, { payload, result });
+  return json(result);
+};
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const raw = init?.body ? String(init.body) : '';
   let body: any = null;
@@ -68,7 +80,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('rpc/bobby_admin_members')) return json({ subscriptions: [{ email: 'reader@example.com', active: true }], grants: [] });
   if (c.url.includes('rpc/bobby_admin_coverage')) return json({ eventsSince: '2026-10-01T12:00:00Z', readsSince: '2026-09-27T00:00:00Z' });
   if (c.url.includes('bobby_coupons') && c.method === 'POST') return json([{ code: c.body.code, reads: c.body.reads }], 201);
-  if (c.url.includes('rpc/bobby_admin_grant')) return json({ ok: true, bonus: { reads: c.body.p_reads, profundo: 0, maximo: 0 }, proUntil: null });
+  if (c.url.includes('rpc/bobby_admin_grant_once')) return grantRpc(c);
   if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
   if (c.url.includes('/auth/v1/admin/users/')) return json({});
   if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
@@ -160,25 +172,48 @@ try {
   eq((await call('POST', 'Bearer user-token', {}, { action: 'create-coupon', reads: 5 })).statusCode, 403, 'a regular account cannot create coupons');
 
   // ---------- grants ----------
-  const gift = await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 });
+  const giftBody = (extra: Record<string, unknown> = {}) => ({ action: 'grant', operationId: randomUUID(), identityId: USER, ...extra });
+  const firstGift = giftBody({ reads: 10 });
+  const gift = await call('POST', 'Bearer admin-token', {}, firstGift);
   eq([gift.statusCode, gift.body.bonus.reads], [200, 10], 'a gift');
-  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_grant'))?.body, { p_identity: USER, p_reads: 10, p_profundo: 0, p_maximo: 0, p_pro_days: 0 }, 'the grant call');
-  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER })).statusCode, 400, 'an empty gift');
-  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: 'nope', reads: 1 })).statusCode, 400, 'a malformed id');
-  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: '0b8f0a52-0000-4000-8000-000000000000', reads: 1 })).statusCode, 404, 'an unknown account');
+  eq(calls.find((c) => c.url.includes('rpc/bobby_admin_grant_once'))?.body, { p_operation: firstGift.operationId, p_admin: ADMIN, p_identity: USER, p_reads: 10, p_profundo: 0, p_maximo: 0, p_pro_days: 0 }, 'actor and operation come from verified admin and fixed intent');
+  eq(audits().length, 0, 'grant uses the atomic RPC audit, not a separate HTTP audit');
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody())).statusCode, 400, 'an empty gift');
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody({ identityId: 'nope', reads: 1 }))).statusCode, 400, 'a malformed id');
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody({ identityId: '0b8f0a52-0000-4000-8000-000000000000', reads: 1 }))).statusCode, 404, 'an unknown account');
+  for (const operationId of [undefined, '', 'nope', '00000000-0000-0000-0000-000000000000']) {
+    eq((await call('POST', 'Bearer admin-token', {}, giftBody({ operationId, reads: 1 }))).statusCode, 400, 'missing/malformed operation rejected');
+    ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant')), 'invalid operation never mutates');
+  }
   for (const [field, value] of [['reads', -1], ['reads', 1.5], ['reads', 1001], ['profundo', 201], ['maximo', 101], ['proDays', 367], ['reads', 'not-a-number']]) {
-    eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, [field]: value })).statusCode, 400, `invalid grant ${field}=${value}`);
+    eq((await call('POST', 'Bearer admin-token', {}, giftBody({ [field]: value }))).statusCode, 400, `invalid grant ${field}=${value}`);
     ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant')), 'invalid grant never reaches the mutation');
   }
-  const forbiddenGift = await call('POST', 'Bearer user-token', {}, { action: 'grant', identityId: USER, reads: 10 });
+  const forbiddenGift = await call('POST', 'Bearer user-token', {}, giftBody({ reads: 10 }));
   eq(forbiddenGift.statusCode, 403, 'non-admin cannot gift to itself');
   ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant') || c.url.includes('bobby_admin_actions')), 'non-admin neither mutates nor creates a grant audit');
-  overrides = (c) => c.url.includes('bobby_admin_actions') && c.method === 'POST' ? json({ message: 'down' }, 500) : null;
-  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 })).statusCode, 503, 'gift refuses an unavailable audit log');
-  ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant')), 'no gift without its audit');
-  overrides = (c) => c.url.includes('rpc/bobby_admin_grant') ? json({ message: 'down' }, 500) : null;
-  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 })).statusCode, 502, 'gift storage failure is visible to the caller');
-  eq(finishes().at(-1)?.detail.status, 'failed', 'failed gift has a failed audit');
+  overrides = (c) => c.url.includes('rpc/bobby_admin_grant_once') ? json({ message: 'down' }, 500) : null;
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody({ reads: 10 }))).statusCode, 502, 'transaction storage failure is visible to the caller');
+  eq(audits().length, 0, 'failure does not create a misleading separate benefit audit');
+  overrides = () => null;
+  const retryGift = giftBody({ reads: 5 });
+  const beforeLost = [giftedReads, grantAudits];
+  overrides = (c) => {
+    if (!c.url.includes('rpc/bobby_admin_grant_once')) return null;
+    grantRpc(c); // SQL committed, then the response was lost.
+    throw new Error('lost response');
+  };
+  eq((await call('POST', 'Bearer admin-token', {}, retryGift)).statusCode, 502, 'lost DB response is ambiguous');
+  overrides = () => null;
+  const recoveredGift = await call('POST', 'Bearer admin-token', {}, retryGift);
+  eq(recoveredGift.statusCode, 200, 'same operation safely recovers its receipt');
+  eq([giftedReads, grantAudits], [beforeLost[0] + 5, beforeLost[1] + 1], 'retry adds one gift and one audit only');
+  eq((await call('POST', 'Bearer admin-token', {}, { ...retryGift, reads: 6 })).statusCode, 409, 'same operation with different payload is refused');
+  eq([giftedReads, grantAudits], [beforeLost[0] + 5, beforeLost[1] + 1], 'conflicting payload adds no gift or audit');
+  overrides = (c) => c.url.includes('rpc/bobby_admin_grant_once') ? json({ ok: false, error: 'not_admin' }) : null;
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody({ reads: 1 }))).statusCode, 403, 'SQL role removal is respected');
+  overrides = (c) => c.url.includes('rpc/bobby_admin_grant_once') ? json({ ok: true, operationId: randomUUID() }) : null;
+  eq((await call('POST', 'Bearer admin-token', {}, giftBody({ reads: 1 }))).statusCode, 502, 'unmatched receipt is never reported as confirmed');
   overrides = () => null;
 
   // ---------- deletion ----------
@@ -369,6 +404,21 @@ try {
   const healedRun = buildInsights({ days: 30, now: NOW, overview: { llm: { deskRuns: { runs: 24, finished: 14, byDay: [{ day: '2026-09-30', runs: 1, finished: 0 }, { day: '2026-10-01', runs: 1, finished: 1 }] },
     providers: { openai: { lastFailure: { at: '2026-10-01T10:27:00Z', stop: 'http_429', surface: 'desk' } }, anthropic: { lastOk: '2026-10-01T17:30:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
   eq(healedRun.find((i) => i.id === 'desk-failures')?.level, 'info', 'failures followed by a successful call are history, not urgent');
+
+  // ---------- dev dashboard fixture follows the same durable acknowledgement ----------
+  const { mockAdminFetch } = await import('../src/components/admin/bobby/mock.ts');
+  const queryUsers = new URLSearchParams({ view: 'users', limit: '200' });
+  const fixtureUsers = (await (await mockAdminFetch('grant-lost', 'GET', queryUsers)).json()).users;
+  const fixtureUser = fixtureUsers.find((u: { is_admin: boolean }) => !u.is_admin);
+  const fixtureGift = { action: 'grant' as const, operationId: randomUUID(), identityId: fixtureUser.id, reads: 5 };
+  eq((await mockAdminFetch('grant-lost', 'POST', null, fixtureGift)).status, 502, 'dev fault loses the first receipt after mutation');
+  const fixtureRecovered = await mockAdminFetch('grant-lost', 'POST', null, fixtureGift);
+  eq([fixtureRecovered.status, (await fixtureRecovered.json()).operationId], [200, fixtureGift.operationId], 'dev retry acknowledges the original intent');
+  const fixtureAfter = (await (await mockAdminFetch('grant-lost', 'GET', queryUsers)).json()).users.find((u: { id: string }) => u.id === fixtureUser.id);
+  eq(fixtureAfter.bonus_reads, (fixtureUser.bonus_reads ?? 0) + 5, 'dev retry adds one gift only');
+  const fixtureActions = (await (await mockAdminFetch('grant-lost', 'GET', new URLSearchParams({ view: 'actions' }))).json()).actions;
+  eq(fixtureActions.filter((a: { detail: { operationId?: string } }) => a.detail.operationId === fixtureGift.operationId).length, 1, 'dev retry has one benefit audit');
+  eq((await mockAdminFetch('grant-lost', 'POST', null, { ...fixtureGift, reads: 6 })).status, 409, 'dev fixture refuses a changed retry payload');
 
   console.log(`admin-api: ${checks} checks passed`);
 } finally {

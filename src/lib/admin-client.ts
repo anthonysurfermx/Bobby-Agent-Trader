@@ -282,7 +282,7 @@ export interface CostRow { id: number; kind: CostKind; channel: string | null; a
 export type AdminPostBody =
   | { action: 'create-coupon'; code?: string; reads: number; profundo: number; maximo: number; maxRedemptions: number | null; expiresAt: string | null; note?: string }
   | { action: 'set-coupon-active'; code: string; active: boolean }
-  | { action: 'grant'; identityId: string; reads?: number; profundo?: number; maximo?: number; proDays?: number }
+  | { action: 'grant'; operationId: string; identityId: string; reads?: number; profundo?: number; maximo?: number; proDays?: number }
   | { action: 'delete-user'; identityId: string; confirm: string }
   | { action: 'set-admin'; identityId: string; admin: boolean }
   | { action: 'credit-mark'; provider: LlmProvider; kind: 'balance' | 'topup'; amountUsd: number; note?: string }
@@ -344,6 +344,9 @@ const SERVER_ES: Array<[RegExp, string | ((m: RegExpExecArray) => string)]> = [
   [/^Invalid account id\.$/, 'Id de cuenta inválido.'],
   [/^Account not found\.$/, 'No se encontró la cuenta.'],
   [/^Choose at least one gift\.$/, 'Elige al menos un regalo.'],
+  [/^A valid grant operation id is required\.$/, 'Falta la confirmación del regalo. Abre de nuevo el formulario.'],
+  [/^This grant operation belongs to a different account, administrator or gift\.$/, 'Este regalo pendiente no coincide con la cuenta, administrador o cantidades originales. Revisa el historial antes de enviar otro.'],
+  [/^The grant was not confirmed\. Retry the same operation\.$/, 'No se confirmó el regalo. Reintenta el mismo regalo pendiente.'],
   [/^You cannot delete your own account from here\.$/, 'No puedes borrar tu propia cuenta desde aquí.'],
   [/^Type the account email to confirm\.$/, 'Escribe el email de la cuenta para confirmar.'],
   [/^The Bobby data was deleted but the sign-in could not be\. Retry\.$/, 'Se borraron los datos de Bobby pero no el inicio de sesión. Vuelve a intentarlo.'],
@@ -939,6 +942,9 @@ export async function fetchAdminActions(): Promise<ActionsResponse> {
 export async function adminAction<T extends Record<string, unknown> = Record<string, unknown>>(body: AdminPostBody): Promise<T & { ok: true }> {
   const r = obj(await request('POST', null, body));
   if (r.ok !== true) throw new AdminError(200, typeof r.error === 'string' ? r.error : 'not_ok', typeof r.error === 'string' ? r.error : 'El servidor no confirmó la acción.');
+  if (body.action === 'grant' && r.operationId !== body.operationId) {
+    throw new AdminError(200, 'bad_response', 'El servidor no confirmó este regalo. Reintenta la misma operación.');
+  }
   return r as T & { ok: true };
 }
 

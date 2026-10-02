@@ -55,6 +55,8 @@ final class BriefingNarrator: BriefingPlayback {
         var analysisBusy: () -> Bool
         /// Another app (music, a call, a podcast) is playing.
         var otherAudioPlaying: () -> Bool
+        /// Re-read before starting audio: a report can finish loading after the app leaves the foreground.
+        var appActive: () -> Bool = { true }
         /// Stops the page's narration line before a briefing takes the voice.
         var stopPageVoice: () -> Void
         var sleep: (TimeInterval) async throws -> Void
@@ -78,6 +80,7 @@ final class BriefingNarrator: BriefingPlayback {
                 micActive: micActive,
                 analysisBusy: analysisBusy,
                 otherAudioPlaying: { AVAudioSession.sharedInstance().isOtherAudioPlaying },
+                appActive: { UIApplication.shared.applicationState == .active },
                 stopPageVoice: stopPageVoice,
                 sleep: { seconds in try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000)) })
         }
@@ -123,6 +126,8 @@ final class BriefingNarrator: BriefingPlayback {
 
     private var run: Run?
     private var task: Task<Void, Never>?
+    private var autoplayTask: Task<Void, Never>?
+    private var autoplayGeneration = UUID()
     private var segmentWaiter: Waiter<NarrationEnd>?
     private var resumeWaiter: Waiter<Bool>?
     /// Audio of the open report: (briefId, contentVersion) → segment → mp3.
@@ -165,6 +170,7 @@ final class BriefingNarrator: BriefingPlayback {
     // MARK: - Contract
 
     func play(report: BriefingReport) {
+        cancelAutoplay()
         guard canNarrate(report) else { objectWillChange.send(); return }
         // Never interrupt the person talking to Bobby or a running analysis.
         guard !env.micActive(), !env.analysisBusy() else { return }
@@ -174,19 +180,25 @@ final class BriefingNarrator: BriefingPlayback {
     /// From a notification tap: only when nothing would surprise the person (sound off, no consent, other
     /// audio). Otherwise the play button waits. Muted means no request at all.
     func autoplay(report: BriefingReport) {
+        cancelAutoplay()
         guard run == nil, canNarrate(report), !output.isMuted, env.riskAccepted(),
               !env.otherAudioPlaying(), !env.micActive(), !env.analysisBusy() else { return }
         if let consent = env.audioConsent() {
             if consent { start(report) }
             return
         }
-        let owner = env.currentUser(), generation = env.currentGeneration()
-        Task { [weak self] in
-            guard let self else { return }
+        let owner = env.currentUser(), generation = env.currentGeneration(), autoplayEpoch = autoplayGeneration
+        autoplayTask = Task { [weak self] in
+            guard let self, !Task.isCancelled, self.autoplayGeneration == autoplayEpoch,
+                  owner == self.env.currentUser(), generation == self.env.currentGeneration(),
+                  self.canNarrate(report), !self.env.otherAudioPlaying(),
+                  !self.env.micActive(), !self.env.analysisBusy() else { return }
             let consent = await self.env.loadAudioConsent()
-            guard consent == true, self.run == nil, owner == self.env.currentUser(), generation == self.env.currentGeneration(),
+            guard !Task.isCancelled, self.autoplayGeneration == autoplayEpoch,
+                  consent == true, self.run == nil, owner == self.env.currentUser(), generation == self.env.currentGeneration(),
                   self.canNarrate(report), !self.output.isMuted, !self.env.otherAudioPlaying(),
                   !self.env.micActive(), !self.env.analysisBusy() else { return }
+            self.autoplayTask = nil
             self.start(report)
         }
     }
@@ -256,7 +268,7 @@ final class BriefingNarrator: BriefingPlayback {
     // MARK: - Run
 
     private var narrationAllowed: Bool {
-        !output.isMuted && env.riskAccepted() && env.currentUser() != nil && env.audioConsent() != false
+        env.appActive() && !output.isMuted && env.riskAccepted() && env.currentUser() != nil && env.audioConsent() != false
     }
 
     private func canNarrate(_ report: BriefingReport) -> Bool {
@@ -278,6 +290,7 @@ final class BriefingNarrator: BriefingPlayback {
 
     /// Cancels the run (if any): pending waits resume as stopped, the voice stops only if this run holds it.
     private func end(_ next: BriefingPlaybackState) {
+        cancelAutoplay()
         let hadRun = run != nil
         run = nil
         task?.cancel()
@@ -293,6 +306,13 @@ final class BriefingNarrator: BriefingPlayback {
         }
         if hadRun || phase != next { phase = next }
         currentSegment = nil
+    }
+
+    /// Cancel both cooperative work and late answers from an operation that ignores cancellation.
+    private func cancelAutoplay() {
+        autoplayGeneration = UUID()
+        autoplayTask?.cancel()
+        autoplayTask = nil
     }
 
     private func isCurrent(_ r: Run) -> Bool {

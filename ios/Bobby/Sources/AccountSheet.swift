@@ -87,6 +87,7 @@ struct AccountSheet: View {
             // R11: nothing reaches the network before the risk notice is accepted.
             guard profile.acceptedRiskNotice else { return }
             await reads.refresh()
+            await invites.refresh()
             if pieces == nil, account.isSignedIn { await land.refresh() }
             if account.isSignedIn { await briefings.refresh() }
         }
@@ -342,6 +343,20 @@ struct AccountSheet: View {
     @ViewBuilder private var accountRows: some View {
         if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn) {
             readsRow(row)
+        }
+        if let row = GiftedReadsRow.content(access: reads.access, meters: invites.meters) {
+            HStack(spacing: 12) {
+                ProfileIcon(symbol: "gift")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.title).font(.system(size: 15)).foregroundStyle(Theme.cream)
+                    Text(row.detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+            }
+            .profileRowFrame()
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("account-gifted-reads")
         }
         // Bobby Pro on the user's own initiative, not only after a refused read (signed out, the sheet asks to sign in).
         if reads.access?.isPro != true {
@@ -785,6 +800,30 @@ struct ReadsRow: Equatable {
         let reset = access.resetsDate.map { L.t("Resets \(BobbyAccessAPI.day($0, spanish: spanish))", "Se renuevan el \(BobbyAccessAPI.day($0, spanish: spanish))", spanish: spanish) }
         return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish) + gift,
                         detail: reset, pro: false, manage: false)
+    }
+}
+
+/// Gift balances are independent of the subscription. Free Quick gifts already appear in ReadsRow;
+/// Pro Quick gifts and either account's premium gifts need their own visible line.
+struct GiftedReadsRow: Equatable {
+    let title: String
+    let detail: String
+
+    static func content(access: BobbyReadAccess?, meters: [NucleoAnalysisLevel: NucleoLevelMeter],
+                        spanish: Bool = L.isSpanish) -> GiftedReadsRow? {
+        guard let access else { return nil }
+        var parts: [String] = []
+        if access.isPro, access.bonus > 0 {
+            parts.append(L.t("Quick: \(access.bonus)", "Rápido: \(access.bonus)", spanish: spanish))
+        }
+        for level in [NucleoAnalysisLevel.profundo, .maximo] {
+            guard let bonus = meters[level]?.bonus, bonus > 0 else { continue }
+            let label = level == .profundo ? L.t("Deep", "Profundo", spanish: spanish) : L.t("Max", "Máximo", spanish: spanish)
+            parts.append("\(label): \(bonus)")
+        }
+        guard !parts.isEmpty else { return nil }
+        return GiftedReadsRow(title: L.t("Gifted reads", "Lecturas de regalo", spanish: spanish),
+                              detail: parts.joined(separator: " · "))
     }
 }
 
