@@ -62,3 +62,11 @@ select * from bobby_admin_device_facts() order by first_seen desc;  -- every ins
 - The LLM ledger covers the desk (and surfaces that call `logLlmUsage`); TTS/Realtime spend is not in it yet.
 - No purchase event has ever arrived: revenue $0 cannot tell "no sales" from "webhook not delivering".
 - Network exclusion on mobile carriers can catch other people on the same /24: remove a network in Usuarios → Tráfico interno.
+
+## Amplitude (server-side export, 2026-10-02)
+
+- `/api/admin?cron=amplitude` runs every 15 minutes and does nothing until `AMPLITUDE_API_KEY` is set in Vercel (`AMPLITUDE_REGION=eu` for an EU project).
+- It sends `bobby_events` after the cursor `bobby_admin_settings.amplitude_cursor` through `bobby_amplitude_batch`. The team's traffic is left out with the same sets the dashboard uses, and events younger than 10 minutes wait.
+- Each event carries the salted install hash as `device_id`, the account uuid as `user_id`, the event, surface, referring host, utm_source, country/region and detail.
+- It never sends an IP, email, user agent or question. `insert_id = bobby-<id>`, so a retried batch does not duplicate.
+- `/api/track` drops crawlers and headless browsers (`isBotUserAgent`) before storing anything, so bots never reach the dashboard or Amplitude.

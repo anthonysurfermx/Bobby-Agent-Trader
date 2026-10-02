@@ -9,6 +9,7 @@
 //          | 'set-internal' | 'set-device-internal' | 'remove-internal-network' | 'set-internal-emails'
 //          | 'preview-digest' | 'send-digest', ... }
 //   GET ?cron=digest — the daily digest email (Vercel cron, Bearer CRON_SECRET; api/_lib/admin-digest.ts).
+//   GET ?cron=amplitude — forwards outside events to Amplitude every 15 min (api/_lib/amplitude.ts).
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
@@ -19,6 +20,7 @@ import {
 } from './_lib/admin.js';
 import { buildInsights } from './_lib/admin-insights.js';
 import { buildDigest, runDigest } from './_lib/admin-digest.js';
+import { runAmplitude } from './_lib/amplitude.js';
 import { notifyOwner } from './_lib/provider-alert.js';
 import { growthPlan } from './_lib/admin-plan.js';
 
@@ -50,6 +52,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     try { return res.status(200).json(await runDigest()); } catch (e) {
       console.error('[admin] digest', e instanceof Error ? e.message : e);
       return res.status(502).json({ error: 'The digest could not be built.' });
+    }
+  }
+  if (req.method === 'GET' && one(req.query.cron) === 'amplitude') {
+    if (!isInternalRequest(req)) return res.status(401).json({ error: 'unauthorized' });
+    try { return res.status(200).json(await runAmplitude()); } catch (e) {
+      console.error('[admin] amplitude', e instanceof Error ? e.message : e);
+      return res.status(502).json({ error: 'The Amplitude export failed; it retries on the next run.' });
     }
   }
   const admin = await requireAdmin(req, res);

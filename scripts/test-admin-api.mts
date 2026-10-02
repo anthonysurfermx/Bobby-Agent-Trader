@@ -14,7 +14,8 @@ delete process.env.REVENUECAT_V2_SECRET_KEY;
 for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER']) delete process.env[k];
 
 const { default: adminHandler } = await import('../api/admin.ts');
-const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
+const { default: trackHandler, normalizeEvent, isBotUserAgent } = await import('../api/track.ts');
+const { toAmplitude } = await import('../api/_lib/amplitude.ts');
 const { parseSalesReport, ascVendor, ascKeyId, ascIssuer, unitEconomics } = await import('../api/_lib/admin.ts');
 const { buildInsights } = await import('../api/_lib/admin-insights.ts');
 const { requestGeo, fromAlpha3, countryCode } = await import('../api/_lib/geo.ts');
@@ -252,26 +253,39 @@ try {
   ok(t.device_hash && !t.device_hash.includes('0d6e4a52'), 'the install id is hashed');
   eq(normalizeEvent({ event: 'visit', referrer: 'https://bobbyprotocol.xyz/desk' })!.referrer, null, 'own pages are not referrers');
   eq(normalizeEvent({ event: 'drop table' }), null, 'unknown events');
+  for (const ua of ['Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)', 'Mozilla/5.0 (Linux; Android 5.0) AppleWebKit/537.36 (KHTML, like Gecko) Mobile Safari/537.36 (compatible; Bytespider; spider-feedback@bytedance.com)', 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/120.0 Safari/537.36', 'Chrome-Lighthouse', 'curl/8.4.0', '', undefined]) {
+    eq(isBotUserAgent(ua), true, `bot user agent: ${String(ua).slice(0, 30)}`);
+  }
+  for (const ua of ['Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 350.0', 'Bobby/52 CFNetwork/1568 Darwin/24.0.0']) {
+    eq(isBotUserAgent(ua), false, `real user agent: ${ua.slice(0, 30)}`);
+  }
+  {
+    const a = toAmplitude({ id: 42, at: '2026-10-02T07:18:15Z', event: 'read_done', platform: 'ios', surface: null, device: 'abc123devicehash', identity: '3c2a301a-d9a2-4ad3-90f0-357d29d8a122', referrer: 'x.com', utm: 'tiktok', country: 'MX', region: 'JAL', detail: 'rapido' });
+    eq([a.event_type, a.device_id, a.user_id, a.time, a.insert_id, a.platform, a.country, a.region], ['read_done', 'abc123devicehash', '3c2a301a-d9a2-4ad3-90f0-357d29d8a122', Date.parse('2026-10-02T07:18:15Z'), 'bobby-42', 'ios', 'MX', 'JAL'], 'amplitude event mapping');
+    eq(a.event_properties, { referrer: 'x.com', utm_source: 'tiktok', detail: 'rapido' }, 'amplitude properties carry only stored fields');
+    const g = toAmplitude({ id: 7, at: '2026-10-02T07:18:15Z', event: 'visit', platform: 'web', surface: 'home', device: 'abc123devicehash', identity: null, referrer: null, utm: null, country: null, region: null, detail: null });
+    eq(['user_id' in g, 'country' in g], [false, false], 'guest without location sends no user_id or country');
+  }
   eq(normalizeEvent({ event: 'visit', surface: '../../etc', device: 'short' })!.surface, null, 'bad surface dropped');
   calls = [];
   const tr = response();
-  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.1', 'x-vercel-ip-country': 'MX', 'x-vercel-ip-country-region': 'JAL' } } as never, tr as never);
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'appstore_click', surface: 'home' }), headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', 'x-forwarded-for': '10.1.1.1', 'x-vercel-ip-country': 'MX', 'x-vercel-ip-country-region': 'JAL' } } as never, tr as never);
   eq(tr.statusCode, 204, 'a beacon (text/plain body) is accepted');
   const stored = calls.find((c) => c.url.includes('rpc/bobby_record_event'))?.body;
   eq([stored?.p_event, stored?.p_surface, stored?.p_platform, stored?.p_country, stored?.p_region], ['appstore_click', 'home', 'web', 'MX', 'JAL'], 'stored with its device touch and coarse location in one call');
   ok(!JSON.stringify(stored).includes('10.1.1.1'), 'the IP is never stored');
   calls = [];
-  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', platform: 'ios' }), headers: { 'x-forwarded-for': '10.1.1.3', 'x-vercel-ip-country': 'MX' } } as never, response() as never);
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', platform: 'ios' }), headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', 'x-forwarded-for': '10.1.1.3', 'x-vercel-ip-country': 'MX' } } as never, response() as never);
   const iosStored = calls.find((c) => c.url.includes('rpc/bobby_record_event'))?.body;
   eq([iosStored?.p_platform, 'p_country' in (iosStored ?? {})], ['ios', false], 'iOS events carry no location');
   const bad = response();
-  await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
+  await trackHandler({ method: 'POST', body: '{"event":"nope"}', headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', 'x-forwarded-for': '10.1.1.2' } } as never, bad as never);
   eq(bad.statusCode, 400, 'unknown events are refused');
   ok(stored?.p_network && !String(stored.p_network).includes('10.1.1'), 'the network travels as a salted hash');
   overrides = (c) => (c.url.includes('rpc/bobby_record_event') ? json({ message: 'down' }, 500) : null);
   calls = [];
   const lost = response();
-  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', surface: 'home' }), headers: { 'x-forwarded-for': '10.1.1.4' } } as never, lost as never);
+  await trackHandler({ method: 'POST', body: JSON.stringify({ event: 'visit', surface: 'home' }), headers: { 'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1', 'x-forwarded-for': '10.1.1.4' } } as never, lost as never);
   eq(lost.statusCode, 503, 'a lost event is not reported as stored');
   eq(calls.find((c) => c.url.includes('api_cache') && c.method === 'POST')?.body?.cache_key, 'track-health', 'and the owner can see it');
   overrides = () => null;
