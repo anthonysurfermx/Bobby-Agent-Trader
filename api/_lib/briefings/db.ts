@@ -201,7 +201,7 @@ export type AudioClaim = { state: 'claimed'; fence: number; attempts: number } |
 export async function claimAudio(audioId: string, worker: string, leaseSeconds: number): Promise<AudioClaim> {
   return obj(await rpc('bobby_brief_audio_claim', { p_audio: audioId, p_worker: worker, p_lease_seconds: leaseSeconds }), 'bobby_brief_audio_claim') as unknown as AudioClaim;
 }
-export async function commitAudio(audioId: string, fence: number, state: 'ready' | 'retry' | 'failed', storagePath: string | null, bytes: number | null, error: string | null): Promise<{ ok: boolean; code?: string }> {
+export async function commitAudio(audioId: string, fence: number, state: 'ready' | 'retry' | 'release' | 'failed', storagePath: string | null, bytes: number | null, error: string | null): Promise<{ ok: boolean; code?: string }> {
   return obj(await rpc('bobby_brief_audio_commit', { p_audio: audioId, p_fence: fence, p_state: state, p_storage_path: storagePath, p_bytes: bytes, p_error: error }), 'bobby_brief_audio_commit') as { ok: boolean; code?: string };
 }
 export type AudioAuth = { state: 'queued' | 'processing' | 'ready' | 'failed'; storagePath: string | null; mime: string } | { code: 'not_found' | 'subscription_required' };

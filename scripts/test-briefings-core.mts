@@ -665,7 +665,7 @@ try {
     fdb = fakeAudioDb();
     const refusing = { ...budgetDb, reserveAttempt: async () => ({ ok: false, code: 'slots_full' }) };
     eq(await ensureAudio(P, { db: fdb.db, store: memStore, tts: slowTts, withReservation: reserveWith(refusing) }), { state: 'queued', retryAfterSeconds: 3 }, 'slots full → queued');
-    eq([fdb.ops.at(-1)![3], fdb.ops.at(-1)![6], ttsCalls], ['retry', 'slots_full', 1], 'committed retry, no TTS');
+    eq([fdb.ops.at(-1)![3], fdb.ops.at(-1)![6], ttsCalls], ['release', 'slots_full', 1], 'slots refusal releases the row without spending an attempt, no TTS');
     delete process.env.BOBBY_BRIEFINGS_MONTHLY_CAP_USD;
     fdb = fakeAudioDb();
     eq(await ensureAudio(P, { db: fdb.db, store: memStore, tts: slowTts, withReservation: reserveWith() }), { state: 'queued', retryAfterSeconds: 60 }, 'no caps → queued, no spend');

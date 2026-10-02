@@ -5,7 +5,7 @@
 // (processing), so two readers with the same companion never pay for the same segment twice.
 // The claimant runs ONE reserved TTS attempt (budget.ts), stores the MP3 in the private bucket, then commits
 // 'ready' under its fence. Failures:
-//   · budget refusal (caps, slots, unresolved attempt, storage) → commit 'retry', answer queued + Retry-After;
+//   · budget refusal (caps, slots, unresolved attempt, storage) → commit 'release' (no attempt spent), answer queued + Retry-After;
 //   · provider failure → commit 'retry', or 'failed' once the work item's attempt cap is reached;
 //   · an unknown outcome → 'retry': the reservation blocks re-paying until reconciliation settles it.
 // With the kill switch off (BOBBY_BRIEFINGS_ENABLED ≠ 'on') nothing is synthesized: 'failed', no DB or provider
@@ -51,7 +51,7 @@ export async function ensureAudio(
   const { fence } = claim;
   const priorAttempts = Number(claim.attempts) || 0;
 
-  const commit = async (state: 'ready' | 'retry' | 'failed', path: string | null, bytes: number | null, error: string | null): Promise<boolean> => {
+  const commit = async (state: 'ready' | 'retry' | 'release' | 'failed', path: string | null, bytes: number | null, error: string | null): Promise<boolean> => {
     try {
       const r = await db.commitAudio(p.audioId, fence, state, path, bytes, error);
       return Boolean(r?.ok);
@@ -70,9 +70,11 @@ export async function ensureAudio(
   if (!r.ok) {
     const code = (r as { ok: false; code: ReservationFailure }).code;
     const providerSpent = code === 'provider_failed';
-    // Only a completed, failed provider attempt counts toward the cap here; refusals spend nothing.
+    // Only an attempt that reached the provider (failed or unknown) consumes one of the key's attempts; refusals
+    // (caps, slots, an unresolved attempt, storage) release the row unchanged — they spend nothing.
+    const reachedProvider = providerSpent || code === 'provider_unknown';
     const final = code === 'attempts_exhausted' || (providerSpent && priorAttempts + 1 >= MAX_ATTEMPTS_PER_WORK);
-    await commit(final ? 'failed' : 'retry', null, null, code);
+    await commit(final ? 'failed' : reachedProvider ? 'retry' : 'release', null, null, code);
     return final ? { state: 'failed' } : { state: 'queued', retryAfterSeconds: RETRY_AFTER[code] };
   }
 

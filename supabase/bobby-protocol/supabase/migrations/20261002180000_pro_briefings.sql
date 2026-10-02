@@ -1276,7 +1276,7 @@ create or replace function public.bobby_brief_audio_commit(p_audio uuid, p_fence
 returns jsonb language plpgsql volatile security invoker set search_path = public, pg_temp as $$
 declare r bobby_brief_audio;
 begin
-  if p_state is null or p_state not in ('ready', 'retry', 'failed') then perform bobby_brief_bad('state'); end if;
+  if p_state is null or p_state not in ('ready', 'retry', 'release', 'failed') then perform bobby_brief_bad('state'); end if;
   select * into r from bobby_brief_audio where id = p_audio for update;
   if not found or r.state <> 'processing' or r.fence <> p_fence or r.lease_expires_at <= now() then
     return jsonb_build_object('ok', false, 'code', 'stale_fence');
@@ -1287,6 +1287,11 @@ begin
         last_error = null, ready_at = now(), updated_at = now() where id = p_audio;
   elsif p_state = 'retry' then
     update bobby_brief_audio set state = 'queued', attempts = attempts + 1, lease_owner = null, lease_expires_at = null,
+        last_error = left(p_error, 64), updated_at = now() where id = p_audio;
+  elsif p_state = 'release' then
+    -- A refusal that never reached the provider (caps, slots, an unresolved attempt, storage): back to queued
+    -- without spending one of the key's attempts, so a busy morning cannot fail a shared narration key for good.
+    update bobby_brief_audio set state = 'queued', lease_owner = null, lease_expires_at = null,
         last_error = left(p_error, 64), updated_at = now() where id = p_audio;
   else
     update bobby_brief_audio set state = 'failed', lease_owner = null, lease_expires_at = null, last_error = left(p_error, 64), updated_at = now()
