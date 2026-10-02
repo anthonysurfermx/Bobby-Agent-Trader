@@ -844,11 +844,6 @@ export default function NucleoDesk() {
   const scheduledGiftDetail = meter?.tier === 'pro' && paidPro && grantExpiry
     ? t(` · gifted Pro through ${grantExpiry}`, ` · Pro regalado hasta el ${grantExpiry}`, ` · Pro presente até ${grantExpiry}`)
     : '';
-  const quickGift = accessState?.access.bonus ?? 0;
-  const quickGiftDetail = quickGift > 0
-    ? t(` · ${quickGift} gifted Quick reads`, ` · ${quickGift} lecturas Rápido de regalo`, ` · ${quickGift} leituras Rápido de presente`)
-    : '';
-
   const errorStage = phase === 'error' ? (
     <div className="flex flex-col items-center">
       <NucleoSphere size={desktop ? 220 : 170} mode="idle" />
@@ -944,6 +939,11 @@ export default function NucleoDesk() {
             onToggleVoiceMode={() => { voice.stop(); closeRecognition(); setFreeVoice((v) => !v); setVoiceNotice(''); }}
             onToggleSpeak={() => setSpeakEnabled((v) => { if (v) voice.stop(); return !v; })}
             onToggleSounds={() => { setSfxMuted(!muted); setMuted(!muted); }}
+            giftBalances={{
+              quick: accessState?.access.bonus ?? 0,
+              deep: accessState?.levels?.levels.profundo.bonus ?? 0,
+              max: accessState?.levels?.levels.maximo.bonus ?? 0,
+            }}
             pro={{
               label: meter?.tier === 'pro'
                 ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
@@ -953,7 +953,7 @@ export default function NucleoDesk() {
                 ? (giftedPro && grantExpiry ? t(`Gifted until ${grantExpiry}`, `Regalado hasta el ${grantExpiry}`, `Presente até ${grantExpiry}`)
                   : paidPro && subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone')
                     : paidPro && subscription?.provider === 'stripe' ? t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar')
-                      : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail + quickGiftDetail
+                      : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail
                 : meterLine ?? (accessState && !accessState.payments.stripe
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
                   : t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês')),

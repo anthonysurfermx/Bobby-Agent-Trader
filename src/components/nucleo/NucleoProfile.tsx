@@ -4,7 +4,7 @@
 // the way the iPhone app keeps them behind its header face.
 import { useState, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Brain, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowLeftRight, Brain, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -48,6 +48,7 @@ interface Props {
   onToggleSounds: () => void;
   onReset: () => void;
   pro: { label: string; detail: string; action?: () => void };
+  giftBalances: { quick: number; deep: number; max: number };
   /** Invite friends: five slots, Bobby Pro for each friend who joins. */
   invite: { label: string; detail: string; action: () => void };
 }
@@ -74,6 +75,7 @@ export default function NucleoProfile(p: Props) {
   const { account, signOut } = useBobbyAccount();
   const next = nextLevelFor(p.xp);
   const progress = next ? Math.max(0, Math.min(1, (p.xp - p.level.minXP) / (next.minXP - p.level.minXP))) : 1;
+  const giftedReads = Object.values(p.giftBalances).some((balance) => balance > 0);
 
   return (
     <motion.div key="profile" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/60 backdrop-blur-[2px]" onClick={p.onClose}>
@@ -154,6 +156,8 @@ export default function NucleoProfile(p: Props) {
             </>
           )}
           <Row icon={<Sparkles size={16} />} label={p.pro.label} detail={p.pro.detail} onClick={p.pro.action} />
+          {giftedReads && <Row icon={<Zap size={16} />} label={t('Gifted reads', 'Lecturas regaladas', 'Leituras de presente')}
+            detail={t(`Quick: ${p.giftBalances.quick} · Deep: ${p.giftBalances.deep} · Max: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`, `Rápido: ${p.giftBalances.quick} · Profundo: ${p.giftBalances.deep} · Máximo: ${p.giftBalances.max}`)} />}
           <Row icon={<UserPlus size={16} />} label={p.invite.label} detail={p.invite.detail} onClick={p.invite.action} />
           <Row icon={<ArrowLeftRight size={16} />} label={t('Swap on Base', 'Swap en Base', 'Swap na Base')} detail={t('Your wallet signs every swap', 'Tu wallet firma cada swap', 'Sua carteira assina cada swap')} onClick={p.onSwap}>
             <span className="flex items-center gap-2"><WalletBalancePill onClick={p.onSwap} /><ChevronRight size={16} style={{ color: '#8A8378' }} /></span>
