@@ -47,6 +47,8 @@ const dateOnly = (iso: string | null) => {
   const d = new Date(iso.length === 10 ? `${iso}T00:00:00Z` : iso);
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-MX', { day: 'numeric', month: 'short', timeZone: 'UTC' });
 };
+/** F14: a share only on a base of 5 or more; below that, "x de n". */
+const rate = (num: number, den: number) => (den >= MIN_RATE_SAMPLE ? pct(num, den) : `${int(num)} de ${int(den)}`);
 const small = (sample: number) => (sample < SMALL_SAMPLE ? ` (muestra pequeña: n=${sample})` : ` (n=${sample})`);
 const COUNTRY = (cc: string) => { try { return new Intl.DisplayNames(['es'], { type: 'region' }).of(cc) ?? cc; } catch { return cc; } };
 const PROVIDER: Record<string, string> = { openai: 'OpenAI', anthropic: 'Anthropic' };
@@ -91,7 +93,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     } else if (n(pr.calls24h) >= 3 && n(pr.failures24h) / n(pr.calls24h) >= 0.5) {
       add({
         id: `failing-${p}`, level: 'critical', area: 'operacion', tab: 'ia', impact: 95, sample: n(pr.calls24h),
-        title: `${PROVIDER[p]} falla en ${pct(n(pr.failures24h), n(pr.calls24h))} de las llamadas (24h)`,
+        title: `${PROVIDER[p]} falla en ${rate(n(pr.failures24h), n(pr.calls24h))} de las llamadas (24h)`,
         detail: `${int(n(pr.failures24h))} de ${int(n(pr.calls24h))} llamadas fallaron en las últimas 24 horas${s(lastFail.stop) ? `; el último error fue ${s(lastFail.stop)}` : ''}.`,
         action: 'Prueba el proveedor desde IA → Probar y revisa crédito y límites de tasa.',
         evidence: [`${int(n(pr.failures24h))}/${int(n(pr.calls24h))} fallos 24h`],
@@ -102,22 +104,22 @@ export function buildInsights(input: InsightInput): Insight[] {
   const runs = o(llm.deskRuns);
   const totalRuns = n(runs.runs), finished = n(runs.finished);
   if (totalRuns >= MIN_RATE_SAMPLE && (totalRuns - finished) / totalRuns >= 0.2) {
-    // A failure wave that already stopped is history, not an outage: healed when a provider answered after the last
-    // failed desk call (the ledger's own evidence), or when the last two UTC days finished at least 80%.
+    // A failure wave that already stopped is history, not an outage: healed only when a desk analysis FINISHED after
+    // the last unfinished one (same definition on both sides). A probe or another surface's call proves a provider,
+    // not a delivered analysis, and an average never proves an order in time (F02).
     const cutoff = new Date(now - 86_400_000).toISOString().slice(0, 10);
     const recent = a(runs.byDay).map(o).filter((d) => String(d.day) >= cutoff);
     const recentRuns = recent.reduce((t, d) => t + n(d.runs), 0), recentDone = recent.reduce((t, d) => t + n(d.finished), 0);
     const failedDays = [...new Set(a(runs.byDay).map(o).filter((d) => n(d.finished) < n(d.runs)).map((d) => String(d.day)))].sort();
-    const stamps = (['anthropic', 'openai'] as const).map((p) => o(providers[p]));
-    const lastDeskFail = stamps.map((pr) => o(pr.lastFailure)).filter((f) => f.surface === 'desk' && s(f.at)).map((f) => Date.parse(String(f.at))).sort((x, y) => y - x)[0];
-    const lastOkAny = stamps.map((pr) => (s(pr.lastOk) ? Date.parse(String(pr.lastOk)) : 0)).sort((x, y) => y - x)[0] ?? 0;
-    const healed = (lastDeskFail != null && lastOkAny > lastDeskFail) || (recentRuns >= 2 && recentDone / recentRuns >= 0.8);
+    const lastFinished = s(runs.lastFinishedAt) ? Date.parse(String(runs.lastFinishedAt)) : null;
+    const lastDeskFail = s(runs.lastUnfinishedAt) ? Date.parse(String(runs.lastUnfinishedAt)) : undefined;
+    const healed = lastFinished != null && lastDeskFail != null && lastFinished > lastDeskFail;
     add({
       id: 'desk-failures', level: healed ? 'info' : (totalRuns - finished) / totalRuns >= 0.4 ? 'critical' : 'warn', area: 'operacion', tab: 'ia', impact: healed ? 40 : 90, sample: totalRuns,
       title: healed
         ? `${int(totalRuns - finished)} de ${int(totalRuns)} análisis fallaron en el periodo; desde la última falla el desk responde`
         : `${int(totalRuns - finished)} de ${int(totalRuns)} análisis del desk no terminaron (${pct(totalRuns - finished, totalRuns)})`,
-      detail: `${healed ? `Las fallas se concentran en ${failedDays.map((d) => dateOnly(d)).join(', ')}${lastDeskFail != null ? ` (la última, ${day(new Date(lastDeskFail).toISOString())})` : ''}; después hubo llamadas correctas. ` : 'Cada análisis sin terminar es un lector que vio "no disponible". '}Se cuenta un análisis por lote del ledger; terminado = el CIO respondió.${small(totalRuns)}`,
+      detail: `${healed ? `Las fallas se concentran en ${failedDays.map((d) => dateOnly(d)).join(', ')}${lastDeskFail != null ? ` (la última, ${day(new Date(lastDeskFail).toISOString())})` : ''}; después terminó un análisis completo (${day(new Date(lastFinished!).toISOString())}). ` : 'Cada análisis sin terminar es un lector que vio "no disponible". '}Se cuenta un análisis por lote del ledger; terminado = el CIO respondió.${small(totalRuns)}`,
       action: healed ? 'Nada urgente: confirma que el respaldo del proveedor que falló tenga crédito para la próxima vez.' : 'Abre IA para ver qué proveedor y qué rol fallan; con crédito y respaldo sanos esto debería bajar de 5%.',
       evidence: [`análisis ${period}d: ${int(totalRuns)}`, `terminados: ${int(finished)}`, `últimas 48 h: ${int(recentDone)}/${int(recentRuns)}`],
     });
@@ -178,7 +180,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'ios-gap', level: 'warn', area: 'medicion', tab: 'funnel', impact: 72, sample: downloads,
       title: `Apple reporta ${count(downloads, 'descarga', 'descargas')}; Bobby solo vio ${count(iosInstalls, 'instalación iOS', 'instalaciones iOS')}`,
-      detail: `${count(downloads - iosInstalls, 'descarga', 'descargas')} (${pct(downloads - iosInstalls, downloads)}) no aparecen: no abrieron la app, o usan una versión que no envía id de instalación. Es la fuga más grande que se puede medir hoy en iOS.`,
+      detail: `${count(downloads - iosInstalls, 'descarga', 'descargas')} (${rate(downloads - iosInstalls, downloads)}) no aparecen: no abrieron la app, o usan una versión que no envía id de instalación. Es la fuga más grande que se puede medir hoy en iOS.`,
       action: 'Libera iOS 1.5 (envía id de instalación y vincula la cuenta) y revisa qué ve alguien en su primera apertura.',
       evidence: [`descargas Apple ${dateOnly(s(store.coveredFrom))}–${dateOnly(s(store.coveredTo))}: ${int(downloads)}`, `instalaciones iOS vistas: ${int(iosInstalls)}`],
     });
@@ -188,7 +190,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (consumedTotal >= MIN_RATE_SAMPLE && consumedInternal / consumedTotal >= 0.25) {
     add({
       id: 'internal-share', level: 'info', area: 'medicion', tab: 'usuarios', impact: 40, sample: consumedTotal,
-      title: `${pct(consumedInternal, consumedTotal)} de las lecturas del periodo fueron del equipo`,
+      title: `${rate(consumedInternal, consumedTotal)} de las lecturas del periodo fueron del equipo`,
       detail: `${int(consumedInternal)} de ${int(consumedTotal)} lecturas vienen de cuentas, instalaciones o redes internas. Ya están fuera de todas las cifras; sin ellas quedan ${int(consumedTotal - consumedInternal)}.`,
       action: 'Si alguna cuenta Apple de prueba aún cuenta como externa, márcala en Usuarios → Interno.',
       evidence: [`internas: ${int(consumedInternal)}`, `externas: ${int(consumedTotal - consumedInternal)}`],
@@ -265,7 +267,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     if (n(top.downloads) / downloads >= 0.4) {
       add({
         id: 'appstore-country', level: 'opportunity', area: 'adquisicion', tab: 'audiencia', impact: 58, sample: downloads,
-        title: `${COUNTRY(String(top.country))} hizo ${int(n(top.downloads))} de ${int(downloads)} descargas (${pct(n(top.downloads), downloads)})`,
+        title: `${COUNTRY(String(top.country))} hizo ${int(n(top.downloads))} de ${int(downloads)} descargas (${rate(n(top.downloads), downloads)})`,
         detail: 'Un solo país concentra las descargas de la App Store en el periodo. Si la ficha no está en su idioma, se pierde la mayoría de esa demanda.',
         action: `Localiza la ficha para ${COUNTRY(String(top.country))} (título, subtítulo, palabras clave y capturas) y revisa qué la está trayendo ahí.`,
         evidence: byCountry.slice(0, 4).map((c) => `${String(c.country)}: ${int(n(c.downloads))}`),
@@ -277,7 +279,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     const best = [...sources].sort((x, y) => n(y.read1) / n(y.installs) - n(x.read1) / n(x.installs))[0];
     add({
       id: 'best-source', level: 'info', area: 'adquisicion', tab: 'funnel', impact: 35, sample: n(best.installs),
-      title: `La fuente que más lee: ${String(best.source).replace(/^utm:/, '')} (${pct(n(best.read1), n(best.installs))} hizo su 1.ª lectura)`,
+      title: `La fuente que más lee: ${String(best.source).replace(/^utm:/, '')} (${rate(n(best.read1), n(best.installs))} hizo su 1.ª lectura)`,
       detail: `${int(n(best.read1))} de ${int(n(best.installs))} instalaciones nuevas de esa fuente leyeron.${small(n(best.installs))}`,
       action: 'Pon más esfuerzo donde la gente sí lee, no donde solo llega.',
       evidence: sources.slice(0, 4).map((x) => `${String(x.source)}: ${int(n(x.read1))}/${int(n(x.installs))}`),
@@ -289,7 +291,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (arrived >= MIN_RATE_SAMPLE && deskOrRead / arrived < 0.5) {
     add({
       id: 'web-desk-reach', level: 'warn', area: 'activacion', tab: 'funnel', impact: 70, sample: arrived,
-      title: `De ${int(arrived)} que llegaron a la web, solo ${int(deskOrRead)} abrieron el desk (${pct(deskOrRead, arrived)})`,
+      title: `De ${int(arrived)} que llegaron a la web, solo ${int(deskOrRead)} abrieron el desk (${rate(deskOrRead, arrived)})`,
       detail: `La mayoría se va antes de probar el producto.${small(arrived)}`,
       action: 'Haz que la primera pantalla lleve directo a preguntar por un activo (un botón, un ejemplo precargado).',
       evidence: [`llegaron: ${int(arrived)}`, `abrieron desk: ${int(deskOrRead)}`],
@@ -298,7 +300,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (deskOrRead >= MIN_RATE_SAMPLE && read1 / deskOrRead < 0.6) {
     add({
       id: 'web-first-read', level: 'warn', area: 'activacion', tab: 'funnel', impact: 68, sample: deskOrRead,
-      title: `${pct(deskOrRead - read1, deskOrRead)} abre el desk y no pide ninguna lectura`,
+      title: `${rate(deskOrRead - read1, deskOrRead)} abre el desk y no pide ninguna lectura`,
       detail: `${int(deskOrRead - read1)} de ${int(deskOrRead)} instalaciones web abrieron el desk sin recibir una lectura.${small(deskOrRead)}`,
       action: 'Ofrece preguntas sugeridas de un toque y revisa que el desk no falle al cargar.',
       evidence: [`abrieron desk: ${int(deskOrRead)}`, `1.ª lectura: ${int(read1)}`],
@@ -333,7 +335,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     if (afterWall / wall < 0.3) {
       add({
         id: 'wall-conversion', level: 'warn', area: 'conversion', tab: 'funnel', impact: 74, sample: wall,
-        title: `El muro de registro convierte ${pct(afterWall, wall)}`,
+        title: `El muro de registro convierte ${rate(afterWall, wall)}`,
         detail: `${int(wall)} instalaciones usaron sus 3 lecturas gratis y pidieron una 4.ª; ${int(afterWall)} crearon o vincularon cuenta después.${small(wall)}`,
         action: `Cambia el mensaje del muro: qué ganan con la cuenta (${ig.paywall ? '10 lecturas por semana' : 'lecturas Rápido sin límite'}, que Bobby recuerde lo que preguntaron), en un solo toque con Apple/Google.`,
         evidence: [`chocaron con el muro: ${int(wall)}`, `cuenta después: ${int(afterWall)}`],
@@ -365,7 +367,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   if (backEligible >= MIN_RATE_SAMPLE) {
     add({
       id: 'readers-back', level: backRead / backEligible < 0.2 ? 'warn' : 'info', area: 'retencion', tab: 'funnel', impact: 72, sample: backEligible,
-      title: `${pct(backRead, backEligible)} de quienes leyeron volvió a leer otro día`,
+      title: `${rate(backRead, backEligible)} de quienes leyeron volvió a leer otro día`,
       detail: `${int(backRead)} de ${int(backEligible)} lectores nuevos leyeron de nuevo en su primera semana; ${int(backReturned)} al menos abrieron Bobby otra vez.${small(backEligible)}`,
       action: 'Dale una razón para volver: recordatorio del activo que preguntó, "¿se cumplió?" al día siguiente.',
       evidence: [`elegibles: ${int(backEligible)}`, `volvieron a leer: ${int(backRead)}`, `volvieron a abrir: ${int(backReturned)}`],

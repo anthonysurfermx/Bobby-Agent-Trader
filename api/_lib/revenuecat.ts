@@ -39,7 +39,7 @@ async function alertRejectedKey(status: number): Promise<void> {
 
 interface RcSubscriber {
   entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
-  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null }>;
+  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null; is_sandbox?: boolean; period_type?: string }>;
 }
 
 /** The bobby_identities row behind a RevenueCat app_user_id (a Supabase auth user id). */
@@ -77,9 +77,13 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   const store = sub?.store ?? 'app_store';
   const provider: 'apple' | 'stripe' = store === 'app_store' || store === 'mac_app_store' ? 'apple' : 'stripe';
   if (current?.provider === 'stripe' && current.stripe_subscription_id && ['active', 'trialing'].includes(current.status) && !active) return true;
+  // Access and revenue are different questions: a sandbox (TestFlight) or trial purchase still unlocks Pro, but the
+  // dashboard only counts verified production subscriptions outside a trial as paying (migration 20261002120000).
+  const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
   await upsertSubscription({
-    identity_id: identityId, provider, status: sub?.refunded_at ? 'refunded' : active ? 'active' : 'expired',
+    identity_id: identityId, provider, status: sub?.refunded_at ? 'refunded' : !active ? 'expired' : periodType === 'trial' ? 'trialing' : 'active',
     product_id: product, current_period_end: expires,
+    environment: typeof sub?.is_sandbox === 'boolean' ? (sub.is_sandbox ? 'sandbox' : 'production') : null, period_type: periodType,
   });
   return active;
 }

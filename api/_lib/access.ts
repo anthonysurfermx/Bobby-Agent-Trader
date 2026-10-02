@@ -121,6 +121,9 @@ export type DeskOutcome = 'read_done' | 'read_failed' | 'wall_signin' | 'wall_pa
 /** What the server saw happen at the desk, for the owner's funnel (bobby_events). Never throws, never delays. */
 export async function recordOutcome(req: VercelRequest, event: DeskOutcome, identity: Identity | null | undefined, detail: string | null = null): Promise<void> {
   try {
+    // Not resolved yet (e.g. the budget pause runs before the meters): resolve it here, after the answer, so a
+    // signed-in team member is recognised even without an install id.
+    if (identity === undefined) identity = await resolveIdentity(req).catch(() => null);
     const platform = clientPlatform(req);
     const geo = platform === 'web' ? requestGeo(req) : null;
     await rpc('bobby_record_outcome', {
@@ -152,7 +155,7 @@ export async function readAccess(req: VercelRequest, identity?: Identity | null)
   return row ? shape(row) : OPEN;
 }
 
-export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null }
+export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null }
 
 export async function getSubscription(identityId: string): Promise<SubscriptionRow | null> {
   const r = await fetch(bobbyRest(`bobby_subscriptions?identity_id=eq.${identityId}&select=*`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });

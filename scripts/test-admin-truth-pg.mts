@@ -27,11 +27,18 @@ const MIGRATIONS = [
   '20261001220000_audience_geo.sql',
   '20261001230000_admin_truth.sql',
   '20261001233000_admin_truth_review.sql',
+  '20261002120000_admin_codex_review.sql',
 ];
 const TRUTH = 'supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql';
 const REVIEW = 'supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql';
 // Re-applying the first migration (to test its idempotent backfill) brings back its functions: the review goes on top.
-const reapply = async () => { await pool.query(readFileSync(TRUTH, 'utf8')); await pool.query(readFileSync(REVIEW, 'utf8')); };
+const CODEX = 'supabase/bobby-protocol/supabase/migrations/20261002120000_admin_codex_review.sql';
+// The Codex-review migration changes three return types: drop them before the older files recreate them.
+const DROP_NEW = 'drop function if exists public.bobby_admin_people_facts(); drop function if exists public.bobby_admin_device_facts(); drop function if exists public.bobby_admin_members(boolean);';
+const reapply = async () => {
+  await pool.query(DROP_NEW);
+  await pool.query(readFileSync(TRUTH, 'utf8')); await pool.query(readFileSync(REVIEW, 'utf8')); await pool.query(readFileSync(CODEX, 'utf8'));
+};
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
@@ -60,6 +67,7 @@ try {
     create table if not exists auth.users (id uuid primary key, created_at timestamptz not null default now());
     create table if not exists auth.identities (user_id uuid not null references auth.users(id), provider text not null);
     create table if not exists public.api_cache (cache_key text primary key, payload jsonb, expires_at timestamptz, updated_at timestamptz default now());`);
+  await pool.query(DROP_NEW);
   for (const file of MIGRATIONS) await pool.query(readFileSync(`supabase/bobby-protocol/supabase/migrations/${file}`, 'utf8'));
   await reapply(); // idempotent
   await pool.query(`truncate public.bobby_events, public.bobby_purchase_events, public.bobby_llm_credit_marks, public.bobby_llm_usage,
@@ -259,7 +267,7 @@ try {
   eq((await one("select count(*)::int n from pg_proc where proname = 'bobby_admin_overview'")).n, 1, 'one overview signature (no ambiguous overload)');
 
   // ---------- the users list agrees with the figures ----------
-  await pool.query(readFileSync('supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql', 'utf8'));
+  await reapply();
   const teamMate = await account({ email: 'anthony@rizoma.boutique', provider: 'google' });
   const ul = (await one('select public.bobby_admin_users(null, 200, 0) as r')).r;
   const row = (id: string) => ul.users.find((u: { id: string }) => u.id === id);
@@ -285,6 +293,51 @@ try {
     const ms = Date.now() - t0;
     ok(ms < 4000, `growth + overview with 2,000 installs, 6,000 reads and 6,000 events in ${ms} ms (under 4 s; the API aborts at 6 s)`);
   } finally { await pc.query('rollback'); pc.release(); }
+
+  // ---------- Codex review (20261002120000) ----------
+  {
+    const facts = async (id: string) => one("select * from public.bobby_admin_people_facts() where person = 'a:' || $1", [id]);
+    // F05: an account signed in on an install seen on a team network is the team's, and so is its other install.
+    const netA = dev('neta'), netB = dev('netb'), acct = await account();
+    await pool.query("insert into public.bobby_internal_networks (network_hash, note) values ('codex-net-hash-1', 'test') on conflict do nothing");
+    await pool.query("select public.bobby_touch_device($1, 'web', null, null, null, null, null, null, 'codex-net-hash-1')", [netA]);
+    await pool.query("select public.bobby_touch_device($1, 'web', null, null, null, $2)", [netA, acct]);
+    await pool.query("select public.bobby_touch_device($1, 'ios', null, null, null, $2)", [netB, acct]);
+    eq([(await facts(acct)).internal, (await one('select public.bobby_device_internal($1) r', [netB])).r], [true, true], 'F05: the whole person follows the team network');
+    const nets = (await one('select public.bobby_admin_internal_networks() r')).r.find((n: { network: string }) => n.network === 'codex-net-');
+    eq([nets.onlyByNetwork, nets.accountsOnlyByNetwork], [1, 1], 'F05: the network view says what it pulls in by itself');
+    await pool.query("update public.bobby_internal_networks set ignored = true where network_hash = 'codex-net-hash-1'");
+    eq((await facts(acct)).internal, false, 'F05: removing the network releases the person');
+    // F04: B reading on A's install today does not make A a reader this week.
+    const shared = dev('shared'), first = await account(), second = await account();
+    await pool.query("select public.bobby_touch_device($1, 'web', null, null, null, $2)", [shared, first]);
+    await pool.query("update public.bobby_activity_days set day = day - 8 where subject in ('d:' || $1, 'a:' || $2)", [shared, first]);
+    await pool.query("update public.bobby_device_accounts set first_at = now() - interval '8 days' where device_hash = $1", [shared]);
+    await consume(second, shared);
+    eq([(await facts(first)).read_7, (await facts(second)).read_7], [false, true], 'F04: another account\'s read stays with that account');
+    // F09: read 40 days ago and opened today is not an active reader.
+    const old = dev('old'); await consume(null, old);
+    await pool.query("update public.bobby_activity_days set day = day - 40 where subject = 'd:' || $1", [old]);
+    await pool.query("update public.bobby_reader_stats set first_read_at = first_read_at - interval '40 days', last_read_at = last_read_at - interval '40 days' where reader = 'd:' || $1", [old]);
+    await pool.query("select public.bobby_touch_device($1, 'web', null, null, null, null)", [old]);
+    const oldFacts = await one("select last_read_day, last_day from public.bobby_admin_people_facts() where person = 'd:' || $1", [old]);
+    ok(oldFacts.last_read_day < oldFacts.last_day, 'F09: last read day is not the last open');
+    // F01: an active subscription with an unknown environment is unverified, never paid; sandbox apart.
+    const buyer = await account(), tester = await account();
+    await pool.query("insert into public.bobby_subscriptions (identity_id, provider, status, current_period_end) values ($1, 'apple', 'active', now() + interval '30 days')", [buyer]);
+    await pool.query("insert into public.bobby_subscriptions (identity_id, provider, status, current_period_end, environment) values ($1, 'apple', 'active', now() + interval '30 days', 'sandbox')", [tester]);
+    const subs = (await one('select public.bobby_admin_overview(30, false) r')).r.subscriptions;
+    const paidBefore = subs.paid;
+    eq([subs.unverified >= 1, subs.sandbox >= 1], [true, true], 'F01: unknown and sandbox are counted apart');
+    await pool.query("update public.bobby_subscriptions set environment = 'production', period_type = 'normal' where identity_id = $1", [buyer]);
+    eq((await one('select public.bobby_admin_overview(30, false) r')).r.subscriptions.paid, paidBefore + 1, 'F01: verified production counts as paid');
+    const econ = (await one('select public.bobby_admin_economics(30, false) r')).r.subscriptions;
+    ok(econ.active >= 1 && econ.sandbox >= 1, 'F01: economics counts verified production only');
+    // F07: a balance of 0 never clears a credit alert.
+    await pool.query("insert into public.bobby_llm_credit_marks (provider, kind, amount_usd) values ('openai', 'balance', 0)");
+    const llm = (await one('select public.bobby_admin_overview(30, false) r')).r.llm.providers.openai;
+    eq(llm.lastTopup, null, 'F07: a zero balance is not a top-up');
+  }
 
   console.log(`admin-truth-pg: ${checks} checks passed`);
 } finally {
