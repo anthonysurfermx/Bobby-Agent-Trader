@@ -73,6 +73,10 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   const product = ent.product_identifier ?? null;
   const sub = product ? subscriber?.subscriptions?.[product] : undefined;
   const expires = ent.expires_date ?? sub?.expires_date ?? null;
+  // RevenueCat's Test Store simulates purchases without any payment, and its key ships in the Debug app config of a
+  // public repo: a Test Store entitlement never grants production Pro and never overwrites a real subscription
+  // (payments security audit 2026-10-02, RC-01).
+  if (sub?.store === 'test_store') return Boolean(current && ['active', 'trialing'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now()));
   const active = !sub?.refunded_at && (expires === null || Date.parse(expires) > Date.now());
   const store = sub?.store ?? 'app_store';
   const provider: 'apple' | 'stripe' = store === 'app_store' || store === 'mac_app_store' ? 'apple' : 'stripe';

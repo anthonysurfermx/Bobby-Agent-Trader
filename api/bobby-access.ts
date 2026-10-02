@@ -140,6 +140,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'checkout') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id).catch(() => null);
+      // One plan per account: never sell a second subscription to someone who already has Bobby Pro (double billing,
+      // and cancelling either one would drop Pro while the other keeps charging). Audit 2026-10-02, STRIPE-04.
+      const live = existing && ['active', 'trialing', 'past_due'].includes(existing.status)
+        && (!existing.current_period_end || Date.parse(existing.current_period_end) > Date.now());
+      if (live) {
+        return res.status(409).json({ code: 'already_pro', provider: existing.provider,
+          error: existing.provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
+      }
       const origin = siteOrigin(req);
       const form: Record<string, string> = {
         mode: 'subscription',
