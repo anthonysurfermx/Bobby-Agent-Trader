@@ -137,7 +137,7 @@ targets:
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
         MARKETING_VERSION: "1.7"
-        CURRENT_PROJECT_VERSION: "56"
+        CURRENT_PROJECT_VERSION: "57"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
         # Test Store key; Release uses the App Store app's public key (RevenueCat → API keys → SDK API keys,

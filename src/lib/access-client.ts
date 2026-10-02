@@ -3,6 +3,8 @@
 // account credential (Apple/Google session first, the wallet session second).
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { progressHeaders } from '@/lib/companions/sync';
+import { t } from '@/lib/companions/i18n';
+import { clientLanguage, clientLocale } from '@/lib/client-language';
 
 export type Tier = 'anon' | 'free' | 'pro';
 /** `bonus`: gifted Quick reads, separate from `remaining`; Pro keeps its balance while reads are unlimited. */
@@ -58,13 +60,20 @@ export async function fetchAccess(headers?: Record<string, string>): Promise<Acc
 }
 
 /** Opens Stripe Checkout (or the billing portal) for Bobby Pro; returns an error message when it cannot. */
-export async function startBilling(action: 'checkout' | 'portal'): Promise<string | null> {
+function billingFailure(status?: number, error?: string): string {
+  if (status === 401 || status === 403) return t('Sign in first: Bobby Pro belongs to your Bobby account.', 'Inicia sesión primero: Bobby Pro pertenece a tu cuenta de Bobby.');
+  if (error === 'Card payments are not switched on yet.') return t('Card payments are not available yet.', 'Los pagos con tarjeta aún no están disponibles.', 'Os pagamentos com cartão ainda não estão disponíveis.', 'Les paiements par carte ne sont pas encore disponibles.', 'I pagamenti con carta non sono ancora disponibili.', 'Kartenzahlungen sind noch nicht verfügbar.');
+  if (error === 'No card subscription on this account.') return t('This account has no card subscription to manage.', 'Esta cuenta no tiene una suscripción con tarjeta que administrar.', 'Esta conta não tem uma assinatura paga com cartão para gerenciar.', 'Ce compte n’a pas d’abonnement payé par carte à gérer.', 'Questo account non ha un abbonamento pagato con carta da gestire.', 'Für dieses Konto gibt es kein per Karte bezahltes Abo zu verwalten.');
+  return t('Payments are temporarily unavailable. Please try again.', 'Los pagos no están disponibles por ahora. Inténtalo de nuevo.', 'Os pagamentos estão temporariamente indisponíveis. Tente novamente.', 'Les paiements sont momentanément indisponibles. Réessaie.', 'I pagamenti non sono disponibili al momento. Riprova.', 'Zahlungen sind vorübergehend nicht verfügbar. Versuche es erneut.');
+}
+export async function startBilling(action: 'checkout' | 'portal', market?: { symbol: string; timeframe: string }): Promise<string | null> {
   try {
-    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action }) });
+    const params = new URLSearchParams(window.location.search);
+    const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action, language: clientLanguage(), locale: clientLocale(), country: params.get('country'), symbol: market?.symbol ?? params.get('symbol'), timeframe: market?.timeframe ?? params.get('timeframe') }) });
     const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
-    return body.error ?? 'Payments are temporarily unavailable.';
-  } catch { return 'Payments are temporarily unavailable.'; }
+    return billingFailure(r.status, body.error);
+  } catch { return billingFailure(); }
 }
 
 // ---- invite a friend: the link carries ?ref=CODE; the code waits here until the friend has an account ----

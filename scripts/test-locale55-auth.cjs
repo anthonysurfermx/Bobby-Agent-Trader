@@ -43,7 +43,7 @@ function environment(language, options = {}) {
     if (name === '@/components/ui/alert') return { Alert: 'Alert', AlertDescription: 'AlertDescription' };
     if (name === './web-translations') return { WEB_TRANSLATIONS: catalog };
     if (name === '../app-language' || name === './app-language') return load('src/lib/app-language.ts');
-    if (name === '../client-language') return load('src/lib/client-language.ts');
+    if (name === '../client-language' || name === '@/lib/client-language') return load('src/lib/client-language.ts');
     if (name === '@/lib/companions/i18n') return load('src/lib/companions/i18n.ts');
     throw new Error('Unexpected dependency: ' + name);
   };
@@ -58,10 +58,10 @@ const signin = 'src/pages/BobbySignInPage.tsx', callback = 'src/pages/AuthCallba
   let env = environment(language), tree = env.render(signin), text = env.i18n();
   assert.equal(nodes(tree, 'title')[0].props.children, text.t('Sign in | Bobby', 'Iniciar sesión | Bobby'));
   assert.equal(nodes(tree, 'Helmet')[0].props.htmlAttributes.lang, language === 'pt' ? 'pt-BR' : ({en:'en-US',es:'es-MX',fr:'fr-FR',it:'it-IT',de:'de-DE'})[language]);
-  assert.deepEqual(nodes(tree, 'a').map(node => node.props.href), ['/', '/desk', '/privacy']); tests++;
+  assert.deepEqual(nodes(tree, 'a').map(node => new URL(node.props.href, 'https://bobbyprotocol.example').pathname), ['/', '/desk', '/privacy']); tests++;
   for (const [index, provider] of [[0,'apple'],[1,'google']]) {
    env = environment(language); tree = env.render(signin); nodes(tree,'button')[index].props.onClick(); await flush();
-   assert.equal(env.calls.oauth[0].provider, provider); assert.equal(env.calls.oauth[0].options.redirectTo, 'https://bobbyprotocol.example/auth/callback'); assert.equal(env.calls.oauth[0].options.skipBrowserRedirect,true); assert.equal(env.calls.assigned.length,1);
+   assert.equal(env.calls.oauth[0].provider, provider); const redirect = new URL(env.calls.oauth[0].options.redirectTo); assert.equal(redirect.origin + redirect.pathname, 'https://bobbyprotocol.example/auth/callback'); assert.equal(redirect.searchParams.get('source'),'bobby'); assert.equal(redirect.searchParams.get('lang'), language); assert.equal(env.calls.oauth[0].options.skipBrowserRedirect,true); assert.equal(env.calls.assigned.length,1);
    env.timers.forEach(timer => timer());
    const brand = provider === 'apple' ? 'Apple' : 'Google';
    assert.equal(env.states[1], env.i18n().t(`The browser did not open ${brand}. Tap the link below to continue.`, `El navegador no abrió ${brand}. Toca el enlace de abajo para continuar.`));
@@ -71,7 +71,7 @@ const signin = 'src/pages/BobbySignInPage.tsx', callback = 'src/pages/AuthCallba
   env = environment(language, { providerUrl: 'https://attacker.example/authorize' }); tree = env.render(signin); nodes(tree,'button')[0].props.onClick(); await flush();
   assert.equal(env.calls.assigned.length,0); assert.equal(env.states[1],env.i18n().t('That sign-in method is not available right now. Try the other one.','Ese método de acceso no está disponible ahora. Prueba el otro.')); tests++;
   env = environment(language,{ session:true, hash:'#access_token=INERT&refresh_token=INERT', back:'/redeem?lang='+language }); env.render(callback); env.effects[0](); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
-  assert.equal(env.calls.getSession,1); assert.equal(env.calls.legacyCallback,0); assert.equal(env.calls.navigated[0].path,'/redeem?lang='+language); assert.equal(env.states[0],'success'); assert.equal(env.states[1],env.i18n().t('Signed in. Returning…','Sesión iniciada. Volviendo…')); assert(env.calls.history.every(url=>!url.includes('token')&&!url.includes('#'))); tests++;
+  assert.equal(env.calls.getSession,1); assert.equal(env.calls.legacyCallback,0); const destination = new URL(env.calls.navigated[0].path, 'https://bobbyprotocol.example'); assert.equal(destination.pathname,'/redeem'); assert.equal(destination.searchParams.get('lang'), language); assert.equal(env.states[0],'success'); assert.equal(env.states[1],env.i18n().t('Signed in. Returning…','Sesión iniciada. Volviendo…')); assert(env.calls.history.every(url=>!url.includes('token')&&!url.includes('#'))); tests++;
   env = environment(language,{params:{error:'access_denied'}}); env.render(callback); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
   assert.equal(env.calls.getSession,0); assert.equal(env.states[1],env.i18n().t('Access denied. Please try again.','Acceso denegado. Por favor intenta de nuevo.')); assert.equal(env.calls.navigated[0].path,'/login'); assert(env.calls.history.every(url=>!url.includes('error='))); tests++;
   env = environment(language); env.render(callback); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
@@ -82,6 +82,10 @@ const signin = 'src/pages/BobbySignInPage.tsx', callback = 'src/pages/AuthCallba
   assert.equal(env.calls.navigated[0].path,'/'); assert.equal(env.states[1],'¡Cuenta verificada exitosamente!'); tests++;
   env = environment(language,{params:{code:'INERT_CODE'},sessionError:true}); env.render(callback); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
   assert.equal(env.states[1],env.i18n().t('An unexpected error occurred.','Ocurrió un error inesperado.')); assert.equal(env.calls.navigated[0].path,'/login'); tests++;
+  env = environment(language,{params:{error:'legacy_provider_error',error_description:'Legacy provider diagnostic'}}); env.render(callback); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
+  assert.equal(env.states[1],'Legacy provider diagnostic'); assert.equal(env.calls.navigated[0].path,'/login'); assert.equal(env.calls.legacyCallback,0); tests++;
+  env = environment(language,{params:{code:'INERT_RECOVERY',type:'recovery'}}); env.render(callback); env.effects[0](); await flush(); env.timers.forEach(timer=>timer());
+  assert.equal(env.calls.legacyCallback,1); assert.equal(env.calls.navigated[0].path,'/reset-password?token=INERT_RECOVERY&type=recovery'); assert.equal(env.states[1],'Verificación exitosa. Ahora puedes cambiar tu contraseña.'); tests++;
  }
  const selected = environment('fr', { persistedLanguage:null, deviceLanguage:'en-US' });
  const selectedTree = selected.render(signin); nodes(selectedTree,'button')[0].props.onClick(); await flush();

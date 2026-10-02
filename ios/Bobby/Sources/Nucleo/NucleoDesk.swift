@@ -933,10 +933,17 @@ final class NucleoDesk {
         }
     }
 
-    /// The latest ok read not saved yet and under 30 min old (restore after a web content crash).
+    /// Restore an unsaved recent read only in its original language/locale. Changing app language
+    /// never relabels or narrates an older answer as if the provider had generated it in the new one.
     func pendingRead(now: Date = Date()) -> [String: Any]? {
         guard profile.acceptedRiskNotice else { return nil }
-        return reads.last { $0.generation == generation() && $0.saved == nil && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow }?.result
+        let language = L.ttsLang, locale = L.localeIdentifier
+        return reads.last {
+            $0.generation == generation() && $0.saved == nil
+                && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow
+                && $0.result["language"] as? String == language
+                && $0.result["locale"] as? String == locale
+        }?.result
     }
 
     // MARK: - saveThesis (the only XP)

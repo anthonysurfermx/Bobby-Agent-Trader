@@ -10750,5 +10750,23 @@
     "pt": "Carteira conectada: {0}\n\nPeça a carteira para consultar os seus recibos confirmados na Base. Reveja qualquer proposta antes de assinar.",
     "it": "Portafoglio collegato: {0}\n\nChiedi il portafoglio per consultare le ricevute confermate su Base. Esamina ogni proposta prima di firmare.",
     "de": "Wallet verbunden: {0}\n\nFrage nach deinem Portfolio, um bestätigte Base-Belege zu prüfen. Prüfe jeden Vorschlag vor der Unterschrift."
+  },
+  "Card payments are not available yet.": {
+    "fr": "Les paiements par carte ne sont pas encore disponibles.",
+    "pt": "Os pagamentos com cartão ainda não estão disponíveis.",
+    "it": "I pagamenti con carta non sono ancora disponibili.",
+    "de": "Kartenzahlungen sind noch nicht verfügbar."
+  },
+  "This account has no card subscription to manage.": {
+    "fr": "Ce compte n’a pas d’abonnement payé par carte à gérer.",
+    "pt": "Esta conta não tem uma subscrição paga com cartão para gerir.",
+    "it": "Questo account non ha un abbonamento pagato con carta da gestire.",
+    "de": "Für dieses Konto gibt es kein per Karte bezahltes Abo zu verwalten."
+  },
+  "Payments are temporarily unavailable. Please try again.": {
+    "fr": "Les paiements sont momentanément indisponibles. Réessaie.",
+    "pt": "Os pagamentos estão temporariamente indisponíveis. Tenta novamente.",
+    "it": "I pagamenti non sono disponibili al momento. Riprova.",
+    "de": "Zahlungen sind vorübergehend nicht verfügbar. Versuche es erneut."
   }
 }

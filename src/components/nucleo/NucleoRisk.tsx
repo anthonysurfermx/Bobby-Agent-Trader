@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { t } from '@/lib/companions/i18n';
+import { clientLanguagePath } from '@/lib/client-language';
 import { progressStore } from '@/lib/companions/progress';
 import { sfxSuccess, sfxTock } from '@/lib/companions/sfx';
 import NucleoSphere from '@/components/companion/NucleoSphere';
@@ -35,7 +36,7 @@ export default function NucleoRisk({ readOnly = false, onClose }: Props) {
   return (
     <div className="n-risk">
       <header className="n-topbar">
-        <a href="/" className="n-wordmark">Bobby</a>
+        <a href={clientLanguagePath('/')} className="n-wordmark">Bobby</a>
         <div className="flex items-center gap-2">
           <LangMenu />
           {readOnly && <button type="button" onClick={onClose} className="n-iconbtn" aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={16} /></button>}
@@ -77,7 +78,7 @@ export default function NucleoRisk({ readOnly = false, onClose }: Props) {
         {full ? (
           <p className="mt-4 text-center text-[12px] leading-relaxed" style={{ color: '#8A8378' }}>
             {t("Data comes from public market sources and can be delayed. Bobby's public calls are recorded on-chain so anyone can check them; that is a track record, not a promise.", 'Los datos vienen de fuentes públicas de mercado y pueden llegar con retraso. Las llamadas públicas de Bobby se registran on-chain para que cualquiera las revise; eso es historial, no promesa.', 'Os dados vêm de fontes públicas de mercado e podem atrasar. As chamadas públicas do Bobby ficam registradas on-chain para que qualquer pessoa possa conferir; isso é histórico, não promessa.')}{' '}
-            <a className="underline" href="/privacy" target="_blank" rel="noreferrer">{t('Privacy Policy', 'Aviso de privacidad', 'Política de Privacidade')}</a>
+            <a className="underline" href={clientLanguagePath('/privacy')} target="_blank" rel="noreferrer">{t('Privacy Policy', 'Aviso de privacidad', 'Política de Privacidade')}</a>
           </p>
         ) : (
           <button type="button" onClick={() => setFull(true)} className="mt-4 text-[13px] underline underline-offset-4" style={{ color: '#A39C91' }}>{t('Read the full notice', 'Leer el aviso completo', 'Ler o aviso completo')}</button>

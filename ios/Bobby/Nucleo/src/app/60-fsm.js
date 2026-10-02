@@ -137,12 +137,12 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
-  if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
-  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
-  if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
+  if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
-  var f = RMOD.failure(r.reply, LANG);
+  var f = RMOD.failure(r.reply, LANG, { locale:LOCALE });
   /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
   if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
   /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
@@ -160,7 +160,7 @@ function cancelRead(){
 /* the ghost satellite on Desk: the thesis saved in THIS session */
 function ghostFill(){
   if (!SAVED || !SAVED.thesis){ A.satG.on = false; return; }
-  var v = RMOD.thesisView(SAVED.thesis, LANG, { signedIn: !!(SES && SES.signedIn) });
+  var v = RMOD.thesisView(SAVED.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
   fillSatNode(el.satG, el.satG.querySelector('.k'), el.satG.querySelector('.v'), null, v.pill, v.price || '', null, null, v.verdict.key === 'review' ? 'alpha' : 'cio', false);
   A.satG.hw = measureSat(el.satG); A.satG.on = true;
 }
@@ -177,7 +177,7 @@ function buildFaces(){
   for (var j = 0; j < 2; j++){
     var th = LEDGER[j], node = el.satT[j];
     if (!th){ A.satT[j].on = false; continue; }
-    var v = RMOD.thesisView(th, LANG, {});
+    var v = RMOD.thesisView(th, LANG, { locale:LOCALE });
     fillSatNode(node, node.querySelector('.k'), node.querySelector('.v'), null, th.symbol, v.price || '', null, v.verdict.word, v.verdict.key === 'review' ? 'alpha' : 'cio', false);
     A.satT[j].hw = measureSat(node); A.satT[j].on = true; A.satT[j].th = th;
   }
@@ -915,7 +915,7 @@ function faceAction(id){
 STATES.THESIS_VIEW = {
   enter: function(prev, d){
     this.back = d.back || 'IDLE';
-    var v = RMOD.thesisView(d.thesis, LANG, { signedIn: !!(SES && SES.signedIn) });
+    var v = RMOD.thesisView(d.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
     v.when = whenLabel(d.thesis.asOf, Date.parse(d.thesis.savedAt));
     fillThesisCard(v, { verdict: v.verdict.key, readOnly: true });
     el.card1.ln.textContent = v.line; A.lnO.set(1);
@@ -937,7 +937,7 @@ STATES.THESIS_VIEW = {
 STATES.RESTORE = {
   enter: function(prev, d){
     var res = d.read, r = { id: ++READ_SEQ, params: null, question: res.question || '', accepted: true, asset: res.asset, market: res.market, reply: res, model: null, requestId: res.requestId, askT: clk };
-    try { r.model = RMOD.build(res, { lang: LANG, signedIn: !!(SES && SES.signedIn) }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
     READ = r; READS_DONE++;
     A.greet.o.set(0); A.meri.forEach(function(m){ m.p.set(0); m.o.set(0); }); A.satG.o.set(0); if (A.note.o.t > 0) A.note.o.set(0);
     prepRead(r.model);

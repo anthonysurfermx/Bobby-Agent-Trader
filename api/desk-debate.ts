@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
 import { z } from 'zod';
-import { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale, type AppLanguage } from '../src/lib/app-language.js';
+import { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale, isAppLocale, type AppLanguage } from '../src/lib/app-language.js';
 import { deskErrorCopy } from './_lib/desk-localization.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
@@ -24,7 +24,8 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido') })
+  .refine(body => body.locale === undefined || isAppLocale(body.locale, body.language), { path: ['locale'], message: 'Locale must match language' });
 
 type Lang = AppLanguage;
 const copy = deskErrorCopy;

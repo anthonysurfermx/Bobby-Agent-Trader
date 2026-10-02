@@ -1,4 +1,4 @@
-import { APP_LANGUAGES, APP_LOCALES, appLocale, type AppLanguage } from '../src/lib/app-language.js';
+import { APP_LANGUAGES, appLocale, isAppLocale, type AppLanguage } from '../src/lib/app-language.js';
 // ============================================================
 // POST /api/bobby-voice-free
 // In-process free TTS (Microsoft Edge Neural voices via the
@@ -35,8 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
   if (body.lang !== undefined && !VALID_LANGS.includes(body.lang)) return res.status(400).json({ error: 'Unsupported language' });
-  if (body.locale !== undefined && !(APP_LOCALES as readonly string[]).includes(body.locale)) return res.status(400).json({ error: 'Unsupported locale' });
   const lang = (body.lang || 'es') as AppLanguage;
+  if (body.locale !== undefined && !isAppLocale(body.locale, lang)) return res.status(400).json({ error: 'Unsupported locale' });
   const locale = appLocale(lang, body.locale);
   // The iOS onboarding ids (chill/directo/pro) map onto the delivery hints.
   const VIBE_ALIASES: Record<string, string> = { chill: 'wise', directo: 'direct', pro: 'analytical' };

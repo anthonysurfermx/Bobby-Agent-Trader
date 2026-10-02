@@ -11,7 +11,7 @@ import ProtectedRoute, { GuestRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
 import { appLanguage } from '@/lib/app-language';
-import { clientLocale } from '@/lib/client-language';
+import { clientLocale, rememberQueryLanguage } from '@/lib/client-language';
 
 // Layout components (no lazy loading para layouts)
 import MainLayout from '@/components/layout/MainLayout';
@@ -177,6 +177,7 @@ function PageLoader() {
 function RootLayout() {
   useLocation(); // Refresh the document locale on route and query transitions.
   const documentLocale = clientLocale();
+  React.useEffect(() => { rememberQueryLanguage(); }, [documentLocale]);
   return (
     <ThemeProvider defaultTheme="system" storageKey="defi-mexico-theme">
       <Helmet htmlAttributes={{ lang: documentLocale }} />

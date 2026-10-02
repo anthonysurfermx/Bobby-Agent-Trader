@@ -49,7 +49,7 @@ function onAskReply(r, res){
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
   if (res.status === 'ok'){
-    try { r.model = RMOD.build(res, { lang: LANG, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
   }
   fsmEvent('reply', r);
@@ -64,7 +64,7 @@ function onStage(p){
 function dockAsset(){
   var r = READ; if (!r || !r.asset) return;
   var parts = [r.asset.symbol];
-  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct) : ''));
+  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price, LANG, RMOD.currencyOf(r), LOCALE) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct, LANG, LOCALE) : ''));
   A.aText = parts.join(' · '); el.dockA.textContent = A.aText; A.dockAO.tween(1, 0.24, E.fade);
 }
 

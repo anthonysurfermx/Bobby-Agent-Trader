@@ -275,6 +275,42 @@ final class NucleoRemediationTests: XCTestCase {
         XCTAssertEqual(cached["status"] as? String, "stale", "Owner validation must precede the saved cache hit")
     }
 
+    func testLanguageChangesDoNotRestoreOrRewriteOtherLanguageReads() async throws {
+        let previous = UserDefaults.standard.object(forKey: L.preferenceKey)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        B34Stub.install(Self.market)
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            let desk = makeDesk(Identity())
+            let read = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+            let id = try XCTUnwrap(read["requestId"] as? String)
+            XCTAssertEqual(read["language"] as? String, language.rawValue)
+            XCTAssertEqual(desk.pendingRead()?["requestId"] as? String, id)
+            let requests = B34Stub.requests.count
+            let xp = desk.companions.disciplineXP
+            for other in AppLanguage.allCases where other != language {
+                UserDefaults.standard.set(other.rawValue, forKey: L.preferenceKey)
+                _ = desk.cancel()
+                XCTAssertNil(desk.pendingRead(), "An unsaved \(language.rawValue) answer cannot return under \(other.rawValue) UI")
+                XCTAssertEqual(desk.companions.disciplineXP, xp, "Changing language preserves progress")
+            }
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            XCTAssertEqual(desk.pendingRead()?["requestId"] as? String, id, "The original read is retained")
+            XCTAssertEqual(B34Stub.requests.count, requests, "Changing language never submits another analysis")
+            let saved = try await desk.saveThesis(NucleoParams(["requestId": id]))
+            XCTAssertEqual(saved["status"] as? String, "saved")
+            let history = desk.theses()["items"] as? [[String: Any]]
+            UserDefaults.standard.set(language == .de ? "fr" : "de", forKey: L.preferenceKey)
+            XCTAssertNil(desk.pendingRead(), "Saved reads stay in history")
+            XCTAssertEqual((desk.theses()["items"] as? [[String: Any]])?.count, history?.count)
+            XCTAssertTrue((desk.theses()["items"] as? [[String: Any]])?.contains { $0["id"] as? String == id } == true)
+            desk.teardown()
+        }
+    }
+
     func testOldFollowUpAndConfirmationTokenAreRejectedLocally() async throws {
         let identity = Identity(), desk = makeDesk(identity)
         B34Stub.install(Self.market)

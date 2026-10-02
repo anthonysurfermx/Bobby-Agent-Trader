@@ -369,7 +369,7 @@ function startAsk(params){
 function onAskReply(r){
   if (!r || typeof r !== 'object') r = { v:1, status:'error', code:'bad_response' };
   if (r.status === 'ok'){
-    try { M = RMOD.build(r, { lang:LANG, firstRead:true, signedIn:!!(SESSION && SESSION.signedIn) }); }
+    try { M = RMOD.build(r, { lang:LANG, locale:LOCALE, firstRead:true, signedIn:!!(SESSION && SESSION.signedIn) }); }
     catch(e){ report('build', e); go('ERROR', { v:1, status:'error', code:'bad_response' }); return; }
     W.reply = r;
     if (W.state === 'RESOLVING') go('THINK_WAIT');
@@ -636,7 +636,7 @@ function teardownRead(){
 }
 ENTER.ERROR = function(r){
   if (r && r.code === 'risk_not_accepted'){ if (SESSION) SESSION.riskAccepted = false; teardownRead(); go('RISK'); return; }
-  var f = RMOD ? RMOD.failure(r, LANG) : { kind:'error', caption:null, chips:[] };
+  var f = RMOD ? RMOD.failure(r, LANG, { locale:LOCALE }) : { kind:'error', caption:null, chips:[] };
   teardownRead(); buzz('warning', 0.4);
   /* a metered read (§8.3) keeps its question natively: the Apple / Bobby Pro chip, then "Try another question" */
   var chips = (f.chips || []).filter(function(c){ return !(c.action && c.action.dismiss); })

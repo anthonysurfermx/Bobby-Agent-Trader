@@ -28,6 +28,7 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { appLocale, isAppLanguage } from '../src/lib/app-language.js';
 
 export const config = { maxDuration: 20 };
 
@@ -37,6 +38,27 @@ const APPLE_PRODUCT_IDS = new Set(['xyz.bobbyprotocol.bobby.pro.monthly']);
 const APPLE_ROOT_G3_SHA256 = '63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179';
 
 const stripeReady = () => Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+
+/** Only bounded interface state returns from billing; callers cannot choose a return host or path. */
+function billingInterface(body: Record<string, unknown>): { query: URLSearchParams; stripeLocale?: string } {
+  const query = new URLSearchParams();
+  if (!isAppLanguage(body.language)) return { query };
+  const language = body.language, locale = appLocale(language, body.locale);
+  query.set('lang', language); query.set('locale', locale);
+  if (typeof body.country === 'string' && /^[A-Z]{2}$/.test(body.country)) query.set('country', body.country);
+  if (typeof body.symbol === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(body.symbol)) query.set('symbol', body.symbol);
+  if (typeof body.timeframe === 'string' && ['5m', '15m', '1H', '4H', '1D'].includes(body.timeframe)) query.set('timeframe', body.timeframe);
+  const stripeLocale = locale === 'pt-BR' ? 'pt-BR'
+    : language === 'es' ? (locale === 'es-ES' ? 'es' : 'es-419')
+    : locale === 'en-GB' ? 'en-GB'
+    : language;
+  return { query, stripeLocale };
+}
+function billingReturn(origin: string, query: URLSearchParams, outcome?: string): string {
+  const params = new URLSearchParams(query);
+  if (outcome) params.set('pro', outcome);
+  return origin + '/desk' + (params.size ? '?' + params.toString() : '');
+}
 
 function siteOrigin(req: VercelRequest): string {
   const host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? '');
@@ -109,7 +131,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { action, signedTransaction, code } = (req.body ?? {}) as { action?: string; signedTransaction?: string; code?: string };
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { action, signedTransaction, code } = body as { action?: string; signedTransaction?: string; code?: string };
   const identity = await requireIdentity(req, res);
   if (!identity) return;
 
@@ -141,17 +164,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id).catch(() => null);
       const origin = siteOrigin(req);
+      const context = billingInterface(body);
       const form: Record<string, string> = {
         mode: 'subscription',
         'line_items[0][price]': String(process.env.STRIPE_PRICE_ID),
         'line_items[0][quantity]': '1',
-        success_url: `${origin}/desk?pro=welcome`,
-        cancel_url: `${origin}/desk?pro=cancelled`,
+        success_url: billingReturn(origin, context.query, 'welcome'),
+        cancel_url: billingReturn(origin, context.query, 'cancelled'),
         client_reference_id: identity.id,
         'metadata[identity_id]': identity.id,
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
+      if (context.stripeLocale) form.locale = context.stripeLocale;
       if (existing?.stripe_customer_id) form.customer = existing.stripe_customer_id;
       const session = await stripe('checkout/sessions', form);
       return res.status(200).json({ url: session.url });
@@ -161,7 +186,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id);
       if (!existing?.stripe_customer_id) return res.status(404).json({ error: 'No card subscription on this account.' });
-      const portal = await stripe('billing_portal/sessions', { customer: existing.stripe_customer_id, return_url: `${siteOrigin(req)}/desk` });
+      const context = billingInterface(body);
+      const portal = await stripe('billing_portal/sessions', { customer: existing.stripe_customer_id, return_url: billingReturn(siteOrigin(req), context.query), ...(context.stripeLocale ? { locale: context.stripeLocale } : {}) });
       return res.status(200).json({ url: portal.url });
     }
 

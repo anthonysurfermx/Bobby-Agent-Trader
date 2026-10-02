@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
 import { Helmet } from 'react-helmet-async';
 import { locale, t } from '@/lib/companions/i18n';
+import { clientLanguagePath, rememberQueryLanguage } from '@/lib/client-language';
 
 type CallbackType = 'signup' | 'recovery' | 'invite' | 'magiclink' | 'email_change' | null;
 type CallbackError =
@@ -62,6 +63,7 @@ export default function AuthCallback() {
   const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
   const code = searchParams.get('code') || hashParams.get('code');
   const token = searchParams.get('token') || hashParams.get('token');
+  const bobbyCallback = searchParams.get('source') === 'bobby';
   const redirectTo = sanitizeRedirect(
     searchParams.get('redirect_to') || hashParams.get('redirect_to'),
     '/'
@@ -97,7 +99,9 @@ export default function AuthCallback() {
     const processCallback = async () => {
       // Read once whatever the outcome: a cancelled sign-in must not send a later one to /redeem.
       const back = takeReturn();
+      const failureDestination = bobbyCallback ? clientLanguagePath('/signin') : '/login';
       try {
+        if (bobbyCallback) rememberQueryLanguage();
         // Bobby's own auth project (Apple / Google from the desk) lands here with
         // the session in the URL hash. Its client parses that when it is created;
         // the legacy DeFi México client below never sees it and used to answer
@@ -105,10 +109,12 @@ export default function AuthCallback() {
         if (!error && (hashParams.get('access_token') || searchParams.get('code'))) {
           const { data } = await bobbySupabase().auth.getSession();
           if (data.session) {
+            rememberQueryLanguage();
             setStatus('success');
             setMessage(back ? t('Signed in. Returning…', 'Sesión iniciada. Volviendo…') : t('Signed in. Returning to the desk…', 'Sesión iniciada. Volviendo al desk…'));
             cleanUrl();
-            setTimeout(() => navigate(back ?? '/desk', { replace: true }), 600);
+            const destination = clientLanguagePath(back ?? '/desk');
+            setTimeout(() => navigate(destination, { replace: true }), 600);
             return;
           }
         }
@@ -142,7 +148,9 @@ export default function AuthCallback() {
               errorMessage = t('This link has already been processed.', 'Este enlace ya fue procesado.');
               break;
             default:
-              errorMessage = errorDescription || t('An authentication error occurred.', 'Ocurrió un error de autenticación.');
+              errorMessage = bobbyCallback
+                ? t('An authentication error occurred.', 'Ocurrió un error de autenticación.')
+                : errorDescription || t('An authentication error occurred.', 'Ocurrió un error de autenticación.');
           }
           
           setMessage(errorMessage);
@@ -152,7 +160,17 @@ export default function AuthCallback() {
           
           // Redirigir más rápido si no es un error crítico
           const delay = error === 'user_already_confirmed' ? 1500 : 2500;
-          setTimeout(() => navigate('/login', { replace: true }), delay);
+          setTimeout(() => navigate(failureDestination, { replace: true }), delay);
+          return;
+        }
+
+        // Bobby OAuth never belongs to the legacy account or recovery handler.
+        if (bobbyCallback) {
+          setStatus('error');
+          const errorMessage = t('Authentication could not be completed.', 'No se pudo completar la autenticación.');
+          setMessage(errorMessage);
+          toast.error(errorMessage);
+          setTimeout(() => navigate(failureDestination, { replace: true }), 2000);
           return;
         }
 
@@ -289,7 +307,7 @@ export default function AuthCallback() {
         setMessage(t('An unexpected error occurred.', 'Ocurrió un error inesperado.'));
         toast.error(t('Unable to process authentication', 'Error al procesar la autenticación'));
         
-        setTimeout(() => navigate('/login', { replace: true }), 2500);
+        setTimeout(() => navigate(failureDestination, { replace: true }), 2500);
       } finally {
         // Limpiar URL de parámetros sensibles
         cleanUrl();

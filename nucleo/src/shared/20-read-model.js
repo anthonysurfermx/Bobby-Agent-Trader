@@ -372,7 +372,16 @@
   };
 
   function lang2(l) { var code = String(l || '').replace(/_/g, '-').toLowerCase().split('-')[0]; return S[code] ? code : 'en'; }
-  function localeFor(l) { var code = lang2(l); return code === 'pt' ? (/br/i.test(String(l)) ? 'pt-BR' : 'pt-PT') : { en:'en-US', es:'es-MX', fr:'fr-FR', it:'it-IT', de:'de-DE' }[code]; }
+  function localeFor(l, preferred) {
+    if (root.NucleoLocale) return root.NucleoLocale.locale(l, preferred);
+    // Preserve the standalone read-model API when the shared locale helper is absent.
+    var code = lang2(l), tag = String(preferred || l || '').replace(/_/g, '-').toLowerCase();
+    var supported = ['en-US','en-GB','en-AU','en-CA','en-IE','es-MX','es-ES','es-US','fr-FR','pt-PT','pt-BR','it-IT','de-DE'];
+    for (var i = 0; i < supported.length; i++) {
+      if (supported[i].toLowerCase() === tag && supported[i].split('-')[0] === code) return supported[i];
+    }
+    return { en:'en-US', es:'es-MX', fr:'fr-FR', pt:'pt-PT', it:'it-IT', de:'de-DE' }[code];
+  }
   function t(lang, key, vars) {
     var s = S[lang2(lang)][key];
     if (s == null) s = S.en[key];
@@ -382,19 +391,15 @@
   function fin(v) { return typeof v === 'number' && isFinite(v); }
 
   /** BobbyAPI.money: >=1000 no decimals with grouping, >=1 two decimals, else four. */
-  function money(v, lang, currency) {
+  function money(v, lang, currency, locale) {
     if (!fin(v)) return null;
     var a = Math.abs(v), sign = v < 0 ? '−' : '';
     currency = currency === undefined ? 'USD' : currency;
     var decimals = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
-    if (currency !== 'USD') return sign + a.toLocaleString(localeFor(lang), { minimumFractionDigits:decimals, maximumFractionDigits:decimals }) + (currency ? ' ' + currency : '');
-    if (['fr', 'pt', 'it', 'de'].indexOf(lang2(lang)) >= 0) {
-      var digits = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
-      return sign + a.toLocaleString(localeFor(lang), { minimumFractionDigits:digits, maximumFractionDigits:digits }) + ' USD';
-    }
-    if (a >= 1000) return sign + '$' + Math.round(a).toLocaleString('en-US');
-    if (a >= 1) return sign + '$' + a.toFixed(2);
-    return sign + '$' + a.toFixed(4);
+    var digits = a.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:decimals, maximumFractionDigits:decimals });
+    if (currency !== 'USD') return sign + digits + (currency ? ' ' + currency : '');
+    if (['fr', 'pt', 'it', 'de'].indexOf(lang2(lang)) >= 0) return sign + digits + ' USD';
+    return sign + '$' + digits;
   }
   function currencyOf(r) {
     var a = r.asset || r, m = r.market || {}, p = r.provenance || {};
@@ -406,14 +411,14 @@
     if (/\.SA$/.test(symbol)) return 'BRL';
     return symbol.indexOf('.') < 0 ? 'USD' : null;
   }
-  function signedPct(v) {
+  function signedPct(v, lang, locale) {
     if (!fin(v)) return null;
-    return (v > 0 ? '▲' : v < 0 ? '▼' : '') + Math.abs(v).toFixed(2) + '%';
+    return (v > 0 ? '▲' : v < 0 ? '▼' : '') + Math.abs(v).toLocaleString(localeFor(lang, locale), { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%';
   }
-  function delta(v) {
+  function delta(v, lang, locale) {
     if (!fin(v)) return null;
-    var a = Math.abs(v);
-    var s = a >= 1000 ? Math.round(a).toLocaleString('en-US') : a >= 1 ? a.toFixed(2) : a.toFixed(4);
+    var a = Math.abs(v), decimals = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
+    var s = a.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:decimals, maximumFractionDigits:decimals });
     return (v >= 0 ? '+' : '−') + s;
   }
 
@@ -504,15 +509,15 @@
     return ok ? { entry: p.entry, stop: p.stop, target: p.target, rewardRisk: fin(p.rewardRisk) ? p.rewardRisk : null } : null;
   }
 
-  function buildSatellites(r, lang, firstRead) {
+  function buildSatellites(r, lang, firstRead, locale) {
     var currency = currencyOf(r);
     var tech = r.technicals || {}, m = r.market || {}, c = r.candles || [];
     var price = fin(m.price) ? m.price : tech.price;
     var sats = [];
     if (fin(price)) {
       var prev = c.length >= 2 ? c[c.length - 2].c : null;
-      sats.push({ slot: 'UL', id: 'price', key: r.asset.symbol, value: money(price, lang, currency), from: fin(prev) ? money(prev, lang, currency) : null,
-        delta: signedPct(m.changePct), dot: !fin(m.changePct) || m.changePct === 0 ? 'neutral' : m.changePct > 0 ? 'alpha' : 'red' });
+      sats.push({ slot: 'UL', id: 'price', key: r.asset.symbol, value: money(price, lang, currency, locale), from: fin(prev) ? money(prev, lang, currency, locale) : null,
+        delta: signedPct(m.changePct, lang, locale), dot: !fin(m.changePct) || m.changePct === 0 ? 'neutral' : m.changePct > 0 ? 'alpha' : 'red' });
     }
     if (fin(tech.rsi14)) {
       var mo = tech.momentum;
@@ -522,19 +527,19 @@
     }
     var vr = closedVolumeRatio(c, r.receivedAt);
     if (vr != null) {
-      sats.push({ slot: 'LR', id: 'volume', key: t(lang, 'sat.volume'), value: vr.toFixed(1) + '×', from: null, delta: t(lang, 'sat.vsAvg'), dot: 'neutral' });
+      sats.push({ slot: 'LR', id: 'volume', key: t(lang, 'sat.volume'), value: vr.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:1, maximumFractionDigits:1 }) + '×', from: null, delta: t(lang, 'sat.vsAvg'), dot: 'neutral' });
     } else if (tech.trend) {
       sats.push({ slot: 'LR', id: 'trend', key: t(lang, 'sat.trend'), value: t(lang, 'trend.' + tech.trend), from: null, delta: t(lang, 'sat.ema'),
         dot: tech.trend === 'up' ? 'alpha' : tech.trend === 'down' ? 'red' : 'neutral' });
     }
     if (fin(tech.support) && fin(tech.resistance)) {
-      sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency) + '–' + money(tech.resistance, lang, currency), from: null,
+      sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
         delta: t(lang, 'sat.range30'), dot: 'neutral' });
     }
     return sats.slice(0, firstRead ? 3 : 4);
   }
 
-  function buildChart(r, lang, plan) {
+  function buildChart(r, lang, plan, locale) {
     var currency = currencyOf(r);
     var c = r.candles || [];
     if (c.length < 10) return null;
@@ -542,11 +547,11 @@
     var closes = pts.map(function (x) { return x.c; });
     var tech = r.technicals || {};
     var lines = [];
-    if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency) }) });
-    if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency) }) });
+    if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) });
+    if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency, locale) }) });
     if (plan) {
       ['entry', 'stop', 'target'].forEach(function (k) {
-        lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency) }) });
+        lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency, locale) }) });
       });
     }
     var vals = closes.concat(lines.map(function (l) { return l.price; }));
@@ -562,15 +567,15 @@
     if (fin(tech.support)) {
       var atr = fin(tech.atrPct) && fin(now.c) ? now.c * tech.atrPct / 100 : 0;
       var top = Math.min(tech.support + atr, Math.max(tech.support, now.c));
-      band = { lo: tech.support, hi: top > tech.support ? top : tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency) }) };
+      band = { lo: tech.support, hi: top > tech.support ? top : tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) };
       var d = now.c - tech.support;
-      bracket = { from: now.c, to: tech.support, label: delta(d), sub: t(lang, d >= 0 ? 'chart.aboveSupport' : 'chart.belowSupport'),
+      bracket = { from: now.c, to: tech.support, label: delta(d, lang, locale), sub: t(lang, d >= 0 ? 'chart.aboveSupport' : 'chart.belowSupport'),
         pct: fin(d / tech.support) ? Math.round((d / tech.support) * 1000) / 10 : null };
     }
     return {
       times: pts.map(function (x) { return x.t; }), closes: closes,
       domain: [lo, hi], gridlines: grid,
-      now: { price: now.c, t: now.t, label: money(now.c, lang, currency) },
+      now: { price: now.c, t: now.t, label: money(now.c, lang, currency, locale) },
       band: band, lines: lines, bracket: bracket,
       source: { timeframe: r.provenance.timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: r.provenance.asOf }
     };
@@ -604,6 +609,7 @@
     opts = opts || {};
     if (!r || r.status !== 'ok') throw new Error('build() needs an ok ask() reply');
     var lang = lang2(opts.lang || r.language), currency = currencyOf(r);
+    var locale = localeFor(lang, opts.locale === undefined ? (r.locale || opts.lang || r.language) : opts.locale);
     var v = r.agents.verdict === 'review' ? 'review' : 'wait';
     var agrees = pulseAgrees(r);
     var plan = planOf(r);
@@ -612,14 +618,14 @@
     var word = t(lang, 'verdict.' + v);
     var ring = agrees ? { mode: 'conviction', pct: Math.max(0, Math.min(100, Math.round(r.pulse.convictionPct))), label: t(lang, 'ring.conviction') }
       : { mode: 'complete', pct: null, label: null };
-    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(price, lang, currency) }];
+    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(price, lang, currency, locale) }];
     if (plan) {
-      rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(plan.entry, lang, currency) });
-      rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(plan.stop, lang, currency) });
-      rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(plan.target, lang, currency) });
+      rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(plan.entry, lang, currency, locale) });
+      rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(plan.stop, lang, currency, locale) });
+      rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(plan.target, lang, currency, locale) });
     } else {
-      if (fin(tech.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(tech.support, lang, currency) });
-      if (fin(tech.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(tech.resistance, lang, currency) });
+      if (fin(tech.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(tech.support, lang, currency, locale) });
+      if (fin(tech.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(tech.resistance, lang, currency, locale) });
     }
     if (tech.trend || fin(tech.rsi14)) {
       rows.push({ id: 'trend', label: t(lang, 'row.trend'),
@@ -634,8 +640,8 @@
       agents: ['alpha', 'red', 'cio'].map(function (k) {
         return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], stance: firstSentence(r.agents[k]), full: r.agents[k] };
       }),
-      satellites: buildSatellites(r, lang, !!opts.firstRead),
-      chart: buildChart(r, lang, plan),
+      satellites: buildSatellites(r, lang, !!opts.firstRead, locale),
+      chart: buildChart(r, lang, plan, locale),
       plan: plan,
       spoken: buildSpoken(r, lang),
       thesis: {
@@ -665,7 +671,7 @@
   }
 
   /** Non-ok replies -> caption + chips. Never a verdict, never XP. */
-  function failure(r, lang) {
+  function failure(r, lang, opts) {
     lang = lang2(lang);
     switch (r && r.status) {
       case 'confirm':
@@ -717,17 +723,19 @@
   /** A saved ledger Thesis (§2.7) -> the read-only thesis card, the ghost satellite and the Theses face. */
   function thesisView(th, lang, opts) {
     var currency = currencyOf(th);
-    lang = lang2(lang); opts = opts || {};
+    opts = opts || {};
+    var locale = localeFor(lang, opts.locale);
+    lang = lang2(lang);
     var v = th.verdict === 'review' ? 'review' : 'wait', sym = String(th.symbol || '');
     var word = t(lang, 'verdict.' + v);
-    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency) }];
+    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency, locale) }];
     if (fin(th.entry) || fin(th.stop) || fin(th.target)) {
-      if (fin(th.entry)) rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(th.entry, lang, currency) });
-      if (fin(th.stop)) rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(th.stop, lang, currency) });
-      if (fin(th.target)) rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(th.target, lang, currency) });
+      if (fin(th.entry)) rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(th.entry, lang, currency, locale) });
+      if (fin(th.stop)) rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(th.stop, lang, currency, locale) });
+      if (fin(th.target)) rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(th.target, lang, currency, locale) });
     } else {
-      if (fin(th.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(th.support, lang, currency) });
-      if (fin(th.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(th.resistance, lang, currency) });
+      if (fin(th.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(th.support, lang, currency, locale) });
+      if (fin(th.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(th.resistance, lang, currency, locale) });
     }
     rows = rows.filter(function (r) { return r.value != null; });
     return {
@@ -740,7 +748,7 @@
       saveLabel: t(lang, 'thesis.save'),
       savedLabel: t(lang, opts.signedIn ? 'thesis.saved' : 'thesis.savedLocal'),
       pill: sym + ' · ' + word.toUpperCase(),
-      price: money(th.price, lang, currency),
+      price: money(th.price, lang, currency, locale),
       points: fin(th.points) ? th.points : 0,
       asOf: th.asOf || null
     };
@@ -748,7 +756,7 @@
 
   root.NucleoReadModel = {
     v: 1, STRINGS: S, HUES: HUES, VERDICT: VERDICT,
-    t: t, money: money, signedPct: signedPct,
+    t: t, money: money, signedPct: signedPct, currencyOf: currencyOf,
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
     build: build, failure: failure, xpChip: xpChip, followUps: followUps, thesisView: thesisView,

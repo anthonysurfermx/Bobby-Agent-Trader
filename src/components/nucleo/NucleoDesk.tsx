@@ -10,6 +10,7 @@ import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { pick, speechLocale, t } from '@/lib/companions/i18n';
+import { clientLanguagePath } from '@/lib/client-language';
 import { progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
@@ -474,7 +475,7 @@ export default function NucleoDesk() {
     voice.stop();
     if (listening) { recognitionRef.current?.stop(); return; }
     if (!freeVoice) {
-      navigate(`/agentic-world/bobby/voice-room?start=1&symbol=${encodeURIComponent(chartSymbol)}&timeframe=${encodeURIComponent(initialScreen.timeframe)}`);
+      navigate(clientLanguagePath(`/agentic-world/bobby/voice-room?start=1&symbol=${encodeURIComponent(chartSymbol)}&timeframe=${encodeURIComponent(initialScreen.timeframe)}`));
       return;
     }
     // Browser dictation + the existing market engine + free TTS. No Realtime call.
@@ -551,7 +552,7 @@ export default function NucleoDesk() {
     } catch { /* user cancelled or canvas tainted */ }
   };
 
-  const openTraderLand = useCallback(() => { sfxTock(); navigate('/trader-land'); }, [navigate]);
+  const openTraderLand = useCallback(() => { sfxTock(); navigate(clientLanguagePath('/trader-land')); }, [navigate]);
 
   const desktop = useMediaQuery('(min-width: 1024px)');
   const debate = useMemo(() => (answer ? debateFor(answer, agents) : null), [answer, agents]);
@@ -594,7 +595,7 @@ export default function NucleoDesk() {
       <div className="flex min-w-[44px] items-center sm:min-w-[92px]">
         {snapshot || phase === 'confirm' || phase === 'error'
           ? <button type="button" onClick={reset} className="n-iconbtn" aria-label={t('Close this read', 'Cerrar esta lectura', 'Fechar esta leitura')}><X size={16} /></button>
-          : <a href="/" className="n-wordmark" aria-label={t('Bobby, home', 'Bobby, inicio', 'Bobby, início')}>Bobby</a>}
+          : <a href={clientLanguagePath('/')} className="n-wordmark" aria-label={t('Bobby, home', 'Bobby, inicio', 'Bobby, início')}>Bobby</a>}
       </div>
       <div className="min-w-0 flex-1 text-center">
         {lastYou && (reading || done || phase === 'confirm') && (
@@ -738,7 +739,7 @@ export default function NucleoDesk() {
             const lv = agents && agents.level !== 'rapido' ? ` · ${levelName(agents.level)}` : '';
             return t(`${tfs} indicators, argued by three agents${lv}. Reference only, not financial advice. `, `Indicadores de ${tfs}, debatidos por tres agentes${lv}. Solo referencia, no es asesoría financiera. `, `Indicadores de ${tfs}, debatidos por três agentes${lv}. Apenas referência, não é recomendação financeira. `);
           })()}
-          <a href="/protocol" className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes', 'Atividade pública dos agentes')}</a>
+          <a href={clientLanguagePath('/protocol')} className="underline" style={{ color: '#A39C91' }}>{t('Public agent activity', 'Actividad pública de los agentes', 'Atividade pública dos agentes')}</a>
         </p>
       </motion.div>
     );
@@ -823,7 +824,7 @@ export default function NucleoDesk() {
 
   const subscribe = async () => {
     setBilling({ busy: true, error: null });
-    const err = await startBilling('checkout');
+    const err = await startBilling('checkout', { symbol: chartSymbol, timeframe: initialScreen.timeframe });
     if (err) setBilling({ busy: false, error: err });
   };
   const meterLine = meter && meter.paywall && meter.tier !== 'pro' && meter.remaining !== null && meter.limit !== null
@@ -958,7 +959,7 @@ export default function NucleoDesk() {
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
                   : t('Unlimited Quick reads · fair use · $5/month', 'Lecturas Rápidas sin límite · uso razonable · $5/mes', 'Análises Rápidas ilimitadas · uso razoável · 5 $/mês', 'Analyses Rapides illimitées · usage raisonnable · 5 $/mois', 'Analisi Rapide illimitate · uso corretto · 5 $/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 5 $/Monat')),
               action: meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
-                if (meter?.tier === 'pro') { void startBilling('portal'); return; }
+                if (meter?.tier === 'pro') { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.
                 if (!accessState.payments.stripe) { setSheet('none'); setInviteOpen(true); void refreshAccess(); return; }

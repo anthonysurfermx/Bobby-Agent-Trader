@@ -46,6 +46,11 @@ export function translatedEnglish(en: string, language: Lang = lang()): string |
 export function pick(entry: Bi | null | undefined): string {
   if (!entry) { console.error('[i18n] Missing translation entry'); return ''; }
   const language = lang();
+  // Legacy third arguments use Brazilian wording. The shared catalogue is the Portugal copy.
+  if (language === 'pt' && locale() === 'pt-PT') {
+    const european = translatedEnglish(entry.en ?? '', language);
+    if (european !== undefined) return european;
+  }
   return entry[language] ?? translatedEnglish(entry.en ?? '', language) ?? entry.en ?? '';
 }
 export function ttsLang(): Lang { return lang(); }

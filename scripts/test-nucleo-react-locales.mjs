@@ -15,7 +15,7 @@ const read=f=>fs.readFileSync(path.join(root,f),'utf8');
 const clean=x=>JSON.parse(JSON.stringify(x));
 function browser(language='fr',preferred='fr-FR',navigatorPreferred=preferred){
  const saved=new Map([['bobby_lang',language],['bobby_locale',preferred]]), requests=[];
- const location={search:'',href:'https://bobby.test/desk',assign:(value)=>{location.assigned=value;}};
+ const location={origin:'https://bobby.test',search:'',href:'https://bobby.test/desk',assign:(value)=>{location.assigned=value;}};
  const ctx=vm.createContext({console, Intl, URL, URLSearchParams, navigator:{language:navigatorPreferred},window:{location},document:{documentElement:{lang:'es'}},localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v))},fetch:async(url,init)=>{requests.push({url,init});return new Response(JSON.stringify({agents:{alpha:'A',red:'R',cio:'C',verdict:'wait',direction:'none'},level:'rapido'}),{headers:{'content-type':'application/json'}});},Response,AbortController,DOMException,TextDecoder,requestAnimationFrame:fn=>{fn();return 0;},setTimeout,clearTimeout});
  const loaded=new Map();let ack=[false,false,false,false];
  const stubs={

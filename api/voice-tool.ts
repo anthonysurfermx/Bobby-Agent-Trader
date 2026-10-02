@@ -1,4 +1,4 @@
-import { appLanguage, appLocale } from '../src/lib/app-language.js';
+import { appLanguage, appLocale, isAppLocale } from '../src/lib/app-language.js';
 import { isListedStockSymbol } from '../src/lib/regional-stocks.js';
 // ============================================================
 // POST /api/voice-tool
@@ -307,12 +307,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'run_debate': {
         // Technical pulse only. desk-debate owns authorization and metering of an analysis.
-        const lang = appLanguage(args?.lang, 'es');
+        const requestedLanguage = args?.language ?? args?.lang;
+        const lang = appLanguage(requestedLanguage, 'es');
+        if (args?.locale !== undefined && !isAppLocale(args.locale, lang)) {
+          return res.status(400).json({ error: 'invalid_request' });
+        }
         const result = await runDebate(
           String(args?.symbol ?? ''),
           args?.context ? String(args.context) : undefined,
           lang,
-          appLocale(lang, args?.locale ?? args?.lang),
+          appLocale(lang, args?.locale ?? requestedLanguage),
         );
         return res.status(200).json({ ...result, access: await readAccess(req) });
       }

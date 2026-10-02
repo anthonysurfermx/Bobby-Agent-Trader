@@ -441,9 +441,12 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     return LANGUAGES.indexOf(code) >= 0 ? code : 'en';
   }
   function locale(value, preferred) {
-    var code = language(value), tag = String(preferred || value || '').replace(/_/g, '-');
-    if (code === 'pt') return /(?:^|-)br(?:-|$)/i.test(tag) ? 'pt-BR' : 'pt-PT';
-    return { en:'en-US', es:'es-MX', fr:'fr-FR', it:'it-IT', de:'de-DE' }[code];
+    var code = language(value), tag = String(preferred || value || '').replace(/_/g, '-').toLowerCase();
+    var supported = ['en-US','en-GB','en-AU','en-CA','en-IE','es-MX','es-ES','es-US','fr-FR','pt-PT','pt-BR','it-IT','de-DE'];
+    for (var i = 0; i < supported.length; i++) {
+      if (supported[i].toLowerCase() === tag && supported[i].split('-')[0] === code) return supported[i];
+    }
+    return { en:'en-US', es:'es-MX', fr:'fr-FR', pt:'pt-PT', it:'it-IT', de:'de-DE' }[code];
   }
   root.NucleoLocale = { languages: LANGUAGES, language: language, locale: locale };
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1074,7 +1077,16 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   };
 
   function lang2(l) { var code = String(l || '').replace(/_/g, '-').toLowerCase().split('-')[0]; return S[code] ? code : 'en'; }
-  function localeFor(l) { var code = lang2(l); return code === 'pt' ? (/br/i.test(String(l)) ? 'pt-BR' : 'pt-PT') : { en:'en-US', es:'es-MX', fr:'fr-FR', it:'it-IT', de:'de-DE' }[code]; }
+  function localeFor(l, preferred) {
+    if (root.NucleoLocale) return root.NucleoLocale.locale(l, preferred);
+    // Preserve the standalone read-model API when the shared locale helper is absent.
+    var code = lang2(l), tag = String(preferred || l || '').replace(/_/g, '-').toLowerCase();
+    var supported = ['en-US','en-GB','en-AU','en-CA','en-IE','es-MX','es-ES','es-US','fr-FR','pt-PT','pt-BR','it-IT','de-DE'];
+    for (var i = 0; i < supported.length; i++) {
+      if (supported[i].toLowerCase() === tag && supported[i].split('-')[0] === code) return supported[i];
+    }
+    return { en:'en-US', es:'es-MX', fr:'fr-FR', pt:'pt-PT', it:'it-IT', de:'de-DE' }[code];
+  }
   function t(lang, key, vars) {
     var s = S[lang2(lang)][key];
     if (s == null) s = S.en[key];
@@ -1084,19 +1096,15 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   function fin(v) { return typeof v === 'number' && isFinite(v); }
 
   /** BobbyAPI.money: >=1000 no decimals with grouping, >=1 two decimals, else four. */
-  function money(v, lang, currency) {
+  function money(v, lang, currency, locale) {
     if (!fin(v)) return null;
     var a = Math.abs(v), sign = v < 0 ? '−' : '';
     currency = currency === undefined ? 'USD' : currency;
     var decimals = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
-    if (currency !== 'USD') return sign + a.toLocaleString(localeFor(lang), { minimumFractionDigits:decimals, maximumFractionDigits:decimals }) + (currency ? ' ' + currency : '');
-    if (['fr', 'pt', 'it', 'de'].indexOf(lang2(lang)) >= 0) {
-      var digits = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
-      return sign + a.toLocaleString(localeFor(lang), { minimumFractionDigits:digits, maximumFractionDigits:digits }) + ' USD';
-    }
-    if (a >= 1000) return sign + '$' + Math.round(a).toLocaleString('en-US');
-    if (a >= 1) return sign + '$' + a.toFixed(2);
-    return sign + '$' + a.toFixed(4);
+    var digits = a.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:decimals, maximumFractionDigits:decimals });
+    if (currency !== 'USD') return sign + digits + (currency ? ' ' + currency : '');
+    if (['fr', 'pt', 'it', 'de'].indexOf(lang2(lang)) >= 0) return sign + digits + ' USD';
+    return sign + '$' + digits;
   }
   function currencyOf(r) {
     var a = r.asset || r, m = r.market || {}, p = r.provenance || {};
@@ -1108,14 +1116,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     if (/\.SA$/.test(symbol)) return 'BRL';
     return symbol.indexOf('.') < 0 ? 'USD' : null;
   }
-  function signedPct(v) {
+  function signedPct(v, lang, locale) {
     if (!fin(v)) return null;
-    return (v > 0 ? '▲' : v < 0 ? '▼' : '') + Math.abs(v).toFixed(2) + '%';
+    return (v > 0 ? '▲' : v < 0 ? '▼' : '') + Math.abs(v).toLocaleString(localeFor(lang, locale), { minimumFractionDigits:2, maximumFractionDigits:2 }) + '%';
   }
-  function delta(v) {
+  function delta(v, lang, locale) {
     if (!fin(v)) return null;
-    var a = Math.abs(v);
-    var s = a >= 1000 ? Math.round(a).toLocaleString('en-US') : a >= 1 ? a.toFixed(2) : a.toFixed(4);
+    var a = Math.abs(v), decimals = a >= 1000 ? 0 : a >= 1 ? 2 : 4;
+    var s = a.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:decimals, maximumFractionDigits:decimals });
     return (v >= 0 ? '+' : '−') + s;
   }
 
@@ -1206,15 +1214,15 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     return ok ? { entry: p.entry, stop: p.stop, target: p.target, rewardRisk: fin(p.rewardRisk) ? p.rewardRisk : null } : null;
   }
 
-  function buildSatellites(r, lang, firstRead) {
+  function buildSatellites(r, lang, firstRead, locale) {
     var currency = currencyOf(r);
     var tech = r.technicals || {}, m = r.market || {}, c = r.candles || [];
     var price = fin(m.price) ? m.price : tech.price;
     var sats = [];
     if (fin(price)) {
       var prev = c.length >= 2 ? c[c.length - 2].c : null;
-      sats.push({ slot: 'UL', id: 'price', key: r.asset.symbol, value: money(price, lang, currency), from: fin(prev) ? money(prev, lang, currency) : null,
-        delta: signedPct(m.changePct), dot: !fin(m.changePct) || m.changePct === 0 ? 'neutral' : m.changePct > 0 ? 'alpha' : 'red' });
+      sats.push({ slot: 'UL', id: 'price', key: r.asset.symbol, value: money(price, lang, currency, locale), from: fin(prev) ? money(prev, lang, currency, locale) : null,
+        delta: signedPct(m.changePct, lang, locale), dot: !fin(m.changePct) || m.changePct === 0 ? 'neutral' : m.changePct > 0 ? 'alpha' : 'red' });
     }
     if (fin(tech.rsi14)) {
       var mo = tech.momentum;
@@ -1224,19 +1232,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     }
     var vr = closedVolumeRatio(c, r.receivedAt);
     if (vr != null) {
-      sats.push({ slot: 'LR', id: 'volume', key: t(lang, 'sat.volume'), value: vr.toFixed(1) + '×', from: null, delta: t(lang, 'sat.vsAvg'), dot: 'neutral' });
+      sats.push({ slot: 'LR', id: 'volume', key: t(lang, 'sat.volume'), value: vr.toLocaleString(localeFor(lang, locale), { minimumFractionDigits:1, maximumFractionDigits:1 }) + '×', from: null, delta: t(lang, 'sat.vsAvg'), dot: 'neutral' });
     } else if (tech.trend) {
       sats.push({ slot: 'LR', id: 'trend', key: t(lang, 'sat.trend'), value: t(lang, 'trend.' + tech.trend), from: null, delta: t(lang, 'sat.ema'),
         dot: tech.trend === 'up' ? 'alpha' : tech.trend === 'down' ? 'red' : 'neutral' });
     }
     if (fin(tech.support) && fin(tech.resistance)) {
-      sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency) + '–' + money(tech.resistance, lang, currency), from: null,
+      sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
         delta: t(lang, 'sat.range30'), dot: 'neutral' });
     }
     return sats.slice(0, firstRead ? 3 : 4);
   }
 
-  function buildChart(r, lang, plan) {
+  function buildChart(r, lang, plan, locale) {
     var currency = currencyOf(r);
     var c = r.candles || [];
     if (c.length < 10) return null;
@@ -1244,11 +1252,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var closes = pts.map(function (x) { return x.c; });
     var tech = r.technicals || {};
     var lines = [];
-    if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency) }) });
-    if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency) }) });
+    if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) });
+    if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency, locale) }) });
     if (plan) {
       ['entry', 'stop', 'target'].forEach(function (k) {
-        lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency) }) });
+        lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency, locale) }) });
       });
     }
     var vals = closes.concat(lines.map(function (l) { return l.price; }));
@@ -1264,15 +1272,15 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     if (fin(tech.support)) {
       var atr = fin(tech.atrPct) && fin(now.c) ? now.c * tech.atrPct / 100 : 0;
       var top = Math.min(tech.support + atr, Math.max(tech.support, now.c));
-      band = { lo: tech.support, hi: top > tech.support ? top : tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency) }) };
+      band = { lo: tech.support, hi: top > tech.support ? top : tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) };
       var d = now.c - tech.support;
-      bracket = { from: now.c, to: tech.support, label: delta(d), sub: t(lang, d >= 0 ? 'chart.aboveSupport' : 'chart.belowSupport'),
+      bracket = { from: now.c, to: tech.support, label: delta(d, lang, locale), sub: t(lang, d >= 0 ? 'chart.aboveSupport' : 'chart.belowSupport'),
         pct: fin(d / tech.support) ? Math.round((d / tech.support) * 1000) / 10 : null };
     }
     return {
       times: pts.map(function (x) { return x.t; }), closes: closes,
       domain: [lo, hi], gridlines: grid,
-      now: { price: now.c, t: now.t, label: money(now.c, lang, currency) },
+      now: { price: now.c, t: now.t, label: money(now.c, lang, currency, locale) },
       band: band, lines: lines, bracket: bracket,
       source: { timeframe: r.provenance.timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: r.provenance.asOf }
     };
@@ -1324,6 +1332,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     opts = opts || {};
     if (!r || r.status !== 'ok') throw new Error('build() needs an ok ask() reply');
     var lang = lang2(opts.lang || r.language), currency = currencyOf(r);
+    var locale = localeFor(lang, opts.locale === undefined ? (r.locale || opts.lang || r.language) : opts.locale);
     var v = r.agents.verdict === 'review' ? 'review' : 'wait';
     var agrees = pulseAgrees(r);
     var plan = planOf(r);
@@ -1332,14 +1341,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var word = t(lang, 'verdict.' + v);
     var ring = agrees ? { mode: 'conviction', pct: Math.max(0, Math.min(100, Math.round(r.pulse.convictionPct))), label: t(lang, 'ring.conviction') }
       : { mode: 'complete', pct: null, label: null };
-    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(price, lang, currency) }];
+    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(price, lang, currency, locale) }];
     if (plan) {
-      rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(plan.entry, lang, currency) });
-      rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(plan.stop, lang, currency) });
-      rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(plan.target, lang, currency) });
+      rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(plan.entry, lang, currency, locale) });
+      rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(plan.stop, lang, currency, locale) });
+      rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(plan.target, lang, currency, locale) });
     } else {
-      if (fin(tech.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(tech.support, lang, currency) });
-      if (fin(tech.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(tech.resistance, lang, currency) });
+      if (fin(tech.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(tech.support, lang, currency, locale) });
+      if (fin(tech.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(tech.resistance, lang, currency, locale) });
     }
     if (tech.trend || fin(tech.rsi14)) {
       rows.push({ id: 'trend', label: t(lang, 'row.trend'),
@@ -1354,8 +1363,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       agents: ['alpha', 'red', 'cio'].map(function (k) {
         return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], stance: firstSentence(r.agents[k]), full: r.agents[k] };
       }),
-      satellites: buildSatellites(r, lang, !!opts.firstRead),
-      chart: buildChart(r, lang, plan),
+      satellites: buildSatellites(r, lang, !!opts.firstRead, locale),
+      chart: buildChart(r, lang, plan, locale),
       plan: plan,
       spoken: buildSpoken(r, lang),
       thesis: {
@@ -1420,17 +1429,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   }
 
   /** An ISO reset time -> "October 3" / "3 de octubre" in the reader's time zone (null when unreadable). */
-  function resetDay(iso, lang) {
+  function resetDay(iso, lang, locale) {
     if (typeof iso !== 'string' || !iso) return null;
     var d = new Date(iso);
     if (isNaN(d.getTime())) return null;
-    try { return d.toLocaleDateString(localeFor(lang), { month: 'long', day: 'numeric' }); } catch (e) { return null; }
+    try { return d.toLocaleDateString(localeFor(lang, locale), { month: 'long', day: 'numeric' }); } catch (e) { return null; }
   }
 
   /** Non-ok replies -> caption + chips. Never a verdict, never XP.
    *  Metered-read refusals (ARCHITECTURE.md §8.3) carry a native `token` that re-asks the same question:
    *  it rides in `retry` (never `token`), so a chip can only re-ask AFTER the sign-in or the purchase. */
-  function failure(r, lang) {
+  function failure(r, lang, opts) {
+    opts = opts || {};
+    var locale = localeFor(lang, opts.locale === undefined ? (r && r.locale) : opts.locale);
     lang = lang2(lang);
     switch (r && r.status) {
       case 'signin_required':
@@ -1438,7 +1449,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
           chips: [{ label: t(lang, 'gate.signinCta'), action: { signIn: true, retry: r.token || null }, primary: true, style: 'apple' },
             { label: t(lang, 'gate.notNow'), action: { dismiss: true } }] };
       case 'subscription_required':
-        var day = resetDay(r.access && r.access.resetsAt, lang);
+        var day = resetDay(r.access && r.access.resetsAt, lang, locale);
         /* a level refusal (upgrade_required) carries native's own line, chip ("Invite a friend") and a lower-level fallback */
         var proChips = [{ label: typeof r.cta === 'string' ? r.cta : t(lang, 'gate.proCta'), action: { paywall: true, retry: r.token || null }, primary: true, style: 'pro' }];
         if (r.fallback && typeof r.fallback.label === 'string' && r.fallback.token) proChips.push({ label: r.fallback.label, action: { token: r.fallback.token } });
@@ -1502,17 +1513,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   /** A saved ledger Thesis (§2.7) -> the read-only thesis card, the ghost satellite and the Theses face. */
   function thesisView(th, lang, opts) {
     var currency = currencyOf(th);
-    lang = lang2(lang); opts = opts || {};
+    opts = opts || {};
+    var locale = localeFor(lang, opts.locale);
+    lang = lang2(lang);
     var v = th.verdict === 'review' ? 'review' : 'wait', sym = String(th.symbol || '');
     var word = t(lang, 'verdict.' + v);
-    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency) }];
+    var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency, locale) }];
     if (fin(th.entry) || fin(th.stop) || fin(th.target)) {
-      if (fin(th.entry)) rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(th.entry, lang, currency) });
-      if (fin(th.stop)) rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(th.stop, lang, currency) });
-      if (fin(th.target)) rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(th.target, lang, currency) });
+      if (fin(th.entry)) rows.push({ id: 'entry', label: t(lang, 'row.entry'), value: money(th.entry, lang, currency, locale) });
+      if (fin(th.stop)) rows.push({ id: 'stop', label: t(lang, 'row.stop'), value: money(th.stop, lang, currency, locale) });
+      if (fin(th.target)) rows.push({ id: 'target', label: t(lang, 'row.target'), value: money(th.target, lang, currency, locale) });
     } else {
-      if (fin(th.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(th.support, lang, currency) });
-      if (fin(th.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(th.resistance, lang, currency) });
+      if (fin(th.support)) rows.push({ id: 'support', label: t(lang, 'row.support'), value: money(th.support, lang, currency, locale) });
+      if (fin(th.resistance)) rows.push({ id: 'resistance', label: t(lang, 'row.resistance'), value: money(th.resistance, lang, currency, locale) });
     }
     rows = rows.filter(function (r) { return r.value != null; });
     return {
@@ -1525,7 +1538,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       saveLabel: t(lang, 'thesis.save'),
       savedLabel: t(lang, opts.signedIn ? 'thesis.saved' : 'thesis.savedLocal'),
       pill: sym + ' · ' + word.toUpperCase(),
-      price: money(th.price, lang, currency),
+      price: money(th.price, lang, currency, locale),
       points: fin(th.points) ? th.points : 0,
       asOf: th.asOf || null
     };
@@ -1533,7 +1546,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 
   root.NucleoReadModel = {
     v: 1, STRINGS: S, HUES: HUES, VERDICT: VERDICT,
-    t: t, money: money, signedPct: signedPct,
+    t: t, money: money, signedPct: signedPct, currencyOf: currencyOf,
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
     build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
@@ -2842,7 +2855,7 @@ function onAskReply(r, res){
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
   if (res.status === 'ok'){
-    try { r.model = RMOD.build(res, { lang: LANG, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
   }
   fsmEvent('reply', r);
@@ -2857,7 +2870,7 @@ function onStage(p){
 function dockAsset(){
   var r = READ; if (!r || !r.asset) return;
   var parts = [r.asset.symbol];
-  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct) : ''));
+  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price, LANG, RMOD.currencyOf(r), LOCALE) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct, LANG, LOCALE) : ''));
   A.aText = parts.join(' · '); el.dockA.textContent = A.aText; A.dockAO.tween(1, 0.24, E.fade);
 }
 
@@ -3311,12 +3324,12 @@ function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
-  if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  if (s === 'confirm'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   /* a level refusal or a premium read that did not finish: one calm line, and a chip the user taps (never silent) */
-  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
-  if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG) }); return; }
+  if (s === 'level_notice'){ go('CONFIRM_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
+  if (s === 'unknown_asset'){ go('UNKNOWN_ASSET', { f: RMOD.failure(r.reply, LANG, { locale:LOCALE }) }); return; }
   if (s === 'cancelled'){ go('RETURNING', { cancelled: true }); return; }
-  var f = RMOD.failure(r.reply, LANG);
+  var f = RMOD.failure(r.reply, LANG, { locale:LOCALE });
   /* consent is missing (a stale or reset notice): not a failed read — the way to the risk beat */
   if (f.kind === 'risk'){ if (SES) SES.riskAccepted = false; go('RISK_GATE', { f: f }); return; }
   /* the server metered this read (§8.3): an account, or Bobby Pro, first. The question waits natively. */
@@ -3334,7 +3347,7 @@ function cancelRead(){
 /* the ghost satellite on Desk: the thesis saved in THIS session */
 function ghostFill(){
   if (!SAVED || !SAVED.thesis){ A.satG.on = false; return; }
-  var v = RMOD.thesisView(SAVED.thesis, LANG, { signedIn: !!(SES && SES.signedIn) });
+  var v = RMOD.thesisView(SAVED.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
   fillSatNode(el.satG, el.satG.querySelector('.k'), el.satG.querySelector('.v'), null, v.pill, v.price || '', null, null, v.verdict.key === 'review' ? 'alpha' : 'cio', false);
   A.satG.hw = measureSat(el.satG); A.satG.on = true;
 }
@@ -3351,7 +3364,7 @@ function buildFaces(){
   for (var j = 0; j < 2; j++){
     var th = LEDGER[j], node = el.satT[j];
     if (!th){ A.satT[j].on = false; continue; }
-    var v = RMOD.thesisView(th, LANG, {});
+    var v = RMOD.thesisView(th, LANG, { locale:LOCALE });
     fillSatNode(node, node.querySelector('.k'), node.querySelector('.v'), null, th.symbol, v.price || '', null, v.verdict.word, v.verdict.key === 'review' ? 'alpha' : 'cio', false);
     A.satT[j].hw = measureSat(node); A.satT[j].on = true; A.satT[j].th = th;
   }
@@ -4089,7 +4102,7 @@ function faceAction(id){
 STATES.THESIS_VIEW = {
   enter: function(prev, d){
     this.back = d.back || 'IDLE';
-    var v = RMOD.thesisView(d.thesis, LANG, { signedIn: !!(SES && SES.signedIn) });
+    var v = RMOD.thesisView(d.thesis, LANG, { locale:LOCALE, signedIn: !!(SES && SES.signedIn) });
     v.when = whenLabel(d.thesis.asOf, Date.parse(d.thesis.savedAt));
     fillThesisCard(v, { verdict: v.verdict.key, readOnly: true });
     el.card1.ln.textContent = v.line; A.lnO.set(1);
@@ -4111,7 +4124,7 @@ STATES.THESIS_VIEW = {
 STATES.RESTORE = {
   enter: function(prev, d){
     var res = d.read, r = { id: ++READ_SEQ, params: null, question: res.question || '', accepted: true, asset: res.asset, market: res.market, reply: res, model: null, requestId: res.requestId, askT: clk };
-    try { r.model = RMOD.build(res, { lang: LANG, signedIn: !!(SES && SES.signedIn) }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
     READ = r; READS_DONE++;
     A.greet.o.set(0); A.meri.forEach(function(m){ m.p.set(0); m.o.set(0); }); A.satG.o.set(0); if (A.note.o.t > 0) A.note.o.set(0);
     prepRead(r.model);

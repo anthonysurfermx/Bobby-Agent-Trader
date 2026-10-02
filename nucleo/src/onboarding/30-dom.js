@@ -159,7 +159,7 @@ function buildSats(list){
 
 /* ---------- chart: built from model.chart (48 real 1H closes, to scale) ---------- */
 var chartSvg = $('chart'), CH = null;
-function tickFmt(v){ var a = Math.abs(v); if (a >= 1000) return Math.round(v).toLocaleString(LOCALE); if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v)); return String(+v.toFixed(a >= 1 ? 2 : 4)); }
+function tickFmt(v){ var a = Math.abs(v); if (a >= 1000) return Math.round(v).toLocaleString(LOCALE); if (Math.abs(v - Math.round(v)) < 1e-9) return String(Math.round(v)); return v.toLocaleString(LOCALE, { maximumFractionDigits:a >= 1 ? 2 : 4 }); }
 function timeFmt(iso, lang){
   try { var d = new Date(iso); if (isNaN(d.getTime())) return ''; return d.toLocaleTimeString(LOCALE, { hour:'numeric', minute:'2-digit' }); } catch(e){ return ''; }
 }

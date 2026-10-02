@@ -406,8 +406,8 @@ final class AccountSession: ObservableObject {
 
     private func fail(data: Data, status: Int) -> AccountDeletion {
         if status == 401 { return interrupted() }
-        let message = (try? JSONSerialization.jsonObject(with: data) as? [String: Any])?["error"] as? String
-        lastError = L.t(message ?? "Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
+        // Provider/server prose is not a catalog key and may be in another language.
+        lastError = L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo")
         return .failed
     }
 
@@ -472,7 +472,7 @@ final class AccountSession: ObservableObject {
             accept(s)
         } catch {
             guard generation == started, signInAttempt == attempt else { return }
-            lastError = L.t("Could not sign in: \(error.localizedDescription)", "No se pudo iniciar sesión — inténtalo de nuevo")
+            lastError = L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo.")
         }
     }
 

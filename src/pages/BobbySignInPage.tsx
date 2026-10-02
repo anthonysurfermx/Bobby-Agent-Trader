@@ -3,6 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { track } from '@/lib/track';
 import { lang, locale, setLang, setLocale, t } from '@/lib/companions/i18n';
+import { clientLanguagePath } from '@/lib/client-language';
 
 /**
  * /signin — Apple / Google sign-in for the web, entered from the static home ("/").
@@ -35,7 +36,7 @@ export default function BobbySignInPage() {
       const preferredLocale = locale();
       setLang(preferredLanguage);
       setLocale(preferredLocale);
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      const redirectTo = `${window.location.origin}${clientLanguagePath('/auth/callback?source=bobby')}`;
       const { data, error: authError } = await bobbySupabase().auth.signInWithOAuth({
         provider,
         options: { redirectTo, skipBrowserRedirect: true },
@@ -69,7 +70,7 @@ export default function BobbySignInPage() {
         <meta name="robots" content="noindex" />
       </Helmet>
       <div className="w-full max-w-[380px] flex flex-col gap-4">
-        <a href="/" className="text-[22px] tracking-[-0.04em] text-[#F2EDE4] no-underline mb-6 self-start">Bobby</a>
+        <a href={clientLanguagePath('/')} className="text-[22px] tracking-[-0.04em] text-[#F2EDE4] no-underline mb-6 self-start">Bobby</a>
         <span className="font-mono text-[11px] tracking-[0.16em] uppercase text-[#8A8378]">{t('Start free', 'Empieza gratis')}</span>
         <h1 className="m-0 text-[34px] leading-[1.05] tracking-[-0.045em] font-light">{t('Sign in to Bobby', 'Inicia sesión en Bobby')}</h1>
         <p className="m-0 mb-2 text-[15px] leading-relaxed text-[#A39C91]">
@@ -98,10 +99,10 @@ export default function BobbySignInPage() {
           </p>
         )}
         <p className="m-0 mt-2 text-[14px] text-[#A39C91]">
-          {t('Just looking?', '¿Solo estás mirando?')} <a href="/desk" className="text-[#F2EDE4] underline underline-offset-4">{t('Try it on the web', 'Pruébalo en la web')}</a>
+          {t('Just looking?', '¿Solo estás mirando?')} <a href={clientLanguagePath('/desk')} className="text-[#F2EDE4] underline underline-offset-4">{t('Try it on the web', 'Pruébalo en la web')}</a>
         </p>
         <p className="m-0 mt-2 text-[12px] leading-normal text-[#8A8378]">
-          {t('By continuing you agree to the', 'Al continuar aceptas la')} <a href="/privacy" className="text-[#A39C91]">{t('Privacy Policy', 'Política de privacidad')}</a>{t('. Educational reads, not financial advice.', '. Lecturas educativas, no asesoría financiera.')}
+          {t('By continuing you agree to the', 'Al continuar aceptas la')} <a href={clientLanguagePath('/privacy')} className="text-[#A39C91]">{t('Privacy Policy', 'Política de privacidad')}</a>{t('. Educational reads, not financial advice.', '. Lecturas educativas, no asesoría financiera.')}
         </p>
       </div>
     </main>
