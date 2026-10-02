@@ -94,11 +94,35 @@ try {
     if(url.includes('bobby_identities')&&method==='POST')return json([{id:ID,auth_user_id:ID,wallet_address:null}]);
     if(method==='DELETE'||method==='PATCH'){deletes.push(`${method} ${url}`);return json({});}
     if(url.includes('/admin/users/'))return json({identities:[{provider:'apple',identity_data:{sub:'apple-user'}}]});
+    if(url.includes('bobby_subscriptions'))return json([]);
     throw new Error(`Unexpected test request: ${url}`);
   };
   const account=response();await accountHandler({...req,method:'DELETE'} as never,account as never);
   eq(account.statusCode,200);eq(account.body.appleRevocation,'manual');eq(deletes.length,3);
   eq(deletes[0].startsWith(`PATCH https://db.test/rest/v1/agent_trades?user_id=eq.${ID}`),true);
   eq(account.body.manualRevocationURL,'https://support.apple.com/en-us/102571');
+
+  // Payments audit 2026-10-02 (STRIPE-02): a live card subscription is cancelled at Stripe before anything is
+  // deleted; if Stripe cannot confirm, nothing is deleted.
+  process.env.STRIPE_SECRET_KEY='sk_test_delete';
+  for (const stripeStatus of [200,500]) {
+    const writes:string[]=[];let cancelled=0;
+    globalThis.fetch=async(input,init)=>{
+      const url=String(input),method=init?.method??'GET';
+      if(url.startsWith('https://api.stripe.com/v1/subscriptions/sub_live')&&method==='DELETE'){cancelled++;return json({},stripeStatus);}
+      if(url.includes('api_cache'))return json([]);
+      if(url.endsWith('/auth/v1/user'))return json({id:ID,app_metadata:{provider:'apple'}});
+      if(url.includes('bobby_identities')&&method==='POST')return json([{id:ID,auth_user_id:ID,wallet_address:null}]);
+      if(url.includes('bobby_subscriptions'))return json([{identity_id:ID,provider:'stripe',status:'active',stripe_subscription_id:'sub_live',stripe_customer_id:'cus_1'}]);
+      if(method==='DELETE'||method==='PATCH'){writes.push(`${method} ${url}`);return json({});}
+      if(url.includes('/admin/users/'))return json({identities:[{provider:'apple',identity_data:{sub:'apple-user'}}]});
+      throw new Error(`Unexpected test request: ${url}`);
+    };
+    const r=response();await accountHandler({...req,method:'DELETE'} as never,r as never);
+    eq(cancelled,1);
+    if(stripeStatus===200){eq(r.statusCode,200);eq(writes.length,3);}
+    else{eq(r.statusCode,503);eq(writes.length,0);}
+  }
+  delete process.env.STRIPE_SECRET_KEY;
   console.log(`ios-remediation: ${checks} checks passed`);
 } finally {globalThis.fetch=original;}

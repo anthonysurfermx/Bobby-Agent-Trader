@@ -39,7 +39,17 @@ async function alertRejectedKey(status: number): Promise<void> {
 
 interface RcSubscriber {
   entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
-  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null }>;
+  subscriptions?: Record<string, { store?: string; expires_date?: string | null; unsubscribe_detected_at?: string | null; billing_issues_detected_at?: string | null; refunded_at?: string | null; is_sandbox?: boolean; period_type?: string }>;
+}
+
+/** Stores whose purchases are real money sold through RevenueCat. Stripe is handled by its own webhook. */
+const PRO_STORES = new Set(['app_store', 'mac_app_store']);
+
+/** Apple sandbox (TestFlight, App Review) grants Pro to everyone unless BOBBY_SANDBOX_PRO_UIDS lists the auth user ids
+ *  allowed to (comma separated). Unset keeps App Review working; set it once the reviewer account is known. */
+function sandboxProAllowed(authUserId: string): boolean {
+  const list = (process.env.BOBBY_SANDBOX_PRO_UIDS || '').split(',').map((s) => s.trim()).filter(Boolean);
+  return list.length === 0 || list.includes(authUserId);
 }
 
 /** The bobby_identities row behind a RevenueCat app_user_id (a Supabase auth user id). */
@@ -63,27 +73,36 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
   const current = await getSubscription(identityId);
-  if (!ent) {
-    // Never erase a card subscription that did not come through RevenueCat.
-    if (current && current.provider === 'apple' && ['active', 'trialing'].includes(current.status)) {
-      await upsertSubscription({ identity_id: identityId, provider: 'apple', status: 'expired' });
+  // Pro comes only from a real store subscription behind the entitlement: an App Store (or Mac App Store) record
+  // with a known store, not refunded and not expired. RevenueCat's Test Store simulates purchases without payment
+  // and its key ships in the public repo's Debug config; an entitlement with no subscription record or no store is
+  // never presumed to be the App Store (payments security audit 2026-10-02, RC-01).
+  // The entitlement names only its latest product; a real App Store subscription may sit beside a Test Store one,
+  // so every eligible record is considered and the one that runs longest wins.
+  const records = Object.entries(subscriber?.subscriptions ?? {})
+    .filter(([, s]) => PRO_STORES.has(String(s?.store)) && !s?.refunded_at && (s?.is_sandbox !== true || sandboxProAllowed(authUserId)))
+    .sort(([, x], [, y]) => (y.expires_date ? Date.parse(y.expires_date) : Infinity) - (x.expires_date ? Date.parse(x.expires_date) : Infinity));
+  const [product, sub] = ent && records.length ? records[0] : [null, undefined];
+  const expires = sub?.expires_date ?? null;
+  const sandbox = sub?.is_sandbox === true;
+  const eligible = Boolean(ent && sub);
+  const active = eligible && (expires === null || Date.parse(expires) > Date.now());
+  // A row this sync owns: an Apple row, or one an earlier sync wrote for a non-Apple store (no Stripe subscription
+  // id). A card subscription written by the Stripe webhook is never touched here.
+  const ownedRow = Boolean(current && (current.provider === 'apple' || !current.stripe_subscription_id));
+  if (!eligible) {
+    // Revoke what an earlier sync granted from an ineligible source (e.g. a Test Store row granted before this fix).
+    if (ownedRow && ['active', 'trialing'].includes(current!.status)) {
+      const refunded = Object.values(subscriber?.subscriptions ?? {}).some((s) => PRO_STORES.has(String(s?.store)) && s?.refunded_at);
+      await upsertSubscription({ identity_id: identityId, provider: current!.provider, status: refunded ? 'refunded' : 'expired' });
     }
-    return false;
+    return Boolean(current && !ownedRow && ['active', 'trialing'].includes(current.status));
   }
-  const product = ent.product_identifier ?? null;
-  const sub = product ? subscriber?.subscriptions?.[product] : undefined;
-  const expires = ent.expires_date ?? sub?.expires_date ?? null;
-  // RevenueCat's Test Store simulates purchases without any payment, and its key ships in the Debug app config of a
-  // public repo: a Test Store entitlement never grants production Pro and never overwrites a real subscription
-  // (payments security audit 2026-10-02, RC-01).
-  if (sub?.store === 'test_store') return Boolean(current && ['active', 'trialing'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now()));
-  const active = !sub?.refunded_at && (expires === null || Date.parse(expires) > Date.now());
-  const store = sub?.store ?? 'app_store';
-  const provider: 'apple' | 'stripe' = store === 'app_store' || store === 'mac_app_store' ? 'apple' : 'stripe';
   if (current?.provider === 'stripe' && current.stripe_subscription_id && ['active', 'trialing'].includes(current.status) && !active) return true;
+  const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
   await upsertSubscription({
-    identity_id: identityId, provider, status: sub?.refunded_at ? 'refunded' : active ? 'active' : 'expired',
-    product_id: product, current_period_end: expires,
+    identity_id: identityId, provider: 'apple', status: sub?.refunded_at ? 'refunded' : !active ? 'expired' : periodType === 'trial' ? 'trialing' : 'active',
+    product_id: product, current_period_end: expires, environment: sandbox ? 'sandbox' : 'production', period_type: periodType,
   });
   return active;
 }

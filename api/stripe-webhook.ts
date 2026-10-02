@@ -45,11 +45,19 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   const identity = String((sub.metadata as Record<string, string> | undefined)?.identity_id ?? fallbackIdentity ?? '');
   if (!/^[0-9a-f-]{36}$/i.test(identity)) { console.error('[stripe-webhook] subscription without identity', sub.id); return; }
   const price = ((sub.items as { data?: Array<{ price?: { id?: string } }> } | undefined)?.data ?? [])[0]?.price?.id ?? null;
-  await upsertSubscription({
-    identity_id: identity, provider: 'stripe', status: String(sub.status ?? 'incomplete'), product_id: price,
-    current_period_end: periodEnd(sub), stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : null,
-    stripe_subscription_id: typeof sub.id === 'string' ? sub.id : null,
-  });
+  try {
+    await upsertSubscription({
+      identity_id: identity, provider: 'stripe', status: String(sub.status ?? 'incomplete'), product_id: price,
+      current_period_end: periodEnd(sub), stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : null,
+      stripe_subscription_id: typeof sub.id === 'string' ? sub.id : null,
+      environment: sub.livemode === true ? 'production' : sub.livemode === false ? 'sandbox' : null,
+    });
+  } catch (e) {
+    // The account was deleted (foreign key): there is nobody to grant Pro to, and retrying for three days changes
+    // nothing. Account deletion cancels the subscription first (api/account.ts).
+    if (e instanceof Error && /subscription upsert (409|23503)/.test(e.message)) { console.error('[stripe-webhook] subscription for a deleted account', sub.id); return; }
+    throw e;
+  }
 }
 
 async function identityForSubscription(subscriptionId: unknown): Promise<string | null> {
@@ -75,7 +83,10 @@ export async function POST(request: Request): Promise<Response> {
       const sub = await stripeGet(`subscriptions/${obj.subscription}`);
       await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
     } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-      await saveSubscription(obj);
+      // Stripe does not deliver events in order: save the subscription as it is now, never the event's snapshot,
+      // so a late or retried event cannot revive a cancelled plan or drop a paid one (audit 2026-10-02, STRIPE-01).
+      const live = typeof obj.id === 'string' ? await stripeGet(`subscriptions/${obj.id}`) : obj;
+      await saveSubscription(live);
     } else if (event.type === 'invoice.paid' && typeof event.id === 'string' && Number(obj.amount_paid) > 0) {
       const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? Number(obj.amount_paid) / 100 : null;
       const subscription = obj.subscription ?? (obj.parent as { subscription_details?: { subscription?: string } } | undefined)?.subscription_details?.subscription;

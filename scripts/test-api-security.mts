@@ -167,13 +167,15 @@ try {
     const { default: chatHandler } = await import('../api/openclaw-chat.js');
     const { response, state } = responseRecorder();
     await chatHandler(request({ message: 'Should I long BTC?' }), response);
-    assert.equal(state.status, 401, 'openclaw-chat must refuse a caller with no allowed Origin and no internal auth');
+    assert.equal(state.status, 403, 'openclaw-chat must refuse a caller without internal auth');
     assert.equal(fetchCalls, 0, 'a refused chat must not reach an LLM');
-    for (const headers of [{ origin: 'https://bobbyprotocol.xyz' }, { 'x-internal-secret': 'test-internal-secret' }]) {
-      const passed = responseRecorder();
-      await chatHandler(request({ message: 'Should I long BTC?' }, headers), passed.response);
-      assert.equal(passed.state.status, 503, `openclaw-chat must admit ${Object.keys(headers)[0]} callers past the gate`);
-    }
+    // Payments audit 2026-10-02 (OMR-1): an allowed Origin is not a credential; only internal callers pass.
+    const spoofed = responseRecorder();
+    await chatHandler(request({ message: 'Should I long BTC?' }, { origin: 'https://bobbyprotocol.xyz' }), spoofed.response);
+    assert.equal(spoofed.state.status, 403, 'openclaw-chat must refuse an Origin-only caller');
+    const internal = responseRecorder();
+    await chatHandler(request({ message: 'Should I long BTC?' }, { 'x-internal-secret': 'test-internal-secret' }), internal.response);
+    assert.equal(internal.state.status, 503, 'openclaw-chat must admit internal callers past the gate');
   }
 
   const [

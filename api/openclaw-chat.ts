@@ -923,11 +923,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // allowed origin (the voice-room text surface, reachable from /desk), which
   // stays behind the public rate limit. A bare script with neither gets 401
   // instead of a free debate.
+  // Internal callers only (payments security audit 2026-10-02, OMR-1): an Origin header is not a credential, so
+  // the public path served the paid debate free and unmetered. The reader-facing debate is /api/desk-debate.
   const internal = isInternalRequest(req);
-  if (!internal && !requestOriginHost(req.headers)) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!internal) {
+    return res.status(403).json({ error: 'This chat moved to the Bobby desk.', code: 'use_desk', url: '/desk' });
   }
-  if (!internal && !await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
 
   const { message, history, language } = req.body as {
     message: string;

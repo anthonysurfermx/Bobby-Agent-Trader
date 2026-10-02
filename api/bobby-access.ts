@@ -139,7 +139,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'checkout') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
-      const existing = await getSubscription(identity.id).catch(() => null);
+      // Fail closed: without knowing the account's current plan, never open a second one.
+      let existing: Awaited<ReturnType<typeof getSubscription>>;
+      try { existing = await getSubscription(identity.id); } catch { return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' }); }
       // One plan per account: never sell a second subscription to someone who already has Bobby Pro (double billing,
       // and cancelling either one would drop Pro while the other keeps charging). Audit 2026-10-02, STRIPE-04.
       const live = existing && ['active', 'trialing', 'past_due'].includes(existing.status)

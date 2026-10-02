@@ -61,6 +61,8 @@ async function call(method: 'GET' | 'DELETE', opts: { body?: unknown; header?: s
     if (url.includes('api_cache')) return json([]);
     if (url.endsWith('/auth/v1/user')) return json({ id: ID, app_metadata: { provider: 'apple' } });
     if (url.includes('bobby_identities') && verb === 'POST') return json([{ id: ID, auth_user_id: ID, wallet_address: null }]);
+    // Payments audit 2026-10-02: deletion first reads the subscription (no card plan here, so nothing to cancel).
+    if (url.includes('bobby_subscriptions') && verb === 'GET') return json([]);
     if (url.includes('/auth/v1/admin/users/') && verb === 'GET') return json({ identities: [{ provider: 'apple', identity_data: { sub: 'apple-user' } }], app_metadata: { provider: 'apple', providers: ['apple'] } });
     if (verb === 'PATCH' || verb === 'DELETE') {
       world.writes.push({ method: verb, url, body: init.body ? JSON.parse(String(init.body)) : undefined });
