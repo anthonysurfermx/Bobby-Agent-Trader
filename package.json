@@ -61,7 +61,7 @@
     "test:user-memory-pg": "tsx scripts/test-user-memory-pg.mts",
     "test:account-delete": "tsx scripts/test-account-delete.mts",
     "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts",
-    "test:briefings": "tsx scripts/test-briefings-calendar.mts && tsx scripts/test-briefings-content.mts && tsx scripts/test-briefings-core.mts",
+    "test:briefings": "tsx scripts/test-briefings-calendar.mts && tsx scripts/test-briefings-content.mts && tsx scripts/test-briefings-core.mts && tsx scripts/test-briefings-macro.mts",
     "test:briefings-api": "tsx scripts/test-briefings-api.mts",
     "test:briefings-worker": "tsx scripts/test-briefings-worker.mts",
     "test:briefings-pg": "tsx scripts/test-briefings-pg.mts"

@@ -63,11 +63,14 @@ struct BobbyReadAccess: Equatable, Sendable {
     /// nil = no limit (Bobby Pro).
     let limit: Int?
     let remaining: Int?
+    /// Gifted reads are separate from the plan balance and never confer Pro.
+    let bonus: Int
     /// ISO-8601; nil = no reset (anonymous reads do not reset).
     let resetsAt: String?
     let paywall: Bool
 
-    init(tier: String, used: Int, limit: Int?, remaining: Int?, resetsAt: String?, paywall: Bool) {
+    init(tier: String, used: Int, limit: Int?, remaining: Int?, resetsAt: String?, paywall: Bool, bonus: Int = 0) {
+        self.bonus = max(0, bonus)
         self.tier = tier; self.used = used; self.limit = limit; self.remaining = remaining; self.resetsAt = resetsAt; self.paywall = paywall
     }
 
@@ -78,6 +81,7 @@ struct BobbyReadAccess: Equatable, Sendable {
         used = Self.count(o["used"]) ?? 0
         limit = Self.count(o["limit"])
         remaining = Self.count(o["remaining"])
+        bonus = Self.count(o["bonus"]) ?? 0
         resetsAt = (o["resetsAt"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         paywall = (o["paywall"] as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } ?? false
     }
@@ -93,7 +97,11 @@ struct BobbyReadAccess: Equatable, Sendable {
     /// The bridge shape (fixtures/normalize.py `access`).
     var json: [String: Any] {
         ["tier": tier, "used": used, "limit": limit.map { $0 as Any } ?? NSNull(), "remaining": remaining.map { $0 as Any } ?? NSNull(),
-         "resetsAt": resetsAt.map { $0 as Any } ?? NSNull(), "paywall": paywall]
+         "resetsAt": resetsAt.map { $0 as Any } ?? NSNull(), "paywall": paywall, "bonus": bonus]
+    }
+
+    static func giftLabel(_ bonus: Int, spanish: Bool = L.isSpanish) -> String {
+        L.t("\(bonus) gifted reads", "\(bonus) lecturas de regalo", spanish: spanish)
     }
 
     var isPro: Bool { tier == "pro" }
@@ -159,7 +167,8 @@ enum BobbyAccessAPI {
     /// access headers: the bearer always comes from `auth`.
     static func send(_ path: String, method: String = "POST", body: [String: Any]? = nil,
                      auth: BobbyMeterAuth, timeout: TimeInterval? = nil,
-                     extraHeaders: [String: String] = [:]) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                     extraHeaders: [String: String] = [:],
+                     onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         func headers(bearer: String?) -> [String: String] {
             Self.headers(bearer: bearer).merging(extraHeaders.filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }) { access, _ in access }
         }
@@ -167,7 +176,7 @@ enum BobbyAccessAPI {
         let bearer = await auth.bearer()
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
-        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer), timeout: timeout)
+        let first = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: bearer), timeout: timeout, onEvent: onEvent)
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         guard first.status == 401, let bearer else { return first }
@@ -175,7 +184,7 @@ enum BobbyAccessAPI {
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         guard let fresh, fresh != bearer else { return first }
-        let retried = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh), timeout: timeout)
+        let retried = try await BobbyAPI.responseWithHeaders(path, method: method, body: body, extraHeaders: headers(bearer: fresh), timeout: timeout, onEvent: onEvent)
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
         return retried

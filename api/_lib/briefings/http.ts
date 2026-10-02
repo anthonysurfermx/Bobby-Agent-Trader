@@ -209,7 +209,7 @@ export async function accountLimit(scope: string, identityId: string, limit: num
   if (r.limited) fail(429, 'rate_limited', {}, { 'Retry-After': String(Math.max(1, Math.ceil((r.resetAt - Date.now()) / 1000))) });
 }
 
-/** Current Pro from the database (subscription or grant). Storage failure propagates (503), never "free". */
+/** Feature paid ACTIVE Pro with verified current production paid-period evidence. Grants/trials are excluded. */
 export async function requirePro(identityId: string): Promise<void> {
   if (!(await isPro(identityId))) fail(403, 'subscription_required');
 }

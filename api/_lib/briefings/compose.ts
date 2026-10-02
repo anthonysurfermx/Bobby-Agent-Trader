@@ -2,14 +2,15 @@
 // Bobby Pro market briefings — deterministic personal composition (spec §8, D1, D2). No I/O, no model call.
 // The "personal synthesis" is a selection over shared content: which asset sections, whether beginner
 // explainers and the risk detail are attached. Nothing here writes new prose.
-//   · Asset order: the frozen followed assets first; then, only when memory is allowed (analysis consent current,
+//   · Weekly asset order: consented asked assets first; explicit interests only if no allowed queries, then general.
+//     Legacy order: frozen followed assets first; then, only when memory is allowed (analysis consent current,
 //     memory enabled, BOBBY_BRIEFINGS_MEMORY=on — decided by the caller) the memory's frequent assets; then, if
 //     still nothing, config.DEFAULT_ASSETS. ≤ LIMITS.assetsPerAccount, supported symbols only.
 //   · usesMemory is true exactly when memory changed the content (an added asset, beginner explainers, the risk
 //     detail); memoryAssets lists the memory-derived symbols actually included. The privacy triggers use both
 //     to withdraw a report when memory is paused, deleted or a symbol forgotten.
-//   · Narration (D2): ≤ 4 segments of WHOLE shared blocks (opening+market / first two asset sections /
-//     risks+agenda / the week), ≤ 800 chars each, ≤ 2,400 total, explainers never narrated. Readers with the
+//   · Weekly narration: personal retrospective first, common coming-week context second, ≤ 3 blocks/1,200 chars.
+//     Legacy narration remains bounded to 4 segments/2,400 chars; explainers are never narrated. Readers with the
 //     same blocks get byte-identical segments, hence the same audio cache key. No name is ever an input here.
 //   · Section facts and statuses come from the narrative, which copied them from evidence.
 // ============================================================
@@ -68,21 +69,29 @@ function narration(opening: string, sections: BriefSection[], cadence: Cadence):
   const assets = of('asset').slice(0, 2);
   const risks = of('risks')[0];
   const agenda = of('agenda')[0];
-  const week = of('week')[0];
-  const blocks: string[][] = [[opening, market?.body ?? '']];
+  const weekly = cadence === 'weekly';
+  const blocks: string[][] = weekly ? [] : [[opening, market?.body ?? '']];
   // A block that cannot fit keeps only its leading whole parts (the first asset, the risks).
   const fit = (parts: string[]) => {
     const packed = packBlock(parts);
     return packed.length ? [packed[0]] : [];
   };
-  if (cadence === 'weekly' && week) blocks.push([week.body]);
-  if (assets.length) blocks.push(assets.map((a) => `${a.title}. ${a.body}`));
-  if (risks || agenda) blocks.push([risks?.body ?? '', agenda?.body ?? '']);
+  if (weekly) {
+    // Personal retrospective first, then the shared coming-week context. The full asset list stays in text.
+    blocks.push([opening, ...assets.map(a => `${a.title}. ${a.body}`)]);
+    blocks.push([market?.body ?? '', agenda?.body ?? '']);
+    if (risks) blocks.push([risks.body]);
+  } else {
+    if (assets.length) blocks.push(assets.map((a) => `${a.title}. ${a.body}`));
+    if (risks || agenda) blocks.push([risks?.body ?? '', agenda?.body ?? '']);
+  }
+  const maxSegments = weekly ? LIMITS.weeklyNarrationSegments : LIMITS.narrationSegments;
+  const maxChars = weekly ? LIMITS.weeklyNarrationChars : LIMITS.narrationChars;
   const out: string[] = [];
   let total = 0;
   for (const b of blocks) {
     for (const seg of fit(b)) {
-      if (out.length >= LIMITS.narrationSegments || total + seg.length > LIMITS.narrationChars) return out;
+      if (out.length >= maxSegments || total + seg.length > maxChars) return out;
       out.push(seg);
       total += seg.length;
     }
@@ -96,11 +105,16 @@ export function composeReport(input: {
   const { period, frozen, narrative, evidence } = input;
   const memory = input.memoryAllowed ? input.memory : null;
   const lang = narrative.language;
+  const weekly = period.cadence === 'weekly';
 
   // ---- asset selection ----
-  const selected = normalize(frozen.assets).slice(0, LIMITS.assetsPerAccount);
+  const asked = normalize(memory?.frequentAssets).slice(0, LIMITS.assetsPerAccount);
+  const interests = normalize(frozen.assets).slice(0, LIMITS.assetsPerAccount);
+  const selected = weekly && asked.length ? [...asked] : [...interests];
+  const personalBasis = asked.length ? 'asked_assets' : interests.length ? 'explicit_interests' : 'general';
   const memoryAssets: string[] = [];
-  if (memory) {
+  if (weekly && asked.length) memoryAssets.push(...asked);
+  if (!weekly && memory) {
     for (const s of normalize(memory.frequentAssets)) {
       if (selected.length >= LIMITS.assetsPerAccount) break;
       if (!selected.includes(s)) { selected.push(s); memoryAssets.push(s); }
@@ -112,17 +126,22 @@ export function composeReport(input: {
   const deepRisk = memory?.explainRiskDepth === 'high';
 
   // ---- sections ----
-  const sections: BriefSection[] = [bare(narrative.market)];
+  const sections: BriefSection[] = weekly ? [] : [bare(narrative.market)];
   let fellBack = false;
   let explainersUsed = false;
   for (const symbol of selected) {
-    const shared = narrative.assets[symbol];
-    const base = shared ?? factsOnlyAssetSection(evidence, lang, symbol);
+    const quote = evidence.quotes.find(q => q.symbol === symbol);
+    const historical = !weekly || (quote?.changeBasis === '7d' && evidence.history?.some(h => h.symbol === symbol));
+    const shared = historical ? narrative.assets[symbol] : undefined;
+    const safeEvidence = historical ? evidence : { ...evidence, quotes: evidence.quotes.filter(q => q.symbol !== symbol) };
+    const base = shared ?? factsOnlyAssetSection(safeEvidence, lang, symbol);
     if (!shared) fellBack = true;
     const s = bare(base);
+    if (weekly) s.title = `${symbol} · ${lang === 'es' ? 'Semana anterior' : 'Previous week'}`;
     if (explain && shared?.explainer) { s.explainer = shared.explainer; explainersUsed = true; }
     sections.push(s);
   }
+  if (weekly) sections.push(bare(narrative.market));
   const risks = bare(narrative.risks);
   let riskDetailUsed = false;
   if (deepRisk) {
@@ -130,7 +149,10 @@ export function composeReport(input: {
     if (detail) { risks.explainer = detail; riskDetailUsed = true; }
   }
   sections.push(risks, bare(narrative.agenda));
-  if (period.cadence === 'weekly' && narrative.week) sections.push(bare(narrative.week));
+  if (period.cadence === 'weekly') {
+    // Keep the full selected list available in text, with compact shared prose for a light briefing.
+    for (const s of sections) s.body = clip(s.body, 220);
+  }
   for (const s of sections) if (s.facts === undefined) delete s.facts;
 
   const content: BriefContent = {
@@ -138,9 +160,10 @@ export function composeReport(input: {
     cadence: period.cadence,
     language: lang,
     title: reportTitle(period, lang),
-    opening: narrative.opening,
+    opening: period.cadence === 'weekly' ? clip(narrative.opening, 140) : narrative.opening,
+    ...(weekly ? { personalBasis } : {}),
     sections,
-    narrationSegments: narration(narrative.opening, sections, period.cadence),
+    narrationSegments: narration(period.cadence === 'weekly' ? clip(narrative.opening, 140) : narrative.opening, sections, period.cadence),
     dataAsOf: evidence.dataAsOf,
     sources: evidence.sources.map((s) => ({ ...s })),
     equitySession: { ...evidence.equitySession },

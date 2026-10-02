@@ -88,7 +88,7 @@ final class BriefingsCenter: ObservableObject {
     func isSaving(_ cadence: BriefingCadence) -> Bool { pendingCadences[cadence] != nil }
 
     /// A briefing is selected for this account but iOS will not show it ("Notifications blocked in iOS").
-    var deliveryBlocked: Bool { permission == .denied && (settings?.anyCadenceOn ?? false) }
+    var deliveryBlocked: Bool { permission == .denied && (settings?.weeklyEnabled ?? false) }
 
     static var systemSettingsURL: URL? { URL(string: UIApplication.openSettingsURLString) }
 
@@ -170,10 +170,15 @@ final class BriefingsCenter: ObservableObject {
         permission = status
     }
 
-    /// Flip one cadence. Enabling asks iOS first when it never asked; a denial still saves the choice.
+    /// Flip the weekly cadence. Legacy cadences can only be disabled; their reports stay readable.
+    /// Enabling asks iOS first when it never asked; a denial still saves the choice.
     @discardableResult
     func setCadence(_ cadence: BriefingCadence, on: Bool) async -> Bool {
         accountChanged()
+        guard !on || BriefingCadence.offeredCadences.contains(cadence) else {
+            lastError = .rejected(code: "cadence_unavailable")
+            return false
+        }
         guard canCallServer else { lastError = .signedOut; return false }
         guard pendingCadences[cadence] == nil else { return false }
         let t = ticket()
@@ -194,7 +199,7 @@ final class BriefingsCenter: ObservableObject {
             return false
         }
         var changes: [String: Any] = [cadence.settingsKey: on]
-        if on && !current.anyCadenceOn {
+        if on && !current.weeklyEnabled {
             // First enable: the report speaks the app's language and the phone's companion.
             let language = appLanguage()
             if BriefingSettings.languages.contains(language), language != current.language { changes["language"] = language }

@@ -8,7 +8,7 @@
 //        shared    — per language some open report is written in: one narrative for (cadence, period, language),
 //                    by the model inside a reserved attempt (budget.ts), else the facts-only fallback (D1);
 //        personal  — claim ≤ PREPARE_BATCH → deterministic composition → validate → fenced publish;
-//        audio     — morning only: pre-synthesis of the narration of reports published in this tick whose owner
+//        audio     — weekly: pre-synthesis of the narration of reports published in this tick whose owner
 //                    gave audio consent, a few cache keys per tick (TTS slots and caps enforced by the reservation);
 //   3. dispatch    — fill the outbox for due ready reports, claim ≤ DELIVERY_BATCH, decrypt, APNs, record outcome;
 //   4. purge       — bounded retention deletes, then the returned Storage objects.
@@ -35,8 +35,8 @@ import { withReservation, type ReservationFailure } from './budget.js';
 import { duePeriods, schedulePolicy, type SchedulePolicy } from './calendar.js';
 import { audioCacheKey, composeReport, validateContent } from './compose.js';
 import {
-  BRIEF_VIBE, DEFAULT_ASSETS, DELIVERY_BATCH, LEASE_SECONDS, LIMITS, LLM_TIMEOUT_MS, PREPARE_BATCH, PROVIDER_MIN_REMAINING_MS, RETENTION,
-  SHARED_MAX_ATTEMPTS, TTS_MODEL, WORKER_BUDGET_MS, WORKER_MAX_DURATION_S, apnsConfig, briefingsEnabled, briefingsMemoryOn, isSupportedAsset,
+  BRIEF_VIBE, DELIVERY_BATCH, LEASE_SECONDS, LLM_TIMEOUT_MS, PREPARE_BATCH, PROVIDER_MIN_REMAINING_MS, RETENTION, SUPPORTED_ASSETS,
+  SHARED_MAX_ATTEMPTS, TTS_MODEL, WORKER_BUDGET_MS, WORKER_MAX_DURATION_S, apnsConfig, briefingsEnabled, briefingsMemoryOn,
   llmChoices, llmMaxTokens, pushMasterKey, settleSeconds, type ApnsConfig, type LlmChoice,
 } from './config.js';
 import { buildEvidence } from './evidence.js';
@@ -202,6 +202,7 @@ export async function runTick(opts: { now: Date; worker: string; deadlineAt: num
     d.logger.error('[briefing-worker] calendar', e instanceof RangeError ? 'range' : 'error');
   }
   for (const { period } of due) {
+    if (period.cadence !== 'weekly') continue; // defense in depth against a legacy/injected scheduler
     if (t.remaining() < STAGE_MIN_REMAINING_MS) { t.report.stoppedEarly = true; break; }
     await preparePeriod(t, period);
   }
@@ -245,23 +246,13 @@ async function preparePeriod(t: Tick, period: Period): Promise<void> {
   const settled = languages.every((l) => { const s = p.shared.get(l)?.state; return s === 'ready' || s === 'failed'; });
   if (!settled) return;
   const published = await personalStage(t, p);
-  if (period.cadence === 'morning' && published.length) await audioStage(t, published);
+  if (period.cadence === 'weekly' && published.length) await audioStage(t, published);
 }
 
-/** The symbols the shared evidence covers: the default sections first (cold-start readers), then followed/memory assets. */
+/** A fixed public universe: no account's followed or asked assets influence a provider request. */
 async function periodSymbols(t: Tick, p: PeriodCtx): Promise<string[]> {
   if (p.symbols) return p.symbols;
-  const out: string[] = [];
-  const add = (s: string) => { const u = s.trim().toUpperCase(); if (isSupportedAsset(u) && !out.includes(u)) out.push(u); };
-  DEFAULT_ASSETS.forEach(add);
-  for (const lang of p.languages) {
-    try {
-      (await t.d.db.neededAssets(p.period.cadence, p.period.periodKey, lang)).forEach(add);
-    } catch (e) {
-      t.d.logger.error('[briefing-worker] needed_assets', errCode(e));
-    }
-  }
-  p.symbols = out.slice(0, LIMITS.sharedAssetSections);
+  p.symbols = Object.keys(SUPPORTED_ASSETS);
   return p.symbols;
 }
 
@@ -458,7 +449,7 @@ async function personalStage(t: Tick, p: PeriodCtx): Promise<Published[]> {
 }
 
 /**
- * Morning narration pre-synthesis: the first segment of every fresh report first, then the next ones; one
+ * Weekly narration pre-synthesis: the first segment of every fresh report first, then the next ones; one
  * ensureAudio per distinct cache key (readers with the same companion share it). Stops at the per-tick bound,
  * when the tick runs short, or at the first refusal (caps, slots) — the authenticated `voice` op covers the rest.
  */

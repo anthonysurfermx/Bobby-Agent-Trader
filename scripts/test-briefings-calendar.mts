@@ -27,10 +27,10 @@ const ALL = { adopted: new Set(['morning', 'close', 'weekly'] as const), morning
 const SESSIONS = { adopted: new Set(['morning'] as const), morningDays: 'sessions' as const };
 
 // ---- policy from env ----
-eq([...DEFAULT.adopted], ['morning'], 'only morning is adopted by default');
+eq([...DEFAULT.adopted], ['weekly'], 'only weekly is adopted by default');
 eq(DEFAULT.morningDays, 'all', 'morning runs every day by default');
 const envPolicy = schedulePolicy({ BOBBY_BRIEFINGS_CADENCES: 'morning, weekly,bogus', BOBBY_BRIEFINGS_MORNING_DAYS: 'sessions' } as NodeJS.ProcessEnv);
-eq([[...envPolicy.adopted].sort(), envPolicy.morningDays], [['morning', 'weekly'], 'sessions'], 'env adopts known cadences only');
+eq([[...envPolicy.adopted].sort(), envPolicy.morningDays], [['weekly'], 'sessions'], 'env adopts known cadences only');
 
 // ---- wall clock ----
 eq(nyLocalToUtc('2026-07-15', '08:00').toISOString(), '2026-07-15T12:00:00.000Z', '08:00 NY = 12:00 UTC in summer');
@@ -64,12 +64,13 @@ for (const [day, mHours, wHours, before, after] of transitions) {
   const m = periodForDate('morning', day, ALL)!;
   eq([m.periodKey, m.periodStart, m.periodEnd, m.scheduledAt], [day, before, after, after], `morning ${day} interval`);
   eq(hoursBetween(m.periodStart, m.periodEnd), mHours, `morning ${day} spans ${mHours}h`);
-  const w = periodForDate('weekly', day, ALL)!;
-  eq(w.periodKey, `${addDays(day, -7)}_${day}`, `weekly key ending ${day}`);
+  const monday = addDays(day, 1);
+  const w = periodForDate('weekly', monday, ALL)!;
+  eq(w.periodKey, `${addDays(monday, -7)}_${monday}`, `weekly key ending ${day}`);
   eq(hoursBetween(w.periodStart, w.periodEnd), wHours, `weekly ending ${day} spans ${wHours}h`);
-  eq([nyParts(utc(w.periodStart)).time, nyParts(utc(w.periodEnd)).time], ['18:00', '18:00'], `weekly ${day} cut at 18:00 NY both ends`);
+  eq([nyParts(utc(w.periodStart)).time, nyParts(utc(w.periodEnd)).time], ['08:00', '08:00'], `weekly ${day} cut at 08:00 NY both ends`);
 }
-eq(hoursBetween(periodForDate('weekly', '2026-07-12', ALL)!.periodStart, periodForDate('weekly', '2026-07-12', ALL)!.periodEnd), 168, 'a week without DST is 168h');
+eq(hoursBetween(periodForDate('weekly', '2026-07-13', ALL)!.periodStart, periodForDate('weekly', '2026-07-13', ALL)!.periodEnd), 168, 'a week without DST is 168h');
 
 // ---- morning period shape ----
 const m1 = periodForDate('morning', '2026-10-02', ALL)!;
@@ -86,7 +87,7 @@ eq(m1, {
   policyVersion: POLICY_VERSION,
   equitySession: { date: '2026-10-02', state: 'pre_market', lastSessionDate: '2026-10-01', closeAt: '2026-10-02T20:00:00.000Z', earlyClose: false, holidayName: null },
 }, 'morning period on a Friday session day');
-eq([NYSE_CALENDAR_VERSION, POLICY_VERSION], ['nyse-2026-2027-v1', 'proposed-v1'], 'versions');
+eq([NYSE_CALENDAR_VERSION, POLICY_VERSION], ['nyse-2026-2027-v1', 'weekly-monday-0800-v1'], 'versions');
 
 // Saturday morning: equities closed_weekend, last session Friday.
 const sat = periodForDate('morning', '2026-10-03', ALL)!;
@@ -102,8 +103,8 @@ eq(periodForDate('morning', '2026-10-04', SESSIONS), null, 'sessions: no Sunday 
 eq(periodForDate('morning', '2026-11-26', SESSIONS), null, 'sessions: no Thanksgiving morning');
 eq(periodForDate('morning', '2028-03-01', SESSIONS), null, 'sessions: no morning outside coverage');
 ok(periodForDate('morning', '2026-11-27', SESSIONS), 'sessions: early-close day still has a morning');
-eq(nextScheduled('morning', utc('2026-10-02T12:30:00Z'), SESSIONS)!.periodKey, '2026-10-05', 'sessions: Friday after 08:00 → next Monday');
-eq(nextScheduled('morning', utc('2026-10-02T12:30:00Z'), DEFAULT)!.periodKey, '2026-10-03', 'all: Friday after 08:00 → Saturday');
+eq(nextScheduled('morning', utc('2026-10-02T12:30:00Z'), SESSIONS), null, 'legacy policy cannot schedule morning');
+eq(nextScheduled('morning', utc('2026-10-02T12:30:00Z'), DEFAULT), null, 'morning has no active schedule');
 
 // ---- NYSE calendar ----
 const holidays2026 = ['2026-01-01', '2026-01-19', '2026-02-16', '2026-04-03', '2026-05-25', '2026-06-19', '2026-07-03', '2026-09-07', '2026-11-26', '2026-12-25'];
@@ -144,7 +145,7 @@ eq([c1.periodKey, c1.periodStart, c1.periodEnd, c1.prepareFrom, c1.readyBy, c1.s
 eq(periodForDate('close', '2026-10-03', ALL), null, 'no close report on Saturday');
 eq(periodForDate('close', '2028-03-01', ALL), null, 'no close report outside coverage (2028)');
 eq(nextScheduled('close', utc('2027-12-31T22:00:00Z'), ALL), null, 'after the last covered close: nothing scheduled');
-eq(nextScheduled('close', utc('2026-11-25T22:00:00Z'), ALL)!.periodKey, '2026-11-27', 'next close skips Thanksgiving');
+eq(nextScheduled('close', utc('2026-11-25T22:00:00Z'), ALL), null, 'legacy policy cannot schedule close');
 
 // equitySession timeline on a session day.
 eq(equitySession('2026-10-02', utc('2026-10-02T13:29:59Z')).state, 'pre_market', '09:29:59 NY pre_market');
@@ -154,64 +155,52 @@ eq(equitySession('2026-10-02', utc('2026-10-02T20:00:00Z')).lastSessionDate, '20
 eq(equitySession('2026-10-05').lastSessionDate, '2026-10-02', 'Monday pre-market: last session Friday');
 
 // ---- weekly across the year boundary ----
-const yb = periodForDate('weekly', '2027-01-03', ALL)!;
+const yb = periodForDate('weekly', '2027-01-04', ALL)!;
 eq([yb.periodKey, yb.periodStart, yb.periodEnd, yb.scheduledAt, yb.prepareFrom, yb.readyBy, yb.pushExpiresAt],
-  ['2026-12-27_2027-01-03', '2026-12-27T23:00:00.000Z', '2027-01-03T23:00:00.000Z', '2027-01-03T23:00:00.000Z',
-    '2027-01-03T22:30:00.000Z', '2027-01-03T22:59:00.000Z', '2027-01-03T23:30:00.000Z'], 'weekly 2026-12-27 → 2027-01-03');
-eq([yb.equitySession.state, yb.equitySession.lastSessionDate], ['closed_weekend', '2026-12-31'], 'weekly label: last session Dec 31 (Jan 1 holiday)');
-eq(periodForDate('weekly', '2027-01-02', ALL), null, 'weekly only on Sundays');
+  ['2026-12-28_2027-01-04', '2026-12-28T13:00:00.000Z', '2027-01-04T13:00:00.000Z', '2027-01-04T13:00:00.000Z',
+    '2027-01-04T12:30:00.000Z', '2027-01-04T12:59:00.000Z', '2027-01-04T13:30:00.000Z'], 'Monday weekly across the year boundary');
+eq([yb.equitySession.state, yb.equitySession.lastSessionDate], ['pre_market', '2026-12-31'], 'weekly label: last session Dec 31 (Jan 1 holiday)');
+eq(periodForDate('weekly', '2027-01-03', ALL), null, 'no Sunday weekly period');
 
-// ---- duePeriods: window edges and idempotence (Friday 2026-10-02, EDT) ----
-const at = (ny: string) => nyLocalToUtc('2026-10-02', ny.slice(0, 5)).getTime() + Number(ny.slice(6) || 0) * 1000;
+// ---- weekly window edges and idempotence ----
+const at = (ny: string) => nyLocalToUtc('2026-10-05', ny.slice(0, 5)).getTime() + Number(ny.slice(6) || 0) * 1000;
 const due = (ms: number, p = DEFAULT) => duePeriods(new Date(ms), p).map((d) => [d.period.cadence, d.period.periodKey, d.phase]);
-eq(due(at('07:29:59')), [], '07:29:59 → nothing');
-eq(due(at('07:30')), [['morning', '2026-10-02', 'prepare']], '07:30 → prepare');
-eq(due(at('07:59:59')), [['morning', '2026-10-02', 'prepare']], '07:59:59 → prepare');
-eq(due(at('08:00')), [['morning', '2026-10-02', 'dispatch']], '08:00 → dispatch');
-eq(due(at('08:29:59')), [['morning', '2026-10-02', 'dispatch']], '08:29:59 → dispatch');
-eq(due(at('08:30')), [], '08:30 → nothing (push expired)');
-eq(duePeriods(new Date(at('07:45')), DEFAULT), duePeriods(new Date(at('07:45')), DEFAULT), 'duplicate ticks compute identical periods');
-eq(duePeriods(new Date(at('07:45')), DEFAULT)[0].period, m1, 'the due period is the canonical one');
-eq(periodFor('morning', new Date(at('08:10')), DEFAULT)!.periodKey, '2026-10-02', 'periodFor inside the window');
-eq(periodFor('morning', new Date(at('09:00')), DEFAULT), null, 'periodFor outside the window');
-eq(due(at('16:00')), [], 'close not adopted by default → nothing at 16:00');
-eq(due(at('15:59:59'), ALL), [], '15:59:59 with close adopted → nothing');
-eq(due(at('16:00'), ALL), [['close', '2026-10-02', 'prepare']], '16:00 → close prepare');
-eq(due(at('16:15'), ALL), [['close', '2026-10-02', 'dispatch']], '16:15 → close dispatch');
-eq(due(at('16:45'), ALL), [], '16:45 → close expired');
-const sun = (ny: string) => new Date(nyLocalToUtc('2026-10-04', ny).getTime());
-eq(duePeriods(sun('17:30'), ALL).map((d) => [d.period.cadence, d.period.periodKey, d.phase]), [['weekly', '2026-09-27_2026-10-04', 'prepare']], 'Sunday 17:30 → weekly prepare');
-eq(duePeriods(sun('18:00'), ALL).map((d) => d.phase), ['dispatch'], 'Sunday 18:00 → weekly dispatch');
-eq(duePeriods(sun('18:30'), ALL), [], 'Sunday 18:30 → weekly expired');
-eq(duePeriods(sun('18:00'), DEFAULT), [], 'weekly not adopted by default');
-eq(duePeriods(sun('07:30'), SESSIONS), [], 'sessions policy: no Sunday morning prepare');
-// Morning across DST: windows stay on NY wall clock.
-eq(duePeriods(utc('2026-11-01T12:30:00Z'), DEFAULT).map((d) => d.phase), ['prepare'], 'Nov 1 2026 07:30 EST = 12:30 UTC → prepare');
-eq(duePeriods(utc('2026-11-01T12:00:00Z'), DEFAULT), [], 'Nov 1 2026 12:00 UTC is 07:00 EST → nothing');
-// Every 5-minute tick of a day yields each window exactly once per phase boundary (no gaps, no duplicates).
+const key = '2026-09-28_2026-10-05';
+eq(due(at('07:29:59')), [], 'before prepare');
+eq(due(at('07:30')), [['weekly', key, 'prepare']], 'Monday 07:30 prepare');
+eq(due(at('07:59:59')), [['weekly', key, 'prepare']], 'before scheduled');
+eq(due(at('08:00')), [['weekly', key, 'dispatch']], 'Monday 08:00 dispatch');
+eq(due(at('08:29:59')), [['weekly', key, 'dispatch']], 'before expiry');
+eq(due(at('08:30')), [], '08:30 expired');
+eq(duePeriods(new Date(at('07:45')), DEFAULT), duePeriods(new Date(at('07:45')), DEFAULT), 'duplicate ticks stable');
+eq(periodFor('weekly', new Date(at('08:10')), DEFAULT)!.periodKey, key, 'inside weekly window');
+eq(periodFor('weekly', new Date(at('09:00')), DEFAULT), null, 'outside weekly window');
+for (const date of ['2026-10-02', '2026-10-03', '2026-10-04', '2026-10-06']) {
+  eq(duePeriods(nyLocalToUtc(date, '08:00'), ALL), [], `no routine briefing on ${date}, even legacy adoption`);
+}
+eq(due(at('16:15'), ALL), [], 'legacy close adoption cannot generate daily reports');
+eq(duePeriods(nyLocalToUtc('2026-10-04', '18:00'), ALL), [], 'no former Sunday18 schedule');
+eq(duePeriods(utc('2026-11-02T12:30:00Z'), DEFAULT).map((d) => d.phase), ['prepare'], 'Monday after fall DST 07:30 EST =12:30UTC');
+eq(duePeriods(utc('2026-03-09T11:30:00Z'), DEFAULT).map((d) => d.phase), ['prepare'], 'Monday after spring DST 07:30EDT=11:30UTC');
+const holiday = periodForDate('weekly', '2026-09-07', DEFAULT)!;
+eq([holiday.equitySession.state, holiday.scheduledAt], ['closed_holiday', '2026-09-07T12:00:00.000Z'], 'holiday Monday briefing still scheduled and labels equity closure');
 const seen = new Map<string, Set<string>>();
-for (let ms = utc('2026-10-02T04:00:00Z').getTime(); ms < utc('2026-10-03T04:00:00Z').getTime(); ms += 5 * 60_000) {
+for (let ms = utc('2026-10-05T04:00:00Z').getTime(); ms < utc('2026-10-06T04:00:00Z').getTime(); ms += 5 * 60_000) {
   for (const d of duePeriods(new Date(ms), ALL)) {
     const k = `${d.period.cadence}:${d.period.periodKey}`;
     if (!seen.has(k)) seen.set(k, new Set());
     seen.get(k)!.add(d.phase);
   }
 }
-eq([...seen.entries()].map(([k, v]) => [k, [...v]]), [['morning:2026-10-02', ['prepare', 'dispatch']], ['close:2026-10-02', ['prepare', 'dispatch']]], 'a day of 5-min ticks sees each period in both phases');
-
-// ---- scheduleSummary ----
-const now = utc('2026-10-02T15:00:00Z'); // Friday 11:00 EDT
+eq([...seen.entries()].map(([k, v]) => [k, [...v]]), [[`weekly:${key}`, ['prepare', 'dispatch']]], '5min ticks only see weekly period');
+const now = utc('2026-10-02T15:00:00Z');
 eq(scheduleSummary(now, DEFAULT), {
-  timezone: 'America/New_York',
-  policyVersion: 'proposed-v1',
-  opening: { configured: true, localTime: '08:00', nextAt: '2026-10-03T12:00:00.000Z' },
+  timezone: 'America/New_York', policyVersion: POLICY_VERSION,
+  opening: { configured: false, localTime: '08:00', nextAt: null },
   close: { configured: false, delayMinutes: 15, nextAt: null },
-  weekly: { configured: false, weekday: 'Sunday', localTime: '18:00', nextAt: null },
-}, 'default summary: only morning configured');
-const full = scheduleSummary(now, ALL);
-eq([full.close.configured, full.close.nextAt, full.weekly.configured, full.weekly.nextAt],
-  [true, '2026-10-02T20:15:00.000Z', true, '2026-10-04T22:00:00.000Z'], 'all adopted: close today 16:15, weekly Sunday 18:00 EDT');
-eq(nextScheduled('morning', utc('2026-10-02T12:00:00Z'), DEFAULT)!.periodKey, '2026-10-03', 'nextScheduled is strictly after now');
-eq(nextScheduled('weekly', utc('2026-10-02T15:00:00Z'), DEFAULT), null, 'nextScheduled null for a non-adopted cadence');
-
+  weekly: { configured: true, weekday: 'Monday', localTime: '08:00', nextAt: '2026-10-05T12:00:00.000Z' },
+}, 'weekly-only schedule summary');
+eq(scheduleSummary(now, ALL), scheduleSummary(now, DEFAULT), 'legacy adoption cannot expose other schedules');
+eq(nextScheduled('weekly', nyLocalToUtc('2026-10-05', '08:00'), DEFAULT)!.periodKey, '2026-10-05_2026-10-12', 'strictly after Monday08 next week');
+eq([...schedulePolicy({ BOBBY_BRIEFINGS_CADENCES: 'morning,close' }).adopted], ['weekly'], 'stale env cannot reactivate routine briefs');
 console.log(`briefings-calendar: ${checks} checks passed`);

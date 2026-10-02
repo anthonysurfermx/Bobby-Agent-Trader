@@ -90,6 +90,7 @@ final class NucleoSession: ObservableObject {
 
     @Published var sheet: NucleoRoute?
     @Published private(set) var classicRequested = false
+    let notch = NucleoNotch()
     /// The briefing the `.briefing` sheet shows (set only when a tap is drained).
     @Published private(set) var selectedBriefId: String?
     /// Briefing notification taps (BobbyAppDelegate stores them; this session drains them once).
@@ -136,6 +137,9 @@ final class NucleoSession: ObservableObject {
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
+        desk.debateStarted = { [weak self] level in self?.notch.debating(level) }
+        desk.askFinished = { [weak self] result in self?.notch.finished(result) }
+        desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)
@@ -165,6 +169,7 @@ final class NucleoSession: ObservableObject {
 
     func emit(_ name: String, _ payload: [String: Any]) {
         guard !tornDown else { return }
+        if name == "ask.stage" { notch.stage(payload) }
         emitter?.emit(name, payload)
     }
 
@@ -454,6 +459,7 @@ final class NucleoSession: ObservableObject {
         profile.riskNoticeVersion = 0
         AccountSession.shared.cancelPendingSignIn()
         desk.invalidatePending()
+        notch.reset()
         speech.cancel()
         nucleoVoice.stop()
         vocabularyTask?.cancel()
@@ -773,6 +779,7 @@ final class NucleoSession: ObservableObject {
         speech.cancel()
         nucleoVoice.teardown()
         desk.teardown()
+        notch.reset()
         vocabularyTask?.cancel()
         cancellables.removeAll()
         tornDown = true
@@ -830,6 +837,7 @@ final class NucleoSession: ObservableObject {
         accountGeneration = account.generation
         accountUserID = account.session?.userId
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
+        notch.reset()
         speech.cancel()
         nucleoVoice.stop()
         if let userId = accountUserID { companions.bind(to: userId) } else { companions.unbind() }

@@ -368,10 +368,10 @@ struct AccountSheet: View {
                        action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
                 .accessibilityIdentifier("account-invite")
         }
-        // Bobby Pro market briefings: the account's three schedules, its consents and its inbox.
-        ProfileRow(label: L.t("Market briefings", "Resúmenes de mercado"),
+        // Bobby Pro weekly briefing: the account's Monday schedule, its consents and its inbox.
+        ProfileRow(label: L.t("Weekly briefing", "Resumen semanal"),
                    detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),
-                   action: { route = .briefings }) { ProfileIcon(symbol: "sun.horizon") }
+                   action: { route = .briefings }) { ProfileIcon(symbol: "calendar") }
             .accessibilityIdentifier("account-briefings")
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
@@ -776,13 +776,14 @@ struct ReadsRow: Equatable {
         }
         guard let limit = access.limit else { return nil }
         let left = access.remaining ?? max(0, limit - access.used)
+        let gift = access.bonus > 0 ? " + " + BobbyReadAccess.giftLabel(access.bonus, spanish: spanish) : ""
         if access.tier == "anon" {
-            return ReadsRow(title: L.t("\(left) of \(limit) free reads left", "Te quedan \(left) de \(limit) lecturas gratis", spanish: spanish),
+            return ReadsRow(title: L.t("\(left) of \(limit) free reads left", "Te quedan \(left) de \(limit) lecturas gratis", spanish: spanish) + gift,
                             detail: signedIn ? nil : L.t("Sign in to keep reading after that.", "Inicia sesión para seguir leyendo después.", spanish: spanish),
                             pro: false, manage: false)
         }
         let reset = access.resetsDate.map { L.t("Resets \(BobbyAccessAPI.day($0, spanish: spanish))", "Se renuevan el \(BobbyAccessAPI.day($0, spanish: spanish))", spanish: spanish) }
-        return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish),
+        return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish) + gift,
                         detail: reset, pro: false, manage: false)
     }
 }

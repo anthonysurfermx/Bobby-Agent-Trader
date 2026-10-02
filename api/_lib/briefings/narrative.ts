@@ -59,7 +59,7 @@ const BASIS_LABEL: Record<BriefLanguage, Record<AssetQuote['changeBasis'], strin
 };
 const L = {
   es: {
-    market: 'Mercado', risks: 'Riesgos', agenda: 'Agenda', week: 'La semana', price: 'Precio', asOf: 'Datos al', status: 'Estado',
+    market: 'Mercado', risks: 'Riesgos', agenda: 'Agenda de esta semana', week: 'Semana anterior', price: 'Precio', asOf: 'Datos al', status: 'Estado',
     fearGreed: 'Miedo y codicia', dxy: 'DXY (estimado BCE)', funding: 'Financiamiento', equities: 'Acciones EE. UU.',
     noData: (s: string) => `Sin datos disponibles para ${s} en este momento.`,
     noFunding: 'Sin datos de financiamiento disponibles.',
@@ -71,7 +71,7 @@ const L = {
     cadence: { morning: 'de apertura', close: 'de cierre', weekly: 'semanal' },
   },
   en: {
-    market: 'Market', risks: 'Risks', agenda: 'Agenda', week: 'The week', price: 'Price', asOf: 'As of', status: 'Status',
+    market: 'Market', risks: 'Risks', agenda: 'This week’s agenda', week: 'Previous week', price: 'Price', asOf: 'As of', status: 'Status',
     fearGreed: 'Fear & Greed', dxy: 'DXY (ECB estimate)', funding: 'Funding', equities: 'US equities',
     noData: (s: string) => `No data available for ${s} right now.`,
     noFunding: 'No funding data available.',
@@ -240,7 +240,7 @@ export function narrativeRequest(evidence: BriefEvidence, language: BriefLanguag
   const wanted = normalizeSymbols(symbols).filter((s) => quoteOf(evidence, s));
   const weekly = evidence.cadence === 'weekly';
   const system = [
-    `You write Bobby's shared ${evidence.cadence === 'morning' ? 'pre-market morning' : evidence.cadence === 'close' ? 'market-close' : 'weekly'} market briefing. The same text is read by many people.`,
+    `You write Bobby's shared ${evidence.cadence === 'morning' ? 'pre-market morning' : evidence.cadence === 'close' ? 'market-close' : 'Monday pre-market weekly'} market briefing. The same text is read by many people.`,
     LANGUAGE_RULE[language],
     'Rules:',
     '1. Use ONLY the facts and numbers in the EVIDENCE block. Copy numbers as given (rounding to fewer decimals is fine). Never compute new numbers (no differences, averages, conversions or targets) and never invent prices, events, news or causes.',
@@ -248,10 +248,10 @@ export function narrativeRequest(evidence: BriefEvidence, language: BriefLanguag
     '3. Times are New York time; write them as given with "ET".',
     '4. Agenda: mention only the agenda items provided. If there are none, say there are no recorded events.',
     '5. No buy/sell/hold instructions, no recommendations, no price targets, no personal or suitability advice, no greetings with names, no links, no markdown.',
-    `6. Lengths: opening ≤ ${NARRATIVE_LIMITS.opening} characters, every title ≤ ${NARRATIVE_LIMITS.title}, every body ≤ ${NARRATIVE_LIMITS.body}, every explainer ≤ ${NARRATIVE_LIMITS.explainer}.`,
+    `6. Lengths: opening ≤ ${weekly ? 140 : NARRATIVE_LIMITS.opening} characters, every title ≤ ${NARRATIVE_LIMITS.title}, every body ≤ ${weekly ? 220 : NARRATIVE_LIMITS.body}, every explainer ≤ ${NARRATIVE_LIMITS.explainer}.`,
     `7. assets: at most one entry per symbol, only symbols from: ${wanted.join(', ') || '(none)'}. explainer = one plain sentence explaining a concept in that section for a beginner, with no numbers (empty string if not useful).`,
     weekly
-      ? '8. week: what changed over the completed week, using only the 7-day changes (changeBasis "7d") and weeklyHistory. Never present a current price as a weekly result.'
+      ? '8. This is a brief, light Monday 08:00 New York outlook for the upcoming week. Prioritize recorded events in the next seven days and the most relevant risks; no invented predictions or routine price alert. The week block is explicitly labelled "Semana anterior" / "Previous week": historical context only from changeBasis "7d" and weeklyHistory (prior Monday 08:00 to this Monday 08:00). Never present historical prices as current prices or a current price as a weekly result.'
       : '8. market: overall context from the quotes and macro data; risks: what could move markets based only on the evidence (volatility regime, funding, data gaps).',
   ].join('\n');
   const user = `EVIDENCE (JSON):\n${JSON.stringify(evidenceBlock(evidence, wanted))}\n\nWrite the briefing as JSON matching the schema.`;

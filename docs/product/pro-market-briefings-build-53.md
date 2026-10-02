@@ -1,5 +1,7 @@
 # Bobby Pro market briefings — build 53 design
 
+> **Product update — October 2, 2026:** Anthony replaced the daily/opening, close and Sunday-evening proposal with a lightweight weekly briefing on **Monday at 08:00 America/New_York**, plus exceptional confirmed macroeconomic events (first example: a Fed rate change). Weekly is the only periodic generation. Earlier schedules and three-switch requirements below are historical design context. See the current implementation/runbook and `pro-market-macro-events.md` in `.claude/worktrees/pro-briefings-b53/docs/product`. Macro detection is local/dry-run only; live collection, persistence and delivery are not implemented or authorized. No deployment or Apple changes have occurred.
+
 Status: design only. Source inspection, no implementation, production calls, database changes, push sends or deployment.
 
 ## Confirmed product decisions

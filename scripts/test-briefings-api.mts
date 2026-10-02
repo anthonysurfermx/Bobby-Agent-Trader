@@ -173,7 +173,7 @@ function reset() {
   authDown = false;
   delete process.env.BOBBY_BRIEFINGS_ENABLED;
   process.env.BOBBY_PUSH_TOKEN_KEY = PUSH_KEY;
-  handlers.bobby_is_pro = () => (pro === 'down' ? storageDown('bobby_is_pro') : pro);
+  handlers.bobby_brief_is_paid_pro = () => (pro === 'down' ? storageDown('bobby_brief_is_paid_pro') : pro);
   handlers.bobby_brief_settings_get = () => settingsState;
   handlers.bobby_brief_settings_patch = (b) => {
     if (b.p_expected_revision !== settingsState.revision) return { ok: false, code: 'revision_conflict', revision: settingsState.revision };
@@ -216,9 +216,9 @@ try {
     eq((await call('settings', { token: A.token, query: { owner: A.identity } })).body.code, 'invalid_request', 'unknown query key (e.g. owner): 400');
     const m = await call('report', { method: 'POST', token: A.token, query: { id: randomUUID() } });
     eq([m.statusCode, m.body.code, m.headers.allow], [405, 'method_not_allowed', 'GET'], 'wrong method: 405 + Allow');
-    const noOrigin = await call('settings', { method: 'PATCH', token: A.token, headers: { origin: undefined as never, 'if-match': '"0"' }, body: { openingEnabled: true } });
+    const noOrigin = await call('settings', { method: 'PATCH', token: A.token, headers: { origin: undefined as never, 'if-match': '"0"' }, body: { weeklyEnabled: true } });
     eq(noOrigin.statusCode, 403, 'a write without Bobby origin: 403');
-    const evil = await call('settings', { method: 'PATCH', token: A.token, headers: { origin: 'https://evil.example', 'if-match': '"0"' }, body: { openingEnabled: true } });
+    const evil = await call('settings', { method: 'PATCH', token: A.token, headers: { origin: 'https://evil.example', 'if-match': '"0"' }, body: { weeklyEnabled: true } });
     eq(evil.statusCode, 403, 'a write from another origin: 403');
     eq(callsOf('bobby_brief_settings_patch').length, 0, 'refused writes reach no storage');
   }
@@ -252,7 +252,7 @@ try {
     eq(g.body.schedules.close.configured, false, 'close is not adopted by default');
     setBriefingsDepsForTests({ waitUntil: (p) => { deferred.push(p); }, now: () => NY_FROZEN });
     const frozen = await call('settings', { token: A.token });
-    eq([frozen.body.schedules.opening.nextAt, frozen.body.schedules.close.nextAt], [new Date('2026-10-03T12:00:00Z').toISOString(), null], 'next 08:00 New York (EDT) from the injected clock; unadopted close has no nextAt');
+    eq([frozen.body.schedules.weekly.nextAt, frozen.body.schedules.opening.nextAt, frozen.body.schedules.close.nextAt], [new Date('2026-10-05T12:00:00Z').toISOString(), null, null], 'next 08:00 New York (EDT) from the injected clock; unadopted close has no nextAt');
     setBriefingsDepsForTests({ waitUntil: (p) => { deferred.push(p); } });
 
     pro = 'down';
@@ -262,10 +262,10 @@ try {
 
     const patch = (body: unknown, headers: Record<string, string> = { 'if-match': '"0"' }, rawBody?: unknown) =>
       call('settings', { method: 'PATCH', token: A.token, headers, body, rawBody });
-    eq((await patch({ openingEnabled: true }, {})).statusCode, 428, 'PATCH without If-Match: 428');
-    eq((await patch({ openingEnabled: true }, {})).body.code, 'revision_required', '428 code revision_required');
-    eq((await patch({ openingEnabled: true }, { 'if-match': 'abc' })).body.code, 'invalid_request', 'malformed If-Match: 400');
-    eq((await patch({ openingEnabled: true, owner: 'x' })).body.code, 'invalid_request', 'unknown field: 400');
+    eq((await patch({ weeklyEnabled: true }, {})).statusCode, 428, 'PATCH without If-Match: 428');
+    eq((await patch({ weeklyEnabled: true }, {})).body.code, 'revision_required', '428 code revision_required');
+    eq((await patch({ weeklyEnabled: true }, { 'if-match': 'abc' })).body.code, 'invalid_request', 'malformed If-Match: 400');
+    eq((await patch({ weeklyEnabled: true, owner: 'x' })).body.code, 'invalid_request', 'unknown field: 400');
     eq((await patch({})).body.code, 'invalid_request', 'empty patch: 400');
     eq((await patch({ openingEnabled: null })).body.code, 'invalid_request', 'null is not a change: 400');
     const big = await patch(undefined, { 'if-match': '"0"' }, JSON.stringify({ language: 'es', pad: 'x'.repeat(3000) }));
@@ -288,30 +288,32 @@ try {
     eq([c1.statusCode, c1.body.code], [400, 'consent_required'], 'enabling consent without accepting a version: consent_required');
     eq((await patch({ audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio + 1 })).body.code, 'consent_required', 'a version other than the current one: consent_required');
     eq((await patch({ audioConsentEnabled: false, acceptedAudioConsentVersion: 1 })).body.code, 'invalid_request', 'withdrawing carries no version');
+    eq((await patch({ openingEnabled: true })).body.code, 'invalid_request', 'daily opt-in rejected');
+    eq((await patch({ closeEnabled: true })).body.code, 'invalid_request', 'close opt-in rejected');
     eq(callsOf('bobby_brief_settings_patch').length, 0, 'no invalid patch reached storage');
 
-    const good = await patch({ openingEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'], analysisConsentEnabled: true, acceptedAnalysisConsentVersion: CONSENT_VERSIONS.analysis, audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio });
+    const good = await patch({ weeklyEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'], analysisConsentEnabled: true, acceptedAnalysisConsentVersion: CONSENT_VERSIONS.analysis, audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio });
     eq([good.statusCode, good.headers.etag, good.body.revision, good.body.eligiblePro], [200, '"1"', 1, true], 'PATCH: 200, new ETag and revision');
     eq(callsOf('bobby_brief_settings_patch')[0].body.p_patch, {
-      openingEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'],
+      weeklyEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'],
       analysisConsentEnabled: true, analysisConsentVersion: CONSENT_VERSIONS.analysis, audioConsentEnabled: true, audioConsentVersion: CONSENT_VERSIONS.audio,
     }, 'the stored patch maps accepted versions to the current server versions');
     eq(callsOf('bobby_brief_settings_patch')[0].body.p_identity, A.identity, 'patched for the session identity');
     const stale = await patch({ weeklyEnabled: true }, { 'if-match': '"0"' });
     eq([stale.statusCode, stale.body.code, stale.body.revision, stale.headers.etag], [409, 'revision_conflict', 1, '"1"'], 'stale revision: 409 with the current revision');
     eq((await patch({ weeklyEnabled: true }, { 'if-match': 'W/"1"' })).statusCode, 200, 'weak ETag form accepted');
-    eq((await patch({ closeEnabled: true }, { 'if-match': '2' })).statusCode, 200, 'bare revision accepted');
+    eq((await patch({ closeEnabled: false }, { 'if-match': '2' })).statusCode, 200, 'bare revision accepted');
 
     pro = false;
-    const expired = await patch({ openingEnabled: false, closeEnabled: true }, { 'if-match': '"3"' });
-    eq([expired.statusCode, expired.body.eligiblePro, expired.body.closeEnabled], [200, false, true], 'expired Pro may save (eligiblePro false)');
+    const expired = await patch({ openingEnabled: false, closeEnabled: false }, { 'if-match': '"3"' });
+    eq([expired.statusCode, expired.body.eligiblePro, expired.body.closeEnabled], [200, false, false], 'expired Pro may save (eligiblePro false)');
     pro = 'down';
     const before = callsOf('bobby_brief_settings_patch').length;
-    eq((await patch({ openingEnabled: true }, { 'if-match': '"4"' })).statusCode, 503, 'entitlement unknown: 503 before any write');
+    eq((await patch({ weeklyEnabled: true }, { 'if-match': '"4"' })).statusCode, 503, 'entitlement unknown: 503 before any write');
     eq(callsOf('bobby_brief_settings_patch').length, before, 'no write behind a 503');
     pro = true;
     handlers.bobby_brief_settings_patch = () => { throw new db.BriefingStorageError('bobby_brief_settings_patch', 400); };
-    eq((await patch({ openingEnabled: true }, { 'if-match': '"4"' })).body.code, 'invalid_request', 'storage-side validation (22023) is a 400');
+    eq((await patch({ weeklyEnabled: true }, { 'if-match': '"4"' })).body.code, 'invalid_request', 'storage-side validation (22023) is a 400');
   }
 
   // ======================================================== devices
@@ -471,6 +473,10 @@ try {
     eq(rep.statusCode, 200, 'report: 200 (id case-normalized)');
     eq(Object.keys(rep.body).sort(), ['cadence', 'calendarVersion', 'contentVersion', 'dataAsOf', 'equitySession', 'id', 'language', 'narrationSegments', 'opening', 'periodEnd', 'periodStart', 'quality', 'scheduledAt', 'sections', 'sources', 'title', 'voice'], 'report fields (content flattened)');
     eq([rep.body.title, rep.body.narrationSegments, rep.body.voice, rep.body.scheduledAt], ['Resumen', content.narrationSegments, 'coral', '2026-10-02T12:00:00.000Z'], 'report content');
+    const originalReportHandler = handlers.bobby_brief_get;
+    handlers.bobby_brief_get = () => ({ report: { ...reportRow, cadence: 'weekly', content: { ...content, personalBasis: 'asked_assets' } } });
+    eq((await call('report', { token: A.token, query: { id: RID } })).body.personalBasis, 'asked_assets', 'weekly personal basis exposed for honest native copy');
+    handlers.bobby_brief_get = originalReportHandler;
     const foreign = await call('report', { token: B.token, query: { id: RID } });
     const missing = await call('report', { token: B.token, query: { id: randomUUID() } });
     eq([foreign.statusCode, foreign.body], [404, missing.body], "another account's report is the same 404 as a missing one");
@@ -521,6 +527,9 @@ try {
     eq((await voice({ ...body, language: 'en' })).statusCode, 409, 'language other than the frozen one: 409');
     eq((await voice({ ...body, contentVersion: 1 })).body.code, 'content_version_conflict', 'stale content version: 409');
     eq((await voice(body, randomUUID(), B.token)).statusCode, 404, "another account's report: 404");
+
+    audioReq = { code: 'subscription_required' };
+    eq([(await voice()).statusCode, ensureCalls.length], [403, 0], 'paid entitlement lapses between validation and queue: 403, no synthesis');
 
     audioReq = { audioId: AUDIO, state: 'ready' };
     const ready = await voice();
@@ -637,16 +646,16 @@ try {
       // ---- settings ----
       const g0 = await call('settings', { token: PA.token });
       eq([g0.statusCode, g0.body.revision, g0.headers.etag, g0.body.eligiblePro, g0.body.openingEnabled], [200, 0, '"0"', true, false], 'PG settings GET: defaults at revision 0');
-      const p1 = await call('settings', { method: 'PATCH', token: PA.token, headers: { 'if-match': '"0"' }, body: { openingEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'], audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio } });
+      const p1 = await call('settings', { method: 'PATCH', token: PA.token, headers: { 'if-match': '"0"' }, body: { weeklyEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'], audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio } });
       eq([p1.statusCode, p1.body.revision, p1.headers.etag, p1.body.audioConsentVersion, p1.body.assets], [200, 1, '"1"', CONSENT_VERSIONS.audio, ['BTC', 'NVDA']], 'PG PATCH saved');
       const [row] = await q('select audio_consent_at is not null as at, revision from public.bobby_brief_settings where identity_id = $1', [PA.identity]);
       eq([row.at, row.revision], [true, 1], 'PG consent acceptance time recorded');
       const st = await call('settings', { method: 'PATCH', token: PA.token, headers: { 'if-match': '"0"' }, body: { weeklyEnabled: true } });
       eq([st.statusCode, st.body.revision, st.headers.etag], [409, 1, '"1"'], 'PG stale PATCH: 409 with the current revision');
       const g1 = await call('settings', { token: PA.token });
-      eq([g1.body.language, g1.body.companionId, g1.body.weeklyEnabled], ['es', 'kora', false], 'PG GET reflects only the accepted change');
-      const pc = await call('settings', { method: 'PATCH', token: PC.token, headers: { 'if-match': '"0"' }, body: { openingEnabled: true } });
-      eq([pc.statusCode, pc.body.eligiblePro, pc.body.openingEnabled], [200, false, true], 'PG non-Pro may save (eligiblePro false)');
+      eq([g1.body.language, g1.body.companionId, g1.body.weeklyEnabled], ['es', 'kora', true], 'PG GET reflects only the accepted change');
+      const pc = await call('settings', { method: 'PATCH', token: PC.token, headers: { 'if-match': '"0"' }, body: { weeklyEnabled: true } });
+      eq([pc.statusCode, pc.body.eligiblePro, pc.body.weeklyEnabled], [200, false, true], 'PG non-Pro may save (eligiblePro false)');
       await call('settings', { method: 'PATCH', token: PB.token, headers: { 'if-match': '"0"' }, body: { audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio } });
 
       // ---- devices: register, replay, A→B rebind, late revoke from A ----
@@ -742,6 +751,34 @@ try {
       eq([got.statusCode, got.headers['content-type'], got.raw?.length], [200, 'audio/mpeg', 3], 'PG audio served to its owner');
       eq((await call('audio', { token: PB.token, query: { id: audioId } })).statusCode, 404, "PG B cannot fetch A's audio");
       eq((await call('audio', { token: PC.token, query: { id: audioId } })).statusCode, 403, 'PG non-Pro audio: 403');
+
+      // Existing global Pro (including grants and RevenueCat's active mirror) is insufficient. All protected
+      // feature routes re-evaluate synthetic paid evidence; no real billing record or provider is used here.
+      await q("insert into bobby_pro_grants (identity_id, pro_until) values ($1, now() + interval '30 days')", [PC.identity]);
+      eq([(await call('settings', { token: PC.token })).body.eligiblePro, (await call(null, { token: PC.token })).statusCode], [false, 403], 'PG grant-only Pro denied for weekly benefits');
+      for (const [sql, label] of [
+        ["update bobby_brief_paid_periods set period_type = 'trial' where identity_id = $1", 'active mirror with a trial'],
+        ["update bobby_brief_paid_periods set environment = 'sandbox' where identity_id = $1", 'Sandbox proof'],
+        ["update bobby_brief_paid_periods set environment = 'unknown' where identity_id = $1", 'unknown environment'],
+        ["update bobby_brief_paid_periods set verification_state = 'unverified' where identity_id = $1", 'unverified proof'],
+        ["delete from bobby_brief_paid_periods where identity_id = $1", 'missing proof'],
+        ["update bobby_subscriptions set current_period_end = null where identity_id = $1", 'unknown expiry'],
+        ["update bobby_subscriptions set status = 'expired' where identity_id = $1", 'expired subscription'],
+      ]) {
+        await setPro(pool, PA.identity, true);
+        await q(sql, [PA.identity]);
+        const before = ensure.length;
+        eq((await call('settings', { token: PA.token })).body.eligiblePro, false, `PG ${label}: eligiblePro false`);
+        const guarded = [
+          await call(null, { token: PA.token }),
+          await call('report', { token: PA.token, query: { id: a3 } }),
+          await call('voice', { method: 'POST', token: PA.token, headers: { 'idempotency-key': randomUUID() }, body: vb }),
+          await call('audio', { token: PA.token, query: { id: audioId } }),
+        ];
+        eq(guarded.map(r => [r.statusCode, r.body.code]), Array.from({ length: 4 }, () => [403, 'subscription_required']), `PG ${label}: inbox/report/voice/audio denied`);
+        eq(ensure.length, before, `PG ${label}: starts no synthesis`);
+      }
+      await setPro(pool, PA.identity, true);
 
       eq(seen.filter((r) => r.headers['cache-control'] !== 'private, no-store').length, 0, 'PG every response is private, no-store');
       eq(seen.flatMap((r) => leaks(JSON.stringify(r.body ?? ''), (r.statusCode === 200 || r.statusCode === 201) && r.body && 'installationCredential' in r.body)), [], 'PG no response leaks a token');

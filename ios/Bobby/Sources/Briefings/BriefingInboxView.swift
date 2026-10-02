@@ -1,8 +1,8 @@
 // Bobby Pro market briefings — "Your briefings" (build 53): the account's ready reports, newest first.
-// The entry that still works when a notification was missed. Invariants:
+// The entry that still works when a notification was missed. Legacy reports remain readable. Invariants:
 //  - Everything listed comes from GET /api/briefings through BriefingsCenter (owner-scoped, Pro): no
 //    report is ever kept on the phone, and an account change empties the list at once (the center).
-//  - A period whose report is not there says so honestly ("Today's briefing isn't available"), from the
+//  - A weekly period whose report is not there says so honestly, from the
 //    server's `latest` state; a dependency failure is an error with retry, never an empty inbox.
 //  - Opening a row fetches the report again (the server re-authorizes owner + Pro); nothing is generated.
 import SwiftUI

@@ -35,7 +35,7 @@ db.setBriefingRpc(rpc);
 const q = async (sql: string, args: unknown[] = []) => (await pool.query(sql, args)).rows;
 const one = async (sql: string, args: unknown[] = []) => (await q(sql, args))[0];
 
-const TABLES = ['bobby_brief_settings', 'bobby_brief_shared', 'bobby_briefs', 'bobby_push_devices', 'bobby_brief_outbox',
+const TABLES = ['bobby_brief_paid_periods', 'bobby_brief_settings', 'bobby_brief_shared', 'bobby_briefs', 'bobby_push_devices', 'bobby_brief_outbox',
   'bobby_brief_provider_attempts', 'bobby_brief_audio', 'bobby_brief_audio_links', 'bobby_brief_idempotency'];
 const hex = (n = 32) => randomBytes(n).toString('hex');
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -44,13 +44,13 @@ const W = 'worker-test';
 
 // ---------- fixtures ----------
 let periodSeq = 0;
-function period(cadence: Cadence = 'morning', scheduledOffsetMin = -1, expiresAfterMin = 30) {
+function period(cadence: Cadence = 'weekly', scheduledOffsetMin = -1, expiresAfterMin = 30) {
   periodSeq++;
   const day = new Date(Date.UTC(2030, 0, 1) + periodSeq * 86_400_000).toISOString().slice(0, 10);
-  const end = new Date(Date.UTC(2030, 0, 1) + (periodSeq + 6) * 86_400_000).toISOString().slice(0, 10);
+  const end = new Date(Date.UTC(2030, 0, 1) + (periodSeq + 7) * 86_400_000).toISOString().slice(0, 10);
   const sched = Date.now() + scheduledOffsetMin * 60_000;
   return {
-    cadence, periodKey: cadence === 'weekly' ? `${day}_${end}` : day, periodStart: iso(sched - 86_400_000), periodEnd: iso(sched),
+    cadence, periodKey: cadence === 'weekly' ? `${day}_${end}` : day, periodStart: iso(sched - (cadence === 'weekly' ? 7 : 1) * 86_400_000), periodEnd: iso(sched),
     scheduledAt: iso(sched), pushExpiresAt: iso(sched + expiresAfterMin * 60_000), calendarVersion: 'nyse-2026-2027-v1', policyVersion: 'proposed-v1',
   };
 }
@@ -62,10 +62,10 @@ async function settings(identity: string, patch: Record<string, unknown>): Promi
   assert.equal(r.ok, true, 'fixture settings patch');
   return (r as { settings: BriefSettings }).settings;
 }
-/** A Pro account with the opening switch on. */
+/** A synthetic paid Pro account with the weekly switch on. */
 async function subscriber(patch: Record<string, unknown> = {}): Promise<string> {
   const id = await makeIdentity(pool, { pro: true });
-  await settings(id, { openingEnabled: true, ...patch });
+  await settings(id, { weeklyEnabled: true, ...patch });
   return id;
 }
 async function insertBrief(identity: string, p: Period): Promise<string> {
@@ -85,7 +85,7 @@ const CONTENT = { version: 1, title: 'fixture', narrationSegments: ['segment one
 /** A published report of `identity` for a fresh period (scheduled `offsetMin` from now). */
 async function readyBrief(identity: string, o: { offsetMin?: number; cadence?: Cadence; usesMemory?: boolean; memoryAssets?: string[] } = {}) {
   const offset = o.offsetMin ?? -1;
-  const p = period(o.cadence ?? 'morning', offset, Math.max(30, 60 - offset)); // still inside its push window
+  const p = period(o.cadence ?? 'weekly', offset, Math.max(30, 60 - offset)); // still inside its push window
   const id = await insertBrief(identity, p);
   const [item] = await db.claimBriefs(p.cadence as Cadence, p.periodKey, W, 60, 10);
   assert.equal(item?.id, id, 'fixture claim');
@@ -156,7 +156,7 @@ try {
       await c.query('begin; set local role service_role;');
       const id = (await c.query('insert into public.bobby_identities (auth_user_id) values (gen_random_uuid()) returning id')).rows[0].id;
       eq((await c.query('select public.bobby_brief_settings_get($1) as r', [id])).rows[0].r.revision, 0, 'service_role reads settings');
-      eq((await c.query("select (public.bobby_brief_settings_patch($1, 0, '{\"openingEnabled\": true}'::jsonb) ->> 'ok') as r", [id])).rows[0].r, 'true', 'service_role patches settings');
+      eq((await c.query("select (public.bobby_brief_settings_patch($1, 0, '{\"weeklyEnabled\": true}'::jsonb) ->> 'ok') as r", [id])).rows[0].r, 'true', 'service_role patches settings');
     } finally { await c.query('rollback').catch(() => {}); c.release(); }
   }
   // A third application changes nothing and fails nothing; the storage bucket block is skipped without a storage schema.
@@ -175,9 +175,52 @@ try {
   await rejects(rpc('bobby_brief_settings_get', { p_identity: randomUUID(), p_other: 1 }), 'unknown argument throws');
   {
     const id = await makeIdentity(pool, { pro: true });
-    eq(await db.isPro(id), true, 'bobby_is_pro returns a scalar boolean (grant)');
+    eq(await db.isPro(id), true, 'feature paid-Pro RPC returns a scalar boolean (synthetic verified paid period)');
     await setPro(pool, id, false);
-    eq(await db.isPro(id), false, '…false without grant or subscription');
+    eq(await db.isPro(id), false, '…false without verified paid subscription');
+  }
+
+  // Feature entitlement is stricter than global Pro. Local evidence here is synthetic, never real billing proof.
+  {
+    const id = await makeIdentity(pool);
+    await q("insert into bobby_pro_grants (identity_id, pro_until) values ($1, now() + interval '30 days')", [id]);
+    eq(await rpc('bobby_is_pro', { p_identity: id }), true, 'global referral/admin grant remains Pro');
+    eq(await db.isPro(id), false, 'grant-only account has no paid briefing entitlement');
+    await setPro(pool, id, true);
+    eq(await db.isPro(id), true, 'active confirmed paid production period qualifies');
+    for (const [sql, label] of [
+      ["update bobby_subscriptions set status = 'trialing' where identity_id = $1", 'trialing subscription'],
+      ["update bobby_subscriptions set status = 'expired' where identity_id = $1", 'expired subscription status'],
+      ["update bobby_subscriptions set status = 'past_due' where identity_id = $1", 'billing issue status'],
+      ["update bobby_subscriptions set current_period_end = null where identity_id = $1", 'unknown expiry'],
+      ["delete from bobby_brief_paid_periods where identity_id = $1", 'missing paid evidence despite active mirror'],
+      ["update bobby_brief_paid_periods set period_type = 'trial' where identity_id = $1", 'RevenueCat trial mirrored as active'],
+      ["update bobby_brief_paid_periods set environment = 'sandbox' where identity_id = $1", 'Sandbox proof'],
+      ["update bobby_brief_paid_periods set environment = 'unknown' where identity_id = $1", 'unknown billing environment'],
+      ["update bobby_brief_paid_periods set paid_amount = 0 where identity_id = $1", 'zero paid amount'],
+      ["update bobby_brief_paid_periods set verification_state = 'unverified' where identity_id = $1", 'unverified evidence'],
+      ["update bobby_brief_paid_periods set product_id = 'other.product' where identity_id = $1", 'mismatched product'],
+      ["update bobby_brief_paid_periods set provider = 'stripe' where identity_id = $1", 'mismatched provider'],
+      ["update bobby_brief_paid_periods set period_end = period_end + interval '1 day' where identity_id = $1", 'mismatched paid period'],
+      ["update bobby_brief_paid_periods set verified_at = now() + interval '1 hour' where identity_id = $1", 'future proof verification'],
+      ["update bobby_brief_paid_periods set period_start = now() + interval '1 hour' where identity_id = $1", 'future paid period'],
+    ]) {
+      await setPro(pool, id, true);
+      await q(sql, [id]);
+      eq(await db.isPro(id), false, `${label} fails closed for briefings`);
+    }
+    await setPro(pool, id, true);
+    await q("update bobby_subscriptions set current_period_end = now() - interval '1 minute' where identity_id = $1", [id]);
+    await q('update bobby_brief_paid_periods p set period_end = s.current_period_end from bobby_subscriptions s where p.identity_id = s.identity_id and p.identity_id = $1', [id]);
+    eq(await db.isPro(id), false, 'expired matching paid period fails closed');
+    await setPro(pool, id, true);
+    eq(await db.isPro(id), true, 'cancelled auto-renewal retains an active already-paid period until expiry (mirror stays active)');
+    await q("update bobby_brief_paid_periods set period_type = 'intro' where identity_id = $1", [id]);
+    eq(await db.isPro(id), true, 'positive paid intro period remains paid (free trial excluded)');
+    await q("update bobby_identities set auth_user_id = null, wallet_address = '0x' || repeat('a', 40) where id = $1", [id]);
+    eq(await db.isPro(id), false, 'wallet-only identity cannot qualify as signed-in briefing account');
+    await q('delete from bobby_identities where id = $1', [id]);
+    eq((await one('select count(*)::int as n from bobby_brief_paid_periods where identity_id = $1', [id])).n, 0, 'account deletion cascades private paid evidence');
   }
 
   // ================================================================ settings
@@ -186,16 +229,16 @@ try {
     const s0 = await db.getSettings(a);
     eq(s0, { revision: 0, openingEnabled: false, closeEnabled: false, weeklyEnabled: false, language: 'en', companionId: null, assets: [],
       analysisConsentEnabled: false, analysisConsentVersion: null, audioConsentEnabled: false, audioConsentVersion: null, privacyEpoch: 0 }, 'defaults at revision 0');
-    eq(await db.patchSettings(a, 3, { openingEnabled: true }), { ok: false, code: 'revision_conflict', revision: 0 }, 'absent row: only revision 0 applies');
-    const r1 = await db.patchSettings(a, 0, { openingEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'] });
-    eq(r1, { ok: true, settings: { ...s0, revision: 1, openingEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'] } }, 'first save inserts at revision 1, same shape as GET');
+    eq(await db.patchSettings(a, 3, { weeklyEnabled: true }), { ok: false, code: 'revision_conflict', revision: 0 }, 'absent row: only revision 0 applies');
+    const r1 = await db.patchSettings(a, 0, { weeklyEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'] });
+    eq(r1, { ok: true, settings: { ...s0, revision: 1, weeklyEnabled: true, language: 'es', companionId: 'kora', assets: ['BTC', 'NVDA'] } }, 'first save inserts at revision 1, same shape as GET');
     eq(await db.getSettings(a), (r1 as { settings: BriefSettings }).settings, 'GET returns what PATCH returned');
     eq(await db.patchSettings(a, 0, { weeklyEnabled: true }), { ok: false, code: 'revision_conflict', revision: 1 }, 'stale revision → conflict with current revision');
     // Defense in depth: invalid values throw (the API validates first).
     for (const [bad, what] of [
       [{ assets: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] }, '7 assets'], [{ assets: ['btc'] }, 'lowercase symbol'], [{ assets: ['BTC', 'BTC'] }, 'duplicate asset'],
       [{ assets: ['BTC; drop'] }, 'symbol pattern'], [{ language: 'fr' }, 'language'], [{ companionId: 'Kora!' }, 'companion pattern'],
-      [{ openingEnabled: 'yes' }, 'non-boolean switch'], [{ owner: 'x' }, 'unknown key'], [{ analysisConsentEnabled: true }, 'consent without version'],
+      [{ weeklyEnabled: 'yes' }, 'non-boolean switch'], [{ owner: 'x' }, 'unknown key'], [{ analysisConsentEnabled: true }, 'consent without version'],
       [{ analysisConsentEnabled: true, analysisConsentVersion: 0 }, 'consent version 0'],
     ] as Array<[Record<string, unknown>, string]>) {
       await rejects(db.patchSettings(a, 1, bad), `rejects ${what}`, (e: unknown) => e instanceof db.BriefingStorageError && e.status === 400);
@@ -214,7 +257,7 @@ try {
     eq(results.filter((r) => r.ok).length, 1, 'one of 8 concurrent saves wins');
     ok(results.filter((r) => !r.ok).every((r) => (r as { revision: number }).revision === 4), 'the others see the new revision');
     const fresh = await makeIdentity(pool);
-    const firsts = await Promise.all(Array.from({ length: 8 }, () => db.patchSettings(fresh, 0, { openingEnabled: true })));
+    const firsts = await Promise.all(Array.from({ length: 8 }, () => db.patchSettings(fresh, 0, { weeklyEnabled: true })));
     eq(firsts.filter((r) => r.ok).length, 1, 'one of 8 concurrent FIRST saves wins (no duplicate row)');
     eq((await one('select count(*)::int as n, max(revision) as rev from bobby_brief_settings where identity_id = $1', [fresh])), { n: 1, rev: 1 }, 'one row at revision 1');
   }
@@ -230,34 +273,40 @@ try {
     eq([n1, n2], [1, 0], 'seed: one Pro account with the switch on; a replayed cron seeds nothing');
     eq((await q('select identity_id from bobby_briefs where cadence = $1 and period_key = $2', [p.cadence, p.periodKey])).map((r) => r.identity_id), [yes], 'only the Pro, switched-on account');
     ok(!(await q('select 1 from bobby_briefs where identity_id = any($1)', [[notPro, off]])).length, 'nobody else');
+    eq(await db.openLanguages('close', p.periodKey), ['en'], 'shared generation is available for an eligible open report');
+    await setPro(pool, yes, false);
+    eq(await db.openLanguages('close', p.periodKey), [], 'payment lapse after seed removes the shared-generation language');
+    await setPro(pool, yes, true);
+    await settings(yes, { closeEnabled: false });
+    eq(await db.openLanguages('close', p.periodKey), [], 'opt-out after seed removes the shared-generation language');
     await rejects(db.seedPeriod({ ...p, periodKey: '2030-01-01_2030-01-07' } as Parameters<typeof db.seedPeriod>[0]), 'a malformed period key is refused');
   }
 
   // ================================================================ shared narrative
   {
     const p = period();
-    const c1 = await db.claimShared('morning', p.periodKey, 'es', W, 60, 3);
+    const c1 = await db.claimShared('weekly', p.periodKey, 'es', W, 60, 3);
     eq([c1.state, (c1 as { fence: number }).fence, (c1 as { attempts: number }).attempts], ['claimed', 1, 0], 'first claim: fence 1');
-    eq(await db.claimShared('morning', p.periodKey, 'es', 'other', 60, 3), { state: 'busy' }, 'a live lease → busy');
+    eq(await db.claimShared('weekly', p.periodKey, 'es', 'other', 60, 3), { state: 'busy' }, 'a live lease → busy');
     const id = (c1 as { id: string }).id;
     eq(await db.commitShared(id, 99, 'ready', {}, {}, null, null), { ok: false, code: 'stale_fence' }, 'wrong fence rejected');
     await q("update bobby_brief_shared set lease_expires_at = now() - interval '1 second' where id = $1", [id]);
     eq(await db.commitShared(id, 1, 'ready', {}, {}, null, null), { ok: false, code: 'stale_fence' }, 'expired lease rejected even with the right fence');
-    const c2 = await db.claimShared('morning', p.periodKey, 'es', W, 60, 3);
+    const c2 = await db.claimShared('weekly', p.periodKey, 'es', W, 60, 3);
     eq([c2.state, (c2 as { fence: number }).fence, (c2 as { attempts: number }).attempts], ['claimed', 2, 1], 'reclaim after an expired lease: fence 2, the lost lease counted');
     eq(await db.commitShared(id, 1, 'ready', {}, {}, null, null), { ok: false, code: 'stale_fence' }, 'the first worker can never commit');
     eq(await db.commitShared(id, 2, 'ready', { quotes: [1] }, { version: 1 }, iso(Date.now()), null), { ok: true }, 'current fence commits');
-    const c3 = await db.claimShared('morning', p.periodKey, 'es', W, 60, 3);
+    const c3 = await db.claimShared('weekly', p.periodKey, 'es', W, 60, 3);
     eq([c3.state, (c3 as { narrative: unknown }).narrative, (c3 as { evidence: unknown }).evidence], ['ready', { version: 1 }, { quotes: [1] }], 'ready returns narrative + evidence');
     const pr = period();
     for (let i = 0; i < 3; i++) {
-      const c = await db.claimShared('morning', pr.periodKey, 'en', W, 60, 3);
+      const c = await db.claimShared('weekly', pr.periodKey, 'en', W, 60, 3);
       if (i < 3 && c.state === 'claimed') await db.commitShared((c as { id: string }).id, (c as { fence: number }).fence, 'retry', null, null, null, 'provider');
     }
-    eq((await db.claimShared('morning', pr.periodKey, 'en', W, 60, 3)).state, 'failed', 'retries are capped by p_max_attempts');
-    eq(await db.claimShared('morning', p.periodKey, 'en', W, 60, 3).then((c) => c.state), 'claimed', 'languages are separate rows');
+    eq((await db.claimShared('weekly', pr.periodKey, 'en', W, 60, 3)).state, 'failed', 'retries are capped by p_max_attempts');
+    eq(await db.claimShared('weekly', p.periodKey, 'en', W, 60, 3).then((c) => c.state), 'claimed', 'languages are separate rows');
     const pc = period();
-    const racers = await Promise.all(Array.from({ length: 8 }, (_, i) => db.claimShared('morning', pc.periodKey, 'en', `r${i}`, 60, 3)));
+    const racers = await Promise.all(Array.from({ length: 8 }, (_, i) => db.claimShared('weekly', pc.periodKey, 'en', `r${i}`, 60, 3)));
     eq(racers.filter((c) => c.state === 'claimed').length, 1, '8 concurrent shared claims → exactly one holder');
     ok(racers.filter((c) => c.state !== 'claimed').every((c) => c.state === 'busy'), '…the others busy');
     eq((await one('select count(*)::int as n from bobby_brief_shared where period_key = $1', [pc.periodKey])).n, 1, '…one row');
@@ -270,10 +319,10 @@ try {
     const ids: string[] = [];
     for (let i = 0; i < 30; i++) ids.push(await subscriber({ assets: ['BTC'] }));
     eq(await db.seedPeriod(p as Parameters<typeof db.seedPeriod>[0]) >= 30, true, 'seeded the 30');
-    const batches = await Promise.all(Array.from({ length: 4 }, (_, i) => db.claimBriefs('morning', p.periodKey, `w${i}`, 60, 10)));
+    const batches = await Promise.all(Array.from({ length: 4 }, (_, i) => db.claimBriefs('weekly', p.periodKey, `w${i}`, 60, 10)));
     const claimed = batches.flat().filter((b) => ids.includes(b.identityId));
     eq(new Set(claimed.map((b) => b.id)).size, claimed.length, 'no report claimed twice by concurrent workers');
-    const rest = await db.claimBriefs('morning', p.periodKey, 'w9', 60, 100);
+    const rest = await db.claimBriefs('weekly', p.periodKey, 'w9', 60, 100);
     eq(new Set([...claimed, ...rest.filter((b) => ids.includes(b.identityId))].map((b) => b.id)).size, 30, 'every report claimed exactly once');
     ok([...claimed, ...rest].every((b) => b.fence === 1), 'every first claim has fence 1');
 
@@ -284,10 +333,10 @@ try {
     const c1 = await pool.connect();
     try {
       await c1.query('begin');
-      const held = (await c1.query(`select public.bobby_brief_claim(p_cadence => 'morning', p_period_key => $1, p_worker => 'held', p_lease_seconds => 60,
+      const held = (await c1.query(`select public.bobby_brief_claim(p_cadence => 'weekly', p_period_key => $1, p_worker => 'held', p_lease_seconds => 60,
         p_limit => 2, p_voices => $2::jsonb, p_default_voice => $3) as r`, [p2.periodKey, JSON.stringify(COMPANION_VOICES), voiceForCompanion(null)])).rows[0].r.items;
       eq(held.length, 2, 'worker 1 holds 2 (uncommitted)');
-      const other = await db.claimBriefs('morning', p2.periodKey, 'free', 60, 100);
+      const other = await db.claimBriefs('weekly', p2.periodKey, 'free', 60, 100);
       eq(other.length, 4, 'worker 2 skips the locked rows and takes the other 4');
       ok(!other.some((o) => held.some((h: { id: string }) => h.id === o.id)), '…no overlap');
       await c1.query('commit');
@@ -297,7 +346,7 @@ try {
     const m = await subscriber({ language: 'es', companionId: 'kora', assets: ['NVDA', 'BTC'], analysisConsentEnabled: true, analysisConsentVersion: 1, audioConsentEnabled: true, audioConsentVersion: 1 });
     await q("insert into bobby_user_prefs (identity_id, experience, risk) values ($1, 'new', 'high')", [m]);
     await q(`insert into bobby_user_assets (identity_id, symbol, asks, first_asked_at, last_asked_at) values
-      ($1, 'NVDA', 3, now() - interval '20 days', now() - interval '1 day'), ($1, 'ETH', 2, now() - interval '20 days', now() - interval '3 days'),
+      ($1, 'NVDA', 1, now() - interval '20 days', now() - interval '1 day'), ($1, 'ETH', 2, now() - interval '20 days', now() - interval '3 days'),
       ($1, 'SOL', 1, now() - interval '5 days', now() - interval '2 hours'), ($1, 'XAG', 9, now() - interval '200 days', now() - interval '100 days')`, [m]);
     const plain = await subscriber();
     const paused = await subscriber({ analysisConsentEnabled: true, analysisConsentVersion: 1 });
@@ -305,15 +354,15 @@ try {
     await q("insert into bobby_user_assets (identity_id, symbol, asks) values ($1, 'NVDA', 5)", [paused]);
     const pm = period();
     for (const id of [m, plain, paused]) await insertBrief(id, pm);
-    eq((await db.neededAssets('morning', pm.periodKey, 'es')).sort(), ['BTC', 'ETH', 'NVDA'], 'needed assets (es): followed + consented frequent');
-    eq(await db.neededAssets('morning', pm.periodKey, 'en'), [], 'needed assets (en): nobody follows anything; paused memory adds nothing');
-    const items = await db.claimBriefs('morning', pm.periodKey, W, 60, 10);
+    eq((await db.neededAssets('weekly', pm.periodKey, 'es')).sort(), ['BTC', 'ETH', 'NVDA', 'SOL'], 'needed assets (es): followed + consented asked assets, including one NVDA question');
+    eq(await db.neededAssets('weekly', pm.periodKey, 'en'), [], 'needed assets (en): nobody follows anything; paused memory adds nothing');
+    const items = await db.claimBriefs('weekly', pm.periodKey, W, 60, 10);
     const byId = Object.fromEntries(items.map((i) => [i.identityId, i]));
     const mi = byId[m];
     const ms = await db.getSettings(m);
     eq(mi.frozen, { settingsRevision: ms.revision, privacyEpoch: ms.privacyEpoch, language: 'es', companionId: 'kora', voice: COMPANION_VOICES.kora,
       assets: ['NVDA', 'BTC'], analysisConsent: true, analysisConsentVersion: 1, audioConsent: true }, 'FrozenSettings shape, voice from the companion map');
-    eq(mi.memory, { experience: 'new', explainRiskDepth: 'high', frequentAssets: ['NVDA', 'ETH'] }, 'memory: prefs + ≥2 asks within 90 days, most recent first');
+    eq(mi.memory, { experience: 'new', explainRiskDepth: 'high', frequentAssets: ['SOL', 'NVDA', 'ETH'] }, 'memory: prefs + one or more asks within 90 days, most recent first');
     eq([byId[plain].memory, byId[plain].frozen.voice, byId[plain].frozen.companionId], [null, voiceForCompanion(null), null], 'no consent → no memory; default voice');
     eq(byId[paused].memory, null, 'memory paused → no memory despite consent');
     const fr = await one('select voice, language, settings_revision, privacy_epoch, lease_owner, state from bobby_briefs where id = $1', [mi.id]);
@@ -324,12 +373,12 @@ try {
     const lapsed = await subscriber(); const optedOut = await subscriber(); const late = await subscriber();
     const bl = await insertBrief(lapsed, pz); const bo = await insertBrief(optedOut, pz);
     await setPro(pool, lapsed, false);
-    await q('update bobby_brief_settings set opening_enabled = false where identity_id = $1', [optedOut]);
-    eq((await db.claimBriefs('morning', pz.periodKey, W, 60, 10)).length, 0, 'neither is claimed');
+    await q('update bobby_brief_settings set weekly_enabled = false where identity_id = $1', [optedOut]);
+    eq((await db.claimBriefs('weekly', pz.periodKey, W, 60, 10)).length, 0, 'neither is claimed');
     eq([await briefState(bl), await briefState(bo)], ['skipped', 'cancelled'], 'non-Pro → skipped, opted out → cancelled');
-    const pl = period('morning', -60, 10);
+    const pl = period('weekly', -60, 10);
     const bd = await insertBrief(late, pl);
-    eq((await db.claimBriefs('morning', pl.periodKey, W, 60, 10)).length, 0, 'past its push deadline: not claimed');
+    eq((await db.claimBriefs('weekly', pl.periodKey, W, 60, 10)).length, 0, 'past its push deadline: not claimed');
     eq(await briefState(bd), 'failed', '…failed (deadline)');
   }
 
@@ -338,13 +387,13 @@ try {
     const a = await subscriber();
     const p = period();
     const id = await insertBrief(a, p);
-    const [it] = await db.claimBriefs('morning', p.periodKey, W, 60, 10);
+    const [it] = await db.claimBriefs('weekly', p.periodKey, W, 60, 10);
     const sharedId = await readyShared(p, 'en');
     const base = { id, fence: it.fence, sharedId, content: CONTENT, quality: 'full', dataAsOf: iso(Date.now()), usesMemory: false, memoryAssets: [], settingsRevision: it.frozen.settingsRevision, privacyEpoch: it.frozen.privacyEpoch };
     eq(await db.publishBrief({ ...base, fence: it.fence + 1 }), { ok: false, code: 'stale_fence' }, 'publish: wrong fence');
     await q("update bobby_briefs set lease_expires_at = now() - interval '1 second' where id = $1", [id]);
     eq(await db.publishBrief(base), { ok: false, code: 'stale_fence' }, 'publish: expired lease');
-    const [again] = await db.claimBriefs('morning', p.periodKey, 'w2', 60, 10);
+    const [again] = await db.claimBriefs('weekly', p.periodKey, 'w2', 60, 10);
     eq([again.id, again.fence], [id, 2], 'reclaimed with fence 2');
     eq(await db.publishBrief(base), { ok: false, code: 'stale_fence' }, 'the stale worker cannot publish');
     const cur = { ...base, fence: 2 };
@@ -357,7 +406,7 @@ try {
 
     const claimOne = async (who: string) => {
       const pp = period(); const bid = await insertBrief(who, pp);
-      const [x] = await db.claimBriefs('morning', pp.periodKey, W, 60, 10);
+      const [x] = await db.claimBriefs('weekly', pp.periodKey, W, 60, 10);
       return { pp, bid, x, sharedId: await readyShared(pp, x.frozen.language) };
     };
     const pub = (c: Awaited<ReturnType<typeof claimOne>>, extra: Record<string, unknown> = {}) => db.publishBrief({ id: c.bid, fence: c.x.fence, sharedId: c.sharedId, content: CONTENT,
@@ -365,9 +414,9 @@ try {
     let c = await claimOne(a); await setPro(pool, a, false);
     eq(await pub(c), { ok: false, code: 'not_pro' }, 'owner lost Pro → not_pro'); eq(await briefState(c.bid), 'skipped', '…skipped');
     await setPro(pool, a, true);
-    c = await claimOne(a); await q('update bobby_brief_settings set opening_enabled = false where identity_id = $1', [a]);
+    c = await claimOne(a); await q('update bobby_brief_settings set weekly_enabled = false where identity_id = $1', [a]);
     eq(await pub(c), { ok: false, code: 'opted_out' }, 'switch off meanwhile → opted_out'); eq(await briefState(c.bid), 'cancelled', '…cancelled');
-    await q('update bobby_brief_settings set opening_enabled = true where identity_id = $1', [a]);
+    await q('update bobby_brief_settings set weekly_enabled = true where identity_id = $1', [a]);
     c = await claimOne(a); await q('update bobby_brief_settings set privacy_epoch = privacy_epoch + 1 where identity_id = $1', [a]);
     eq(await pub(c), { ok: false, code: 'privacy_changed' }, 'privacy epoch moved → privacy_changed');
     const back = await one('select state, content, frozen, lease_owner from bobby_briefs where id = $1', [c.bid]);
@@ -377,7 +426,7 @@ try {
     eq(await db.failBrief(c.bid, c.x.fence + 5, 'x', false).then(() => briefState(c.bid)), 'preparing', 'fail with a stale fence does nothing');
     await db.failBrief(c.bid, c.x.fence, 'provider_timeout', false);
     eq([await briefState(c.bid), (await one('select attempts from bobby_briefs where id = $1', [c.bid])).attempts], ['pending', 1], 'non-final fail → pending, attempts 1');
-    for (let i = 0; i < 2; i++) { const [x] = await db.claimBriefs('morning', c.pp.periodKey, W, 60, 10); await db.failBrief(c.bid, x.fence, 'again', false); }
+    for (let i = 0; i < 2; i++) { const [x] = await db.claimBriefs('weekly', c.pp.periodKey, W, 60, 10); await db.failBrief(c.bid, x.fence, 'again', false); }
     eq(await briefState(c.bid), 'failed', 'the third failure is final');
     const c4 = await claimOne(a); await db.failBrief(c4.bid, c4.x.fence, 'invalid_content', true);
     eq(await briefState(c4.bid), 'failed', 'final fail → failed at once');
@@ -411,8 +460,8 @@ try {
     const page2 = await db.inbox(A, null, { scheduledAt: last.scheduledAt, id: last.id }, 2);
     eq(page2.items.map((i) => i.id), [r2.id, r1.id], 'page 2 continues the keyset');
     eq((await db.inbox(A, null, { scheduledAt: page2.items[1].scheduledAt, id: page2.items[1].id }, 2)).items, [], 'page 3 empty');
-    eq((await db.inbox(A, 'weekly', null, 20)).items, [], 'cadence filter');
-    eq(page1.latest.map((l) => [l.cadence, l.periodKey, l.state]), [['morning', future.period.periodKey, 'preparing']], 'latest: the newest morning period is not due yet → preparing');
+    eq((await db.inbox(A, 'morning', null, 20)).items, [], 'cadence filter excludes another cadence');
+    eq(page1.latest.map((l) => [l.cadence, l.periodKey, l.state]), [['weekly', future.period.periodKey, 'preparing']], 'latest: the newest weekly period is not due yet → preparing');
     // B asks with A's ids as a cursor: still only B's (none).
     eq((await db.inbox(B, null, { scheduledAt: last.scheduledAt, id: last.id }, 20)).items, [], "a cursor never reveals another account's items");
     await setPro(pool, A, false);
@@ -421,10 +470,10 @@ try {
     await setPro(pool, A, true);
     // latest: unavailable after a failed period; disabled cadences are omitted.
     const C = await subscriber();
-    const pf = period('morning', -10); const bf = await insertBrief(C, pf);
+    const pf = period('weekly', -10); const bf = await insertBrief(C, pf);
     await q("update bobby_briefs set state = 'failed' where id = $1", [bf]);
     eq((await db.inbox(C, null, null, 20)).latest.map((l) => l.state), ['unavailable'], 'latest: failed → unavailable');
-    await settings(C, { openingEnabled: false });
+    await settings(C, { weeklyEnabled: false });
     eq((await db.inbox(C, null, null, 20)).latest, [], 'latest omits switched-off cadences');
   }
 
@@ -435,18 +484,18 @@ try {
     const bPending = await insertBrief(a, pPending);
     const bPrep = await insertBrief(a, pPrep);
     const bClose = await insertBrief(a, pClose);
-    await db.claimBriefs('morning', pPrep.periodKey, W, 60, 10);
+    await db.claimBriefs('weekly', pPrep.periodKey, W, 60, 10);
     const ready = await readyBrief(a);
     const dev = await register(a);
     await db.fillOutbox(100);
     const [ob] = await outboxRows(ready.id);
     eq(ob?.state, 'pending', 'an unsent push exists for the ready report');
-    await settings(a, { openingEnabled: false });
+    await settings(a, { weeklyEnabled: false });
     eq([await briefState(bPending), await briefState(bPrep), await briefState(bClose), await briefState(ready.id)], ['cancelled', 'cancelled', 'pending', 'ready'],
-      'disabling morning cancels its pending/preparing reports only; close and ready reports untouched');
+      'disabling weekly cancels its pending/preparing reports only; legacy close and ready reports untouched');
     eq((await outboxRows(ready.id))[0].state, 'cancelled', '…and its unsent push');
     eq((await db.getReport(a, ready.id) as { report: unknown }).report !== undefined, true, 'the ready report stays readable');
-    await settings(a, { openingEnabled: true });
+    await settings(a, { weeklyEnabled: true });
     eq([await briefState(bPending), await briefState(bPrep)], ['pending', 'pending'], 're-enabling revives never-prepared reports of an open window');
     await db.revokeDevice(a, (dev.r as { registrationId: string }).registrationId, 1, sha(dev.proof));
   }
@@ -523,6 +572,25 @@ try {
     eq((await one('select status, invalid_reason from bobby_push_devices where id = $1', [ireg])), { status: 'invalid', invalid_reason: 'BadDeviceToken' }, 'invalidate at the current revision');
     const revived = await db.rebindDevice(A, ireg, 1, sha(inv.proof), sha(hex()), device(), 5);
     eq(revived, { ok: true, registrationId: ireg, bindingRevision: 2 }, 'an invalidated installation rebinds with a fresh token');
+  }
+
+  // Legacy reports stay readable, but daily/close delivery intents cannot be created or claimed.
+  {
+    const owner = await subscriber();
+    await settings(owner, { openingEnabled: true, closeEnabled: true });
+    const registered = await register(owner);
+    const registration = (registered.r as { registrationId: string }).registrationId;
+    for (const cadence of ['morning', 'close'] as const) {
+      const legacy = await readyBrief(owner, { cadence });
+      await db.fillOutbox(1000);
+      eq((await outboxRows(legacy.id)).length, 0, `${cadence}: no new delivery intent`);
+      const [old] = await q(`insert into bobby_brief_outbox (brief_id, identity_id, device_id, installation_id, binding_revision, collapse_id, language, due_at, expires_at)
+        select $1::uuid, identity_id, id, installation_id, binding_revision, 'legacy-' || ($1::uuid)::text, 'en', now() - interval '1 minute', now() + interval '30 minutes'
+        from bobby_push_devices where id = $2 returning id`, [legacy.id, registration]);
+      const claimed = await db.claimOutbox(W, 60, 200);
+      ok(!claimed.some(item => item.briefId === legacy.id), `${cadence}: old queued intent not sent to APNs`);
+      eq((await one('select state from bobby_brief_outbox where id = $1', [old.id])).state, 'cancelled', `${cadence}: old queued intent cancelled`);
+    }
   }
 
   // ================================================================ outbox
@@ -696,6 +764,7 @@ try {
     eq(await db.authorizeAudio(C, randomUUID()), { code: 'not_found' }, 'missing → not_found');
     await setPro(pool, A, false);
     eq(await db.authorizeAudio(A, audioId), { code: 'subscription_required' }, 'owner without Pro → subscription_required');
+    eq(await db.requestAudio(A, ra.id, 1, 1, sha('lapsed request'), voice, 'en'), { code: 'subscription_required' }, 'owner without paid Pro cannot queue synthesis');
     eq(await db.authorizeAudio(C, audioId), { code: 'not_found' }, '…a stranger still not_found');
     await setPro(pool, A, true);
     eq((await db.inbox(A, null, null, 20)).items.find((i) => i.id === ra.id)?.audioState, 'ready', 'inbox audioState ready');
@@ -704,6 +773,10 @@ try {
     // retry / lease expiry / attempt cap
     const k2 = sha('segment two');
     const q2 = await db.requestAudio(A, ra.id, 1, 1, k2, voice, 'en') as { audioId: string };
+    await setPro(pool, A, false);
+    eq(await db.claimAudio(q2.audioId, W, 60), { state: 'failed' }, 'no paid linked reader → no synthesis lease');
+    eq((await one('select state, fence from bobby_brief_audio where id = $1', [q2.audioId])).state, 'queued', 'denied synthesis preserves a reusable queued cache key');
+    await setPro(pool, A, true);
     let c = await db.claimAudio(q2.audioId, W, 60) as { fence: number };
     await db.commitAudio(q2.audioId, c.fence, 'retry', null, null, 'tts_503');
     eq((await one('select state, attempts from bobby_brief_audio where id = $1', [q2.audioId])), { state: 'queued', attempts: 1 }, 'retry → queued, attempts 1');
@@ -728,7 +801,7 @@ try {
     const generic = await readyBrief(A);
     const futureMem = await readyBrief(A, { offsetMin: 15, usesMemory: true, memoryAssets: ['NVDA'] });
     const pp = period(); const prep = await insertBrief(A, pp);
-    const [pi] = await db.claimBriefs('morning', pp.periodKey, W, 60, 10);
+    const [pi] = await db.claimBriefs('weekly', pp.periodKey, W, 60, 10);
     await db.fillOutbox(100);
     eq((await outboxRows(past.id))[0]?.state, 'pending', 'a memory-based report has an unsent push');
     const epoch0 = (await db.getSettings(A)).privacyEpoch;
@@ -794,10 +867,10 @@ try {
   {
     const A = await subscriber();
     const p = period(); const b = await insertBrief(A, p);
-    await db.claimBriefs('morning', p.periodKey, W, 60, 10);
+    await db.claimBriefs('weekly', p.periodKey, W, 60, 10);
     await q("update bobby_briefs set lease_expires_at = now() - interval '1 second' where id = $1", [b]);
-    const pd = period('morning', -60, 10); const bd = await insertBrief(A, pd);
-    const ps = period(); const sc = await db.claimShared('morning', ps.periodKey, 'en', W, 60, 3) as { id: string };
+    const pd = period('weekly', -60, 10); const bd = await insertBrief(A, pd);
+    const ps = period(); const sc = await db.claimShared('weekly', ps.periodKey, 'en', W, 60, 3) as { id: string };
     await q("update bobby_brief_shared set lease_expires_at = now() - interval '1 second' where id = $1", [sc.id]);
     const ra = await readyBrief(A);
     const aq = await db.requestAudio(A, ra.id, 1, 0, sha(randomUUID()), voiceForCompanion(null), 'en') as { audioId: string };
@@ -838,7 +911,7 @@ try {
     const A = await subscriber();
     const oldIds: string[] = [];
     for (let i = 0; i < 7; i++) {
-      const p = period('morning', -60 * 24 * 100 - i * 60 * 24, 30); // ~100+ days ago
+      const p = period('weekly', -60 * 24 * 100 - i * 60 * 24, 30); // ~100+ days ago
       oldIds.push(await insertBrief(A, p));
     }
     const recent = await readyBrief(A);

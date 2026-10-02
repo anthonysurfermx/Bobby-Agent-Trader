@@ -1,5 +1,7 @@
 # Resúmenes de mercado Bobby Pro — entrega local build 53 (2 oct 2026)
 
+> **Actualización posterior:** este informe conserva la entrega histórica de Claude en `2f81cfbf`. La dirección vigente es semanal lunes 08:00 NY más eventos macro excepcionales. Ver [ajuste local](pro-market-briefings-weekly-update-2026-10-02.md) y [revisión independiente](pro-market-briefings-review-2026-10-02.md); los totales originales necesitan cotejo y no prueban staging/iPhone.
+
 Rama `feat/pro-briefings-b53` (worktree `.claude/worktrees/pro-briefings-b53`, base `main` b96e4ee). **Nada desplegado,
 ninguna migración aplicada en remoto, ninguna capacidad Apple cambiada, ninguna notificación enviada, ningún gasto real.**
 Contrato de implementación: [pro-market-briefings-implementation.md](pro-market-briefings-implementation.md). Activación:

@@ -62,7 +62,7 @@ let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 
-const policy = { adopted: new Set(['morning'] as const), morningDays: 'all' as const } as unknown as import('../api/_lib/briefings/calendar.ts').SchedulePolicy;
+const policy = { adopted: new Set(['weekly'] as const), morningDays: 'all' as const } as unknown as import('../api/_lib/briefings/calendar.ts').SchedulePolicy;
 const MIN = 60_000;
 const MASTER = randomBytes(32);
 const APNS: ApnsConfig = { keyId: 'ABCDEFGHIJ', teamId: 'KLMNOPQRST', privateKey: '-----BEGIN PRIVATE KEY-----\nfixture\n-----END PRIVATE KEY-----', topic: 'xyz.bobbyprotocol.bobby', environments: new Set(['production']) };
@@ -93,7 +93,7 @@ const emptySnapshot = (at: Date): GlobalMarketSnapshot => ({ prices: [], stocks:
 
 /** Real evidence code over a fixture snapshot (agenda: an empty stored calendar; no weekly history needed). */
 const evidenceWith = (snap: (at: Date) => GlobalMarketSnapshot, at: () => Date) => (period: Period, symbols: string[]) =>
-  buildEvidence(period, symbols, { now: at, snapshot: async () => snap(at()), agenda: async () => [], dailyCloses: async () => [] });
+  buildEvidence(period, symbols, { now: at, snapshot: async () => snap(at()), agenda: async () => [], dailyCloses: async () => [...snap(at()).prices, ...snap(at()).stocks].map(q => ({ symbol: q.symbol, from: { at: period.periodStart, price: q.price }, to: { at: new Date(Math.min(at().getTime(), Date.parse(period.periodEnd)) - 60_000).toISOString(), price: q.price } })) });
 
 /** A number-free model narrative (passes the grounding validator). */
 const MODEL_NARRATIVE = {
@@ -101,7 +101,8 @@ const MODEL_NARRATIVE = {
   market: { title: 'Market', body: 'Crypto traded quietly overnight while equities wait for the session.' },
   assets: [{ symbol: 'BTC', title: 'Bitcoin', body: 'Bitcoin moved little overnight and funding stayed close to neutral.', explainer: '' }],
   risks: { title: 'Risks', body: 'Positioning looks balanced; a sharp move in the dollar would change the picture.' },
-  agenda: { title: 'Agenda', body: 'The equity session opens later this morning.' },
+  agenda: { title: 'Agenda', body: 'Watch the recorded events during the upcoming week.' },
+  week: { title: 'Previous week', body: 'Historical closing prices provide the context for the week ahead.' },
 };
 
 // ---------- fakes ----------
@@ -170,7 +171,7 @@ const logger = {
 };
 
 // The calendar period of a Monday morning; the tick runs at 07:35 NY unless a test moves it.
-const P: Period = cal.periodForDate('morning', '2026-10-05', policy)!;
+const P: Period = cal.periodForDate('weekly', '2026-10-05', policy)!;
 const AT_0735 = cal.nyLocalToUtc('2026-10-05', '07:35');
 
 interface Harness {
@@ -367,8 +368,23 @@ async function call(h: (req: any, res: any) => Promise<unknown>, req: import('@v
   ok(['full', 'partial'].includes(pub[0].quality), `model quality is full/partial (${pub[0].quality})`);
   eq([h.audio.length, r.audioReady], [Math.min(pub[0].content.narrationSegments.length, workerMod.AUDIO_PRESYNTH_PER_TICK), h.audio.length], 'morning audio pre-synthesized per distinct segment');
   const needed = h.db.named('neededAssets');
-  eq(needed.length, 1, 'needed assets read once per open language');
+  eq(needed.length, 0, 'no account-derived symbol union reaches evidence/providers');
   setCaps(false);
+}
+
+// The shared provider inputs are public and identical regardless of private activity or consent.
+{
+  const symbolsSeen: string[][] = [];
+  for (const memoryOn of [false, true]) {
+    const h = harness({ db: { neededAssets: async () => { throw new Error('private symbols must not be read'); } }, deps: {
+      memoryOn: () => memoryOn,
+      buildEvidence: async (period, symbols) => { symbolsSeen.push([...symbols]); return evidenceWith(snapshot, () => AT_0735)(period, symbols); },
+    } });
+    await h.run();
+    eq(h.db.named('neededAssets').length, 0, 'account symbol union unused regardless memory flag');
+  }
+  eq(symbolsSeen[0], Object.keys((await import('../api/_lib/briefings/config.ts')).SUPPORTED_ASSETS), 'all17 public assets covered');
+  eq(symbolsSeen[1], symbolsSeen[0], 'private memory cannot alter a provider request');
 }
 
 // ---- budget missing → facts-only, still published ----
@@ -526,7 +542,7 @@ async function call(h: (req: any, res: any) => Promise<unknown>, req: import('@v
   const closeP = cal.periodForDate('close', '2026-10-05', { ...policy, adopted: new Set(['close']) } as typeof policy)!;
   const h4 = harness({ deps: { duePeriods: () => [{ period: closeP, phase: 'prepare' }] }, now: cal.nyLocalToUtc('2026-10-05', '16:05') });
   const r4 = await h4.run();
-  eq([r4.published, h4.audio.length], [1, 0], 'close reports are not pre-synthesized (morning only)');
+  eq([r4.published, h4.audio.length], [0, 0], 'legacy close periods cannot generate reports or audio');
 }
 
 // ---- dispatch ----
@@ -643,8 +659,8 @@ if (!url) {
       const iso = (m: number) => new Date(now + m * MIN).toISOString();
       const parts = cal.nyParts(new Date(now));
       return {
-        cadence: 'morning', periodKey: `2031-0${1 + Math.floor(keySeq / 28)}-${String(1 + (keySeq % 28)).padStart(2, '0')}`,
-        periodStart: iso(-24 * 60 + (o.scheduled)), periodEnd: iso(o.scheduled), scheduledAt: iso(o.scheduled), prepareFrom: iso(o.prepare ?? -10),
+        cadence: 'weekly', periodKey: `2031-01-01_2031-01-${String(8 + keySeq).padStart(2, '0')}`,
+        periodStart: iso(-7 * 24 * 60 + (o.scheduled)), periodEnd: iso(o.scheduled), scheduledAt: iso(o.scheduled), prepareFrom: iso(o.prepare ?? -10),
         readyBy: iso(o.readyBy), pushExpiresAt: iso(o.expires), calendarVersion: cal.NYSE_CALENDAR_VERSION, policyVersion: cal.POLICY_VERSION,
         equitySession: cal.equitySession(parts.date, new Date(now)),
       };
@@ -682,11 +698,11 @@ if (!url) {
     const briefsOf = async (p: Period) => q('select identity_id, state, quality, uses_memory, memory_assets, language, content from bobby_briefs where period_key = $1 order by created_at', [p.periodKey]);
 
     // ---------- main scenario: 3 Pro (en/es/en) + non-Pro + opted-out, all with devices ----------
-    const A = await account({ pro: true, patch: { openingEnabled: true, language: 'en', assets: ['BTC', 'NVDA'], audioConsentEnabled: true, audioConsentVersion: 1 } });
-    const B = await account({ pro: true, patch: { openingEnabled: true, language: 'es', companionId: 'kora' } });
-    const C = await account({ pro: true, patch: { openingEnabled: true, language: 'en', assets: ['ETH'] } });
-    const N = await account({ pro: false, patch: { openingEnabled: true } });
-    const O = await account({ pro: true, patch: { openingEnabled: false, closeEnabled: true } });
+    const A = await account({ pro: true, patch: { weeklyEnabled: true, language: 'en', assets: ['BTC', 'NVDA'], audioConsentEnabled: true, audioConsentVersion: 1 } });
+    const B = await account({ pro: true, patch: { weeklyEnabled: true, language: 'es', companionId: 'kora' } });
+    const C = await account({ pro: true, patch: { weeklyEnabled: true, language: 'en', assets: ['ETH'] } });
+    const N = await account({ pro: false, patch: { weeklyEnabled: true } });
+    const O = await account({ pro: true, patch: { weeklyEnabled: false, closeEnabled: true } });
     const dA1 = await device(A); await device(A, 'denied'); const dAX = await device(A);
     const dB1 = await device(B); const dC1 = await device(C); const dC2 = await device(C);
     await device(N); await device(O);
@@ -746,10 +762,10 @@ if (!url) {
     const t5 = await tick();
     eq([t5.dispatched, sent.length - sentBefore], [0, 0], 'replayed dispatch tick sends nothing');
     // Main-scenario accounts leave the morning cadence so the next scenarios stay readable.
-    for (const id of [A, B, C]) { const s = await dbMod.getSettings(id); await dbMod.patchSettings(id, s.revision, { openingEnabled: false }); }
+    for (const id of [A, B, C]) { const s = await dbMod.getSettings(id); await dbMod.patchSettings(id, s.revision, { weeklyEnabled: false }); }
 
     // ---------- Pro expiry between publish and dispatch ----------
-    const E = await account({ pro: true, patch: { openingEnabled: true } });
+    const E = await account({ pro: true, patch: { weeklyEnabled: true } });
     const dE = await device(E);
     const P2 = period({ readyBy: 20, scheduled: 21, expires: 50 });
     due = [P2];
@@ -767,11 +783,11 @@ if (!url) {
     eq([sent.length - before2, e2.dispatched, sent.some((n) => n.token === dE.token)], [0, 0, false], 'Pro expired → no push');
     eq((await one("select o.state from bobby_brief_outbox o join bobby_briefs b on b.id = o.brief_id where b.period_key = $1", [P2.periodKey])).state, 'cancelled', 'the intent was cancelled at claim');
     await setPro(pool, E, true);
-    { const s = await dbMod.getSettings(E); await dbMod.patchSettings(E, s.revision, { openingEnabled: false }); }
+    { const s = await dbMod.getSettings(E); await dbMod.patchSettings(E, s.revision, { weeklyEnabled: false }); }
 
     // ---------- memory pause before publish → recomposed without memory ----------
     process.env.BOBBY_BRIEFINGS_MEMORY = 'on';
-    const M = await account({ pro: true, patch: { openingEnabled: true, analysisConsentEnabled: true, analysisConsentVersion: 1 } });
+    const M = await account({ pro: true, patch: { weeklyEnabled: true, analysisConsentEnabled: true, analysisConsentVersion: 1 } });
     await q("insert into bobby_user_prefs (identity_id, experience, risk) values ($1, 'new', 'high')", [M]);
     await q("insert into bobby_user_assets (identity_id, symbol, asks, last_asked_at) values ($1, 'SOL', 3, now())", [M]);
     const P3 = period({ readyBy: 20, scheduled: 21, expires: 50 });
@@ -800,10 +816,10 @@ if (!url) {
     const [mRow2] = await briefsOf(P3b);
     eq([mRow2.uses_memory, mRow2.memory_assets], [true, ['SOL']], 'control: with memory on the report used SOL from memory');
     delete process.env.BOBBY_BRIEFINGS_MEMORY;
-    { const s = await dbMod.getSettings(M); await dbMod.patchSettings(M, s.revision, { openingEnabled: false }); }
+    { const s = await dbMod.getSettings(M); await dbMod.patchSettings(M, s.revision, { weeklyEnabled: false }); }
 
     // ---------- missed cron: the push window passed ----------
-    const F = await account({ pro: true, patch: { openingEnabled: true } });
+    const F = await account({ pro: true, patch: { weeklyEnabled: true } });
     const dF = await device(F);
     const P5 = period({ readyBy: 20, scheduled: 21, expires: 50 });
     due = [P5];
@@ -812,7 +828,7 @@ if (!url) {
     due = [shift(P5, -22)];
     apnsOn = false;
     await tick(); // F's intent filled, APNs paused
-    const G = await account({ pro: true, patch: { openingEnabled: true } });
+    const G = await account({ pro: true, patch: { weeklyEnabled: true } });
     await dbMod.seedPeriod(shift(P5, -22)); // G's report seeded but never prepared
     // The crons stop; the window passes.
     await q("update bobby_briefs set push_expires_at = now() - interval '1 minute', scheduled_at = now() - interval '31 minutes' where period_key = $1", [P5.periodKey]);
@@ -825,11 +841,11 @@ if (!url) {
     eq((await one("select o.state from bobby_brief_outbox o join bobby_briefs b on b.id = o.brief_id where b.period_key = $1", [P5.periodKey])).state, 'expired', "F's intent marked expired");
     eq((await one('select state, last_error from bobby_briefs where period_key = $1 and identity_id = $2', [P5.periodKey, G])), { state: 'failed', last_error: 'deadline' }, "G's never-prepared report failed at its deadline");
     ok(f1.expired >= 1 && f1.failed >= 1, 'tick counts the expiry and the deadline');
-    for (const id of [F, G]) { const s = await dbMod.getSettings(id); await dbMod.patchSettings(id, s.revision, { openingEnabled: false }); }
+    for (const id of [F, G]) { const s = await dbMod.getSettings(id); await dbMod.patchSettings(id, s.revision, { weeklyEnabled: false }); }
 
     // ---------- unknown provider attempt → reconcile → one more attempt ----------
     setCaps(true);
-    const U = await account({ pro: true, patch: { openingEnabled: true } });
+    const U = await account({ pro: true, patch: { weeklyEnabled: true } });
     const P4 = period({ readyBy: 60, scheduled: 61, expires: 90 });
     due = [P4];
     llmCalls = 0;

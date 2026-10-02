@@ -6,10 +6,13 @@
 // written for the reader's language; error copy is the app's own (BriefingsError).
 import Foundation
 
-/// Internal cadence. Profile calls `morning` "Market opening" (a pre-market report, not the opening bell).
+/// Internal cadence. Legacy reports still decode morning/close; Profile offers only the weekly briefing.
 enum BriefingCadence: String, CaseIterable, Identifiable, Sendable {
     case morning, close, weekly
     var id: String { rawValue }
+
+    /// The active product offer; legacy cadences remain readable but cannot be newly enabled.
+    static let offeredCadences: [BriefingCadence] = [.weekly]
 
     /// The settings key that switches this cadence (PATCH /api/briefing-settings).
     var settingsKey: String {
@@ -113,7 +116,7 @@ struct BriefingSchedule: Equatable, Sendable {
     let configured: Bool
     /// New York local time, "08:00".
     let localTime: String?
-    /// "Sunday" (weekly only).
+    /// "Monday" (weekly only).
     let weekday: String?
     /// Close only: minutes after the official close.
     let delayMinutes: Int?
@@ -334,6 +337,13 @@ struct BriefingEquitySession: Equatable, Sendable {
     }
 }
 
+/// How the personal retrospective was selected; never evidence of asset ownership.
+enum BriefingPersonalBasis: String, Sendable {
+    case askedAssets = "asked_assets"
+    case explicitInterests = "explicit_interests"
+    case general
+}
+
 /// GET /api/briefing?id= — an immutable, owner-scoped report.
 struct BriefingReport: Equatable, Identifiable, Sendable {
     let id: String
@@ -348,6 +358,8 @@ struct BriefingReport: Equatable, Identifiable, Sendable {
     let title: String
     let opening: String
     let sections: [BriefingSection]
+    /// Optional on legacy reports; absent or unknown must not be presented as consented question history.
+    let personalBasis: BriefingPersonalBasis?
     /// ≤ 4 spoken segments, each ≤ 800 characters (server-validated; re-checked here).
     let narrationSegments: [String]
     let sources: [BriefingSource]
@@ -375,6 +387,7 @@ struct BriefingReport: Equatable, Identifiable, Sendable {
         title = o["title"] as? String ?? ""
         opening = o["opening"] as? String ?? ""
         sections = (o["sections"] as? [Any] ?? []).compactMap(BriefingSection.init(json:))
+        personalBasis = (o["personalBasis"] as? String).flatMap(BriefingPersonalBasis.init(rawValue:))
         // Out-of-bounds segments are dropped rather than trimmed: a cut sentence would be spoken wrong.
         narrationSegments = Array((o["narrationSegments"] as? [Any] ?? []).compactMap { raw -> String? in
             guard let s = raw as? String, !s.isEmpty, s.count <= Self.maxSegmentChars else { return nil }

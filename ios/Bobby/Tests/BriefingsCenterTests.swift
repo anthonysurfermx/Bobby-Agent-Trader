@@ -28,10 +28,10 @@ final class BriefingsCenterTests: XCTestCase {
             "analysisConsentEnabled": analysisConsent, "analysisConsentVersion": analysisConsent ? 1 : NSNull(),
             "audioConsentEnabled": audioConsent, "audioConsentVersion": audioConsent ? 1 : NSNull(),
             "eligiblePro": eligible,
-            "schedules": ["timezone": "America/New_York", "policyVersion": "proposed-v1",
-                          "opening": ["configured": true, "localTime": "08:00", "nextAt": "2026-10-03T12:00:00.000Z"],
+            "schedules": ["timezone": "America/New_York", "policyVersion": "weekly-monday-0800-v1",
+                          "opening": ["configured": false, "localTime": "08:00", "nextAt": NSNull()],
                           "close": ["configured": false, "delayMinutes": 15, "nextAt": NSNull()],
-                          "weekly": ["configured": false, "weekday": "Sunday", "localTime": "18:00", "nextAt": NSNull()]],
+                          "weekly": ["configured": true, "weekday": "Monday", "localTime": "08:00", "nextAt": "2026-10-05T12:00:00.000Z"]],
             "options": ["assets": ["BTC", "ETH", "NVDA"], "companions": ["orb", "kora"], "consentVersions": ["analysis": 1, "audio": 1]],
         ]
         return BriefingSettingsSnapshot(json: json)!
@@ -61,8 +61,8 @@ final class BriefingsCenterTests: XCTestCase {
     // MARK: account isolation
 
     func testAccountSwitchClearsAtOnceAndRejectsALateAnswerFromA() async {
-        let c = center(initial: snapshot(revision: 2, opening: true))
-        XCTAssertTrue(c.isOn(.morning))
+        let c = center(initial: snapshot(revision: 2, weekly: true))
+        XCTAssertTrue(c.isOn(.weekly))
         let started = expectation(description: "A's settings read is suspended")
         var pending: CheckedContinuation<BriefingSettingsSnapshot, Error>?
         c.load = { _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
@@ -73,8 +73,8 @@ final class BriefingsCenterTests: XCTestCase {
         XCTAssertNil(c.settings)
         XCTAssertNil(c.eligiblePro)
         XCTAssertNil(c.options)
-        XCTAssertFalse(c.isOn(.morning))
-        pending?.resume(returning: snapshot(revision: 3, opening: true, weekly: true))
+        XCTAssertFalse(c.isOn(.weekly))
+        pending?.resume(returning: snapshot(revision: 3, weekly: true))
         let refreshed = await result.value
         XCTAssertFalse(refreshed)
         XCTAssertNil(c.settings, "A's answer never reaches B")
@@ -85,17 +85,17 @@ final class BriefingsCenterTests: XCTestCase {
         let started = expectation(description: "A's PATCH is suspended")
         var pending: CheckedContinuation<BriefingSettingsSnapshot, Error>?
         c.save = { _, _, _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
-        let result = Task { await c.setCadence(.morning, on: true) }
+        let result = Task { await c.setCadence(.weekly, on: true) }
         await fulfillment(of: [started], timeout: 3)
-        XCTAssertTrue(c.isSaving(.morning))
+        XCTAssertTrue(c.isSaving(.weekly))
         user = "b"; generation = UUID()
         c.accountChanged()
-        XCTAssertFalse(c.isSaving(.morning), "B never sees A's pending switch")
-        pending?.resume(returning: snapshot(revision: 2, opening: true))
+        XCTAssertFalse(c.isSaving(.weekly), "B never sees A's pending switch")
+        pending?.resume(returning: snapshot(revision: 2, weekly: true))
         let saved = await result.value
         XCTAssertFalse(saved)
         XCTAssertNil(c.settings)
-        XCTAssertFalse(c.isOn(.morning))
+        XCTAssertFalse(c.isOn(.weekly))
         XCTAssertEqual(deliveryEnables, 0, "A's late answer does not register B's device")
     }
 
@@ -116,31 +116,31 @@ final class BriefingsCenterTests: XCTestCase {
             self.saves.append((revision, changes))
             return try await withCheckedThrowingContinuation { pending = $0; started.fulfill() }
         }
-        let result = Task { await c.setCadence(.morning, on: true) }
+        let result = Task { await c.setCadence(.weekly, on: true) }
         await fulfillment(of: [started], timeout: 3)
-        XCTAssertTrue(c.isOn(.morning), "the switch shows the pending target")
-        XCTAssertTrue(c.isSaving(.morning))
-        XCTAssertEqual(c.settings?.openingEnabled, false, "nothing is persisted before the answer")
-        let second = await c.setCadence(.morning, on: false)
+        XCTAssertTrue(c.isOn(.weekly), "the switch shows the pending target")
+        XCTAssertTrue(c.isSaving(.weekly))
+        XCTAssertEqual(c.settings?.weeklyEnabled, false, "nothing is persisted before the answer")
+        let second = await c.setCadence(.weekly, on: false)
         XCTAssertFalse(second, "one flip at a time per cadence")
         pending?.resume(throwing: BriefingsError.unavailable)
         let saved = await result.value
         XCTAssertFalse(saved)
-        XCTAssertFalse(c.isOn(.morning), "reverted to the confirmed value")
-        XCTAssertFalse(c.isSaving(.morning))
+        XCTAssertFalse(c.isOn(.weekly), "reverted to the confirmed value")
+        XCTAssertFalse(c.isSaving(.weekly))
         XCTAssertEqual(c.lastError, .unavailable)
         XCTAssertEqual(saves.count, 1)
         XCTAssertEqual(saves[0].revision, 1)
-        XCTAssertEqual(saves[0].changes["openingEnabled"] as? Bool, true)
+        XCTAssertEqual(saves[0].changes["weeklyEnabled"] as? Bool, true)
         XCTAssertEqual(deliveryEnables, 0)
 
         c.save = { [unowned self] _, revision, changes in
             self.saves.append((revision, changes))
-            return self.snapshot(revision: 2, opening: true)
+            return self.snapshot(revision: 2, weekly: true)
         }
-        let enabled = await c.setCadence(.morning, on: true)
+        let enabled = await c.setCadence(.weekly, on: true)
         XCTAssertTrue(enabled)
-        XCTAssertTrue(c.isOn(.morning))
+        XCTAssertTrue(c.isOn(.weekly))
         XCTAssertEqual(c.settings?.revision, 2)
         XCTAssertNil(c.lastError)
         XCTAssertEqual(deliveryEnables, 1, "a confirmed enable with permission asks for the APNs token")
@@ -153,14 +153,14 @@ final class BriefingsCenterTests: XCTestCase {
         c.currentCompanion = { "kora" }
         c.save = { [unowned self] _, revision, changes in
             self.saves.append((revision, changes))
-            return self.snapshot(revision: revision + 1, opening: true, language: "es", companion: "kora")
+            return self.snapshot(revision: revision + 1, weekly: true, language: "es", companion: "kora")
         }
-        _ = await c.setCadence(.morning, on: true)
+        _ = await c.setCadence(.weekly, on: true)
         XCTAssertEqual(saves.last?.changes["language"] as? String, "es")
         XCTAssertEqual(saves.last?.changes["companionId"] as? String, "kora")
-        // A second cadence is not a first enable: nothing else is mirrored.
+        // Disabling the weekly briefing is not a first enable: nothing else is mirrored.
         c.appLanguage = { "en" }
-        _ = await c.setCadence(.close, on: true)
+        _ = await c.setCadence(.weekly, on: false)
         XCTAssertNil(saves.last?.changes["language"])
         XCTAssertNil(saves.last?.changes["companionId"])
         XCTAssertEqual(saves.last?.revision, 2, "each PATCH carries the newest revision")
@@ -187,11 +187,11 @@ final class BriefingsCenterTests: XCTestCase {
             throw BriefingsError.conflict(revision: 5)
         }
         c.load = { [unowned self] _ in self.snapshot(revision: 5, close: true) }
-        let saved = await c.setCadence(.morning, on: true)
+        let saved = await c.setCadence(.weekly, on: true)
         XCTAssertFalse(saved)
         XCTAssertEqual(saves.count, 1, "the change is not re-sent on its own")
         XCTAssertEqual(c.settings?.revision, 5)
-        XCTAssertFalse(c.isOn(.morning))
+        XCTAssertFalse(c.isOn(.weekly))
         XCTAssertTrue(c.isOn(.close), "the other device's choice is shown")
         XCTAssertEqual(c.lastError, .conflict(revision: 5))
     }
@@ -211,35 +211,35 @@ final class BriefingsCenterTests: XCTestCase {
         c.requestPermission = { [unowned self] in self.permissionRequests += 1; self.status = .denied; return .denied }
         c.save = { [unowned self] _, revision, changes in
             self.saves.append((revision, changes))
-            return self.snapshot(revision: 2, opening: true)
+            return self.snapshot(revision: 2, weekly: true)
         }
-        let saved = await c.setCadence(.morning, on: true)
+        let saved = await c.setCadence(.weekly, on: true)
         XCTAssertTrue(saved)
         XCTAssertEqual(permissionRequests, 1, "the OS is asked once, on the explicit enable")
-        XCTAssertEqual(c.settings?.openingEnabled, true, "the account selection is saved anyway")
+        XCTAssertEqual(c.settings?.weeklyEnabled, true, "the account selection is saved anyway")
         XCTAssertEqual(c.permission, .denied)
         XCTAssertTrue(c.deliveryBlocked)
         XCTAssertEqual(deliveryEnables, 0, "no token request while iOS blocks notifications")
         XCTAssertEqual(BriefingsCenter.systemSettingsURL?.absoluteString, "app-settings:")
         // Disabling never prompts.
         c.save = { [unowned self] _, revision, _ in self.snapshot(revision: revision + 1) }
-        _ = await c.setCadence(.morning, on: false)
+        _ = await c.setCadence(.weekly, on: false)
         XCTAssertEqual(permissionRequests, 1)
         XCTAssertFalse(c.deliveryBlocked)
     }
 
     func testExpiredProStillAllowsDisabling() async {
-        let c = center(initial: snapshot(revision: 9, opening: true, weekly: true, eligible: false))
+        let c = center(initial: snapshot(revision: 9, weekly: true, eligible: false))
         XCTAssertEqual(c.eligiblePro, false)
         c.save = { [unowned self] _, revision, changes in
             self.saves.append((revision, changes))
-            return self.snapshot(revision: 10, weekly: true, eligible: false)
+            return self.snapshot(revision: 10, eligible: false)
         }
-        let saved = await c.setCadence(.morning, on: false)
+        let saved = await c.setCadence(.weekly, on: false)
         XCTAssertTrue(saved)
-        XCTAssertFalse(c.isOn(.morning))
-        XCTAssertTrue(c.isOn(.weekly))
-        XCTAssertEqual(saves.first?.changes as? [String: Bool], ["openingEnabled": false])
+        XCTAssertFalse(c.isOn(.weekly))
+        XCTAssertFalse(c.settings?.weeklyEnabled ?? true)
+        XCTAssertEqual(saves.first?.changes as? [String: Bool], ["weeklyEnabled": false])
         XCTAssertEqual(permissionRequests, 0)
     }
 
@@ -250,7 +250,7 @@ final class BriefingsCenterTests: XCTestCase {
         c.riskAccepted = { false }
         let early = await c.refresh()
         XCTAssertFalse(early)
-        let flipped = await c.setCadence(.morning, on: true)
+        let flipped = await c.setCadence(.weekly, on: true)
         XCTAssertFalse(flipped)
         c.riskAccepted = { true }
         user = nil
@@ -295,6 +295,32 @@ final class BriefingsCenterTests: XCTestCase {
         XCTAssertEqual(saves.count, 1)
         XCTAssertEqual(saves[0].changes as? [String: String], ["companionId": "kora"])
         XCTAssertEqual(c.settings?.companionId, "kora")
+    }
+
+    func testLegacyCadencesCannotBeEnabledOrAskPermission() async {
+        status = .notDetermined
+        let c = center(initial: snapshot(revision: 1))
+        let morning = await c.setCadence(.morning, on: true)
+        let close = await c.setCadence(.close, on: true)
+        XCTAssertFalse(morning)
+        XCTAssertFalse(close)
+        XCTAssertTrue(saves.isEmpty)
+        XCTAssertEqual(permissionRequests, 0)
+        XCTAssertEqual(deliveryEnables, 0)
+        XCTAssertEqual(c.lastError, .rejected(code: "cadence_unavailable"))
+    }
+
+    func testLegacyCadenceCanStillBeDisabledWithoutPermission() async {
+        let c = center(initial: snapshot(revision: 3, opening: true))
+        c.save = { [unowned self] _, revision, changes in
+            self.saves.append((revision, changes))
+            return self.snapshot(revision: revision + 1)
+        }
+        let disabled = await c.setCadence(.morning, on: false)
+        XCTAssertTrue(disabled)
+        XCTAssertEqual(saves.first?.changes as? [String: Bool], ["openingEnabled": false])
+        XCTAssertFalse(c.settings?.openingEnabled ?? true)
+        XCTAssertEqual(permissionRequests, 0)
     }
 
     // MARK: inbox
@@ -359,9 +385,9 @@ final class BriefingsCenterTests: XCTestCase {
         var seen: (path: String, method: String, headers: [String: String])?
         let transport = BriefingsTransport(json: { path, method, _, headers, _ in
             seen = (path, method, headers)
-            return BriefingsReply(json: ["openingEnabled": true, "eligiblePro": true], status: 200, headers: ["etag": "W/\"12\""])
+            return BriefingsReply(json: ["weeklyEnabled": true, "eligiblePro": true], status: 200, headers: ["etag": "W/\"12\""])
         }, bytes: { _ in .unavailable })
-        let snapshot = try await BriefingsAPI(transport: transport, auth: .none).patchSettings(revision: 11, changes: ["openingEnabled": true])
+        let snapshot = try await BriefingsAPI(transport: transport, auth: .none).patchSettings(revision: 11, changes: ["weeklyEnabled": true])
         XCTAssertEqual(seen?.path, "api/briefing-settings")
         XCTAssertEqual(seen?.method, "PATCH")
         XCTAssertEqual(seen?.headers["If-Match"], "\"11\"")
@@ -468,11 +494,13 @@ final class BriefingsCenterTests: XCTestCase {
         XCTAssertEqual(bare.settings.language, "en")
         XCTAssertNil(BriefingSettingsSnapshot(json: ["openingEnabled": true]), "no revision, nothing safe to save against")
         let full = snapshot(revision: 3)
-        XCTAssertEqual(full.schedules?.opening?.configured, true)
-        XCTAssertEqual(full.schedules?.opening?.localTime, "08:00")
-        XCTAssertNotNil(full.schedules?.opening?.nextAt)
-        XCTAssertEqual(full.schedules?.close?.configured, false, "close/weekly stay 'schedule pending' until adopted")
-        XCTAssertEqual(full.schedules?.weekly?.weekday, "Sunday")
+        XCTAssertEqual(full.schedules?.opening?.configured, false)
+        XCTAssertNil(full.schedules?.opening?.nextAt)
+        XCTAssertEqual(full.schedules?.close?.configured, false, "legacy cadences are not scheduled")
+        XCTAssertEqual(full.schedules?.weekly?.configured, true)
+        XCTAssertEqual(full.schedules?.weekly?.weekday, "Monday")
+        XCTAssertEqual(full.schedules?.weekly?.localTime, "08:00")
+        XCTAssertNotNil(full.schedules?.weekly?.nextAt)
         XCTAssertEqual(full.options?.companions, ["orb", "kora"])
         XCTAssertEqual(full.options?.audioConsentVersion, 1)
         let objects = BriefingOptions(json: ["companions": [["id": "orb", "voice": "ash"], "kora", 3]])

@@ -267,10 +267,10 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
 }
 
 const who = (u: AdminUser) => u.email ?? u.id;
-const intOrZero = (v: string) => { const n = Number(v); return Number.isFinite(n) ? Math.floor(n) : NaN; };
-const digits = (v: string) => v.replace(/\D/g, '').slice(0, 4);
+const intOrZero = (v: string) => { const n = Number(v); return /^\d+$/.test(v) && Number.isSafeInteger(n) ? n : NaN; };
 
 function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClose: () => void; onDone: (text: string) => void }) {
+  const inFlight = useRef(false);
   const [reads, setReads] = useState('');
   const [profundo, setProfundo] = useState('');
   const [maximo, setMaximo] = useState('');
@@ -286,7 +286,8 @@ function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClos
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!user || invalid || empty) return;
+    if (!user || invalid || empty || inFlight.current) return;
+    inFlight.current = true;
     setBusy(true); setMsg(null);
     try {
       const body: { action: 'grant'; identityId: string; reads?: number; profundo?: number; maximo?: number; proDays?: number } = { action: 'grant', identityId: user.id };
@@ -299,12 +300,12 @@ function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClos
       onDone(`Regalo enviado a ${identityName(user)}.`);
     } catch (err) {
       setMsg({ ok: false, text: toAdminError(err).message });
-    } finally { setBusy(false); }
+    } finally { inFlight.current = false; setBusy(false); }
   };
 
   return (
     <Modal
-      open={!!user} onOpenChange={(o) => { if (!o) onClose(); }}
+      open={!!user} onOpenChange={(o) => { if (!o && !inFlight.current) onClose(); }}
       title="Regalar a esta cuenta"
       description={user && (
         <div className="flex flex-col gap-2">
@@ -314,15 +315,15 @@ function GrantDialog({ user, onClose, onDone }: { user: AdminUser | null; onClos
       )}
     >
       <form onSubmit={submit} className="grid grid-cols-2 gap-3">
-        <Field label="Lecturas" hint="0–1000"><TextInput mono inputMode="numeric" value={reads} onChange={(e) => setReads(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Profundo" hint="0–200"><TextInput mono inputMode="numeric" value={profundo} onChange={(e) => setProfundo(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Máximo" hint="0–100"><TextInput mono inputMode="numeric" value={maximo} onChange={(e) => setMaximo(digits(e.target.value))} placeholder="0" /></Field>
-        <Field label="Días de Bobby Pro" hint="0–366"><TextInput mono inputMode="numeric" value={proDays} onChange={(e) => setProDays(digits(e.target.value))} placeholder="0" /></Field>
+        <Field label="Lecturas" hint="0–1000"><TextInput mono disabled={busy} inputMode="numeric" value={reads} onChange={(e) => setReads(e.target.value)} placeholder="0" /></Field>
+        <Field label="Profundo" hint="0–200"><TextInput mono disabled={busy} inputMode="numeric" value={profundo} onChange={(e) => setProfundo(e.target.value)} placeholder="0" /></Field>
+        <Field label="Máximo" hint="0–100"><TextInput mono disabled={busy} inputMode="numeric" value={maximo} onChange={(e) => setMaximo(e.target.value)} placeholder="0" /></Field>
+        <Field label="Días de Bobby Pro" hint="0–366"><TextInput mono disabled={busy} inputMode="numeric" value={proDays} onChange={(e) => setProDays(e.target.value)} placeholder="0" /></Field>
         <div className="col-span-2 flex flex-col gap-3">
           {invalid && <FormMessage message={{ ok: false, text: `Revisa el valor de ${{ reads: 'lecturas', profundo: 'Profundo', maximo: 'Máximo', proDays: 'días Pro' }[invalid]}.` }} />}
           <FormMessage message={msg} />
           <div className="flex justify-end gap-2">
-            <Btn variant="ghost" onClick={onClose}>Cancelar</Btn>
+            <Btn variant="ghost" disabled={busy} onClick={onClose}>Cancelar</Btn>
             <Btn type="submit" variant="primary" busy={busy} disabled={!!invalid || empty}>Regalar</Btn>
           </div>
         </div>

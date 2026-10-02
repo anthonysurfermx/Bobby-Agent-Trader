@@ -136,7 +136,7 @@ export function pgRpcTransport(pool: pg.Pool): RpcFn {
   };
 }
 
-/** A Supabase (Apple/Google) account identity; Pro through an unexpired grant when asked. */
+/** A Supabase account identity; paid Pro uses SYNTHETIC local subscription/payment evidence when asked. */
 export async function makeIdentity(pool: pg.Pool, opts: { pro?: boolean } = {}): Promise<string> {
   const { rows } = await pool.query('insert into public.bobby_identities (auth_user_id) values (gen_random_uuid()) returning id');
   const id = rows[0].id as string;
@@ -144,12 +144,26 @@ export async function makeIdentity(pool: pg.Pool, opts: { pro?: boolean } = {}):
   return id;
 }
 
-/** Pro on: a grant valid for 30 days. Pro off: no grant and no subscription. */
+/** Pro on: synthetic active paid production period. Fixtures are not proof of any real billing integration. */
 export async function setPro(pool: pg.Pool, identityId: string, pro: boolean): Promise<void> {
   if (pro) {
-    await pool.query(`insert into public.bobby_pro_grants (identity_id, pro_until) values ($1, now() + interval '30 days')
-      on conflict (identity_id) do update set pro_until = excluded.pro_until, updated_at = now()`, [identityId]);
+    await pool.query(`insert into public.bobby_subscriptions (identity_id, provider, status, product_id, current_period_end)
+      values ($1, 'apple', 'active', 'qa.synthetic.pro.monthly', now() + interval '30 days')
+      on conflict (identity_id) do update set provider = excluded.provider, status = excluded.status,
+        product_id = excluded.product_id, current_period_end = excluded.current_period_end, updated_at = now()`, [identityId]);
+    await pool.query(`insert into public.bobby_brief_paid_periods
+      (identity_id, provider, product_id, period_start, period_end, environment, period_type, paid_amount, currency,
+       proof_source, proof_id, proof_sha256, verification_state, verified_at)
+      select identity_id, provider, product_id, now() - interval '1 hour', current_period_end,
+        'production', 'normal', 4.99, 'USD', 'revenuecat', 'qa.synthetic.payment', repeat('a', 64), 'confirmed', now()
+      from public.bobby_subscriptions where identity_id = $1
+      on conflict (identity_id) do update set provider = excluded.provider, product_id = excluded.product_id,
+        period_start = excluded.period_start, period_end = excluded.period_end, environment = excluded.environment,
+        period_type = excluded.period_type, paid_amount = excluded.paid_amount, currency = excluded.currency,
+        proof_source = excluded.proof_source, proof_id = excluded.proof_id, proof_sha256 = excluded.proof_sha256,
+        verification_state = excluded.verification_state, verified_at = excluded.verified_at, updated_at = now()`, [identityId]);
   } else {
+    await pool.query('delete from public.bobby_brief_paid_periods where identity_id = $1', [identityId]);
     await pool.query('delete from public.bobby_pro_grants where identity_id = $1', [identityId]);
     await pool.query('delete from public.bobby_subscriptions where identity_id = $1', [identityId]);
   }

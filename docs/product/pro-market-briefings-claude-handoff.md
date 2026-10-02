@@ -1,5 +1,7 @@
 # Brief para Claude: resúmenes de mercado de Bobby Pro
 
+> **Product update — October 2, 2026:** Anthony replaced the daily/opening, close and Sunday-evening proposal with a lightweight weekly briefing on **Monday at 08:00 America/New_York**, plus exceptional confirmed macroeconomic events (first example: a Fed rate change). Weekly is the only periodic generation. Earlier schedules and three-switch requirements below are historical design context. See the current implementation/runbook and `pro-market-macro-events.md` in `.claude/worktrees/pro-briefings-b53/docs/product`. Macro detection is local/dry-run only; live collection, persistence and delivery are not implemented or authorized. No deployment or Apple changes have occurred.
+
 Preparado el 2 de octubre de 2026. **Estado: infraestructura diseñada y contrastada con el código; aún no implementada ni desplegada.** Build objetivo: **53**. La fuente inspeccionada todavía declara **1.5 (52)**.
 
 ## Brief corto para compartir

@@ -6,16 +6,18 @@ more specific, it wins. Nothing here authorizes deploys, remote migrations, Appl
 
 ## 0. Decisions taken in this implementation
 
+Current scope: weekly Monday 08:00 NY plus proposed exceptional macro-event delivery. Only weekly is wired to periodic generation. The macro module is a pure off-by-default planner, not a live feed, SQL queue or push sender. See [macro plan](pro-market-macro-events.md) and [independent review](pro-market-briefings-review-2026-10-02.md).
+
 | # | Decision | Why |
 |---|---|---|
-| D1 | **No per-account LLM call.** One shared narrative per (cadence, period, language); the "personal synthesis" is a deterministic composition (followed assets, consented memory → which sections, explainer depth). | Cost is O(periods × languages), not O(users); memory never reaches an AI provider (same principle as memory v2, PR #112); no debate per recipient. |
+| D1 | **No per-account LLM call.** One shared narrative per (cadence, period, language); the "personal synthesis" is a deterministic composition (followed assets, consented memory → which sections, explainer depth). | Shared LLM generation is O(periods × languages), with no debate per recipient. TTS/traffic can grow with distinct preferences/voices. Shared provider evidence uses a fixed public universe of all 17 supported assets, independent of account memory; consented memory affects private deterministic composition only. |
 | D2 | **Audio is shared** and keyed by `sha256(text, voice, language, vibe, model)`; segments are whole shared blocks, so two readers with the same companion reuse the same audio. Stored in a **private Supabase Storage bucket** `briefing-audio` (no object storage existed); served only through the authenticated `audio` op. | Bounded TTS spend; no permanent public URL. |
 | D3 | **Two functions**: `api/briefings.ts` (router, `op` query) + `api/briefing-worker.ts` (cron). `vercel.json` rewrites map the contract paths: `/api/briefing-settings`→`op=settings`, `/api/briefing-device`→`op=device`, `/api/briefing`→`op=report`, `/api/briefing-voice`→`op=voice`, `/api/briefing-audio`→`op=audio`; `/api/briefings` is the inbox. | Lean infra (≈101 functions today). |
-| D4 | Cadences are **adopted by config**: `BOBBY_BRIEFINGS_CADENCES` (default `morning`). Close (+15 min) and weekly (Sun 18:00) are implemented with the proposed policy but return `configured:false` until adopted; Profile shows them disabled with "schedule pending". | Only 08:00 NY is confirmed. |
-| D5 | Morning runs every calendar day (`BOBBY_BRIEFINGS_MORNING_DAYS=all`, alt `sessions`); on non-session days equities are labelled closed and crypto is 24/7. | Proposal P1 (pending approval). |
+| D4 | Cadences are **adopted by config**: `BOBBY_BRIEFINGS_CADENCES` (default `weekly`; legacy values cannot enable daily/close). Weekly is the only adopted periodic cadence: Monday 08:00 New York. Legacy morning/close values remain readable but cannot schedule new generation or deliveries; Profile offers one weekly switch. | Anthony confirmed weekly Monday 08:00 NY on October 2, superseding daily/close. |
+| D5 | Morning/close are not scheduled or offered. Monday weekly remains Monday when equities are closed, accurately labelling market state; crypto remains 24/7. | Weekly Monday schedule confirmed; operational preparation/expiry remain proposals. |
 | D6 | Weekly history = provider **daily candles** for the interval (dated, real) + the persisted shared evidence rows; never today's snapshot relabelled. | Design §Generation. |
 | D7 | Token rotation for the **same owner** re-fences pending outbox rows to the new binding revision in the same transaction (the old token is never used). An **owner change** (A→B) cancels A's unsent rows. | Keeps the 08:00 push across a token refresh without ever delivering under a stale binding. |
-| D8 | An `unknown` (timed-out/crashed) paid attempt blocks retries of that work item until reconciliation; reconciliation after `BOBBY_BRIEFINGS_SETTLE_SECONDS` (default 300) **assumes the charge** at the reserved amount (`settled_assumed`), then the item may retry within its attempt cap (2). | Never a blind retry; exposure bounded and counted. |
+| D8 | An `unknown` (timed-out/crashed) paid attempt blocks retries of that work item until reconciliation; reconciliation after `BOBBY_BRIEFINGS_SETTLE_SECONDS` (default 300) **assumes the charge** at the reserved amount (`settled_assumed`), then the item may retry within its attempt cap (2). | Exposure is bounded by the dedicated budget, but this is an assumed-charge retry, not provider reconciliation. Policy is pending adoption; see independent review. |
 | D9 | Push APNs environment comes from the client's **signed provisioning profile** (`apnsEnvironment` field, `production` when no embedded profile) and must be in `BOBBY_APNS_ENVIRONMENTS` (default `production`). Topic is server config only. | Contract: no client-chosen topic; env derived from signing, not DEBUG. |
 | D10 | Memory personalization of briefings needs: account `analysisConsentEnabled` (current version) + memory enabled + `BOBBY_BRIEFINGS_MEMORY=on` (default off until App Privacy answers cover it). iOS gets a memory screen (view/correct/pause/delete via `/api/memory`). | Design §7. |
 | D11 | Retention (proposals, parameters of the purge RPC, not hard-coded in SQL): reports 90 d, audio 14 d, outbox 30 d, provider attempts 400 d (no personal data), revoked/invalid devices 30 d, idempotency 24 h, shared evidence 120 d. | Must be explicit before activation. |
@@ -25,8 +27,8 @@ more specific, it wins. Nothing here authorizes deploys, remote migrations, Appl
 | Variable | Meaning | Default |
 |---|---|---|
 | `BOBBY_BRIEFINGS_ENABLED` | `on` enables preparation/dispatch/synthesis. Reads of retained reports work regardless. | off |
-| `BOBBY_BRIEFINGS_CADENCES` | Comma list of adopted cadences. | `morning` |
-| `BOBBY_BRIEFINGS_MORNING_DAYS` | `all` or `sessions`. | `all` |
+| `BOBBY_BRIEFINGS_CADENCES` | Weekly only; stale daily/close values cannot enable generation. | `weekly` |
+| `BOBBY_BRIEFINGS_MORNING_DAYS` | Legacy compatibility only; no daily generation. | ignored for scheduling |
 | `BOBBY_BRIEFINGS_DAILY_CAP_USD`, `BOBBY_BRIEFINGS_MONTHLY_CAP_USD` | Dedicated caps (UTC day/month). Missing/invalid ⇒ `budget_unavailable` (no paid work). | none |
 | `BOBBY_BRIEFINGS_LLM` | Ordered provider:model list. | `anthropic:claude-sonnet-5-5,openai:gpt-4o-mini` |
 | `BOBBY_BRIEFINGS_LLM_MAX_TOKENS` | Output ceiling per narrative attempt. | 3000 |
@@ -39,13 +41,13 @@ more specific, it wins. Nothing here authorizes deploys, remote migrations, Appl
 | `BOBBY_APNS_TOPIC` | Bundle id topic. | `xyz.bobbyprotocol.bobby` |
 | `BOBBY_APNS_ENVIRONMENTS` | Allowed environments. | `production` |
 | `CRON_SECRET` | Worker auth (strict, only this secret). | none ⇒ 503 |
-| `BOBBY_OPS_SECRET` | Manual worker run (`POST`, header `x-bobby-ops`); `at=` time override only when `VERCEL_ENV !== 'production'`. | none |
+| `BOBBY_OPS_SECRET` | Manual worker run (`POST`, header `x-bobby-ops`); JSON `{ "at": "<ISO>" }` calendar override only when `VERCEL_ENV !== 'production'`. | none |
 
 Static configuration lives in `config.ts` constants: supported asset universe (BTC, ETH, SOL, XAUT, XAG, NVDA, AAPL, TSLA,
 META, MSFT, COIN, SPY, GOOGL, AMZN, AMD, MSTR, QQQ), companion→voice allowlist (orb ash, byte ballad, kora coral,
 zip sage, glitch cedar, momo marin, flux alloy, rook onyx, halo shimmer, axiom fable, iris sage, sol coral, zuri nova,
 mira alloy, nalu marin, vega shimmer, noor fable, keo mellow), consent versions (analysis 1, audio 1), limits
-(assets ≤ 6, report ≤ 24 KiB, segments ≤ 4 × 800, narration ≤ 2,400, devices ≤ 5/account), push copy
+(assets ≤ 6, report ≤ 24 KiB, weekly narration ≤ 3 × 800 and ≤ 1,200 total, devices ≤ 5/account), push copy
 (es "Bobby tiene tu resumen de mercado listo", en "Bobby has your market briefing ready", title "Bobby").
 
 ## 2. Calendar and periods — `api/_lib/briefings/calendar.ts`
@@ -61,8 +63,8 @@ mira alloy, nalu marin, vega shimmer, noor fable, keo mellow), consent versions 
   → next `scheduledAt`; `duePeriods(now, policy)` → periods in preparation or dispatch window.
 - Windows (proposal, `policyVersion = proposed-v1`): morning prepare 07:30, readyBy 07:59, scheduled 08:00, push expires 08:30;
   close: scheduled = official close + 15 min, prepare from close, readyBy scheduled − 1 min, expires scheduled + 30 min,
-  session days only; weekly: scheduled Sunday 18:00, prepare 17:30, readyBy 17:59, expires 18:30, interval
-  `[previous Sunday 18:00, this Sunday 18:00)` NY → UTC (DST can change elapsed hours).
+  session days only; weekly: scheduled Monday 08:00, prepare 07:30, readyBy 07:59, expires 08:30, retrospective interval
+  `[previous Monday 08:00, this Monday 08:00)` NY → UTC (DST can change elapsed hours). Upcoming agenda is the following week; historical quotes are labelled separately. Morning/close windows are retained helpers, not adopted work.
 
 ## 3. Database — migration `supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql`
 
@@ -71,7 +73,7 @@ from `public, anon, authenticated` **by name**, granted to `service_role`; funct
 public, pg_temp`, revoked/granted the same way; every per-account table `identity_id uuid not null references
 public.bobby_identities(id) on delete cascade` (account deletion needs no code change); index identity FKs and due work.
 
-Tables: `bobby_brief_settings`, `bobby_brief_shared`, `bobby_briefs`, `bobby_push_devices`, `bobby_brief_outbox`,
+Tables: `bobby_brief_paid_periods`, `bobby_brief_settings`, `bobby_brief_shared`, `bobby_briefs`, `bobby_push_devices`, `bobby_brief_outbox`,
 `bobby_brief_provider_attempts`, `bobby_brief_audio`, `bobby_brief_audio_links`, `bobby_brief_idempotency`.
 Key constraints: `bobby_briefs unique (identity_id, cadence, period_key)`; `bobby_brief_shared unique (cadence,
 period_key, language)`; `bobby_brief_outbox unique (brief_id, installation_id)`; `bobby_push_devices` partial uniques
@@ -90,6 +92,10 @@ AFTER DELETE ⇒ `('memory_deleted', true)`; `bobby_user_assets` AFTER DELETE FO
 `old.last_asked_at >= now() - interval '90 days'` (explicit forget, not retention) ⇒ `bobby_brief_memory_forgotten(identity,
 symbol)`. Bumps only touch identities that have a settings row.
 
+Paid authorization is feature-specific: `bobby_brief_is_paid_pro(p_identity)` requires an authenticated identity, active subscription with a known future expiry, and matching verified positive-paid Production period evidence in `bobby_brief_paid_periods` (same provider, product and expiry). Trials, Sandbox, grants, missing/unverified evidence and zero-paid introductory periods do not qualify. A positive-paid introductory period may qualify. The global `bobby_is_pro` and existing prices/products remain unchanged. The real billing evidence adapter is **not implemented**: the feature remains off and empty evidence denies access, including for paying customers until an adapter provides authoritative proof.
+
+New iOS query-history capture is **not implemented**: existing persisted, consented web queries may personalize the report; one question qualifies. Do not claim newly asked iOS assets are recorded until the collection/privacy/versioned-consent integration is completed.
+
 ### RPCs (all return `jsonb` unless noted; `p_*` params; service_role only)
 
 | RPC | Semantics |
@@ -101,10 +107,10 @@ symbol)`. Bumps only touch identities that have a settings row.
 | `bobby_push_device_revoke(p_identity, p_registration, p_expected_revision bigint, p_proof_verifier text)` | Owner-scoped. Missing / other owner / already revoked / bad proof ⇒ `{ok:true, state:'already'}`; revision mismatch ⇒ `code:'revision_conflict'`; else revoke + cancel unsent rows ⇒ `{ok:true, state:'revoked'}`. |
 | `bobby_push_device_invalidate(p_registration, p_binding_revision bigint, p_reason text)` | APNs said the token is dead; only when the revision still matches. |
 | `bobby_brief_idem_begin(p_identity, p_scope text, p_key text, p_digest text, p_ttl_seconds int)` / `bobby_brief_idem_finish(p_identity, p_scope, p_key, p_status int, p_response text)` | `{state:'new'}`, `{state:'replay', status, response}` (response is the encrypted receipt text), `{state:'mismatch'}`, `{state:'in_progress'}`. |
-| `bobby_brief_seed(p_cadence, p_period_key, p_period_start, p_period_end, p_scheduled_at, p_push_expires_at, p_calendar_version, p_policy_version)` | Inserts `pending` briefs for every identity whose cadence switch is on and `bobby_is_pro` is true (`on conflict do nothing`). Returns `{seeded}`. |
+| `bobby_brief_seed(p_cadence, p_period_key, p_period_start, p_period_end, p_scheduled_at, p_push_expires_at, p_calendar_version, p_policy_version)` | Inserts `pending` briefs for every identity whose cadence switch is on and `bobby_brief_is_paid_pro` is true (`on conflict do nothing`). Returns `{seeded}`. |
 | `bobby_brief_shared_claim(p_cadence, p_period_key, p_language, p_worker, p_lease_seconds int, p_max_attempts int)` | Insert-or-claim. `{state:'ready', id, narrative, evidence}`, `{state:'claimed', id, fence, attempts}`, `{state:'busy'}`, `{state:'failed'}`. |
 | `bobby_brief_shared_commit(p_id uuid, p_fence bigint, p_state text, p_evidence jsonb, p_narrative jsonb, p_data_as_of timestamptz, p_error text)` | Fenced; `p_state` `ready` or `retry` (attempts+1, lease cleared) or `failed`. `{ok}` / `{ok:false, code:'stale_fence'}`. |
-| `bobby_brief_needed_assets(p_cadence, p_period_key, p_language)` | Union of `assets` (+ memory frequent assets when consent and memory allow) for pending/preparing briefs of that period, intersected with nothing (TS filters the universe). Returns `{symbols:[...]}`. |
+| `bobby_brief_needed_assets(p_cadence, p_period_key, p_language)` | Legacy helper retained for compatibility; current worker does not use account-derived assets to build public/provider evidence. It fetches the fixed public 17-asset universe instead. |
 | `bobby_brief_claim(p_cadence, p_period_key, p_worker, p_lease_seconds int, p_limit int)` | `for update skip locked` over `pending` (or `preparing` with expired lease). Skips non-Pro (state `skipped`) and opted-out (`cancelled`). Freezes and returns per item `{id, identityId, fence, frozen: FrozenSettings, memory: ComposerMemory|null}` (memory only when analysis consent current + memory enabled; the TS layer also checks `BOBBY_BRIEFINGS_MEMORY`). |
 | `bobby_brief_publish(p_id, p_fence, p_shared_id uuid, p_content jsonb, p_quality text, p_data_as_of timestamptz, p_uses_memory bool, p_memory_assets text[], p_settings_revision int, p_privacy_epoch int)` | Fenced. Re-validates owner Pro, cadence on, `privacy_epoch` unchanged ⇒ `ready`, `content_version = 1`. Otherwise `{ok:false, code:'stale_fence'|'not_pro'|'opted_out'|'privacy_changed'}` (privacy_changed puts it back to `pending`). |
 | `bobby_brief_fail(p_id, p_fence, p_error text, p_final bool)` | attempts+1; `failed` when final or attempts ≥ 3, else `pending`. |
@@ -155,7 +161,7 @@ Cron `*/5 * * * *` (all scheduled instants fall on 5-minute boundaries). `GET` w
 language (`shared_claim` → evidence → LLM narrative with reservation per HTTP attempt, falling back to facts-only when
 budget/providers fail or the readyBy deadline is near → `shared_commit`) → 3. personal stage: `claim` ≤ 10 →
 compose (deterministic) → validate → `publish` (never before the shared row is ready) → 4. audio pre-synthesis for
-morning periods (shared segments of ready reports whose owners have audio consent, TTS slots permitting) → 5. dispatch:
+weekly periods (shared segments of ready reports whose owners have audio consent, TTS slots permitting) → 5. dispatch:
 `outbox_fill` → `outbox_claim` ≤ 50 → APNs → `outbox_result` → 6. `purge` (bounded). The tick returns counts only.
 
 ## 6. iOS (build 53)
@@ -178,7 +184,7 @@ no name is sent anywhere (the visual greeting may use the local Apple given name
 TS: `scripts/test-briefings-calendar.mts`, `test-briefings-core.mts` (compose/validate/crypto/apns/budget adapters),
 `test-briefings-api.mts` (router with mocked PostgREST/auth), `test-briefings-worker.mts`, `test-briefings-pg.mts`
 (local PG17: RLS/grants, uniqueness, fencing, SKIP LOCKED concurrency, budget atomicity, device CAS, A→B, privacy triggers,
-purge), `test-briefings-load-pg.mts` (100 queued deliveries, 20 concurrent distinct-account opens). iOS:
+purge), 100 queued deliveries and 20 concurrent distinct-account opens remain unimplemented/unmeasured (the previously named `test-briefings-load-pg.mts` is absent). iOS:
 `BriefingsTests.swift`, `BriefingNarratorTests.swift`, `PushRegistrarTests.swift`. Physical-device APNs receipt, staging
 load with real providers and measured cost remain pending (need deploy/migration authorization).
 
@@ -204,7 +210,7 @@ export function scheduleSummary(now: Date, policy: SchedulePolicy): {
   timezone: 'America/New_York'; policyVersion: string;
   opening: { configured: boolean; localTime: '08:00'; nextAt: string | null };
   close: { configured: boolean; delayMinutes: 15; nextAt: string | null };
-  weekly: { configured: boolean; weekday: 'Sunday'; localTime: '18:00'; nextAt: string | null };
+  weekly: { configured: boolean; weekday: 'Monday'; localTime: '08:00'; nextAt: string | null };
 };
 
 // market-snapshot.ts (api/_lib/) — extracted verbatim from bobby-intel.ts; bobby-intel imports it (behavior identical)

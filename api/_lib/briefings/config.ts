@@ -5,17 +5,15 @@
 // Spec: docs/product/pro-market-briefings-implementation.md §1.
 // ============================================================
 import type { BriefLanguage, Cadence, DeviceEnvironment } from './types.js';
-import { CADENCES } from './types.js';
 
 type Env = NodeJS.ProcessEnv;
 
 /** Preparation, dispatch and synthesis run only when this is exactly 'on'. Retained reports stay readable either way. */
 export const briefingsEnabled = (env: Env = process.env): boolean => env.BOBBY_BRIEFINGS_ENABLED === 'on';
 
-/** Cadences whose schedule policy has been adopted. Only `morning` (08:00 New York) is confirmed today. */
-export function adoptedCadences(env: Env = process.env): Set<Cadence> {
-  const raw = (env.BOBBY_BRIEFINGS_CADENCES ?? 'morning').split(',').map((s) => s.trim()).filter(Boolean);
-  return new Set(raw.filter((c): c is Cadence => (CADENCES as readonly string[]).includes(c)));
+/** Product policy: only the Monday 08:00 weekly briefing. Legacy env values cannot activate daily/close work. */
+export function adoptedCadences(_env: Env = process.env): Set<Cadence> {
+  return new Set<Cadence>(['weekly']);
 }
 
 /** Proposal P1: every calendar day ('all') or only equity session days ('sessions'). */
@@ -101,7 +99,9 @@ export const LIMITS = {
   narrationSegments: 4,
   segmentChars: 800,
   narrationChars: 2400,
-  sharedAssetSections: 12,
+  weeklyNarrationSegments: 3,
+  weeklyNarrationChars: 1200,
+  sharedAssetSections: 17,
   settingsBodyBytes: 2048,
   deviceBodyBytes: 2048,
   voiceBodyBytes: 1024,

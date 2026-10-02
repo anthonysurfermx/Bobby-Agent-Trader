@@ -201,14 +201,14 @@ const noHistory = async () => [] as NonNullable<BriefEvidence['history']>;
   const snap = snapshot(now, { stocks: [{ symbol: 'SPY', price: 600, change24h: 0.2, asOf: iso(ny('2026-11-25', '16:00')), prevClose: 598.8 }] });
   const e = await buildEvidence(period, ['SPY', 'BTC'], { now: () => now, snapshot: async () => snap, agenda: noAgenda });
   eq([e.equitySession.state, e.equitySession.holidayName, e.equitySession.lastSessionDate, q(e, 'SPY').freshness], ['closed_holiday', 'Thanksgiving Day', '2026-11-25', 'closed'], 'holiday: closed as of Wednesday');
-  const weekly = cal.periodForDate('weekly', '2026-11-22', policy)!;
-  const ew = await buildEvidence(weekly, ['SPY'], { now: () => ny('2026-11-22', '17:35'), snapshot: async () => snap, agenda: noAgenda, dailyCloses: noHistory });
+  const weekly = cal.periodForDate('weekly', '2026-11-23', policy)!;
+  const ew = await buildEvidence(weekly, ['SPY'], { now: () => ny('2026-11-23', '07:35'), snapshot: async () => snap, agenda: noAgenda, dailyCloses: noHistory });
   eq(ew.agenda.map((a) => a.title), [`${MARKET_HOURS_TITLES.holidayPrefix}Thanksgiving Day`, MARKET_HOURS_TITLES.earlyClose], 'weekly look-ahead: holiday + early close only');
 }
 
 // =============== 3. weekly history ===============
-const weekly = cal.periodForDate('weekly', '2026-10-04', policy)!;
-const weeklyNow = ny('2026-10-04', '17:35');
+const weekly = cal.periodForDate('weekly', '2026-10-05', policy)!;
+const weeklyNow = ny('2026-10-05', '07:35');
 const realHistory: NonNullable<BriefEvidence['history']> = [
   { symbol: 'SPY', from: { at: iso(ny('2026-09-25', '16:00')), price: 560 }, to: { at: iso(ny('2026-10-02', '16:00')), price: 571.32 } },
   { symbol: 'BTC', from: { at: '2026-09-27T00:00:00.000Z', price: 65000 }, to: { at: '2026-10-04T00:00:00.000Z', price: 67450.12 } },
@@ -255,7 +255,7 @@ const realHistory: NonNullable<BriefEvidence['history']> = [
   });
   ok(urls.some((u) => u.includes('market/history-candles?instId=BTC-USDT&bar=1Dutc')) && urls.some((u) => u.includes('chart/SPY?range=1mo&interval=1d')), 'provider daily candle endpoints');
   eq(hist, [
-    { symbol: 'BTC', from: { at: '2026-09-27T00:00:00.000Z', price: 60600 }, to: { at: '2026-10-04T00:00:00.000Z', price: 61300 } },
+    { symbol: 'BTC', from: { at: '2026-09-28T00:00:00.000Z', price: 60700 }, to: { at: '2026-10-04T00:00:00.000Z', price: 61300 } },
     { symbol: 'SPY', from: { at: iso(ny('2026-09-25', '16:00')), price: 525 }, to: { at: iso(ny('2026-10-02', '16:00')), price: 502 } },
   ], 'closes picked at the interval bounds; failed symbol omitted; unconfirmed candle ignored');
 }
@@ -420,14 +420,47 @@ const memory = { experience: 'new' as const, explainRiskDepth: 'high' as const, 
   eq(validateContent({ ...r.content, title: '' }), 'bad_header', 'title required');
 }
 {
-  // Weekly composition: the week block is narrated right after the market.
+  // Weekly composition: upcoming agenda before explicitly labelled historical context.
   const ew = await buildEvidence(weekly, ['SPY', 'BTC'], { now: () => weeklyNow, snapshot: async () => snapshot(weeklyNow), agenda: noAgenda, dailyCloses: async () => realHistory });
   const fw = factsOnlyNarrative(ew, 'en', ['SPY', 'BTC']);
   const c = composeReport({ period: weekly, frozen: frozen({ language: 'en', assets: ['SPY', 'BTC'] }), memory: null, memoryAllowed: false, narrative: fw, evidence: ew });
-  eq(c.content.sections.map((s) => s.kind), ['market', 'asset', 'asset', 'risks', 'agenda', 'week'], 'weekly sections');
-  eq(c.content.narrationSegments[1], fw.week!.body, 'weekly narration: week block second');
-  eq(c.content.title, 'Weekly briefing · 2026-09-27 – 2026-10-04', 'weekly title');
+  eq(c.content.sections.map((s) => s.kind), ['asset', 'asset', 'market', 'risks', 'agenda'], 'personal retrospective before common upcoming-week context');
+  ok(c.content.narrationSegments[0].includes(c.content.sections[0].body), 'personal retrospective first in voice');
+  ok(c.content.narrationSegments[1].includes(c.content.sections.find(s => s.kind === 'agenda')!.body), 'common upcoming agenda second in voice');
+  ok(c.content.sections[0].title.includes('Previous week'), 'historical asset explicitly labelled');
+  ok(c.content.narrationSegments.length <= 3 && c.content.narrationSegments.join('').length <= 1200, 'weekly voice is light: max3 segments/1200chars');
+  ok(c.content.sections.every(s => s.body.length <= 220), 'weekly prose sections compact');
+  eq(c.content.title, 'Weekly briefing · 2026-09-28 – 2026-10-05', 'weekly title');
   eq(validateContent(c.content), null, 'weekly content valid');
+}
+
+// Weekly queries are interests, never holdings. Consent gates selection; real history gates the figures.
+{
+  const dated = [{ symbol: 'NVDA', from: { at: iso(ny('2026-09-25', '16:00')), price: 160 }, to: { at: iso(ny('2026-10-02', '16:00')), price: 180 } }, ...realHistory];
+  const e = await buildEvidence(weekly, ['NVDA', 'SPY', 'BTC'], {
+    now: () => weeklyNow, snapshot: async () => snapshot(weeklyNow), dailyCloses: async () => dated,
+    agenda: async () => [{ title: 'Recorded economic release', at: iso(ny('2026-10-07', '08:30')), kind: 'macro', severity: 4 }],
+  });
+  const n = factsOnlyNarrative(e, 'en', ['NVDA', 'SPY', 'BTC']);
+  const asked = { experience: null, explainRiskDepth: null, frequentAssets: ['NVDA'] };
+  const make = (allowed: boolean, assets: string[] = ['SPY']) => composeReport({ period: weekly, frozen: frozen({ language: 'en', assets }), memory: asked, memoryAllowed: allowed, narrative: n, evidence: e });
+  const personal = make(true);
+  eq([personal.content.personalBasis, personal.content.sections[0].symbol, personal.memoryAssets], ['asked_assets', 'NVDA', ['NVDA']], 'consented asked assets before explicit interests');
+  ok(personal.content.sections[0].body.includes('+12.50%') && personal.content.sections[0].body.includes('over 7 days'), 'NVDA uses dated160→180 history, not spot24h');
+  ok(personal.content.narrationSegments[0].includes('NVDA') && personal.content.narrationSegments[1].includes('Recorded economic release'), 'personal retrospective before dated coming-week agenda');
+  ok(!/holding|position|portfolio/i.test(personal.content.sections[0].body), 'asked does not imply ownership');
+  const large = { ...n, opening: 'h'.repeat(140), assets: Object.fromEntries(Object.entries(n.assets).map(([symbol, section]) => [symbol, { ...section, body: 'p'.repeat(220) }])), market: { ...n.market, body: 'm'.repeat(220) }, agenda: { ...n.agenda, body: 'a'.repeat(220) }, risks: { ...n.risks, body: 'r'.repeat(220) } };
+  const two = composeReport({ period: weekly, frozen: frozen({ language: 'en', assets: [] }), memory: { ...asked, frequentAssets: ['NVDA', 'SPY'] }, memoryAllowed: true, narrative: large, evidence: e });
+  ok(two.content.narrationSegments[0].includes('NVDA') && two.content.narrationSegments[0].includes('SPY'), 'first two asked assets narrated');
+  ok(two.content.narrationSegments[1].includes('m'.repeat(220)) && two.content.narrationSegments[1].includes('a'.repeat(220)), 'maximum personal block preserves common outlook and agenda');
+  ok(two.content.narrationSegments.join('').length <= 1200, 'large personal blocks respect lightweight limit');
+  const off = make(false);
+  eq([off.content.personalBasis, off.content.sections[0].symbol, off.usesMemory], ['explicit_interests', 'SPY', false], 'consent off uses declared interests, not asked history');
+  eq(make(false, []).content.personalBasis, 'general', 'no consented queries or declared interests gives honest general basis');
+  const spot = { ...e, history: e.history!.filter(h => h.symbol !== 'NVDA'), quotes: e.quotes.map(q => q.symbol === 'NVDA' ? { ...q, changeBasis: '24h' as const } : q) };
+  const missing = composeReport({ period: weekly, frozen: frozen({ language: 'en', assets: ['NVDA'] }), memory: null, memoryAllowed: false, narrative: n, evidence: spot });
+  eq(missing.content.sections[0].status, 'missing', 'spot24h never masquerades as personal weekly history');
+  ok(missing.content.sections[0].body.includes('No data available'), 'unavailable retrospective is stated honestly');
 }
 
 console.log(`briefings-content: ${checks} checks passed`);

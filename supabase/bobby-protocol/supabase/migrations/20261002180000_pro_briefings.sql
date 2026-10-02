@@ -27,7 +27,7 @@
 --     reconciliation assumes the charge (D8).
 --   · Privacy: pausing/deleting memory, forgetting an asset or withdrawing analysis consent bumps privacy_epoch, fences
 --     in-flight personal preparation and withdraws/purges memory-based content (triggers below + settings_patch).
---   · Pro is always the live bobby_is_pro answer (subscription or unexpired grant), checked at seed, claim, publish,
+--   · Briefings eligibility is always the live bobby_brief_is_paid_pro answer (verified paid ACTIVE subscription), checked at seed, claim, publish,
 --     dispatch and read. Never a cached flag.
 --
 -- Access. The Auth project may differ from the data project, so access is API-only: RLS on with no policies, every
@@ -42,6 +42,29 @@
 -- Idempotent: applied twice in scripts/test-briefings-pg.mts.
 
 -- ============================================================ tables
+
+-- Feature-owned payment evidence. The existing subscription mirror also marks RevenueCat trials/Sandbox active,
+-- so active status alone cannot establish this feature's paid-only contract. NO billing adapter populates this
+-- table yet: unknown evidence fails closed and the feature must remain disabled until that integration is verified.
+create table if not exists public.bobby_brief_paid_periods (
+  identity_id uuid primary key references public.bobby_identities(id) on delete cascade,
+  provider text not null check (provider in ('stripe', 'apple')),
+  product_id text not null check (length(product_id) between 1 and 120),
+  period_start timestamptz not null,
+  period_end timestamptz not null,
+  environment text not null check (environment in ('production', 'sandbox', 'unknown')),
+  period_type text not null check (period_type in ('normal', 'intro', 'trial', 'unknown')),
+  paid_amount numeric(14, 4) not null check (paid_amount >= 0),
+  currency text not null check (currency ~ '^[A-Z]{3}$'),
+  proof_source text not null check (proof_source in ('revenuecat', 'stripe')),
+  proof_id text not null check (length(proof_id) between 1 and 160),
+  proof_sha256 text not null check (proof_sha256 ~ '^[0-9a-f]{64}$'),
+  verification_state text not null check (verification_state in ('confirmed', 'unverified')),
+  verified_at timestamptz not null,
+  updated_at timestamptz not null default now(),
+  check (period_start < period_end)
+);
+create index if not exists bobby_brief_paid_periods_end_idx on public.bobby_brief_paid_periods (period_end);
 
 create table if not exists public.bobby_brief_settings (
   identity_id uuid primary key references public.bobby_identities(id) on delete cascade,
@@ -275,6 +298,7 @@ create table if not exists public.bobby_brief_idempotency (
 );
 create index if not exists bobby_brief_idempotency_expires_idx on public.bobby_brief_idempotency (expires_at);
 
+alter table public.bobby_brief_paid_periods enable row level security;
 alter table public.bobby_brief_settings enable row level security;
 alter table public.bobby_brief_shared enable row level security;
 alter table public.bobby_briefs enable row level security;
@@ -284,10 +308,10 @@ alter table public.bobby_brief_provider_attempts enable row level security;
 alter table public.bobby_brief_audio enable row level security;
 alter table public.bobby_brief_audio_links enable row level security;
 alter table public.bobby_brief_idempotency enable row level security;
-revoke all on public.bobby_brief_settings, public.bobby_brief_shared, public.bobby_briefs, public.bobby_push_devices,
+revoke all on public.bobby_brief_paid_periods, public.bobby_brief_settings, public.bobby_brief_shared, public.bobby_briefs, public.bobby_push_devices,
   public.bobby_brief_outbox, public.bobby_brief_provider_attempts, public.bobby_brief_audio, public.bobby_brief_audio_links,
   public.bobby_brief_idempotency from public, anon, authenticated;
-grant all on public.bobby_brief_settings, public.bobby_brief_shared, public.bobby_briefs, public.bobby_push_devices,
+grant all on public.bobby_brief_paid_periods, public.bobby_brief_settings, public.bobby_brief_shared, public.bobby_briefs, public.bobby_push_devices,
   public.bobby_brief_outbox, public.bobby_brief_provider_attempts, public.bobby_brief_audio, public.bobby_brief_audio_links,
   public.bobby_brief_idempotency to service_role;
 
@@ -301,6 +325,26 @@ begin
 end $$;
 
 -- ============================================================ helpers
+
+-- Paid ACTIVE Pro for briefings only. Referral/admin grants, trials, Sandbox and unknown expiry/proof are denied.
+-- Cancelling auto-renewal preserves access while authoritative status is active and the verified paid period lasts.
+-- This never changes the global bobby_is_pro function or any other subscription right/price.
+create or replace function public.bobby_brief_is_paid_pro(p_identity uuid)
+returns boolean language sql stable security invoker set search_path = public, pg_temp as $$
+  select exists (
+    select 1 from bobby_subscriptions s
+      join bobby_identities i on i.id = s.identity_id and i.auth_user_id is not null
+      join bobby_brief_paid_periods p on p.identity_id = s.identity_id
+     where s.identity_id = p_identity and s.status = 'active'
+       and s.current_period_end is not null and s.current_period_end > now()
+       and p.provider = s.provider and p.product_id = s.product_id and p.period_end = s.current_period_end
+       and p.period_start <= now() and p.period_end > now()
+       and p.environment = 'production' and p.period_type in ('normal', 'intro') and p.paid_amount > 0
+       and p.verification_state = 'confirmed' and p.verified_at <= now()
+       and ((p.provider = 'apple' and p.proof_source = 'revenuecat')
+         or (p.provider = 'stripe' and p.proof_source in ('stripe', 'revenuecat')))
+  );
+$$;
 
 create or replace function public.bobby_brief_bad(p_what text)
 returns void language plpgsql volatile security invoker set search_path = public, pg_temp as $$
@@ -756,7 +800,7 @@ begin
   insert into bobby_briefs (identity_id, cadence, period_key, period_start, period_end, scheduled_at, push_expires_at, calendar_version, policy_version)
   select s.identity_id, p_cadence, p_period_key, p_period_start, p_period_end, p_scheduled_at, p_push_expires_at, p_calendar_version, p_policy_version
     from bobby_brief_settings s
-   where bobby_brief_cadence_on(s, p_cadence) and bobby_is_pro(s.identity_id)
+   where bobby_brief_cadence_on(s, p_cadence) and bobby_brief_is_paid_pro(s.identity_id)
   on conflict (identity_id, cadence, period_key) do nothing;
   get diagnostics n = row_count;
   return jsonb_build_object('seeded', n);
@@ -820,12 +864,12 @@ begin
 end;
 $$;
 
--- Frequent assets the composer may use: asked at least twice within 90 days, most recent first, at most 6.
+-- Asked assets the weekly composer may use: one or more questions within 90 days, most recent first, at most 6.
 create or replace function public.bobby_brief_frequent_assets(p_identity uuid)
 returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
   select coalesce(jsonb_agg(x.symbol order by x.last_asked_at desc, x.symbol), '[]'::jsonb)
     from (select symbol, last_asked_at from bobby_user_assets
-           where identity_id = p_identity and asks >= 2 and last_asked_at >= now() - interval '90 days'
+           where identity_id = p_identity and asks >= 1 and last_asked_at >= now() - interval '90 days'
            order by last_asked_at desc, symbol limit 6) x
 $$;
 
@@ -867,7 +911,8 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
   select jsonb_build_object('languages', coalesce(jsonb_agg(d.language order by d.language), '[]'::jsonb))
     from (select distinct case when b.state = 'preparing' and b.language is not null then b.language else s.language end as language
             from bobby_briefs b join bobby_brief_settings s on s.identity_id = b.identity_id
-           where b.cadence = p_cadence and b.period_key = p_period_key and b.state in ('pending', 'preparing')) d
+           where b.cadence = p_cadence and b.period_key = p_period_key and b.state in ('pending', 'preparing')
+             and bobby_brief_cadence_on(s, p_cadence) and bobby_brief_is_paid_pro(b.identity_id)) d
 $$;
 
 -- Claim ≤ p_limit due reports (pending, or preparing whose lease expired — counted as an attempt) with
@@ -908,7 +953,7 @@ begin
       select * into s from bobby_brief_settings where identity_id = r.identity_id;
       if not found or not bobby_brief_cadence_on(s, p_cadence) then
         update bobby_briefs set state = 'cancelled', lease_owner = null, lease_expires_at = null, updated_at = now() where id = r.id;
-      elsif not bobby_is_pro(r.identity_id) then
+      elsif not bobby_brief_is_paid_pro(r.identity_id) then
         update bobby_briefs set state = 'skipped', lease_owner = null, lease_expires_at = null, updated_at = now() where id = r.id;
       elsif r.push_expires_at <= now() or v_attempts >= 3 then
         update bobby_briefs set state = 'failed', attempts = v_attempts, lease_owner = null, lease_expires_at = null,
@@ -955,7 +1000,7 @@ begin
   end if;
 
   select * into s from bobby_brief_settings where identity_id = b.identity_id;
-  if not bobby_is_pro(b.identity_id) then
+  if not bobby_brief_is_paid_pro(b.identity_id) then
     update bobby_briefs set state = 'skipped', lease_owner = null, lease_expires_at = null, updated_at = now() where id = p_id;
     return jsonb_build_object('ok', false, 'code', 'not_pro');
   end if;
@@ -1007,11 +1052,11 @@ begin
     from bobby_briefs b
     join bobby_brief_settings s on s.identity_id = b.identity_id
     join bobby_push_devices d on d.identity_id = b.identity_id and d.status = 'active' and d.permission in ('authorized', 'provisional')
-   where b.state = 'ready' and b.scheduled_at <= now() and b.push_expires_at > now()
+   where b.state = 'ready' and b.cadence = 'weekly' and b.scheduled_at <= now() and b.push_expires_at > now()
      and bobby_brief_cadence_on(s, b.cadence)
      and (not b.uses_memory or s.privacy_epoch = b.privacy_epoch)
      and not exists (select 1 from bobby_brief_outbox o where o.brief_id = b.id and o.installation_id = d.installation_id)
-     and bobby_is_pro(b.identity_id)
+     and bobby_brief_is_paid_pro(b.identity_id)
    order by b.scheduled_at, b.id
    limit least(greatest(coalesce(p_limit, 1), 1), 1000)
   on conflict (brief_id, installation_id) do nothing;
@@ -1059,10 +1104,10 @@ begin
             last_reason = 'attempts', updated_at = now() where id = r.id;
       elsif d.status is distinct from 'active' or d.identity_id <> r.identity_id or d.binding_revision <> r.binding_revision
          or d.permission not in ('authorized', 'provisional')
-         or b.state is distinct from 'ready' or b.identity_id <> r.identity_id
+         or b.state is distinct from 'ready' or b.cadence is distinct from 'weekly' or b.identity_id <> r.identity_id
          or s.identity_id is null or not bobby_brief_cadence_on(s, b.cadence)
          or (b.uses_memory and s.privacy_epoch <> b.privacy_epoch)
-         or not bobby_is_pro(r.identity_id) then
+         or not bobby_brief_is_paid_pro(r.identity_id) then
         update bobby_brief_outbox set state = 'cancelled', attempts = v_attempts, lease_owner = null, lease_expires_at = null,
             last_reason = 'stale', updated_at = now() where id = r.id;
       else
@@ -1238,6 +1283,7 @@ begin
   if p_content_version is distinct from b.content_version or p_voice is distinct from b.voice or p_language is distinct from b.language then
     return jsonb_build_object('code', 'content_version_conflict');
   end if;
+  if not bobby_brief_is_paid_pro(p_identity) then return jsonb_build_object('code', 'subscription_required'); end if;
   insert into bobby_brief_audio (cache_key, voice, language) values (p_cache_key, p_voice, p_language)
     on conflict (cache_key) do update set last_used_at = now()
     returning id, state into v_id, v_state;
@@ -1259,6 +1305,13 @@ begin
   if r.state = 'ready' then return jsonb_build_object('state', 'ready'); end if;
   if r.state = 'failed' then return jsonb_build_object('state', 'failed'); end if;
   if r.state = 'processing' and r.lease_expires_at > now() then return jsonb_build_object('state', 'busy'); end if;
+  -- Re-check before paid synthesis, including pre-synthesis after publishing. Do not poison a shared cache key
+  -- when all linked readers lapse: a later eligible reader can still claim it.
+  if not exists (
+    select 1 from bobby_brief_audio_links l join bobby_briefs b on b.id = l.brief_id
+     where l.audio_id = r.id and b.state = 'ready' and l.content_version = b.content_version
+       and bobby_brief_is_paid_pro(b.identity_id)
+  ) then return jsonb_build_object('state', 'failed'); end if;
   v_attempts := r.attempts + case when r.state = 'processing' then 1 else 0 end;
   if v_attempts >= 3 then
     update bobby_brief_audio set state = 'failed', attempts = v_attempts, lease_owner = null, lease_expires_at = null,
@@ -1312,7 +1365,7 @@ begin
         where l.audio_id = p_audio and b.identity_id = p_identity and b.state = 'ready' and l.content_version = b.content_version) then
     return jsonb_build_object('code', 'not_found');
   end if;
-  if not bobby_is_pro(p_identity) then return jsonb_build_object('code', 'subscription_required'); end if;
+  if not bobby_brief_is_paid_pro(p_identity) then return jsonb_build_object('code', 'subscription_required'); end if;
   update bobby_brief_audio set last_used_at = now() where id = p_audio returning * into a;
   return jsonb_build_object('state', a.state, 'storagePath', case when a.state = 'ready' then a.storage_path end, 'mime', a.mime);
 end;
@@ -1374,7 +1427,7 @@ declare b bobby_briefs;
 begin
   select * into b from bobby_briefs where id = p_id and identity_id = p_identity and state = 'ready' and scheduled_at <= now();
   if not found then return jsonb_build_object('code', 'not_found'); end if;
-  if not bobby_is_pro(p_identity) then return jsonb_build_object('code', 'subscription_required'); end if;
+  if not bobby_brief_is_paid_pro(p_identity) then return jsonb_build_object('code', 'subscription_required'); end if;
   return jsonb_build_object('report', jsonb_build_object('id', b.id, 'cadence', b.cadence, 'contentVersion', b.content_version,
     'periodStart', b.period_start, 'periodEnd', b.period_end, 'scheduledAt', b.scheduled_at, 'dataAsOf', b.data_as_of,
     'calendarVersion', b.calendar_version, 'quality', b.quality, 'content', b.content, 'voice', b.voice, 'language', b.language));

@@ -166,6 +166,20 @@ try {
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER })).statusCode, 400, 'an empty gift');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: 'nope', reads: 1 })).statusCode, 400, 'a malformed id');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: '0b8f0a52-0000-4000-8000-000000000000', reads: 1 })).statusCode, 404, 'an unknown account');
+  for (const [field, value] of [['reads', -1], ['reads', 1.5], ['reads', 1001], ['profundo', 201], ['maximo', 101], ['proDays', 367], ['reads', 'not-a-number']]) {
+    eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, [field]: value })).statusCode, 400, `invalid grant ${field}=${value}`);
+    ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant')), 'invalid grant never reaches the mutation');
+  }
+  const forbiddenGift = await call('POST', 'Bearer user-token', {}, { action: 'grant', identityId: USER, reads: 10 });
+  eq(forbiddenGift.statusCode, 403, 'non-admin cannot gift to itself');
+  ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant') || c.url.includes('bobby_admin_actions')), 'non-admin neither mutates nor creates a grant audit');
+  overrides = (c) => c.url.includes('bobby_admin_actions') && c.method === 'POST' ? json({ message: 'down' }, 500) : null;
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 })).statusCode, 503, 'gift refuses an unavailable audit log');
+  ok(!calls.some((c) => c.url.includes('rpc/bobby_admin_grant')), 'no gift without its audit');
+  overrides = (c) => c.url.includes('rpc/bobby_admin_grant') ? json({ message: 'down' }, 500) : null;
+  eq((await call('POST', 'Bearer admin-token', {}, { action: 'grant', identityId: USER, reads: 10 })).statusCode, 502, 'gift storage failure is visible to the caller');
+  eq(finishes().at(-1)?.detail.status, 'failed', 'failed gift has a failed audit');
+  overrides = () => null;
 
   // ---------- deletion ----------
   const wrong = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'someone@else.com' });

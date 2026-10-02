@@ -313,56 +313,66 @@ final class BriefingsExperienceTests: XCTestCase {
 
     // MARK: - Settings screen mapping
 
-    private func schedules(close: Bool = false) -> BriefingSchedules {
-        BriefingSchedules(json: [
+    private func schedules(weekly: Bool = true) -> BriefingSchedules {
+        let nextAt: Any = weekly ? "2026-10-05T12:00:00.000Z" : NSNull()
+        let json: [String: Any] = [
             "timezone": "America/New_York",
+            // Legacy fields stay decodable, even when an older server marks them configured.
             "opening": ["configured": true, "localTime": "08:00", "nextAt": "2026-10-05T12:00:00.000Z"],
-            "close": ["configured": close, "delayMinutes": 15, "nextAt": close ? "2026-10-05T20:15:00.000Z" : NSNull()],
-            "weekly": ["configured": false, "weekday": "Sunday", "localTime": "18:00", "nextAt": NSNull()],
-        ])!
+            "close": ["configured": true, "delayMinutes": 15, "nextAt": "2026-10-05T20:15:00.000Z"],
+            "weekly": ["configured": weekly, "weekday": "Monday", "localTime": "08:00", "nextAt": nextAt],
+        ]
+        return BriefingSchedules(json: json)!
     }
 
-    func testProAccountCanTurnAdoptedSchedulesOnOnly() {
+    func testProfileOffersOnlyTheAdoptedWeeklyBriefing() {
         let p = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1), eligiblePro: true,
                                                   schedules: schedules(), pending: [:], permission: .authorized)
         XCTAssertFalse(p.showsPro)
         XCTAssertFalse(p.blocked)
-        XCTAssertEqual(p.rows.map(\.cadence), [.morning, .close, .weekly])
-        XCTAssertEqual(p.rows.map(\.interactive), [true, false, false], "close/weekly are pending schedules")
-        XCTAssertEqual(p.rows.map(\.configured), [true, false, false])
+        XCTAssertEqual(p.rows.map(\.cadence), [.weekly], "daily and close are not offered, even by an older server")
+        XCTAssertEqual(p.rows.map(\.interactive), [true])
+        XCTAssertEqual(p.rows.map(\.configured), [true])
+        let pending = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1), eligiblePro: true,
+                                                        schedules: schedules(weekly: false), pending: [:], permission: .authorized)
+        XCTAssertFalse(pending.rows[0].interactive)
     }
 
-    func testNonProCanOnlyTurnSwitchesOff() {
-        let settings = BriefingSettings(revision: 3, openingEnabled: true, closeEnabled: false)
+    func testNonProCanOnlyTurnTheWeeklySwitchOff() {
+        let settings = BriefingSettings(revision: 3, openingEnabled: true, weeklyEnabled: true)
         let p = BriefingSettingsPresentation.make(settings: settings, eligiblePro: false,
-                                                  schedules: schedules(close: true), pending: [:], permission: .authorized)
+                                                  schedules: schedules(), pending: [:], permission: .authorized)
         XCTAssertTrue(p.showsPro)
-        XCTAssertEqual(p.rows.map(\.isOn), [true, false, false])
-        XCTAssertEqual(p.rows.map(\.interactive), [true, false, false], "on → can turn off; off → cannot turn on")
-        let unknown = BriefingSettingsPresentation.make(settings: settings, eligiblePro: nil,
-                                                        schedules: schedules(close: true), pending: [:], permission: .authorized)
+        XCTAssertEqual(p.rows.map(\.isOn), [true])
+        XCTAssertEqual(p.rows.map(\.interactive), [true], "weekly on → can turn off without Pro")
+        let off = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 3, openingEnabled: true), eligiblePro: false,
+                                                    schedules: schedules(), pending: [:], permission: .authorized)
+        XCTAssertFalse(off.rows[0].interactive, "a legacy daily flag cannot unlock a weekly opt-in")
+        let unknown = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 3), eligiblePro: nil,
+                                                        schedules: schedules(), pending: [:], permission: .authorized)
         XCTAssertFalse(unknown.showsPro, "unknown is not a refusal")
-        XCTAssertFalse(unknown.rows[1].interactive, "unknown is never read as Pro")
+        XCTAssertFalse(unknown.rows[0].interactive, "unknown is never read as Pro")
     }
 
-    func testPendingSwitchShowsItsTargetAndLocks() {
+    func testPendingWeeklySwitchShowsItsTargetAndLocks() {
         let p = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1), eligiblePro: true,
-                                                  schedules: schedules(), pending: [.morning: true], permission: .authorized)
+                                                  schedules: schedules(), pending: [.weekly: true], permission: .authorized)
         XCTAssertTrue(p.rows[0].isOn)
         XCTAssertTrue(p.rows[0].saving)
         XCTAssertFalse(p.rows[0].interactive)
-        let off = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1, openingEnabled: true), eligiblePro: true,
-                                                    schedules: schedules(), pending: [.morning: false], permission: .authorized)
+        let off = BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1, weeklyEnabled: true), eligiblePro: true,
+                                                    schedules: schedules(), pending: [.weekly: false], permission: .authorized)
         XCTAssertFalse(off.rows[0].isOn)
     }
 
-    func testBlockedOnlyWhenDeniedAndAConfirmedSwitchIsOn() {
-        let on = BriefingSettings(revision: 1, openingEnabled: true)
+    func testBlockedOnlyWhenDeniedAndTheWeeklySwitchIsOn() {
+        let on = BriefingSettings(revision: 1, weeklyEnabled: true)
         XCTAssertTrue(BriefingSettingsPresentation.make(settings: on, eligiblePro: true, schedules: schedules(),
                                                         pending: [:], permission: .denied).blocked)
         XCTAssertFalse(BriefingSettingsPresentation.make(settings: on, eligiblePro: true, schedules: schedules(),
                                                          pending: [:], permission: .authorized).blocked)
-        XCTAssertFalse(BriefingSettingsPresentation.make(settings: BriefingSettings(revision: 1), eligiblePro: true,
+        let legacyOnly = BriefingSettings(revision: 1, openingEnabled: true, closeEnabled: true)
+        XCTAssertFalse(BriefingSettingsPresentation.make(settings: legacyOnly, eligiblePro: true,
                                                          schedules: schedules(), pending: [:], permission: .denied).blocked)
         XCTAssertFalse(BriefingSettingsPresentation.make(settings: nil, eligiblePro: nil, schedules: nil,
                                                          pending: [:], permission: .denied).blocked)
@@ -370,33 +380,42 @@ final class BriefingsExperienceTests: XCTestCase {
 
     func testNothingIsInteractiveBeforeTheSettingsAreRead() {
         let p = BriefingSettingsPresentation.make(settings: nil, eligiblePro: nil, schedules: nil, pending: [:], permission: .authorized)
+        XCTAssertEqual(p.rows.map(\.cadence), [.weekly])
         XCTAssertTrue(p.rows.allSatisfy { !$0.interactive && !$0.isOn })
         XCTAssertFalse(p.showsPro)
     }
 
-    func testScheduleCopyInNewYorkTimeWithTheLocalEquivalent() {
-        let s = schedules(close: true)
+    func testMondayEightScheduleCopyInNewYorkAndThePhoneTime() {
+        let s = schedules()
         let ny = BriefingFormat.newYork
         let mexico = TimeZone(identifier: "America/Mexico_City")!
-        let pending = BriefingFormat.schedule(.weekly, s.weekly, spanish: true, zone: ny)
-        XCTAssertEqual(pending, "Horario en revisión")
+        XCTAssertEqual(BriefingFormat.schedule(.weekly, schedules(weekly: false).weekly, spanish: true, zone: ny), "Horario en revisión")
         XCTAssertEqual(BriefingFormat.schedule(.weekly, nil, spanish: false, zone: ny), "Schedule pending")
-        let morningNY = BriefingFormat.schedule(.morning, s.opening, spanish: false, zone: ny)
-        XCTAssertEqual(morningNY, "Every day · 08:00 New York", "no 'your time' when the phone is in New York")
-        let morningMX = BriefingFormat.schedule(.morning, s.opening, spanish: true, zone: mexico)
-        XCTAssertTrue(morningMX.hasPrefix("Todos los días · 08:00 Nueva York · "))
-        XCTAssertTrue(morningMX.hasSuffix("tu hora"))
-        XCTAssertTrue(morningMX.contains("6:00"), morningMX)
-        let close = BriefingFormat.schedule(.close, s.close, spanish: false, zone: ny)
-        XCTAssertTrue(close.hasPrefix("15 min after the US close (New York) · next "), close)
+        XCTAssertEqual(BriefingFormat.schedule(.weekly, s.weekly, spanish: false, zone: ny), "Mondays · 08:00 New York")
+        XCTAssertEqual(BriefingFormat.schedule(.weekly, s.weekly, spanish: true, zone: ny), "Lunes · 08:00 Nueva York")
+        let weeklyMX = BriefingFormat.schedule(.weekly, s.weekly, spanish: true, zone: mexico)
+        XCTAssertTrue(weeklyMX.hasPrefix("Lunes · 08:00 Nueva York · "), weeklyMX)
+        XCTAssertTrue(weeklyMX.hasSuffix("tu hora"))
+        XCTAssertTrue(weeklyMX.contains("6:00"), weeklyMX)
+        let winter = BriefingSchedule(configured: true, localTime: "08:00", weekday: "Monday",
+                                      nextAt: BobbyAccessAPI.date("2026-11-02T13:00:00Z"))
+        let winterMX = BriefingFormat.schedule(.weekly, winter, spanish: false, zone: mexico)
+        XCTAssertTrue(winterMX.hasPrefix("Mondays · 08:00 New York · "), winterMX)
+        XCTAssertTrue(winterMX.contains("7:00"), "the local equivalent changes with New York DST")
+        let noPolicyFields = BriefingSchedule(configured: true)
+        XCTAssertEqual(BriefingFormat.schedule(.weekly, noPolicyFields, spanish: false, zone: ny), "Mondays · 08:00 New York")
     }
 
-    func testRowSummaryAndLatestNotices() throws {
+    func testWeeklySummaryAndNoticesPreserveLegacyReportDecoding() throws {
         XCTAssertEqual(BriefingCopy.summary(nil, spanish: false), "Bobby Pro")
         XCTAssertEqual(BriefingCopy.summary(BriefingSettings(revision: 1, openingEnabled: true, weeklyEnabled: true), spanish: true),
-                       "Apertura de mercado · Semanal")
-        let unavailable = try XCTUnwrap(BriefingLatest(json: ["cadence": "morning", "state": "unavailable"]))
-        XCTAssertEqual(BriefingCopy.latestNotice(unavailable, spanish: false), "Today’s briefing isn’t available")
+                       "Resumen semanal")
+        XCTAssertEqual(BriefingCopy.summary(BriefingSettings(revision: 1, openingEnabled: true, closeEnabled: true), spanish: false), "Bobby Pro")
+        let legacy = try XCTUnwrap(BriefingLatest(json: ["cadence": "morning", "state": "unavailable"]))
+        XCTAssertEqual(legacy.cadence, .morning, "old reports still parse")
+        XCTAssertNil(BriefingCopy.latestNotice(legacy, spanish: false), "no daily offer or status in the weekly inbox")
+        let unavailable = try XCTUnwrap(BriefingLatest(json: ["cadence": "weekly", "state": "unavailable"]))
+        XCTAssertEqual(BriefingCopy.latestNotice(unavailable, spanish: false), "This week’s briefing isn’t available")
         let ready = try XCTUnwrap(BriefingLatest(json: ["cadence": "weekly", "state": "ready"]))
         XCTAssertNil(BriefingCopy.latestNotice(ready, spanish: false))
         XCTAssertEqual(BriefingCopy.quality("facts_only", spanish: false), "Facts only")
@@ -603,6 +622,52 @@ final class BriefingsExperienceTests: XCTestCase {
         await m.load()
         XCTAssertEqual(m.phase, .unavailable)
         XCTAssertEqual(fetches, 0, "no network signed out or before consent")
+    }
+
+    func testWeeklyGroupsKeepPersonalHistoryBeforeCommonOutlook() throws {
+        let json: [String: Any] = [
+            "id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301", "cadence": "weekly", "contentVersion": 1,
+            "personalBasis": "asked_assets",
+            "sections": [
+                ["kind": "market", "title": "Market", "body": "Outlook"],
+                ["kind": "asset", "symbol": "BTC", "title": "BTC last week", "body": "Past week"],
+                ["kind": "asset", "symbol": "NVDA", "title": "NVDA last week", "body": "Past week"],
+                ["kind": "agenda", "title": "Agenda", "body": "Coming week"],
+            ],
+        ]
+        let report = try XCTUnwrap(BriefingReport(json: json))
+        let parts = BriefingWeeklyPresentation(report: report, spanish: true)
+        XCTAssertEqual(report.personalBasis, .askedAssets)
+        XCTAssertEqual(parts.personalSections.map(\.symbol), ["BTC", "NVDA"])
+        XCTAssertEqual(parts.commonSections.map(\.kind), ["market", "agenda"])
+        XCTAssertEqual(parts.personalTitle, "Tus consultas: la semana pasada")
+        XCTAssertEqual(parts.commonTitle, "El mercado: la semana que empieza")
+        XCTAssertNil(parts.personalNotice)
+        var fallbackJSON = json
+        fallbackJSON["personalBasis"] = "explicit_interests"
+        let fallback = BriefingWeeklyPresentation(report: try XCTUnwrap(BriefingReport(json: fallbackJSON)), spanish: false)
+        XCTAssertEqual(fallback.personalTitle, "Your interests: last week", "selected interests must not be labelled as questions")
+        fallbackJSON.removeValue(forKey: "personalBasis")
+        let legacy = try XCTUnwrap(BriefingReport(json: fallbackJSON))
+        XCTAssertNil(legacy.personalBasis)
+        XCTAssertEqual(BriefingWeeklyPresentation(report: legacy, spanish: true).personalTitle, "Tus intereses: la semana pasada")
+    }
+
+    func testGeneralWeeklyFallbackShowsNoInventedPersonalRetrospective() throws {
+        let json: [String: Any] = [
+            "id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301", "cadence": "weekly", "contentVersion": 1,
+            "personalBasis": "general",
+            "sections": [["kind": "market", "title": "Market", "body": "Outlook"]],
+        ]
+        let report = try XCTUnwrap(BriefingReport(json: json))
+        let parts = BriefingWeeklyPresentation(report: report, spanish: false)
+        XCTAssertEqual(report.personalBasis, .general)
+        XCTAssertTrue(parts.personalSections.isEmpty)
+        XCTAssertEqual(parts.commonSections.map(\.kind), ["market"])
+        XCTAssertEqual(parts.personalNotice, "No personal asset review is available for this briefing. The market outlook follows.")
+        var unknown = json
+        unknown["personalBasis"] = "future_basis"
+        XCTAssertNil(try XCTUnwrap(BriefingReport(json: unknown)).personalBasis, "unknown metadata cannot invent consented history")
     }
 
     func testPlaybackDefaultIsSilentAndHidden() {

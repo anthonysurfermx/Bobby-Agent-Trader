@@ -13,7 +13,8 @@
 // request-security's own `{error}` body, without a code.)
 // Invariants:
 //   · The owner is the verified session's identity, never a body/query field. Foreign and missing ids are the
-//     same 404. Pro and storage are read from the database; a failure is 503, never "free" or "empty".
+//     same 404. Feature-specific paid ACTIVE Pro and storage are read from the database; unknown payment fails
+//     closed (no referral grants/trials/Sandbox). A storage failure is 503, never "free" or "empty".
 //   · Opening a report never generates anything. Narration is synthesized only through voice.ensureAudio (one
 //     reserved attempt per cache key, single-flight) and only with BOBBY_BRIEFINGS_ENABLED=on; cached audio and
 //     retained reports stay readable with the flag off.
@@ -194,6 +195,8 @@ async function patchSettings({ req, res, identity }: Ctx) {
   if (expected === undefined) fail(428, 'revision_required');
   if (expected === null) fail(400, 'invalid_request');
   const body = parseWith(SettingsPatch, await readJsonBody(req, LIMITS.settingsBodyBytes));
+  // Preserve legacy switches for safe opt-out, but only the weekly product can be enabled.
+  if (body.openingEnabled === true || body.closeEnabled === true) fail(400, 'invalid_request');
 
   const patch: Record<string, unknown> = {};
   for (const k of ['openingEnabled', 'closeEnabled', 'weeklyEnabled', 'language', 'companionId', 'assets'] as const) {
@@ -377,6 +380,7 @@ type ReportFields = {
   id: string; cadence: Cadence; contentVersion: number; periodStart: string | null; periodEnd: string | null; scheduledAt: string | null;
   dataAsOf: string | null; calendarVersion: string; quality: string; title: string; opening: string; sections: unknown[];
   narrationSegments: string[]; sources: unknown[]; equitySession: unknown; voice: string | null; language: string;
+  personalBasis?: 'asked_assets' | 'explicit_interests' | 'general';
 };
 
 /** The owned, ready report (404 for missing or foreign, 403 for an owner without Pro). Never regenerates. */
@@ -393,6 +397,8 @@ async function loadReport(identityId: string, id: string): Promise<ReportFields>
     calendarVersion: String(r.calendarVersion ?? ''), quality: String(r.quality ?? ''),
     title: typeof content.title === 'string' ? content.title : '',
     opening: typeof content.opening === 'string' ? content.opening : '',
+    ...(['asked_assets', 'explicit_interests', 'general'].includes(String(content.personalBasis))
+      ? { personalBasis: content.personalBasis as ReportFields['personalBasis'] } : {}),
     sections: Array.isArray(content.sections) ? content.sections : [],
     narrationSegments: Array.isArray(content.narrationSegments) ? content.narrationSegments.filter((s): s is string => typeof s === 'string') : [],
     sources: Array.isArray(content.sources) ? content.sources : [],
@@ -463,7 +469,10 @@ async function voice({ req, res, identity }: Ctx) {
   const cacheKey = audioCacheKey(text, body.voice, body.language, BRIEF_VIBE, TTS_MODEL());
 
   const a = await db.requestAudio(identity.id, briefId, body.contentVersion, body.segmentIndex, cacheKey, body.voice, body.language);
-  if ('code' in a) return a.code === 'content_version_conflict' ? fail(409, 'content_version_conflict') : fail(404, 'not_found');
+  if ('code' in a) {
+    if (a.code === 'subscription_required') fail(403, 'subscription_required');
+    return a.code === 'content_version_conflict' ? fail(409, 'content_version_conflict') : fail(404, 'not_found');
+  }
   if (a.state === 'ready') return answer(200, { state: 'ready', audioId: a.audioId, mediaType: AUDIO_MIME });
   if (a.state === 'failed') fail(503, 'voice_unavailable');
   if (!briefingsEnabled()) fail(503, 'feature_disabled');
@@ -509,4 +518,3 @@ async function audio({ res, identity, query }: Ctx) {
   res.setHeader('Content-Length', String(bytes.length));
   return res.status(200).end(bytes);
 }
-

@@ -9,9 +9,9 @@
 //     canonical periods; a tick at or after pushExpiresAt no longer sees that period.
 //   · Equities are never labelled live outside a configured core session; outside calendar coverage the
 //     equity state is 'unknown' and the close cadence is not scheduled at all.
-//   · Weekly: the period is defined by its cutoff instant (Sunday 18:00 NY), covering the preceding seven
-//     local days up to that instant. It does not claim a calendar week has ended (that is midnight); it
-//     covers the latest completed equity trading week plus the crypto weekend so far.
+//   · Weekly: Monday 08:00 NY, with prior Monday 08:00 → current Monday 08:00 as the historical interval.
+//     The briefing looks ahead to the coming week; historical quotes are explicitly labelled retrospective.
+//     Daily/close helpers remain for stored data, but they cannot become scheduled work.
 // ============================================================
 import type { Cadence, EquitySessionState, Period } from './types.js';
 import { CADENCES } from './types.js';
@@ -19,7 +19,7 @@ import { adoptedCadences, morningDays } from './config.js';
 
 export const NY_TIMEZONE = 'America/New_York' as const;
 export const NYSE_CALENDAR_VERSION = 'nyse-2026-2027-v1';
-export const POLICY_VERSION = 'proposed-v1';
+export const POLICY_VERSION = 'weekly-monday-0800-v1';
 
 /**
  * NYSE holidays and early closes, coverage 2026-01-01 … 2027-12-31.
@@ -63,11 +63,11 @@ export const NYSE_CALENDAR = {
   } as Readonly<Record<string, string>>,
 } as const;
 
-/** Schedule windows of policy `proposed-v1`, NY local times (minutes for the close cadence). */
+/** NY local windows. Preparation/readiness/expiry remain operational proposals; weekly delivery is confirmed. */
 const WINDOWS = {
   morning: { prepare: '07:30', readyBy: '07:59', scheduled: '08:00', expires: '08:30' },
   close: { delayMinutes: 15, readyByBeforeMinutes: 1, expiresAfterMinutes: 30 },
-  weekly: { prepare: '17:30', readyBy: '17:59', scheduled: '18:00', expires: '18:30' },
+  weekly: { prepare: '07:30', readyBy: '07:59', scheduled: '08:00', expires: '08:30' },
 } as const;
 
 export interface SchedulePolicy { adopted: Set<Cadence>; morningDays: 'all' | 'sessions' }
@@ -268,7 +268,7 @@ function buildPeriod(
  * period can always be recomputed from its key's date.
  *   · morning: every day ('all') or only NYSE session days ('sessions'; unknown days outside coverage are skipped);
  *   · close: NYSE session days inside coverage only;
- *   · weekly: Sundays only; `date` is the cutoff Sunday.
+ *   · weekly: Mondays only; `date` is the cutoff Monday.
  */
 export function periodForDate(cadence: Cadence, date: string, policy: SchedulePolicy): Period | null {
   parseDate(date);
@@ -291,7 +291,7 @@ export function periodForDate(cadence: Cadence, date: string, policy: SchedulePo
       hours.closeAt, addMinutes(scheduled, -w.readyByBeforeMinutes), addMinutes(scheduled, w.expiresAfterMinutes), date,
     );
   }
-  if (weekdayOf(date) !== 0) return null;
+  if (weekdayOf(date) !== 1) return null;
   const w = WINDOWS.weekly;
   const startDate = addDays(date, -7);
   return buildPeriod(
@@ -311,6 +311,7 @@ export function duePeriods(now: Date, policy: SchedulePolicy): Array<{ period: P
   const today = nyParts(now).date;
   const out: Array<{ period: Period; phase: 'prepare' | 'dispatch' }> = [];
   for (const cadence of CADENCES) {
+    if (cadence !== 'weekly') continue;
     if (!policy.adopted.has(cadence)) continue;
     for (const date of [addDays(today, -1), today, addDays(today, 1)]) {
       const period = periodForDate(cadence, date, policy);
@@ -332,11 +333,10 @@ const NEXT_SCAN_DAYS = 370;
 
 /** The next period of an adopted cadence scheduled strictly after `now`; null when not adopted or not scheduled. */
 export function nextScheduled(cadence: Cadence, now: Date, policy: SchedulePolicy): Period | null {
-  if (!policy.adopted.has(cadence)) return null;
+  if (cadence !== 'weekly' || !policy.adopted.has(cadence)) return null;
   const at = now.getTime();
   let date = nyParts(now).date;
   for (let i = 0; i <= NEXT_SCAN_DAYS; i++, date = addDays(date, 1)) {
-    if (cadence === 'close' && date > NYSE_CALENDAR.coverage.to) return null;
     const period = periodForDate(cadence, date, policy);
     if (period && Date.parse(period.scheduledAt) > at) return period;
   }
@@ -348,14 +348,14 @@ export function scheduleSummary(now: Date, policy: SchedulePolicy): {
   timezone: 'America/New_York'; policyVersion: string;
   opening: { configured: boolean; localTime: '08:00'; nextAt: string | null };
   close: { configured: boolean; delayMinutes: 15; nextAt: string | null };
-  weekly: { configured: boolean; weekday: 'Sunday'; localTime: '18:00'; nextAt: string | null };
+  weekly: { configured: boolean; weekday: 'Monday'; localTime: '08:00'; nextAt: string | null };
 } {
   const nextAt = (cadence: Cadence): string | null => nextScheduled(cadence, now, policy)?.scheduledAt ?? null;
   return {
     timezone: NY_TIMEZONE,
     policyVersion: POLICY_VERSION,
-    opening: { configured: policy.adopted.has('morning'), localTime: WINDOWS.morning.scheduled, nextAt: nextAt('morning') },
-    close: { configured: policy.adopted.has('close'), delayMinutes: WINDOWS.close.delayMinutes, nextAt: nextAt('close') },
-    weekly: { configured: policy.adopted.has('weekly'), weekday: 'Sunday', localTime: WINDOWS.weekly.scheduled, nextAt: nextAt('weekly') },
+    opening: { configured: false, localTime: WINDOWS.morning.scheduled, nextAt: null },
+    close: { configured: false, delayMinutes: WINDOWS.close.delayMinutes, nextAt: null },
+    weekly: { configured: policy.adopted.has('weekly'), weekday: 'Monday', localTime: WINDOWS.weekly.scheduled, nextAt: nextAt('weekly') },
   };
 }

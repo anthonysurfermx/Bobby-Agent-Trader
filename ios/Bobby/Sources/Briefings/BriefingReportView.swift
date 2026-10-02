@@ -152,6 +152,33 @@ final class BriefingReportModel: ObservableObject {
     }
 }
 
+/// Two parts of the weekly report. An asset section reflects a question or selected interest,
+/// never a holding, an executed trade or portfolio performance. Order within each part stays server-authored.
+struct BriefingWeeklyPresentation {
+    let personalSections: [BriefingSection]
+    let commonSections: [BriefingSection]
+    let personalTitle: String
+    let commonTitle: String
+    let personalNotice: String?
+
+    init(report: BriefingReport, spanish: Bool = L.isSpanish) {
+        personalSections = report.sections.filter { $0.kind == "asset" }
+        commonSections = report.sections.filter { $0.kind != "asset" }
+        if report.personalBasis == .askedAssets {
+            personalTitle = L.t("Your questions: last week", "Tus consultas: la semana pasada", spanish: spanish)
+        } else if !personalSections.isEmpty {
+            personalTitle = L.t("Your interests: last week", "Tus intereses: la semana pasada", spanish: spanish)
+        } else {
+            personalTitle = L.t("Your questions: last week", "Tus consultas: la semana pasada", spanish: spanish)
+        }
+        commonTitle = L.t("The market: the week ahead", "El mercado: la semana que empieza", spanish: spanish)
+        personalNotice = personalSections.isEmpty
+            ? L.t("No personal asset review is available for this briefing. The market outlook follows.",
+                  "No hay un repaso personal de activos disponible en este resumen. Sigue el panorama general del mercado.", spanish: spanish)
+            : nil
+    }
+}
+
 // MARK: - Screen
 
 struct BriefingReportView: View {
@@ -255,7 +282,26 @@ struct BriefingReportView: View {
                 .padding(.top, 12)
                 .accessibilityIdentifier("briefing-quality")
         }
-        ForEach(Array(report.sections.enumerated()), id: \.offset) { _, section in sectionView(section) }
+        if report.cadence == .weekly {
+            let parts = BriefingWeeklyPresentation(report: report)
+            VStack(alignment: .leading, spacing: 0) {
+                BriefingSectionLabel(text: parts.personalTitle)
+                if let notice = parts.personalNotice {
+                    Text(notice).font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
+                        .fixedSize(horizontal: false, vertical: true).padding(.top, 8)
+                }
+                ForEach(Array(parts.personalSections.enumerated()), id: \.offset) { _, section in sectionView(section) }
+            }
+            .accessibilityIdentifier("briefing-personal-block")
+            VStack(alignment: .leading, spacing: 0) {
+                BriefingSectionLabel(text: parts.commonTitle)
+                ForEach(Array(parts.commonSections.enumerated()), id: \.offset) { _, section in sectionView(section) }
+            }
+            .accessibilityIdentifier("briefing-common-block")
+        } else {
+            // Retained daily/close reports remain readable in their original order.
+            ForEach(Array(report.sections.enumerated()), id: \.offset) { _, section in sectionView(section) }
+        }
         footer(report)
     }
 

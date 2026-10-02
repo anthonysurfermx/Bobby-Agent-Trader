@@ -87,6 +87,7 @@
     "api/_lib/swap-receipts.ts",
     "api/_lib/stock-signals.ts",
     "api/_lib/briefings/types.ts",
+    "api/_lib/briefings/macro-events.ts",
     "api/_lib/briefings/config.ts",
     "api/_lib/briefings/db.ts",
     "api/_lib/briefings/calendar.ts",

@@ -18,27 +18,29 @@ Archivos clave:
 
 ## (a) Decisiones pendientes — cada una vive en una variable o constante
 
-Hoy solo está **confirmado** el resumen de las 08:00 hora de Nueva York. Todo lo demás es propuesta:
+La dirección confirmada es **semanal ligero los lunes a las 08:00 America/New_York**, más eventos macro importantes confirmados. Semanal es la única cadencia periódica. No generar diarios/cierres. Preparación, expiración, retención y los criterios/límites macro siguen siendo propuestas. [Revisión pendiente antes de activar](pro-market-briefings-review-2026-10-02.md).
 
 | # | Decisión | Propuesta actual | Dónde se codifica |
 |---|---|---|---|
-| P1 | Mañana en días sin sesión (fines de semana, feriados) | Todos los días; acciones marcadas "cerrado", cripto 24/7 | `BOBBY_BRIEFINGS_MORNING_DAYS` = `all` (alt. `sessions`) |
-| P2 | Resumen de cierre | Cierre oficial +15 min, respeta cierres anticipados | Se activa agregando `close` a `BOBBY_BRIEFINGS_CADENCES` (el +15 está en `calendar.ts`) |
-| P3 | Semanal | Domingo 18:00 NY, intervalo `[domingo anterior 18:00, este domingo 18:00)` | Se activa agregando `weekly` a `BOBBY_BRIEFINGS_CADENCES` |
+| P1 | Periodicidad confirmada | Solo semanal lunes 08:00 NY, incluso festivos con mercado correctamente etiquetado | Política `weekly-monday-0800-v1` |
+| P2 | Diarios y cierres | Excluidos de generación y entrega; conservar solo lectura histórica | Config/calendario/API/outbox rechazan nuevas cadencias legacy |
+| P3 | Periodo histórico del semanal | `[lunes anterior 08:00, este lunes 08:00)`; agenda futura separada | `calendar.ts`, `evidence.ts` |
 | P4 | Ventana de preparación | Prepara 07:30, listo 07:59, push 08:00, expira 08:30 | `calendar.ts` (`POLICY_VERSION = proposed-v1`) |
 | P5 | Retención (D11) | Reportes 90 d, audio 14 d, outbox 30 d, intentos 400 d, dispositivos revocados 30 d, idempotencia 24 h, evidencia compartida 120 d | `RETENTION` en `config.ts` (parámetros de `bobby_brief_purge`) |
-| P6 | Switches iniciales | Todos apagados hasta que la persona los active | Default de `bobby_brief_settings_get` (sin fila = todo off) |
+| P6 | Switch inicial | Un único semanal, apagado hasta opt-in | Default de settings; Profile no ofrece diarios/cierre |
 | P7 | Memoria en resúmenes | Apagado hasta revisar App Privacy | `BOBBY_BRIEFINGS_MEMORY` = off |
 | P8 | Calendario NYSE 2026–2027 | Fechas en `calendar.ts` | **Verificar contra nyse.com** antes de activar `close` |
 
+Alertas macro: [plan y clasificador local](pro-market-macro-events.md), apagado por defecto; faltan integración y aprobación de criterios/cupos antes de cualquier envío.
+
 Si cambias P5, actualiza también la sección de privacidad (dice "valores vigentes al lanzamiento") y `EFFECTIVE_DATE`.
-`BOBBY_BRIEFINGS_CADENCES` por defecto es solo `morning`: cierre y semanal aparecen en Perfil como "horario pendiente".
+`BOBBY_BRIEFINGS_CADENCES` por defecto es `weekly`; valores legacy no habilitan matutino/cierre. Profile ofrece solo el semanal. El calendario evita generar contenido periódico fuera de su ventana de lunes.
 
 ## (b) Apple 🔐
 
 1. **APNs Auth Key (.p8)**: developer.apple.com → Certificates, Identifiers & Profiles → Keys → "+" → marca
-   *Apple Push Notifications service (APNs)*. Descarga el `.p8` (solo se puede bajar una vez) y anota el **Key ID** y
-   el **Team ID**. Guárdalo en Keychain/gestor de contraseñas, nunca en el repo.
+   *Apple Push Notifications service (APNs)*. Revisa primero claves existentes para no crear duplicados. Si se necesita una nueva, prepara scope limitado al topic de Bobby y entorno Production para TestFlight/App Store; confirma la creación en la pantalla final. Descarga el `.p8` (solo se puede bajar una vez) y anota el **Key ID** y
+   el **Team ID**. Las claves nuevas pueden estar restringidas por entorno/topic: no asumir que una clave Production también acepta Sandbox. [Documentación Apple](https://developer.apple.com/documentation/usernotifications/establishing-a-token-based-connection-to-apns). Guárdalo en Keychain/gestor de contraseñas, nunca en el repo.
 2. **App ID `xyz.bobbyprotocol.bobby`**: Identifiers → el App ID → activa la capability **Push Notifications** → Save.
 3. **Perfiles / archivos**: regenera los provisioning profiles después del paso 2. Verifica en el archive de build 53
    que el entitlement `aps-environment` existe y vale **`production`** (TestFlight y App Store usan production; el
@@ -60,8 +62,8 @@ Primero en **Preview/staging**, después en Production. Nunca en Git.
 | Variable | Valor | Nota |
 |---|---|---|
 | `BOBBY_BRIEFINGS_ENABLED` | **sin definir / off** | Se prende solo cuando pase staging (e) y el iPhone (f) |
-| `BOBBY_BRIEFINGS_CADENCES` | `morning` | Agregar `close`, `weekly` solo cuando se aprueben P2/P3 |
-| `BOBBY_BRIEFINGS_MORNING_DAYS` | `all` o `sessions` | P1 |
+| `BOBBY_BRIEFINGS_CADENCES` | `weekly` | Única cadencia periódica; no habilitar diarios/cierre |
+| `BOBBY_BRIEFINGS_MORNING_DAYS` | Legacy, no configura generación | P2 |
 | `BOBBY_BRIEFINGS_DAILY_CAP_USD`, `BOBBY_BRIEFINGS_MONTHLY_CAP_USD` | tú decides | **Obligatorias**: sin ellas = `budget_unavailable`, no hay gasto pagado (solo texto "facts-only") |
 | `BOBBY_BRIEFINGS_LLM` | default `anthropic:claude-sonnet-5-5,openai:gpt-4o-mini` | Orden de proveedores |
 | `BOBBY_BRIEFINGS_LLM_MAX_TOKENS` | default 3000 | Techo por intento |
@@ -73,7 +75,7 @@ Primero en **Preview/staging**, después en Production. Nunca en Git.
 | `BOBBY_APNS_KEY_ID`, `BOBBY_APNS_TEAM_ID` | del paso (b1) | 10 caracteres cada uno |
 | `BOBBY_APNS_PRIVATE_KEY` | contenido PEM del `.p8` (`\n` escapados se aceptan) | Sin él: el despacho se pausa, las filas esperan hasta expirar |
 | `BOBBY_APNS_TOPIC` | default `xyz.bobbyprotocol.bobby` | Solo config del servidor |
-| `BOBBY_APNS_ENVIRONMENTS` | `production` | Agregar `sandbox` solo en staging si pruebas builds de desarrollo |
+| `BOBBY_APNS_ENVIRONMENTS` | `production` | Agregar `sandbox` solo si staging tiene una clave APNs válida para Sandbox |
 | `CRON_SECRET` | no vacío | Sin él el worker responde 503 |
 | `BOBBY_OPS_SECRET` | no vacío, distinto de `CRON_SECRET` | Disparo manual del worker (e) |
 
@@ -109,11 +111,10 @@ Ojo con el gasto global: `bobby_llm_spend()` suma **todas** las superficies, as�
 
 Con `BOBBY_BRIEFINGS_ENABLED=on` **solo en el entorno de staging** (Preview, `VERCEL_ENV !== 'production'`):
 
-1. **Disparo controlado** (el cron real apunta a producción): `POST /api/briefing-worker?at=<ISO>` con header
-   `x-bobby-ops: <BOBBY_OPS_SECRET>`. El override `at=` solo funciona fuera de producción. Úsalo para simular 07:30
-   (preparación), 08:00 (despacho), 08:31 (expiración) y un cambio de horario (DST, marzo/noviembre).
+1. **Disparo controlado** (el cron real apunta a producción): `POST /api/briefing-worker` con JSON `{"at":"<ISO>"}` y header
+   `x-bobby-ops: <BOBBY_OPS_SECRET>`. El override solo funciona fuera de producción y cambia **solo el calendario**, no `now()` de PostgreSQL. No permite probar libremente despacho/expiración con una fecha simulada: alinear el reloj/fixtures de una base local o correr staging en tiempo real. Para el semanal, las ventanas propuestas del lunes son 07:30, 08:00 y 08:31 NY, incluyendo DST.
 2. **Carga**: 100 entregas en cola y 20 aperturas simultáneas de reportes desde 20 cuentas distintas
-   (`scripts/test-briefings-load-pg.mts` lo cubre en PG local; en staging repetir con cuentas de prueba reales).
+   (pendiente de implementar y ejecutar: el archivo `scripts/test-briefings-load-pg.mts` mencionado en la entrega original no existe; los tests actuales no acreditan ese escenario).
 3. **Qué medir** (no inventar números; anotar lo observado):
    - Tiempo de preparación: desde el claim de 07:30 hasta `ready` de todos los reportes (¿antes de 07:59?).
    - Costo LLM y TTS por periodo: `bobby_brief_provider_attempts` (reservado vs. liquidado, `settled_assumed`) y
@@ -126,10 +127,9 @@ Con `BOBBY_BRIEFINGS_ENABLED=on` **solo en el entorno de staging** (Preview, `VE
 
 ## (f) Protocolo en iPhone físico
 
-Un HTTP 200 de APNs **no prueba** que llegó la notificación, y el simulador no prueba recepción real. Con build 53 de
-TestFlight (entorno production) en un iPhone real:
+Un HTTP 200 de APNs **no prueba** que llegó la notificación, y el simulador no prueba recepción real. Con un build 53 QA que apunte expresamente al backend de staging y tenga firma/entorno APNs compatible, en un iPhone real (TestFlight usa APNs production). La app actual apunta por defecto a producción; no asumir que el dispositivo usa staging sin verificar la URL compilada:
 
-1. Recepción real: activar "Apertura del mercado", aceptar permiso, disparar en staging, confirmar que el aviso llega
+1. Recepción real: activar "Resumen semanal", aceptar permiso, disparar en staging, confirmar que el aviso llega
    con el texto genérico (sin nombre, símbolos ni cifras) en pantalla bloqueada.
 2. Tap con la app cerrada (cold) y en segundo plano (warm): abre el reporte correcto y empieza la narración solo si
    hay consentimiento de audio.
@@ -170,7 +170,7 @@ costo_periodo ≈ (narrativas × idiomas × costo_por_narrativa)
 
 - `narrativas` = 1 por periodo y cadencia (D1: no hay llamada LLM por cuenta) — más reintentos y fallback.
 - `idiomas` = idiomas con al menos un reporte pendiente (hoy `es`, `en`).
-- `segmentos_TTS_únicos` ≤ 4 por reporte de ≤ 2,400 caracteres; solo se sintetizan bloques compartidos (D2).
+- `segmentos_TTS_únicos` ≤ 3 por reporte semanal de ≤ 1,200 caracteres; solo se sintetizan bloques compartidos (D2).
 - `voces_en_uso` = voces distintas entre suscriptores con consentimiento de audio (18 compañeros → menos voces).
 - `costo_por_segmento` ≈ caracteres × `BOBBY_BRIEFINGS_TTS_ESTIMATE_USD_PER_CHAR` (OpenAI no devuelve uso).
 
@@ -181,7 +181,7 @@ costo_periodo ≈ (narrativas × idiomas × costo_por_narrativa)
 | Voces distintas en uso | _pendiente_ | |
 | Tasa de reuso de audio | _pendiente_ | |
 | Reintentos / `unknown` por periodo | _pendiente_ | |
-| Costo total por periodo (morning) | _pendiente_ | |
+| Costo total por periodo (weekly) | _pendiente_ | |
 
 Con esos valores se fijan `BOBBY_BRIEFINGS_DAILY_CAP_USD` y `MONTHLY` con margen, y se recalibra
 `BOBBY_BRIEFINGS_TTS_RESERVE_USD_PER_CHAR`. No anunciar costos hasta tener esta tabla llena.

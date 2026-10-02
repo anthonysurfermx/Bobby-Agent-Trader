@@ -202,6 +202,36 @@ try {
   await assert.rejects(grant(bo, 5000, 0, 0, 0)); checks++;
   for (const role of ['anon', 'authenticated']) eq((await pool.query("select has_function_privilege($1, 'public.bobby_admin_grant(uuid,int,int,int,int)', 'execute') as r", [role])).rows[0].r, false, `${role} cannot grant`);
 
+  // A dashboard gift is the same server-side balance spent by iOS requests; no AI/provider calls.
+  const receiver = await account({ email: 'grant-consumer@example.test' });
+  await grant(receiver, 1, 1, 1, 0);
+  const balance = async () => (await pool.query('select reads, profundo, maximo from public.bobby_usage_bonus where identity_id=$1', [receiver])).rows[0];
+  eq(await balance(), { reads: 1, profundo: 1, maximo: 1 }, 'persisted in the selected identity');
+  eq((await pool.query('select count(*)::int n from public.bobby_usage_bonus where identity_id=$1', [ana])).rows[0].n, 0, 'another identity receives no gift');
+  const consume = async (paywall = true) => (await pool.query("select public.bobby_consume_read($1,null,null,'ios','NVDA',$2) r", [receiver, paywall])).rows[0].r;
+  for (let i = 0; i < 10; i++) eq((await consume()).allowed, true, 'base allowance is consumed first');
+  eq((await balance()).reads, 1, 'base reads leave the gift intact');
+  const paidByGift = await consume();
+  eq([paidByGift.allowed, paidByGift.bonus], [true, 0], 'iOS at its cap spends one gifted read');
+  eq((await consume()).allowed, false, 'no reads after base and gift are exhausted');
+  await pool.query('delete from public.bobby_reads where id=$1', [paidByGift.readId]);
+  eq((await balance()).reads, 1, 'a failed gifted analysis is refunded');
+  eq((await consume(false)).allowed, true, 'paywall off permits another ordinary read');
+  eq((await balance()).reads, 1, 'paywall off does not spend gifted reads');
+  const zeroLimits = { anon: { profundo: [0, 7], maximo: [0, 7] }, free: { profundo: [0, 7], maximo: [0, 7] }, pro: { profundo: [0, 7], maximo: [0, 7] } };
+  for (const level of ['profundo', 'maximo']) {
+    const lv = (await pool.query("select public.bobby_consume_level($1,null,$2,'NVDA',$3::jsonb) r", [receiver, level, JSON.stringify(zeroLimits)])).rows[0].r;
+    eq([lv.allowed, lv.bonus], [true, 0], `gift permits ${level} even with zero base allowance`);
+    await pool.query('delete from public.bobby_level_uses where id=$1', [lv.useId]);
+    eq((await balance())[level], 1, `${level} failure returns the gift`);
+  }
+  const race = await Promise.all([consume(), consume()]);
+  eq(race.filter((r) => r.allowed).length, 1, 'two simultaneous iOS calls cannot spend one gift twice');
+  // Characterize the open retry defect: admin grants have no operation key and repeat their addition.
+  await grant(receiver, 5, 0, 0, 0);
+  await grant(receiver, 5, 0, 0, 0);
+  eq((await balance()).reads, 10, 'a repeated admin grant currently adds twice (not idempotent)');
+
   // ---------- cascades ----------
   await pool.query("insert into public.bobby_admins(identity_id) values ($1)", [bo]);
   await pool.query("insert into public.bobby_events(event, platform, identity_id) values ('visit', 'web', $1)", [bo]);

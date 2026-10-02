@@ -429,7 +429,8 @@ enum BobbyAPI {
     /// `retry-after` on a 429). Same URL, Origin header, timeouts and body as `response`.
     /// `extraHeaders` carries the metered-read identity (`BobbyAccessAPI.headers`).
     static func responseWithHeaders(_ path: String, method: String = "GET", body: [String: Any]? = nil,
-                                    extraHeaders: [String: String] = [:], timeout: TimeInterval? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+                                    extraHeaders: [String: String] = [:], timeout: TimeInterval? = nil,
+                                    onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         guard let url = URL(string: base.absoluteString + "/" + path) else {
             throw URLError(.badURL)
         }
@@ -447,14 +448,49 @@ enum BobbyAPI {
             req.setValue("application/json", forHTTPHeaderField: "Content-Type")
             req.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
+        if let onEvent { return try await liveResponse(req, onEvent: onEvent) }
         let (data, response) = try await URLSession.shared.data(for: req)
         let http = response as? HTTPURLResponse
+        return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, lowercasedHeaders(http))
+    }
+
+    private static func lowercasedHeaders(_ http: HTTPURLResponse?) -> [String: String] {
         var headers: [String: String] = [:]
         for (key, value) in http?.allHeaderFields ?? [:] {
             guard let name = key as? String else { continue }
             headers[name.lowercased()] = value as? String ?? "\(value)"
         }
-        return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, headers)
+        return headers
+    }
+
+    /// The server's NDJSON desk stream. Gates remain ordinary JSON with their HTTP status.
+    /// A complete final line has the same body as the non-streaming response.
+    private static func liveResponse(_ request: URLRequest, onEvent: @Sendable ([String: Any]) -> Void) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+        var req = request
+        req.setValue("application/x-ndjson, application/json", forHTTPHeaderField: "Accept")
+        let (bytes, response) = try await URLSession.shared.bytes(for: req)
+        let http = response as? HTTPURLResponse
+        let headers = lowercasedHeaders(http)
+        let status = http?.statusCode ?? 0
+        guard headers["content-type"]?.lowercased().contains("ndjson") == true else {
+            var data = Data()
+            for try await byte in bytes { data.append(byte) }
+            return (try? JSONSerialization.jsonObject(with: data), status, headers)
+        }
+        for try await line in bytes.lines {
+            try Task.checkCancellation()
+            guard let event = (try? JSONSerialization.jsonObject(with: Data(line.utf8))) as? [String: Any],
+                  let type = event["type"] as? String else { continue }
+            switch type {
+            case "final":
+                guard let data = event["data"] as? [String: Any] else { throw URLError(.cannotParseResponse) }
+                return (data, status, headers)
+            case "error":
+                return (["code": "analysis_failed", "error": event["error"] ?? NSNull(), "refunded": event["refunded"] ?? false], 503, headers)
+            default: onEvent(event)
+            }
+        }
+        throw URLError(.networkConnectionLost)
     }
 
     /// Words that carry no asset meaning in a natural question, es/en.

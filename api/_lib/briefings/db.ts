@@ -46,11 +46,11 @@ const obj = (v: unknown, name: string): Record<string, unknown> => {
   return v as Record<string, unknown>;
 };
 
-// ---- Pro entitlement (bobby_is_pro: live subscription or unexpired grant). Never consumes a read. ----
+// ---- Feature-specific paid ACTIVE Pro. Grants/trials/Sandbox/unknown paid-period evidence fail closed. ----
 /** True/false from the database; throws BriefingStorageError when unknown (callers answer 503, never "free"). */
 export async function isPro(identityId: string): Promise<boolean> {
-  const v = await rpc('bobby_is_pro', { p_identity: identityId }, 4000);
-  if (typeof v !== 'boolean') throw new BriefingStorageError('bobby_is_pro', 200);
+  const v = await rpc('bobby_brief_is_paid_pro', { p_identity: identityId }, 4000);
+  if (typeof v !== 'boolean') throw new BriefingStorageError('bobby_brief_is_paid_pro', 200);
   return v;
 }
 
@@ -193,7 +193,7 @@ export async function budgetStatus(): Promise<Record<string, unknown>> {
 }
 
 // ---- audio ----
-export type AudioRequest = { audioId: string; state: 'queued' | 'processing' | 'ready' | 'failed' } | { code: 'not_found' | 'content_version_conflict' };
+export type AudioRequest = { audioId: string; state: 'queued' | 'processing' | 'ready' | 'failed' } | { code: 'not_found' | 'content_version_conflict' | 'subscription_required' };
 export async function requestAudio(identityId: string, briefId: string, contentVersion: number, segment: number, cacheKey: string, voice: string, language: string): Promise<AudioRequest> {
   return obj(await rpc('bobby_brief_audio_request', { p_identity: identityId, p_brief: briefId, p_content_version: contentVersion, p_segment: segment, p_cache_key: cacheKey, p_voice: voice, p_language: language }), 'bobby_brief_audio_request') as unknown as AudioRequest;
 }

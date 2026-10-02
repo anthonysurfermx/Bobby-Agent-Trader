@@ -1,10 +1,10 @@
 // Bobby Pro market briefings — Profile › Market briefings (build 53).
-// Three independent switches (opening / close / weekly) explained in New York time with the phone's
+// One weekly switch (Monday 08:00 New York) with the phone's
 // equivalent, the two consents, the followed assets, and links to the inbox and the memory screen.
 // Invariants:
 //  - Every value shown comes from BriefingsCenter (the account's revisioned settings); a switch shows its
 //    pending target with a spinner and is saved only when the server answers (the center owns that).
-//  - A non-Pro account sees why and how to get Bobby Pro, and can only turn switches OFF. A schedule the
+//  - A non-Pro account sees why and how to get Bobby Pro, and can only turn the weekly switch OFF. A schedule the
 //    server has not adopted (`configured:false`) reads "Schedule pending" and cannot be turned on.
 //  - iOS permission is separate from the account choice: a denied permission with a switch on shows
 //    "Notifications blocked in iOS" and the Settings route; it never claims delivery.
@@ -22,7 +22,7 @@ enum BriefingCopy {
         switch c {
         case .morning: return L.t("Market opening", "Apertura de mercado", spanish: spanish)
         case .close: return L.t("Market close", "Cierre de mercado", spanish: spanish)
-        case .weekly: return L.t("Weekly", "Semanal", spanish: spanish)
+        case .weekly: return L.t("Weekly briefing", "Resumen semanal", spanish: spanish)
         }
     }
 
@@ -33,14 +33,14 @@ enum BriefingCopy {
                                   "Antes de la apertura en EE. UU.: lo de la noche, tus activos, riesgos y la agenda del día", spanish: spanish)
         case .close: return L.t("After the US close: what changed in the session and what is still open",
                                 "Después del cierre en EE. UU.: qué cambió en la sesión y qué sigue abierto", spanish: spanish)
-        case .weekly: return L.t("The week’s changes and what to watch next week",
-                                 "Los cambios de la semana y qué vigilar la próxima", spanish: spanish)
+        case .weekly: return L.t("A short look at the past week and what to watch this week",
+                                 "Un vistazo breve a la semana pasada y qué vigilar esta semana", spanish: spanish)
         }
     }
 
     /// The Profile row detail: the briefings this account has on, or "Bobby Pro" when none.
     static func summary(_ settings: BriefingSettings?, spanish: Bool = L.isSpanish) -> String {
-        let on = BriefingCadence.allCases.filter { settings?.isOn($0) == true }
+        let on = BriefingCadence.offeredCadences.filter { settings?.isOn($0) == true }
         guard !on.isEmpty else { return "Bobby Pro" }
         return on.map { cadence($0, spanish: spanish) }.joined(separator: " · ")
     }
@@ -68,6 +68,7 @@ enum BriefingCopy {
 
     /// The honest line for a period whose report is not (yet) there; nil when it is ready.
     static func latestNotice(_ latest: BriefingLatest, spanish: Bool = L.isSpanish) -> String? {
+        guard BriefingCadence.offeredCadences.contains(latest.cadence) else { return nil }
         switch latest.state {
         case .ready: return nil
         case .preparing:
@@ -174,8 +175,8 @@ enum BriefingFormat {
             }
             return line
         case .weekly:
-            let day = weekdays(s.weekday, spanish: spanish) ?? s.weekday ?? ""
-            var line = L.t("\(day) · \(s.localTime ?? "") New York", "\(day) · \(s.localTime ?? "") Nueva York", spanish: spanish)
+            let day = weekdays(s.weekday ?? "Monday", spanish: spanish) ?? s.weekday ?? ""
+            var line = L.t("\(day) · \(s.localTime ?? "08:00") New York", "\(day) · \(s.localTime ?? "08:00") Nueva York", spanish: spanish)
             if let next = s.nextAt, differsFromNewYork(at: next, zone: zone) {
                 line += " · \(weekdayTime(next, spanish: spanish, zone: zone)) \(yours)"
             }
@@ -207,7 +208,7 @@ struct BriefingSettingsPresentation: Equatable {
 
     static func make(settings: BriefingSettings?, eligiblePro: Bool?, schedules: BriefingSchedules?,
                      pending: [BriefingCadence: Bool], permission: PushPermission) -> BriefingSettingsPresentation {
-        let rows = BriefingCadence.allCases.map { c -> BriefingCadenceRow in
+        let rows = BriefingCadence.offeredCadences.map { c -> BriefingCadenceRow in
             let isOn = pending[c] ?? settings?.isOn(c) ?? false
             let saving = pending[c] != nil
             let configured = schedules?.schedule(for: c)?.configured ?? false
@@ -216,7 +217,7 @@ struct BriefingSettingsPresentation: Equatable {
                                       interactive: settings != nil && !saving && (isOn || canTurnOn))
         }
         return BriefingSettingsPresentation(rows: rows, showsPro: settings != nil && eligiblePro == false,
-                                            blocked: permission == .denied && (settings?.anyCadenceOn ?? false))
+                                            blocked: permission == .denied && (settings?.weeklyEnabled ?? false))
     }
 }
 
@@ -249,7 +250,7 @@ struct BriefingsSettingsView: View {
         NavigationStack(path: $path) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    BriefingTopBar(title: L.t("Market briefings", "Resúmenes de mercado"), onClose: onClose)
+                    BriefingTopBar(title: L.t("Weekly market briefing", "Resumen semanal de mercado"), onClose: onClose)
                     content
                 }
                 .padding(.horizontal, 22)
@@ -283,8 +284,8 @@ struct BriefingsSettingsView: View {
     }
 
     @ViewBuilder private var content: some View {
-        Text(L.t("Bobby prepares a market briefing for you and lets you know when it is ready. Times follow New York; your phone’s time is shown next to it.",
-                 "Bobby prepara un resumen de mercado para ti y te avisa cuando está listo. Los horarios siguen a Nueva York; junto a ellos ves la hora de tu teléfono."))
+        Text(L.t("Start your week with a short market briefing every Monday at 08:00 New York. Bobby lets you know when it is ready; your phone’s time appears below.",
+                 "Empieza la semana con un resumen breve de mercado cada lunes a las 08:00 de Nueva York. Bobby te avisa cuando está listo; abajo ves la hora de tu teléfono."))
             .font(.system(size: 13)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
             .padding(.top, 14)
         if !account.isSignedIn {
@@ -319,7 +320,7 @@ struct BriefingsSettingsView: View {
         let p = presentation
         if p.showsPro { proCard }
         if p.blocked { blockedBanner }
-        BriefingSectionLabel(text: L.t("Briefings", "Resúmenes"))
+        BriefingSectionLabel(text: L.t("Weekly briefing", "Resumen semanal"))
         ForEach(p.rows) { row in cadenceRow(row) }
         if let error = center.lastError {
             Text(error.message).font(.system(size: 12)).foregroundStyle(Theme.down)

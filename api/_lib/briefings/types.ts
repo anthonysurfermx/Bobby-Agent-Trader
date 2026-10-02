@@ -133,6 +133,8 @@ export interface BriefContent {
   language: BriefLanguage;
   title: string;
   opening: string;
+  /** Weekly retrospective source. An asked asset is an interest, never evidence of a holding. */
+  personalBasis?: 'asked_assets' | 'explicit_interests' | 'general';
   sections: BriefSection[];
   /** ≤ 4 segments, each ≤ 800 chars, total ≤ 2,400 chars. Spoken text only (no name). */
   narrationSegments: string[];
@@ -174,7 +176,7 @@ export interface FrozenSettings {
 export interface ComposerMemory {
   experience: 'new' | 'some' | 'experienced' | null;
   explainRiskDepth: 'low' | 'medium' | 'high' | null;
-  /** Supported symbols the account asked about at least twice, most relevant first. */
+  /** Supported symbols the account asked about at least once, most relevant first. */
   frequentAssets: string[];
 }
 
