@@ -24,6 +24,7 @@ import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
+import { track } from '@/lib/track';
 import { captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
 import NucleoChart from './NucleoChart';
 import NucleoProfile from './NucleoProfile';
@@ -116,6 +117,7 @@ function Voice({ k, line, active, align }: { k: AgentKey; line: string | null; a
 }
 
 export default function NucleoDesk() {
+  useEffect(() => { track('desk_entered', 'desk'); }, []);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const location = useLocation();

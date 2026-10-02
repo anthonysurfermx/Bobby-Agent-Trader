@@ -24,7 +24,7 @@ const endpoint = () => ((process.env.AMPLITUDE_REGION || '').trim().toLowerCase(
 
 /** One stored event → one Amplitude event. insert_id makes a retried batch idempotent on Amplitude's side. */
 export function toAmplitude(r: Row) {
-  const props: Record<string, string> = {};
+  const props: Record<string, string> = { platform: r.platform ?? 'web' };
   if (r.surface) props.surface = r.surface;
   if (r.referrer) props.referrer = r.referrer;
   if (r.utm) props.utm_source = r.utm;
@@ -59,10 +59,10 @@ export async function runAmplitude(): Promise<{ ok: boolean; skipped?: string; s
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: AbortSignal.timeout(15_000),
         body: JSON.stringify({ api_key: apiKey, events: b.events.map(toAmplitude), options: { min_id_length: 5 } }),
       });
-      if (!r.ok) {
+      if (r.status !== 200) {
         // The cursor stays put: the same batch is retried on the next run (insert_id dedupes on Amplitude's side).
-        const text = (await r.text().catch(() => '')).slice(0, 200);
-        throw new Error(`amplitude ${r.status} ${text}`);
+        // Never log the response body: an ingestion error could echo credentials or identifiers.
+        throw new Error(`amplitude ${r.status}`);
       }
       sent += b.events.length;
     }

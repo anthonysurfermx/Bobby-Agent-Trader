@@ -262,7 +262,7 @@ try {
   {
     const a = toAmplitude({ id: 42, at: '2026-10-02T07:18:15Z', event: 'read_done', platform: 'ios', surface: null, device: 'abc123devicehash', identity: '3c2a301a-d9a2-4ad3-90f0-357d29d8a122', referrer: 'x.com', utm: 'tiktok', country: 'MX', region: 'JAL', detail: 'rapido' });
     eq([a.event_type, a.device_id, a.user_id, a.time, a.insert_id, a.platform, a.country, a.region], ['read_done', 'abc123devicehash', '3c2a301a-d9a2-4ad3-90f0-357d29d8a122', Date.parse('2026-10-02T07:18:15Z'), 'bobby-42', 'ios', 'MX', 'JAL'], 'amplitude event mapping');
-    eq(a.event_properties, { referrer: 'x.com', utm_source: 'tiktok', detail: 'rapido' }, 'amplitude properties carry only stored fields');
+    eq(a.event_properties, { platform: 'ios', referrer: 'x.com', utm_source: 'tiktok', detail: 'rapido' }, 'amplitude properties carry only stored fields');
     const g = toAmplitude({ id: 7, at: '2026-10-02T07:18:15Z', event: 'visit', platform: 'web', surface: 'home', device: 'abc123devicehash', identity: null, referrer: null, utm: null, country: null, region: null, detail: null });
     eq(['user_id' in g, 'country' in g], [false, false], 'guest without location sends no user_id or country');
   }

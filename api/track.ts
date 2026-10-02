@@ -2,7 +2,7 @@
 // /api/track — first-party funnel events for the owner dashboard (bobby_events, migration 20261001180000).
 // POST { event, surface?, device?, platform?, referrer?, utm? } (JSON, or text/plain from sendBeacon) → 204.
 // bobby_record_event stores the event and touches the device (bobby_devices: first touch, active days).
-//   event: visit | appstore_click | signin_start | paywall_view | purchase_start
+//   event: visit | desk_entered | appstore_click | signin_start | paywall_view | purchase_start
 // The install id is stored as the same salted hash the read meter uses (api/_lib/access.ts), so a visit and
 // a later guest read of the same browser line up; no IP, user agent, URL path beyond a short surface name,
 // or free text is kept. Referrers keep their host only. Web events keep the country and region Vercel derives
@@ -13,10 +13,11 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { createLimiter, getClientIpKey, saltedKey } from './_lib/rate-limit.js';
 import { requestGeo } from './_lib/geo.js';
 import { callerHash } from './_lib/access.js';
+import { resolveIdentity } from './_lib/user-identity.js';
 
 export const config = { maxDuration: 10 };
 
-const EVENTS = new Set(['visit', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start']);
+const EVENTS = new Set(['visit', 'desk_entered', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start']);
 const OWN_HOSTS = /(^|\.)(bobbyprotocol\.xyz|vercel\.app|localhost)$/;
 const limiter = createLimiter(120, 60_000);
 // Crawlers and link previewers that run JS (Googlebot, Bytespider, headless Chrome, Lighthouse…) are not visitors:
@@ -57,10 +58,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const geo = requestGeo(req);
   let failure: string | null = null;
   try {
+    // Never accept an identity from the body. A signed-in event links the anonymous install to the same
+    // canonical Bobby identity used by authoritative checkout and billing events.
+    const identity = await resolveIdentity(req);
     const r = await fetch(bobbyRest('rpc/bobby_record_event'), {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
       body: JSON.stringify({
         p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source,
+        p_identity: identity?.id ?? null,
         ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
       }),
     });

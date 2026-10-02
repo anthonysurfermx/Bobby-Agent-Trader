@@ -60,6 +60,10 @@ export async function fetchAccess(): Promise<AccessState | null> {
 /** Opens Stripe Checkout (or the billing portal) for Bobby Pro; returns an error message when it cannot. */
 export async function startBilling(action: 'checkout' | 'portal'): Promise<string | null> {
   try {
+    if (action === 'checkout') {
+      // Load after this module initializes: the tracker shares accessHeaders and the install id.
+      void import('@/lib/track').then(({ track }) => track('purchase_start', 'desk')).catch(() => {});
+    }
     const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action }) });
     const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; code?: string; provider?: string };
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
