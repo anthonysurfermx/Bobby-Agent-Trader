@@ -19,6 +19,10 @@ export const config = { maxDuration: 10 };
 const EVENTS = new Set(['visit', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start']);
 const OWN_HOSTS = /(^|\.)(bobbyprotocol\.xyz|vercel\.app|localhost)$/;
 const limiter = createLimiter(120, 60_000);
+// Crawlers and link previewers that run JS (Googlebot, Bytespider, headless Chrome, Lighthouse…) are not visitors:
+// their events are dropped before storage. The user agent is only matched here, never stored.
+const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|bytespider|petalbot|python-requests|curl\/|wget|go-http-client|okhttp|axios|node-fetch|phantomjs|puppeteer|playwright|selenium/i;
+export const isBotUserAgent = (ua: unknown) => typeof ua !== 'string' || !ua.trim() || BOT_UA.test(ua);
 
 export function normalizeEvent(raw: Record<string, unknown>) {
   const event = typeof raw.event === 'string' && EVENTS.has(raw.event) ? raw.event : null;
@@ -44,6 +48,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (limiter.check(getClientIpKey(req)).limited) return res.status(429).end();
+  if (isBotUserAgent(req.headers['user-agent'])) return res.status(204).end();
   let raw: Record<string, unknown>;
   try { raw = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {}) as Record<string, unknown>; }
   catch { return res.status(400).json({ error: 'Invalid JSON' }); }
