@@ -40,6 +40,7 @@ function browser(path, storage = new Map(), session = null, options = {}) {
   const change = (url) => { const u = new URL(url, location.href); Object.assign(location, { hostname: u.hostname, pathname: u.pathname, search: u.search, href: u.href }); };
   const context = vm.createContext({
     console, URL, URLSearchParams, Request, Response, AbortController, setTimeout, clearTimeout, queueMicrotask, __session: session,
+    __clockMs: Date.now(),
     location, crypto: { randomUUID: () => UUID },
     localStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, String(v)), removeItem: (k) => storage.delete(k) },
     navigator: { sendBeacon: (url, body) => { sent.push({ url, body: JSON.parse(body), beacon: true }); return true; } },
@@ -49,10 +50,16 @@ function browser(path, storage = new Map(), session = null, options = {}) {
     fetch: async (url, init = {}) => {
       sent.push({ url, body: init.body ? JSON.parse(init.body) : null, headers: init.headers ?? {} });
       if (url === '/api/track' && options.rejectFirstTrack) { options.rejectFirstTrack = false; throw new Error('simulated analytics network failure'); }
+      if (url === '/api/track' && options.holdFirstTrack) { const gate = options.holdFirstTrack; delete options.holdFirstTrack; await gate; }
       return url === '/api/bobby-access' ? Response.json({ url: 'https://checkout.stripe.test/local' }) : new Response(null, { status: 204 });
     },
   });
-  vm.runInContext('globalThis.window = globalThis;', context);
+  vm.runInContext(`globalThis.window = globalThis;
+    const OriginalDate = Date;
+    globalThis.Date = class extends OriginalDate {
+      constructor(...args) { super(...(args.length ? args : [globalThis.__clockMs])); }
+      static now() { return globalThis.__clockMs; }
+    };`, context);
   return { context, sent, assigned, events, storage, change };
 }
 
@@ -67,6 +74,7 @@ assert.ok(homeScript, 'static home contains device tracking script'); checks++;
 vm.runInContext(homeScript, route.context);
 await tick();
 eq(route.sent.filter((r) => r.body?.event === 'visit').map((r) => [r.body.surface, r.body.platform, r.body.device]), [['home', 'web', UUID]], 'root emits home visit with persistent browser install');
+eq(route.sent.find((r) => r.body?.event === 'visit').body.at, route.context.__clockMs, 'static home captures occurrence time when the event happens');
 
 const desk = browser('/desk', route.storage, { access_token: 'LOCAL_TEST_TOKEN' });
 vm.runInContext(clientBundle, desk.context);
@@ -128,4 +136,22 @@ vm.runInContext(failedOptionalBundle, unavailableAnalytics.context);
 eq(await unavailableAnalytics.context.BobbyTest.startBilling('checkout'), null, 'optional analytics import failure does not prevent Checkout');
 await tick();
 eq(unavailableAnalytics.assigned, ['https://checkout.stripe.test/local'], 'failed analytics chunk still navigates to authoritative Checkout');
+
+let releaseFirstTrack;
+const firstTrackGate = new Promise((resolve) => { releaseFirstTrack = resolve; });
+const delayed = browser('/desk', new Map(), { access_token: 'LOCAL_TEST_TOKEN' }, { holdFirstTrack: firstTrackGate });
+vm.runInContext(clientBundle, delayed.context);
+const visitAt = delayed.context.__clockMs;
+delayed.context.BobbyTest.startTracking();
+await tick();
+delayed.context.__clockMs = visitAt + 250;
+delayed.context.BobbyTest.track('desk_entered', 'desk');
+await tick();
+eq(delayed.sent.filter((r) => r.url === '/api/track').length, 1, 'second occurrence waits behind the slow first network request');
+delayed.context.__clockMs = visitAt + 8000;
+releaseFirstTrack();
+await tick();
+const delayedEntries = delayed.sent.filter((r) => r.url === '/api/track');
+eq(delayedEntries.map((r) => [r.body.event, r.body.at]), [['visit', visitAt], ['desk_entered', visitAt + 250]], 'browser capture timestamps survive asynchronous queue delay');
+eq(delayedEntries[1].body.at < delayed.context.__clockMs, true, 'queued Desk time represents occurrence rather than later send time');
 console.log(`web-funnel-client independent VM: ${checks} checks passed; all network calls simulated`);

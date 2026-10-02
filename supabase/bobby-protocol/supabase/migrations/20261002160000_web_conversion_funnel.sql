@@ -3,26 +3,31 @@ alter table public.bobby_events drop constraint if exists bobby_events_event_che
 alter table public.bobby_events add constraint bobby_events_event_check check (event in (
   'visit', 'desk_entered', 'checkout_opened', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start',
   'read_done', 'read_failed', 'wall_signin', 'wall_paywall', 'wall_level', 'desk_blocked'));
+-- Receipt time remains created_at for the cursor and ten-minute internal-traffic hold.
+-- Occurrence time preserves bounded browser capture order despite an asynchronous analytics queue.
+alter table public.bobby_events add column if not exists occurred_at timestamptz;
 
 -- Old callers still work with the default identity. The API obtains identity from verified credentials only.
 drop function if exists public.bobby_record_event(text, text, text, text, text, text, text, text, text);
+drop function if exists public.bobby_record_event(text, text, text, text, text, text, text, text, text, uuid);
 create or replace function public.bobby_record_event(p_event text, p_platform text, p_surface text, p_device text,
   p_referrer text, p_utm text, p_country text default null, p_region text default null,
-  p_network text default null, p_identity uuid default null)
+  p_network text default null, p_identity uuid default null, p_at timestamptz default null)
 returns void language plpgsql security invoker set search_path = public, pg_temp as $$
 declare c text := case when p_platform = 'web' then bobby_geo_country(p_country) end;
         r text := case when p_platform = 'web' then bobby_geo_region(p_country, p_region) end;
 begin
-  insert into bobby_events (event, platform, surface, device_hash, identity_id, referrer, utm_source, country, region)
-    values (p_event, p_platform, p_surface, p_device, p_identity, p_referrer, p_utm, c, r);
+  insert into bobby_events (event, platform, surface, device_hash, identity_id, referrer, utm_source, country, region, occurred_at)
+    values (p_event, p_platform, p_surface, p_device, p_identity, p_referrer, p_utm, c, r,
+      case when p_at between now() - interval '5 minutes' and now() + interval '1 second' then p_at else now() end);
   if p_device is not null then
     perform bobby_touch_device(p_device, p_platform, case when p_event = 'visit' then p_surface end,
       p_referrer, p_utm, p_identity, c, r, p_network);
   end if;
 end;
 $$;
-revoke all on function public.bobby_record_event(text, text, text, text, text, text, text, text, text, uuid) from public, anon, authenticated;
-grant execute on function public.bobby_record_event(text, text, text, text, text, text, text, text, text, uuid) to service_role;
+revoke all on function public.bobby_record_event(text, text, text, text, text, text, text, text, text, uuid, timestamptz) from public, anon, authenticated;
+grant execute on function public.bobby_record_event(text, text, text, text, text, text, text, text, text, uuid, timestamptz) to service_role;
 
 -- Persist session dedupe without sending Stripe session ids or URLs to Amplitude.
 create table if not exists public.bobby_checkout_funnel_sessions (
@@ -45,9 +50,9 @@ begin
   insert into bobby_checkout_funnel_sessions(session_id, identity_id) values (p_session, p_identity)
     on conflict(session_id) do nothing;
   if not found then return false; end if;
-  insert into bobby_events(event, platform, surface, device_hash, identity_id, country, region)
+  insert into bobby_events(event, platform, surface, device_hash, identity_id, country, region, occurred_at)
     values ('checkout_opened', pf, 'desk', dev, p_identity, c,
-      case when c is not null then bobby_geo_region(p_country, p_region) end);
+      case when c is not null then bobby_geo_region(p_country, p_region) end, now());
   if dev is not null then
     perform bobby_touch_device(dev, pf, 'desk', null, null, p_identity, c, p_region, p_network);
   end if;
@@ -56,6 +61,26 @@ end;
 $$;
 revoke all on function public.bobby_record_checkout_opened(uuid, text, text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.bobby_record_checkout_opened(uuid, text, text, text, text, text, text) to service_role;
+
+create or replace function public.bobby_amplitude_batch(p_limit int default 500)
+returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
+  with cur as (
+    select coalesce((select (value->>'id')::bigint from bobby_admin_settings where key = 'amplitude_cursor'), 0) as id
+  ), scan as (
+    select e.* from bobby_events e, cur
+    where e.id > cur.id and e.created_at < now() - interval '10 minutes'
+    order by e.id limit least(greatest(coalesce(p_limit, 500), 1), 1000)
+  ), ii as (select bobby_internal_identity_ids() as id), dd as (select bobby_internal_device_hashes() as h)
+  select jsonb_build_object(
+    'cursor', (select id from cur), 'last', (select max(id) from scan), 'scanned', (select count(*) from scan),
+    'events', coalesce((select jsonb_agg(jsonb_build_object(
+      'id', s.id, 'at', coalesce(s.occurred_at, s.created_at), 'event', s.event, 'platform', s.platform, 'surface', s.surface,
+      'device', s.device_hash, 'identity', s.identity_id, 'referrer', s.referrer, 'utm', s.utm_source,
+      'country', s.country, 'region', s.region, 'detail', s.detail) order by s.id)
+    from scan s where (s.identity_id is null or s.identity_id not in (select id from ii))
+      and (s.device_hash is null or s.device_hash not in (select h from dd))
+      and (s.device_hash is not null or s.identity_id is not null)), '[]'::jsonb));
+$$;
 
 -- The conversion alias has no revenue fields. The original financial event is exported separately.
 -- A durable identity marker excludes renewals and later re-subscriptions even after acknowledgement retries.

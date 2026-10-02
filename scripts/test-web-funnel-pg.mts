@@ -13,7 +13,7 @@ process.env.AMPLITUDE_API_KEY = 'funnel-test-ingestion';
 process.env.RATE_LIMIT_SALT = 'funnel-test-salt';
 delete process.env.BOBBY_AUTH_URL;
 delete process.env.AMPLITUDE_REGION;
-const { default: trackHandler } = await import('../api/track.ts');
+const { default: trackHandler, normalizeEvent } = await import('../api/track.ts');
 const { recordCheckoutOpened } = await import('../api/_lib/funnel.ts');
 const { runAmplitude, toAmplitude } = await import('../api/_lib/amplitude.ts');
 const { runAmplitudeBilling, toAmplitudeFirstPaid } = await import('../api/_lib/amplitude-billing.ts');
@@ -65,7 +65,7 @@ const request = (auth = false) => ({ method: 'POST', headers: {
 } });
 const track = async (event: string, surface: string, auth = false, extra = {}) => {
   const res = { statusCode: 200, setHeader() {}, status(n: number) { this.statusCode = n; return this; }, json() { return this; }, end() { return this; } };
-  await trackHandler({ ...request(auth), body: JSON.stringify({ event, surface, device: DEVICE, platform: 'web', ...extra }) } as never, res as never);
+  await trackHandler({ ...request(auth), body: JSON.stringify({ event, at: Date.now(), surface, device: DEVICE, platform: 'web', ...extra }) } as never, res as never);
   return res.statusCode;
 };
 const purchase = async (id: string, identity: string, type: string, amount: number, eventAge: number, opts: { store?: string; environment?: string; createdAge?: number } = {}) => {
@@ -132,7 +132,35 @@ try {
   eq(concurrent.sort(), [false,true], 'concurrent session recording has one atomic winner');
   eq((await q("select count(*)::int n from bobby_events where identity_id=$1 and event='checkout_opened'", [OTHER]))[0].n, 1, 'one stored event after concurrent calls');
 
+  const captured = Date.now() - 2000, queuedDevice = 'd0222222-0000-4000-8000-000000000022';
+  const fastRequest = request(true);
+  fastRequest.headers['x-bobby-device'] = queuedDevice;
+  await recordCheckoutOpened(fastRequest as never, { ...identity, id: OTHER }, 'cs_test_fast_backend');
+  await track('visit', 'home', false, { at: captured, device: queuedDevice });
+  await track('desk_entered', 'desk', false, { at: captured + 10, device: queuedDevice });
+  const fastRows = await q(`select e.* from bobby_events e where e.device_hash=(select device_hash from bobby_events
+    where identity_id=$1 and event='checkout_opened' order by id desc limit 1) order by id`, [OTHER]);
+  eq(fastRows.map(r => r.event), ['checkout_opened','visit','desk_entered'], 'fast backend actually arrives before queued browser stages');
+  eq(fastRows.map(r => r.event).sort((a,b) => {
+    const x = fastRows.find(r => r.event === a), y = fastRows.find(r => r.event === b);
+    return +x.occurred_at - +y.occurred_at;
+  }), ['visit','desk_entered','checkout_opened'], 'captured occurrence time preserves logical ordered funnel');
+  eq(+fastRows[1].occurred_at, captured, 'delayed visit retains browser capture timestamp exactly');
+  eq(+fastRows[2].occurred_at, captured + 10, 'delayed Desk retains its separate capture timestamp');
+  eq(+fastRows[1].created_at > +fastRows[0].created_at, true, 'server receipt order is kept separately');
+  eq((await rpc('bobby_amplitude_batch', { p_limit: 500 })).scanned, 0, 'backdated capture does not bypass ten-minute arrival hold');
+  const clock = Date.now();
+  eq(normalizeEvent({ event:'visit', at:clock - 300_000 }, clock)!.at, new Date(clock - 300_000).toISOString(), 'bounded past timestamp accepted');
+  for (const at of [clock - 300_001, clock + 1001, clock + 0.5, '2000-01-01', NaN, Infinity]) {
+    eq(normalizeEvent({ event:'visit', at }, clock)!.at, null, 'invalid clock or timestamp ignored');
+  }
+  await rpc('bobby_record_event', { p_event:'visit',p_platform:'web',p_surface:'other',p_device:'db-time-fixture',
+    p_referrer:null,p_utm:null,p_at:'1970-01-01T00:00:00Z' });
+  const rejectedClock = (await q("select occurred_at,created_at from bobby_events where device_hash='db-time-fixture'"))[0];
+  eq(+rejectedClock.occurred_at, +rejectedClock.created_at, 'database independently refuses arbitrary backdating');
+
   await purchase('invoice-first', USER, 'INITIAL_PURCHASE', 4.9, 15);
+  await q("update bobby_purchase_events set event_at=now() where id='invoice-first'");
   await q("update bobby_events set created_at=created_at-interval '20 minutes'");
   uploads = [];
   eq((await runAmplitude()).purchasesSent, 1, 'existing cron includes billing after usage');
@@ -146,6 +174,9 @@ try {
   eq('revenue' in stages[3], false, 'conversion alias has no revenue');
   eq(exported.filter(e => 'revenue' in e).length, 1, 'only original charge contributes monetary revenue');
   eq(stages[3].time, exported.find(e => e.event_type === 'billing_initial_purchase').time, 'alias preserves original payment timestamp');
+  eq(stages.every((e,i) => i === 0 || stages[i-1].time <= e.time), true, 'main journey timestamps stay ordered from capture through authoritative payment');
+  const fastExport = exported.filter(e => e.device_id === fastRows[0].device_hash);
+  eq(fastExport.sort((a,b) => a.time-b.time).map(e => e.event_type), ['visit','desk_entered','checkout_opened'], 'actual exporter preserves queued browser-before-Checkout ordering');
   eq(JSON.stringify(exported).includes('fixture@example.test') || JSON.stringify(exported).includes('fixture-token') || JSON.stringify(exported).includes('cs_test_') || JSON.stringify(exported).includes(AUTH), false, 'no email, token, auth UUID or Stripe session exported');
   await purchase('resubscription', USER, 'INITIAL_PURCHASE', 4.9, 10);
   uploads = []; await runAmplitudeBilling();

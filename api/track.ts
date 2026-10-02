@@ -25,7 +25,7 @@ const limiter = createLimiter(120, 60_000);
 const BOT_UA = /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|preview|facebookexternalhit|bytespider|petalbot|python-requests|curl\/|wget|go-http-client|okhttp|axios|node-fetch|phantomjs|puppeteer|playwright|selenium/i;
 export const isBotUserAgent = (ua: unknown) => typeof ua !== 'string' || !ua.trim() || BOT_UA.test(ua);
 
-export function normalizeEvent(raw: Record<string, unknown>) {
+export function normalizeEvent(raw: Record<string, unknown>, now = Date.now()) {
   const event = typeof raw.event === 'string' && EVENTS.has(raw.event) ? raw.event : null;
   if (!event) return null;
   const platform = raw.platform === 'ios' || raw.platform === 'android' ? raw.platform : 'web';
@@ -42,7 +42,11 @@ export function normalizeEvent(raw: Record<string, unknown>) {
     } catch { referrer = null; }
   }
   const utm = typeof raw.utm === 'string' ? raw.utm.toLowerCase().trim() : '';
-  return { event, platform, surface, device_hash: device, referrer, utm_source: /^[a-z0-9_.-]{1,40}$/.test(utm) ? utm : null };
+  // Preserve capture order when the analytics queue reaches us after Checkout. Old clients or invalid clocks
+  // retain server receipt time. The database applies the same bound; the client cannot arbitrarily backdate.
+  const at = typeof raw.at === 'number' && Number.isSafeInteger(raw.at) && raw.at >= now - 5 * 60_000 && raw.at <= now + 1000
+    ? new Date(raw.at).toISOString() : null;
+  return { event, at, platform, surface, device_hash: device, referrer, utm_source: /^[a-z0-9_.-]{1,40}$/.test(utm) ? utm : null };
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -65,7 +69,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(3000),
       body: JSON.stringify({
         p_event: row.event, p_platform: row.platform, p_surface: row.surface, p_device: row.device_hash, p_referrer: row.referrer, p_utm: row.utm_source,
-        p_identity: identity?.id ?? null,
+        p_identity: identity?.id ?? null, p_at: row.at,
         ...(row.platform === 'web' ? { p_country: geo.country, p_region: geo.region } : {}), p_network: callerHash(req),
       }),
     });

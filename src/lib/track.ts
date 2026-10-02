@@ -23,7 +23,7 @@ export function track(event: TrackEvent, surface?: string | null) {
     if (typeof window === 'undefined' || /^(localhost|127\.)/.test(location.hostname)) return;
     const params = new URLSearchParams(location.search);
     const body = JSON.stringify({
-      event, surface: surface ?? surfaceOf(location.pathname), device: deviceId(), platform: 'web',
+      event, at: Date.now(), surface: surface ?? surfaceOf(location.pathname), device: deviceId(), platform: 'web',
       referrer: document.referrer || undefined, utm: params.get('utm_source') ?? undefined,
     });
     // Beacon cannot carry verified credentials. Queue requests so a direct /desk view stores its site visit
