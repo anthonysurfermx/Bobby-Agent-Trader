@@ -8,9 +8,34 @@
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { getSubscription, upsertSubscription } from './access.js';
+import { getCache, setCache } from './api-cache.js';
+import { notifyOwner } from './provider-alert.js';
 
 export const PRO_ENTITLEMENT = 'pro';
-export const revenueCatReady = () => Boolean(process.env.REVENUECAT_SECRET_KEY);
+const secretKey = () => (process.env.REVENUECAT_SECRET_KEY || '').trim();
+export const revenueCatReady = () => Boolean(secretKey());
+
+const KEY_ALERT_WINDOW_SEC = 6 * 3600;
+let keyAlertAt = 0;
+
+/** RevenueCat refused the secret key: every purchase stays unlinked until it is replaced, so tell the owner. */
+async function alertRejectedKey(status: number): Promise<void> {
+  if (Date.now() - keyAlertAt < KEY_ALERT_WINDOW_SEC * 1000) return;
+  keyAlertAt = Date.now();
+  try {
+    if (await getCache('revenuecat-key-alert')) return;
+    await setCache('revenuecat-key-alert', { status, at: new Date().toISOString() }, KEY_ALERT_WINDOW_SEC);
+  } catch { /* the per-instance guard still holds */ }
+  notifyOwner('Bobby: RevenueCat rechazó la llave secreta — las compras no se vinculan', [
+    `RevenueCat respondió ${status} a GET /v1/subscribers con REVENUECAT_SECRET_KEY.`,
+    '',
+    'Mientras tanto Apple cobra, pero Bobby no puede confirmar Bobby Pro: la app muestra "no pudo confirmar tu suscripción" y el webhook falla (RevenueCat lo reintenta).',
+    '',
+    'Arreglo: RevenueCat → Project settings → API keys → nueva secret key versión V1 → reemplazar REVENUECAT_SECRET_KEY en Vercel (Production) y redesplegar.',
+    '',
+    'No vuelvo a avisar en las próximas 6 horas.',
+  ].join('\n'));
+}
 
 interface RcSubscriber {
   entitlements?: Record<string, { expires_date?: string | null; product_identifier?: string }>;
@@ -30,9 +55,10 @@ export async function identityForAuthUser(authUserId: string): Promise<string | 
 export async function syncRevenueCat(authUserId: string, identityId: string): Promise<boolean> {
   if (!revenueCatReady()) throw new Error('RevenueCat is not configured');
   const r = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(authUserId)}`, {
-    headers: { Authorization: `Bearer ${process.env.REVENUECAT_SECRET_KEY}`, 'Content-Type': 'application/json' },
+    headers: { Authorization: `Bearer ${secretKey()}`, 'Content-Type': 'application/json' },
     signal: AbortSignal.timeout(8000),
   });
+  if (r.status === 401 || r.status === 403) await alertRejectedKey(r.status);
   if (!r.ok) throw new Error(`revenuecat subscriber ${r.status}`);
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];

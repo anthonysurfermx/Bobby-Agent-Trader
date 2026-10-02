@@ -68,7 +68,9 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<Record<
   try {
     const r = await fetch(bobbyRest(`rpc/${name}`), { method: 'POST', headers: bobbyServiceHeaders(), body: JSON.stringify(body), signal: AbortSignal.timeout(4000) });
     if (!r.ok) { console.error('[access]', name, r.status, await r.text().catch(() => '')); return null; }
-    return (await r.json()) as Record<string, unknown>;
+    // A void RPC (bobby_touch_device) answers 200/204 with an empty body.
+    const text = await r.text();
+    return text ? (JSON.parse(text) as Record<string, unknown>) : null;
   } catch (e) {
     console.error('[access]', name, e instanceof Error ? e.message : e);
     return null;
