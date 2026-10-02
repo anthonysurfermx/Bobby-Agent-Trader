@@ -87,6 +87,22 @@ final class DeskMemory {
 
     // MARK: implicit watchlist
 
+    /// Automatic suggestions follow the app's speech locale, as on the web. These are listed
+    /// market identifiers, never translated labels. They only pad empty slots in personal history.
+    static func defaultQuickAccess(for resolution: LanguageResolution) -> [String] {
+        switch resolution.language {
+        case .fr: return ["MC.PA", "TTE.PA", "BTC"]
+        case .pt:
+            return resolution.localeIdentifier == "pt-BR"
+                ? ["PETR4.SA", "VALE3.SA", "BTC"]
+                : ["EDP.LS", "GALP.LS", "BTC"]
+        case .it: return ["ENI.MI", "ENEL.MI", "BTC"]
+        case .de: return ["SAP.DE", "SIE.DE", "BTC"]
+        case .en: return ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
+        case .es: return ["BTC", "NVDA", "ETH", "TSLA", "ORO"]
+        }
+    }
+
     var watchlist: [WatchedAsset] {
         guard let data = defaults.data(forKey: key(Key.watchlist)),
               let list = try? JSONDecoder().decode([WatchedAsset].self, from: data) else { return [] }

@@ -110,3 +110,58 @@ final class NativeLocalizationTests: XCTestCase {
         XCTAssertFalse(thesis?.line.contains("$") == true, "A saved thesis without currency must not invent USD")
     }
 }
+
+/// Regional chips are local suggestions, independent of account/AI consent or device preferences.
+final class NativeRegionalQuickAccessTests: XCTestCase {
+    private final class MemoryDefaults: UserDefaults {
+        private var values: [String: Any] = [:]
+        init() { super.init(suiteName: "Bobby.RegionalQuickAccess.TestDouble")! }
+        override func object(forKey key: String) -> Any? { values[key] }
+        override func set(_ value: Any?, forKey key: String) { values[key] = value }
+        override func removeObject(forKey key: String) { values.removeValue(forKey: key) }
+        override func string(forKey key: String) -> String? { values[key] as? String }
+        override func data(forKey key: String) -> Data? { values[key] as? Data }
+        override func bool(forKey key: String) -> Bool { values[key] as? Bool ?? false }
+        override func integer(forKey key: String) -> Int { values[key] as? Int ?? 0 }
+    }
+
+    func testEmptyHistorySuggestsListedRegionalSymbolsAndRetainsLegacyEnglishSpanish() {
+        let cases: [(String, String, String?, [String])] = [
+            ("fr", "fr-FR", "FR", ["MC.PA", "TTE.PA", "BTC"]),
+            ("pt", "pt-PT", "PT", ["EDP.LS", "GALP.LS", "BTC"]),
+            ("pt", "pt-BR", "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
+            ("pt", "en-US", "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
+            ("it", "it-IT", "IT", ["ENI.MI", "ENEL.MI", "BTC"]),
+            ("de", "de-DE", "DE", ["SAP.DE", "SIE.DE", "BTC"]),
+            ("en", "en-US", "FR", ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]),
+            ("es", "es-MX", "DE", ["BTC", "NVDA", "ETH", "TSLA", "ORO"])
+        ]
+        for (language, preferred, country, expected) in cases {
+            let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: [preferred], region: country)
+            let defaults = DeskMemory.defaultQuickAccess(for: resolution)
+            XCTAssertEqual(defaults, expected)
+            XCTAssertEqual(DeskMemory(defaults: MemoryDefaults()).quickAccess(fallback: defaults), expected)
+        }
+    }
+
+    func testRegionalPaddingNeverRewritesPersonalHistoryOrReplacesFiveCustomSymbols() {
+        let memory = DeskMemory(defaults: MemoryDefaults())
+        let now = Date(timeIntervalSince1970: 1000)
+        memory.recordQuery(symbol: "VOW3.DE", isEquity: true, now: now)
+        memory.recordQuery(symbol: "SOL", isEquity: false, now: now.addingTimeInterval(1))
+        let original = memory.watchlist
+        for language in ["fr", "pt", "it", "de", "en", "es"] {
+            let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: ["pt-BR"], region: nil)
+            let row = memory.quickAccess(fallback: DeskMemory.defaultQuickAccess(for: resolution))
+            XCTAssertEqual(Array(row.prefix(2)), ["SOL", "VOW3.DE"])
+            XCTAssertEqual(memory.watchlist, original)
+            XCTAssertEqual(Set(row).count, row.count)
+        }
+        for index in 0..<5 {
+            memory.recordQuery(symbol: "CUSTOM\(index).PA", isEquity: true, now: now.addingTimeInterval(Double(index + 2)))
+        }
+        let french = LanguageResolution.resolve(selection: "fr", preferredLanguages: [], region: nil)
+        XCTAssertEqual(memory.quickAccess(fallback: DeskMemory.defaultQuickAccess(for: french)),
+                       memory.watchlist.prefix(5).map(\.symbol))
+    }
+}

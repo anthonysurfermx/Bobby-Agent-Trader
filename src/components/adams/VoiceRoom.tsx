@@ -75,6 +75,15 @@ function formatDeskNumber(value: number | null): string {
   return value.toLocaleString(speechLocale(), { maximumFractionDigits: value < 10 ? 4 : 2 });
 }
 
+/** Keep the resolved interface locale and explicit market when leaving the voice room. */
+function deskPath(symbol: string, timeframe: string, freeVoice = false): string {
+  const query = new URLSearchParams({ symbol, timeframe, lang: interfaceLanguage(), locale: speechLocale() });
+  if (freeVoice) query.set('voice', 'free');
+  const country = new URLSearchParams(window.location.search).get('country');
+  if (country !== null) query.set('country', country);
+  return `/desk?${query.toString()}`;
+}
+
 export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToChat?: () => void; autoStart?: boolean } = {}) {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -111,7 +120,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
   });
   useEffect(() => {
     if (!fallback) return;
-    navigate(`/desk?voice=free&symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`, {
+    navigate(deskPath(symbol, timeframe, true), {
       replace: true, state: { voiceFallback: true, transcript },
     });
   }, [fallback, navigate, symbol, timeframe, transcript]);
@@ -157,11 +166,11 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white">
       <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:64px_64px]" />
 
-      {needsSignIn && <SignInPrompt xp={progress.xp} voiceAccess onClose={() => { dismissSignIn(); navigate(`/desk?voice=free&symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`); }} />}
+      {needsSignIn && <SignInPrompt xp={progress.xp} voiceAccess onClose={() => { dismissSignIn(); navigate(deskPath(symbol, timeframe, true)); }} />}
       {/* ---- top bar ---- */}
       <header className="relative z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-5 py-3 lg:px-6">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => { disconnect(); navigate('/desk'); }}
+          <button type="button" onClick={() => { disconnect(); navigate(deskPath(symbol, timeframe)); }}
             aria-label={ui('Back to desk', 'Volver al desk')}
             className="flex h-11 w-11 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white">
             <ArrowLeft className="h-5 w-5" />

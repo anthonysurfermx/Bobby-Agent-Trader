@@ -209,6 +209,53 @@ check('dictation uses the selected locale and aborts when the consent gate unmou
  b.toggleListening();assert.equal(started,1);assert.equal(b.requests.length,0);
 });
 
+function voiceFallbackFixture({query,stored='en',storedLocale='en-US',device='en-US',deniedStorage=false}){
+ const b=browser(stored,storedLocale,device),effects=[],navigations=[],transcript=[{id:'original',role:'user',text:'Original market question'}];
+ let fallback=false,dismissed=0,disconnected=0;
+ if(!stored){b.saved.delete('bobby_lang');b.saved.delete('bobby_locale');}
+ b.saved.set('bobby.companion.progress.v1',JSON.stringify({aiConsentGranted:true,riskNoticeVersion:7,quickAccess:['BNP.PA','AAPL','BTC'],quickAccessCustomized:true}));
+ if(deniedStorage)Object.defineProperty(b.context,'localStorage',{get(){throw new DOMException('Storage denied','SecurityError');}});
+ b.location.search=query;b.location.pathname='/agentic-world/bobby/voice-room';
+ b.stubs.react.useEffect=fn=>effects.push(fn);
+ b.stubs['react-router-dom'].useNavigate=()=>((url,options)=>navigations.push({url,options}));
+ const forbidden=()=>{throw new Error('Routing checks must not activate audio or voice transport');};
+ b.stubs['@/hooks/useRealtimeVoice']={useRealtimeVoice:(_language,_mode,options)=>({
+  state:'idle',error:null,level:0,transcript,tools:[],proposal:null,fallback,needsSignIn:true,remainingSeconds:0,
+  symbol:options.initialSymbol,timeframe:options.initialTimeframe,levels:[],thesis:null,debate:null,deskBrief:null,briefState:{status:'idle'},
+  connect:forbidden,disconnect:()=>disconnected++,startTalking:forbidden,stopTalking:forbidden,micMuted:true,setSymbol:forbidden,setTimeframe:forbidden,dismissProposal:forbidden,resetConversation:forbidden,dismissSignIn:()=>dismissed++,
+ })};
+ const component=b.load('src/components/adams/VoiceRoom.tsx').VoiceRoom;
+ function render(active){fallback=active;effects.length=0;const tree=component();const effect=effects.find(fn=>fn.toString().includes('if (!fallback)'));assert.ok(effect);return{tree,effect};}
+ return{...b,render,navigations,transcript,dismissed:()=>dismissed,disconnected:()=>disconnected};
+}
+for(const scenario of [
+ {name:'pt-BR query over English storage',query:'?lang=pt&locale=pt-BR&country=BR&symbol=BNP.PA&timeframe=4H',language:'pt',locale:'pt-BR',country:'BR'},
+ {name:'French query with explicit Brazilian market',query:'?lang=fr&country=BR&symbol=BNP.PA&timeframe=4H',language:'fr',locale:'fr-FR',country:'BR'},
+ {name:'Italian query rejects incompatible Portuguese locale',query:'?lang=it&locale=pt-BR&symbol=BNP.PA&timeframe=4H',language:'it',locale:'it-IT',country:'IT'},
+ {name:'German query over French storage',query:'?lang=de&symbol=BNP.PA&timeframe=4H',stored:'fr',storedLocale:'fr-FR',language:'de',locale:'de-DE',country:'DE'},
+ {name:'saved pt-BR over French browser',query:'?symbol=BNP.PA&timeframe=4H',stored:'pt',storedLocale:'pt-BR',device:'fr-FR',language:'pt',locale:'pt-BR',country:'BR'},
+ {name:'French browser without a saved choice',query:'?symbol=BNP.PA&timeframe=4H',stored:'',device:'fr-FR',language:'fr',locale:'fr-FR',country:'FR'},
+ {name:'regional language query over English storage',query:'?lang=pt-BR&symbol=BNP.PA&timeframe=4H',language:'pt',locale:'pt-BR',country:'BR'},
+ {name:'pt-BR query with storage denied',query:'?lang=pt&locale=pt-BR&symbol=BNP.PA&timeframe=4H',deniedStorage:true,language:'pt',locale:'pt-BR',country:'BR'},
+])check(scenario.name+': fallback, sign-in close and back preserve locale and a custom stock',()=>{
+ const b=voiceFallbackFixture(scenario),before=[...b.saved];
+ const idle=b.render(false);idle.effect();assert.equal(b.navigations.length,0);
+ const signIn=elements(idle.tree).find(e=>e.type===b.stubs['@/components/companion/SignInPrompt'].default);assert.ok(signIn);signIn.props.onClose();assert.equal(b.dismissed(),1);
+ b.render(true).effect();assert.equal(b.navigations.length,2);
+ assert.equal(b.navigations[0].url,b.navigations[1].url);
+ const i=b.load('src/lib/companions/i18n.ts'),back=elements(idle.tree).find(e=>e.type==='button'&&e.props['aria-label']===i.t('Back to desk','Volver al desk'));assert.ok(back);back.props.onClick();assert.equal(b.disconnected(),1);assert.equal(b.navigations.length,3);
+ for(const [index,navigation] of b.navigations.entries()){
+  const destination=new URL(navigation.url,'https://bobby.test');assert.equal(destination.pathname,'/desk');assert.equal(destination.searchParams.get('voice'),index===2?null:'free');
+  assert.equal(destination.searchParams.get('symbol'),'BNP.PA');assert.equal(destination.searchParams.get('timeframe'),'4H');assert.equal(destination.searchParams.get('lang'),scenario.language);assert.equal(destination.searchParams.get('locale'),scenario.locale);
+  assert.equal(destination.searchParams.get('country'),new URLSearchParams(scenario.query).get('country'));
+  b.location.search=destination.search;
+  const client=b.load('src/lib/client-language.ts');assert.equal(client.clientLanguage(),scenario.language);assert.equal(client.clientLocale(),scenario.locale);
+  assert.equal(b.load('src/components/nucleo/deskData.ts').marketContext().country,scenario.country);
+ }
+ assert.equal(b.navigations[1].options.replace,true);assert.equal(b.navigations[1].options.state.voiceFallback,true);assert.equal(b.navigations[1].options.state.transcript,b.transcript);
+ assert.deepEqual([...b.saved],before);assert.equal(b.requests.length,0);
+});
+
 
 function renderRootLayout(b){
  const source=ts.createSourceFile('App.tsx',read('src/App.tsx'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);

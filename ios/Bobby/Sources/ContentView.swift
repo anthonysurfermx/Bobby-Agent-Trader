@@ -91,7 +91,7 @@ final class BobbyViewModel: ObservableObject {
     let profile = AgentProfile()
     let companions = CompanionStore()
     private let memory = DeskMemory()
-    static var defaultQuickAccess: [String] { ["BTC", "NVDA", "ETH", "TSLA", L.t("GOLD", "ORO")] }
+    static var defaultQuickAccess: [String] { DeskMemory.defaultQuickAccess(for: L.resolution) }
     /// Read through to the store: sign-out, deletion and sync change it there.
     var streak: Int { companions.disciplineStreak }
     @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess

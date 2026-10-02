@@ -1,7 +1,7 @@
 {
   "version": "1.7",
-  "build": "55",
-  "status": "Local candidate metadata; not saved or submitted in App Store Connect",
+  "build": "56",
+  "status": "Local 1.7 candidate56 metadata, replacing processed55 for regional quick-access correction; not saved or submitted in App Store Connect",
   "baseListing": "Version 1.6 (54) description and billing terms; new six-language and regional discovery scope",
   "locales": {
     "en-US": {
