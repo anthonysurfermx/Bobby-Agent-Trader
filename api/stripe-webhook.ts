@@ -49,6 +49,7 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
     identity_id: identity, provider: 'stripe', status: String(sub.status ?? 'incomplete'), product_id: price,
     current_period_end: periodEnd(sub), stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : null,
     stripe_subscription_id: typeof sub.id === 'string' ? sub.id : null,
+    environment: sub.livemode === true ? 'production' : sub.livemode === false ? 'sandbox' : null,
   });
 }
 

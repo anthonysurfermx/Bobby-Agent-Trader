@@ -331,7 +331,8 @@ try {
   endpointMock();
   const noKey = response();
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, noKey as never);
-  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'No provider keys means unavailable before any spend');
+  // The funnel outcome (bobby_record_outcome) is recorded; nothing is metered or spent.
+  eq([noKey.statusCode, noKey.body.code, calls.filter((c) => !String(c.url).includes('bobby_record_outcome')).length], [503, 'desk_unavailable', 0], 'No provider keys means unavailable before any spend');
   process.env.ANTHROPIC_API_KEY = 'test-anthropic';
   process.env.OPENAI_API_KEY = 'test-openai';
 

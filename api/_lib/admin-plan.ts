@@ -73,10 +73,10 @@ export async function growthPlan(insights: Insight[], metrics: Record<string, un
       return {
         title: str(x.title, 140), why: str(x.why, 600), measure: str(x.measure, 240),
         steps: (Array.isArray(x.steps) ? x.steps : []).map((s) => str(s, 240)).filter(Boolean).slice(0, 4),
-        // A priority that cites nothing real is dropped: the plan never stands on an invented finding.
-        findings: (Array.isArray(x.findings) ? x.findings : []).map((f) => str(f, 60)).filter((f) => ids.has(f)),
+        findings: (Array.isArray(x.findings) ? x.findings : []).map((f) => str(f, 60)).filter(Boolean),
       };
-    }).filter((p) => p.title && p.findings.length);
+    // A priority that cites any finding that does not exist is dropped whole (its text may lean on it): F15.
+    }).filter((p) => p.title && p.findings.length && p.findings.every((f) => ids.has(f)));
     const plan: GrowthPlan = {
       generatedAt: new Date().toISOString(), model: MODEL, summary: str(raw.summary, 400), priorities, cached: false,
       usd: Number(usage.reduce((t, u) => t + u.usd, 0).toFixed(4)),

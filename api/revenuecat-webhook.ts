@@ -37,11 +37,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     .filter((id): id is string => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)));
   try {
     let firstIdentity: string | null = null;
+    const owners: Array<[string, string]> = [];
     for (const authUserId of ids) {
       const identity = await identityForAuthUser(authUserId);
-      if (identity) { firstIdentity ??= identity; await syncRevenueCat(authUserId, identity); }
+      if (identity) { firstIdentity ??= identity; owners.push([authUserId, identity]); }
     }
-    // Revenue for the owner dashboard; a failed write is retried by RevenueCat like a failed sync.
+    // Revenue evidence first: a failing subscriber sync (e.g. a rejected key) must not lose the purchase event.
+    // The insert ignores duplicates, so RevenueCat's retry of this delivery is safe.
     if (event.id && event.type) {
       await recordPurchaseEvent({
         id: event.id, type: event.type, environment: event.environment, store: event.store, productId: event.product_id,
@@ -50,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         country: event.country_code,
       });
     }
+    for (const [authUserId, identity] of owners) await syncRevenueCat(authUserId, identity);
   } catch (e) {
     console.error('[revenuecat-webhook]', event.type, e instanceof Error ? e.message : e);
     return res.status(500).json({ error: 'retry' }); // RevenueCat retries failed deliveries

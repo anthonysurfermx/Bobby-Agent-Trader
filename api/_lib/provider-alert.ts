@@ -73,10 +73,17 @@ export function alertProviderCredit(provider: AlertProvider, code: string, endpo
  * Callers pass only what the owner needs to act — never questions, emails, wallets or free-text from users.
  */
 export function notifyOwner(subject: string, text: string): void {
+  const task = sendOwnerEmail(subject, text).catch(() => undefined);
+  try { waitUntil(task); } catch { /* outside a request context the promise still runs */ }
+}
+
+/** The same email, awaited: accepted = Resend took it (delivery to the inbox is not known here). */
+export async function sendOwnerEmail(subject: string, text: string): Promise<{ accepted: boolean; status: number | null; reason: string | null }> {
   const apiKey = (process.env.RESEND_API_KEY || '').trim();
   const to = (process.env.BOBBY_ALERT_EMAIL || process.env.WAITLIST_NOTIFY_EMAIL || '').trim();
-  if (!apiKey || !to) { console.error('[provider-alert] owner notice not sent: no alert email configured'); return; }
-  const task = fetch('https://api.resend.com/emails', {
+  if (!apiKey || !to) { console.error('[provider-alert] owner notice not sent: no alert email configured'); return { accepted: false, status: null, reason: 'not_configured' }; }
+  try {
+    const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -84,8 +91,10 @@ export function notifyOwner(subject: string, text: string): void {
       to: [to], subject, text,
     }),
     signal: AbortSignal.timeout(8000),
-  }).then((r) => { if (!r.ok) console.error('[provider-alert] owner notice failed', r.status); }).catch(() => undefined);
-  try { waitUntil(task); } catch { /* outside a request context the promise still runs */ }
+    });
+    if (!r.ok) { console.error('[provider-alert] owner notice failed', r.status); return { accepted: false, status: r.status, reason: 'rejected' }; }
+    return { accepted: true, status: r.status, reason: null };
+  } catch { return { accepted: false, status: null, reason: 'unreachable' }; }
 }
 
 /** Tests only: forget the per-instance window. */

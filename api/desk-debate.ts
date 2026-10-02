@@ -108,9 +108,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let knownIdentity: Identity | null | undefined;
   let streaming = false;
   // What happened, for the owner's funnel (bobby_events): recorded after answering, never on the reader's time.
-  const outcome = (event: DeskOutcome, detail: string | null = null) => waitUntil(recordOutcome(req, event, knownIdentity ?? null, detail));
+  // Exactly one per request (F11): the first call wins, and the finally block records any exit nobody named.
+  let recorded = false;
+  const outcome = (event: DeskOutcome, detail: string | null = null) => {
+    if (recorded) return;
+    recorded = true;
+    waitUntil(recordOutcome(req, event, knownIdentity, detail));
+  };
   try {
-    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) { outcome('desk_blocked', 'no_provider'); return refuse(res, 503, 'desk_unavailable', unavailable); }
     // The spend guard reads the ledger before anything is spent: premium pauses above the daily cap, the
     // whole desk at the monthly hard cap (api/_lib/llm-usage.ts).
     const budget = await llmBudget();
@@ -121,11 +127,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
     }
     const addressKeys = getClientQuotaKeys(req);
-    if (!addressKeys) return refuse(res, 503, 'desk_unavailable', unavailable);
+    if (!addressKeys) { outcome('desk_blocked', 'unavailable'); return refuse(res, 503, 'desk_unavailable', unavailable); }
     // A premium level spends its own allowance before any model call; a failed analysis gives it back.
     if (level !== 'rapido') {
       const gate = await consumeLevel(req, level, symbol);
-      if (!gate) return refuse(res, 503, 'desk_unavailable', unavailable);
+      if (!gate) { outcome('desk_blocked', 'unavailable'); return refuse(res, 503, 'desk_unavailable', unavailable); }
       if (!gate.allowed) {
         const meter = { tier: gate.tier, used: gate.used, limit: gate.limit, resetsAt: gate.resetsAt };
         knownIdentity = gate.identity;
@@ -213,7 +219,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   } catch (error) {
     const refunded = await refund();
-    outcome('read_failed', error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error');
+    // A reader who closed the stream mid-analysis left; it is not a failed analysis (F11).
+    outcome('read_failed', left.signal.aborted ? 'left' : error instanceof LlmHttpError ? 'provider_http' : error instanceof DeskOutputRejected ? 'output_rejected' : 'analysis_error');
     // Never log private questions, model payloads, or provider credentials — only the rejection class.
     if (error instanceof DeskOutputRejected) console.error('[desk-debate] model output rejected', error.reason);
     // Readers always get the same plain failure; the provider detail stays in the log below and, for exhausted
@@ -231,6 +238,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     return refuse(res, 503, 'analysis_failed', failureMessage);
   } finally {
+    if (!recorded) outcome('desk_blocked', 'unrecorded');
     // The response is already sent here and Vercel freezes the function once it has ended: the ledger
     // write must be registered with waitUntil, or it only lands when the instance wakes for another request
     // (seen in prod on 2026-09-29: a Rápido read was never recorded).

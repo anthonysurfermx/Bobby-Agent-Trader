@@ -76,7 +76,9 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
         items={[
           {
             label: 'Pagando Bobby Pro', value: show('subscriptions.active', fmtInt(o.subscriptions.paid)),
-            caption: !cov?.purchasesSince ? 'nunca ha llegado un evento de compra (ni de prueba)'
+            // F01: an active subscription whose store environment is unknown is not counted as paying.
+            caption: o.subscriptions.unverified ? `${fmtInt(o.subscriptions.unverified)} con Pro activo sin verificar (entorno desconocido) — no cuenta como pago${o.subscriptions.sandbox ? ` · ${fmtInt(o.subscriptions.sandbox)} de prueba (sandbox)` : ''}`
+              : !cov?.purchasesSince ? 'nunca ha llegado un evento de compra (ni de prueba)'
               : `${fmtInt(o.subscriptions.trialing)} en prueba · ${fmtInt(o.subscriptions.giftedPro)} con Pro regalado · ${fmtUsd(o.revenue.grossUsd)} brutos en ${period}d`,
           },
           {

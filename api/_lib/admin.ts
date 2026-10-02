@@ -51,7 +51,11 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
     // The browser and the address used for /admin are the team's own traffic: the dashboard leaves them out.
     // Awaited, not deferred: the very first view from a new browser must already exclude that browser.
     const device = deviceHash(req), network = callerHash(req);
-    if (device || network) await rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null);
+    // F10: if the mark cannot be written, the figures could include this session: retry once, then refuse to load.
+    if (device || network) {
+      const mark = () => rpc('bobby_mark_admin_session', { p_device: device, p_network: network });
+      try { await mark(); } catch { await mark(); }
+    }
     return identity;
   } catch {
     res.status(503).json({ error: 'The admin check is unavailable. Try again.' });
@@ -588,7 +592,7 @@ interface EconomicsRaw {
   days: number; since: string;
   revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; payersEver?: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
   costs: { marketingUsd: number; infraUsd: number; otherUsd: number; entries?: number; byChannel: Array<{ channel: string; usd: number }> };
-  subscriptions: { active: number; trialing?: number }; newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
+  subscriptions: { active: number; trialing?: number; unverified?: number; sandbox?: number }; newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
   assumptions: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number };
 }
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
@@ -600,7 +604,8 @@ export function unitEconomics(raw: EconomicsRaw) {
   const priceUsd = n(raw.revenue.lastPriceUsd) || n(a.priceUsd) || 4.99;
   // A saved 0% fee is a real choice (a web sale with no store): only an absent value falls back to 15%.
   const fee = typeof a.storeFee === 'number' && Number.isFinite(a.storeFee) ? a.storeFee : 0.15;
-  const takehome = n(raw.revenue.takehome) || 1 - fee;
+  // A stored take-home of 0 is a value, not a missing one (F12).
+  const takehome = raw.revenue.takehome !== null && raw.revenue.takehome !== undefined && Number.isFinite(Number(raw.revenue.takehome)) ? Number(raw.revenue.takehome) : 1 - fee;
   const payersEver = n(raw.revenue.payersEver);
   const activeSubs = n(raw.subscriptions.active);
   // Monthly churn: expirations in the last 30 days over the subscriptions alive at its start, once there are
@@ -625,7 +630,7 @@ export function unitEconomics(raw: EconomicsRaw) {
     revenue: {
       grossUsd: round(n(raw.revenue.grossUsd)), netUsd: round(n(raw.revenue.netUsd)), refundsUsd: round(n(raw.revenue.refundsUsd)),
       mrrGrossUsd: round(activeSubs * priceUsd), mrrNetUsd: round(activeSubs * priceUsd * takehome),
-      activeSubscriptions: activeSubs, trialing: n(raw.subscriptions.trialing), newPaying: n(raw.revenue.newPaying), payersEver, priceUsd, takehome,
+      activeSubscriptions: activeSubs, trialing: n(raw.subscriptions.trialing), unverifiedSubscriptions: n(raw.subscriptions.unverified), sandboxSubscriptions: n(raw.subscriptions.sandbox), newPaying: n(raw.revenue.newPaying), payersEver, priceUsd, takehome,
       priceSource: n(raw.revenue.lastPriceUsd) ? 'observed' : n(a.priceUsd) ? 'assumed' : 'default',
     },
     costs: {

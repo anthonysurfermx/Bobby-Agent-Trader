@@ -61,7 +61,7 @@ export interface AdminOverview {
     topSurfaces: Array<{ surface: string; visitors: number }>;
     topReferrers: Array<{ referrer: string; visitors: number }>;
   };
-  subscriptions: { active: number; paid: number; trialing: number; byStatus: Record<string, number>; byProvider: Record<string, number>; giftedPro: number };
+  subscriptions: { active: number; paid: number; trialing: number; byStatus: Record<string, number>; byProvider: Record<string, number>; giftedPro: number; unverified?: number; sandbox?: number };
   revenue: {
     grossUsd: number; netUsd: number; refundsUsd: number;
     newSubscriptions: number; newPaying: number; renewals: number; cancellations: number; expirations: number; sandboxEvents: number; internalEvents: number;
@@ -611,6 +611,7 @@ export function normalizeOverview(raw: unknown, opts: { compare?: boolean } = {}
     subscriptions: {
       active: r.n(subs, 'active', 'subscriptions.active'), paid: num(subs.paid), trialing: num(subs.trialing), byStatus: r.cnt(subs, 'byStatus', 'subscriptions.byStatus'),
       byProvider: r.cnt(subs, 'byProvider', 'subscriptions.byProvider'), giftedPro: r.n(subs, 'giftedPro', 'subscriptions.giftedPro'),
+      unverified: Number((subs as Record<string, unknown> | undefined)?.unverified) || 0, sandbox: Number((subs as Record<string, unknown> | undefined)?.sandbox) || 0,
     },
     revenue: {
       grossUsd: r.n(rev, 'grossUsd', 'revenue.grossUsd'), netUsd: r.n(rev, 'netUsd', 'revenue.netUsd'), refundsUsd: r.n(rev, 'refundsUsd', 'revenue.refundsUsd'),

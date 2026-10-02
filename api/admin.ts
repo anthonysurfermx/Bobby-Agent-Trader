@@ -19,9 +19,8 @@ import {
   setAssumptions, setCouponActive, setDeviceInternal, setInternal, setInternalEmails,
 } from './_lib/admin.js';
 import { buildInsights } from './_lib/admin-insights.js';
-import { buildDigest, runDigest } from './_lib/admin-digest.js';
+import { buildDigest, deliverDigest, runDigest } from './_lib/admin-digest.js';
 import { runAmplitude } from './_lib/amplitude.js';
-import { notifyOwner } from './_lib/provider-alert.js';
 import { growthPlan } from './_lib/admin-plan.js';
 
 /** The overview view in full: figures, integrations, growth, Search Console and the diagnosis built from them. */
@@ -171,8 +170,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       case 'send-digest': {
         const d = await buildDigest();
-        notifyOwner(d.subject, d.text);
-        return { body: { subject: d.subject }, audit: { subject: d.subject } };
+        const r = await deliverDigest(d);
+        if (!r.accepted) throw new AdminError(502, r.reason === 'not_configured' ? 'No alert email is configured.' : 'The email service rejected the digest.');
+        return { body: { subject: d.subject, accepted: true }, audit: { subject: d.subject, accepted: true } };
       }
       case 'set-internal-emails': {
         const { emails } = await setInternalEmails(body);
