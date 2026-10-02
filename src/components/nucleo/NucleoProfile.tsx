@@ -47,7 +47,7 @@ interface Props {
   onToggleSpeak: () => void;
   onToggleSounds: () => void;
   onReset: () => void;
-  pro: { label: string; detail: string; action: () => void };
+  pro: { label: string; detail: string; action?: () => void };
   /** Invite friends: five slots, Bobby Pro for each friend who joins. */
   invite: { label: string; detail: string; action: () => void };
 }

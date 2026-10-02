@@ -165,6 +165,25 @@ final class BobbyAccessTests: XCTestCase {
         XCTAssertTrue(proRow.detail?.contains("renews") == true)
         let web = BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: nil)
         XCTAssertEqual(ReadsRow.content(access: pro, subscription: web, signedIn: true, spanish: false)?.manage, false)
+        let giftedUntil = "2099-10-10T12:00:00Z"
+        let gifted = try XCTUnwrap(ReadsRow.content(access: pro, subscription: nil, signedIn: true,
+                                                   grantUntil: giftedUntil, grantSource: "admin", spanish: false))
+        XCTAssertEqual(gifted.title, "Bobby Pro · Gifted")
+        XCTAssertTrue(gifted.detail?.contains("gifted Pro until") == true)
+        XCTAssertTrue(gifted.detail?.contains("2099") == true, "gift expiry includes the year")
+        XCTAssertFalse(gifted.manage, "an admin gift has no App Store subscription to manage")
+        let expiredApple = BobbySubscription(provider: "apple", status: "expired", currentPeriodEnd: "2020-01-01T00:00:00Z")
+        XCTAssertEqual(ReadsRow.content(access: pro, subscription: expiredApple, signedIn: true,
+                                        grantUntil: giftedUntil, grantSource: "admin", spanish: true)?.title,
+                       "Bobby Pro · Regalado", "an expired paid row cannot hide the live grant")
+        XCTAssertEqual(ReadsRow.content(access: pro, subscription: apple, signedIn: true,
+                                        grantUntil: giftedUntil, grantSource: "admin", spanish: false)?.title,
+                       "Bobby Pro · Active", "a live paid period retains its subscription controls")
+        XCTAssertTrue(ReadsRow.content(access: pro, subscription: apple, signedIn: true,
+                                       grantUntil: giftedUntil, grantSource: "admin", spanish: false)?.detail?.contains("gifted Pro until") == true,
+                      "a gift scheduled after the paid period remains visible on the phone")
+        XCTAssertEqual(NucleoReferral(json: ["code": "ABCDEFGH", "url": "https://bobbyprotocol.xyz/desk?ref=ABCDEFGH",
+                                            "accepted": 0, "max": 5, "proUntil": giftedUntil, "proSource": "admin"])?.proSource, "admin")
         XCTAssertNil(ReadsRow.content(access: nil, subscription: nil, signedIn: true), "no server word, no line")
     }
 

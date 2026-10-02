@@ -646,7 +646,7 @@ try {
     eq([stored[0].path, stored[0].mime, stored[0].bytes.length], [audioPath(cacheKey), 'audio/mpeg', 4096], 'stored at the content-addressed path');
     eq(fdb.ops.filter((o) => o[0] === 'commit'), [['commit', 'aud-1', 1, 'ready', audioPath(cacheKey), 4096, null]], 'committed ready under its fence');
     const reserveArgs = budgetOps.find((o) => o[0] === 'reserve')![1] as any;
-    eq([reserveArgs.kind, reserveArgs.workRef, reserveArgs.provider, reserveArgs.model, reserveArgs.reserveUsd], ['tts', `audio:${cacheKey}`, 'openai', 'gpt-4o-mini-tts', providers.ttsReserveUsd(P.text.length)], 'tts reservation for the cache key');
+    eq([reserveArgs.kind, reserveArgs.workRef, reserveArgs.provider, reserveArgs.model, reserveArgs.reserveUsd], ['tts', `audio:${P.audioId}`, 'openai', 'gpt-4o-mini-tts', providers.ttsReserveUsd(P.text.length)], 'tts attempts belong to this audio generation, not a purged prior row');
     eq(await ensureAudio(P, { db: fdb.db, store: memStore, tts: slowTts, withReservation: reserveWith() }), { state: 'ready' }, 'later caller: ready, no synthesis');
     eq(ttsCalls, 1, 'still one TTS call');
 

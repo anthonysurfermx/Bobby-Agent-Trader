@@ -439,7 +439,7 @@ final class BriefingsExperienceTests: XCTestCase {
 
     private func memoryCenter() -> MemoryCenter {
         memoryUser = "a"; memoryGeneration = UUID(); memoryCalls = []
-        let c = MemoryCenter(observeAccount: false)
+        let c = MemoryCenter(observeAccount: false, defaults: defaults)
         c.currentUser = { [unowned self] in self.memoryUser }
         c.currentGeneration = { [unowned self] in self.memoryGeneration }
         c.riskAccepted = { true }
@@ -463,6 +463,8 @@ final class BriefingsExperienceTests: XCTestCase {
 
     func testMemoryAccountSwitchDropsTheLateAnswerFromA() async {
         let c = memoryCenter()
+        await c.refresh()
+        XCTAssertTrue(c.setNativeCapture(true))
         let started = expectation(description: "A's read is suspended")
         var pending: CheckedContinuation<(json: Any?, status: Int), Error>?
         c.send = { _, _, _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
@@ -471,11 +473,90 @@ final class BriefingsExperienceTests: XCTestCase {
         memoryUser = "b"; memoryGeneration = UUID()
         c.accountChanged()
         XCTAssertNil(c.snapshot)
+        XCTAssertFalse(c.nativeOptedIn, "B does not inherit A's native consent")
         pending?.resume(returning: (memoryJSON(["SOL"]), 200))
         let ok = await result.value
         XCTAssertFalse(ok)
         XCTAssertNil(c.snapshot, "A's memory never reaches B")
         XCTAssertFalse(c.loading)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+    }
+
+    func testNativeMemoryDefaultsOffAndIsScopedToAccount() async {
+        let c = memoryCenter()
+        XCTAssertFalse(c.nativeOptedIn, "web memory being on does not opt in this iPhone")
+        let loaded = await c.refresh()
+        XCTAssertTrue(loaded)
+        XCTAssertTrue(c.snapshot?.enabled == true)
+        XCTAssertFalse(c.nativeOptedIn)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+        XCTAssertTrue(c.setNativeCapture(true))
+        XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+        XCTAssertFalse(c.allowsNativeCapture(user: "b", generation: memoryGeneration))
+        memoryUser = "b"; memoryGeneration = UUID()
+        c.accountChanged()
+        XCTAssertFalse(c.nativeOptedIn)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+        memoryUser = "a"; memoryGeneration = UUID()
+        c.accountChanged()
+        XCTAssertTrue(c.nativeOptedIn, "A's explicit choice is stored only for A on this device")
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: UUID()), "stale generation is not consent")
+        XCTAssertTrue(c.setNativeCapture(false))
+        XCTAssertFalse(c.nativeOptedIn)
+        let reopened = MemoryCenter(observeAccount: false, defaults: defaults)
+        reopened.currentUser = { [unowned self] in self.memoryUser }
+        reopened.currentGeneration = { [unowned self] in self.memoryGeneration }
+        reopened.accountChanged(force: true)
+        XCTAssertFalse(reopened.nativeOptedIn, "revocation persists across a new center")
+    }
+
+    func testPauseRevokesNativeCaptureBeforeFailedNetworkWrite() async {
+        let c = memoryCenter()
+        let loaded = await c.refresh()
+        XCTAssertTrue(loaded)
+        XCTAssertTrue(c.setNativeCapture(true))
+        let started = expectation(description: "pause PATCH is suspended")
+        var pending: CheckedContinuation<(json: Any?, status: Int), Error>?
+        c.send = { _, _, _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
+        let pause = Task { await c.setEnabled(false) }
+        await fulfillment(of: [started], timeout: 3)
+        XCTAssertFalse(c.nativeOptedIn, "local consent is gone before the PATCH reply")
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+        pending?.resume(throwing: URLError(.notConnectedToInternet))
+        let paused = await pause.value
+        XCTAssertFalse(paused)
+        XCTAssertFalse(c.nativeOptedIn, "a network failure cannot restore consent")
+        XCTAssertEqual(c.lastError, .unavailable)
+    }
+
+    func testPausedServerMemoryCannotEnableNativeCapture() async {
+        let c = memoryCenter()
+        c.send = { [unowned self] _, _, _ in (self.memoryJSON(enabled: false), 200) }
+        let loaded = await c.refresh()
+        XCTAssertTrue(loaded)
+        XCTAssertFalse(c.setNativeCapture(true))
+        XCTAssertFalse(c.nativeOptedIn)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+    }
+
+    func testLatePauseReplyCannotChangeNewAccountsMemoryChoice() async {
+        let c = memoryCenter()
+        let loaded = await c.refresh()
+        XCTAssertTrue(loaded)
+        XCTAssertTrue(c.setNativeCapture(true))
+        let started = expectation(description: "A's pause PATCH is suspended")
+        var pending: CheckedContinuation<(json: Any?, status: Int), Error>?
+        c.send = { _, _, _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
+        let pause = Task { await c.setEnabled(false) }
+        await fulfillment(of: [started], timeout: 3)
+        memoryUser = "b"; memoryGeneration = UUID()
+        c.accountChanged()
+        pending?.resume(returning: (memoryJSON(["NVDA"], enabled: true), 200))
+        let accepted = await pause.value
+        XCTAssertFalse(accepted)
+        XCTAssertNil(c.snapshot)
+        XCTAssertFalse(c.nativeOptedIn)
+        XCTAssertFalse(c.allowsNativeCapture(user: "b", generation: memoryGeneration))
     }
 
     func testMemoryShownForAIsClearedAtOnceForB() async {

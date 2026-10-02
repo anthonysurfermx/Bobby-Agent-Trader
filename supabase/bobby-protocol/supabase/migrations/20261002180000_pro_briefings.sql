@@ -44,8 +44,9 @@
 -- ============================================================ tables
 
 -- Feature-owned payment evidence. The existing subscription mirror also marks RevenueCat trials/Sandbox active,
--- so active status alone cannot establish this feature's paid-only contract. NO billing adapter populates this
--- table yet: unknown evidence fails closed and the feature must remain disabled until that integration is verified.
+-- so active status alone cannot establish this feature's paid-only contract. api/_lib/revenuecat.ts
+-- populates this from an authenticated positive-paid webhook corroborated by a fresh subscriber snapshot.
+-- Unknown evidence fails closed; the feature's rollout still needs live purchase/renewal verification.
 create table if not exists public.bobby_brief_paid_periods (
   identity_id uuid primary key references public.bobby_identities(id) on delete cascade,
   provider text not null check (provider in ('stripe', 'apple')),

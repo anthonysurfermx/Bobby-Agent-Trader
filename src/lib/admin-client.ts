@@ -375,6 +375,7 @@ function translate(code: string): string | null {
 
 function errorMessage(status: number, code: string | null): string {
   if (code === 'not_admin') return 'Esta cuenta no es administradora.';
+  if (code === 'paid_period_end_unknown') return 'La suscripción pagada no tiene fecha de término. Sincroniza su periodo de facturación antes de regalar días Pro; no se entregó ningún crédito.';
   const es = code ? translate(code) : null;
   if (es) return es;
   if (status === 401) return 'Inicia sesión para continuar.';

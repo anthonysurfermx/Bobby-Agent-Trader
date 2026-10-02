@@ -28,6 +28,7 @@ const MIGRATIONS = [
   '20261001210000_admin_audit_fixes.sql',
   '20261001220000_audience_geo.sql',
   '20261002132827_admin_grant_idempotency.sql',
+  '20261002140326_pro_gift_balance_visibility.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
@@ -196,11 +197,44 @@ try {
     (await pool.query('select public.bobby_admin_grant_once($1,$2,$3,$4,$5,$6,$7) as r', [operation, admin, id, r, pf, mx, pd])).rows[0].r;
   const g1 = await grant(bo, 5, 1, 0, 0);
   eq([g1.ok, g1.bonus], [true, { reads: 12, profundo: 1, maximo: 0 }], 'a gift stacks on the coupon balance');
+  const freeGiftAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [bo])).rows[0].r;
+  eq([freeGiftAccess.tier, freeGiftAccess.bonus], ['free', 12], 'free account sees the combined coupon and admin gift');
   const g2 = await grant(bo, 0, 0, 0, 7);
   ok(Math.round((new Date(g2.proUntil).getTime() - Date.now()) / 86_400_000) === 7, 'seven days of Pro');
   eq((await pool.query("select source from public.bobby_pro_grants where identity_id = $1", [bo])).rows[0].source, 'admin', 'an admin grant');
+  const proAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [bo])).rows[0].r;
+  eq([proAccess.tier, proAccess.limit, proAccess.bonus], ['pro', null, 12], 'Pro remains unlimited and sees its gifted Quick balance');
+  eq((await pool.query('select public.bobby_read_access($1,null,true) as r', [ana])).rows[0].r.bonus, 0, 'another Pro account sees no gifted Quick balance');
   const g3 = await grant(bo, 0, 0, 0, 3);
   ok(Math.round((new Date(g3.proUntil).getTime() - Date.now()) / 86_400_000) === 10, 'Pro days stack');
+  const payingReceiver = await account({ email: 'paid-gift@example.test' });
+  await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'apple', 'active', now() + interval '20 days')", [payingReceiver]);
+  const paidGift = await grant(payingReceiver, 0, 0, 0, 7);
+  ok(Math.round((new Date(paidGift.proUntil).getTime() - Date.now()) / 86_400_000) === 27,
+    'admin Pro starts after the paid period rather than expiring during it');
+  eq((await pool.query("select source from public.bobby_pro_grants where identity_id = $1", [payingReceiver])).rows[0].source,
+    'admin', 'paid user grant records its server-authoritative source');
+  const paidGiftAgain = await grant(payingReceiver, 0, 0, 0, 3);
+  ok(Math.round((new Date(paidGiftAgain.proUntil).getTime() - Date.now()) / 86_400_000) === 30,
+    'repeated admin Pro gifts stack after the paid period');
+  const unknownEnd = await account({ email: 'unknown-paid-end@example.test' });
+  await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'apple', 'active', null)", [unknownEnd]);
+  const uncertainOperation = randomUUID();
+  eq((await grant(unknownEnd, 3, 1, 0, 7, uncertainOperation)).error, 'paid_period_end_unknown',
+    'a live paid subscription without a known end cannot silently consume gifted Pro days');
+  eq((await pool.query('select count(*)::int n from public.bobby_usage_bonus where identity_id=$1', [unknownEnd])).rows[0].n, 0,
+    'unknown paid end grants no partial reads or levels');
+  eq((await pool.query('select count(*)::int n from public.bobby_pro_grants where identity_id=$1', [unknownEnd])).rows[0].n, 0,
+    'unknown paid end grants no Pro time');
+  eq((await pool.query('select count(*)::int n from public.bobby_admin_grant_operations where operation_id=$1', [uncertainOperation])).rows[0].n, 0,
+    'a rejected intent leaves no durable receipt');
+  eq((await pool.query("select count(*)::int n from public.bobby_admin_actions where target=$1 and action='grant'", [unknownEnd])).rows[0].n, 0,
+    'a rejected intent leaves no success audit');
+  await pool.query("update public.bobby_subscriptions set current_period_end=now() + interval '20 days' where identity_id=$1", [unknownEnd]);
+  const resolvedGift = await grant(unknownEnd, 3, 1, 0, 7, uncertainOperation);
+  ok(Math.round((new Date(resolvedGift.proUntil).getTime() - Date.now()) / 86_400_000) === 27,
+    'the same operation succeeds once the paid end is known');
+  eq(resolvedGift.bonus, { reads: 3, profundo: 1, maximo: 0 }, 'retry grants the complete intent once');
   eq((await grant(randomUUID(), 1, 0, 0, 0)).error, 'not_found', 'an unknown account');
   await assert.rejects(grant(bo, 0, 0, 0, 0)); checks++;
   await assert.rejects(grant(bo, 5000, 0, 0, 0)); checks++;
@@ -229,6 +263,8 @@ try {
   await grant(receiver, 1, 1, 1, 0);
   const balance = async () => (await pool.query('select reads, profundo, maximo from public.bobby_usage_bonus where identity_id=$1', [receiver])).rows[0];
   eq(await balance(), { reads: 1, profundo: 1, maximo: 1 }, 'persisted in the selected identity');
+  const freeAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [receiver])).rows[0].r;
+  eq([freeAccess.tier, freeAccess.bonus], ['free', 1], 'free account still sees its own gifted Quick balance');
   eq((await pool.query('select count(*)::int n from public.bobby_usage_bonus where identity_id=$1', [ana])).rows[0].n, 0, 'another identity receives no gift');
   const consume = async (paywall = true) => (await pool.query("select public.bobby_consume_read($1,null,null,'ios','NVDA',$2) r", [receiver, paywall])).rows[0].r;
   for (let i = 0; i < 10; i++) eq((await consume()).allowed, true, 'base allowance is consumed first');

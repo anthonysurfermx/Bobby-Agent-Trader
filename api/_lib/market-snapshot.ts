@@ -1,8 +1,7 @@
 // ============================================================
 // Global market snapshot — the read-only public market fetchers shared by /api/bobby-intel and the Bobby Pro
 // briefing worker (api/_lib/briefings/evidence.ts).
-//   · Moved out of api/bobby-intel.ts unchanged: every fetcher keeps its URL, parsing, rounding and fail-soft
-//     behaviour ([] / null on any error), so bobby-intel's payload and its api_cache entry are identical.
+//   · Fetchers retain their payload and fail-soft behaviour, with a finite public-source deadline.
 //   · The `*Quotes` / `*Detailed` variants keep the provider timestamp the original functions drop (Yahoo
 //     regularMarketTime, alternative.me timestamp, the ECB fix date). The original functions are thin wrappers
 //     that strip those fields again, so their output objects are key-for-key what they were.
@@ -12,6 +11,9 @@
 // ============================================================
 
 // ---- Market Regime Detection ----
+const PUBLIC_SOURCE_TIMEOUT_MS = 5_000;
+const sourceSignal = () => AbortSignal.timeout(PUBLIC_SOURCE_TIMEOUT_MS);
+
 export type MarketRegime = 'high_vol' | 'low_vol' | 'normal';
 
 export function detectRegime(btcChange24h: number): { regime: MarketRegime; label: string } {
@@ -25,7 +27,7 @@ export function detectRegime(btcChange24h: number): { regime: MarketRegime; labe
 export async function fetchLivePrices(): Promise<Array<{ symbol: string; price: number; change24h: number }>> {
   const instruments = ['BTC-USDT', 'ETH-USDT', 'SOL-USDT', 'OKB-USDT', 'XAUT-USDT', 'PAXG-USDT'];
   try {
-    const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT');
+    const res = await fetch('https://www.okx.com/api/v5/market/tickers?instType=SPOT', { signal: sourceSignal() });
     if (!res.ok) return [];
     const json = await res.json() as { code: string; data: Array<{ instId: string; last: string; open24h: string }> };
     if (json.code !== '0') return [];
@@ -45,7 +47,7 @@ export async function fetchLivePrices(): Promise<Array<{ symbol: string; price: 
 
     // Also fetch silver (SWAP only)
     try {
-      const swapRes = await fetch('https://www.okx.com/api/v5/market/ticker?instId=XAG-USDT-SWAP');
+      const swapRes = await fetch('https://www.okx.com/api/v5/market/ticker?instId=XAG-USDT-SWAP', { signal: sourceSignal() });
       const swapJson = await swapRes.json() as { code: string; data: Array<{ last: string; open24h: string }> };
       if (swapJson.code === '0' && swapJson.data?.[0]) {
         const s = swapJson.data[0];
@@ -72,7 +74,7 @@ export async function fetchFundingRates(): Promise<FundingRate[]> {
   try {
     const results = await Promise.all(instruments.map(async (instId) => {
       try {
-        const res = await fetch(`https://www.okx.com/api/v5/public/funding-rate?instId=${instId}`);
+        const res = await fetch(`https://www.okx.com/api/v5/public/funding-rate?instId=${instId}`, { signal: sourceSignal() });
         if (!res.ok) return null;
         const json = await res.json() as { code: string; data: Array<{ instId: string; fundingRate: string; nextFundingRate: string; nextFundingTime: string }> };
         if (json.code !== '0' || !json.data?.[0]) return null;
@@ -98,7 +100,7 @@ export async function fetchOpenInterest(): Promise<OpenInterestData[]> {
   try {
     const results = await Promise.all(instruments.map(async (instId) => {
       try {
-        const res = await fetch(`https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=${instId}`);
+        const res = await fetch(`https://www.okx.com/api/v5/public/open-interest?instType=SWAP&instId=${instId}`, { signal: sourceSignal() });
         if (!res.ok) return null;
         const json = await res.json() as { code: string; data: Array<{ instId: string; oi: string; oiCcy: string; ts: string }> };
         if (json.code !== '0' || !json.data?.[0]) return null;
@@ -125,7 +127,7 @@ export async function fetchTopTradersLSRatio(): Promise<LongShortRatio[]> {
   try {
     const results = await Promise.all(instruments.map(async ({ symbol, instId }) => {
       try {
-        const res = await fetch(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=1H`);
+        const res = await fetch(`https://www.okx.com/api/v5/rubik/stat/contracts/long-short-account-ratio-contract-top-trader?instId=${instId}&period=1H`, { signal: sourceSignal() });
         if (!res.ok) return null;
         const json = await res.json() as { code: string; data: string[][] };
         if (json.code !== '0' || !json.data?.[0]) return null;
@@ -153,7 +155,7 @@ export interface FearGreedData { value: number; classification: string }
 /** fetchFearGreed plus the index publication time (alternative.me `timestamp`, a daily index). */
 export async function fetchFearGreedDetailed(): Promise<(FearGreedData & { asOf: string | null }) | null> {
   try {
-    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json');
+    const res = await fetch('https://api.alternative.me/fng/?limit=1&format=json', { signal: sourceSignal() });
     if (!res.ok) return null;
     const json = await res.json() as { data: Array<{ value: string; value_classification: string; timestamp?: string }> };
     if (!json.data?.[0]) return null;
@@ -174,7 +176,7 @@ export async function fetchFearGreed(): Promise<FearGreedData | null> {
 /** fetchDXY plus the ECB reference-rate date the value is computed from (`YYYY-MM-DD`, a daily fix). */
 export async function fetchDXYDetailed(): Promise<{ dxy: number; asOf: string | null } | null> {
   try {
-    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF');
+    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=EUR,JPY,GBP,CAD,SEK,CHF', { signal: sourceSignal() });
     if (!res.ok) return null;
     const json = await res.json() as { date?: string; rates: { EUR: number; JPY: number; GBP: number; CAD: number; SEK: number; CHF: number } };
     const r = json.rates;
@@ -206,7 +208,7 @@ export async function fetchTopStockQuotes(): Promise<StockQuote[]> {
     // crypto and metals quotes. One request either way — Yahoo takes the
     // whole list in a single spark call.
     const url = 'https://query1.finance.yahoo.com/v7/finance/spark?symbols=NVDA,AAPL,TSLA,META,MSFT,COIN,SPY,GOOGL,AMZN,AMD,MSTR,QQQ&range=1d&interval=1d';
-    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' } });
+    const response = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0' }, signal: sourceSignal() });
     if (!response.ok) return [];
     const data = await response.json() as Record<string, unknown>;
     const spark = data.spark as { result?: Array<{ symbol: string; response: Array<{ meta: Record<string, unknown> }> }> } | undefined;
@@ -271,6 +273,8 @@ export interface SnapshotFetchers {
   fearGreed: typeof fetchFearGreedDetailed;
   dxy: typeof fetchDXYDetailed;
   now: () => Date;
+  /** Bounds each injected source too, even if a fetch implementation ignores AbortSignal. */
+  sourceTimeoutMs?: number;
 }
 
 const DEFAULT_FETCHERS: SnapshotFetchers = {
@@ -286,7 +290,18 @@ const DEFAULT_FETCHERS: SnapshotFetchers = {
 export async function loadGlobalMarketSnapshot(fetchers: Partial<SnapshotFetchers> = {}): Promise<GlobalMarketSnapshot> {
   const f = { ...DEFAULT_FETCHERS, ...fetchers };
   const fetchedAt = f.now().toISOString();
-  const settled = await Promise.allSettled([f.livePrices(), f.stocks(), f.funding(), f.fearGreed(), f.dxy()]);
+  const timeoutMs = Math.max(1, Math.min(f.sourceTimeoutMs ?? PUBLIC_SOURCE_TIMEOUT_MS, PUBLIC_SOURCE_TIMEOUT_MS));
+  const withinDeadline = <T>(run: () => Promise<T>): Promise<T> => new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('public_source_timeout')), timeoutMs);
+    Promise.resolve().then(run).then(
+      (result) => { clearTimeout(timer); resolve(result); },
+      (error) => { clearTimeout(timer); reject(error); },
+    );
+  });
+  const settled = await Promise.allSettled([
+    withinDeadline(f.livePrices), withinDeadline(f.stocks), withinDeadline(f.funding),
+    withinDeadline(f.fearGreed), withinDeadline(f.dxy),
+  ]);
   const value = <T>(i: number, fallback: T): T => (settled[i].status === 'fulfilled' ? ((settled[i] as PromiseFulfilledResult<T>).value ?? fallback) : fallback);
   const crypto = value<Array<{ symbol: string; price: number; change24h: number }>>(0, []);
   const stocks = value<StockQuote[]>(1, []);

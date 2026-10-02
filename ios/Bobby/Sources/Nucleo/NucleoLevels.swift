@@ -102,6 +102,7 @@ struct NucleoReferral: Equatable, Sendable {
     let max: Int
     let rewardDays: Int?
     let proUntil: String?
+    let proSource: String?
 
     init?(json: Any?) {
         guard let o = json as? [String: Any], let code = o["code"] as? String, let url = o["url"] as? String,
@@ -112,6 +113,7 @@ struct NucleoReferral: Equatable, Sendable {
         max = BobbyReadAccess.count(o["max"]) ?? 5
         rewardDays = BobbyReadAccess.count(o["rewardDays"])
         proUntil = o["proUntil"] as? String
+        proSource = o["proSource"] as? String
     }
 }
 

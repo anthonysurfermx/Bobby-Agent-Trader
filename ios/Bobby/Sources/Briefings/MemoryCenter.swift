@@ -1,17 +1,18 @@
-// Account memory on iPhone (build 53, design §7 / D10): see, correct, pause and delete what Bobby
+// Account memory on iPhone: see, correct, pause and delete what Bobby
 // remembers about a signed-in Apple/Google account, through the existing /api/memory (api/memory.ts):
 //   GET → {enabled, prefs:{horizon, experience, risk}, assets:[{symbol, asks, lastAskedAt, lastHorizon}], retentionDays}
 //   PATCH {horizon?|experience?|risk?: enum|null, memoryEnabled?: bool} → same body
 //   DELETE ?symbol=X → forget one asset; DELETE (no symbol) → forget everything. Both answer the same body.
 // Invariants (the BriefingsCenter pattern):
-//  - Nothing is stored on the phone; the snapshot belongs to the account and is cleared at once on an
-//    account change. Every answer is checked against the account it was asked for (user id + generation +
-//    this center's epoch) and late answers are dropped.
+//  - Only the native opt-in bit is kept on the phone, keyed by account; memory data stays on the server.
+//    The snapshot is cleared at once on an account change. Every answer is checked against the account
+//    it was asked for (user id + generation + this center's epoch) and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
 //  - R11: no network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
 import Combine
+import CryptoKit
 import Foundation
 
 struct RememberedAsset: Equatable, Identifiable, Sendable {
@@ -101,6 +102,7 @@ enum MemoryError: Error, Equatable, Sendable {
 final class MemoryCenter: ObservableObject {
     static let shared = MemoryCenter()
     static let path = "api/memory"
+    nonisolated static let nativeOptInHeader = "x-bobby-memory-opt-in"
 
     @Published private(set) var snapshot: MemorySnapshot?
     @Published private(set) var loading = false
@@ -109,6 +111,8 @@ final class MemoryCenter: ObservableObject {
     @Published private(set) var lastError: MemoryError?
     /// "Delete everything" was asked for and waits for its confirmation.
     @Published private(set) var confirmingForgetAll = false
+    /// Separate from the server's shared web/account preference. Defaults off for every account on this device.
+    @Published private(set) var nativeOptedIn = false
 
     /// One HTTP call: (path with query, method, body) → (json, status). Tests replace it.
     var send: (_ path: String, _ method: String, _ body: [String: Any]?) async throws -> (json: Any?, status: Int) = { path, method, body in
@@ -123,10 +127,13 @@ final class MemoryCenter: ObservableObject {
     private var ownerGeneration: UUID?
     private var epoch = UUID()
     private var cancellables = Set<AnyCancellable>()
+    private let defaults: UserDefaults
 
-    init(observeAccount: Bool = true) {
+    init(observeAccount: Bool = true, defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         owner = currentUser()
         ownerGeneration = currentGeneration()
+        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
         guard observeAccount else { return }
         NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.accountChanged() } }
@@ -139,6 +146,7 @@ final class MemoryCenter: ObservableObject {
         owner = currentUser()
         ownerGeneration = currentGeneration()
         epoch = UUID()
+        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
         snapshot = nil
         loading = false
         saving = false
@@ -153,6 +161,24 @@ final class MemoryCenter: ObservableObject {
     }
 
     private var canCallServer: Bool { riskAccepted() && currentUser() != nil }
+
+    private static func nativeOptInKey(_ user: String) -> String {
+        let digest = SHA256.hash(data: Data(user.utf8)).map { String(format: "%02x", $0) }.joined()
+        return "agent.nativeMemoryOptIn.v1.\(digest)"
+    }
+
+    private func revokeNativeCapture() {
+        nativeOptedIn = false
+        if let user = currentUser() { defaults.removeObject(forKey: Self.nativeOptInKey(user)) }
+    }
+
+    /// Called only while constructing an authenticated desk POST. A late request from another account or
+    /// generation cannot borrow this account's consent. The server still checks its own memory preference.
+    func allowsNativeCapture(user: String, generation: UUID) -> Bool {
+        accountChanged()
+        return nativeOptedIn && riskAccepted() && owner == user && ownerGeneration == generation
+            && currentUser() == user && currentGeneration() == generation
+    }
 
     // MARK: reads
 
@@ -173,9 +199,30 @@ final class MemoryCenter: ObservableObject {
 
     // MARK: corrections
 
-    /// Pause (false) or resume (true): a paused memory saves nothing new and personalizes nothing.
+    /// Pause (false) or resume (true) shared account memory. Revocation is local before the network call:
+    /// an offline PATCH cannot leave the phone recording after the person switched it off.
     @discardableResult
-    func setEnabled(_ on: Bool) async -> Bool { await write("PATCH", Self.path, body: ["memoryEnabled": on]) }
+    func setEnabled(_ on: Bool) async -> Bool {
+        accountChanged()
+        if !on { revokeNativeCapture() }
+        return await write("PATCH", Self.path, body: ["memoryEnabled": on])
+    }
+
+    /// Opt iPhone asks in separately from web memory. Turning it off is immediate and needs no network.
+    /// A server-side pause always wins; it also clears this local consent when observed on refresh.
+    @discardableResult
+    func setNativeCapture(_ on: Bool) -> Bool {
+        accountChanged()
+        if !on { revokeNativeCapture(); return true }
+        guard canCallServer, !saving, snapshot?.enabled == true, let user = currentUser() else {
+            if currentUser() == nil { lastError = .signedOut } else { lastError = .rejected }
+            return false
+        }
+        defaults.set(true, forKey: Self.nativeOptInKey(user))
+        nativeOptedIn = true
+        lastError = nil
+        return true
+    }
 
     /// Set or clear (nil) one preference. Values outside the server's enums are refused locally.
     @discardableResult
@@ -245,6 +292,7 @@ final class MemoryCenter: ObservableObject {
         switch result {
         case .success(let s):
             snapshot = s
+            if !s.enabled { revokeNativeCapture() }
             lastError = nil
             return true
         case .failure(let e):

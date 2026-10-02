@@ -19,6 +19,8 @@ import { BriefingStorageError, type RpcFn } from '../api/_lib/briefings/db.js';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS_DIR = join(ROOT, 'supabase/bobby-protocol/supabase/migrations');
 export const BRIEFINGS_MIGRATION = join(MIGRATIONS_DIR, '20261002180000_pro_briefings.sql');
+export const BRIEFINGS_DEVICE_MIGRATION = join(MIGRATIONS_DIR, '20261002183000_brief_device_atomic.sql');
+export const BRIEFINGS_SOURCE_GUARD_MIGRATION = join(MIGRATIONS_DIR, '20261002184500_brief_paid_source_guard.sql');
 /**
  * The smallest chain of real migrations the briefings migration depends on, each with the object that proves it is
  * already applied (a shared cluster, e.g. CI after scripts/test-trader-land-growth.sql, may hold part of the chain).
@@ -77,6 +79,12 @@ export async function bootstrapBriefingsDb(url: string): Promise<pg.Pool> {
       const sql = readFileSync(BRIEFINGS_MIGRATION, 'utf8');
       await c.query(sql);
       await c.query(sql); // idempotent
+      const deviceSql = readFileSync(BRIEFINGS_DEVICE_MIGRATION, 'utf8');
+      await c.query(deviceSql);
+      await c.query(deviceSql); // idempotent
+      const sourceGuardSql = readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8');
+      await c.query(sourceGuardSql);
+      await c.query(sourceGuardSql); // idempotent
     } finally {
       await c.query(`alter default privileges in schema public revoke all on tables from anon, authenticated;
         alter default privileges in schema public revoke all on functions from anon, authenticated;

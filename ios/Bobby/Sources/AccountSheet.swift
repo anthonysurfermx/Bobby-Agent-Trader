@@ -341,7 +341,8 @@ struct AccountSheet: View {
     }
 
     @ViewBuilder private var accountRows: some View {
-        if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn) {
+        if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn,
+                                      grantUntil: invites.referral?.proUntil, grantSource: invites.referral?.proSource) {
             readsRow(row)
         }
         if let row = GiftedReadsRow.content(access: reads.access, meters: invites.meters) {
@@ -779,15 +780,31 @@ struct ReadsRow: Equatable {
     /// Manage subscription (Apple's sheet): only for an App Store subscription.
     let manage: Bool
 
-    static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool, spanish: Bool = L.isSpanish) -> ReadsRow? {
+    private static func giftDate(_ date: Date, spanish: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: spanish ? "es_ES" : "en_US")
+        formatter.dateFormat = spanish ? "d 'de' MMMM 'de' yyyy" : "MMMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool,
+                        grantUntil: String? = nil, grantSource: String? = nil, spanish: Bool = L.isSpanish) -> ReadsRow? {
         guard let access else { return nil }
         if access.isPro {
-            let end = subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) }
+            let paid = ["active", "trialing"].contains(subscription?.status ?? "")
+                && (subscription?.periodEnd.map { $0 > .now } ?? true)
+            let grantEnd = grantUntil.flatMap(BobbyAccessAPI.date)
+            let activeGrant = ["admin", "referral"].contains(grantSource ?? "") && (grantEnd ?? .distantPast) > .now
+            let gifted = !paid && activeGrant
+            let end = paid ? subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) } : nil
             let canceled = ["canceled", "cancelled", "expired"].contains(subscription?.status ?? "")
-            let detail = BobbyStore.Copy.benefits(spanish: spanish) + (end.map { canceled ? L.t(" · ends \($0)", " · termina el \($0)", spanish: spanish)
-                                                        : L.t(" · renews \($0)", " · se renueva el \($0)", spanish: spanish) } ?? "")
-            return ReadsRow(title: L.t("Bobby Pro · Active", "Bobby Pro · Activo", spanish: spanish), detail: detail, pro: true,
-                            manage: subscription?.managedByApple ?? false)
+            let paidDetail = end.map { canceled ? L.t(" · ends \($0)", " · termina el \($0)", spanish: spanish)
+                                                : L.t(" · renews \($0)", " · se renueva el \($0)", spanish: spanish) } ?? ""
+            let grantDetail = activeGrant ? grantEnd.map { L.t(" · gifted Pro until \(giftDate($0, spanish: spanish))", " · Pro regalado hasta el \(giftDate($0, spanish: spanish))", spanish: spanish) } ?? "" : ""
+            let detail = BobbyStore.Copy.benefits(spanish: spanish) + paidDetail + grantDetail
+            return ReadsRow(title: gifted ? L.t("Bobby Pro · Gifted", "Bobby Pro · Regalado", spanish: spanish)
+                                          : L.t("Bobby Pro · Active", "Bobby Pro · Activo", spanish: spanish), detail: detail, pro: true,
+                            manage: paid && (subscription?.managedByApple ?? false))
         }
         guard let limit = access.limit else { return nil }
         let left = access.remaining ?? max(0, limit - access.used)

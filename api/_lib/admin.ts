@@ -182,6 +182,7 @@ export async function grant(admin: Identity, body: Record<string, unknown>) {
     if (result?.error === 'operation_conflict') throw new AdminError(409, 'This grant operation belongs to a different account, administrator or gift.');
     if (result?.error === 'not_admin') throw new AdminError(403, 'not_admin');
     if (result?.error === 'not_found') throw new AdminError(404, 'Account not found.');
+    if (result?.error === 'paid_period_end_unknown') throw new AdminError(409, 'paid_period_end_unknown');
     throw new AdminError(502, 'The grant was not confirmed. Retry the same operation.');
   }
   if ((result as { operationId?: string }).operationId?.toLowerCase() !== operationId.toLowerCase()) {

@@ -63,7 +63,9 @@ export async function ensureAudio(
   };
 
   const r = await reserve(
-    { kind: 'tts', workRef: `audio:${p.cacheKey}`, provider: 'openai', model: TTS_MODEL(), reserveUsd: ttsReserveUsd(p.text.length), worker: p.worker },
+    // A purged cache row gets a new audioId. Its prior, successful generation must not exhaust the
+    // attempt cap when a still-readable report asks to regenerate audio after retention expiry.
+    { kind: 'tts', workRef: `audio:${p.audioId}`, provider: 'openai', model: TTS_MODEL(), reserveUsd: ttsReserveUsd(p.text.length), worker: p.worker },
     () => tts(p.text, p.voice, p.language, { timeoutMs: TTS_TIMEOUT_MS }),
   );
 

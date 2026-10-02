@@ -324,8 +324,20 @@ try {
     const installationId = randomUUID();
     const reg = { installationId, apnsToken: APNS, permissionState: 'authorized', appBuild: 53, apnsEnvironment: 'production' };
     let deviceReply: Record<string, unknown> = { ok: true, registrationId: randomUUID(), bindingRevision: 1 };
-    handlers.bobby_push_device_register = () => deviceReply;
-    handlers.bobby_push_device_rebind = () => deviceReply;
+    handlers.bobby_push_device_write_once = (b) => {
+      const scope = 'device_atomic';
+      const begin = idem.begin({ p_identity: b.p_identity, p_scope: scope, p_key: b.p_key, p_digest: b.p_digest });
+      if (begin.state !== 'new') return begin;
+      const legacy = b.p_action === 'register' ? 'bobby_push_device_register' : 'bobby_push_device_rebind';
+      rpcCalls.push({ name: legacy, body: b.p_action === 'register'
+        ? { ...b, p_credential_verifier: b.p_new_verifier }
+        : { ...b, p_expected_revision: b.p_expected_revision } });
+      const result = deviceReply;
+      const status = result.ok ? (b.p_action === 'register' ? 201 : 200) : result.code === 'not_found' ? 404 : 409;
+      const response = JSON.stringify({ device: result, ...(result.ok ? { sealedCredential: b.p_sealed_credential } : {}) });
+      idem.finish({ p_identity: b.p_identity, p_scope: scope, p_key: b.p_key, p_status: status, p_response: response });
+      return { state: 'done', status, response };
+    };
     handlers.bobby_push_device_revoke = () => deviceReply;
     const post = (body: unknown, headers: Record<string, string> = {}, token = A.token) => call('device', { method: 'POST', token, headers, body });
 
@@ -341,7 +353,7 @@ try {
     eq((await post({ ...reg, apnsToken: 'zz'.repeat(32) }, { 'idempotency-key': randomUUID() })).body.code, 'invalid_request', 'token must be hex');
     eq((await post({ ...reg, apnsToken: 'ab'.repeat(8) }, { 'idempotency-key': randomUUID() })).body.code, 'invalid_request', 'token length is bounded');
     eq((await post({ ...reg, permissionState: 'ephemeral' }, { 'idempotency-key': randomUUID() })).body.code, 'invalid_request', 'permission enum');
-    eq(callsOf('bobby_push_device_register').length + callsOf('bobby_brief_idem_begin').length, 0, 'invalid registrations reach no storage');
+    eq(callsOf('bobby_push_device_write_once').length, 0, 'invalid registrations reach no storage');
 
     const key = randomUUID();
     const first = await post(reg, { 'idempotency-key': key });
@@ -350,14 +362,14 @@ try {
     const cred = first.body.installationCredential as string;
     CREDENTIALS.push(cred);
     ok(/^[A-Za-z0-9_-]{43}$/.test(cred), 'credential: 32 random bytes base64url');
-    const regCall = callsOf('bobby_push_device_register')[0].body;
+    const regCall = callsOf('bobby_push_device_write_once')[0].body;
     eq(regCall.p_identity, A.identity, 'registered for the session identity');
-    eq(regCall.p_credential_verifier, credentialVerifier(cred), 'only the credential verifier is stored');
+    eq(regCall.p_new_verifier, credentialVerifier(cred), 'only the credential verifier is stored');
     eq([regCall.p_topic, regCall.p_environment, regCall.p_max_active], ['xyz.bobbyprotocol.bobby', 'production', 5], 'topic from config, environment checked, device cap');
     ok(/^v1:/.test(regCall.p_token_ciphertext) && /^[0-9a-f]{64}$/.test(regCall.p_token_fingerprint), 'token sealed + keyed fingerprint');
     ok(!JSON.stringify(rpcCalls).includes(APNS) && !JSON.stringify(rpcCalls).includes(cred), 'no RPC ever sees the raw token or the credential');
     const stored = [...idem.rows.values()][0];
-    ok(stored.response && !stored.response.includes(cred) && JSON.parse(openReceipt(stored.response, Buffer.from(PUSH_KEY, 'base64'))).body.installationCredential === cred, 'the receipt is sealed at rest');
+    ok(stored.response && !stored.response.includes(cred) && openReceipt(JSON.parse(stored.response).sealedCredential, Buffer.from(PUSH_KEY, 'base64')) === cred, 'the credential in the atomic receipt is sealed at rest');
 
     const replay = await post(reg, { 'idempotency-key': key });
     eq([replay.statusCode, replay.body], [201, first.body], 'replay: the same receipt and status');
@@ -368,7 +380,7 @@ try {
     const changed = await post({ ...reg, appBuild: 54 }, { 'idempotency-key': key });
     eq([changed.statusCode, changed.body.code], [409, 'idempotency_mismatch'], 'same key, changed payload: 409 idempotency_mismatch');
     const busyKey = randomUUID();
-    idem.rows.set(`${A.identity}|device|${busyKey}`, { digest: 'x', state: 'in_progress' });
+    idem.rows.set(`${A.identity}|device_atomic|${busyKey}`, { digest: 'x', state: 'in_progress' });
     eq((await post(reg, { 'idempotency-key': busyKey })).statusCode, 409, 'a different payload under an in-flight key is refused');
 
     const rebind = { ...reg, registrationId: first.body.registrationId, expectedBindingRevision: 1 };
@@ -673,12 +685,29 @@ try {
       ok(!String(dev.token_ciphertext).includes(TOKEN), 'PG token stored encrypted');
       const r1b = await call('device', { method: 'POST', token: PA.token, headers: { 'idempotency-key': k1 }, body: reg });
       eq([r1b.statusCode, r1b.body], [201, r1.body], 'PG replay returns the same sealed receipt');
+      const afterLostReply = await Promise.all(Array.from({ length: 6 }, () =>
+        call('device', { method: 'POST', token: PA.token, headers: { 'idempotency-key': k1 }, body: reg })));
+      ok(afterLostReply.every((r) => r.statusCode === 201 && JSON.stringify(r.body) === JSON.stringify(r1.body)),
+        'six concurrent retries after a lost answer recover the identical installation proof');
+      eq((await q('select count(*)::int as n from public.bobby_push_devices where installation_id = $1', [inst]))[0].n, 1,
+        'concurrent retries commit exactly one device binding');
+      const [deviceReceipt] = await q("select state, response from public.bobby_brief_idempotency where identity_id = $1 and scope = 'device_atomic' and idem_key = $2", [PA.identity, k1]);
+      eq(deviceReceipt.state, 'done', 'the receipt commits with the binding');
+      ok(!deviceReceipt.response.includes(cred1) && !deviceReceipt.response.includes(TOKEN),
+        'the atomic receipt stores neither plaintext credential nor APNs token');
       eq((await call('device', { method: 'POST', token: PA.token, headers: { 'idempotency-key': k1 }, body: { ...reg, appBuild: 54 } })).body.code, 'idempotency_mismatch', 'PG changed payload under the same key: 409');
       const bConflict = await call('device', { method: 'POST', token: PB.token, headers: { 'idempotency-key': randomUUID() }, body: reg });
       eq([bConflict.statusCode, bConflict.body.code], [409, 'conflict'], 'PG B cannot take the installation without its proof');
-      const rb = await call('device', { method: 'POST', token: PB.token, headers: { 'idempotency-key': randomUUID(), 'x-bobby-installation-proof': cred1 }, body: { ...reg, registrationId: regId, expectedBindingRevision: 1 } });
+      const rebindKey = randomUUID();
+      const rebindHeaders = { 'idempotency-key': rebindKey, 'x-bobby-installation-proof': cred1 };
+      const rebindBody = { ...reg, registrationId: regId, expectedBindingRevision: 1 };
+      const rb = await call('device', { method: 'POST', token: PB.token, headers: rebindHeaders, body: rebindBody });
       eq([rb.statusCode, rb.body.registrationId, rb.body.bindingRevision], [200, regId, 2], 'PG rebind A→B with the proof: 200, revision 2');
       const cred2 = rb.body.installationCredential as string;
+      const rbRetry = await call('device', { method: 'POST', token: PB.token, headers: rebindHeaders, body: rebindBody });
+      eq([rbRetry.statusCode, rbRetry.body], [200, rb.body], 'a lost rebind answer replays its original rotated proof');
+      eq(Number((await q('select binding_revision from public.bobby_push_devices where id = $1', [regId]))[0].binding_revision), 2,
+        'the rebind replay does not rotate again');
       CREDENTIALS.push(cred1, cred2);
       const lateA = await call('device', { method: 'DELETE', token: PA.token, headers: { 'x-bobby-installation-proof': cred1 }, body: { registrationId: regId, expectedBindingRevision: 1 } });
       eq(lateA.statusCode, 204, "PG a late logout from A answers 204");

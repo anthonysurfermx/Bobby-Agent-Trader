@@ -440,6 +440,12 @@ enum BobbyAPI {
         req.setValue("https://bobbyprotocol.xyz", forHTTPHeaderField: "Origin")
         req.timeoutInterval = timeout ?? (path == "api/desk-debate" ? 100 : 60)
         for (name, value) in extraHeaders { req.setValue(value, forHTTPHeaderField: name) }
+        // Never trust a caller-supplied opt-in header. Native adds it only to an authenticated desk POST
+        // whose bearer still belongs to the current account and whose local, account-scoped choice is on.
+        req.setValue(nil, forHTTPHeaderField: MemoryCenter.nativeOptInHeader)
+        if await shouldAffirmNativeMemory(path: path, method: method, headers: extraHeaders) {
+            req.setValue("1", forHTTPHeaderField: MemoryCenter.nativeOptInHeader)
+        }
         if extraHeaders.keys.contains(where: { $0.caseInsensitiveCompare("Authorization") == .orderedSame })
             || extraHeaders[BobbyAccessAPI.deviceHeader] != nil {
             req.setValue("no-store", forHTTPHeaderField: "Cache-Control")
@@ -452,6 +458,19 @@ enum BobbyAPI {
         let (data, response) = try await URLSession.shared.data(for: req)
         let http = response as? HTTPURLResponse
         return (try? JSONSerialization.jsonObject(with: data), http?.statusCode ?? 0, lowercasedHeaders(http))
+    }
+
+    private static func shouldAffirmNativeMemory(path: String, method: String, headers: [String: String]) async -> Bool {
+        guard path == "api/desk-debate", method == "POST",
+              let authorization = headers.first(where: { $0.key.caseInsensitiveCompare("Authorization") == .orderedSame })?.value,
+              authorization.hasPrefix("Bearer ") else { return false }
+        let owner = await MainActor.run { (AccountSession.shared.session?.userId, AccountSession.shared.generation) }
+        guard let user = owner.0, let token = await AccountSession.shared.accessToken(),
+              authorization == "Bearer \(token)" else { return false }
+        return await MainActor.run {
+            AccountSession.shared.session?.userId == user && AccountSession.shared.generation == owner.1
+                && MemoryCenter.shared.allowsNativeCapture(user: user, generation: owner.1)
+        }
     }
 
     private static func lowercasedHeaders(_ http: HTTPURLResponse?) -> [String: String] {
@@ -595,8 +614,9 @@ enum BobbyAPI {
 
     /// Shared technical evidence: regime, indicators, signal and risk plan.
     static func debate(_ symbol: String, question: String, isEquity: Bool = false) async -> BobbyAnswer {
-        guard let reply = try? await response("api/desk-debate", method: "POST",
-                                              body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"])
+        guard let reply = try? await BobbyAccessAPI.send("api/desk-debate", method: "POST",
+                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"],
+                                                         auth: .account, timeout: 100)
         else { return BobbyAnswer(symbol: symbol) }
         if let failure = DeskFailure(status: reply.status, body: reply.json) {
             var refused = BobbyAnswer(symbol: symbol)

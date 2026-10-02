@@ -6,7 +6,8 @@
 //    this model's request token); an account change hides the report at once and asks again.
 //  - A missing or foreign id reads the same generic line ("isn't available on this account"); 403 is the
 //    Pro offer; a dependency failure offers a retry. The server's text is never shown.
-//  - The greeting may use the Apple given name stored on this phone: visual only, never sent anywhere.
+//  - The greeting may use the Apple given name stored on this phone: visual and on-device speech only;
+//    the name is never sent to Bobby's voice endpoint.
 //  - Text is always readable; narration is optional and lives behind BriefingPlayback (the audio package
 //    injects the real player through BriefingPlaybackFactory; the default does nothing and hides the bar).
 import Combine

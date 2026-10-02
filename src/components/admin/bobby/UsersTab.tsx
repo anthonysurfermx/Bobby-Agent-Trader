@@ -326,7 +326,14 @@ function GrantDialog({ adminId, user, onClose, onDone }: { adminId: string; user
       onClose();
       onDone(`Regalo enviado a ${identityName(user)}.`);
     } catch (err) {
-      setMsg({ ok: false, text: toAdminError(err).message });
+      const failure = toAdminError(err);
+      if (failure.code === 'paid_period_end_unknown') {
+        // The SQL RPC explicitly committed no grant or receipt. Unlock this form so the owner
+        // can retry after the subscription has a known paid-period end.
+        sessionStorage.removeItem(storageKey);
+        pending.current = null; setRetained(false);
+      }
+      setMsg({ ok: false, text: failure.message });
     } finally { inFlight.current = false; setBusy(false); }
   };
 

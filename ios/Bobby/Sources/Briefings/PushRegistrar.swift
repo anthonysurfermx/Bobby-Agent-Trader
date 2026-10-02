@@ -131,6 +131,12 @@ final class PushRegistrar: ObservableObject {
     var requestAuthorization: () async -> Bool = {
         (try? await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])) ?? false
     }
+    /// The account's confirmed opt-in, including after a cold launch with no local binding.
+    var weeklyEnabled: () async -> Bool = {
+        let center = BriefingsCenter.shared
+        if center.settings == nil { _ = await center.refresh() }
+        return center.settings?.weeklyEnabled == true
+    }
     var registerForRemote: () -> Void = { UIApplication.shared.registerForRemoteNotifications() }
     var environment: () -> String = { PushRegistrar.apnsEnvironment(profileText: PushRegistrar.embeddedProfileText()) }
     var appBuild: () -> Int = { Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0 }
@@ -213,13 +219,16 @@ final class PushRegistrar: ObservableObject {
         state = .failed
     }
 
-    /// Permission can change in Settings while the app is away: re-read it, and let a bound device
-    /// re-sync (the decision table rebinds only when something changed or the 24 h window passed).
+    /// Permission can change in Settings while the app is away. A previously failed first registration
+    /// has no binding yet, so recover it only when the account still opted in and delivery is allowed.
     func appBecameActive() {
-        guard riskAccepted(), currentUser() != nil else { return }
+        guard riskAccepted(), let owner = currentUser() else { return }
         Task {
-            _ = await currentPermission()
-            guard riskAccepted(), currentUser() != nil, storage.load()?.hasBinding == true else { return }
+            let status = await currentPermission()
+            guard riskAccepted(), currentUser() == owner else { return }
+            if storage.load()?.hasBinding != true {
+                guard status.allowsDelivery, await weeklyEnabled(), currentUser() == owner else { return }
+            }
             registerForRemote()
         }
     }

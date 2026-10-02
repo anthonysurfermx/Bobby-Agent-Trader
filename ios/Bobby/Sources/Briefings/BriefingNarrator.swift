@@ -28,6 +28,8 @@ import UIKit
 protocol BriefingAudioOutput: AnyObject {
     var isMuted: Bool { get }
     var isPaused: Bool { get }
+    /// On-device synthesis only; the given name is never sent to the voice endpoint.
+    func playLocalGreeting(_ text: String, language: String, onFinish: @escaping (NarrationEnd) -> Void) -> Bool
     func playPrepared(_ data: Data, playbackRate: Float, onFinish: @escaping (NarrationEnd) -> Void) -> Bool
     func pause()
     func resume()
@@ -57,6 +59,8 @@ final class BriefingNarrator: BriefingPlayback {
         var otherAudioPlaying: () -> Bool
         /// Re-read before starting audio: a report can finish loading after the app leaves the foreground.
         var appActive: () -> Bool = { true }
+        /// Apple's given name is scoped to the signed-in Apple ID and read on this device at use time.
+        var localGivenName: () -> String? = { nil }
         /// Stops the page's narration line before a briefing takes the voice.
         var stopPageVoice: () -> Void
         var sleep: (TimeInterval) async throws -> Void
@@ -81,6 +85,7 @@ final class BriefingNarrator: BriefingPlayback {
                 analysisBusy: analysisBusy,
                 otherAudioPlaying: { AVAudioSession.sharedInstance().isOtherAudioPlaying },
                 appActive: { UIApplication.shared.applicationState == .active },
+                localGivenName: { AppleGivenName.name(for: AccountSession.shared.session?.appleUserId) },
                 stopPageVoice: stopPageVoice,
                 sleep: { seconds in try await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000)) })
         }
@@ -323,7 +328,23 @@ final class BriefingNarrator: BriefingPlayback {
         if env.audioConsent() == nil {
             let consent = await env.loadAudioConsent()
             guard isCurrent(r) else { return }
-            if consent == false { end(.idle); return }
+            guard consent == true else { end(.idle); return }
+        }
+        if report.cadence == .weekly, let name = env.localGivenName()?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !name.isEmpty, name.count <= 80 {
+            guard isCurrent(r), narrationAllowed, !env.micActive(), !env.analysisBusy() else { end(.idle); return }
+            let greeting = report.language == "es"
+                ? "Hola, \(name). Este es tu resumen semanal."
+                : "Hi, \(name). This is your weekly briefing."
+            currentSegment = nil
+            phase = .playing
+            let outcome = await playGreeting(greeting, language: report.language)
+            guard isCurrent(r) else { return }
+            switch outcome {
+            case .finished: break
+            case .stopped: end(.idle); return
+            case .failed: end(.failed); return
+            }
         }
         for index in report.narrationSegments.indices {
             guard isCurrent(r) else { return }
@@ -422,6 +443,23 @@ final class BriefingNarrator: BriefingPlayback {
             segmentWaiter = waiter
             let started = output.playPrepared(data, playbackRate: 1.0) { [weak self] end in
                 // A completion of an older segment or run never ends this one.
+                guard let self, self.segmentWaiter?.token == waiter.token else { return }
+                self.segmentWaiter = nil
+                waiter.finish(end)
+            }
+            if !started {
+                if segmentWaiter?.token == waiter.token { segmentWaiter = nil }
+                waiter.finish(.failed)
+            }
+        }
+    }
+
+    /// The local greeting uses the same token fencing, pause and stop path as prepared segments.
+    private func playGreeting(_ text: String, language: String) async -> NarrationEnd {
+        await withCheckedContinuation { (continuation: CheckedContinuation<NarrationEnd, Never>) in
+            let waiter = Waiter<NarrationEnd> { continuation.resume(returning: $0) }
+            segmentWaiter = waiter
+            let started = output.playLocalGreeting(text, language: language) { [weak self] end in
                 guard let self, self.segmentWaiter?.token == waiter.token else { return }
                 self.segmentWaiter = nil
                 waiter.finish(end)

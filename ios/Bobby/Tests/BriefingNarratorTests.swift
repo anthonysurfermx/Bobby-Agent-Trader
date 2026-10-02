@@ -10,10 +10,19 @@ private final class RecordingOutput: BriefingAudioOutput {
     var isPaused = false
     var accepts = true
     private(set) var played: [(data: Data, onFinish: (NarrationEnd) -> Void)] = []
+    private(set) var greetings: [(text: String, language: String)] = []
     private(set) var stops = 0
     private(set) var pauses = 0
     private(set) var resumes = 0
     private var pending: ((NarrationEnd) -> Void)?
+
+    func playLocalGreeting(_ text: String, language: String, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
+        guard accepts, !isMuted else { return false }
+        stop()
+        greetings.append((text, language))
+        pending = onFinish
+        return true
+    }
 
     func playPrepared(_ data: Data, playbackRate: Float, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
         guard accepts, !isMuted else { return false }
@@ -58,6 +67,7 @@ final class BriefingNarratorTests: XCTestCase {
     private var busy = false
     private var otherAudio = false
     private var active = true
+    private var localName: String?
     private var pageStops = 0
     private var consentLoads = 0
     private var voiceCalls: [(brief: String, version: Int, segment: Int, voice: String, language: String, key: String)] = []
@@ -77,6 +87,7 @@ final class BriefingNarratorTests: XCTestCase {
         output = RecordingOutput()
         user = "user-a"; generation = UUID(); risk = true; consent = true; loadedConsent = true
         mic = false; busy = false; otherAudio = false; active = true; pageStops = 0; consentLoads = 0
+        localName = nil
         gateConsent = false; consentGates = []
         voiceCalls = []; audioCalls = []; sleeps = []; audioAnswers = [:]; voiceGate = [:]; gatedSegments = []
         voiceAnswer = { BriefingVoiceState(state: .ready, audioId: BriefingNarratorTests.audioId($0)) }
@@ -119,14 +130,15 @@ final class BriefingNarratorTests: XCTestCase {
             analysisBusy: { [unowned self] in self.busy },
             otherAudioPlaying: { [unowned self] in self.otherAudio },
             appActive: { [unowned self] in self.active },
+            localGivenName: { [unowned self] in self.localName },
             stopPageVoice: { [unowned self] in self.pageStops += 1 },
             sleep: { [unowned self] seconds in self.sleeps.append(seconds); await Task.yield() })
         return BriefingNarrator(output: output, environment: env, observe: false)
     }
 
     private func report(_ id: String = BriefingNarratorTests.briefId, segments: Int = 3, voice: String? = "ash",
-                        version: Int = 2) -> BriefingReport {
-        var json: [String: Any] = ["id": id, "cadence": "morning", "contentVersion": version, "title": "Opening",
+                        version: Int = 2, cadence: String = "morning") -> BriefingReport {
+        var json: [String: Any] = ["id": id, "cadence": cadence, "contentVersion": version, "title": "Opening",
                                    "opening": "Good morning", "sections": [], "language": "es",
                                    "narrationSegments": (0..<segments).map { "Segment \($0) text, never sent." }]
         if let voice { json["voice"] = voice }
@@ -143,6 +155,49 @@ final class BriefingNarratorTests: XCTestCase {
     private func settle() async throws { try await Task.sleep(nanoseconds: 60_000_000) }
 
     // MARK: - Order and completions
+
+    func testWeeklyGreetingUsesOnlyDeviceAndPrecedesProviderAudio() async throws {
+        localName = "Ana"
+        let n = narrator()
+        n.play(report: report(segments: 1, cadence: "weekly"))
+        try await waitUntil("local greeting") { self.output.greetings.count == 1 }
+        XCTAssertEqual(output.greetings.first?.text, "Hola, Ana. Este es tu resumen semanal.")
+        XCTAssertEqual(output.greetings.first?.language, "es")
+        XCTAssertTrue(voiceCalls.isEmpty, "The local name never reaches the voice API request")
+        XCTAssertTrue(audioCalls.isEmpty)
+        output.finishCurrent(.finished)
+        try await waitUntil("prepared segment after greeting") { self.output.played.count == 1 }
+        XCTAssertEqual(voiceCalls.count, 1)
+        XCTAssertEqual(voiceCalls.first?.segment, 0)
+        output.finishCurrent(.finished)
+        try await waitUntil("finished") { n.phase == .finished }
+    }
+
+    func testWeeklyGreetingStopsOnAccountChangeAndDoesNotRequestAudio() async throws {
+        localName = "Ana"
+        let n = narrator()
+        n.autoplay(report: report(segments: 1, cadence: "weekly"))
+        try await waitUntil("local greeting") { self.output.greetings.count == 1 }
+        generation = UUID()
+        n.accountChanged()
+        try await settle()
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertTrue(audioCalls.isEmpty)
+        XCTAssertEqual(n.phase, .idle)
+    }
+
+    func testUnknownAudioConsentNeverStartsLocalGreeting() async throws {
+        localName = "Ana"
+        consent = nil
+        loadedConsent = nil
+        let n = narrator()
+        n.play(report: report(segments: 1, cadence: "weekly"))
+        try await waitUntil("consent load") { self.consentLoads == 1 }
+        try await settle()
+        XCTAssertTrue(output.greetings.isEmpty)
+        XCTAssertTrue(voiceCalls.isEmpty)
+        XCTAssertEqual(n.phase, .idle)
+    }
 
     func testSegmentsPlayInOrderAndAdvanceOnlyOnFinished() async throws {
         let n = narrator()

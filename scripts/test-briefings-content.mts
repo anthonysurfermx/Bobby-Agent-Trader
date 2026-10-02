@@ -80,6 +80,15 @@ const q = (e: BriefEvidence, s: string) => e.quotes.find((x) => x.symbol === s)!
   eq(s.sources, [{ name: 'okx_spot', ok: true }, { name: 'yahoo_equities', ok: true }, { name: 'okx_funding', ok: false }, { name: 'fear_greed', ok: false }, { name: 'dxy_ecb', ok: true }], 'per-source outcome');
   const noBtc = await loadGlobalMarketSnapshot({ now: () => at, livePrices: async () => [], stocks: async () => [], funding: async () => [], fearGreed: async () => null, dxy: async () => null });
   eq(noBtc.regime, null, 'no BTC ⇒ no regime (never a default 0%)');
+  const stalled = await loadGlobalMarketSnapshot({
+    now: () => at,
+    sourceTimeoutMs: 20,
+    livePrices: async () => new Promise<never>(() => {}),
+    stocks: async () => [{ symbol: 'SPY', price: 571, change24h: 0.2, prevClose: 570, asOf: iso(at) }],
+    funding: async () => [], fearGreed: async () => null, dxy: async () => null,
+  });
+  eq([stalled.sources[0].ok, stalled.sources[1].ok, stalled.stocks.length], [false, true, 1],
+    'a stalled public source times out while the usable sources survive');
 
   // The bobby-intel fetchers keep their exact output shape; the detailed variants add the as-of.
   const original = globalThis.fetch;

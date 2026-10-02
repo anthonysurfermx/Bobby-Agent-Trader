@@ -68,6 +68,26 @@ export interface DeviceWrite {
   tokenCiphertext: string; tokenFingerprint: string; environment: DeviceEnvironment; topic: string;
   permission: PermissionState; appBuild: number;
 }
+export type DeviceWriteOnce =
+  | { state: 'done' | 'replay'; status: number; response: string }
+  | { state: 'mismatch' | 'in_progress' };
+/** The binding, credential rotation and replay receipt commit in one PostgreSQL transaction. */
+export async function writeDeviceOnce(p: {
+  identityId: string; key: string; digest: string; action: 'register' | 'rebind';
+  installationId: string; registrationId: string | null; expectedRevision: number | null;
+  proofVerifier: string | null; newVerifier: string; sealedCredential: string;
+  write: DeviceWrite; maxActive: number;
+}): Promise<DeviceWriteOnce> {
+  return obj(await rpc('bobby_push_device_write_once', {
+    p_identity: p.identityId, p_key: p.key, p_digest: p.digest, p_action: p.action,
+    p_installation: p.installationId, p_registration: p.registrationId,
+    p_expected_revision: p.expectedRevision, p_proof_verifier: p.proofVerifier,
+    p_new_verifier: p.newVerifier, p_token_ciphertext: p.write.tokenCiphertext,
+    p_token_fingerprint: p.write.tokenFingerprint, p_environment: p.write.environment,
+    p_topic: p.write.topic, p_permission: p.write.permission, p_app_build: p.write.appBuild,
+    p_max_active: p.maxActive, p_sealed_credential: p.sealedCredential,
+  }), 'bobby_push_device_write_once') as unknown as DeviceWriteOnce;
+}
 export type DeviceResult =
   | { ok: true; registrationId: string; bindingRevision: number }
   | { ok: false; code: 'conflict' | 'device_limit' | 'not_found' | 'revision_conflict'; bindingRevision?: number };

@@ -245,17 +245,6 @@ function installationProof(req: VercelRequest): string {
 
 const IDEM_TTL_SECONDS = 86_400;
 
-/** Write a device answer and keep it (sealed: it may hold the credential) as the key's receipt. */
-async function finishDevice(res: VercelResponse, identityId: string, key: string, master: Buffer, status: number, body: Record<string, unknown>) {
-  try {
-    await db.idemFinish(identityId, 'device', key, status, sealReceipt(JSON.stringify({ status, body }), master));
-  } catch {
-    // The receipt stays in progress and is taken over after 60 s; the answer below is still the truth.
-    console.error('[briefings] device receipt storage');
-  }
-  return res.status(status).json(body);
-}
-
 async function postDevice({ req, res, identity }: Ctx) {
   const master = pushMasterKey();
   if (!master) fail(503, 'feature_disabled');
@@ -269,19 +258,6 @@ async function postDevice({ req, res, identity }: Ctx) {
 
   // The proof is part of the request's identity (only its hash enters the digest).
   const digest = requestDigest(body, proof ? createHash('sha256').update(proof).digest('hex') : '');
-  const begin = await db.idemBegin(identity.id, 'device', key, digest, IDEM_TTL_SECONDS);
-  if (begin.state === 'mismatch') fail(409, 'idempotency_mismatch');
-  if (begin.state === 'in_progress') fail(409, 'conflict', {}, { 'Retry-After': '5' });
-  if (begin.state === 'replay') {
-    let stored: { status: number; body: Record<string, unknown> };
-    try {
-      stored = JSON.parse(openReceipt(begin.response, master as Buffer));
-    } catch {
-      return fail(409, 'conflict'); // sealed under a rotated key: the client starts over with a new key
-    }
-    return res.status(stored.status).json(stored.body);
-  }
-
   const topic = apnsTopic();
   const write: db.DeviceWrite = {
     tokenCiphertext: encryptToken(body.apnsToken, master as Buffer),
@@ -293,24 +269,42 @@ async function postDevice({ req, res, identity }: Ctx) {
   };
   const credential = newInstallationCredential();
   const installationId = body.installationId.toLowerCase();
-  const r = rebind
-    ? await db.rebindDevice(identity.id, (body.registrationId as string).toLowerCase(), body.expectedBindingRevision as number, credentialVerifier(proof as string), credentialVerifier(credential), write, LIMITS.devicesPerAccount)
-    : await db.registerDevice(identity.id, installationId, write, credentialVerifier(credential), LIMITS.devicesPerAccount);
-
+  const operation = await db.writeDeviceOnce({
+    identityId: identity.id, key, digest, action: rebind ? 'rebind' : 'register', installationId,
+    registrationId: rebind ? (body.registrationId as string).toLowerCase() : null,
+    expectedRevision: rebind ? body.expectedBindingRevision as number : null,
+    proofVerifier: rebind ? credentialVerifier(proof as string) : null,
+    newVerifier: credentialVerifier(credential), sealedCredential: sealReceipt(credential, master as Buffer),
+    write, maxActive: LIMITS.devicesPerAccount,
+  });
+  if (operation.state === 'mismatch') return fail(409, 'idempotency_mismatch');
+  if (operation.state === 'in_progress') return fail(409, 'conflict', {}, { 'Retry-After': '5' });
+  if (!('response' in operation)) return fail(503, 'storage_unavailable');
+  let stored: { device: db.DeviceResult; sealedCredential?: string };
+  try {
+    stored = JSON.parse(operation.response);
+    if (!stored?.device || typeof stored.device !== 'object') throw new Error('receipt_shape');
+  } catch {
+    return fail(503, 'storage_unavailable');
+  }
+  const r = stored!.device;
   if (r.ok) {
-    return finishDevice(res, identity.id, key, master as Buffer, rebind ? 200 : 201,
-      { registrationId: r.registrationId, bindingRevision: Number(r.bindingRevision), installationCredential: credential });
+    let replayedCredential: string;
+    try { replayedCredential = openReceipt(stored!.sealedCredential as string, master as Buffer); }
+    catch { return fail(409, 'conflict'); } // rotated master key: never invent another credential
+    return res.status(operation.status).json({ registrationId: r.registrationId,
+      bindingRevision: Number(r.bindingRevision), installationCredential: replayedCredential });
   }
   const code = (r as { code: string }).code;
   console.warn('[briefings] device', code);
-  if (code === 'device_limit') return finishDevice(res, identity.id, key, master as Buffer, 409, errorBody('device_limit'));
-  if (code === 'not_found') return finishDevice(res, identity.id, key, master as Buffer, 404, errorBody('not_found'));
+  if (code === 'device_limit') return res.status(409).json(errorBody('device_limit'));
+  if (code === 'not_found') return res.status(404).json(errorBody('not_found'));
   if (code === 'revision_conflict') {
     const br = Number((r as { bindingRevision?: unknown }).bindingRevision);
-    return finishDevice(res, identity.id, key, master as Buffer, 409, errorBody('revision_conflict', Number.isInteger(br) ? { bindingRevision: br } : {}));
+    return res.status(409).json(errorBody('revision_conflict', Number.isInteger(br) ? { bindingRevision: br } : {}));
   }
   // An active binding of this installation or token exists (owner never revealed): taking it over needs the proof.
-  return finishDevice(res, identity.id, key, master as Buffer, 409, errorBody('conflict'));
+  return res.status(409).json(errorBody('conflict'));
 }
 
 async function revokeDevice({ req, res, identity }: Ctx) {

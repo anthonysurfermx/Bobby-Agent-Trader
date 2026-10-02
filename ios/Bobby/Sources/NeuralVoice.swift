@@ -72,9 +72,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
             guard self.fallbackUtterance === utterance else { return }
-            self.fallbackUtterance = nil
-            self.level = 0
-            self.speaking = false
+            self.endFallback(.finished)
         }
     }
 
@@ -88,9 +86,18 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in
             guard self.fallbackUtterance === utterance else { return }
-            self.fallbackUtterance = nil
-            self.level = 0
-            self.speaking = false
+            self.endFallback(.stopped)
+        }
+    }
+
+    private func endFallback(_ end: NarrationEnd) {
+        fallbackUtterance = nil
+        isPaused = false
+        level = 0
+        speaking = false
+        if let pending = preparedFinish, pending.generation == generation {
+            preparedFinish = nil
+            pending.onFinish(end)
         }
     }
 
@@ -172,9 +179,32 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         return true
     }
 
+    /// Speaks the locally stored Apple name on this device. No HTTP request or provider text is involved.
+    @discardableResult
+    func playLocalGreeting(_ text: String, language: String, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
+        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech, !text.isEmpty,
+              language == "en" || language == "es" else { return false }
+        stop()
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: language == "es" ? "es-ES" : "en-US")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        fallbackUtterance = utterance
+        engine = .device
+        speaking = true
+        preparedFinish = (generation, onFinish)
+        fallback.speak(utterance)
+        return true
+    }
+
     /// Holds the current audio at its position. `speaking` is left true on purpose: page narration reads its
     /// end from the falling edge of `speaking`, and a pause is not an end.
     func pause() {
+        if fallbackUtterance != nil, !isPaused {
+            if fallback.pauseSpeaking(at: .immediate) { isPaused = true; level = 0 }
+            return
+        }
         guard let player, player.isPlaying, !isPaused else { return }
         player.pause()
         isPaused = true
@@ -184,6 +214,11 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
 
     /// Continues a paused request from where it stopped. Muting or withdrawn consent while paused stops it.
     func resume() {
+        if fallbackUtterance != nil, isPaused {
+            guard !isMuted, allowsExternalSpeech else { stop(); return }
+            if fallback.continueSpeaking() { isPaused = false }
+            return
+        }
         guard let player, isPaused else { return }
         guard !isMuted, allowsExternalSpeech else { stop(); return }
         isPaused = false

@@ -47,13 +47,14 @@ final class PushRegistrarTests: XCTestCase {
     private var status: PushPermission = .authorized
     private var clock = Date(timeIntervalSince1970: 1_790_000_000)
     private var keys = 0
+    private var weeklyOn = false
     private var server: DeviceServer!
     private var suite = ""
     private var defaults: UserDefaults!
 
     override func setUp() async throws {
         try await super.setUp()
-        user = "a"; status = .authorized; keys = 0
+        user = "a"; status = .authorized; keys = 0; weeklyOn = false
         clock = Date(timeIntervalSince1970: 1_790_000_000)
         server = DeviceServer()
         suite = "bobby.push.tests.\(UUID().uuidString)"
@@ -73,6 +74,7 @@ final class PushRegistrarTests: XCTestCase {
         r.riskAccepted = { true }
         r.authorizationStatus = { [unowned self] in self.status }
         r.requestAuthorization = { true }
+        r.weeklyEnabled = { [unowned self] in self.weeklyOn }
         r.registerForRemote = {}
         r.environment = { "sandbox" }
         r.appBuild = { 53 }
@@ -277,6 +279,33 @@ final class PushRegistrarTests: XCTestCase {
         XCTAssertEqual(server.calls[0].body["expectedBindingRevision"] as? Int, 1)
         XCTAssertEqual(storage.load()?.permission, "denied")
         XCTAssertEqual(storage.load()?.bindingRevision, 2)
+    }
+
+    func testInitialRegistrationRecoversOnActiveOnlyForConfirmedOptIn() async throws {
+        let r = registrar()
+        let asked = expectation(description: "APNs registration retried after permission changes")
+        asked.expectedFulfillmentCount = 1
+        r.registerForRemote = { [unowned r, tokenA] in r.didRegister(tokenHex: tokenA); asked.fulfill() }
+        server.responder = { [regA] _ in DeviceServer.receipt(regA, revision: 1, credential: "cred-a") }
+
+        status = .denied
+        weeklyOn = true
+        r.appBecameActive()
+        await Task.yield()
+        XCTAssertTrue(server.calls.isEmpty, "denied permission cannot start an unbound registration")
+
+        status = .authorized
+        weeklyOn = false
+        r.appBecameActive()
+        await Task.yield()
+        XCTAssertTrue(server.calls.isEmpty, "an opted-out account cannot silently register")
+
+        weeklyOn = true
+        r.appBecameActive()
+        await fulfillment(of: [asked], timeout: 3)
+        await r.settle()
+        XCTAssertEqual(server.calls.count, 1)
+        XCTAssertEqual(r.state, .registered)
     }
 
     // MARK: account changes

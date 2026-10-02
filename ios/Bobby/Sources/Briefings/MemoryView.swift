@@ -1,9 +1,5 @@
-// Profile › Memory (build 53): the account memory of /api/memory, on iPhone, to see, correct, pause and
-// delete — the precondition for letting memory shape market briefings (D10). Mirrors the web dialog
-// (src/components/nucleo/MemoryDialog.tsx): a pause switch, three clearable preferences, the remembered
-// assets with "Forget", and "Delete everything" behind a confirmation. All state lives in MemoryCenter
-// (account-scoped, cleared on account change); this view only renders it. Copy matches the privacy page:
-// iPhone questions do not add to this memory and memory never goes to an AI provider for briefings.
+// Profile › Memory: shared account memory plus a separate, default-off iPhone ask opt-in. The screen
+// shows corrections, remembered assets and confirmed deletion; MemoryCenter owns account isolation.
 import SwiftUI
 
 struct MemoryView: View {
@@ -71,26 +67,41 @@ struct MemoryView: View {
     }
 
     @ViewBuilder private func loaded(_ s: MemorySnapshot) -> some View {
-        Text(L.t("Only the assets you ask about on bobbyprotocol.xyz and what you choose here. Questions asked in this app are not added. Anything untouched for \(s.retentionDays) days is erased.",
-                 "Solo los activos que preguntas en bobbyprotocol.xyz y lo que eliges aquí. Las preguntas que haces en esta app no se suman. Lo que no uses en \(s.retentionDays) días se borra."))
+        Text(L.t("Bobby stores the asset symbol, ask count and dates, last named horizon and last public market price for up to \(s.retentionDays) days. It does not store full questions or your name in memory. iPhone questions join only after you enable them below.",
+                 "Bobby guarda el símbolo del activo, número y fechas de consultas, último horizonte indicado y último precio público de mercado hasta \(s.retentionDays) días. No guarda preguntas completas ni tu nombre en la memoria. Las preguntas del iPhone se suman solo si las activas abajo."))
             .font(.system(size: 13)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
             .padding(.top, 10)
             .accessibilityIdentifier("memory-retention")
-        BriefingToggleRow(label: L.t("Remember my assets", "Recordar mis activos"),
-                          detail: s.enabled ? L.t("Bobby can shape answers and, with your consent, briefings.",
-                                                  "Bobby puede dar forma a sus respuestas y, con tu consentimiento, a tus resúmenes.")
-                                            : L.t("Paused: Bobby saves nothing new and does not personalize answers.",
-                                                  "En pausa: Bobby no guarda nada nuevo ni personaliza respuestas."),
+        BriefingToggleRow(label: L.t("Use account memory", "Usar memoria de la cuenta"),
+                          detail: s.enabled ? L.t("Bobby can use your memory for answers and opted-in briefings.",
+                                                  "Bobby puede usar tu memoria para respuestas y resúmenes aceptados.")
+                                            : L.t("Paused across web and iPhone: no new asks are saved or personalized.",
+                                                  "En pausa en web y iPhone: no se guardan ni personalizan consultas nuevas."),
                           footnote: nil, isOn: s.enabled, saving: center.saving, enabled: !center.saving) { on in
             Task { await center.setEnabled(on) }
         }
         .padding(.top, 18)
         .accessibilityIdentifier("memory-enabled")
+        BriefingToggleRow(label: L.t("Include iPhone questions", "Incluir preguntas del iPhone"),
+                          detail: !s.enabled
+                            ? L.t("Resume account memory above before opting in on iPhone.",
+                                  "Reanuda la memoria de la cuenta arriba antes de activarla en iPhone.")
+                            : center.nativeOptedIn
+                                ? L.t("New iPhone desk answers can update your account memory.",
+                                      "Las respuestas nuevas del desk en iPhone pueden actualizar la memoria de tu cuenta.")
+                                : L.t("Off on this iPhone, even while web memory is on.",
+                                      "Desactivado en este iPhone, aunque la memoria web esté activa."),
+                          footnote: nil, isOn: center.nativeOptedIn, saving: center.saving,
+                          enabled: s.enabled && !center.saving) { on in
+            _ = center.setNativeCapture(on)
+        }
+        .padding(.top, 12)
+        .accessibilityIdentifier("memory-native-opt-in")
         ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
         BriefingSectionLabel(text: L.t("Assets", "Activos") + " · \(s.assets.count)")
         if s.assets.isEmpty {
-            Text(L.t("Nothing yet. Each asset you ask about on the web shows up here.",
-                     "Todavía nada. Cada activo que preguntes en la web aparece aquí."))
+            Text(L.t("Nothing yet. Assets asked about on the web, or on an opted-in iPhone, appear here.",
+                     "Todavía nada. Aquí aparecen los activos consultados en la web o en un iPhone con permiso activado."))
                 .font(.system(size: 12)).foregroundStyle(Theme.warmDim)
         } else {
             ForEach(s.assets) { asset in assetRow(asset) }

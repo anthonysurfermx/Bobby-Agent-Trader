@@ -215,6 +215,28 @@ try {
   overrides = (c) => c.url.includes('rpc/bobby_admin_grant_once') ? json({ ok: true, operationId: randomUUID() }) : null;
   eq((await call('POST', 'Bearer admin-token', {}, giftBody({ reads: 1 }))).statusCode, 502, 'unmatched receipt is never reported as confirmed');
   overrides = () => null;
+  overrides = (c) => c.url.includes('rpc/bobby_admin_grant_once') ? json({ ok: false, error: 'paid_period_end_unknown' }) : null;
+  const unknownPaidEnd = await call('POST', 'Bearer admin-token', {}, giftBody({ reads: 3, proDays: 7 }));
+  eq([unknownPaidEnd.statusCode, unknownPaidEnd.body.error], [409, 'paid_period_end_unknown'],
+    'an open paid period rejects mixed credits and Pro time with a specific recoverable error');
+  overrides = () => null;
+
+  // The same account's access response carries the active Pro grant expiry and its DB source.
+  const { referralStatus } = await import('../api/_lib/referrals.ts');
+  const proUntil = new Date(Date.now() + 7 * 86_400_000).toISOString();
+  overrides = (c) => c.url.includes('bobby_referral_codes?') ? json([{ code: 'ABCDEFGH' }])
+    : c.url.includes('bobby_referrals?') ? json([])
+      : c.url.includes('bobby_pro_grants?') ? json([{ pro_until: proUntil, source: 'admin' }]) : null;
+  const grantStatus = await referralStatus(USER, 'https://bobbyprotocol.xyz');
+  eq([grantStatus.proUntil, grantStatus.proSource], [proUntil, 'admin'], 'access exposes the active admin grant and expiry');
+  ok(calls.some((c) => c.url.includes('bobby_pro_grants?') && c.url.includes('select=pro_until,source')),
+    'the source comes from the grant table');
+  overrides = (c) => c.url.includes('bobby_referral_codes?') ? json([{ code: 'ABCDEFGH' }])
+    : c.url.includes('bobby_referrals?') ? json([])
+      : c.url.includes('bobby_pro_grants?') ? json([{ pro_until: '2020-01-01T00:00:00Z', source: 'admin' }]) : null;
+  const expiredGrantStatus = await referralStatus(USER, 'https://bobbyprotocol.xyz');
+  eq([expiredGrantStatus.proUntil, expiredGrantStatus.proSource], [null, null], 'expired gifts are not presented as active');
+  overrides = () => null;
 
   // ---------- deletion ----------
   const wrong = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'someone@else.com' });

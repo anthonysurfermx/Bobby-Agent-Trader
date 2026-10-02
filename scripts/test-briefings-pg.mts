@@ -14,7 +14,7 @@ import type pg from 'pg';
 import * as db from '../api/_lib/briefings/db.js';
 import { COMPANION_VOICES, voiceForCompanion } from '../api/_lib/briefings/config.js';
 import type { BriefSettings, Cadence } from '../api/_lib/briefings/types.js';
-import { BRIEFINGS_MIGRATION, assertLocalUrl, bootstrapBriefingsDb, makeIdentity, pgRpcTransport, setPro } from './briefings-pg-harness.mjs';
+import { BRIEFINGS_MIGRATION, BRIEFINGS_SOURCE_GUARD_MIGRATION, assertLocalUrl, bootstrapBriefingsDb, makeIdentity, pgRpcTransport, setPro } from './briefings-pg-harness.mjs';
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -136,7 +136,7 @@ try {
     eq((await one('select has_function_privilege($1, $2, $3) as r', ['service_role', fn, 'execute'])).r, true, `service_role executes ${fn}`);
   }
   for (const fn of ['bobby_brief_settings_get', 'bobby_brief_inbox', 'bobby_brief_get', 'bobby_brief_claim', 'bobby_brief_budget_reserve',
-    'bobby_brief_purge', 'bobby_push_device_register', 'bobby_brief_outbox_claim', 'bobby_brief_audio_authorize', 'bobby_brief_privacy_bump']) {
+    'bobby_brief_purge', 'bobby_push_device_register', 'bobby_push_device_write_once', 'bobby_brief_outbox_claim', 'bobby_brief_audio_authorize', 'bobby_brief_privacy_bump']) {
     ok(fns.some((s) => s.startsWith(`${fn}(`)), `${fn} exists`);
   }
   // …and real attempts as anon/authenticated fail, while service_role works.
@@ -161,11 +161,14 @@ try {
   }
   // A third application changes nothing and fails nothing; the storage bucket block is skipped without a storage schema.
   await pool.query(readFileSync(BRIEFINGS_MIGRATION, 'utf8')); checks++;
+  await pool.query(readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8')); checks++;
   // With a storage schema (as on Supabase) the private bucket is created once, never public.
   await q(`create schema if not exists storage;
     create table if not exists storage.buckets (id text primary key, name text not null, public boolean not null default false)`);
   await pool.query(readFileSync(BRIEFINGS_MIGRATION, 'utf8'));
   await pool.query(readFileSync(BRIEFINGS_MIGRATION, 'utf8'));
+  await pool.query(readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8'));
+  await pool.query(readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8'));
   eq(await q('select id, name, public from storage.buckets'), [{ id: 'briefing-audio', name: 'briefing-audio', public: false }], 'private briefing-audio bucket, once');
   await q('drop schema storage cascade');
   eq((await one("select count(*)::int as n from pg_trigger where tgname in ('bobby_brief_prefs_update', 'bobby_brief_prefs_delete', 'bobby_brief_assets_delete')")).n, 3, 'three memory triggers, once each');
@@ -221,6 +224,19 @@ try {
     eq(await db.isPro(id), false, 'wallet-only identity cannot qualify as signed-in briefing account');
     await q('delete from bobby_identities where id = $1', [id]);
     eq((await one('select count(*)::int as n from bobby_brief_paid_periods where identity_id = $1', [id])).n, 0, 'account deletion cascades private paid evidence');
+  }
+  // The two Stripe payment sources must not borrow each other's positive-paid evidence.
+  {
+    const id = await makeIdentity(pool, { pro: true });
+    await q("update bobby_subscriptions set provider = 'stripe', stripe_subscription_id = 'sub_direct_test' where identity_id = $1", [id]);
+    await q("update bobby_brief_paid_periods set provider = 'stripe' where identity_id = $1", [id]);
+    eq(await db.isPro(id), false, 'RevenueCat Web Billing proof cannot authorize a direct Stripe subscription');
+    await q("update bobby_brief_paid_periods set proof_source = 'stripe' where identity_id = $1", [id]);
+    eq(await db.isPro(id), true, 'positive direct Stripe proof authorizes its current period');
+    await q('update bobby_subscriptions set stripe_subscription_id = null where identity_id = $1', [id]);
+    eq(await db.isPro(id), false, 'direct Stripe proof cannot authorize RevenueCat Web Billing');
+    await q("update bobby_brief_paid_periods set proof_source = 'revenuecat' where identity_id = $1", [id]);
+    eq(await db.isPro(id), true, 'positive RevenueCat Web Billing proof authorizes its current period');
   }
 
   // ================================================================ settings

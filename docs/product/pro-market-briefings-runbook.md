@@ -1,4 +1,4 @@
-# Resúmenes de mercado Bobby Pro — runbook de activación (build 53)
+# Resúmenes de mercado Bobby Pro — runbook de activación (build 54)
 
 Para Anthony. Contrato técnico: [implementation spec](pro-market-briefings-implementation.md) (decisiones D1–D11,
 §1 variables, §3 RPCs). Diseño: [build-53](pro-market-briefings-build-53.md). API: [contratos](pro-market-briefings-api-contracts.md).
@@ -10,7 +10,8 @@ Archivos clave:
 - Config y defaults: `api/_lib/briefings/config.ts` (`RETENTION`, `LIMITS`, `PUSH_COPY`, `COMPANION_VOICES`).
 - Calendario NYSE y ventanas: `api/_lib/briefings/calendar.ts` (`NYSE_CALENDAR_VERSION = nyse-2026-2027-v1`).
 - Router HTTP: `api/briefings.ts` · Worker cron: `api/briefing-worker.ts` + `api/_lib/briefings/worker.ts`.
-- Migración: `supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql`.
+- Migraciones: `20261002180000_pro_briefings.sql`, `20261002183000_brief_device_atomic.sql` y
+  `20261002184500_brief_paid_source_guard.sql`, en ese orden.
 - Privacidad: `src/pages/PrivacyPage.tsx` (sección "Market briefings and notifications (Bobby Pro)").
 - iOS: `ios/Bobby/Sources/Briefings/`, `project.yml` (build 53, `aps-environment`).
 
@@ -42,7 +43,7 @@ Si cambias P5, actualiza también la sección de privacidad (dice "valores vigen
    *Apple Push Notifications service (APNs)*. Revisa primero claves existentes para no crear duplicados. Si se necesita una nueva, prepara scope limitado al topic de Bobby y entorno Production para TestFlight/App Store; confirma la creación en la pantalla final. Descarga el `.p8` (solo se puede bajar una vez) y anota el **Key ID** y
    el **Team ID**. Las claves nuevas pueden estar restringidas por entorno/topic: no asumir que una clave Production también acepta Sandbox. [Documentación Apple](https://developer.apple.com/documentation/usernotifications/establishing-a-token-based-connection-to-apns). Guárdalo en Keychain/gestor de contraseñas, nunca en el repo.
 2. **App ID `xyz.bobbyprotocol.bobby`**: Identifiers → el App ID → activa la capability **Push Notifications** → Save.
-3. **Perfiles / archivos**: regenera los provisioning profiles después del paso 2. Verifica en el archive de build 53
+3. **Perfiles / archivos**: regenera los provisioning profiles después del paso 2. Verifica en el archive de build 54
    que el entitlement `aps-environment` existe y vale **`production`** (TestFlight y App Store usan production; el
    servidor solo acepta los entornos de `BOBBY_APNS_ENVIRONMENTS`, default `production`). No uses
    `codesign -d --entitlements -` dentro de archives (ver memoria de ASC); revisa el `.app` exportado o el perfil.
@@ -92,7 +93,10 @@ Ojo con el gasto global: `bobby_llm_spend()` suma **todas** las superficies, as�
 ## (d) Migración 🔐
 
 1. Orden: `20261002180000_pro_briefings.sql` va **después** de `20261002120000` (la migración del dashboard, en otra
-   rama). Verifica con `list_migrations` que la 120000 ya está aplicada en el proyecto destino.
+   rama); después aplica `20261002183000_brief_device_atomic.sql` y
+   `20261002184500_brief_paid_source_guard.sql`. Verifica con `list_migrations` que todas constan como aplicadas
+   en el proyecto destino antes de activar el worker. La última separa la evidencia de pago de RevenueCat Web Billing
+   y Stripe directo; sin ella, una prueba de una fuente puede servir para la otra.
 2. **Staging primero.** Nunca prod sin haber pasado (e).
 3. Bucket: la migración crea `briefing-audio` solo si existe el schema `storage`. Verifica después:
    `select id, public from storage.buckets where id = 'briefing-audio';` → debe existir y `public = false`.
