@@ -24,7 +24,7 @@ Contrato de implementación: [pro-market-briefings-implementation.md](pro-market
 | 3 Calendario y motor | `calendar.ts`, `evidence.ts`, `narrative.ts`, `compose.ts`, `api/_lib/market-snapshot.ts` (extraído de bobby-intel sin cambiar su salida) | calendario 142 (DST 2026/2027, festivos verificados, cierres anticipados, semana cruzando año, cron duplicado/perdido); contenido 149 |
 | 4 Presupuesto | `budget.ts`, `providers.ts` (un intento HTTP por llamada), RPCs `bobby_brief_budget_*` | core 237; PG: topes y plazas no se exceden con 10+ reservas concurrentes; `unknown` bloquea reintento ciego |
 | 5 Push | `apns.ts` (HTTP/2, JWT ES256), `push-crypto.ts`, `op=device`, `PushRegistrar.swift`, entitlement `aps-environment` | core (payload genérico, mapeo de estados APNs); PG rebind A→B, rotación, revocación tardía; iOS `PushRegistrarTests` |
-| 6 iOS | `ios/Bobby/Sources/Briefings/*`, `AccountSheet`, `NucleoSession/RootView`, `NeuralVoice`, build 53 | ver sección iOS abajo |
+| 6 iOS | `ios/Bobby/Sources/Briefings/*`, `AccountSheet`, `NucleoSession/RootView`, `NeuralVoice`, build 53 | BobbyTests completo en simulador iPhone 17 Pro: **348 tests, 0 fallos** (287 previos intactos, incl. AvatarVoiceTests 16; nuevos: centro/registro/intención 42, experiencia 35, narración 25) |
 | 7 Privacidad | triggers de memoria en la migración, `MemoryView.swift`, `PrivacyPage.tsx`, runbook | PG: pausa/borrado de memoria retira contenido personal pendiente; retención no purga |
 | Orquestación | `worker.ts`, `api/briefing-worker.ts` | worker 143 (99 unit + 44 end-to-end contra PG real: replay de cron sin duplicados, expiración, rebind A→B, Pro vencido sin push, reconciliación) |
 
@@ -50,5 +50,5 @@ cuentan también contra el tope global del Desk (`bobby_llm_spend` suma todas la
 6. iPhone físico: recepción APNs real, toque en frío/caliente, cambio de cuenta, silencio, segundo plano.
 7. Conocidos (de los agentes): limpieza de objetos huérfanos en Storage si falla el borrado; reinstalación que pierde la
    credencial del Keychain y conserva token → `conflict` sin ruta de recuperación; rotar `BOBBY_PUSH_TOKEN_KEY` exige
-   re-registro; calendario cubre 2026–2027; validación numérica conservadora (puede caer a facts-only); pantallas iOS sin
+   re-registro; calendario cubre 2026–2027; acceso a la API acepta cualquier sesión Supabase verificada (decidir si excluir email/anónimas sin romper X); validación numérica conservadora (puede caer a facts-only); pantallas iOS sin
    revisión visual (solo tests y compilación).
