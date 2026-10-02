@@ -92,6 +92,7 @@ try {
     if(url.includes('api_cache'))return json([]);
     if(url.endsWith('/auth/v1/user'))return json({id:ID,app_metadata:{provider:'apple'}});
     if(url.includes('bobby_identities')&&method==='POST')return json([{id:ID,auth_user_id:ID,wallet_address:null}]);
+    if(url.endsWith('/rpc/bobby_checkout_block_for_deletion'))return json({customer:null,sessionId:null});
     if(method==='DELETE'||method==='PATCH'){deletes.push(`${method} ${url}`);return json({});}
     if(url.includes('/admin/users/'))return json({identities:[{provider:'apple',identity_data:{sub:'apple-user'}}]});
     if(url.includes('bobby_subscriptions'))return json([]);
@@ -110,11 +111,14 @@ try {
     globalThis.fetch=async(input,init)=>{
       const url=String(input),method=init?.method??'GET';
       if(url.startsWith('https://api.stripe.com/v1/subscriptions/sub_live')&&method==='DELETE'){cancelled++;return json({},stripeStatus);}
+      if(url.startsWith('https://api.stripe.com/v1/customers/search'))return json({data:[{id:'cus_1'}]});
+      if(url.startsWith('https://api.stripe.com/v1/checkout/sessions?customer=cus_1'))return json({data:[]});
       if(url.startsWith('https://api.stripe.com/v1/subscriptions/search'))return json({data:[]});
       if(url.startsWith('https://api.stripe.com/v1/subscriptions?customer=cus_1'))return json({data:[{id:'sub_live',status:'active'}]});
       if(url.includes('api_cache'))return json([]);
       if(url.endsWith('/auth/v1/user'))return json({id:ID,app_metadata:{provider:'apple'}});
       if(url.includes('bobby_identities')&&method==='POST')return json([{id:ID,auth_user_id:ID,wallet_address:null}]);
+      if(url.endsWith('/rpc/bobby_checkout_block_for_deletion'))return json({customer:null,sessionId:null});
       if(url.includes('bobby_subscriptions'))return json([{identity_id:ID,provider:'apple',status:'active',stripe_subscription_id:'sub_live',stripe_customer_id:'cus_1'}]);
       if(method==='DELETE'||method==='PATCH'){writes.push(`${method} ${url}`);return json({});}
       if(url.includes('/admin/users/'))return json({identities:[{provider:'apple',identity_data:{sub:'apple-user'}}]});
