@@ -53,7 +53,7 @@ function refreshCollections(){
   bcall('theses').then(function(r){ if (gen !== OWNER_GEN) return; if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
   bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
   bcall('roster').then(function(r){ if (gen !== OWNER_GEN) return; ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
-  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) receiveSuggestions(x); }).catch(noop);
 }
 function resetVisibleRead(preserveSignIn){
   if (preserveSignIn) return;
@@ -147,7 +147,7 @@ function boot(){
     });
     at(0.5, start);
     bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) receiveSuggestions(x); }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

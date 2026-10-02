@@ -103,7 +103,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #lvl.on{opacity:1;pointer-events:auto}
 #lvl::before{content:'';position:absolute;inset:-9px -4px}   /* 28 pt to the eye, 44 pt to the finger */
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%;touch-action:none;-webkit-user-select:none;user-select:none}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
 #pill .mic{width:22px;height:22px;margin:-11px 0 0 -11px}
 #pill .kbd{width:24px;height:24px;margin:-12px 0 0 -12px}

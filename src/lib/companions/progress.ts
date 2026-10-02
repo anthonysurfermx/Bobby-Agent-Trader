@@ -72,9 +72,10 @@ export interface Progress {
   syncedAt: string | null;
 }
 
-const REGIONAL_QUICK_ACCESS: Record<string, string[]> = { 'fr-FR': ['MC.PA', 'TTE.PA', 'BTC'], 'pt-PT': ['EDP.LS', 'GALP.LS', 'BTC'], 'pt-BR': ['PETR4.SA', 'VALE3.SA', 'BTC'], 'it-IT': ['ENI.MI', 'ENEL.MI', 'BTC'], 'de-DE': ['SAP.DE', 'SIE.DE', 'BTC'], 'en-US': ['BTC', 'NVDA', 'ETH'], 'es-MX': ['BTC', 'NVDA', 'ETH'] };
+const REGIONAL_QUICK_ACCESS: Record<string, string[]> = { 'fr-FR': ['BTC', 'NVDA', 'MC.PA', 'TTE.PA'], 'pt-PT': ['BTC', 'NVDA', 'EDP.LS', 'GALP.LS'], 'pt-BR': ['BTC', 'NVDA', 'PETR4.SA', 'VALE3.SA'], 'it-IT': ['BTC', 'NVDA', 'ENI.MI', 'ENEL.MI'], 'de-DE': ['BTC', 'NVDA', 'SAP.DE', 'SIE.DE'], 'en-US': ['BTC', 'NVDA', 'ETH'], 'es-MX': ['BTC', 'NVDA', 'ETH'] };
+const LEGACY_AUTOMATIC_QUICK_ACCESS = [['MC.PA', 'TTE.PA', 'BTC'], ['EDP.LS', 'GALP.LS', 'BTC'], ['PETR4.SA', 'VALE3.SA', 'BTC'], ['ENI.MI', 'ENEL.MI', 'BTC'], ['SAP.DE', 'SIE.DE', 'BTC']];
 const regionalQuickAccess = () => [...(REGIONAL_QUICK_ACCESS[speechLocale()] ?? REGIONAL_QUICK_ACCESS['en-US'])];
-const isAutomaticQuickAccess = (symbols: string[]) => Object.values(REGIONAL_QUICK_ACCESS).some(defaults => defaults.length === symbols.length && defaults.every((symbol, i) => symbol === symbols[i]));
+const isAutomaticQuickAccess = (symbols: string[]) => [...Object.values(REGIONAL_QUICK_ACCESS), ...LEGACY_AUTOMATIC_QUICK_ACCESS].some(defaults => defaults.length === symbols.length && defaults.every((symbol, i) => symbol === symbols[i]));
 
 const DEFAULT: Progress = {
   aiConsentGranted: false,

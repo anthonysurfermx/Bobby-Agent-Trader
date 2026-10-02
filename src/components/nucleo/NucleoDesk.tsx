@@ -861,20 +861,20 @@ export default function NucleoDesk() {
   // then another question of the reader's, then their other assets.
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
   const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
-  const suggestions: Array<{ label: string; go: () => void }> = done && snapshot
+  const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = done && snapshot
     ? [
       ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.toUpperCase().includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
       { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
       ...progress.quickAccess.filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
     ]
-    : progress.quickAccess.slice(0, 3).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
+    : progress.quickAccess.slice(0, 3).map((sym) => ({ label: sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
   const chips = !reading && phase !== 'confirm' ? (
     <div className="w-full">
       {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}
       <div className="n-label mb-3 text-center">{t('You might want to ask', 'Quizá quieras preguntar', 'Talvez você queira perguntar')}</div>
       <div className="n-chips">
         {suggestions.map((c, i) => (
-          <button key={c.label} type="button" className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => { sfxTock(); c.go(); }}>{c.label}</button>
+          <button key={c.label} type="button" aria-label={c.ariaLabel} className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => { sfxTock(); c.go(); }}>{c.label}</button>
         ))}
         <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); setSheet('board'); }}>{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</button>
       </div>

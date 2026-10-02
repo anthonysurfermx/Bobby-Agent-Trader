@@ -48,6 +48,7 @@ var LIGHT = { x: 0, y: 0, tx: 0, ty: 0 };
 var SCRIPTED = false;   /* true while a harness script owns the finger */
 stage.addEventListener('pointerdown', function(e){
   if (e.isPrimary === false) return;
+  if (e.button != null && e.button !== 0) return;
   if (SCRIPTED){ harnessTapToggle(e); return; }
   if (PTR.id != null) return;
   PTR.id = e.pointerId; PTR.realT = performance.now();
@@ -60,8 +61,9 @@ stage.addEventListener('pointermove', function(e){
   var p = toStage(e.clientX, e.clientY);
   if (!RM){ LIGHT.tx = clamp((p[0] - 195) / 195 * 0.06, -0.06, 0.06); LIGHT.ty = clamp(-(p[1] - 340) / 340 * 0.06, -0.06, 0.06); }
   if (e.pointerId !== PTR.id) return;
+  if (e.cancelable && PTR.hitEl === el.pill) e.preventDefault();
   inMove(p[0], p[1]);
-});
+}, { passive: false });
 stage.addEventListener('pointerup', function(e){ if (e.pointerId !== PTR.id) return; PTR.id = null; var p = toStage(e.clientX, e.clientY); inUp(p[0], p[1]); });
 stage.addEventListener('pointercancel', function(e){ if (e.pointerId !== PTR.id) return; PTR.id = null; inCancel(); });
 stage.addEventListener('lostpointercapture', function(e){ if (e.pointerId === PTR.id){ PTR.id = null; inCancel(); } });
@@ -69,11 +71,25 @@ stage.addEventListener('pointerleave', function(){ LIGHT.tx = 0; LIGHT.ty = 0; }
 /* keyboard, switch control and VoiceOver: a click that no real pointer-down preceded is an activation,
    delivered as a tap at the control's centre (a real finger's click is already handled by the gesture) */
 stage.addEventListener('click', function(e){
-  if (SCRIPTED || (PTR.realT && performance.now() - PTR.realT < 800)) return;
+  if (SCRIPTED || (e.detail !== 0 && PTR.realT && performance.now() - PTR.realT < 800)) return;
   var h = hitOf(e.target); if (!h) return;
   var r = h.getBoundingClientRect(), p = toStage(r.left + r.width / 2, r.top + r.height / 2);
   inDown(p[0], p[1], h); inUp(p[0], p[1]);   /* the pill: an instant tap = the typing path */
 });
+stage.addEventListener('contextmenu', function(e){ if (hitOf(e.target) === el.pill) e.preventDefault(); });
+// Older web views deliver TouchEvent only. Use the same gesture and keep text selection native.
+if (!W.PointerEvent){
+  function touchOf(e){ var list = e.changedTouches || []; for (var i = 0; i < list.length; i++) if (list[i].identifier === PTR.id) return list[i]; return null; }
+  stage.addEventListener('touchstart', function(e){
+    if (SCRIPTED || PTR.id != null || !e.changedTouches || !e.changedTouches.length || e.target && e.target.tagName === 'TEXTAREA') return;
+    var t = e.changedTouches[0]; PTR.id = t.identifier; PTR.realT = performance.now();
+    var p = toStage(t.clientX, t.clientY); inDown(p[0], p[1], hitOf(e.target));
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  stage.addEventListener('touchmove', function(e){ var t = touchOf(e); if (!t) return; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inMove(p[0], p[1]); }, { passive: false });
+  stage.addEventListener('touchend', function(e){ var t = touchOf(e); if (!t) return; PTR.id = null; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inUp(p[0], p[1]); }, { passive: false });
+  stage.addEventListener('touchcancel', function(e){ if (!touchOf(e)) return; PTR.id = null; inCancel(); }, { passive: false });
+}
 /* iOS ignores user-scalable=no: block pinch and double-tap zoom explicitly */
 try {
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(t){ D.addEventListener(t, function(e){ e.preventDefault(); }, { passive: false }); });

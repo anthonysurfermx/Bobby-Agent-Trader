@@ -694,11 +694,12 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertEqual(NucleoSpeech.level(rms: 0.01), (20 * log10(0.01) + 50) / 45, accuracy: 1e-6)
     }
 
-    /// Never prompts; `onDevice` is exactly "a recognizer can run on this device for this language".
+    /// Never prompts. Authorization remains actionable before the local model is ready.
     func testSpeechPermissionNeverPromptsAndIsOnDeviceOrUnavailable() {
         let permission = NucleoSpeech().permission()
         print("[NucleoBridgeTests] speech permission on this simulator:", permission.state, "onDevice", permission.onDevice)
-        XCTAssertEqual(permission.onDevice, permission.state != "unavailable")
+        if permission.state == "granted" { XCTAssertTrue(permission.onDevice) }
+        if permission.state == "unavailable" { XCTAssertFalse(permission.onDevice) }
         XCTAssertTrue(["granted", "denied", "undetermined", "restricted", "unavailable"].contains(permission.state))
     }
 

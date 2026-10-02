@@ -127,12 +127,12 @@ final class NativeRegionalQuickAccessTests: XCTestCase {
 
     func testEmptyHistorySuggestsListedRegionalSymbolsAndRetainsLegacyEnglishSpanish() {
         let cases: [(String, String, String?, [String])] = [
-            ("fr", "fr-FR", "FR", ["MC.PA", "TTE.PA", "BTC"]),
-            ("pt", "pt-PT", "PT", ["EDP.LS", "GALP.LS", "BTC"]),
-            ("pt", "pt-BR", "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
-            ("pt", "en-US", "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
-            ("it", "it-IT", "IT", ["ENI.MI", "ENEL.MI", "BTC"]),
-            ("de", "de-DE", "DE", ["SAP.DE", "SIE.DE", "BTC"]),
+            ("fr", "fr-FR", "FR", ["BTC", "NVDA", "MC.PA", "TTE.PA"]),
+            ("pt", "pt-PT", "PT", ["BTC", "NVDA", "EDP.LS", "GALP.LS"]),
+            ("pt", "pt-BR", "BR", ["BTC", "NVDA", "PETR4.SA", "VALE3.SA"]),
+            ("pt", "en-US", "BR", ["BTC", "NVDA", "PETR4.SA", "VALE3.SA"]),
+            ("it", "it-IT", "IT", ["BTC", "NVDA", "ENI.MI", "ENEL.MI"]),
+            ("de", "de-DE", "DE", ["BTC", "NVDA", "SAP.DE", "SIE.DE"]),
             ("en", "en-US", "FR", ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]),
             ("es", "es-MX", "DE", ["BTC", "NVDA", "ETH", "TSLA", "ORO"])
         ]
@@ -140,6 +140,7 @@ final class NativeRegionalQuickAccessTests: XCTestCase {
             let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: [preferred], region: country)
             let defaults = DeskMemory.defaultQuickAccess(for: resolution)
             XCTAssertEqual(defaults, expected)
+            XCTAssertEqual(Array(defaults.prefix(2)), ["BTC", "NVDA"], "Common starters must appear before regional padding in every app language")
             XCTAssertEqual(DeskMemory(defaults: MemoryDefaults()).quickAccess(fallback: defaults), expected)
         }
     }
@@ -154,6 +155,7 @@ final class NativeRegionalQuickAccessTests: XCTestCase {
             let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: ["pt-BR"], region: nil)
             let row = memory.quickAccess(fallback: DeskMemory.defaultQuickAccess(for: resolution))
             XCTAssertEqual(Array(row.prefix(2)), ["SOL", "VOW3.DE"])
+            XCTAssertTrue(row.contains("BTC") && row.contains("NVDA"), "Common starters pad history without replacing it")
             XCTAssertEqual(memory.watchlist, original)
             XCTAssertEqual(Set(row).count, row.count)
         }

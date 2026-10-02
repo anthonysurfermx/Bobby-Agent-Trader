@@ -304,12 +304,29 @@ function setHorizon(hrs){
 
 /* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
 var DYING = [];
+function showIdleSuggestions(){
+  if (ST.name !== 'IDLE') return;
+  var list = [], seen = {};
+  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+    var sym = String(item && item.symbol || '').toUpperCase();
+    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    seen[sym] = 1;
+    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
+    list.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+  });
+  if (list.length) chipsShow(list, true); else chipsHide();
+}
+function receiveSuggestions(reply){
+  SUGG = reply;
+  if (ST.name === 'IDLE') showIdleSuggestions();
+}
 function chipsShow(list, eyebrow){
   chipsHide(true);
   A.chipX.set(0);
   var x = 20;
   list.forEach(function(c, i){
     var b = mk('button', 'chip' + (i === 0 ? ' first' : ''), c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
+    if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
     el.chipRow.appendChild(b);
     var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
     x += w + 8; A.chips.push(ch);

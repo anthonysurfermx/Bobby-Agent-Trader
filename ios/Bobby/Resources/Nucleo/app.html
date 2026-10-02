@@ -103,7 +103,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #lvl.on{opacity:1;pointer-events:auto}
 #lvl::before{content:'';position:absolute;inset:-9px -4px}   /* 28 pt to the eye, 44 pt to the finger */
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%;touch-action:none;-webkit-user-select:none;user-select:none}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
 #pill .mic{width:22px;height:22px;margin:-11px 0 0 -11px}
 #pill .kbd{width:24px;height:24px;margin:-12px 0 0 -12px}
@@ -3116,6 +3116,22 @@ function setHorizon(hrs){
 
 /* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
 var DYING = [];
+function showIdleSuggestions(){
+  if (ST.name !== 'IDLE') return;
+  var list = [], seen = {};
+  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+    var sym = String(item && item.symbol || '').toUpperCase();
+    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    seen[sym] = 1;
+    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
+    list.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+  });
+  if (list.length) chipsShow(list, true); else chipsHide();
+}
+function receiveSuggestions(reply){
+  SUGG = reply;
+  if (ST.name === 'IDLE') showIdleSuggestions();
+}
 function chipsShow(list, eyebrow){
   chipsHide(true);
   A.chipX.set(0);
@@ -3125,6 +3141,7 @@ function chipsShow(list, eyebrow){
     var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
     var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '\uF8FF'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
+    else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
     el.chipRow.appendChild(b);
     var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
     x += w + 8; A.chips.push(ch);
@@ -3320,7 +3337,7 @@ function glassHome(){
   ambientCanon(false); U.flood.cfg = UT(0.70); U.flood.to(0); U.scrim.to(0); U.braid.to(0); U.filA.to(0); U.swirl.to(0);
   U.energy.to(0.35); U.wflow.to(0.18); U.irid.to(1); U.breathK.to(1); A.ringOff.to(14, 'soft'); A.pctPos.to(0, 'soft'); S.pull.to(0, BODY.gulp);
 }
-function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.chartT0 < 1e8 || capCur >= 0 || A.chips.length > 0; }
+function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.chartT0 < 1e8 || capCur >= 0 || A.chips.some(function(c){ return !(c.action && c.action.starter); }); }
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
@@ -3400,10 +3417,14 @@ STATES.IDLE = {
     pillMode(idleMode());
     if (d && d.hint){ hint(tt(d.hint)); } else idleHint();
     if (d && d.restoreGreet){ if (!lineShown(A.greet)){ setGreeting(); greetIn(); } meriIn(); }
+    showIdleSuggestions();
   },
+  exit: function(){ chipsHide(); },
   tick: function(){ if (A.th.x !== 0 && !A.th.moving() && Math.abs(A.th.x - Math.round(A.th.x / TAU) * TAU) < 1e-3) A.th.set(0); },
-  down: function(h, p){
+  down: function(h, p, hitEl){
     if (h === 'pill') return pillDown(p);
+    if (h === 'chip') return chipG(hitEl);
+    if (h === 'chiprow') return chipRowG();
     if (h === 'avatar') return avatarG();
     if (h === 'wm' && DEV_BUILD) return wordmarkPress();
     if (h === 'lvl') return tapG(function(){ tick('light'); openNative('levels'); });
@@ -3420,24 +3441,37 @@ function wordmarkPress(){
 }
 var LP_SEQ = 0;
 
-/* the pill: press → listen (granted), pre-permission card (undetermined), or typing (denied / unavailable) */
+/* the pill: hold → listen / pre-permission / unavailable feedback; a short tap always types */
 function pillDown(p, fromRead){
   A.press.to(0.94, 'snap'); tick('light');
-  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT();
+  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT(), ended = false;
+  function cancel(){
+    if (ended) return; ended = true;
+    if (ms === 'granted') STATES.LISTENING.release(false, true);
+    else A.press.to(1, 'emit');
+  }
+  function move(p){ if (Math.hypot(p.x - p.x0, p.y - p.y0) > 32) cancel(); }
   if (ms === 'granted'){
     go('LISTENING', { fromRead: !!fromRead });
-    return { move: noop, up: function(){ STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: function(){ STATES.LISTENING.release(false, true); } };
+    return { move: move, up: function(){ if (ended) return; ended = true; STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: cancel };
   }
   if (ms === 'undetermined'){
     // A short tap always types; voice permission belongs to the hold gesture.
-    return { move: noop, up: function(){
+    return { move: move, up: function(){
+      if (ended) return; ended = true;
       A.press.to(1, 'emit');
       if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
       else if (fromRead) go('RETURNING');
       else go('PRE_PERMISSION');
-    }, cancel: function(){ A.press.to(1, 'emit'); } };
+    }, cancel: cancel };
   }
-  return { move: noop, up: function(){ A.press.to(1, 'emit'); openTyping({ fromRead: !!fromRead }); }, cancel: function(){ A.press.to(1, 'emit'); } };
+  // A hold is a voice attempt. Explain unavailable dictation without raising the keyboard.
+  at(0.25, function(){ if (!ended) hint(tt('hint.micOff')); });
+  return { move: move, up: function(){
+    if (ended) return; ended = true; A.press.to(1, 'emit');
+    if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
+    else hint(tt('hint.micOff'));
+  }, cancel: cancel };
 }
 
 /* ---------- PRE_PERMISSION: the onboarding O3 card, blooming from the bottom rim ---------- */
@@ -3461,8 +3495,8 @@ STATES.PRE_PERMISSION = {
       if (ST.name !== 'PRE_PERMISSION') return;
       if (m && m.state) SES.mic = m;
       if (m && m.state === 'granted') go('IDLE', { hint: 'hint.hold', restoreGreet: true });
-      else { go('IDLE', { restoreGreet: true }); openTyping({}); }
-    }, function(){ if (ST.name === 'PRE_PERMISSION') go('IDLE', { restoreGreet: true }); });
+      else go('IDLE', { hint: 'hint.micOff', restoreGreet: true });
+    }, function(){ if (ST.name === 'PRE_PERMISSION') go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); });
   }
 };
 
@@ -3470,6 +3504,7 @@ STATES.PRE_PERMISSION = {
 STATES.LISTENING = {
   enter: function(prev, d){
     this.released = false; this.finalWait = 0; this.live = false;
+    var startSeq = this.startSeq = (this.startSeq || 0) + 1;
     chromeUp();
     if (d.fromRead || readShowing()){ clearRead(); glassHome(); moveSphere(340, 120); tintHome(); A.satG.o.tween(0, 0.2, E.fade); }
     if (A.note.o.t > 0) noteOut();
@@ -3477,9 +3512,10 @@ STATES.LISTENING = {
     U.faceOn.to(0);
     var self = this;
     bcall('speech.start').then(function(r){
+      if (startSeq !== self.startSeq) return;   /* a cancelled attempt cannot stop or reopen a newer hold */
       if (ST.name !== 'LISTENING' || self.released && !self.live){ if (r && r.status === 'listening') bcall('speech.stop', { cancel: true }).catch(noop); return; }
       self.onStart(r && r.status);
-    }, function(){ if (ST.name === 'LISTENING') self.onStart('failed'); });
+    }, function(){ if (startSeq === self.startSeq && ST.name === 'LISTENING') self.onStart('failed'); });
     cue(0.09, function(){ if (self.released) return; A.pillW.to(236, 'pill'); pillMode('bars'); A.barsT0 = clk; A.barsOutT0 = 1e9; A.glow.tween(0.8, 0.24, E.fade); A.goo.tween(1, 0.3, E.fade); });
     cue(0.10, function(){ if (self.released) return; if (lineShown(A.greet)) greetOut(); meriOut(); A.satG.o.tween(0, 0.2, E.fade); hint(tt('hint.release')); });
     cue(0.15, function(){ if (self.released) return; S.r.to(132, 'soft'); S.lean.to(6, BODY.gaze); S.bulge.to(0.02, BODY.gaze); U.listenIr.to(1); });
@@ -3500,7 +3536,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING' || this.released) return;
     this.released = true;
     if (isTap || cancelled){
-      if (this.live) bcall('speech.stop', { cancel: true }).catch(noop);
+      bcall('speech.stop', { cancel: true }).catch(noop);   /* also cancel native start before its bridge reply arrives */
       this.collapse(); txReset();
       if (isTap) openTyping({}); else go('IDLE', { restoreGreet: true });
       return;
@@ -3915,7 +3951,7 @@ function chipAct(c){
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
-  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: true }); }
+  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
   enter: function(){ chipsShow(RMOD.followUps(READ.model, SUGG || {}, LANG), true); },
@@ -4199,6 +4235,7 @@ var LIGHT = { x: 0, y: 0, tx: 0, ty: 0 };
 var SCRIPTED = false;   /* true while a harness script owns the finger */
 stage.addEventListener('pointerdown', function(e){
   if (e.isPrimary === false) return;
+  if (e.button != null && e.button !== 0) return;
   if (SCRIPTED){ harnessTapToggle(e); return; }
   if (PTR.id != null) return;
   PTR.id = e.pointerId; PTR.realT = performance.now();
@@ -4211,8 +4248,9 @@ stage.addEventListener('pointermove', function(e){
   var p = toStage(e.clientX, e.clientY);
   if (!RM){ LIGHT.tx = clamp((p[0] - 195) / 195 * 0.06, -0.06, 0.06); LIGHT.ty = clamp(-(p[1] - 340) / 340 * 0.06, -0.06, 0.06); }
   if (e.pointerId !== PTR.id) return;
+  if (e.cancelable && PTR.hitEl === el.pill) e.preventDefault();
   inMove(p[0], p[1]);
-});
+}, { passive: false });
 stage.addEventListener('pointerup', function(e){ if (e.pointerId !== PTR.id) return; PTR.id = null; var p = toStage(e.clientX, e.clientY); inUp(p[0], p[1]); });
 stage.addEventListener('pointercancel', function(e){ if (e.pointerId !== PTR.id) return; PTR.id = null; inCancel(); });
 stage.addEventListener('lostpointercapture', function(e){ if (e.pointerId === PTR.id){ PTR.id = null; inCancel(); } });
@@ -4220,11 +4258,25 @@ stage.addEventListener('pointerleave', function(){ LIGHT.tx = 0; LIGHT.ty = 0; }
 /* keyboard, switch control and VoiceOver: a click that no real pointer-down preceded is an activation,
    delivered as a tap at the control's centre (a real finger's click is already handled by the gesture) */
 stage.addEventListener('click', function(e){
-  if (SCRIPTED || (PTR.realT && performance.now() - PTR.realT < 800)) return;
+  if (SCRIPTED || (e.detail !== 0 && PTR.realT && performance.now() - PTR.realT < 800)) return;
   var h = hitOf(e.target); if (!h) return;
   var r = h.getBoundingClientRect(), p = toStage(r.left + r.width / 2, r.top + r.height / 2);
   inDown(p[0], p[1], h); inUp(p[0], p[1]);   /* the pill: an instant tap = the typing path */
 });
+stage.addEventListener('contextmenu', function(e){ if (hitOf(e.target) === el.pill) e.preventDefault(); });
+// Older web views deliver TouchEvent only. Use the same gesture and keep text selection native.
+if (!W.PointerEvent){
+  function touchOf(e){ var list = e.changedTouches || []; for (var i = 0; i < list.length; i++) if (list[i].identifier === PTR.id) return list[i]; return null; }
+  stage.addEventListener('touchstart', function(e){
+    if (SCRIPTED || PTR.id != null || !e.changedTouches || !e.changedTouches.length || e.target && e.target.tagName === 'TEXTAREA') return;
+    var t = e.changedTouches[0]; PTR.id = t.identifier; PTR.realT = performance.now();
+    var p = toStage(t.clientX, t.clientY); inDown(p[0], p[1], hitOf(e.target));
+    if (e.cancelable) e.preventDefault();
+  }, { passive: false });
+  stage.addEventListener('touchmove', function(e){ var t = touchOf(e); if (!t) return; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inMove(p[0], p[1]); }, { passive: false });
+  stage.addEventListener('touchend', function(e){ var t = touchOf(e); if (!t) return; PTR.id = null; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inUp(p[0], p[1]); }, { passive: false });
+  stage.addEventListener('touchcancel', function(e){ if (!touchOf(e)) return; PTR.id = null; inCancel(); }, { passive: false });
+}
 /* iOS ignores user-scalable=no: block pinch and double-tap zoom explicitly */
 try {
   ['gesturestart', 'gesturechange', 'gestureend'].forEach(function(t){ D.addEventListener(t, function(e){ e.preventDefault(); }, { passive: false }); });
@@ -5260,7 +5312,7 @@ function refreshCollections(){
   bcall('theses').then(function(r){ if (gen !== OWNER_GEN) return; if (r && Array.isArray(r.items)) LEDGER = r.items; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
   bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
   bcall('roster').then(function(r){ if (gen !== OWNER_GEN) return; ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
-  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+  bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) receiveSuggestions(x); }).catch(noop);
 }
 function resetVisibleRead(preserveSignIn){
   if (preserveSignIn) return;
@@ -5354,7 +5406,7 @@ function boot(){
     });
     at(0.5, start);
     bcall('island').then(function(i){ if (gen !== OWNER_GEN) return; ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) SUGG = x; }).catch(noop);
+    bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) receiveSuggestions(x); }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

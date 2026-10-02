@@ -72,7 +72,7 @@ for(const [language,locale] of [['en','en-US'],['es','es-MX'],['fr','fr-FR'],['p
 check('language selector changes a query-pinned language and keeps Portuguese region',()=>{const b=browser('fr','pt-BR');b.location.search='?lang=fr&locale=fr-FR';b.location.href='https://bobby.test/desk?lang=fr&locale=fr-FR';const menu=b.load('src/components/nucleo/LangMenu.tsx').LangSegment;const buttons=elements(menu()).filter(e=>e.type==='button');assert.equal(buttons.length,6);buttons.find(e=>e.props.children==='PT').props.onClick();assert.equal(b.saved.get('bobby_lang'),'pt');assert.equal(b.saved.get('bobby_locale'),'pt-BR');assert.equal(new URL(b.location.assigned).searchParams.get('lang'),'pt');assert.equal(new URL(b.location.assigned).searchParams.has('locale'),false);});
 check('changing locale refreshes automatic suggestions while keeping personal assets',()=>{
  const persisted='bobby.companion.progress.v1';
- for(const [language,locale,symbols] of [['pt','pt-PT',['EDP.LS','GALP.LS','BTC']],['pt','pt-BR',['PETR4.SA','VALE3.SA','BTC']],['it','it-IT',['ENI.MI','ENEL.MI','BTC']],['de','de-DE',['SAP.DE','SIE.DE','BTC']]]){
+ for(const [language,locale,symbols] of [['pt','pt-PT',['BTC','NVDA','EDP.LS','GALP.LS']],['pt','pt-BR',['BTC','NVDA','PETR4.SA','VALE3.SA']],['it','it-IT',['BTC','NVDA','ENI.MI','ENEL.MI']],['de','de-DE',['BTC','NVDA','SAP.DE','SIE.DE']]]){
   const b=browser(language,locale);b.saved.set(persisted,JSON.stringify({quickAccess:['MC.PA','TTE.PA','BTC'],aiConsentGranted:false}));
   const p=b.load('src/lib/companions/progress.ts').progressStore;assert.deepEqual(clean(p.get().quickAccess),symbols);assert.equal(p.get().quickAccessCustomized,false);
   p.setQuickAccess(['AAPL','MC.PA','BTC']);assert.equal(p.get().quickAccessCustomized,true);

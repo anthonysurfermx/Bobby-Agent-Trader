@@ -133,7 +133,7 @@ function glassHome(){
   ambientCanon(false); U.flood.cfg = UT(0.70); U.flood.to(0); U.scrim.to(0); U.braid.to(0); U.filA.to(0); U.swirl.to(0);
   U.energy.to(0.35); U.wflow.to(0.18); U.irid.to(1); U.breathK.to(1); A.ringOff.to(14, 'soft'); A.pctPos.to(0, 'soft'); S.pull.to(0, BODY.gulp);
 }
-function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.chartT0 < 1e8 || capCur >= 0 || A.chips.length > 0; }
+function readShowing(){ return A.cardsOn || A.vCond.t > 0 || U.flood.t > 0 || A.chartT0 < 1e8 || capCur >= 0 || A.chips.some(function(c){ return !(c.action && c.action.starter); }); }
 function routeReply(r){
   var s = r.reply.status;
   if (s === 'ok'){ go('THINK_WAIT'); return; }
@@ -206,10 +206,14 @@ STATES.IDLE = {
     pillMode(idleMode());
     if (d && d.hint){ hint(tt(d.hint)); } else idleHint();
     if (d && d.restoreGreet){ if (!lineShown(A.greet)){ setGreeting(); greetIn(); } meriIn(); }
+    showIdleSuggestions();
   },
+  exit: function(){ chipsHide(); },
   tick: function(){ if (A.th.x !== 0 && !A.th.moving() && Math.abs(A.th.x - Math.round(A.th.x / TAU) * TAU) < 1e-3) A.th.set(0); },
-  down: function(h, p){
+  down: function(h, p, hitEl){
     if (h === 'pill') return pillDown(p);
+    if (h === 'chip') return chipG(hitEl);
+    if (h === 'chiprow') return chipRowG();
     if (h === 'avatar') return avatarG();
     if (h === 'wm' && DEV_BUILD) return wordmarkPress();
     if (h === 'satG') return tapG(function(){ if (SAVED && SAVED.thesis) go('THESIS_VIEW', { thesis: SAVED.thesis, back: 'IDLE' }); });
@@ -225,20 +229,37 @@ function wordmarkPress(){
 }
 var LP_SEQ = 0;
 
-/* the pill: press → listen (granted), pre-permission card (undetermined), or typing (denied / unavailable) */
+/* the pill: hold → listen / pre-permission / unavailable feedback; a short tap always types */
 function pillDown(p, fromRead){
   A.press.to(0.94, 'snap'); tick('light');
-  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT();
+  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT(), ended = false;
+  function cancel(){
+    if (ended) return; ended = true;
+    if (ms === 'granted') STATES.LISTENING.release(false, true);
+    else A.press.to(1, 'emit');
+  }
+  function move(p){ if (Math.hypot(p.x - p.x0, p.y - p.y0) > 32) cancel(); }
   if (ms === 'granted'){
     go('LISTENING', { fromRead: !!fromRead });
-    return { move: noop, up: function(){ STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: function(){ STATES.LISTENING.release(false, true); } };
+    return { move: move, up: function(){ if (ended) return; ended = true; STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: cancel };
   }
   if (ms === 'undetermined'){
-    if (fromRead) go('RETURNING');
-    else go('PRE_PERMISSION');
-    return { move: noop, up: function(){ A.press.to(1, 'emit'); }, cancel: function(){ A.press.to(1, 'emit'); } };
+    // A short tap always types; voice permission belongs to the hold gesture.
+    return { move: move, up: function(){
+      if (ended) return; ended = true;
+      A.press.to(1, 'emit');
+      if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
+      else if (fromRead) go('RETURNING');
+      else go('PRE_PERMISSION');
+    }, cancel: cancel };
   }
-  return { move: noop, up: function(){ A.press.to(1, 'emit'); openTyping({ fromRead: !!fromRead }); }, cancel: function(){ A.press.to(1, 'emit'); } };
+  // A hold is a voice attempt. Explain unavailable dictation without raising the keyboard.
+  at(0.25, function(){ if (!ended) hint(tt('hint.micOff')); });
+  return { move: move, up: function(){
+    if (ended) return; ended = true; A.press.to(1, 'emit');
+    if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
+    else hint(tt('hint.micOff'));
+  }, cancel: cancel };
 }
 
 /* ---------- PRE_PERMISSION: the onboarding O3 card, blooming from the bottom rim ---------- */
@@ -262,8 +283,8 @@ STATES.PRE_PERMISSION = {
       if (ST.name !== 'PRE_PERMISSION') return;
       if (m && m.state) SES.mic = m;
       if (m && m.state === 'granted') go('IDLE', { hint: 'hint.hold', restoreGreet: true });
-      else { go('IDLE', { restoreGreet: true }); openTyping({}); }
-    }, function(){ if (ST.name === 'PRE_PERMISSION') go('IDLE', { restoreGreet: true }); });
+      else go('IDLE', { hint: 'hint.micOff', restoreGreet: true });
+    }, function(){ if (ST.name === 'PRE_PERMISSION') go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); });
   }
 };
 
@@ -271,6 +292,7 @@ STATES.PRE_PERMISSION = {
 STATES.LISTENING = {
   enter: function(prev, d){
     this.released = false; this.finalWait = 0; this.live = false;
+    var startSeq = this.startSeq = (this.startSeq || 0) + 1;
     chromeUp();
     if (d.fromRead || readShowing()){ clearRead(); glassHome(); moveSphere(340, 120); tintHome(); A.satG.o.tween(0, 0.2, E.fade); }
     if (A.note.o.t > 0) noteOut();
@@ -278,9 +300,10 @@ STATES.LISTENING = {
     U.faceOn.to(0);
     var self = this;
     bcall('speech.start').then(function(r){
+      if (startSeq !== self.startSeq) return;   /* a cancelled attempt cannot stop or reopen a newer hold */
       if (ST.name !== 'LISTENING' || self.released && !self.live){ if (r && r.status === 'listening') bcall('speech.stop', { cancel: true }).catch(noop); return; }
       self.onStart(r && r.status);
-    }, function(){ if (ST.name === 'LISTENING') self.onStart('failed'); });
+    }, function(){ if (startSeq === self.startSeq && ST.name === 'LISTENING') self.onStart('failed'); });
     cue(0.09, function(){ if (self.released) return; A.pillW.to(236, 'pill'); pillMode('bars'); A.barsT0 = clk; A.barsOutT0 = 1e9; A.glow.tween(0.8, 0.24, E.fade); A.goo.tween(1, 0.3, E.fade); });
     cue(0.10, function(){ if (self.released) return; if (lineShown(A.greet)) greetOut(); meriOut(); A.satG.o.tween(0, 0.2, E.fade); hint(tt('hint.release')); });
     cue(0.15, function(){ if (self.released) return; S.r.to(132, 'soft'); S.lean.to(6, BODY.gaze); S.bulge.to(0.02, BODY.gaze); U.listenIr.to(1); });
@@ -301,7 +324,7 @@ STATES.LISTENING = {
     if (ST.name !== 'LISTENING' || this.released) return;
     this.released = true;
     if (isTap || cancelled){
-      if (this.live) bcall('speech.stop', { cancel: true }).catch(noop);
+      bcall('speech.stop', { cancel: true }).catch(noop);   /* also cancel native start before its bridge reply arrives */
       this.collapse(); txReset();
       if (isTap) openTyping({}); else go('IDLE', { restoreGreet: true });
       return;
@@ -711,7 +734,7 @@ function chipAct(c){
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
-  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: true }); }
+  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
   enter: function(){ chipsShow(RMOD.followUps(READ.model, SUGG || {}, LANG), true); },

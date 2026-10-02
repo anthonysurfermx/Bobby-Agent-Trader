@@ -9,6 +9,17 @@ import Foundation
 import Speech
 
 @MainActor
+protocol NucleoSpeechRecognizing {
+    var locale: Locale { get }
+    var supportsOnDeviceRecognition: Bool { get }
+    var isAvailable: Bool { get }
+    func recognitionTask(with request: SFSpeechRecognitionRequest,
+                         resultHandler: @escaping (SFSpeechRecognitionResult?, Error?) -> Void) -> SFSpeechRecognitionTask
+}
+
+extension SFSpeechRecognizer: NucleoSpeechRecognizing {}
+
+@MainActor
 final class NucleoSpeech {
     static let maxListeningSeconds: Double = 60
     static let finalWaitSeconds: Double = 1.5
@@ -20,7 +31,7 @@ final class NucleoSpeech {
     /// Dictation vocabulary (asset names and tickers), set once per session.
     var vocabulary: [String] = []
 
-    private var recognizer: SFSpeechRecognizer?
+    private var recognizer: (any NucleoSpeechRecognizing)?
     private var recognizerLocale: String?
     private var recognizerCandidates: [String] = []
     private var engine: AVAudioEngine?
@@ -35,9 +46,25 @@ final class NucleoSpeech {
     private var lastLevelAt: CFTimeInterval = 0
     private var observers: [NSObjectProtocol] = []
     private let finalWait: Double
+    private let permissionInputs: (() -> PermissionInputs)?
+    private let supportedLocales: () -> Set<String>
+    private let makeRecognizer: (String) -> (any NucleoSpeechRecognizing)?
 
-    init(finalWait: Double? = nil) {
+    /// Authorization and local capability may change independently (for example after an OS prompt).
+    struct PermissionInputs {
+        let mic: AVAudioApplication.recordPermission
+        let speech: SFSpeechRecognizerAuthorizationStatus
+        let onDevice: Bool
+    }
+
+    init(finalWait: Double? = nil,
+         permissionInputs: (() -> PermissionInputs)? = nil,
+         supportedLocales: @escaping () -> Set<String> = { Set(SFSpeechRecognizer.supportedLocales().map(\.identifier)) },
+         makeRecognizer: @escaping (String) -> (any NucleoSpeechRecognizing)? = { SFSpeechRecognizer(locale: Locale(identifier: $0)) }) {
         self.finalWait = finalWait ?? Self.finalWaitSeconds
+        self.permissionInputs = permissionInputs
+        self.supportedLocales = supportedLocales
+        self.makeRecognizer = makeRecognizer
     }
 
     var isListening: Bool { listening }
@@ -52,11 +79,15 @@ final class NucleoSpeech {
 
     /// Never prompts.
     func permission() -> Permission {
-        guard let recognizer = resolveRecognizer() else { return Permission(state: "unavailable", onDevice: false) }
-        guard recognizer.supportsOnDeviceRecognition else { return Permission(state: "unavailable", onDevice: false) }
-        return Permission(state: Self.state(mic: AVAudioApplication.shared.recordPermission,
-                                            speech: SFSpeechRecognizer.authorizationStatus()),
-                          onDevice: true)
+        let inputs = permissionInputs?() ?? PermissionInputs(
+            mic: AVAudioApplication.shared.recordPermission,
+            speech: SFSpeechRecognizer.authorizationStatus(),
+            onDevice: resolveRecognizer()?.supportsOnDeviceRecognition ?? false)
+        let authorization = Self.state(mic: inputs.mic, speech: inputs.speech)
+        // The local model may not be ready before authorization. A hold must still offer the
+        // explicit OS permission flow; only an authorized attempt requires on-device capability.
+        let state = authorization == "granted" && !inputs.onDevice ? "unavailable" : authorization
+        return Permission(state: state, onDevice: inputs.onDevice)
     }
 
     nonisolated static func state(mic: AVAudioApplication.recordPermission, speech: SFSpeechRecognizerAuthorizationStatus) -> String {
@@ -83,18 +114,36 @@ final class NucleoSpeech {
     }
 
     /// The selected app language, using only supported on-device recognizers in that language.
-    private func resolveRecognizer() -> SFSpeechRecognizer? {
+    func resolveRecognizer(requireAvailable: Bool = false) -> (any NucleoSpeechRecognizing)? {
         let candidates = L.speechLocaleCandidates
-        if let recognizer, let recognizerLocale, recognizerCandidates == candidates, candidates.contains(recognizerLocale) { return recognizer }
+        let supported = Set(supportedLocales().map(Self.localeKey))
+        if let recognizer, let recognizerLocale,
+           recognizerCandidates == candidates, candidates.contains(recognizerLocale),
+           supported.contains(Self.localeKey(recognizerLocale)),
+           Self.localeKey(recognizer.locale.identifier) == Self.localeKey(recognizerLocale),
+           recognizer.supportsOnDeviceRecognition,
+           !requireAvailable || recognizer.isAvailable { return recognizer }
         for id in candidates {
-            if let r = SFSpeechRecognizer(locale: Locale(identifier: id)), r.supportsOnDeviceRecognition {
-                recognizer = r
-                recognizerLocale = id
-                recognizerCandidates = candidates
-                return r
-            }
+            // Apple's locale initializer can fall back to the keyboard's dictation language.
+            // Do not instantiate unsupported locales or accept a different actual locale.
+            guard supported.contains(Self.localeKey(id)),
+                  let r = makeRecognizer(id),
+                  Self.localeKey(r.locale.identifier) == Self.localeKey(id),
+                  r.supportsOnDeviceRecognition,
+                  !requireAvailable || r.isAvailable else { continue }
+            recognizer = r
+            recognizerLocale = id
+            recognizerCandidates = candidates
+            return r
         }
+        recognizer = nil
+        recognizerLocale = nil
+        recognizerCandidates = candidates
         return nil
+    }
+
+    nonisolated private static func localeKey(_ identifier: String) -> String {
+        identifier.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 
     /// The one request shape this app ever sends: on-device only, partial results, punctuation.
@@ -127,7 +176,7 @@ final class NucleoSpeech {
         case "unavailable": return .unavailable
         default: return .denied
         }
-        guard let recognizer, recognizer.isAvailable else { return .unavailable }
+        guard let recognizer = resolveRecognizer(requireAvailable: true), recognizer.isAvailable else { return .unavailable }
         willStart()
 
         let audio = AVAudioSession.sharedInstance()

@@ -92,7 +92,7 @@ function boot(){
     });
     at(0.5, start);
     bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ SUGG = x; }).catch(noop);
+    bcall('suggestions').then(function(x){ receiveSuggestions(x); }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

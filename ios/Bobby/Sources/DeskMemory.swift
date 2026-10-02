@@ -91,13 +91,13 @@ final class DeskMemory {
     /// market identifiers, never translated labels. They only pad empty slots in personal history.
     static func defaultQuickAccess(for resolution: LanguageResolution) -> [String] {
         switch resolution.language {
-        case .fr: return ["MC.PA", "TTE.PA", "BTC"]
+        case .fr: return ["BTC", "NVDA", "MC.PA", "TTE.PA"]
         case .pt:
             return resolution.localeIdentifier == "pt-BR"
-                ? ["PETR4.SA", "VALE3.SA", "BTC"]
-                : ["EDP.LS", "GALP.LS", "BTC"]
-        case .it: return ["ENI.MI", "ENEL.MI", "BTC"]
-        case .de: return ["SAP.DE", "SIE.DE", "BTC"]
+                ? ["BTC", "NVDA", "PETR4.SA", "VALE3.SA"]
+                : ["BTC", "NVDA", "EDP.LS", "GALP.LS"]
+        case .it: return ["BTC", "NVDA", "ENI.MI", "ENEL.MI"]
+        case .de: return ["BTC", "NVDA", "SAP.DE", "SIE.DE"]
         case .en: return ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
         case .es: return ["BTC", "NVDA", "ETH", "TSLA", "ORO"]
         }

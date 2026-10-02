@@ -83,13 +83,13 @@ function loadSugg(){
   SUGG_P = call('suggestions', {}).then(function(r){ W.sugg = r || null; return r; }, function(){ W.sugg = null; return null; });
   return SUGG_P;
 }
-/* chips from suggestions(): quick access "How is X looking?", movers "Why is X moving today?" (max 3, no repeats) */
+/* Compact ticker labels keep three suggestions visible; questions remain localized actions and accessible labels. */
 function suggestionChips(){
   var s = W.sugg, out = [], seen = {}, qa = (s && s.quickAccess) || [], mv = (s && s.movers) || [];
-  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!sym || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:q, action:{ ask:q } }); }
-  qa.slice(0, 2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!/^[A-Z0-9.^=-]{1,20}$/.test(sym) || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:q, action:{ ask:q, symbol:sym } }); }
+  qa.slice(0, 3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   mv.forEach(function(x){ push(x && x.symbol, 'chip.move'); });
-  qa.slice(2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  qa.slice(3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   return out;
 }
 function setChips(list){ W.chips = list || []; W.chipsKey = W.chips.map(function(c){ return c.label; }).join('|') + '#' + T.toFixed(3); tb('chips'); }
@@ -244,32 +244,40 @@ function askPress(){
   if (W.gotLine){ capGone(W.gotLine); }
   to(W.lean, 1); W.micBreath = false;
   if (mic === 'granted') startListening(p);
+  else if (mic !== 'undetermined') at(0.25, function(){ if (W.press === p && !p.released && !p.cancelled) setHint(Ls('hint.micOff')); });
 }
-function askRelease(){
+function askRelease(cancelled){
   var p = W.press; if (!p) return; W.press = null; p.released = true;
   var dt = T - p.t;
+  if (cancelled){
+    p.cancelled = true; W.listenSeq++;
+    if (p.mic === 'granted' || p.listening) fire('speech.stop', { cancel:true });
+    endListenVisual(); go('ASK_TEACH', { quiet:true }); return;
+  }
   if (p.mic === 'granted'){
-    if (dt < 0.25){ p.cancelled = true; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
+    if (dt < 0.25){ p.cancelled = true; W.listenSeq++; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
     if (W.state === 'LISTENING') stopListening();
     return;
   }
   to(W.lean, 0);
+  if (dt < 0.25){ go('TYPING'); return; }
   if (p.mic === 'undetermined'){ go('PRE_PERMISSION'); return; }
-  go('TYPING', { reason:'denied' });
+  go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
 }
 function startListening(p){
   var req = ++W.listenSeq;
   go('LISTENING');
   call('speech.start', {}).then(function(r){
     var s = r && r.status;
-    if (req !== W.listenSeq || p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
+    if (req !== W.listenSeq) return;   /* an old reply must never stop the newer microphone session */
+    if (p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
     if (s === 'listening'){ p.listening = true; if (p.released && W.state === 'LISTENING') fire('speech.stop', {}); return; }
     endListenVisual();
     if (s === 'busy'){ go('ASK_TEACH', { quiet:true }); return; }
     var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' ? 'unavailable' : 'denied');
     if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' };
     p.mic = mic;
-    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('TYPING', { reason:'denied' }); }
+    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); }
     else { W.press = p; W.state = 'ASK_TEACH'; }   /* the release decides (card or typing) */
   }, function(){ if (req !== W.listenSeq) return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
 }
@@ -281,8 +289,8 @@ function permContinue(){
   call('speech.requestPermission', {}).then(function(m){
     W.permBusy = false; if (m && m.state && SESSION) SESSION.mic = m;
     if (W.state !== 'PRE_PERMISSION') return;
-    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('TYPING', { reason:'denied' });
-  }, function(){ W.permBusy = false; if (W.state === 'PRE_PERMISSION') go('TYPING', { reason:'denied' }); });
+    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+  }, function(){ W.permBusy = false; if (W.state === 'PRE_PERMISSION') go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); });
 }
 ENTER.LISTENING = function(){
   setPill('listen', '', 236); tb('listen'); moveSphere(340, 132); to(W.lean, 1); setHint(Ls('hint.release'));

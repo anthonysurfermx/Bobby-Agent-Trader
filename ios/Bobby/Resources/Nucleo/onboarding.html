@@ -127,7 +127,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #mer i{position:absolute;left:0;top:0;height:6px;width:6px;margin:-3px 0 0 -3px;border-radius:3px;background:var(--ink4);opacity:0}
 #pglow{width:270px;height:78px;border-radius:40px;background:conic-gradient(from var(--ga,0deg),#4D6BFF,#9A5CFF,#FF6EC7,#5CE1FF,#4D6BFF);filter:blur(22px);z-index:3}
 #pill{position:absolute;left:0;top:742px;height:56px;width:96px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -12px rgba(0,0,0,.9);overflow:hidden;z-index:4;opacity:0;pointer-events:auto}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -12px rgba(0,0,0,.9);overflow:hidden;z-index:4;opacity:0;pointer-events:auto;touch-action:none;-webkit-user-select:none;user-select:none}
 #pill .ic{position:absolute;left:50%;top:50%;width:22px;height:22px;margin:-11px 0 0 -11px}
 #pill .bars{position:absolute;left:50%;top:50%;width:131px;height:32px;margin:-16px 0 0 -65.5px;display:flex;gap:3px;align-items:center}
 #pill .bars i{display:block;width:3px;height:28px;border-radius:2px;background:var(--ink);transform:scaleY(.14)}
@@ -2396,6 +2396,7 @@ var STR = {
     'hint.hold': 'Hold to ask',
     'hint.release': 'Release to send',
     'hint.type': 'Type your question',
+    'hint.micOff': 'Mic is off · tap to type',
     'hint.sttEmpty': 'I didn’t catch that · Hold and try again',
     'hint.sttError': 'The mic stopped · Hold to try again',
     'type.placeholder': 'Ask about a stock or a crypto',
@@ -2458,6 +2459,7 @@ var STR = {
     'hint.hold': 'Mantén para preguntar',
     'hint.release': 'Suelta para enviar',
     'hint.type': 'Escribe tu pregunta',
+    'hint.micOff': 'Micrófono apagado · toca para escribir',
     'hint.sttEmpty': 'No te escuché · Mantén e intenta de nuevo',
     'hint.sttError': 'El micrófono se detuvo · Mantén para intentar',
     'type.placeholder': 'Pregunta por una acción o cripto',
@@ -2521,6 +2523,7 @@ var STR = {
     "hint.hold": "Maintenez pour demander",
     "hint.release": "Relâchez pour envoyer",
     "hint.type": "Écrivez votre question",
+    "hint.micOff": "Micro désactivé · touchez pour écrire",
     "hint.sttEmpty": "Je n’ai pas compris · maintenez et réessayez",
     "hint.sttError": "Le micro s’est arrêté · maintenez pour réessayer",
     "type.placeholder": "Une question sur une action ou une crypto",
@@ -2585,6 +2588,7 @@ var STR = {
     "hint.hold": "Mantenha para perguntar",
     "hint.release": "Solte para enviar",
     "hint.type": "Escreva a sua pergunta",
+    "hint.micOff": "Microfone desligado · toque para escrever",
     "hint.sttEmpty": "Não percebi · mantenha e tente novamente",
     "hint.sttError": "O microfone parou · mantenha para tentar novamente",
     "type.placeholder": "Pergunte sobre uma ação ou cripto",
@@ -2650,6 +2654,7 @@ var STR = {
     "hint.hold": "Tieni premuto per chiedere",
     "hint.release": "Rilascia per inviare",
     "hint.type": "Scrivi la tua domanda",
+    "hint.micOff": "Microfono spento · tocca per scrivere",
     "hint.sttEmpty": "Non ho capito · tieni premuto e riprova",
     "hint.sttError": "Il microfono si è fermato · tieni premuto per riprovare",
     "type.placeholder": "Chiedi di un’azione o una cripto",
@@ -2714,6 +2719,7 @@ var STR = {
     "hint.hold": "Zum Fragen halten",
     "hint.release": "Zum Senden loslassen",
     "hint.type": "Gib deine Frage ein",
+    "hint.micOff": "Mikrofon aus · zum Schreiben tippen",
     "hint.sttEmpty": "Nicht verstanden · halten und erneut versuchen",
     "hint.sttError": "Mikrofon gestoppt · zum Wiederholen halten",
     "type.placeholder": "Frage zu einer Aktie oder Kryptowährung",
@@ -3096,13 +3102,13 @@ function loadSugg(){
   SUGG_P = call('suggestions', {}).then(function(r){ W.sugg = r || null; return r; }, function(){ W.sugg = null; return null; });
   return SUGG_P;
 }
-/* chips from suggestions(): quick access "How is X looking?", movers "Why is X moving today?" (max 3, no repeats) */
+/* Compact ticker labels keep three suggestions visible; questions remain localized actions and accessible labels. */
 function suggestionChips(){
   var s = W.sugg, out = [], seen = {}, qa = (s && s.quickAccess) || [], mv = (s && s.movers) || [];
-  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!sym || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:q, action:{ ask:q } }); }
-  qa.slice(0, 2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!/^[A-Z0-9.^=-]{1,20}$/.test(sym) || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:q, action:{ ask:q, symbol:sym } }); }
+  qa.slice(0, 3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   mv.forEach(function(x){ push(x && x.symbol, 'chip.move'); });
-  qa.slice(2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  qa.slice(3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   return out;
 }
 function setChips(list){ W.chips = list || []; W.chipsKey = W.chips.map(function(c){ return c.label; }).join('|') + '#' + T.toFixed(3); tb('chips'); }
@@ -3222,32 +3228,40 @@ function askPress(){
   if (W.gotLine){ capGone(W.gotLine); }
   to(W.lean, 1); W.micBreath = false;
   if (mic === 'granted') startListening(p);
+  else if (mic !== 'undetermined') at(0.25, function(){ if (W.press === p && !p.released && !p.cancelled) setHint(Ls('hint.micOff')); });
 }
-function askRelease(){
+function askRelease(cancelled){
   var p = W.press; if (!p) return; W.press = null; p.released = true;
   var dt = T - p.t;
+  if (cancelled){
+    p.cancelled = true; W.listenSeq++;
+    if (p.mic === 'granted' || p.listening) fire('speech.stop', { cancel:true });
+    endListenVisual(); go('ASK_TEACH', { quiet:true }); return;
+  }
   if (p.mic === 'granted'){
-    if (dt < 0.25){ p.cancelled = true; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
+    if (dt < 0.25){ p.cancelled = true; W.listenSeq++; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
     if (W.state === 'LISTENING') stopListening();
     return;
   }
   to(W.lean, 0);
+  if (dt < 0.25){ go('TYPING'); return; }
   if (p.mic === 'undetermined'){ go('PRE_PERMISSION'); return; }
-  go('TYPING', { reason:'denied' });
+  go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
 }
 function startListening(p){
   var req = ++W.listenSeq;
   go('LISTENING');
   call('speech.start', {}).then(function(r){
     var s = r && r.status;
-    if (req !== W.listenSeq || p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
+    if (req !== W.listenSeq) return;   /* an old reply must never stop the newer microphone session */
+    if (p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
     if (s === 'listening'){ p.listening = true; if (p.released && W.state === 'LISTENING') fire('speech.stop', {}); return; }
     endListenVisual();
     if (s === 'busy'){ go('ASK_TEACH', { quiet:true }); return; }
     var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' ? 'unavailable' : 'denied');
     if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' };
     p.mic = mic;
-    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('TYPING', { reason:'denied' }); }
+    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); }
     else { W.press = p; W.state = 'ASK_TEACH'; }   /* the release decides (card or typing) */
   }, function(){ if (req !== W.listenSeq) return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
 }
@@ -3259,8 +3273,8 @@ function permContinue(){
   call('speech.requestPermission', {}).then(function(m){
     W.permBusy = false; if (m && m.state && SESSION) SESSION.mic = m;
     if (W.state !== 'PRE_PERMISSION') return;
-    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('TYPING', { reason:'denied' });
-  }, function(){ W.permBusy = false; if (W.state === 'PRE_PERMISSION') go('TYPING', { reason:'denied' }); });
+    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+  }, function(){ W.permBusy = false; if (W.state === 'PRE_PERMISSION') go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); });
 }
 ENTER.LISTENING = function(){
   setPill('listen', '', 236); tb('listen'); moveSphere(340, 132); to(W.lean, 1); setHint(Ls('hint.release'));
@@ -4544,6 +4558,7 @@ function renderChips(){
     /* the Sign in with Apple chip: white, the Apple logo in the system font; the Bobby Pro chip: ink */
     cls(c, 'apple', sty === 'apple'); cls(c, 'pro', sty === 'pro');
     if (sty === 'apple'){ var lg = document.createElement('span'); lg.className = 'lg'; lg.setAttribute('aria-hidden', 'true'); lg.textContent = '\uF8FF'; c.insertBefore(lg, c.firstChild); c.setAttribute('aria-label', ch.label); }
+    else if (ch && ch.ariaLabel) c.setAttribute('aria-label', ch.ariaLabel);
     else c.removeAttribute('aria-label');
   }); }
   var x = 20;
@@ -4705,6 +4720,7 @@ function inMove(x, y){
   P.x = x; P.y = y; P.hist.push([nowS(), x, y]); if (P.hist.length > 16) P.hist.shift();
   var dx = x - P.x0, dy = y - P.y0, ad = Math.max(Math.abs(dx), Math.abs(dy));
   if (ad > 8) P.moved = true;
+  if (P.hit === 'pill' && W.press && Math.hypot(dx, dy) > 32){ if (W.pr.pill) W.pr.pill[1] = T; askRelease(true); }
   if (P.kind === 'pull?' && ad > 6){
     if (dy > Math.abs(dx) && pullStart(P.y0)) P.kind = 'pull'; else P.kind = null;
   } else if ((P.kind === 'card?' || P.kind === 'track?') && ad > 6){
@@ -4750,7 +4766,7 @@ function pillUp(cancelled){
   if (W.pressFrom === 'RISK'){ W.pressFrom = null; agreeRelease(); return; }
   W.pressFrom = null;
   var s = W.state;
-  if (W.press){ askRelease(); return; }            /* the mic is live only between speech.start and speech.stop */
+  if (W.press){ askRelease(cancelled); return; }   /* a cancelled pointer discards dictation */
   if (s === 'RISK'){ agreeRelease(); return; }
   if (cancelled) return;
   if (s === 'RESOLVING' || s === 'THINK_WAIT'){ fire('cancel', {}); buzz('light', 0.4); }
@@ -4773,22 +4789,41 @@ function action(hit, idx){
 function hitOf(t){ var el = t && t.closest ? t.closest('[data-hit]') : null; return el ? [el.getAttribute('data-hit'), +(el.getAttribute('data-i') || -1)] : [null, -1]; }
 function inTypeBox(t){ return !!(t && t.closest && t.closest('#typeBox')); }
 var HP = null;   /* harness: a real tap (< 8 px) toggles pause */
+var PTR_CAPTURE = null;
+function releasePointer(){ var el = PTR_CAPTURE, id = PTR_ID; PTR_CAPTURE = null; PTR_ID = null; if (el && el.releasePointerCapture) try { el.releasePointerCapture(id); } catch(e){} }
 window.addEventListener('pointerdown', function(e){
-  if (inTypeBox(e.target) || !e.isPrimary) return;
+  if (inTypeBox(e.target) || e.isPrimary === false || e.button != null && e.button !== 0) return;
   if (HARNESS){ HP = { id:e.pointerId, x:e.clientX, y:e.clientY }; return; }
   if (PTR_ID != null) return;
   PTR_ID = e.pointerId;
   var h = hitOf(e.target), p = toStage(e.clientX, e.clientY);
+  if (h[0] === 'pill'){
+    if (e.cancelable) e.preventDefault();
+    PTR_CAPTURE = pill; try { pill.setPointerCapture(e.pointerId); } catch(e){}
+  }
   inDown(h[0], h[1], p[0], p[1]);
-}, { passive:true });
-window.addEventListener('pointermove', function(e){ if (HARNESS || e.pointerId !== PTR_ID) return; var p = toStage(e.clientX, e.clientY); inMove(p[0], p[1]); }, { passive:true });
+}, { passive:false });
+window.addEventListener('pointermove', function(e){ if (HARNESS || e.pointerId !== PTR_ID) return; if (PTR && PTR.hit === 'pill' && e.cancelable) e.preventDefault(); var p = toStage(e.clientX, e.clientY); inMove(p[0], p[1]); }, { passive:false });
 window.addEventListener('pointerup', function(e){
   if (HARNESS){ if (HP && HP.id === e.pointerId){ var dx = e.clientX - HP.x, dy = e.clientY - HP.y; HP = null; if (dx * dx + dy * dy < 64) togglePause(); } return; }
-  if (e.pointerId !== PTR_ID) return; PTR_ID = null;
+  if (e.pointerId !== PTR_ID) return; releasePointer(); PTR_ID = null;
   var p = toStage(e.clientX, e.clientY), h = hitOf(document.elementFromPoint(e.clientX, e.clientY));
   inUp(p[0], p[1], h[0], false);
 }, { passive:true });
-window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; return; } if (e.pointerId !== PTR_ID) return; PTR_ID = null; inUp(null, null, null, true); }, { passive:true });
+window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; return; } if (e.pointerId !== PTR_ID) return; releasePointer(); PTR_ID = null; inUp(null, null, null, true); }, { passive:true });
+window.addEventListener('lostpointercapture', function(e){ if (e.pointerId !== PTR_ID) return; PTR_CAPTURE = null; PTR_ID = null; inUp(null, null, null, true); });
+document.addEventListener('contextmenu', function(e){ if (hitOf(e.target)[0] === 'pill') e.preventDefault(); });
+if (!window.PointerEvent){
+  function touchOf(e){ var list = e.changedTouches || []; for (var i = 0; i < list.length; i++) if (list[i].identifier === PTR_ID) return list[i]; return null; }
+  window.addEventListener('touchstart', function(e){
+    if (HARNESS || inTypeBox(e.target) || PTR_ID != null || !e.changedTouches || !e.changedTouches.length) return;
+    var t = e.changedTouches[0], h = hitOf(e.target), p = toStage(t.clientX, t.clientY); PTR_ID = t.identifier;
+    inDown(h[0], h[1], p[0], p[1]); if (e.cancelable) e.preventDefault();
+  }, { passive:false });
+  window.addEventListener('touchmove', function(e){ var t = touchOf(e); if (!t) return; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inMove(p[0], p[1]); }, { passive:false });
+  window.addEventListener('touchend', function(e){ var t = touchOf(e); if (!t) return; PTR_ID = null; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY), h = hitOf(document.elementFromPoint(t.clientX, t.clientY)); inUp(p[0], p[1], h[0], false); }, { passive:false });
+  window.addEventListener('touchcancel', function(e){ if (!touchOf(e)) return; PTR_ID = null; inUp(null, null, null, true); }, { passive:false });
+}
 /* VoiceOver / keyboard activation arrives as a click with detail 0: a tap on the same handlers */
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
