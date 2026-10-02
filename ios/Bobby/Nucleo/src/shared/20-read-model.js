@@ -591,8 +591,9 @@
   }
   function firstSentence(text) { return sentences(text)[0] || ''; }
   function clipWords(text, max) {
+    if (!(max > 0)) return '';
     if (text.length <= max) return text;
-    var cut = text.slice(0, max + 1).replace(/\s+\S*$/, '');
+    var cut = text.slice(0, max - 1).replace(/\s+\S*$/, '');
     return cut.replace(/[,;:.\s]+$/, '') + '…';
   }
 
@@ -760,6 +761,15 @@
       }
     }
     var close = t(lang, 'spoken.close.' + r.agents.verdict);
+    // NucleoVoice accepts at most 800 characters. Keep the localized verdict and
+    // shorten narration only; every original synthesis line remains in the debate.
+    var remaining = 800 - close.length - 1, bounded = [];
+    picked.forEach(function (line) {
+      if (remaining <= 0) return;
+      var part = clipWords(line, remaining);
+      if (part) { bounded.push(part); remaining -= part.length + 1; }
+    });
+    picked = bounded;
     var all = picked.concat([close]);
     var text = all.join(' ');
     var words = text.split(/\s+/).filter(Boolean);
@@ -949,7 +959,7 @@
     var qa = (sugg && sugg.quickAccess) || [], mv = (sugg && sugg.movers) || [];
     qa.map(function (s) { return { s: s, kind: 'quick' }; }).concat(mv.map(function (s) { return { s: s, kind: 'mover' }; })).forEach(function (x) {
       var s = String(x.s && x.s.symbol || '').toUpperCase();
-      if (out.length >= 3 || !/^[A-Z0-9][A-Z0-9.\-]{0,11}$/.test(s) || seen[s]) return;
+      if (out.length >= 3 || !/^[A-Z0-9.^=-]{1,20}$/.test(s) || seen[s]) return;
       seen[s] = 1;
       var q = t(lang, x.kind === 'mover' && opts.whyForMovers ? 'follow.why' : 'follow.how', { symbol: s });
       out.push({ label: q, action: { question: q, symbol: s } });

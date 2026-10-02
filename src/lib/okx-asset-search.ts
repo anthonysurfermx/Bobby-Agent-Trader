@@ -775,13 +775,22 @@ export async function resolveOkxAssetFromText(
   options?: { instTypes?: OkxSearchInstType[] },
 ): Promise<OkxResolvedAsset | null> {
   const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
-  // Possessives first ("NVIDIA'S" → NVIDIA), then punctuation.
-  const upper = normalizeQueryValue(text).replace(/([A-Z0-9])['’]S\b/g, '$1').replace(/[¿?¡!.,;:'’"]/g, '');
+  // Possessives and Romance elisions are word boundaries, not ticker prefixes:
+  // NVIDIA's → NVIDIA; l'Ethereum / dell'Ethereum → Ethereum. Keep the original
+  // provider ids such as BTC-USDT intact. Only unambiguous names/tickers with
+  // explicit German financial suffixes are split; gas-free, near-term and one-week
+  // are ordinary prose and must not turn into GAS, NEAR or ONE token requests.
+  const upper = normalizeQueryValue(text)
+    .replace(/([A-Z0-9])['’]S\b/g, '$1')
+    .replace(/\b(?:L|D|DELL|ALL|NELL|SULL|DALL)['’](?=[A-Z])/g, '')
+    .replace(/[¿?¡!.,;:'’"]/g, '');
   if (!upper) return null;
 
   // Three characters minimum per word: "in video" must not resolve INJ via "IN".
-  const words = upper.split(/\s+/).filter((w) => w.length >= 3 && !QUERY_STOPWORDS.has(w));
-  const candidates = upper.includes(' ') ? [upper, ...words] : [upper];
+  const words = upper.split(/\s+/)
+    .map(word => /^(BITCOIN|BTC|ETHEREUM|ETH|SOLANA|SOL|NVIDIA|NVDA)-(?:PREIS|KURS|CHART|AKTIE|RISIKO|RISIKEN)$/.exec(word)?.[1] ?? word)
+    .filter((w) => w.length >= 3 && !QUERY_STOPWORDS.has(w));
+  const candidates = [...new Set([upper, ...words])];
 
   let fallback: { resolved: OkxResolvedAsset; rank: number } | null = null;
   for (const candidate of candidates) {

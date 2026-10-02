@@ -13,6 +13,7 @@ import { appLanguage, appLocale } from '../../../src/lib/app-language.js';
 // Times are shown in New York time ("ET"), the timezone of every schedule.
 // ============================================================
 import { nyParts } from './calendar.js';
+import { localizedHolidayName, localizedMacroTitle } from './calendar-localization.js';
 import { MARKET_HOURS_TITLES, normalizeSymbols, worstFreshness } from './evidence.js';
 import type { AssetQuote, BriefEvidence, BriefLanguage, BriefSection, Freshness, SectionStatus, SharedNarrative } from './types.js';
 
@@ -55,13 +56,28 @@ const FRESH_LABEL: Record<BriefLanguage, Record<Freshness, string>> = {
   "pt-BR": {"live": "em tempo real", "delayed": "com atraso", "closed": "no fecho", "stale": "desatualizado", "missing": "indisponível", "24_7": "24/7"},
 };
 const SOURCE_LABEL: Record<BriefLanguage, Record<string, string>> = {
-  es: { okx_spot: 'OKX (cripto)', yahoo_equities: 'Yahoo Finance (acciones)', okx_funding: 'OKX (financiamiento)', fear_greed: 'Miedo y codicia', dxy_ecb: 'BCE (DXY)', macro_calendar: 'calendario macro', daily_history: 'historial diario' },
-  en: { okx_spot: 'OKX (crypto)', yahoo_equities: 'Yahoo Finance (equities)', okx_funding: 'OKX (funding)', fear_greed: 'Fear & Greed', dxy_ecb: 'ECB (DXY)', macro_calendar: 'macro calendar', daily_history: 'daily history' },  "fr": {"okx_spot": "marché crypto", "yahoo_equities": "Yahoo Finance (actions)", "okx_funding": "financement crypto", "fear_greed": "Peur et avidité", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendrier macroéconomique", "daily_history": "historique quotidien"},
+  es: { okx_spot: 'mercado cripto', yahoo_equities: 'Yahoo Finance (acciones)', okx_funding: 'financiamiento cripto', fear_greed: 'Miedo y codicia', dxy_ecb: 'BCE (DXY)', macro_calendar: 'calendario macro', daily_history: 'historial diario' },
+  en: { okx_spot: 'crypto market', yahoo_equities: 'Yahoo Finance (equities)', okx_funding: 'crypto funding', fear_greed: 'Fear & Greed', dxy_ecb: 'ECB (DXY)', macro_calendar: 'macro calendar', daily_history: 'daily history' },  "fr": {"okx_spot": "marché crypto", "yahoo_equities": "Yahoo Finance (actions)", "okx_funding": "financement crypto", "fear_greed": "Peur et avidité", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendrier macroéconomique", "daily_history": "historique quotidien"},
   "pt": {"okx_spot": "mercado cripto", "yahoo_equities": "Yahoo Finance (ações)", "okx_funding": "financiamento cripto", "fear_greed": "Medo e ganância", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendário macroeconómico", "daily_history": "histórico diário"},
   "it": {"okx_spot": "mercato cripto", "yahoo_equities": "Yahoo Finance (azioni)", "okx_funding": "finanziamento cripto", "fear_greed": "Paura e avidità", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendario macroeconomico", "daily_history": "storico giornaliero"},
   "de": {"okx_spot": "Kryptomarkt", "yahoo_equities": "Yahoo Finance (Aktien)", "okx_funding": "Kryptofinanzierung", "fear_greed": "Angst und Gier", "dxy_ecb": "EZB (DXY)", "macro_calendar": "Makrokalender", "daily_history": "Tagesverlauf"},
   "pt-BR": {"okx_spot": "mercado cripto", "yahoo_equities": "Yahoo Finance (ações)", "okx_funding": "financiamento cripto", "fear_greed": "Medo e ganância", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendário macroeconómico", "daily_history": "histórico diário"},
 };
+// Provider enum labels are metadata, not generated prose. Translate known values
+// without changing the observed index; unknown prose stays out of user-facing copy.
+const FEAR_GREED_CLASSIFICATIONS: Record<BriefLanguage, readonly string[]> = {
+  en: ['Extreme Fear', 'Fear', 'Neutral', 'Greed', 'Extreme Greed'],
+  es: ['Miedo extremo', 'Miedo', 'Neutral', 'Codicia', 'Codicia extrema'],
+  fr: ['Peur extrême', 'Peur', 'Neutre', 'Avidité', 'Avidité extrême'],
+  pt: ['Medo extremo', 'Medo', 'Neutro', 'Ganância', 'Ganância extrema'],
+  'pt-BR': ['Medo extremo', 'Medo', 'Neutro', 'Ganância', 'Ganância extrema'],
+  it: ['Paura estrema', 'Paura', 'Neutrale', 'Avidità', 'Avidità estrema'],
+  de: ['Extreme Angst', 'Angst', 'Neutral', 'Gier', 'Extreme Gier'],
+};
+function fearGreedClassification(value: string, lang: BriefLanguage): string | null {
+  const index = ['extreme fear', 'fear', 'neutral', 'greed', 'extreme greed'].indexOf(value.trim().toLowerCase());
+  return index < 0 ? null : FEAR_GREED_CLASSIFICATIONS[lang][index];
+}
 const BASIS_LABEL: Record<BriefLanguage, Record<AssetQuote['changeBasis'], string>> = {
   es: { '24h': 'en 24 h', prev_close: 'vs. cierre anterior', session: 'en la sesión', '7d': 'en 7 días' },
   en: { '24h': 'over 24h', prev_close: 'vs previous close', session: 'in session', '7d': 'over 7 days' },  "fr": {"24h": "sur 24 h", "prev_close": "par rapport à la clôture précédente", "session": "pendant la séance", "7d": "sur 7 jours"},
@@ -205,6 +221,7 @@ const L = {
 /** Plain sentence about the US equity session; never implies a live session when closed. */
 export function equitySessionLine(e: BriefEvidence['equitySession'], lang: BriefLanguage): string {
   const last = e.lastSessionDate;
+  const holiday = e.holidayName ? localizedHolidayName(e.holidayName, lang) : null;
   if (lang !== 'es' && lang !== 'en') {
     const copy = {
       fr: { open: 'séance régulière ouverte', pre_market: 'séance pas encore ouverte', after_close: 'séance fermée', closed_weekend: 'fermé pour le week-end', closed_holiday: 'fermé pour jour férié', unknown: 'horaires non confirmés; vérifiez la date de chaque prix', last: 'dernière clôture' },
@@ -213,7 +230,7 @@ export function equitySessionLine(e: BriefEvidence['equitySession'], lang: Brief
       it: { open: 'seduta regolare aperta', pre_market: 'la seduta non è ancora aperta', after_close: 'seduta chiusa', closed_weekend: 'chiuso nel fine settimana', closed_holiday: 'chiuso per festività', unknown: 'orari non confermati; controlla la data di ogni prezzo', last: 'ultima chiusura' },
       de: { open: 'reguläre Sitzung geöffnet', pre_market: 'Sitzung noch nicht geöffnet', after_close: 'Sitzung geschlossen', closed_weekend: 'am Wochenende geschlossen', closed_holiday: 'wegen Feiertag geschlossen', unknown: 'Handelszeiten unbestätigt; prüfe jedes Kursdatum', last: 'letzter Schlusskurs' },
     }[lang];
-    return `${L[lang].equities}: ${copy[e.state]}${e.holidayName ? ` (${e.holidayName})` : ''}${e.state !== 'open' && last ? `; ${copy.last}: ${last}` : ''}.`;
+    return `${L[lang].equities}: ${copy[e.state]}${holiday ? ` (${holiday})` : ''}${e.state !== 'open' && last ? `; ${copy.last}: ${last}` : ''}.`;
   }
 
   if (lang === 'es') {
@@ -222,7 +239,7 @@ export function equitySessionLine(e: BriefEvidence['equitySession'], lang: Brief
       case 'pre_market': return last ? `Acciones de EE. UU.: la sesión aún no abre; precios al cierre del ${last}.` : 'Acciones de EE. UU.: la sesión aún no abre.';
       case 'after_close': return `Acciones de EE. UU.: sesión cerrada; precios al cierre del ${e.date}.`;
       case 'closed_weekend': return last ? `Acciones de EE. UU.: cerrado por fin de semana; precios al cierre del ${last}.` : 'Acciones de EE. UU.: cerrado por fin de semana.';
-      case 'closed_holiday': return `Acciones de EE. UU.: cerrado por feriado${e.holidayName ? ` (${e.holidayName})` : ''}${last ? `; precios al cierre del ${last}` : ''}.`;
+      case 'closed_holiday': return `Acciones de EE. UU.: cerrado por feriado${holiday ? ` (${holiday})` : ''}${last ? `; precios al cierre del ${last}` : ''}.`;
       default: return 'Acciones de EE. UU.: horario no confirmado; revisa la fecha de cada precio.';
     }
   }
@@ -231,27 +248,28 @@ export function equitySessionLine(e: BriefEvidence['equitySession'], lang: Brief
     case 'pre_market': return last ? `US equities: the session has not opened; prices as of the ${last} close.` : 'US equities: the session has not opened.';
     case 'after_close': return `US equities: session closed; prices as of the ${e.date} close.`;
     case 'closed_weekend': return last ? `US equities: closed for the weekend; prices as of the ${last} close.` : 'US equities: closed for the weekend.';
-    case 'closed_holiday': return `US equities: closed for a holiday${e.holidayName ? ` (${e.holidayName})` : ''}${last ? `; prices as of the ${last} close` : ''}.`;
+    case 'closed_holiday': return `US equities: closed for a holiday${holiday ? ` (${holiday})` : ''}${last ? `; prices as of the ${last} close` : ''}.`;
     default: return 'US equities: session hours unconfirmed; check each price date.';
   }
 }
 
-/** Localized agenda title; market-hours items have canonical English titles in evidence. */
+/** Display labels only; raw calendar and macro event identities stay in evidence. */
 export function agendaTitle(item: BriefEvidence['agenda'][number], lang: BriefLanguage): string {
-  if (lang === 'en' || item.kind !== 'market_hours') return item.title;
+  if (item.kind === 'macro') return localizedMacroTitle(item.title, lang);
+  if (lang === 'en') return item.title;
   if (lang !== 'es') {
     const labels = { fr: ['Ouverture de la séance américaine', 'Clôture de la séance américaine', 'Clôture anticipée de la séance américaine', 'Marchés américains fermés'], pt: ['Abertura da sessão dos EUA', 'Fecho da sessão dos EUA', 'Fecho antecipado da sessão dos EUA', 'Mercados dos EUA encerrados'], 'pt-BR': ['Abertura da sessão dos EUA', 'Fechamento da sessão dos EUA', 'Fechamento antecipado da sessão dos EUA', 'Mercados dos EUA fechados'], it: ['Apertura della seduta statunitense', 'Chiusura della seduta statunitense', 'Chiusura anticipata della seduta statunitense', 'Mercati statunitensi chiusi'], de: ['US-Handelssitzung öffnet', 'US-Handelssitzung schließt', 'US-Handelssitzung schließt vorzeitig', 'US-Märkte geschlossen'] }[lang];
     if (item.title === MARKET_HOURS_TITLES.open) return labels[0];
     if (item.title === MARKET_HOURS_TITLES.close) return labels[1];
     if (item.title === MARKET_HOURS_TITLES.earlyClose) return labels[2];
-    if (item.title.startsWith(MARKET_HOURS_TITLES.holidayPrefix)) return `${labels[3]}: ${item.title.slice(MARKET_HOURS_TITLES.holidayPrefix.length)}`;
+    if (item.title.startsWith(MARKET_HOURS_TITLES.holidayPrefix)) return `${labels[3]}: ${localizedHolidayName(item.title.slice(MARKET_HOURS_TITLES.holidayPrefix.length), lang)}`;
     return item.title;
   }
 
   if (item.title === MARKET_HOURS_TITLES.open) return 'Abre la sesión de acciones de EE. UU.';
   if (item.title === MARKET_HOURS_TITLES.close) return 'Cierra la sesión de acciones de EE. UU.';
   if (item.title === MARKET_HOURS_TITLES.earlyClose) return 'Cierre anticipado de la sesión de acciones de EE. UU.';
-  if (item.title.startsWith(MARKET_HOURS_TITLES.holidayPrefix)) return `Acciones de EE. UU. cerradas: ${item.title.slice(MARKET_HOURS_TITLES.holidayPrefix.length)}`;
+  if (item.title.startsWith(MARKET_HOURS_TITLES.holidayPrefix)) return `Acciones de EE. UU. cerradas: ${localizedHolidayName(item.title.slice(MARKET_HOURS_TITLES.holidayPrefix.length), lang)}`;
   return item.title;
 }
 
@@ -292,7 +310,10 @@ export function assetFacts(q: AssetQuote | null, lang: BriefLanguage): NonNullab
 function marketFacts(e: BriefEvidence, lang: BriefLanguage): NonNullable<BriefSection['facts']> {
   const l = L[lang];
   const facts: NonNullable<BriefSection['facts']> = [];
-  if (e.macro.fearGreed) facts.push({ label: l.fearGreed, value: `${e.macro.fearGreed.value} (${e.macro.fearGreed.classification}) · ${FRESH_LABEL[lang][e.macro.fearGreed.freshness]}` });
+  if (e.macro.fearGreed) {
+    const classification = fearGreedClassification(e.macro.fearGreed.classification, lang);
+    facts.push({ label: l.fearGreed, value: `${e.macro.fearGreed.value}${classification ? ` (${classification})` : ''} · ${FRESH_LABEL[lang][e.macro.fearGreed.freshness]}` });
+  }
   if (e.macro.dxy) facts.push({ label: l.dxy, value: `${fmtPrice(e.macro.dxy.value, lang)}${e.macro.dxy.asOf ? ` · ${e.macro.dxy.asOf}` : ''}` });
   return facts.slice(0, MAX_FACTS);
 }
@@ -393,7 +414,7 @@ export function narrativeRequest(evidence: BriefEvidence, language: BriefLanguag
     `6. Lengths: opening ≤ ${weekly ? 140 : NARRATIVE_LIMITS.opening} characters, every title ≤ ${NARRATIVE_LIMITS.title}, every body ≤ ${weekly ? 220 : NARRATIVE_LIMITS.body}, every explainer ≤ ${NARRATIVE_LIMITS.explainer}.`,
     `7. assets: at most one entry per symbol, only symbols from: ${wanted.join(', ') || '(none)'}. explainer = one plain sentence explaining a concept in that section for a beginner, with no numbers (empty string if not useful).`,
     weekly
-      ? '8. This is a brief, light Monday 08:00 New York outlook for the upcoming week. Prioritize recorded events in the next seven days and the most relevant risks; no invented predictions or routine price alert. The week block is explicitly labelled "Semana anterior" / "Previous week": historical context only from changeBasis "7d" and weeklyHistory (prior Monday 08:00 to this Monday 08:00). Never present historical prices as current prices or a current price as a weekly result.'
+      ? `8. This is a brief, light Monday 08:00 New York outlook for the upcoming week. Prioritize recorded events in the next seven days and the most relevant risks; no invented predictions or routine price alert. The week block is explicitly labelled "${L[language].week}": historical context only from changeBasis "7d" and weeklyHistory (prior Monday 08:00 to this Monday 08:00). Never present historical prices as current prices or a current price as a weekly result.`
       : '8. market: overall context from the quotes and macro data; risks: what could move markets based only on the evidence (volatility regime, funding, data gaps).',
   ].join('\n');
   const user = `EVIDENCE (JSON):\n${JSON.stringify(evidenceBlock(evidence, wanted))}\n\nWrite the briefing as JSON matching the schema.`;
@@ -467,7 +488,9 @@ function candidates(token: string): Array<{ value: number; decimals: number }> {
 export function ungroundedNumbers(text: string, evidence: BriefEvidence): string[] {
   const allowed = evidenceNumbers(evidence);
   const year = new Date(evidence.capturedAt).getUTCFullYear();
-  const stripped = text.replace(TIME_RE, ' ');
+  // French and Portuguese group thousands with a space (often NBSP/narrow NBSP).
+  // Treat only standard three-digit groups as one amount before grounding it.
+  const stripped = text.replace(TIME_RE, ' ').replace(/\b\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?=[.,]\d|\b)/g, token => token.replace(/[ \u00a0\u202f]/g, ''));
   const bad: string[] = [];
   for (const m of stripped.matchAll(NUM_RE)) {
     const token = m[0];
@@ -593,7 +616,10 @@ export function factsOnlyNarrative(evidence: BriefEvidence, language: BriefLangu
   if (hasEquity || !inEvidence.length) marketParts.push(equitySessionLine(evidence.equitySession, language));
   const shown = inEvidence.map((s) => quoteOf(evidence, s)!).filter((q) => q.price !== null).slice(0, 4);
   if (shown.length) marketParts.push(`${shown.map((q) => quoteLine(q, language)).join('; ')}.`);
-  if (evidence.macro.fearGreed) marketParts.push(`${l.fearGreed}: ${evidence.macro.fearGreed.value} (${evidence.macro.fearGreed.classification}).`);
+  if (evidence.macro.fearGreed) {
+    const classification = fearGreedClassification(evidence.macro.fearGreed.classification, language);
+    marketParts.push(`${l.fearGreed}: ${evidence.macro.fearGreed.value}${classification ? ` (${classification})` : ''}.`);
+  }
   if (evidence.macro.dxy) marketParts.push(`${l.dxy}: ${fmtPrice(evidence.macro.dxy.value, language)}${evidence.macro.dxy.asOf ? ` (${evidence.macro.dxy.asOf})` : ''}.`);
 
   const agendaBody = !evidence.sources.find((s) => s.name === 'macro_calendar')?.ok && !evidence.agenda.length

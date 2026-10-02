@@ -265,7 +265,7 @@ function pillDown(p, fromRead){
 /* ---------- PRE_PERMISSION: the onboarding O3 card, blooming from the bottom rim ---------- */
 STATES.PRE_PERMISSION = {
   enter: function(){
-    this.asked = false; chromeUp();
+    this.asked = false; this.permissionSeq = (this.permissionSeq || 0) + 1; chromeUp();
     if (lineShown(A.greet)) greetOut(); meriOut(); hint('');
     el.permH.textContent = tt('perm.title'); el.permP.textContent = tt('perm.body'); el.permBtn.textContent = tt('perm.cta');
     A.perm.b = clk + 0.10; A.perm.g = 1e9; A.perm.p.set(0); A.perm.p.to(1, 'emit', null, 0.10); A.perm.press.set(1);
@@ -278,13 +278,14 @@ STATES.PRE_PERMISSION = {
   },
   cont: function(){
     if (this.asked) return; this.asked = true; tick('light');
+    var self = this, seq = this.permissionSeq;
     A.perm.g = clk; A.perm.p.to(0, 'ret');
     bcall('speech.requestPermission').then(function(m){
-      if (ST.name !== 'PRE_PERMISSION') return;
+      if (seq !== self.permissionSeq || ST.name !== 'PRE_PERMISSION') return;
       if (m && m.state) SES.mic = m;
       if (m && m.state === 'granted') go('IDLE', { hint: 'hint.hold', restoreGreet: true });
       else go('IDLE', { hint: 'hint.micOff', restoreGreet: true });
-    }, function(){ if (ST.name === 'PRE_PERMISSION') go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); });
+    }, function(){ if (seq === self.permissionSeq && ST.name === 'PRE_PERMISSION') go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); });
   }
 };
 
@@ -342,12 +343,18 @@ STATES.LISTENING = {
     txSet(text, true);
     go('SENDING', { question: text, origin: 'speech' });
   },
+  interrupt: function(hintKey){
+    this.released = true; this.finalWait = 0; this.startSeq++;
+    bcall('speech.stop', { cancel: true }).catch(noop);
+    if (typeof cancelInput === 'function') cancelInput();
+    this.collapse(); txReset(); go('IDLE', { hint: hintKey || null, restoreGreet: true });
+  },
   on: function(name, p){
     if (name === 'speech.partial'){ if (!this.released || this.finalWait) txSet(p && p.text, false); }
     else if (name === 'speech.final'){ if (this.released) this.gotFinal(p && p.text); }
-    else if (name === 'speech.error'){ this.released = true; this.collapse(); txReset(); go('IDLE', { hint: 'hint.micStopped', restoreGreet: true }); }
-    else if (name === 'speech.state' && p && p.state === 'stopped' && !this.released){ this.released = true; this.collapse(); this.finalWait = clk; }
-    else if (name === 'app.state' && p && p.state === 'background' && !this.released){ this.released = true; this.collapse(); txReset(); go('IDLE', { restoreGreet: true }); }
+    else if (name === 'speech.error'){ if (p && p.code === 'interrupted') SPEECH.draft = txText(); this.interrupt('hint.micStopped'); }
+    else if (name === 'speech.state' && p && p.state === 'stopped' && !this.released){ this.live = false; this.collapse(); }   /* capture ending is not the user's release */
+    else if (name === 'app.state' && p && p.state === 'background') this.interrupt();
   },
   tick: function(){ if (this.finalWait && clk - this.finalWait > 2.0) this.gotFinal(txText()); },
   down: function(h){ return null; }
@@ -364,11 +371,12 @@ STATES.TYPING = {
     if (!this.d.fromRead) chipsHide();
     A.type.p.set(0); A.type.p.to(1, 'emit'); A.type.o.tween(1, 0.2, E.fade);
     A.pillO.tween(0, 0.16, E.fade);
-    el.ta.value = ''; el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); taAutosize();
+    el.ta.value = SPEECH.draft || ''; SPEECH.draft = ''; el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); taAutosize();
     showTypeBox(true);
   },
   exit: function(){ A.type.p.to(0, 'ret'); A.type.o.tween(0, 0.16, E.fade); A.pillO.tween(1, 0.2, E.fade); try { el.ta.blur(); } catch (e) {} at(0.2, function(){ if (ST.name !== 'TYPING') showTypeBox(false); }); },
   send: function(){
+    if (ST.name !== 'TYPING' || TB.composing) return;
     var q = el.ta.value.replace(/\s+/g, ' ').trim();
     if (!q){ this.cancel(); return; }
     var params = this.d.followUpOf ? { followUpOf: this.d.followUpOf, question: q } : { question: q };
@@ -388,7 +396,7 @@ STATES.SENDING = {
     if (A.note.o.t > 0) noteOut();
     var q = d.question || (READ && READ.question) || '';
     var params = d.params || (d.token ? { token: d.token } : { question: q });
-    startRead(params, q);
+    startRead(params, q).inputEpoch = SPEECH.draftEpoch || 0;
     A.qText = q; A.aText = ''; el.dockA.textContent = ''; A.dockAO.set(0);
     var pre = 0;
     if (d.origin === 'type'){ txReset(); txSet(q, true, 0.045); pre = Math.min(0.6, A.tx.words.length * 0.045) + 0.35; }
@@ -762,6 +770,7 @@ STATES.RETURNING = {
 STATES.ERROR = {
   enter: function(prev, d){
     var f = d.f || {};
+    if (f.kind === 'too_long' && READ && READ.inputEpoch === (SPEECH.draftEpoch || 0)) SPEECH.draft = READ.question || '';
     dissolveThink(); glassHome(); A.chartT0 = 1e9;
     moveSphere(340, 120, prev === 'THINK_WAIT'); at(0.5, sag);
     pillMode(idleMode()); hint('');

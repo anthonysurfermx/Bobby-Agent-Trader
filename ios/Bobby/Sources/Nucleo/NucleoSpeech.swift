@@ -13,11 +13,61 @@ protocol NucleoSpeechRecognizing {
     var locale: Locale { get }
     var supportsOnDeviceRecognition: Bool { get }
     var isAvailable: Bool { get }
-    func recognitionTask(with request: SFSpeechRecognitionRequest,
-                         resultHandler: @escaping (SFSpeechRecognitionResult?, Error?) -> Void) -> SFSpeechRecognitionTask
+    func startRecognition(with request: SFSpeechRecognitionRequest,
+                          deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> any NucleoSpeechTask
 }
 
-extension SFSpeechRecognizer: NucleoSpeechRecognizing {}
+@MainActor
+protocol NucleoSpeechTask { func cancel() }
+extension SFSpeechRecognitionTask: NucleoSpeechTask {}
+
+extension SFSpeechRecognizer: NucleoSpeechRecognizing {
+    func startRecognition(with request: SFSpeechRecognitionRequest,
+                          deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> any NucleoSpeechTask {
+        recognitionTask(with: request, resultHandler: NucleoSpeech.resultHandler(deliver))
+    }
+}
+
+/// Owns only the audio hardware. The speech state machine and result policy stay in NucleoSpeech.
+@MainActor
+protocol NucleoSpeechCapturing {
+    func open(request: SFSpeechAudioBufferRecognitionRequest, level: @escaping @Sendable (Float) -> Void) throws
+    func close()
+    func restore()
+}
+
+enum NucleoSpeechCaptureFault: Error, Equatable { case session, format, engine }
+
+@MainActor
+private final class AppleNucleoSpeechCapture: NucleoSpeechCapturing {
+    private var engine: AVAudioEngine?
+
+    func open(request: SFSpeechAudioBufferRecognitionRequest, level: @escaping @Sendable (Float) -> Void) throws {
+        let audio = AVAudioSession.sharedInstance()
+        do {
+            try audio.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers])
+            try audio.setActive(true, options: [])
+        } catch { throw NucleoSpeechCaptureFault.session }
+        let engine = AVAudioEngine()
+        let input = engine.inputNode
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else { throw NucleoSpeechCaptureFault.format }
+        input.installTap(onBus: 0, bufferSize: 1024, format: format,
+                         block: NucleoSpeech.tapBlock(request: request, level: level))
+        self.engine = engine
+        engine.prepare()
+        do { try engine.start() } catch { throw NucleoSpeechCaptureFault.engine }
+    }
+
+    func close() {
+        if let engine { engine.inputNode.removeTap(onBus: 0); engine.stop() }
+        engine = nil
+    }
+
+    func restore() {
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+    }
+}
 
 @MainActor
 final class NucleoSpeech {
@@ -34,11 +84,13 @@ final class NucleoSpeech {
     private var recognizer: (any NucleoSpeechRecognizing)?
     private var recognizerLocale: String?
     private var recognizerCandidates: [String] = []
-    private var engine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
-    private var task: SFSpeechRecognitionTask?
+    private var task: (any NucleoSpeechTask)?
     private var listening = false
     private var awaitingFinal = false
+    /// A definitive recognizer result may end audio before the held gesture is released.
+    private var recognitionFinished = false
+    private var activeLocaleIdentifier: String?
     private var latestText = ""
     private var session = 0
     private var autoStop: Task<Void, Never>?
@@ -46,6 +98,8 @@ final class NucleoSpeech {
     private var lastLevelAt: CFTimeInterval = 0
     private var observers: [NSObjectProtocol] = []
     private let finalWait: Double
+    private let capture: any NucleoSpeechCapturing
+    private let sleep: @MainActor (Double) async throws -> Void
     private let permissionInputs: (() -> PermissionInputs)?
     private let supportedLocales: () -> Set<String>
     private let makeRecognizer: (String) -> (any NucleoSpeechRecognizing)?
@@ -59,10 +113,16 @@ final class NucleoSpeech {
 
     init(finalWait: Double? = nil,
          permissionInputs: (() -> PermissionInputs)? = nil,
+         capture: (any NucleoSpeechCapturing)? = nil,
+         sleep: @escaping @MainActor (Double) async throws -> Void = { seconds in
+             try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+         },
          supportedLocales: @escaping () -> Set<String> = { Set(SFSpeechRecognizer.supportedLocales().map(\.identifier)) },
          makeRecognizer: @escaping (String) -> (any NucleoSpeechRecognizing)? = { SFSpeechRecognizer(locale: Locale(identifier: $0)) }) {
         self.finalWait = finalWait ?? Self.finalWaitSeconds
         self.permissionInputs = permissionInputs
+        self.capture = capture ?? AppleNucleoSpeechCapture()
+        self.sleep = sleep
         self.supportedLocales = supportedLocales
         self.makeRecognizer = makeRecognizer
     }
@@ -179,53 +239,41 @@ final class NucleoSpeech {
         guard let recognizer = resolveRecognizer(requireAvailable: true), recognizer.isAvailable else { return .unavailable }
         willStart()
 
-        let audio = AVAudioSession.sharedInstance()
-        do {
-            try audio.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers])
-            try audio.setActive(true, options: [])
-        } catch {
-            restoreAudioSession()
-            emit("speech.error", ["code": "failed", "message": "audio session"])
-            return .unavailable
-        }
-
         let request = Self.makeRequest(contextualStrings: vocabulary)
-        let engine = AVAudioEngine()
-        let input = engine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        guard format.sampleRate > 0, format.channelCount > 0 else {
-            restoreAudioSession()
-            return .unavailable
-        }
+        activeLocaleIdentifier = L.localeIdentifier
+        recognitionFinished = false
         session += 1
         let token = session
-        input.installTap(onBus: 0, bufferSize: 1024, format: format,
-                         block: Self.tapBlock(request: request) { [weak self] rms in
-            Task { @MainActor in self?.levelSample(rms, token: token) }
-        })
-        engine.prepare()
         do {
-            try engine.start()
+            try capture.open(request: request) { [weak self] rms in
+                Task { @MainActor in self?.levelSample(rms, token: token) }
+            }
         } catch {
-            input.removeTap(onBus: 0)
+            request.endAudio()
+            closeMicrophone()
+            activeLocaleIdentifier = nil
             restoreAudioSession()
-            emit("speech.error", ["code": "failed", "message": "audio engine"])
+            if error as? NucleoSpeechCaptureFault != .format {
+                let message = error as? NucleoSpeechCaptureFault == .session ? "audio session" : "audio engine"
+                emit("speech.error", ["code": "failed", "message": message])
+            }
             return .unavailable
         }
-        self.engine = engine
         self.request = request
         latestText = ""
         listening = true
         awaitingFinal = false
-        task = recognizer.recognitionTask(with: request, resultHandler: Self.resultHandler { [weak self] text, isFinal, failed in
+        task = recognizer.startRecognition(with: request) { [weak self] text, isFinal, failed in
             Task { @MainActor in self?.recognized(text: text, isFinal: isFinal, failed: failed, token: token) }
-        })
+        }
         observeInterruptions()
         emit("speech.state", ["state": "listening"])
+        let sleep = self.sleep
         autoStop = Task { [weak self] in
-            try? await Task.sleep(nanoseconds: UInt64(Self.maxListeningSeconds * 1_000_000_000))
+            try? await sleep(Self.maxListeningSeconds)
             guard !Task.isCancelled, let self, self.listening, self.session == token else { return }
-            _ = self.stop(cancel: false)
+            // The listening bound closes audio; it never confirms a question while the finger is held.
+            self.interrupted()
         }
         return .listening
     }
@@ -260,7 +308,12 @@ final class NucleoSpeech {
         request?.endAudio()
         closeMicrophone()
         emit("speech.state", ["state": "stopped"])
-        waitForFinal()
+        if recognitionFinished {
+            awaitingFinal = true
+            deliverFinal()
+        } else {
+            waitForFinal()
+        }
         return .stopped
     }
 
@@ -269,10 +322,10 @@ final class NucleoSpeech {
         finalTimeout?.cancel()
         awaitingFinal = true
         let token = session
+        let sleep = self.sleep, wait = finalWait
         finalTimeout = Task { [weak self] in
-            guard let self else { return }
-            try? await Task.sleep(nanoseconds: UInt64(self.finalWait * 1_000_000_000))
-            guard !Task.isCancelled, self.session == token else { return }
+            try? await sleep(wait)
+            guard !Task.isCancelled, let self, self.session == token else { return }
             self.deliverFinal()
         }
     }
@@ -281,17 +334,15 @@ final class NucleoSpeech {
     func cancel() { stop(cancel: true) }
 
     private func closeMicrophone() {
-        if let engine {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
-        engine = nil
+        capture.close()
     }
 
     private func finishRecognition() {
         finalTimeout?.cancel()
         finalTimeout = nil
         awaitingFinal = false
+        recognitionFinished = false
+        activeLocaleIdentifier = nil
         task = nil
         request = nil
         restoreAudioSession()
@@ -299,6 +350,7 @@ final class NucleoSpeech {
 
     private func deliverFinal() {
         guard awaitingFinal else { return }
+        guard matchesActiveLocale else { cancel(); return }
         let text = latestText.trimmingCharacters(in: .whitespacesAndNewlines)
         task?.cancel()
         finishRecognition()
@@ -307,21 +359,30 @@ final class NucleoSpeech {
 
     /// Back to the voice's spoken-audio category; NeuralVoice.play activates it when Bobby speaks.
     private func restoreAudioSession() {
-        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        capture.restore()
     }
 
     // MARK: - Callbacks (hop to the main actor)
 
     private func levelSample(_ rms: Float, token: Int) {
-        guard listening, session == token else { return }
+        guard listening, session == token, !recognitionFinished else { return }
+        guard matchesActiveLocale else { cancel(); return }
         let now = CACurrentMediaTime()
         guard now - lastLevelAt >= Self.levelInterval else { return }
         lastLevelAt = now
         emit("speech.level", ["level": Self.level(rms: rms)])
     }
 
+    private var matchesActiveLocale: Bool {
+        activeLocaleIdentifier == nil || activeLocaleIdentifier == L.localeIdentifier
+    }
+
     private func recognized(text: String?, isFinal: Bool, failed: Bool, token: Int) {
-        guard session == token else { return }
+        guard session == token, listening || awaitingFinal else { return }
+        guard matchesActiveLocale else { cancel(); return }
+        // endAudio/cancel after a final may cause another callback. Preserve the settled text
+        // and wait for the explicit release; a late callback must not erase or confirm it.
+        guard !recognitionFinished else { return }
         if let text { latestText = text }
         if listening {
             if failed {
@@ -337,13 +398,22 @@ final class NucleoSpeech {
                 return
             }
             if let text, !text.isEmpty { emit("speech.partial", ["text": text]) }
+            if isFinal {
+                recognitionFinished = true
+                request?.endAudio()
+                closeMicrophone()
+                task?.cancel()
+                task = nil
+                // Keep the logical hold active. A stopped event would make the page treat
+                // this as a release; only stop(cancel:false) may emit the stored final.
+            }
             return
         }
         // After release: the final result (or "no speech" error) settles it early.
         if awaitingFinal, isFinal || failed { deliverFinal() }
     }
 
-    nonisolated private static func tapBlock(request: SFSpeechAudioBufferRecognitionRequest,
+    nonisolated fileprivate static func tapBlock(request: SFSpeechAudioBufferRecognitionRequest,
                                              level: @escaping @Sendable (Float) -> Void) -> AVAudioNodeTapBlock {
         { buffer, _ in
             request.append(buffer)
@@ -356,7 +426,7 @@ final class NucleoSpeech {
         }
     }
 
-    nonisolated private static func resultHandler(_ deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> (SFSpeechRecognitionResult?, Error?) -> Void {
+    nonisolated fileprivate static func resultHandler(_ deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> (SFSpeechRecognitionResult?, Error?) -> Void {
         { result, error in
             deliver(result?.bestTranscription.formattedString, result?.isFinal ?? false, error != nil)
         }

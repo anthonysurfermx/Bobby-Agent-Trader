@@ -14,7 +14,11 @@ export const REGIONAL_STOCKS: readonly RegionalStock[] = [
   { symbol: 'SAP.DE', name: 'SAP', aliases: ['sap'], region: 'DE', currency: 'EUR', exchange: 'Xetra' },
   { symbol: 'SIE.DE', name: 'Siemens', aliases: ['siemens'], region: 'DE', currency: 'EUR', exchange: 'Xetra' },
 ];
-const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[’']/g, '').toUpperCase().replace(/\s+/g, ' ').trim();
+const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '').toUpperCase()
+  .replace(/\b(?:L|D|DELL|ALL|NELL|SULL|DALL)['’](?=[A-Z])/g, '').replace(/[’']/g, '')
+  // Preserve exchange-qualified ids (SAP.DE), while sentence punctuation is a boundary.
+  .replace(/[?!¿¡,:;()"“”]/g, ' ').replace(/\.(?=\s|$)/g, ' ')
+  .replace(/\s+/g, ' ').trim();
 export const regionalStock = (symbol: string) => REGIONAL_STOCKS.find(s => s.symbol === symbol.toUpperCase());
 export const isListedStockSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,18}\.(?:PA|LS|SA|MI|DE)$/i.test(symbol);
 export function marketRegion(language?: unknown, locale?: unknown, country?: unknown): RegionalStock['region'] | null {
@@ -37,8 +41,8 @@ export function resolveRegionalStock(text: string): RegionalStock | null {
   const hits = REGIONAL_STOCKS.filter(s => tokens.has(s.symbol) || [s.name, ...s.aliases].some(v => {
     const term = normalize(v);
     // OR, MC, SAP and VALE are ordinary words or ambiguous tickers in sentences.
-    if (term.length < 4 || term === 'VALE') return false;
-    return (` ${phrase} `).includes(` ${term} `);
+    if ((term.length < 4 && term !== 'EDP') || term === 'VALE') return false;
+    return tokens.has(term) || (` ${phrase} `).includes(` ${term} `);
   }));
   return hits.length === 1 ? hits[0] : null;
 }

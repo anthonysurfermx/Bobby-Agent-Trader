@@ -198,8 +198,8 @@ private final class SpeechRecognizerProbe: NucleoSpeechRecognizing {
         supportsOnDeviceRecognition = onDevice
     }
 
-    func recognitionTask(with request: SFSpeechRecognitionRequest,
-                         resultHandler: @escaping (SFSpeechRecognitionResult?, Error?) -> Void) -> SFSpeechRecognitionTask {
+    func startRecognition(with request: SFSpeechRecognitionRequest,
+                          deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> any NucleoSpeechTask {
         fatalError("Capability tests must never open a microphone or recognition task")
     }
 }

@@ -79,7 +79,7 @@ final class NucleoSession: ObservableObject {
     let voice: NeuralVoice
     let fixtures: Bool
     let desk: NucleoDesk
-    let speech = NucleoSpeech()
+    let speech: NucleoSpeech
     let nucleoVoice: NucleoVoice
     let haptics = NucleoHaptics()
     private let defaults: UserDefaults
@@ -114,6 +114,7 @@ final class NucleoSession: ObservableObject {
          profile: AgentProfile = AgentProfile(),
          companions: CompanionStore = CompanionStore(),
          voice: NeuralVoice? = nil,
+         speech: NucleoSpeech? = nil,
          ledger: NucleoLedger = NucleoLedger(),
          defaults: UserDefaults = .standard,
          briefingIntent: BriefingIntent? = nil) {
@@ -123,6 +124,8 @@ final class NucleoSession: ObservableObject {
         self.companions = companions
         let voice = voice ?? NeuralVoice()
         self.voice = voice
+        self.speech = speech ?? NucleoSpeech()
+        let speech = self.speech
         self.defaults = defaults
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)

@@ -92,7 +92,7 @@ function sim(h){
   }
   if (W.state === 'THINK_WAIT'){ thinkHints(); if (W.reply && T - W.stT >= W.floor) go('THINK_RESOLVE'); }
   if (W.state === 'LISTENING' && W.awaitFinal && T > W.awaitFinal){
-    W.awaitFinal = 0; var last = W.qw.map(function(w){ return w.text; }).join(' ');
+    W.awaitFinal = 0; var last = W.speechText || '';   /* display keeps only its last 40 words; the input remains complete */
     onSpeechFinal(last);                                           /* no final within 1.5 s (+1 s grace): the last partial */
   }
   verdictStep();

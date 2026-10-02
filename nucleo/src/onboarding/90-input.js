@@ -73,6 +73,7 @@ function inUp(x, y, upHit, cancelled){
   }
   if (P.kind === 'scroll'){ W.drag = null; }
 }
+function cancelInput(){ if (typeof releasePointer === 'function') releasePointer(); PTR_ID = null; inUp(null, null, null, true); }
 /* the pill: hold to ask, hold to agree, tap to choose / cancel / skip / open the read */
 function pillDown(){
   var s = W.state;
@@ -150,17 +151,21 @@ document.addEventListener('click', function(e){
 if (HARNESS) document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
 
 /* ---------- typing: a real textarea outside the scaled stage, lifted with visualViewport ---------- */
-var typeBox = $('typeBox'), typeIn = $('typeIn'), typeSend = $('typeSend');
+var typeBox = $('typeBox'), typeIn = $('typeIn'), typeSend = $('typeSend'), typeComposing = false;
 function showTypeBox(on){
+  if (!on) typeComposing = false;
   if (on){ if (!typeBox.classList.contains('on')){ typeBox.classList.add('on'); tb('typing'); tb('pillHide'); } typeSend.disabled = !String(typeIn.value || '').trim(); focusType(); }
   else if (typeBox.classList.contains('on')){ typeBox.classList.remove('on'); tg('typing'); if (isOn('pillHide')) tg('pillHide'); }
 }
 function focusType(){ try { typeIn.focus({ preventScroll:true }); } catch(e){ try { typeIn.focus(); } catch(x){} } }
-typeIn.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); typeSubmit(); } else if (e.key === 'Escape'){ e.preventDefault(); typeCancel(); } });
-typeIn.addEventListener('input', function(){ typeSend.disabled = !String(typeIn.value || '').trim(); typeIn.style.height = 'auto'; typeIn.style.height = Math.min(120, typeIn.scrollHeight) + 'px'; });
+typeIn.addEventListener('keydown', function(e){ if (typeComposing || e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); typeSubmit(); } else if (e.key === 'Escape'){ e.preventDefault(); typeCancel(); } });
+function typeAutosize(){ typeSend.disabled = typeComposing || !String(typeIn.value || '').trim(); typeIn.style.height = 'auto'; typeIn.style.height = Math.min(120, typeIn.scrollHeight) + 'px'; }
+typeIn.addEventListener('compositionstart', function(){ typeComposing = true; typeAutosize(); });
+typeIn.addEventListener('compositionend', function(){ typeComposing = false; typeAutosize(); });
+typeIn.addEventListener('input', typeAutosize);
 typeSend.addEventListener('pointerdown', function(e){ e.preventDefault(); });   /* keep the keyboard up */
 typeSend.addEventListener('click', function(){ typeSubmit(); });
-typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && document.activeElement !== typeIn) typeCancel(); }, 180); });
+typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && !typeComposing && document.activeElement !== typeIn) typeCancel(); }, 180); });
 function renderTyping(){
   if (!typeBox.classList.contains('on')) return;
   var vv = window.visualViewport, vb = vv ? vv.offsetTop + vv.height : window.innerHeight;

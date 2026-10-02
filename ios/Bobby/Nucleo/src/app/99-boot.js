@@ -24,14 +24,17 @@ function applySession(s, first){
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
-  var oldLang = LANG;
+  var oldLang = LANG, oldLocale = LOCALE;
   LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
   D.documentElement.lang = LANG;
+  if (!first && oldLocale !== LOCALE){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; }
   if (first && s.reducedMotion) RM = true;
+  if (!first && oldLocale !== LOCALE && ST && ST.name === 'LISTENING') STATES.LISTENING.interrupt();
   if (!first && oldLang !== LANG){
     if (typeof agentNames === 'function') agentNames();
     if (typeof buildFaces === 'function') buildFaces();
     if (ST && ST.name === 'IDLE') setGreeting();
+    if (ST && ST.name === 'TYPING'){ el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); }
   }
   var c = s.companion || null, id = c ? c.id : null;
   if (first || id !== prevId){
@@ -56,6 +59,7 @@ function refreshCollections(){
   bcall('suggestions').then(function(x){ if (gen === OWNER_GEN) receiveSuggestions(x); }).catch(noop);
 }
 function resetVisibleRead(preserveSignIn){
+  SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1;
   if (preserveSignIn) return;
   GATE_BUSY = false;
   if (ST.name !== 'BOOT') {
@@ -89,7 +93,7 @@ function wire(){
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
   BR.on('account.changed', accountChanged);
   BR.on('consent.withdrawn', consentWithdrawn);
-  BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('analysis.level', lvlApply);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
