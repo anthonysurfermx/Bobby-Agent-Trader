@@ -7,6 +7,7 @@
 // email, user agent or free text. Off unless AMPLITUDE_API_KEY is set (AMPLITUDE_REGION=eu for EU projects).
 // ============================================================
 import { rpc } from './admin.js';
+import { runAmplitudeBilling } from './amplitude-billing.js';
 
 const MAX_BATCHES = 5;
 
@@ -45,7 +46,7 @@ export function toAmplitude(r: Row) {
 }
 
 /** Sends everything pending (up to MAX_BATCHES × 500 events per run). */
-export async function runAmplitude(): Promise<{ ok: boolean; skipped?: string; sent: number; scanned: number; cursor: number | null }> {
+export async function runAmplitude(): Promise<{ ok: boolean; skipped?: string; sent: number; purchasesSent?: number; scanned: number; cursor: number | null }> {
   const apiKey = (process.env.AMPLITUDE_API_KEY || '').trim();
   if (!apiKey) return { ok: true, skipped: 'AMPLITUDE_API_KEY not set', sent: 0, scanned: 0, cursor: null };
   let sent = 0, scanned = 0, cursor: number | null = null;
@@ -70,5 +71,8 @@ export async function runAmplitude(): Promise<{ ok: boolean; skipped?: string; s
     cursor = b.last;
     if (!moved || b.scanned < 500) break;
   }
-  return { ok: true, sent, scanned, cursor };
+  // Billing has its own acknowledgement ledger: late store events or a repaired identity cannot fall behind
+  // the usage cursor. One batch bounds the extra work in this 15-minute cron.
+  const purchasesSent = await runAmplitudeBilling();
+  return { ok: true, sent, purchasesSent, scanned, cursor };
 }
