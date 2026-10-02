@@ -86,6 +86,7 @@ private struct NucleoStage: View {
         NucleoWebViewRepresentable(controller: controller)
             .ignoresSafeArea()
             .background(Color.black.ignoresSafeArea())
+            .overlay(alignment: .top) { NucleoNotchView(notch: session.notch) }
             // The pages keep their top free for the island; the status bar steps aside.
             .statusBarHidden(true)
             .persistentSystemOverlays(.hidden)

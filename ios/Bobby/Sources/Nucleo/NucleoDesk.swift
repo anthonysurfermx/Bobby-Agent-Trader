@@ -276,12 +276,12 @@ enum NucleoDeskIO {
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// Uses the same account-scoped retry as other private requests.
     static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
-                       auth: BobbyMeterAuth = .account) async -> DebateOutcome {
+                       auth: BobbyMeterAuth = .account, onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
             let reply = try await BobbyAccessAPI.send("api/desk-debate", method: "POST",
                                                                body: ["symbol": symbol, "question": question, "language": L.ttsLang,
                                                                       "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue],
-                                                               auth: auth, timeout: level.timeout)
+                                                               auth: auth, timeout: level.timeout, onEvent: onEvent)
             return parseDebate(status: reply.status, json: reply.json, headers: reply.headers)
         } catch let error as URLError {
             switch error.code {
@@ -468,6 +468,11 @@ final class NucleoDesk {
     var isSignedIn: () -> Bool = { AccountSession.shared.isSignedIn }
     var userID: () -> String? = { AccountSession.shared.session?.userId }
     var emit: (String, [String: Any]) -> Void = { _, _ in }
+    /// Native-only progress for the notch HUD: the debate went out, or the ask resolved (its result dictionary).
+    var debateStarted: (NucleoAnalysisLevel) -> Void = { _ in }
+    var askFinished: ([String: Any]) -> Void = { _ in }
+    /// One live desk line (`evidence`, `agent`…) while the debate runs.
+    var debateEvent: ([String: Any]) -> Void = { _ in }
     var sessionChanged: () -> Void = {}
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
@@ -688,6 +693,7 @@ final class NucleoDesk {
         guard let current = inflight else { return ["cancelled": false] }
         inflight = nil
         current.task.cancel()
+        askFinished(Self.cancelledResult)
         current.continuation.resume(returning: Self.cancelledResult)
         return ["cancelled": true]
     }
@@ -695,6 +701,7 @@ final class NucleoDesk {
     private func complete(_ requestId: String, _ result: [String: Any]) {
         guard let current = inflight, current.requestId == requestId else { return }
         inflight = nil
+        askFinished(result)
         current.continuation.resume(returning: result)
     }
 
@@ -791,12 +798,16 @@ final class NucleoDesk {
         defer { pulseTask?.cancel() }
 
         let question = job.question
-        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level, auth: auth)
+        let live: @Sendable ([String: Any]) -> Void = { [weak self] event in
+            Task { @MainActor in self?.debateEvent(event) }
+        }
+        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level, auth: auth, onEvent: live)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         guard isCurrent(job) else { return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
         let candles = bars.map(\.json)
         emit("ask.stage", ["requestId": job.requestId, "stage": "candles", "candles": candles, "provenance": NSNull()])
+        debateStarted(level)
         let desk = await deskRead
         guard isCurrent(job) else { return Self.cancelledResult }
         if case let .gated(status, message, access) = desk {
