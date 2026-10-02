@@ -61,6 +61,7 @@ struct BriefingSettings: Equatable, Sendable {
     var weeklyEnabled: Bool
     /// "en" | "es"
     var language: String
+    var locale: String? = nil
     var companionId: String?
     var assets: [String]
     var analysisConsentEnabled: Bool
@@ -68,7 +69,8 @@ struct BriefingSettings: Equatable, Sendable {
     var audioConsentEnabled: Bool
     var audioConsentVersion: Int?
 
-    static let languages: Set<String> = ["en", "es"]
+    static let languages: Set<String> = ["en", "es", "fr", "pt", "it", "de"]
+    static let narrationLanguages = languages.union(["pt-PT", "pt-BR"])
 
     init(revision: Int = 0, openingEnabled: Bool = false, closeEnabled: Bool = false, weeklyEnabled: Bool = false,
          language: String = "en", companionId: String? = nil, assets: [String] = [],
@@ -91,7 +93,12 @@ struct BriefingSettings: Equatable, Sendable {
         closeEnabled = BriefingJSON.bool(o["closeEnabled"]) ?? false
         weeklyEnabled = BriefingJSON.bool(o["weeklyEnabled"]) ?? false
         let lang = o["language"] as? String ?? "en"
-        language = Self.languages.contains(lang) ? lang : "en"
+        let base = lang.split(separator: "-").first.map(String.init) ?? lang
+        language = Self.languages.contains(base) ? base : "en"
+        let rawLocale = (o["locale"] as? String) ?? (lang.contains("-") ? lang : nil)
+        if let rawLocale {
+            locale = LanguageResolution.resolve(selection: language, preferredLanguages: [rawLocale], region: nil).localeIdentifier
+        }
         companionId = BriefingJSON.string(o["companionId"])
         assets = BriefingJSON.strings(o["assets"])
         analysisConsentEnabled = BriefingJSON.bool(o["analysisConsentEnabled"]) ?? false
@@ -401,7 +408,7 @@ struct BriefingReport: Equatable, Identifiable, Sendable {
         equitySession = BriefingEquitySession(json: o["equitySession"])
         voice = BriefingJSON.string(o["voice"])
         let lang = o["language"] as? String ?? "en"
-        language = BriefingSettings.languages.contains(lang) ? lang : "en"
+        language = BriefingSettings.narrationLanguages.contains(lang) ? lang : "en"
     }
 }
 

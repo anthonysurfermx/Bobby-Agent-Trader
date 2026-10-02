@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { Sparkles, Lock } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
+import { lang, locale } from '@/lib/companions/i18n';
+import { kineticText as text } from '@/lib/companions/kinetic-copy';
+import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
 
 interface AIInsightsTerminalProps {
   context: string;
@@ -57,24 +59,24 @@ export function AIInsightsTerminal({
   context,
   data,
   commandLabel,
-  buttonLabel = 'EXPLAIN WITH AI',
+  buttonLabel,
   className = '',
 }: AIInsightsTerminalProps) {
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const { i18n } = useTranslation();
   const [lines, setLines] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [streaming, setStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [started, setStarted] = useState(false);
   const [showLoginPrompt, setShowLoginPrompt] = useState(false);
+  const [showConsentPrompt, setShowConsentPrompt] = useState(false);
 
-  // Sync language with i18n state
-  const language = i18n.language?.startsWith('es') ? 'es' : 'en' as const;
-  const toggleLanguage = () => {
-    i18n.changeLanguage(language === 'en' ? 'es' : 'en');
-  };
+  const language = lang();
+  const outputLocale = locale();
+  const displayButtonLabel = buttonLabel ?? text('EXPLAIN WITH AI');
+  const requiresAiConsent = context === 'metacognition';
+  const hasAiConsent = () => progressStore.get().aiConsentGranted && progressStore.get().riskNoticeVersion >= RISK_NOTICE_VERSION;
   const terminalRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
@@ -86,6 +88,8 @@ export function AIInsightsTerminal({
   }, [lines]);
 
   const runExplanation = useCallback(async () => {
+    if (requiresAiConsent && !hasAiConsent()) { setShowConsentPrompt(true); return; }
+    setShowConsentPrompt(false);
     setStreaming(true);
     setError(null);
     setLines([]);
@@ -93,22 +97,24 @@ export function AIInsightsTerminal({
     setStarted(true);
 
     abortRef.current = new AbortController();
+    let failureMessage = text('The explanation is temporarily unavailable. Try again.');
 
     try {
       const res = await fetch('/api/explain', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ context, data, language }),
+        body: JSON.stringify({ context, data, language, locale: outputLocale }),
         signal: abortRef.current.signal,
       });
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `HTTP ${res.status}`);
+        failureMessage = errData.error || failureMessage;
+        throw new Error(failureMessage);
       }
 
       const reader = res.body?.getReader();
-      if (!reader) throw new Error('No readable stream');
+      if (!reader) throw new Error(text('The explanation is temporarily unavailable. Try again.'));
 
       const decoder = new TextDecoder();
       let buffer = '';
@@ -167,12 +173,25 @@ export function AIInsightsTerminal({
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
-        setError(err.message || 'Failed to connect');
+        setError(failureMessage);
       }
     } finally {
       setStreaming(false);
     }
-  }, [context, data, language]);
+  }, [context, data, language, outputLocale, requiresAiConsent]);
+
+  // Withdrawing Bobby AI permission stops this request immediately.
+  useEffect(() => {
+    if (!requiresAiConsent) return;
+    const unsubscribe = progressStore.subscribe(() => {
+      if (!hasAiConsent()) {
+        abortRef.current?.abort();
+        setStreaming(false);
+        setShowConsentPrompt(true);
+      }
+    });
+    return () => { unsubscribe(); };
+  }, [requiresAiConsent]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -204,15 +223,12 @@ export function AIInsightsTerminal({
               className="relative flex items-center gap-2.5 px-5 py-3 bg-gradient-to-r from-amber-900/80 to-amber-800/80 border border-amber-400/60 text-amber-300 hover:text-amber-100 text-sm font-bold tracking-wide transition-all hover:scale-[1.02]"
             >
               <Sparkles className="w-4 h-4" />
-              {buttonLabel}
+              {displayButtonLabel}
             </button>
           </div>
-          <button
-            onClick={toggleLanguage}
-            className="px-2 py-3 border border-cyan-500/20 text-cyan-400/60 hover:text-cyan-400 text-[10px] transition-colors"
-          >
+          <span className="px-2 py-3 border border-cyan-500/20 text-cyan-400/60 text-[10px]">
             {language.toUpperCase()}
-          </button>
+          </span>
         </div>
 
         {/* Login prompt */}
@@ -221,7 +237,7 @@ export function AIInsightsTerminal({
             <div className="flex items-center gap-2">
               <Lock className="w-3.5 h-3.5 text-amber-400/80" />
               <span className="text-amber-400/80 text-[11px]">
-                {language === 'es' ? 'Inicia sesion para usar el AI Analyzer' : 'Sign in to use the AI Analyzer'}
+                {text('Sign in to use the AI Analyzer')}
               </span>
             </div>
             <div className="flex gap-2">
@@ -229,16 +245,23 @@ export function AIInsightsTerminal({
                 onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname + window.location.search))}
                 className="text-[10px] px-3 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors"
               >
-                {language === 'es' ? 'INICIAR SESION' : 'SIGN IN'}
+                {text('SIGN IN')}
               </button>
               <button
                 onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname + window.location.search))}
                 className="text-[10px] px-3 py-1.5 border border-cyan-500/30 text-cyan-400/60 hover:text-cyan-400 transition-colors"
               >
-                {language === 'es' ? 'CREAR CUENTA' : 'SIGN UP'}
+                {text('SIGN UP')}
               </button>
             </div>
           </div>
+        )}
+
+        {showConsentPrompt && (
+          <p className="mt-3 text-amber-400/80 text-[11px]">
+            {text('Enable AI permission in the Desk before sending dashboard data for an explanation.')} {' '}
+            <button onClick={() => navigate('/desk')} className="underline text-green-400">{text('Open Desk')}</button>
+          </p>
         )}
 
         {/* Glow animation */}
@@ -268,12 +291,9 @@ export function AIInsightsTerminal({
         </div>
         <span className="text-cyan-400 text-[10px] ml-1">{cmd}</span>
         <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={toggleLanguage}
-            className="px-1.5 py-0.5 text-[9px] border border-cyan-500/20 text-cyan-400/40 hover:text-cyan-400 transition-colors"
-          >
+          <span className="px-1.5 py-0.5 text-[9px] border border-cyan-500/20 text-cyan-400/40">
             {language.toUpperCase()}
-          </button>
+          </span>
           {streaming ? (
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           ) : (
@@ -281,11 +301,18 @@ export function AIInsightsTerminal({
               onClick={runExplanation}
               className="text-[10px] text-cyan-400/40 hover:text-cyan-400 transition-colors"
             >
-              re-run
+              {text('Run again')}
             </button>
           )}
         </div>
       </div>
+
+        {showConsentPrompt && (
+          <p className="mt-3 text-amber-400/80 text-[11px]">
+            {text('Enable AI permission in the Desk before sending dashboard data for an explanation.')} {' '}
+            <button onClick={() => navigate('/desk')} className="underline text-green-400">{text('Open Desk')}</button>
+          </p>
+        )}
 
       {/* Terminal body */}
       <div
@@ -294,7 +321,7 @@ export function AIInsightsTerminal({
       >
         {lines.length === 0 && streaming && (
           <div className="text-cyan-400/60 text-[11px] animate-pulse">
-            {'>'} Connecting to AI analyst...
+            {'>'} {text('Connecting to AI analyst...')}
           </div>
         )}
 
@@ -314,7 +341,7 @@ export function AIInsightsTerminal({
 
         {error && (
           <div className="text-red-400 text-[11px] mt-2">
-            {'>'} ERROR: {error}
+            {'>'} {text('ERROR:')} {error}
           </div>
         )}
       </div>

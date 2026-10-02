@@ -16,7 +16,7 @@ export default function CompanionDeskPage() {
     document.body.classList.add('nucleo-ui');
     return () => document.body.classList.remove('nucleo-ui');
   }, []);
-  const riskDue = progress.riskNoticeVersion < RISK_NOTICE_VERSION;
+  const riskDue = !progress.aiConsentGranted || progress.riskNoticeVersion < RISK_NOTICE_VERSION;
   // Visitors who accepted the notice under the old flow but never finished the picker go straight in.
   useEffect(() => { if (!riskDue && !progress.onboarded) progressStore.finishOnboarding(); }, [riskDue, progress.onboarded]);
   return (

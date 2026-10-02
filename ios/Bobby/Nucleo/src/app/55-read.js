@@ -169,7 +169,7 @@ function fillSats(model){
 /* ---- the chart: 48 real closes, exhaled from the sphere (geometry built once per read) ---- */
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
-function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString('en-US'); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toFixed(dp); }
+function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }

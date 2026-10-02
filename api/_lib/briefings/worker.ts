@@ -1,3 +1,4 @@
+import { BRIEF_LANGUAGES } from './types.js';
 // ============================================================
 // Bobby Pro market briefings — one worker tick (spec §5). Called by api/briefing-worker.ts every 5 minutes (cron)
 // or by a manual ops run. Stages, in order, each bounded and deadline-aware:
@@ -397,7 +398,7 @@ async function personalStage(t: Tick, p: PeriodCtx): Promise<Published[]> {
     let retryLater = false;
 
     for (const item of items) {
-      const lang: BriefLanguage = item.frozen?.language === 'es' ? 'es' : 'en';
+      const lang: BriefLanguage = (BRIEF_LANGUAGES as readonly unknown[]).includes(item.frozen?.language) ? item.frozen.language : 'en';
       // The language may have changed since the open-language scan: settle it now (memoized otherwise).
       const shared = await ensureShared(t, p, lang);
       if (shared.state === 'failed') { await fail(item.id, item.fence, 'shared_failed', true); continue; }
@@ -559,7 +560,7 @@ async function deliver(t: Tick, cfg: ApnsConfig, master: Buffer, item: dbModule.
   try {
     out = await d.sendApns(cfg, {
       token, environment: item.environment, topic: item.topic, apnsId: item.apnsId, collapseId: item.collapseId,
-      expiresAt, language: item.language === 'es' ? 'es' : 'en', briefId: item.briefId,
+      expiresAt, language: (BRIEF_LANGUAGES as readonly unknown[]).includes(item.language) ? item.language : 'en', briefId: item.briefId,
     }, new Date(d.now()));
   } catch {
     // sendApns classifies instead of throwing; if it ever throws the request may have been written.

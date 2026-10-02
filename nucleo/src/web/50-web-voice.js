@@ -95,10 +95,10 @@
   /* ---- network voice (neural) ---- */
   /** Like NeuralVoice: a line that was stopped never retries, and its request is dropped. */
   function fetchTTS(line, text, persona) {
-    var body = { text: text, lang: NW.lang, vibe: 'direct' };   // AgentProfile's default vibe `directo` → server `direct`
+    var body = { text: text, lang: NW.lang, locale: NW.locale, vibe: 'direct' };   // AgentProfile's default vibe `directo` → server `direct`
     if (persona) body.voice = persona;
     function attempt(n) {
-      if (cur !== line) return Promise.resolve(null);
+      if (cur !== line || !S.riskAccepted()) return Promise.resolve(null);
       return NW.http('/api/bobby-voice-free', { method: 'POST', body: body, timeoutMs: TTS_TIMEOUT, binary: true, signal: line.ctl ? line.ctl.signal : null }).then(function (r) {
         if (r.status === 200 && r.data && r.data.byteLength > 500) return r.data;
         throw new Error('tts ' + r.status);
@@ -159,7 +159,7 @@
   function speakDevice(line) {
     var synth = window.speechSynthesis;
     if (!synth || !window.SpeechSynthesisUtterance) { finish('failed'); return; }
-    var u = new SpeechSynthesisUtterance(line.text), tag = NW.lang === 'es' ? 'es-MX' : 'en-US';
+    var u = new SpeechSynthesisUtterance(line.text), tag = NW.locale;
     u.lang = tag; u.rate = 1;
     // Only a voice that runs on this device: an online system voice would send the text to a
     // service the risk notice does not name (it names OpenAI and Microsoft, through our server).

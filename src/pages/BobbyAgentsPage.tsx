@@ -1,3 +1,5 @@
+import { kineticText as text, kineticStatus as status } from '@/lib/companions/kinetic-copy';
+import { locale } from '@/lib/companions/i18n';
 // ============================================================
 // Bobby Agent Leaderboard — Stitch "NEO-TOKYO 2030"
 // Agent performance index with real stats from bobby-pnl
@@ -82,22 +84,21 @@ export default function BobbyAgentsPage() {
 
   return (
     <KineticShell activeTab="agents" showSidebar nucleo>
-      <Helmet><title>Agent Leaderboard | Bobby Agent Trader</title></Helmet>
+      <Helmet><title>{text("Agent Leaderboard | Bobby Agent Trader")}</title></Helmet>
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">
         {/* Hero Header — Stitch outlined text style */}
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mb-10">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-            <span className="font-mono text-[9px] text-green-400/60 tracking-widest">LIVE PERFORMANCE INDEX</span>
+            <span className="font-mono text-[9px] text-green-400/60 tracking-widest">{text("PERFORMANCE INDEX")}</span>
           </div>
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-black tracking-tighter leading-none">
-            AGENT <span className="text-white/15">/</span> LEADERBOARD
-          </h1>
+            {text("AGENT")}{' '}<span className="text-white/15">/</span> {text("LEADERBOARD")}</h1>
         </motion.div>
 
         {loading ? (
-          <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">LOADING AGENTS...</span></div>
+          <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">{text("LOADING AGENTS...")}</span></div>
         ) : (
           <>
             {/* Agent Cards */}
@@ -116,24 +117,24 @@ export default function BobbyAgentsPage() {
                         <span className={`text-lg md:text-xl font-bold font-mono ${agent.color}`}>{agent.name}</span>
                         <span className={`text-[8px] font-mono px-2 py-0.5 rounded ${
                           agent.status === 'ACTIVE' ? 'bg-green-500/10 text-green-400' : agent.status === 'IDLE' ? 'bg-amber-500/10 text-amber-400' : 'bg-red-500/10 text-red-400'
-                        }`}>{agent.status}</span>
+                        }`}>{status(agent.status)}</span>
                       </div>
-                      <p className="text-[10px] font-mono text-white/25 mt-0.5">{agent.role}</p>
+                      <p className="text-[10px] font-mono text-white/25 mt-0.5">{text(agent.role)}</p>
                     </div>
                   </div>
                   <div className="flex gap-6 md:gap-8 font-mono text-right">
                     <div>
-                      <span className="text-[8px] text-white/20 block tracking-widest">WIN_RATE</span>
+                      <span className="text-[8px] text-white/20 block tracking-widest">{text("WIN_RATE")}</span>
                       <span className="text-lg font-bold text-white/80">{typeof agent.winRate === 'number' ? agent.winRate.toFixed(1) + '%' : '--'}</span>
                     </div>
                     <div>
-                      <span className="text-[8px] text-white/20 block tracking-widest">RETURN</span>
+                      <span className="text-[8px] text-white/20 block tracking-widest">{text("RETURN")}</span>
                       <span className={`text-lg font-bold ${typeof agent.totalReturn === 'number' ? (agent.totalReturn >= 0 ? 'text-green-400' : 'text-red-400') : 'text-white/20'}`}>
                         {typeof agent.totalReturn === 'number' ? `${agent.totalReturn >= 0 ? '+' : ''}${agent.totalReturn}%` : '--'}
                       </span>
                     </div>
                     <div>
-                      <span className="text-[8px] text-white/20 block tracking-widest">TRADES</span>
+                      <span className="text-[8px] text-white/20 block tracking-widest">{text("TRADES")}</span>
                       <span className="text-lg font-bold text-white/60">{agent.trades}</span>
                     </div>
                   </div>
@@ -146,8 +147,7 @@ export default function BobbyAgentsPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
                 <h2 className="font-mono text-sm font-black tracking-[0.2em] uppercase mb-4 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full" />
-                  Recent_Council_Decisions
-                </h2>
+                  {text("Recent_Council_Decisions")}</h2>
                 <div className="space-y-2">
                   {decisions.slice(0, 8).map((d, i) => {
                     const conv = Math.round((d.conviction_score || 0) * 100);
@@ -167,10 +167,10 @@ export default function BobbyAgentsPage() {
                             d.status === 'executed' ? 'bg-green-500/10 text-green-400' :
                             d.status === 'rejected' ? 'bg-red-500/10 text-red-400' :
                             'bg-white/5 text-white/30'
-                          }`}>{d.status?.toUpperCase() || 'PENDING'}</span>
+                          }`}>{status(d.status?.toUpperCase() || 'PENDING')}</span>
                         </div>
                         <span className="text-[9px] font-mono text-white/15">
-                          {new Date(d.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(d.created_at).toLocaleString(locale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     );
@@ -185,20 +185,20 @@ export default function BobbyAgentsPage() {
                 className="mt-8 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded p-6 hover:bg-white/[0.04] transition-all duration-300">
                 <div className="flex items-center justify-between">
                   <div>
-                    <span className="text-[9px] font-mono text-white/30 tracking-widest">PUBLIC_PROTOCOL_EQUITY</span>
+                    <span className="text-[9px] font-mono text-white/30 tracking-widest">{text("PUBLIC_PROTOCOL_EQUITY")}</span>
                     <div className="text-3xl font-mono font-black text-green-400 mt-1">${s.currentEquity.toFixed(2)}</div>
                   </div>
                   <div className="text-right">
                     <span className={`text-xl font-mono font-bold ${s.totalReturn >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                       {s.totalReturn >= 0 ? '+' : ''}{s.totalReturn}%
                     </span>
-                    <p className="text-[9px] font-mono text-white/20 mt-1">FROM ${s.startingCapital} INITIAL</p>
+                    <p className="text-[9px] font-mono text-white/20 mt-1">{text('FROM ${0} INITIAL', s.startingCapital)}</p>
                   </div>
                 </div>
               </motion.div>
             )}
             {!hasPublicPerformance && <div className="mt-8 font-mono text-[10px] text-white/30">
-              {roomMode === 'personal' ? 'Your private trade receipts are available in the Record page after wallet sign-in.' : 'No publicly attributable protocol trades have been recorded yet.'}
+              {text(roomMode === 'personal' ? 'Your private trade receipts are available in the Record page after wallet sign-in.' : 'No publicly attributable protocol trades have been recorded yet.')}
             </div>}
           </>
         )}

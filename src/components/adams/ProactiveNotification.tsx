@@ -4,6 +4,7 @@ import { Bell, X, ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { sessionFetch } from '@/lib/bobby-session';
 import { useBobbySession } from '@/hooks/useBobbySession';
+import { t } from '@/lib/companions/i18n';
 
 const POLL_INTERVAL = 30_000; // 30s
 
@@ -14,18 +15,11 @@ interface ProactiveAlert {
   advisor_name: string;
 }
 
-const OPEN_CHAT_LABEL: Record<string, string> = { es: 'Abrir chat', en: 'Open chat', pt: 'Abrir chat' };
-
 export function ProactiveNotification({ walletAddress }: { walletAddress?: string }) {
   const [alerts, setAlerts] = useState<ProactiveAlert[]>([]);
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
   const navigate = useNavigate();
   const { ready: sessionReady } = useBobbySession({ auto: false });
-
-  // Read user language preference
-  const lang = (() => {
-    try { const p = JSON.parse(localStorage.getItem('bobby_profile') || '{}'); return p.language || 'en'; } catch { return 'en'; }
-  })();
 
   const fetchUnread = useCallback(async () => {
     if (!walletAddress) return;
@@ -85,7 +79,7 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
                   {(alert.advisor_name || 'BOBBY').toUpperCase()}
                 </span>
               </div>
-              <button onClick={() => markRead(alert.id)} className="text-white/20 hover:text-white/60 transition-colors">
+              <button onClick={() => markRead(alert.id)} aria-label={t('Dismiss notification', 'Descartar notificación')} className="text-white/20 hover:text-white/60 transition-colors">
                 <X className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -98,7 +92,7 @@ export function ProactiveNotification({ walletAddress }: { walletAddress?: strin
               onClick={() => goToChat(alert.id)}
               className="flex items-center gap-1.5 text-[10px] text-green-400/70 hover:text-green-400 transition-colors font-mono"
             >
-              {OPEN_CHAT_LABEL[lang] || OPEN_CHAT_LABEL.en} <ArrowRight className="w-3 h-3" />
+              {t('Open chat', 'Abrir chat')} <ArrowRight className="w-3 h-3" />
             </button>
           </motion.div>
         ))}

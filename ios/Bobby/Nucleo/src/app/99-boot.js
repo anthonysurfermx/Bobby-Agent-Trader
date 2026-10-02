@@ -24,7 +24,15 @@ function applySession(s, first){
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
-  if (first){ LANG = s.language === 'es' ? 'es' : 'en'; D.documentElement.lang = LANG; if (s.reducedMotion) RM = true; }
+  var oldLang = LANG;
+  LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
+  D.documentElement.lang = LANG;
+  if (first && s.reducedMotion) RM = true;
+  if (!first && oldLang !== LANG){
+    if (typeof agentNames === 'function') agentNames();
+    if (typeof buildFaces === 'function') buildFaces();
+    if (ST && ST.name === 'IDLE') setGreeting();
+  }
   var c = s.companion || null, id = c ? c.id : null;
   if (first || id !== prevId){
     ME.id = id; ME.webId = c ? c.webId : null; ME.art = c ? artFor(c.webId) : null; ME.label = c ? titleCase(c.label) : '';

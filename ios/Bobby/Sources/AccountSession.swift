@@ -284,9 +284,9 @@ final class AccountSession: ObservableObject {
     nonisolated static let accountClientHeader = "X-Bobby-Account-Client"
     nonisolated static let accountClientVersion = "2"
     /// Apple's "Stop using Sign in with Apple" page, in the device's language.
-    nonisolated static var defaultManualRevocationURL: URL { defaultManualRevocationURL(spanish: L.isSpanish) }
-    nonisolated static func defaultManualRevocationURL(spanish: Bool) -> URL {
-        URL(string: spanish ? "https://support.apple.com/es-mx/102571" : "https://support.apple.com/en-us/102571")!
+    nonisolated static var defaultManualRevocationURL: URL { defaultManualRevocationURL(spanish: nil) }
+    nonisolated static func defaultManualRevocationURL(spanish: Bool? = nil) -> URL {
+        URL(string: "https://support.apple.com/" + (spanish.map { $0 ? "es-mx" : "en-us" } ?? L.localeIdentifier.lowercased()) + "/102571")!
     }
 
     /// `GET` asks what deletion needs; `DELETE` deletes. Both carry the client header.
@@ -302,24 +302,24 @@ final class AccountSession: ObservableObject {
 
     /// Apple's own page only: anything else the server names falls back to it. A Spanish phone
     /// opens the es-MX edition, so the page matches the Spanish steps in the alert.
-    nonisolated static func manualRevocationURL(from raw: Any?, spanish: Bool = L.isSpanish) -> URL {
+    nonisolated static func manualRevocationURL(from raw: Any?, spanish: Bool? = nil) -> URL {
         guard let text = raw as? String, let url = URL(string: text), url.scheme == "https",
               let host = url.host?.lowercased(), host == "apple.com" || host.hasSuffix(".apple.com") else {
             return defaultManualRevocationURL(spanish: spanish)
         }
-        guard spanish, var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
         // support.apple.com/<lang>-<region>/102571: swap the locale segment, keep the article.
         var segments = parts.path.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
         guard segments.count > 1, segments[1].range(of: "^[A-Za-z]{2}-[A-Za-z]{2}$", options: .regularExpression) != nil else { return url }
-        segments[1] = "es-mx"
+        segments[1] = spanish.map { $0 ? "es-mx" : "en-us" } ?? L.localeIdentifier.lowercased()
         parts.path = segments.joined(separator: "/")
         return parts.url ?? url
     }
 
     /// The steps Apple documents for iPhone (support.apple.com/102571, September 2026), in the
     /// words the Settings app uses: "Configuración", not "Ajustes", on an es-MX phone.
-    nonisolated static var manualRevocationSteps: String { manualRevocationSteps(spanish: L.isSpanish) }
-    nonisolated static func manualRevocationSteps(spanish: Bool) -> String {
+    nonisolated static var manualRevocationSteps: String { manualRevocationSteps(spanish: nil) }
+    nonisolated static func manualRevocationSteps(spanish: Bool? = nil) -> String {
         L.t("To finish, open Settings, tap your name, tap Sign in with Apple, choose Bobby and tap Delete.",
             "Para terminar, abre Configuración, toca tu nombre, toca Iniciar sesión con Apple, elige Bobby y toca Eliminar.",
             spanish: spanish)

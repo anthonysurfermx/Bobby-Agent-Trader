@@ -1,0 +1,3 @@
+"NSMicrophoneUsageDescription" = "Bobby ascolta solo mentre tieni premuto il pulsante, per sentire la tua domanda.";
+"NSSpeechRecognitionUsageDescription" = "Bobby trasforma la tua domanda vocale in testo su questo iPhone. L’audio non lascia mai il dispositivo.";
+"NSPhotoLibraryAddUsageDescription" = "Bobby salva la carta del tuo avatar in Foto solo quando tocchi Salva immagine.";

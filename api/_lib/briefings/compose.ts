@@ -25,6 +25,11 @@ import { BRIEF_LANGUAGES, CADENCES } from './types.js';
 const TITLES: Record<BriefLanguage, Record<Cadence, string>> = {
   es: { morning: 'Apertura de mercado', close: 'Cierre de mercado', weekly: 'Resumen semanal' },
   en: { morning: 'Market opening', close: 'Market close', weekly: 'Weekly briefing' },
+  fr: { morning: 'Ouverture du marché', close: 'Clôture du marché', weekly: 'Résumé hebdomadaire' },
+  pt: { morning: 'Abertura do mercado', close: 'Fecho do mercado', weekly: 'Resumo semanal' },
+  'pt-BR': { morning: 'Abertura do mercado', close: 'Fechamento do mercado', weekly: 'Resumo semanal' },
+  it: { morning: 'Apertura del mercato', close: 'Chiusura del mercato', weekly: 'Riepilogo settimanale' },
+  de: { morning: 'Marktöffnung', close: 'Marktschluss', weekly: 'Wochenüberblick' },
 };
 
 function reportTitle(period: Period, lang: BriefLanguage): string {
@@ -137,7 +142,7 @@ export function composeReport(input: {
     const base = shared ?? factsOnlyAssetSection(safeEvidence, lang, symbol);
     if (!shared) fellBack = true;
     const s = bare(base);
-    if (weekly) s.title = `${symbol} · ${lang === 'es' ? 'Semana anterior' : 'Previous week'}`;
+    if (weekly) s.title = `${symbol} · ${({ es: 'Semana anterior', en: 'Previous week', fr: 'Semaine précédente', pt: 'Semana anterior', 'pt-BR': 'Semana anterior', it: 'Settimana precedente', de: 'Vorherige Woche' })[lang]}`;
     if (explain && shared?.explainer) { s.explainer = shared.explainer; explainersUsed = true; }
     sections.push(s);
   }

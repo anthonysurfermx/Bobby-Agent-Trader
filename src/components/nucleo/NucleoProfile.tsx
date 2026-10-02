@@ -98,7 +98,7 @@ export default function NucleoProfile(p: Props) {
         </div>
         <div className="mt-4">
           <div className="flex items-baseline justify-between">
-            <span className="n-label">{t('Level', 'Nivel', 'Nível')} {p.level.number} · {p.level.name}</span>
+            <span className="n-label">{t('Level', 'Nivel', 'Nível')} {p.level.number} · {pick(p.level.label)}</span>
             <span className="n-label">{p.xp} XP{next ? ` / ${next.minXP}` : ''}</span>
           </div>
           <div className="mt-2 h-[3px] overflow-hidden rounded-full" style={{ background: 'rgba(242,237,228,.08)' }}>
@@ -171,7 +171,7 @@ export default function NucleoProfile(p: Props) {
         <div className="mt-6 space-y-1">
           <div className="n-label mb-2">{t('Preferences', 'Preferencias', 'Preferências')}</div>
           <Row icon={<Mic size={16} />} label={t('Voice', 'Voz', 'Voz')} detail={p.freeVoice ? t('Free: dictation in the browser', 'Gratis: dictado en el navegador', 'Grátis: ditado no navegador') : t('Live voice room', 'Sala de voz en vivo', 'Sala de voz ao vivo')} onClick={p.onToggleVoiceMode}>
-            <span className="n-pill-sm">{p.freeVoice ? t('Free', 'Gratis', 'Grátis') : 'Live'}</span>
+            <span className="n-pill-sm">{p.freeVoice ? t('Free', 'Gratis', 'Grátis') : t('Live', 'En vivo', 'Em direto')}</span>
           </Row>
           <Row icon={p.speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />} label={t('Bobby speaks', 'Bobby habla', 'Bobby fala')} onClick={p.onToggleSpeak}>
             <span className="n-pill-sm">{p.speakEnabled ? t('On', 'Sí', 'Ligado') : t('Off', 'No', 'Desligado')}</span>

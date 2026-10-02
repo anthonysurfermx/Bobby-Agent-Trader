@@ -40,7 +40,8 @@ var RISK_NOTICE = null, ROSTER_P = null, RISK_P = null, SUGG_P = null, PICK_DEFA
 function applySession(s){
   if (!s || typeof s !== 'object') return;
   SESSION = s;
-  var lang = s.language === 'es' ? 'es' : 'en';
+  var lang = NucleoLocale.language(s.language);
+  LOCALE = NucleoLocale.locale(lang, s.locale || s.speechLocale || s.localeRegion);
   if (lang !== LANG){ LANG = lang; applyStaticStrings(); }
   if (s.companion && s.companion.webId){
     var a = artFor(s.companion.webId, s.companion.palette, titleCase(s.companion.label));

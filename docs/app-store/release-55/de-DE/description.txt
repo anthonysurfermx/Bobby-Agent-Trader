@@ -1,0 +1,28 @@
+Lerne Bobby kennen, deinen Begleiter beim Nachdenken über die Märkte.
+
+Stelle eine Frage zu einem unterstützten Vermögenswert, etwa einer Aktie oder Kryptowährung: per Texteingabe oder optionalem Diktieren auf dem Gerät. Bobby verbindet drei Perspektiven: Chancen, eine kritische Risikoprüfung und eine Zusammenfassung der verfügbaren Belege.
+
+SECHS SPRACHEN UND LOKALER KONTEXT
+Nutze Bobby auf Deutsch, Englisch, Spanisch, Französisch, Portugiesisch oder Italienisch. Ändere die Sprache im Profil. Portugiesische Stimme und Diktierfunktion folgen der auf dem Gerät eingestellten Variante für Portugal oder Brasilien. Suche unterstützte lokale Aktien nach Namen oder Symbol; die ursprünglichen Börsensymbole und Kurswährungen bleiben erhalten.
+
+EINE ANALYSE ZUM WIEDERLESEN
+Sieh dir Marktkontext, einen Chart, Zeitstempel der Quellen und eine bedingte Schlussfolgerung an. Speichere eine Analyse auf deinem Gerät und lies die Begründung später erneut. Abwarten ist eine sinnvolle Antwort, wenn die Belege nicht ausreichen.
+
+WÄHLE DIE ANALYSETIEFE
+Schnell, Vertieft und Maximal bieten unterschiedliche Analysetiefen. Gastanalysen und Stufen mit Konto haben Nutzungslimits; Verfügbarkeit und verbleibende Kontingente werden in der App angezeigt. Manche Stufen erfordern Mit Apple anmelden.
+
+DEIN BEGLEITER UND DEIN FORTSCHRITT
+Wähle einen Begleiter, passe dein Profil an und erkunde Trader Land. Ein optionales Apple-Konto synchronisiert deinen Fortschritt. Deine Insel bleibt privat, bis du sie veröffentlichst. Auf öffentlichen Inseln kannst du Inhalte melden und Ersteller blockieren.
+
+DU ENTSCHEIDEST ÜBER KI
+Die Verarbeitung durch externe KI erfordert deine Zustimmung. Lies den Hinweis und widerrufe deine Zustimmung im Profil. Die Diktierfunktion nutzt Apples Spracherkennung auf unterstützten Geräten; Mikrofonaufnahmen werden nicht hochgeladen. Du kannst jederzeit tippen. Die optionale Sprachausgabe lässt sich stummschalten.
+
+Bobby ist ein Lernwerkzeug zur Marktanalyse. Die iPhone-App verbindet keine Wallets, führt keine Trades aus und bewegt kein Geld. Analysen können unvollständig oder falsch sein, und Marktdaten können verzögert sein. Bobby verspricht keine Renditen und bietet keine persönliche Anlageberatung. Du entscheidest, was du tust.
+
+Datenschutz: https://bobbyprotocol.xyz/privacy?lang=de
+Support: https://bobbyprotocol.xyz/support?lang=de
+
+BOBBY PRO (OPTIONAL)
+Bobby Pro ist ein optionales Monatsabonnement mit automatischer Verlängerung: unbegrenzte Schnellanalysen (angemessene Nutzung), dazu 60 Vertiefte und 10 Maximale Analysen alle 30 Tage. Der Preis wird vor dem Kauf in deiner Währung angezeigt. Die Zahlung wird bei Bestätigung über dein Apple-Konto abgerechnet. Das Abo verlängert sich automatisch, sofern du nicht mindestens 24 Stunden vor Ende des aktuellen Zeitraums kündigst. Verwalte oder kündige es unter Einstellungen › Apple-Konto › Abonnements. Käufe wiederherstellen findest du im Profil.
+
+Nutzungsbedingungen (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

@@ -1,3 +1,5 @@
+import { kineticText as text, kineticStatus as status } from '@/lib/companions/kinetic-copy';
+import { locale } from '@/lib/companions/i18n';
 // ============================================================
 // Bobby Performance Analytics — Stitch "AGENT_CORE_V4.2"
 // Full PnL dashboard: KPIs, cumulative growth, daily alpha,
@@ -59,7 +61,7 @@ export default function BobbyAnalyticsPage() {
     if (!pnl || !s) return [];
     let cum = s.startingCapital;
     return [
-      { label: 'START', equity: s.startingCapital },
+      { label: text('START'), equity: s.startingCapital },
       ...pnl.closedPositions.map((t, i) => {
         cum += t.realizedPnl;
         return { label: `#${i + 1}`, equity: cum, symbol: t.symbol, result: t.result, pnl: t.realizedPnl };
@@ -81,36 +83,35 @@ export default function BobbyAnalyticsPage() {
   return (
     <KineticShell activeTab="analytics" showSidebar nucleo>
       <Helmet>
-        <title>Performance Analytics | Bobby Agent Trader</title>
+        <title>{text("Performance Analytics | Bobby Agent Trader")}</title>
       </Helmet>
 
       <div className="p-6 md:p-8 max-w-7xl mx-auto pb-20">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex min-w-0 justify-between items-end mb-8">
           <div className="min-w-0">
-            <h1 className="break-all text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl">PERFORMANCE_ANALYTICS</h1>
+            <h1 className="break-all text-2xl font-black leading-tight tracking-tight sm:text-3xl md:text-4xl">{text("PERFORMANCE_ANALYTICS")}</h1>
             <p className="font-mono text-xs text-white/30 mt-1">
-              Bobby's public track record · Confirmed Base receipts · <span className="text-green-400">LATEST SNAPSHOT</span>
+              {text("Bobby's public track record · Confirmed Base receipts ·")}{' '}<span className="text-green-400">{text("LATEST SNAPSHOT")}</span>
             </p>
           </div>
           {pnl?.closedPositions.length ? <div className="hidden sm:flex gap-4">
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] px-4 py-2 flex flex-col items-end rounded">
-              <span className="text-[8px] font-mono text-white/25 mb-1">PROFIT_FACTOR</span>
+              <span className="text-[8px] font-mono text-white/25 mb-1">{text("PROFIT_FACTOR")}</span>
               <span className={`font-mono text-sm ${profitFactor >= 1 ? 'text-green-400' : 'text-red-400'}`}>{profitFactor.toFixed(2)}</span>
             </div>
             <div className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] px-4 py-2 flex flex-col items-end rounded">
-              <span className="text-[8px] font-mono text-white/25 mb-1">MAX_DRAWDOWN</span>
+              <span className="text-[8px] font-mono text-white/25 mb-1">{text("MAX_DRAWDOWN")}</span>
               <span className="font-mono text-sm text-red-400">-{maxDrawdown.toFixed(1)}%</span>
             </div>
           </div> : null}
         </motion.div>
 
         {loading ? (
-          <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">LOADING ANALYTICS...</span></div>
+          <div className="text-center py-20"><span className="text-[10px] font-mono text-white/20 animate-pulse">{text("LOADING ANALYTICS...")}</span></div>
         ) : s && s.totalTrades === 0 ? (
           <div className="border border-white/[0.04] bg-white/[0.02] rounded p-8 font-mono text-sm text-white/50">
-            No publicly attributable protocol trades have been recorded yet. Performance metrics need confirmed public receipts.
-          </div>
+            {text("No publicly attributable protocol trades have been recorded yet. Performance metrics need confirmed public receipts.")}</div>
         ) : s ? (
           <>
             {/* KPI Row — 4 cards */}
@@ -124,7 +125,7 @@ export default function BobbyAnalyticsPage() {
               ].map(kpi => (
                 <div key={kpi.label} className="bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-6 rounded relative group hover:bg-white/[0.04] transition-all">
                   <div className="absolute top-0 right-0 w-1 h-1 bg-green-500 m-2" />
-                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">{kpi.label}</span>
+                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">{text(kpi.label)}</span>
                   <div className={`mt-2 text-2xl md:text-3xl font-mono font-bold tracking-tighter ${kpi.color}`} style={{ fontVariantNumeric: 'tabular-nums' }}>{kpi.value}</div>
                 </div>
               ))}
@@ -137,7 +138,7 @@ export default function BobbyAnalyticsPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.2 }}
                 className="lg:col-span-8 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-6 rounded">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">CUMULATIVE_GROWTH_INDEX</span>
+                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">{text("CUMULATIVE_GROWTH_INDEX")}</span>
                 </div>
                 <div className="w-full h-52">
                   <ResponsiveContainer width="100%" height="100%">
@@ -156,7 +157,7 @@ export default function BobbyAnalyticsPage() {
                         const d = payload[0].payload;
                         return (
                           <div className="bg-[#161A1D] border border-white/10 rounded px-3 py-2 shadow-xl text-xs font-mono">
-                            <p className="text-white/80 font-bold">{d.symbol ? `${d.symbol} ${d.result}` : 'START'}</p>
+                            <p className="text-white/80 font-bold">{d.symbol ? `${d.symbol} ${status(d.result)}` : text('START')}</p>
                             <p className="text-green-400">${d.equity?.toFixed(4)}</p>
                           </div>
                         );
@@ -176,7 +177,7 @@ export default function BobbyAnalyticsPage() {
               {/* Daily Alpha Bars */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}
                 className="lg:col-span-4 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-6 rounded flex flex-col">
-                <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase mb-4">DAILY_PNL</span>
+                <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase mb-4">{text("DAILY_PNL")}</span>
                 <div className="flex-grow">
                   {dailyPnl.length > 0 ? (
                     <ResponsiveContainer width="100%" height={180}>
@@ -205,7 +206,7 @@ export default function BobbyAnalyticsPage() {
                       </BarChart>
                     </ResponsiveContainer>
                   ) : (
-                    <div className="flex items-center justify-center h-full text-[9px] font-mono text-white/15">NO DATA</div>
+                    <div className="flex items-center justify-center h-full text-[9px] font-mono text-white/15">{text("NO DATA")}</div>
                   )}
                 </div>
               </motion.div>
@@ -215,19 +216,19 @@ export default function BobbyAnalyticsPage() {
               {/* Council Efficiency */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}
                 className="lg:col-span-5 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] p-6 rounded">
-                <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase mb-4 block">COUNCIL_OVERVIEW</span>
+                <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase mb-4 block">{text("COUNCIL_OVERVIEW")}</span>
                 <div className="space-y-4">
                   {[
-                    { name: 'BOBBY_CIO', role: 'Final decision maker', color: 'text-green-400', barColor: 'bg-green-500', stat: `${s.winRate.toFixed(1)}% WR` },
-                    { name: 'ALPHA_HUNTER', role: 'Opportunity scanner', color: 'text-amber-400', barColor: 'bg-amber-500', stat: `${s.wins} signals` },
-                    { name: 'RED_TEAM', role: 'Thesis destroyer', color: 'text-red-400', barColor: 'bg-red-500', stat: `${s.losses} vetoes` },
+                    { name: 'BOBBY_CIO', role: 'Final decision maker', color: 'text-green-400', barColor: 'bg-green-500', stat: text('{0}% win rate', s.winRate.toFixed(1)) },
+                    { name: 'ALPHA_HUNTER', role: 'Opportunity scanner', color: 'text-amber-400', barColor: 'bg-amber-500', stat: text('{0} wins', s.wins) },
+                    { name: 'RED_TEAM', role: 'Thesis destroyer', color: 'text-red-400', barColor: 'bg-red-500', stat: text('{0} losses', s.losses) },
                   ].map(agent => (
                     <div key={agent.name} className="space-y-1">
                       <div className="flex justify-between font-mono text-[10px]">
                         <span className={agent.color}>{agent.name}</span>
                         <span className="text-white/40">{agent.stat}</span>
                       </div>
-                      <p className="text-[8px] font-mono text-white/15">{agent.role}</p>
+                      <p className="text-[8px] font-mono text-white/15">{text(agent.role)}</p>
                     </div>
                   ))}
                 </div>
@@ -237,25 +238,25 @@ export default function BobbyAnalyticsPage() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
                 className="lg:col-span-7 bg-white/[0.02] backdrop-blur-sm border border-white/[0.04] rounded overflow-hidden flex flex-col">
                 <div className="p-4 border-b border-white/[0.04] flex justify-between items-center bg-black/40">
-                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">LIVE_EXECUTION_LEDGER</span>
-                  <span className="font-mono text-[10px] text-green-400 animate-pulse">STREAMING...</span>
+                  <span className="text-[10px] font-mono text-white/30 tracking-widest uppercase">{text("CONFIRMED_RECEIPT_LEDGER")}</span>
+                  <span className="font-mono text-[10px] text-green-400">{text("LATEST SNAPSHOT")}</span>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left font-mono text-[10px]">
                     <thead className="bg-[#1c1b1b] text-white/30 sticky top-0">
                       <tr>
-                        <th className="p-3 font-normal">TIMESTAMP</th>
-                        <th className="p-3 font-normal">SYMBOL</th>
-                        <th className="p-3 font-normal">ACTION</th>
-                        <th className="p-3 font-normal text-right">ENTRY</th>
-                        <th className="p-3 font-normal text-right">PNL</th>
-                        <th className="p-3 font-normal">STATUS</th>
+                        <th className="p-3 font-normal">{text("TIMESTAMP")}</th>
+                        <th className="p-3 font-normal">{text("SYMBOL")}</th>
+                        <th className="p-3 font-normal">{text("ACTION")}</th>
+                        <th className="p-3 font-normal text-right">{text("ENTRY")}</th>
+                        <th className="p-3 font-normal text-right">{text("PNL")}</th>
+                        <th className="p-3 font-normal">{text("STATUS")}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/[0.02]">
                       {pnl?.closedPositions.slice(0, 8).map((t, i) => (
                         <tr key={i} className="hover:bg-white/[0.02] transition-colors">
-                          <td className="p-3 text-white/25">{new Date(t.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
+                          <td className="p-3 text-white/25">{new Date(t.closeTime).toLocaleTimeString(locale(), { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</td>
                           <td className="p-3 font-bold text-white/80">{t.symbol}/USD</td>
                           <td className={`p-3 ${t.direction === 'long' ? 'text-green-400' : 'text-red-400'}`}>{t.direction.toUpperCase()}</td>
                           <td className="p-3 text-right text-white/60">{t.entryPrice.toFixed(2)}</td>
@@ -265,7 +266,7 @@ export default function BobbyAnalyticsPage() {
                           <td className="p-3">
                             <span className={`px-2 py-0.5 rounded-full text-[8px] font-bold ${
                               t.result === 'WIN' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                            }`}>{t.result === 'WIN' ? 'FILLED' : 'STOPPED'}</span>
+                            }`}>{status(t.result === 'WIN' ? 'WIN' : 'LOSS')}</span>
                           </td>
                         </tr>
                       ))}
@@ -275,11 +276,10 @@ export default function BobbyAnalyticsPage() {
               </motion.div>
             </div>
             </> : <div className="border border-white/[0.04] bg-white/[0.02] rounded p-6 font-mono text-xs text-white/40">
-              The public endpoint provides aggregate totals only. Individual receipts and trade-level charts are not published here.
-            </div>}
+              {text("The public endpoint provides aggregate totals only. Individual receipts and trade-level charts are not published here.")}</div>}
           </>
         ) : (
-          <div className="text-center py-20 text-white/20 text-sm font-mono">No analytics data available</div>
+          <div className="text-center py-20 text-white/20 text-sm font-mono">{text("No analytics data available")}</div>
         )}
       </div>
     </KineticShell>

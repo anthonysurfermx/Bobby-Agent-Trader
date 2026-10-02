@@ -1,3 +1,4 @@
+import { t, speechLocale } from '@/lib/companions/i18n';
 // ============================================================
 // KineticShell — Shared layout wrapper for Stitch "Agent Terminal"
 // Provides: top nav, sidebar (desktop), mobile bottom nav, ticker tape, scanline
@@ -15,13 +16,13 @@ import { MIN_POLL_MS, useVisiblePoll } from '@/hooks/useVisiblePoll';
 
 // V3 IA: 4 páginas core (Gemini). Rutas legacy quedan alcanzables por deep-link.
 const NAV_ITEMS = [
-  { id: 'terminal', label: 'WAR ROOM', path: '/desk' },
-  { id: 'history', label: 'PERFORMANCE', path: '/record' },
-  { id: 'analytics', label: 'INTEL', path: '/agentic-world/bobby/analytics' },
-  { id: 'console', label: 'CONSOLE', path: '/agentic-world/bobby/console' },
+  { id: 'terminal', label: t("WAR ROOM", "ANÁLISIS"), path: '/desk' },
+  { id: 'history', label: t("PERFORMANCE", "RENDIMIENTO"), path: '/record' },
+  { id: 'analytics', label: t("INTEL", "INFORMACIÓN"), path: '/agentic-world/bobby/analytics' },
+  { id: 'console', label: t("CONSOLE", "CONSOLA"), path: '/agentic-world/bobby/console' },
 ] as const;
 
-type NavItemId = (typeof NAV_ITEMS)[number]['id'];
+type NavItemId = (typeof NAV_ITEMS)[number]['id'] | 'agents' | 'metacognition' | 'docs' | 'marketplace' | 'harness' | 'challenge' | 'signals' | 'sandbox' | 'playbooks';
 
 interface KineticShellProps {
   children: ReactNode;
@@ -42,9 +43,9 @@ const TICKER_LIMIT = 20;
 const TICKER_REFRESH_MS = MIN_POLL_MS;
 
 const formatTickerPrice = (value: number) =>
-  value >= 1000 ? value.toLocaleString('en-US', { maximumFractionDigits: 0 })
-    : value >= 1 ? value.toFixed(2)
-      : value.toFixed(4);
+  value >= 1000 ? value.toLocaleString(speechLocale(), { maximumFractionDigits: 0 })
+    : value >= 1 ? value.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : value.toLocaleString(speechLocale(), { minimumFractionDigits: 4, maximumFractionDigits: 4 });
 
 function TickerTape() {
   const [tickers, setTickers] = useState<Array<{ symbol: string; change24h: number; last: number }>>([]);
@@ -71,7 +72,7 @@ function TickerTape() {
 
   const items = tickers.length > 0
     ? tickers.map(t => `$${t.symbol} ${formatTickerPrice(t.last)} ${t.change24h >= 0 ? '+' : ''}${t.change24h}%`)
-    : ['$BTC --', '$ETH --', '$SOL --', 'LOADING...'];
+    : ['$BTC --', '$ETH --', '$SOL --', t("LOADING...", "CARGANDO…")];
 
   // Duplicate for seamless loop
   const doubled = [...items, ...items];
@@ -139,7 +140,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
       <nav className={`sticky top-0 w-full flex justify-between items-center px-4 md:px-6 h-14 bg-[#131313]/80 backdrop-blur-md z-50 ${navGlow} border-b border-white/5`}>
         <Link to="/protocol" className={`text-lg font-black tracking-tighter ${navAccent} font-mono hover:opacity-80 transition-opacity`}>
           {roomMode === 'personal' && hasAgent
-            ? `${agentName} TRADING ROOM`
+            ? t(`${agentName} TRADING ROOM`, `SALA DE TRADING DE ${agentName}`)
             : `BOBBY PROTOCOL`}
         </Link>
 
@@ -153,8 +154,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
                 : 'text-white/30 hover:text-white/50'
             }`}
           >
-            PUBLIC NETWORK
-          </button>
+            {t("PUBLIC NETWORK", "RED PÚBLICA")}</button>
           {hasAgent ? (
             <button
               onClick={() => setRoomMode('personal')}
@@ -164,15 +164,14 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
                   : 'text-white/30 hover:text-white/50'
               }`}
             >
-              MY AGENT: {agentName}
+              {t('MY AGENT', 'MI AGENTE')}: {agentName}
             </button>
           ) : (
             <button
               onClick={() => navigate('/agentic-world/deploy')}
               className="px-3 py-1.5 text-white/20 hover:text-white/40 transition-all flex items-center gap-1"
             >
-              <Lock className="w-2.5 h-2.5" /> MY AGENT
-            </button>
+              <Lock className="w-2.5 h-2.5" /> {t("MY AGENT", "MI AGENTE")}</button>
           )}
         </div>
 
@@ -192,7 +191,7 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
           <div className="flex items-center gap-2">
             <div className={`w-2 h-2 rounded-full animate-pulse ${roomMode === 'personal' && hasAgent ? 'bg-current ' + navAccent : 'bg-[#0052ff]'}`} />
             <span className={`text-[9px] font-mono tracking-wider hidden sm:inline ${navAccent}`}>
-              {roomMode === 'personal' ? 'PERSONAL' : 'ONLINE'}
+              {roomMode === 'personal' ? t("PERSONAL", "PERSONAL") : t("ONLINE", "EN LÍNEA")}
             </span>
           </div>
         </div>
@@ -215,10 +214,10 @@ function KineticShellInner({ children, activeTab, showSidebar = false, minimalNa
       {!minimalNav && (
       <nav className="md:hidden fixed bottom-0 w-full h-14 bg-[#131313]/90 backdrop-blur-xl border-t border-white/5 flex items-center justify-around px-4 z-50">
         {[
-          { id: 'terminal', icon: '⌘', label: 'WAR ROOM', path: '/desk' },
-          { id: 'history', icon: '◎', label: 'PERFORMANCE', path: '/record' },
-          { id: 'analytics', icon: '◈', label: 'INTEL', path: '/agentic-world/bobby/analytics' },
-          { id: 'console', icon: '△', label: 'CONSOLE', path: '/agentic-world/bobby/console' },
+          { id: 'terminal', icon: '⌘', label: t("WAR ROOM", "ANÁLISIS"), path: '/desk' },
+          { id: 'history', icon: '◎', label: t("PERFORMANCE", "RENDIMIENTO"), path: '/record' },
+          { id: 'analytics', icon: '◈', label: t("INTEL", "INFORMACIÓN"), path: '/agentic-world/bobby/analytics' },
+          { id: 'console', icon: '△', label: t("CONSOLE", "CONSOLA"), path: '/agentic-world/bobby/console' },
         ].map(item => (
           <Link key={item.id} to={item.path}
             className={`flex flex-col items-center gap-0.5 ${

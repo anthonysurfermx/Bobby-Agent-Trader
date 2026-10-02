@@ -165,7 +165,8 @@
     var list = NW.lsGet(K.desk, []);
     var row = (Array.isArray(list) ? list : []).filter(function (x) { return NW.isObj(x) && typeof x.symbol === 'string'; })
       .slice(0, limit).map(function (x) { return x.symbol; });
-    (CFG.quickAccess || []).forEach(function (t) { if (row.indexOf(t) < 0 && row.length < limit) row.push(t); });
+    var regional = { FR:['MC.PA', 'TTE.PA', 'BTC'], PT:['EDP.LS', 'GALP.LS', 'BTC'], BR:['PETR4.SA', 'VALE3.SA', 'BTC'], IT:['ENI.MI', 'ENEL.MI', 'BTC'], DE:['SAP.DE', 'SIE.DE', 'BTC'] };
+    (regional[NW.country] || CFG.quickAccess || []).forEach(function (t) { if (row.indexOf(t) < 0 && row.length < limit) row.push(t); });
     return row;
   };
 

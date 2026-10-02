@@ -230,6 +230,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #taSend{position:absolute;right:7px;bottom:7px;width:36px;height:36px;border-radius:18px;background:#F2EDE4;color:#141210;display:grid;place-items:center;cursor:pointer}
 #taSend::before{content:'';position:absolute;inset:-4px;border-radius:22px}   /* 44 pt hit area */
 #taSend[disabled]{opacity:.3}
+/* Translated copy can use two lines inside the existing controls. */
+#hint .roll,#hint .roll>span{height:28px;white-space:normal;line-height:13px}
+#hint{height:28px}
+.card dt{max-width:52%;white-space:normal;line-height:13px;overflow-wrap:anywhere}
+.card dd{max-width:48%;overflow-wrap:anywhere}
 </style>
 </head>
 <body data-page="app">

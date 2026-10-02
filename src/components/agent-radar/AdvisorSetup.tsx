@@ -11,6 +11,8 @@ import {
   Wallet, ArrowRight, Sparkles, TrendingUp, BarChart3,
   Globe, Gem, Bot, LineChart, Brain, Landmark, Layers, Languages,
 } from 'lucide-react';
+import { lang as interfaceLanguage, speechLocale, setLang, setLocale, t as ui, type Lang } from '@/lib/companions/i18n';
+import { appLocale } from '@/lib/app-language';
 import { PixelLobster } from '@/components/ui/pixel-icons';
 
 // ---- Types ----
@@ -20,7 +22,8 @@ export interface AdvisorProfile {
   userName: string;
   advisorName: string;
   categories: string[];
-  language: string;
+  language: Lang;
+  locale?: string;
   scanIntervalHours: number;
 }
 
@@ -29,15 +32,15 @@ export interface AdvisorProfile {
 const ADVISOR_SUGGESTIONS = ['Bobby', 'Axe', 'Jarvis', 'Oracle', 'Satoshi', 'Alpha'];
 
 const CATEGORIES = [
-  { key: 'crypto',       label: 'Crypto',              icon: Gem },
+  { key: 'crypto',       label: ui('Crypto', "Cripto"),              icon: Gem },
   { key: 'defi',         label: 'DeFi',                icon: Layers },
-  { key: 'stocks',       label: 'Stocks',              icon: TrendingUp },
-  { key: 'forex',        label: 'Forex',               icon: Globe },
-  { key: 'prediction',   label: 'Prediction Markets',  icon: BarChart3 },
-  { key: 'ai_agents',    label: 'AI Agents',           icon: Bot },
+  { key: 'stocks',       label: ui('Stocks', "Acciones"),              icon: TrendingUp },
+  { key: 'forex',        label: ui('Forex', "Divisas"),               icon: Globe },
+  { key: 'prediction',   label: ui('Prediction Markets', "Mercados de predicción"),  icon: BarChart3 },
+  { key: 'ai_agents',    label: ui('AI Agents', "Agentes de IA"),           icon: Bot },
   { key: 'nfts',         label: 'NFTs',                icon: Sparkles },
-  { key: 'macro',        label: 'Macro',               icon: Landmark },
-  { key: 'trading',      label: 'Trading',             icon: LineChart },
+  { key: 'macro',        label: ui('Macro', "Macro"),               icon: Landmark },
+  { key: 'trading',      label: ui('Trading', "Trading"),             icon: LineChart },
 ];
 
 const LS_KEY = 'agent_radar_profile';
@@ -97,7 +100,7 @@ export function AdvisorSetup({ onComplete }: Props) {
   const [userName, setUserName] = useState('');
   const [advisorName, setAdvisorName] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
-  const [language, setLanguage] = useState('es');
+  const [language, setLanguage] = useState<Lang>(interfaceLanguage);
   const [scanInterval, setScanInterval] = useState(8);
 
   // Auto-advance to step 1 when wallet connects
@@ -119,8 +122,15 @@ export function AdvisorSetup({ onComplete }: Props) {
       advisorName: advisorName.trim() || 'Bobby',
       categories,
       language,
+      locale: appLocale(language, speechLocale()),
       scanIntervalHours: scanInterval,
     };
+    setLang(language);
+    setLocale(profile.locale!);
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', language);
+    url.searchParams.delete('locale');
+    window.history.replaceState({}, '', url.toString());
     onComplete(profile);
   };
 
@@ -154,16 +164,15 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 0 && (
           <div className="space-y-6 text-center">
             <div>
-              <h2 className="text-2xl font-bold text-white mb-2">Welcome to Agent Radar</h2>
-              <p className="text-neutral-500 text-sm">Connect your wallet to set up your AI financial advisor</p>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("Welcome to Agent Radar", "Bienvenido a Agent Radar")}</h2>
+              <p className="text-neutral-500 text-sm">{ui("Connect your wallet to set up your AI financial advisor", "Conecta tu wallet para configurar tu analista de IA")}</p>
             </div>
             <button
               onClick={() => openWallet()}
               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
             >
               <Wallet className="w-5 h-5" />
-              Connect Wallet
-            </button>
+              {ui("Connect Wallet", "Conectar wallet")}</button>
           </div>
         )}
 
@@ -171,8 +180,8 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 1 && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">What's your name?</h2>
-              <p className="text-neutral-500 text-sm">Your advisor will use this to greet you every morning</p>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("What's your name?", "¿Cómo te llamas?")}</h2>
+              <p className="text-neutral-500 text-sm">{ui("Your advisor will use this to greet you every morning", "Tu analista usará tu nombre para saludarte")}</p>
             </div>
 
             <input
@@ -190,8 +199,7 @@ export function AdvisorSetup({ onComplete }: Props) {
               disabled={!userName.trim()}
               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Continue
-              <ArrowRight className="w-4 h-4" />
+              {ui("Continue", "Continuar")}<ArrowRight className="w-4 h-4" />
             </button>
           </div>
         )}
@@ -200,10 +208,9 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 2 && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Name your AI advisor</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("Name your AI advisor", "Nombra a tu analista de IA")}</h2>
               <p className="text-neutral-500 text-sm">
-                This is your personal financial intelligence agent
-              </p>
+                {ui("This is your personal financial intelligence agent", "Este es tu agente personal de análisis financiero")}</p>
             </div>
 
             <input
@@ -245,8 +252,7 @@ export function AdvisorSetup({ onComplete }: Props) {
                   <div>
                     <div className="text-[11px] text-green-400/60 mb-0.5">{advisorName.trim()}</div>
                     <div className="text-sm text-neutral-300">
-                      Buenos días {userName || 'there'}! The market is showing interesting signals today.
-                      I detected 3 whale movements on Solana worth $45K...
+                      {ui(`Example preview: Hello ${userName || '…'}. Ask about an asset to begin a market read.`, `Vista de ejemplo: Hola ${userName || '…'}. Pregunta por un activo para comenzar una lectura de mercado.`)}
                     </div>
                   </div>
                 </div>
@@ -258,13 +264,11 @@ export function AdvisorSetup({ onComplete }: Props) {
               disabled={!advisorName.trim()}
               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Continue
-              <ArrowRight className="w-4 h-4" />
+              {ui("Continue", "Continuar")}<ArrowRight className="w-4 h-4" />
             </button>
 
             <button onClick={() => setStep(1)} className="w-full text-center text-neutral-600 text-xs hover:text-neutral-400 transition-colors">
-              Back
-            </button>
+              {ui("Back", "Volver")}</button>
           </div>
         )}
 
@@ -272,9 +276,9 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 3 && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">What interests you?</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("What interests you?", "¿Qué te interesa?")}</h2>
               <p className="text-neutral-500 text-sm">
-                Pick 3 categories — {advisorName} will focus on these
+                {ui(`Pick 3 categories for ${advisorName}`, `Elige 3 categorías para ${advisorName}`)}
               </p>
               <div className={`mt-2 text-sm font-medium ${categories.length === 3 ? 'text-green-400' : 'text-neutral-600'}`}>
                 {categories.length} / 3
@@ -311,13 +315,11 @@ export function AdvisorSetup({ onComplete }: Props) {
               disabled={categories.length !== 3}
               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors disabled:opacity-20 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              Continue
-              <ArrowRight className="w-4 h-4" />
+              {ui("Continue", "Continuar")}<ArrowRight className="w-4 h-4" />
             </button>
 
             <button onClick={() => setStep(2)} className="w-full text-center text-neutral-600 text-xs hover:text-neutral-400 transition-colors">
-              Back
-            </button>
+              {ui("Back", "Volver")}</button>
           </div>
         )}
 
@@ -325,9 +327,9 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 4 && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Choose your language</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("Choose your language", "Elige tu idioma")}</h2>
               <p className="text-neutral-500 text-sm">
-                {advisorName} will communicate in this language
+                {ui(`${advisorName} will communicate in this language`, `${advisorName} se comunicará en este idioma`)}
               </p>
             </div>
 
@@ -335,11 +337,14 @@ export function AdvisorSetup({ onComplete }: Props) {
               {[
                 { code: 'es', label: 'Español', flag: '🇲🇽', desc: 'Tu asesor hablará en español' },
                 { code: 'en', label: 'English', flag: '🇺🇸', desc: 'Your advisor will speak English' },
-                { code: 'pt', label: 'Português', flag: '🇧🇷', desc: 'Seu assessor falará em português' },
+                { code: 'pt', label: 'Português', flag: appLocale('pt', speechLocale()) === 'pt-BR' ? '🇧🇷' : '🇵🇹', desc: 'Seu assessor falará em português' },
+                { code: 'fr', label: 'Français', flag: '🇫🇷', desc: 'Votre conseiller parlera français' },
+                { code: 'it', label: 'Italiano', flag: '🇮🇹', desc: 'Il tuo consulente parlerà italiano' },
+                { code: 'de', label: 'Deutsch', flag: '🇩🇪', desc: 'Dein Berater spricht Deutsch' },
               ].map(lang => (
                 <button
                   key={lang.code}
-                  onClick={() => setLanguage(lang.code)}
+                  onClick={() => setLanguage(lang.code as Lang)}
                   className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-all ${
                     language === lang.code
                       ? 'bg-white text-black border-white'
@@ -361,13 +366,11 @@ export function AdvisorSetup({ onComplete }: Props) {
               onClick={() => setStep(5)}
               className="w-full py-4 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
             >
-              Continue
-              <ArrowRight className="w-4 h-4" />
+              {ui("Continue", "Continuar")}<ArrowRight className="w-4 h-4" />
             </button>
 
             <button onClick={() => setStep(3)} className="w-full text-center text-neutral-600 text-xs hover:text-neutral-400 transition-colors">
-              Back
-            </button>
+              {ui("Back", "Volver")}</button>
           </div>
         )}
 
@@ -375,9 +378,9 @@ export function AdvisorSetup({ onComplete }: Props) {
         {step === 5 && (
           <div className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-white mb-2">Analysis frequency</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">{ui("Analysis frequency", "Frecuencia de análisis")}</h2>
               <p className="text-neutral-500 text-sm">
-                How often should {advisorName} scan the market?
+                {ui(`Preferred analysis interval for ${advisorName}`, `Intervalo de análisis preferido para ${advisorName}`)}
               </p>
             </div>
 
@@ -403,14 +406,7 @@ export function AdvisorSetup({ onComplete }: Props) {
             {/* Preview */}
             <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4">
               <div className="text-xs text-neutral-400 text-center">
-                {advisorName} {language === 'es' ? 'analizará el mercado' : language === 'pt' ? 'analisará o mercado' : 'will analyze the market'}{' '}
-                <span className="text-green-400 font-bold">{Math.floor(24 / scanInterval)}x</span>{' '}
-                {language === 'es' ? 'al día' : language === 'pt' ? 'por dia' : 'per day'}
-                {scanInterval === 4 && (
-                  <span className="block mt-1 text-amber-400/60 text-[10px]">
-                    {language === 'es' ? 'Más análisis = más oportunidades detectadas' : language === 'pt' ? 'Mais análises = mais oportunidades detectadas' : 'More scans = more opportunities detected'}
-                  </span>
-                )}
+                {ui(`Preferred scan interval: ${scanInterval} h. This local preference does not schedule background work.`, `Intervalo preferido: ${scanInterval} h. Esta preferencia local no programa tareas en segundo plano.`)}
               </div>
             </div>
 
@@ -419,12 +415,11 @@ export function AdvisorSetup({ onComplete }: Props) {
               className="w-full py-4 bg-green-500 text-black font-bold rounded-xl hover:bg-green-400 transition-colors flex items-center justify-center gap-2"
             >
               <Brain className="w-5 h-5" />
-              Launch {advisorName || 'Advisor'}
+              {ui("Launch", "Iniciar")}{advisorName || 'Advisor'}
             </button>
 
             <button onClick={() => setStep(4)} className="w-full text-center text-neutral-600 text-xs hover:text-neutral-400 transition-colors">
-              Back
-            </button>
+              {ui("Back", "Volver")}</button>
           </div>
         )}
       </div>

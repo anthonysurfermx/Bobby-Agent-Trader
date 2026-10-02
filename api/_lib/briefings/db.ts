@@ -7,6 +7,7 @@
 // ============================================================
 import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
 import type { BriefSettings, Cadence, ComposerMemory, DeviceEnvironment, FrozenSettings, PermissionState } from './types.js';
+import { BRIEF_LANGUAGES, type BriefLanguage } from './types.js';
 import { COMPANION_VOICES, voiceForCompanion } from './config.js';
 
 export class BriefingStorageError extends Error {
@@ -147,9 +148,9 @@ export async function neededAssets(cadence: Cadence, periodKey: string, language
 }
 
 /** Languages of the period's open (pending/preparing) reports: the worker writes a shared narrative only for these. */
-export async function openLanguages(cadence: Cadence, periodKey: string): Promise<Array<'en' | 'es'>> {
+export async function openLanguages(cadence: Cadence, periodKey: string): Promise<BriefLanguage[]> {
   const r = obj(await rpc('bobby_brief_open_languages', { p_cadence: cadence, p_period_key: periodKey }), 'bobby_brief_open_languages');
-  return Array.isArray(r.languages) ? r.languages.filter((l): l is 'en' | 'es' => l === 'en' || l === 'es') : [];
+  return Array.isArray(r.languages) ? r.languages.filter((l): l is BriefLanguage => (BRIEF_LANGUAGES as readonly unknown[]).includes(l)) : [];
 }
 
 export interface ClaimedBrief { id: string; identityId: string; fence: number; frozen: FrozenSettings; memory: ComposerMemory | null }
@@ -179,7 +180,7 @@ export async function fillOutbox(limit: number): Promise<number> {
 }
 export interface OutboxItem {
   id: string; fence: number; briefId: string; deviceId: string; bindingRevision: number; tokenCiphertext: string;
-  environment: DeviceEnvironment; topic: string; apnsId: string; collapseId: string; language: 'en' | 'es'; expiresAt: string; attempts: number;
+  environment: DeviceEnvironment; topic: string; apnsId: string; collapseId: string; language: BriefLanguage; expiresAt: string; attempts: number;
 }
 export async function claimOutbox(worker: string, leaseSeconds: number, limit: number): Promise<OutboxItem[]> {
   const r = obj(await rpc('bobby_brief_outbox_claim', { p_worker: worker, p_lease_seconds: leaseSeconds, p_limit: limit }, 10_000), 'bobby_brief_outbox_claim');

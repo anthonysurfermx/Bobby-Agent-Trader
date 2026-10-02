@@ -49,7 +49,19 @@ struct TraderLandWorld: Decodable {
             return (extendTo ?? []).compactMap(LandHorizon.init(rawValue:)).filter { $0.hours > hours }.sorted { $0.hours < $1.hours }
         }
     }
-    struct Bilingual: Decodable { let en: String; let es: String; var text: String { L.t(en, es) } }
+    struct Bilingual: Decodable {
+        let en: String; let es: String
+        let fr: String?; let pt: String?; let it: String?; let de: String?
+        var text: String {
+            switch L.language {
+            case "fr": return fr ?? L.t(en, es)
+            case "pt": return pt ?? L.t(en, es)
+            case "it": return it ?? L.t(en, es)
+            case "de": return de ?? L.t(en, es)
+            default: return L.t(en, es)
+            }
+        }
+    }
     /// `PieceSummary` on the server. Only the id is required; a malformed name never breaks the world.
     struct Piece: Decodable {
         let id: String

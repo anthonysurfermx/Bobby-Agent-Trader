@@ -9,9 +9,9 @@ const P = '/app/poster';
 const MONO = "[font-family:'Geist_Mono',ui-monospace,monospace]";
 
 const SQUAD = [
-  { id: 'iris', src: `${P}/squad-iris.webp`, name: 'IRIS', tone: 'ICE', accent: '#38BDF8', ratio: 362 / 1000, breathe: 4.6 },
-  { id: 'sol', src: `${P}/squad-sol.webp`, name: 'SOL', tone: 'GOLD', accent: '#FACC15', ratio: 346 / 1000, breathe: 5.2 },
-  { id: 'glitch', src: `${P}/squad-glitch.webp`, name: 'GLITCH', tone: 'PLASMA', accent: '#A855F7', ratio: 351 / 1000, breathe: 4.2 },
+  { id: 'iris', src: `${P}/squad-iris.webp`, name: 'IRIS', tone: () => t('ICE', 'HIELO'), accent: '#38BDF8', ratio: 362 / 1000, breathe: 4.6 },
+  { id: 'sol', src: `${P}/squad-sol.webp`, name: 'SOL', tone: () => t('GOLD', 'ORO'), accent: '#FACC15', ratio: 346 / 1000, breathe: 5.2 },
+  { id: 'glitch', src: `${P}/squad-glitch.webp`, name: 'GLITCH', tone: () => t('PLASMA', 'PLASMA'), accent: '#A855F7', ratio: 351 / 1000, breathe: 4.2 },
 ];
 
 export default function SquadLineup() {
@@ -31,7 +31,7 @@ export default function SquadLineup() {
             <motion.button
               key={c.id}
               type="button"
-              aria-label={`${c.name} · ${c.tone}`}
+              aria-label={`${c.name} · ${c.tone()}`}
               aria-pressed={on}
               onMouseEnter={() => setActive(c.id)}
               onMouseLeave={() => setActive((v) => (v === c.id ? null : v))}
@@ -51,14 +51,14 @@ export default function SquadLineup() {
                 animate={on ? { opacity: 1, y: 0, scale: 1 } : { opacity: 0, y: 10, scale: 0.8 }}
                 transition={{ type: 'spring', stiffness: 380, damping: 22 }}
               >
-                {c.name} · {c.tone}
+                {c.name} · {c.tone()}
               </motion.span>
               <motion.div
                 className="w-full origin-bottom"
                 animate={on ? { y: -18, scaleY: 1, scaleX: 1 } : reduceMotion ? { y: 0 } : { y: 0, scaleY: [1, 1.014, 1], scaleX: [1, 0.994, 1] }}
                 transition={on ? { type: 'spring', stiffness: 420, damping: 14 } : { duration: c.breathe, repeat: Infinity, ease: 'easeInOut', delay: i * 0.6 }}
               >
-                <img src={c.src} alt={t(`${c.name[0]}${c.name.slice(1).toLowerCase()}, one of the Bobby squad`, `${c.name[0]}${c.name.slice(1).toLowerCase()}, del squad de Bobby`)} draggable={false} className="block h-auto w-full select-none" />
+                <img src={c.src} alt={t('{0}, one of the Bobby squad', '{0}, del equipo de Bobby').replace('{0}', `${c.name[0]}${c.name.slice(1).toLowerCase()}`)} draggable={false} className="block h-auto w-full select-none" />
               </motion.div>
             </motion.button>
           );

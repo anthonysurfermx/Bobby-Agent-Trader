@@ -1,4 +1,4 @@
-import { sessionFetch } from '@/lib/bobby-session';
+import { sessionFetch } from '../bobby-session';
 // ============================================================
 // Semantic Router — extracted to shared module
 // Used by AdamsChat.tsx and potentially by backend
@@ -83,20 +83,25 @@ export const STOCK_MAP: Record<string, string> = {
 const AMBIGUOUS_STOCK_WORDS = new Set([
   'meta', 'strategy', 'coin', 'ko', 'dia', 'uso', 'ton', 'cat', 'arm', 'sei', 'sui', 'op', 'ada',
   'ma', 'v', 'ba', 'gs', 'uni', 'salud', 'energía', 'tecnología', 'financieras', 'near', 'ark', 'dow',
-  'oro', 'gold', 'plata', 'silver', 'oil', 'petróleo', 'crudo',
+  'oro', 'gold', 'plata', 'silver', 'oil', 'petróleo', 'crudo', 'sap', 'vale', 'or', 'mc',
 ]);
 const ETF_ONLY_WORDS = new Set(['oro', 'gold', 'plata', 'silver', 'oil', 'petróleo', 'crudo']);
 
 export function detectStocks(text: string): string[] {
-  const lower = text.toLowerCase();
-  const found: string[] = [];
+  const normalizeWords = (value: string) => value.normalize('NFD').replace(/\p{Diacritic}/gu, '').replace(/[’']/g, "'").toLowerCase();
+  const lower = normalizeWords(text);
+  // Provider-qualified ids preserve their exchange, including uncatalogued listings.
+  // Quotes still require a successful identity/currency check at /api/stock-price.
+  const found: string[] = [...new Set((text.match(/(?<![\p{L}\p{N}_.-])[A-Z0-9][A-Z0-9.-]{0,18}\.(?:PA|LS|SA|MI|DE)(?![\p{L}\p{N}_.-])/giu) ?? []).map(symbol => symbol.toUpperCase()))];
   for (const [key, ticker] of Object.entries(STOCK_MAP)) {
-    const escapedKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const matches = new RegExp(`\\b${escapedKey}\\b`).test(lower);
+    const escapedKey = normalizeWords(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const matches = new RegExp(`(?<![\\p{L}\\p{N}_.-])${escapedKey}(?![\\p{L}\\p{N}_.-])`, 'u').test(lower);
     if (!matches) continue;
     if (AMBIGUOUS_STOCK_WORDS.has(key)) {
       const escapedTicker = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const explicitTicker = new RegExp(`(?:\\$${escapedTicker}\\b|\\b${escapedTicker}\\b)`).test(text);
+      const explicitTicker = text.trim().toUpperCase() === ticker || new RegExp(`(?:\\$${escapedTicker}\\b|(?<![\\p{L}\\p{N}_.-])${escapedTicker}(?![\\p{L}\\p{N}_.-]))`, 'u').test(text);
+      // SAP and VALE are also ambiguous company names/ordinary words. Never infer an ADR.
+      if ((key === 'sap' || key === 'vale' || key === 'or' || key === 'mc') && !explicitTicker) continue;
       const marketContext = /\b(stock|ticker|acci[oó]n|etf|precio|cotiz\w*|analiz\w*|compr\w*|vend\w*|invert\w*|trade|trading|opini[oó]n|compar\w*|versus|vs\.?)\b/i.test(text);
       const explicitEtfContext = /\b(etf|fondo|stock|ticker|acci[oó]n)\b/i.test(text);
       if (ETF_ONLY_WORDS.has(key) && !explicitTicker && !explicitEtfContext) continue;
@@ -136,6 +141,9 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
 export function detectIntent(text: string): 'price' | 'analyze' | 'portfolio' | 'trending' | 'prices_all' | 'help' | 'chat' | 'greeting' | 'ambiguous' {
   const l = text.toLowerCase().trim();
   const wordCount = l.split(/\s+/).length;
+
+  // A literal uppercase ticker is intentional even when it is also a greeting (VALE).
+  if (wordCount <= 2 && detectStocks(text).some(symbol => text.trim() === symbol || text.trim() === `$${symbol}`)) return 'price';
 
   // RULE 0: Casual greetings & small talk → quick response, no analysis, ZERO tokens
   if (wordCount <= 4 && /^(hola|hey|hi|hello|sup|yo|buenas?|buenos? [dnt]|good (morning|evening|night)|what.?s up|que tal|qu[ée] onda|saludos|gracias|thanks|thank you|de nada|adiós|bye|chao|ok|okay|cool|nice|genial|perfecto|vale|orale|ya)\b/i.test(l)) return 'greeting';

@@ -1,3 +1,4 @@
+import { REGIONAL_STOCKS, isListedStockSymbol } from './regional-stocks';
 // ============================================================
 // voice-assets — one asset universe for the whole voice desk.
 //
@@ -53,6 +54,12 @@ export const VOICE_ASSETS: VoiceAsset[] = [
   { symbol: 'PEPE', name: 'Pepe', venue: 'okx', group: 'Cripto' },
   { symbol: 'WIF', name: 'dogwifhat', venue: 'okx', group: 'Cripto' },
   { symbol: 'SHIB', name: 'Shiba Inu', venue: 'okx', group: 'Cripto', aliases: ['shiba'] },
+
+  ...REGIONAL_STOCKS.map(s => ({ symbol: s.symbol, name: s.name, aliases: s.aliases, venue: 'equity' as const, group: 'Acciones' as const })),
+
+  // Explicit US ADR symbols must survive regional company-name matching.
+  { symbol: 'SAP', name: 'SAP ADR (NYSE)', venue: 'equity', group: 'Acciones' },
+  { symbol: 'VALE', name: 'Vale ADR (NYSE)', venue: 'equity', group: 'Acciones' },
 
   // --- equities (Yahoo) ---
   { symbol: 'NVDA', name: 'Nvidia', venue: 'equity', group: 'Acciones', aliases: ['nvidia corporation', 'envidia', 'n vidia'] },
@@ -135,7 +142,7 @@ const SPOKEN_TO_SYMBOL: Record<string, string> = (() => {
  */
 const HOMONYMS = new Set([
   'META', 'USO', 'DIA', 'TON', 'CAT', 'ARM', 'SEI', 'SUI', 'OP', 'ADA', 'MA', 'V', 'BA', 'GS', 'UNI',
-  'SALUD', 'ENERGÍA', 'TECNOLOGÍA', 'FINANCIERAS', 'NEAR', 'ARK', 'DOW',
+  'VALE', 'SAP', 'OR', 'MC', 'SALUD', 'ENERGÍA', 'TECNOLOGÍA', 'FINANCIERAS', 'NEAR', 'ARK', 'DOW',
 ]);
 
 export const ASSET_GROUPS: Array<{ label: VoiceAsset['group']; assets: VoiceAsset[] }> = (
@@ -144,7 +151,7 @@ export const ASSET_GROUPS: Array<{ label: VoiceAsset['group']; assets: VoiceAsse
 
 /** True when the ticker is priced from Yahoo rather than OKX. */
 export function isEquitySymbol(symbol: string): boolean {
-  return EQUITY_SYMBOLS.has(symbol.trim().toUpperCase());
+  return EQUITY_SYMBOLS.has(symbol.trim().toUpperCase()) || isListedStockSymbol(symbol.trim());
 }
 
 export function getVoiceAsset(symbol: string): VoiceAsset | undefined {
@@ -155,6 +162,7 @@ export function getVoiceAsset(symbol: string): VoiceAsset | undefined {
 export function normalizeAssetSymbol(value: unknown): string {
   const raw = String(value ?? 'BTC').trim().toUpperCase().slice(0, 128);
   if (SPOKEN_TO_SYMBOL[raw]) return SPOKEN_TO_SYMBOL[raw];
+  if (isListedStockSymbol(raw)) return raw;
   // The model sometimes hands back a full pair ("BTC-USDT", "ETH/USD"); the
   // chart and the market endpoint both want the bare base ticker.
   const dashIndex = raw.indexOf('-');

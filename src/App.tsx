@@ -4,12 +4,14 @@ import { createBrowserRouter, RouterProvider, Outlet, ScrollRestoration, Navigat
 import { Toaster } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { Analytics } from '@vercel/analytics/react'; // ✅ PARA REACT (no Next.js)
-import { HelmetProvider } from 'react-helmet-async';
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import { AuthProvider } from './hooks/useAuth';
 import Web3ContextProvider from '@/libs/components/Web3ContextProvider';
 import ProtectedRoute, { GuestRoute } from '@/components/auth/ProtectedRoute';
 import { ThemeProvider } from '@/components/ThemeProvider';
 import { lazyWithRetry } from '@/lib/lazyWithRetry';
+import { appLanguage } from '@/lib/app-language';
+import { clientLocale } from '@/lib/client-language';
 
 // Layout components (no lazy loading para layouts)
 import MainLayout from '@/components/layout/MainLayout';
@@ -148,6 +150,11 @@ const UnauthorizedPage = lazy(() => import('@/pages/UnauthorizedPage'));
 
 // Componente de loading para Suspense
 function PageLoader() {
+  const queryLanguage = new URLSearchParams(window.location.search).get('lang');
+  let savedLanguage: string | null = null;
+  try { savedLanguage = localStorage.getItem('bobby_lang'); } catch {}
+  const language = appLanguage(queryLanguage || savedLanguage || navigator.language);
+  const loading = { en: 'Loading', es: 'Cargando', fr: 'Chargement', pt: 'A carregar', it: 'Caricamento', de: 'Wird geladen' }[language];
   return (
     <div className="min-h-[60vh] flex items-center justify-center bg-background">
       <div className="text-center space-y-4">
@@ -158,7 +165,7 @@ function PageLoader() {
           </div>
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium text-foreground">Loading</p>
+          <p className="text-sm font-medium text-foreground">{loading}</p>
           <p className="text-xs text-muted-foreground">Bobby Protocol</p>
         </div>
       </div>
@@ -168,8 +175,11 @@ function PageLoader() {
 
 // Root layout que envuelve todo con AuthProvider y Web3ContextProvider
 function RootLayout() {
+  useLocation(); // Refresh the document locale on route and query transitions.
+  const documentLocale = clientLocale();
   return (
     <ThemeProvider defaultTheme="system" storageKey="defi-mexico-theme">
+      <Helmet htmlAttributes={{ lang: documentLocale }} />
       <Web3ContextProvider>
         <AuthProvider>
           <Outlet />

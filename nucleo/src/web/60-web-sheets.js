@@ -45,7 +45,7 @@
     var root = el('div'), panel = el('div', null, 'p'), close = el('button', null, 'x');
     root.id = 'nwSheet';
     panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-modal', 'true'); panel.setAttribute('aria-label', label);
-    close.type = 'button'; close.setAttribute('aria-label', NW.t('Close', 'Cerrar'));
+    close.type = 'button'; close.setAttribute('aria-label', NW.t('Close', 'Cerrar', 'Fechar', 'Fermer', 'Chiudi', 'Schließen'));
     close.innerHTML = '<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M2 2 L12 12 M12 2 L2 12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>';
     panel.appendChild(close);
     fill(panel);
@@ -79,11 +79,23 @@
   SH.isOpen = function () { return !!open; };
   SH.close = function () { if (open) open.dismiss(); };
 
+  SH.withdrawAIConsent = function () {
+    var prof = S.profile(); prof.riskVersion = 0; S.saveProfile(prof);
+    if (NW.voice) NW.voice.stop('stopped');
+    if (NW.speech) NW.speech.stop({ cancel: true });
+    if (NW.desk) NW.desk.cancel();
+    SH.close();
+    NW.navigate(NW.ROUTES.onboarding + location.search + '#risk', { replace: true });
+  };
+
   SH.riskNotice = function () {
     var n = NW.cfg.riskNotice, list = n.statements[NW.lang] || n.statements.en;
-    return present('riskNotice', NW.t('Risk notice', 'Aviso de riesgo'), function (panel) {
-      panel.appendChild(el('h2', NW.t('Risk notice', 'Aviso de riesgo')));
+    return present('riskNotice', NW.t('Risk notice', 'Aviso de riesgo', 'Aviso de risco', 'Avertissement sur les risques', 'Avvertenza sui rischi', 'Risikohinweis'), function (panel) {
+      panel.appendChild(el('h2', NW.t('Risk notice', 'Aviso de riesgo', 'Aviso de risco', 'Avertissement sur les risques', 'Avvertenza sui rischi', 'Risikohinweis')));
       list.forEach(function (s) { panel.appendChild(el('h3', s.title)); panel.appendChild(el('p', s.body)); });
+      var withdraw = el('button', NW.t('Withdraw AI consent', 'Retirar consentimiento de IA', 'Retirar consentimento de IA', 'Retirer le consentement à l’IA', 'Revoca il consenso all’IA', 'KI-Einwilligung widerrufen'));
+      withdraw.type = 'button'; withdraw.addEventListener('click', SH.withdrawAIConsent);
+      panel.appendChild(withdraw);
     });
   };
 
@@ -94,9 +106,9 @@
   SH.squad = function () {
     var art = {};
     try { JSON.parse(document.getElementById('companions').textContent).forEach(function (c) { art[c.id] = c; }); } catch (e) {}
-    return present('squad', NW.t('Squad', 'Escuadrón'), function (panel) {
+    return present('squad', NW.t('Squad', 'Escuadrón', 'Equipa', 'Équipe', 'Squadra', 'Team'), function (panel) {
       var prof = S.profile(), xp = S.progress().xp;
-      panel.appendChild(el('h2', NW.t('Squad', 'Escuadrón')));
+      panel.appendChild(el('h2', NW.t('Squad', 'Escuadrón', 'Equipa', 'Équipe', 'Squadra', 'Team')));
       var grid = el('div');
       grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(88px,1fr));gap:14px 8px;margin-top:6px';
       NW.cfg.companions.forEach(function (c) {
@@ -105,14 +117,14 @@
         var b = el('button');
         b.type = 'button'; b.disabled = !open;
         b.setAttribute('aria-pressed', mine ? 'true' : 'false');
-        b.setAttribute('aria-label', name + (open ? '' : ' · ' + NW.t('Level', 'Nivel') + ' ' + c.requiredLevel));
+        b.setAttribute('aria-label', name + (open ? '' : ' · ' + NW.t('Level', 'Nivel', 'Nível', 'Niveau', 'Livello', 'Stufe') + ' ' + c.requiredLevel));
         b.style.cssText = 'display:flex;flex-direction:column;align-items:center;gap:6px;border:0;background:none;color:inherit;font:inherit;cursor:' + (open ? 'pointer' : 'default') + ';opacity:' + (open ? 1 : 0.38) + ';padding:4px';
         var ph = el('span');
         ph.style.cssText = 'width:60px;height:60px;border-radius:50%;overflow:hidden;background:#232120;box-shadow:0 0 0 ' + (mine ? '2px #F2EDE4' : '.5px rgba(242,237,228,.2)');
         var a = art[c.webId];
         if (a && a.dataUri) { var im = el('img'); im.alt = ''; im.src = a.dataUri; im.style.cssText = 'width:118%;height:118%;margin:-4% 0 0 -9%;display:block'; ph.appendChild(im); }
         b.appendChild(ph);
-        var lb = el('span', open ? name : name + ' · ' + NW.t('Lv', 'Nv') + ' ' + c.requiredLevel);
+        var lb = el('span', open ? name : name + ' · ' + NW.t('Lv', 'Nv', 'Nv', 'Niv.', 'Liv.', 'St.') + ' ' + c.requiredLevel);
         lb.style.cssText = 'font:500 13px/16px Geist,-apple-system,system-ui,sans-serif;color:' + (mine ? '#F2EDE4' : '#A39C91');
         b.appendChild(lb);
         if (open && !mine) b.addEventListener('click', function () { if (NW.commitCompanion) NW.commitCompanion(c.id); SH.close(); });
@@ -123,17 +135,16 @@
   };
 
   SH.account = function () {
-    return present('account', NW.t('Your progress', 'Tu progreso'), function (panel) {
+    return present('account', NW.t('Your progress', 'Tu progreso', 'O seu progresso', 'Votre progression', 'I tuoi progressi', 'Dein Fortschritt'), function (panel) {
       var prof = S.profile(), prog = S.progress(), lvl = S.levelJSON(prog.xp), c = prof.companionId ? S.companion(prof.companionId) : null;
-      panel.appendChild(el('h2', NW.t('Your progress', 'Tu progreso')));
+      panel.appendChild(el('h2', NW.t('Your progress', 'Tu progreso', 'O seu progresso', 'Votre progression', 'I tuoi progressi', 'Dein Fortschritt')));
       if (c) {
         var name = c.label.charAt(0) + c.label.slice(1).toLowerCase();
-        panel.appendChild(el('h3', name + ' · ' + NW.t('Level', 'Nivel') + ' ' + lvl.number + ' · ' + prog.xp + ' XP'));
+        panel.appendChild(el('h3', name + ' · ' + NW.t('Level', 'Nivel', 'Nível', 'Niveau', 'Livello', 'Stufe') + ' ' + lvl.number + ' · ' + prog.xp + ' XP'));
       }
-      panel.appendChild(el('p', NW.t('Your companion, XP and saved theses live in this browser. Signing in is not available on the web.',
-        'Tu compañero, tu XP y tus tesis guardadas viven en este navegador. En la web no se puede iniciar sesión.')));
+      panel.appendChild(el('p', NW.t('Your companion, XP and saved theses live in this browser. Signing in is not available on the web.', 'Tu compañero, tu XP y tus tesis guardadas viven en este navegador. En la web no se puede iniciar sesión.', 'O seu companheiro, XP e teses guardadas ficam neste navegador. O início de sessão não está disponível na web.', 'Votre compagnon, votre XP et vos thèses enregistrées sont conservés dans ce navigateur. La connexion n’est pas disponible sur le web.', 'Il tuo compagno, i tuoi XP e le tesi salvate restano in questo browser. L’accesso non è disponibile sul web.', 'Dein Begleiter, XP und gespeicherte Thesen bleiben in diesem Browser. Die Anmeldung ist im Web nicht verfügbar.')));
       var pp = el('p'); pp.style.marginTop = '16px';
-      var a = el('a', NW.t('Privacy Policy', 'Aviso de privacidad')); a.href = NW.ROUTES.privacy;
+      var a = el('a', NW.t('Privacy Policy', 'Aviso de privacidad', 'Política de privacidade', 'Politique de confidentialité', 'Informativa sulla privacy', 'Datenschutzerklärung')); a.href = NW.ROUTES.privacy;
       pp.appendChild(a); panel.appendChild(pp);
     });
   };

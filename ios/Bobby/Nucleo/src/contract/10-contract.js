@@ -43,7 +43,7 @@
   }
 
   var SESSION = {
-    v: eq(1), firstRun: T.bool, onboarded: T.bool, language: oneOf('en', 'es'), localHour: T.int,
+    v: eq(1), firstRun: T.bool, onboarded: T.bool, language: oneOf('en', 'es', 'fr', 'pt', 'it', 'de'), localHour: T.int,
     companion: nullOr({ id: T.str, webId: T.str, label: T.str, palette: T.str, voicePersona: T.str }),
     xp: T.int, level: { number: T.int, name: T.str, progress: T.num, nextMinXP: nullOr(T.int) }, streak: T.int,
     signedIn: T.bool, riskAccepted: T.bool, riskVersion: T.int, muted: T.bool, reducedMotion: T.bool,
@@ -52,7 +52,7 @@
   };
   var CANDLE = { t: T.int, o: T.num, h: T.num, l: T.num, c: T.num, v: T.num };
   var ASK_OK = {
-    v: eq(1), status: eq('ok'), requestId: T.str, question: T.str, language: oneOf('en', 'es'),
+    v: eq(1), status: eq('ok'), requestId: T.str, question: T.str, language: oneOf('en', 'es', 'fr', 'pt', 'it', 'de'),
     asset: { symbol: T.str, name: T.str, isEquity: T.bool },
     market: { price: nullOr(T.num), changePct: nullOr(T.num) },
     technicals: { price: nullOr(T.num), rsi14: nullOr(T.num), ema20: nullOr(T.num), ema50: nullOr(T.num), support: nullOr(T.num),

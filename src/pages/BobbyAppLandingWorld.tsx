@@ -13,7 +13,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useInView, useReducedMotion, useScroll, useTransform, type Easing, type MotionValue } from 'framer-motion';
-import { isSpanish, t } from '@/lib/companions/i18n';
+import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, t } from '@/lib/companions/i18n';
 import { APP_STORE_URL } from '@/lib/app-store';
 import BobbyWorld from '@/components/app-landing/BobbyWorld';
 import LedgeByte from '@/components/app-landing/LedgeByte';
@@ -49,14 +49,18 @@ function useRecord(): StatsState {
   return state;
 }
 
-function setLang(next: 'en' | 'es') {
+function setLang(next: Lang) {
   try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  const requestedLocale = url.searchParams.get('locale');
+  if (requestedLocale && requestedLocale.split(/[-_]/)[0].toLowerCase() !== next) url.searchParams.delete('locale');
+  window.location.replace(url.href);
 }
 
 const EASE: [number, number, number, number] = [0.2, 0.8, 0.2, 1];
 
-const num = (n: number) => n.toLocaleString(isSpanish() ? 'es-MX' : 'en-US');
+const num = (n: number) => n.toLocaleString(currentLocale());
 
 function AppleGlyph() {
   return (
@@ -515,7 +519,7 @@ function StampedOrder() {
         >
           <div className="a3-stamp rounded-[18px] border-[5px] border-[#E0443E] px-4 py-3 text-center text-[#E0443E] lg:rounded-[22px] lg:border-[7px] lg:px-6 lg:py-4">
             <div className="text-[44px] font-black leading-none tracking-[-0.04em] lg:text-[62px]">{t('NOT TODAY.', 'HOY NO.')}</div>
-            <div className={`${MONO} mt-2 whitespace-nowrap text-[10px] font-semibold tracking-[0.18em] lg:text-[13px]`}>HALO // RISK GATE</div>
+            <div className={`${MONO} mt-2 whitespace-nowrap text-[10px] font-semibold tracking-[0.18em] lg:text-[13px]`}>{t('HALO // RISK GATE', 'HALO // PUERTA DE RIESGO')}</div>
           </div>
         </motion.div>
 
@@ -556,6 +560,7 @@ export default function BobbyAppLandingWorld() {
   return (
     <div className="min-h-screen bg-[#08130E] text-[#050706] antialiased [font-family:Archivo,system-ui,sans-serif] selection:bg-[#7FFABD] selection:text-[#050706]">
       <Helmet>
+        <html lang={currentLocale()} />
         <title>{pageTitle}</title>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=Geist+Mono:wght@400;500;600&display=swap" />
         <meta name="description" content={pageDescription} />
@@ -581,9 +586,9 @@ export default function BobbyAppLandingWorld() {
             <a href="/protocol" className="transition hover:opacity-70">Bobby Protocol</a>
           </nav>
           <div className="flex items-center gap-3 lg:gap-5">
-            <button type="button" onClick={() => setLang(isSpanish() ? 'en' : 'es')} className="min-h-11 px-1 text-[13px] font-bold opacity-60 transition hover:opacity-100 lg:text-[15px]">
-              {isSpanish() ? 'EN' : 'ES'}
-            </button>
+            <select aria-label={t('Language', 'Idioma')} value={lang()} onChange={(event) => setLang(event.target.value as Lang)} className="min-h-11 px-1 text-[13px] font-bold opacity-60 transition hover:opacity-100 lg:text-[15px] bg-transparent">
+              {LANGS.map((language) => <option key={language} value={language} className="bg-[#111] text-white">{LANG_NAME[language]}</option>)}
+            </select>
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center rounded-full bg-[#050706] px-4 text-sm font-bold text-[#FBFAF1] transition hover:bg-black lg:h-12 lg:px-6 lg:text-base">
               {t('Get the app', 'Descárgala')}
             </a>

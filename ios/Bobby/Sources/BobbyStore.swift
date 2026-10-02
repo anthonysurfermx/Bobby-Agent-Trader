@@ -304,19 +304,19 @@ final class BobbyStore: NSObject, ObservableObject {
     var proPurchasable: Bool { package != nil && access.applePayments == true }
 
     /// The price line: the package's localized price and its period ("$4.99 / month").
-    func priceLine(spanish: Bool = L.isSpanish) -> String? {
+    func priceLine(spanish: Bool? = nil) -> String? {
         guard let package else { return nil }
         guard let period = periodName(spanish: spanish) else { return package.localizedPriceString }
         return package.localizedPriceString + " / " + period
     }
 
     /// Guideline 3.1.2, next to the price: how it renews and where to cancel, from the product's own period.
-    func renewsLine(spanish: Bool = L.isSpanish) -> String? {
+    func renewsLine(spanish: Bool? = nil) -> String? {
         guard let period = package?.storeProduct.subscriptionPeriod else { return nil }
         return Self.renewsLine(value: period.value, unit: period.unit, spanish: spanish)
     }
 
-    nonisolated static func renewsLine(value: Int, unit: SubscriptionPeriod.Unit, spanish: Bool) -> String {
+    nonisolated static func renewsLine(value: Int, unit: SubscriptionPeriod.Unit, spanish: Bool? = nil) -> String {
         let cancel = L.t("Cancel anytime in Settings › Apple Account › Subscriptions.",
                          "Cancela cuando quieras en Configuración › Cuenta de Apple › Suscripciones.", spanish: spanish)
         if value == 1, unit == .month {
@@ -327,12 +327,12 @@ final class BobbyStore: NSObject, ObservableObject {
     }
 
     /// "month" / "mes" for the renewal terms (nil when the product has no period).
-    func periodName(spanish: Bool = L.isSpanish) -> String? {
+    func periodName(spanish: Bool? = nil) -> String? {
         guard let period = package?.storeProduct.subscriptionPeriod else { return nil }
         return Self.periodName(value: period.value, unit: period.unit, spanish: spanish)
     }
 
-    nonisolated static func periodName(value n: Int, unit: SubscriptionPeriod.Unit, spanish: Bool) -> String {
+    nonisolated static func periodName(value n: Int, unit: SubscriptionPeriod.Unit, spanish: Bool? = nil) -> String {
         switch unit {
         case .day: return n == 1 ? L.t("day", "día", spanish: spanish) : L.t("\(n) days", "\(n) días", spanish: spanish)
         case .week: return n == 1 ? L.t("week", "semana", spanish: spanish) : L.t("\(n) weeks", "\(n) semanas", spanish: spanish)
@@ -355,8 +355,8 @@ final class BobbyStore: NSObject, ObservableObject {
                 "Bobby no pudo confirmar tu suscripción ahora. Toca Restaurar compras en un momento.")
         }
         /// The one Bobby Pro benefit statement (server LEVEL_LIMITS.pro; Quick rides the unmetered read).
-        static var benefits: String { benefits(spanish: L.isSpanish) }
-        static func benefits(spanish: Bool) -> String {
+        static var benefits: String { benefits(spanish: nil) }
+        static func benefits(spanish: Bool? = nil) -> String {
             L.t("Unlimited Quick reads (fair use) · 60 Deep and 10 Max every 30 days",
                 "Lecturas Rápidas ilimitadas (uso justo) · 60 Profundo y 10 Máximo cada 30 días", spanish: spanish)
         }

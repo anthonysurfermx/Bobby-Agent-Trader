@@ -1,13 +1,18 @@
+import { lang as currentLanguage, locale as currentLocale } from '@/lib/companions/i18n';
+import { appLocale, appLanguage } from '@/lib/app-language';
 // ============================================================
 // useBobbyVoice — Hook that orchestrates Bobby's vocal presence
-// Manages: ElevenLabs API calls, IndexedDB caching, AudioContext + AnalyserNode
-// Smart routing: ElevenLabs for key moments, Web Speech API for fillers
+// Manages: server TTS requests, IndexedDB caching, AudioContext + AnalyserNode
+// Voice generation and playback require the current local web AI permission
 // Sentence-level streaming: Bobby speaks first sentence while LLM still generates
 // Returns: speak(), speakLocal(), queueSentence(), flushQueue(), stop()
 // ============================================================
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { getConfiguredVoice } from '@/lib/agent-voice';
+import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
+
+const canUseVoice = () => progressStore.get().aiConsentGranted && progressStore.get().riskNoticeVersion >= RISK_NOTICE_VERSION;
 
 // ---- IndexedDB cache for audio blobs ----
 
@@ -118,40 +123,49 @@ function getAgentVibe(): string | undefined {
 // In-flight TTS fetches — stop() aborts them so cancelled speech can't
 // keep downloading (or play) after the user cut it off
 const activeVoiceFetches = new Set<AbortController>();
+let voiceFetchGeneration = 0;
 
 export function abortActiveVoiceFetches(): void {
+  voiceFetchGeneration++;
   for (const c of activeVoiceFetches) c.abort();
   activeVoiceFetches.clear();
 }
 
-async function fetchAudio(text: string, voice?: string, lang?: string): Promise<ArrayBuffer | null> {
+async function fetchAudio(text: string, voice?: string, lang: string = currentLanguage()): Promise<ArrayBuffer | null> {
+  const generation = voiceFetchGeneration;
+  const isCurrent = () => canUseVoice() && generation === voiceFetchGeneration;
+  if (!isCurrent()) return null;
   const vibe = getAgentVibe();
   // 'cio' is the personal agent speaking — honor the persona voice the
   // user picked in onboarding. alpha/red stay theatrical debate voices.
   const requested = voice || 'cio';
   const effectiveVoice = requested === 'cio' ? (getConfiguredVoice() || 'cio') : requested;
-  const cacheKey = await cacheKeyFor(text + '|' + effectiveVoice + '|' + (lang || 'en') + '|' + (vibe || ''));
+  const cacheKey = await cacheKeyFor(text + '|' + effectiveVoice + '|' + appLocale(appLanguage(lang), currentLocale()) + '|' + (vibe || ''));
+  if (!isCurrent()) return null;
   const cached = await getCachedAudio(cacheKey);
+  if (!isCurrent()) return null;
   if (cached) return cached;
 
   const controller = new AbortController();
   activeVoiceFetches.add(controller);
+  const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
   try {
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
     const res = await fetch('/api/bobby-voice-free', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text, voice: effectiveVoice, lang: lang || 'en', vibe }),
+      body: JSON.stringify({ text, voice: effectiveVoice, lang: lang || 'en', locale: appLocale(appLanguage(lang), currentLocale()), vibe }),
       signal: controller.signal,
     });
     clearTimeout(timeout);
-    if (!res.ok) return null;
+    if (!res.ok || !isCurrent()) return null;
     const data = await res.arrayBuffer();
+    if (!isCurrent() || controller.signal.aborted) return null;
     await setCachedAudio(cacheKey, data);
     return data;
   } catch {
     return null;
   } finally {
+    clearTimeout(timeout);
     activeVoiceFetches.delete(controller);
   }
 }
@@ -208,6 +222,9 @@ export function useBobbyVoice(): BobbyVoiceState {
   useEffect(() => {
     return () => {
       queueStoppedRef.current = true;
+      queueGenerationRef.current++;
+      abortActiveVoiceFetches();
+      playbackSettleRef.current?.();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.src = '';
@@ -223,7 +240,7 @@ export function useBobbyVoice(): BobbyVoiceState {
   // This "warms up" the AudioContext and Audio element so future play() calls work
   const voiceInitializedRef = useRef(false);
   const initVoiceContext = useCallback(() => {
-    if (voiceInitializedRef.current) return;
+    if (!canUseVoice() || voiceInitializedRef.current) return;
     voiceInitializedRef.current = true;
 
     // 1. Create and warm up Audio element with silent MP3
@@ -253,6 +270,7 @@ export function useBobbyVoice(): BobbyVoiceState {
   // ---- Shared audio playback (used by speak + queue) ----
 
   const playAudioData = useCallback((audioData: ArrayBuffer): Promise<void> => {
+    if (!canUseVoice()) return Promise.resolve();
     return new Promise((resolve, reject) => {
       const blob = new Blob([audioData], { type: 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
@@ -318,12 +336,12 @@ export function useBobbyVoice(): BobbyVoiceState {
   // ---- Queue processor: plays sentences sequentially ----
 
   const processQueue = useCallback(async () => {
-    if (isPlayingQueueRef.current) return; // Already processing
+    if (!canUseVoice() || isPlayingQueueRef.current) return; // Already processing
     isPlayingQueueRef.current = true;
     const generation = queueGenerationRef.current;
 
     while (sentenceQueueRef.current.length > 0) {
-      if (queueStoppedRef.current || generation !== queueGenerationRef.current) break;
+      if (!canUseVoice() || queueStoppedRef.current || generation !== queueGenerationRef.current) break;
 
       const item = sentenceQueueRef.current.shift()!;
       let audioData: ArrayBuffer | null = null;
@@ -334,7 +352,7 @@ export function useBobbyVoice(): BobbyVoiceState {
         continue;
       }
 
-      if (queueStoppedRef.current || generation !== queueGenerationRef.current) break;
+      if (!canUseVoice() || queueStoppedRef.current || generation !== queueGenerationRef.current) break;
       if (!audioData || audioData.byteLength < 100) continue; // Skip failed/empty fetches
 
       // Accumulate for voice note sharing
@@ -349,6 +367,7 @@ export function useBobbyVoice(): BobbyVoiceState {
       }
     }
 
+    if (generation !== queueGenerationRef.current) return;
     isPlayingQueueRef.current = false;
     // Only set not speaking if queue is truly empty and nothing else playing
     if (sentenceQueueRef.current.length === 0) {
@@ -385,12 +404,15 @@ export function useBobbyVoice(): BobbyVoiceState {
   // Plays in order as audio becomes available
 
   const queueSentence = useCallback((sentence: string, voice?: string, lang?: string) => {
+    if (!canUseVoice()) return;
     const clean = sentence.replace(/[-*_#>]/g, '').replace(/\n+/g, ' ').trim();
     if (clean.length < 8) return; // Skip trivial fragments
 
     // Start fetching audio immediately (non-blocking) — voice selects Alpha/Red/CIO
     const audioPromise = fetchAudio(clean, voice, lang);
 
+    // An explicit new sentence belongs to the current generation and may start immediately after stop().
+    queueStoppedRef.current = false;
     sentenceQueueRef.current.push({ text: clean, audio: audioPromise });
     setIsSpeaking(true);
 
@@ -412,7 +434,7 @@ export function useBobbyVoice(): BobbyVoiceState {
 
   const getLastResponseAudio = useCallback((): Blob | null => {
     const chunks = responseAudioChunksRef.current;
-    if (chunks.length === 0) return null;
+    if (!canUseVoice() || chunks.length === 0) return null;
     // Concatenate all MP3 chunks — MP3 is frame-based so raw concat works
     return new Blob(chunks, { type: 'audio/mpeg' });
   }, []);
@@ -422,14 +444,26 @@ export function useBobbyVoice(): BobbyVoiceState {
     setHasResponseAudio(false);
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = progressStore.subscribe(() => {
+    if (!canUseVoice()) {
+      stop();
+      clearResponseAudio();
+      voiceInitializedRef.current = false;
+    }
+    });
+    return () => { unsubscribe(); };
+  }, [stop, clearResponseAudio]);
+
   // ---- Full text speak (legacy — for greetings, one-shot phrases) ----
 
   const speak = useCallback(async (text: string) => {
-    if (!text.trim()) return;
+    if (!canUseVoice() || !text.trim()) return;
     stop();
+    const generation = queueGenerationRef.current;
 
     const audioData = await fetchAudio(text);
-    if (!audioData) return;
+    if (!audioData || !canUseVoice() || generation !== queueGenerationRef.current) return;
 
     try {
       await playAudioData(audioData);
@@ -438,8 +472,8 @@ export function useBobbyVoice(): BobbyVoiceState {
   }, [stop, playAudioData]);
 
   // Local speak — changed to use regular voice queue for Hackathon Demo to guarantee Edge TTS
-  const speakLocal = useCallback(async (text: string, lang: string = 'en') => {
-    if (!text.trim()) return;
+  const speakLocal = useCallback(async (text: string, lang: string = currentLanguage()) => {
+    if (!canUseVoice() || !text.trim()) return;
     stop();
     queueSentence(text, 'cio', lang);
   }, [stop, queueSentence]);

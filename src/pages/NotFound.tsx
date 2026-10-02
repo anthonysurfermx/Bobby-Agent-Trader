@@ -1,8 +1,8 @@
 // src/pages/NotFound.tsx — a missing page on bobbyprotocol.xyz, in the Núcleo look: warm charcoal,
-// Sora headline, ivory pill back to the desk. Language follows the rest of the app (en/es/pt).
+// Sora headline, ivory pill back to the desk. Language follows the six-language app.
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { htmlLang, t } from '@/lib/companions/i18n';
+import { htmlLang, lang, locale, t } from '@/lib/companions/i18n';
 
 export default function NotFound() {
   const navigate = useNavigate();
@@ -20,7 +20,7 @@ export default function NotFound() {
         {t('It may have moved. Bobby is on the desk.', 'Quizá se movió. Bobby está en el desk.', 'Talvez tenha mudado de lugar. O Bobby está no desk.')}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-3">
-        <Link to="/desk" className="inline-flex min-h-11 items-center rounded-full px-6 text-sm font-semibold" style={{ background: '#F2EDE4', color: '#0B0A09' }}>
+        <Link to={`/desk?lang=${lang()}&locale=${locale()}`} className="inline-flex min-h-11 items-center rounded-full px-6 text-sm font-semibold" style={{ background: '#F2EDE4', color: '#0B0A09' }}>
           {t('Open the desk', 'Abrir el desk', 'Abrir o desk')}
         </Link>
         <button type="button" onClick={() => (window.history.length > 1 ? navigate(-1) : navigate('/'))} className="inline-flex min-h-11 items-center rounded-full border px-6 text-sm" style={{ borderColor: 'rgba(242,237,228,.14)', color: '#F2EDE4' }}>

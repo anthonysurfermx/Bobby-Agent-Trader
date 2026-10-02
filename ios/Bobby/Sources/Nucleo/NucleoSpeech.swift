@@ -22,6 +22,7 @@ final class NucleoSpeech {
 
     private var recognizer: SFSpeechRecognizer?
     private var recognizerLocale: String?
+    private var recognizerCandidates: [String] = []
     private var engine: AVAudioEngine?
     private var request: SFSpeechAudioBufferRecognitionRequest?
     private var task: SFSpeechRecognitionTask?
@@ -81,14 +82,15 @@ final class NucleoSpeech {
         return permission()
     }
 
-    /// es-MX on a Spanish phone, en-US otherwise; the first of those the device supports.
+    /// The selected app language, using only supported on-device recognizers in that language.
     private func resolveRecognizer() -> SFSpeechRecognizer? {
-        let candidates = L.isSpanish ? ["es-MX", "es-US", "es-ES"] : ["en-US", "en-GB"]
-        if let recognizer, let recognizerLocale, candidates.contains(recognizerLocale) { return recognizer }
+        let candidates = L.speechLocaleCandidates
+        if let recognizer, let recognizerLocale, recognizerCandidates == candidates, candidates.contains(recognizerLocale) { return recognizer }
         for id in candidates {
             if let r = SFSpeechRecognizer(locale: Locale(identifier: id)), r.supportsOnDeviceRecognition {
                 recognizer = r
                 recognizerLocale = id
+                recognizerCandidates = candidates
                 return r
             }
         }

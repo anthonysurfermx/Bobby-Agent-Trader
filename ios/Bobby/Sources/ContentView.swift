@@ -91,7 +91,7 @@ final class BobbyViewModel: ObservableObject {
     let profile = AgentProfile()
     let companions = CompanionStore()
     private let memory = DeskMemory()
-    static let defaultQuickAccess = ["BTC", "NVDA", "ETH", "TSLA", L.t("GOLD", "ORO")]
+    static var defaultQuickAccess: [String] { ["BTC", "NVDA", "ETH", "TSLA", L.t("GOLD", "ORO")] }
     /// Read through to the store: sign-out, deletion and sync change it there.
     var streak: Int { companions.disciplineStreak }
     @Published var quickAccess: [String] = BobbyViewModel.defaultQuickAccess
@@ -802,7 +802,7 @@ struct ContentView: View {
                     Label("Trader Land", systemImage: "map")
                 }
                 Section {
-                    Label(vm.streak >= 1 ? L.t("Discipline streak: \(vm.streak) day\(vm.streak == 1 ? "" : "s") 🔥", "Racha de disciplina: \(vm.streak) día\(vm.streak == 1 ? "" : "s") 🔥") : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
+                    Label(vm.streak >= 1 ? L.disciplineStreak(vm.streak) : L.t("No streak yet — review an analysis", "Sin racha aún — revisa un análisis"),
                           systemImage: "flame")
                 }
                 Section {

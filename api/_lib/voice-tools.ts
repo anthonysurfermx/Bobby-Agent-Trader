@@ -1,3 +1,4 @@
+import { APP_LANGUAGES, languageName, type AppLanguage } from '../../src/lib/app-language.js';
 // ============================================================
 // Voice tool contract for the Realtime voice room.
 //
@@ -37,7 +38,7 @@ export const VOICE_TOOLS = [
           type: 'string',
           description: 'Any extra context the human gave (timeframe, risk appetite, thesis).',
         },
-        lang: { type: 'string', enum: ['es', 'en'], description: 'Language selected in the UI.' },
+        lang: { type: 'string', enum: APP_LANGUAGES, description: 'Language selected in the UI.' },
       },
       required: ['symbol'],
     },
@@ -155,10 +156,10 @@ export const VOICE_TOOLS = [
   },
 ] as const;
 
-export function voiceInstructions(lang: 'es' | 'en' | 'auto'): string {
+export function voiceInstructions(lang: AppLanguage | 'auto', locale?: string): string {
   const language = lang === 'auto'
     ? 'Match the language the person actually speaks, starting with their first utterance. Spanish question means Mexican Spanish answer, even if the interface is English. Switch when they switch or explicitly request it. A ticker or English trading term is not a language switch. If speech is unclear, ask briefly in the last clear language; default to Spanish before any clear speech.'
-    : `Speak ${lang === 'es' ? 'natural Mexican Spanish' : 'natural English'} unless the person explicitly asks for another language.`;
+    : `Speak ${languageName(lang, locale)} unless the person explicitly asks for another language.`;
   return `You are Bobby, the user's market companion. You speak through their chosen avatar.
 LANGUAGE: ${language}
 

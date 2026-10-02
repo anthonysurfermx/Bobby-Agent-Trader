@@ -46,13 +46,13 @@ enum AgentVoice: String, CaseIterable, Identifiable {
 enum AuraForge {
     /// (keyword fragments, hue 0..1) — checked in order, first hit wins.
     private static let energies: [([String], Double)] = [
-        (["rojo", "fuego", "sangre", "red"], 0.995),
-        (["naranja", "orange", "sunset"], 0.075),
-        (["dorad", "solar", "oro", "amarill", "gold"], 0.115),
-        (["verde", "matrix", "hacker", "green", "neon"], 0.415),
+        (["rojo", "fuego", "sangre", "red", "rouge", "vermelh", "rosso", "rot"], 0.995),
+        (["naranja", "orange", "sunset", "laranja", "arancione"], 0.075),
+        (["dorad", "solar", "oro", "amarill", "gold", "dore", "dourad", "dorata"], 0.115),
+        (["verde", "matrix", "hacker", "green", "neon", "vert", "grun"], 0.415),
         (["cyan", "hielo", "ice", "turquesa", "aqua"], 0.505),
-        (["azul", "voltaje", "electric", "eléctric", "blue"], 0.615),
-        (["violeta", "morad", "ultra", "midnight", "purple", "lila"], 0.745),
+        (["azul", "voltaje", "electric", "eléctric", "blue", "bleu", "blu", "blau"], 0.615),
+        (["violeta", "morad", "ultra", "midnight", "purple", "lila", "violet", "viola", "violett"], 0.745),
         (["rosa", "pink", "magenta"], 0.895),
     ]
 
@@ -73,13 +73,13 @@ enum AuraForge {
 
     /// Inspiration chips for the onboarding step. Every name keeps a keyword
     /// the hue engine recognizes, so EN and ES sparks land on the same colors.
-    static let sparks = [
+    static var sparks: [String] { [
         L.t("electric blue", "azul voltaje"),
         L.t("hacker green", "verde hacker"),
         L.t("violet after midnight", "violeta de medianoche"),
         L.t("golden hour", "hora dorada"),
         L.t("fearless red", "rojo sin miedo"),
-    ]
+    ] }
 
     /// Spark keyword whose hue lands closest to a target (circular distance).
     /// Lets a chosen companion re-tint the legacy aura accents so the whole
@@ -118,7 +118,7 @@ enum AgentVibe: String, CaseIterable, Identifiable {
     var id: String { rawValue }
     var label: String {
         switch self {
-        case .chill: return "Chill"
+        case .chill: return L.t("Chill", "Relajado")
         case .directo: return L.t("Direct", "Directo")
         case .pro: return "Pro"
         }

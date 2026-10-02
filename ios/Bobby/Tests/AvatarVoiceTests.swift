@@ -45,9 +45,12 @@ final class AvatarVoiceTests: XCTestCase {
     private var session: URLSession!
     private var defaults: UserDefaults!
     private var defaultsSuite: String!
+    private var previousLanguage: String?
 
     override func setUp() {
         super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: L.preferenceKey)
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
         defaultsSuite = "avatar-voice-tests-\(UUID().uuidString)"
         defaults = UserDefaults(suiteName: defaultsSuite)!
         // Every network-positive test explicitly uses current consent, independent of the test host.
@@ -61,6 +64,8 @@ final class AvatarVoiceTests: XCTestCase {
         session.invalidateAndCancel()
         defaults.removePersistentDomain(forName: defaultsSuite)
         AvatarVoiceProtocol.handler = nil
+        if let previousLanguage { UserDefaults.standard.set(previousLanguage, forKey: L.preferenceKey) }
+        else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
         super.tearDown()
     }
 
@@ -76,6 +81,7 @@ final class AvatarVoiceTests: XCTestCase {
     }
 
     @MainActor func testBundledAvatarClipPlaysAudibleSamplesAndFinishesWithoutNetwork() async throws {
+        UserDefaults.standard.set("es", forKey: L.preferenceKey)
         defaults.set(0, forKey: "agent.riskNoticeVersion")
         AvatarVoiceProtocol.handler = { _ in XCTFail("A bundled avatar clip must not make a network request") }
         let voice = NeuralVoice(session: session, defaults: defaults)
@@ -193,6 +199,24 @@ final class AvatarVoiceTests: XCTestCase {
         try await waitUntil { voice.speaking && voice.level > 0.06 }
     }
 
+    @MainActor func testNewLanguagePublicPreviewsUseLocalVoicesWithoutProviderConsentOrSpend() async throws {
+        AvatarVoiceProtocol.handler = { _ in XCTFail("Localized public previews must not call an external provider") }
+        defaults.removeObject(forKey: "agent.riskNoticeVersion")
+        let voice = NeuralVoice(session: session, defaults: defaults)
+        defer { voice.stop() }
+        for language in ["fr", "pt", "it", "de"] {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            let companion = try XCTUnwrap(bobbyCompanions.first)
+            voice.speakClip("select-orb-" + language, fallbackText: companion.selectLine, persona: companion.voicePersona)
+            if NeuralVoice.deviceVoice(language: language) != nil {
+                XCTAssertEqual(voice.engine, .device)
+                XCTAssertTrue(voice.speaking)
+            }
+            voice.stop()
+        }
+        try await Task.sleep(for: .milliseconds(200))
+    }
+
     @MainActor func testMuteDiscardsAnAudioResponseThatArrivesLate() async throws {
         let data = try clip()
         let request = expectation(description: "request before mute")
@@ -227,6 +251,7 @@ final class AvatarVoiceTests: XCTestCase {
         XCTAssertEqual(bobbyCompanions.count, 18)
         XCTAssertEqual(clips.count, 108)
         for (name, persona) in clips.sorted(by: { $0.key < $1.key }) {
+            UserDefaults.standard.set(name.hasSuffix("-es") ? "es" : "en", forKey: L.preferenceKey)
             XCTAssertNotNil(Bundle.main.url(forResource: name, withExtension: "mp3"), name)
             voice.speakClip(name, fallbackText: "Missing clip", persona: persona, playbackRate: 1.12)
             let deadline = Date().addingTimeInterval(3)
@@ -273,6 +298,7 @@ final class AvatarVoiceTests: XCTestCase {
         AvatarVoiceProtocol.handler = { _ in XCTFail("Muted narration must not call TTS") }
         let voice = NeuralVoice(session: session, defaults: defaults)
         defer { voice.stop() }
+        UserDefaults.standard.set("es", forKey: L.preferenceKey)
         voice.speakClip("select-byte-es", fallbackText: "Hola", persona: "ballad")
         try await waitUntil { voice.speaking && voice.level > 0.06 }
         voice.isMuted = true
@@ -288,6 +314,7 @@ final class AvatarVoiceTests: XCTestCase {
         try await Task.sleep(for: .milliseconds(200))
         XCTAssertFalse(relaunched.speaking)
         relaunched.isMuted = false
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
         relaunched.speakClip("select-byte-en", fallbackText: "Hello", persona: "ballad")
         try await waitUntil { relaunched.speaking && relaunched.level > 0.06 }
         XCTAssertFalse(defaults.bool(forKey: NeuralVoice.mutePreferenceKey))

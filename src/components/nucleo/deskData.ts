@@ -2,22 +2,30 @@
 // (/api/voice-tool run_debate), the three stances cut from it, candles and today's movers.
 // Moved out of the previous desk component unchanged; only the exports are new.
 import { deskJson } from '@/lib/desk-request';
-import { deskPrice as money } from '@/lib/desk-price';
-import { lang, t } from '@/lib/companions/i18n';
+import { deskPrice as formatMoney } from '@/lib/desk-price';
+import { lang, speechLocale, t } from '@/lib/companions/i18n';
 import type { ChartLevel } from '@/components/adams/MarketCanvas';
 import { accessHeaders, type Access, type DeskLevel } from '@/lib/access-client';
 
-export interface Snapshot { symbol: string; name?: string; isEquity: boolean }
+export interface Snapshot { symbol: string; name?: string; isEquity: boolean; currency?: string; exchange?: string }
 export interface Resolution { snapshot: Snapshot; needsConfirmation: boolean; confirmName: string; proxyNote: string | null }
+
+export function marketContext() {
+  const language = lang(), locale = speechLocale();
+  const requested = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('country');
+  const country = /^[A-Z]{2}$/.test(requested || '') ? requested! : locale.split('-')[1].toUpperCase();
+  return { language, locale, country };
+}
+export function marketQuery() { return new URLSearchParams(marketContext()).toString(); }
 
 export async function assetSearch(q: string, limit?: number, signal?: AbortSignal): Promise<Record<string, unknown> | null> {
   try {
-    const { ok, data } = await deskJson<Record<string, unknown>>('/api/bobby-asset-search', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q, ...(limit ? { limit } : {}) }) });
+    const { ok, data } = await deskJson<Record<string, unknown>>('/api/bobby-asset-search', { signal, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ q, ...marketContext(), ...(limit ? { limit } : {}) }) });
     if (ok) return data;
   } catch { /* Fall back only while this search is still current. */ }
   if (signal?.aborted) return null;
   try {
-    const { ok, data } = await deskJson<Record<string, unknown>>(`/api/bobby-asset-search?q=${encodeURIComponent(q)}${limit ? `&limit=${limit}` : ''}`, { signal });
+    const { ok, data } = await deskJson<Record<string, unknown>>(`/api/bobby-asset-search?q=${encodeURIComponent(q)}&${marketQuery()}${limit ? `&limit=${limit}` : ''}`, { signal });
     if (ok) return data;
   } catch { /* Surface an unavailable result to the caller. */ }
   return null;
@@ -39,7 +47,7 @@ export async function resolveAsset(query: string, signal?: AbortSignal): Promise
   if (!symbol) return null;
   const aliases = (resolved.aliases as string[] | undefined) ?? [];
   return {
-    snapshot: { symbol, name: (resolved.displayName as string | undefined) ?? undefined, isEquity: resolved.assetClass === 'equity' },
+    snapshot: { symbol, name: (resolved.displayName as string | undefined) ?? undefined, isEquity: resolved.assetClass === 'equity', ...(typeof resolved.currency === 'string' ? { currency: resolved.currency } : {}), ...(typeof resolved.exchange === 'string' ? { exchange: resolved.exchange } : {}) },
     needsConfirmation: Boolean(resolution?.needsConfirmation),
     confirmName: prettyName(aliases.find((a) => a !== symbol) ?? symbol, symbol),
     proxyNote: (resolution?.proxyNote as string | null | undefined) ?? null,
@@ -47,7 +55,7 @@ export async function resolveAsset(query: string, signal?: AbortSignal): Promise
 }
 
 export interface Answer {
-  symbol: string; price: number | null; trend: string | null; momentum: string | null; rsi: number | null; support: number | null; resistance: number | null; atrPct: number | null;
+  symbol: string; currency?: string; price: number | null; trend: string | null; momentum: string | null; rsi: number | null; support: number | null; resistance: number | null; atrPct: number | null;
   regime: string | null; signal: string | null; direction: string | null; convictionPct: number | null; entry: number | null; stop: number | null; target: number | null; rewardRisk: number | null; overview: string | null; error: boolean;
   /** Metered access: set when the server stopped the read (sign in first, or Bobby Pro), and the meter after a read. */
   gate: 'signin_required' | 'subscription_required' | null; access: Access | null;
@@ -59,13 +67,15 @@ const str = (v: unknown): string | null => (typeof v === 'string' ? v : null);
 export async function runDebate(symbol: string, signal: AbortSignal): Promise<Answer> {
   const a: Answer = { symbol, price: null, trend: null, momentum: null, rsi: null, support: null, resistance: null, atrPct: null, regime: null, signal: null, direction: null, convictionPct: null, entry: null, stop: null, target: null, rewardRisk: null, overview: null, error: false, gate: null, access: null };
   try {
-    const { ok, data: obj } = await deskJson<Record<string, unknown>>('/api/voice-tool', { signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ tool: 'run_debate', args: { symbol } }) }, 45_000);
+    const { ok, data: obj } = await deskJson<Record<string, unknown>>('/api/voice-tool', { signal, method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ tool: 'run_debate', args: { symbol, ...marketContext() } }) }, 45_000);
     if (obj && typeof obj === 'object' && obj.access) a.access = obj.access as Access;
     if (!ok && (obj.code === 'signin_required' || obj.code === 'subscription_required')) { a.gate = obj.code; return a; }
     if (!ok || obj.error) { a.error = true; return a; }
     a.regime = str(obj.regime);
     const m = obj.market as Record<string, unknown> | undefined;
     a.price = num(m?.price);
+    const provenance = obj.provenance as Record<string, unknown> | undefined;
+    a.currency = str(m?.currency) ?? str(provenance?.currency) ?? (/\.(PA|LS|MI|DE)$/i.test(symbol) ? 'EUR' : /\.SA$/i.test(symbol) ? 'BRL' : undefined);
     const tech = obj.technicals as Record<string, unknown> | null | undefined;
     if (tech) { a.price = a.price ?? num(tech.price); a.trend = str(tech.trend); a.momentum = str(tech.momentum); a.rsi = num(tech.rsi14); a.support = num(tech.support); a.resistance = num(tech.resistance); a.atrPct = num(tech.atrPct); }
     const p = obj.technical_pulse as Record<string, unknown> | null | undefined;
@@ -136,7 +146,7 @@ export async function runAgents(symbol: string, isEquity: boolean, question: str
     const response = await fetch('/api/desk-debate', {
       signal: controller.signal, method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json', ...(await accessHeaders()) },
-      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), language: lang(), level }),
+      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), ...marketContext(), level }),
     });
     // Refusals (and a server without the live desk) answer plain JSON.
     if (!(response.headers.get('content-type') ?? '').includes('ndjson') || !response.body) {
@@ -219,6 +229,7 @@ export interface Debate { stances: [Stance, Stance, Stance]; headline: string; s
 export const AGENT_TONE: Record<AgentKey, string> = { alpha: '#3FE0B5', red: '#FF5A5F', cio: '#F6B94E' };
 
 export function debateFor(a: Answer, g?: Agents | null): Debate {
+  const money = (value: number) => formatMoney(value, a.currency);
   const noTrade = isNoTrade(a, g);
   const direction: Debate['direction'] = !noTrade && a.direction === 'long' ? 'long' : !noTrade && a.direction === 'short' ? 'short' : 'none';
   const withSide = direction !== 'none';
@@ -235,28 +246,28 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
 
   let alpha: Stance;
   if (withSide && a.entry !== null) {
-    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`${long ? 'Bullish' : 'Bearish'} setup: ${read}. Entry ${money(a.entry)}.`, `Setup ${long ? 'alcista' : 'bajista'}: ${read}. Entrada ${money(a.entry)}.`, `Setup ${long ? 'de alta' : 'de baixa'}: ${read}. Entrada ${money(a.entry)}.`), level: { kind: 'entry', price: a.entry, label: t('entry', 'entrada', 'entrada'), to: zone(a.entry, back) } };
+    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`${long ? t('Bullish', 'Alcista', 'De alta') : t('Bearish', 'Bajista', 'De baixa')} setup: ${read}. Entry ${money(a.entry)}.`, `Setup ${long ? 'alcista' : 'bajista'}: ${read}. Entrada ${money(a.entry)}.`, `Setup ${long ? 'de alta' : 'de baixa'}: ${read}. Entrada ${money(a.entry)}.`), level: { kind: 'entry', price: a.entry, label: t('entry', 'entrada', 'entrada'), to: zone(a.entry, back) } };
   } else {
     const watch = a.support ?? a.resistance;
-    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`No clean setup${read ? `: ${read}` : ''}.${watch !== null ? ` Watching ${money(watch)}.` : ''}`, `Sin setup limpio${read ? `: ${read}` : ''}.${watch !== null ? ` Vigila ${money(watch)}.` : ''}`, `Sem setup limpo${read ? `: ${read}` : ''}.${watch !== null ? ` De olho em ${money(watch)}.` : ''}`), level: watch !== null ? { kind: 'entry', price: watch, label: a.support !== null ? t('support', 'soporte', 'suporte') : t('resistance', 'resistencia', 'resistência') } : null };
+    alpha = { key: 'alpha', name: 'ALPHA HUNTER', score: conv, line: t(`No clean setup${read ? `: ${read}` : ''}.${watch !== null ? ` ${t('Watching', 'Vigila', 'A observar')} ${money(watch)}.` : ''}`, `Sin setup limpio${read ? `: ${read}` : ''}.${watch !== null ? ` Vigila ${money(watch)}.` : ''}`, `Sem setup limpo${read ? `: ${read}` : ''}.${watch !== null ? ` De olho em ${money(watch)}.` : ''}`), level: watch !== null ? { kind: 'entry', price: watch, label: a.support !== null ? t('support', 'soporte', 'suporte') : t('resistance', 'resistencia', 'resistência') } : null };
   }
 
   const severity = conv !== null ? Math.max(0, Math.min(100, 100 - conv)) : null;
   let red: Stance;
   if (withSide && a.stop !== null) {
-    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`Thesis breaks ${long ? 'below' : 'above'} ${money(a.stop)}.${heatNote}`, `La tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}.${heatNote}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}.${heatNote}`), level: { kind: 'stop', price: a.stop, label: t('invalidation', 'invalidación', 'invalidação'), to: zone(a.stop, back) } };
+    red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`Thesis breaks ${long ? t('below', 'debajo de', 'abaixo de') : t('above', 'encima de', 'acima de')} ${money(a.stop)}.${heatNote}`, `La tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}.${heatNote}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}.${heatNote}`), level: { kind: 'stop', price: a.stop, label: t('invalidation', 'invalidación', 'invalidação'), to: zone(a.stop, back) } };
   } else if (a.support !== null && a.resistance !== null) {
     red = { key: 'red', name: 'RED TEAM', score: severity, line: t(`No edge between ${money(a.support)} and ${money(a.resistance)}.${heatNote}`, `Sin ventaja entre ${money(a.support)} y ${money(a.resistance)}.${heatNote}`, `Sem vantagem entre ${money(a.support)} e ${money(a.resistance)}.${heatNote}`), level: { kind: 'stop', price: a.resistance, label: t('resistance', 'resistencia', 'resistência') } };
   } else {
     red = { key: 'red', name: 'RED TEAM', score: severity, line: t('Not enough structure to defend a thesis.', 'No hay estructura suficiente para defender una tesis.', 'Não há estrutura suficiente para defender uma tese.'), level: null };
   }
 
-  const rr = a.rewardRisk !== null ? ` · R:R ${a.rewardRisk.toFixed(1)}` : '';
+  const rr = a.rewardRisk !== null ? ` · R:R ${a.rewardRisk.toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : '';
   const cio: Stance = withSide && a.target !== null
     ? { key: 'cio', name: 'CIO', score: conv, line: t(`${conv}% conviction · target ${money(a.target)}${rr}`, `${conv}% de convicción · objetivo ${money(a.target)}${rr}`, `${conv}% de convicção · alvo ${money(a.target)}${rr}`), level: { kind: 'target', price: a.target, label: t('target', 'objetivo', 'alvo'), to: zone(a.target, ahead) } }
     : { key: 'cio', name: 'CIO', score: conv, line: noTradeReason(a, g), level: null };
 
-  const headline = direction === 'none' ? 'NO TRADE' : `${direction.toUpperCase()}${conv !== null ? ` ${conv}%` : ''}`;
+  const headline = direction === 'none' ? t('NO TRADE', 'NO OPERAR', 'NÃO OPERAR') : `${direction === 'long' ? t('LONG', 'ALCISTA', 'COMPRADOR') : t('SHORT', 'BAJISTA', 'VENDEDOR')}${conv !== null ? ` ${conv}%` : ''}`;
   if (g) {
     // The real debate: each role's own words. Levels, scores and the chart stay the engine's.
     alpha = { ...alpha, line: g.alpha };
@@ -264,7 +275,7 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
     const cioReal: Stance = { ...cio, line: g.cio };
     const close = direction === 'none'
       ? t('My call: no trade.', 'Mi lectura: no operar.', 'Minha leitura: não operar.')
-      : t(`My call: ${direction}, ${conv}% conviction. Reference only.`, `Mi lectura: ${direction}, ${conv}% de convicción. Solo referencia.`, `Minha leitura: ${direction}, ${conv}% de convicção. Apenas referência.`);
+      : t(`My call: ${direction === 'long' ? t('long', 'alcista', 'comprador') : t('short', 'bajista', 'vendedor')}, ${conv}% conviction. Reference only.`, `Mi lectura: ${direction === 'long' ? t('long', 'alcista', 'comprador') : t('short', 'bajista', 'vendedor')}, ${conv}% de convicción. Solo referencia.`, `Minha leitura: ${direction === 'long' ? t('long', 'alcista', 'comprador') : t('short', 'bajista', 'vendedor')}, ${conv}% de convicção. Apenas referência.`);
     const cioSpoken = g.cio.length > 600 ? `${g.cio.slice(0, 600).replace(/\s+\S*$/, '')}…` : g.cio;
     // With the CIO's synthesis, Bobby says the answer and its reason, not the whole ruling.
     const spoken = g.synthesis ? `${g.synthesis.headline} ${g.synthesis.why}` : `${cioSpoken} ${close}`;
@@ -273,7 +284,7 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
   const at = a.price !== null ? t(`${a.symbol} is at ${money(a.price)}. `, `${a.symbol} está en ${money(a.price)}. `, `${a.symbol} está em ${money(a.price)}. `) : '';
   const spoken = withSide && a.entry !== null && a.stop !== null && a.target !== null
     ? at + t(
-      `Alpha Hunter sees a ${long ? 'bullish' : 'bearish'} setup${read ? `: ${read}` : ''}, entry at ${money(a.entry)}. Red Team: the thesis breaks ${long ? 'below' : 'above'} ${money(a.stop)}. CIO: ${long ? 'bullish' : 'bearish'} bias with ${conv}% conviction, target ${money(a.target)}. Reference only.`,
+      `Alpha Hunter sees a ${long ? t('bullish', 'alcista', 'de alta') : t('bearish', 'bajista', 'de baixa')} setup${read ? `: ${read}` : ''}, entry at ${money(a.entry)}. Red Team: the thesis breaks ${long ? t('below', 'debajo de', 'abaixo de') : t('above', 'encima de', 'acima de')} ${money(a.stop)}. CIO: ${long ? t('bullish', 'alcista', 'de alta') : t('bearish', 'bajista', 'de baixa')} bias with ${conv}% conviction, target ${money(a.target)}. Reference only.`,
       `Alpha Hunter ve setup ${long ? 'alcista' : 'bajista'}${read ? `: ${read}` : ''}, entrada en ${money(a.entry)}. Red Team: la tesis se rompe si ${long ? 'pierde' : 'supera'} ${money(a.stop)}. CIO: sesgo ${long ? 'alcista' : 'bajista'} con ${conv}% de convicción, objetivo ${money(a.target)}. Solo referencia.`,
       `Alpha Hunter vê um setup ${long ? 'de alta' : 'de baixa'}${read ? `: ${read}` : ''}, entrada em ${money(a.entry)}. Red Team: a tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}. CIO: viés ${long ? 'de alta' : 'de baixa'} com ${conv}% de convicção, alvo ${money(a.target)}. Apenas referência.`,
     )
@@ -289,7 +300,7 @@ export interface Mover { symbol: string; changePct: number }
 export async function topMovers(limit = 2): Promise<Mover[]> {
   const out: Mover[] = [];
   try {
-    const res = await fetch('/api/bobby-asset-search?browse=1');
+    const res = await fetch('/api/bobby-asset-search?browse=1&' + marketQuery());
     const obj = (await res.json()) as { movers?: Array<{ symbol: string; change24h: number | null }> };
     for (const r of obj.movers ?? []) if (typeof r.change24h === 'number') out.push({ symbol: r.symbol, changePct: r.change24h });
   } catch { /* ignore */ }
@@ -315,4 +326,4 @@ export async function candles(symbol: string, isEquity: boolean): Promise<Candle
   } catch { return []; }
 }
 
-export { money };
+export { formatMoney as money };

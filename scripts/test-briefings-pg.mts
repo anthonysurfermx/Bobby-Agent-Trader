@@ -253,7 +253,7 @@ try {
     // Defense in depth: invalid values throw (the API validates first).
     for (const [bad, what] of [
       [{ assets: ['A', 'B', 'C', 'D', 'E', 'F', 'G'] }, '7 assets'], [{ assets: ['btc'] }, 'lowercase symbol'], [{ assets: ['BTC', 'BTC'] }, 'duplicate asset'],
-      [{ assets: ['BTC; drop'] }, 'symbol pattern'], [{ language: 'fr' }, 'language'], [{ companionId: 'Kora!' }, 'companion pattern'],
+      [{ assets: ['BTC; drop'] }, 'symbol pattern'], [{ language: 'ja' }, 'language'], [{ companionId: 'Kora!' }, 'companion pattern'],
       [{ weeklyEnabled: 'yes' }, 'non-boolean switch'], [{ owner: 'x' }, 'unknown key'], [{ analysisConsentEnabled: true }, 'consent without version'],
       [{ analysisConsentEnabled: true, analysisConsentVersion: 0 }, 'consent version 0'],
     ] as Array<[Record<string, unknown>, string]>) {

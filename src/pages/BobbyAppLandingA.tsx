@@ -10,7 +10,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import { isSpanish, t } from '@/lib/companions/i18n';
+import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, t } from '@/lib/companions/i18n';
 import { APP_STORE_URL } from '@/lib/app-store';
 
 const DESK_URL = '/desk';
@@ -33,9 +33,13 @@ function useProtocolStats() {
   return stats;
 }
 
-function setLang(next: 'en' | 'es') {
+function setLang(next: Lang) {
   try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  const requestedLocale = url.searchParams.get('locale');
+  if (requestedLocale && requestedLocale.split(/[-_]/)[0].toLowerCase() !== next) url.searchParams.delete('locale');
+  window.location.replace(url.href);
 }
 
 function AppleGlyph({ className = 'h-5 w-[17px]' }: { className?: string }) {
@@ -96,9 +100,9 @@ export default function BobbyAppLandingA() {
     const written = Number(record?.commitmentsCreated);
     const wrong = Number(record?.losses);
     if (!Number.isFinite(written) || written <= 0) return null;
-    const writtenLabel = written.toLocaleString(isSpanish() ? 'es-MX' : 'en-US');
+    const writtenLabel = written.toLocaleString(currentLocale());
     if (!Number.isFinite(wrong)) return t(`${writtenLabel} calls written down.`, `${writtenLabel} llamadas escritas.`);
-    const wrongLabel = wrong.toLocaleString(isSpanish() ? 'es-MX' : 'en-US');
+    const wrongLabel = wrong.toLocaleString(currentLocale());
     return t(
       `${writtenLabel} calls written down. ${wrongLabel} of them wrong.`,
       `${writtenLabel} llamadas escritas. ${wrongLabel} de ellas falladas.`,
@@ -117,6 +121,7 @@ export default function BobbyAppLandingA() {
   return (
     <div className="min-h-screen bg-[#07090A] text-[#F6F3EC] antialiased [font-family:'Schibsted_Grotesk',system-ui,sans-serif] selection:bg-[#5CFF91] selection:text-[#07090A]">
       <Helmet>
+        <html lang={currentLocale()} />
         <title>{pageTitle}</title>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" />
         <meta name="description" content={pageDescription} />
@@ -154,9 +159,9 @@ export default function BobbyAppLandingA() {
             <a href={DESK_URL} className="text-[15px] font-medium text-[#F6F3EC]/70 transition hover:text-white">{t('Web app', 'Web app')}</a>
           </nav>
           <div className="flex items-center gap-3 lg:gap-6">
-            <button type="button" onClick={() => setLang(isSpanish() ? 'en' : 'es')} className="min-h-11 px-1 text-[13px] font-semibold text-[#F6F3EC]/60 transition hover:text-white lg:text-[15px]">
-              {isSpanish() ? 'EN' : 'ES'}
-            </button>
+            <select aria-label={t('Language', 'Idioma')} value={lang()} onChange={(event) => setLang(event.target.value as Lang)} className="min-h-11 px-1 text-[13px] font-semibold text-[#F6F3EC]/60 transition hover:text-white lg:text-[15px] bg-transparent">
+              {LANGS.map((language) => <option key={language} value={language} className="bg-[#111] text-white">{LANG_NAME[language]}</option>)}
+            </select>
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-full bg-[#F6F3EC] px-4 text-[13px] font-semibold text-[#07090A] transition hover:bg-white lg:h-11 lg:px-6 lg:text-[15px]">
               {t('Get the app', 'Descárgala')}
             </a>

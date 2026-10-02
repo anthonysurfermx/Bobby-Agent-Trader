@@ -14,7 +14,7 @@ const REPO = path.join(HERE, '..', '..');
 const built = fs.readFileSync(path.join(REPO, 'public', 'nucleo', 'index.html'), 'utf8');
 const CATALOG = JSON.parse(built.match(/window\.NUCLEO_WEB=(\{.*?\});<\/script>/)[1]);
 const WEB = fs.readdirSync(path.join(SRC, 'web')).filter((n) => n.endsWith('.js')).sort();
-const CODE = [fs.readFileSync(path.join(SRC, 'shared', '10-bridge.js'), 'utf8')]
+const CODE = ['05-locale.js', '10-bridge.js'].map((n) => fs.readFileSync(path.join(SRC, 'shared', n), 'utf8'))
   .concat(WEB.map((n) => fs.readFileSync(path.join(SRC, 'web', n), 'utf8')));
 
 let passed = 0, failed = 0;
@@ -174,8 +174,8 @@ async function run() {
     const stages = p.events.filter((e) => e[0] === 'ask.stage').map((e) => e[1].stage);
     eq(stages, ['resolving', 'accepted', 'market', 'candles'], 'stage order');
     const desk = p.calls.find((c) => c[1] === '/api/desk-debate');
-    eq(desk[2], { symbol: 'NVDA', question: 'Should I buy NVIDIA?', language: 'en', assetType: 'equity' }, 'desk body is the app body');
-    eq(p.calls.find((c) => c[1] === '/api/bobby-asset-search')[2], { q: 'Should I buy NVIDIA?' }, 'asset search is a POST with the question');
+    eq(desk[2], { symbol: 'NVDA', question: 'Should I buy NVIDIA?', language: 'en', locale: 'en-US', country: 'US', assetType: 'equity' }, 'desk body is the app body');
+    eq(p.calls.find((c) => c[1] === '/api/bobby-asset-search')[2], { q: 'Should I buy NVIDIA?', language: 'en', locale: 'en-US', country: 'US' }, 'asset search is a POST with the question');
     ok(p.calls.some((c) => c[1] === '/api/stock-candles?symbol=NVDA&range=7d&interval=1h'), 'equity 1H candles');
     const s = await p.call('session', {});
     eq(s.pendingRead && s.pendingRead.requestId, r.requestId, 'an unsaved ok read is pendingRead');
@@ -339,6 +339,26 @@ async function run() {
     eq(await p.call('openNative', { route: 'isla' }), { opened: true }, 'Isla opens Trader Land');
     await sleep(5);
     eq(p.nav.at(-1), ['assign', '/trader-land'], 'the Trader Land route');
+  }
+
+  // Six locales keep regional voice, notice and search fields; withdrawal blocks external routes.
+  for (const language of ['fr', 'pt', 'it', 'de']) {
+    class LocaleRec { constructor() { LocaleRec.last = this; } start() {} abort() {} stop() {} }
+    const p = page({ ls: ONBOARDED, lang: language, recognizer: LocaleRec });
+    const session = await p.call('session', { page: 'app' });
+    eq(session.language, language, language + ' session');
+    eq(session.locale, ({ fr: 'fr-FR', pt: 'pt-PT', it: 'it-IT', de: 'de-DE' })[language], language + ' regional locale');
+    const notice = await p.call('riskNotice');
+    eq(notice.statements, CATALOG.riskNotice.statements[language], language + ' all browser consent clauses');
+    await p.call('speech.requestPermission'); await p.call('speech.start');
+    eq(LocaleRec.last.lang, session.locale, language + ' microphone locale');
+    p.sandbox.__nucleoWeb.sheets.withdrawAIConsent();
+    eq(p.sandbox.__nucleoWeb.state.riskAccepted(), false, language + ' withdrawn consent');
+    const before = p.calls.length;
+    eq((await p.call('ask', { question: 'MC.PA' })).code, 'risk_not_accepted', language + ' no external read after withdrawal');
+    eq((await p.call('speech.start')).status, 'unavailable', language + ' no external dictation after withdrawal');
+    eq((await p.call('speak', { id: 'after-withdraw', text: 'test' })).status, 'muted', language + ' no external speech after withdrawal');
+    eq(p.calls.length, before, language + ' withdrawal sends no HTTP request');
   }
 
   // Spanish

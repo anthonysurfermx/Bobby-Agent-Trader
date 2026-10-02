@@ -80,6 +80,32 @@ final class NucleoBridgeTests: XCTestCase {
         XCTAssertTrue(session.openNative(.account), "account management never requires AI consent")
     }
 
+    func testLocalizedPublicPreviewsDoNotRequireExternalConsentOrReachTheNetwork() throws {
+        let previousLanguage = UserDefaults.standard.string(forKey: L.preferenceKey)
+        let previousMute = UserDefaults.standard.object(forKey: NeuralVoice.mutePreferenceKey)
+        defer {
+            if let previousLanguage { UserDefaults.standard.set(previousLanguage, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+            if let previousMute { UserDefaults.standard.set(previousMute, forKey: NeuralVoice.mutePreferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: NeuralVoice.mutePreferenceKey) }
+        }
+        UserDefaults.standard.set(false, forKey: NeuralVoice.mutePreferenceKey)
+        let (session, _, _) = make(riskAccepted: false)
+        defer { session.teardown() }
+        for language in ["fr", "pt", "it", "de"] {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            let companion = try XCTUnwrap(bobbyCompanions.first)
+            XCTAssertEqual(session.previewVoice(companion), .queued)
+            XCTAssertFalse(session.profile.acceptedRiskNotice)
+            if NeuralVoice.deviceVoice(language: language) != nil {
+                XCTAssertEqual(session.voice.engine, .device)
+                XCTAssertTrue(session.voice.speaking)
+            }
+            session.nucleoVoice.stop()
+        }
+        XCTAssertTrue(NucleoFixtures.log.isEmpty)
+    }
+
     private func reply(_ bridge: NucleoBridge, _ method: String, _ params: [String: Any] = [:]) async -> [String: Any] {
         let (reply, error) = await bridge.handle(body: ["v": 1, "method": method, "params": params], trusted: true)
         XCTAssertNil(error, "\(method) envelope refused")

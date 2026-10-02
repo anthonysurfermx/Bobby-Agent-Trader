@@ -1,20 +1,27 @@
 // The language menu, the React twin of the home's (public/home/index.html): a small glass globe
-// that unfolds into a glass capsule with Español · English · Português, the current one marked by
+// that unfolds into a glass capsule with six supported languages, the current one marked by
 // a small cyan dot. Choosing one stores it in `bobby_lang` and reloads, so every t() on the page
 // reads the new choice (the strings are resolved at render time, and a reload is the one
 // re-render that reaches all of them, sheets and portals included).
 // `LangSegment` is the same choice inline, for the profile's Language row.
 import { useEffect, useId, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from 'react';
-import { LANGS, LANG_NAME, lang, setLang, t, type Lang } from '@/lib/companions/i18n';
+import { LANGS, LANG_NAME, lang, setLang, setLocale, t, type Lang } from '@/lib/companions/i18n';
 import { sfxTock } from '@/lib/companions/sfx';
 
-const BCP47: Record<Lang, string> = { es: 'es', en: 'en', pt: 'pt-BR' };
+const BCP47: Record<Lang, string> = { es: 'es-MX', en: 'en-US', fr: 'fr-FR', pt: 'pt', it: 'it-IT', de: 'de-DE' };
 
 /** Store the choice and reload. Returns false when it is already the current language. */
 function choose(next: Lang): boolean {
   if (next === lang()) return false;
+  let savedLocale = '';
+  try { savedLocale = localStorage.getItem('bobby_locale') || ''; } catch {}
+  const preferred = savedLocale.startsWith('pt') ? savedLocale : navigator.language;
   setLang(next);
-  window.location.reload();
+  setLocale(next === 'pt' ? (/^pt[-_]br$/i.test(preferred) ? 'pt-BR' : 'pt-PT') : BCP47[next]);
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  url.searchParams.delete('locale');
+  window.location.assign(url.href);
   return true;
 }
 
@@ -129,7 +136,7 @@ export default function LangMenu() {
   );
 }
 
-/** The same three choices inline (the profile's Language row): ES · EN · PT. */
+/** The same six choices inline (the profile's Language row): ES · EN · FR · PT · IT · DE. */
 export function LangSegment() {
   const current = lang();
   return (

@@ -1,3 +1,5 @@
+import { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale } from '../src/lib/app-language.js';
+import { BRIEF_LANGUAGES } from './_lib/briefings/types.js';
 // ============================================================
 // /api/briefings — Bobby Pro market briefings, the public account surface (one function, keyed by `op`).
 // Spec: docs/product/pro-market-briefings-implementation.md §4 (decision D3). vercel.json rewrites map the
@@ -140,7 +142,8 @@ function settingsBody(s: BriefSettings, eligiblePro: boolean): Record<string, un
     openingEnabled: s.openingEnabled,
     closeEnabled: s.closeEnabled,
     weeklyEnabled: s.weeklyEnabled,
-    language: s.language,
+    language: appLanguage(s.language),
+    locale: appLocale(appLanguage(s.language), s.language),
     companionId: s.companionId,
     assets: s.assets,
     analysisConsentEnabled: s.analysisConsentEnabled,
@@ -164,7 +167,8 @@ const SettingsPatch = z.object({
   openingEnabled: z.boolean().optional(),
   closeEnabled: z.boolean().optional(),
   weeklyEnabled: z.boolean().optional(),
-  language: z.enum(['en', 'es']).optional(),
+  language: z.enum(APP_LANGUAGES).optional(),
+  locale: z.enum(APP_LOCALES).optional(),
   companionId: z.string().max(32).refine((id) => hasOwn(COMPANION_VOICES, id)).optional(),
   assets: z.array(AssetSymbol).max(LIMITS.assetsPerAccount).refine((a) => new Set(a).size === a.length).optional(),
   analysisConsentEnabled: z.boolean().optional(),
@@ -198,10 +202,13 @@ async function patchSettings({ req, res, identity }: Ctx) {
   // Preserve legacy switches for safe opt-out, but only the weekly product can be enabled.
   if (body.openingEnabled === true || body.closeEnabled === true) fail(400, 'invalid_request');
 
+  if (body.locale && !body.language) fail(400, 'invalid_request');
+  if (body.locale && appLanguage(body.locale) !== body.language) fail(400, 'invalid_request');
   const patch: Record<string, unknown> = {};
   for (const k of ['openingEnabled', 'closeEnabled', 'weeklyEnabled', 'language', 'companionId', 'assets'] as const) {
     if (body[k] !== undefined) patch[k] = body[k];
   }
+  if (body.language === 'pt' && appLocale('pt', body.locale) === 'pt-BR') patch.language = 'pt-BR';
   consentPatch(patch, body.analysisConsentEnabled, body.acceptedAnalysisConsentVersion, CONSENT_VERSIONS.analysis, 'analysisConsentEnabled', 'analysisConsentVersion');
   consentPatch(patch, body.audioConsentEnabled, body.acceptedAudioConsentVersion, CONSENT_VERSIONS.audio, 'audioConsentEnabled', 'audioConsentVersion');
 
@@ -415,7 +422,7 @@ const VoiceBody = z.object({
   contentVersion: z.number().int().min(1).max(1_000_000),
   segmentIndex: z.number().int().min(0).max(LIMITS.narrationSegments - 1),
   voice: z.string().max(32),
-  language: z.enum(['en', 'es']),
+  language: z.enum(BRIEF_LANGUAGES),
 }).strict();
 
 /** A queued answer this far out means the budget refused (voice.ts): narration is unavailable, the text is not. */

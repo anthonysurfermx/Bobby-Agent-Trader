@@ -13,7 +13,7 @@ import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
 import { Apple, ArrowRight, ChevronRight, Flame, Lock, Map as MapIcon, Menu, MessageSquareText, PawPrint, ShieldCheck, Sparkles, X } from 'lucide-react';
 import { COMPANIONS, tintFor } from '@/lib/companions/data';
-import { isSpanish, pick, t } from '@/lib/companions/i18n';
+import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, pick, t } from '@/lib/companions/i18n';
 import TraderLandPreview, { TRADER_LAND_URL } from '@/components/companion/TraderLandPreview';
 import { APP_STORE_URL } from '@/lib/app-store';
 
@@ -29,7 +29,7 @@ const GREEN = '#5cff91';
 const formatNumber = (value: unknown, fallback = '—') => {
   if (value === null || value === undefined || value === '') return fallback;
   const numeric = Number(value);
-  return Number.isFinite(numeric) ? numeric.toLocaleString('en-US') : fallback;
+  return Number.isFinite(numeric) ? numeric.toLocaleString(currentLocale()) : fallback;
 };
 
 function useProtocolStats() {
@@ -52,14 +52,18 @@ function useProtocolStats() {
   return stats;
 }
 
-function setLang(next: 'en' | 'es') {
+function setLang(next: Lang) {
   try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  const requestedLocale = url.searchParams.get('locale');
+  if (requestedLocale && requestedLocale.split(/[-_]/)[0].toLowerCase() !== next) url.searchParams.delete('locale');
+  window.location.replace(url.href);
 }
 
 function BrandMark() {
   return (
-    <a href="/app" className="flex items-center gap-2.5 text-white" aria-label="Bobby home">
+    <a href="/app" className="flex items-center gap-2.5 text-white" aria-label={t('Bobby home', 'Inicio de Bobby')}>
       <span className="relative grid h-10 w-10 place-items-center overflow-hidden rounded-[13px] border border-[#F5C542]/40 bg-[#0b0a06] shadow-[0_0_28px_rgba(245,197,66,.22)]">
         <img src="/favicon-bobby-v3.png" alt="" className="h-10 w-10 object-cover" />
       </span>
@@ -69,12 +73,10 @@ function BrandMark() {
 }
 
 function LangToggle() {
-  const es = isSpanish();
   return (
-    <div className="inline-flex overflow-hidden rounded-full border border-white/12 font-mono text-[9px] font-bold uppercase tracking-[0.12em]">
-      <button type="button" onClick={() => setLang('es')} className={`min-h-11 px-3 py-2 transition ${es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>ES</button>
-      <button type="button" onClick={() => setLang('en')} className={`min-h-11 px-3 py-2 transition ${!es ? 'bg-white text-black' : 'text-white/55 hover:text-white'}`}>EN</button>
-    </div>
+    <select aria-label={t('Language', 'Idioma')} value={lang()} onChange={(event) => setLang(event.target.value as Lang)} className="min-h-11 rounded-full border border-white/15 bg-transparent px-3 font-mono text-xs text-white">
+      {LANGS.map((language) => <option key={language} value={language} className="bg-[#111] text-white">{LANG_NAME[language]}</option>)}
+    </select>
   );
 }
 
@@ -161,7 +163,7 @@ export default function BobbyAppLandingExperience() {
       const losses = Number(record?.losses);
       return Number.isFinite(wins) && Number.isFinite(losses) ? `${wins}W / ${losses}L` : `n=${resolved}`;
     }
-    return Number.isFinite(winRate) ? `${winRate.toFixed(1)}%` : '—';
+    return Number.isFinite(winRate) ? new Intl.NumberFormat(currentLocale(), { style: 'percent', minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(winRate / 100) : '—';
   }, [record?.losses, record?.wins, resolved, winRate]);
 
   const companion = COMPANIONS[activeCompanion] ?? COMPANIONS[0];
@@ -174,13 +176,13 @@ export default function BobbyAppLandingExperience() {
     [t('How a call is made', 'Cómo se decide'), '#how'],
     [t('The record', 'El historial'), '#record'],
     [t('Discipline', 'Disciplina'), '#aura'],
-    ['Squad', '#squad'],
+    [t('Squad', 'Equipo'), '#squad'],
   ];
 
   const moments = [
-    { step: '01', eyebrow: t('Ask your question', 'Haz tu pregunta'), title: t('Type the ticker. The desk wakes up.', 'Escribe el ticker. El desk despierta.'), image: '/app/shot-desk.webp', alt: t('The Live Desk with Byte ready for a market question (earlier iPhone build; voice is now on the web only)', 'El Live Desk con Byte listo para una pregunta de mercado (versión anterior para iPhone; la voz ahora solo está en la web)'), accent: GREEN },
+    { step: '01', eyebrow: t('Ask your question', 'Haz tu pregunta'), title: t('Type the ticker. The desk wakes up.', 'Escribe el ticker. El desk despierta.'), image: '/app/shot-desk.webp', alt: t("The Live Desk with Byte ready for a market question (earlier iPhone build shown)", "El Live Desk con Byte listo para una pregunta de mercado (se muestra una versión anterior para iPhone)"), accent: GREEN },
     { step: '02', eyebrow: t('The answer gets challenged', 'La respuesta se refuta'), title: t('Three agents argue. Risk can close the gate.', 'Tres agentes discuten. El riesgo puede cerrar la puerta.'), image: '/app/shot-notrade.webp', alt: t('A real NO TRADE verdict on BTC with the live chart', 'Un NO TRADE real en BTC con la gráfica en vivo'), accent: '#7ea6ff' },
-    { step: '03', eyebrow: t('Voice tone · web', 'Tono de voz · web'), title: t('The tone changes. The data never does.', 'El tono cambia. Los datos nunca.'), image: '/app/shot-vibe.webp', alt: t('Choosing how Byte sounds in live voice, which is on the web desk (earlier iPhone build shown)', 'Eligiendo cómo suena Byte en la voz en vivo, que está en el desk web (se muestra una versión anterior para iPhone)'), accent: GOLD },
+    { step: '03', eyebrow: t('Voice tone', 'Tono de voz'), title: t('The tone changes. The data never does.', 'El tono cambia. Los datos nunca.'), image: '/app/shot-vibe.webp', alt: t("Choosing Byte’s voice style (earlier iPhone build shown)", "Eligiendo el estilo de voz de Byte (se muestra una versión anterior para iPhone)"), accent: GOLD },
   ];
 
 
@@ -189,6 +191,7 @@ export default function BobbyAppLandingExperience() {
   return (
     <div className="min-h-screen overflow-x-clip [&_section[id]]:scroll-mt-24 [&_a:focus-visible]:outline [&_a:focus-visible]:outline-2 [&_a:focus-visible]:outline-offset-4 [&_a:focus-visible]:outline-[#b7e89c] [&_button:focus-visible]:outline [&_button:focus-visible]:outline-2 [&_button:focus-visible]:outline-offset-4 [&_button:focus-visible]:outline-[#b7e89c] bg-[#050706] font-sans text-white antialiased selection:bg-[#5cff91] selection:text-[#041009]">
       <Helmet>
+        <html lang={currentLocale()} />
         <title>{pageTitle}</title>
         <meta name="description" content={t('Everyone asks an AI about their assets now. Bobby is what comes after: three agents challenge the answer, a risk gate can veto it, and the verdict goes on the record before the market settles it.', 'Todo el mundo le pregunta a una IA por sus activos. Bobby es lo que viene después: tres agentes refutan la respuesta, una puerta de riesgo puede vetarla, y el veredicto queda registrado antes de que el mercado lo resuelva.')} />
         <link rel="canonical" href="https://bobbyprotocol.xyz/app" />
@@ -299,7 +302,7 @@ export default function BobbyAppLandingExperience() {
             <motion.div {...reveal} className="mb-12 max-w-3xl">
               <div className="mb-4 font-mono text-[10px] font-black uppercase tracking-[0.2em] text-[#5cff91]">02 / {t('How a call is made', 'Cómo se decide')}</div>
               <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-5xl lg:text-7xl">{t('Ask the same question.', 'Haz la misma pregunta.')}<br /><span className="text-white/38">{t('Get an answer that was tested.', 'Recibe una respuesta que ya fue probada.')}</span></h2>
-              <p className="mt-5 max-w-xl font-mono text-[10px] uppercase leading-5 tracking-[0.12em] text-white/40">{t('Screens from an earlier iPhone build. In the current iPhone app you type your question; live voice is on the web desk.', 'Pantallas de una versión anterior para iPhone. En la app actual para iPhone escribes tu pregunta; la voz en vivo está en el desk web.')}</p>
+              <p className="mt-5 max-w-xl font-mono text-[10px] uppercase leading-5 tracking-[0.12em] text-white/40">{t("Screens from an earlier iPhone build. The current app supports typed and spoken questions; the web desk also offers voice.", "Pantallas de una versión anterior para iPhone. La app actual permite preguntas escritas y habladas; el desk web también ofrece voz.")}</p>
             </motion.div>
             <div className="grid gap-5 lg:grid-cols-3">
               {moments.map((moment, index) => (
@@ -407,7 +410,7 @@ export default function BobbyAppLandingExperience() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_100%,rgba(245,197,66,.16),transparent_50%),radial-gradient(circle_at_82%_24%,rgba(92,255,145,.12),transparent_38%)]" />
           <motion.div {...reveal} className="relative mx-auto max-w-4xl overflow-hidden rounded-[2rem] border border-white/12 bg-white/[0.045] p-6 text-center shadow-[0_40px_120px_rgba(0,0,0,.45)] backdrop-blur-xl sm:p-10 lg:p-14">
             <h2 className="text-4xl font-black leading-[0.95] tracking-[-0.065em] sm:text-6xl">{t('Stop asking.', 'Deja de preguntar.')}<br /><span className="text-[#F5C542]">{t('Start checking.', 'Empieza a comprobar.')}</span></h2>
-            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t('Bobby is on the App Store for iPhone, where you type your question and read the answer. The Live Desk is also open on the web, with live voice.', 'Bobby ya está en el App Store para iPhone: escribes tu pregunta y lees la respuesta. El Live Desk también está abierto en la web, con voz en vivo.')}</p>
+            <p className="mx-auto mt-6 max-w-xl text-sm leading-6 text-white/52 sm:text-base sm:leading-7">{t("Bobby is on the App Store for iPhone: type or speak your question, and read or hear the answer. The web desk also offers voice.", "Bobby está en el App Store para iPhone: escribe o dicta tu pregunta y lee o escucha la respuesta. El desk web también ofrece voz.")}</p>
             <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
               <AppStoreBadge />
               <a href={TRY_IT_URL} className="inline-flex min-h-14 items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] px-7 font-mono text-xs font-bold uppercase tracking-[0.14em] text-white transition hover:bg-white/[0.12]">{t('Open the desk on the web', 'Abre el desk en la web')} <ArrowRight className="h-4 w-4" /></a>

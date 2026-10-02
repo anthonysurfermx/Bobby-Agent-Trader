@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MessageSquare, X, Bug, Lightbulb, Send } from 'lucide-react';
+import { t } from '@/lib/companions/i18n';
 
 interface FeedbackWidgetProps {
   userEmail?: string;
@@ -37,7 +38,8 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
       <button
         onClick={() => setIsOpen(!isOpen)}
         className="fixed bottom-20 right-4 z-50 w-10 h-10 rounded-full bg-white/[0.06] border border-white/[0.08] flex items-center justify-center text-white/40 hover:text-green-400 hover:border-green-500/30 transition-all"
-        title="Feedback"
+        title={t('Feedback', 'Comentarios')}
+        aria-label={isOpen ? t('Close feedback', 'Cerrar comentarios') : t('Send feedback', 'Enviar comentarios')}
       >
         {isOpen ? <X className="w-4 h-4" /> : <MessageSquare className="w-4 h-4" />}
       </button>
@@ -54,11 +56,11 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
             {sent ? (
               <div className="text-center py-6">
                 <span className="text-green-400 text-2xl">✓</span>
-                <p className="text-white/60 text-xs font-mono mt-2">¡Gracias! Lo revisaremos.</p>
+                <p className="text-white/60 text-xs font-mono mt-2">{t('Thank you! We will review it.', '¡Gracias! Lo revisaremos.')}</p>
               </div>
             ) : (
               <>
-                <h3 className="font-mono text-[10px] uppercase tracking-[2px] text-white/50 mb-3">Feedback</h3>
+                <h3 className="font-mono text-[10px] uppercase tracking-[2px] text-white/50 mb-3">{t('Feedback', 'Comentarios')}</h3>
 
                 {/* Type selector */}
                 <div className="flex gap-2 mb-3">
@@ -68,7 +70,7 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
                       type === 'bug' ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'text-white/30 border border-white/[0.06] hover:text-white/50'
                     }`}
                   >
-                    <Bug className="w-3 h-3" /> Bug
+                    <Bug className="w-3 h-3" /> {t('Bug', 'Error')}
                   </button>
                   <button
                     onClick={() => setType('feature')}
@@ -76,7 +78,7 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
                       type === 'feature' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'text-white/30 border border-white/[0.06] hover:text-white/50'
                     }`}
                   >
-                    <Lightbulb className="w-3 h-3" /> Idea
+                    <Lightbulb className="w-3 h-3" /> {t('Idea', 'Idea')}
                   </button>
                   <button
                     onClick={() => setType('general')}
@@ -84,7 +86,7 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
                       type === 'general' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'text-white/30 border border-white/[0.06] hover:text-white/50'
                     }`}
                   >
-                    <MessageSquare className="w-3 h-3" /> General
+                    <MessageSquare className="w-3 h-3" /> {t('General', 'General')}
                   </button>
                 </div>
 
@@ -92,7 +94,8 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
                 <textarea
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="¿Qué salió mal? ¿Qué mejorarías?"
+                  placeholder={t('What went wrong? What would you improve?', '¿Qué salió mal? ¿Qué mejorarías?')}
+                  aria-label={t('Your feedback', 'Tus comentarios')}
                   className="w-full h-20 bg-[#0f131e] border border-white/[0.06] rounded p-2 text-xs text-white/80 font-mono placeholder:text-white/20 resize-none focus:outline-none focus:border-green-500/30"
                   maxLength={2000}
                 />
@@ -104,7 +107,7 @@ export function FeedbackWidget({ userEmail, walletAddress, page, context }: Feed
                   className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 text-[10px] font-mono bg-green-500/10 border border-green-500/20 text-green-400 rounded hover:bg-green-500/20 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
                 >
                   <Send className="w-3 h-3" />
-                  {sending ? 'Enviando...' : 'Enviar'}
+                  {sending ? t('Sending...', 'Enviando...') : t('Send', 'Enviar')}
                 </button>
               </>
             )}

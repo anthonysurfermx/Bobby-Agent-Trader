@@ -58,7 +58,7 @@
   function sessionJSON() {
     var prof = S.profile(), prog = S.progress(), onboarded = prof.onboarded && !!prof.companionId;
     return {
-      v: 1, page: currentPage, firstRun: !onboarded, onboarded: onboarded, language: NW.lang, localHour: new Date().getHours(),
+      v: 1, page: currentPage, firstRun: !onboarded, onboarded: onboarded, language: NW.lang, locale: NW.locale, country: NW.country, localHour: new Date().getHours(),
       companion: companionJSON(prof.companionId), xp: prog.xp, level: S.levelJSON(prog.xp), streak: prog.streak,
       signedIn: false, signInAvailable: false,
       riskAccepted: prof.riskVersion >= S.RISK_VERSION, riskVersion: S.RISK_VERSION, muted: prof.muted, reducedMotion: reducedMotion(),

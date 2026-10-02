@@ -1,3 +1,4 @@
+import { speechLocale, t as ui, translatedEnglish, lang } from '@/lib/companions/i18n';
 // ============================================================
 // IntelligenceFeed — Visible metacognition: Alpha vs Red Team vs Bobby CIO
 // Shows the internal debate that leads to Bobby's trading decisions
@@ -77,18 +78,17 @@ export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket
         <div className="flex items-center gap-2">
           <Brain className={`w-3.5 h-3.5 ${moodColor}`} />
           <span className="text-[10px] font-mono font-bold tracking-[2px] text-white/60 uppercase">
-            Intelligence Console
-          </span>
+            {ui("Intelligence Console", "Panel de inteligencia")}</span>
           {metacognition && (
             <span className={`text-[9px] font-mono ${moodColor} ml-2`}>
-              {metacognition.mood.toUpperCase()} {metacognition.isSafeMode ? '/ SAFE MODE' : ''}
+              {({ confident: ui('Confident', 'Confiado'), cautious: ui('Cautious', 'Cauteloso'), defensive: ui('Defensive', 'Defensivo') })[metacognition.mood].toUpperCase()} {metacognition.isSafeMode ? ui('/ SAFE MODE', '/ MODO PRUDENTE') : ''}
             </span>
           )}
         </div>
         <div className="flex items-center gap-2">
           {metacognition && (
             <span className="text-[9px] font-mono text-white/30">
-              WR {metacognition.winRate.toFixed(0)}%
+              {ui('Win rate', 'Tasa de acierto')} {metacognition.winRate.toLocaleString(speechLocale(), { maximumFractionDigits: 0 })}%
             </span>
           )}
           {expanded ? <ChevronUp className="w-3 h-3 text-white/30" /> : <ChevronDown className="w-3 h-3 text-white/30" />}
@@ -110,14 +110,14 @@ export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket
               {topSignals && topSignals.length > 0 && (
                 <FeedSection
                   icon={<Activity className="w-3 h-3 text-cyan-400" />}
-                  label="SIGNALS DETECTED"
+                  label={ui("SIGNALS DETECTED", "SEÑALES DETECTADAS")}
                   delay={isLive ? 0.2 : 0}
                 >
                   {topSignals.map((s, i) => (
                     <div key={i} className="flex items-center gap-2 text-[10px] font-mono">
                       <span className="text-cyan-400/60">[{CHAIN_NAME[s.chain] || s.chain}]</span>
                       <span className="text-white/70">{s.token}</span>
-                      <span className="text-white/30">score:{s.score}</span>
+                      <span className="text-white/30">{ui("score:", "puntuación:")}{s.score}</span>
                       <span className="text-white/20">{s.reasons.join(', ')}</span>
                     </div>
                   ))}
@@ -151,7 +151,7 @@ export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket
               {/* BOBBY CIO — THE VERDICT */}
               <FeedSection
                 icon={<Gavel className="w-3 h-3 text-amber-400" />}
-                label="BOBBY CIO — VERDICT"
+                label={ui("BOBBY CIO — VERDICT", "BOBBY CIO — VEREDICTO")}
                 color="amber"
                 delay={isLive ? 2.2 : 0}
               >
@@ -164,14 +164,14 @@ export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket
               {polymarket && polymarket.length > 0 && (
                 <FeedSection
                   icon={<TrendingUp className="w-3 h-3 text-purple-400" />}
-                  label="POLYMARKET CONSENSUS"
+                  label={ui("POLYMARKET CONSENSUS", "CONSENSO DE POLYMARKET")}
                   delay={isLive ? 2.8 : 0}
                 >
                   {polymarket.map((m, i) => (
                     <div key={i} className="text-[10px] font-mono space-y-0.5">
                       <div className="text-purple-300/70 truncate">"{m.title}"</div>
                       <div className="text-white/30 pl-2">
-                        {m.traders} traders → {m.consensus} | {m.price} | edge {m.edge}
+                        {m.traders.toLocaleString(speechLocale())} {ui('traders', 'operadores')} → {m.consensus} | {m.price} | {ui('edge', 'ventaja')} {m.edge}
                       </div>
                     </div>
                   ))}
@@ -180,9 +180,9 @@ export function IntelligenceFeed({ debate, metacognition, topSignals, polymarket
 
               {/* SIZING + SELF-OPTIMIZATION */}
               <div className="px-4 py-2 flex items-center gap-3 text-[9px] font-mono text-white/20 border-t border-white/[0.03]">
-                {debate.sizingMethod && <span>sizing: {debate.sizingMethod}</span>}
-                {debate.selfOptimized && <span className="text-green-400/40">prompt self-optimized</span>}
-                {metacognition?.isSafeMode && <span className="text-red-400/50">SAFE MODE — reduced exposure</span>}
+                {debate.sizingMethod && <span>{ui("sizing:", "tamaño:")}{debate.sizingMethod}</span>}
+                {debate.selfOptimized && <span className="text-green-400/40">{ui("prompt self-optimized", "instrucciones ajustadas")}</span>}
+                {metacognition?.isSafeMode && <span className="text-red-400/50">{ui("SAFE MODE — reduced exposure", "MODO PRUDENTE — exposición reducida")}</span>}
               </div>
             </div>
           </motion.div>

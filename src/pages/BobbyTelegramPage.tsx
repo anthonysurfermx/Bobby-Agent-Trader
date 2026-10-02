@@ -1,3 +1,5 @@
+import { kineticText as text, kineticStatus as status } from '@/lib/companions/kinetic-copy';
+import { locale } from '@/lib/companions/i18n';
 // ============================================================
 // Bobby Telegram Bot Preview — Stitch chat interface
 // Multi-agent cluster response, voice waveform, group CTA
@@ -57,9 +59,9 @@ export default function BobbyTelegramPage() {
       .then(r => r.json())
       .then(d => {
         // telegram_groups is service-role only now; the status endpoint carries name + bot status.
-        if (d.group_name || d.bot_status) setGroupInfo({ name: d.group_name || 'Your Group', status: d.bot_status || (d.active ? 'active' : 'unknown') });
+        if (d.group_name || d.bot_status) setGroupInfo({ name: d.group_name || text('Your Group'), status: d.bot_status || (d.active ? 'active' : 'unknown') });
         if (d.active) {
-          if (!d.group_name) setGroupInfo({ name: 'Group', status: 'active' });
+          if (!d.group_name) setGroupInfo({ name: text('Group'), status: 'active' });
           setGroupActive(true);
         }
       })
@@ -68,16 +70,15 @@ export default function BobbyTelegramPage() {
 
   return (
     <KineticShell activeTab="terminal" nucleo>
-      <Helmet><title>Telegram | Bobby Agent Trader</title></Helmet>
+      <Helmet><title>{text("Telegram | Bobby Agent Trader")}</title></Helmet>
 
       <div className="max-w-md mx-auto px-5 pt-6 pb-20">
         {/* Header */}
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="text-center mb-6">
-          <span className="text-[8px] font-mono text-green-400/40 tracking-widest">TELEGRAM_INTEGRATION</span>
-          <h1 className="text-2xl font-black tracking-tight mt-1">Your Agent on Telegram</h1>
+          <span className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("TELEGRAM_INTEGRATION")}</span>
+          <h1 className="text-2xl font-black tracking-tight mt-1">{text("Your Agent on Telegram")}</h1>
           <p className="text-[10px] font-mono text-white/30 mt-2 max-w-xs mx-auto leading-relaxed">
-            Get your agent's debates and signals directly in Telegram. Three agents debate — you decide.
-          </p>
+            {text("Get your agent's debates and signals directly in Telegram. Three agents debate — you decide.")}</p>
         </motion.div>
 
         {/* Group status — informational only; this page never requests a wallet or payment. */}
@@ -92,21 +93,19 @@ export default function BobbyTelegramPage() {
                   <div className="w-16 h-16 rounded-full bg-green-500/20 border-2 border-green-500/40 flex items-center justify-center mx-auto mb-4">
                     <Check className="w-8 h-8 text-green-400" />
                   </div>
-                  <h3 className="text-xl font-black text-green-400 mb-1">BOBBY IS LIVE</h3>
-                  <p className="text-[10px] font-mono text-white/40 mb-1">{groupInfo?.name || 'Your group'}</p>
-                  <p className="text-[9px] font-mono text-white/20 mb-4">Bobby is now fully integrated.</p>
+                  <h3 className="text-xl font-black text-green-400 mb-1">{text("BOBBY IS LIVE")}</h3>
+                  <p className="text-[10px] font-mono text-white/40 mb-1">{groupInfo?.name || text('Your group')}</p>
+                  <p className="text-[9px] font-mono text-white/20 mb-4">{text("Bobby is now fully integrated.")}</p>
                   <a href="https://t.me/Bobbyagentraderbot" target="_blank" rel="noopener noreferrer"
                     className="inline-block w-full px-6 py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all"
                     style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                    OPEN IN TELEGRAM →
-                  </a>
+                    {text("OPEN IN TELEGRAM →")}</a>
                   <button onClick={() => { navigator.clipboard.writeText('https://t.me/Bobbyagentraderbot'); }}
                     className="text-[8px] font-mono text-white/15 mt-2 hover:text-white/30 transition-colors block">
-                    Link not working? Click to copy: t.me/Bobbyagentraderbot
-                  </button>
+                    {text("Link not working? Click to copy: t.me/Bobbyagentraderbot")}</button>
                   <p className="text-[8px] font-mono text-white/15 mt-2">
-                    Bot not responding? Make sure Bobby has admin privileges.{' '}
-                    <a href="https://t.me/Bobbyagentraderbot" className="text-green-400/40 hover:text-green-400">Contact Support</a>
+                    {text("Bot not responding? Make sure Bobby has admin privileges.")}{' '}
+                    <a href="https://t.me/Bobbyagentraderbot" className="text-green-400/40 hover:text-green-400">{text("Contact Support")}</a>
                   </p>
                 </>
               )}
@@ -117,16 +116,14 @@ export default function BobbyTelegramPage() {
                     <span className="text-amber-400 text-lg">⏸</span>
                   </div>
                   <h3 className="text-sm font-black mb-1">
-                    GROUP SETUP PAUSED FOR {groupInfo?.name?.toUpperCase() || 'YOUR GROUP'}
+                    {text("GROUP SETUP PAUSED FOR")}{' '}{groupInfo?.name?.toUpperCase() || text('YOUR GROUP')}
                   </h3>
                   <div className="bg-white/[0.02] border border-white/[0.06] rounded p-3 mb-4 text-left">
                     <p className="text-[9px] font-mono text-white/50 leading-relaxed">
-                      New group activation is paused while Bobby moves to a Base-only architecture. Existing active groups keep working.
-                    </p>
+                      {text("New group activation is paused while Bobby moves to a Base-only architecture. Existing active groups keep working.")}</p>
                   </div>
                   <p className="text-[7px] font-mono text-white/15 mt-2 leading-relaxed">
-                    This page never connects a wallet, requests payment or moves funds. A payment request is not from Bobby.
-                  </p>
+                    {text("This page never connects a wallet, requests payment or moves funds. A payment request is not from Bobby.")}</p>
                 </>
               )}
             </div>
@@ -139,13 +136,14 @@ export default function BobbyTelegramPage() {
 
           {/* Date separator */}
           <div className="text-center">
-            <span className="text-[9px] font-mono text-white/20 bg-white/[0.03] px-3 py-1 rounded-full">Today, 14:02 UTC</span>
+            <span className="text-[9px] font-mono text-white/20 bg-white/[0.03] px-3 py-1 rounded-full">{text("Example conversation · 14:02 UTC")}</span>
+            <p className="mt-2 text-[9px] font-mono text-white/25">{text("Illustrative prices, not a current recommendation.")}</p>
           </div>
 
           {/* User message */}
           <div className="flex justify-end">
             <div className="bg-green-500/10 border border-green-500/20 rounded-xl rounded-tr-none px-4 py-2.5 max-w-[75%]">
-              <p className="text-sm text-white/80">{DEMO_CONVERSATION[0].text}</p>
+              <p className="text-sm text-white/80">{text(DEMO_CONVERSATION[0].text!)}</p>
               <span className="text-[8px] text-white/20 font-mono mt-1 block text-right">{DEMO_CONVERSATION[0].time} ✓✓</span>
             </div>
           </div>
@@ -162,9 +160,9 @@ export default function BobbyTelegramPage() {
                     <span className={`text-[9px] font-mono font-bold ${agent.textColor}`}>{agent.name}</span>
                     <span className={`text-[7px] font-mono px-1.5 py-0.5 rounded ${
                       agent.stance === 'BULLISH' ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                    }`}>{agent.stance}</span>
+                    }`}>{status(agent.stance)}</span>
                   </div>
-                  <p className="text-[10px] text-white/40 leading-relaxed">{agent.text}</p>
+                  <p className="text-[10px] text-white/40 leading-relaxed">{text(agent.text)}</p>
                 </motion.div>
               ))}
 
@@ -174,10 +172,10 @@ export default function BobbyTelegramPage() {
               {/* Bobby's Verdict */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.7 }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <span className="text-[9px] font-mono font-bold text-yellow-400">Bobby's Verdict</span>
-                  <span className="text-[7px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{DEMO_CONVERSATION[1].verdict!.action}</span>
+                  <span className="text-[9px] font-mono font-bold text-yellow-400">{text("Bobby's Verdict")}</span>
+                  <span className="text-[7px] font-mono text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded">{text(DEMO_CONVERSATION[1].verdict!.action)}</span>
                 </div>
-                <p className="text-[10px] text-white/50 leading-relaxed mb-3">{DEMO_CONVERSATION[1].verdict!.reasoning}</p>
+                <p className="text-[10px] text-white/50 leading-relaxed mb-3">{text(DEMO_CONVERSATION[1].verdict!.reasoning)}</p>
 
                 {/* Conviction bar */}
                 <div className="flex items-center gap-3">
@@ -214,42 +212,38 @@ export default function BobbyTelegramPage() {
               <div className="w-10 h-10 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center mx-auto mb-3">
                 <span className="text-lg">⚡</span>
               </div>
-              <h3 className="text-sm font-bold mb-1">ACTIVATE BOBBY IN YOUR GROUP</h3>
+              <h3 className="text-sm font-bold mb-1">{text("ACTIVATE BOBBY IN YOUR GROUP")}</h3>
               <p className="text-[10px] font-mono text-white/30 mb-3 max-w-xs mx-auto">
-                Activate Bobby in your Telegram group. Multi-agent trading intelligence, voice notes, real-time signals.
-              </p>
+                {text("Activate Bobby in your Telegram group. Multi-agent trading intelligence, voice notes, real-time signals.")}</p>
               {/* Service status */}
               <div className="bg-white/[0.02] border border-white/[0.06] rounded p-3 mb-4 max-w-xs mx-auto">
                 <div className="flex justify-between text-[9px] font-mono mb-1">
-                  <span className="text-white/30">SERVICE</span>
+                  <span className="text-white/30">{text("SERVICE")}</span>
                   <span className="text-white/60">Bobby Agent Trader</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mb-1">
-                  <span className="text-white/30">PROOFS</span>
+                  <span className="text-white/30">{text("PROOFS")}</span>
                   <span className="text-white/60">Base (8453)</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mb-1">
-                  <span className="text-white/30">STATUS</span>
-                  <span className="text-amber-300">New activations paused</span>
+                  <span className="text-white/30">{text("STATUS")}</span>
+                  <span className="text-amber-300">{text("New activations paused")}</span>
                 </div>
                 <div className="flex justify-between text-[9px] font-mono mt-2 pt-2 border-t border-white/[0.06]">
-                  <span className="text-white/40">FUNDS</span>
-                  <span className="text-green-400 font-bold">No payment requested</span>
+                  <span className="text-white/40">{text("FUNDS")}</span>
+                  <span className="text-green-400 font-bold">{text("No payment requested")}</span>
                 </div>
               </div>
 
               <a href="https://t.me/Bobbyagentraderbot?startgroup=true" target="_blank" rel="noopener noreferrer"
                 className="inline-block w-full max-w-xs px-6 py-3 bg-green-500 text-black font-mono text-[10px] font-black tracking-widest rounded active:scale-95 transition-all"
                 style={{ boxShadow: '0 0 20px rgba(34,197,94,0.3)' }}>
-                ADD BOT TO GROUP →
-              </a>
+                {text("ADD BOT TO GROUP →")}</a>
               <p className="text-[8px] font-mono text-white/15 mt-2">
-                Bobby never sends a wallet or payment prompt from this flow.
-              </p>
+                {text("Bobby never sends a wallet or payment prompt from this flow.")}</p>
               <button onClick={() => navigator.clipboard.writeText('https://t.me/Bobbyagentraderbot?startgroup=true')}
                 className="text-[7px] font-mono text-white/10 mt-1 hover:text-white/25 transition-colors">
-                Desktop? Click to copy link
-              </button>
+                {text("Desktop? Click to copy link")}</button>
             </div>
           </div>
         </motion.div>
@@ -264,8 +258,8 @@ export default function BobbyTelegramPage() {
             { label: 'ON_CHAIN', desc: 'Base proof record' },
           ].map(f => (
             <div key={f.label} className="bg-white/[0.02] border border-white/[0.04] rounded p-3">
-              <span className="text-[8px] font-mono text-green-400/50 tracking-widest">{f.label}</span>
-              <p className="text-[10px] font-mono text-white/40 mt-0.5">{f.desc}</p>
+              <span className="text-[8px] font-mono text-green-400/50 tracking-widest">{text(f.label)}</span>
+              <p className="text-[10px] font-mono text-white/40 mt-0.5">{text(f.desc)}</p>
             </div>
           ))}
         </motion.div>
@@ -273,8 +267,7 @@ export default function BobbyTelegramPage() {
         {/* Back link */}
         <div className="mt-6 text-center">
           <Link to="/desk" className="text-[9px] font-mono text-white/20 hover:text-green-400 transition-colors">
-            ← BACK_TO_TERMINAL
-          </Link>
+            {text("← BACK_TO_TERMINAL")}</Link>
         </div>
       </div>
     </KineticShell>

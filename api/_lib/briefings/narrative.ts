@@ -1,3 +1,4 @@
+import { appLanguage, appLocale } from '../../../src/lib/app-language.js';
 // ============================================================
 // Bobby Pro market briefings — the shared narrative, written once per (cadence, period, language). Spec §8, D1.
 //   · narrativeRequest(): the model receives ONLY the evidence block (numbers with freshness labels and as-of).
@@ -22,7 +23,7 @@ const MAX_FACTS = 6;
 
 // ---- formatting (shared with compose.ts) ----
 
-const locale = (lang: BriefLanguage) => (lang === 'es' ? 'es-MX' : 'en-US');
+const locale = (lang: BriefLanguage) => appLocale(appLanguage(lang), lang);
 /** Display precision of a price: 2 decimals, 4 under 1. The model sees these same rounded values. */
 export const priceDecimals = (v: number): number => (Math.abs(v) < 1 ? 4 : 2);
 const roundTo = (v: number, d: number) => Math.round(v * 10 ** d) / 10 ** d;
@@ -47,15 +48,27 @@ export function fmtAt(iso: string | null): string | null {
 
 const FRESH_LABEL: Record<BriefLanguage, Record<Freshness, string>> = {
   es: { live: 'en vivo', delayed: 'con retraso', closed: 'al cierre', stale: 'desactualizado', missing: 'sin datos', '24_7': '24/7' },
-  en: { live: 'live', delayed: 'delayed', closed: 'at close', stale: 'stale', missing: 'unavailable', '24_7': '24/7' },
+  en: { live: 'live', delayed: 'delayed', closed: 'at close', stale: 'stale', missing: 'unavailable', '24_7': '24/7' },  "fr": {"live": "en direct", "delayed": "différé", "closed": "à la clôture", "stale": "périmé", "missing": "indisponible", "24_7": "24/7"},
+  "pt": {"live": "em tempo real", "delayed": "com atraso", "closed": "no fecho", "stale": "desatualizado", "missing": "indisponível", "24_7": "24/7"},
+  "it": {"live": "in tempo reale", "delayed": "ritardato", "closed": "alla chiusura", "stale": "obsoleto", "missing": "non disponibile", "24_7": "24/7"},
+  "de": {"live": "live", "delayed": "verzögert", "closed": "zum Schlusskurs", "stale": "veraltet", "missing": "nicht verfügbar", "24_7": "24/7"},
+  "pt-BR": {"live": "em tempo real", "delayed": "com atraso", "closed": "no fecho", "stale": "desatualizado", "missing": "indisponível", "24_7": "24/7"},
 };
 const SOURCE_LABEL: Record<BriefLanguage, Record<string, string>> = {
   es: { okx_spot: 'OKX (cripto)', yahoo_equities: 'Yahoo Finance (acciones)', okx_funding: 'OKX (financiamiento)', fear_greed: 'Miedo y codicia', dxy_ecb: 'BCE (DXY)', macro_calendar: 'calendario macro', daily_history: 'historial diario' },
-  en: { okx_spot: 'OKX (crypto)', yahoo_equities: 'Yahoo Finance (equities)', okx_funding: 'OKX (funding)', fear_greed: 'Fear & Greed', dxy_ecb: 'ECB (DXY)', macro_calendar: 'macro calendar', daily_history: 'daily history' },
+  en: { okx_spot: 'OKX (crypto)', yahoo_equities: 'Yahoo Finance (equities)', okx_funding: 'OKX (funding)', fear_greed: 'Fear & Greed', dxy_ecb: 'ECB (DXY)', macro_calendar: 'macro calendar', daily_history: 'daily history' },  "fr": {"okx_spot": "marché crypto", "yahoo_equities": "Yahoo Finance (actions)", "okx_funding": "financement crypto", "fear_greed": "Peur et avidité", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendrier macroéconomique", "daily_history": "historique quotidien"},
+  "pt": {"okx_spot": "mercado cripto", "yahoo_equities": "Yahoo Finance (ações)", "okx_funding": "financiamento cripto", "fear_greed": "Medo e ganância", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendário macroeconómico", "daily_history": "histórico diário"},
+  "it": {"okx_spot": "mercato cripto", "yahoo_equities": "Yahoo Finance (azioni)", "okx_funding": "finanziamento cripto", "fear_greed": "Paura e avidità", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendario macroeconomico", "daily_history": "storico giornaliero"},
+  "de": {"okx_spot": "Kryptomarkt", "yahoo_equities": "Yahoo Finance (Aktien)", "okx_funding": "Kryptofinanzierung", "fear_greed": "Angst und Gier", "dxy_ecb": "EZB (DXY)", "macro_calendar": "Makrokalender", "daily_history": "Tagesverlauf"},
+  "pt-BR": {"okx_spot": "mercado cripto", "yahoo_equities": "Yahoo Finance (ações)", "okx_funding": "financiamento cripto", "fear_greed": "Medo e ganância", "dxy_ecb": "BCE (DXY)", "macro_calendar": "calendário macroeconómico", "daily_history": "histórico diário"},
 };
 const BASIS_LABEL: Record<BriefLanguage, Record<AssetQuote['changeBasis'], string>> = {
   es: { '24h': 'en 24 h', prev_close: 'vs. cierre anterior', session: 'en la sesión', '7d': 'en 7 días' },
-  en: { '24h': 'over 24h', prev_close: 'vs previous close', session: 'in session', '7d': 'over 7 days' },
+  en: { '24h': 'over 24h', prev_close: 'vs previous close', session: 'in session', '7d': 'over 7 days' },  "fr": {"24h": "sur 24 h", "prev_close": "par rapport à la clôture précédente", "session": "pendant la séance", "7d": "sur 7 jours"},
+  "pt": {"24h": "em 24 h", "prev_close": "face ao fecho anterior", "session": "na sessão", "7d": "em 7 dias"},
+  "it": {"24h": "in 24 h", "prev_close": "rispetto alla chiusura precedente", "session": "nella seduta", "7d": "in 7 giorni"},
+  "de": {"24h": "über 24 Std.", "prev_close": "gegenüber dem vorherigen Schlusskurs", "session": "in der Sitzung", "7d": "über 7 Tage"},
+  "pt-BR": {"24h": "em 24 h", "prev_close": "face ao fecho anterior", "session": "na sessão", "7d": "em 7 dias"},
 };
 const L = {
   es: {
@@ -82,11 +95,127 @@ const L = {
     opening: (c: string, at: string) => `${c} briefing with data as of ${at}.`,
     cadence: { morning: 'Market opening', close: 'Market close', weekly: 'Weekly' },
   },
+  "fr": {
+    market: "Marché",
+    risks: "Risques",
+    agenda: "Agenda de cette semaine",
+    week: "Semaine précédente",
+    price: "Prix",
+    asOf: "Données au",
+    status: "État",
+    fearGreed: "Peur et avidité",
+    dxy: "DXY (estimation BCE)",
+    funding: "Financement",
+    equities: "Actions américaines",
+    noData: (s: string) => `Aucune donnée disponible pour ${s} actuellement.`,
+    noFunding: "Aucune donnée de financement disponible.",
+    sourcesDown: (list: string) => `Sources incomplètes ou périmées : ${list}.`,
+    agendaEmpty: "Aucun événement enregistré dans le calendrier pour cette période.",
+    agendaDown: "Le calendrier des événements était indisponible.",
+    weekEmpty: "L’historique quotidien ne suffit pas pour comparer la semaine.",
+    opening: (c: string, at: string) => `Résumé ${c} avec les données au ${at}.`,
+    cadence: {"morning": "d’ouverture", "close": "de clôture", "weekly": "hebdomadaire"},
+  },
+  "pt": {
+    market: "Mercado",
+    risks: "Riscos",
+    agenda: "Agenda desta semana",
+    week: "Semana anterior",
+    price: "Preço",
+    asOf: "Dados em",
+    status: "Estado",
+    fearGreed: "Medo e ganância",
+    dxy: "DXY (estimativa BCE)",
+    funding: "Financiamento",
+    equities: "Ações dos EUA",
+    noData: (s: string) => `Sem dados disponíveis para ${s} neste momento.`,
+    noFunding: "Sem dados de financiamento disponíveis.",
+    sourcesDown: (list: string) => `Fontes incompletas ou desatualizadas: ${list}.`,
+    agendaEmpty: "Não há eventos registados no calendário para este período.",
+    agendaDown: "O calendário de eventos estava indisponível.",
+    weekEmpty: "O histórico diário não é suficiente para comparar a semana.",
+    opening: (c: string, at: string) => `Resumo ${c} com dados em ${at}.`,
+    cadence: {"morning": "de abertura", "close": "de fecho", "weekly": "semanal"},
+  },
+  "it": {
+    market: "Mercato",
+    risks: "Rischi",
+    agenda: "Agenda di questa settimana",
+    week: "Settimana precedente",
+    price: "Prezzo",
+    asOf: "Dati al",
+    status: "Stato",
+    fearGreed: "Paura e avidità",
+    dxy: "DXY (stima BCE)",
+    funding: "Finanziamento",
+    equities: "Azioni statunitensi",
+    noData: (s: string) => `Nessun dato disponibile per ${s} al momento.`,
+    noFunding: "Nessun dato di finanziamento disponibile.",
+    sourcesDown: (list: string) => `Fonti incomplete o obsolete: ${list}.`,
+    agendaEmpty: "Non ci sono eventi registrati nel calendario per questo periodo.",
+    agendaDown: "Il calendario degli eventi non era disponibile.",
+    weekEmpty: "Lo storico giornaliero non basta per confrontare la settimana.",
+    opening: (c: string, at: string) => `Riepilogo ${c} con dati al ${at}.`,
+    cadence: {"morning": "di apertura", "close": "di chiusura", "weekly": "settimanale"},
+  },
+  "de": {
+    market: "Markt",
+    risks: "Risiken",
+    agenda: "Agenda dieser Woche",
+    week: "Vorherige Woche",
+    price: "Preis",
+    asOf: "Datenstand",
+    status: "Status",
+    fearGreed: "Angst und Gier",
+    dxy: "DXY (EZB-Schätzung)",
+    funding: "Finanzierung",
+    equities: "US-Aktien",
+    noData: (s: string) => `Derzeit keine Daten für ${s} verfügbar.`,
+    noFunding: "Keine Finanzierungsdaten verfügbar.",
+    sourcesDown: (list: string) => `Unvollständige oder veraltete Quellen: ${list}.`,
+    agendaEmpty: "Für diesen Zeitraum sind keine Ereignisse im Kalender gespeichert.",
+    agendaDown: "Der Ereigniskalender war nicht verfügbar.",
+    weekEmpty: "Der Tagesverlauf reicht für einen Wochenvergleich nicht aus.",
+    opening: (c: string, at: string) => `${c} Überblick mit Datenstand ${at}.`,
+    cadence: {"morning": "zur Eröffnung", "close": "zum Schluss", "weekly": "wöchentlich"},
+  },
+  "pt-BR": {
+    market: "Mercado",
+    risks: "Riscos",
+    agenda: "Agenda desta semana",
+    week: "Semana anterior",
+    price: "Preço",
+    asOf: "Dados em",
+    status: "Estado",
+    fearGreed: "Medo e ganância",
+    dxy: "DXY (estimativa BCE)",
+    funding: "Financiamento",
+    equities: "Ações dos EUA",
+    noData: (s: string) => `Sem dados disponíveis para ${s} neste momento.`,
+    noFunding: "Sem dados de financiamento disponíveis.",
+    sourcesDown: (list: string) => `Fontes incompletas ou desatualizadas: ${list}.`,
+    agendaEmpty: "Não há eventos registados no calendário para este período.",
+    agendaDown: "O calendário de eventos estava indisponível.",
+    weekEmpty: "O histórico diário não é suficiente para comparar a semana.",
+    opening: (c: string, at: string) => `Resumo ${c} com dados em ${at}.`,
+    cadence: {"morning": "de abertura", "close": "de fecho", "weekly": "semanal"},
+  },
 } as const;
 
 /** Plain sentence about the US equity session; never implies a live session when closed. */
 export function equitySessionLine(e: BriefEvidence['equitySession'], lang: BriefLanguage): string {
   const last = e.lastSessionDate;
+  if (lang !== 'es' && lang !== 'en') {
+    const copy = {
+      fr: { open: 'séance régulière ouverte', pre_market: 'séance pas encore ouverte', after_close: 'séance fermée', closed_weekend: 'fermé pour le week-end', closed_holiday: 'fermé pour jour férié', unknown: 'horaires non confirmés; vérifiez la date de chaque prix', last: 'dernière clôture' },
+      pt: { open: 'sessão regular aberta', pre_market: 'a sessão ainda não abriu', after_close: 'sessão encerrada', closed_weekend: 'encerrado ao fim de semana', closed_holiday: 'encerrado por feriado', unknown: 'horário não confirmado; verifica a data de cada preço', last: 'último fecho' },
+      'pt-BR': { open: 'sessão regular aberta', pre_market: 'a sessão ainda não abriu', after_close: 'sessão encerrada', closed_weekend: 'fechado no fim de semana', closed_holiday: 'fechado por feriado', unknown: 'horário não confirmado; confira a data de cada preço', last: 'último fechamento' },
+      it: { open: 'seduta regolare aperta', pre_market: 'la seduta non è ancora aperta', after_close: 'seduta chiusa', closed_weekend: 'chiuso nel fine settimana', closed_holiday: 'chiuso per festività', unknown: 'orari non confermati; controlla la data di ogni prezzo', last: 'ultima chiusura' },
+      de: { open: 'reguläre Sitzung geöffnet', pre_market: 'Sitzung noch nicht geöffnet', after_close: 'Sitzung geschlossen', closed_weekend: 'am Wochenende geschlossen', closed_holiday: 'wegen Feiertag geschlossen', unknown: 'Handelszeiten unbestätigt; prüfe jedes Kursdatum', last: 'letzter Schlusskurs' },
+    }[lang];
+    return `${L[lang].equities}: ${copy[e.state]}${e.holidayName ? ` (${e.holidayName})` : ''}${e.state !== 'open' && last ? `; ${copy.last}: ${last}` : ''}.`;
+  }
+
   if (lang === 'es') {
     switch (e.state) {
       case 'open': return 'Acciones de EE. UU.: sesión regular abierta.';
@@ -110,6 +239,15 @@ export function equitySessionLine(e: BriefEvidence['equitySession'], lang: Brief
 /** Localized agenda title; market-hours items have canonical English titles in evidence. */
 export function agendaTitle(item: BriefEvidence['agenda'][number], lang: BriefLanguage): string {
   if (lang === 'en' || item.kind !== 'market_hours') return item.title;
+  if (lang !== 'es') {
+    const labels = { fr: ['Ouverture de la séance américaine', 'Clôture de la séance américaine', 'Clôture anticipée de la séance américaine', 'Marchés américains fermés'], pt: ['Abertura da sessão dos EUA', 'Fecho da sessão dos EUA', 'Fecho antecipado da sessão dos EUA', 'Mercados dos EUA encerrados'], 'pt-BR': ['Abertura da sessão dos EUA', 'Fechamento da sessão dos EUA', 'Fechamento antecipado da sessão dos EUA', 'Mercados dos EUA fechados'], it: ['Apertura della seduta statunitense', 'Chiusura della seduta statunitense', 'Chiusura anticipata della seduta statunitense', 'Mercati statunitensi chiusi'], de: ['US-Handelssitzung öffnet', 'US-Handelssitzung schließt', 'US-Handelssitzung schließt vorzeitig', 'US-Märkte geschlossen'] }[lang];
+    if (item.title === MARKET_HOURS_TITLES.open) return labels[0];
+    if (item.title === MARKET_HOURS_TITLES.close) return labels[1];
+    if (item.title === MARKET_HOURS_TITLES.earlyClose) return labels[2];
+    if (item.title.startsWith(MARKET_HOURS_TITLES.holidayPrefix)) return `${labels[3]}: ${item.title.slice(MARKET_HOURS_TITLES.holidayPrefix.length)}`;
+    return item.title;
+  }
+
   if (item.title === MARKET_HOURS_TITLES.open) return 'Abre la sesión de acciones de EE. UU.';
   if (item.title === MARKET_HOURS_TITLES.close) return 'Cierra la sesión de acciones de EE. UU.';
   if (item.title === MARKET_HOURS_TITLES.earlyClose) return 'Cierre anticipado de la sesión de acciones de EE. UU.';
@@ -233,7 +371,11 @@ export function evidenceBlock(e: BriefEvidence, symbols: string[]): Record<strin
 
 const LANGUAGE_RULE: Record<BriefLanguage, string> = {
   es: 'Write in Mexican Spanish: plain, warm and clear, short sentences, no hype, no slang overload. Address nobody by name.',
-  en: 'Write in plain, warm, clear English: short sentences, no hype. Address nobody by name.',
+  en: 'Write in plain, warm, clear English: short sentences, no hype. Address nobody by name.',  "fr": "Write in French (France): plain, warm and clear, short sentences, no hype. Address nobody by name.",
+  "pt": "Write in European Portuguese (Portugal): plain, warm and clear, short sentences, no hype. Address nobody by name.",
+  "pt-BR": "Write in Brazilian Portuguese: plain, warm and clear, short sentences, no hype. Address nobody by name.",
+  "it": "Write in Italian (Italy): plain, warm and clear, short sentences, no hype. Address nobody by name.",
+  "de": "Write in German (Germany): plain, warm and clear, short sentences, no hype. Address nobody by name.",
 };
 
 export function narrativeRequest(evidence: BriefEvidence, language: BriefLanguage, symbols: string[]): { system: string; user: string; schema: { name: string; schema: Record<string, unknown> } } {
@@ -284,7 +426,11 @@ const URL_RE = /https?:\/\/|www\.|\b[a-z0-9-]+\.(?:com|io|org|net|xyz|ai|co|mx|a
 const MARKUP_RE = /\[[^\]]*\]\([^)]*\)|\*\*|__|`|^\s*#{1,6}\s|<\/?[a-z][^>]*>/im;
 const ADVICE_RE: Record<BriefLanguage, RegExp> = {
   en: /\b(you should|we recommend|i recommend|consider (?:buying|selling)|(?:buy|sell|hold) (?:now|it|this|them)|price target)\b/i,
-  es: /(deber[ií]as|te recomiendo|recomendamos|te sugiero|\b(?:compra|vende|mant[eé]n|comprar|vender) (?:ya|ahora|hoy)\b|precio objetivo)/i,
+  es: /(deber[ií]as|te recomiendo|recomendamos|te sugiero|\b(?:compra|vende|mant[eé]n|comprar|vender) (?:ya|ahora|hoy)\b|precio objetivo)/i,  "fr": /\b(tu devrais|vous devriez|je recommande|nous recommandons|(?:achète|achetez|vends|vendez|acheter|vendre) maintenant|objectif de (?:prix|cours))\b/i,
+  "pt": /(deverias|deveria|recomendo|recomendamos|aconselho|(?:compra|compre|vende|venda|comprar|vender) (?:já|agora|hoje)|preço[- ]alvo)/i,
+  "it": /\b(dovresti|ti consiglio|raccomandiamo|(?:compra|vendi|comprare|vendere) (?:ora|subito|oggi)|prezzo obiettivo)\b/i,
+  "de": /\b(du solltest|ich empfehle|wir empfehlen|(?:kaufe|verkaufe|kaufen|verkaufen) (?:jetzt|sofort|heute)|Kursziel)\b/i,
+  "pt-BR": /(deverias|deveria|recomendo|recomendamos|aconselho|(?:compra|compre|vende|venda|comprar|vender) (?:já|agora|hoje)|preço[- ]alvo)/i,
 };
 const TIME_RE = /\b(?:[01]?\d|2[0-3]):[0-5]\d\b/g;
 const NUM_RE = /\d+(?:[.,]\d+)*/g;

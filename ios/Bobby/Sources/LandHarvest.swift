@@ -169,10 +169,14 @@ struct HarvestMoment: Identifiable, Equatable {
 }
 
 extension AwardThesis {
-    /// "BTC long @ $64,210.50" in the reader's language.
+    /// The saved thesis has no currency field: show its price without inventing a currency.
     var line: String {
         let bias = direction == "long" ? L.t("long", "alcista") : direction == "short" ? L.t("short", "bajista") : L.t("no bias", "sin sesgo")
-        return "\(symbol) \(bias)" + (price.map { " @ \(BobbyAnswer.money($0))" } ?? "")
+        let formatter = NumberFormatter()
+        formatter.locale = L.locale
+        formatter.numberStyle = .decimal
+        formatter.maximumFractionDigits = (price ?? 0) >= 1000 ? 0 : ((price ?? 0) >= 1 ? 2 : 4)
+        return "\(symbol) \(bias)" + (price.map { " @ " + (formatter.string(from: NSNumber(value: $0)) ?? String($0)) } ?? "")
     }
 }
 

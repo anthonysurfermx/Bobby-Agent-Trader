@@ -9,7 +9,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
-import { isPortuguese, pick, speechLocale, t } from '@/lib/companions/i18n';
+import { pick, speechLocale, t } from '@/lib/companions/i18n';
 import { progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
@@ -34,7 +34,7 @@ import LevelControl, { LEVEL_HUE, allowanceFor, levelName, storedLevel, storeLev
 import LimitDialog, { type LimitState } from './LimitDialog';
 import InvitePanel from './InvitePanel';
 import {
-  AGENT_TONE, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money, noTradeReason, prettyName, resolveAsset, runAgents, runDebate, topMovers, type Agents,
+  AGENT_TONE, marketQuery, assetSearch, candles, debateFor, isNoTrade, isUnavailable, localizedMomentum, localizedTrend, money as formatMoney, noTradeReason, prettyName, resolveAsset, runAgents, runDebate, topMovers, type Agents,
   type AgentKey, type Answer, type Candle, type Mover, type Resolution, type Snapshot,
 } from './deskData';
 
@@ -62,13 +62,13 @@ function greeting(name?: string | null): string {
   const h = new Date().getHours();
   const [en, es, pt] = h < 5 || h >= 19 ? ['Good evening', 'Buenas noches', 'Boa noite'] : h < 12 ? ['Good morning', 'Buenos días', 'Bom dia'] : ['Good afternoon', 'Buenas tardes', 'Boa tarde'];
   const tail = name ? `, ${name}.` : '.';
-  return t(en + tail, es + tail, pt + tail);
+  return t(en, es, pt) + tail;
 }
-const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(v >= 10 || v <= -10 ? 1 : 2)}%`;
+const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toLocaleString(speechLocale(), { minimumFractionDigits: v >= 10 || v <= -10 ? 1 : 2, maximumFractionDigits: v >= 10 || v <= -10 ? 1 : 2 })}%`;
 
 /** The spoken read as karaoke: one sentence at a time, the current word lit, on the reading clock. */
 function Caption({ text, run }: { text: string; run: string | number }) {
-  const sentences = useMemo(() => text.split(/(?<=[.!?])\s+(?=[A-Z¿¡$0-9])/).filter(Boolean), [text]);
+  const sentences = useMemo(() => text.split(/(?<=[.!?])\s+(?=[A-ZÀ-ÖØ-Þ¿¡$0-9])/).filter(Boolean), [text]);
   const [pos, setPos] = useState({ s: 0, w: 0 });
   useEffect(() => {
     setPos({ s: 0, w: 0 });
@@ -537,7 +537,7 @@ export default function NucleoDesk() {
       })));
       if (pet) { ctx.font = '150px serif'; ctx.fillText(pet.emoji, 180, 900); }
       ctx.fillStyle = '#F2EDE4'; ctx.font = '300 76px Sora, system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText(displayName, 540, 1000);
-      ctx.fillStyle = '#A39C91'; ctx.font = '500 26px ui-monospace, monospace'; ctx.fillText(`${t('LEVEL', 'NIVEL', 'NÍVEL')} ${level.number} · ${level.name} · ${progress.xp} XP`, 540, 1050);
+      ctx.fillStyle = '#A39C91'; ctx.font = '500 26px ui-monospace, monospace'; ctx.fillText(`${t('LEVEL', 'NIVEL', 'NÍVEL')} ${level.number} · ${pick(level.label)} · ${progress.xp} XP`, 540, 1050);
       ctx.fillStyle = 'rgba(242,237,228,0.8)'; ctx.font = '28px system-ui, sans-serif';
       const line = [...worn.map((w) => pick(w.name)), ...(pet ? [pick(pet.name)] : [])].join(' · ') || t('No gear yet — first read drops the first tool.', 'Sin equipo aún — la primera lectura suelta la primera herramienta.', 'Sem equipamento ainda — a primeira leitura libera a primeira ferramenta.');
       ctx.fillText(line.slice(0, 70), 540, 1120);
@@ -583,7 +583,7 @@ export default function NucleoDesk() {
     const first = pts[0].close, last = pts[pts.length - 1].close;
     return first > 0 ? ((last - first) / first) * 100 : null;
   }, [series]);
-  const assetLine = snapshot ? [snapshot.symbol, answer?.price != null ? money(answer.price) : null, change !== null ? signedPct(change) : null].filter(Boolean).join(' · ') : '';
+  const assetLine = snapshot ? [snapshot.symbol, answer?.price != null ? formatMoney(answer.price, answer.currency ?? snapshot?.currency) : null, change !== null ? signedPct(change) : null].filter(Boolean).join(' · ') : '';
   const activeAgent: AgentKey | null = phase === 'alpha' || phase === 'resolving' || phase === 'rebuttal' ? 'alpha' : phase === 'redTeam' ? 'red' : phase === 'cio' ? 'cio' : null;
   const nextLevel = nextLevelFor(progress.xp);
   const xpArc = nextLevel ? Math.max(0.04, Math.min(1, (progress.xp - level.minXP) / (nextLevel.minXP - level.minXP))) : 1;
@@ -663,10 +663,10 @@ export default function NucleoDesk() {
   const sats = useMemo(() => {
     if (!answer || !snapshot) return [] as Array<{ k: string; v: string; q?: string | null; dot: string }>;
     const out: Array<{ k: string; v: string; q?: string | null; dot: string }> = [];
-    if (answer.price != null) out.push({ k: snapshot.symbol, v: money(answer.price), q: change !== null ? signedPct(change) : null, dot: change !== null && change < 0 ? AGENT_TONE.red : AGENT_TONE.alpha });
+    if (answer.price != null) out.push({ k: snapshot.symbol, v: formatMoney(answer.price, answer.currency ?? snapshot?.currency), q: change !== null ? signedPct(change) : null, dot: change !== null && change < 0 ? AGENT_TONE.red : AGENT_TONE.alpha });
     if (answer.rsi != null) { const mom = answer.momentum ? localizedMomentum(answer.momentum) : null; out.push({ k: 'RSI 14', v: String(Math.round(answer.rsi)), q: mom, dot: answer.rsi >= 70 ? AGENT_TONE.red : answer.rsi <= 30 ? AGENT_TONE.alpha : '#A39C91' }); }
-    if (answer.support != null && answer.resistance != null) out.push({ k: t('Range', 'Rango', 'Faixa'), v: `${money(answer.support)}–${money(answer.resistance)}`, dot: '#A39C91' });
-    if (answer.trend) { const trend = localizedTrend(answer.trend); out.push({ k: t('Trend', 'Tendencia', 'Tendência'), v: trend.charAt(0).toUpperCase() + trend.slice(1), q: answer.atrPct != null ? `ATR ${answer.atrPct.toFixed(1)}%` : null, dot: '#A39C91' }); }
+    if (answer.support != null && answer.resistance != null) out.push({ k: t('Range', 'Rango', 'Faixa'), v: `${formatMoney(answer.support, answer.currency ?? snapshot?.currency)}–${formatMoney(answer.resistance, answer.currency ?? snapshot?.currency)}`, dot: '#A39C91' });
+    if (answer.trend) { const trend = localizedTrend(answer.trend); out.push({ k: t('Trend', 'Tendencia', 'Tendência'), v: trend.charAt(0).toUpperCase() + trend.slice(1), q: answer.atrPct != null ? `ATR ${answer.atrPct.toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%` : null, dot: '#A39C91' }); }
     return out;
   }, [answer, snapshot, change]);
 
@@ -708,15 +708,15 @@ export default function NucleoDesk() {
     const trade = debate.direction !== 'none';
     const title = agentsFailed ? t(`${snapshot.symbol}: market read`, `${snapshot.symbol}: lectura del mercado`, `${snapshot.symbol}: leitura do mercado`) : debate.direction === 'long' ? t(`Long on ${snapshot.symbol}.`, `Long en ${snapshot.symbol}.`, `Long em ${snapshot.symbol}.`) : debate.direction === 'short' ? t(`Short on ${snapshot.symbol}.`, `Short en ${snapshot.symbol}.`, `Short em ${snapshot.symbol}.`) : t(`No trade on ${snapshot.symbol}.`, `No trade en ${snapshot.symbol}.`, `No trade em ${snapshot.symbol}.`);
     const rows: Array<{ k: string; v: string; dot?: string }> = [];
-    if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer', 'Preço na leitura'), v: money(answer.price) });
+    if (answer.price != null) rows.push({ k: t('Price at read', 'Precio al leer', 'Preço na leitura'), v: formatMoney(answer.price, answer.currency ?? snapshot?.currency) });
     if (trade) {
-      if (answer.entry != null) rows.push({ k: t('Entry', 'Entrada', 'Entrada'), v: money(answer.entry), dot: AGENT_TONE.alpha });
-      if (answer.target != null) rows.push({ k: t('Target', 'Objetivo', 'Alvo'), v: money(answer.target), dot: AGENT_TONE.cio });
-      if (answer.stop != null) rows.push({ k: t('Stop · invalidation', 'Stop · invalidación', 'Stop · invalidação'), v: money(answer.stop), dot: AGENT_TONE.red });
-      if (answer.rewardRisk != null) rows.push({ k: t('Reward : risk', 'Beneficio : riesgo', 'Retorno : risco'), v: `${answer.rewardRisk.toFixed(1)} : 1` });
+      if (answer.entry != null) rows.push({ k: t('Entry', 'Entrada', 'Entrada'), v: formatMoney(answer.entry, answer.currency ?? snapshot?.currency), dot: AGENT_TONE.alpha });
+      if (answer.target != null) rows.push({ k: t('Target', 'Objetivo', 'Alvo'), v: formatMoney(answer.target, answer.currency ?? snapshot?.currency), dot: AGENT_TONE.cio });
+      if (answer.stop != null) rows.push({ k: t('Stop · invalidation', 'Stop · invalidación', 'Stop · invalidação'), v: formatMoney(answer.stop, answer.currency ?? snapshot?.currency), dot: AGENT_TONE.red });
+      if (answer.rewardRisk != null) rows.push({ k: t('Reward : risk', 'Beneficio : riesgo', 'Retorno : risco'), v: `${answer.rewardRisk.toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })} : 1` });
     } else {
-      if (answer.support != null) rows.push({ k: t('Support', 'Soporte', 'Suporte'), v: money(answer.support) });
-      if (answer.resistance != null) rows.push({ k: t('Resistance', 'Resistencia', 'Resistência'), v: money(answer.resistance) });
+      if (answer.support != null) rows.push({ k: t('Support', 'Soporte', 'Suporte'), v: formatMoney(answer.support, answer.currency ?? snapshot?.currency) });
+      if (answer.resistance != null) rows.push({ k: t('Resistance', 'Resistencia', 'Resistência'), v: formatMoney(answer.resistance, answer.currency ?? snapshot?.currency) });
     }
     const trendRsi = [answer.trend ? localizedTrend(answer.trend) : null, answer.rsi != null ? `RSI ${Math.round(answer.rsi)}` : null].filter(Boolean).join(' · ');
     if (trendRsi) rows.push({ k: t('Trend · RSI', 'Tendencia · RSI', 'Tendência · RSI'), v: trendRsi.charAt(0).toUpperCase() + trendRsi.slice(1) });
@@ -784,7 +784,7 @@ export default function NucleoDesk() {
           </div>
         )}
         {agents?.sufficiency && !agents.sufficiency.sufficient && agents.sufficiency.missing.length > 0 && (
-          <p className="mt-3 text-[13px]" style={{ color: '#A39C91' }}>{t(`For your horizon the desk is missing ${agents.sufficiency.missing.join(' · ')} data.`, `Para tu plazo faltan datos de ${agents.sufficiency.missing.join(' · ')}.`, `Para o seu prazo faltam dados de ${agents.sufficiency.missing.join(' · ')}.`)}</p>
+          <p className="mt-3 text-[13px]" style={{ color: '#A39C91' }}>{t(`For your horizon the desk is missing ${agents.sufficiency.missing.map((value) => t(value, value)).join(' · ')} data.`, `Para tu plazo faltan datos de ${agents.sufficiency.missing.map((value) => t(value, value)).join(' · ')}.`, `Para o seu prazo faltam dados de ${agents.sufficiency.missing.map((value) => t(value, value)).join(' · ')}.`)}</p>
         )}
         <button type="button" className="n-debate-more" aria-expanded onClick={() => { sfxTock(); setShowDebate(false); }}>
           {t('Show less', 'Ver menos', 'Ver menos')}
@@ -901,7 +901,7 @@ export default function NucleoDesk() {
         {proNotice && (
           <div className="n-notice" role="status">
             <span>{proNotice === 'welcome'
-              ? (meter?.tier === 'pro' ? t('Welcome to Bobby Pro. Unlimited reads.', 'Bienvenido a Bobby Pro. Lecturas sin límite.', 'Boas-vindas ao Bobby Pro. Leituras ilimitadas.') : t('Payment received. Activating Bobby Pro…', 'Pago recibido. Activando Bobby Pro…', 'Pagamento recebido. Ativando o Bobby Pro…'))
+              ? (meter?.tier === 'pro' ? t('Welcome to Bobby Pro. Unlimited Quick reads, subject to fair use.', 'Bienvenido a Bobby Pro. Lecturas Rápidas sin límite, con uso razonable.', 'Bem-vindo ao Bobby Pro. Análises Rápidas ilimitadas, com uso razoável.', 'Bienvenue dans Bobby Pro. Analyses Rapides illimitées, sous réserve d’usage raisonnable.', 'Benvenuto in Bobby Pro. Analisi Rapide illimitate, con uso corretto.', 'Willkommen bei Bobby Pro. Unbegrenzte Schnellanalysen bei angemessener Nutzung.') : t('Payment received. Activating Bobby Pro…', 'Pago recibido. Activando Bobby Pro…', 'Pagamento recebido. Ativando o Bobby Pro…'))
               : t('Checkout cancelled. Nothing was charged.', 'Pago cancelado. No se cobró nada.', 'Pagamento cancelado. Nada foi cobrado.')}</span>
             <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setProNotice(null)}><X size={14} /></button>
           </div>
@@ -956,7 +956,7 @@ export default function NucleoDesk() {
                       : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail
                 : meterLine ?? (accessState && !accessState.payments.stripe
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
-                  : t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês')),
+                  : t('Unlimited Quick reads · fair use · $5/month', 'Lecturas Rápidas sin límite · uso razonable · $5/mes', 'Análises Rápidas ilimitadas · uso razoável · 5 $/mês', 'Analyses Rapides illimitées · usage raisonnable · 5 $/mois', 'Analisi Rapide illimitate · uso corretto · 5 $/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 5 $/Monat')),
               action: meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
                 if (meter?.tier === 'pro') { void startBilling('portal'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
@@ -1029,14 +1029,14 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
   const [opener] = useState(() => document.activeElement instanceof HTMLElement ? document.activeElement : null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [hits, setHits] = useState<Array<{ symbol: string; name: string; assetClass: string }>>([]);
-  const [sections, setSections] = useState<Array<{ title: string; rows: Array<{ symbol: string; name: string; last: number | null }> }>>([]);
+  const [sections, setSections] = useState<Array<{ title: string; rows: Array<{ symbol: string; name: string; last: number | null; currency?: string }> }>>([]);
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch('/api/bobby-asset-search?browse=1');
-        const obj = (await res.json()) as { browse?: Record<string, Array<{ symbol: string; name: string; last: number | null }>> };
+        const res = await fetch('/api/bobby-asset-search?browse=1&' + marketQuery());
+        const obj = (await res.json()) as { browse?: Record<string, Array<{ symbol: string; name: string; last: number | null; currency?: string }>> };
         const b = obj.browse ?? {};
-        setSections([[t('Crypto', 'Cripto', 'Cripto'), b.crypto], [t('Stocks & ETFs', 'Acciones y ETFs', 'Ações e ETFs'), b.equity], [t('Metals', 'Metales', 'Metais'), b.commodity]].filter(([, rows]) => rows?.length).map(([title, rows]) => ({ title: title as string, rows: (rows as Array<{ symbol: string; name: string; last: number | null }>).slice(0, 24) })));
+        setSections([[t('Crypto', 'Cripto', 'Cripto'), b.crypto], [t('Stocks & ETFs', 'Acciones y ETFs', 'Ações e ETFs'), b.equity], [t('Metals', 'Metales', 'Metais'), b.commodity]].filter(([, rows]) => rows?.length).map(([title, rows]) => ({ title: title as string, rows: (rows as Array<{ symbol: string; name: string; last: number | null; currency?: string }>).slice(0, 24) })));
       } catch { /* the search still works */ }
     })();
   }, []);
@@ -1050,7 +1050,7 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
       const results = (obj?.results as Array<Record<string, unknown>> | undefined) ?? [];
       const seen = new Set<string>();
       const out: Array<{ symbol: string; name: string; assetClass: string }> = [];
-      for (const r of results) { const sym = String(r.symbol ?? ''); if (!sym || seen.has(sym)) continue; seen.add(sym); const aliases = (r.aliases as string[] | undefined) ?? []; out.push({ symbol: sym, name: prettyName(aliases.find((a) => a !== sym) ?? sym, sym), assetClass: String(r.assetClass ?? 'crypto') }); }
+      for (const r of results) { const sym = String(r.symbol ?? ''); if (!sym || seen.has(sym)) continue; seen.add(sym); const aliases = (r.aliases as string[] | undefined) ?? []; out.push({ symbol: sym, name: typeof r.displayName === 'string' ? r.displayName : prettyName(aliases.find((a) => a !== sym) ?? sym, sym), assetClass: String(r.assetClass ?? 'crypto') }); }
       setHits(out);
     }, 200);
     return () => { controller.abort(); clearTimeout(id); };
@@ -1078,11 +1078,11 @@ function BoardSheet({ onPick, onClose }: { onPick: (symbol: string) => void; onC
           </div>
           <div className="min-h-0 space-y-5 overflow-y-auto overscroll-contain px-5 pb-5">
             {q.trim().length >= 2
-              ? (hits.length === 0 ? <div className="text-[14px]" style={{ color: '#8A8378' }}>{t('Nothing yet — keep typing; Bobby resolves typos.', 'Nada aún — sigue escribiendo; Bobby resuelve typos.', 'Nada ainda — continue digitando; o Bobby entende erros de digitação.')}</div> : <div>{hits.map((h) => row(h.symbol, h.name, h.assetClass))}</div>)
+              ? (hits.length === 0 ? <div className="text-[14px]" style={{ color: '#8A8378' }}>{t('Nothing yet — keep typing; Bobby resolves typos.', 'Nada aún — sigue escribiendo; Bobby resuelve typos.', 'Nada ainda — continue digitando; o Bobby entende erros de digitação.')}</div> : <div>{hits.map((h) => row(h.symbol, h.name, h.assetClass === 'equity' ? t('Stock', 'Acción', 'Ação') : h.assetClass === 'commodity' ? t('Commodity', 'Materia prima', 'Matéria-prima') : t('Crypto', 'Cripto', 'Cripto')))}</div>)
               : sections.map((s) => (
                 <div key={s.title}>
                   <div className="n-label mb-1 flex justify-between"><span>{s.title}</span><span>{s.rows.length}</span></div>
-                  <div>{s.rows.map((r) => row(r.symbol, r.name, r.last !== null ? money(r.last) : ''))}</div>
+                  <div>{s.rows.map((r) => row(r.symbol, r.name, r.last !== null ? formatMoney(r.last, r.currency) : ''))}</div>
                 </div>
               ))}
           </div>

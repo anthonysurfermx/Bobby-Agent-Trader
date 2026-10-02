@@ -1,3 +1,4 @@
+import { APP_LANGUAGES, APP_LOCALES, appLocale, type AppLanguage } from '../src/lib/app-language.js';
 // ============================================================
 // POST /api/bobby-voice-free
 // In-process free TTS (Microsoft Edge Neural voices via the
@@ -22,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // burns ~15 in five minutes, and venue Wi-Fi shares one IP across phones.
   if (!await enforcePublicRateLimit(req, res, 'bobby-voice-free', 60, 600)) return;
 
-  const body = (req.body ?? {}) as { text?: string; voice?: string; lang?: string; vibe?: string; edgeVoice?: string; mode?: string };
+  const body = (req.body ?? {}) as { text?: string; voice?: string; lang?: string; locale?: string; vibe?: string; edgeVoice?: string; mode?: string };
   const text = body.text;
   // Whitelist every steering param — this endpoint is public. edgeVoice
   // (the iOS "Configura tu Bobby" menu) is validated inside the TTS layer
@@ -30,10 +31,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Personas plus raw OpenAI voice ids: the 10-companion squad needs 10 voices.
   const VALID_VOICES = ['alpha', 'red', 'cio', 'male', 'female', 'coral', 'ballad', 'sage', 'ash',
     'nova', 'echo', 'shimmer', 'verse', 'alloy', 'marin', 'cedar', 'onyx', 'fable', 'mellow'];
-  const VALID_LANGS = ['es', 'en', 'pt'];
+  const VALID_LANGS: readonly string[] = APP_LANGUAGES;
   const VALID_VIBES = ['direct', 'analytical', 'wise'];
   const voice = VALID_VOICES.includes(body.voice || '') ? body.voice : 'cio';
-  const lang = VALID_LANGS.includes(body.lang || '') ? body.lang : 'es';
+  if (body.lang !== undefined && !VALID_LANGS.includes(body.lang)) return res.status(400).json({ error: 'Unsupported language' });
+  if (body.locale !== undefined && !(APP_LOCALES as readonly string[]).includes(body.locale)) return res.status(400).json({ error: 'Unsupported locale' });
+  const lang = (body.lang || 'es') as AppLanguage;
+  const locale = appLocale(lang, body.locale);
   // The iOS onboarding ids (chill/directo/pro) map onto the delivery hints.
   const VIBE_ALIASES: Record<string, string> = { chill: 'wise', directo: 'direct', pro: 'analytical' };
   const vibeRequested = VIBE_ALIASES[body.vibe || ''] ?? body.vibe;
@@ -61,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // mp3: AVAudioPlayer/Safari can't play opus — apps always get MP3
     const speech = await generateSpeech(text, {
-      lang, voice, vibe, edgeVoice, format: 'mp3', preservePersona,
+      lang, locale, voice, vibe, edgeVoice, format: 'mp3', preservePersona,
       // Free mode never retries a paid provider, even when Edge is unavailable.
       provider: body.mode === 'free' || budget.limited ? 'edge' : undefined,
     });

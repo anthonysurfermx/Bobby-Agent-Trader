@@ -42,7 +42,7 @@ final class BriefingsCenter: ObservableObject {
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
     /// The app's language ("en" | "es"), mirrored into the account on the first enable.
-    var appLanguage: () -> String = { L.isSpanish ? "es" : "en" }
+    var appLanguage: () -> String = { L.language }
     /// The companion chosen on this phone (mirrored on the first enable when the server allows it).
     var currentCompanion: () -> String? = { UserDefaults.standard.string(forKey: "companion.id") }
     var load: (BobbyMeterAuth) async throws -> BriefingSettingsSnapshot = { auth in try await BriefingsAPI(auth: auth).settings() }
@@ -202,7 +202,12 @@ final class BriefingsCenter: ObservableObject {
         if on && !current.weeklyEnabled {
             // First enable: the report speaks the app's language and the phone's companion.
             let language = appLanguage()
-            if BriefingSettings.languages.contains(language), language != current.language { changes["language"] = language }
+            if BriefingSettings.languages.contains(language) {
+                if language != current.language { changes["language"] = language }
+                let locale = LanguageResolution.resolve(selection: language, preferredLanguages: Locale.preferredLanguages,
+                                                        region: Locale.current.region?.identifier).localeIdentifier
+                if current.locale != locale { changes["locale"] = locale }
+            }
             if let companion = desiredCompanion ?? currentCompanion(), companion != current.companionId, companionAllowed(companion) {
                 changes["companionId"] = companion
             }
@@ -228,8 +233,11 @@ final class BriefingsCenter: ObservableObject {
     @discardableResult
     func setLanguage(_ language: String) async -> Bool {
         accountChanged()
-        guard BriefingSettings.languages.contains(language), settings?.language != language else { return false }
-        return await update(field: "language", changes: ["language": language])
+        guard BriefingSettings.languages.contains(language) else { return false }
+        let locale = LanguageResolution.resolve(selection: language, preferredLanguages: Locale.preferredLanguages,
+                                                region: Locale.current.region?.identifier).localeIdentifier
+        guard settings?.language != language || settings?.locale != locale else { return false }
+        return await update(field: "language", changes: ["language": language, "locale": locale])
     }
 
     @discardableResult

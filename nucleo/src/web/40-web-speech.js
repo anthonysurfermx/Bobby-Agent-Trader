@@ -1,7 +1,7 @@
 /* Núcleo WEB transport, part 4: speech-to-text (ARCHITECTURE.md §2.3, §2.5, §2.6).
  *
  * The browser's Web Speech API (SpeechRecognition / webkitSpeechRecognition) with interim
- * results, in es-MX or en-US. Unlike iOS (R8, on-device only) the browser may send the audio
+ * results, in the selected six-language speech locale. Unlike iOS (R8, on-device only) the browser may send the audio
  * to its own speech service, so `onDevice` is always false and the pre-permission card says so.
  * Browsers without the API (Firefox) report `unavailable` and the engines take the typing path.
  *
@@ -113,6 +113,7 @@
 
   /** speech.start → listening | needs_permission | denied | unavailable | busy. Runs inside the pill's pointerdown. */
   SP.start = function () {
+    if (!NW.state.riskAccepted()) return 'unavailable';
     var s = SP.permission().state;
     if (s === 'unavailable') return 'unavailable';
     if (s === 'denied') return 'denied';
@@ -121,7 +122,7 @@
     if (NW.voice) NW.voice.stop('stopped');   // native: speech.willStart stops the voice
     var rec;
     try { rec = new Rec(); } catch (e) { return 'unavailable'; }
-    rec.lang = NW.lang === 'es' ? 'es-MX' : 'en-US';
+    rec.lang = NW.locale;
     rec.continuous = true;
     rec.interimResults = true;
     try { rec.maxAlternatives = 1; } catch (e) {}

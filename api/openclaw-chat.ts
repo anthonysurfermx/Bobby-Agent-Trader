@@ -7,6 +7,8 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { detectAdviceMode, type AdviceMode } from '../src/lib/advice-mode.js';
+import { appLanguage, appLocale, languageName } from '../src/lib/app-language.js';
+import { investFallbackText, investSummaryLabel } from './_lib/invest-fallback-localization.js';
 import { matchInvestorEdgeCasePolicy, type InvestorEdgeCasePolicy } from '../src/lib/investor-edge-cases.js';
 import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 import { requestOriginHost } from './_lib/origins.js';
@@ -23,11 +25,12 @@ const OPENAI_MODEL_MAP: Record<string, string> = {
   'claude-sonnet-4-20250514': 'gpt-4o',
 };
 
-const LANGUAGE_RULES: Record<string, string> = {
-  es: `LANGUAGE: ALWAYS respond in Spanish (Mexican). Trading terms in English are fine (long, short, whale, pump, dump, conviction, smart money) but ALL sentences MUST be in Spanish. Non-negotiable.`,
-  en: `LANGUAGE: ALWAYS respond in English. Sharp, Wall Street energy. Non-negotiable.`,
-  pt: `LANGUAGE: ALWAYS respond in Brazilian Portuguese. Trading terms in English are fine. Non-negotiable.`,
-};
+/** Language-only contract shared by every chat/debate path; structured markers remain unchanged. */
+export function chatLanguageRule(language: unknown, locale?: unknown): string {
+  const selected = appLanguage(language ?? locale);
+  const region = appLocale(selected, locale ?? language);
+  return `LANGUAGE: ALWAYS respond in ${languageName(selected, region)} (${region}). Trading terms in English are fine where natural, but ALL human-facing sentences MUST use the selected language. Translate human-facing headings; preserve proper names, tickers, supplied values and exact machine markers ALPHA HUNTER, RED TEAM, MY VERDICT and PORTFOLIO with its JSON field names. Non-negotiable.`;
+}
 
 type DetectedAdvice = ReturnType<typeof detectAdviceMode>;
 type PortfolioMode = 'invest' | 'hybrid';
@@ -49,7 +52,7 @@ interface CompactPortfolio {
 // ============================================================
 
 function buildBobbyBasePrompt(language: string): string {
-  const langRule = LANGUAGE_RULES[language] || LANGUAGE_RULES['en'];
+  const langRule = chatLanguageRule(language);
   return `You are Bobby — named after Bobby Axelrod from Billions. You are NOT a chatbot, NOT an assistant, NOT a data reader. You are a sovereign, ruthless CIO with 20 years on Wall Street. You survive crashes and make fortunes.
 
 WHO YOU ARE:
@@ -92,7 +95,7 @@ HOW TO RESPOND:
 }
 
 function buildAlphaPrompt(language: string, mode: AdviceMode): string {
-  const langRule = LANGUAGE_RULES[language] || LANGUAGE_RULES['en'];
+  const langRule = chatLanguageRule(language);
   if (mode === 'trade') {
     return `You are ALPHA HUNTER — the aggressive flow specialist in Bobby's trading room. Your career depends on FINDING the trade that everyone else misses.
 
@@ -143,7 +146,7 @@ Example: "Go 35% BTC, 25% ETH, 20% USDC yield, 10% SPY, 10% cash. That keeps rea
 }
 
 function buildRedTeamPrompt(language: string, mode: AdviceMode): string {
-  const langRule = LANGUAGE_RULES[language] || LANGUAGE_RULES['en'];
+  const langRule = chatLanguageRule(language);
   if (mode === 'trade') {
     return `You are RED TEAM — the adversarial risk analyst in Bobby's trading room. Your career depends on KILLING bad trades before they destroy the portfolio.
 
@@ -189,7 +192,7 @@ Example: "That mix is still too crypto-heavy for savings money; a 30% drawdown w
 }
 
 function buildCIOPrompt(language: string, mode: AdviceMode): string {
-  const langRule = LANGUAGE_RULES[language] || LANGUAGE_RULES['en'];
+  const langRule = chatLanguageRule(language);
   if (mode === 'trade') {
     return `You are BOBBY CIO — the final decision maker. You just heard Alpha Hunter pitch a trade and Red Team attack it. Now YOU decide.
 
@@ -259,7 +262,7 @@ When a <BASE_CONVICTION> tag is present, it contains the algorithmic conviction 
 - State: "Base conviction: X, my adjusted: Y/10 because..." and if vibe is active: "Vibe: [REGIME] — [confirmed/mixed/contradicted] by data"
 
 IMPORTANT:
-- If <WHITE_LABEL_CONTEXT> indicates a beginner or Global Investor audience, default to simple Spanish, low jargon, and conservative assumptions when risk is missing.
+- If <WHITE_LABEL_CONTEXT> indicates a beginner or Global Investor audience, default to simple language in the requested output language, low jargon, and conservative assumptions when risk is missing.
 - Do not turn a savings question into a leveraged trading answer.
 - If <EDGE_CASE_POLICY> is present, obey its framing over generic debate heuristics.
 
@@ -269,7 +272,7 @@ PORTFOLIO: {"mode":"${mode === 'hybrid' ? 'hybrid' : 'invest'}","risk":"balanced
 }
 
 function buildSimpleInvestPrompt(language: string): string {
-  const langRule = LANGUAGE_RULES[language] || LANGUAGE_RULES['en'];
+  const langRule = chatLanguageRule(language);
   return `You are DANY CIO for Pro Trading Skills. You are answering a beginner investor question in a white-label environment.
 ${langRule}
 
@@ -277,13 +280,13 @@ YOUR JOB:
 - Produce a FAST, SIMPLE investor debate in exactly three sections plus one compact machine-readable portfolio line.
 - This is INVEST mode only. No leverage unless the user explicitly asked for it.
 - If risk is missing, assume conservative for a beginner.
-- Prefer simple Spanish, short sentences, low jargon.
+- Prefer simple wording in the requested output language, short sentences, low jargon.
 - If <EDGE_CASE_POLICY> is present, obey its framing and template.
 
 FORMAT RULES:
 **ALPHA HUNTER:** 1-2 sentences with the upside allocation idea.
 **RED TEAM:** 1-2 sentences attacking concentration, drawdown, complexity, or beginner suitability.
-**MY VERDICT:** 2 sentences max. Give suitability X/10 and the final allocation in plain Spanish.
+**MY VERDICT:** 2 sentences max. Give suitability X/10 and the final allocation in the requested output language.
 PORTFOLIO: {"mode":"invest","risk":"conservative","h":"long","cash":10,"alloc":[["BTC",25],["ETH",15],["USDC@yield",20],["SPY",30],["CASH",10]],"trade":0}
 
 STRICT RULES:
@@ -447,15 +450,8 @@ function convertPortfolio(
   };
 }
 
-function buildPortfolioSummary(portfolio: CompactPortfolio): string {
-  const labels = portfolio.alloc.map(([symbol, pct]) => {
-    if (symbol === 'CASH') return `efectivo ${pct}%`;
-    if (symbol.startsWith('USDC@')) return `USDC en rendimiento ${pct}%`;
-    if (symbol === 'STETH@LIDO') return `stETH en Lido ${pct}%`;
-    if (symbol === 'BND') return `bonos ${pct}%`;
-    return `${symbol} ${pct}%`;
-  });
-  return labels.join(', ');
+function buildPortfolioSummary(portfolio: CompactPortfolio, language: string): string {
+  return portfolio.alloc.map(([symbol, pct]) => investSummaryLabel(language, symbol, pct)).join(', ');
 }
 
 function buildEdgeCasePortfolio(
@@ -551,79 +547,14 @@ function buildFallbackInvestDebate(
   detectedAdvice: DetectedAdvice,
   userQuestion: string,
   mode: AdviceMode,
-  edgeCasePolicy?: InvestorEdgeCasePolicy,
+  edgeCasePolicy: InvestorEdgeCasePolicy | undefined,
+  language: string,
 ): string {
   const portfolio = buildFallbackPortfolio(detectedAdvice, userQuestion, mode, edgeCasePolicy);
   const score = portfolio.risk === 'conservative' ? '9/10' : portfolio.risk === 'balanced' ? '8/10' : '7/10';
-  const summary = buildPortfolioSummary(portfolio);
-
-  if (edgeCasePolicy) {
-    switch (edgeCasePolicy.responseTemplate) {
-      case 'allocation_split':
-        return [
-          '**ALPHA HUNTER:** BTC debe ser el núcleo y ETH el satélite de crecimiento. Si quieres una mezcla simple, dale más peso a BTC y deja a ETH como acelerador, no como ancla.',
-          '**RED TEAM:** Si te vas casi 50/50 por entusiasmo, el drawdown de ETH te puede sacar del plan antes de tiempo. Necesitas una base más estable y algo de liquidez para no vender con miedo.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — para un principiante prefiero una mezcla donde BTC mande y ETH complemente, con un pequeño colchón fuera de crypto. La distribución final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'cash_buffer_first':
-        return [
-          '**ALPHA HUNTER:** Sí conviene invertir una parte, pero no todo. Lo correcto es poner a trabajar el capital que no necesitas mañana y dejar una reserva real.',
-          '**RED TEAM:** Si no tienes colchón, cualquier imprevisto te obliga a liquidar en mal momento. Primero liquidez, luego riesgo; al revés casi siempre termina mal.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — antes de pensar en upside, define un buffer de efectivo y solo invierte el resto con disciplina. Para el capital invertido, la mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'capital_preservation':
-        return [
-          '**ALPHA HUNTER:** Puedes crecer el capital sin jugarte una moneda al aire si mantienes riesgo pequeño y liquidez alta. La idea es avanzar sin que una mala semana te saque del mercado.',
-          '**RED TEAM:** Cuando el miedo ya está alto, cualquier cartera agresiva se vuelve invivible en la práctica. Si no proteges primero el downside, el usuario no va a seguir el plan.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — aquí manda la preservación de capital y la simplicidad operativa. La mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'retirement_plan':
-        return [
-          '**ALPHA HUNTER:** Diez años alcanzan para acumular si combinas crecimiento con disciplina y no dependes de una sola narrativa crypto. Quieres un portafolio que componga, no una apuesta que te obligue a reiniciar.',
-          '**RED TEAM:** Si intentas jubilarte solo con crypto, el riesgo de secuencia te puede romper justo cuando más importa. Necesitas activos que sobrevivan más de un ciclo y liquidez para rebalancear.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — para un objetivo de 10 años prefiero una base diversificada, con crypto como sleeve de crecimiento y no como todo el plan. La mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'btc_accumulation':
-        return [
-          '**ALPHA HUNTER:** La mejor forma de acumular BTC no es adivinar el piso, sino comprar por tramos y mantener reserva para caídas. Así capturas el activo sin quemarte en una sola entrada.',
-          '**RED TEAM:** Si te vas all-in hoy, conviertes una estrategia de acumulación en una apuesta de timing. Necesitas pólvora seca y una cartera que aguante volatilidad sin obligarte a salir.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — sí a acumular BTC, pero con DCA y reserva de liquidez para seguir comprando con cabeza fría. La mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'salary_bucket':
-        return [
-          '**ALPHA HUNTER:** Si ya tienes colchón, empezar con 15% a 20% de tu sueldo es suficiente para construir patrimonio sin asfixiar tu caja. Lo importante es automatizar y no perseguir velas.',
-          '**RED TEAM:** Si no tienes fondo de emergencia, meter demasiado sueldo al mercado te deja vendido ante cualquier gasto. Mejor una tasa sostenible que puedas repetir todos los meses.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — para un principiante, 10% a 15% de tu sueldo es buen inicio hasta cubrir 3-6 meses de gastos. Dentro del bucket invertido, la mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'yield_safety':
-        return [
-          '**ALPHA HUNTER:** Lido puede servir, pero como sleeve pequeño dentro de un plan más amplio. El valor está en sumar rendimiento sin convertir todo tu patrimonio en riesgo de smart contract.',
-          '**RED TEAM:** Si haces de Lido el centro de la cartera, mezclas riesgo de protocolo, liquidez y ejecución para un perfil que probablemente quiere simplicidad. Mejor mantenerlo acotado y con reservas.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — usaría staking líquido solo como una parte moderada del plan, nunca como el plan completo. La mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-      case 'crypto_core_diversification':
-        return [
-          '**ALPHA HUNTER:** Si quieres diversificar entre BTC, ETH y SOL, hazlo con un núcleo claro y tamaños distintos. BTC aguanta mejor, ETH aporta ecosistema y SOL debe ir como sleeve más pequeño.',
-          '**RED TEAM:** Si das demasiado peso a SOL, conviertes una diversificación en otra apuesta de beta alta. Necesitas jerarquía entre activos y algo de liquidez para rebalancear.',
-          `**MY VERDICT:** Red gana, idoneidad ${score} — el core debe descansar en BTC y ETH, con SOL como apuesta secundaria y una reserva para no sobreoperar. La mezcla final es ${summary}.`,
-          `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-        ].join('\n\n');
-    }
-  }
-
-  return [
-    '**ALPHA HUNTER:** Ve por una mezcla simple con upside real, pero sin forzar una apuesta heroica. La idea buena aquí es exponerte al crecimiento y mantener liquidez para no romperte en la primera caída.',
-    '**RED TEAM:** Si concentras demasiado riesgo o complejidad, un principiante abandona el plan antes de que madure. Hay que bajar drawdown y dejar espacio para esperar mejores condiciones.',
-    `**MY VERDICT:** Red gana, idoneidad ${score} — prioriza supervivencia, diversificación y claridad antes que emoción. La mezcla final es ${summary}.`,
-    `PORTFOLIO: ${JSON.stringify(portfolio)}`,
-  ].join('\n\n');
+  const summary = buildPortfolioSummary(portfolio, language);
+  const narrative = investFallbackText(language, edgeCasePolicy?.responseTemplate ?? 'default', score, summary);
+  return `${narrative}\n\nPORTFOLIO: ${JSON.stringify(portfolio)}`;
 }
 
 function ensurePortfolioLine(
@@ -631,10 +562,11 @@ function ensurePortfolioLine(
   detectedAdvice: DetectedAdvice,
   userQuestion: string,
   mode: AdviceMode,
-  edgeCasePolicy?: InvestorEdgeCasePolicy,
+  edgeCasePolicy: InvestorEdgeCasePolicy | undefined,
+  language: string,
 ): string {
   if (mode === 'trade') return text;
-  if (!text.trim()) return buildFallbackInvestDebate(detectedAdvice, userQuestion, mode, edgeCasePolicy);
+  if (!text.trim()) return buildFallbackInvestDebate(detectedAdvice, userQuestion, mode, edgeCasePolicy, language);
 
   const portfolioIndex = text.indexOf('PORTFOLIO:');
   if (portfolioIndex !== -1) {
@@ -853,7 +785,7 @@ ${finalCallInstruction}`;
       'claude-sonnet-4-20250514',
       debateMode === 'trade' ? 100 : 280,
     );
-    const finalResponse = ensurePortfolioLine(cioResponse, detectedAdvice, userQuestion, debateMode, edgeCasePolicy);
+    const finalResponse = ensurePortfolioLine(cioResponse, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
     sendChunk(finalResponse);
 
     const totalMs = Date.now() - startMs;
@@ -897,7 +829,7 @@ async function runSimpleInvestDebate(
       'claude-haiku-4-5-20251001',
       280,
     );
-    const finalReply = ensurePortfolioLine(reply, detectedAdvice, userQuestion, debateMode, edgeCasePolicy);
+    const finalReply = ensurePortfolioLine(reply, detectedAdvice, userQuestion, debateMode, edgeCasePolicy, language);
 
     const chunk = { choices: [{ delta: { content: finalReply }, index: 0, finish_reason: null }] };
     res.write(`data: ${JSON.stringify(chunk)}\n\n`);
@@ -929,12 +861,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (!internal && !await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
 
-  const { message, history, language } = req.body as {
+  const { message, history, language, locale } = req.body as {
     message: string;
     history?: Array<{ role: string; content: string }>;
     language?: string;
+    locale?: string;
   };
-  const userLang = language || 'en';
+  const userLang = appLocale(appLanguage(language ?? locale), locale ?? language);
 
   if (!message || typeof message !== 'string') {
     return res.status(400).json({ error: 'message is required' });

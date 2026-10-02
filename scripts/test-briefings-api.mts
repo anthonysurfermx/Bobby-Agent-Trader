@@ -283,7 +283,7 @@ try {
     eq((await patch({ assets: ['BTC', 'BTC'] })).body.code, 'invalid_request', 'assets must be unique');
     eq((await patch({ assets: ['DOGE'] })).body.code, 'invalid_request', 'assets must be supported');
     eq((await patch({ assets: ['BTC', 'ETH', 'SOL', 'NVDA', 'AAPL', 'TSLA', 'META'] })).body.code, 'invalid_request', 'at most 6 assets');
-    eq((await patch({ language: 'fr' })).body.code, 'invalid_request', 'language enum');
+    eq((await patch({ language: 'ja' })).body.code, 'invalid_request', 'language enum');
     const c1 = await patch({ analysisConsentEnabled: true });
     eq([c1.statusCode, c1.body.code], [400, 'consent_required'], 'enabling consent without accepting a version: consent_required');
     eq((await patch({ audioConsentEnabled: true, acceptedAudioConsentVersion: CONSENT_VERSIONS.audio + 1 })).body.code, 'consent_required', 'a version other than the current one: consent_required');

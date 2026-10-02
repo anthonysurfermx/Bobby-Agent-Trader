@@ -1,0 +1,115 @@
+{
+  "v": 1,
+  "source": "Browser platform disclosure; native v5 source retained for investment/risk clauses",
+  "version": 7,
+  "statements": {
+    "en": [
+      {
+        "title": "Allow AI processing of my questions.",
+        "body": "Bobby sends your question and public market context to OpenAI or Anthropic for analysis. Live voice sends microphone audio to OpenAI to generate the conversation. Browser dictation may send audio to your browser’s speech service; it is not guaranteed to stay on this device. If narration is enabled, reply text may go to OpenAI or Microsoft for speech. Avoid personal or account details. You can withdraw AI consent from this notice."
+      },
+      {
+        "title": "Not investment advice.",
+        "body": "Verdicts, levels and stops are educational analysis made by software, not recommendations for you."
+      },
+      {
+        "title": "Bobby never takes custody or signs for you.",
+        "body": "This desk can prepare Base swap transaction data for your connected wallet. You review and sign from your wallet; Bobby never holds your funds or keys."
+      },
+      {
+        "title": "You can lose money. You decide.",
+        "body": "Data can be late or wrong. If you need advice, talk to a licensed professional."
+      }
+    ],
+    "es": [
+      {
+        "title": "Permito que la IA procese mis preguntas.",
+        "body": "Bobby envía tu pregunta y contexto público de mercado a OpenAI o Anthropic para analizarlos. La voz en vivo envía audio del micrófono a OpenAI para generar la conversación. El dictado del navegador puede enviar audio a su servicio de voz; no se garantiza que permanezca en este dispositivo. Si activas la narración, el texto de respuesta puede ir a OpenAI o Microsoft para narrarlo. Evita datos personales o de cuentas. Puedes retirar el consentimiento de IA desde este aviso."
+      },
+      {
+        "title": "No es asesoría de inversión.",
+        "body": "Veredictos, niveles y stops son análisis educativo hecho por un programa, no recomendaciones para ti."
+      },
+      {
+        "title": "Bobby nunca toma custodia ni firma por ti.",
+        "body": "Este desk puede preparar datos de transacción para swaps en Base con tu wallet conectada. Tú revisas y firmas desde tu wallet; Bobby nunca guarda tus fondos ni llaves."
+      },
+      {
+        "title": "Puedes perder dinero. Tú decides.",
+        "body": "Los datos pueden llegar tarde o mal. Si necesitas asesoría, acude a un profesional autorizado."
+      }
+    ],
+    "fr": [
+      {
+        "title": "J’autorise le traitement de mes questions par l’IA.",
+        "body": "Bobby transmet votre question et le contexte public des marchés à OpenAI ou Anthropic pour analyse. La voix en direct transmet l’audio du microphone à OpenAI pour générer la conversation. La dictée du navigateur peut transmettre l’audio à son service vocal ; il n’est pas garanti qu’il reste sur cet appareil. Si la narration est activée, le texte de réponse peut être transmis à OpenAI ou Microsoft pour la voix. Évitez les données personnelles ou de compte. Vous pouvez retirer votre consentement à l’IA dans cet avis."
+      },
+      {
+        "title": "Aucun conseil en investissement.",
+        "body": "Les conclusions, niveaux et seuils d’arrêt sont des analyses éducatives produites par un logiciel, sans recommandations personnelles."
+      },
+      {
+        "title": "Bobby ne détient jamais vos fonds et ne signe pas pour vous.",
+        "body": "Ce bureau peut préparer les données d’une transaction d’échange sur Base pour votre portefeuille connecté. Vous vérifiez et signez depuis votre portefeuille ; Bobby ne détient jamais vos fonds ni vos clés."
+      },
+      {
+        "title": "Vous pouvez perdre de l’argent. Vous décidez.",
+        "body": "Les données peuvent être tardives ou incorrectes. Pour un conseil, consultez un professionnel agréé."
+      }
+    ],
+    "pt": [
+      {
+        "title": "Permito que a IA processe as minhas perguntas.",
+        "body": "O Bobby envia a sua pergunta e contexto público de mercado à OpenAI ou Anthropic para análise. A voz ao vivo envia áudio do microfone à OpenAI para gerar a conversa. O ditado do navegador pode enviar áudio ao seu serviço de voz; não há garantia de que permaneça neste dispositivo. Com narração ativa, o texto da resposta pode ir à OpenAI ou Microsoft para voz. Evite dados pessoais ou de contas. Pode retirar o consentimento de IA neste aviso."
+      },
+      {
+        "title": "Não é aconselhamento de investimento.",
+        "body": "Conclusões, níveis e limites de saída são análises educativas feitas por software, não recomendações pessoais."
+      },
+      {
+        "title": "O Bobby nunca guarda os seus fundos nem assina por si.",
+        "body": "Este espaço pode preparar dados de transações de troca na Base para a sua carteira ligada. Revê e assina na sua carteira; o Bobby nunca guarda os seus fundos nem chaves."
+      },
+      {
+        "title": "Pode perder dinheiro. A decisão é sua.",
+        "body": "Os dados podem chegar tarde ou estar errados. Se precisar de aconselhamento, consulte um profissional autorizado."
+      }
+    ],
+    "it": [
+      {
+        "title": "Consento il trattamento delle mie domande da parte dell’IA.",
+        "body": "Bobby invia la domanda e il contesto pubblico di mercato a OpenAI o Anthropic per l’analisi. La voce dal vivo invia l’audio del microfono a OpenAI per generare la conversazione. La dettatura del browser può inviare audio al suo servizio vocale; non è garantito che resti su questo dispositivo. Con narrazione attiva, il testo della risposta può essere inviato a OpenAI o Microsoft per la voce. Evita dati personali o di account. Puoi revocare il consenso all’IA da questo avviso."
+      },
+      {
+        "title": "Non è consulenza d’investimento.",
+        "body": "Conclusioni, livelli e soglie di uscita sono analisi educative prodotte da software, non raccomandazioni personali."
+      },
+      {
+        "title": "Bobby non custodisce mai i tuoi fondi e non firma per te.",
+        "body": "Questo spazio può preparare i dati di uno scambio su Base per il tuo portafoglio connesso. Verifichi e firmi dal tuo portafoglio; Bobby non custodisce mai fondi o chiavi."
+      },
+      {
+        "title": "Puoi perdere denaro. Decidi tu.",
+        "body": "I dati possono arrivare tardi o essere errati. Per una consulenza, rivolgiti a un professionista abilitato."
+      }
+    ],
+    "de": [
+      {
+        "title": "Ich erlaube die KI-Verarbeitung meiner Fragen.",
+        "body": "Bobby sendet deine Frage und öffentliche Marktdaten zur Analyse an OpenAI oder Anthropic. Live-Sprache sendet Mikrofon-Audio an OpenAI, um die Unterhaltung zu erzeugen. Browser-Diktieren kann Audio an den Sprachdienst des Browsers senden; es bleibt nicht garantiert auf diesem Gerät. Bei aktivierter Sprachausgabe kann Antworttext an OpenAI oder Microsoft gehen. Vermeide persönliche oder Kontodaten. Du kannst die KI-Einwilligung in diesem Hinweis widerrufen."
+      },
+      {
+        "title": "Keine Anlageberatung.",
+        "body": "Fazit, Kurswerte und Ausstiegsgrenzen sind von Software erstellte Analysen zu Lernzwecken, keine persönlichen Empfehlungen."
+      },
+      {
+        "title": "Bobby verwahrt deine Mittel nicht und signiert nicht für dich.",
+        "body": "Dieser Bereich kann Transaktionsdaten für einen Tausch auf Base für deine verbundene Wallet vorbereiten. Du prüfst und signierst in deiner Wallet; Bobby verwahrt weder Mittel noch Schlüssel."
+      },
+      {
+        "title": "Du kannst Geld verlieren. Du entscheidest.",
+        "body": "Daten können verspätet oder falsch sein. Wenn du Beratung brauchst, wende dich an eine zugelassene Fachperson."
+      }
+    ]
+  }
+}

@@ -36,6 +36,7 @@ struct AccountSheet: View {
     @ObservedObject private var briefings = BriefingsCenter.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
     @StateObject private var land = LandPulse()
+    @AppStorage(L.preferenceKey) private var languageSelection = "system"
     @State private var manageSubscription = false
     @State private var busy = false
     @State private var showDeleteConfirmation = false
@@ -361,7 +362,7 @@ struct AccountSheet: View {
         }
         // Bobby Pro on the user's own initiative, not only after a refused read (signed out, the sheet asks to sign in).
         if reads.access?.isPro != true {
-            ProfileRow(label: "Bobby Pro", detail: BobbyStore.Copy.benefits, action: { route = .pro }) {
+            ProfileRow(label: "Bobby Pro", detail: BobbyStore.Copy.benefits, detailLineLimit: nil, action: { route = .pro }) {
                 ProfileIcon(symbol: "infinity", tint: Theme.cream)
             }
             .accessibilityIdentifier("account-pro")
@@ -392,14 +393,26 @@ struct AccountSheet: View {
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
         }
-        // Bobby speaks the phone's language; iOS keeps the per-app choice in Settings.
-        ProfileRow(label: L.t("Language", "Idioma"),
-                   detail: L.isSpanish ? "Español" : "English",
-                   trailing: L.t("Settings", "Configuración"),
-                   action: {
-                       if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                   }) { ProfileIcon(symbol: "globe") }
-            .accessibilityIdentifier("account-language")
+        Menu {
+            Button(L.t("Follow iPhone language", "Usar el idioma del iPhone")) { L.select("system") }
+            ForEach(AppLanguage.allCases, id: \.rawValue) { language in
+                Button(language.name) { L.select(language.rawValue) }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ProfileIcon(symbol: "globe")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L.t("Language", "Idioma")).font(.system(size: 15)).foregroundStyle(Theme.cream)
+                    Text(L.displayName).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
+                }
+                Spacer()
+                Text(L.t("Change", "Cambiar")).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
+                Image(systemName: "chevron.down").font(.system(size: 10)).foregroundStyle(Theme.warmMuted)
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("account-language")
         // What Bobby remembers about this account: see, correct, pause or delete it.
         ProfileRow(label: L.t("Memory", "Memoria"),
                    detail: L.t("What Bobby remembers about your assets and preferences", "Lo que Bobby recuerda de tus activos y preferencias"),
@@ -709,6 +722,7 @@ private struct ProfileRow<Icon: View>: View {
     let label: String
     var detail: String? = nil
     var trailing: String? = nil
+    var detailLineLimit: Int? = 2
     let action: () -> Void
     @ViewBuilder let icon: () -> Icon
 
@@ -724,7 +738,7 @@ private struct ProfileRow<Icon: View>: View {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(label).font(.system(size: 15)).foregroundStyle(Theme.cream).lineLimit(1)
                     if let detail {
-                        Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim).lineLimit(2)
+                        Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim).lineLimit(detailLineLimit)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -780,15 +794,15 @@ struct ReadsRow: Equatable {
     /// Manage subscription (Apple's sheet): only for an App Store subscription.
     let manage: Bool
 
-    private static func giftDate(_ date: Date, spanish: Bool) -> String {
+    private static func giftDate(_ date: Date, spanish: Bool? = nil) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: spanish ? "es_ES" : "en_US")
-        formatter.dateFormat = spanish ? "d 'de' MMMM 'de' yyyy" : "MMMM d, yyyy"
+        formatter.locale = L.formatLocale(spanish: spanish)
+        formatter.setLocalizedDateFormatFromTemplate("MMMMdyyyy")
         return formatter.string(from: date)
     }
 
     static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool,
-                        grantUntil: String? = nil, grantSource: String? = nil, spanish: Bool = L.isSpanish) -> ReadsRow? {
+                        grantUntil: String? = nil, grantSource: String? = nil, spanish: Bool? = nil) -> ReadsRow? {
         guard let access else { return nil }
         if access.isPro {
             let paid = ["active", "trialing"].contains(subscription?.status ?? "")
@@ -827,7 +841,7 @@ struct GiftedReadsRow: Equatable {
     let detail: String
 
     static func content(access: BobbyReadAccess?, meters: [NucleoAnalysisLevel: NucleoLevelMeter],
-                        spanish: Bool = L.isSpanish) -> GiftedReadsRow? {
+                        spanish: Bool? = nil) -> GiftedReadsRow? {
         guard let access else { return nil }
         var parts: [String] = []
         if access.isPro, access.bonus > 0 {

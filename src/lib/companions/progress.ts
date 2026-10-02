@@ -6,10 +6,11 @@
 // a level is crossed, and gear that drops at 1 / 100 / 200 XP.
 // Never XP for volume, frequency or P&L.
 // ============================================================
+import { speechLocale } from './i18n';
 import { useSyncExternalStore } from 'react';
 import { type CompanionLevel, type CompanionTool, levelFor, newlyUnlockedTools, nextLevelFor } from './data';
 
-export const RISK_NOTICE_VERSION = 1;
+export const RISK_NOTICE_VERSION = 7;
 const KEY = 'bobby.companion.progress.v1';
 const MAX_DAILY_AWARDS = 3;
 
@@ -48,6 +49,8 @@ export interface ServerProgress {
 }
 
 export interface Progress {
+  /** Browser AI consent is local and cannot be granted by a server/native progress merge. */
+  aiConsentGranted: boolean;
   companionId: string | null;
   vibeId: string;
   onboarded: boolean;
@@ -59,6 +62,8 @@ export interface Progress {
   dailyAwards: number;
   dailyAwardsDay: string | null;
   quickAccess: string[];
+  /** Automatic regional suggestions refresh with locale; personal choices remain unchanged. */
+  quickAccessCustomized: boolean;
   /** Trader Land soft currency and the legacy route position (capped at 8 for iOS 1.1) — server-owned, mirrored here. */
   aura: number;
   routeIndex: number;
@@ -67,7 +72,12 @@ export interface Progress {
   syncedAt: string | null;
 }
 
+const REGIONAL_QUICK_ACCESS: Record<string, string[]> = { 'fr-FR': ['MC.PA', 'TTE.PA', 'BTC'], 'pt-PT': ['EDP.LS', 'GALP.LS', 'BTC'], 'pt-BR': ['PETR4.SA', 'VALE3.SA', 'BTC'], 'it-IT': ['ENI.MI', 'ENEL.MI', 'BTC'], 'de-DE': ['SAP.DE', 'SIE.DE', 'BTC'], 'en-US': ['BTC', 'NVDA', 'ETH'], 'es-MX': ['BTC', 'NVDA', 'ETH'] };
+const regionalQuickAccess = () => [...(REGIONAL_QUICK_ACCESS[speechLocale()] ?? REGIONAL_QUICK_ACCESS['en-US'])];
+const isAutomaticQuickAccess = (symbols: string[]) => Object.values(REGIONAL_QUICK_ACCESS).some(defaults => defaults.length === symbols.length && defaults.every((symbol, i) => symbol === symbols[i]));
+
 const DEFAULT: Progress = {
+  aiConsentGranted: false,
   companionId: null,
   vibeId: 'directo',
   onboarded: false,
@@ -77,7 +87,8 @@ const DEFAULT: Progress = {
   lastDay: null,
   dailyAwards: 0,
   dailyAwardsDay: null,
-  quickAccess: ['BTC', 'NVDA', 'ETH'],
+  quickAccess: regionalQuickAccess(),
+  quickAccessCustomized: false,
   aura: 0,
   routeIndex: 0,
   pendingEvents: [],
@@ -93,11 +104,14 @@ function load(): Progress {
     // touching saved progress. Vite removes this branch from production.
     if (import.meta.env.DEV) {
       const companionId = new URLSearchParams(window.location.search).get('skinQa');
-      if (companionId) return { ...DEFAULT, companionId, onboarded: true, riskNoticeVersion: RISK_NOTICE_VERSION, xp: 500 };
+      if (companionId) return { ...DEFAULT, companionId, onboarded: true, riskNoticeVersion: RISK_NOTICE_VERSION, aiConsentGranted: true, xp: 500 };
     }
     const raw = localStorage.getItem(KEY);
     if (!raw) return { ...DEFAULT };
-    return { ...DEFAULT, ...(JSON.parse(raw) as Partial<Progress>) };
+    const saved = JSON.parse(raw) as Partial<Progress>;
+    const symbols = Array.isArray(saved.quickAccess) ? saved.quickAccess.filter((symbol): symbol is string => typeof symbol === 'string') : [];
+    const customized = saved.quickAccessCustomized ?? (symbols.length > 0 && !isAutomaticQuickAccess(symbols));
+    return { ...DEFAULT, ...saved, quickAccess: customized && symbols.length ? symbols : regionalQuickAccess(), quickAccessCustomized: customized };
   } catch {
     return { ...DEFAULT };
   }
@@ -133,11 +147,12 @@ export const progressStore = {
     listeners.add(listener);
     return () => listeners.delete(listener);
   },
-  acceptRiskNotice() { commit({ ...state, riskNoticeVersion: RISK_NOTICE_VERSION }); },
+  acceptRiskNotice() { commit({ ...state, riskNoticeVersion: RISK_NOTICE_VERSION, aiConsentGranted: true }); },
+  withdrawAIConsent() { commit({ ...state, aiConsentGranted: false, riskNoticeVersion: 0 }); },
   setCompanion(companionId: string) { commit({ ...state, companionId }); },
   setVibe(vibeId: string) { commit({ ...state, vibeId }); },
   finishOnboarding() { commit({ ...state, onboarded: true }); },
-  setQuickAccess(quickAccess: string[]) { commit({ ...state, quickAccess }); },
+  setQuickAccess(quickAccess: string[]) { commit({ ...state, quickAccess, quickAccessCustomized: true }); },
   /** Dev/reset: back to a fresh install. */
   reset() { commit({ ...DEFAULT }); },
 

@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { waitUntil } from '@vercel/functions';
 import { z } from 'zod';
+import { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale, type AppLanguage } from '../src/lib/app-language.js';
+import { deskErrorCopy } from './_lib/desk-localization.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
@@ -22,10 +24,10 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
 
-type Lang = 'en' | 'es' | 'pt';
-const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
+type Lang = AppLanguage;
+const copy = deskErrorCopy;
 
 /**
  * Every refusal carries a stable `code` the app can switch on:
@@ -80,12 +82,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
   const rawLang = (req.body as { language?: unknown } | undefined)?.language;
-  const lang: Lang = rawLang === 'es' || rawLang === 'pt' ? rawLang : 'en';
+  const lang: Lang = appLanguage(rawLang);
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
   }
   const { symbol, question, language, assetType, level } = parsed.data;
+  const locale = appLocale(language, parsed.data.locale);
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
     return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
@@ -193,9 +196,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
     const asked = horizonOf(question);
-    const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
+    const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left before the answer reached them (the last call was already in flight): nothing was
     // delivered, so a premium use is given back.
     if (left.signal.aborted) { const pendingRefund = refund(); waitUntil(pendingRefund); outcome('read_failed', 'left'); await pendingRefund; return; }

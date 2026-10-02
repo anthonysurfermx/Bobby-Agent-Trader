@@ -100,6 +100,7 @@ targets:
       path: Sources/Info.plist
       properties:
         CFBundleDisplayName: Bobby
+        CFBundleLocalizations: [en, es, fr, pt, it, de]
         CFBundleShortVersionString: $(MARKETING_VERSION)
         CFBundleVersion: $(CURRENT_PROJECT_VERSION)
         CFBundleURLTypes:
@@ -135,8 +136,8 @@ targets:
         TARGETED_DEVICE_FAMILY: "1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: QZRTV6CMTT
-        MARKETING_VERSION: "1.6"
-        CURRENT_PROJECT_VERSION: "54"
+        MARKETING_VERSION: "1.7"
+        CURRENT_PROJECT_VERSION: "55"
       configs:
         # RevenueCat PUBLIC SDK keys (meant to ship in the app; not secret keys). Debug uses the dashboard's
         # Test Store key; Release uses the App Store app's public key (RevenueCat → API keys → SDK API keys,

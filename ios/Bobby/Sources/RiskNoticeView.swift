@@ -11,7 +11,7 @@ enum RiskNotice {
     // Bodies expand in the scroll view so every recipient remains readable.
     // Shared by RiskNoticeView and the Núcleo risk beat (`riskNotice()`), so the
     // words the human agrees to are the same on both screens.
-    static func statements(spanish: Bool) -> [(title: String, body: String)] {
+    static func statements(spanish: Bool? = nil) -> [(title: String, body: String)] {
         [
             (L.t("Allow AI processing of my questions.", "Permito que la IA procese mis preguntas.", spanish: spanish),
              L.t("Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation audio stays on your iPhone. Avoid personal or account details. You can withdraw AI consent here at any time.", "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El audio del dictado permanece en tu iPhone. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras.", spanish: spanish)),
@@ -38,7 +38,7 @@ struct RiskNoticeView: View {
     @State private var checks: [Bool] = [false, false, false, false]
     @State private var confirmsWithdrawal = false
 
-    private var statements: [(title: String, body: String)] { RiskNotice.statements(spanish: L.isSpanish) }
+    private var statements: [(title: String, body: String)] { RiskNotice.statements() }
 
     private var allChecked: Bool { checks.allSatisfy { $0 } }
     /// Read-only shows the statements as agreed only once they really were (the Núcleo onboarding can
@@ -77,6 +77,8 @@ struct RiskNoticeView: View {
                                 .background(Theme.card)
                                 .clipShape(Circle())
                         }
+                        .accessibilityLabel(L.t("Close", "Cerrar"))
+                        .accessibilityIdentifier("risk-close")
                     }
                 }
                 .padding(.horizontal, 18)

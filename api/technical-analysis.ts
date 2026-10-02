@@ -18,6 +18,13 @@ interface Candle {
   vol: number;
 }
 
+interface EquityCandleSnapshot {
+  candles: Candle[];
+  currency: string | null;
+  exchange: string | null;
+  asOf: string | null;
+}
+
 interface TechnicalData {
   symbol: string;
   candles: Candle[];
@@ -211,14 +218,17 @@ async function fetchCandles(instId: string, bar: string = '1H', limit: number = 
 // indicators from the same venue avoids two classes of demo failure: several
 // curated stocks have no OKX swap, and tokenized-stock swaps can diverge from
 // the cash-market chart the user is looking at.
-async function fetchEquityCandles(symbol: string): Promise<Candle[]> {
+async function fetchEquityCandles(symbol: string): Promise<EquityCandleSnapshot> {
+  const empty: EquityCandleSnapshot = { candles: [], currency: null, exchange: null, asOf: null };
   const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=1mo&interval=1h`;
   const res = await fetch(url, {
+    signal: AbortSignal.timeout(8000),
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; BobbyAgentTrader/1.0)' },
   });
-  if (!res.ok) return [];
+  if (!res.ok) return empty;
   const json = await res.json() as {
     chart?: { result?: Array<{
+      meta?: { symbol?: string; currency?: string; exchangeName?: string; fullExchangeName?: string; regularMarketTime?: number };
       timestamp?: number[];
       indicators?: { quote?: Array<{
         open?: Array<number | null>; high?: Array<number | null>;
@@ -228,16 +238,26 @@ async function fetchEquityCandles(symbol: string): Promise<Candle[]> {
     }> };
   };
   const result = json.chart?.result?.[0];
+  if (result?.meta?.symbol && result.meta.symbol.toUpperCase() !== symbol) return empty;
   const quote = result?.indicators?.quote?.[0];
-  if (!result?.timestamp || !quote) return [];
-  return result.timestamp.map((ts, index) => ({
+  if (!result?.timestamp || !quote) return empty;
+  const candles = result.timestamp.map((ts, index) => ({
     ts: ts * 1000,
     o: Number(quote.open?.[index]),
     h: Number(quote.high?.[index]),
     l: Number(quote.low?.[index]),
     c: Number(quote.close?.[index]),
     vol: Number(quote.volume?.[index] ?? 0),
-  })).filter((c) => [c.ts, c.o, c.h, c.l, c.c].every(Number.isFinite) && c.c > 0);
+  })).filter((c) => [c.ts, c.o, c.h, c.l, c.c].every(Number.isFinite) && c.o > 0 && c.l > 0 && c.c > 0 && c.h >= c.l);
+  const marketTime = result.meta?.regularMarketTime;
+  const exchange = result.meta?.fullExchangeName || result.meta?.exchangeName;
+  return {
+    candles,
+    currency: typeof result.meta?.currency === 'string' && /^[A-Z]{3}$/.test(result.meta.currency) ? result.meta.currency : null,
+    exchange: typeof exchange === 'string' && exchange.trim() ? exchange : null,
+    asOf: typeof marketTime === 'number' && Number.isFinite(marketTime) && marketTime > 0 && marketTime * 1000 <= Date.now()
+      ? new Date(marketTime * 1000).toISOString() : null,
+  };
 }
 
 // ---- Handler ----
@@ -258,9 +278,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const instId = resolved?.instId || `${symbol}-USDT`;
 
   try {
-    const candles = requestedIsEquity || resolved?.kind === 'stock'
-      ? await fetchEquityCandles(symbol)
-      : await fetchCandles(instId, '1H', 168); // 7 days of hourly candles
+    const equitySnapshot = requestedIsEquity || resolved?.kind === 'stock' ? await fetchEquityCandles(symbol) : null;
+    const candles = equitySnapshot?.candles ?? await fetchCandles(instId, '1H', 168); // 7 days of hourly candles
     if (candles.length < 50) return res.status(404).json({ error: `Not enough candle data for ${symbol}` });
 
     const closes = candles.map(c => c.c);
@@ -329,6 +348,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       ok: true,
       symbol,
+      ...(equitySnapshot ? { currency: equitySnapshot.currency, exchange: equitySnapshot.exchange, asOf: equitySnapshot.asOf } : {}),
       candles: chartCandles,
       indicators: {
         sma20: sma20.slice(-72).map(v => isNaN(v) ? null : parseFloat(v.toFixed(2))),

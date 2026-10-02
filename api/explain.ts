@@ -1,5 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
+import { appLanguage, appLocale, languageName, type AppLanguage } from '../src/lib/app-language.js';
+import { explainError } from './_lib/explain-localization.js';
 
 const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
 
@@ -578,46 +580,12 @@ function buildPrompt(context: unknown, data: any): string | null {
   }
 }
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  // Rate limiting: in-memory first (free, per instance), then persistent
-  // (cross-instance, survives cold starts) — per-IP quota + global cap.
-  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
-  const rateCheck = isRateLimited(ip);
-  if (rateCheck.limited) {
-    return res.status(429).json({ error: `Daily limit reached (${RATE_LIMIT}/day). Resets in 24h. Save your queries for the insights that matter most.` });
-  }
-  const [ipLimit, globalLimit] = await Promise.all([
-    checkPersistentLimit('explain', ip, DAILY_LIMIT_PER_IP, 24 * 60 * 60),
-    checkPersistentLimit('explain', 'global', DAILY_LIMIT_GLOBAL, 24 * 60 * 60),
-  ]);
-  if (ipLimit.limited) {
-    return res.status(429).json({ error: `Daily limit reached (${DAILY_LIMIT_PER_IP}/day). Resets in 24h. Save your queries for the insights that matter most.` });
-  }
-  if (globalLimit.limited) {
-    console.error('[Explain] Global daily cap hit — possible abuse or organic spike');
-    return res.status(429).json({ error: 'Bobby is at capacity today. Try again tomorrow.' });
-  }
-
-  const { context, data, language = 'en' } = req.body || {};
-
-  if (!context || !data) {
-    return res.status(400).json({ error: 'Missing context or data' });
-  }
-
-  const userPrompt = buildPrompt(context, data);
-  if (userPrompt === null) {
-    return res.status(400).json({ error: `Invalid context. Valid: ${VALID_CONTEXTS.join(', ')}` });
-  }
-
+export function buildExplainSystemPrompt(context: string, language: AppLanguage, locale?: string): string {
   // Metacognition gets its own system prompt — Bobby in post-mortem mode
   const metacognitionSystemPrompt = `You are Bobby, a ruthless CIO and veteran quant, doing a brutally honest post-mortem review of your own decision engine.
 
 Write in short terminal-style lines, each starting with ">".
-${language === 'es' ? 'Respond in Spanish. Use crypto/trading slang natural in LatAm trading communities.' : 'Respond in English. Use trading floor jargon naturally.'}
+Respond in ${languageName(language, locale)}. Use natural trading vocabulary in the requested language.
 Keep it concise, high-signal, and personal. Sound like a veteran trader reviewing their own PnL in private — not a SaaS dashboard explainer.
 
 VOICE RULES (THE 6AM PHONE CALL):
@@ -625,8 +593,8 @@ VOICE RULES (THE 6AM PHONE CALL):
 - Use vocabulary like: pain trade, liquidity sweep, structural breakdown.
 
 Rules:
-- Start with > INITIATING METACOGNITION SEQUENCE...
-- Then > SYNCING NEURAL WEIGHTS FOR USER: {userName} (if available)
+- Start with the localized equivalent of > INITIATING METACOGNITION SEQUENCE...
+- Then the localized equivalent of > SYNCING NEURAL WEIGHTS FOR USER: {userName} (if available)
 - Lead with your strongest non-obvious diagnosis, NOT a summary of panels.
 - Every claim MUST connect at least 2 different parts of the dashboard. No isolated stat readings.
 - Translate quant-speak into trader psychology ("calibration error 0.18" → "I'm being dangerously overconfident").
@@ -652,7 +620,7 @@ Never hallucinate numbers. Never walk through panels mechanically.`;
 Write in short terminal-style lines, each starting with ">".
 Be direct, use data points, identify patterns.
 Write 4-6 paragraphs max. Keep each line under 100 characters.
-${language === 'es' ? 'Respond in Spanish.' : 'Respond in English.'}
+Respond in ${languageName(language, locale)}.
 Never speculate beyond the data provided. Never hallucinate numbers.
 BANNED: Emojis, "Hey guys", "As an AI", "Not financial advice". NEVER apologize.
 
@@ -680,6 +648,47 @@ When analyzing wallets with a STRATEGY CLASSIFICATION, explain what the strategy
 Reference the specific metrics (avgROI, sizeCV, directionalBias, bimodal) to support your analysis.
 
 After your analysis, output a single line starting with "TAGS:" followed by 2-4 comma-separated tags that classify this entity (e.g. "Market Maker, The House, 24/7 Operator" or "Sniper, Latency Arb, High ROI").`;
+
+  return systemPrompt + `\n\nOUTPUT LANGUAGE: ${languageName(language, locale)} (${appLocale(language, locale)}). Translate human-facing headings and analysis into this language, including the example structure above. Preserve proper names, tickers, all provided numeric values, and the exact machine marker TAGS:. The selected output language takes priority over the language of quoted user text.`;
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const { context, data, language, locale } = req.body || {};
+  const outputLanguage = appLanguage(language ?? locale);
+  const outputLocale = appLocale(outputLanguage, locale ?? language);
+  if (req.method !== 'POST') {
+    return res.status(405).json({ code: 'method_not_allowed', error: explainError(outputLanguage, 'method_not_allowed') });
+  }
+
+  // Rate limiting: in-memory first (free, per instance), then persistent
+  // (cross-instance, survives cold starts) — per-IP quota + global cap.
+  const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || 'unknown';
+  const rateCheck = isRateLimited(ip);
+  if (rateCheck.limited) {
+    return res.status(429).json({ code: 'daily_limit', error: explainError(outputLanguage, 'daily_limit', RATE_LIMIT) });
+  }
+  const [ipLimit, globalLimit] = await Promise.all([
+    checkPersistentLimit('explain', ip, DAILY_LIMIT_PER_IP, 24 * 60 * 60),
+    checkPersistentLimit('explain', 'global', DAILY_LIMIT_GLOBAL, 24 * 60 * 60),
+  ]);
+  if (ipLimit.limited) {
+    return res.status(429).json({ code: 'daily_limit', error: explainError(outputLanguage, 'daily_limit', DAILY_LIMIT_PER_IP) });
+  }
+  if (globalLimit.limited) {
+    console.error('[Explain] Global daily cap hit — possible abuse or organic spike');
+    return res.status(429).json({ code: 'capacity', error: explainError(outputLanguage, 'capacity') });
+  }
+
+  if (!context || !data) {
+    return res.status(400).json({ code: 'missing_context', error: explainError(outputLanguage, 'missing_context') });
+  }
+
+  const userPrompt = buildPrompt(context, data);
+  if (userPrompt === null) {
+    return res.status(400).json({ code: 'invalid_context', error: explainError(outputLanguage, 'invalid_context', VALID_CONTEXTS.join(', ')) });
+  }
+
+  const systemPrompt = buildExplainSystemPrompt(context, outputLanguage, outputLocale);
 
   try {
     // Set up SSE streaming
@@ -734,9 +743,9 @@ After your analysis, output a single line starting with "TAGS:" followed by 2-4 
   } catch (error: any) {
     console.error('AI explain error:', error);
     if (!res.headersSent) {
-      res.status(500).json({ error: 'Failed to generate explanation' });
+      res.status(500).json({ code: 'generation_failed', error: explainError(outputLanguage, 'generation_failed') });
     } else {
-      res.write(`data: ${JSON.stringify({ error: 'Stream interrupted' })}\n\n`);
+      res.write(`data: ${JSON.stringify({ code: 'stream_interrupted', error: explainError(outputLanguage, 'stream_interrupted') })}\n\n`);
       res.end();
     }
   }

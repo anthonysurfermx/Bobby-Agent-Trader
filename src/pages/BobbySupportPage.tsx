@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { Helmet } from 'react-helmet-async';
-import { lang } from '@/lib/companions/i18n';
+import { lang, LANGS, LANG_NAME, htmlLang, translateText, type Lang } from '@/lib/companions/i18n';
+import { appLanguage, isAppLanguage } from '@/lib/app-language';
 
-type SupportRequest = { message: string; email: string; language: 'en' | 'es'; kind: string };
+type SupportRequest = { message: string; email: string; language: Lang; kind: string };
 
 /** A successful HTTP response alone is not proof that the private queue saved the request. */
 export async function sendSupportRequest(request: SupportRequest): Promise<void> {
@@ -25,8 +26,8 @@ export async function sendSupportRequest(request: SupportRequest): Promise<void>
 
 export default function BobbySupportPage() {
   const requested = new URLSearchParams(window.location.search).get('lang');
-  const es = requested ? requested === 'es' : lang() === 'es';
-  const t = (en: string, spanish: string) => es ? spanish : en;
+  const language = isAppLanguage(requested?.toLowerCase().split(/[-_]/)[0]) ? appLanguage(requested) : lang();
+  const t = (en: string, spanish: string) => language === 'es' ? spanish : translateText(language, en);
   const [message, setMessage] = useState('');
   const [email, setEmail] = useState('');
   const [kind, setKind] = useState('support');
@@ -36,16 +37,16 @@ export default function BobbySupportPage() {
     if (status === 'sending' || message.trim().length < 3) return;
     setStatus('sending');
     try {
-      await sendSupportRequest({ message, email, kind, language: es ? 'es' : 'en' });
+      await sendSupportRequest({ message, email, kind, language });
       setStatus('saved');
       setMessage('');
     } catch { setStatus('error'); }
   }
   const fieldClass = 'mt-2 w-full rounded-xl border border-white/15 bg-white/[0.04] px-4 py-3 text-white outline-none focus:border-[#A795EF]';
   return <KineticShell activeTab="terminal" minimalNav showTicker={false} showStatus={false} nucleo><main className="min-h-screen bg-[#050505] px-4 py-16 text-white sm:px-6">
-    <Helmet><title>{t('Bobby support and community rules', 'Soporte y reglas de Bobby')}</title><html lang={es ? 'es' : 'en'} /></Helmet>
+    <Helmet><title>{t('Bobby support and community rules', 'Soporte y reglas de Bobby')}</title><html lang={htmlLang()} /></Helmet>
     <div className="mx-auto max-w-2xl space-y-8 leading-7">
-      <nav aria-label={t('Language', 'Idioma')} className="flex gap-4 font-mono text-[11px] uppercase tracking-[0.14em] text-white/40"><a href="?lang=en" aria-current={!es ? 'page' : undefined} className={es ? 'hover:text-white' : 'text-white'}>English</a><a href="?lang=es" aria-current={es ? 'page' : undefined} className={es ? 'text-white' : 'hover:text-white'}>Español</a></nav>
+      <nav aria-label={t('Language', 'Idioma')} className="flex flex-wrap gap-4 font-mono text-[11px] uppercase tracking-[0.14em] text-white/40">{LANGS.map(code => <a key={code} href={`?lang=${code}`} aria-current={language === code ? 'page' : undefined} className={language === code ? 'text-white' : 'hover:text-white'}>{LANG_NAME[code]}</a>)}</nav>
       <h1 className="text-4xl md:text-5xl">{t('How can we help?', '¿Cómo podemos ayudarte?')}</h1>
       <section id="contact" className="scroll-mt-24 space-y-3">
         <h2 className="text-xl">{t('Contact Bobby privately', 'Contacta a Bobby en privado')}</h2>
@@ -64,7 +65,7 @@ export default function BobbySupportPage() {
           <label className="block" htmlFor="support-message">{t('How can we help?', '¿Cómo podemos ayudarte?')}
             <textarea id="support-message" className={fieldClass} rows={5} minLength={3} maxLength={2000} required value={message} onChange={event => setMessage(event.target.value)} disabled={status === 'sending'} aria-describedby="support-data-note" />
           </label>
-          <p id="support-data-note" className="text-sm text-white/60">{t('Include your app version and only the details needed to explain the request. Sending shares these fields with the private support service. Read our ', 'Incluye la versión de la app y solo los detalles necesarios para explicar la solicitud. Al enviar, compartes estos campos con el servicio privado de soporte. Lee el ')}<a className="underline underline-offset-4" href={`/privacy?lang=${es ? 'es' : 'en'}`}>{t('privacy policy', 'aviso de privacidad')}</a>.</p>
+          <p id="support-data-note" className="text-sm text-white/60">{t('Include your app version and only the details needed to explain the request. Sending shares these fields with the private support service. Read our ', 'Incluye la versión de la app y solo los detalles necesarios para explicar la solicitud. Al enviar, compartes estos campos con el servicio privado de soporte. Lee el ')}<a className="underline underline-offset-4" href={`/privacy?lang=${language}`}>{t('privacy policy', 'aviso de privacidad')}</a>.</p>
           <button className="rounded-xl bg-[#F2EDE4] px-5 py-3 font-semibold text-[#0D0B15] disabled:opacity-50" type="submit" disabled={status === 'sending' || message.trim().length < 3}>{status === 'sending' ? t('Sending…', 'Enviando…') : t('Send private request', 'Enviar solicitud privada')}</button>
           <p role={status === 'error' ? 'alert' : 'status'} aria-live="polite" className={status === 'error' ? 'text-[#FF8F9A]' : 'text-[#80D9E8]'}>
             {status === 'saved' ? t('Your request was saved to Bobby’s private support queue.', 'Tu solicitud se guardó en la cola privada de soporte de Bobby.') : status === 'error' ? t('We could not confirm your request was saved. Your message is still here; please try again.', 'No pudimos confirmar que se guardara tu solicitud. Tu mensaje sigue aquí; vuelve a intentarlo.') : ''}
@@ -86,7 +87,7 @@ export default function BobbySupportPage() {
         <h2 className="text-xl">{t('Your account and data', 'Tu cuenta y tus datos')}</h2>
         <p>{t('Tap the companion avatar at the top right to open Profile. Sign in with Apple is optional; its given name stays on this iPhone for a greeting. When signed in, choose “Delete account” and confirm “Delete account permanently” to remove your account, synced progress and Trader Land data. Apple may ask you to authorize once more. Signing out does not delete the account.', 'Toca el avatar del compañero arriba a la derecha para abrir Perfil. Iniciar sesión con Apple es opcional; su nombre de pila se guarda en este iPhone para saludarte. Con sesión iniciada, elige “Borrar cuenta” y confirma “Borrar cuenta definitivamente” para borrar la cuenta, el progreso sincronizado y los datos de Trader Land. Apple puede pedirte autorizar una vez más. Cerrar sesión no borra la cuenta.')}</p>
         <p>{t('Guest Quick reads have a limited allowance. Deep and Max availability follows the usage limits shown in the app. Bobby Pro is an optional auto-renewing monthly subscription bought through Apple: unlimited Quick reads (fair use) plus 60 Deep and 10 Max every 30 days. It renews until you cancel it in Settings › Apple Account › Subscriptions; deleting your Bobby account does not cancel it. To restore it on a new iPhone, open Profile → Restore Purchases. Optional invitations can earn promotional Pro access with an expiry; that is not an Apple subscription.', 'Las lecturas Rápidas de invitado tienen un cupo limitado. La disponibilidad de Profundo y Máximo sigue los límites que muestra la app. Bobby Pro es una suscripción mensual opcional con renovación automática que se compra con Apple: lecturas Rápidas ilimitadas (uso justo) más 60 Profundo y 10 Máximo cada 30 días. Se renueva hasta que la canceles en Ajustes › Cuenta de Apple › Suscripciones; borrar tu cuenta de Bobby no la cancela. Para restaurarla en otro iPhone, abre Perfil → Restaurar compras. Las invitaciones opcionales pueden dar acceso Pro promocional con vencimiento; eso no es una suscripción de Apple.')}</p>
-        <a className="text-white underline" href={`/privacy?lang=${es ? 'es' : 'en'}`}>{t('Privacy policy', 'Aviso de privacidad')}</a>
+        <a className="text-white underline" href={`/privacy?lang=${language}`}>{t('Privacy policy', 'Aviso de privacidad')}</a>
       </section>
     </div>
   </main></KineticShell>;

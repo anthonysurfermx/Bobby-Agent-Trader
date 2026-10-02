@@ -180,6 +180,7 @@ struct AuraCardSheet: View {
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(Theme.card))
                 }
+                .accessibilityLabel(L.t("Close", "Cerrar"))
             }
             // Preview scales to the sheet so the whole 4:5 card is visible on
             // every phone; the shared image still renders at 3× (1080×1350).

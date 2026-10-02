@@ -2,6 +2,8 @@ import { useId, useState } from 'react';
 import { ArrowUpRight, Move, RotateCw, Undo2 } from 'lucide-react';
 import { t } from '@/lib/companions/i18n';
 
+import { landPieceLabel } from '@/lib/trader-land/piece-labels';
+
 export const TRADER_LAND_URL = '/trader-land';
 
 // Art anchors and bounds match the shipped gate-A manifest. This small preview
@@ -37,7 +39,7 @@ export default function TraderLandPreview() {
   return (
     <figure className="overflow-hidden rounded-[1.75rem] border border-[#b9e6c9]/20 bg-[#101e1b] shadow-[0_32px_100px_#0005]">
       <div className="flex items-center justify-between gap-3 border-b border-white/10 px-5 py-4 text-xs">
-        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#d6eddc]">BOBBY WORLD / 01</span>
+        <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-[#d6eddc]">{t("BOBBY WORLD / 01", "MUNDO BOBBY / 01")}</span>
         <span className="flex items-center gap-2 text-[#b7d5bf]"><span className="h-1.5 w-1.5 rounded-full bg-[#b5e89c]" />{t('Interactive preview', 'Vista interactiva')}</span>
       </div>
       <svg viewBox="30 110 800 520" className="w-full bg-[radial-gradient(ellipse_at_center,#20423755,transparent_70%)]" role="img" aria-labelledby={titleId}>
@@ -54,7 +56,7 @@ export default function TraderLandPreview() {
       </svg>
       <div className="mx-4 mb-4 rounded-2xl border border-[#bbdbac]/20 bg-[#1d3025] p-4">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-[#eff6df]">Candle Tower</span>
+          <span className="text-sm font-semibold text-[#eff6df]">{landPieceLabel("Candle Tower")}</span>
           <span className="text-xs text-[#b7d5bf]" role="status">{selected.cols} × {selected.rows} · {t('Try the controls', 'Prueba los controles')}</span>
         </div>
         <div className="grid grid-cols-3 gap-2">

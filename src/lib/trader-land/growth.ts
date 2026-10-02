@@ -7,7 +7,8 @@
 //   · the Aura Core moves like a piece and wakes once 5 pieces stand
 // No React, no DOM: the web test scripts import this directly.
 // ============================================================
-import { t } from '@/lib/companions/i18n';
+import { pick, t, type Bi } from '@/lib/companions/i18n';
+import { landPieceLabel } from './piece-labels';
 import { SLAB, coreCells, footprintCells, homeZoom, landSize, type LandGeometry, type SpriteFrame } from './geometry';
 
 /** Every /api/trader-land request declares it implements this contract (growth is only triggered for such clients). */
@@ -128,10 +129,12 @@ function prettyId(id: string, world?: string) {
   return bare.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 /** Display name of a piece: the catalog name in the reader's language, else the id. */
-export function pieceName(piece: PieceSummary | null | undefined, spanish: boolean): string {
+export function pieceName(piece: PieceSummary | null | undefined, spanish?: boolean): string {
   if (!piece) return '';
-  const name = piece.name as { en?: string; es?: string } | null | undefined;
-  return (spanish ? name?.es : name?.en) ?? name?.en ?? prettyId(piece.id, piece.world);
+  const name = piece.name as Bi | null | undefined;
+  const fallback = prettyId(piece.id, piece.world);
+  if (spanish !== undefined) return (spanish ? name?.es : name?.en) ?? name?.en ?? fallback;
+  return name?.en ? pick(name) : landPieceLabel(fallback);
 }
 
 /**
@@ -174,7 +177,7 @@ export function extendErrorMessage(status: number, error: unknown): string {
   if (/bloomed/i.test(text)) return t('This seed already bloomed.', 'Esta semilla ya floreció.', 'Esta semente já floresceu.');
   if (/review/i.test(text)) return t('Its review is already open.', 'Su revisión ya está abierta.', 'A revisão dela já está aberta.');
   if (/only grow/i.test(text) || status === 400) return t('A horizon can only grow.', 'Un horizonte solo puede crecer.', 'Um horizonte só pode crescer.');
-  return text || t('The seed could not be extended. Try again.', 'No se pudo extender la semilla. Inténtalo de nuevo.', 'Não foi possível estender a semente. Tente de novo.');
+  return t('The seed could not be extended. Try again.', 'No se pudo extender la semilla. Inténtalo de nuevo.', 'Não foi possível estender a semente. Tente de novo.');
 }
 
 /** A transparent tap target over the art, in island canvas units. */

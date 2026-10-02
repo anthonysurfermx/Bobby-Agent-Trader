@@ -3,7 +3,7 @@
 // adds Bobby Pro days to yours. The numbers come from /api/bobby-access, never from here.
 import { useState } from 'react';
 import { Check, Copy, Plus, Share2 } from 'lucide-react';
-import { isPortuguese, t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { sfxSuccess, sfxTock } from '@/lib/companions/sfx';
 import type { AccessState } from '@/lib/access-client';
 
@@ -24,7 +24,7 @@ export default function InvitePanel({ state, onSignIn }: Props) {
   const max = referral?.max ?? terms?.maxFriends ?? 5;
   const reward = rewardLabel(referral?.rewardDays ?? terms?.rewardDays ?? 30);
   const accepted = referral?.accepted ?? 0;
-  const proUntil = referral?.proUntil ? new Date(referral.proUntil).toLocaleDateString(isPortuguese() ? 'pt-BR' : undefined, { month: 'long', day: 'numeric' }) : null;
+  const proUntil = referral?.proUntil ? new Date(referral.proUntil).toLocaleDateString(speechLocale(), { month: 'long', day: 'numeric' }) : null;
   const link = referral?.url ?? '';
   const shortLink = link.replace(/^https?:\/\//, '');
 

@@ -100,7 +100,7 @@ struct BobbyReadAccess: Equatable, Sendable {
          "resetsAt": resetsAt.map { $0 as Any } ?? NSNull(), "paywall": paywall, "bonus": bonus]
     }
 
-    static func giftLabel(_ bonus: Int, spanish: Bool = L.isSpanish) -> String {
+    static func giftLabel(_ bonus: Int, spanish: Bool? = nil) -> String {
         L.t("\(bonus) gifted reads", "\(bonus) lecturas de regalo", spanish: spanish)
     }
 
@@ -191,9 +191,9 @@ enum BobbyAccessAPI {
     }
 
     /// "October 4" / "4 de octubre", in the app's language and the phone's time zone.
-    static func day(_ date: Date, spanish: Bool = L.isSpanish, timeZone: TimeZone = .current) -> String {
+    static func day(_ date: Date, spanish: Bool? = nil, timeZone: TimeZone = .current) -> String {
         let f = DateFormatter()
-        f.locale = Locale(identifier: spanish ? "es_MX" : "en_US")
+        f.locale = L.formatLocale(spanish: spanish)
         f.timeZone = timeZone
         f.setLocalizedDateFormatFromTemplate("MMMMd")
         return f.string(from: date)

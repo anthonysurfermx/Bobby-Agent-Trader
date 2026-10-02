@@ -318,6 +318,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
         <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="es" lang="es">Español<i aria-hidden="true"></i></button>
         <button class="lang-opt" type="button" role="menuitemradio" aria-checked="true" tabindex="-1" data-lang="en" lang="en">English<i aria-hidden="true"></i></button>
         <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="pt" lang="pt">Português<i aria-hidden="true"></i></button>
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="de" lang="de">Deutsch<i aria-hidden="true"></i></button>
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="it" lang="it">Italiano<i aria-hidden="true"></i></button>
+        <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="fr" lang="fr">Français<i aria-hidden="true"></i></button>
       </div>
     </div>
     <a class="tb-app" href="/desk">App</a>
@@ -428,11 +431,11 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 </footer>
 
 <script>
-/* ---------- language: English is the copy in the markup; es / pt swap it in place.
-   The choice lives in localStorage `bobby_lang` (en | es | pt), the key the React app reads, so /desk follows. ---------- */
+/* ---------- language: English is the copy in the markup; six languages swap it in place.
+   The choice lives in localStorage `bobby_lang` (en | es | fr | pt | it | de), the key the React app reads, so /desk follows. ---------- */
 (function(){
   'use strict';
-  var KEY = 'bobby_lang', HTML_LANG = { en: 'en', es: 'es-MX', pt: 'pt-BR' };
+  var KEY = 'bobby_lang', HTML_LANG = { en: 'en-US', es: 'es-MX', fr: 'fr-FR', pt: 'pt-PT', it: 'it-IT', de: 'de-DE' };
   var DICT = {
     en: {
       'c.res': 'RESISTANCE', 'c.sup': 'SUPPORT', 'c.now': 'NOW', 'c.tag': 'EXAMPLE · NVDA · 1H'
@@ -557,6 +560,277 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     }
   };
 
+  Object.assign(DICT, {
+  "fr": {
+    "meta.title": "Bobby — Réfléchissez avant de décider",
+    "meta.desc": "Posez une question sur un actif. Trois points de vue confrontent l’idée, le risque peut inviter à attendre, et la décision vous appartient.",
+    "tb.home": "Bobby, accueil",
+    "tb.lang": "Langue",
+    "hero.h1": "Interroger une IA sur votre actif <em>ne suffit plus à vous donner un avantage.</em>",
+    "hero.cue": "Défiler",
+    "p.aria": "Le problème",
+    "p.eyebrow": "Un chat IA quelconque · Exemple",
+    "p.asst": "Assistant",
+    "p.day1": "Lun. 09:12",
+    "p.day2": "Jeu. 16:40",
+    "p.q": "Est-ce le bon moment pour NVIDIA ?",
+    "p.a1": "Oui. La demande de puces d’IA continue de croître et la dynamique est forte. <mark>Cela semble être un bon point d’entrée.</mark>",
+    "p.a2": "L’action paraît tendue après sa hausse. <mark>Il serait peut-être sage d’attendre</mark> un repli.",
+    "p.fail": "Deux réponses assurées. <span>Personne ne les a vérifiées, et le chat ne se souviendra pas du lundi.</span>",
+    "d.aria": "Comment Bobby répond",
+    "d.eyebrow": "La même question, posée à Bobby",
+    "d.h2": "Avant que vous entendiez une réponse, <em>elle doit résister à une critique.</em>",
+    "d.alpha.role": "défend la thèse",
+    "d.alpha": "La demande de puces d’IA dépasse encore l’offre, et les acheteurs ont défendu le dernier repli.",
+    "d.red.role": "la met à l’épreuve",
+    "d.red": "Le prix suppose déjà des trimestres parfaits. Un seul échec, et ce plancher cède.",
+    "d.cio.role": "tranche",
+    "d.cio": "La thèse tient. Le point d’entrée, non. Attendez un meilleur niveau.",
+    "v.ready": "Prêt",
+    "v.wait": "Attendre",
+    "v.pass": "Passer",
+    "w.aria": "Le verdict",
+    "w.chart": "Graphique illustratif sur une heure avec résistance et support",
+    "w.call": "La thèse tient, le point d’entrée non. Mon verdict : <em>attendre.</em>",
+    "w.rule": "Bobby répond avec l’un de ces trois mots : Prêt, Attendre ou Passer. Il ne vous dit jamais d’acheter ou de vendre.",
+    "w.fine": "Analyse illustrative · NVDA · Éducatif, sans conseil financier",
+    "c.res": "RÉSISTANCE",
+    "c.sup": "SUPPORT",
+    "c.now": "MAINTENANT",
+    "c.tag": "EXEMPLE · NVDA · 1H",
+    "r.aria": "L’historique",
+    "r.eyebrow": "L’historique · Exemple",
+    "r.h2": "Bobby se souvient de sa réponse. <em>Puis il en suit le résultat.</em>",
+    "r.d1": "26 sept.",
+    "r.d2": "19 sept.",
+    "r.d3": "12 sept.",
+    "r.d4": "05 sept.",
+    "r.open": "Ouvert · évalué dans 7 jours",
+    "r.right": "Résolu · juste",
+    "r.missed": "Résolu · manqué",
+    "r.note": "Chaque analyse est enregistrée avant le résultat, puis évaluée. Les erreurs restent à côté des réussites. <a href=\"/record\">Voir l’historique public</a>",
+    "r.same": "Bobby utilise les mêmes modèles que tout le monde. <em>La différence est dans la procédure qui les entoure.</em>",
+    "t.eyebrow": "Commencez gratuitement",
+    "t.h2": "Vos analyses, votre compagnon et votre historique, <em>sur le web et sur iPhone.</em>",
+    "t.try": "Essayer Bobby",
+    "t.ios": "Obtenir l’app iPhone",
+    "f.eyebrow": "Pour les développeurs, les agents et les curieux",
+    "f.copy": "Les règles derrière chaque analyse : comment une réponse est contestée avant d’être présentée, comment elle est évaluée ensuite et comment tout agent peut suivre la même procédure.",
+    "f.cta": "Lire le protocole",
+    "f.nav": "Protocole",
+    "f.rules": "Les règles",
+    "f.calls": "Verdicts vérifiés",
+    "f.record": "Historique",
+    "f.docs": "Documentation et MCP",
+    "f.audits": "Audits",
+    "f.heartbeat": "Activité du contrat",
+    "f.disc": "Analyses éducatives, sans conseil financier.",
+    "f.support": "Assistance",
+    "f.privacy": "Confidentialité"
+  },
+  "it": {
+    "meta.title": "Bobby — Rifletti prima di decidere",
+    "meta.desc": "Fai una domanda su un asset. Tre prospettive mettono alla prova l’idea, il rischio può suggerire di aspettare e la decisione è tua.",
+    "tb.home": "Bobby, pagina iniziale",
+    "tb.lang": "Lingua",
+    "hero.h1": "Chiedere a un’IA del tuo asset <em>non è più un vantaggio.</em>",
+    "hero.cue": "Scorri",
+    "p.aria": "Il problema",
+    "p.eyebrow": "Una chat IA qualsiasi · Esempio",
+    "p.asst": "Assistente",
+    "p.day1": "Lun 09:12",
+    "p.day2": "Gio 16:40",
+    "p.q": "È il momento giusto per NVIDIA?",
+    "p.a1": "Sì. La domanda di chip per l’IA continua a crescere e lo slancio è forte. <mark>Sembra un buon punto d’ingresso.</mark>",
+    "p.a2": "Il titolo sembra tirato dopo il rialzo. <mark>Potrebbe essere prudente aspettare</mark> un ritracciamento.",
+    "p.fail": "Due risposte sicure. <span>Nessuno le ha verificate, e la chat non ricorderà il lunedì.</span>",
+    "d.aria": "Come risponde Bobby",
+    "d.eyebrow": "La stessa domanda, posta a Bobby",
+    "d.h2": "Prima di ascoltare una risposta, <em>deve resistere a una critica.</em>",
+    "d.alpha.role": "sostiene la tesi",
+    "d.alpha": "La domanda di chip per l’IA supera ancora l’offerta e gli acquirenti hanno difeso l’ultimo ribasso.",
+    "d.red.role": "la mette alla prova",
+    "d.red": "Il prezzo sconta già trimestri perfetti. Basta un errore e quel sostegno cede.",
+    "d.cio.role": "decide",
+    "d.cio": "La tesi regge. L’ingresso, no. Aspetta un livello migliore.",
+    "v.ready": "Pronto",
+    "v.wait": "Aspetta",
+    "v.pass": "Passa",
+    "w.aria": "Il verdetto",
+    "w.chart": "Grafico illustrativo a un’ora con resistenza e supporto",
+    "w.call": "La tesi regge, l’ingresso no. Il mio verdetto: <em>aspetta.</em>",
+    "w.rule": "Bobby risponde con una di tre parole: Pronto, Aspetta o Passa. Non ti dice mai di comprare o vendere.",
+    "w.fine": "Analisi illustrativa · NVDA · Educativo, senza consulenza finanziaria",
+    "c.res": "RESISTENZA",
+    "c.sup": "SUPPORTO",
+    "c.now": "ORA",
+    "c.tag": "ESEMPIO · NVDA · 1H",
+    "r.aria": "Lo storico",
+    "r.eyebrow": "Lo storico · Esempio",
+    "r.h2": "Bobby ricorda la sua risposta. <em>Poi ne segue il risultato.</em>",
+    "r.d1": "26 set",
+    "r.d2": "19 set",
+    "r.d3": "12 set",
+    "r.d4": "05 set",
+    "r.open": "Aperto · valutato tra 7 giorni",
+    "r.right": "Risolto · corretto",
+    "r.missed": "Risolto · errato",
+    "r.note": "Ogni analisi viene registrata prima del risultato e valutata dopo. Gli errori restano accanto ai successi. <a href=\"/record\">Vedi lo storico pubblico</a>",
+    "r.same": "Bobby usa gli stessi modelli di tutti. <em>La differenza è nella procedura che li circonda.</em>",
+    "t.eyebrow": "Inizia gratis",
+    "t.h2": "Le tue analisi, il tuo compagno e il tuo storico, <em>sul web e su iPhone.</em>",
+    "t.try": "Prova Bobby",
+    "t.ios": "Scarica l’app per iPhone",
+    "f.eyebrow": "Per sviluppatori, agenti e curiosi",
+    "f.copy": "Le regole dietro ogni analisi: come una risposta viene contestata prima di essere mostrata, come viene valutata dopo e come ogni agente può seguire la stessa procedura.",
+    "f.cta": "Leggi il protocollo",
+    "f.nav": "Protocollo",
+    "f.rules": "Le regole",
+    "f.calls": "Verdetti verificati",
+    "f.record": "Storico",
+    "f.docs": "Documentazione e MCP",
+    "f.audits": "Audit",
+    "f.heartbeat": "Attività del contratto",
+    "f.disc": "Analisi educative, senza consulenza finanziaria.",
+    "f.support": "Assistenza",
+    "f.privacy": "Privacy"
+  },
+  "de": {
+    "meta.title": "Bobby — Nachdenken, bevor du entscheidest",
+    "meta.desc": "Stelle eine Frage zu einem Vermögenswert. Drei Perspektiven prüfen die Idee, das Risiko kann fürs Abwarten sprechen, und die Entscheidung liegt bei dir.",
+    "tb.home": "Bobby, Startseite",
+    "tb.lang": "Sprache",
+    "hero.h1": "Eine KI zu deinem Vermögenswert zu befragen <em>ist kein Vorsprung mehr.</em>",
+    "hero.cue": "Scrollen",
+    "p.aria": "Das Problem",
+    "p.eyebrow": "Ein beliebiger KI-Chat · Beispiel",
+    "p.asst": "Assistent",
+    "p.day1": "Mo. 09:12",
+    "p.day2": "Do. 16:40",
+    "p.q": "Ist jetzt ein guter Zeitpunkt für NVIDIA?",
+    "p.a1": "Ja. Die Nachfrage nach KI-Chips wächst weiter und die Dynamik ist stark. <mark>Das scheint ein guter Einstieg zu sein.</mark>",
+    "p.a2": "Die Aktie wirkt nach dem Anstieg überdehnt. <mark>Es könnte klug sein,</mark> einen Rücksetzer abzuwarten.",
+    "p.fail": "Zwei selbstsichere Antworten. <span>Niemand hat sie geprüft, und der Chat wird sich nicht an Montag erinnern.</span>",
+    "d.aria": "Wie Bobby antwortet",
+    "d.eyebrow": "Dieselbe Frage, an Bobby gestellt",
+    "d.h2": "Bevor du eine Antwort hörst, <em>muss sie einer Kritik standhalten.</em>",
+    "d.alpha.role": "begründet die These",
+    "d.alpha": "Die Nachfrage nach KI-Chips übersteigt noch das Angebot, und Käufer haben den letzten Rücksetzer verteidigt.",
+    "d.red.role": "stellt sie auf die Probe",
+    "d.red": "Der Preis setzt bereits perfekte Quartale voraus. Ein Fehler und diese Unterstützung bricht.",
+    "d.cio.role": "entscheidet",
+    "d.cio": "Die These trägt. Der Einstieg noch nicht. Warte auf ein besseres Niveau.",
+    "v.ready": "Bereit",
+    "v.wait": "Warten",
+    "v.pass": "Auslassen",
+    "w.aria": "Das Urteil",
+    "w.chart": "Beispiel eines Stundencharts mit Widerstand und Unterstützung",
+    "w.call": "Die These trägt, der Einstieg noch nicht. Mein Urteil: <em>warten.</em>",
+    "w.rule": "Bobby antwortet mit einem von drei Wörtern: Bereit, Warten oder Auslassen. Es sagt dir nie, dass du kaufen oder verkaufen sollst.",
+    "w.fine": "Beispielanalyse · NVDA · Bildungszweck, keine Finanzberatung",
+    "c.res": "WIDERSTAND",
+    "c.sup": "UNTERSTÜTZUNG",
+    "c.now": "JETZT",
+    "c.tag": "BEISPIEL · NVDA · 1H",
+    "r.aria": "Die Historie",
+    "r.eyebrow": "Die Historie · Beispiel",
+    "r.h2": "Bobby erinnert sich an seine Antwort. <em>Dann verfolgt es das Ergebnis.</em>",
+    "r.d1": "26. Sept.",
+    "r.d2": "19. Sept.",
+    "r.d3": "12. Sept.",
+    "r.d4": "05. Sept.",
+    "r.open": "Offen · in 7 Tagen bewertet",
+    "r.right": "Abgeschlossen · richtig",
+    "r.missed": "Abgeschlossen · falsch",
+    "r.note": "Jede Analyse wird vor dem Ergebnis gespeichert und danach bewertet. Fehler bleiben neben Erfolgen sichtbar. <a href=\"/record\">Öffentliche Historie ansehen</a>",
+    "r.same": "Bobby nutzt dieselben Modelle wie alle anderen. <em>Der Unterschied liegt im Verfahren darum herum.</em>",
+    "t.eyebrow": "Kostenlos starten",
+    "t.h2": "Deine Analysen, dein Begleiter und deine Historie, <em>im Web und auf dem iPhone.</em>",
+    "t.try": "Bobby ausprobieren",
+    "t.ios": "iPhone-App herunterladen",
+    "f.eyebrow": "Für Entwickler, Agenten und Neugierige",
+    "f.copy": "Die Regeln hinter jeder Analyse: wie eine Antwort vor der Anzeige hinterfragt wird, wie sie danach bewertet wird und wie jeder Agent dasselbe Verfahren anwenden kann.",
+    "f.cta": "Protokoll lesen",
+    "f.nav": "Protokoll",
+    "f.rules": "Die Regeln",
+    "f.calls": "Geprüfte Urteile",
+    "f.record": "Historie",
+    "f.docs": "Dokumentation und MCP",
+    "f.audits": "Prüfungen",
+    "f.heartbeat": "Vertragsaktivität",
+    "f.disc": "Analysen zu Bildungszwecken, keine Finanzberatung.",
+    "f.support": "Support",
+    "f.privacy": "Datenschutz"
+  },
+  "ptPT": {
+    "meta.title": "Bobby — Pensa antes de decidir",
+    "meta.desc": "Faz uma pergunta sobre um ativo. Três perspetivas confrontam a ideia, o risco pode sugerir esperar, e a decisão é tua.",
+    "tb.home": "Bobby, início",
+    "tb.lang": "Idioma",
+    "hero.h1": "Perguntar a uma IA pelo teu ativo <em>já não é uma vantagem.</em>",
+    "hero.cue": "Desliza",
+    "p.aria": "O problema",
+    "p.eyebrow": "Qualquer conversa com IA · Exemplo",
+    "p.asst": "Assistente",
+    "p.day1": "Seg 09:12",
+    "p.day2": "Qui 16:40",
+    "p.q": "Será este um bom momento para a NVIDIA?",
+    "p.a1": "Sim. A procura de chips de IA continua a crescer e o impulso é forte. <mark>Parece um bom ponto de entrada.</mark>",
+    "p.a2": "A ação parece esticada após a subida. <mark>Talvez seja prudente esperar</mark> uma correção.",
+    "p.fail": "Duas respostas muito seguras. <span>Ninguém as verificou, e a conversa não se vai lembrar de segunda-feira.</span>",
+    "d.aria": "Como responde o Bobby",
+    "d.eyebrow": "A mesma pergunta, feita ao Bobby",
+    "d.h2": "Antes de ouvires uma resposta, <em>ela tem de resistir a uma crítica.</em>",
+    "d.alpha.role": "defende a tese",
+    "d.alpha": "A procura de chips de IA ainda supera a oferta, e os compradores defenderam a última descida.",
+    "d.red.role": "põe-na à prova",
+    "d.red": "O preço já pressupõe trimestres perfeitos. Um só erro e esse suporte cede.",
+    "d.cio.role": "decide",
+    "d.cio": "A tese é válida. A entrada, ainda não. Espera um nível melhor.",
+    "v.ready": "Pronto",
+    "v.wait": "Espera",
+    "v.pass": "Passo",
+    "w.aria": "O veredicto",
+    "w.chart": "Gráfico ilustrativo de uma hora com resistência e suporte",
+    "w.call": "A tese é válida, a entrada ainda não. O meu veredicto: <em>espera.</em>",
+    "w.rule": "O Bobby responde com uma de três palavras: Pronto, Espera ou Passo. Nunca te diz para comprares ou venderes.",
+    "w.fine": "Análise ilustrativa · NVDA · Educativo, sem aconselhamento financeiro",
+    "c.res": "RESISTÊNCIA",
+    "c.sup": "SUPORTE",
+    "c.now": "AGORA",
+    "c.tag": "EXEMPLO · NVDA · 1H",
+    "r.aria": "O histórico",
+    "r.eyebrow": "O histórico · Exemplo",
+    "r.h2": "O Bobby lembra-se da resposta. <em>Depois acompanha o resultado.</em>",
+    "r.d1": "26 set",
+    "r.d2": "19 set",
+    "r.d3": "12 set",
+    "r.d4": "05 set",
+    "r.open": "Aberta · avaliada em 7 dias",
+    "r.right": "Resolvida · acertou",
+    "r.missed": "Resolvida · falhou",
+    "r.note": "Cada análise é registada antes do resultado e avaliada depois. Os erros ficam ao lado dos acertos. <a href=\"/record\">Ver o histórico público</a>",
+    "r.same": "O Bobby usa os mesmos modelos que toda a gente. <em>A diferença está no procedimento à volta deles.</em>",
+    "t.eyebrow": "Começa gratuitamente",
+    "t.h2": "As tuas análises, o teu companheiro e o teu histórico, <em>na web e no iPhone.</em>",
+    "t.try": "Experimenta o Bobby",
+    "t.ios": "Obtém a app para iPhone",
+    "f.eyebrow": "Para programadores, agentes e curiosos",
+    "f.copy": "As regras de cada análise: como uma resposta é contestada antes de ser apresentada, como é avaliada depois e como qualquer agente pode seguir o mesmo procedimento.",
+    "f.cta": "Lê o protocolo",
+    "f.nav": "Protocolo",
+    "f.rules": "As regras",
+    "f.calls": "Veredictos verificados",
+    "f.record": "Histórico",
+    "f.docs": "Documentação e MCP",
+    "f.audits": "Auditorias",
+    "f.heartbeat": "Atividade do contrato",
+    "f.disc": "Análises educativas, sem aconselhamento financeiro.",
+    "f.support": "Apoio",
+    "f.privacy": "Privacidade"
+  }
+});
+
   var metaDesc = document.querySelector('meta[name="description"]');
   var textEls = [].slice.call(document.querySelectorAll('[data-i18n]'));
   var ariaEls = [].slice.call(document.querySelectorAll('[data-i18n-aria]'));
@@ -567,21 +841,33 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   textEls.forEach(function(el){ var k = el.getAttribute('data-i18n'); if (!(k in EN)) EN[k] = el.innerHTML; });
   ariaEls.forEach(function(el){ var k = el.getAttribute('data-i18n-aria'); if (!(k in EN)) EN[k] = el.getAttribute('aria-label'); });
 
-  function valid(l){ return l === 'en' || l === 'es' || l === 'pt'; }
+  function valid(l){ return ['en','es','fr','pt','it','de'].indexOf(l) !== -1; }
+  function supported(l){ var base = String(l || '').trim().toLowerCase().split(/[-_]/)[0]; return valid(base) ? base : ''; }
+  function locale(l){
+    var params = new URLSearchParams(location.search), requested = params.get('locale'), queryLanguage = params.get('lang');
+    var saved = '', savedLanguage = ''; try { saved = localStorage.getItem('bobby_locale') || ''; savedLanguage = localStorage.getItem(KEY) || ''; } catch(e) {}
+    var candidate = /^pt[-_]/i.test(requested || '') ? requested : /^pt[-_]/i.test(queryLanguage || '') ? queryLanguage : /^pt[-_]/i.test(saved) ? saved : /^pt[-_]/i.test(savedLanguage) ? savedLanguage : navigator.language || '';
+    return l === 'pt' ? (/^pt[-_]BR$/i.test(candidate) ? 'pt-BR' : 'pt-PT') : HTML_LANG[l];
+  }
   function detect(){
-    try { var s = localStorage.getItem(KEY); if (valid(s)) return s; } catch (e) { /* private mode */ }
+    var q = supported(new URLSearchParams(location.search).get('lang')); if (q) return q;
+    try { var s = supported(localStorage.getItem(KEY)); if (s) return s; } catch (e) { /* private mode */ }
     var n = String(navigator.language || '').toLowerCase();
-    return n.indexOf('es') === 0 ? 'es' : n.indexOf('pt') === 0 ? 'pt' : 'en';
+    var base = n.split('-')[0]; return valid(base) ? base : 'en';
   }
 
   var current = 'en', listeners = [];
-  function t(k){ var d = DICT[current]; return d && k in d ? d[k] : EN[k]; }
+  function t(k){ var d = current === 'pt' && locale(current) === 'pt-PT' ? DICT.ptPT : DICT[current]; return d && k in d ? d[k] : EN[k]; }
   function apply(l){
     if (!valid(l)) l = 'en';
     current = l;
-    document.documentElement.lang = HTML_LANG[l];
+    document.documentElement.lang = locale(l);
     document.title = t('meta.title');
     if (metaDesc) metaDesc.setAttribute('content', t('meta.desc'));
+    ['meta[property="og:title"]','meta[name="twitter:title"]'].forEach(function(sel){ var el=document.querySelector(sel); if(el) el.setAttribute('content',t('meta.title')); });
+    ['meta[property="og:description"]','meta[name="twitter:description"]'].forEach(function(sel){ var el=document.querySelector(sel); if(el) el.setAttribute('content',t('meta.desc')); });
+    var ogLocale=document.querySelector('meta[property="og:locale"]'); if(ogLocale) ogLocale.setAttribute('content',locale(l).replace('-','_'));
+    document.querySelectorAll('a[href^="/"]').forEach(function(a){ var url=new URL(a.getAttribute('href'),location.origin); url.searchParams.set('lang',l); url.searchParams.set('locale',locale(l)); a.setAttribute('href',url.pathname+url.search+url.hash); });
     textEls.forEach(function(el){ var v = t(el.getAttribute('data-i18n')); if (el.innerHTML !== v) el.innerHTML = v; });
     ariaEls.forEach(function(el){ el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
     opts.forEach(function(o){ o.setAttribute('aria-checked', String(o.getAttribute('data-lang') === l)); });
@@ -605,7 +891,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     if (returnFocus) btn.focus();
   }
   function choose(l){
-    try { localStorage.setItem(KEY, l); } catch (e) { /* private mode: the page still switches */ }
+    try { localStorage.setItem(KEY, l); localStorage.setItem('bobby_locale',locale(l)); } catch (e) { /* private mode: the page still switches */ }
     if (l !== current) apply(l);
     closeMenu(true);
   }
@@ -633,6 +919,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   window.BobbyI18n = {
     t: t,
     lang: function(){ return current; },
+    locale: function(){ return locale(current); },
     onChange: function(fn){ listeners.push(fn); }
   };
   apply(detect());
