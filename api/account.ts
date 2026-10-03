@@ -34,6 +34,10 @@ import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './_
 import { requestOriginHost } from './_lib/origins.js';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity } from './_lib/user-identity.js';
+import { getSubscription } from './_lib/access.js';
+import { stopBillingFor } from './_lib/stripe-api.js';
+import { blockCheckoutForDeletion } from './_lib/checkout-attempt.js';
+import { notifyOwner } from './_lib/provider-alert.js';
 import { AppleRevocationError, appleRevocationReady, revokeAppleAuthorization, APPLE_MANUAL_REVOCATION_URL } from './_lib/apple-revocation.js';
 
 export const config = { maxDuration: 45 };
@@ -84,6 +88,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     appleRevocation = usesApple ? 'manual' : 'not_applicable';
     const code = (req.body as { appleAuthorizationCode?: unknown } | undefined)?.appleAuthorizationCode;
     const hasCode = typeof code === 'string' && code.length > 0 && code.length <= 4096;
+    if (automatic && !hasCode && accountClientVersion(req.headers) >= 2) {
+      return res.status(409).json({ error: 'Confirm with Apple before deleting this account.', appleAuthorizationRequired: true });
+    }
+    // Card billing stops once the reversible checks above have passed, and before the Apple revocation, which cannot
+    // be undone: once the account is gone the user could neither reach the billing portal nor stop the charges
+    // (payments security audit 2026-10-02, STRIPE-02; red team order fix). New checkouts are blocked first, then Stripe
+    // itself is asked (customer + metadata), whatever our row says. A charge that is still possible and cannot be
+    // confirmed stopped ends the request with nothing deleted; anything else Stripe could not confirm goes ahead and
+    // is reported to the owner, so a Stripe outage never blocks deletion for an account with no live card plan.
+    let billing: Awaited<ReturnType<typeof stopBillingFor>>;
+    try {
+      const checkout = await blockCheckoutForDeletion(identity.id);
+      billing = await stopBillingFor(identity.id, await getSubscription(identity.id), checkout);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      console.error('[account-delete] card subscription not cancelled', detail);
+      notifyOwner('Bobby: no se pudo cancelar una suscripción de tarjeta al borrar una cuenta',
+        `Un usuario intentó borrar su cuenta y Stripe no confirmó la cancelación, así que no se borró nada.\nDetalle: ${detail.slice(0, 200)}\nRevisa STRIPE_SECRET_KEY y el estado de Stripe.`);
+      return res.status(503).json({ error: 'Your card subscription could not be cancelled, so nothing was deleted. Please try again.' });
+    }
+    if (billing.unverified) {
+      console.error('[account-delete] stripe unverified', billing.unverified);
+      notifyOwner('Bobby: cuenta borrada sin confirmar Stripe — revisar a mano',
+        `Se borró una cuenta sin plan de tarjeta vigente en nuestra base, pero Stripe no pudo confirmarlo.\nIdentity: ${identity.id}\nDetalle: ${billing.unverified}\nBusca en Stripe el cliente con metadata identity_id = ${identity.id} y cancela o expira lo que siga abierto.`);
+    }
+    const cardCancelled = billing.cancelled > 0;
     if (automatic && hasCode) {
       try {
         await revokeAppleAuthorization(code, apple!.identity_data!.sub!);
@@ -93,13 +123,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Class only: never the code, tokens, client secret or key material.
         console.error('[account-delete] apple revoke failed', failure ? `${failure.kind} ${failure.stage} ${failure.detail}` : `unexpected ${(error as Error)?.name ?? 'Error'}`);
         if (failure?.kind === 'transient') {
-          return res.status(503).json({ error: 'Apple could not be reached to revoke Sign in with Apple. Nothing was deleted; please retry.', code: 'apple_unavailable' });
+          return res.status(503).json({ code: 'apple_unavailable', cardCancelled, error: cardCancelled
+            ? 'Apple could not be reached to revoke Sign in with Apple. Your card plan was cancelled; nothing else was deleted. Please retry.'
+            : 'Apple could not be reached to revoke Sign in with Apple. Nothing was deleted; please retry.' });
         }
         // Rejected or unexpected: retrying cannot fix it. Delete anyway and
         // give the user Apple's manual revocation steps.
       }
-    } else if (automatic && accountClientVersion(req.headers) >= 2) {
-      return res.status(409).json({ error: 'Confirm with Apple before deleting this account.', appleAuthorizationRequired: true });
     }
   } catch (error) {
     console.error('[account-delete] server configuration unavailable', error);

@@ -75,6 +75,7 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
         if (!reader) throw new Error('No stream');
         const decoder = new TextDecoder();
         let text = '';
+        let failed: string | null = null;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -85,10 +86,14 @@ async function handleMethod(method: string, params: Record<string, unknown> = {}
             if (data === '[DONE]') continue;
             try {
               const parsed = JSON.parse(data);
-              text += parsed.choices?.[0]?.delta?.content || '';
+              if (parsed.bobby_error) failed = String(parsed.bobby_error);
+              text += parsed.choices?.[0]?.delta?.content || (typeof parsed.text === 'string' ? parsed.text : '');
             } catch {}
           }
         }
+        // An empty analysis is a failure, so the x402 payment stays redeemable (audit 2026-10-02).
+        if (failed) throw new Error(`analysis failed: ${failed}`);
+        if (!text.trim()) throw new Error('empty analysis');
         return { content: [{ type: 'text', text }] };
       }
 

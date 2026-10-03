@@ -2248,6 +2248,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           })),
         }),
       });
+      // The text chat moved to the desk (payments security audit 2026-10-02): /api/openclaw-chat answers internal callers only.
+      if (res.status === 403) { window.location.assign('/desk'); return; }
 
       if (!res.ok) throw new Error(`OpenClaw: ${res.status}`);
 

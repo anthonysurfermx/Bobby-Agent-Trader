@@ -48,6 +48,7 @@ jobs:
       - run: npm run test:rpc-redaction
       - run: npm run test:mcp-payment-transport
       - run: npm run test:admin-api
+      - run: npm run test:payments-guards
       - run: npm run test:llm-ledger
       - run: npm run test:briefings
       - run: npm run test:revenuecat-store-guard
@@ -123,6 +124,7 @@ jobs:
       - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/test-trader-land-growth.sql
       - run: npm run test:progress-atomic-pg
       - run: npm run test:levels-referrals-pg
+      - run: npm run test:payments-guards-pg
       - run: npm run test:coupons-pg
       - run: npm run test:admin-pg
       - run: npm run test:lifecycle-pg

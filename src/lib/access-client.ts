@@ -16,7 +16,7 @@ export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMete
 export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; proSource?: 'admin' | 'referral' | null; friends: Array<{ joinedAt: string }> }
 export interface AccessState {
   access: Access; signedIn: boolean;
-  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null;
+  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null; cardPlan?: boolean; appleActive?: boolean } | null;
   payments: { stripe: boolean; apple: boolean };
   levels?: LevelState | null; referral?: Referral | null;
   /** [uses, window days] per plan and premium level, and the invite terms (api/_lib/desk-levels.ts). */
@@ -60,9 +60,15 @@ export async function fetchAccess(headers?: Record<string, string>): Promise<Acc
 /** Opens Stripe Checkout (or the billing portal) for Bobby Pro; returns an error message when it cannot. */
 export async function startBilling(action: 'checkout' | 'portal'): Promise<string | null> {
   try {
+    if (action === 'checkout') {
+      // Load after this module initializes: the tracker shares accessHeaders and the install id.
+      void import('@/lib/track').then(({ track }) => track('purchase_start', 'desk')).catch(() => {});
+    }
     const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action }) });
-    const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+    const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; code?: string; provider?: string };
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
+    // Already paying by card (e.g. a past_due renewal): open the billing portal to fix it instead of a dead end.
+    if (action === 'checkout' && r.status === 409 && body.code === 'already_pro' && body.provider === 'stripe') return startBilling('portal');
     return body.error ?? 'Payments are temporarily unavailable.';
   } catch { return 'Payments are temporarily unavailable.'; }
 }

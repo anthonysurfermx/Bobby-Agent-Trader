@@ -31,3 +31,13 @@ export async function recordPurchaseEvent(e: PurchaseEvent): Promise<void> {
   });
   if (!r.ok) throw new Error(`purchase event ${r.status}`);
 }
+
+/** Repair an earlier out-of-order invoice row without changing its financial amount. */
+export async function linkPurchaseIdentityIfMissing(eventId: string, identityId: string | null): Promise<void> {
+  if (!identityId) return;
+  const r = await fetch(bobbyRest(`bobby_purchase_events?id=eq.${encodeURIComponent(eventId)}&identity_id=is.null`), {
+    method: 'PATCH', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000),
+    body: JSON.stringify({ identity_id: identityId }),
+  });
+  if (!r.ok) throw new Error(`purchase identity repair ${r.status}`);
+}

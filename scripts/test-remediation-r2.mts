@@ -48,6 +48,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
   if (url.includes('/api/protocol-record')) return json({ ok: true });
   if (url.endsWith('/auth/v1/user') && method === 'GET') return json({ id: AUTH_USER_ID, email: null, app_metadata: { provider: 'apple' } });
   if (url.includes('/auth/v1/admin/users/') && method === 'DELETE') return json({});
+  if (url.endsWith('/rest/v1/rpc/bobby_checkout_block_for_deletion')) return json({ customer: null, sessionId: null });
   if (url.includes('/rest/v1/bobby_identities')) {
     if (method === 'POST') return json([{ id: AUTH_IDENTITY_ID, auth_user_id: AUTH_USER_ID, wallet_address: null }]);
     if (method === 'DELETE') return json([], identityDeleteStatus);

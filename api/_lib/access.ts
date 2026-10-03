@@ -152,7 +152,7 @@ export async function readAccess(req: VercelRequest, identity?: Identity | null)
   return row ? shape(row) : OPEN;
 }
 
-export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null }
+export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null; apple_status?: string | null; apple_current_period_end?: string | null; apple_product_id?: string | null; apple_environment?: 'production' | 'sandbox' | null; apple_period_type?: string | null }
 
 export async function getSubscription(identityId: string): Promise<SubscriptionRow | null> {
   const r = await fetch(bobbyRest(`bobby_subscriptions?identity_id=eq.${identityId}&select=*`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
@@ -170,7 +170,20 @@ export async function upsertSubscription(row: Partial<SubscriptionRow> & { ident
   if (!r.ok) throw new Error(`subscription upsert ${r.status} ${await r.text().catch(() => '')}`);
 }
 
-export const publicSubscription = (s: SubscriptionRow | null) => s ? { provider: s.provider, status: s.status, currentPeriodEnd: s.current_period_end } : null;
+export const publicSubscription = (s: SubscriptionRow | null) => {
+  if (!s) return null;
+  const live = (status: string | null | undefined, end: string | null | undefined) =>
+    ['active', 'trialing'].includes(status ?? '') && (!end || Date.parse(end) > Date.now());
+  const appleActive = s.provider === 'apple' ? live(s.status, s.current_period_end) : live(s.apple_status, s.apple_current_period_end);
+  const showApple = s.provider === 'stripe' && appleActive && !live(s.status, s.current_period_end);
+  return {
+    provider: showApple ? 'apple' as const : s.provider,
+    status: showApple ? s.apple_status : s.status,
+    currentPeriodEnd: showApple ? s.apple_current_period_end : s.current_period_end,
+    appleActive,
+    cardPlan: Boolean(s.provider === 'stripe' && s.stripe_customer_id && s.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(s.status)),
+  };
+};
 
 // ---- premium analysis levels (Profundo, Máximo): their own meter, per account or device ----
 // The allowances live in api/_lib/desk-levels.ts; bobby_consume_level (20260929150000) counts atomically.
@@ -226,4 +239,3 @@ export async function readLevels(req: VercelRequest, identity?: Identity | null)
   const levels = (row.levels ?? {}) as Record<string, unknown>;
   return { tier: tierOf(row.tier), levels: { profundo: meter(levels.profundo), maximo: meter(levels.maximo) } };
 }
-

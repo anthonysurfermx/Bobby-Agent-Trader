@@ -21,6 +21,13 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (u.hostname === 'api.revenuecat.com') return Response.json({ subscriber });
   if (u.pathname === '/rest/v1/bobby_subscriptions') {
     if (init?.method === 'POST') { const b = JSON.parse(String(init.body)); writes.push(b); subs.set(b.identity_id, { ...subs.get(b.identity_id), ...b }); return new Response(null, { status: 204 }); }
+    // The Apple mirror beside a card plan: a PATCH scoped to the row's own Stripe subscription id.
+    if (init?.method === 'PATCH') {
+      const id = (u.searchParams.get('identity_id') ?? '').replace('eq.', ''), sid = (u.searchParams.get('stripe_subscription_id') ?? '').replace('eq.', '');
+      const row = subs.get(id);
+      if (!row || row.stripe_subscription_id !== sid) return Response.json([]);
+      const b = JSON.parse(String(init.body)); writes.push(b); subs.set(id, { ...row, ...b }); return Response.json([{ identity_id: id }]);
+    }
     const id = (u.searchParams.get('identity_id') ?? '').replace('eq.', '');
     return Response.json(subs.has(id) ? [subs.get(id)] : []);
   }
@@ -78,7 +85,7 @@ reset();
 subs.set('id-d', { identity_id: 'id-d', provider: 'stripe', status: 'active', current_period_end: future, stripe_subscription_id: 'sub_real' });
 subscriber = { entitlements: ent(), subscriptions: { p: { store: 'test_store', expires_date: future } } };
 eq(await syncRevenueCat(UID, 'id-d'), true, 'a live card subscription keeps Pro');
-eq(writes.length, 0, 'the live Stripe row is never touched by a RevenueCat sync');
+eq([subs.get('id-d')?.provider, subs.get('id-d')?.status, subs.get('id-d')?.apple_status], ['stripe', 'active', 'expired'], 'the live Stripe row keeps its state; the Test Store never activates the mirror');
 
 reset();
 subscriber = { entitlements: ent('p'), subscriptions: { p: { store: 'app_store', expires_date: future, period_type: 'normal', is_sandbox: false } } };
@@ -113,33 +120,44 @@ subs.set('id-x', { identity_id: 'id-x', provider: 'apple', status: 'active', cur
 eq(await syncRevenueCat(UID, 'id-x'), false, 'an expired App Store subscription is not Pro');
 eq(subs.get('id-x')?.status, 'expired', 'and is recorded as expired');
 
-// A card row only shields itself while it grants Pro.
+// A row that carries a direct card plan stays Stripe's; the store plan is recorded beside it in the Apple mirror,
+// which bobby_is_pro reads independently. So a card plan never hides, freezes or blocks an App Store purchase.
+const mirror = (id: string) => { const r = subs.get(id) ?? {}; return [r.provider, r.status, r.stripe_subscription_id, r.apple_status, r.apple_current_period_end]; };
 reset();
 subs.set('id-k', { identity_id: 'id-k', provider: 'stripe', status: 'active', current_period_end: future, stripe_subscription_id: 'sub_live', stripe_customer_id: 'cus_k' });
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later } } };
 eq(await syncRevenueCat(UID, 'id-k'), true, 'card plan + Apple plan: Pro');
-eq([writes.length, subs.get('id-k')?.provider], [0, 'stripe'], 'a live Stripe row is never rewritten by RevenueCat');
+eq(mirror('id-k'), ['stripe', 'active', 'sub_live', 'active', later], 'the live Stripe row keeps its own state and the Apple plan goes to the mirror');
 
 reset();
 subs.set('id-r1', { identity_id: 'id-r1', provider: 'stripe', status: 'canceled', current_period_end: future, stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_r1' });
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
 eq(await syncRevenueCat(UID, 'id-r1'), true, 'an App Store purchase after an ended card plan grants Pro');
-eq([subs.get('id-r1')?.provider, subs.get('id-r1')?.status, subs.get('id-r1')?.stripe_customer_id], ['apple', 'active', 'cus_r1'], 'the row becomes the Apple plan and keeps the Stripe customer');
+eq(mirror('id-r1'), ['stripe', 'canceled', 'sub_1', 'active', future], 'it is recorded in the mirror; the card references stay');
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later } } };
 eq(await syncRevenueCat(UID, 'id-r1'), true, 'its renewal still syncs');
-eq(subs.get('id-r1')?.current_period_end, later, 'and extends the period (an old Stripe id on the row never freezes it)');
+eq(mirror('id-r1')[4], later, 'and extends the mirrored period (an old Stripe id on the row never freezes it)');
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later, refunded_at: new Date().toISOString() } } };
+eq(await syncRevenueCat(UID, 'id-r1'), false, 'a later refund ends Pro');
+eq(mirror('id-r1')[3], 'refunded', 'and is recorded in the mirror');
 
 reset();
 subs.set('id-r2', { identity_id: 'id-r2', provider: 'stripe', status: 'canceled', current_period_end: future, stripe_subscription_id: 'sub_1' });
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: past } } };
 eq(await syncRevenueCat(UID, 'id-r2'), false, 'expired Apple + ended card: no Pro');
-eq([writes.length, subs.get('id-r2')?.provider], [0, 'stripe'], 'nothing is written over the card row');
+eq(mirror('id-r2').slice(0, 4), ['stripe', 'canceled', 'sub_1', 'expired'], 'the card row is untouched; the mirror says expired');
 
 reset();
 subs.set('id-r3', { identity_id: 'id-r3', provider: 'stripe', status: 'past_due', current_period_end: future, stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_r3' });
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
 eq(await syncRevenueCat(UID, 'id-r3'), true, 'a past_due card plan never blocks an App Store purchase');
-eq([subs.get('id-r3')?.provider, subs.get('id-r3')?.stripe_subscription_id], ['apple', 'sub_1'], 'it is recorded, and the Stripe ids stay on the row');
+eq(mirror('id-r3'), ['stripe', 'past_due', 'sub_1', 'active', future], 'the past_due card plan stays visible and the Apple plan is recorded beside it');
+
+reset();
+subs.set('id-t', { identity_id: 'id-t', provider: 'stripe', status: 'canceled', current_period_end: future, stripe_subscription_id: 'sub_1' });
+subscriber = { entitlements: ent(), subscriptions: { p: { store: 'test_store', expires_date: future } } };
+eq(await syncRevenueCat(UID, 'id-t'), false, 'a Test Store purchase beside an ended card plan grants nothing');
+eq(mirror('id-t')[3], 'expired', 'and the mirror never becomes active from it');
 
 // Apple's billing grace period keeps Pro.
 reset();

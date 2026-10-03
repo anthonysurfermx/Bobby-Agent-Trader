@@ -1,9 +1,9 @@
 // First-party funnel events for the owner dashboard (api/track.ts → bobby_events). No cookies: the same
 // install id the read meter uses (access-client deviceId), a short surface name, the referrer host and
 // utm_source. Fire-and-forget; never blocks or breaks a page.
-import { deviceId } from '@/lib/access-client';
+import { accessHeaders, deviceId } from '@/lib/access-client';
 
-export type TrackEvent = 'visit' | 'appstore_click' | 'signin_start' | 'paywall_view' | 'purchase_start';
+export type TrackEvent = 'visit' | 'desk_entered' | 'appstore_click' | 'signin_start' | 'paywall_view' | 'purchase_start';
 
 const SURFACES: Array<[RegExp, string]> = [
   [/^\/desk/, 'desk'], [/^\/redeem/, 'redeem'], [/^\/signin/, 'signin'], [/^\/protocol/, 'protocol'],
@@ -12,19 +12,38 @@ const SURFACES: Array<[RegExp, string]> = [
 ];
 export const surfaceOf = (path: string): string | null => {
   if (path.startsWith('/admin')) return null; // the dashboard does not count itself
+  if (path === '/' || /^\/home(?:\/|$)/.test(path)) return 'home';
   return SURFACES.find(([re]) => re.test(path))?.[1] ?? 'other';
 };
+
+let pending = Promise.resolve();
 
 export function track(event: TrackEvent, surface?: string | null) {
   try {
     if (typeof window === 'undefined' || /^(localhost|127\.)/.test(location.hostname)) return;
     const params = new URLSearchParams(location.search);
     const body = JSON.stringify({
-      event, surface: surface ?? surfaceOf(location.pathname), device: deviceId(), platform: 'web',
+      event, at: Date.now(), surface: surface ?? surfaceOf(location.pathname), device: deviceId(), platform: 'web',
       referrer: document.referrer || undefined, utm: params.get('utm_source') ?? undefined,
     });
-    if (navigator.sendBeacon?.('/api/track', body)) return;
-    void fetch('/api/track', { method: 'POST', body, keepalive: true, headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
+    // Beacon cannot carry verified credentials. Queue requests so a direct /desk view stores its site visit
+    // before the separately mounted Desk event, using the same install and the server-resolved account.
+    pending = pending.then(async () => {
+      const controller = new AbortController();
+      await new Promise<void>((resolve) => {
+        // A stalled auth lookup or network request must release the queue for later funnel steps.
+        const timer = window.setTimeout(() => { controller.abort(); resolve(); }, 4000);
+        // On the sign-in callback the session is still in the URL: asking for credentials would start the auth client,
+        // which consumes that URL before the callback page reads it (intermittent "invalid link"). Send that visit
+        // with the install only.
+        const authCallback = location.pathname.startsWith('/auth/') || /access_token=|refresh_token=|[?&#]code=/.test(location.hash + location.search);
+        const credentials: Promise<Record<string, string>> = authCallback
+          ? Promise.resolve({ 'x-bobby-device': deviceId(), 'x-bobby-platform': 'web' }) : accessHeaders();
+        void credentials.then((headers) => fetch('/api/track', { method: 'POST', body, keepalive: true,
+          signal: controller.signal, headers: { 'Content-Type': 'text/plain', ...headers } }))
+          .catch(() => {}).finally(() => { window.clearTimeout(timer); resolve(); });
+      });
+    }).catch(() => {});
   } catch { /* analytics never breaks the page */ }
 }
 

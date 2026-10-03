@@ -24,6 +24,7 @@ import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
+import { track } from '@/lib/track';
 import { accessHeaders, captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
 import { accessOwner, AccessResponseGate } from '@/lib/access-response-gate';
 import NucleoChart from './NucleoChart';
@@ -117,6 +118,7 @@ function Voice({ k, line, active, align }: { k: AgentKey; line: string | null; a
 }
 
 export default function NucleoDesk() {
+  useEffect(() => { track('desk_entered', 'desk'); }, []);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const location = useLocation();
@@ -949,15 +951,19 @@ export default function NucleoDesk() {
                 ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
                   : t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo')
                 : 'Bobby Pro',
-              detail: meter?.tier === 'pro'
+              // A card plan that can still charge is always reachable from here, whatever grants Pro today.
+              detail: subscription?.cardPlan
+                ? t('Manage or cancel card billing', 'Administrar o cancelar el cobro con tarjeta', 'Gerenciar ou cancelar a cobrança no cartão')
+                : meter?.tier === 'pro'
                 ? (giftedPro && grantExpiry ? t(`Gifted until ${grantExpiry}`, `Regalado hasta el ${grantExpiry}`, `Presente até ${grantExpiry}`)
                   : paidPro && subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone')
                     : paidPro && subscription?.provider === 'stripe' ? t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar')
                       : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail
                 : meterLine ?? (accessState && !accessState.payments.stripe
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
-                  : t('Unlimited reads · $5/month', 'Lecturas sin límite · $5/mes', 'Leituras ilimitadas · $5/mês')),
-              action: meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
+                  : t('Unlimited reads · US$4.90/month', 'Lecturas sin límite · US$4.90/mes', 'Leituras ilimitadas · US$4.90/mês')),
+              action: !subscription?.cardPlan && meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
+                if (subscription?.cardPlan) { void startBilling('portal'); return; }
                 if (meter?.tier === 'pro') { void startBilling('portal'); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.

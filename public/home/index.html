@@ -28,7 +28,7 @@
     try {
       if (/^(localhost|127\.)/.test(location.hostname)) return;
       var p = new URLSearchParams(location.search);
-      var b = JSON.stringify({ event: event, surface: 'home', device: dev() || undefined, platform: 'web', referrer: document.referrer || undefined, utm: p.get('utm_source') || undefined });
+      var b = JSON.stringify({ event: event, at: Date.now(), surface: 'home', device: dev() || undefined, platform: 'web', referrer: document.referrer || undefined, utm: p.get('utm_source') || undefined });
       if (!(navigator.sendBeacon && navigator.sendBeacon('/api/track', b))) fetch('/api/track', { method: 'POST', body: b, keepalive: true });
     } catch (e) { /* analytics never breaks the page */ }
   }
