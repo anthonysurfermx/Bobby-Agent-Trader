@@ -19,9 +19,9 @@ The dashboard preserves historical installs, separates provider read time from r
 
 | Check | Result |
 | --- | --- |
-| Fresh PostgreSQL R2 chain, including #130 Apple mirror and Supabase-style default grants | 354 checks passed |
+| PostgreSQL R2, including #130 Apple mirror, predecessor NULL writes, privilege scope and JIT setting restoration | 355 checks passed |
 | Telemetry PostgreSQL suite, retention, concurrency, internal scope, cardinality and failure isolation | 196 checks passed |
-| Existing PostgreSQL progress/levels/payments/coupons/admin/lifecycle/memory/truth chain | All passed before applying newer migrations |
+| Exact CI PostgreSQL progress/levels/payments/coupons/admin/lifecycle/memory/truth/R2/telemetry order | All passed |
 | Payment guards and schema-compatibility HTTP regressions | 75 + 26 checks passed |
 | Briefings calendar/content/core/macro/RevenueCat/Stripe and store guards | All passed |
 | Admin API | 197 checks passed |
@@ -34,6 +34,8 @@ The dashboard preserves historical installs, separates provider read time from r
 | Dependency audit gate | Passed with the existing expiring braces exception |
 
 The local scale case returned the full live snapshot in 65 ms or less with 110,000 events and 2,000 installations; 6,000 legacy build labels returned at most 20 build entries. These are local measurements, not production latency guarantees.
+
+The first remote run passed application, integration and Security checks but failed the analytics performance assertion: growth + overview + economics took 11,624 ms against the unchanged 4,000 ms budget. The four bounded analytics/live RPCs now use function-local `jit=off`, preserving the caller's configuration, invoker security and grants. Tests report each RPC's timing and execution settings. The local rerun took 743 ms for the three analytics RPCs; Homebrew PostgreSQL reports JIT unavailable, so remote CI must verify the Linux performance result. The time budgets remain unchanged.
 
 ## Production observation
 

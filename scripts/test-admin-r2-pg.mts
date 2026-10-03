@@ -39,6 +39,8 @@ const MIGRATIONS = [
   '20261002231124_admin_truth_live_snapshot.sql',
 ];
 const R2 = `${DIR}/20261002231124_admin_truth_live_snapshot.sql`;
+const JIT_DISABLED = new Set(['public.bobby_admin_growth(integer,boolean)', 'public.bobby_admin_overview(integer,boolean)',
+  'public.bobby_admin_economics(integer,boolean)', 'public.bobby_admin_live(boolean)']);
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
@@ -105,6 +107,7 @@ try {
     } else await pool.query(readFileSync(`${DIR}/${file}`, 'utf8'));
   }
   await reapply(); // idempotent
+  console.log('  PostgreSQL execution settings:', await one("select current_setting('server_version') as version, current_setting('jit') as caller_jit, pg_jit_available() as jit_available"));
 
   await block('privileges and shape', async () => {
     const fns = ['public.bobby_admin_live(boolean)', 'public.bobby_internal_subjects(boolean)', 'public.bobby_team_nodes(boolean)', 'public.bobby_payer_charges()', 'public.bobby_admin_users(text,integer,integer)', 'public.bobby_team_closure(boolean)', 'public.bobby_internal_identity_ids()', 'public.bobby_internal_device_hashes()',
@@ -117,8 +120,8 @@ try {
     for (const fn of fns) {
       for (const role of ['anon', 'authenticated']) eq((await one('select has_function_privilege($1, $2, $3) as r', [role, fn, 'execute'])).r, false, `${role} cannot execute ${fn}`);
       eq((await one('select has_function_privilege($1, $2, $3) as r', ['service_role', fn, 'execute'])).r, true, `service_role executes ${fn}`);
-      eq(await one('select prosecdef, proconfig from pg_proc where oid = $1::regprocedure', [fn]), { prosecdef: false, proconfig: ['search_path=public, pg_temp'] },
-        `${fn}: security invoker with an explicit search_path`);
+      eq(await one('select prosecdef, proconfig from pg_proc where oid = $1::regprocedure', [fn]), { prosecdef: false, proconfig: ['search_path=public, pg_temp', ...(JIT_DISABLED.has(fn) ? ['jit=off'] : [])] },
+        `${fn}: invoker, exact search_path and bounded-query JIT setting`);
     }
     for (const table of ['bobby_subscriptions', 'bobby_activity_days', 'bobby_device_accounts', 'bobby_events', 'bobby_purchase_events']) {
       eq((await one('select relrowsecurity as r from pg_class where oid = $1::regclass', [`public.${table}`])).r, true, `RLS stays on ${table}`);
@@ -126,6 +129,13 @@ try {
     }
     eq((await one("select count(*)::int n from pg_proc where proname = 'bobby_admin_members'")).n, 1, 'exactly one bobby_admin_members (no ambiguous overload for PostgREST)');
     eq((await members()).includeInternal, false, 'the deployed call with no argument resolves to the default (team out)');
+    const jitCaller = await pool.connect();
+    try {
+      await jitCaller.query('begin');
+      await jitCaller.query('set local jit = on');
+      await jitCaller.query('select public.bobby_admin_growth(30,false),public.bobby_admin_overview(30,false),public.bobby_admin_economics(30,false),public.bobby_admin_live(false)');
+      eq((await jitCaller.query("select current_setting('jit') as value")).rows[0].value,'on','function JIT controls restore an explicitly enabled caller session setting');
+    } finally { await jitCaller.query('rollback'); jitCaller.release(); }
     // The Amplitude export (20261002090000) calls these two as set-returning functions: same shape.
     eq(await one(`select pg_get_function_result('public.bobby_internal_identity_ids()'::regprocedure) i, pg_get_function_result('public.bobby_internal_device_hashes()'::regprocedure) d`),
       { i: 'SETOF uuid', d: 'SETOF text' }, 'the internal sets keep their signature and return type');
@@ -659,9 +669,20 @@ try {
         public.bobby_activity_days, public.bobby_events, public.bobby_subscriptions, public.bobby_purchase_events, public.bobby_device_networks, public.bobby_internal_networks`);
       const team = (await pc.query('select (select count(*) from public.bobby_internal_identity_ids())::int a, (select count(*) from public.bobby_internal_device_hashes())::int d')).rows[0];
       ok(team.a >= 7 && team.d >= 7 && team.a < 50, `the team network pulls in its ${team.d} installs and ${team.a} accounts, not the whole graph`);
-      const t0 = Date.now();
-      await pc.query('select public.bobby_admin_growth(30, false), public.bobby_admin_overview(30, false), public.bobby_admin_economics(30, false)');
-      const ms = Date.now() - t0;
+      const rpcTimes: Record<string, number> = {};
+      for (const name of ['growth','overview','economics']) {
+        const started = Date.now();
+        await pc.query(`select public.bobby_admin_${name}(30, false)`);
+        rpcTimes[name] = Date.now() - started;
+      }
+      const ms = Object.values(rpcTimes).reduce((total, value) => total + value, 0);
+      console.log('    analytics RPC times (ms):', rpcTimes);
+      if (ms >= 4000) {
+        for (const name of ['growth','overview','economics']) {
+          const plan = (await pc.query(`explain (analyze,buffers,settings,format json) select public.bobby_admin_${name}(30,false)`)).rows;
+          console.log(`    slow ${name} EXPLAIN:`, JSON.stringify(plan));
+        }
+      }
       ok(ms < 4000, `growth + overview + economics with 2,000 paired accounts, 200 shared installs and a team network in ${ms} ms (under 4 s)`);
       const t1 = Date.now();
       await pc.query('select public.bobby_admin_members(false), public.bobby_admin_internal_networks(), public.bobby_admin_geo(30, false)');

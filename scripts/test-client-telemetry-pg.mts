@@ -54,7 +54,7 @@ try{
   for(const fn of [signature,'public.bobby_prune_client_telemetry(boolean)','public.bobby_client_telemetry_health()','public.bobby_admin_client_live(boolean)','public.bobby_admin_server_live(boolean)','public.bobby_admin_live(boolean)']){
    for(const role of ['anon','authenticated'])eq((await one('select has_function_privilege($1,$2,$3) r',[role,fn,'execute'])).r,false,`${role} denied ${fn}`);
    eq((await one('select has_function_privilege($1,$2,$3) r',['service_role',fn,'execute'])).r,true,`service executes ${fn}`);
-   eq(await one('select prosecdef,proconfig from pg_proc where oid=$1::regprocedure',[fn]),{prosecdef:false,proconfig:['search_path=public, pg_temp']},'invoker and controlled search path');
+   eq(await one('select prosecdef,proconfig from pg_proc where oid=$1::regprocedure',[fn]),{prosecdef:false,proconfig:['search_path=public, pg_temp',...(fn==='public.bobby_admin_server_live(boolean)'?['jit=off']:[])]},'invoker, controlled search path and exact server-live JIT setting');
   }
   for(const table of ['bobby_client_events','bobby_client_presence','bobby_client_coverage']){
    eq((await one('select relrowsecurity r from pg_class where oid=$1::regclass',[`public.${table}`])).r,true,'RLS enabled');

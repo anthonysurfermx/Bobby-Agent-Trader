@@ -636,10 +636,13 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
       limit least(greatest(coalesce(p_limit, 50), 1), 200) offset greatest(coalesce(p_offset, 0), 0)) r), '[]'::jsonb));
 $$;
 
+-- These latency-bounded analytics calls opt out of JIT compilation. Their nested multi-CTE
+-- plans run for short dashboard reads; LLVM startup cost must not consume the API request budget.
+-- Other application queries retain the database's JIT setting.
 -- Growth (20261001233000): people from the v2 facts (F04 attribution) with the verified payers apart from Pro
 -- access; the outcomes count read_abandoned apart from read_failed (F11).
 create or replace function public.bobby_admin_growth(p_days int, p_internal boolean default false)
-returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp as $$
+returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp set jit = off as $$
 declare
   d int := least(greatest(coalesce(p_days, 30), 1), 365);
   since timestamptz := date_trunc('day', now()) - make_interval(days => d - 1);
@@ -815,7 +818,7 @@ $$;
 -- first-ever verified charge in the period (F13) and payingInPeriod for the old meaning; lastTopup = a positive
 -- top-up (F07); the last finished and unfinished desk analysis (F02); read_abandoned in the outcome coverage (F11).
 create or replace function public.bobby_admin_overview(p_days int, p_internal boolean default false)
-returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp as $$
+returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp set jit = off as $$
 declare
   d int := least(greatest(coalesce(p_days, 30), 1), 365);
   since timestamptz := date_trunc('day', now()) - make_interval(days => d - 1);
@@ -1025,7 +1028,7 @@ $$;
 -- subscriptions.active = verified payers (what the MRR multiplies), the other classes apart (F01); 30-day readers
 -- = people with a read in the last 30 days, not lifetime readers who only opened (F09).
 create or replace function public.bobby_admin_economics(p_days int, p_internal boolean default false)
-returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp as $$
+returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp set jit = off as $$
 declare
   d int := least(greatest(coalesce(p_days, 30), 1), 365);
   since timestamptz := date_trunc('day', now()) - make_interval(days => d - 1);
@@ -1260,7 +1263,7 @@ grant execute on function public.bobby_internal_subjects(boolean) to service_rol
 
 -- Recent server-observed activity. This does not establish an online session, client rendering or crash health.
 create or replace function public.bobby_admin_live(p_internal boolean default false)
-returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
+returns jsonb language sql stable security invoker set search_path = public, pg_temp set jit = off as $$
   with team_accounts as materialized (select bobby_internal_identity_ids() as id),
   team_devices as materialized (select bobby_internal_device_hashes() as id),
   ev as materialized (
