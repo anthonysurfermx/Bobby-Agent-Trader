@@ -1,0 +1,2 @@
+# Preserve real build and test transcripts byte-for-byte for SHA-256 receipts.
+*.log -whitespace
