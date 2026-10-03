@@ -328,7 +328,7 @@ export function NoTradeCard({ symbol, reason, xp, onClose, compact = false }: { 
           </div>
         </div>
         <div className="mt-8 text-center text-4xl md:text-5xl font-mono tracking-[0.22em] text-sky-200">{t("NO TRADE", "NO OPERAR", "NÃO OPERAR")}</div>
-        <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.', 'Sem setup ainda. Capital protegido.')}</div>
+        <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. No exposure.', 'Sin setup todavía. Sin exposición.', 'Sem setup ainda. Sem exposição.')}</div>
         <div className="mt-1 text-center text-white/55 text-xs font-mono">{reason}</div>
         <div className="mt-5 flex items-center justify-between text-[11px] font-mono border border-white/[0.08] rounded-lg px-3 py-2 bg-black/30">
           <span className="text-amber-300 flex items-center gap-1"><Sparkles size={12} /> {xp > 0 ? t(`+${xp} DISCIPLINE XP`, `+${xp} XP DE DISCIPLINA`, `+${xp} XP DE DISCIPLINA`) : t('DAILY CAP REACHED', 'TOPE DIARIO ALCANZADO', 'LIMITE DIÁRIO ATINGIDO')}</span>

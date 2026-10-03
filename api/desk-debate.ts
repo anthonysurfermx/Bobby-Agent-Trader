@@ -6,7 +6,7 @@ import { deskErrorCopy } from './_lib/desk-localization.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
-import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
+import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidenceFor, runDeskDebate, timeframeRequestOf } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, resolveCaller, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
@@ -50,6 +50,13 @@ const copy = deskErrorCopy;
  * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'; iOS also requires an explicit opt-in on this request. The ask is
  * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
  * make no memory call; the iPhone app also needs its per-request memory opt-in.
+ *
+ * Chart timeframe: a question that names one ("en diario", "weekly chart", "4H") is analysed on it at every level.
+ * Its candles are loaded beside the level's evidence and its block becomes `technicals`, with `provenance.timeframe`
+ * and `provenance.asOf` naming it; `sufficiency.requested` lists what was asked and `sufficiency.missing` what the
+ * desk could not load (monthly; weekly or 4H for a stock), in which case the nearest timeframe leads and the answer
+ * says so first. The level, the model calls and the meters are the same as without it. The question is the only
+ * signal: no request field, and a question that names none answers on 1H exactly as before.
  *
  * Outcomes (bobby_events, the owner's funnel): every request that passes validation records exactly one, with the
  * caller resolved before any gate (a budget pause by a signed-in account carries that account). A 405, a foreign
@@ -208,7 +215,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
     const memoryOwner = memoryDeskAllowed(req, clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
-    const evidence = levelPlan(level).evidence === 'v2' ? await loadDeskEvidenceV2(symbol, assetType) : await loadDeskEvidence(symbol, assetType);
+    const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level).evidence, timeframeRequestOf(question, language));
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
     const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
     const asked = horizonOf(question, language);

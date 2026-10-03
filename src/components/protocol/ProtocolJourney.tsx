@@ -101,7 +101,7 @@ export default function ProtocolJourney({ debate }: { debate?: JourneyDebate }) 
   const isCall = !!verdict && verdict.action !== 'none' && verdict.direction !== 'none' && !!verdict.direction;
   const sphereVerdict: SphereVerdict = !isCall ? 'wait' : verdict?.direction === 'short' ? 'pass' : 'ready';
   const word = isCall ? String(verdict?.direction).toUpperCase() : 'No call';
-  const sub = typeof verdict?.conviction === 'number' ? `conviction ${verdict.conviction}/10` : 'capital protected';
+  const sub = typeof verdict?.conviction === 'number' ? `conviction ${verdict.conviction}/10` : 'no exposure';
 
   const key = STAGES[stage].key;
   const mode: SphereMode = key === 'orb' ? 'verdict' : key === 'click' ? 'idle' : key === 'gate' || key === 'evidence' ? 'listen' : 'debate';
@@ -376,7 +376,7 @@ function SceneVeto({ isCall, verdictDirection }: { isCall: boolean; verdictDirec
       <motion.div initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.3 }} className="w-full max-w-[200px] rounded-xl border p-4 text-center" style={{ borderColor: `${TONE.cio}66` }}>
         <div className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: TONE.cio }}>CIO ruled</div>
         <div className="mt-2 text-lg text-white">{isCall ? `review · ${verdictDirection}` : 'wait'}</div>
-        <div className="font-mono text-[11px] text-white/50">{isCall ? 'same direction → call survives' : 'no call · capital protected'}</div>
+        <div className="font-mono text-[11px] text-white/50">{isCall ? 'same direction → call survives' : 'no call · no exposure'}</div>
       </motion.div>
     </div>
   );

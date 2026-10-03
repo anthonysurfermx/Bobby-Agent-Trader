@@ -52,6 +52,7 @@
     "test:desk-audit": "tsx scripts/test-desk-audit.mts",
     "test:ios-remediation": "tsx scripts/test-ios-remediation.mts && tsx scripts/test-desk-debate.mts && tsx scripts/test-account-delete.mts",
     "test:desk-debate": "tsx scripts/test-desk-debate.mts",
+    "test:desk-timeframe": "tsx scripts/test-desk-timeframe.mts",
     "test:desk-levels": "tsx scripts/test-desk-levels.mts",
     "test:levels-referrals-pg": "tsx scripts/test-levels-referrals-pg.mts",
     "test:coupons-pg": "tsx scripts/test-coupons-pg.mts",

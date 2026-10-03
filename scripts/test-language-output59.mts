@@ -15,7 +15,7 @@ const { default: desk } = await import('../api/desk-debate.ts');
 const { deskErrorCopy } = await import('../api/_lib/desk-localization.ts');
 const { appLocale, languageName } = await import('../src/lib/app-language.ts');
 const { factsOnlyNarrative, narrativeRequest, validateNarrative, ungroundedNumbers, agendaTitle, equitySessionLine, clip } = await import('../api/_lib/briefings/narrative.ts');
-const { horizonOf, sufficiencyOf, runDeskDebate } = await import('../api/_lib/desk-debate.ts');
+const { horizonOf, sufficiencyOf, runDeskDebate, timeframeRequestOf, TIMEFRAME_RULE } = await import('../api/_lib/desk-debate.ts');
 const { composeReport, validateContent, audioCacheKey } = await import('../api/_lib/briefings/compose.ts');
 const { PUSH_COPY } = await import('../api/_lib/briefings/config.ts');
 const { MARKET_HOURS_TITLES, marketHoursAgenda, readMacroAgenda } = await import('../api/_lib/briefings/evidence.ts');
@@ -54,6 +54,22 @@ for(const lang of languages)for(const [i,expected]of ['intraday','week','month',
   const s=sufficiencyOf(question,['1H']);assert.equal(s.horizon,expected);
   assert.equal(s.sufficient,expected==='intraday');
   if(expected!=='intraday')assert.ok(s.missing.includes('1D'));
+  assert.deepEqual(timeframeRequestOf(question),[],'A horizon asks for no chart timeframe');assert.ok(!('requested' in s));
+});
+// A chart timeframe asked for by name, the way each language's traders say it: [daily, weekly, 4-hour, monthly].
+const timeframeQuestions={
+  en:['What does BTC look like on the daily chart?','BTC on the weekly chart','BTC on the 4-hour chart','BTC on the monthly chart'],
+  es:['¿Cómo ves BTC en diario?','BTC en temporalidad semanal','BTC en gráfico de 4 horas','BTC en el gráfico mensual'],
+  fr:['Que dit le graphique journalier de BTC ?','BTC en hebdomadaire','BTC sur le graphique 4 heures','BTC sur le graphique mensuel'],
+  pt:['Como está o BTC no diário?','BTC no gráfico semanal','BTC no gráfico de 4 horas','BTC no gráfico mensal'],
+  it:['Cosa dice il grafico giornaliero di BTC?','BTC sul grafico settimanale','BTC sul grafico a 4 ore','BTC sul grafico mensile'],
+  de:['Wie sieht BTC im Tageschart aus?','BTC im Wochenchart','BTC im 4-Stunden-Chart','BTC im Monatschart'],
+};
+for(const lang of languages)for(const [i,expected]of ['1D','1W','4H','1M'].entries())await check(`timeframe/${lang}/${expected}: a chart timeframe asked for by name is the need, whatever the horizon`,()=>{
+  const question=timeframeQuestions[lang][i];assert.deepEqual(timeframeRequestOf(question,lang),[expected]);
+  const missing=sufficiencyOf(question,['1H'],lang);assert.deepEqual(missing.requested,[expected]);assert.deepEqual(missing.missing,[expected]);assert.equal(missing.sufficient,false);
+  const loaded=sufficiencyOf(question,['1H',expected],lang);assert.deepEqual(loaded.missing,[]);assert.equal(loaded.sufficient,true);
+  assert.equal(loaded.horizon,horizonOf(question,lang),'The horizon keeps the meaning horizonOf gives it');
 });
 await check('horizon/fr: "mes" (my) is not the Spanish or Portuguese month',()=>{
   for(const question of ['Dois-je garder mes actions LVMH ?','Que penses-tu de mes positions sur Bitcoin ?']){
@@ -326,6 +342,15 @@ try{
       assert.equal(result.statusCode,200);assert.equal(modelCalls-before,3);assert.equal(result.body.agents.cio,words[language][0]);
       assert.equal(result.body.agents.synthesis.risk,words[language][2]);assert.equal(result.body.provenance.instrument,'BTC-USDT');
       assert.ok(prompts.slice(promptBefore).every(p=>p.includes(`Write in ${languageName(language,locale)}.`)));
+    });
+    await check(`handler/${locale}: a daily chart request leads with the daily block, in three calls and the reader's language`,async()=>{
+      const before=modelCalls,promptBefore=prompts.length;const result=await post({symbol:'BTC',assetType:'crypto',question:timeframeQuestions[language][0],language,locale});
+      assert.equal(result.statusCode,200);assert.equal(modelCalls-before,3);assert.equal(result.body.level,'rapido');
+      assert.equal(result.body.provenance.timeframe,'1D');assert.equal(result.body.provenance.instrument,'BTC-USDT');
+      assert.deepEqual(result.body.sufficiency.requested,['1D']);assert.deepEqual(result.body.evidenceUsed.timeframes,['1H','1D']);
+      assert.equal(result.body.agents.cio,words[language][0]);
+      // The rule survives JSON.stringify of the request body as written: ASCII, no double quotes.
+      assert.ok(prompts.slice(promptBefore).every(p=>p.includes(`Write in ${languageName(language,locale)}.`)&&p.includes(TIMEFRAME_RULE)));
     });
     for(const gate of ['signin','pro'])await check(`handler/${locale}: ${gate} refuses before model with localized copy`,async()=>{
       mode=gate;const before=modelCalls;const result=await post({symbol:'BTC',question:words[language][4],language,locale});

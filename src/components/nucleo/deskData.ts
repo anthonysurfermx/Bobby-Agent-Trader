@@ -298,9 +298,9 @@ export function debateFor(a: Answer, g?: Agents | null): Debate {
       `Alpha Hunter vê um setup ${long ? 'de alta' : 'de baixa'}${read ? `: ${read}` : ''}, entrada em ${money(a.entry)}. Red Team: a tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(a.stop)}. CIO: viés ${long ? 'de alta' : 'de baixa'} com ${conv}% de convicção, alvo ${money(a.target)}. Apenas referência.`,
     )
     : at + t(
-      `Alpha Hunter finds no clean setup${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protected. ${noTradeReason(a, g)}`,
-      `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a, g)}`,
-      `Alpha Hunter não vê um setup limpo${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, capital protegido. ${noTradeReason(a, g)}`,
+      `Alpha Hunter finds no clean setup${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, no exposure. ${noTradeReason(a, g)}`,
+      `Alpha Hunter no ve un setup limpio${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, sin exposición. ${noTradeReason(a, g)}`,
+      `Alpha Hunter não vê um setup limpo${read ? `: ${read}` : ''}. Red Team: ${red.line} CIO: NO TRADE, sem exposição. ${noTradeReason(a, g)}`,
     );
   return { stances: [alpha, red, cio], headline, spoken, noTrade, direction };
 }
