@@ -145,6 +145,12 @@ try {
     await reapply();
     eq((await one("select count(*)::int n from pg_proc where proname = 'bobby_admin_members'")).n, 1, 're-applied: still one bobby_admin_members');
     ok((await one("select pg_get_constraintdef(oid) d from pg_constraint where conname = 'bobby_events_event_check'")).d.includes('read_abandoned'), 're-applied: read_abandoned accepted');
+    // The web conversion funnel's events (20261002160000) survive this migration: the live site records both.
+    for (const event of ['desk_entered', 'checkout_opened']) {
+      ok((await one("select pg_get_constraintdef(oid) d from pg_constraint where conname = 'bobby_events_event_check'")).d.includes(`'${event}'`), `re-applied: ${event} still accepted`);
+      await pool.query("insert into public.bobby_events(event, platform) values ($1, 'web')", [event]);
+      eq(Number((await one('delete from public.bobby_events where event = $1 returning 1 as n', [event]))?.n), 1, `${event} row stored and removed`);
+    }
   });
 
   // ---------- F01: Pro access is not commercial evidence ----------

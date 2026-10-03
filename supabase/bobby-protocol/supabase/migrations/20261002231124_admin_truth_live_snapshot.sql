@@ -101,9 +101,11 @@ alter table public.bobby_activity_days add column if not exists guest_reads int 
 -- The owner set this link aside for the team rule only (people, their dedup and the cohorts still use it).
 alter table public.bobby_device_accounts add column if not exists team_ignored boolean not null default false;
 
+-- Keep desk_entered and checkout_opened: the web conversion funnel (20261002160000) added them and the live site
+-- records both (api/track.ts, bobby_record_checkout_opened). This list only adds read_abandoned.
 alter table public.bobby_events drop constraint if exists bobby_events_event_check;
 alter table public.bobby_events add constraint bobby_events_event_check check (event in (
-  'visit', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start',
+  'visit', 'desk_entered', 'checkout_opened', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start',
   'read_done', 'read_failed', 'read_abandoned', 'wall_signin', 'wall_paywall', 'wall_level', 'desk_blocked'));
 
 -- Guest activity so far. An install with at most one pairing: its activity is the guest's or that one account's,
