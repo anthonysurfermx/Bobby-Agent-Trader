@@ -509,5 +509,20 @@ reset();
   eq([patch?.visibility,patch?.title],['private','My quiet island'],'renaming from native cannot publish UGC');
 }
 
+// ---------- Android uses the same atomic progress and review contracts ----------
+reset();
+{
+  rpcAnswers.bobby_apply_progress = () => ({ progress: { ...progressRow, last_platform: 'android' }, legacyImported: 0, results: [] });
+  const saved = await call(progressHandler, 'POST', { platform: 'android', profile: { companionId: 'byte' } });
+  eq(saved.status, 200, 'Android profile request reaches the atomic progress API');
+  eq((rpcCalls('bobby_apply_progress')[0]?.body as any)?.p_platform, 'android', 'Android remains Android in the progress RPC');
+  rpcAnswers.bobby_close_seed = () => ({ ok: false, error: 'review_not_ready' });
+  const review = await call(landHandler, 'POST', { action: 'close', inventoryId: U(3), platform: 'android' });
+  eq(review.status, 409, 'Android close is schema-valid and still respects the transaction review gate');
+  eq((rpcCalls('bobby_close_seed')[0]?.body as any)?.p_platform, 'android', 'Android remains Android in the close RPC');
+  const rejected = await call(progressHandler, 'POST', { platform: 'unknown', events: [] });
+  eq(rejected.status, 400, 'adding Android does not admit arbitrary platforms');
+}
+
 console.log(`\n${passed} passed, ${failures.length} failed`);
 if (failures.length) process.exit(1);

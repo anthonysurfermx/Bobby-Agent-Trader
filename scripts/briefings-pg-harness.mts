@@ -10,7 +10,7 @@
 //     (a scalar boolean for bobby_is_pro, an object for jsonb). A database error becomes BriefingStorageError, as
 //     a non-2xx PostgREST answer would.
 // Local scratch databases only (127.0.0.1 / localhost / ::1): never a remote or production database.
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
@@ -20,6 +20,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MIGRATIONS_DIR = join(ROOT, 'supabase/bobby-protocol/supabase/migrations');
 export const BRIEFINGS_MIGRATION = join(MIGRATIONS_DIR, '20261002180000_pro_briefings.sql');
 export const BRIEFINGS_DEVICE_MIGRATION = join(MIGRATIONS_DIR, '20261002183000_brief_device_atomic.sql');
+export const BRIEFINGS_FCM_MIGRATION = join(MIGRATIONS_DIR, '20261003120000_fcm_push_support.sql');
 export const BRIEFINGS_SOURCE_GUARD_MIGRATION = join(MIGRATIONS_DIR, '20261002184500_brief_paid_source_guard.sql');
 /**
  * The smallest chain of real migrations the briefings migration depends on, each with the object that proves it is
@@ -85,6 +86,11 @@ export async function bootstrapBriefingsDb(url: string): Promise<pg.Pool> {
       const sourceGuardSql = readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8');
       await c.query(sourceGuardSql);
       await c.query(sourceGuardSql); // idempotent
+      if (existsSync(BRIEFINGS_FCM_MIGRATION)) {
+        const fcmSql = readFileSync(BRIEFINGS_FCM_MIGRATION, 'utf8');
+        await c.query(fcmSql);
+        await c.query(fcmSql); // optional transport migration is also idempotent
+      }
     } finally {
       await c.query(`alter default privileges in schema public revoke all on tables from anon, authenticated;
         alter default privileges in schema public revoke all on functions from anon, authenticated;

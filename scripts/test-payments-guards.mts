@@ -42,6 +42,7 @@ let foundCustomers: Array<Record<string, unknown>> = [];
 let lastPortalCustomer: string | null = null;
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input));
+  if(u.pathname.endsWith('/rpc/bobby_purchase_capability'))return Response.json({version:1,activated:false});
   if (u.hostname === 'api.revenuecat.com') return Response.json({ subscriber });
   if (u.hostname === 'api.stripe.com') {
     const m = init?.method ?? 'GET';
@@ -348,7 +349,7 @@ eq([r.statusCode, stripeCalls.includes('POST /v1/checkout/sessions/cs_test_sessi
 eq((await call()).body?.code, 'account_deleting', 'a later checkout cannot pass the deletion marker');
 reset();
 subs.set('id-buyer', { identity_id: 'id-buyer', provider: 'stripe', status: 'canceled', stripe_subscription_id: 'sub_old',
-  stripe_customer_id: 'cus_old', apple_status: 'active', apple_current_period_end: future });
+  stripe_customer_id: 'cus_old', current_period_end: null, apple_status: 'active', apple_current_period_end: future });
 r = await call();
 eq([r.statusCode, r.body?.provider, stripeCalls.length], [409, 'apple', 0], 'active Apple mirror blocks a new card checkout');
 reset();

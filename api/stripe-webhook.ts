@@ -8,15 +8,16 @@
 // ============================================================
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { getSubscription, upsertSubscription } from './_lib/access.js';
+import { activeSubscription, getSubscription, SubscriptionProviderConflictError, upsertSubscription } from './_lib/access.js';
 import { notifyOwner } from './_lib/provider-alert.js';
 import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
 import { linkPurchaseIdentity, recordPurchaseEvent } from './_lib/purchases.js';
+import { reconcileStripeWebhook } from './_lib/purchase-reservations.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
-const stripeWork = new AsyncLocalStorage<{ deadline: number }>();
+const stripeWork = new AsyncLocalStorage<{ deadline: number; reconciledAttempts: Set<string> }>();
 const PAGE_LIMIT = 3;
 async function bounded<T>(load: () => Promise<T>, maximum = 5000): Promise<T> {
   const ms = Math.min(maximum, (stripeWork.getStore()?.deadline ?? Date.now() + maximum) - Date.now());
@@ -189,12 +190,18 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   if (!/^[0-9a-f-]{36}$/i.test(identity)) { console.error('[stripe-webhook] subscription without identity', sub.id); return null; }
   // A test-mode subscription never touches production accounts (audit 2026-10-02, SEC-CFG-04).
   if (sub.livemode === false && process.env.VERCEL_ENV === 'production') { console.error('[stripe-webhook] test-mode subscription ignored', sub.id); return null; }
+  await reconcileReservedAttempt(sub, 'subscription');
   const status = String(sub.status ?? 'incomplete');
   const incomingLive = ['active', 'trialing', 'past_due'].includes(status);
   // One row per account is shared with the App Store and with older subscriptions: a non-live state for this
   // subscription never overwrites a different plan that is still live (a late retry for an old subscription, or an
   // active Apple plan). STRIPE-01 / STRIPE-03.
   const current = await getSubscription(identity);
+  if (current?.provider === 'google') {
+    // Keep the production Apple/card sidecar behavior; Google has a separately verified owner gate.
+    if (!incomingLive) return null;
+    if (activeSubscription(current)) throw new SubscriptionProviderConflictError();
+  }
   if (current && !incomingLive) {
     const currentLive = ['active', 'trialing', 'past_due'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
     const otherPlan = current.provider === 'apple' || (current.stripe_subscription_id && current.stripe_subscription_id !== sub.id);
@@ -394,6 +401,20 @@ async function attributeRefunds(charge: Record<string, unknown>, ledgerIds: stri
   }
 }
 
+/** Reconcile a signed event's durable attempt within the existing bounded Stripe work. */
+async function reconcileReservedAttempt(object: Record<string, unknown>, resource: 'checkout' | 'subscription'): Promise<void> {
+  const attempt = (object.metadata as Record<string, unknown> | undefined)?.purchase_attempt_id;
+  if (typeof attempt !== 'string' || !/^[0-9a-f-]{36}$/i.test(attempt)) return;
+  const reference = stripeId(object.id);
+  if (!reference) return;
+  const completed = stripeWork.getStore()?.reconciledAttempts;
+  if (completed?.has(attempt)) return;
+  await bounded(() => reconcileStripeWebhook(attempt,
+    resource === 'checkout' ? reference : null,
+    resource === 'subscription' ? reference : null));
+  completed?.add(attempt);
+}
+
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !process.env.STRIPE_SECRET_KEY) return json(503, { error: 'Stripe is not configured' });
@@ -403,8 +424,9 @@ export async function POST(request: Request): Promise<Response> {
   try { event = JSON.parse(raw); } catch { return json(400, { error: 'bad payload' }); }
   if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.type !== 'string') return json(400, { error: 'bad payload' });
   const obj = event.data?.object ?? {};
-  return stripeWork.run({ deadline: Date.now() + 50_000 }, async () => {
+  return stripeWork.run({ deadline: Date.now() + 50_000, reconciledAttempts: new Set<string>() }, async () => {
     try {
+      if (['checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated', 'customer.subscription.deleted'].includes(event.type ?? '')) await reconcileReservedAttempt(obj, event.type === 'checkout.session.completed' ? 'checkout' : 'subscription');
       if (event.type === 'checkout.session.completed' && obj.mode === 'subscription' && typeof obj.subscription === 'string') {
         const sub = await stripeGet(`subscriptions/${obj.subscription}`);
         await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
@@ -426,6 +448,7 @@ export async function POST(request: Request): Promise<Response> {
               invoiceId(invoice.customer) !== invoiceId(obj.customer) || subscriptionOfInvoice(invoice) !== sid) throw new Error('Stripe invoice subscription/customer mismatch');
           const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
           if (mapped && metadataIdentity && mapped !== metadataIdentity) throw new Error('Stripe subscription owner mismatch');
+          await reconcileReservedAttempt(sub, 'subscription');
           const identity = await saveSubscription(sub, mapped);
           if (identity) {
             if (ledgerId) await linkPurchaseIdentity(ledgerId, identity, purchaseTransport);

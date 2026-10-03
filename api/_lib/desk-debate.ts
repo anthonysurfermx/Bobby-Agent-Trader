@@ -266,7 +266,7 @@ const ADVICE: RegExp[] = [
   // Same shape as the English imperative: "Compra neta hoy…" is data.
   /(?:(?<=^)|(?<=[.!?¡]\s*))(?:[Cc]ompra|[Vv]ende|[Cc]ompre|[Vv]enda|[Cc]ompren|[Vv]endan)\s+(?:(?:lo|la|los|las|esto|eso|todo|más|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:ya|ahora|hoy|de\s+inmediato|inmediatamente)(?![\p{L}])/gu,
   // Leverage is sizing advice, whatever the language: "apalancamiento de 3x", "3x leverage", "alavancagem de 5x".
-  /\b(?:apalancamiento|alavancagem|leverage|levier|leva|Hebel)\s+(?:de\s+|of\s+)?\d+(?:[.,]\d+)?\s*[x×]/giu,
+  /\b(?:apalancamiento|alavancagem|leverage|levier|leva|Hebel)\s+(?:de\s+|of\s+|di\s+|von\s+)?\d+(?:[.,]\d+)?\s*[x×]/giu,
   /\b\d+(?:[.,]\d+)?\s*[x×]\s+(?:leverage|apalancamiento|alavancagem|levier|leva|Hebel)\b/giu,
   // A second-person call to act at the start of a sentence.
   /(?:(?<=^)|(?<=[.!?¡]\s*))(?:Aprovecha|Aprovechen|Abre|Abran|Entra|Entren|Shortea|Take\s+advantage|Aproveite|Abra|Entre\s+(?:agora|já))(?![\p{L}])/gu,
@@ -276,7 +276,7 @@ const ADVICE: RegExp[] = [
   /(?<![\p{L}])(?:tu\s+(?:dois|devrais)|vous\s+(?:devez|devriez)|je\s+(?:conseille|recommande))\s+(?:d['’])?(?:acheter|vendre|ouvrir)(?![\p{L}])/giu,
   /(?<![\p{L}])(?:dovresti|devi|ti\s+(?:consiglio|raccomando))\s+(?:di\s+)?(?:comprare|vendere|aprire)(?![\p{L}])/giu,
   /(?<![\p{L}])(?:du\s+(?:solltest|musst)|ich\s+empfehle)\b[^.;]{0,35}\b(?:kaufen|verkaufen|eröffnen)\b/giu,
-  /(?:(?<=^)|(?<=[.!?]\s*))(?:[Aa]chète|[Vv]ends|[Aa]chetez|[Vv]endez|[Cc]ompra|[Vv]endi|[Kk]aufe|[Vv]erkaufe)\b[^.;]{0,25}\b(?:maintenant|aujourd['’]?hui|subito|ora|oggi|jetzt|sofort|heute)\b/gu,
+  /(?:(?<=^)|(?<=[.!?]\s*))(?:[Aa]chète|[Vv]ends|[Aa]chetez|[Vv]endez|[Cc]ompra|[Vv]endi|[Kk]aufe|[Vv]erkaufe|[Kk]aufen\s+Sie|[Vv]erkaufen\s+Sie)\b[^.;]{0,25}\b(?:maintenant|aujourd['’]?hui|subito|adesso|ora|oggi|jetzt|sofort|heute)\b/gu,
   // Portuguese personal instructions.
   /(?<![\p{L}])(?:voc[eê]\s+)?(?:deve(?:ria)?|precisa|tem\s+que)\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
   /(?<![\p{L}])(?:recomendo|aconselho|sugiro)\s+(?:que\s+)?(?:voc[eê]\s+)?(?:comprar|compre|vender|venda|abrir|abra)(?![\p{L}])/giu,
@@ -319,7 +319,8 @@ const HEDGE_BEFORE = /(?:\bfar\s+from(?:\s+(?:being|an?|the))*\s*$|\blejos\s+de(
 const HEDGE_AFTER = /^\s*(?:would|is|was|will)\s+(?:be\s+)?(?:wrong|a\s+mistake|misleading|incorrect|an?\s+(?:exaggeration|overstatement))\b|^\s*(?:ser[ií]a|es)\s+(?:un\s+error|enga[ñn]oso|incorrecto|una\s+exageraci[oó]n)/iu;
 
 function negatedBefore(text: string, at: number): boolean {
-  const sentence = text.slice(0, at).slice(sentenceStart(text.slice(0, at)));
+  // A comma followed by French 'mais' starts an affirmative contrast. Bare Portuguese 'não … mais' remains negated.
+  const sentence = text.slice(0, at).slice(sentenceStart(text.slice(0, at))).split(/,\s*mais\b/iu).at(-1)!;
   if (HEDGE_BEFORE.test(sentence)) return true;
   const reach = words(sentence).slice(-8);
   const turn = reach.map(word => TURNS.has(word)).lastIndexOf(true);
@@ -343,7 +344,9 @@ function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): Re
     // Its first word is the pattern's own ("sin riesgo" is the claim, not a negation), and so is the
     // determiner of "sans aucun risque", "sin ningún riesgo", "sem nenhum risco", "senza nessun rischio".
     const own = OWN_DETERMINER.test(match[0]) ? 2 : 1;
-    if (checkAfter && words(match[0]).slice(own).some(word => NEGATIONS.has(word))) return false;
+    const inner = words(match[0]).slice(own);
+    const innerTurn = inner.map(word => TURNS.has(word)).lastIndexOf(true);
+    if (inner.slice(innerTurn + 1).some(word => NEGATIONS.has(word))) return false;
     return !negatedBefore(text, at) && !(checkAfter && negatedAfter(text, at + match[0].length));
   });
 }
@@ -351,11 +354,11 @@ function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): Re
 /** Markdown emphasis must not hide a claim from the guard ("**3x**", "_garantizado_"). */
 const plainText = (text: string) => text.replace(/[*_`~]+/g, '');
 
-const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wait|review|esperar|revisar)\b/iu;
+const STATED_VERDICT = /\b(?:verdict|veredicto|veredito|verdetto|urteil)\b\W{0,4}(?:(?:is|es|est|è|é|ist)\W{1,4})?(wait|review|esperar|revisar|attendre|examiner|attendere|rivedere|warten|prüfen)\b/iu;
 
 /**
  * Post-generation guard, deliberately narrow: an affirmative guarantee /
- * risk-free / sure-profit claim or a personal buy/sell instruction (EN/ES) in
+ * risk-free / sure-profit claim or a personal buy/sell instruction in the six languages in
  * any role, or a CIO that states a verdict other than the one it returned,
  * fails the analysis. No verdict is substituted. The CIO naming the other
  * side's case is normal weighing, not a contradiction: a text-vs-direction
@@ -367,7 +370,7 @@ export function reviewDeskOutput(agents: { alpha: string; red: string; cio: stri
     if (ADVICE.some(pattern => affirmedMatches(text, pattern, false).length > 0)) throw new DeskOutputRejected('advice');
   }
   const stated = agents.cio.match(STATED_VERDICT)?.[1]?.toLowerCase();
-  if (stated && (stated === 'wait' || stated === 'esperar' ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
+  if (stated && (['wait', 'esperar', 'attendre', 'attendere', 'warten'].includes(stated) ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
 }
 
 /**

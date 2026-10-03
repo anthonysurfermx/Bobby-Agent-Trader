@@ -9,12 +9,12 @@
 //   DATABASE_URL=postgres://postgres@127.0.0.1:55491/briefings_pg npx tsx scripts/test-briefings-pg.mts
 import assert from 'node:assert/strict';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import type pg from 'pg';
 import * as db from '../api/_lib/briefings/db.js';
 import { COMPANION_VOICES, voiceForCompanion } from '../api/_lib/briefings/config.js';
 import type { BriefSettings, Cadence } from '../api/_lib/briefings/types.js';
-import { BRIEFINGS_MIGRATION, BRIEFINGS_SOURCE_GUARD_MIGRATION, assertLocalUrl, bootstrapBriefingsDb, makeIdentity, pgRpcTransport, setPro } from './briefings-pg-harness.mjs';
+import { BRIEFINGS_FCM_MIGRATION, BRIEFINGS_MIGRATION, BRIEFINGS_SOURCE_GUARD_MIGRATION, assertLocalUrl, bootstrapBriefingsDb, makeIdentity, pgRpcTransport, setPro } from './briefings-pg-harness.mjs';
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -171,6 +171,13 @@ try {
   await pool.query(readFileSync(BRIEFINGS_SOURCE_GUARD_MIGRATION, 'utf8'));
   eq(await q('select id, name, public from storage.buckets'), [{ id: 'briefing-audio', name: 'briefing-audio', public: false }], 'private briefing-audio bucket, once');
   await q('drop schema storage cascade');
+  // Base-migration idempotency checks above replace v1 functions; restore the optional routing wrappers
+  // before ALL lifecycle regressions below, so this suite tests APNs with FCM migration present.
+  if (existsSync(BRIEFINGS_FCM_MIGRATION)) {
+    await pool.query(readFileSync(BRIEFINGS_FCM_MIGRATION, 'utf8'));
+    await pool.query(readFileSync(BRIEFINGS_FCM_MIGRATION, 'utf8'));
+    eq(await db.fcmMigrationReady(), true, 'FCM wrappers restored idempotently before legacy APNs regressions');
+  }
   eq((await one("select count(*)::int as n from pg_trigger where tgname in ('bobby_brief_prefs_update', 'bobby_brief_prefs_delete', 'bobby_brief_assets_delete')")).n, 3, 'three memory triggers, once each');
 
   // ================================================================ transport

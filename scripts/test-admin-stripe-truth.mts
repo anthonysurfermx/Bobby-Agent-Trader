@@ -7,6 +7,7 @@ process.env.STRIPE_PRICE_ID = 'price_bobby_truth';
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'offline-service';
 const { POST } = await import('../api/stripe-webhook.ts');
+const { setPurchaseRpcForTests } = await import('../api/_lib/purchase-reservations.ts');
 const { linkPurchaseIdentity, recordPurchaseEvent } = await import('../api/_lib/purchases.ts');
 const OWNER = '00000000-0000-4000-8000-000000000001', OTHER = '00000000-0000-4000-8000-000000000002';
 const SID = 'sub_truth', IID = 'in_truth', CID = 'ch_truth', PID = 'pi_truth', CUSTOMER = 'cus_truth';
@@ -92,6 +93,49 @@ try {
   ok(calls.findIndex((c) => c.method === 'POST' && c.url.pathname.endsWith('bobby_purchase_events')) < calls.findIndex((c) => c.url.host === 'api.stripe.com'), 'invoice money stored before any remote reconciliation');
   eq(proofs.size, 0, 'outage cannot grant paid proof');
   ok(Date.parse(chargeRow.event_at) > (START + 86_000) * 1000, 'invoice issuance is not treated as payment time');
+  // Rebased durable reservations must retain canonical69 ledger-first behavior.
+  const attemptId = '00000000-0000-4000-8000-000000000071';
+  let durableCalls: Array<{name:string;body:any}> = [];
+  setPurchaseRpcForTests(async (name, body) => { durableCalls.push({name,body}); throw new Error('Synthetic reservation storage outage'); });
+  reset();
+  invoice.metadata = { purchase_attempt_id: attemptId };
+  override = c => c.url.host === 'api.stripe.com' ? json({ error: 'outage' }, 503) : null;
+  eq((await POST(signed('invoice.paid', invoice))).status, 500, 'invoice carrying attempt metadata retries provider outage');
+  eq(ledger.size, 1, 'attempt metadata cannot bypass authenticated invoice ledger-first persistence');
+  eq(durableCalls.length, 0, 'invoice metadata is not a reservation reference before current provider verification');
+  reset(); durableCalls = [];
+  const knownRefund = refund('re_attempt_outage', 100, { metadata: { purchase_attempt_id: attemptId } });
+  override = c => c.url.host === 'api.stripe.com' ? json({ error: 'outage' }, 503) : null;
+  eq((await POST(signed('refund.updated', knownRefund))).status, 500, 'refund carrying attempt metadata retries attribution outage');
+  eq(ledger.get('stripe-refund-re_attempt_outage')?.price_usd, -1, 'authenticated refund amount is retained before provider outage');
+  eq(durableCalls.length, 0, 'refund metadata never starts reservation reconciliation');
+
+  reset(); durableCalls = [];
+  invoice.metadata = { purchase_attempt_id: attemptId };
+  sub.metadata.purchase_attempt_id = attemptId; sub.items.has_more = false;
+  const recoveredSession = { id: 'cs_recovered69', object: 'checkout.session', mode: 'subscription', livemode: true,
+    client_reference_id: OWNER, customer: CUSTOMER, metadata: { identity_id: OWNER, purchase_attempt_id: attemptId },
+    status: 'complete', payment_status: 'paid', subscription: SID };
+  const reservation = { id: attemptId, identity_id: OWNER, owner_key: 'synthetic-owner', provider: 'stripe',
+    phase: 'needs_reconciliation', revision: 2, provider_reference: null,
+    dispatch_payload: { customer: CUSTOMER, client_reference_id: OWNER, 'metadata[identity_id]': OWNER,
+      'line_items[0][price]': 'price_bobby_truth' } };
+  setPurchaseRpcForTests(async (name, body) => {
+    durableCalls.push({name,body});
+    if(name === 'bobby_purchase_reference_get') return {attempt: reservation};
+    if(name === 'bobby_purchase_observe') return {attempt: {...reservation, phase:'confirmed', provider_reference:body.p_reference}};
+    throw new Error('Unexpected synthetic durable RPC: '+name);
+  });
+  override = c => c.url.host === 'api.stripe.com' && c.url.pathname === '/v1/checkout/sessions'
+    ? json({object:'list',has_more:false,data:[recoveredSession]})
+    : c.url.host === 'api.stripe.com' && c.url.pathname === '/v1/checkout/sessions/cs_recovered69' ? json(recoveredSession) : null;
+  eq((await POST(signed('invoice.paid', invoice))).status, 200, 'current subscription hint recovers lost Checkout write from invoice');
+  eq(durableCalls.filter(c=>c.name==='bobby_purchase_reference_get').length, 1, 'same request reconciles the real attempt once, without metadata-only no-op');
+  eq(durableCalls.filter(c=>c.name==='bobby_purchase_observe').map(c=>[c.body.p_reference,c.body.p_phase]), [['cs_recovered69','confirmed']], 'actual correlated session supplies durable confirmation');
+  eq(calls.filter(c=>c.url.host==='api.stripe.com'&&c.url.pathname==='/v1/checkout/sessions').map(c=>c.url.searchParams.get('subscription')), [SID], 'lost-create recovery looks up the actual current subscription');
+  ok(calls.findIndex(c=>c.method==='POST'&&c.url.pathname.endsWith('bobby_purchase_events')) < calls.findIndex(c=>c.url.pathname==='/v1/checkout/sessions'), 'canonical money ledger persists before attempt reconciliation');
+  eq(calls.filter(c=>c.url.host==='api.stripe.com'&&c.method==='POST').length, 0, 'webhook recovery creates no new payable Checkout or charge');
+  setPurchaseRpcForTests(null);
   reset();
   const paidAt = Math.floor(Date.now() / 1000) - 30, eventAt = paidAt + 10;
   invoice.created = START - 5 * 86_400; invoice.status_transitions = { paid_at: paidAt };
@@ -216,5 +260,5 @@ try {
   reset();
   await assert.rejects(recordPurchaseEvent({ id: 'x'.repeat(81), type: 'REFUND' }), /id invalid/); checks++;
   eq(calls.length, 0, 'long canonical id never truncates into a colliding money record');
-} finally { globalThis.fetch = originalFetch; console.error = originalError; }
+} finally { setPurchaseRpcForTests(null); globalThis.fetch = originalFetch; console.error = originalError; }
 console.log(`admin-stripe-truth: ${checks} checks passed (offline; no provider transactions)`);

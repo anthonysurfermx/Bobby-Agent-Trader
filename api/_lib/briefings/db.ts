@@ -8,7 +8,7 @@
 import { bobbyRest, bobbyServiceHeaders } from '../bobby-db.js';
 import type { BriefSettings, Cadence, ComposerMemory, DeviceEnvironment, FrozenSettings, PermissionState } from './types.js';
 import { BRIEF_LANGUAGES, type BriefLanguage } from './types.js';
-import { COMPANION_VOICES, voiceForCompanion } from './config.js';
+import { COMPANION_VOICES, CONSENT_VERSIONS, voiceForCompanion } from './config.js';
 
 export class BriefingStorageError extends Error {
   constructor(readonly rpc: string, readonly status: number | null) {
@@ -68,6 +68,7 @@ export async function patchSettings(identityId: string, expectedRevision: number
 export interface DeviceWrite {
   tokenCiphertext: string; tokenFingerprint: string; environment: DeviceEnvironment; topic: string;
   permission: PermissionState; appBuild: number;
+  provider?: 'fcm'; fcmProjectId?: string; packageName?: string;
 }
 export type DeviceWriteOnce =
   | { state: 'done' | 'replay'; status: number; response: string }
@@ -77,9 +78,10 @@ export async function writeDeviceOnce(p: {
   identityId: string; key: string; digest: string; action: 'register' | 'rebind';
   installationId: string; registrationId: string | null; expectedRevision: number | null;
   proofVerifier: string | null; newVerifier: string; sealedCredential: string;
-  write: DeviceWrite; maxActive: number;
+  write: DeviceWrite; maxActive: number; analysisConsentVersion?: number;
 }): Promise<DeviceWriteOnce> {
-  return obj(await rpc('bobby_push_device_write_once', {
+  const name = p.write.provider === 'fcm' ? 'bobby_push_device_write_once_fcm_v2' : 'bobby_push_device_write_once';
+  return obj(await rpc(name, {
     p_identity: p.identityId, p_key: p.key, p_digest: p.digest, p_action: p.action,
     p_installation: p.installationId, p_registration: p.registrationId,
     p_expected_revision: p.expectedRevision, p_proof_verifier: p.proofVerifier,
@@ -87,7 +89,13 @@ export async function writeDeviceOnce(p: {
     p_token_fingerprint: p.write.tokenFingerprint, p_environment: p.write.environment,
     p_topic: p.write.topic, p_permission: p.write.permission, p_app_build: p.write.appBuild,
     p_max_active: p.maxActive, p_sealed_credential: p.sealedCredential,
-  }), 'bobby_push_device_write_once') as unknown as DeviceWriteOnce;
+    ...(p.write.provider === 'fcm' ? { p_fcm_project: p.write.fcmProjectId, p_package: p.write.packageName,
+      p_analysis_consent_version: p.analysisConsentVersion } : {}),
+  }), name) as unknown as DeviceWriteOnce;
+}
+export async function fcmMigrationReady(): Promise<boolean> {
+  const r = obj(await rpc('bobby_brief_fcm_capability_v2', {}), 'bobby_brief_fcm_capability_v2');
+  return r.registrationVersion === 2 && r.targetType === 'fid';
 }
 export type DeviceResult =
   | { ok: true; registrationId: string; bindingRevision: number }
@@ -181,6 +189,7 @@ export async function fillOutbox(limit: number): Promise<number> {
 export interface OutboxItem {
   id: string; fence: number; briefId: string; deviceId: string; bindingRevision: number; tokenCiphertext: string;
   environment: DeviceEnvironment; topic: string; apnsId: string; collapseId: string; language: BriefLanguage; expiresAt: string; attempts: number;
+  provider?: 'apns' | 'fcm'; fcmProjectId?: string; packageName?: string; targetType?: 'fid';
 }
 export async function claimOutbox(worker: string, leaseSeconds: number, limit: number): Promise<OutboxItem[]> {
   const r = obj(await rpc('bobby_brief_outbox_claim', { p_worker: worker, p_lease_seconds: leaseSeconds, p_limit: limit }, 10_000), 'bobby_brief_outbox_claim');
@@ -189,6 +198,15 @@ export async function claimOutbox(worker: string, leaseSeconds: number, limit: n
 export type OutboxOutcome = 'accepted' | 'retry' | 'invalid_token' | 'ambiguous' | 'config';
 export async function outboxResult(id: string, fence: number, outcome: OutboxOutcome, apnsStatus: number | null, reason: string | null, retryAfterSeconds: number | null): Promise<void> {
   await rpc('bobby_brief_outbox_result', { p_id: id, p_fence: fence, p_outcome: outcome, p_apns_status: apnsStatus, p_reason: reason ? reason.slice(0, 48) : null, p_retry_after_seconds: retryAfterSeconds });
+}
+export async function claimOutboxV2(worker: string, leaseSeconds: number, limit: number, providers: Array<'apns' | 'fcm'>, fcmProjectId: string | null = null): Promise<OutboxItem[]> {
+  const r = obj(await rpc('bobby_brief_outbox_claim_v2', { p_worker: worker, p_lease_seconds: leaseSeconds, p_limit: limit, p_providers: providers, p_fcm_project: fcmProjectId, p_package: 'xyz.bobbyprotocol.bobby', p_analysis_consent_version: CONSENT_VERSIONS.analysis }, 10_000), 'bobby_brief_outbox_claim_v2');
+  return Array.isArray(r.items) ? r.items as OutboxItem[] : [];
+}
+export async function outboxResultV2(id: string, fence: number, outcome: OutboxOutcome, status: number | null, reason: string | null,
+  retryAfterSeconds: number | null, provider: 'apns' | 'fcm', messageId: string | null): Promise<void> {
+  await rpc('bobby_brief_outbox_result_v2', { p_id: id, p_fence: fence, p_outcome: outcome, p_provider_status: status,
+    p_reason: reason ? reason.slice(0, 48) : null, p_retry_after_seconds: retryAfterSeconds, p_provider: provider, p_message_id: messageId });
 }
 
 // ---- budget ----

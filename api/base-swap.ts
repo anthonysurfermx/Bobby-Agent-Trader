@@ -1,3 +1,4 @@
+import { clientPlatform } from './_lib/access.js';
 // ============================================================
 // /api/base-swap — Uniswap V3 on Base, the only swap rail.
 //
@@ -116,7 +117,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         identityId: identity?.id ?? null,
         cycleId: body.cycleId ?? null,
         intentJti: body.cycleId ? body.intentJti ?? null : null,
-        platform: 'web',
+        platform: clientPlatform(req) as 'web' | 'ios' | 'android',
         tokenIn: { symbol: quote.tokenIn.symbol, address: quote.tokenIn.address },
         tokenOut: { symbol: quote.tokenOut.symbol, address: quote.tokenOut.address },
         amountInRaw: quote.amountInRaw,

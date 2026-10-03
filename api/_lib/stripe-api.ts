@@ -110,12 +110,14 @@ export async function subscriptionsFor(identityId: string, customerId: string | 
 
 /** Cancels (immediately) every subscription of the identity that can still charge. Throws if any cannot be confirmed. */
 export async function cancelAllFor(identityId: string, customerId: string | null | undefined, storedSubId: string | null | undefined,
-  checkoutCustomerId?: string | null): Promise<number> {
+  checkoutCustomerId?: string | null, extraCustomers: string[] = [], extraSessions: string[] = []): Promise<number> {
   const customers = await customersFor(identityId, customerId);
-  if (checkoutCustomerId && !customers.includes(checkoutCustomerId)) customers.push(checkoutCustomerId);
+  if (extraCustomers.length>10 || extraSessions.length>10 || extraCustomers.some(id=>!/^cus_[A-Za-z0-9]+$/.test(id)) || extraSessions.some(id=>!/^cs_[A-Za-z0-9_]+$/.test(id))) throw new Error('invalid deletion billing references');
+  for (const id of [checkoutCustomerId,...extraCustomers]) if (id && !customers.includes(id)) customers.push(id);
   // Expire checkout first: otherwise deleting the account could leave a session
   // that charges an initial invoice after its owner and Pro access are gone.
   for (const id of customers) await expireOpenCheckouts(id);
+  for (const id of [...new Set(extraSessions)]) await expireCheckoutSession(id);
   let cancelled = 0;
   const subscriptions = new Map<string, Sub>();
   for (const id of customers.length ? customers : [null]) {
@@ -140,13 +142,13 @@ export interface BillingRow { status?: string; stripe_customer_id?: string | nul
  * Deletion is never blocked for good (App Store 5.1.1(v)). Red team 2026-10-02.
  */
 export async function stopBillingFor(identityId: string, row: BillingRow | null,
-  checkout: { customer: string | null; sessionId: string | null }): Promise<{ cancelled: number; unverified: string | null }> {
-  const known = Boolean(row?.stripe_customer_id || row?.stripe_subscription_id || checkout.customer || checkout.sessionId);
+  checkout: { customer: string | null; sessionId: string | null; customers?: string[]; sessionIds?: string[]; pendingStripe?: boolean }): Promise<{ cancelled: number; unverified: string | null }> {
+  const known = Boolean(row?.stripe_customer_id || row?.stripe_subscription_id || checkout.customer || checkout.sessionId || checkout.customers?.length || checkout.sessionIds?.length || checkout.pendingStripe);
   if (!key() && !known) return { cancelled: 0, unverified: null };
   // A row that carries a Stripe subscription id reports the card plan's own status (the Apple plan lives in its mirror).
-  const mayCharge = (Boolean(row?.stripe_subscription_id) && !STRIPE_TERMINAL.has(String(row?.status))) || Boolean(checkout.sessionId);
+  const mayCharge = (Boolean(row?.stripe_subscription_id) && !STRIPE_TERMINAL.has(String(row?.status))) || Boolean(checkout.sessionId || checkout.sessionIds?.length || checkout.pendingStripe);
   try {
-    const cancelled = await cancelAllFor(identityId, row?.stripe_customer_id, row?.stripe_subscription_id, checkout.customer);
+    const cancelled = await cancelAllFor(identityId, row?.stripe_customer_id, row?.stripe_subscription_id, checkout.customer,checkout.customers??[],checkout.sessionIds??[]);
     if (checkout.sessionId) await expireCheckoutSession(checkout.sessionId);
     return { cancelled, unverified: null };
   } catch (e) {

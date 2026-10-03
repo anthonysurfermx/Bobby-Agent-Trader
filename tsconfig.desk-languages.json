@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "lib": ["ES2023", "DOM"], "module": "ESNext", "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true, "isolatedModules": true, "skipLibCheck": true, "noEmit": true,
+    "strict": false, "types": ["node"]
+  },
+  "include": ["api/desk-debate.ts", "scripts/test-desk-six-languages.mts"]
+}

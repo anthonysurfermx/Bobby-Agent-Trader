@@ -24,6 +24,7 @@ function escapeHtml(value: unknown): string {
 }
 
 async function sendEmailNotification(feedback: Record<string, unknown>): Promise<void> {
+  if (!BREVO_API_KEY.trim()) return;
   const type = escapeHtml(String(feedback.type || 'bug').toUpperCase());
   const emoji = type === 'BUG' ? '🐛' : type === 'FEATURE' ? '💡' : '💬';
   const from = escapeHtml(feedback.user_email || feedback.wallet_address || 'Anonymous');
@@ -51,10 +52,10 @@ async function sendEmailNotification(feedback: Record<string, unknown>): Promise
       }),
     });
     if (!res.ok) {
-      console.error('[Feedback] Brevo error:', res.status, await res.text().catch(() => ''));
+      console.error('[Feedback] Brevo error:', res.status);
     }
   } catch (e) {
-    console.error('[Feedback] Email send failed:', e);
+    console.error('[Feedback] Email send failed');
   }
 }
 
@@ -98,10 +99,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     saved = sbRes.ok;
     if (!saved) {
-      console.error('[Feedback] Supabase insert failed:', sbRes.status, await sbRes.text().catch(() => ''));
+      console.error('[Feedback] Supabase insert failed:', sbRes.status);
     }
   } catch (e) {
-    console.error('[Feedback] Supabase error:', e);
+    console.error('[Feedback] Supabase error');
   }
 
   if (!saved) return res.status(503).json({ ok: false, saved: false, error: 'Your request could not be saved. Please retry.' });

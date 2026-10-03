@@ -45,6 +45,7 @@ const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'),
 // Direction A3 (sticker poster stack + Bobby's world) is /app since 2026-09-24; /app-world stays as an alias.
 const BobbyAppLandingWorld = lazyWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
 const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
+const BobbyDeleteAccountPage = lazy(() => import('@/pages/BobbyDeleteAccountPage'));
 const BobbyRedeemPage = lazy(() => import('@/pages/BobbyRedeemPage'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
@@ -351,6 +352,10 @@ const router = createBrowserRouter(
         {
           path: 'support',
           element: (<Suspense fallback={<PageLoader />}><BobbySupportPage /></Suspense>),
+        },
+        {
+          path: 'delete-account',
+          element: (<Suspense fallback={<PageLoader />}><BobbyDeleteAccountPage /></Suspense>),
         },
         // Coupons: an Apple/Google account redeems a code for extra reads (api/_lib/coupons.ts).
         {

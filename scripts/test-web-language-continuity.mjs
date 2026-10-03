@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import { fileURLToPath } from 'node:url';
 import * as crypto from 'node:crypto';
+import { z } from 'zod';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = file => fs.readFileSync(path.join(root, file), 'utf8');
@@ -102,13 +103,32 @@ for(const[language,locale]of locales)for(const denied of[false,true]){
       const copy={access_denied:['Access denied. Please try again.','Acceso denegado. Por favor intenta de nuevo.'],unexpected_provider_error:['An authentication error occurred.','Ocurrió un error de autenticación.'],transport_error:['An unexpected error occurred.','Ocurrió un error inesperado.']}[scenario]??['Authentication could not be completed.','No se pudo completar la autenticación.'];assert.equal(failure.states[1],failure.load('src/lib/companions/i18n.ts').t(...copy));
     });
   }
-  for(const file of['src/components/nucleo/NucleoRisk.tsx','src/pages/PrivacyPage.tsx','src/pages/BobbySupportPage.tsx','src/pages/BobbySignInPage.tsx']){
+  for(const file of['src/components/nucleo/NucleoRisk.tsx','src/pages/PrivacyPage.tsx','src/pages/BobbySupportPage.tsx','src/pages/BobbySignInPage.tsx','src/pages/BobbyDeleteAccountPage.tsx']){
     const links=browser(language,locale,denied),tree=links.load(file).default({});
     const local=nodes(tree).filter(node=>node.type==='a'&&node.props.href?.startsWith('/')&&!node.props.href.startsWith('//'));
     check(`${locale} ${file}: local app links keep dialect and country`,()=>{
       assert.ok(local.length);for(const link of local){const query=new URL(link.props.href,'https://bobby.test').searchParams;assert.equal(query.get('lang'),language);assert.equal(query.get('locale'),locale);assert.equal(query.get('country'),'BR');}assert.equal(links.calls.fetch.length,0);
     });
   }
+}
+
+// Execute the new deletion consumer, including regional aliases and Android return links.
+for(const [language,locale] of [...locales,['es','es-ES']]) {
+  const b=browser(language,locale,true);b.go('/delete-account?'+new URLSearchParams({lang:language,locale,country:'BR',platform:'android'}));
+  const tree=b.load('src/pages/BobbyDeleteAccountPage.tsx').default(),all=nodes(tree);
+  check(`${locale}: private deletion page keeps language, region and Android backlinks`,()=>{
+    const title={en:'Delete your Bobby account',es:'Borrar tu cuenta Bobby',fr:'Supprimer votre compte Bobby',pt:'Eliminar a tua conta Bobby',it:'Elimina il tuo account Bobby',de:'Dein Bobby-Konto löschen'};
+    assert.equal(all.find(n=>n.type==='h1').props.children,title[language]);
+    assert.equal(all.find(n=>n.type==='html').props.lang,locale);
+    for(const link of all.filter(n=>n.type==='a'&&n.props.href?.startsWith('/'))){const query=new URL(link.props.href,'https://bobby.test').searchParams;assert.equal(query.get('lang'),language);assert.equal(query.get('locale'),locale);assert.equal(query.get('country'),'BR');assert.equal(query.get('platform'),'android');}
+    const switchers=all.filter(n=>n.type==='a'&&n.props.href?.startsWith('?'));assert.equal(switchers.length,6);
+    for(const link of switchers){const q=new URLSearchParams(link.props.href);assert.equal(q.get('country'),'BR');assert.equal(q.get('platform'),'android');assert.ok(q.get('locale').startsWith(q.get('lang')+'-'));}
+    assert.equal(b.calls.fetch.length,0);assert.equal(all.find(n=>n.type==='button').props.disabled,true);
+  });
+}
+for(const alias of ['es-MX','pt-BR']) {
+  const b=browser('en','en-US',true);b.go('/delete-account?'+new URLSearchParams({lang:alias,country:'BR'}));const all=nodes(b.load('src/pages/BobbyDeleteAccountPage.tsx').default());
+  check(`${alias}: regional language alias retains document locale`,()=>assert.equal(all.find(n=>n.type==='html').props.lang,alias));
 }
 
 for(const[language,locale]of locales){
@@ -156,10 +176,11 @@ async function billingApi(body,{signedIn=true,host='bobbyprotocol.xyz'}={}){
   const identity={id:'inert-owner',authUserId:'inert-user'};
   const forbidden=()=>{throw new Error('Unrelated billing operation must not run');};
   const stubs={
-    'node:crypto':crypto,'@vercel/functions':{waitUntil(){}},
+    'node:crypto':crypto,'zod':{z},'@vercel/functions':{waitUntil(){}},
+    './_lib/google-publisher.js':{},'./_lib/purchase-reservations.js':{stripeUsesReservations:async()=>false},
     './_lib/request-security.js':{enforcePublicRateLimit:async()=>true},
     './_lib/user-identity.js':{requireIdentity:async(_req,res)=>{if(!signedIn){res.status(401).json({error:'Inert unauthenticated'});return null;}return identity;}},
-    './_lib/access.js':{getSubscription:async()=>({stripe_customer_id:'cus_INERT'})},
+    './_lib/access.js':{getSubscription:async()=>({stripe_customer_id:'cus_INERT'}),activeSubscription:()=>false},
     './_lib/referrals.js':{},'./_lib/coupons.js':{},'./_lib/rate-limit-persistent.js':{},'./_lib/rate-limit.js':{},'./_lib/desk-levels.js':{},'./_lib/bobby-db.js':{},'./_lib/revenuecat.js':{},
     // Checkout reaches Stripe through these modules: reads find nothing open, and the one create is recorded like a fetch.
     './_lib/stripe-api.js':{STRIPE_TERMINAL:new Set(['canceled','incomplete_expired']),customerFor:async()=>'cus_INERT',findCustomer:async(_id,stored)=>stored??null,expireCheckoutSession:forbidden,

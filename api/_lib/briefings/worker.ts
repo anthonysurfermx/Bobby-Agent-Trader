@@ -43,6 +43,8 @@ import {
 import { buildEvidence } from './evidence.js';
 import { factsOnlyNarrative, narrativeRequest, validateNarrative } from './narrative.js';
 import { decryptToken } from './push-crypto.js';
+import { decryptFcmTarget } from './push-crypto.js';
+import { fcmConfig, sendFcm, FCM_MIN_REMAINING_MS, type FcmConfig, type FcmNotification, type FcmOutcome } from './fcm.js';
 import { llmJsonOnce, llmReserveUsd } from './providers.js';
 import { ensureAudio } from './voice.js';
 import type { BriefEvidence, BriefLanguage, Period, SharedNarrative } from './types.js';
@@ -57,7 +59,8 @@ export interface TickReport {
 
 export type WorkerDb = Pick<typeof dbModule,
   'reconcile' | 'seedPeriod' | 'openLanguages' | 'neededAssets' | 'claimShared' | 'commitShared' | 'claimBriefs' | 'publishBrief'
-  | 'failBrief' | 'requestAudio' | 'fillOutbox' | 'claimOutbox' | 'outboxResult' | 'purge'>;
+  | 'failBrief' | 'requestAudio' | 'fillOutbox' | 'claimOutbox' | 'outboxResult' | 'purge'>
+  & Partial<Pick<typeof dbModule, 'claimOutboxV2' | 'outboxResultV2'>>;
 
 export interface WorkerDeps {
   enabled: () => boolean;
@@ -84,6 +87,9 @@ export interface WorkerDeps {
   closeApns: () => void;
   pushMasterKey: () => Buffer | null;
   decryptToken: (sealed: string, master: Buffer) => string;
+  fcmConfig?: () => FcmConfig | null;
+  sendFcm?: (cfg: FcmConfig, n: FcmNotification, now: Date) => Promise<FcmOutcome>;
+  decryptFcmTarget?: (sealed: string, master: Buffer) => string;
   audioStore: () => AudioStore;
   /** Wall clock in epoch ms: elapsed time and the tick deadline (the period clock is opts.now). */
   now: () => number;
@@ -115,6 +121,9 @@ const DEFAULT_DEPS: WorkerDeps = {
   closeApns,
   pushMasterKey: () => pushMasterKey(),
   decryptToken,
+  fcmConfig,
+  sendFcm: (cfg, n, now) => sendFcm(cfg, n, undefined, now),
+  decryptFcmTarget,
   audioStore: () => supabaseAudioStore(),
   now: () => Date.now(),
   logger: console,
@@ -209,7 +218,11 @@ export async function runTick(opts: { now: Date; worker: string; deadlineAt: num
   }
 
   // 3. dispatch
-  if (t.remaining() >= STAGE_MIN_REMAINING_MS) await dispatchStage(t);
+  if (t.remaining() >= STAGE_MIN_REMAINING_MS) {
+    await dispatchStage(t);
+    if (t.remaining() >= STAGE_MIN_REMAINING_MS) await dispatchFcmStage(t);
+    else t.report.stoppedEarly = true;
+  }
   else t.report.stoppedEarly = true;
 
   // 4. purge
@@ -580,6 +593,62 @@ async function deliver(t: Tick, cfg: ApnsConfig, master: Buffer, item: dbModule.
     d.logger.error('[briefing-worker] result', errCode(e));
   }
   return out.outcome;
+}
+
+/** Optional provider: only FCM rows are claimed, and a configuration failure never pauses APNs. */
+async function dispatchFcmStage(t: Tick): Promise<void> {
+  const { d } = t;
+  const cfg = d.fcmConfig?.();
+  if (!cfg) return;
+  const master = d.pushMasterKey();
+  if (!master) { t.codes.add('push_key_unavailable'); return; }
+  if (!d.db.claimOutboxV2 || !d.db.outboxResultV2 || !d.sendFcm || !d.decryptFcmTarget) { t.codes.add('fcm_storage_unavailable'); return; }
+  const seen = new Set<string>();
+  let paused = false;
+  const result = async (item: dbModule.OutboxItem, out: FcmOutcome) => {
+    try { await d.db.outboxResultV2!(item.id, item.fence, out.outcome, out.status, out.reason, out.retryAfterSeconds ?? null, 'fcm', out.messageId ?? null); }
+    catch (e) { d.logger.error('[briefing-worker] fcm_result', errCode(e)); }
+  };
+  for (let round = 0; round < OUTBOX_MAX_ROUNDS && !paused; round++) {
+    if (t.remaining() < FCM_MIN_REMAINING_MS) { t.report.stoppedEarly = true; break; }
+    let items: dbModule.OutboxItem[];
+    try { items = await d.db.claimOutboxV2(t.worker, LEASE_SECONDS, DELIVERY_BATCH, ['fcm'], cfg.projectId); }
+    catch (e) { d.logger.error('[briefing-worker] fcm_claim', errCode(e)); break; }
+    if (!items.length) break;
+    for (let i = 0; i < items.length; i += APNS_CONCURRENCY) {
+      const batch = items.slice(i, i + APNS_CONCURRENCY);
+      if (paused || t.remaining() < FCM_MIN_REMAINING_MS) {
+        if (!paused) t.report.stoppedEarly = true;
+        for (const item of batch) await result(item, { outcome: 'config', status: null, reason: 'released', retryAfterSeconds: RELEASE_RETRY_S });
+        continue;
+      }
+      const outcomes = await Promise.all(batch.map(async (item) => {
+        if (seen.has(item.id)) { await result(item, { outcome: 'config', status: null, reason: 'deferred_tick' }); return 'skipped'; }
+        seen.add(item.id);
+        const expiresAt = new Date(item.expiresAt);
+        if (!Number.isFinite(expiresAt.getTime()) || expiresAt.getTime() <= d.now()) { t.report.expired++; return 'skipped'; }
+        let fid: string;
+        try { fid = d.decryptFcmTarget!(item.tokenCiphertext, master); }
+        catch { await result(item, { outcome: 'config', status: null, reason: 'target_unreadable' }); return 'config'; }
+        let out: FcmOutcome;
+        if (item.provider !== 'fcm' || item.targetType !== 'fid') out = { outcome: 'config', status: null, reason: 'provider_mismatch' };
+        else try { out = await d.sendFcm!(cfg, { fid, projectId: item.fcmProjectId ?? '', packageName: item.packageName ?? '',
+          briefId: item.briefId, registrationId: item.deviceId, bindingRevision: item.bindingRevision, expiresAt }, new Date(d.now())); }
+        catch { out = { outcome: 'ambiguous', status: null, reason: 'send_threw' }; }
+        if (out.outcome === 'retry' && out.status === null && out.reason === 'expired') { t.report.expired++; return 'skipped'; }
+        t.report.dispatched++;
+        if (out.outcome === 'accepted') t.report.accepted++;
+        if (out.outcome === 'retry' || out.outcome === 'ambiguous') {
+          const base = out.retryAfterSeconds ?? 30;
+          out.retryAfterSeconds = Math.min(86400, Math.max(base, 30 * 2 ** Math.min(item.attempts, 5)) + Math.floor(Math.random() * 6));
+        }
+        await result(item, out);
+        return out.outcome;
+      }));
+      if (outcomes.includes('config')) { paused = true; t.codes.add('fcm_config'); }
+    }
+    if (items.length < DELIVERY_BATCH) break;
+  }
 }
 
 // ============================================================ purge

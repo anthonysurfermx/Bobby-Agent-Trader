@@ -7,10 +7,10 @@
 // ============================================================
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { timingSafeEqual } from 'node:crypto';
-import { identityForAuthUser, revenueCatReady, syncRevenueCat, type RevenueCatPaidEvent } from './_lib/revenuecat.js';
+import { identityForAuthUser, revenueCatReady, revenueCatStoreProvider, syncRevenueCat, type RevenueCatPaidEvent } from './_lib/revenuecat.js';
 import { recordPurchaseEvent } from './_lib/purchases.js';
 
-export const config = { maxDuration: 20 };
+export const config = { maxDuration: 90 };
 
 function authorized(req: VercelRequest): boolean {
   const expected = process.env.REVENUECAT_WEBHOOK_AUTH ?? '';
@@ -46,7 +46,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // not hide a received charge from the dashboard. The event id makes retries idempotent.
     if (event.id && event.type) {
       await recordPurchaseEvent({
-        id: event.id, type: event.type, environment: event.environment, store: event.store, productId: event.product_id,
+        id: event.id, type: event.type,
+        environment: event.type === 'TEST' ? 'SANDBOX' : revenueCatStoreProvider(event.store) && event.environment === 'PRODUCTION' ? 'PRODUCTION' :
+          event.environment === 'SANDBOX' || (typeof event.store === 'string' && event.store.toLowerCase() === 'test_store') ? 'SANDBOX' : 'UNKNOWN',
+        store: event.store, productId: event.product_id,
         priceUsd: event.price, takehome: event.takehome_percentage, commissionPct: event.commission_percentage, taxPct: event.tax_percentage,
         currency: event.currency, priceLocal: event.price_in_purchased_currency, identityId: firstIdentity, at: event.event_timestamp_ms,
         country: event.country_code,

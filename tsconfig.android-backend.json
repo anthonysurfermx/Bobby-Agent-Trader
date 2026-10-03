@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": [
+      "ES2023",
+      "DOM"
+    ],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "strict": false,
+    "types": [
+      "node"
+    ]
+  },
+  "include": [
+    "api/_lib/access.ts",
+    "api/_lib/revenuecat.ts",
+    "api/_lib/user-memory.ts",
+    "api/_lib/trader-land.ts",
+    "api/_lib/swap-receipts.ts",
+    "api/bobby-access.ts",
+    "api/revenuecat-webhook.ts",
+    "api/stripe-webhook.ts",
+    "api/progress.ts",
+    "api/trader-land.ts",
+    "api/base-swap.ts",
+    "api/swap-receipt.ts"
+  ]
+}

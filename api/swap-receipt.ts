@@ -27,7 +27,7 @@ export const config = { maxDuration: 20 };
 const Schema = z.object({
   txHash: z.string().regex(/^0x[0-9a-fA-F]{64}$/),
   wallet: z.string().regex(WALLET_RE),
-  platform: z.enum(['web', 'ios']).optional(),
+  platform: z.enum(['web', 'ios', 'android']).optional(),
 });
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
