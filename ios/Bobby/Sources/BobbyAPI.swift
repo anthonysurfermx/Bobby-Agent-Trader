@@ -614,8 +614,11 @@ enum BobbyAPI {
 
     /// Shared technical evidence: regime, indicators, signal and risk plan.
     static func debate(_ symbol: String, question: String, isEquity: Bool = false) async -> BobbyAnswer {
+        let requestId = UUID().uuidString.lowercased()
+        let generation = await AccountSession.shared.generation
+        await BobbyTelemetry.shared.readStarted(requestId)
         guard let reply = try? await BobbyAccessAPI.send("api/desk-debate", method: "POST",
-                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto"],
+                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto", "requestId": requestId],
                                                          auth: .account, timeout: 100)
         else { return BobbyAnswer(symbol: symbol) }
         if let failure = DeskFailure(status: reply.status, body: reply.json) {
@@ -630,6 +633,10 @@ enum BobbyAPI {
               let cio = agents["cio"], !cio.isEmpty,
               let verdict = agents["verdict"], ["wait", "review"].contains(verdict)
         else { return BobbyAnswer(symbol: symbol) }
+        guard await AccountSession.shared.generation == generation else { return BobbyAnswer(symbol: symbol) }
+        if let receipt = BobbyTelemetryReceipt(json: obj["telemetry"], expectedRequestId: requestId) {
+            await BobbyTelemetry.shared.readReceived(receipt)
+        }
         var answer = decodeEvidence(obj, symbol: symbol)
         answer.alphaArgument = alpha; answer.redArgument = red; answer.cioArgument = cio
         answer.agentVerdict = verdict

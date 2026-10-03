@@ -4,6 +4,8 @@ import { adminAction, createCoupon, fetchAdminCoupons, type AdminCoupon, type Co
 import { Btn, Card, CardHead, CopyButton, Empty, ErrorState, Field, FormMessage, Loading, Note, StaleBanner, Switch, TableScroll, Tag, TextInput, td, th, tr } from './ui';
 import { fmtDate, fmtDateTime, fmtGift, fmtInt, timeOf } from './format';
 import { toAdminError, useLoad } from './useLoad';
+import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 type Notify = (text: string, ok?: boolean) => void;
 
@@ -68,7 +70,7 @@ function CreateCoupon({ onCreated }: { onCreated: (c: AdminCoupon) => void }) {
 
   return (
     <Card>
-      <CardHead title="Crear cupón" sub="Cada cuenta de Apple o Google lo canjea una vez. Los usos regalados se gastan cuando se acaban los gratis." />
+      <CardHead title="Crear cupón" sub="Cada cuenta autenticada verificada lo canjea una vez. Los usos regalados se gastan cuando se acaban los gratis." />
       <form onSubmit={submit} className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Field label="Código (opcional)" hint="vacío: se genera uno como BOBBY-7K2QX" className="col-span-2">
           <TextInput mono value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').slice(0, 32))} placeholder="AMIGOS20" autoCapitalize="characters" spellCheck={false} />
@@ -111,7 +113,7 @@ function CreateCoupon({ onCreated }: { onCreated: (c: AdminCoupon) => void }) {
 }
 
 export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshKey: number; notify: Notify; onChanged: () => void }) {
-  const { data, error, loading, reload } = useLoad(fetchAdminCoupons, `coupons|${refreshKey}`);
+  const { data, error, loading, reload, updatedAt } = useLoad(fetchAdminCoupons, `coupons|${refreshKey}`, { intervalMs: CORE_REFRESH_MS });
   const [toggling, setToggling] = useState<string | null>(null);
 
   const setActive = async (c: AdminCoupon, active: boolean) => {
@@ -128,6 +130,7 @@ export default function CouponsTab({ refreshKey, notify, onChanged }: { refreshK
 
   return (
     <div className="flex flex-col gap-4">
+      <SourceFreshness meta={sourceMetaForError(data?.meta, error?.message)} maxAgeMs={CORE_STALE_MS} label="Cupones y canjes · cada 30 s" fallbackAt={updatedAt} />
       <CreateCoupon onCreated={(c) => { notify(`Cupón ${c.code} creado.`); void reload(true); onChanged(); }} />
 
       {data && error && <StaleBanner error={error} onRetry={() => void reload()} />}

@@ -9,6 +9,7 @@
   "limit": 10,
   "remaining": 0,
   "resetsAt": "2026-10-03T12:00:00.000Z",
-  "paywall": true
+  "paywall": true,
+  "bonus": 0
  }
 }

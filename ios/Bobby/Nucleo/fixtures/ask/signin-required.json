@@ -9,6 +9,7 @@
   "limit": 3,
   "remaining": 0,
   "resetsAt": null,
-  "paywall": false
+  "paywall": false,
+  "bonus": 0
  }
 }

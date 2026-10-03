@@ -150,7 +150,7 @@ function frame(now){
   while (acc >= H && guard < 80){ simStep(H); acc -= H; guard++; }
   if (guard >= 80) acc = 0;
   var kl = 1 - Math.exp(-Math.min(0.05, raw) / 0.3); LIGHT.x += (LIGHT.tx - LIGHT.x) * kl; LIGHT.y += (LIGHT.ty - LIGHT.y) * kl;
-  try { render(); } catch (err) { logErr('render', err); }
+  try { render(); observePresentedRead(); } catch (err) { logErr('render', err); }
   dirty = false;
   try { qcFeed(raw); if (FPS) fpsFeed(now, raw, performance.now() - tj); } catch (err) { logErr('perf', err); }
 }

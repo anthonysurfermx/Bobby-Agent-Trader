@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import type { IdentityTransport } from './user-identity.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { checkPersistentLimit } from './rate-limit-persistent.js';
 import { createLimiter, getClientIpKey, type Limiter } from './rate-limit.js';
@@ -127,6 +128,7 @@ export async function enforcePublicRateLimit(
   scope: string,
   limit: number,
   windowSec: number,
+  options: { transport?: IdentityTransport } = {},
 ): Promise<boolean> {
   let limiter = localLimiters.get(scope);
   if (!limiter) {
@@ -137,7 +139,7 @@ export async function enforcePublicRateLimit(
   // Hashed identity — persisted rate-limit rows never hold a raw IP
   const ip = getClientIpKey(req);
   const local = limiter.check(ip);
-  const persistent = await checkPersistentLimit(scope, ip, limit, windowSec);
+  const persistent = await checkPersistentLimit(scope, ip, limit, windowSec, options);
   const limited = local.limited || persistent.limited;
   const remaining = Math.min(local.remaining, persistent.remaining);
   const resetAt = Math.max(local.resetAt, persistent.resetAt);

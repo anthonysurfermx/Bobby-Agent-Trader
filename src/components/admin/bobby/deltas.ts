@@ -1,7 +1,8 @@
 // "vs periodo anterior": the dashboard asks the server for twice the window and compares the second half of
 // each daily series with the first half. A comparison is only shown when both halves are covered by the source
 // (reads since the first recorded read and at most 35 days back, visits since the first event, LLM spend since the
-// ledger started, revenue since the first purchase event): days before a source existed are NaN, never zeros.
+// ledger started, revenue since the first purchase event): days before a source existed are NaN, never zeros, and
+// a source whose coverage is unknown (the server did not send it) is NaN on every day.
 // Under MIN_BASE in the previous window a percentage is noise, so the delta carries the counts instead.
 import type { AdminOverview } from '@/lib/admin-client';
 
@@ -17,9 +18,12 @@ export interface CompareSeries {
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0);
 
-/** Days before `since` (a source with no data yet) become NaN. A null `since` means the source has no rows at all. */
+/**
+ * Days before `since` become NaN. A null `since` means the source has no rows at all; undefined means its coverage
+ * is unknown (not sent): in both cases every day is NaN, so no comparison is drawn from it.
+ */
 function covered(series: number[], days: string[], since: string | null | undefined, maxDays = Infinity): number[] {
-  const first = since === undefined ? '' : since === null ? '9999-12-31' : since.slice(0, 10);
+  const first = since == null ? '9999-12-31' : since.slice(0, 10);
   const oldest = Number.isFinite(maxDays) ? days[Math.max(0, days.length - maxDays)] ?? '' : '';
   return series.map((v, i) => ((days[i] ?? '') < first || (days[i] ?? '') < oldest ? NaN : v));
 }

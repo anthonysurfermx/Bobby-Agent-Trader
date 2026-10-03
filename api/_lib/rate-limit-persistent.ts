@@ -1,3 +1,4 @@
+import type { IdentityTransport } from './user-identity.js';
 import { bobbyDbUrlOptional, bobbyServiceKeyOptional } from './bobby-db.js';
 // ============================================================
 // rate-limit-persistent — cross-instance rate limiter backed by the
@@ -41,12 +42,13 @@ export async function checkPersistentLimit(
   id: string,
   limit: number,
   windowSec: number,
-  options: { failClosed?: boolean } = {},
+  options: { failClosed?: boolean; transport?: IdentityTransport } = {},
 ): Promise<PersistentLimitResult> {
   const openResult = { limited: false, remaining: limit, resetAt: Date.now() + windowSec * 1000 };
   const unavailable = options.failClosed ? { ...openResult, limited: true, remaining: 0 } : openResult;
   if (!SB_URL || !SB_KEY) return unavailable;
 
+  const transport = options.transport ?? { fetch: (url: string, init?: RequestInit) => fetch(url, init), body: <T>(load: () => Promise<T>) => load() };
   const key = `rl:${scope}:${id}`;
   try {
     const nowIso = new Date().toISOString();
@@ -55,9 +57,9 @@ export async function checkPersistentLimit(
       `?cache_key=eq.${encodeURIComponent(key)}` +
       `&expires_at=gt.${encodeURIComponent(nowIso)}` +
       `&select=payload,expires_at&limit=1`;
-    const getRes = await fetch(getUrl, { headers: headers(), signal: AbortSignal.timeout(3000) });
+    const getRes = await transport.fetch(getUrl, { headers: headers(), signal: AbortSignal.timeout(3000) });
     if (!getRes.ok) return unavailable;
-    const rows = (await getRes.json()) as Array<{ payload: { count?: number }; expires_at: string }>;
+    const rows = (await transport.body(() => getRes.json())) as Array<{ payload: { count?: number }; expires_at: string }>;
 
     if (!Array.isArray(rows)) return unavailable;
     const row = rows.length > 0 ? rows[0] : null;
@@ -65,7 +67,7 @@ export async function checkPersistentLimit(
     const count = (row?.payload?.count ?? 0) + 1;
     const expiresAt = row?.expires_at ?? new Date(Date.now() + windowSec * 1000).toISOString();
 
-    const write = await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
+    const write = await transport.fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
       method: 'POST',
       signal: AbortSignal.timeout(3000),
       headers: { ...headers(), Prefer: 'resolution=merge-duplicates,return=minimal' },

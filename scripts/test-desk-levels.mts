@@ -331,7 +331,7 @@ try {
   endpointMock();
   const noKey = response();
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?', level: 'maximo' }) as never, noKey as never);
-  eq([noKey.statusCode, noKey.body.code, calls.length], [503, 'desk_unavailable', 0], 'No provider keys means unavailable before any spend');
+  eq([noKey.statusCode, noKey.body.code, calls.map((c) => c.url)], [503, 'desk_unavailable', ['https://db.test/rest/v1/rpc/bobby_record_outcome']], 'No provider keys records the block before any spend');
   process.env.ANTHROPIC_API_KEY = 'test-anthropic';
   process.env.OPENAI_API_KEY = 'test-openai';
 

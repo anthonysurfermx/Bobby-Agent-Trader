@@ -68,3 +68,11 @@ android/*.aab
 android/*.apk
 android/*.idsig
 android/store_icon.png
+
+# Deployment-specific first-party telemetry bundle, rebuilt before Vite copies public assets.
+/public/client-telemetry.js
+
+# Private operational QA evidence stays in the local audit workspace.
+/docs/qa/dashboard-live-2026-10-03/
+/docs/qa/client-telemetry-2026-10-03/
+/ios/Bobby/docs/client-telemetry-evidence.json

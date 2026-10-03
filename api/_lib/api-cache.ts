@@ -33,7 +33,7 @@ export async function getCache<T>(key: string): Promise<T | null> {
       `?cache_key=eq.${encodeURIComponent(key)}` +
       `&expires_at=gt.${encodeURIComponent(nowIso)}` +
       `&select=payload&limit=1`;
-    const res = await fetch(url, { headers: headers() });
+    const res = await fetch(url, { headers: headers(), signal: AbortSignal.timeout(4000) });
     if (!res.ok) return null;
     const rows = await res.json();
     if (!Array.isArray(rows) || rows.length === 0) return null;
@@ -50,6 +50,7 @@ export async function setCache<T>(key: string, payload: T, ttlSec: number): Prom
     // Upsert via PostgREST: merge-duplicates on the primary key.
     await fetch(`${SB_URL}/rest/v1/api_cache?on_conflict=cache_key`, {
       method: 'POST',
+      signal: AbortSignal.timeout(4000),
       headers: {
         ...headers(),
         Prefer: 'resolution=merge-duplicates,return=minimal',
@@ -63,6 +64,45 @@ export async function setCache<T>(key: string, payload: T, ttlSec: number): Prom
     });
   } catch {
     // fire-and-forget — a failed cache write must never break the caller
+  }
+}
+
+/**
+ * Atomically claims `key` for `ttlSec` (rpc/bobby_cache_claim): true = this caller holds it now, false = someone
+ * else holds an unexpired claim, null = the claim could not be made (no credentials, storage down). Never throws.
+ */
+export async function claimCache(key: string, ttlSec: number, payload: unknown = {}): Promise<boolean | null> {
+  if (!hasCreds()) return null;
+  try {
+    const res = await fetch(`${SB_URL}/rest/v1/rpc/bobby_cache_claim`, {
+      method: 'POST',
+      headers: headers(),
+      body: JSON.stringify({ p_key: key, p_ttl_seconds: ttlSec, p_payload: payload }),
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    const claimed = await res.json();
+    return typeof claimed === 'boolean' ? claimed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Drops `key` (a claim that did not lead anywhere). With `nonce`, only while the stored payload still carries that
+ *  nonce: a claim that expired and was taken by someone else is never released by its former holder. False when the
+ *  delete could not be confirmed. Never throws. */
+export async function releaseCache(key: string, nonce?: string): Promise<boolean> {
+  if (!hasCreds()) return false;
+  try {
+    const owner = nonce ? `&payload->>nonce=eq.${encodeURIComponent(nonce)}` : '';
+    const res = await fetch(`${SB_URL}/rest/v1/api_cache?cache_key=eq.${encodeURIComponent(key)}${owner}`, {
+      method: 'DELETE',
+      headers: { ...headers(), Prefer: 'return=minimal' },
+      signal: AbortSignal.timeout(4000),
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
 

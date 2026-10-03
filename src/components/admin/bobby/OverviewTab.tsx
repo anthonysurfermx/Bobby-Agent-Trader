@@ -3,7 +3,7 @@ import { isMissing, type OverviewResponse } from '@/lib/admin-client';
 import { Card, KpiStrip, MissingNote, Note, Row, Segmented } from './ui';
 import { BarsChart, BigNumber, HeroCard, StatusBars } from './charts';
 import { READS_HISTORY_DAYS, growthWindows, windowDelta, type CompareSeries } from './deltas';
-import { DASH, coverageLine, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtPct, fmtUsd, label, type ValueFormat } from './format';
+import { DASH, coverageLine, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtPct, fmtUsd, label, teamOut, teamReadsCaption, type ValueFormat } from './format';
 import InsightsPanel from './InsightsPanel';
 import { PeopleCard } from './LifecycleCards';
 
@@ -12,8 +12,10 @@ type HeroMetric = 'reads' | 'accounts' | 'revenue';
 /** a/b as a share only when the base can carry one; otherwise the counts themselves. */
 const share = (a: number, b: number) => (b >= 5 ? fmtPct(a, b) : `${fmtInt(a)}/${fmtInt(b)}`);
 
-export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
+export default function OverviewTab({ data, period, cmp, onOpenTab, notify, markFailed = false }: {
   data: OverviewResponse; period: number; cmp: CompareSeries | null; onOpenTab?: (tab: string) => void; notify?: (text: string, ok?: boolean) => void;
+  /** This load could not mark the owner's browser as the team's: no caption claims a verified exclusion. */
+  markFailed?: boolean;
 }) {
   const { overview: o, integrations: i, growth: g, insights } = data;
   const [metric, setMetric] = useState<HeroMetric>('reads');
@@ -28,7 +30,8 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
   const readsDaily = rd.web.map((v, k) => v + (rd.ios[k] ?? 0) + (rd.android[k] ?? 0));
   const llmPeriod = o.llm.providers.anthropic.period + o.llm.providers.openai.period;
   // The ledger carries no account, so cost per read uses every read; with the team included, reads already has them.
-  const allReads = o.includeInternal ? o.activity.reads : o.activity.reads + o.activity.readsInternal;
+  // An unknown team count leaves the per-read cost unknown too (never divided by the outside reads alone).
+  const allReads = o.includeInternal ? o.activity.reads : miss('activity.readsInternal') ? null : o.activity.reads + o.activity.readsInternal;
   const who = o.includeInternal ? 'con el equipo' : 'externas';
   const outcomesPartial = !!g?.outcomes.outcomesSince && new Date(g.outcomes.outcomesSince).getTime() > new Date(g.since).getTime();
   const act = o.activity.activation;
@@ -38,46 +41,61 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
   const hero: Record<HeroMetric, { label: string; values: number[]; path: string; format: ValueFormat; series?: number[]; history?: number; display: string }> = {
     reads: { label: 'Lecturas', values: readsDaily, path: 'activity.readsDaily', format: 'int', series: cmp?.reads, history: READS_HISTORY_DAYS, display: show('activity.reads', fmtInt(o.activity.reads)) },
     accounts: { label: 'Cuentas nuevas', values: o.accounts.daily, path: 'accounts.daily', format: 'int', series: cmp?.accounts, display: show('accounts.new', fmtInt(o.accounts.new)) },
-    revenue: { label: 'Ingresos brutos', values: o.revenue.daily, path: 'revenue.daily', format: 'usd', series: cmp?.revenue, display: show('revenue.grossUsd', fmtUsd(o.revenue.grossUsd)) },
+    revenue: { label: 'Ingresos brutos · USD registrados', values: o.revenue.daily, path: 'revenue.daily', format: 'usd', series: cmp?.revenue, display: show('revenue.grossUsd', fmtUsd(o.revenue.grossUsd)) },
   };
   const h = hero[metric];
   const heroMissing = miss(h.path);
   const providers = Object.entries(o.accounts.byProvider).sort((a, b) => b[1] - a[1]);
   const heroNote = metric === 'reads'
-    ? `Lecturas consumidas${internalOut ? ', sin las del equipo' : ''}. Registradas desde ${cov?.readsSince ? fmtDate(cov.readsSince) : '—'} (la tabla guarda 35 días).`
-    : metric === 'revenue' && !cov?.purchasesSince ? 'Nunca ha llegado un evento de compra: este $0 no distingue "sin ventas" de "webhook sin entregar".'
+    ? `Lecturas consumidas${internalOut ? `, ${teamOut(markFailed, 'sin las del equipo')}` : ''}. Registradas desde ${cov?.readsSince ? fmtDate(cov.readsSince) : '—'} (la tabla guarda 35 días).`
+    : metric === 'revenue' && cov && !cov.purchasesSince ? 'Nunca ha llegado un evento de compra: este $0 no distingue "sin ventas" de "webhook sin entregar".'
     : undefined;
 
   return (
     <div className="flex flex-col gap-4">
       <MissingNote missing={o.missing} />
-      <InsightsPanel insights={insights} missing={!g} onOpenTab={onOpenTab} notify={notify} period={period} internal={o.includeInternal} />
+      {!miss('revenue.unattributedEvents') && o.revenue.unattributedEvents > 0 && <Note tag="Por conciliar">
+        {fmtUsd(o.revenue.unattributedGrossUsd)} en ingresos y {fmtUsd(o.revenue.unattributedRefundsUsd)} en reembolsos sin cuenta atribuida ({fmtInt(o.revenue.unattributedEvents)} eventos).
+        {o.includeInternal ? ' Están en el total; su pertenencia a clientes o equipo sigue sin verificar.' : ' Se muestran aparte y quedan fuera de los ingresos de clientes externos. Un total externo de $0 no descarta estos registros.'}
+      </Note>}
+      {!miss('revenue.unconvertedEvents') && o.revenue.unconvertedEvents > 0 && <Note tag="Importe pendiente">
+        {fmtInt(o.revenue.unconvertedEvents)} eventos sin importe USD confirmado. Estos registros no se convierten con una tasa supuesta y el total USD no demuestra que su importe sea $0.
+      </Note>}
+      <InsightsPanel insights={insights} missing={!g || data.insightsUnavailable} onOpenTab={onOpenTab} notify={notify} period={period} internal={o.includeInternal} markFailed={markFailed} />
 
       <KpiStrip
         items={[
           {
-            label: 'Personas activas · 7 días', value: g ? fmtInt(g.people.active7d) : DASH,
+            label: 'Cuentas/dispositivos activos · 7 días', value: g ? fmtInt(g.people.active7d) : DASH,
             caption: g
-              ? `${fmtInt(g.people.readers7d)} leyeron · de ${fmtInt(g.people.total)} personas (${fmtInt(g.people.accounts)} cuentas + ${fmtInt(g.people.guests)} instalaciones sin cuenta)${internalOut && (g.people.excluded.accounts + g.people.excluded.guests) ? ` · sin el equipo (−${fmtInt(g.people.excluded.accounts + g.people.excluded.guests)})` : ''}`
+              ? `${fmtInt(g.people.readers7d)} leyeron · ${fmtInt(g.people.total)} sujetos observados (${fmtInt(g.people.accounts)} cuentas + ${fmtInt(g.people.guests)} instalaciones sin cuenta)${internalOut && (g.people.excluded.accounts + g.people.excluded.guests) ? ` · ${teamOut(markFailed, `sin el equipo (−${fmtInt(g.people.excluded.accounts + g.people.excluded.guests)})`)}` : internalOut && markFailed ? ` · ${teamOut(true)}` : ''}`
               : 'dato no disponible',
           },
           {
             label: `Lecturas · ${period}d`, value: show('activity.reads', fmtInt(o.activity.reads)),
             delta: delta('activity.readsDaily', cmp?.reads, READS_HISTORY_DAYS),
-            caption: `${delivered != null ? `${fmtInt(delivered)} respuestas entregadas${outcomesPartial ? ` desde ${fmtDate(g!.outcomes.outcomesSince)} (parcial)` : ''} · ` : ''}${internalOut && o.activity.readsInternal ? `sin ${fmtInt(o.activity.readsInternal)} del equipo` : 'incluye las del equipo'}`,
+            caption: `${delivered != null ? `${fmtInt(delivered)} respuestas emitidas por servidor${outcomesPartial ? ` desde ${fmtDate(g!.outcomes.outcomesSince)} (parcial)` : ''} · ` : ''}${teamReadsCaption(o.includeInternal, miss('activity.readsInternal') ? null : o.activity.readsInternal, markFailed)}`,
           },
           {
             label: `Cuentas nuevas · ${period}d`, value: show('accounts.new', fmtInt(o.accounts.new)), delta: delta('accounts.daily', cmp?.accounts),
-            caption: `${show('accounts.total', fmtInt(o.accounts.total))} cuentas ${who} en total${internalOut && o.accounts.internal ? ` · ${fmtInt(o.accounts.internal)} del equipo fuera` : ''}`,
+            caption: `${show('accounts.total', fmtInt(o.accounts.total))} cuentas ${who} en total${internalOut && o.accounts.internal ? ` · ${teamOut(markFailed, `${fmtInt(o.accounts.internal)} del equipo fuera`)}` : internalOut && markFailed ? ` · ${teamOut(true)}` : ''}`,
           },
         ]}
       />
       <KpiStrip
         items={[
           {
-            label: 'Pagando Bobby Pro', value: show('subscriptions.active', fmtInt(o.subscriptions.paid)),
-            caption: !cov?.purchasesSince ? 'nunca ha llegado un evento de compra (ni de prueba)'
-              : `${fmtInt(o.subscriptions.trialing)} en prueba · ${fmtInt(o.subscriptions.giftedPro)} con Pro regalado · ${fmtUsd(o.revenue.grossUsd)} brutos en ${period}d`,
+            // Only verified payers: production, not a trial, with a positive production charge. Pro access without
+            // that evidence is counted beside it, never as a payer.
+            label: 'Pagando Bobby Pro (verificado)', value: show('subscriptions.paidVerified', fmtInt(o.subscriptions.paidVerified)),
+            caption: [
+              `${show('subscriptions.unverified', fmtInt(o.subscriptions.unverified))} sin verificar`,
+              `${show('subscriptions.test', fmtInt(o.subscriptions.test))} de prueba`,
+              `${show('subscriptions.giftedPro', fmtInt(o.subscriptions.giftedPro))} con Pro regalado`,
+              !cov ? 'cobertura de compras no disponible'
+                : !cov.purchasesSince ? 'nunca ha llegado un evento de compra'
+                : `${show('revenue.grossUsd', fmtUsd(o.revenue.grossUsd))} brutos USD registrados en ${period}d`,
+            ].join(' · '),
           },
           {
             label: 'Activación de cuentas nuevas', value: miss('activity.activation') ? DASH : act.accounts ? share(act.activated, act.accounts) : DASH,
@@ -108,11 +126,11 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
       >
         <BarsChart
           days={o.days} values={h.values} format={h.format}
-          emptyLabel={heroMissing ? 'Dato no disponible' : metric === 'revenue' ? 'Sin ingresos en el periodo' : 'Sin datos en el periodo'}
+          emptyLabel={heroMissing ? 'Dato no disponible' : metric === 'revenue' ? 'Sin ingresos atribuidos al filtro del periodo' : 'Sin datos en el periodo'}
         />
       </HeroCard>
 
-      {g && <PeopleCard people={g.people} includeInternal={g.includeInternal} />}
+      {g && <PeopleCard people={g.people} includeInternal={g.includeInternal} markFailed={markFailed} />}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -138,14 +156,14 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify }: {
           </div>
         </Card>
         <Card>
-          <BigNumber label={o.includeInternal ? 'Cuentas (con el equipo)' : 'Cuentas externas'} value={show('accounts.total', fmtInt(o.accounts.total))} caption="Apple / Google" />
+          <BigNumber label={o.includeInternal ? 'Cuentas (con el equipo)' : 'Cuentas externas'} value={show('accounts.total', fmtInt(o.accounts.total))} caption="Cuentas con identidad autenticada verificada" />
           {miss('accounts.byProvider') ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p> : providers.length ? (
             <StatusBars rows={providers.map(([k, v], idx) => ({ label: label(k), value: v, fill: (idx % 2 ? 'orange' : 'blue') as 'orange' | 'blue', sub: share(v, o.accounts.total) }))} />
           ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay cuentas {who}.</p>}
           <div className="mt-5 border-t border-white/[0.06] pt-2">
             <Row label="Leyeron en los últimos 7 días" value={fmtInt(o.accounts.active7d)} />
-            <Row label="Lectores 7d (personas)" value={fmtInt(o.activity.activeReaders7d)} hint={`${fmtInt(o.activity.activeReaders7dSplit.accounts)} cuentas · ${fmtInt(o.activity.activeReaders7dSplit.guests)} invitados`} />
-            {internalOut && <Row label="Del equipo (fuera de las cifras)" value={fmtInt(o.accounts.internal)} />}
+            <Row label="Lectores 7d (cuentas/dispositivos)" value={fmtInt(o.activity.activeReaders7d)} hint={`${fmtInt(o.activity.activeReaders7dSplit.accounts)} cuentas · ${fmtInt(o.activity.activeReaders7dSplit.guests)} instalaciones sin cuenta`} />
+            {internalOut && <Row label={markFailed ? 'Del equipo (fuera de las cifras · sin verificar)' : 'Del equipo (fuera de las cifras)'} value={fmtInt(o.accounts.internal)} />}
             <Row label="Identidades wallet (no son cuentas)" value={fmtInt(o.accounts.wallets)} />
           </div>
         </Card>

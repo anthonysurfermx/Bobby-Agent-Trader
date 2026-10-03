@@ -4,10 +4,10 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Menu as MenuIcon, RefreshCw, UserCheck, UserX } from 'lucide-react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { rememberReturn } from '@/lib/access-client';
-import { adminMockMode, fetchAdminMe, fetchAdminOverview, type AdminMe, type AdminPeriod, type OverviewResponse } from '@/lib/admin-client';
-import { ErrorState, IconBtn, Loading, Segmented, StaleBanner } from '@/components/admin/bobby/ui';
+import { adminMockMode, fetchAdminIntegrations, fetchAdminLive, fetchAdminMe, fetchAdminOverview, isMissing, type AdminMe, type AdminPeriod, type OverviewResponse } from '@/lib/admin-client';
+import { ErrorState, IconBtn, Loading, Note, Segmented, StaleBanner } from '@/components/admin/bobby/ui';
 import { integrationProblems } from '@/components/admin/bobby/health';
-import { fmtInt, fmtUsd } from '@/components/admin/bobby/format';
+import { DASH, fmtInt, fmtUsd } from '@/components/admin/bobby/format';
 import { compareSeries } from '@/components/admin/bobby/deltas';
 import { TABS, type TabId } from '@/components/admin/bobby/nav';
 import { toAdminError, useLoad } from '@/components/admin/bobby/useLoad';
@@ -20,6 +20,9 @@ import MembershipsTab from '@/components/admin/bobby/MembershipsTab';
 import CouponsTab from '@/components/admin/bobby/CouponsTab';
 import LlmTab from '@/components/admin/bobby/LlmTab';
 import IntegrationsTab from '@/components/admin/bobby/IntegrationsTab';
+import OperationalPanel from '@/components/admin/bobby/OperationalPanel';
+import SourceFreshness from '@/components/admin/bobby/SourceFreshness';
+import { composeOverview, CORE_REFRESH_MS, CORE_STALE_MS, mergeProviderSnapshots, PROVIDER_REFRESH_MS, sourceMetaForError } from '@/components/admin/bobby/live';
 
 /**
  * /admin — Bobby's owner dashboard: accounts, reads, funnel, memberships, coupons, LLM spend and
@@ -125,15 +128,15 @@ function headerCount(tab: TabId, d: OverviewResponse | null, period: number): st
   switch (tab) {
     case 'resumen': {
       const urgent = d.insights.filter((x) => x.level === 'critical' || x.level === 'warn').length;
-      return d.growth ? `${fmtInt(d.growth.people.active7d)} personas activas 7d${urgent ? ` · ${urgent} por atender` : ''}` : null;
+      return d.growth ? `${fmtInt(d.growth.people.active7d)} cuentas/dispositivos activos 7d${urgent ? ` · ${urgent} por atender` : ''}` : null;
     }
     case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas ${o.includeInternal ? '(con el equipo)' : 'externas'}`;
     case 'funnel': return d.growth ? `${fmtInt(d.growth.cohorts.web.arrived + d.growth.cohorts.ios.arrived)} llegadas observadas · ${period}d` : null;
     case 'audiencia': return null;
-    case 'membresias': return `${fmtInt(o.subscriptions.paid)} pagando`;
+    case 'membresias': return `${isMissing(o.missing, 'subscriptions.paidVerified') ? DASH : fmtInt(o.subscriptions.paidVerified)} pagando (verificado)`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
     case 'ia': return `${fmtUsd(o.llm.providers.anthropic.period + o.llm.providers.openai.period, true)} · ${period}d`;
-    case 'integraciones': { const n = integrationProblems(d.integrations, d.searchConsole, o).length; return n ? `${n} pendientes` : 'todo conectado'; }
+    case 'integraciones': { if (!d.providersLoaded) return 'fuentes pendientes de consulta'; const n = integrationProblems(d.integrations, d.searchConsole, o).length; return n ? `${n} pendientes` : 'estado de fuentes'; }
   }
 }
 
@@ -147,9 +150,11 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const [focusSearch, setFocusSearch] = useState(false);
   const [flash, setFlash] = useState<{ id: number; text: string; ok: boolean } | null>(null);
   const flashId = useRef(0);
-  const overview = useLoad(() => fetchAdminOverview(period, { internal }), `${period}|${internal ? 'all' : 'ext'}|${refreshKey}`);
+  const overview = useLoad((signal) => fetchAdminOverview(period, { internal, signal }), `${period}|${internal ? 'all' : 'ext'}`, { intervalMs: CORE_REFRESH_MS });
+  const live = useLoad((signal) => fetchAdminLive(internal, signal), `live|${internal ? 'all' : 'ext'}`, { intervalMs: CORE_REFRESH_MS });
+  const providers = useLoad((signal) => fetchAdminIntegrations(period, signal), `providers|${period}`, { intervalMs: PROVIDER_REFRESH_MS, merge: mergeProviderSnapshots });
   // Twice the window, for "vs periodo anterior". Optional: if it fails the deltas just do not show.
-  const compare = useLoad(() => fetchAdminOverview(Math.min(period * 2, 365), { compare: true, internal }), `cmp|${period}|${internal ? 'all' : 'ext'}|${refreshKey}`);
+  const compare = useLoad((signal) => fetchAdminOverview(Math.min(period * 2, 365), { compare: true, internal, signal }), `cmp|${period}|${internal ? 'all' : 'ext'}`, { intervalMs: PROVIDER_REFRESH_MS });
 
   useEffect(() => {
     const onHash = () => setTab(readTab());
@@ -157,9 +162,9 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
   useEffect(() => {
-    const s = overview.error?.status;
+    const s = [overview.error, live.error, providers.error].find((e) => e?.status === 401 || e?.status === 403)?.status;
     if (s === 401 || s === 403) onAuthLost(s);
-  }, [overview.error, onAuthLost]);
+  }, [overview.error, live.error, providers.error, onAuthLost]);
   useEffect(() => {
     if (!flash) return;
     const t = window.setTimeout(() => setFlash(null), 4000);
@@ -190,23 +195,32 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const toggleInternal = () => setInternal((v) => { writeInternal(!v); return !v; });
   const notify = useCallback((text: string, ok = true) => setFlash({ id: ++flashId.current, text, ok }), []);
   const reloadOverview = overview.reload;
-  const reloadCompare = compare.reload;
-  const onChanged = useCallback(() => { void reloadOverview(true); void reloadCompare(true); }, [reloadOverview, reloadCompare]);
+  const reloadCompare = compare.reload, reloadLive = live.reload, reloadProviders = providers.reload;
+  const onChanged = useCallback(() => { void reloadOverview(true); void reloadCompare(true); void reloadLive(true); void reloadProviders(true); }, [reloadOverview, reloadCompare, reloadLive, reloadProviders]);
   const onSearchFocused = useCallback(() => setFocusSearch(false), []);
   const doSignOut = useCallback(async () => { await signOut(); onSignedOut(); }, [onSignedOut]);
 
   const needsOverview = tab !== 'usuarios' && tab !== 'cupones';
   // Never mix modes either: data loaded with the team included is not shown under "sin equipo".
-  const o = overview.data && overview.dataKey?.split('|')[0] === String(period) && overview.dataKey?.split('|')[1] === (internal ? 'all' : 'ext') ? overview.data : null;
+  const providerData = providers.dataKey === `providers|${period}` ? providers.data : null;
+  const o = overview.data && overview.dataKey === `${period}|${internal ? 'all' : 'ext'}` ? composeOverview(
+    { ...overview.data, meta: sourceMetaForError(overview.data.meta, overview.error?.message) },
+    providerData ? { ...providerData, meta: sourceMetaForError(providerData.meta, providers.error?.message) } : null,
+  ) : null;
+  const liveData = live.dataKey === `live|${internal ? 'all' : 'ext'}` ? live.data : null;
   // Never mix ranges: the comparison is used only when it was loaded for this exact period and refresh, and
   // the overview only while its data belongs to the selected period (a refresh may keep showing it).
-  const cmp = compare.data && !compare.stale && !compare.error ? compareSeries(compare.data.overview) : null;
+  const comparisonDays = compare.data?.overview.days;
+  const comparisonAligned = comparisonDays?.[comparisonDays.length - 1] === o?.overview.days[o.overview.days.length - 1];
+  const cmp = compare.data && !compare.stale && !compare.error && comparisonAligned ? compareSeries(compare.data.overview) : null;
   const current = TABS.find((t) => t.id === tab)!;
   const count = headerCount(tab, o, period);
   const reads = o?.overview.activity.readsDaily;
   // Outside reads in the selected period (the header switch decides whether the team's are in).
   const platforms = reads ? { web: reads.web.reduce((a, b) => a + b, 0), ios: reads.ios.reduce((a, b) => a + b, 0), days: period } : null;
   const email = me.email ?? me.identityId;
+  // The server could not mark this browser as the team's: "sin equipo" is not verified for this load.
+  const markFailed = !internal && !!o?.internalMarkFailed;
 
   const sidebarProps = { tab, onSelect: selectTab, onSearch: () => { setDrawer(false); openSearch(); }, email, onSignOut: () => void doSignOut(), platforms };
 
@@ -236,25 +250,33 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
           <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
             <h1 className="m-0 shrink-0 text-[14px] font-medium">{current.label}</h1>
             {count && <span className="hidden truncate font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#5C5C5C] sm:inline">{count}</span>}
-            {adminMockMode() && <span className="hidden font-mono text-[10px] uppercase tracking-[0.08em] text-[#F7A04B] sm:inline">mock</span>}
+            {adminMockMode() && <span className="font-mono text-[8px] uppercase leading-tight tracking-[0.04em] text-[#F7A04B] sm:text-[10px]">Datos ficticios</span>}
           </div>
           <button
             type="button" onClick={toggleInternal} aria-pressed={internal}
-            title={internal ? 'Incluye tus cuentas, instalaciones y redes. Toca para dejarlas fuera.' : 'Tus cuentas, instalaciones y redes están fuera de todas las cifras. Toca para incluirlas.'}
-            aria-label={internal ? 'Con equipo: incluye tu tráfico' : 'Sin equipo: tu tráfico está fuera'}
+            title={internal
+              ? 'Con equipo: las cifras incluyen tus cuentas, instalaciones y redes. Toca para dejarlas fuera.'
+              : 'Sin equipo: tus cuentas, instalaciones y redes quedan fuera de las cifras propias de Resumen, Embudo, Audiencia y Membresías. No aplica a lo que la fuente no separa (descargas de App Store, Search Console, métricas de RevenueCat, gasto de IA: cada tarjeta lo dice) ni a Usuarios, Cupones, IA e Integraciones, que muestran todo.'}
+            aria-label={internal ? 'Con equipo: incluye tu tráfico' : markFailed ? 'Sin equipo, sin verificar: este navegador no se pudo marcar' : 'Sin equipo: tu tráfico está fuera'}
             className={`flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 font-mono text-[10.5px] uppercase tracking-[0.06em] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#F28C38] sm:px-2.5 ${internal ? 'border-[#F28C38]/40 bg-[#F28C38]/10 text-[#F7A04B]' : 'border-white/[0.08] text-[#8B8B8B] hover:text-[#EDEDED]'}`}
           >
             {internal ? <UserCheck className="h-3.5 w-3.5 sm:hidden" strokeWidth={1.8} aria-hidden /> : <UserX className="h-3.5 w-3.5 sm:hidden" strokeWidth={1.8} aria-hidden />}
-            <span className="hidden sm:inline">{internal ? 'Con equipo' : 'Sin equipo'}</span>
+            <span className="hidden sm:inline">{internal ? 'Con equipo' : markFailed ? 'Sin equipo · sin verificar' : 'Sin equipo'}</span>
           </button>
           <Segmented<AdminPeriod> label="Periodo" value={period} onChange={setPeriod} options={PERIODS.map((p) => ({ value: p, label: `${p}D` }))} />
           <span className="hidden max-w-[220px] truncate font-mono text-[11px] text-[#5C5C5C] lg:inline" title={email}>{email}</span>
-          <IconBtn label="Actualizar" onClick={() => setRefreshKey((k) => k + 1)} disabled={overview.loading && !!o}>
+          <IconBtn label="Actualizar" onClick={() => { setRefreshKey((k) => k + 1); onChanged(); }} disabled={overview.loading && !!o}>
             <RefreshCw className={`h-4 w-4 ${overview.loading && o ? 'animate-spin' : ''}`} strokeWidth={1.6} />
           </IconBtn>
         </header>
 
         <main className="mx-auto w-full max-w-[1240px] px-4 py-5 md:px-6 md:py-6" aria-label={current.label}>
+          {tab === 'resumen' && <OperationalPanel data={liveData} error={live.error} loading={live.loading} updatedAt={live.updatedAt} onRetry={() => void live.reload(true)} />}
+          <div className="mb-4 flex flex-col gap-2">
+            <SourceFreshness meta={sourceMetaForError(o?.meta, overview.error?.message)} maxAgeMs={CORE_STALE_MS} label="Bobby · cada 30 s · pausa al ocultar pestaña" fallbackAt={overview.updatedAt} />
+            <SourceFreshness meta={sourceMetaForError(providerData?.meta, providers.error?.message)} maxAgeMs={PROVIDER_REFRESH_MS * 2} label="Apple / Google / RevenueCat · cada 5 min · publicación diferida" fallbackAt={providers.updatedAt} />
+            {providers.error && <StaleBanner error={providers.error} onRetry={() => void providers.reload(true)} />}
+          </div>
           {needsOverview && !o ? (
             overview.error ? <ErrorState message={overview.error.message} onRetry={() => void overview.reload()} /> : <Loading label="Cargando el resumen" />
           ) : (
@@ -262,11 +284,16 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
               {needsOverview && overview.error && (
                 <div className="mb-4"><StaleBanner error={overview.error} onRetry={() => void overview.reload()} /></div>
               )}
-              {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} onOpenTab={(id) => selectTab(id as TabId)} notify={notify} />}
-              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} internal={internal} />}
-              {tab === 'audiencia' && <AudienceTab period={period} refreshKey={refreshKey} internal={internal} data={o ?? undefined} />}
+              {markFailed && (
+                <div className="mb-4">
+                  <Note tone="orange" tag="Sin verificar">No se pudo marcar este navegador como del equipo (2 intentos). Esta carga puede incluir tu propio tráfico; recarga para reintentar.</Note>
+                </div>
+              )}
+              {tab === 'resumen' && o && <OverviewTab data={o} period={period} cmp={cmp} onOpenTab={(id) => selectTab(id as TabId)} notify={notify} markFailed={markFailed} />}
+              {tab === 'funnel' && o && <FunnelTab data={o} period={period} cmp={cmp} refreshKey={refreshKey} notify={notify} internal={internal} markFailed={markFailed} />}
+              {tab === 'audiencia' && <AudienceTab period={period} refreshKey={refreshKey} internal={internal} data={o ?? undefined} markFailed={markFailed} />}
               {tab === 'usuarios' && <UsersTab me={me} refreshKey={refreshKey} notify={notify} onChanged={onChanged} focusSearch={focusSearch} onSearchFocused={onSearchFocused} />}
-              {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} />}
+              {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} internal={internal} notify={notify} onChanged={onChanged} markFailed={markFailed} />}
               {tab === 'cupones' && <CouponsTab refreshKey={refreshKey} notify={notify} onChanged={onChanged} />}
               {tab === 'ia' && o && <LlmTab data={o} period={period} cmp={cmp} notify={notify} onChanged={onChanged} />}
               {tab === 'integraciones' && o && <IntegrationsTab data={o} period={period} refreshKey={refreshKey} />}

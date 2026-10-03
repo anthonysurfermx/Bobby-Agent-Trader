@@ -1,19 +1,20 @@
 // "Economía unitaria": revenue, CAC and ROI observed from the server's /api/admin?view=lifecycle, each with the
 // formula it came from; LTV, LTV:CAC and payback, which are a projection from the owner's assumptions while no
 // account has ever paid (ltv.scenario); the costs that feed them (register / delete) and the assumptions.
+// Payers and MRR are verified ones only (production, not a trial, with a positive charge); revenue with no
+// purchase event ever received is "Sin medir", never an observed $0. Cost dates are UTC, like the server's.
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { adminAction, type AdminError, type CostKind, type CostRow, type Economics } from '@/lib/admin-client';
 import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Note, Segmented, StaleBanner, TableScroll, Tag, TextInput, td, th, tr } from './ui';
 import { BigNumber, StatusBars, type StatusRow } from './charts';
-import { fmtDate, fmtDec, fmtInt, fmtUsd } from './format';
+import { fmtDate, fmtDec, fmtInt, fmtUsd, todayUtc } from './format';
 import { toAdminError } from './useLoad';
 
 type Notify = (text: string, ok?: boolean) => void;
 
 const pct = (v: number | null | undefined, digits = 1) => (v == null || !Number.isFinite(v) ? '—' : `${(v * 100).toFixed(digits).replace(/\.0$/, '')}%`);
 const KIND_LABEL: Record<CostKind, string> = { marketing: 'Marketing', infra: 'Infra', other: 'Otro' };
-const todayLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 const channelInput = (v: string) => v.toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 32);
 function moneyInput(raw: string): string {
   const [int = '', ...rest] = raw.replace(/,/g, '.').replace(/[^\d.]/g, '').split('.');
@@ -57,12 +58,12 @@ function CostForm({ onSaved }: { onSaved: (text: string) => void }) {
   const [kind, setKind] = useState<CostKind>('marketing');
   const [channel, setChannel] = useState('');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(todayLocal);
+  const [date, setDate] = useState(() => todayUtc());
   const [note, setNote] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const value = Number(amount);
-  const valid = amount !== '' && Number.isFinite(value) && value > 0 && value <= 1_000_000 && (!date || date <= todayLocal());
+  const valid = amount !== '' && Number.isFinite(value) && value > 0 && value <= 1_000_000 && (!date || date <= todayUtc());
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -97,7 +98,7 @@ function CostForm({ onSaved }: { onSaved: (text: string) => void }) {
             <TextInput mono inputMode="decimal" value={amount} onChange={(e) => setAmount(moneyInput(e.target.value))} placeholder="0.00" className="pl-7" />
           </div>
         </Field>
-        <Field label="Fecha"><TextInput mono type="date" value={date} max={todayLocal()} onChange={(e) => setDate(e.target.value)} /></Field>
+        <Field label="Fecha (UTC)"><TextInput mono type="date" value={date} max={todayUtc()} onChange={(e) => setDate(e.target.value)} /></Field>
         <Field label="Nota (opcional)"><TextInput value={note} onChange={(e) => setNote(e.target.value.slice(0, 160))} placeholder="Campaña, factura…" /></Field>
         <div className="col-span-2 flex flex-col gap-2">
           <FormMessage message={msg} />
@@ -228,7 +229,7 @@ function Assumptions({ e, onSaved }: { e: Economics; onSaved: (text: string) => 
           <FormMessage message={msg} />
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="m-0 max-w-[620px] font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-              El precio del último cobro real y la comisión real de las compras tienen prioridad; el churn observado reemplaza al supuesto cuando hay 5+ suscripciones en la base.
+              El importe del último cobro registrado y la tasa disponible en los eventos tienen prioridad sobre los supuestos; el churn observado reemplaza al supuesto cuando hay 5+ suscripciones en la base. Las comisiones de Stripe siguen sin confirmar.
             </p>
             <Btn type="submit" variant="primary" busy={busy} disabled={problems.length > 0}>Guardar supuestos</Btn>
           </div>
@@ -311,14 +312,17 @@ export default function EconomicsSection({ e, costs, costsError, onCostsRetry, p
 
       <Split cols={3}>
         <EconCell
-          label="Ingresos (observados)" value={fmtUsd(r.netUsd)}
+          label="Ingresos · USD registrados" value={r.measured ? fmtUsd(r.netUsd) : 'Sin medir'} tone={r.measured ? undefined : 'dim'}
+          hint={r.measured ? undefined : 'nunca ha llegado un evento de compra'}
           details={[
-            <>neto estimado · bruto {fmtUsd(r.grossUsd)} · reembolsos {fmtUsd(r.refundsUsd)}</>,
-            <>MRR neto <span className="text-[#EDEDED]">{fmtUsd(r.mrrNetUsd)}</span> · {fmtInt(r.activeSubscriptions)} suscripciones pagadas</>,
-            <>{fmtInt(r.trialing)} en prueba (no cuentan en el MRR)</>,
-            <>{fmtInt(r.newPaying)} nuevos pagadores · {fmtInt(r.payersEver)} han pagado alguna vez</>,
+            r.measured
+              ? <>neto estimado · bruto {fmtUsd(r.grossUsd)} · reembolsos {fmtUsd(r.refundsUsd)}{r.purchasesSince ? ` · eventos desde ${fmtDate(r.purchasesSince)}` : ''}{r.unverifiedGrossUsd ? ` · incluye ${fmtUsd(r.unverifiedGrossUsd)} de cuentas sin verificar (no son pagadores)` : ''}</>
+              : <>no se distingue «sin ventas» de «webhook sin entregar»</>,
+            r.unconvertedEvents == null ? <>No se confirmó la cobertura de importes USD pendientes.</> : r.unconvertedEvents > 0 ? <>{fmtInt(r.unconvertedEvents)} eventos sin importe USD confirmado · no se estima su conversión.</> : null,
+            <>MRR neto verificado <span className="text-[#EDEDED]">{fmtUsd(r.mrrNetUsd)}</span> · {fmtInt(r.paidVerified)} pagadas verificadas · {fmtInt(r.unverifiedSubscriptions)} sin verificar y {fmtInt(r.testSubscriptions)} de prueba (fuera del MRR)</>,
+            <>{fmtInt(r.newPaying)} nuevos pagadores verificados · {fmtInt(r.payingInPeriod)} con cobro en el periodo · {fmtInt(r.payersEver)} han pagado alguna vez (verificados)</>,
           ]}
-          formula={`neto = bruto − comisión e impuestos de la tienda − reembolsos · MRR = ${fmtInt(r.activeSubscriptions)} pagadas × ${fmtUsd(r.priceUsd)} × ${pct(r.takehome)} · nuevo pagador = cuenta con un cobro positivo en el periodo`}
+          formula={`neto estimado = bruto × tasa disponible o supuesta − reembolsos (comisiones de Stripe sin confirmar) · MRR = ${fmtInt(r.paidVerified)} pagadas verificadas × ${fmtUsd(r.priceUsd)} × ${pct(r.takehome)} · nuevo pagador = pagador verificado (membresía de producción, sin prueba) cuyo primer cobro de toda su vida cae en el periodo`}
         />
         <EconCell
           label="CAC por pagador" value={acq.cacPerPaying != null ? fmtUsd(acq.cacPerPaying) : '—'} hint={acq.cacPerPaying == null ? cacHint : undefined}
@@ -331,7 +335,7 @@ export default function EconomicsSection({ e, costs, costsError, onCostsRetry, p
         <EconCell
           label="ROI del periodo" value={e.roi.roi != null ? `${e.roi.roi >= 0 ? '+' : ''}${pct(e.roi.roi)}` : '—'}
           tone={e.roi.roi == null ? undefined : e.roi.roi >= 0 ? 'green' : 'red'}
-          hint={e.roi.roi == null ? 'registra costos' : r.payersEver <= 0 ? 'sin pagadores: solo refleja el gasto' : undefined}
+          hint={e.roi.roi == null ? 'registra costos' : r.payersEver <= 0 && r.netUsd <= 0 ? 'sin pagadores: solo refleja el gasto' : r.payersEver <= 0 ? 'sin pagadores verificados' : undefined}
           details={[
             <>resultado <span className={e.roi.profitUsd >= 0 ? 'text-[#4ADE80]' : 'text-[#F06A6A]'}>{fmtUsd(e.roi.profitUsd)}</span> = neto {fmtUsd(r.netUsd)} − costos registrados {fmtUsd(c.totalUsd)}</>,
           ]}

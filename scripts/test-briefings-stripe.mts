@@ -64,7 +64,7 @@ newShape.lines.data[0].parent.subscription_item_details.proration = true;
 no(proof(sub(), newShape), 'proration alone is not a paid full subscription period');
 
 let liveSub: any = sub(), liveInvoice: any = invoice();
-let liveCharge: any = { id: cid, payment_intent: pid, customer, livemode: true,
+let liveCharge: any = { id: cid, payment_intent: pid, customer, currency: 'usd', invoice: iid, livemode: true,
                         paid: true, captured: true, disputed: false, amount: 499, amount_refunded: 0 };
 let livePayments: any[] = [{
   invoice: iid, status: 'paid', livemode: true, currency: 'usd', amount_paid: 499,
@@ -84,7 +84,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     return json({ id: pid, status: 'succeeded', customer, livemode: true, latest_charge: cid });
   if (url.includes('api.stripe.com/v1/charges/')) return json(liveCharge);
   if (url.includes('/bobby_subscriptions?stripe_subscription_id'))
-    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id }] : []);
+    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id, stripe_customer_id: mirrored.stripe_customer_id }] : []);
   if (url.includes('/bobby_subscriptions?on_conflict')) {
     mirrored = JSON.parse(String(init?.body)); return json(null, 201);
   }
@@ -94,7 +94,16 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     if (method === 'DELETE') { paidProof = null; return new Response(null, { status: 204 }); }
   }
   if (url.includes('/bobby_purchase_events')) {
-    purchaseRows.push(JSON.parse(String(init?.body))); return json(null, 201);
+    const id = new URL(url).searchParams.get('id')?.replace(/^eq\./, '');
+    const row = purchaseRows.find((r) => r.id === id);
+    if (method === 'PATCH') {
+      if (!row || row.identity_id) return json([]);
+      row.identity_id = JSON.parse(String(init?.body)).identity_id; return json([{ identity_id: row.identity_id }]);
+    }
+    if (method === 'GET') return json(row ? [{ identity_id: row.identity_id }] : []);
+    const body = JSON.parse(String(init?.body));
+    if (!purchaseRows.some((r) => r.id === body.id)) purchaseRows.push(body);
+    return json(null, 201);
   }
   throw new Error(`unexpected ${method} ${url}`);
 }) as typeof fetch;
@@ -135,7 +144,8 @@ try {
   await POST(signed('invoice.paid', liveInvoice));
   yes(paidProof, 'new paid invoice restores proof');
   liveCharge = { ...liveCharge, amount_refunded: 499, refunded: true };
-  const refunded = { id: cid, payment_intent: pid, livemode: true, amount: 499, amount_refunded: 499, currency: 'usd' };
+  const refunded = { id: cid, payment_intent: pid, customer, invoice: iid, livemode: true, amount: 499, amount_refunded: 499, currency: 'usd',
+    refunds: { has_more: false, data: [{ id: 're_paid_54', charge: cid, amount: 499, currency: 'usd', created: startSec, status: 'succeeded' }] } };
   eq((await POST(signed('charge.refunded', refunded))).status, 200, 'signed full refund processed');
   no(paidProof, 'full refund removes proof even if subscription snapshot still says active');
   eq((await POST(signed('invoice.paid', liveInvoice))).status, 200, 'late invoice replay is processed');

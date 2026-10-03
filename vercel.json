@@ -287,5 +287,10 @@
     "api/realtime-session.ts": {
       "maxDuration": 240
     }
+  },
+  "git": {
+    "deploymentEnabled": {
+      "codex/dashboard-live-review": false
+    }
   }
 }
