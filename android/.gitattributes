@@ -1,0 +1,4 @@
+# Generated Three.js shader strings retain the vendor formatting.
+app/src/main/assets/equipment-stage/viewer.js -whitespace
+# Keep the official Windows Gradle launcher as CRLF on checkout.
+gradlew.bat text eol=crlf whitespace=cr-at-eol

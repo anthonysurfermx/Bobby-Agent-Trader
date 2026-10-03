@@ -155,4 +155,3 @@ for (const tree of Object.keys(TREES)) {
     assert.match(template, /<div id="hintS" class="a" aria-hidden="true"><\/div>/);
   });
 }
-

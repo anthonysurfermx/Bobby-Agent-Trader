@@ -152,4 +152,3 @@ test('Android consent step: the docked question stops 8 px before the Profile bu
   assert.equal(pad('RISK', true, 110), '', 'accepted: the button leaves and the full line is back');
   for (const state of ['COMMIT', 'RESOLVING', 'THINK_WAIT', 'VERDICT', 'CARDS']) assert.equal(pad(state, false, 110), '', state);
 });
-

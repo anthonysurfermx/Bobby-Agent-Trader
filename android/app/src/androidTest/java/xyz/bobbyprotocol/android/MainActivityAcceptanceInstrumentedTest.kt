@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.test.core.app.ActivityScenario
@@ -42,6 +43,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.nucleo.NucleoSession
+import xyz.bobbyprotocol.android.nucleo.NucleoStateStore
 import xyz.bobbyprotocol.android.push.PushConfiguration
 import xyz.bobbyprotocol.android.push.PushRuntime
 import xyz.bobbyprotocol.android.push.PushStatus
@@ -122,10 +124,15 @@ class MainActivityAcceptanceInstrumentedTest {
     @Test fun accountAndBriefingPrivacyControlsRemainAccessibleBeforeAiConsent() {
         bridge("openNative", JSONObject().put("route", "account"))
         waitForNativeSheet("account")
-        compose.onNodeWithText("Continue with Google").assertIsDisplayed()
-        assertReadableNativeText("Profile")
-        assertReadableNativeText("Your Bobby")
-        assertReadableNativeText("Sign in to sync your progress across devices.")
+        compose.onNodeWithTag("account-profile").assertExists()
+        compose.onNodeWithTag("account-level").assertIsDisplayed()
+        compose.onNodeWithTag("account-stats").assertIsDisplayed()
+        assertReadableNativeText("PROFILE")
+        compose.onNodeWithText("Sign in so your XP, streak, gear and island follow you").performScrollTo().assertIsDisplayed()
+        assertReadableNativeText("Sign in so your XP, streak, gear and island follow you")
+        compose.onNodeWithText("Continue with Google").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Privacy policy").performScrollTo().assertIsDisplayed()
+        compose.onNodeWithText("Help and support").assertIsDisplayed()
         assertReadableNativeSystemBars()
         instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
         waitForNativeDismissal()
@@ -136,6 +143,17 @@ class MainActivityAcceptanceInstrumentedTest {
         waitForNativeDismissal()
         assertFalse(bridge("session").getBoolean("riskAccepted"))
         assertTrue("Account privacy navigation must not send a guest API request", refusedRequests.isEmpty())
+    }
+
+    @Test fun profileVoiceChoicePersistsThroughTheNativeMenuWithoutExternalProcessing() {
+        bridge("openNative", JSONObject().put("route", "account"))
+        waitForNativeSheet("account")
+        compose.onNodeWithTag("account-voice-type").performScrollTo().performClick()
+        compose.onNodeWithText("Masculine").performClick()
+        assertEquals("male", bridge("session").getString("voicePreference"))
+        assertEquals("male", NucleoStateStore(context).voicePreference)
+        assertFalse(bridge("session").getBoolean("riskAccepted"))
+        assertTrue("Choosing a local voice preference must not fetch audio or send an API request", refusedRequests.isEmpty())
     }
 
     @OptIn(ExperimentalTestApi::class)

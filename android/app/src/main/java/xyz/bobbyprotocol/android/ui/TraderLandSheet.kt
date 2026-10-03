@@ -192,7 +192,7 @@ fun TraderLandSheet(
             val grew = answer.optJSONObject("grew")
             notice = when {
                 closed != null -> "${t("Thesis reviewed", "Tesis revisada")}: ${closed.optString("outcome")} · ${closed.optInt("xp")} XP · ${closed.optInt("aura")} Aura"
-                grew != null -> "${t("Island grew", "La isla creció")} · ${grew.optInt("from")} → ${grew.optInt("to")}" 
+                grew != null -> "${t("Island grew", "La isla creció")} · ${grew.optInt("from")} → ${grew.optInt("to")}"
                 else -> t("Saved", "Guardado")
             }
             if (closed != null) {

@@ -25,6 +25,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+      - name: Install locked viewer dependencies
+        run: npm ci
+      - name: Generate the bundled equipment viewer
+        run: node android/nucleo/equipment-stage/build.mjs
       - name: Generate the bundled production engine
         run: python3 android/nucleo/build.py --release
       - name: Check the Android bridge

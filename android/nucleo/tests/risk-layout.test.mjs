@@ -256,4 +256,3 @@ for (const [tree, paths] of Object.entries(TREES)) {
     assert.match(renderLines, /st\(linesEl, null, 0\); st\(rmoreEl, null, 0\);/, 'no chevron without the copy');
   });
 }
-
