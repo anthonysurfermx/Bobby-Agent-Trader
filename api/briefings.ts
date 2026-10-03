@@ -48,6 +48,8 @@ import {
 } from './_lib/briefings/http.js';
 import type { BriefSettings, Cadence } from './_lib/briefings/types.js';
 import { CADENCES } from './_lib/briefings/types.js';
+import { fcmConfig, FCM_FID } from './_lib/briefings/fcm.js';
+import { encryptFcmTarget, fcmTargetFingerprint } from './_lib/briefings/push-crypto.js';
 
 export const config = { maxDuration: 30 };
 
@@ -106,7 +108,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const spec = OPS[op];
     const query = queryParams(req, ['op', ...spec.query]);
     const method = (req.method ?? 'GET').toUpperCase();
-    if (!spec.methods.includes(method)) fail(405, 'method_not_allowed', {}, { Allow: spec.methods.join(', ') });
+    const capabilityRead = op === 'device' && method === 'GET' && header(req, 'x-bobby-push-client') === '2';
+    if (!capabilityRead && !spec.methods.includes(method)) fail(405, 'method_not_allowed', {}, { Allow: spec.methods.join(', ') });
     // Writes come only from Bobby's origins (the iOS client sends Origin: https://bobbyprotocol.xyz).
     if (method !== 'GET' && !requestOriginHost(req.headers)) fail(403, 'invalid_request');
 
@@ -117,7 +120,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ctx: Ctx = { req, res, identity, query, method };
     switch (op) {
       case 'settings': return method === 'PATCH' ? await patchSettings(ctx) : await getSettings(ctx);
-      case 'device': return method === 'DELETE' ? await revokeDevice(ctx) : await postDevice(ctx);
+      case 'device': return method === 'GET' ? await getDeviceCapability(ctx) : method === 'DELETE' ? await revokeDevice(ctx) : await postDevice(ctx);
       case 'inbox': return await inbox(ctx);
       case 'report': return await report(ctx);
       case 'voice': return await voice(ctx);
@@ -234,6 +237,22 @@ const DeviceDelete = z.object({
   registrationId: z.string().regex(UUID_RE),
   expectedBindingRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
 }).strict();
+const FcmDeviceBody = z.object({
+  provider: z.literal('fcm'), installationId: z.string().regex(UUID_RE),
+  fcmInstallationId: z.string().regex(FCM_FID), fcmProjectId: z.string().regex(/^[a-z][a-z0-9-]{4,28}[a-z0-9]$/),
+  permissionState: z.literal('authorized'), appBuild: z.number().int().min(0).max(1_000_000),
+  registrationId: z.string().regex(UUID_RE).optional(), expectedBindingRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER).optional(),
+}).strict();
+
+async function getDeviceCapability({ res }: Ctx) {
+  const cfg = fcmConfig();
+  let available = false;
+  if (cfg && pushMasterKey()) {
+    try { available = await db.fcmMigrationReady(); } catch { /* missing migration/storage keeps optional FCM off */ }
+  }
+  return res.status(200).json({ registrationVersion: 2, providers: { fcm: { available, projectId: cfg?.projectId ?? '',
+    packageName: 'xyz.bobbyprotocol.bobby', targets: ['fid'] } } });
+}
 
 const PROOF = /^[A-Za-z0-9_-]{43}$/;
 /** X-Bobby-Installation-Proof: the 32-byte base64url credential returned at registration. */
@@ -249,8 +268,14 @@ async function postDevice({ req, res, identity }: Ctx) {
   const master = pushMasterKey();
   if (!master) fail(503, 'feature_disabled');
   const key = idempotencyKey(req);
-  const body = parseWith(DeviceBody, await readJsonBody(req, LIMITS.deviceBodyBytes));
-  if (!apnsEnvironments().has(body.apnsEnvironment)) fail(400, 'invalid_request');
+  const raw = await readJsonBody(req, LIMITS.deviceBodyBytes);
+  const isFcm = raw !== null && typeof raw === 'object' && (raw as Record<string, unknown>).provider === 'fcm';
+  if (isFcm && header(req, 'x-bobby-push-client') !== '2') fail(400, 'invalid_request');
+  const body = isFcm ? parseWith(FcmDeviceBody, raw) : parseWith(DeviceBody, raw);
+  const cfg = isFcm ? fcmConfig() : null;
+  if (isFcm && !cfg) fail(503, 'feature_disabled');
+  if ('fcmProjectId' in body && body.fcmProjectId !== cfg!.projectId) fail(400, 'invalid_request');
+  if ('apnsEnvironment' in body && !apnsEnvironments().has(body.apnsEnvironment)) fail(400, 'invalid_request');
   const rebind = body.registrationId !== undefined;
   if (rebind !== (body.expectedBindingRevision !== undefined)) fail(400, 'invalid_request');
   const proof = rebind ? installationProof(req) : null;
@@ -259,14 +284,16 @@ async function postDevice({ req, res, identity }: Ctx) {
   // The proof is part of the request's identity (only its hash enters the digest).
   const digest = requestDigest(body, proof ? createHash('sha256').update(proof).digest('hex') : '');
   const topic = apnsTopic();
-  const write: db.DeviceWrite = {
-    tokenCiphertext: encryptToken(body.apnsToken, master as Buffer),
-    tokenFingerprint: tokenFingerprint(body.apnsToken, topic, body.apnsEnvironment, master as Buffer),
-    environment: body.apnsEnvironment,
-    topic,
-    permission: body.permissionState,
-    appBuild: body.appBuild,
-  };
+  const apns = body as z.infer<typeof DeviceBody>;
+  const fcm = body as z.infer<typeof FcmDeviceBody>;
+  const write: db.DeviceWrite = isFcm ? {
+    provider: 'fcm', fcmProjectId: cfg!.projectId, packageName: cfg!.packageName,
+    tokenCiphertext: encryptFcmTarget(fcm.fcmInstallationId, master as Buffer),
+    tokenFingerprint: fcmTargetFingerprint(fcm.fcmInstallationId, cfg!.projectId, cfg!.packageName, master as Buffer),
+    environment: 'production', topic: cfg!.packageName, permission: body.permissionState, appBuild: body.appBuild,
+  } : { tokenCiphertext: encryptToken(apns.apnsToken, master as Buffer),
+    tokenFingerprint: tokenFingerprint(apns.apnsToken, topic, apns.apnsEnvironment, master as Buffer),
+    environment: apns.apnsEnvironment, topic, permission: body.permissionState, appBuild: body.appBuild };
   const credential = newInstallationCredential();
   const installationId = body.installationId.toLowerCase();
   const operation = await db.writeDeviceOnce({
@@ -275,7 +302,7 @@ async function postDevice({ req, res, identity }: Ctx) {
     expectedRevision: rebind ? body.expectedBindingRevision as number : null,
     proofVerifier: rebind ? credentialVerifier(proof as string) : null,
     newVerifier: credentialVerifier(credential), sealedCredential: sealReceipt(credential, master as Buffer),
-    write, maxActive: LIMITS.devicesPerAccount,
+    write, maxActive: LIMITS.devicesPerAccount, ...(isFcm ? { analysisConsentVersion: CONSENT_VERSIONS.analysis } : {}),
   });
   if (operation.state === 'mismatch') return fail(409, 'idempotency_mismatch');
   if (operation.state === 'in_progress') return fail(409, 'conflict', {}, { 'Retry-After': '5' });
@@ -297,6 +324,7 @@ async function postDevice({ req, res, identity }: Ctx) {
   }
   const code = (r as { code: string }).code;
   console.warn('[briefings] device', code);
+  if (code === 'consent_required') return fail(400, 'consent_required');
   if (code === 'device_limit') return res.status(409).json(errorBody('device_limit'));
   if (code === 'not_found') return res.status(404).json(errorBody('not_found'));
   if (code === 'revision_conflict') {

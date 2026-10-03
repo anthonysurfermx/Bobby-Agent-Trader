@@ -160,7 +160,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   }
   if (url.includes('/bobby_subscriptions')) {
     if (method === 'GET') return json(currentSubscription ? [currentSubscription] : []);
-    if (method === 'POST') { currentSubscription = JSON.parse(String(init?.body)); return json(null, 201); }
+    if (method === 'POST') { currentSubscription = { ...currentSubscription, ...JSON.parse(String(init?.body)) }; return json(null, 201); }
     // The Apple mirror beside a card plan: RevenueCat's state is stored next to the Stripe row, never over it.
     if (method === 'PATCH') { Object.assign(currentSubscription as object, JSON.parse(String(init?.body))); return json([{ identity_id: identity }]); }
   }

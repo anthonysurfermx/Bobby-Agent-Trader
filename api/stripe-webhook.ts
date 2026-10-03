@@ -8,9 +8,10 @@
 // ============================================================
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { notifyOwner } from './_lib/provider-alert.js';
-import { getSubscription, upsertSubscription } from './_lib/access.js';
+import { activeSubscription, getSubscription, SubscriptionProviderConflictError, upsertSubscription } from './_lib/access.js';
 import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
 import { linkPurchaseIdentityIfMissing, recordPurchaseEvent } from './_lib/purchases.js';
+import { reconcileStripeWebhook } from './_lib/purchase-reservations.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
@@ -166,6 +167,8 @@ async function netStripePaid(invoice: Record<string, unknown>): Promise<number> 
 }
 
 async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?: string | null) {
+  const attemptId=(sub.metadata as Record<string,unknown>|undefined)?.purchase_attempt_id;
+  if(typeof attemptId==='string'&&/^[0-9a-f-]{36}$/i.test(attemptId))await reconcileStripeWebhook(attemptId,null,stripeId(sub.id));
   const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
   if (metadataIdentity && fallbackIdentity && metadataIdentity !== fallbackIdentity) throw new Error('Stripe subscription owner mismatch');
   const identity = String(metadataIdentity ?? fallbackIdentity ?? '');
@@ -178,6 +181,11 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   // subscription never overwrites a different plan that is still live (a late retry for an old subscription, or an
   // active Apple plan). STRIPE-01 / STRIPE-03.
   const current = await getSubscription(identity);
+  if (current?.provider === 'google') {
+    // Keep the production Apple/card sidecar behavior; Google has a separately verified owner gate.
+    if (!incomingLive) return null;
+    if (activeSubscription(current)) throw new SubscriptionProviderConflictError();
+  }
   if (current && !incomingLive) {
     const currentLive = ['active', 'trialing', 'past_due'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
     const otherPlan = current.provider === 'apple' || (current.stripe_subscription_id && current.stripe_subscription_id !== sub.id);
@@ -258,7 +266,7 @@ async function recordStripeRefunds(charge: Record<string, unknown>): Promise<voi
       if (refund.status !== 'succeeded' || !/^re_[A-Za-z0-9_]+$/.test(refund.id) || refund.charge !== chargeId || !Number.isSafeInteger(refund.amount) || (refund.amount ?? 0) <= 0) continue;
       const currency = String(refund.currency ?? charge.currency ?? '').toLowerCase();
       await recordPurchaseEvent({
-        id: `stripe-refund-${refund.id}`, type: 'REFUND', environment: charge.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE',
+        id: `stripe-refund-${refund.id}`, type: 'REFUND', environment: charge.livemode === true ? 'PRODUCTION' : charge.livemode === false ? 'SANDBOX' : 'UNKNOWN', store: 'STRIPE',
         priceUsd: currency === 'usd' ? -refund.amount! / 100 : null, takehome: 1,
         currency: currency.toUpperCase() || null, priceLocal: -refund.amount! / 100,
         identityId, at: typeof refund.created === 'number' ? refund.created * 1000 : null, country,
@@ -304,6 +312,8 @@ export async function POST(request: Request): Promise<Response> {
   try { event = JSON.parse(raw); } catch { return json(400, { error: 'bad payload' }); }
   const obj = event.data?.object ?? {};
   try {
+    const attemptId=(obj.metadata as Record<string,unknown>|undefined)?.purchase_attempt_id;
+    if(typeof attemptId==='string'&&/^[0-9a-f-]{36}$/i.test(attemptId))await reconcileStripeWebhook(attemptId, obj.object==='checkout.session'?stripeId(obj.id):null, obj.object==='subscription'?stripeId(obj.id):null);
     if (event.type === 'checkout.session.completed' && obj.mode === 'subscription' && typeof obj.subscription === 'string') {
       const sub = await stripeGet(`subscriptions/${obj.subscription}`);
       await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
@@ -321,7 +331,9 @@ export async function POST(request: Request): Promise<Response> {
           stripeGet(`subscriptions/${sid}`), stripeGet(`invoices/${obj.id}`),
         ]);
         const mapped = await identityForSubscription(sid);
-        const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
+        const attemptId=(sub.metadata as Record<string,unknown>|undefined)?.purchase_attempt_id;
+  if(typeof attemptId==='string'&&/^[0-9a-f-]{36}$/i.test(attemptId))await reconcileStripeWebhook(attemptId,null,stripeId(sub.id));
+  const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
         if (mapped && metadataIdentity && mapped !== metadataIdentity) throw new Error('Stripe subscription owner mismatch');
         identity = await saveSubscription(sub, mapped);
         if (identity) {
@@ -340,7 +352,7 @@ export async function POST(request: Request): Promise<Response> {
         const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? Number(obj.amount_paid) / 100 : null;
         const identityId = identity ?? await identityForSubscription(sid);
         await recordPurchaseEvent({
-          id: purchaseId, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
+          id: purchaseId, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === true ? 'PRODUCTION' : obj.livemode === false ? 'SANDBOX' : 'UNKNOWN',
           store: 'STRIPE', priceUsd: usd, takehome: usd !== null ? stripeTakehome(usd) : null, currency: String(obj.currency ?? '').toUpperCase() || null,
           priceLocal: Number(obj.amount_paid) / 100, identityId, at: Number(obj.created) * 1000 || null,
           country: (obj.customer_address as { country?: string } | null | undefined)?.country ?? null,

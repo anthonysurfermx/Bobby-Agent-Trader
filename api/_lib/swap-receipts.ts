@@ -47,7 +47,7 @@ export interface BuiltSwapRow {
   cycleId?: string | null;
   /** Single-use intent id: at most one CONFIRMED swap per jti; a still-'built' row is superseded by a re-quote. */
   intentJti?: string | null;
-  platform?: 'web' | 'ios';
+  platform?: 'web' | 'ios' | 'android';
   tokenIn: { symbol: string; address: string };
   tokenOut: { symbol: string; address: string };
   amountInRaw: string;
@@ -273,7 +273,7 @@ export function tradeFacts(row: Pick<BuiltRow, 'token_in_address' | 'token_out_a
 export async function confirmSwapReceipt(
   v: ChainVerification,
   wallet: string,
-  opts: { identityId?: string | null; platform?: 'web' | 'ios' } = {},
+  opts: { identityId?: string | null; platform?: 'web' | 'ios' | 'android' } = {},
   fetchImpl: typeof fetch = storeFetch,
 ): Promise<ConfirmResult> {
   const none: ConfirmResult = { recorded: false, outcome: 'unbuilt', id: null, tradeId: null };

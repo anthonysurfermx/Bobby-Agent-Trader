@@ -6,6 +6,7 @@ import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidence, loadDeskEvidenceV2, runDeskDebate } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
+import { DESK_LANGUAGES, DESK_LOCALES, deskCopy, isDeskLanguage } from './_lib/desk-languages.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
@@ -22,10 +23,7 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
-
-type Lang = 'en' | 'es' | 'pt';
-const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(DESK_LANGUAGES).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
 
 /**
  * Every refusal carries a stable `code` the app can switch on:
@@ -77,21 +75,22 @@ async function quotaRetryAfter(quota: { caller: string; network: string }): Prom
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!requestOriginHost(req.headers)) return res.status(403).json({ error: 'Origin not allowed' });
   const rawLang = (req.body as { language?: unknown } | undefined)?.language;
-  const lang: Lang = rawLang === 'es' || rawLang === 'pt' ? rawLang : 'en';
+  const lang = isDeskLanguage(rawLang) ? rawLang : 'en';
+  res.setHeader('Content-Language', DESK_LOCALES[lang]);
+  if (req.method !== 'POST') return res.status(405).json({ error: deskCopy(lang, 'method') });
+  if (!requestOriginHost(req.headers)) return res.status(403).json({ error: deskCopy(lang, 'origin') });
   const parsed = Body.safeParse(req.body);
   if (!parsed.success) {
-    return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
+    return refuse(res, 400, 'invalid_request', deskCopy(lang, 'invalid'));
   }
   const { symbol, question, language, assetType, level } = parsed.data;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
-    return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
+    return refuse(res, 400, 'question_too_long', deskCopy(language, 'tooLong'), { maxLength: DESK_QUESTION_MAX });
   }
-  const unavailable = copy(language, 'The analysis desk is temporarily unavailable.', 'La mesa de análisis no está disponible por ahora.');
-  const failed = copy(language, 'The analysis could not finish. Please retry. No verdict was issued.', 'El análisis no pudo terminar. Inténtalo de nuevo. No se emitió ningún veredicto.');
+  const unavailable = deskCopy(language, 'unavailable');
+  const failed = deskCopy(language, 'failed');
   const live = String(req.headers.accept ?? '').includes('application/x-ndjson');
   // The reader closed the stream: the remaining model calls are not made for nobody.
   const left = new AbortController();
@@ -117,8 +116,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (budget.allPaused || (level !== 'rapido' && budget.premiumPaused)) {
       outcome('desk_blocked', budget.allPaused ? 'budget_paused' : 'premium_paused');
       return refuse(res, 503, 'budget_paused', level === 'rapido' || budget.allPaused
-        ? copy(language, 'The desk is paused for now. Try again later.', 'El desk está en pausa por ahora. Inténtalo más tarde.')
-        : copy(language, 'Deep and Max are paused for today. Quick still works.', 'Profundo y Máximo están en pausa por hoy. Rápido sigue disponible.'), { level, quickAvailable: !budget.allPaused });
+        ? deskCopy(language, 'paused')
+        : deskCopy(language, 'premiumPaused'), { level, quickAvailable: !budget.allPaused });
     }
     const addressKeys = getClientQuotaKeys(req);
     if (!addressKeys) return refuse(res, 503, 'desk_unavailable', unavailable);
@@ -132,9 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // A guest asked to sign in is the sign-in wall, not a paying intent; only plan limits are wall_level.
         if (gate.code === 'signin_required') outcome('wall_signin', level);
         else outcome('wall_level', `${level}-${gate.code ?? 'refused'}`);
-        if (gate.code === 'signin_required') return refuse(res, 403, 'signin_required', copy(language, 'Create your free account to use this level.', 'Crea tu cuenta gratis para usar este nivel.'), { level, meter });
-        if (gate.code === 'upgrade_required') return refuse(res, 403, 'upgrade_required', copy(language, 'You used this level for now. Get Bobby Pro or invite a friend.', 'Ya usaste este nivel por ahora. Obtén Bobby Pro o invita a un amigo.'), { level, meter });
-        return refuse(res, 403, 'level_exhausted', copy(language, 'You used this level for this month.', 'Ya usaste este nivel este mes.'), { level, meter });
+        if (gate.code === 'signin_required') return refuse(res, 403, 'signin_required', deskCopy(language, 'signinLevel'), { level, meter });
+        if (gate.code === 'upgrade_required') return refuse(res, 403, 'upgrade_required', deskCopy(language, 'upgrade'), { level, meter });
+        return refuse(res, 403, 'level_exhausted', deskCopy(language, 'exhausted'), { level, meter });
       }
       useId = gate.useId;
       knownIdentity = gate.identity;
@@ -150,8 +149,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (read.code === 'access_unavailable') return refuse(res, 503, 'desk_unavailable', unavailable);
       return refuse(res, read.code === 'signin_required' ? 401 : 402, read.code ?? 'subscription_required',
         read.code === 'signin_required'
-          ? copy(language, 'Create your free account to keep reading.', 'Crea tu cuenta gratis para seguir leyendo.')
-          : copy(language, 'Your general read allowance is used for now.', 'Tu cupo de lecturas generales se agotó por ahora.'), { access: read.access });
+          ? deskCopy(language, 'signinRead')
+          : deskCopy(language, 'readsUsed'), { access: read.access });
     }
     readId = read.readId;
     access = read.access;
@@ -174,7 +173,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       outcome('desk_blocked', 'daily_limit');
       // Caller, network and global windows are all 24 h: this is not "retry in a moment".
       res.setHeader('Retry-After', String(await quotaRetryAfter(keys)));
-      return refuse(res, 429, 'daily_limit', copy(language, "Bobby reached today's analysis limit. Try again tomorrow.", 'Bobby llegó al límite de análisis de hoy. Vuelve a intentarlo mañana.'));
+      return refuse(res, 429, 'daily_limit', deskCopy(language, 'daily'));
     }
     const send = (line: Record<string, unknown>) => { if (!res.writableEnded) res.write(`${JSON.stringify(line)}\n`); };
     if (live) {

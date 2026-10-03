@@ -3,7 +3,7 @@
 // migration 20260927120000):
 //   · anonymous device (sends x-bobby-device): 3 reads → then sign-in is required;
 //   · signed in: 10 reads per rolling 7 days → then Bobby Pro, while BOBBY_PAYWALL=on;
-//   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.
+//   · Bobby Pro (Stripe on the web, Apple on iOS, Google Play on Android): no cap.
 //   · coupon gifts (bobby_usage_bonus, 20261001160000): extra reads / Profundo / Máximo spent after the
 //     regular allowance runs out and never counted toward it (api/_lib/coupons.ts).
 // A client that sends no device id (iOS ≤ 1.5 build 42) is served as before.
@@ -152,22 +152,48 @@ export async function readAccess(req: VercelRequest, identity?: Identity | null)
   return row ? shape(row) : OPEN;
 }
 
-export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null; apple_status?: string | null; apple_current_period_end?: string | null; apple_product_id?: string | null; apple_environment?: 'production' | 'sandbox' | null; apple_period_type?: string | null }
+export type SubscriptionProvider = 'stripe' | 'apple' | 'google';
+export interface SubscriptionRow { identity_id: string; provider: SubscriptionProvider; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null; apple_status?: string | null; apple_current_period_end?: string | null; apple_product_id?: string | null; apple_environment?: 'production' | 'sandbox' | null; apple_period_type?: string | null }
+
+export class SubscriptionProviderConflictError extends Error {
+  readonly code = 'subscription_provider_conflict';
+  constructor() { super('An active subscription already belongs to another provider'); }
+}
+
+/** Membership mirrors include recoverable card obligations and the current Apple sidecar. */
+export function activeSubscription(row: (Pick<SubscriptionRow, 'status' | 'current_period_end'> & Partial<Pick<SubscriptionRow, 'provider' | 'stripe_subscription_id' | 'apple_status' | 'apple_current_period_end'>>) | null, now = Date.now()): boolean {
+  if (!row) return false;
+  if (row.provider === 'stripe' && row.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(row.status)) return true;
+  const live = (status: string | null | undefined, end: string | null | undefined) => {
+    if (!['active', 'trialing'].includes(status ?? '')) return false;
+    if (end === null || end === undefined) return true;
+    const time = Date.parse(end); return !Number.isFinite(time) || time > now;
+  };
+  return live(row.status, row.current_period_end) || live(row.apple_status, row.apple_current_period_end);
+}
 
 export async function getSubscription(identityId: string): Promise<SubscriptionRow | null> {
   const r = await fetch(bobbyRest(`bobby_subscriptions?identity_id=eq.${identityId}&select=*`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`subscriptions ${r.status}`);
-  const rows = (await r.json()) as SubscriptionRow[];
-  return rows[0] ?? null;
+  const rows = await r.json() as SubscriptionRow[];
+  if (!Array.isArray(rows) || rows.length > 1) throw new Error('Malformed subscription state');
+  const row = rows[0];
+  if (row && (row.identity_id !== identityId || typeof row.provider !== 'string' || typeof row.status !== 'string' ||
+      !(row.current_period_end === null || typeof row.current_period_end === 'string'))) throw new Error('Malformed subscription state');
+  return row ?? null;
 }
 
-export async function upsertSubscription(row: Partial<SubscriptionRow> & { identity_id: string; provider: 'stripe' | 'apple'; status: string }): Promise<void> {
+export async function upsertSubscription(row: Partial<SubscriptionRow> & { identity_id: string; provider: SubscriptionProvider; status: string }): Promise<void> {
   const r = await fetch(bobbyRest('bobby_subscriptions?on_conflict=identity_id'), {
     method: 'POST',
     headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify({ ...row, updated_at: new Date().toISOString() }),
   });
-  if (!r.ok) throw new Error(`subscription upsert ${r.status} ${await r.text().catch(() => '')}`);
+  if (!r.ok) {
+    const error = await r.json().catch(() => null) as { code?: string; message?: string } | null;
+    if (error?.code === '23514' && error.message === 'subscription_provider_conflict') throw new SubscriptionProviderConflictError();
+    throw new Error(`subscription upsert ${r.status} ${JSON.stringify({code:error?.code??null})}`);
+  }
 }
 
 export const publicSubscription = (s: SubscriptionRow | null) => {

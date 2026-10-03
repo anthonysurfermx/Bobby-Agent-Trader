@@ -40,11 +40,21 @@ export async function completeCheckout(identity: string, attemptId: string, url:
 }
 
 /** Account deletion uses the reserved customer even before a subscription row exists. */
-export async function blockCheckoutForDeletion(identity: string): Promise<{ customer: string | null; sessionId: string | null }> {
+export async function blockCheckoutForDeletion(identity: string): Promise<{ customer: string | null; sessionId: string | null; customers?: string[]; sessionIds?: string[]; pendingStripe?: boolean }> {
   const row = await rpc('bobby_checkout_block_for_deletion', { p_identity: identity });
   if (!row || typeof row !== 'object') throw new Error('invalid checkout deletion block');
   const value = row as Record<string, unknown>;
   if ((value.customer !== null && typeof value.customer !== 'string') ||
       (value.sessionId !== null && typeof value.sessionId !== 'string')) throw new Error('invalid checkout deletion block');
-  return { customer: value.customer as string | null, sessionId: value.sessionId as string | null };
+  const refs = (field: string, pattern: RegExp) => {
+    if (value[field] === undefined) return undefined; // canonical pre-extension response stays compatible
+    const refs = value[field];
+    if (!Array.isArray(refs) || refs.length > 10 || refs.some(ref => typeof ref !== 'string' || !pattern.test(ref))) throw new Error('invalid checkout deletion block');
+    return [...new Set(refs)] as string[];
+  };
+  if (value.pendingStripe !== undefined && typeof value.pendingStripe !== 'boolean') throw new Error('invalid checkout deletion block');
+  const customers=refs('customers',/^cus_[A-Za-z0-9]+$/),sessionIds=refs('sessionIds',/^cs_[A-Za-z0-9_]+$/);
+  return { customer: value.customer as string | null, sessionId: value.sessionId as string | null,
+    ...(customers ? {customers} : {}), ...(sessionIds ? {sessionIds} : {}),
+    ...(typeof value.pendingStripe === 'boolean' ? {pendingStripe:value.pendingStripe} : {}) };
 }

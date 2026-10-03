@@ -19,7 +19,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { X509Certificate, createHash, verify as verifySignature } from 'node:crypto';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { requireIdentity, resolveIdentity } from './_lib/user-identity.js';
-import { getSubscription, paywallOn, publicSubscription, readAccess, readLevels, touchDevice, upsertSubscription } from './_lib/access.js';
+import { activeSubscription, getSubscription, paywallOn, publicSubscription, readAccess, readLevels, SubscriptionProviderConflictError, touchDevice, upsertSubscription } from './_lib/access.js';
 import { waitUntil } from '@vercel/functions';
 import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.js';
 import { isCouponCode, normalizeCoupon, redeemCoupon } from './_lib/coupons.js';
@@ -27,12 +27,15 @@ import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
-import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { z } from 'zod';
+import { GoogleProofUnavailable, PLAY_TOKEN } from './_lib/google-publisher.js';
+import { PurchaseProtocolError, dispatch, getAttempt, googleReservationReady, publicAttempt, purchaseCapability, reconcileGoogleAttempt, reconcileLegacyCheckout, reconcileStripeAttempt, reservedStripeCheckout, reserveGoogle, stripeUsesReservations, verifyAttemptToken, type PurchaseAttempt } from './_lib/purchase-reservations.js';
+import { googlePaymentsReady, revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
 import { customerFor, expireCheckoutSession, findCustomer, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
 import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
 import { recordCheckoutOpened } from './_lib/funnel.js';
 
-export const config = { maxDuration: 20 };
+export const config = { maxDuration: 90 };
 
 const APPLE_BUNDLE_ID = 'xyz.bobbyprotocol.bobby';
 const APPLE_PRODUCT_IDS = new Set(['xyz.bobbyprotocol.bobby.pro.monthly']);
@@ -64,6 +67,25 @@ async function stripe(path: string, form: Record<string, string>): Promise<Recor
   const body = (await r.json()) as Record<string, unknown>;
   if (!r.ok) throw new Error(`stripe ${path} ${r.status} ${JSON.stringify((body as { error?: { message?: string } }).error?.message ?? '')}`);
   return body;
+}
+
+const uuid = z.string().uuid();
+const productId = z.string().regex(/^[A-Za-z0-9._-]{1,120}$/);
+const purchaseActions = new Set(['purchase-reserve','purchase-start','purchase-submit','purchase-attempt-status','purchase-reconcile','purchase-attempt-cancel']);
+function purchaseBody(body:unknown,action:string):any {
+ const shape = action === 'purchase-reserve' ? {action:z.literal(action),provider:z.literal('google'),operationId:uuid,productId,basePlanId:productId,offerId:productId.nullable()}
+  : action === 'purchase-start' ? {action:z.literal(action),attemptId:uuid,operationId:uuid}
+  : action === 'purchase-submit' ? {action:z.literal(action),attemptId:uuid,purchaseToken:z.string().max(4096).regex(PLAY_TOKEN)}
+  : action === 'purchase-attempt-status' ? {action:z.literal(action),attemptId:uuid.optional()}
+  : {action:z.literal(action),attemptId:uuid};
+ const parsed=z.object(shape).strict().safeParse(body);
+ if(!parsed.success)throw new PurchaseProtocolError('invalid_purchase_request',400);return parsed.data;
+}
+function publicConfirmation(attempt:PurchaseAttempt|null,subscription:Awaited<ReturnType<typeof getSubscription>>) {
+ const value=publicAttempt(attempt);if(!value)return null;
+ return {...value,confirmed:attempt!.provider==='google'&&attempt!.phase==='confirmed'&&!!attempt!.token_fingerprint&&
+  subscription?.provider==='google'&&activeSubscription(subscription)&&subscription.environment==='production'&&
+  [attempt!.product_id,`${attempt!.product_id}:${attempt!.base_plan_id}`].includes(subscription.product_id??'')};
 }
 
 // ---- Apple: StoreKit 2 signed transactions ----
@@ -101,7 +123,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     waitUntil(touchDevice(req, identity));
     let subscription = null;
     let subscriptionAvailable = true;
-    try { subscription = identity ? await getSubscription(identity.id) : null; } catch { subscription = null; subscriptionAvailable = false; }
+    try { subscription = identity ? await getSubscription(identity.id) : null; }
+    catch {
+      if (req.headers['x-bobby-platform'] === 'android') return res.status(503).json({ error: 'Subscription status is temporarily unavailable.', code: 'access_unavailable' });
+      subscription = null; subscriptionAvailable = false;
+    }
     const [access, levels, referral] = await Promise.all([
       readAccess(req, identity),
       readLevels(req, identity),
@@ -118,7 +144,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // caller always sees them open (the shipped iPhone paywall reads this before sign-in; it cannot buy until then).
       payments: { stripe: stripeReady(), apple: revenueCatReady() && (!identity || (subscriptionAvailable && !(
         subscription?.stripe_subscription_id && !STRIPE_TERMINAL.has(subscription.status)
-      ))), revenuecat: revenueCatReady() },
+      ))), google: googlePaymentsReady() && subscriptionAvailable && await googleReservationReady(), revenuecat: revenueCatReady() },
+      purchaseReservationVersion: (await purchaseCapability().catch(() => ({version:0}))).version,
+      purchaseAttempt: identity ? publicConfirmation(await getAttempt(identity.id).catch(() => null), subscription) : null,
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -128,6 +156,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!identity) return;
 
   try {
+    if (typeof action === 'string' && purchaseActions.has(action)) {
+      // A verified account authorizes this operation. Native also rechecks its current owner/risk
+      // consent before every request; this header is an explicit assertion, not stored risk proof.
+      if (identity.via !== 'supabase' || !identity.authUserId) throw new PurchaseProtocolError('account_required',401);
+      if (req.headers['x-bobby-platform'] !== 'android' || req.headers['x-bobby-purchase-client'] !== '1' || req.headers['x-bobby-external-processing'] !== 'accepted' || req.headers.origin !== 'https://bobbyprotocol.xyz') throw new PurchaseProtocolError('purchase_client_required',400);
+      const limited = await checkPersistentLimit('bobby-purchase-account',saltedKey(`purchase:${identity.id}`),30,60,{failClosed:true});
+      if(limited.limited)throw new PurchaseProtocolError('purchase_rate_limited',429);
+      const data=purchaseBody(req.body,action);
+      if(action==='purchase-reserve'){
+        if(!googlePaymentsReady())throw new PurchaseProtocolError('google_sales_not_ready');
+        if(revenueCatReady())await syncRevenueCat(identity.authUserId,identity.id);
+        await reconcileLegacyCheckout(identity.id);
+        return res.status(200).json(await reserveGoogle(identity.id,identity.authUserId,data.operationId,{productId:data.productId,basePlanId:data.basePlanId,offerId:data.offerId}));
+      }
+      let attempt=await getAttempt(identity.id,data.attemptId??null);
+      if(!attempt) return res.status(200).json({ok:true,purchaseAttempt:null});
+      if(attempt.provider!=='google'&&action!=='purchase-attempt-status'&&action!=='purchase-attempt-cancel')throw new PurchaseProtocolError('purchase_provider_conflict',409);
+      if(action==='purchase-start'){
+        if(!googlePaymentsReady()||!await googleReservationReady())throw new PurchaseProtocolError('google_sales_not_ready');
+        const dispatched=await dispatch(identity.id,attempt.id,data.operationId);
+        if(!dispatched.attempt)throw new PurchaseProtocolError(dispatched.code??'purchase_storage_unavailable',409);
+        return res.status(200).json({attempt:publicAttempt(dispatched.attempt),launchAllowed:dispatched.dispatchAllowed===true});
+      }
+      if(action==='purchase-submit')attempt=await verifyAttemptToken(attempt,data.purchaseToken);
+      if(action==='purchase-attempt-cancel'&&attempt.provider==='stripe')attempt=(await reconcileStripeAttempt(attempt,true)).attempt;
+      else if(action!=='purchase-attempt-status'){
+        // Restore/reconcile is allowed with sales off. A late pending purchase may expose only an
+        // RC order hint; its actual Google token and owner are still verified before any mirror write.
+        if(revenueCatReady())await syncRevenueCat(identity.authUserId,identity.id);
+        attempt=await getAttempt(identity.id,attempt.id)??attempt;
+        attempt=await reconcileGoogleAttempt(attempt);
+      }
+      const subscription=await getSubscription(identity.id);
+      return res.status(200).json({ok:true,access:await readAccess(req,identity),subscription:publicSubscription(subscription),purchaseAttempt:publicConfirmation(attempt,subscription)});
+    }
+
     if (action === 'referral-claim') {
       const normalized = typeof code === 'string' ? code.trim().toUpperCase() : '';
       if (!isReferralCode(normalized)) return res.status(400).json({ error: 'That invite link is not valid.', result: 'invalid_code' });
@@ -153,20 +217,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (action === 'checkout') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
+      const participating=await stripeUsesReservations();
+      if(participating&&identity.authUserId){
+        if(!revenueCatReady())throw new PurchaseProtocolError('purchase_inventory_unavailable');
+        try { await syncRevenueCat(identity.authUserId,identity.id); }
+        catch (error) {
+          if (error instanceof PurchaseProtocolError || error instanceof GoogleProofUnavailable || error instanceof SubscriptionProviderConflictError) throw error;
+          throw new PurchaseProtocolError('purchase_inventory_unavailable', 503);
+        }
+      }
+      if(participating){const pending=await getAttempt(identity.id);if(pending?.provider==='google')throw new PurchaseProtocolError('purchase_pending',409);}
+      if(participating)await reconcileLegacyCheckout(identity.id);
       // Fail closed: without knowing the account's current plan, never open a second one.
       let existing: Awaited<ReturnType<typeof getSubscription>>;
       try { existing = await getSubscription(identity.id); } catch { return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' }); }
       // One plan per account: never sell a second subscription to someone who already has Bobby Pro (double billing,
       // and cancelling either one would drop Pro while the other keeps charging). Audit 2026-10-02, STRIPE-04.
-      const live = existing && ((existing.stripe_subscription_id && !STRIPE_TERMINAL.has(existing.status))
-        || (existing.provider === 'apple' && ['active', 'trialing'].includes(existing.status)
+      const live = activeSubscription(existing) || existing && ((existing.stripe_subscription_id && !STRIPE_TERMINAL.has(existing.status))
+        || (['apple', 'google'].includes(existing.provider) && ['active', 'trialing'].includes(existing.status)
           && (!existing.current_period_end || Date.parse(existing.current_period_end) > Date.now()))
         || (['active', 'trialing'].includes(existing.apple_status ?? '')
           && (!existing.apple_current_period_end || Date.parse(existing.apple_current_period_end) > Date.now())));
       if (live) {
         const provider = ['active', 'trialing'].includes(existing.apple_status ?? '') ? 'apple' : existing.provider;
         return res.status(409).json({ code: 'already_pro', provider,
-          error: provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : 'You already have Bobby Pro through the App Store.' });
+          error: provider === 'stripe' ? 'You already have Bobby Pro. Manage it from your account.' : provider === 'google' ? 'You already have Bobby Pro through Google Play.' : 'You already have Bobby Pro through the App Store.' });
       }
       // Stripe is the source of truth for "already paying": one customer per identity, refuse while any of its
       // subscriptions can still charge, and reuse a checkout that is still open instead of opening a second one
@@ -184,6 +259,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch (error) {
         console.error('[bobby-access] checkout preflight', error instanceof Error ? error.message : error);
         return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
+      }
+      if (participating) {
+        // Keep the canonical customer/subscription inventory before the shared durable gate.
+        // A legacy open session not owned by this ledger is not an empty/drained inventory.
+        const prior = await getAttempt(identity.id);
+        if (openSession?.id && (!prior || prior.provider_reference !== openSession.id)) throw new PurchaseProtocolError('purchase_inventory_unavailable');
+        const origin = siteOrigin(req);
+        const form: Record<string,string> = {
+          mode:'subscription',customer,expires_at:String(Math.floor(Date.now()/1000)+35*60),
+          'line_items[0][price]':String(process.env.STRIPE_PRICE_ID),'line_items[0][quantity]':'1',
+          success_url:`${origin}/desk?pro=welcome`,cancel_url:`${origin}/desk?pro=cancelled`,
+          client_reference_id:identity.id,'metadata[identity_id]':identity.id,
+          'subscription_data[metadata][identity_id]':identity.id,allow_promotion_codes:'true',
+        };
+        const result=await reservedStripeCheckout(identity.id,form);
+        try { const receipt=await getAttempt(identity.id); if(receipt?.provider_reference)observeCheckout(req,identity,receipt.provider_reference); } catch { /* telemetry never fails a verified Checkout */ }
+        return res.status(200).json(result);
       }
       let claim: Awaited<ReturnType<typeof claimCheckout>>;
       try { claim = await claimCheckout(identity.id, customer, String(process.env.STRIPE_PRICE_ID), siteOrigin(req)); }
@@ -205,6 +297,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         observeCheckout(req, identity, claim.sessionId);
         return res.status(200).json({ url: claim.url });
       }
+      if (claim.state !== 'create') return res.status(503).json({ error: 'Checkout is being prepared. Try again in a moment.' });
       if (openSession?.id && openSession.url) {
         try { await completeCheckout(identity.id, claim.attemptId, openSession.url, openSession.id); }
         catch (error) { await expireCheckoutSession(openSession.id); throw error; }
@@ -250,9 +343,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'revenuecat-sync') {
       if (!revenueCatReady()) return res.status(503).json({ error: 'Subscriptions are not switched on yet.' });
       if (!identity.authUserId) return res.status(400).json({ error: 'Sign in with Apple or Google to use Bobby Pro.' });
+      // Reinstallation can lose the local journal. A captured server candidate/receipt still
+      // reconciles the ORIGINAL attempt without exposing or asking the SDK for another charge.
+      const pending=await getAttempt(identity.id).catch(()=>null);
+      if(pending?.provider==='google'&&(pending.token_ciphertext||pending.candidate_ciphertext))await reconcileGoogleAttempt(pending);
       await syncRevenueCat(identity.authUserId, identity.id);
       const subscription = await getSubscription(identity.id);
-      return res.status(200).json({ ok: true, access: await readAccess(req, identity), subscription: publicSubscription(subscription) });
+      return res.status(200).json({ ok: true, access: await readAccess(req, identity), subscription: publicSubscription(subscription), purchaseAttempt: publicConfirmation(await getAttempt(identity.id).catch(() => null),subscription) });
     }
 
     if (action === 'apple') {
@@ -272,21 +369,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const active = !revoked && expires !== null && expires > Date.now();
       // The same Apple subscription restored on another account moves with the purchase (one owner at a time).
       await fetch(bobbyRest(`bobby_subscriptions?apple_original_transaction_id=eq.${original}&identity_id=neq.${identity.id}`), { method: 'DELETE', headers: bobbyServiceHeaders() });
-      const current = await getSubscription(identity.id).catch(() => null);
-      // Never let an Apple sync overwrite a live card subscription.
-      if (!(current?.provider === 'stripe' && ['active', 'trialing'].includes(current.status) && !active)) {
-        await upsertSubscription({
+      const current = await getSubscription(identity.id);
+      // The retired emergency path cannot overwrite an active Google or card membership.
+      if (current?.provider !== 'apple' && activeSubscription(current)) throw new SubscriptionProviderConflictError();
+      await upsertSubscription({
           identity_id: identity.id, provider: 'apple', status: revoked ? 'revoked' : active ? 'active' : 'expired',
           product_id: String(tx.productId), current_period_end: expires !== null ? new Date(expires).toISOString() : null,
-          apple_original_transaction_id: original, stripe_customer_id: current?.stripe_customer_id ?? null, stripe_subscription_id: current?.provider === 'apple' ? null : current?.stripe_subscription_id ?? null,
-        });
-      }
+          apple_original_transaction_id: original, stripe_customer_id: current?.stripe_customer_id ?? null, stripe_subscription_id: null,
+      });
       const subscription = await getSubscription(identity.id);
       return res.status(200).json({ ok: true, access: await readAccess(req, identity), subscription: publicSubscription(subscription) });
     }
 
     return res.status(400).json({ error: 'Unknown action' });
   } catch (e) {
+    if(e instanceof PurchaseProtocolError || e instanceof GoogleProofUnavailable) {
+      const attempt=await getAttempt(identity.id).catch(()=>null);
+      return res.status(e instanceof PurchaseProtocolError?e.status:503).json({error:'The purchase needs verification. Open Help if it remains pending.',code:e.code,purchaseAttempt:publicAttempt(attempt),supportUrl:'https://bobbyprotocol.xyz/support'});
+    }
+    if (e instanceof SubscriptionProviderConflictError) return res.status(409).json({ error: 'An active subscription already exists.', code: e.code });
     console.error('[bobby-access]', action, e instanceof Error ? e.message : e);
     const busy = action === 'referral-claim' ? 'Invitations are temporarily unavailable. Try again.'
       : action === 'redeem-coupon' ? 'Coupons are temporarily unavailable. Try again.'

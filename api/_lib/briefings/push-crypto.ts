@@ -17,7 +17,7 @@ import { bobbyServiceKeyOptional } from '../bobby-db.js';
 import { pushMasterKey } from './config.js';
 import type { DeviceEnvironment } from './types.js';
 
-type Purpose = 'token-enc' | 'token-fp' | 'receipt' | 'cursor';
+type Purpose = 'token-enc' | 'token-fp' | 'receipt' | 'cursor' | 'fcm-target-enc' | 'fcm-target-fp';
 const SALT = Buffer.from('bobby-briefings-push-v1', 'utf8');
 const SEAL_PREFIX = 'v1:';
 const IV_BYTES = 12;
@@ -57,6 +57,17 @@ export function encryptToken(hexToken: string, master: Buffer): string {
 
 export function decryptToken(sealed: string, master: Buffer): string {
   return open(sealed, subkey(master, 'token-enc'));
+}
+
+/** FIDs are case-sensitive and use independent keys; APNs normalization never touches them. */
+export function encryptFcmTarget(fid: string, master: Buffer): string {
+  return seal(fid, subkey(master, 'fcm-target-enc'));
+}
+export function decryptFcmTarget(sealed: string, master: Buffer): string {
+  return open(sealed, subkey(master, 'fcm-target-enc'));
+}
+export function fcmTargetFingerprint(fid: string, projectId: string, packageName: string, master: Buffer): string {
+  return createHmac('sha256', subkey(master, 'fcm-target-fp')).update(JSON.stringify(['fcm', 'fid', fid, projectId, packageName])).digest('hex');
 }
 
 /** HMAC-SHA256 hex over 'token|topic|environment' (token lower-cased hex). */

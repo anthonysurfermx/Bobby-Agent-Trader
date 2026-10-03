@@ -8,13 +8,17 @@
 // ============================================================
 import { createHash } from 'node:crypto';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
-import { getSubscription, upsertSubscription } from './access.js';
+import { activeSubscription, getSubscription, SubscriptionProviderConflictError, upsertSubscription, type SubscriptionProvider } from './access.js';
 import { getCache, setCache } from './api-cache.js';
+import { GoogleProofUnavailable, googleAccountId, googleProducts, PLAY_ORDER, verifyGoogleOrder, verifyGoogleToken, type GoogleProof } from './google-publisher.js';
+import { attemptProduct, getAttempt, openPurchaseToken, recordGoogleObligation } from './purchase-reservations.js';
 import { notifyOwner } from './provider-alert.js';
 
 export const PRO_ENTITLEMENT = 'pro';
 const secretKey = () => (process.env.REVENUECAT_SECRET_KEY || '').trim();
 export const revenueCatReady = () => Boolean(secretKey());
+/** Sales are opt-in. Turning sales off never revokes a previously verified production membership. */
+export const googlePaymentsReady = () => revenueCatReady() && process.env.BOBBY_GOOGLE_PAYMENTS_ENABLED === 'true';
 // These are Bobby's verified API resource IDs, not the shorter dashboard project ID. Never choose
 // the first project or accept a customer/project/app supplied by a client during paid reconciliation.
 const BOBBY_RC_PROJECT = 'proj2d9c569b';
@@ -82,8 +86,9 @@ interface RcSubscriber {
 }
 
 interface PaidPeriod {
+  google_token_fingerprint?: string;
   identity_id: string;
-  provider: 'apple' | 'stripe';
+  provider: SubscriptionProvider;
   product_id: string;
   period_start: string;
   period_end: string;
@@ -99,13 +104,19 @@ interface PaidPeriod {
 }
 
 const paidEventTypes = new Set(['INITIAL_PURCHASE', 'RENEWAL']);
-const storeProvider = (store: string | undefined): 'apple' | 'stripe' | null => {
-  switch (store?.toLowerCase()) {
+const canonicalStore = (store: unknown): string | null => {
+  const value = typeof store === 'string' ? store.toLowerCase() : '';
+  return value === 'google_play' ? 'play_store' : value || null;
+};
+export const revenueCatStoreProvider = (store: unknown): SubscriptionProvider | null => {
+  switch (canonicalStore(store)) {
     case 'app_store': case 'mac_app_store': return 'apple';
+    case 'play_store': return 'google';
     case 'rc_billing': case 'stripe': return 'stripe';
     default: return null;
   }
 };
+const storeProvider = revenueCatStoreProvider;
 const paidPeriodType = (raw: string | null | undefined): 'normal' | 'intro' | null => {
   const value = raw?.toLowerCase();
   return value === 'normal' || value === 'intro' ? value : null;
@@ -129,7 +140,7 @@ const transactionId = (value: string | number | null | undefined): string | null
 };
 
 /** The current subscriber confirms ownership, live period, environment and transaction independently of the webhook. */
-function currentPaidSubscription(subscriber: RcSubscriber | undefined): { product: string; sub: RcSubscription; provider: 'apple' | 'stripe'; start: string; end: string; txn: string; periodType: 'normal' | 'intro' } | null {
+function currentPaidSubscription(subscriber: RcSubscriber | undefined): { product: string; sub: RcSubscription; provider: SubscriptionProvider; start: string; end: string; txn: string; periodType: 'normal' | 'intro' } | null {
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
   const product = ent?.product_identifier;
   if (!product || product.length > 120) return null;
@@ -152,7 +163,7 @@ export function paidPeriodFromRevenueCat(identityId: string, authUserId: string,
   if (!live || !event || !paidEventTypes.has(event.type ?? '') || event.app_user_id !== authUserId ||
       event.environment !== 'PRODUCTION' || event.is_family_share !== false ||
       event.product_id !== live.product || storeProvider(event.store) !== live.provider ||
-      event.store?.toLowerCase() !== live.sub.store?.toLowerCase() ||
+      canonicalStore(event.store) !== canonicalStore(live.sub.store) ||
       paidPeriodType(event.period_type) !== live.periodType ||
       transactionId(event.transaction_id) !== live.txn ||
       !eventTimeMatches(event.purchased_at_ms, live.start) || !eventTimeMatches(event.expiration_at_ms, live.end) ||
@@ -177,11 +188,19 @@ export function paidPeriodFromRevenueCat(identityId: string, authUserId: string,
 /** Recover a previously delivered purchase from provider history, with the same guards as a webhook.
  * The revenue ledger alone lacks transaction/period fields and must never supply a fabricated event.
  * Recent history is bounded to 20 events; ambiguous duplicates or missing fields fail closed. */
+function paidHistoryApp(live: ReturnType<typeof currentPaidSubscription>): string | null {
+  if (live?.provider === 'apple' && live.product === BOBBY_RC_PRODUCT) return BOBBY_RC_APP;
+  const app = process.env.BOBBY_REVENUECAT_ANDROID_APP_ID?.trim();
+  const product = process.env.BOBBY_REVENUECAT_ANDROID_PRODUCT_ID?.trim();
+  return live?.provider === 'google' && live.product === product && /^app[a-z0-9]+$/.test(app ?? '') ? app! : null;
+}
+
 export function paidPeriodFromRevenueCatHistory(identityId: string, authUserId: string,
                                                subscriber: RcSubscriber | undefined, history: unknown,
                                                now = new Date()): PaidPeriod | null {
   const live = currentPaidSubscription(subscriber);
-  if (!live || live.provider !== 'apple' || live.product !== BOBBY_RC_PRODUCT) return null;
+  const appId = paidHistoryApp(live);
+  if (!live || !appId) return null;
   if (!history || typeof history !== 'object' || Array.isArray(history)) return null;
   const list = history as { object?: unknown; items?: unknown };
   if (list.object !== 'list' || !Array.isArray(list.items) || list.items.length > PAID_HISTORY_LIMIT) return null;
@@ -189,7 +208,7 @@ export function paidPeriodFromRevenueCatHistory(identityId: string, authUserId: 
   for (const item of list.items) {
     if (!item || typeof item !== 'object' || Array.isArray(item)) continue;
     const row = item as { object?: unknown; id?: unknown; app_id?: unknown; type?: unknown; body?: unknown };
-    if (row.object !== 'customer.event' || row.app_id !== BOBBY_RC_APP || typeof row.id !== 'string' ||
+    if (row.object !== 'customer.event' || row.app_id !== appId || typeof row.id !== 'string' ||
         row.id.length === 0 || row.id.length > 160 || !row.body || typeof row.body !== 'object' || Array.isArray(row.body)) continue;
     const type = row.type === 'PURCHASES_INITIAL_PURCHASE' ? 'INITIAL_PURCHASE' :
                  row.type === 'PURCHASES_RENEWAL' ? 'RENEWAL' : null;
@@ -226,7 +245,7 @@ async function paidPeriodFromHistory(identityId: string, authUserId: string,
                                      subscriber: RcSubscriber | undefined): Promise<PaidPeriod | null> {
   const key = process.env.REVENUECAT_V2_SECRET_KEY?.trim();
   const live = currentPaidSubscription(subscriber);
-  if (!key || !/^[0-9a-f-]{36}$/i.test(authUserId) || !live || live.provider !== 'apple' || live.product !== BOBBY_RC_PRODUCT) return null;
+  if (!key || !/^[0-9a-f-]{36}$/i.test(authUserId) || !live || !paidHistoryApp(live)) return null;
   try {
     const response = await fetch(`https://api.revenuecat.com/v2/projects/${BOBBY_RC_PROJECT}/customers/${encodeURIComponent(authUserId)}/events?environment=production&limit=${PAID_HISTORY_LIMIT}`, {
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -249,21 +268,27 @@ function existingProofMatches(row: PaidPeriod, subscriber: RcSubscriber | undefi
 }
 
 async function reconcilePaidPeriod(identityId: string, authUserId: string, subscriber: RcSubscriber | undefined,
-                                   event?: RevenueCatPaidEvent): Promise<void> {
+                                   event?: RevenueCatPaidEvent, googleOwnership: {fingerprint:string;orderOwned:boolean|null}|null = null): Promise<void> {
+  // Unknown provider observations cannot create a new paid proof. A matching previously owner-bound
+  // receipt may survive a transient outage; legacy/unbound or mismatched Google proof never does.
+  const google = currentPaidSubscription(subscriber)?.provider === 'google';
+  if (google && !googleOwnership) subscriber = undefined;
   const url = bobbyRest(`bobby_brief_paid_periods?identity_id=eq.${identityId}&proof_source=eq.revenuecat`);
   const read = await fetch(`${url}&select=*`, { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!read.ok) throw new Error(`paid period read ${read.status}`);
   const existing = ((await read.json()) as PaidPeriod[])[0];
-  const fresh = paidPeriodFromRevenueCat(identityId, authUserId, subscriber, event) ??
+  let fresh = google && googleOwnership?.orderOwned !== true ? null : paidPeriodFromRevenueCat(identityId, authUserId, subscriber, event) ??
     (!event && (!existing || !existingProofMatches(existing, subscriber))
       ? await paidPeriodFromHistory(identityId, authUserId, subscriber) : null);
+  if (fresh?.provider === 'google') fresh = googleOwnership?.orderOwned === true ? {...fresh,google_token_fingerprint:googleOwnership.fingerprint} : null;
+  const ownerMatches = existing?.provider !== 'google' || !!googleOwnership && existing.google_token_fingerprint === googleOwnership.fingerprint && googleOwnership.orderOwned !== false;
   if (fresh) {
     const write = await fetch(bobbyRest('bobby_brief_paid_periods?on_conflict=identity_id'), {
       method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
       body: JSON.stringify({ ...fresh, updated_at: new Date().toISOString() }), signal: AbortSignal.timeout(4000),
     });
     if (!write.ok) throw new Error(`paid period upsert ${write.status}`);
-  } else if (existing && !existingProofMatches(existing, subscriber)) {
+  } else if (existing && (!existingProofMatches(existing, subscriber) || !ownerMatches)) {
     const remove = await fetch(url, { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
     if (!remove.ok) throw new Error(`paid period delete ${remove.status}`);
   }
@@ -313,27 +338,79 @@ export async function syncRevenueCat(authUserId: string, identityId: string, pai
   const { subscriber } = (await r.json()) as { subscriber?: RcSubscriber };
   const ent = subscriber?.entitlements?.[PRO_ENTITLEMENT];
   const current = await getSubscription(identityId);
+  const currentFreeTrialFingerprints = new Set<string>();
+  const cardObligation = current?.provider === 'stripe' && !!current.stripe_subscription_id && !['canceled','incomplete_expired'].includes(current.status);
+  const appleBaselineActive=!!ent&&Object.values(subscriber?.subscriptions??{}).some(s=>{
+    if(storeProvider(s?.store)!=='apple'||s.refunded_at||s.is_sandbox===true&&!sandboxProAllowed(authUserId))return false;
+    if(!s.expires_date)return true;
+    const end=s.grace_period_expires_date&&Date.parse(s.grace_period_expires_date)>Date.parse(s.expires_date)?s.grace_period_expires_date:s.expires_date;
+    return Date.parse(end)>Date.now();
+  });
+  // A missing entitlement does NOT mean no future charge. Preserve actual Google ON_HOLD/PAUSED/
+  // pending obligations even when RevenueCat marks the access mirror expired. No store guess is used.
+  for (const [legacyProduct, legacy] of Object.entries(subscriber?.subscriptions ?? {})) {
+    if(storeProvider(legacy?.store)!=='google'||legacy.is_sandbox!==false)continue;
+    let attempt: Awaited<ReturnType<typeof getAttempt>>=null;
+    try {
+    attempt=await getAttempt(identityId);
+    const catalog=googleProducts().filter(p=>legacyProduct===p.productId||legacyProduct===`${p.productId}:${p.basePlanId}`);
+    const expected=attempt?.provider==='google'?attemptProduct(attempt):catalog.length===1?catalog[0]:null;
+    const hint=typeof legacy.store_transaction_id==='string'?legacy.store_transaction_id:null;
+    if(!expected||!catalog.some(p=>JSON.stringify(p)===JSON.stringify(expected)))throw new GoogleProofUnavailable('google_product_unverified');
+    const before=attempt&&attempt.origin!=='adopted'?attempt.dispatch_at?Date.parse(attempt.dispatch_at):NaN:null;
+    const proof=attempt?.token_ciphertext?await verifyGoogleToken(openPurchaseToken(attempt.token_ciphertext),expected,googleAccountId(authUserId),before)
+      :hint&&PLAY_ORDER.test(hint)?await verifyGoogleOrder(hint,expected,googleAccountId(authUserId),before):(()=>{throw new GoogleProofUnavailable('google_order_unavailable');})();
+    if(proof.currentFreeTrial)currentFreeTrialFingerprints.add(proof.fingerprint);
+    if(proof.phase==='pending'||proof.phase==='confirmed'||attempt?.token_fingerprint){
+      const observed=await recordGoogleObligation(identityId,proof);
+      // Persist a corroborated trial demotion before a later provider read can fail. This only
+      // updates an existing matching Google mirror; it cannot invent a new entitlement on outage.
+      if(proof.currentFreeTrial&&proof.phase==='confirmed'&&current?.provider==='google'&&activeSubscription(current)&&
+        observed.token_fingerprint===proof.fingerprint&&[proof.product.productId,`${proof.product.productId}:${proof.product.basePlanId}`].includes(current.product_id??'')&&sameTime(proof.expiryTime,current.current_period_end)){
+        await upsertSubscription({identity_id:identityId,provider:'google',status:'trialing',period_type:'trial'});
+      }
+    }
+    } catch(error) {
+      // Preserve deployed Apple eligibility beside a foreign/unavailable non-entitlement Google
+      // record. It grants no Google ownership and never releases an existing financial gate.
+      if(appleBaselineActive || cardObligation)continue;
+      const mismatch=error instanceof GoogleProofUnavailable&&['google_owner_unverified','google_product_unverified','google_purchase_not_participating','google_purchase_precedes_attempt','google_membership_unverified','google_expiry_unverified'].includes(error.code);
+      if(mismatch&&current?.provider==='google'&&activeSubscription(current))await upsertSubscription({identity_id:identityId,provider:'google',status:'expired'});
+      await reconcilePaidPeriod(identityId,authUserId,mismatch?undefined:subscriber,paidEvent,!mismatch&&attempt?.token_fingerprint&&attempt.google_account_id===googleAccountId(authUserId)?{fingerprint:attempt.token_fingerprint,orderOwned:currentFreeTrialFingerprints.has(attempt.token_fingerprint)?false:null}:null);
+      throw error;
+    }
+  }
   // Pro comes only from a real-money store subscription behind the entitlement (storeProvider: the App Store, the Mac
   // App Store, RevenueCat Web Billing), not refunded and not expired. RevenueCat's Test Store simulates purchases
   // without payment and its key ships in the public repo's Debug config; promotional grants, unknown stores and an
   // entitlement with no subscription record are never presumed to be the App Store (payments security audit
   // 2026-10-02, RC-01). The entitlement names only its latest product, and a real subscription may sit beside a Test
   // Store one, so every eligible record is considered and the one that runs longest wins.
-  // Apple's billing grace period keeps access after a failed renewal until grace_period_expires_date.
+  // Apple's billing grace period and Sandbox allowlist retain the deployed behavior. Google requires a
+  // production purchased subscription tied to this entitlement's bounded period; Sandbox uses a separate QA grant.
   const until = (s: RcSubscription) => {
+    if (storeProvider(s.store) === 'google') return s.expires_date ?? null;
     if (!s.expires_date) return null;
     return s.grace_period_expires_date && Date.parse(s.grace_period_expires_date) > Date.parse(s.expires_date) ? s.grace_period_expires_date : s.expires_date;
   };
   const records = Object.entries(subscriber?.subscriptions ?? {})
-    .filter(([, s]) => storeProvider(s?.store) && !s?.refunded_at && (s?.is_sandbox !== true || sandboxProAllowed(authUserId)))
+    .filter(([product, s]) => {
+      const provider = storeProvider(s?.store);
+      if (!provider || s?.refunded_at) return false;
+      if (provider === 'google') return !cardObligation && s.is_sandbox === false && s.ownership_type === 'PURCHASED' &&
+        validTime(s.expires_date) !== null && product === ent?.product_identifier && sameTime(s.expires_date, ent.expires_date);
+      return s?.is_sandbox !== true || sandboxProAllowed(authUserId);
+    })
     .sort(([, x], [, y]) => (until(y) ? Date.parse(until(y)!) : Infinity) - (until(x) ? Date.parse(until(x)!) : Infinity));
   const [product, sub] = ent && records.length ? records[0] : [null, undefined];
   const expires = sub ? until(sub) : null;
   const eligible = Boolean(ent && sub);
   const active = eligible && (expires === null || Date.parse(expires) > Date.now());
+  const provider = storeProvider(sub?.store);
+  if (provider === 'google' && current && current.provider !== 'google' && activeSubscription(current)) throw new SubscriptionProviderConflictError();
   const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
   const refunded = () => Object.values(subscriber?.subscriptions ?? {}).some((s) => storeProvider(s?.store) && s?.refunded_at);
-  if (current?.stripe_subscription_id) {
+  if (current?.stripe_subscription_id && provider !== 'google') {
     // A row that ever carried a direct card plan stays Stripe's: its card references survive cancellation, so account
     // deletion, checkout and the portal always find them, and the webhook alone writes its status. The store plan
     // lives beside it in the Apple mirror, which bobby_is_pro reads independently and which is cleared on refund or
@@ -356,10 +433,51 @@ export async function syncRevenueCat(authUserId: string, identityId: string, pai
     await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent);
     return false;
   }
+  let googleProof: GoogleProof | null = null;
+  let googlePaidOrderOwned: boolean|null = null;
+  let googleKnownFingerprint: string|null = null;
+  if (provider === 'google') {
+    try {
+      const attempt = await getAttempt(identityId);
+      if(attempt?.google_account_id===googleAccountId(authUserId))googleKnownFingerprint=attempt.token_fingerprint;
+      const options = googleProducts().filter((candidate) => product === candidate.productId || product === `${candidate.productId}:${candidate.basePlanId}`);
+      // An exact reserved option wins. Legacy catalog ambiguity never guesses an offer.
+      const expected = attempt?.provider === 'google' ? attemptProduct(attempt) : options.length === 1 ? options[0] : null;
+      const hint = typeof sub?.store_transaction_id === 'string' ? sub.store_transaction_id
+        : typeof paidEvent?.transaction_id === 'string' ? paidEvent.transaction_id : null;
+      if (!expected || !options.some(candidate => JSON.stringify(candidate) === JSON.stringify(expected)) ) throw new GoogleProofUnavailable('google_order_unavailable');
+      const notBefore = attempt && attempt.origin !== 'adopted' ? attempt.dispatch_at ? Date.parse(attempt.dispatch_at) : NaN : null;
+      googleProof = attempt?.token_ciphertext ? await verifyGoogleToken(openPurchaseToken(attempt.token_ciphertext),expected,googleAccountId(authUserId),notBefore)
+        : hint && PLAY_ORDER.test(hint) ? await verifyGoogleOrder(hint, expected, googleAccountId(authUserId), notBefore) : (() => {throw new GoogleProofUnavailable('google_order_unavailable');})();
+      if (active && (googleProof.phase !== 'confirmed' || !sameTime(googleProof.expiryTime, expires))) throw new GoogleProofUnavailable('google_membership_unverified');
+      // Confirmation and membership are separate. The durable open-owner row remains held even if
+      // the following membership write fails; ON_HOLD/PAUSED obligations never depend on this mirror.
+      await recordGoogleObligation(identityId, googleProof);
+      // CURRENT authoritative free-trial state contradicts any positive paid-period claim.
+      // It retains legitimate basic access/obligation, but cannot preserve an older paid receipt.
+      if(googleProof.currentFreeTrial)googlePaidOrderOwned=false;
+      // A separately aliased financial order cannot borrow ownership from another owned trial/token.
+      if(hint&&PLAY_ORDER.test(hint)){
+        try { const paidOrder=await verifyGoogleOrder(hint,expected,googleAccountId(authUserId),notBefore);
+          googlePaidOrderOwned=!googleProof.currentFreeTrial&&!paidOrder.currentFreeTrial&&paidOrder.fingerprint===googleProof.fingerprint&&sameTime(paidOrder.expiryTime,expires);
+        } catch (error) { googlePaidOrderOwned=googleProof.currentFreeTrial||error instanceof GoogleProofUnavailable&&['google_owner_unverified','google_product_unverified','google_purchase_not_participating'].includes(error.code)?false:null; }
+      }
+    } catch (error) {
+      // Provider outages retain a previously verified mirror. An authoritative owner/product/state
+      // mismatch withholds Google access; no such observation releases the financial obligation.
+      const mismatch=error instanceof GoogleProofUnavailable && ['google_owner_unverified','google_product_unverified','google_purchase_not_participating','google_purchase_precedes_attempt','google_membership_unverified','google_expiry_unverified'].includes(error.code);
+      if (mismatch && current?.provider === 'google' && activeSubscription(current)) await upsertSubscription({ identity_id: identityId, provider: 'google', status: 'expired' });
+      await reconcilePaidPeriod(identityId, authUserId, mismatch?undefined:subscriber,paidEvent,!mismatch&&googleKnownFingerprint?{fingerprint:googleKnownFingerprint,orderOwned:currentFreeTrialFingerprints.has(googleKnownFingerprint)?false:null}:null);
+      throw error;
+    }
+  }
+
+  const effectivePeriodType=googleProof?.currentFreeTrial?'trial':periodType;
   await upsertSubscription({
-    identity_id: identityId, provider: storeProvider(sub?.store) ?? 'apple', status: !active ? 'expired' : periodType === 'trial' ? 'trialing' : 'active',
-    product_id: product, current_period_end: expires, environment: sub?.is_sandbox === true ? 'sandbox' : 'production', period_type: periodType,
+    identity_id: identityId, provider: provider!, status: !active ? 'expired' : effectivePeriodType === 'trial' ? 'trialing' : 'active',
+    product_id: product, current_period_end: expires,
+    stripe_customer_id: current?.stripe_customer_id ?? null, stripe_subscription_id: current?.stripe_subscription_id ?? null, environment: sub?.is_sandbox === true ? 'sandbox' : 'production', period_type: effectivePeriodType,
   });
-  await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent);
+  await reconcilePaidPeriod(identityId, authUserId, subscriber, paidEvent, googleProof?{fingerprint:googleProof.fingerprint,orderOwned:googlePaidOrderOwned}:null);
   return active;
 }
