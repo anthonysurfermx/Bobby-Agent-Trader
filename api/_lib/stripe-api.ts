@@ -30,11 +30,19 @@ export async function stripeApi<T = Record<string, unknown>>(method: 'GET' | 'PO
 // Stripe Search uses backslashes to escape characters inside quoted values.
 const q = (s: string) => s.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
 
+const missingCustomer = (e: unknown) => e instanceof StripeError && (e.status === 404 || /no such customer/i.test(e.message));
+
+/** The identity's Stripe customer without ever creating one: the stored id, else a metadata search. */
+export async function findCustomer(identityId: string, stored: string | null | undefined): Promise<string | null> {
+  if (stored) return stored;
+  const found = await stripeApi<{ data?: Array<{ id: string }> }>('GET', `customers/search?query=${encodeURIComponent(`metadata['identity_id']:'${q(identityId)}'`)}&limit=1`);
+  return found.data?.[0]?.id ?? null;
+}
+
 /** The identity's Stripe customer: the stored one, else one found by metadata, else a new one (idempotent per identity). */
 export async function customerFor(identityId: string, stored: string | null | undefined, email?: string | null): Promise<string> {
-  if (stored) return stored;
-  const found = await stripeApi<{ data?: Array<{ id: string }> }>('GET', `customers/search?query=${encodeURIComponent(`metadata['identity_id']:'${q(identityId)}'`)}&limit=1`).catch(() => null);
-  if (found?.data?.[0]?.id) return found.data[0].id;
+  const known = await findCustomer(identityId, stored).catch(() => null);
+  if (known) return known;
   const created = await stripeApi<{ id: string }>('POST', 'customers',
     { 'metadata[identity_id]': identityId, ...(email ? { email } : {}) }, `bobby-customer-${identityId}`);
   return created.id;
@@ -85,7 +93,9 @@ async function expireOpenCheckouts(customerId: string): Promise<void> {
 export async function subscriptionsFor(identityId: string, customerId: string | null | undefined, storedSubId: string | null | undefined): Promise<Sub[]> {
   const seen = new Map<string, Sub>();
   if (customerId) {
-    const list = await stripeApi<{ data?: Sub[] }>('GET', `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`);
+    // A customer Stripe does not know (deleted, or a test-mode id) has no subscriptions under this key.
+    const list = await stripeApi<{ data?: Sub[] }>('GET', `subscriptions?customer=${encodeURIComponent(customerId)}&status=all&limit=100`)
+      .catch((e) => { if (missingCustomer(e)) return { data: [] as Sub[] }; throw e; });
     for (const s of list.data ?? []) seen.set(s.id, s);
   }
   // Defense in depth (a second customer from an old double checkout). Search can be unavailable: not fatal.
@@ -117,4 +127,31 @@ export async function cancelAllFor(identityId: string, customerId: string | null
     catch (e) { if (!(e instanceof StripeError && e.status === 404)) throw e; }
   }
   return cancelled;
+}
+
+export interface BillingRow { status?: string; stripe_customer_id?: string | null; stripe_subscription_id?: string | null }
+
+/**
+ * Before an account is deleted: expire its open checkouts and cancel every Stripe subscription that can still charge.
+ * Throws only when a charge is still possible and Stripe could not confirm it stopped (a card plan that is not
+ * terminal, or a checkout opened in the last minutes), so the caller deletes nothing and the user retries.
+ * Anything else Stripe could not confirm (an outage for an account whose card plan already ended or that never paid,
+ * or card payments switched off) comes back as `unverified`: the deletion goes ahead and the owner checks it by hand.
+ * Deletion is never blocked for good (App Store 5.1.1(v)). Red team 2026-10-02.
+ */
+export async function stopBillingFor(identityId: string, row: BillingRow | null,
+  checkout: { customer: string | null; sessionId: string | null }): Promise<{ cancelled: number; unverified: string | null }> {
+  const known = Boolean(row?.stripe_customer_id || row?.stripe_subscription_id || checkout.customer || checkout.sessionId);
+  if (!key() && !known) return { cancelled: 0, unverified: null };
+  // A row that carries a Stripe subscription id reports the card plan's own status (the Apple plan lives in its mirror).
+  const mayCharge = (Boolean(row?.stripe_subscription_id) && !STRIPE_TERMINAL.has(String(row?.status))) || Boolean(checkout.sessionId);
+  try {
+    const cancelled = await cancelAllFor(identityId, row?.stripe_customer_id, row?.stripe_subscription_id, checkout.customer);
+    if (checkout.sessionId) await expireCheckoutSession(checkout.sessionId);
+    return { cancelled, unverified: null };
+  } catch (e) {
+    // No key at all cannot be retried into success: go ahead and report it rather than block deletion for ever.
+    if (mayCharge && !(e instanceof StripeError && e.status === 0)) throw e;
+    return { cancelled: 0, unverified: (e instanceof Error ? e.message : String(e)).slice(0, 300) };
+  }
 }

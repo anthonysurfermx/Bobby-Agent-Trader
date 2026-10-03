@@ -37,6 +37,8 @@ const purchases = new Map<string, Record<string, unknown>>();
 const checkoutEvents = new Map<string, Record<string, unknown>>();
 let refunds: Array<Record<string, unknown>> = [];
 let charge: Record<string, unknown> = {};
+let foundCustomers: Array<Record<string, unknown>> = [];
+let lastPortalCustomer: string | null = null;
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input));
   if (u.hostname === 'api.revenuecat.com') return Response.json({ subscriber });
@@ -45,7 +47,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     stripeCalls.push(`${m} ${u.pathname}`);
     if (u.pathname === '/v1/customers/search' || u.pathname === '/v1/subscriptions/search') stripeQueries.push(u.searchParams.get('query') ?? '');
     if (stripeDown) return Response.json({ error: { message: 'down' } }, { status: 500 });
-    if (u.pathname === '/v1/customers/search') return Response.json({ data: [] });
+    if (u.pathname === '/v1/customers/search') return Response.json({ data: foundCustomers });
+    if (u.pathname === '/v1/billing_portal/sessions' && m === 'POST') { lastPortalCustomer = new URLSearchParams(String(init?.body)).get('customer'); return Response.json({ url: 'https://billing.stripe.test/p' }); }
     if (u.pathname === '/v1/customers' && m === 'POST') return Response.json({ id: 'cus_new' });
     if (u.pathname === '/v1/subscriptions' && m === 'GET') return Response.json({ data: stripeSubsList });
     if (u.pathname === '/v1/checkout/sessions' && m === 'GET') return Response.json({ data: openSessions });
@@ -125,6 +128,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const id = (u.searchParams.get('identity_id') ?? '').replace('eq.', '');
     return Response.json(subs.has(id) ? [subs.get(id)] : []);
   }
+  if (u.pathname === '/rest/v1/bobby_brief_paid_periods') return init?.method && init.method !== 'GET' ? new Response(null, { status: 204 }) : Response.json([]);
   return new Response(null, { status: 204 });
 }) as typeof fetch;
 
@@ -132,7 +136,7 @@ const { syncRevenueCat } = await import('../api/_lib/revenuecat.ts');
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const later = new Date(Date.now() + 60 * 86_400_000).toISOString();
 const ent = (product = 'p') => ({ pro: { expires_date: future, product_identifier: product } });
-const reset = () => { subs.clear(); writes = []; stripeCalls = []; stripeQueries = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; sessionForms = []; sessionKeys = []; sessionGate = null; failSessionOnce = false; failComplete = false; sessionStatus = 'open'; attempts.clear(); blockedForDeletion.clear(); purchases.clear(); checkoutEvents.clear(); refunds = []; charge = {}; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
+const reset = () => { subs.clear(); writes = []; stripeCalls = []; stripeQueries = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; sessionForms = []; sessionKeys = []; sessionGate = null; failSessionOnce = false; failComplete = false; sessionStatus = 'open'; attempts.clear(); blockedForDeletion.clear(); purchases.clear(); checkoutEvents.clear(); refunds = []; charge = {}; foundCustomers = []; lastPortalCustomer = null; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
 const UID = '00000000-0000-4000-8000-000000000001';
 
 // ---------------- RC-01 ----------------
@@ -426,5 +430,24 @@ eq([w.status, purchases.size], [200, 2], 'repeated charge.refunded events dedupe
 refunds[2].status = 'succeeded';
 w = await deliver({ id: 'evt_refund_update', type: 'refund.updated', data: { object: { id: 're_pending', charge: 'ch_1' } } });
 eq([w.status, purchases.size, purchases.get('stripe-refund-re_pending')?.price_usd], [200, 3, -0.5], 'a later successful async refund is added once');
+
+// The portal finds the customer at Stripe when the row does not carry it yet (webhook pending), and never creates one.
+{
+  process.env.STRIPE_SECRET_KEY = 'sk_test_x'; process.env.STRIPE_PRICE_ID = 'price_x';
+  const { default: accessHandler } = await import('../api/bobby-access.ts');
+  let portalIp = 0;
+  const portal = async () => {
+    const res = { statusCode: 200, body: null as any, status(c: number) { this.statusCode = c; return this; }, json(b: unknown) { this.body = b; return this; }, setHeader() {} };
+    await accessHandler({ method: 'POST', body: { action: 'portal' }, query: {}, headers: { authorization: 'Bearer user-token', 'x-forwarded-for': `10.9.7.${++portalIp}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
+    return res;
+  };
+  reset();
+  let p = await portal();
+  eq([p.statusCode, stripeCalls.includes('POST /v1/customers')], [404, false], 'the portal never creates a customer');
+  reset();
+  foundCustomers = [{ id: 'cus_meta' }];
+  p = await portal();
+  eq([p.statusCode, p.body?.url, lastPortalCustomer], [200, 'https://billing.stripe.test/p', 'cus_meta'], 'the portal opens for a customer found by metadata');
+}
 
 console.log(`payments-guards: ${checks} checks passed`);

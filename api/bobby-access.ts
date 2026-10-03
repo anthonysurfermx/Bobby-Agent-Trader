@@ -28,7 +28,7 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
-import { customerFor, expireCheckoutSession, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
+import { customerFor, expireCheckoutSession, findCustomer, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
 import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
 import { recordCheckoutOpened } from './_lib/funnel.js';
 
@@ -238,8 +238,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (action === 'portal') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id);
-      if (!existing?.stripe_customer_id) return res.status(404).json({ error: 'No card subscription on this account.' });
-      const portal = await stripe('billing_portal/sessions', { customer: existing.stripe_customer_id, return_url: `${siteOrigin(req)}/desk` });
+      // The row may not carry the customer yet (webhook pending or retrying): Stripe is asked by metadata, never created.
+      const portalCustomer = await findCustomer(identity.id, existing?.stripe_customer_id).catch(() => null);
+      if (!portalCustomer) return res.status(404).json({ error: 'No card subscription on this account.' });
+      const portal = await stripe('billing_portal/sessions', { customer: portalCustomer, return_url: `${siteOrigin(req)}/desk` });
       return res.status(200).json({ url: portal.url });
     }
 

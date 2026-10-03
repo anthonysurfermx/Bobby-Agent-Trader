@@ -50,6 +50,9 @@ const grantRpc = (c: Call) => {
   giftReceipts.set(c.body.p_operation, { payload, result });
   return json(result);
 };
+let subscriptionRows: Array<Record<string, unknown>> = [];
+let stripeDown = false;
+const stripeCalls: string[] = [];
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const raw = init?.body ? String(init.body) : '';
   let body: any = null;
@@ -81,6 +84,13 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (c.url.includes('rpc/bobby_admin_coverage')) return json({ eventsSince: '2026-10-01T12:00:00Z', readsSince: '2026-09-27T00:00:00Z' });
   if (c.url.includes('bobby_coupons') && c.method === 'POST') return json([{ code: c.body.code, reads: c.body.reads }], 201);
   if (c.url.includes('rpc/bobby_admin_grant_once')) return grantRpc(c);
+  if (c.url.includes('bobby_subscriptions?identity_id=eq.') && c.method === 'GET') return json(subscriptionRows);
+  if (c.url.includes('rpc/bobby_checkout_block_for_deletion')) return json({ customer: null, sessionId: null });
+  if (c.url.startsWith('https://api.stripe.com/')) {
+    const path = new URL(c.url).pathname; stripeCalls.push(`${c.method} ${path}`);
+    if (stripeDown) return json({ error: { message: 'down' } }, 500);
+    return json(path === '/v1/subscriptions' ? { data: [{ id: 'sub_live', status: 'active' }] } : { data: [] });
+  }
   if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
   if (c.url.includes('/auth/v1/admin/users/')) return json({});
   if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
@@ -243,7 +253,17 @@ try {
   eq(wrong.statusCode, 400, 'deletion needs the typed email');
   ok(!calls.some((c) => c.method === 'DELETE'), 'and deletes nothing');
   eq((await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: ADMIN, confirm: 'owner@example.com' })).statusCode, 400, 'never yourself');
+  // A card plan that may still charge is cancelled at Stripe before anything is deleted; if Stripe cannot confirm, nothing is.
+  process.env.STRIPE_SECRET_KEY = 'sk_test_admin';
+  subscriptionRows = [{ identity_id: USER, provider: 'stripe', status: 'active', stripe_subscription_id: 'sub_live', stripe_customer_id: 'cus_1' }];
+  stripeDown = true;
+  const blocked = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'reader@example.com' });
+  eq(blocked.statusCode, 503, 'Stripe cannot confirm the cancellation: the deletion stops');
+  ok(!calls.some((c) => c.method === 'DELETE' && !c.url.startsWith('https://api.stripe.com/')), 'and nothing of ours is deleted');
+  stripeDown = false; stripeCalls.length = 0;
   const gone = await call('POST', 'Bearer admin-token', {}, { action: 'delete-user', identityId: USER, confirm: 'Reader@Example.com' });
+  ok(stripeCalls.includes('DELETE /v1/subscriptions/sub_live'), 'the live card plan is cancelled at Stripe first');
+  subscriptionRows = []; delete process.env.STRIPE_SECRET_KEY;
   eq(gone.statusCode, 200, 'an account is deleted');
   const order = calls.map((c) => `${c.method} ${c.url.replace(/^https:\/\/db\.test/, '')}`).filter((s) => /agent_trades|bobby_identities\?id|auth\/v1\/admin/.test(s));
   eq(order.map((s) => s.split('?')[0]), ['GET /rest/v1/bobby_identities', 'DELETE /auth/v1/admin/users/' + USER_AUTH, 'PATCH /rest/v1/agent_trades', 'DELETE /rest/v1/bobby_identities'], 'sign-in first (a failure leaves everything for the retry), then trades de-linked, then data');

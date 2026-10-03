@@ -12,7 +12,9 @@ import { gunzipSync } from 'node:zlib';
 import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './bobby-db.js';
 import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
-import { callerHash, deviceHash, paywallOn } from './access.js';
+import { callerHash, deviceHash, getSubscription, paywallOn } from './access.js';
+import { stopBillingFor } from './stripe-api.js';
+import { blockCheckoutForDeletion } from './checkout-attempt.js';
 import { countryCode, fromAlpha3 } from './geo.js';
 
 const TIMEOUT = 6000;
@@ -198,6 +200,12 @@ export async function deleteUser(admin: Identity, body: Record<string, unknown>)
   const confirm = typeof body.confirm === 'string' ? body.confirm.trim().toLowerCase() : '';
   // Apple accounts that hide their email are confirmed by their id.
   if (confirm !== (row.email || row.id).toLowerCase()) throw new AdminError(400, 'Type the account email to confirm.');
+  // Card billing stops first, as in api/account.ts: a deleted account can never reach the portal again. A charge that
+  // is still possible and cannot be confirmed stopped ends the deletion with nothing changed (red team 2026-10-02).
+  let billing: Awaited<ReturnType<typeof stopBillingFor>>;
+  try { billing = await stopBillingFor(row.id, await getSubscription(row.id), await blockCheckoutForDeletion(row.id)); }
+  catch { throw new AdminError(503, 'Stripe could not confirm the card subscription was cancelled, so nothing was deleted. Retry.'); }
+  if (billing.unverified) console.error('[admin] delete: stripe unverified', row.id, billing.unverified);
   // The sign-in goes first: if it fails nothing is deleted yet, so a retry finds the account again.
   if (row.auth_user_id) {
     const url = (process.env.BOBBY_AUTH_URL || bobbyDbUrl()).replace(/\/+$/, '');
@@ -209,7 +217,7 @@ export async function deleteUser(admin: Identity, body: Record<string, unknown>)
   }
   await rest(`agent_trades?user_id=eq.${row.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: null }) });
   await rest(`bobby_identities?id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-  return { target: row.email || row.id };
+  return { target: row.email || row.id, ...(billing.unverified ? { stripeUnverified: billing.unverified } : {}) };
 }
 
 export async function setAdmin(admin: Identity, body: Record<string, unknown>) {
