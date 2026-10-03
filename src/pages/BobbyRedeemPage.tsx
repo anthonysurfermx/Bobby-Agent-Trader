@@ -76,7 +76,7 @@ export default function BobbyRedeemPage() {
 
   const signIn = (provider: 'apple' | 'google') => {
     rememberReturn(validCode(code) ? `/redeem?code=${code}&lang=${l}` : `/redeem?lang=${l}`);
-    window.location.assign(`/signin?provider=${provider}&lang=${l}&locale=${speechLocale()}`);
+    window.location.assign(`/signin?provider=${provider}&lang=${encodeURIComponent(l)}&locale=${encodeURIComponent(speechLocale())}`);
   };
 
   async function submit(event: FormEvent<HTMLFormElement>) {

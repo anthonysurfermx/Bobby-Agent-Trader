@@ -314,7 +314,7 @@ function sentenceStart(before: string): number {
 
 // Hedges that deny what follows them: "far from a sure bet", "it would be a
 // mistake to call this a sure thing", "lejos de ser una apuesta segura".
-const HEDGE_BEFORE = /(?:\bfar\s+from(?:\s+(?:being|an?|the))*\s*$|\blejos\s+de(?:\s+(?:ser|una?|el|la))*\s*$|\bloin\s+d['’][eê]tre(?:\s+(?:une?|le|la))*\s*$|\balles\s+andere\s+als(?:\s+eine?)?\s*$|\btutt['’]altro\s+che(?:\s+(?:una?|un))*\s*$|\blonge\s+de(?:\s+(?:ser|uma?|um|o|a))*\s*$|\b(?:mistake|wrong|misleading|incorrect)\s+to\s+(?:call|say|treat|describe|label)\b|\b(?:error|equivocado|enga[ñn]oso)\s+(?:llamar|decir|tratar|describir)\b)/iu;
+const HEDGE_BEFORE = /(?:\bfar\s+from(?:\s+(?:being|an?|the))*\s*$|\blejos\s+de(?:\s+(?:ser|una?|el|la))*\s*$|\bloin\s+d['’][eê]tre(?:\s+(?:une?|le|la))*\s*$|\balles\s+andere\s+als(?:\s+eine?)?\s*$|\btutt['’]altro\s+che(?:\s+una?)*\s*$|\blonge\s+de(?:\s+(?:ser|uma?|o|a))*\s*$|\b(?:mistake|wrong|misleading|incorrect)\s+to\s+(?:call|say|treat|describe|label)\b|\b(?:error|equivocado|enga[ñn]oso)\s+(?:llamar|decir|tratar|describir)\b)/iu;
 // …and ones that deny what came before them: "Calling this risk-free would be wrong."
 const HEDGE_AFTER = /^\s*(?:would|is|was|will)\s+(?:be\s+)?(?:wrong|a\s+mistake|misleading|incorrect|an?\s+(?:exaggeration|overstatement))\b|^\s*(?:ser[ií]a|es)\s+(?:un\s+error|enga[ñn]oso|incorrecto|una\s+exageraci[oó]n)/iu;
 
