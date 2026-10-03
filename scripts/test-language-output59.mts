@@ -280,6 +280,15 @@ for(const language of [...languages,'pt-BR'] as const){
   });
 }
 
+// What the answer guard must stop, and what it must let through, in each reader's language.
+const guardProse={
+  en:{advice:'You should buy BTC now.',guarantee:'A non-negotiable, guaranteed profit.',disclaimer:'Nothing here is guaranteed, and no trade is risk-free.'},
+  es:{advice:'Deberías comprar BTC ahora.',guarantee:'La ganancia está garantizada.',disclaimer:'No es una recomendación de compra.'},
+  fr:{advice:"Je te recommande d'acheter BTC maintenant.",guarantee:'Cette stratégie garantit des profits.',disclaimer:"Ce n'est pas un conseil financier. Aucun rendement n'est garanti."},
+  pt:{advice:'Deves comprar BTC agora.',guarantee:'Os lucros estão garantidos.',disclaimer:'Isto não é aconselhamento financeiro. Nenhum lucro está garantido.'},
+  it:{advice:'Ti consiglio di comprare BTC.',guarantee:'I rendimenti sono garantiti.',disclaimer:'Non è una raccomandazione. Nessun rendimento è garantito.'},
+  de:{advice:'Du solltest jetzt BTC kaufen.',guarantee:'Deine Gewinne sind garantiert.',disclaimer:'Keine Gewinne sind garantiert. Nichts ist garantiert.'},
+};
 const originalFetch=globalThis.fetch;
 let activeLanguage: typeof languages[number]='en', modelCalls=0, mode='ok';
 const prompts:string[]=[];
@@ -297,7 +306,8 @@ globalThis.fetch=(async(input:RequestInfo|URL,init?:RequestInit)=>{
   if(url.hostname==='api.openai.com'||url.hostname==='api.anthropic.com'){
     const payload=JSON.parse(String(init?.body));prompts.push(String(init?.body)); modelCalls++;
     const w=words[activeLanguage];const isCio=JSON.stringify(payload.system||payload.messages).includes('Your role is CIO:');
-    const reply=isCio?{analysis:w[0],verdict:'wait',direction:'none',synthesis:{headline:w[0],why:w[1],risk:w[2],watch:w[3],watchLevel:0,followUp:w[4]}}:{analysis:w[0]};
+    const argument=(guardProse[activeLanguage] as Record<string,string>)[mode]??w[0];
+    const reply=isCio?{analysis:w[0],verdict:'wait',direction:'none',synthesis:{headline:w[0],why:w[1],risk:w[2],watch:w[3],watchLevel:0,followUp:w[4]}}:{analysis:argument};
     if(isCio&&String(payload.system).includes('Also return scenarios'))Object.assign(reply,{scenarios:{confirm:w[1],invalidate:w[2]}});
     const content=mode==='invalid_model'?'{}':JSON.stringify(reply);
     if(url.hostname==='api.anthropic.com')return json({stop_reason:'end_turn',content:[{type:'text',text:content}]});
@@ -333,6 +343,16 @@ try{
       assert.equal(result.statusCode,503);assert.equal(result.body.code,'analysis_failed');
       assert.equal(result.body.error,deskErrorCopy(language,'The analysis could not finish. Please retry. No verdict was issued.','El análisis no pudo terminar. Inténtalo de nuevo. No se emitió ningún veredicto.'));
       assert.ok(!result.body.agents);
+    });
+    for(const kind of ['advice','guarantee'] as const)await check(`handler/${locale}: ${kind} in the reader's language fails the read with localized copy and no verdict`,async()=>{
+      mode=kind;const result=await post({symbol:'BTC',question:words[language][4],language,locale});
+      assert.equal(result.statusCode,503);assert.equal(result.body.code,'analysis_failed');assert.ok(!result.body.agents);
+      assert.equal(result.body.error,deskErrorCopy(language,'The analysis could not finish. Please retry. No verdict was issued.','El análisis no pudo terminar. Inténtalo de nuevo. No se emitió ningún veredicto.'));
+      assert.ok(!JSON.stringify(result.body).includes(guardProse[language][kind]),'The rejected prose never reaches the reader');
+    });
+    await check(`handler/${locale}: the same language's disclaimer reaches the reader untouched`,async()=>{
+      mode='disclaimer';const result=await post({symbol:'BTC',question:words[language][4],language,locale});
+      assert.equal(result.statusCode,200);assert.equal(result.body.agents.alpha,guardProse[language].disclaimer);assert.equal(result.body.agents.red,guardProse[language].disclaimer);
     });
     mode='ok';
   }

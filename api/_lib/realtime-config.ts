@@ -4,7 +4,8 @@ import { voiceScreenContext } from '../../src/lib/realtime-context.js';
 const REALTIME_MODEL = 'gpt-realtime-2.1';
 export function realtimeConfig(body: Record<string, unknown>) {
   const { lang, voice, autoLanguage, symbol, timeframe } = body;
-  const sessionLang = appLanguage(lang, 'es');
+  // A request without a supported `lang` takes the language of its locale, else the shared default (English).
+  const sessionLang = appLanguage(lang, appLanguage(body.locale));
   const locale = appLocale(sessionLang, body.locale);
   const languageMode = autoLanguage === false ? sessionLang : 'auto';
   const screen = voiceScreenContext(symbol, timeframe);

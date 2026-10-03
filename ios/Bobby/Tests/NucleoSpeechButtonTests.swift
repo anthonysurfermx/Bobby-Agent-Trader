@@ -6,6 +6,7 @@ import XCTest
 @MainActor
 final class NucleoSpeechButtonTests: XCTestCase {
     private var previousSelection: String?
+    private var suites: [String] = []
 
     override func setUp() {
         super.setUp()
@@ -15,7 +16,18 @@ final class NucleoSpeechButtonTests: XCTestCase {
     override func tearDown() {
         if let previousSelection { UserDefaults.standard.set(previousSelection, forKey: L.preferenceKey) }
         else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        for name in suites { UserDefaults.standard.removePersistentDomain(forName: name) }
+        suites.removeAll()
         super.tearDown()
+    }
+
+    /// An isolated store for the Apple speech service agreement (never the app's own defaults).
+    private func store(agreed: Bool = false) -> UserDefaults {
+        let name = "NucleoSpeechButtonTests." + UUID().uuidString
+        suites.append(name)
+        let defaults = UserDefaults(suiteName: name)!
+        if agreed { defaults.set(true, forKey: NucleoSpeech.appleServiceConsentKey) }
+        return defaults
     }
 
     func testFirstHoldOffersPermissionBeforeARecognizerIsReadyInEveryLanguage() {
@@ -70,24 +82,96 @@ final class NucleoSpeechButtonTests: XCTestCase {
         XCTAssertEqual(speech.stop(cancel: false), .idle)
     }
 
-    func testGrantedAuthorizationWithoutALocalModelIsGrantedAndReportsOnDeviceTruthfully() {
-        let server = NucleoSpeech(permissionInputs: {
+    func testGrantedAuthorizationWithoutALocalModelNeedsTheAgreementAndReportsOnDeviceTruthfully() {
+        XCTAssertEqual(NucleoSpeech.appleServiceConsentKey, "speech.appleServiceConsent.v1")
+        let pending = NucleoSpeech(defaults: store(), permissionInputs: {
+            .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
+        })
+        XCTAssertEqual(pending.permission(), .init(state: "consent", onDevice: false))
+        let server = NucleoSpeech(defaults: store(agreed: true), permissionInputs: {
             .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
         })
         XCTAssertEqual(server.permission(), .init(state: "granted", onDevice: false))
-        let local = NucleoSpeech(permissionInputs: {
-            .init(mic: .granted, speech: .authorized, available: true, onDevice: true)
-        })
-        XCTAssertEqual(local.permission(), .init(state: "granted", onDevice: true))
+        // The on-device path never depends on the agreement.
+        for agreed in [false, true] {
+            let local = NucleoSpeech(defaults: store(agreed: agreed), permissionInputs: {
+                .init(mic: .granted, speech: .authorized, available: true, onDevice: true)
+            })
+            XCTAssertEqual(local.permission(), .init(state: "granted", onDevice: true))
+        }
+    }
+
+    func testAppleSpeechServiceWithoutTheStoredAgreementReportsConsentAndNeverOpensAudioInEveryLanguage() {
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            let speech = NucleoSpeech(defaults: store(), permissionInputs: {
+                .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
+            })
+            var audioStarts = 0
+            speech.willStart = { audioStarts += 1 }
+            XCTAssertEqual(speech.permission(), .init(state: "consent", onDevice: false), language.rawValue)
+            XCTAssertEqual(speech.start(), .consent, language.rawValue)
+            XCTAssertEqual(NucleoSpeech.StartStatus.consent.rawValue, "consent")
+            XCTAssertFalse(speech.isListening, language.rawValue)
+            XCTAssertEqual(audioStarts, 0, "Nothing may open before the user agreed to Apple's speech service")
+            XCTAssertEqual(speech.stop(cancel: true), .idle)
+        }
+    }
+
+    func testTheApplePromptIsRaisedOnlyInTheConsentStateAndOnlyAnAllowIsStored() async {
+        let defaults = store()
+        var inputs = NucleoSpeech.PermissionInputs(mic: .granted, speech: .authorized, available: true, onDevice: false)
+        let speech = NucleoSpeech(defaults: defaults, permissionInputs: { inputs })
+        var asked = 0, answer = false
+        speech.confirmAppleService = { asked += 1; return answer }
+        // "Type instead": nothing is stored, nothing starts, and a later request asks again.
+        let declined = await speech.requestPermission()
+        XCTAssertEqual(declined, .init(state: "consent", onDevice: false))
+        XCTAssertNil(defaults.object(forKey: NucleoSpeech.appleServiceConsentKey))
+        XCTAssertEqual(speech.start(), .consent)
+        XCTAssertEqual(asked, 1)
+        answer = true
+        let allowed = await speech.requestPermission()
+        XCTAssertEqual(allowed, .init(state: "granted", onDevice: false))
+        XCTAssertTrue(defaults.bool(forKey: NucleoSpeech.appleServiceConsentKey))
+        XCTAssertEqual(asked, 2)
+        // Agreed: never asked again.
+        let again = await speech.requestPermission()
+        XCTAssertEqual(again.state, "granted")
+        XCTAssertEqual(asked, 2)
+        // Withdrawn with the AI permission: the state is `consent` again and nothing starts.
+        speech.revokeAppleServiceConsent()
+        XCTAssertFalse(speech.appleServiceConsent)
+        XCTAssertEqual(speech.permission(), .init(state: "consent", onDevice: false))
+        XCTAssertEqual(speech.start(), .consent)
+        // The local model, a refusal and an unreachable service never raise the prompt.
+        let quiet: [(NucleoSpeech.PermissionInputs, String)] = [
+            (.init(mic: .granted, speech: .authorized, available: true, onDevice: true), "granted"),
+            (.init(mic: .granted, speech: .authorized, available: false, onDevice: false), "unavailable"),
+            (.init(mic: .denied, speech: .authorized, available: true, onDevice: false), "denied"),
+            (.init(mic: .granted, speech: .restricted, available: true, onDevice: false), "restricted")
+        ]
+        for (snapshot, state) in quiet {
+            inputs = snapshot
+            let result = await speech.requestPermission()
+            XCTAssertEqual(result.state, state)
+            XCTAssertEqual(asked, 2, state)
+            XCTAssertNil(defaults.object(forKey: NucleoSpeech.appleServiceConsentKey), state)
+        }
     }
 
     func testNextHoldRechecksPermissionAndCapabilityAfterAPrompt() {
         var inputs = NucleoSpeech.PermissionInputs(mic: .undetermined, speech: .notDetermined, available: false, onDevice: false)
-        let speech = NucleoSpeech(permissionInputs: { inputs })
+        let defaults = store()
+        let speech = NucleoSpeech(defaults: defaults, permissionInputs: { inputs })
         XCTAssertEqual(speech.start(), .needsPermission)
         inputs = .init(mic: .granted, speech: .authorized, available: false, onDevice: false)
         XCTAssertEqual(speech.start(), .unavailable)
+        // Reachable again, through Apple's speech service only: the agreement comes first.
         inputs = .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
+        XCTAssertEqual(speech.permission(), .init(state: "consent", onDevice: false))
+        XCTAssertEqual(speech.start(), .consent)
+        defaults.set(true, forKey: NucleoSpeech.appleServiceConsentKey)
         XCTAssertEqual(speech.permission(), .init(state: "granted", onDevice: false))
         inputs = .init(mic: .granted, speech: .authorized, available: true, onDevice: true)
         XCTAssertEqual(speech.permission(), .init(state: "granted", onDevice: true))

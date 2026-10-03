@@ -37,7 +37,10 @@ class Surface {
   blur() {}
 }
 function animation() { return new Proxy({ x: 0, t: 0, to() {}, set() {}, tween() {}, moving: () => false }, { get(target, key) { if (!(key in target)) target[key] = animation(); return target[key]; } }); }
-function world(page, language = 'de', permission = 'granted', pointer = true, delayedStart = false) {
+// native: what the bridge answers now. `fresh` = speech.permission (default: the cached state), `prompt` = the state
+// speech.requestPermission resolves with (the OS prompts and the Apple speech service alert), `start` = speech.start,
+// `wait` = a promise that keeps that alert on screen until the test answers it.
+function world(page, language = 'de', permission = 'granted', pointer = true, delayedStart = false, native = {}) {
   const doc = new Surface('document', null, 'DOCUMENT'), win = new Surface('window', null, 'WINDOW'), stage = new Surface('stage', null, 'DIV');
   const pill = new Surface('pill', 'pill'), ta = new Surface(page === 'app' ? 'ta' : 'typeIn', null, 'TEXTAREA'), typeBox = new Surface('typeBox', null, 'DIV'), send = new Surface('typeSend');
   const elements = { pill, typeBox, typeIn: ta, typeSend: send, rbody: new Surface('rbody', null, 'DIV') };
@@ -45,7 +48,7 @@ function world(page, language = 'de', permission = 'granted', pointer = true, de
   let realTime = 1000;
   const c = { window: win, document: doc, D: doc, stage, pill, HARNESS: false, SCRIPTED: false, RM: true, T: 1, clk: 1, fitS: 1, fitX: 0, fitY: 0, FIT: 1, FIT_X: 0, FIT_Y: 0,
     performance: { now: () => realTime }, setTimeout() {}, clamp: (v, a, b) => Math.max(a, Math.min(b, v)), lerp: (a, b, p) => a + (b - a) * p, noop() {},
-    A: animation(), U: animation(), S: animation(), E: {}, BODY: {}, SPEECH: {}, STATES: {}, ENTER: {}, ST: { name: 'IDLE' }, SESSION: { mic: { state: permission } }, SES: { mic: { state: permission } },
+    A: animation(), U: animation(), S: animation(), E: {}, BODY: {}, SPEECH: {}, STATES: {}, ENTER: {}, ST: { name: 'IDLE' }, GEN: 0, idleMode: () => 'mic', SESSION: { mic: { state: permission } }, SES: { mic: { state: permission } },
     el: { pill, ta, typeBox, taSend: send }, $: id => elements[id] || new Surface(id), CARDS: [], cardD: null, DSCROLL: { max: 0 }, RISK_LAYOUT: null, RISK_NOTICE: null,
     tick() {}, at(seconds, run) { timers.push({ at: realTime + seconds * 1000, run }); }, after() {}, cue() {}, chromeUp() {}, readShowing: () => false, lineShown: () => false, txReset() {}, txText: () => '', txSet() {}, meriOut() {}, hint: value => hints.push(value),
     pillMode() {}, clearRead() {}, glassHome() {}, moveSphere() {}, tintHome() {}, greetOut() {}, noteOut() {}, att() {}, st() {}, logErr: (where, e) => errors.push(`${where}: ${e.message}`),
@@ -56,7 +59,14 @@ function world(page, language = 'de', permission = 'granted', pointer = true, de
     fire: (method, params) => calls.push({ method, params }),
     W: page === 'app' ? win : { state: 'ASK_TEACH', press: null, listenSeq: 0, pr: {}, lean: {}, micBreath: true, txShift: {}, track: {} },
   };
-  function bridge(method, params) { calls.push({ method, params }); if (method === 'speech.start' && delayedStart) return new Promise(resolve => starts.push(resolve)); return Promise.resolve({ status: method === 'speech.start' ? 'listening' : 'idle' }); }
+  function bridge(method, params) {
+    calls.push({ method, params });
+    if (method === 'speech.start' && delayedStart) return new Promise(resolve => starts.push(resolve));
+    if (method === 'speech.permission') return native.fresh === 'error' ? Promise.reject(new Error('test permission failure')) : Promise.resolve({ state: native.fresh || permission, onDevice: false });
+    if (method === 'speech.requestPermission' && native.wait) return native.wait.then(() => ({ state: native.prompt || 'granted', onDevice: false }));
+    if (method === 'speech.requestPermission') return Promise.resolve({ state: native.prompt || 'granted', onDevice: false });
+    return Promise.resolve({ status: method === 'speech.start' ? (native.start || 'listening') : 'idle' });
+  }
   if (pointer) win.PointerEvent = function() {};
   doc.elementFromPoint = () => pill;
   const ctx = vm.createContext(c);
@@ -64,7 +74,7 @@ function world(page, language = 'de', permission = 'granted', pointer = true, de
   ctx.LANG = language;
   const fsm = read(base + page + '/60-fsm.js');
   if (page === 'app') {
-    vm.runInContext(fn(fsm, 'pillDown') + '\n' + fsm.slice(fsm.indexOf('STATES.PRE_PERMISSION ='), fsm.indexOf('/* ---------- TYPING:')) + '\n' + fn(fsm, 'openTyping'), ctx);
+    vm.runInContext(fsm.slice(fsm.indexOf('function pillDown('), fsm.indexOf('/* ---------- TYPING:')) + '\n' + fn(fsm, 'openTyping'), ctx);
     c.STATES.IDLE = { down: (hit, p) => hit === 'pill' ? c.pillDown(p) : null };
     c.STATES.TYPING = { send() { calls.push({ method: 'typed.send' }); }, cancel() { c.ST.name = 'IDLE'; } };
     c.go = (name, data = {}) => { const previous = c.ST.name; c.ST.name = name; transitions.push(name); if (data.hint) hints.push(c.tt(data.hint)); if (name === 'LISTENING') c.STATES.LISTENING.enter(previous, data); };
@@ -75,6 +85,9 @@ function world(page, language = 'de', permission = 'granted', pointer = true, de
     vm.runInContext(read(base + 'onboarding/90-input.js'), ctx);
   }
   return { c, stage, win, doc, pill, ta, calls, transitions, hints, errors, starts,
+    speech: () => calls.filter(x => x.method.startsWith('speech.')).map(x => x.method),
+    mic: () => (page === 'app' ? c.SES : c.SESSION).mic.state,
+    lastHint: key => assert.equal(hints.at(-1), page === 'app' ? c.tt(key) : c.Ls(key)),
     input: page === 'app' ? stage : win,
     advance(seconds) { realTime += seconds * 1000; c.clk += seconds; c.T += seconds; for (let i = 0; i < timers.length;) { if (timers[i].at <= realTime) timers.splice(i, 1)[0].run(); else i++; } },
     flush: async () => { await Promise.resolve(); await Promise.resolve(); },
@@ -94,18 +107,105 @@ for (const page of ['app', 'onboarding']) for (const language of languages) {
     await result.flush();
     check(`${page}/${language}/${permission} permission reply preserves viewport and explicit typing`, () => { assert.equal(result.ta.focusCount, 0); assert.equal(result.state(), page === 'app' ? 'IDLE' : 'ASK_TEACH'); assert.equal(result.hints.at(-1), page === 'app' ? result.c.tt('hint.micOff') : result.c.Ls('hint.micOff')); assert.equal(result.calls.filter(x => x.method === 'speech.requestPermission').length, 1); });
   }
+  for (const [answer, typed] of [['granted', 0], ['consent', 1]]) {
+    const card = world(page, language, 'undetermined', true, false, { prompt: answer });
+    if (page === 'app') { card.c.ST.name = 'PRE_PERMISSION'; card.c.STATES.PRE_PERMISSION.cont(); }
+    else { card.c.W.state = 'PRE_PERMISSION'; card.c.permContinue(); }
+    await card.flush();
+    check(`${page}/${language} permission card: Apple speech prompt answered ${answer === 'granted' ? 'allow keeps the keyboard closed' : 'type opens typing'}`, () => { assert.equal(card.mic(), answer); assert.equal(card.ta.focusCount, typed); assert.equal(card.state() === 'TYPING', typed === 1); assert.deepEqual(card.speech(), ['speech.requestPermission']); });
+  }
   for (const permission of ['denied', 'restricted', 'unavailable']) {
     const w = world(page, language, permission);
-    w.input.emit('pointerdown', { target: w.pill }); w.advance(0.3);
+    w.input.emit('pointerdown', { target: w.pill }); w.advance(0.3); await w.flush();
     check(`${page}/${language}/${permission} hold provides localized feedback before release`, () => { assert.equal(w.hints.at(-1), page === 'app' ? w.c.tt('hint.micOff') : w.c.Ls('hint.micOff')); assert.ok(w.hints.at(-1)); assert.equal(w.ta.focusCount, 0); });
     w.advance(0.5); w.input.emit('pointerup', { target: w.pill });
-    check(`${page}/${language}/${permission} hold keeps the keyboard closed`, () => { assert.equal(w.ta.focusCount, 0); assert.notEqual(w.state(), 'TYPING'); assert.ok(w.hints.length, 'localized unavailable hint'); assert.equal(w.calls.filter(x => x.method.startsWith('speech.')).length, 0); });
+    check(`${page}/${language}/${permission} hold keeps the keyboard closed`, () => { assert.equal(w.ta.focusCount, 0); assert.notEqual(w.state(), 'TYPING'); assert.ok(w.hints.length, 'localized unavailable hint'); assert.deepEqual(w.speech(), ['speech.permission'], 'the hold asks native once and starts nothing'); assert.equal(w.mic(), permission, 'denied and unavailable stay distinct'); });
     const tap = world(page, language, permission);
     tap.input.emit('pointerdown', { target: tap.pill }); tap.advance(0.1); tap.input.emit('pointerup', { target: tap.pill });
-    check(`${page}/${language}/${permission} tap still types`, () => { assert.equal(tap.state(), 'TYPING'); assert.equal(tap.ta.focusCount, 1); });
+    check(`${page}/${language}/${permission} tap still types`, () => { assert.equal(tap.state(), 'TYPING'); assert.equal(tap.ta.focusCount, 1); assert.deepEqual(tap.speech(), []); });
     const cancelled = world(page, language, permission);
     cancelled.input.emit('pointerdown', { target: cancelled.pill }); cancelled.advance(0.1); cancelled.input.emit('pointercancel', { target: cancelled.pill }); cancelled.advance(1);
-    check(`${page}/${language}/${permission} cancel invalidates delayed hold feedback`, () => { assert.equal(cancelled.ta.focusCount, 0); assert.deepEqual(cancelled.hints.filter(Boolean), []); });
+    check(`${page}/${language}/${permission} cancel invalidates delayed hold feedback`, () => { assert.equal(cancelled.ta.focusCount, 0); assert.deepEqual(cancelled.hints.filter(Boolean), []); assert.deepEqual(cancelled.speech(), []); });
+    // The cache is stale: native can listen now (the connection came back, a model was installed, access changed).
+    const back = world(page, language, permission, true, false, { fresh: 'granted' });
+    back.input.emit('pointerdown', { target: back.pill }); back.advance(0.3); await back.flush();
+    check(`${page}/${language}/${permission} stale cache: the same hold records once native says granted`, () => { assert.equal(back.state(), 'LISTENING'); assert.deepEqual(back.speech(), ['speech.permission', 'speech.start']); assert.equal(back.mic(), 'granted'); assert.equal(back.ta.focusCount, 0); });
+    back.advance(0.5); back.input.emit('pointerup', { target: back.pill }); await back.flush();
+    check(`${page}/${language}/${permission} stale cache: releasing that hold ends dictation once`, () => { assert.equal(back.calls.filter(x => x.method === 'speech.stop' && !x.params?.cancel).length, 1); assert.ok(!back.calls.some(x => x.method === 'speech.stop' && x.params?.cancel)); assert.equal(back.ta.focusCount, 0); });
+    const next = world(page, language, permission, true, false, { fresh: 'granted' });
+    next.input.emit('pointerdown', { target: next.pill }); next.advance(0.6); next.input.emit('pointerup', { target: next.pill }); await next.flush();
+    check(`${page}/${language}/${permission} stale cache: an answer after the release invites the next hold`, () => { assert.deepEqual(next.speech(), ['speech.permission']); assert.equal(next.mic(), 'granted'); if (page === 'app') next.lastHint('hint.hold'); else { assert.equal(next.transitions.at(-1), 'ASK_TEACH'); assert.deepEqual(next.hints.filter(Boolean), [], 'the quiet beat shows hold to ask, never the unavailable line'); } assert.equal(next.ta.focusCount, 0); assert.notEqual(next.state(), 'TYPING'); });
+    next.input.emit('pointerdown', { target: next.pill }); await next.flush();
+    check(`${page}/${language}/${permission} stale cache: the next hold starts at once`, () => assert.deepEqual(next.speech(), ['speech.permission', 'speech.start']));
+    const other = permission === 'unavailable' ? 'denied' : 'unavailable';
+    const moved = world(page, language, permission, true, false, { fresh: other });
+    moved.input.emit('pointerdown', { target: moved.pill }); moved.advance(0.6); moved.input.emit('pointerup', { target: moved.pill }); await moved.flush();
+    check(`${page}/${language}/${permission} fresh ${other} replaces the cache and is never merged with it`, () => { assert.equal(moved.mic(), other); assert.deepEqual(moved.speech(), ['speech.permission']); moved.lastHint('hint.micOff'); assert.equal(moved.ta.focusCount, 0); });
+    const failing = world(page, language, permission, true, false, { fresh: 'error' });
+    failing.input.emit('pointerdown', { target: failing.pill }); failing.advance(0.6); failing.input.emit('pointerup', { target: failing.pill }); await failing.flush();
+    check(`${page}/${language}/${permission} a failed re-query keeps the cached state and still explains`, () => { assert.equal(failing.mic(), permission); failing.lastHint('hint.micOff'); assert.equal(failing.ta.focusCount, 0); assert.deepEqual(failing.speech(), ['speech.permission']); });
+    const first = world(page, language, permission, true, false, { fresh: 'undetermined' });
+    first.input.emit('pointerdown', { target: first.pill }); first.advance(0.6); first.input.emit('pointerup', { target: first.pill }); await first.flush();
+    check(`${page}/${language}/${permission} fresh undetermined leads to the pre-permission card, not to a prompt`, () => { assert.equal(first.state(), 'PRE_PERMISSION'); assert.deepEqual(first.speech(), ['speech.permission']); assert.equal(first.ta.focusCount, 0); });
+  }
+  // `consent`: only Apple's speech service can transcribe the language and the user has not agreed to it.
+  // Native asks (speech.requestPermission raises its alert) before anything is captured; the page follows the answer.
+  for (const cached of ['consent', 'unavailable', 'denied']) {
+    const allow = world(page, language, cached, true, false, { fresh: 'consent', prompt: 'granted' });
+    allow.input.emit('pointerdown', { target: allow.pill }); allow.advance(0.3); await allow.flush();
+    check(`${page}/${language}/${cached} hold in the consent state asks before anything is captured`, () => { assert.deepEqual(allow.speech(), ['speech.permission', 'speech.requestPermission']); assert.equal(allow.ta.focusCount, 0); assert.notEqual(allow.state(), 'LISTENING'); });
+    allow.input.emit('pointerup', { target: allow.pill }); await allow.flush();
+    check(`${page}/${language}/${cached} allow keeps the keyboard closed and invites the next hold`, () => { assert.equal(allow.mic(), 'granted'); assert.equal(allow.ta.focusCount, 0); assert.notEqual(allow.state(), 'TYPING'); assert.ok(!allow.speech().includes('speech.start')); if (page === 'app') allow.lastHint('hint.hold'); else assert.equal(allow.transitions.at(-1), 'ASK_TEACH'); });
+    allow.input.emit('pointerdown', { target: allow.pill }); await allow.flush();
+    check(`${page}/${language}/${cached} the hold after allow records`, () => { assert.deepEqual(allow.speech().slice(-1), ['speech.start']); assert.equal(allow.speech().filter(x => x === 'speech.requestPermission').length, 1); assert.equal(allow.state(), 'LISTENING'); });
+  }
+  const type = world(page, language, 'consent', true, false, { prompt: 'consent' });
+  type.input.emit('pointerdown', { target: type.pill }); type.advance(0.6); type.input.emit('pointerup', { target: type.pill }); await type.flush();
+  check(`${page}/${language} type in the consent prompt opens typing and stores nothing`, () => { assert.equal(type.state(), 'TYPING'); assert.equal(type.ta.focusCount, 1); assert.equal(type.mic(), 'consent'); assert.deepEqual(type.speech(), ['speech.permission', 'speech.requestPermission']); });
+  if (page === 'app') type.c.ST.name = 'IDLE'; else type.c.W.state = 'ASK_TEACH';
+  type.input.emit('pointerdown', { target: type.pill }); type.advance(0.6); type.input.emit('pointerup', { target: type.pill }); await type.flush();
+  check(`${page}/${language} a later hold offers the consent prompt again`, () => { assert.equal(type.speech().filter(x => x === 'speech.requestPermission').length, 2); assert.ok(!type.speech().includes('speech.start')); });
+  const consentTap = world(page, language, 'consent');
+  consentTap.input.emit('pointerdown', { target: consentTap.pill }); consentTap.advance(0.1); consentTap.input.emit('pointerup', { target: consentTap.pill }); consentTap.advance(1); await consentTap.flush();
+  check(`${page}/${language} a tap in the consent state types and asks nothing`, () => { assert.equal(consentTap.state(), 'TYPING'); assert.equal(consentTap.ta.focusCount, 1); assert.deepEqual(consentTap.speech(), []); });
+  const consentCancel = world(page, language, 'consent');
+  consentCancel.input.emit('pointerdown', { target: consentCancel.pill }); consentCancel.advance(0.1); consentCancel.input.emit('pointercancel', { target: consentCancel.pill }); consentCancel.advance(1); await consentCancel.flush();
+  check(`${page}/${language} a cancelled press in the consent state asks nothing`, () => { assert.deepEqual(consentCancel.speech(), []); assert.equal(consentCancel.ta.focusCount, 0); });
+  const consentDrag = world(page, language, 'consent');
+  consentDrag.input.emit('pointerdown', { target: consentDrag.pill }); consentDrag.advance(0.3); consentDrag.input.emit('pointermove', { target: consentDrag.pill, clientY: 670 }); await consentDrag.flush();
+  check(`${page}/${language} a hold dragged away before native answers raises no prompt`, () => { assert.deepEqual(consentDrag.speech(), ['speech.permission']); assert.equal(consentDrag.ta.focusCount, 0); });
+  // A stale `granted` cache: native refuses to start without the agreement and the page asks, still capturing nothing.
+  const refused = world(page, language, 'granted', true, false, { start: 'consent', prompt: 'consent' });
+  refused.input.emit('pointerdown', { target: refused.pill }); await refused.flush();
+  check(`${page}/${language} speech.start answering consent raises the prompt and never listens`, () => { assert.deepEqual(refused.speech().slice(0, 2), ['speech.start', 'speech.requestPermission']); assert.notEqual(refused.state(), 'LISTENING'); });
+  await refused.flush();
+  check(`${page}/${language} declining after a refused start opens typing with the cache corrected`, () => { assert.equal(refused.mic(), 'consent'); assert.equal(refused.state(), 'TYPING'); assert.equal(refused.ta.focusCount, 1); });
+  if (page === 'app') {
+    // The alert takes longer to read than ERROR (6 s) or RETURNING last, so the glass goes home under it. The answer
+    // is still followed there; a read that began meanwhile is never interrupted.
+    const prompted = async (from, answer, then) => {
+      let answerPrompt; const opened = [];
+      const w = world(page, language, 'consent', true, false, { prompt: answer, wait: new Promise(resolve => { answerPrompt = resolve; }) });
+      const go = w.c.go; w.c.go = (name, data = {}) => { if (name === 'TYPING') opened.push(JSON.parse(JSON.stringify(data))); go(name, data); };   // a plain copy: the page's object belongs to its own realm
+      w.c.ST.name = from; w.c.STATES[from] = { down: (hit, p) => hit === 'pill' ? w.c.pillDown(p, true) : null };
+      w.input.emit('pointerdown', { target: w.pill }); w.advance(0.6); w.input.emit('pointerup', { target: w.pill }); await w.flush();
+      assert.deepEqual(w.speech(), ['speech.permission', 'speech.requestPermission'], 'the prompt is up and nothing was captured');
+      if (then) { w.c.GEN += 2; w.c.ST.name = then; }
+      w.hints.length = 0; answerPrompt(); await w.flush(); await w.flush();
+      return { w, opened };
+    };
+    for (const rest of ['IDLE', 'RETURNING']) {
+      const typed = await prompted('ERROR', 'consent', rest);
+      check(`${page}/${language} type answered after the glass came to rest (${rest}) still opens typing`, () => { assert.equal(typed.w.state(), 'TYPING'); assert.equal(typed.w.ta.focusCount, 1); assert.deepEqual(typed.opened, [{ fromRead: false }]); assert.equal(typed.w.mic(), 'consent'); assert.ok(!typed.w.speech().includes('speech.start')); });
+    }
+    const allowed = await prompted('ERROR', 'granted', 'IDLE');
+    check(`${page}/${language} allow answered after the glass came to rest invites the next hold`, () => { assert.equal(allowed.w.mic(), 'granted'); allowed.w.lastHint('hint.hold'); assert.equal(allowed.w.ta.focusCount, 0); assert.equal(allowed.w.state(), 'IDLE'); });
+    for (const answer of ['consent', 'granted']) {
+      const busy = await prompted('ERROR', answer, 'THINK_WAIT');
+      check(`${page}/${language} ${answer === 'consent' ? 'type' : 'allow'} answered during another read never interrupts it`, () => { assert.equal(busy.w.state(), 'THINK_WAIT'); assert.equal(busy.w.ta.focusCount, 0); assert.deepEqual(busy.opened, []); assert.deepEqual(busy.w.hints, []); assert.equal(busy.w.mic(), answer, 'native remains the source of the mic state'); });
+    }
+    const inRead = await prompted('CARDS', 'consent', null);
+    check(`${page}/${language} type answered where the hold began keeps the read behind the keyboard`, () => { assert.equal(inRead.w.state(), 'TYPING'); assert.equal(inRead.w.ta.focusCount, 1); assert.deepEqual(inRead.opened, [{ fromRead: true }]); });
   }
   const active = world(page, language);
   const down = active.input.emit('pointerdown', { target: active.pill }); await active.flush();

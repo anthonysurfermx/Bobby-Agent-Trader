@@ -15,7 +15,7 @@ final class NativeSpeechPipelineTests: XCTestCase {
     }
 
     override func tearDown() {
-        for context in contexts { context.speech.cancel(); context.clock.drain() }
+        for context in contexts { context.speech.cancel(); context.clock.drain(); context.forget() }
         contexts.removeAll()
         if let previousSelection { UserDefaults.standard.set(previousSelection, forKey: L.preferenceKey) }
         else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
@@ -32,9 +32,13 @@ final class NativeSpeechPipelineTests: XCTestCase {
         ("de", "de-DE", "Überprüfe den Kurs: 1.234,56 € — heißt das Größe?")
     ]
 
-    private func context(_ item: (String, String, String), onDevice: Bool = true) -> SpeechPipelineContext {
+    /// `agreed`: the Apple speech service agreement is stored (isolated defaults; never by default, so
+    /// every on-device test below also proves that the local model needs no agreement).
+    /// `reportsOnDevice`: what the permission snapshot claims when it differs from the recognizer.
+    private func context(_ item: (String, String, String), onDevice: Bool = true, agreed: Bool = false,
+                         reportsOnDevice: Bool? = nil) -> SpeechPipelineContext {
         UserDefaults.standard.set(item.0, forKey: L.preferenceKey)
-        let context = SpeechPipelineContext(locale: item.1, onDevice: onDevice)
+        let context = SpeechPipelineContext(locale: item.1, onDevice: onDevice, agreed: agreed, reportsOnDevice: reportsOnDevice)
         contexts.append(context)
         return context
     }
@@ -63,9 +67,9 @@ final class NativeSpeechPipelineTests: XCTestCase {
         }
     }
 
-    func testMissingOnDeviceModelRecognizesThroughAppleSpeechServiceInTheSameLanguageAndRegion() async {
+    func testMissingOnDeviceModelRecognizesThroughAppleSpeechServiceInTheSameLanguageAndRegionOnceAgreed() async {
         for item in Self.cases {
-            let c = context(item, onDevice: false)
+            let c = context(item, onDevice: false, agreed: true)
             XCTAssertEqual(c.speech.permission(), .init(state: "granted", onDevice: false), item.1)
             XCTAssertEqual(c.speech.start(), .listening, item.1)
             XCTAssertEqual(c.speech.resolveRecognizer()?.locale.identifier, item.1, "The capture keeps its own recognizer")
@@ -85,9 +89,143 @@ final class NativeSpeechPipelineTests: XCTestCase {
         }
     }
 
-    func testUnreachableSpeechServiceWithoutAModelNeverOpensTheMicrophoneAndRecoversOnTheNextHold() async {
+    func testAppleSpeechServiceWithoutTheStoredAgreementNeverCreatesARequestOrOpensTheMicrophone() async {
         for item in Self.cases {
             let c = context(item, onDevice: false)
+            XCTAssertEqual(c.speech.permission(), .init(state: "consent", onDevice: false), item.1)
+            XCTAssertEqual(c.speech.start(), .consent, item.1)
+            XCTAssertFalse(c.speech.isListening, item.1)
+            XCTAssertNil(c.capture.request, "No recognition request may exist before the agreement: " + item.1)
+            XCTAssertFalse(c.capture.opened, item.1)
+            XCTAssertEqual(c.capture.closeCount, 0)
+            XCTAssertEqual(c.recognizer.tasks.count, 0)
+            XCTAssertEqual(c.audioStarts, 0, "The voice is not even interrupted")
+            XCTAssertEqual(c.events.count, 0)
+            XCTAssertEqual(c.speech.stop(cancel: false), .idle)
+            // "Type instead" in the prompt: nothing stored, still no capture, and it can be asked again.
+            let declined = await c.speech.requestPermission()
+            XCTAssertEqual(declined, .init(state: "consent", onDevice: false), item.1)
+            XCTAssertEqual(c.prompts, 1)
+            XCTAssertNil(c.defaults.object(forKey: NucleoSpeech.appleServiceConsentKey))
+            XCTAssertEqual(c.speech.start(), .consent, item.1)
+            XCTAssertNil(c.capture.request)
+            XCTAssertEqual(c.recognizer.tasks.count, 0)
+            // "Allow": stored natively; the next hold records through Apple's speech service, same language and region.
+            c.promptAnswer = true
+            let allowed = await c.speech.requestPermission()
+            XCTAssertEqual(allowed, .init(state: "granted", onDevice: false), item.1)
+            XCTAssertEqual(c.prompts, 2)
+            XCTAssertTrue(c.defaults.bool(forKey: NucleoSpeech.appleServiceConsentKey))
+            XCTAssertEqual(c.speech.start(), .listening, item.1)
+            XCTAssertEqual(c.speech.resolveRecognizer()?.locale.identifier, item.1)
+            XCTAssertTrue(c.capture.request?.requiresOnDeviceRecognition == false, item.1)
+            XCTAssertEqual(c.recognizer.tasks.count, 1)
+            XCTAssertEqual(c.audioStarts, 1)
+            c.speech.cancel()
+            // Withdrawn: the very next hold is refused again.
+            c.speech.revokeAppleServiceConsent()
+            XCTAssertEqual(c.speech.start(), .consent, item.1)
+            XCTAssertEqual(c.recognizer.tasks.count, 1)
+        }
+    }
+
+    func testOnDeviceRecognitionNeverNeedsTheAgreementAndNeverRaisesThePrompt() async {
+        for item in Self.cases {
+            let c = context(item)
+            XCTAssertNil(c.defaults.object(forKey: NucleoSpeech.appleServiceConsentKey))
+            XCTAssertEqual(c.speech.permission(), .init(state: "granted", onDevice: true), item.1)
+            let asked = await c.speech.requestPermission()
+            XCTAssertEqual(asked, .init(state: "granted", onDevice: true), item.1)
+            XCTAssertEqual(c.prompts, 0, "The on-device path has no prompt: " + item.1)
+            XCTAssertEqual(c.speech.start(), .listening, item.1)
+            XCTAssertTrue(c.capture.request?.requiresOnDeviceRecognition == true, item.1)
+            XCTAssertNil(c.defaults.object(forKey: NucleoSpeech.appleServiceConsentKey))
+            c.speech.cancel()
+        }
+    }
+
+    func testAServerRecognizerNeverStartsWithoutTheAgreementEvenWhenThePhoneHoldsTheModel() {
+        for item in Self.cases {
+            // The permission snapshot sees the local model, but only a server recognizer can run right now.
+            let c = context(item, onDevice: false, reportsOnDevice: true)
+            XCTAssertEqual(c.speech.permission(), .init(state: "granted", onDevice: true), item.1)
+            XCTAssertEqual(c.speech.start(), .unavailable, item.1)
+            XCTAssertFalse(c.speech.isListening)
+            XCTAssertNil(c.capture.request, "Start is the enforcement point: " + item.1)
+            XCTAssertEqual(c.recognizer.tasks.count, 0)
+            XCTAssertEqual(c.audioStarts, 0)
+            XCTAssertEqual(c.events.count, 0)
+            c.defaults.set(true, forKey: NucleoSpeech.appleServiceConsentKey)
+            XCTAssertEqual(c.speech.start(), .listening, item.1)
+            XCTAssertTrue(c.capture.request?.requiresOnDeviceRecognition == false, item.1)
+            c.speech.cancel()
+        }
+    }
+
+    func testTheAgreementNeverLetsAnotherLanguageTranscribe() {
+        for item in Self.cases {
+            UserDefaults.standard.set(item.0, forKey: L.preferenceKey)
+            let c = context(item, onDevice: false, agreed: true)
+            // Apple's speech service is reachable for every other language, never for the app language.
+            var attempted: [String] = []
+            let capture = SpeechCaptureProbe()
+            let others = Set(["en-US", "es-MX", "fr-FR", "pt-BR", "it-IT", "de-DE"].filter { !$0.hasPrefix(item.0 + "-") })
+            let speech = NucleoSpeech(defaults: c.defaults,
+                permissionInputs: { .init(mic: .granted, speech: .authorized, available: true, onDevice: false) },
+                capture: capture, supportedLocales: { others },
+                makeRecognizer: { id in attempted.append(id); return PipelineRecognizerProbe(locale: id, onDevice: false) })
+            XCTAssertEqual(speech.start(), .unavailable, item.1)
+            XCTAssertEqual(attempted, [], "No recognizer of another language may be created for " + item.0)
+            XCTAssertNil(capture.request)
+            XCTAssertFalse(speech.isListening)
+        }
+    }
+
+    func testNativeSessionTellsThePageAboutTheAgreementAndWithdrawsItWithTheAIPermission() async throws {
+        let riskKey = "agent.riskNoticeVersion"
+        let savedRisk = UserDefaults.standard.object(forKey: riskKey)
+        defer {
+            if let savedRisk { UserDefaults.standard.set(savedRisk, forKey: riskKey) } else { UserDefaults.standard.removeObject(forKey: riskKey) }
+        }
+        let c = context(Self.cases[2], onDevice: false)   // French, no local model
+        let name = "SpeechPipeline.session." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: name)!
+        let session = NucleoSession(fixtures: true, speech: c.speech, defaults: defaults)
+        let recorder = SpeechSessionRecorder(context: c)
+        session.emitter = recorder
+        // The session installs the native alert; here the test answers in its place.
+        var prompts = 0, answer = false
+        c.speech.confirmAppleService = { prompts += 1; return answer }
+        let mic = session.sessionJSON()["mic"] as? [String: Any]
+        XCTAssertEqual(mic?["state"] as? String, "consent")
+        XCTAssertEqual(mic?["onDevice"] as? Bool, false)
+        let refused = try await session.dispatch("speech.start", NucleoParams([:])) as? [String: Any]
+        XCTAssertEqual(refused?["status"] as? String, "consent")
+        XCTAssertNil(c.capture.request)
+        let declined = try await session.dispatch("speech.requestPermission", NucleoParams([:])) as? [String: Any]
+        XCTAssertEqual(declined?["state"] as? String, "consent")
+        XCTAssertEqual(c.events.last(where: { $0.0 == "session.changed" }).flatMap { $0.1["mic"] as? [String: Any] }?["state"] as? String, "consent")
+        answer = true
+        let allowed = try await session.dispatch("speech.requestPermission", NucleoParams([:])) as? [String: Any]
+        XCTAssertEqual(allowed?["state"] as? String, "granted")
+        XCTAssertEqual(allowed?["onDevice"] as? Bool, false)
+        XCTAssertEqual(prompts, 2)
+        let started = try await session.dispatch("speech.start", NucleoParams([:])) as? [String: Any]
+        XCTAssertEqual(started?["status"] as? String, "listening")
+        XCTAssertTrue(c.capture.request?.requiresOnDeviceRecognition == false)
+        session.revokeRiskNoticeConsent()
+        XCTAssertFalse(c.speech.isListening)
+        XCTAssertFalse(c.capture.opened)
+        XCTAssertEqual(c.speech.permission().state, "consent")
+        XCTAssertEqual(c.speech.start(), .consent)
+        withExtendedLifetime(recorder) {}
+        session.teardown()
+        defaults.removePersistentDomain(forName: name)
+    }
+
+    func testUnreachableSpeechServiceWithoutAModelNeverOpensTheMicrophoneAndRecoversOnTheNextHold() async {
+        for item in Self.cases {
+            let c = context(item, onDevice: false, agreed: true)
             c.recognizer.isAvailable = false
             XCTAssertEqual(c.speech.start(), .unavailable, item.1)
             XCTAssertFalse(c.speech.isListening)
@@ -438,17 +576,39 @@ private final class SpeechPipelineContext {
     let recognizer: PipelineRecognizerProbe
     let clock = SpeechManualClock()
     let speech: NucleoSpeech
+    /// Isolated: holds only the Apple speech service agreement.
+    let defaults: UserDefaults
+    private let suite: String
     var events: [(String, [String: Any])] = []
+    /// `willStart` calls: the voice is interrupted only when a capture really begins.
+    var audioStarts = 0
+    /// The Apple speech service prompt: how often it was raised, and what the user answers.
+    var prompts = 0
+    var promptAnswer = false
 
-    init(locale: String, onDevice: Bool = true) {
+    init(locale: String, onDevice: Bool = true, agreed: Bool = false, reportsOnDevice: Bool? = nil) {
         recognizer = PipelineRecognizerProbe(locale: locale, onDevice: onDevice)
+        let suite = "SpeechPipeline.agreement." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        if agreed { defaults.set(true, forKey: NucleoSpeech.appleServiceConsentKey) }
+        self.suite = suite
+        self.defaults = defaults
         let recognizer = self.recognizer, capture = self.capture, clock = self.clock
-        speech = NucleoSpeech(permissionInputs: { .init(mic: .granted, speech: .authorized, available: true, onDevice: onDevice) },
+        let reported = reportsOnDevice ?? onDevice
+        speech = NucleoSpeech(defaults: defaults,
+            permissionInputs: { .init(mic: .granted, speech: .authorized, available: true, onDevice: reported) },
             capture: capture, sleep: { try await clock.sleep($0) }, supportedLocales: { [locale] },
             makeRecognizer: { $0 == locale ? recognizer : nil })
         speech.vocabulary = ["BTC", "NVDA", "SAP.DE", "São Paulo"]
         speech.emit = { [weak self] name, payload in self?.events.append((name, payload)) }
+        speech.willStart = { [weak self] in self?.audioStarts += 1 }
+        speech.confirmAppleService = { [weak self] in
+            self?.prompts += 1
+            return self?.promptAnswer ?? false
+        }
     }
+
+    func forget() { defaults.removePersistentDomain(forName: suite) }
 
     var names: [String] { events.map(\.0) }
     var states: [String] { events.filter { $0.0 == "speech.state" }.compactMap { $0.1["state"] as? String } }

@@ -3264,7 +3264,47 @@ function askPress(){
   if (W.gotLine){ capGone(W.gotLine); }
   to(W.lean, 1); W.micBreath = false;
   if (mic === 'granted') startListening(p);
-  else if (mic !== 'undetermined') at(0.25, function(){ if (W.press === p && !p.released && !p.cancelled) setHint(Ls('hint.micOff')); });
+  else if (mic !== 'undetermined') at(0.25, function(){ if (W.press === p && !p.released && !p.cancelled) askFresh(p); });
+}
+/* The cached session says the mic cannot listen, and that cache goes stale (the connection came back, a dictation
+   model was installed, access changed). Once the press is a hold, native is asked again (speech.permission) and its
+   fresh answer decides; `denied` and `unavailable` stay what native says they are. A short tap asks nothing: it types. */
+function askFresh(p){
+  if (p.asked) return; p.asked = true;
+  function answered(m){
+    if (m && m.state){ if (SESSION) SESSION.mic = m; p.mic = m.state; }
+    p.fresh = true;
+    if (p.cancelled || W.press && W.press !== p) return;   /* cancelled, or a newer press owns the pill */
+    if (p.mic === 'consent'){ askAppleSpeech(p); return; }
+    if (p.released){ askSettle(p); return; }
+    if (W.press !== p) return;
+    if (p.mic === 'granted') startListening(p);   /* still held: this hold records */
+    else if (p.mic !== 'undetermined') setHint(Ls('hint.micOff'));   /* a hold is a voice attempt: say so while the finger is down */
+  }
+  call('speech.permission', {}).then(answered, function(){ answered(null); });
+}
+function askSettle(p){   /* the hold is over and native has answered */
+  if (!askCapable()) return;
+  if (p.mic === 'granted') go('ASK_TEACH', { quiet:true });   /* it can listen now: the next hold records */
+  else if (p.mic === 'undetermined') go('PRE_PERMISSION');
+  else if (p.mic !== 'consent') go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+}
+/* `consent`: only Apple's speech service can transcribe the app language on this phone, and the user has not agreed
+   to send the audio there. Native asks before anything is captured (speech.requestPermission raises its alert:
+   allow, or type) and keeps the answer; the page only follows it. "Type" stores nothing, so a later hold asks again. */
+function askAppleSpeech(p){
+  if (p){ p.cancelled = true; if (W.press === p) W.press = null; }
+  to(W.lean, 0);
+  if (W.consentBusy) return;
+  W.consentBusy = true;
+  call('speech.requestPermission', {}).then(function(m){
+    W.consentBusy = false;
+    if (m && m.state && SESSION) SESSION.mic = m;
+    if (!askCapable() || W.press) return;   /* the first run moved on, or a newer press owns the pill */
+    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true });   /* allowed: the next hold records */
+    else if (m && m.state === 'consent') go('TYPING');
+    else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+  }, function(){ W.consentBusy = false; });
 }
 function askRelease(cancelled){
   var p = W.press; if (!p) return; W.press = null; p.released = true;
@@ -3281,8 +3321,8 @@ function askRelease(cancelled){
   }
   to(W.lean, 0);
   if (dt < 0.25){ go('TYPING'); return; }
-  if (p.mic === 'undetermined'){ go('PRE_PERMISSION'); return; }
-  go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+  if (p.mic === 'undetermined' || p.fresh) askSettle(p);   /* undetermined: the card's Continue asks native */
+  else askFresh(p);   /* native's fresh answer decides when it arrives */
 }
 function startListening(p){
   var req = ++W.listenSeq;
@@ -3294,9 +3334,11 @@ function startListening(p){
     if (s === 'listening'){ p.listening = true; if (p.released && W.state === 'LISTENING') fire('speech.stop', {}); return; }
     endListenVisual();
     if (s === 'busy'){ go('ASK_TEACH', { quiet:true }); return; }
-    var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' ? 'unavailable' : 'denied');
-    if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' };
+    var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' || s === 'consent' ? s : 'denied');
+    if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' && mic !== 'consent' };
     p.mic = mic;
+    /* the cache said granted; native refused to start without the agreement to Apple's speech service */
+    if (mic === 'consent'){ go('ASK_TEACH', { quiet:true }); askAppleSpeech(p); return; }
     if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); }
     else { W.press = p; W.state = 'ASK_TEACH'; }   /* the release decides (card or typing) */
   }, function(){ if (req !== W.listenSeq) return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
@@ -3310,7 +3352,9 @@ function permContinue(){
   call('speech.requestPermission', {}).then(function(m){
     if (generation !== W.gen || W.state !== 'PRE_PERMISSION') return;
     W.permBusy = false; if (m && m.state && SESSION) SESSION.mic = m;
-    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true });
+    else if (m && m.state === 'consent') go('TYPING');   /* the Apple speech prompt followed the OS ones: the user chose to type */
+    else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
   }, function(){ if (generation !== W.gen || W.state !== 'PRE_PERMISSION') return; W.permBusy = false; go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); });
 }
 ENTER.LISTENING = function(){

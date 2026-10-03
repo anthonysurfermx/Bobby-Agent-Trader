@@ -10,7 +10,7 @@ import XCTest
 /// also writes the PNGs there at the device's native resolution.
 final class ProReviewShots: XCTestCase {
     private let app = XCUIApplication()
-    private let common = ["-agent.riskNoticeVersion", "5", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+    private let common = ["-agent.riskNoticeVersion", "6", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
                           "-companion.id", "momo", "-companion.selected.v2.local", "momo",
                           "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES"]
 

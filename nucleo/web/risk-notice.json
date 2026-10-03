@@ -42,37 +42,37 @@
     "fr": [
       {
         "title": "J’autorise le traitement de mes questions par l’IA.",
-        "body": "Bobby transmet votre question et le contexte public des marchés à OpenAI ou Anthropic pour analyse. La voix en direct transmet l’audio du microphone à OpenAI pour générer la conversation. La dictée du navigateur peut transmettre l’audio à son service vocal ; il n’est pas garanti qu’il reste sur cet appareil. Si la narration est activée, le texte de réponse peut être transmis à OpenAI ou Microsoft pour la voix. Évitez les données personnelles ou de compte. Vous pouvez retirer votre consentement à l’IA dans cet avis."
+        "body": "Bobby transmet ta question et le contexte public des marchés à OpenAI ou Anthropic pour analyse. La voix en direct transmet l’audio du microphone à OpenAI pour générer la conversation. La dictée du navigateur peut transmettre l’audio à son service vocal ; il n’est pas garanti qu’il reste sur cet appareil. Si la narration est activée, le texte de réponse peut être transmis à OpenAI ou Microsoft pour la voix. Évite les données personnelles ou de compte. Tu peux retirer ton consentement à l’IA dans cet avis."
       },
       {
         "title": "Aucun conseil en investissement.",
         "body": "Les conclusions, niveaux et seuils d’arrêt sont des analyses éducatives produites par un logiciel, sans recommandations personnelles."
       },
       {
-        "title": "Bobby ne détient jamais vos fonds et ne signe pas pour vous.",
-        "body": "Ce bureau peut préparer les données d’une transaction d’échange sur Base pour votre portefeuille connecté. Vous vérifiez et signez depuis votre portefeuille ; Bobby ne détient jamais vos fonds ni vos clés."
+        "title": "Bobby ne détient jamais tes fonds et ne signe pas pour toi.",
+        "body": "Ce bureau peut préparer les données d’une transaction d’échange sur Base pour ton portefeuille connecté. Tu vérifies et signes depuis ton portefeuille ; Bobby ne détient jamais tes fonds ni tes clés."
       },
       {
-        "title": "Vous pouvez perdre de l’argent. Vous décidez.",
-        "body": "Les données peuvent être tardives ou incorrectes. Pour un conseil, consultez un professionnel agréé."
+        "title": "Tu peux perdre de l’argent. Tu décides.",
+        "body": "Les données peuvent être tardives ou incorrectes. Pour un conseil, consulte un professionnel agréé."
       }
     ],
     "pt": [
       {
         "title": "Permito que a IA processe as minhas perguntas.",
-        "body": "O Bobby envia a sua pergunta e contexto público de mercado à OpenAI ou Anthropic para análise. A voz ao vivo envia áudio do microfone à OpenAI para gerar a conversa. O ditado do navegador pode enviar áudio ao seu serviço de voz; não há garantia de que permaneça neste dispositivo. Com narração ativa, o texto da resposta pode ir à OpenAI ou Microsoft para voz. Evite dados pessoais ou de contas. Pode retirar o consentimento de IA neste aviso."
+        "body": "O Bobby envia a tua pergunta e contexto público de mercado à OpenAI ou Anthropic para análise. A voz ao vivo envia áudio do microfone à OpenAI para gerar a conversa. O ditado do navegador pode enviar áudio ao seu serviço de voz; não há garantia de que permaneça neste dispositivo. Com narração ativa, o texto da resposta pode ir à OpenAI ou Microsoft para voz. Evita dados pessoais ou de contas. Podes retirar o consentimento de IA neste aviso."
       },
       {
         "title": "Não é aconselhamento de investimento.",
         "body": "Conclusões, níveis e limites de saída são análises educativas feitas por software, não recomendações pessoais."
       },
       {
-        "title": "O Bobby nunca guarda os seus fundos nem assina por si.",
-        "body": "Este espaço pode preparar dados de transações de troca na Base para a sua carteira ligada. Revê e assina na sua carteira; o Bobby nunca guarda os seus fundos nem chaves."
+        "title": "O Bobby nunca guarda os teus fundos nem assina por ti.",
+        "body": "Este espaço pode preparar dados de transações de troca na Base para a tua carteira ligada. Revês e assinas na tua carteira; o Bobby nunca guarda os teus fundos nem chaves."
       },
       {
-        "title": "Pode perder dinheiro. A decisão é sua.",
-        "body": "Os dados podem chegar tarde ou estar errados. Se precisar de aconselhamento, consulte um profissional autorizado."
+        "title": "Podes perder dinheiro. A decisão é tua.",
+        "body": "Os dados podem chegar tarde ou estar errados. Se precisares de aconselhamento, consulta um profissional autorizado."
       }
     ],
     "it": [

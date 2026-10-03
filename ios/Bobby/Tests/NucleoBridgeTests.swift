@@ -700,7 +700,9 @@ final class NucleoBridgeTests: XCTestCase {
         let permission = NucleoSpeech().permission()
         print("[NucleoBridgeTests] speech permission on this simulator:", permission.state, "onDevice", permission.onDevice)
         if permission.state == "unavailable" { XCTAssertFalse(permission.onDevice) }
-        XCTAssertTrue(["granted", "denied", "undetermined", "restricted", "unavailable"].contains(permission.state))
+        // `consent`: authorized, but only Apple's speech service can transcribe and the user has not agreed.
+        if permission.state == "consent" { XCTAssertFalse(permission.onDevice) }
+        XCTAssertTrue(["granted", "denied", "undetermined", "restricted", "unavailable", "consent"].contains(permission.state))
     }
 
     func testHapticsAreRateLimited() {

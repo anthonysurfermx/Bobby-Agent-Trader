@@ -194,24 +194,53 @@ const HUMAN_ALIASES: Record<string, string[]> = {
  * wrong instrument. (VIX→UVXY and CHATGPT→OPENAI were dropped entirely: a
  * levered ETF is not the index, and a product is not a company's stock.)
  */
-const PROXY_ALIASES: Record<string, { symbol: string; note: string }> = {
-  GOLD: { symbol: 'XAUT', note: 'Tether Gold (XAUT), a tokenized gold product' },
-  ORO: { symbol: 'XAUT', note: 'Tether Gold (XAUT), oro tokenizado' },
-  OIL: { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
-  PETROLEO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
-  CRUDO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
-  'CRUDE OIL': { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
+// What the gold and oil proxies really are, in the six interface languages. The reader's language wins over
+// the language of the word that matched ("oro" is Spanish and Italian, "gold" English and German).
+const GOLD_NOTES: Record<AppLanguage, string> = {
+  en: 'Tether Gold (XAUT), a tokenized gold product',
+  es: 'Tether Gold (XAUT), oro tokenizado',
+  pt: 'Tether Gold (XAUT), ouro tokenizado',
+  fr: 'Tether Gold (XAUT), de l’or tokenisé',
+  it: 'Tether Gold (XAUT), oro tokenizzato',
+  de: 'Tether Gold (XAUT), tokenisiertes Gold',
+};
+const OIL_NOTES: Record<AppLanguage, string> = {
+  en: 'United States Oil Fund (USO), an oil ETF — not spot oil',
+  es: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot',
+  pt: 'United States Oil Fund (USO), um ETF de petróleo — não é petróleo à vista',
+  fr: 'United States Oil Fund (USO), un ETF pétrolier — pas le pétrole au comptant',
+  it: 'United States Oil Fund (USO), un ETF sul petrolio — non petrolio spot',
+  de: 'United States Oil Fund (USO), ein Öl-ETF — kein Spot-Öl',
+};
+const PROXY_ALIASES: Record<string, { symbol: string; note: string; notes?: Record<AppLanguage, string> }> = {
+  GOLD: { symbol: 'XAUT', note: GOLD_NOTES.en, notes: GOLD_NOTES },
+  ORO: { symbol: 'XAUT', note: GOLD_NOTES.es, notes: GOLD_NOTES },
+  OIL: { symbol: 'USO', note: OIL_NOTES.en, notes: OIL_NOTES },
+  PETROLEO: { symbol: 'USO', note: OIL_NOTES.es, notes: OIL_NOTES },
+  CRUDO: { symbol: 'USO', note: OIL_NOTES.es, notes: OIL_NOTES },
+  'CRUDE OIL': { symbol: 'USO', note: OIL_NOTES.en, notes: OIL_NOTES },
   // Accent-free keys: the lookup strips accents ("pétrole", "petróleo", "Erdöl").
-  OURO: { symbol: 'XAUT', note: 'Tether Gold (XAUT), ouro tokenizado' },
-  PETROLE: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF pétrolier — pas le pétrole au comptant' },
-  PETROLIO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF sul petrolio — non petrolio spot' },
-  ERDOL: { symbol: 'USO', note: 'United States Oil Fund (USO), ein Öl-ETF — kein Spot-Öl' },
-  ROHOL: { symbol: 'USO', note: 'United States Oil Fund (USO), ein Öl-ETF — kein Spot-Öl' },
+  OURO: { symbol: 'XAUT', note: GOLD_NOTES.pt, notes: GOLD_NOTES },
+  PETROLE: { symbol: 'USO', note: OIL_NOTES.fr, notes: OIL_NOTES },
+  PETROLIO: { symbol: 'USO', note: OIL_NOTES.it, notes: OIL_NOTES },
+  ERDOL: { symbol: 'USO', note: OIL_NOTES.de, notes: OIL_NOTES },
+  ROHOL: { symbol: 'USO', note: OIL_NOTES.de, notes: OIL_NOTES },
   // ETF tickers that are not listed on OKX. Without these, "GLD" substring-
   // matched AGLD (Adventure Gold) and analyzed a game token with no warning.
   GLD: { symbol: 'XAUT', note: 'Tether Gold (XAUT), a tokenized gold product — GLD itself is not listed on OKX' },
   SLV: { symbol: 'XAG', note: 'Silver (XAG) perpetual — SLV itself is not listed on OKX' },
 };
+
+/**
+ * Commodity wording that cannot stand as a word of its own: French "l'or" (the bare "or" is a conjunction in
+ * French and English, so only the article or "prix de" makes it gold), German "Öl" (two letters) and the German
+ * compounds "Ölpreis", "Goldpreis", "Goldkurs". Each is read as the proxy word of the same commodity.
+ */
+const COMMODITY_PHRASES: ReadonlyArray<[RegExp, string]> = [
+  [/(?<![\p{L}\p{N}])(?:L['’]|(?:PRIX|COURS) D(?:E |['’]))OR(?![\p{L}\p{N}])/gu, ' GOLD '],
+  [/(?<![\p{L}\p{N}])GOLD-?(?:PREIS(?:E|ES)?|KURS)(?![\p{L}\p{N}])/gu, ' GOLD '],
+  [/(?<![\p{L}\p{N}])(?:ROH|ERD)?(?:ÖL|OEL)-?(?:PREIS(?:E|ES)?|KURS)?(?![\p{L}\p{N}])/gu, ' OIL '],
+];
 
 function normalizeQueryValue(value: string): string {
   return value.trim().toUpperCase();
@@ -222,12 +251,14 @@ function bareQueryValue(value: string): string {
   return value.normalize('NFD').replace(/\p{M}/gu, '');
 }
 
-function proxyAlias(term: string): { symbol: string; note: string } | undefined {
+function proxyAlias(term: string): (typeof PROXY_ALIASES)[string] | undefined {
   return PROXY_ALIASES[term] ?? PROXY_ALIASES[bareQueryValue(term)];
 }
 
 function compactQueryValue(value: string): string {
-  return normalizeQueryValue(value).replace(/[^A-Z0-9]/g, '');
+  // Accented letters fold to their base letter, like every word list here. Dropping them read French "été" as
+  // T (AT&T), Portuguese "até" as AT and Spanish "costó" as COST: whole tickers, analysed without asking.
+  return bareQueryValue(normalizeQueryValue(value)).replace(/[^A-Z0-9]/g, '');
 }
 
 function familyParts(raw: RawOkxInstrument): string[] {
@@ -596,11 +627,12 @@ function fuzzyBudget(term: string): number {
 }
 
 /** Query words worth fuzzing: long enough, alphabetic, not pure numbers. */
-function fuzzyTermsFor(normalized: string): string[] {
+function fuzzyTermsFor(normalized: string, everyday?: ReadonlySet<string>): string[] {
   const seen = new Set<string>();
   for (const word of normalized.split(/\s+/)) {
     // Filler is never a typo of an asset: Italian "come" is not COMP, Spanish "como" neither.
-    if (isFillerWord(word.replace(/[¿?¡!.,;:'’"]/g, ''))) continue;
+    const bare = word.replace(/[¿?¡!.,;:'’"]/g, '');
+    if (isFillerWord(bare) || everyday?.has(bareQueryValue(bare))) continue;
     const clean = word.replace(/[^A-Z0-9]/g, '');
     if (clean.length >= 4 && !/^\d+$/.test(clean)) seen.add(clean);
   }
@@ -613,9 +645,11 @@ export type OkxMatchKind = 'exact' | 'partial' | 'proxy' | 'fuzzy';
  * Score one instrument against a query and say HOW it matched. The kind is
  * the safety signal: `exact` (ticker/spoken name) analyzes straight away,
  * `proxy` (gold→XAUT, oil→USO) and `fuzzy` (typos, dictation mangles) must
- * be confirmed by the user before any analysis runs.
+ * be confirmed by the user before any analysis runs. `everyday` holds the
+ * tickers that are ordinary words in the reader's language: a typo guess is
+ * never made from one of them, nor towards one ("dati" is not DAI).
  */
-function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score: number; kind: OkxMatchKind; strong: boolean } {
+function scoreInstrument(instrument: OkxAssetInstrument, query: string, everyday?: ReadonlySet<string>): { score: number; kind: OkxMatchKind; strong: boolean } {
   const normalized = normalizeQueryValue(query);
   const compact = compactQueryValue(query);
   if (!normalized) return { score: 0, kind: 'partial', strong: false };
@@ -667,10 +701,11 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
   // aliases catches them, scored well below any exact/substring hit so real
   // matches always win. Priority still breaks ties toward the liquid market.
   if (!score) {
-    for (const term of fuzzyTermsFor(normalized)) {
+    for (const term of fuzzyTermsFor(normalized, everyday)) {
       const budget = fuzzyBudget(term);
       if (!budget) continue;
       for (const alias of instrument.aliases) {
+        if (everyday?.has(alias)) continue;
         const d = editDistanceAtMost(term, alias, budget);
         if (d <= budget && 620 - d * 40 > score) {
           score = 620 - d * 40;
@@ -685,8 +720,8 @@ function scoreInstrument(instrument: OkxAssetInstrument, query: string): { score
   return { score: score + instrument.priority, kind, strong };
 }
 
-function rankInstrument(instrument: OkxAssetInstrument, query: string): number {
-  return scoreInstrument(instrument, query).score;
+function rankInstrument(instrument: OkxAssetInstrument, query: string, everyday?: ReadonlySet<string>): number {
+  return scoreInstrument(instrument, query, everyday).score;
 }
 
 export async function searchOkxInstruments(
@@ -694,6 +729,8 @@ export async function searchOkxInstruments(
   options?: {
     instTypes?: OkxSearchInstType[];
     limit?: number;
+    /** The reader's language, when known: its everyday words are not typo-matched to tickers. */
+    language?: unknown;
   },
 ): Promise<OkxAssetInstrument[]> {
   const normalized = normalizeQueryValue(query);
@@ -702,10 +739,11 @@ export async function searchOkxInstruments(
   const limit = Math.min(Math.max(options?.limit || 8, 1), 25);
   const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
   const catalog = await getOkxInstrumentCatalog();
+  const everyday = options?.language == null ? undefined : HOMONYM_TICKERS[appLanguage(options.language)];
 
   return catalog
     .filter((instrument) => allowedTypes.has(instrument.instType))
-    .map((instrument) => ({ instrument, score: rankInstrument(instrument, normalized) }))
+    .map((instrument) => ({ instrument, score: rankInstrument(instrument, normalized, everyday) }))
     .filter((entry) => entry.score > 0)
     .sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
@@ -753,6 +791,9 @@ const QUERY_STOPWORDS = new Set([
   'ESO', 'PIENSAS', 'OPINAS', 'CREES', 'DEBERIA', 'DEBERÍA', 'SEMANA', 'MES', 'HAY', 'TIENE', 'PERO', 'MAS', 'MÁS',
   'ARE', 'MAIN', 'RISK', 'RISKS', 'CHART', 'CHARTS', 'CURRENT', 'TREND', 'THINK', 'SHOULD', 'DOES',
   'THIS', 'THAT', 'THESE', 'FOR', 'AND', 'WHY', 'WHEN', 'WILL', 'CAN', 'WEEK', 'MONTH', 'LOOK', 'LOOKS',
+  // Market shorthand written in capitals in every language: quote currencies, "ATH", "APR", "NFT", "GMT".
+  // Each is also a listed ticker, reachable by typing it alone.
+  'USD', 'USDT', 'USDC', 'ATH', 'APR', 'NFT', 'NFTS', 'GMT',
   // ---- French ----
   'QUEL', 'QUELLE', 'QUELS', 'QUELLES', 'QUOI', 'QUI', 'DONT', 'COMMENT', 'POURQUOI', 'QUAND', 'EST', 'SONT', 'SUIS',
   'ETES', 'ETRE', 'ETAIT', 'SERA', 'SERAIT', 'AVOIR', 'AVEZ', 'AVONS', 'LES', 'DES', 'UNE', 'DANS', 'SUR', 'SOUS', 'AVEC',
@@ -774,6 +815,7 @@ const QUERY_STOPWORDS = new Set([
   'ALLA', 'ALLO', 'AGLI', 'ALLE', 'PER', 'TRA', 'FRA', 'PIU', 'MENO', 'MOLTO', 'POCO', 'BENE', 'MALE', 'ANCHE', 'ANCORA',
   'GIA', 'MAI', 'SEMPRE', 'TUTTO', 'TUTTI', 'MIO', 'MIA', 'TUO', 'TUA', 'SUO', 'SUA', 'NOI', 'VOI', 'LORO', 'LEI', 'UNO',
   'GLI', 'ECCO', 'CIAO', 'GRAZIE', 'BUON', 'BUONO', 'BUONA', 'SICURO', 'OTTIMISTA', 'MOMENTO', 'AZIONE', 'AZIONI', 'CONVIENE',
+  'DATI', 'DATO', 'VEDI', 'VEDO', 'DIRE',
   // ---- German ----
   'WAS', 'WIE', 'WER', 'WANN', 'WARUM', 'WIESO', 'WELCHE', 'WELCHER', 'WELCHES', 'WELCHEN', 'IST', 'SIND', 'BIN', 'BIST',
   'SEID', 'WAR', 'WAREN', 'SEIN', 'HABE', 'HAST', 'HAT', 'HABEN', 'WIRD', 'WERDEN', 'WIRST', 'WERDE', 'KANN', 'KANNST',
@@ -798,20 +840,50 @@ const QUERY_STOPWORDS = new Set([
 ]);
 
 /**
- * Crypto tickers that are also everyday words in one interface language
- * (French "ton avis", Italian "sei sicuro", "sui mercati", "dai dati";
- * Portuguese "uma boa altura"). Inside a sentence such a word is the asset
- * only when written in capitals ("TON"); typed alone it always is. English and
- * Spanish keep their behaviour: their own filler is in the list above.
+ * Tickers and spoken names that are also everyday words in one interface
+ * language (French "ton avis", Italian "sei sicuro", "dai dati"; Spanish
+ * "el meme del día", "el sol"; Portuguese "uma boa altura"; English "is it
+ * safe", "the graph of"). Inside a sentence such a word is the asset only
+ * when written in capitals ("TON"); typed alone it always is. Checked against
+ * the live catalogue (672 bases, 2026-10-03); words are accent-free.
  */
+// The same everyday word in all six languages (loanwords and market slang).
+const EVERYDAY_ANYWHERE = [
+  'ANIME', 'APP', 'BIO', 'BOT', 'CAP', 'CHIP', 'COIN', 'CORE', 'DATA', 'DEGEN', 'ETC', 'GALA', 'HYPE', 'LAYER', 'MEGA', 'MEME',
+  'PROMPT', 'PUMP', 'SATS', 'SUPER', 'SUSHI', 'TEAM', 'THETA', 'TRUMP', 'TURBO', 'ZEN', 'ZOOM',
+];
 const HOMONYM_TICKERS: Record<AppLanguage, ReadonlySet<string>> = {
-  en: new Set(),
-  es: new Set(),
-  fr: new Set(['TON', 'MON', 'ONT', 'FIL', 'DIS', 'MEME', 'ORDI', 'SUPER']),
-  it: new Set(['SEI', 'SUI', 'DAI', 'DIA', 'ERA', 'GAS', 'SOLO', 'SUPER']),
-  pt: new Set(['SEI', 'UMA', 'DAI', 'DIA', 'ERA', 'GAS', 'VALE', 'SUPER']),
-  de: new Set(['GAS', 'ALT', 'ACH', 'SUPER']),
+  en: new Set([...EVERYDAY_ANYWHERE,
+    'ACE', 'ACT', 'ALGO', 'APE', 'ARM', 'AUCTION', 'BABY', 'BANANA', 'BAND', 'BASED', 'BAT', 'BEAT', 'BILL', 'BLEND', 'BLUR',
+    'CARDS', 'CAT', 'CITY', 'COST', 'DOGS', 'DOT', 'EDGE', 'FLOW', 'FLUID', 'FLY', 'GAS', 'GIGGLE', 'GOAT', 'GRAM',
+    'GRASS', 'HOME', 'HOOD', 'HOT', 'HUT', 'KITE', 'LAB', 'LIGHT', 'LINK', 'LIT', 'LITE', 'MAGIC', 'MASK', 'MET', 'MOONSHOT',
+    'MOVE', 'NEAR', 'NET', 'NIGHT', 'NOT', 'OFC', 'ONE', 'ORDER', 'PEOPLE', 'PIXEL', 'PROS', 'PROVE', 'QUANT', 'RAM', 'RAVE',
+    'RAY', 'RECALL', 'RENDER', 'RIOT', 'RIVER', 'SAFE', 'SAND', 'SENT', 'SHELL', 'SHOP', 'SIGN', 'SKY', 'SMH', 'SNOW', 'SOON',
+    'SPACE', 'STABLE', 'SUN', 'SYRUP', 'TRUST', 'TRUTH', 'USELESS', 'VINE', 'VIRTUAL', 'WEN', 'WET', 'WIN',
+    // Spoken names that are ordinary English words: "the graph of Bitcoin" is not The Graph.
+    'COMPOUND', 'CURVE', 'FETCH', 'GRAPH', 'IMMUTABLE', 'OPTIMISM', 'SANDBOX', 'STACKS', 'STELLAR', 'STRATEGY']),
+  es: new Set([...EVERYDAY_ANYWHERE,
+    'ALGO', 'BANANA', 'CIEN', 'DIA', 'ERA', 'GAS', 'LEO', 'LINEA', 'LINK', 'LUNA', 'META', 'MINA', 'MODERNA', 'PARTI', 'PROS', 'ROBO',
+    'SOL', 'SOLO', 'TIA', 'USAR', 'USO', 'VALE', 'VELO', 'VINE', 'VIRTUAL']),
+  fr: new Set([...EVERYDAY_ANYWHERE,
+    'ALLO', 'BAT', 'DIS', 'FIL', 'LIT', 'MET', 'META', 'MON', 'NET', 'ONT', 'ORDI', 'PARTI', 'PEOPLE', 'PLUME', 'PROS', 'QUANT',
+    'SENT', 'STABLE', 'TON', 'VELO']),
+  it: new Set([...EVERYDAY_ANYWHERE,
+    'BANANA', 'DAI', 'DIA', 'ERA', 'GAS', 'LIDO', 'LINEA', 'LINK', 'LUNA', 'META', 'MINA', 'MODERNA', 'PARTI', 'PROVE', 'SEI',
+    'SOLO', 'SUI', 'USO', 'VALE', 'VELO']),
+  pt: new Set([...EVERYDAY_ANYWHERE,
+    'ALGO', 'BANANA', 'DAI', 'DIA', 'ERA', 'FOGO', 'GAS', 'LIDO', 'LINK', 'META', 'MINA', 'MODERNA', 'MOVE', 'PARTI', 'PROS',
+    'PROVE', 'ROBO', 'SEI', 'SOL', 'SOLO', 'TAO', 'TIA', 'UMA', 'USAR', 'USO', 'VALE', 'VIRTUAL']),
+  de: new Set([...EVERYDAY_ANYWHERE,
+    'ACH', 'ALT', 'ARM', 'BAND', 'BAT', 'BRETT', 'EIGEN', 'GAS', 'GRAPH', 'HUT', 'LINK', 'NOT', 'ORDER', 'SAFE', 'SAND', 'SEI', 'SHOP',
+    'SOLO', 'TON', 'UNI', 'WAL', 'WEN']),
 };
+
+// A caller that does not say its language is not assumed to speak English: only the shared words apply.
+const EVERYDAY_UNKNOWN: ReadonlySet<string> = new Set(EVERYDAY_ANYWHERE);
+
+// Spoken names of more than one word ("BITCOIN CASH"): read as a unit, so "Bitcoin Cash" is never read as Bitcoin.
+const MULTIWORD_NAMES = new Set(Object.values(HUMAN_ALIASES).flat().filter((alias) => alias.includes(' ')));
 
 /** A word, or every part of a hyphenated one ("penses-tu", "est-ce"), is filler or too short to name an asset. */
 function isFillerWord(word: string): boolean {
@@ -822,21 +894,26 @@ export interface OkxResolvedAsset {
   instrument: OkxAssetInstrument;
   matchKind: OkxMatchKind;
   matchedTerm: string;
-  /** Fuzzy and proxy matches must be confirmed by the user before analysis. */
+  /** Anything but one asset named outright must be confirmed by the user before analysis. */
   needsConfirmation: boolean;
   /** For proxy matches: what the instrument actually is, in plain words. */
   proxyNote: string | null;
+  /** Only when the text names more than one asset: all of them in the order named, `instrument` first. */
+  candidates?: OkxAssetInstrument[];
 }
+
+type ScoredMatch = { instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind; strong: boolean };
 
 async function bestScoredMatch(
   query: string,
   allowedTypes: Set<OkxSearchInstType>,
-): Promise<{ instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind; strong: boolean } | null> {
+  everyday?: ReadonlySet<string>,
+): Promise<ScoredMatch | null> {
   const catalog = await getOkxInstrumentCatalog();
-  let best: { instrument: OkxAssetInstrument; score: number; kind: OkxMatchKind; strong: boolean } | null = null;
+  let best: ScoredMatch | null = null;
   for (const instrument of catalog) {
     if (!allowedTypes.has(instrument.instType)) continue;
-    const { score, kind, strong } = scoreInstrument(instrument, query);
+    const { score, kind, strong } = scoreInstrument(instrument, query, everyday);
     if (score <= 0) continue;
     if (!best || score > best.score || (score === best.score && instrument.priority > best.instrument.priority)) {
       best = { instrument, score, kind, strong };
@@ -847,21 +924,29 @@ async function bestScoredMatch(
 
 /**
  * Resolve free text ("que pasa con eterium", "taiwan semiconductor hoy") to
- * one instrument with an honest match kind. Candidate order: the whole
- * phrase first (multi-word names), then each non-stopword word. The first
- * EQUALITY hit (a whole ticker, id or spoken name) wins immediately, wherever
- * it sits in the question; a prefix-only exact hit waits for one, and a short
- * prefix ("SON" → SONIC) is a guess that must be confirmed. Then proxy beats
- * partial, and fuzzy only if nothing else.
+ * one instrument with an honest match kind. Only an unambiguous request is
+ * answered without confirmation: the whole text is a name or ticker, or the
+ * sentence names exactly one asset outright (a whole ticker, id or spoken
+ * name). Every asset the sentence names is collected, not just the first: two
+ * of them ("Bitcoin and Ethereum") come back as candidates to confirm. A
+ * commodity word (gold, oil) stands for its proxy and is always confirmed.
+ * Anything weaker (a prefix, a substring, a typo) is a guess: confirmed in a
+ * sentence, and never made from filler or from an everyday word.
  */
 export async function resolveOkxAssetFromText(
   text: string,
-  options?: { instTypes?: OkxSearchInstType[]; language?: unknown },
+  options?: {
+    instTypes?: OkxSearchInstType[];
+    language?: unknown;
+    /** The text is what is left of a longer sentence (another asset's name was taken out): no word of it stands alone. */
+    sentence?: boolean;
+  },
 ): Promise<OkxResolvedAsset | null> {
   const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
   text = text.normalize('NFC');
-  // The interface language decides which tickers are also ordinary words; none when it is unknown.
-  const homonyms = HOMONYM_TICKERS[appLanguage(options?.language)];
+  // The interface language decides which tickers are also ordinary words; unknown, only those shared by all six.
+  const language = appLanguage(options?.language);
+  const homonyms = options?.language == null ? EVERYDAY_UNKNOWN : HOMONYM_TICKERS[language];
   // Words the user wrote in capitals. A sentence typed entirely in capitals says nothing.
   const capitals = new Set(text !== text.toUpperCase() ? text.match(/(?<![\p{L}\p{N}])[\p{Lu}\p{N}]{2,}(?![\p{L}\p{N}])/gu) ?? [] : []);
   // Possessives and Romance elisions are word boundaries, not ticker prefixes:
@@ -869,38 +954,93 @@ export async function resolveOkxAssetFromText(
   // provider ids such as BTC-USDT intact. Only unambiguous names/tickers with
   // explicit German financial suffixes are split; gas-free, near-term and one-week
   // are ordinary prose and must not turn into GAS, NEAR or ONE token requests.
-  const upper = normalizeQueryValue(text)
+  // A pair written as traders do ("BTC/USDT", "BTCUSDT") names its base.
+  const upper = COMMODITY_PHRASES.reduce((value, [phrase, word]) => value.replace(phrase, word), normalizeQueryValue(text))
     .replace(/([A-Z0-9])['’]S\b/g, '$1')
     .replace(/\b(?:L|D|QU|J|N|C|S|M|T|UN|DELL|ALL|NELL|SULL|DALL|COS|COM|DOV)['’](?=[A-ZÀ-Ý])/g, '')
-    .replace(/[¿?¡!.,;:'’"«»“”()]/g, '');
+    .replace(/[¿?¡!.,;:'’"«»“”()]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
   if (!upper) return null;
 
-  // Three characters minimum per word: "in video" must not resolve INJ via "IN".
-  const words = upper.split(/\s+/)
-    .map(word => /^(BITCOIN|BTC|ETHEREUM|ETH|SOLANA|SOL|NVIDIA|NVDA)-(?:PREIS|KURS|CHART|AKTIE|RISIKO|RISIKEN)$/.exec(word)?.[1] ?? word)
-    .filter((w) => !isFillerWord(w) && !(homonyms.has(bareQueryValue(w)) && !capitals.has(w)));
-  const candidates = [...new Set([upper, ...words])];
-
-  let fallback: { resolved: OkxResolvedAsset; rank: number } | null = null;
-  for (const candidate of candidates) {
-    const hit = await bestScoredMatch(candidate, allowedTypes);
-    if (!hit) continue;
-    // A prefix-only "exact" hit from a short word is as much a guess as a short substring.
-    const shortPrefix = hit.kind === 'exact' && !hit.strong && candidate.length <= 4;
-    const resolved: OkxResolvedAsset = {
+  const tokens = upper.split(' ')
+    .map(word => /^(BITCOIN|BTC|ETHEREUM|ETH|SOLANA|SOL|NVIDIA|NVDA)-(?:PREIS|KURS|CHART|AKTIE|RISIKO|RISIKEN)$/.exec(word)?.[1]
+      ?? /^([A-Z0-9]{2,10})\/?(?:USDT|USDC)$/.exec(word)?.[1] ?? word);
+  const sentence = tokens.length > 1 || options?.sentence === true;
+  // A lone word left over from a longer sentence is weighed below as a word of it, not as the whole text.
+  const leftover = sentence && tokens.length === 1;
+  // An everyday word of the reader's language is the asset only in capitals (or alone, as the whole text).
+  const everyday = (word: string) => homonyms.has(bareQueryValue(word)) && !capitals.has(word);
+  const describe = (hit: ScoredMatch, term: string, needsConfirmation: boolean): OkxResolvedAsset => {
+    const proxy = hit.kind === 'proxy' ? proxyAlias(term) : undefined;
+    return {
       instrument: hit.instrument,
       matchKind: hit.kind,
-      matchedTerm: candidate,
-      // Short substring hits ("GLD" inside AGLD) are guesses too — ask first.
-      needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy' || shortPrefix || (hit.kind === 'partial' && candidate.length <= 4),
-      proxyNote: hit.kind === 'proxy' ? (proxyAlias(candidate)?.note ?? null) : null,
+      matchedTerm: term,
+      needsConfirmation,
+      proxyNote: proxy ? ((options?.language != null && proxy.notes?.[language]) || proxy.note) : null,
     };
-    if (hit.kind === 'exact' && hit.strong) return resolved;
-    // Prefix exact (long word) > proxy > short prefix guess > partial > fuzzy.
-    const rank = hit.kind === 'exact' ? (shortPrefix ? 1.5 : 3) : hit.kind === 'proxy' ? 2 : hit.kind === 'partial' ? 1 : 0;
-    if (!fallback || rank > fallback.rank) fallback = { resolved, rank };
+  };
+
+  // The whole text is one name or ticker ("ton", "Bitcoin Cash", "BTC-USDT"): nothing to weigh.
+  const whole = leftover ? null : await bestScoredMatch(upper, allowedTypes, homonyms);
+  if (whole?.kind === 'exact' && whole.strong) return describe(whole, upper, false);
+
+  // `named`: every asset the text names outright. `guess`: the best of what merely looks like one.
+  const named: Array<{ hit: ScoredMatch; term: string; at: number }> = [];
+  let guess = null as { resolved: OkxResolvedAsset; rank: number } | null;
+  const weigh = (hit: ScoredMatch | null, term: string, at: number) => {
+    if (!hit) return;
+    if (hit.kind === 'proxy' || (hit.kind === 'exact' && hit.strong)) {
+      const same = named.find((entry) => entry.hit.instrument.symbol === hit.instrument.symbol);
+      if (!same) named.push({ hit, term, at });
+      else if (same.hit.kind === 'proxy' && hit.kind === 'exact') Object.assign(same, { hit, term });
+      return;
+    }
+    // In a sentence a short word, or an everyday word even in capitals, is an asset only as a whole ticker or
+    // name: "sell" is not Russell, "CAC" is not Coca-Cola, and an unlisted "TON" is not ONDO.
+    if (sentence && (term.length <= 4 || homonyms.has(bareQueryValue(term)))) return;
+    // A prefix-only "exact" hit from a short word is as much a guess as a short substring ("GLD" inside AGLD).
+    const shortPrefix = hit.kind === 'exact' && term.length <= 4;
+    const needsConfirmation = sentence || hit.kind === 'fuzzy' || shortPrefix || (hit.kind === 'partial' && term.length <= 4);
+    // Prefix exact (long word) > short prefix guess > partial > fuzzy.
+    const rank = hit.kind === 'exact' ? (shortPrefix ? 1.5 : 3) : hit.kind === 'partial' ? 1 : 0;
+    if (!guess || rank > guess.rank) guess = { resolved: describe(hit, term, needsConfirmation), rank };
+  };
+  // Short of a whole name the text is still a search ("son", "pop m"): its best look-alike is offered. A typo
+  // guess over a whole sentence is only its words again, weighed one by one below.
+  if (!sentence || whole?.kind !== 'fuzzy') weigh(whole, upper, 0);
+
+  // Names of several words first, so "Bitcoin Cash" is one asset and not Bitcoin plus a stray word.
+  const taken = new Set<number>();
+  for (let size = 3; size >= 2; size--) {
+    for (let i = 0; size < tokens.length && i + size <= tokens.length; i++) {
+      const span = tokens.slice(i, i + size);
+      const name = span.join(' ');
+      if (!MULTIWORD_NAMES.has(name) || span.some((word, k) => taken.has(i + k) || QUERY_STOPWORDS.has(word))) continue;
+      const hit = await bestScoredMatch(name, allowedTypes, homonyms);
+      if (!(hit?.kind === 'exact' && hit.strong)) continue;
+      weigh(hit, name, i);
+      span.forEach((_, k) => taken.add(i + k));
+    }
   }
-  return fallback?.resolved ?? null;
+  // Three characters minimum per word: "in video" must not resolve INJ via "IN".
+  const weighed = new Set(leftover ? [] : [upper]);
+  for (const [i, word] of tokens.entries()) {
+    if (taken.has(i) || weighed.has(word) || isFillerWord(word) || everyday(word)) continue;
+    weighed.add(word);
+    weigh(await bestScoredMatch(word, allowedTypes, homonyms), word, i);
+  }
+
+  // Two assets in one question: never pick silently. The first one named leads the confirmation, a full name
+  // or plain ticker ahead of an everyday word in capitals ("do NOT buy Bitcoin").
+  const ordinary = (term: string) => Number(homonyms.has(bareQueryValue(term)));
+  named.sort((a, b) => ordinary(a.term) - ordinary(b.term) || a.at - b.at);
+  if (named.length > 1) {
+    return { ...describe(named[0].hit, named[0].term, true), candidates: named.map((entry) => entry.hit.instrument) };
+  }
+  if (named.length === 1) return describe(named[0].hit, named[0].term, named[0].hit.kind === 'proxy');
+  return guess?.resolved ?? null;
 }
 
 /** SPOT + SWAP venues for one base symbol, from the cached catalog. */

@@ -19,6 +19,10 @@ const normalize = (s: string) => s.normalize('NFD').replace(/\p{Diacritic}/gu, '
   // Preserve exchange-qualified ids (SAP.DE), while sentence punctuation is a boundary.
   .replace(/[?!¿¡,:;()"“”]/g, ' ').replace(/\.(?=\s|$)/g, ' ')
   .replace(/\s+/g, ' ').trim();
+// A short name that is an everyday word at home ("intesa" = agreement, "c'è intesa", "d'intesa"). Typed alone it is
+// offered for confirmation; inside a sentence only the full name or the ticker names the company.
+const HOMONYM_ALIASES = new Set(['INTESA']);
+export const isRegionalHomonym = (text: string) => HOMONYM_ALIASES.has(normalize(text));
 export const regionalStock = (symbol: string) => REGIONAL_STOCKS.find(s => s.symbol === symbol.toUpperCase());
 export const isListedStockSymbol = (symbol: string) => /^[A-Z0-9][A-Z0-9.-]{0,18}\.(?:PA|LS|SA|MI|DE)$/i.test(symbol);
 export function marketRegion(language?: unknown, locale?: unknown, country?: unknown): RegionalStock['region'] | null {
@@ -42,14 +46,39 @@ export function resolveRegionalStock(text: string, language?: unknown, locale?: 
   if (phrase === 'VALE' || (phrase === 'SAP' && region !== 'DE')) return null;
   const exact = REGIONAL_STOCKS.filter(s => [s.symbol, s.name, ...s.aliases].some(v => normalize(v) === phrase));
   if (exact.length === 1) return exact[0];
+  const hits = namedInSentence(phrase, region);
+  return hits.length === 1 ? hits[0] : null;
+}
+/** Every listing a sentence names by ticker or by name. */
+function namedInSentence(phrase: string, region: RegionalStock['region'] | null): RegionalStock[] {
   const tokens = new Set(phrase.split(/[^A-Z0-9.]+/).filter(Boolean));
-  const hits = REGIONAL_STOCKS.filter(s => tokens.has(s.symbol) || [s.name, ...s.aliases].some(v => {
+  return REGIONAL_STOCKS.filter(s => tokens.has(s.symbol) || [s.name, ...s.aliases].some(v => {
     const term = normalize(v);
     // OR, MC, SAP and VALE are ordinary words or ambiguous tickers in sentences; a short name counts at home.
-    if (term === 'VALE' || (term.length < 4 && term !== 'EDP' && s.region !== region)) return false;
+    if (term === 'VALE' || HOMONYM_ALIASES.has(term) || (term.length < 4 && term !== 'EDP' && s.region !== region)) return false;
     return tokens.has(term) || (` ${phrase} `).includes(` ${term} `);
   }));
-  return hits.length === 1 ? hits[0] : null;
+}
+/**
+ * The listings a sentence names, each with where its name starts, and the sentence with those names blanked out
+ * (same length, decomposed accents). The caller reads `rest` for a second asset ("Bitcoin et LVMH") instead of
+ * answering for one of the two.
+ */
+export function regionalMentions(text: string, language?: unknown, locale?: unknown, country?: unknown): { stocks: Array<{ stock: RegionalStock; at: number }>; rest: string } {
+  let rest = text.normalize('NFD');
+  const stocks = namedInSentence(normalize(text), marketRegion(language, locale, country)).map(stock => {
+    let at = -1;
+    // Longest name first, so "Intesa Sanpaolo" goes as one name before its parts.
+    for (const term of [stock.symbol, stock.name, ...stock.aliases].map(normalize).sort((a, b) => b.length - a.length)) {
+      const letters = [...term].map(c => c === ' ' ? '\\s+' : c.replace(/[\\^$.*+?()[\]{}|]/, '\\$&') + '\\p{M}*').join('');
+      rest = rest.replace(new RegExp(`(?<![\\p{L}\\p{N}])${letters}(?![\\p{L}\\p{N}])`, 'giu'), (found: string, index: number) => {
+        if (at < 0 || index < at) at = index;
+        return ' '.repeat(found.length);
+      });
+    }
+    return { stock, at };
+  });
+  return { stocks: stocks.sort((a, b) => a.at - b.at), rest };
 }
 export function searchRegionalStocks(text: string, language?: unknown, locale?: unknown, country?: unknown): RegionalStock[] {
   const q = normalize(text);
@@ -59,6 +88,6 @@ export function searchRegionalStocks(text: string, language?: unknown, locale?: 
   // Search-as-you-type matches a whole id or name, or the start of one of its words from three letters on:
   // never the middle of a company name ("TON" in Vuitton, "ENS" in Siemens), which hid crypto tickers.
   const starts = (value: string) => value === q || (q.length >= 3 && (` ${value}`).includes(` ${q}`));
-  return REGIONAL_STOCKS.filter(s => s === exact || [s.symbol, s.name, ...s.aliases].some(v => starts(normalize(v)) || (normalize(v).length >= 4 && normalize(v) !== 'VALE' && (` ${q} `).includes(` ${normalize(v)} `))))
+  return REGIONAL_STOCKS.filter(s => s === exact || [s.symbol, s.name, ...s.aliases].some(v => starts(normalize(v)) || (normalize(v).length >= 4 && normalize(v) !== 'VALE' && !HOMONYM_ALIASES.has(normalize(v)) && (` ${q} `).includes(` ${normalize(v)} `))))
     .sort((a,b) => Number(b === exact) - Number(a === exact) || Number(b.region === region) - Number(a.region === region));
 }

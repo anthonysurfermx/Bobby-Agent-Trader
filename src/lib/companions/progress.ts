@@ -61,6 +61,7 @@ export interface Progress {
   lastDay: string | null;
   dailyAwards: number;
   dailyAwardsDay: string | null;
+  /** History: the assets the reader asked about, newest first, once `quickAccessCustomized`; until then the automatic starters. */
   quickAccess: string[];
   /** Automatic regional suggestions refresh with locale; personal choices remain unchanged. */
   quickAccessCustomized: boolean;
@@ -81,6 +82,23 @@ const LEGACY_AUTOMATIC_QUICK_ACCESS = [
 ];
 const regionalQuickAccess = () => [...(REGIONAL_QUICK_ACCESS[speechLocale()] ?? REGIONAL_QUICK_ACCESS['en-US'])];
 const isAutomaticQuickAccess = (symbols: string[]) => [...Object.values(REGIONAL_QUICK_ACCESS), ...LEGACY_AUTOMATIC_QUICK_ACCESS].some(defaults => defaults.length === symbols.length && defaults.every((symbol, i) => symbol === symbols[i]));
+// What a chip shows for a symbol: the same names as the Núcleo page (nucleo/src/app/55-read.js CHIP_NAMES). The question still carries the symbol.
+const QUICK_ACCESS_NAMES: Record<string, string> = { NVDA: 'NVIDIA', 'MC.PA': 'LVMH', 'OR.PA': 'L’Oréal', 'EDP.LS': 'EDP', 'GALP.LS': 'Galp', 'PETR4.SA': 'Petrobras', 'VALE3.SA': 'Vale', 'ISP.MI': 'Intesa Sanpaolo', 'ENEL.MI': 'Enel', 'SAP.DE': 'SAP', 'SIE.DE': 'Siemens' };
+export const quickAccessName = (symbol: string) => (Object.prototype.hasOwnProperty.call(QUICK_ACCESS_NAMES, symbol) ? QUICK_ACCESS_NAMES[symbol] : symbol);
+/**
+ * The visible row, kept apart from the history it starts from: the reader's own assets (newest first), then today's
+ * regional starters, without duplicates. The first local stock of the market holds position 2 until the reader has
+ * asked about it.
+ */
+export function quickAccessRow(progress: Pick<Progress, 'quickAccess' | 'quickAccessCustomized'>, limit = 3): string[] {
+  const starters = regionalQuickAccess();
+  const asked = progress.quickAccessCustomized ? progress.quickAccess : [];
+  // Local stocks are the exchange-qualified symbols of the regional row (MC.PA, SAP.DE); a row without one has no anchor.
+  const local = starters.find((symbol) => symbol.includes('.'));
+  const row = [...new Set([...asked, ...starters])];
+  if (local && !asked.includes(local)) { row.splice(row.indexOf(local), 1); row.splice(1, 0, local); }
+  return row.slice(0, limit);
+}
 
 const DEFAULT: Progress = {
   aiConsentGranted: false,

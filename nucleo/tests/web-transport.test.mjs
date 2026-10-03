@@ -371,6 +371,41 @@ async function run() {
     eq(s.level.name, 'EN ESCENA', 'Spanish level names');
   }
 
+  // Boot contract between the engines and this tree's bridge. nucleoBridge.on() THROWS on a name the bridge does
+  // not declare; an engine subscribes inside boot(), before session(), so one unknown name leaves the page black.
+  // ('account.changed' reached the engine copies without the bridge: /nucleo did not boot.) Unknown methods only
+  // reject, but an engine must not depend on one either.
+  {
+    const p = page({ ls: ONBOARDED });
+    for (const name of ['app', 'onboarding']) {
+      const dir = path.join(SRC, name);
+      const src = fs.readdirSync(dir).filter((n) => n.endsWith('.js')).sort().map((n) => fs.readFileSync(path.join(dir, n), 'utf8')).join('\n');
+      const subscribed = [...new Set([...src.matchAll(/\bBR\.on\('([^']+)'/g)].map((m) => m[1]))];
+      ok(subscribed.includes('session.changed') && subscribed.length >= 8, `${name}: the engine's subscriptions were found (${subscribed.length})`);
+      for (const event of subscribed) {
+        let thrown = null;
+        try { p.B.on(event, () => {})(); } catch (e) { thrown = e; }
+        ok(!thrown, `${name}: the bridge accepts the engine's '${event}' subscription${thrown ? ' (' + (thrown.code || thrown.message) + ')' : ''}`);
+      }
+      const called = [...new Set([...src.matchAll(/\b(?:bcall|call|fire)\('([A-Za-z.]+)'/g)].map((m) => m[1]))];
+      ok(called.includes('session'), `${name}: the engine's bridge calls were found (${called.length})`);
+      for (const method of called) ok(p.B.METHODS.includes(method), `${name}: the bridge knows the engine's '${method}' call`);
+    }
+    // The Apple speech-service agreement is native only. A browser's recognizer is `granted` with onDevice:false and
+    // never the native `consent` state, so the engines' Apple prompt (speech.requestPermission from `consent`) cannot
+    // be raised on the web.
+    ok(!WEB.some((n) => /['"]consent['"]/.test(fs.readFileSync(path.join(SRC, 'web', n), 'utf8'))), 'the web transport never answers the native consent mic state');
+  }
+  {
+    class Rec { start() {} stop() {} abort() {} }
+    const p = page({ ls: ONBOARDED, recognizer: Rec });
+    await p.call('session', { page: 'app' });
+    await p.call('speech.requestPermission');
+    eq(await p.call('speech.permission'), { state: 'granted', onDevice: false }, 'web: a cloud recognizer is granted, never consent');
+    eq(await p.call('speech.start'), { status: 'listening' }, 'web: the hold listens with no further prompt');
+    await p.call('speech.stop', { cancel: true });
+  }
+
   console.log(`${failed ? 'FAILED' : 'ok'} — ${passed} passed, ${failed} failed`);
   process.exit(failed ? 1 : 0);
 }

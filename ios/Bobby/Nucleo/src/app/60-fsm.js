@@ -238,22 +238,23 @@ function wordmarkPress(){
 }
 var LP_SEQ = 0;
 
-/* the pill: hold → listen / pre-permission / unavailable feedback; a short tap always types */
+/* the pill: hold → listen / pre-permission / the Apple speech prompt / unavailable feedback; a short tap always types */
 function pillDown(p, fromRead){
   A.press.to(0.94, 'snap'); tick('light');
-  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT(), ended = false;
+  var ms = SES && SES.mic ? SES.mic.state : 'undetermined', t0 = nowT(), ended = false, live = false;
+  function listen(){ live = true; go('LISTENING', { fromRead: !!fromRead }); }
   function cancel(){
     if (ended) return; ended = true;
-    if (ms === 'granted') STATES.LISTENING.release(false, true);
+    if (live) STATES.LISTENING.release(false, true);
     else A.press.to(1, 'emit');
   }
   function move(p){ if (Math.hypot(p.x - p.x0, p.y - p.y0) > 32) cancel(); }
   if (ms === 'granted'){
-    go('LISTENING', { fromRead: !!fromRead });
+    listen();
     return { move: move, up: function(){ if (ended) return; ended = true; STATES.LISTENING.release(nowT() - t0 < 0.25, false); }, cancel: cancel };
   }
   if (ms === 'undetermined'){
-    // A short tap always types; voice permission belongs to the hold gesture.
+    // A short tap always types; voice permission belongs to the hold gesture (the card's Continue asks native).
     return { move: move, up: function(){
       if (ended) return; ended = true;
       A.press.to(1, 'emit');
@@ -262,14 +263,62 @@ function pillDown(p, fromRead){
       else go('PRE_PERMISSION');
     }, cancel: cancel };
   }
-  // Voice input cannot run right now (no speech model for this language and no connection, or access is off).
-  // A hold is a voice attempt: say so and offer typing. A tap opens the keyboard, as the hint promises.
-  at(0.25, function(){ if (!ended) hint(tt('hint.micOff')); });
+  // The cached session says the mic cannot listen, and that cache goes stale (the connection came back, a dictation
+  // model was installed, access changed). Once the press is a hold, native is asked again and its fresh answer
+  // decides; `denied` and `unavailable` stay what native says they are. A short tap asks nothing: it types.
+  var seq = pillDown.seq = (pillDown.seq || 0) + 1, asked = false, fresh = false, released = false;
+  function settle(){   /* the hold is over and native has answered */
+    if (ms === 'granted') hint(tt('hint.hold'));   /* it can listen now: the next hold records */
+    else if (ms === 'undetermined'){ if (fromRead) go('RETURNING'); else go('PRE_PERMISSION'); }
+    else if (ms !== 'consent') hint(tt('hint.micOff'));
+  }
+  function ask(){
+    if (asked) return; asked = true;
+    micFresh(function(){
+      if (seq !== pillDown.seq || ended && !released) return;   /* a newer press owns the pill, or this one was cancelled */
+      ms = SES && SES.mic ? SES.mic.state : ms; fresh = true;
+      if (ms === 'consent'){ ended = true; A.press.to(1, 'emit'); askAppleSpeech(fromRead); return; }
+      if (released){ settle(); return; }
+      if (ms === 'granted'){ listen(); return; }   /* still held: this hold records */
+      if (ms !== 'undetermined') hint(tt('hint.micOff'));   /* a hold is a voice attempt: say so while the finger is down */
+    });
+  }
+  at(0.25, function(){ if (!ended) ask(); });
   return { move: move, up: function(){
-    if (ended) return; ended = true; A.press.to(1, 'emit');
-    if (nowT() - t0 < 0.25) openTyping({ fromRead: !!fromRead });
-    else hint(tt('hint.micOff'));
+    if (ended) return; ended = true;
+    if (live){ STATES.LISTENING.release(false, false); return; }
+    A.press.to(1, 'emit');
+    if (nowT() - t0 < 0.25){ openTyping({ fromRead: !!fromRead }); return; }
+    released = true;
+    if (fresh) settle(); else ask();
   }, cancel: cancel };
+}
+/* speech.permission, now: the session's mic state is replaced by native's answer (a failed call keeps the cache) */
+function micFresh(then){
+  bcall('speech.permission').then(function(m){
+    if (m && m.state && SES){ SES.mic = m; if (ST.name === 'IDLE') pillMode(idleMode()); }
+    then();
+  }, function(){ then(); });
+}
+/* `consent`: only Apple's speech service can transcribe the app language on this phone, and the user has not agreed
+   to send the audio there. Native asks before anything is captured (speech.requestPermission raises its alert:
+   allow, or type) and keeps the answer; the page only follows it. "Type" stores nothing, so a later hold asks again. */
+function askAppleSpeech(fromRead){
+  if (askAppleSpeech.busy) return;
+  askAppleSpeech.busy = true;
+  var g = GEN;
+  bcall('speech.requestPermission').then(function(m){
+    askAppleSpeech.busy = false;
+    if (m && m.state && SES) SES.mic = m;
+    /* The prompt takes longer to read than ERROR (6 s) or RETURNING last. The answer is followed where the hold
+       began, or once the glass has come back to rest; a read that started meanwhile is never interrupted. */
+    var same = GEN === g;
+    if (!same && ST.name !== 'IDLE' && ST.name !== 'RETURNING') return;
+    if (ST.name === 'IDLE') pillMode(idleMode());
+    if (m && m.state === 'granted') hint(tt('hint.hold'));   /* allowed: the next hold records */
+    else if (m && m.state === 'consent') openTyping({ fromRead: same && !!fromRead });
+    else hint(tt('hint.micOff'));
+  }, function(){ askAppleSpeech.busy = false; });
 }
 
 /* ---------- PRE_PERMISSION: the onboarding O3 card, blooming from the bottom rim ---------- */
@@ -294,6 +343,7 @@ STATES.PRE_PERMISSION = {
       if (seq !== self.permissionSeq || ST.name !== 'PRE_PERMISSION') return;
       if (m && m.state) SES.mic = m;
       if (m && m.state === 'granted') go('IDLE', { hint: 'hint.hold', restoreGreet: true });
+      else if (m && m.state === 'consent') openTyping({});   /* the Apple speech prompt followed the OS ones: the user chose to type */
       else go('IDLE', { hint: 'hint.micOff', restoreGreet: true });
     }, function(){ if (seq === self.permissionSeq && ST.name === 'PRE_PERMISSION') go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); });
   }
@@ -323,6 +373,8 @@ STATES.LISTENING = {
     if (status === 'listening'){ this.live = true; if (this.released && !this.finalWait) bcall('speech.stop', { cancel: true }).catch(noop); return; }
     this.collapse();
     if (status === 'needs_permission'){ SES.mic.state = 'undetermined'; go('PRE_PERMISSION'); return; }
+    /* the cache said granted; native refused to start without the agreement to Apple's speech service */
+    if (status === 'consent'){ SES.mic = { state: 'consent', onDevice: false }; go('IDLE', { restoreGreet: true }); askAppleSpeech(false); return; }
     if (status === 'denied' || status === 'unavailable' || status === 'restricted'){ SES.mic.state = status; go('IDLE', { hint: 'hint.micOff', restoreGreet: true }); return; }
     go('IDLE', { restoreGreet: true });
   },
@@ -400,6 +452,9 @@ STATES.TYPING = {
 STATES.SENDING = {
   enter: function(prev, d){
     this.d = d; chromeUp(); hint('');
+    /* A starter chip asks straight from the idle home: the greeting and its satellites leave here, as they already do
+       for voice (LISTENING) and typing (TYPING). Without this the greeting stayed under the read's own text. */
+    if (lineShown(A.greet)) greetOut(); meriOut(); A.satG.o.tween(0, 0.2, E.fade);
     var fromRead = !!d.fromRead || readShowing();
     if (fromRead){ clearRead(); cue(0.35, function(){ glassHome(); ambientCanon(true); moveSphere(340, 120, true); }); }
     else chipsHide();

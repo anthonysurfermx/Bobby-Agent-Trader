@@ -35,7 +35,7 @@ function harness(language = 'en') {
   };
   const ctx = vm.createContext({
     W: { state: 'BOOT', agreeBusy: false, agree: null, pr: {} }, T: 0,
-    SESSION: { onboarded: true, signedIn: true, riskAccepted: false, riskVersion: 5 },
+    SESSION: { onboarded: true, signedIn: true, riskAccepted: false, riskVersion: 6 },
     LANG: language, HASH: '', riskProfileEl: profile, linesEl: {}, rbodyEl: null,
     HARNESS: false, FIT: 1, FIT_X: 0, FIT_Y: 0,
     enterBorn() {}, go(name, args) { ctx.W.state = name; ctx.W.riskOnly = !!args?.only; },
@@ -55,10 +55,10 @@ function harness(language = 'en') {
 }
 
 for (const language of ['en', 'es']) {
-  for (const scenario of ['withdrawal and relaunch', 'build 44 consent v4 upgraded to v5']) {
+  for (const scenario of ['withdrawal and relaunch', 'build 60 consent v5 upgraded to v6']) {
     test(language + ': ' + scenario + ' keeps Profile accessible without renewed AI consent', () => {
       const { ctx, profile, classes, calls } = harness(language);
-      ctx.SESSION.previousRiskVersion = scenario.startsWith('build') ? 4 : 0;
+      ctx.SESSION.previousRiskVersion = scenario.startsWith('build') ? 5 : 0;
       ctx.route(ctx.SESSION);
       assert.equal(ctx.W.state, 'RISK');
       assert.equal(ctx.W.riskOnly, true);
@@ -146,7 +146,7 @@ test('the release template contains a 44-point profile button hidden until the r
 for (const ready of [false, true]) {
   test('accessible consent activation is explicit and readiness guarded: ' + ready, () => {
     const { ctx, listeners } = harness();
-    ctx.W.state = 'RISK'; ctx.W.agreeReady = ready; ctx.RISK_NOTICE = { version: 5 };
+    ctx.W.state = 'RISK'; ctx.W.agreeReady = ready; ctx.RISK_NOTICE = { version: 6 };
     let accepted = 0; ctx.agreeComplete = () => { accepted++; ctx.W.agreeBusy = true; };
     const target = { closest(selector) { return selector === '[data-hit]' ? { getAttribute: () => 'pill' } : null; } };
     listeners['document.click']({ detail: 1, target });

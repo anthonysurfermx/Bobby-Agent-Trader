@@ -93,7 +93,7 @@ check('coupon copy and gifts are complete in all six languages without modifying
   const gift={reads:7,profundo:2,maximo:1};const rendered=giftLine(gift,language);assert.match(rendered,/7/);assert.match(rendered,/2/);assert.match(rendered,/1/);assert.deepEqual(gift,{reads:7,profundo:2,maximo:1});if(['fr','pt','it','de'].includes(language))assert.ok(!rendered.includes('reads'));
  }
 });
-check('browser disclosure distinguishes externally processed dictation and wallet signing',()=>{const web=JSON.parse(read('nucleo/web/risk-notice.json')),native=JSON.parse(read('nucleo/native/risk-notice.json'));assert.equal(web.version,7);assert.equal(native.version,5);for(const language of ['en','es','fr','pt','it','de']){assert.equal(web.statements[language].length,4);assert.ok(web.statements[language][0].body.includes('OpenAI'));assert.ok(!web.statements[language][0].body.includes('iPhone'));assert.ok(web.statements[language][2].body.includes('Base'));}});
+check('browser disclosure distinguishes externally processed dictation and wallet signing',()=>{const web=JSON.parse(read('nucleo/web/risk-notice.json')),native=JSON.parse(read('nucleo/native/risk-notice.json'));assert.equal(web.version,7);assert.equal(native.version,6);for(const language of ['en','es','fr','pt','it','de']){assert.equal(web.statements[language].length,4);assert.ok(web.statements[language][0].body.includes('OpenAI'));assert.ok(!web.statements[language][0].body.includes('iPhone'));assert.ok(web.statements[language][2].body.includes('Base'));}});
 for(const [language,locale] of locales){
  const b=browser(language,locale),progress=b.load('src/lib/companions/progress.ts'),Page=b.load('src/pages/BobbyAgentTraderPage.tsx').default;
  b.location.search='?start=1';
@@ -134,7 +134,7 @@ for(const [language,locale] of locales){
 check('live voice disclosure names microphone audio and OpenAI explicitly in every language',()=>{
  const web=JSON.parse(read('nucleo/web/risk-notice.json'));
  for(const language of ['en','es','fr','pt','it','de']){const body=web.statements[language][0].body;assert.match(body,/OpenAI/);assert.match(body,({en:/microphone audio/,es:/audio del micrófono/,fr:/audio du microphone/,pt:/áudio do microfone/,it:/audio del microfono/,de:/Mikrofon-Audio/})[language]);}
- assert.equal(JSON.parse(read('ios/Bobby/Nucleo/fixtures/native/risk-notice.json')).version,5);
+ assert.equal(JSON.parse(read('ios/Bobby/Nucleo/fixtures/native/risk-notice.json')).version,6);
 });
 check('formal browser catalogue preserves placeholders and resolves every maintained key',()=>{
  const rows=JSON.parse(read('src/lib/companions/web-translations-extra.json'));

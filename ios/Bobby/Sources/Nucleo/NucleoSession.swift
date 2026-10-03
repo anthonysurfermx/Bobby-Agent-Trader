@@ -124,7 +124,7 @@ final class NucleoSession: ObservableObject {
         self.companions = companions
         let voice = voice ?? NeuralVoice()
         self.voice = voice
-        self.speech = speech ?? NucleoSpeech()
+        self.speech = speech ?? NucleoSpeech(defaults: defaults)
         let speech = self.speech
         self.defaults = defaults
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
@@ -150,6 +150,7 @@ final class NucleoSession: ObservableObject {
             if name == "speech.state", payload["state"] as? String == "stopped" { self?.scheduleBriefingDrain() }
         }
         speech.willStart = { [weak self] in self?.nucleoVoice.stop() }
+        speech.confirmAppleService = { [weak self] in await self?.confirmAppleSpeechService() ?? false }
         nucleoVoice.emit = emit
         briefingGate = BriefingTapGate(
             appActive: { UIApplication.shared.applicationState == .active },
@@ -436,6 +437,41 @@ final class NucleoSession: ObservableObject {
         return nucleoVoice.speakClip(id: "preview-\(c.id)", clip: clip, fallbackText: c.selectLine, persona: c.voicePersona)
     }
 
+    // MARK: - Apple's speech service (dictation without a local model)
+
+    /// The prompt below is on screen: no sheet may be presented under it.
+    private var speechPromptOpen = false
+
+    /// Only Apple's speech service can transcribe the app language on this phone. Asked before any
+    /// audio is captured, in a native alert so nothing on the page can answer for the user: allow
+    /// (NucleoSpeech stores it), or type instead (nothing is stored; a later hold asks again).
+    private func confirmAppleSpeechService() async -> Bool {
+        // Only when the alert can really appear: otherwise nothing is stored and the page offers typing.
+        guard !tornDown, !speechPromptOpen, sheet == nil, openSheet == nil,
+              let host = Self.topViewController(), host.viewIfLoaded?.window != nil,
+              !host.isBeingPresented, !host.isBeingDismissed else { return false }
+        nucleoVoice.stop()
+        speechPromptOpen = true
+        defer { speechPromptOpen = false }
+        return await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+            let alert = UIAlertController(
+                title: L.t("Send your voice to Apple to dictate?", "¿Enviar tu voz a Apple para dictar?"),
+                message: L.t("To dictate in this language, your voice is sent to Apple’s speech service to be transcribed. Bobby does not store the audio. You can type instead.",
+                             "Para dictar en este idioma, tu voz se envía al servicio de voz de Apple para transcribirla. Bobby no guarda el audio. También puedes escribir."),
+                preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: L.t("Type instead", "Prefiero escribir"), style: .cancel) { _ in done.resume(returning: false) })
+            alert.addAction(UIAlertAction(title: L.t("Allow", "Permitir"), style: .default) { _ in done.resume(returning: true) })
+            host.present(alert, animated: true)
+        }
+    }
+
+    private static func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        var top = scenes.flatMap(\.windows).first { $0.isKeyWindow }?.rootViewController
+        while let next = top?.presentedViewController { top = next }
+        return top
+    }
+
     // MARK: - Risk notice
 
     func riskNotice() -> [String: Any] {
@@ -468,6 +504,7 @@ final class NucleoSession: ObservableObject {
         desk.invalidatePending()
         notch.reset()
         speech.cancel()
+        speech.revokeAppleServiceConsent()
         nucleoVoice.stop()
         vocabularyTask?.cancel()
         vocabularyTask = nil
@@ -551,7 +588,7 @@ final class NucleoSession: ObservableObject {
     /// Presents the paywall and answers when it closes: `{status, access}`. Only `subscribed` (the
     /// server verified the App Store transaction) means the page may re-ask its question.
     func paywall() async -> [String: Any] {
-        guard profile.acceptedRiskNotice, sheet == nil, openSheet == nil, paywallContinuation == nil else {
+        guard profile.acceptedRiskNotice, sheet == nil, openSheet == nil, !speechPromptOpen, paywallContinuation == nil else {
             return ["status": "unavailable", "access": NSNull()]
         }
         nucleoVoice.stop()
@@ -616,7 +653,7 @@ final class NucleoSession: ObservableObject {
     private var openSheet: NucleoRoute?
 
     func openNative(_ route: NucleoRoute) -> Bool {
-        guard sheet == nil, openSheet == nil else { return false }
+        guard sheet == nil, openSheet == nil, !speechPromptOpen else { return false }
         nucleoVoice.stop()
         speech.cancel()
         // A read refused for consent (§2.4 step 2) sends the app page here. The read-only notice
@@ -652,7 +689,7 @@ final class NucleoSession: ObservableObject {
                 // The report's Bobby Pro offer: the paywall follows once the report is gone (nothing awaits it).
                 briefingWantsPro = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                    guard let self, !self.tornDown, self.sheet == nil, self.openSheet == nil, self.profile.acceptedRiskNotice else { return }
+                    guard let self, !self.tornDown, self.sheet == nil, self.openSheet == nil, !self.speechPromptOpen, self.profile.acceptedRiskNotice else { return }
                     self.openSheet = .paywall
                     self.sheet = .paywall
                     self.emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
@@ -663,7 +700,7 @@ final class NucleoSession: ObservableObject {
             if inviteWantsPro, paywallContinuation != nil {
                 inviteWantsPro = false
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                    guard let self, self.sheet == nil, self.openSheet == nil else { self?.finishPaywall(); return }
+                    guard let self, self.sheet == nil, self.openSheet == nil, !self.speechPromptOpen else { self?.finishPaywall(); return }
                     self.openSheet = .paywall
                     self.sheet = .paywall
                     self.emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
@@ -746,7 +783,7 @@ final class NucleoSession: ObservableObject {
         guard currentPage == NucleoPage.app.name,
               gate.appActive(),
               profile.acceptedRiskNotice, onboarded,
-              sheet == nil, openSheet == nil,
+              sheet == nil, openSheet == nil, !speechPromptOpen,
               !gate.listening(), !gate.deskBusy(), !gate.narrating()
         else { return false }
         guard let id = briefingIntent.take() ?? heldBriefId else { return false }
