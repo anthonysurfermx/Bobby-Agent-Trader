@@ -13,6 +13,9 @@ import { CLIENT_EVENT_MAX_BYTES, clientBinding, normalizeClientEvent, clientBuil
 
 export const config = { maxDuration: 10 };
 const transport = { fetch: adminFetch, body: adminBounded };
+/** Ingestion is public and unauthenticated: it stays off until the owner sets BOBBY_CLIENT_TELEMETRY=on (the same
+ *  convention as BOBBY_MEMORY). Off answers 204 before any origin, auth, limiter or storage work. */
+export const clientTelemetryOn = () => (process.env.BOBBY_CLIENT_TELEMETRY || '').trim().toLowerCase() === 'on';
 
 async function recordFailure(error: string, authenticated: boolean) {
   try {
@@ -31,6 +34,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (process.env.VERCEL_ENV === 'preview') {
     res.setHeader('Cache-Control', 'no-store');
     return res.status(404).json({ error: 'Telemetry unavailable in preview' });
+  }
+  if (!clientTelemetryOn()) {
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(204).end();
   }
   return withAdminRead(() => dispatch(req, res), { budgetMs: 8000 });
 }

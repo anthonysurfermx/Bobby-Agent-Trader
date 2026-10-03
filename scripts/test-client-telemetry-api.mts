@@ -8,6 +8,7 @@ process.env.BOBBY_SUPABASE_ANON_KEY = 'offline-anon';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'offline-service';
 process.env.BOBBY_SESSION_SECRET = 'offline-wallet-session-secret-32-characters';
 process.env.RATE_LIMIT_SALT = 'offline-client-telemetry-salt-32';
+process.env.BOBBY_CLIENT_TELEMETRY = 'on';
 delete process.env.BOBBY_AUTH_URL;
 delete process.env.BOBBY_AUTH_ANON_KEY;
 delete process.env.VERCEL_ENV;
@@ -138,6 +139,23 @@ eq(waitUntilCalls, previewWaitCalls, 'Preview schedules no health or background 
 eq(waits.length, 0, 'Preview leaves no pending writes');
 
 process.env.VERCEL_ENV = 'production';
+// Off unless the owner turns it on: the public endpoint does no origin, auth, limiter, storage or health work.
+for (const value of [undefined, 'off', '1']) {
+  if (value === undefined) delete process.env.BOBBY_CLIENT_TELEMETRY; else process.env.BOBBY_CLIENT_TELEMETRY = value;
+  let offHeaderReads = 0, offBodyReads = 0;
+  const offWaitCalls = waitUntilCalls;
+  calls.length = 0;
+  const offRes = response();
+  await handler({ method: 'POST', get headers() { offHeaderReads++; return previewHeaders; },
+    get body() { offBodyReads++; return previewBody; } } as never, offRes as never);
+  eq(offRes.statusCode, 204, `ingestion is off when BOBBY_CLIENT_TELEMETRY is ${value ?? 'unset'}`);
+  eq(offRes.ended, 1, 'off emits one terminal response');
+  eq(offRes.headers['Cache-Control'], 'no-store', 'off response is not cached');
+  eq([offHeaderReads, offBodyReads], [0, 0], 'off stops before origin/auth/rate/body processing');
+  eq(calls.length, 0, 'off performs no auth, identity, limiter, storage or health fetch');
+  eq(waitUntilCalls, offWaitCalls, 'off schedules no health or background work');
+}
+process.env.BOBBY_CLIENT_TELEMETRY = 'on';
 const productionRes = await post(previewBody, { authorization: 'Bearer offline-valid' });
 eq(productionRes.statusCode, 204, 'production still admits the authenticated receipt report');
 ok(calls.some(c => c.url.includes('/auth/v1/user')), 'production verifies the account');
