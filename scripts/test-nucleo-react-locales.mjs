@@ -16,7 +16,7 @@ const clean=x=>JSON.parse(JSON.stringify(x));
 function browser(language='fr',preferred='fr-FR',navigatorPreferred=preferred){
  const saved=new Map([['bobby_lang',language],['bobby_locale',preferred]]), requests=[];
  const location={origin:'https://bobby.test',search:'',href:'https://bobby.test/desk',assign:(value)=>{location.assigned=value;}};
- const ctx=vm.createContext({console, Intl, URL, URLSearchParams, navigator:{language:navigatorPreferred},window:{location},document:{documentElement:{lang:'es'}},localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v))},fetch:async(url,init)=>{requests.push({url,init});return new Response(JSON.stringify({agents:{alpha:'A',red:'R',cio:'C',verdict:'wait',direction:'none'},level:'rapido'}),{headers:{'content-type':'application/json'}});},Response,AbortController,DOMException,TextDecoder,requestAnimationFrame:fn=>{fn();return 0;},setTimeout,clearTimeout});
+ const ctx=vm.createContext({console, Intl, URL, URLSearchParams, navigator:{language:navigatorPreferred},window:{location},document:{documentElement:{lang:'es'}},localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v))},fetch:async(url,init)=>{if(url==='/api/geo')return new Response('{"country":null}');requests.push({url,init});return new Response(JSON.stringify({agents:{alpha:'A',red:'R',cio:'C',verdict:'wait',direction:'none'},level:'rapido'}),{headers:{'content-type':'application/json'}});},Response,AbortController,DOMException,TextDecoder,requestAnimationFrame:fn=>{fn();return 0;},setTimeout,clearTimeout});
  const loaded=new Map();let ack=[false,false,false,false];
  const stubs={
   react:{Component:class { constructor(props){this.props=props;this.state={};} },useState:init=>[Array.isArray(init)?ack:typeof init==='function'?init():init,()=>{}],useEffect:()=>{},useMemo:fn=>fn(),useCallback:fn=>fn,useId:()=> 'test-id',useRef:init=>({current:init}),useSyncExternalStore:(_sub,get)=>get()},
@@ -93,7 +93,7 @@ check('coupon copy and gifts are complete in all six languages without modifying
   const gift={reads:7,profundo:2,maximo:1};const rendered=giftLine(gift,language);assert.match(rendered,/7/);assert.match(rendered,/2/);assert.match(rendered,/1/);assert.deepEqual(gift,{reads:7,profundo:2,maximo:1});if(['fr','pt','it','de'].includes(language))assert.ok(!rendered.includes('reads'));
  }
 });
-check('browser disclosure distinguishes externally processed dictation and wallet signing',()=>{const web=JSON.parse(read('nucleo/web/risk-notice.json')),native=JSON.parse(read('nucleo/native/risk-notice.json'));assert.equal(web.version,7);assert.equal(native.version,5);for(const language of ['en','es','fr','pt','it','de']){assert.equal(web.statements[language].length,4);assert.ok(web.statements[language][0].body.includes('OpenAI'));assert.ok(!web.statements[language][0].body.includes('iPhone'));assert.ok(web.statements[language][2].body.includes('Base'));}});
+check('browser disclosure distinguishes externally processed dictation and wallet signing',()=>{const web=JSON.parse(read('nucleo/web/risk-notice.json')),native=JSON.parse(read('nucleo/native/risk-notice.json'));assert.equal(web.version,7);assert.equal(native.version,6);for(const language of ['en','es','fr','pt','it','de']){assert.equal(web.statements[language].length,4);assert.ok(web.statements[language][0].body.includes('OpenAI'));assert.ok(!web.statements[language][0].body.includes('iPhone'));assert.ok(web.statements[language][2].body.includes('Base'));}});
 for(const [language,locale] of locales){
  const b=browser(language,locale),progress=b.load('src/lib/companions/progress.ts'),Page=b.load('src/pages/BobbyAgentTraderPage.tsx').default;
  b.location.search='?start=1';
@@ -134,7 +134,7 @@ for(const [language,locale] of locales){
 check('live voice disclosure names microphone audio and OpenAI explicitly in every language',()=>{
  const web=JSON.parse(read('nucleo/web/risk-notice.json'));
  for(const language of ['en','es','fr','pt','it','de']){const body=web.statements[language][0].body;assert.match(body,/OpenAI/);assert.match(body,({en:/microphone audio/,es:/audio del micrófono/,fr:/audio du microphone/,pt:/áudio do microfone/,it:/audio del microfono/,de:/Mikrofon-Audio/})[language]);}
- assert.equal(JSON.parse(read('ios/Bobby/Nucleo/fixtures/native/risk-notice.json')).version,5);
+ assert.equal(JSON.parse(read('ios/Bobby/Nucleo/fixtures/native/risk-notice.json')).version,6);
 });
 check('formal browser catalogue preserves placeholders and resolves every maintained key',()=>{
  const rows=JSON.parse(read('src/lib/companions/web-translations-extra.json'));
@@ -312,7 +312,7 @@ check('blocked storage and absent AI consent still declare German without mounti
 });
 check('the initial root locale resolver imports no translation catalogue or page dependencies',()=>{
  const b=browser('de','de-DE');assert.equal(b.load('src/lib/client-language.ts').clientLocale(),'de-DE');
- assert.deepEqual([...b.loaded.keys()].sort(),['src/lib/app-language.ts','src/lib/client-language.ts']);
+ assert.deepEqual([...b.loaded.keys()].sort(),['src/lib/app-language.ts','src/lib/client-language.ts','src/lib/geo-language.ts']);
  const app=ts.createSourceFile('App.tsx',read('src/App.tsx'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
  assert.ok(app.statements.some(item=>ts.isImportDeclaration(item)&&item.moduleSpecifier.text==='@/lib/client-language'));
  assert.ok(!app.statements.some(item=>ts.isImportDeclaration(item)&&item.moduleSpecifier.text==='@/lib/companions/i18n'));

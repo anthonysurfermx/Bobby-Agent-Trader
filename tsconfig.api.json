@@ -112,6 +112,7 @@
     "api/_lib/admin-plan.ts",
     "api/_lib/admin-digest.ts",
     "api/client-telemetry.ts",
-    "api/_lib/client-telemetry.ts"
+    "api/_lib/client-telemetry.ts",
+    "api/geo.ts"
   ]
 }

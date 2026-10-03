@@ -220,7 +220,7 @@ export class DeskOutputRejected extends Error {
 }
 
 // Affirmative claims only (see affirmedMatches): a negation earlier in the
-// sentence ("no trade is risk-free", "No indicator, however strong, guarantees
+// same clause ("no trade is risk-free", "No indicator, however strong, guarantees
 // returns"), a conditional in the same clause ("whether you should buy…"), or
 // a negated predicate right after a guarantee ("guaranteed returns do not
 // exist", "las ganancias garantizadas no existen") skips the match, so the
@@ -240,17 +240,28 @@ const GUARANTEE: RegExp[] = [
   /\b(?:sin\s+(?:ning[uú]n\s+)?riesgos?(?!\s+(?:definido|controlado|limitado|claro|acotado|gestionado|calculado|adicional)(?:e?s)?\b)(?!\s+de\s+(?!p[eé]rd))|cero\s+riesgo|riesgo\s+cero|apuesta\s+segura|jugada\s+segura|dinero\s+f[aá]cil)(?![\p{L}])/giu,
   /\b(?:tu|su|el)\s+(?:capital|dinero|inversi[oó]n)\s+(?:est[aá]|estar[aá]|queda(?:r[aá])?)\s+(?:totalmente\s+|completamente\s+)?(?:protegid[oa]|a\s+salvo)\b/giu,
   /\bproteg\w*\b[^.;]{0,25}\bde\s+(?:cualquier|toda)\s+p[eé]rdida\b/giu,
-  // The same affirmative-claim guard for the added product languages.
-  /(?<![\p{L}])(?:gains?|profits?|rendements?)\s+(?:(?:sont|seront|est|sera)\s+)?(?:garantis?|garanties?|assurés?)(?![\p{L}])/giu,
+  // The same affirmative-claim guard for the added product languages, in passive ("les gains sont
+  // garantis", "profit garanti") and active form ("cette stratégie garantit des profits").
+  /(?<![\p{L}])(?:gains?|profits?|rendements?|bénéfices?)\s+(?:(?:sont|seront|est|sera)\s+)?(?:garantis?|garanties?|assurés?)(?![\p{L}])/giu,
+  /(?<![\p{L}])garanti[\p{L}]*\s+(?:[\p{L}'’]+\s+){0,3}?(?:gains?|profits?|rendements?|bénéfices?)(?![\p{L}])/giu,
   // "taux sans risque" is the risk-free rate, and "sans risque de rester bloqué / sans risque excessif" is not a promise.
   /(?<![\p{L}])(?:(?<!\b(?:taux|actifs?)\s)sans\s+(?:aucun\s+|le\s+moindre\s+)?risques?(?!\s+(?:majeur|suppl[eé]mentaire|excessif|inutile|d[eé]fini|limit[eé]|additionnel)s?(?![\p{L}]))(?!\s+d(?:e\s+|['’])(?!pert|perd))|z[eé]ro\s+risque|risque\s+(?:nul|z[eé]ro))(?![\p{L}])/giu,
-  /(?<![\p{L}])(?:profitti|guadagni|rendimenti)\s+(?:garantiti|sicuri)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:profitt[oi]|guadagn[oi]|rendiment[oi])\s+(?:(?:è|sono|sar[aà]|saranno)\s+)?(?:garantit[oi]|sicur[oi]|assicurat[oi])(?![\p{L}])/giu,
+  /(?<![\p{L}])garan[tz][\p{L}]*\s+(?:[\p{L}'’]+\s+){0,3}?(?:profitt[oi]|guadagn[oi]|rendiment[oi])(?![\p{L}])/giu,
   /(?<![\p{L}])(?:(?<!\btasso\s)senza\s+(?:alcun\s+|nessun\s+)?risch(?:io|i)(?!\s+(?:definito|controllato|limitato|calcolato|eccessiv[oi]|aggiuntiv[oi]))|rischio\s+zero|zero\s+rischi(?:o)?)(?![\p{L}])/giu,
-  /(?<![\p{L}])(?:garantierte\s+(?:Gewinne|Renditen)|risikofrei|risikolos|ohne\s+(?:jedes\s+|jegliches\s+)?Risiko|null\s+Risiko)(?![\p{L}])/giu,
+  /(?<![\p{L}])garantier[\p{L}]*\s+(?:[\p{L}]+\s+){0,2}?(?:Gewinn(?:e|en)?|Renditen?|Ertr[aä]ge?)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:Gewinne?|Renditen?|Ertr[aä]ge?)\s+(?:(?:ist|sind|wird|werden|bleib(?:t|en))\s+)?garantiert(?![\p{L}])/giu,
+  // "ein risikofreier Trade" is the claim; "der risikofreie Zins" and "risikofreie Anleihen" are the risk-free rate.
+  /(?<![\p{L}])(?:(?:risikofrei|risikolos)(?:e[mnrs]?)?(?!\s+(?:Zins|Rendite|Anlage|Anleihe|Staatsanleihe|Referenz)[\p{L}]*)|ohne\s+(?:jede[sn]?\s+|jegliche[sn]?\s+)?Risik(?:o|en)|null\s+Risiko)(?![\p{L}])/giu,
   // Portuguese (the desk answers in pt-BR too).
-  /\b(?:lucros?|retornos?|ganhos?|rendimentos?)\s+(?:garantid[oa]s?|assegurad[oa]s?|cert[oa]s?)\b/giu,
-  /\bgarant\w*\s+(?:\S+\s+){0,2}?(?:lucros?|retornos?|ganhos?|rendimentos?)\b/giu,
+  /\b(?:lucros?|retornos?|ganhos?|rendimentos?)\s+(?:(?:est[aá]|est[aã]o|é|s[aã]o|ser[aá]|ser[aã]o)\s+)?(?:garantid[oa]s?|assegurad[oa]s?|cert[oa]s?)\b/giu,
+  /\bgarant\w*(?:-(?:te|lhe|vos|nos|lhes))?\s+(?:\S+\s+){0,2}?(?:lucros?|retornos?|ganhos?|rendimentos?)\b/giu,
   /(?<![\p{L}])(?:(?<!\btaxa\s)sem\s+(?:nenhum\s+|qualquer\s+)?riscos?(?!\s+(?:definido|controlado|limitado|calculado|excessivo|adicional))|risco\s+zero|zero\s+risco)(?![\p{L}])/giu,
+  // "Your capital is protected" in the added languages; "ton capital n'est pas protégé" never matches.
+  /(?<![\p{L}])(?:ton|votre|le)\s+(?:capital|argent|investissement)\s+(?:est|sera|reste(?:ra)?)\s+(?:totalement\s+|entièrement\s+)?(?:protégé|garanti|en\s+sécurité|à\s+l['’]abri)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:dein|Ihr|das)\s+(?:Kapital|Geld|Investment)\s+(?:ist|bleibt)\s+(?:vollständig\s+|komplett\s+)?(?:geschützt|sicher)(?![\p{L}])/giu,
+  /(?<![\p{L}])il\s+(?:(?:tuo|vostro)\s+)?(?:capitale|denaro|investimento)\s+(?:è|sarà|resta|rimane)\s+(?:totalmente\s+|completamente\s+)?(?:protetto|garantito|al\s+sicuro)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:o\s+teu|o\s+seu|teu|seu|o)\s+(?:capital|dinheiro|investimento)\s+(?:est[aá]|estar[aá]|fica(?:r[aá])?)\s+(?:totalmente\s+|completamente\s+)?(?:protegido|garantido|seguro|a\s+salvo)(?![\p{L}])/giu,
 ];
 // "short-term caution" or "a short while" is not a short trade.
 const ADVICE: RegExp[] = [
@@ -273,19 +284,19 @@ const ADVICE: RegExp[] = [
   // "The best trade is to open a short…" / "la mejor operación es abrir…" / "o melhor trade é abrir…".
   /\b(?:best|mejor|melhor)\s+(?:trade|operaci[oó]n|opera[cç][aã]o|jugada)\b[^.;]{0,50}\b(?:is|would\s+be|es|ser[ií]a|é|seria)\s+(?:to\s+)?(?:open|buy|sell|short|go|abrir|comprar|vender|entrar|shortear)\b/giu,
   // French, Italian and German personal trade instructions, not neutral descriptions.
-  /(?<![\p{L}])(?:tu\s+(?:dois|devrais)|vous\s+(?:devez|devriez)|je\s+(?:conseille|recommande))\s+(?:d['’])?(?:acheter|vendre|ouvrir)(?![\p{L}])/giu,
-  /(?<![\p{L}])(?:dovresti|devi|ti\s+(?:consiglio|raccomando))\s+(?:di\s+)?(?:comprare|vendere|aprire)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:tu\s+(?:dois|devrais)|vous\s+(?:devez|devriez)|je\s+(?:(?:te|vous)\s+)?(?:conseille|recommande|suggère))\s+(?:[\p{L}]+ment\s+)?(?:d['’]|de\s+)?(?:acheter|vendre|ouvrir)(?![\p{L}])/giu,
+  /(?<![\p{L}])(?:dovresti|devi|ti\s+(?:consiglio|raccomando))\s+(?:[\p{L}]+mente\s+)?(?:di\s+)?(?:comprare|acquistare|vendere|aprire)(?![\p{L}])/giu,
   /(?<![\p{L}])(?:du\s+(?:solltest|musst)|ich\s+empfehle)\b[^.;]{0,35}\b(?:kaufen|verkaufen|eröffnen)\b/giu,
   /(?:(?<=^)|(?<=[.!?]\s*))(?:[Aa]chète|[Vv]ends|[Aa]chetez|[Vv]endez|[Cc]ompra|[Vv]endi|[Kk]aufe|[Vv]erkaufe)\b[^.;]{0,25}\b(?:maintenant|aujourd['’]?hui|subito|ora|oggi|jetzt|sofort|heute)\b/gu,
   // Portuguese personal instructions.
-  /(?<![\p{L}])(?:voc[eê]\s+)?(?:deve(?:ria)?|precisa|tem\s+que)\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
-  /(?<![\p{L}])(?:recomendo|aconselho|sugiro)\s+(?:que\s+)?(?:voc[eê]\s+)?(?:comprar|compre|vender|venda|abrir|abra)(?![\p{L}])/giu,
-  /(?:(?<=^)|(?<=[.!?]\s*))(?:[Cc]ompre|[Vv]enda)\s+(?:(?:isso|tudo|mais|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:j[aá]|agora|hoje|imediatamente)(?![\p{L}])/gu,
+  /(?<![\p{L}])(?:(?:voc[eê]|tu)\s+)?(?:deve(?:s|ria|rias)?|devias?|precisas?(?:\s+de)?|te(?:m|ns)\s+(?:que|de))\s+(?:j[aá]\s+|agora\s+)?(?:comprar|vender|abrir\s+(?:uma\s+)?(?:posi[cç][aã]o\s+)?(?:long|short|comprada|vendida))\b/giu,
+  /(?<![\p{L}])(?:recomendo|aconselho|sugiro)(?:-te|-lhe)?\s+(?:que\s+)?(?:(?:voc[eê]|tu)\s+)?(?:a\s+)?(?:comprar|compre|compres|vender|venda|vendas|abrir|abra|abras)(?![\p{L}])/giu,
+  /(?:(?<=^)|(?<=[.!?]\s*))(?:[Cc]ompre|[Vv]enda|[Cc]ompra|[Vv]ende)\s+(?:(?:isso|tudo|mais|[A-Z][A-Z0-9.-]{1,9})\s+)?(?:j[aá]|agora|hoje|imediatamente)(?![\p{L}])/gu,
 ];
 
-// Any of these up to eight words back in the same sentence negates a match…
-const NEGATIONS = new Set(['ne', 'pas', 'aucun', 'aucune', 'jamais', 'non', 'nessun', 'nessuna', 'nicht', 'kein', 'keine', 'niemals', 'no', 'not', 'never', 'nothing', 'none', 'nobody', 'cannot', "can't", "isn't", "aren't", "won't", "doesn't", "don't", 'without', 'nor', 'neither', 'avoid',
-  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'ni', 'sin', 'tampoco', 'evita', 'evitar',
+// Any of these up to eight words back in the same clause negates a match…
+const NEGATIONS = new Set(['ne', 'pas', 'aucun', 'aucune', 'jamais', 'non', 'nessun', 'nessuna', 'nicht', 'kein', 'keine', 'niemals', 'no', 'not', 'never', 'nothing', 'none', 'nobody', 'no-one', 'cannot', "can't", "isn't", "aren't", "won't", "doesn't", "don't", 'without', 'nor', 'neither', 'avoid',
+  'nunca', 'jamás', 'ningún', 'ninguna', 'ninguno', 'nada', 'nadie', 'ni', 'sin', 'tampoco', 'evita', 'evitar',
   'não', 'nenhum', 'nenhuma', 'jamais', 'sem', 'evite', 'evitar', 'nem', 'ninguém', 'tampouco',
   // French, Italian and German disclaimers: "rien n'est sans risque", "nie ohne Risiko", "mai senza rischio".
   'rien', 'sans', 'ni', 'guère', "n'est", "n'a", "n'y", "n'existe", "n'offre",
@@ -294,16 +305,37 @@ const NEGATIONS = new Set(['ne', 'pas', 'aucun', 'aucune', 'jamais', 'non', 'nes
 // …unless the argument turns in between: "Nothing is certain, but this is risk-free."
 const TURNS = new Set(['but', 'so', 'yet', 'therefore', 'thus', 'hence', 'because', 'although', 'though',
   'pero', 'sino', 'aunque', 'así', 'entonces', 'porque', 'pues',
-  // French "mais" is left out on purpose: Portuguese "não … mais" (no longer) would cut its own negation.
-  // French "car" too: in English it is a noun, and "No car maker is risk-free" must stay a disclaimer.
+  // "mais" is French "but" and Portuguese "more": see turnEnd.
+  // French "car" is left out on purpose: in English it is a noun, and "No car maker is risk-free" must stay a disclaimer.
   'donc', 'pourtant', 'cependant', 'però', 'tuttavia', 'quindi', 'perciò', 'perché',
   'aber', 'sondern', 'deshalb', 'daher', 'weil', 'mas', 'porém', 'portanto', 'então', 'contudo']);
+// Portuguese "não … mais" (no longer) keeps its negation; any other "mais" is the French "but".
+const PT_NEGATIONS = new Set(['não', 'nunca', 'nem', 'sem', 'nenhum', 'nenhuma', 'nada', 'ninguém']);
+// A clause that opens with one of these is still governed by the negation before its comma: "or" carries it
+// on ("not advice, or a sure thing"), and German sets a comma before every subordinate clause ("Das heißt
+// nicht, dass es risikofrei ist") and relative clause ("Es gibt keine Strategie, die Gewinne garantiert").
+const CONTINUES = new Set(['or', 'ou', 'oder', 'dass', 'ob']);
+const RELATIVE = new Set(['der', 'die', 'das', 'den', 'dem', 'welche', 'welcher', 'welches']);
 // A conditional only hedges its own clause: "Si rompe, la ganancia está garantizada" is still a claim.
 const CONDITIONALS = new Set(['whether', 'if', 'si']);
 // A guarantee negated by its own predicate: "…do not exist", "…no existen", "…is not a sure bet".
-const NEGATED_AFTER = new Set(['pas', 'jamais', 'non', 'nicht', 'niemals', 'nie', 'mai', 'não', "n'existent", "n'existe", "n'est", 'not', 'no', 'never', 'nunca', 'jamás', "isn't", "aren't", "don't", "doesn't", "won't", 'cannot', "can't"]);
+const NEGATED_AFTER = new Set(['pas', 'jamais', 'non', 'nicht', 'niemals', 'nie', 'niemand', 'keiner', 'mai', 'não', "n'existent", "n'existe", "n'est", 'not', 'no', 'never', 'non-existent', 'nonexistent', 'nunca', 'jamás', "isn't", "aren't", "don't", "doesn't", "won't", 'cannot', "can't"]);
+// Emphasis built from negation words affirms what follows it: "no doubt", "sans hésitation", "ohne Zweifel",
+// "il n'y a aucun doute", "no hay duda" ("no question of guaranteed returns" is a denial and stays).
+const CERTAINTY = /(?<![\p{L}])(?:(?:without|sans|ohne|senza|sin|sem)\s+(?:(?:a|any|aucune?|l[ea]\s+moindre|jede[nr]?|jegliche[nr]?|zu|alcun[ao]?|ombra\s+di|ning[uú]n|ninguna|lugar\s+a|qualquer|sombra\s+de)\s+)?|(?:n['’]y\s+a|ne\s+fait|n['’]ai|no\s+(?:hay|cabe|tengo|queda)|non\s+(?:c['’]è|ho)|não\s+(?:há|tenho|resta))\s+(?:(?:aucun|pas\s+de|ninguna|alcun|nenhuma|qualquer)\s+)?|(?:no|aucun|nul|pas\s+de|kein|keine|keinen|nessun|ning[uú]n|ninguna|nenhuma)\s+)(?:doubts?|question|hesitation|doutes?|h[eé]sitation|h[eé]siter|Zweifel|Frage|Z[oö]gern|dubbio|dubbi|esitazione|esitare|dudas?|dudar(?:lo)?|d[uú]vidas?|hesita[cç][aã]o|hesitar)(?![\p{L}])(?!\s+of(?![\p{L}]))/giu;
 
-const words = (text: string) => text.toLowerCase().replace(/’/g, "'").split(/[^\p{L}']+/u).filter(Boolean);
+// A hyphenated compound is one word: the "non" of "non-stop returns" negates nothing, while the prefix of
+// "non-guaranteed returns" ends the text before the claim and still does.
+const words = (text: string): string[] => text.toLowerCase().replace(/’/g, "'").match(/[\p{L}']+(?:-[\p{L}']+)*/gu) ?? [];
+/** How many leading words of `clause` its last adversative cuts off from what follows. One pass: linear in the clause. */
+function turnEnd(clause: string[]): number {
+  let end = 0, negated = false;
+  clause.forEach((word, i) => {
+    if (TURNS.has(word) || (word === 'mais' && !negated)) end = i + 1;
+    if (PT_NEGATIONS.has(word)) negated = true;
+  });
+  return end;
+}
 
 /** Where the sentence holding `before`'s end starts: a terminator followed by a space ("20.5" is no boundary), or ¡/¿. */
 function sentenceStart(before: string): number {
@@ -320,10 +352,20 @@ const HEDGE_AFTER = /^\s*(?:would|is|was|will)\s+(?:be\s+)?(?:wrong|a\s+mistake|
 
 function negatedBefore(text: string, at: number): boolean {
   const sentence = text.slice(0, at).slice(sentenceStart(text.slice(0, at)));
-  if (HEDGE_BEFORE.test(sentence)) return true;
-  const reach = words(sentence).slice(-8);
-  const turn = reach.map(word => TURNS.has(word)).lastIndexOf(true);
-  if (reach.slice(turn + 1).some(word => NEGATIONS.has(word))) return true;
+  // A negation or a hedge covers its own clause only: "Sans hésitation, tu dois acheter" is still an
+  // instruction. Clauses end at a comma ("65,000" has none) and at an adversative…
+  const clauses = sentence.split(/,(?=\s|$)/u).map(words);
+  const own = clauses.pop() ?? [];
+  let scope = own.slice(turnEnd(own));
+  if (scope.length === own.length && clauses.length > 0) {
+    // …and carry on across the comma of a continued or subordinate clause, or around one comma-delimited
+    // aside: "No indicator, however strong, guarantees returns."
+    const previous = clauses.pop() ?? [];
+    if (CONTINUES.has(own[0]) || (own.length === 1 && RELATIVE.has(own[0]))) scope = [...previous.slice(turnEnd(previous)), ...own];
+    else if (clauses.length > 0 && turnEnd(previous) === 0) { const outer = clauses.pop() ?? []; scope = [...outer.slice(turnEnd(outer)), ...own]; }
+  }
+  if (HEDGE_BEFORE.test(scope.join(' '))) return true;
+  if (scope.slice(-8).some(word => NEGATIONS.has(word))) return true;
   return words(sentence.slice(sentence.lastIndexOf(',') + 1)).slice(-6).some(word => CONDITIONALS.has(word));
 }
 
@@ -348,14 +390,14 @@ function affirmedMatches(text: string, pattern: RegExp, checkAfter: boolean): Re
   });
 }
 
-/** Markdown emphasis must not hide a claim from the guard ("**3x**", "_garantizado_"). */
-const plainText = (text: string) => text.replace(/[*_`~]+/g, '');
+/** Markdown emphasis must not hide a claim from the guard ("**3x**", "_garantizado_"), nor may "no doubt" excuse one. */
+const plainText = (text: string) => text.replace(/[*_`~]+/g, '').replace(CERTAINTY, ' ');
 
 const STATED_VERDICT = /\b(?:verdict|veredicto)\b\W{0,4}(?:(?:is|es)\W{1,4})?(wait|review|esperar|revisar)\b/iu;
 
 /**
  * Post-generation guard, deliberately narrow: an affirmative guarantee /
- * risk-free / sure-profit claim or a personal buy/sell instruction (EN/ES) in
+ * risk-free / sure-profit claim or a personal buy/sell instruction (six languages) in
  * any role, or a CIO that states a verdict other than the one it returned,
  * fails the analysis. No verdict is substituted. The CIO naming the other
  * side's case is normal weighing, not a contradiction: a text-vs-direction
@@ -369,6 +411,9 @@ export function reviewDeskOutput(agents: { alpha: string; red: string; cio: stri
   const stated = agents.cio.match(STATED_VERDICT)?.[1]?.toLowerCase();
   if (stated && (stated === 'wait' || stated === 'esperar' ? 'wait' : 'review') !== agents.verdict) throw new DeskOutputRejected('verdict');
 }
+
+/** Every pattern of the guard, exported for the linear-time check in scripts/test-desk-debate.mts. */
+export const GUARD_PATTERNS: readonly RegExp[] = [...GUARANTEE, ...ADVICE, CERTAINTY, HEDGE_BEFORE, HEDGE_AFTER];
 
 /**
  * The same guard for text published outside the desk (the daily public cycle): returns the

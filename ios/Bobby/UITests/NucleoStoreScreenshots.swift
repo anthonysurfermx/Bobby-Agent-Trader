@@ -9,7 +9,7 @@ final class NucleoStoreScreenshots: XCTestCase {
         continueAfterFailure = false
         let app = XCUIApplication()
         app.launchArguments = ["-nucleo-fixtures", "default", "-nucleo-page", "app",
-            "-AppleLanguages", "(\(language))", "-agent.riskNoticeVersion", "5",
+            "-AppleLanguages", "(\(language))", "-agent.riskNoticeVersion", "6",
             "-companion.id", "momo", "-companion.selected.v2.local", "momo",
             "-avatar.voiceMuted", "YES", "-nucleo.voiceMuteReset.v1", "YES"]
         app.launch()

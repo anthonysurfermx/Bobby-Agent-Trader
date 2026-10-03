@@ -50,7 +50,8 @@ export async function resolveAsset(query: string, signal?: AbortSignal): Promise
   const aliases = (resolved.aliases as string[] | undefined) ?? [];
   return {
     snapshot: { symbol, name: (resolved.displayName as string | undefined) ?? undefined, isEquity: resolved.assetClass === 'equity', ...(typeof resolved.currency === 'string' ? { currency: resolved.currency } : {}), ...(typeof resolved.exchange === 'string' ? { exchange: resolved.exchange } : {}) },
-    needsConfirmation: Boolean(resolution?.needsConfirmation),
+    // The first row stands in only when the server resolved nothing, and then it is offered, never assumed.
+    needsConfirmation: Boolean(resolution?.needsConfirmation) || !obj.resolved,
     confirmName: prettyName(aliases.find((a) => a !== symbol) ?? symbol, symbol),
     proxyNote: (resolution?.proxyNote as string | null | undefined) ?? null,
   };

@@ -173,25 +173,35 @@ async function billingApi(body,{signedIn=true,host='bobbyprotocol.xyz'}={}){
   await module.exports.default({method:'POST',headers:{host},body},response);
   return{requests,response};
 }
-for(const[language,locale]of locales)for(const action of['checkout','portal']){
-  const{requests,response}=await billingApi({action,language,locale,country:'BR',symbol:'BNP.PA',timeframe:'1D',return_url:'https://attacker.test/path'});
-  check(`${locale}: actual ${action} handler binds provider locale and preserves safe return context`,()=>{
+// Checkout is idempotent per attempt (one Stripe idempotency key per attempt, and Stripe rejects a retry whose form
+// differs), so nothing from the request body may shape its form: a retry in another language or on another asset
+// must send the very same parameters. The billing portal has no idempotency key and keeps language and asset.
+const checkoutForm=(await billingApi({action:'checkout'})).requests[0].form.toString();
+const assertCheckoutForm=form=>{
+  assert.equal(form.toString(),checkoutForm);assert.equal(form.get('locale'),null);
+  assert.equal(form.get('success_url'),'https://bobbyprotocol.xyz/desk?pro=welcome');assert.equal(form.get('cancel_url'),'https://bobbyprotocol.xyz/desk?pro=cancelled');
+  assert.equal(form.get('line_items[0][price]'),'price_INERT');assert.equal(form.get('client_reference_id'),'inert-owner');
+};
+for(const[language,locale]of locales){
+  const checkout=await billingApi({action:'checkout',language,locale,country:'BR',symbol:'BNP.PA',timeframe:'1D',return_url:'https://attacker.test/path'});
+  check(`${locale}: actual checkout handler sends the same form in every language`,()=>{assert.equal(checkout.response.statusCode,200);assert.equal(checkout.requests.length,1);assertCheckoutForm(checkout.requests[0].form);});
+  const{requests,response}=await billingApi({action:'portal',language,locale,country:'BR',symbol:'BNP.PA',timeframe:'1D',return_url:'https://attacker.test/path'});
+  check(`${locale}: actual portal handler binds provider locale and preserves safe return context`,()=>{
     assert.equal(response.statusCode,200);assert.equal(requests.length,1);const form=requests[0].form;
     assert.equal(form.get('locale'),locale==='pt-BR'?'pt-BR':language==='es'?'es-419':language);
-    const returns=action==='checkout'?['success_url','cancel_url']:['return_url'];
-    for(const key of returns){const url=new URL(form.get(key));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.pathname,'/desk');assert.equal(url.searchParams.get('lang'),language);assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('country'),'BR');assert.equal(url.searchParams.get('symbol'),action==='checkout'?null:'BNP.PA');assert.equal(url.searchParams.get('timeframe'),action==='checkout'?null:'1D');assert.ok(!url.href.includes('attacker'));}
-    if(action==='checkout'){assert.equal(new URL(form.get('success_url')).searchParams.get('pro'),'welcome');assert.equal(new URL(form.get('cancel_url')).searchParams.get('pro'),'cancelled');assert.equal(form.get('line_items[0][price]'),'price_INERT');assert.equal(form.get('client_reference_id'),'inert-owner');}else assert.equal(form.get('customer'),'cus_INERT');
+    const url=new URL(form.get('return_url'));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.pathname,'/desk');assert.equal(url.searchParams.get('lang'),language);assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('country'),'BR');assert.equal(url.searchParams.get('symbol'),'BNP.PA');assert.equal(url.searchParams.get('timeframe'),'1D');assert.ok(!url.href.includes('attacker'));
+    assert.equal(form.get('customer'),'cus_INERT');
   });
 }
-for(const[language,locale,provider]of[['es','es-ES','es'],['es','es-US','es-419'],['en','en-GB','en-GB'],['en','en-AU','en'],['en','en-CA','en'],['en','en-IE','en']])for(const action of['checkout','portal']){
-  const{requests,response}=await billingApi({action,language,locale,symbol:'^GSPC',timeframe:'1D'});
-  check(`${locale}: ${action} keeps supported provider dialect and index identifier`,()=>{assert.equal(response.statusCode,200);assert.equal(requests[0].form.get('locale'),provider);const url=new URL(requests[0].form.get(action==='checkout'?'success_url':'return_url'));assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('symbol'),action==='checkout'?null:'^GSPC');});
+for(const[language,locale,provider]of[['es','es-ES','es'],['es','es-US','es-419'],['en','en-GB','en-GB'],['en','en-AU','en'],['en','en-CA','en'],['en','en-IE','en']]){
+  const checkout=await billingApi({action:'checkout',language,locale,symbol:'^GSPC',timeframe:'1D'});
+  check(`${locale}: checkout form ignores the dialect`,()=>{assert.equal(checkout.response.statusCode,200);assertCheckoutForm(checkout.requests[0].form);});
+  const{requests,response}=await billingApi({action:'portal',language,locale,symbol:'^GSPC',timeframe:'1D'});
+  check(`${locale}: portal keeps supported provider dialect and index identifier`,()=>{assert.equal(response.statusCode,200);assert.equal(requests[0].form.get('locale'),provider);const url=new URL(requests[0].form.get('return_url'));assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('symbol'),'^GSPC');});
 }
 for(const symbol of['BRK-B','=F','BTC-USD','^GSPC','A'.repeat(20)]){
-  // Checkout is idempotent per attempt (Stripe rejects a retry whose form differs), so the asset stays out of its form;
-  // the billing portal, which has no idempotency key, still returns to the asset.
   const{requests}=await billingApi({action:'checkout',language:'fr',locale:'fr-FR',symbol});
-  check(`checkout form does not vary with the Desk symbol ${symbol}`,()=>{assert.equal(new URL(requests[0].form.get('success_url')).searchParams.get('symbol'),null);});
+  check(`checkout form does not vary with the Desk symbol ${symbol}`,()=>{assertCheckoutForm(requests[0].form);});
   const portal=await billingApi({action:'portal',language:'fr',locale:'fr-FR',symbol});
   check(`portal return preserves Desk contract symbol ${symbol}`,()=>{assert.equal(new URL(portal.requests[0].form.get('return_url')).searchParams.get('symbol'),symbol);});
 }
@@ -199,7 +209,10 @@ for(const action of['checkout','portal']){
   const legacy=await billingApi({action});
   check(`legacy ${action} without interface context preserves its contract`,()=>{const form=legacy.requests[0].form;assert.equal(form.get('locale'),null);assert.equal(form.get(action==='checkout'?'success_url':'return_url'),action==='checkout'?'https://bobbyprotocol.xyz/desk?pro=welcome':'https://bobbyprotocol.xyz/desk');});
   const malformed=await billingApi({action,language:'fr',locale:'de-DE',country:'BR?redirect=evil',symbol:'BTC<script>',timeframe:'1D;alert()',return_url:'https://attacker.test/path'},{host:'attacker.test'});
-  check(`${action}: malformed region and market cannot become return instructions`,()=>{const url=new URL(malformed.requests[0].form.get(action==='checkout'?'success_url':'return_url'));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.searchParams.get('lang'),'fr');assert.equal(url.searchParams.get('locale'),'fr-FR');for(const key of['country','symbol','timeframe','return_url'])assert.equal(url.searchParams.get(key),null);});
+  check(`${action}: malformed region and market cannot become return instructions`,()=>{
+    if(action==='checkout'){assertCheckoutForm(malformed.requests[0].form);return;}
+    const url=new URL(malformed.requests[0].form.get('return_url'));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.searchParams.get('lang'),'fr');assert.equal(url.searchParams.get('locale'),'fr-FR');for(const key of['country','symbol','timeframe','return_url'])assert.equal(url.searchParams.get(key),null);
+  });
   const denied=await billingApi({action,language:'de',locale:'de-DE'},{signedIn:false});
   check(`${action}: localization does not bypass required sign-in`,()=>{assert.equal(denied.response.statusCode,401);assert.equal(denied.requests.length,0);});
 }

@@ -234,25 +234,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         observeCheckout(req, identity, openSession.id);
         return res.status(200).json({ url: openSession.url });
       }
-      // Interface language only shapes the return address and Stripe's page language. The symbol and timeframe stay
-      // out of this form: the create call is idempotent per checkout attempt, and Stripe rejects a retry of the same
-      // attempt whose parameters differ (a retry after the reader switched asset would fail with a 400).
-      const context = billingInterface(body);
-      context.query.delete('symbol'); context.query.delete('timeframe');
+      // Nothing from the request body shapes this form: the create call is idempotent per checkout attempt, and
+      // Stripe rejects a retry of the same attempt whose parameters differ (a retry after the reader switched
+      // language or asset would fail with a 400). Without `locale`, Stripe Checkout follows the browser language.
       const form: Record<string, string> = {
         mode: 'subscription',
         customer: claim.customer,
         expires_at: String(claim.expiresAt),
         'line_items[0][price]': claim.price,
         'line_items[0][quantity]': '1',
-        success_url: billingReturn(claim.origin, context.query, 'welcome'),
-        cancel_url: billingReturn(claim.origin, context.query, 'cancelled'),
+        success_url: `${claim.origin}/desk?pro=welcome`,
+        cancel_url: `${claim.origin}/desk?pro=cancelled`,
         client_reference_id: identity.id,
         'metadata[identity_id]': identity.id,
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
-      if (context.stripeLocale) form.locale = context.stripeLocale;
       const session = await stripeApi<{ id?: string; url?: string }>('POST', 'checkout/sessions', form, `bobby-checkout-${claim.attemptId}`);
       if (typeof session.id !== 'string' || typeof session.url !== 'string') throw new Error('Stripe checkout has no id or URL');
       try { await completeCheckout(identity.id, claim.attemptId, session.url, session.id); }

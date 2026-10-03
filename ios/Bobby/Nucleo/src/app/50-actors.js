@@ -121,8 +121,8 @@ function tintTo(c, amt, wash, Tr){
 function tintHome(){ tintTo(ME.tint, ME.id ? ME.cap : 0, ME.id ? 0.12 : 0, 0.8); }
 function tintDuck(){ TINT.amt.cfg = UT(0.3); TINT.amt.to(0); TINT.wash.cfg = UT(0.3); TINT.wash.to(0); }
 function pillMode(m){ A.mode = m; for (var k in A.modeO) A.modeO[k].tween(k === m ? 1 : 0, k === m ? 0.24 : 0.16, E.fade, k === m ? 0.06 : 0); ariaPill(); }
-/* the idle pill: a mic when speech can work, a keyboard when it cannot */
-function idleMode(){ var s = SES && SES.mic ? SES.mic.state : 'undetermined'; return (s === 'granted' || s === 'undetermined') ? 'mic' : 'kbd'; }
+/* the idle pill: a mic when speech can work (a hold may still ask first), a keyboard when it cannot */
+function idleMode(){ var s = SES && SES.mic ? SES.mic.state : 'undetermined'; return (s === 'granted' || s === 'undetermined' || s === 'consent') ? 'mic' : 'kbd'; }
 function ariaPill(){
   var k = A.mode === 'think' ? 'aria.pillCancel' : A.mode === 'stop' ? 'aria.pillStop' : A.mode === 'kbd' ? 'aria.pillType' : 'aria.pill';
   att(el.pill, 'aria-label', tt(k));

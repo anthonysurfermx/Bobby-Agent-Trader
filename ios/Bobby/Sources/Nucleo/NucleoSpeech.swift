@@ -1,7 +1,9 @@
 // Hold-to-ask speech for the Núcleo page (Nucleo/ARCHITECTURE.md §2.6, R8).
 // Recognition runs ON DEVICE when the phone holds Apple's model for the app language;
-// otherwise Apple's speech service transcribes it in that same language. It never falls
-// back to another language, and Bobby never stores or uploads the audio itself. The
+// otherwise Apple's speech service transcribes it in that same language, and only after the
+// user agreed to that (`appleServiceConsentKey`): without the stored agreement no request is
+// created and the microphone is never tapped. It never falls back to another language, and
+// Bobby never stores or uploads the audio itself. The
 // microphone is live only between `speech.start` (pill down) and `speech.stop` (pill up),
 // stops on its own after 60 s, on an audio interruption or a headset change, and when the
 // app leaves the foreground. If nothing can recognize the language right now (no local
@@ -82,6 +84,12 @@ final class NucleoSpeech {
     var willStart: () -> Void = {}
     /// Dictation vocabulary (asset names and tickers), set once per session.
     var vocabulary: [String] = []
+    /// The user agreed that Apple's speech service transcribes dictation when the phone holds no
+    /// model for the app language. Without it a recognizer that is not on-device never starts.
+    static let appleServiceConsentKey = "speech.appleServiceConsent.v1"
+    /// Asks for that agreement before anything is captured (the session shows a native alert).
+    /// True = allow; false = type instead, nothing is stored and a later hold may ask again.
+    var confirmAppleService: @MainActor () async -> Bool = { false }
 
     private var recognizer: (any NucleoSpeechRecognizing)?
     private var recognizerLocale: String?
@@ -100,6 +108,7 @@ final class NucleoSpeech {
     private var lastLevelAt: CFTimeInterval = 0
     private var observers: [NSObjectProtocol] = []
     private let finalWait: Double
+    private let defaults: UserDefaults
     private let capture: any NucleoSpeechCapturing
     private let sleep: @MainActor (Double) async throws -> Void
     private let permissionInputs: (() -> PermissionInputs)?
@@ -117,6 +126,7 @@ final class NucleoSpeech {
     }
 
     init(finalWait: Double? = nil,
+         defaults: UserDefaults = .standard,
          permissionInputs: (() -> PermissionInputs)? = nil,
          capture: (any NucleoSpeechCapturing)? = nil,
          sleep: @escaping @MainActor (Double) async throws -> Void = { seconds in
@@ -125,6 +135,7 @@ final class NucleoSpeech {
          supportedLocales: @escaping () -> Set<String> = { Set(SFSpeechRecognizer.supportedLocales().map(\.identifier)) },
          makeRecognizer: @escaping (String) -> (any NucleoSpeechRecognizing)? = { SFSpeechRecognizer(locale: Locale(identifier: $0)) }) {
         self.finalWait = finalWait ?? Self.finalWaitSeconds
+        self.defaults = defaults
         self.permissionInputs = permissionInputs
         self.capture = capture ?? AppleNucleoSpeechCapture()
         self.sleep = sleep
@@ -133,6 +144,11 @@ final class NucleoSpeech {
     }
 
     var isListening: Bool { listening }
+
+    var appleServiceConsent: Bool { defaults.bool(forKey: Self.appleServiceConsentKey) }
+
+    /// Withdrawn together with the AI permission; the next server-only hold asks again.
+    func revokeAppleServiceConsent() { defaults.removeObject(forKey: Self.appleServiceConsentKey) }
 
     // MARK: - Permission
 
@@ -143,6 +159,8 @@ final class NucleoSpeech {
     }
 
     /// Never prompts. `onDevice` is true only when the resolved recognizer holds the local model.
+    /// `consent`: both OS permissions are granted, only Apple's speech service can transcribe the
+    /// language, and the user has not agreed to send the audio there (`onDevice` is false).
     func permission() -> Permission {
         let inputs: PermissionInputs
         if let permissionInputs {
@@ -159,7 +177,11 @@ final class NucleoSpeech {
         // A recognizer may not be ready before authorization. A hold must still offer the explicit
         // OS permission flow; only an authorized attempt needs a recognizer for the language, and
         // it is `unavailable` only when neither the phone nor Apple's speech service can run one.
-        let state = authorization == "granted" && !inputs.available ? "unavailable" : authorization
+        let state: String
+        if authorization != "granted" { state = authorization }
+        else if !inputs.available { state = "unavailable" }
+        else if !inputs.onDevice && !appleServiceConsent { state = "consent" }
+        else { state = "granted" }
         return Permission(state: state, onDevice: inputs.available && inputs.onDevice)
     }
 
@@ -171,18 +193,24 @@ final class NucleoSpeech {
         return "denied"
     }
 
-    /// The two OS prompts, in order: microphone, then speech recognition.
+    /// What dictation still needs from the user, in order: the two OS prompts (microphone, then
+    /// speech recognition) and, when only Apple's speech service can transcribe the language, the
+    /// agreement to send the audio there. Declining stores nothing: the state stays `consent`.
     func requestPermission() async -> Permission {
-        let current = permission()
-        guard current.state == "undetermined" else { return current }
-        if AVAudioApplication.shared.recordPermission == .undetermined {
-            _ = await AVAudioApplication.requestRecordPermission()
-        }
-        if AVAudioApplication.shared.recordPermission == .granted, SFSpeechRecognizer.authorizationStatus() == .notDetermined {
-            await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-                SFSpeechRecognizer.requestAuthorization { _ in done.resume() }
+        var current = permission()
+        if current.state == "undetermined" {
+            if AVAudioApplication.shared.recordPermission == .undetermined {
+                _ = await AVAudioApplication.requestRecordPermission()
             }
+            if AVAudioApplication.shared.recordPermission == .granted, SFSpeechRecognizer.authorizationStatus() == .notDetermined {
+                await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+                    SFSpeechRecognizer.requestAuthorization { _ in done.resume() }
+                }
+            }
+            current = permission()
         }
+        guard current.state == "consent" else { return current }
+        if await confirmAppleService() { defaults.set(true, forKey: Self.appleServiceConsentKey) }
         return permission()
     }
 
@@ -246,7 +274,7 @@ final class NucleoSpeech {
 
     // MARK: - Start / stop
 
-    enum StartStatus: String { case listening, needsPermission = "needs_permission", denied, unavailable, busy }
+    enum StartStatus: String { case listening, needsPermission = "needs_permission", denied, unavailable, consent, busy }
 
     func start() -> StartStatus {
         if listening || awaitingFinal { return .busy }
@@ -255,12 +283,19 @@ final class NucleoSpeech {
         case "granted": break
         case "undetermined": return .needsPermission
         case "unavailable": return .unavailable
+        case "consent": return .consent
         default: return .denied
         }
         guard let recognizer = resolveRecognizer(requireAvailable: true), recognizer.isAvailable else { return .unavailable }
+        // The enforcement point: audio may reach Apple's speech service only with the stored agreement.
+        // No request exists and the microphone is untouched before this line. Reaching it without the
+        // agreement means the phone holds the model but only a server recognizer can run right now.
+        // Read once: the request must be on-device-only exactly when that is what let it through.
+        let onDevice = recognizer.supportsOnDeviceRecognition
+        guard onDevice || appleServiceConsent else { return .unavailable }
         willStart()
 
-        let request = Self.makeRequest(contextualStrings: vocabulary, onDevice: recognizer.supportsOnDeviceRecognition)
+        let request = Self.makeRequest(contextualStrings: vocabulary, onDevice: onDevice)
         activeLocaleIdentifier = L.localeIdentifier
         recognitionFinished = false
         session += 1

@@ -6,7 +6,7 @@ import SwiftUI
 
 enum RiskNotice {
     /// Bump when the wording changes materially; users re-acknowledge.
-    static let currentVersion = 5
+    static let currentVersion = 6
 
     // Bodies expand in the scroll view so every recipient remains readable.
     // Shared by RiskNoticeView and the Núcleo risk beat (`riskNotice()`), so the

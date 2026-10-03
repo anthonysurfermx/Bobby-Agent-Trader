@@ -122,7 +122,8 @@ final class NucleoPrivacyUITests: XCTestCase {
     }
 
     func testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement() {
-        launch(page: "onboarding", riskVersion: 4, reset: true)
+        // The last accepted version before the dictation sentence changed: covers the 5 to 6 upgrade.
+        launch(page: "onboarding", riskVersion: 5, reset: true)
         tapLocalQuestion()
         waitUntilHittable(fullNotice)
         XCTAssertTrue(disclosure.waitForExistence(timeout: 20))
@@ -173,7 +174,7 @@ final class NucleoPrivacyUITests: XCTestCase {
         XCTAssertLessThanOrEqual(disclosure.frame.maxY, viewport.maxY + 2,
                                  "The final withdrawal sentence must fit or be reachable by scrolling")
         waitUntilHittable(fullNotice)
-        capture("nucleo-risk-v5-disclosure-complete")
+        capture("nucleo-risk-v6-disclosure-complete")
 
         let agree = app.webViews.buttons["I agree to the risk notice and AI processing"]
         waitUntilHittable(agree)
@@ -185,19 +186,19 @@ final class NucleoPrivacyUITests: XCTestCase {
         XCTAssertFalse(app.webViews.buttons["Open the risk notice"].isHittable,
                        "The failure must come after acceptance, not from a missing-consent refusal")
 
-        // Remove the argument-domain v4 override: acceptance must persist v5 in the app domain.
+        // Remove the argument-domain v5 override: acceptance must persist v6 in the app domain.
         app.terminate()
         launch(page: "onboarding")
         tapLocalQuestion()
         waitUntilHittable(failureRetry, timeout: 30)
         XCTAssertFalse(fullNotice.isHittable, "An accepted current notice must not gate the next question")
         XCTAssertFalse(app.webViews.buttons["Open the risk notice"].isHittable,
-                       "The persisted v5 consent was lost on relaunch")
-        capture("nucleo-risk-v5-agreement-persisted")
+                       "The persisted v6 consent was lost on relaunch")
+        capture("nucleo-risk-v6-agreement-persisted")
     }
 
     func testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch() {
-        launch(page: "app", riskVersion: 5, reset: true)
+        launch(page: "app", riskVersion: 6, reset: true)
         waitUntilHittable(homeProfile)
         homeProfile.tap()
         let name = app.staticTexts["account-display-name"]

@@ -392,6 +392,7 @@ struct AccountSheet: View {
             .accessibilityIdentifier("account-briefings")
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
+            VoiceGenderRow(voice: voice)
         }
         Menu {
             Button(L.t("Follow iPhone language", "Usar el idioma del iPhone")) { L.select("system") }
@@ -885,6 +886,42 @@ private struct VoiceSwitchRow: View {
         .tint(Theme.orbViolet)
         .profileRowFrame()
         .accessibilityIdentifier("account-voice")
+    }
+}
+
+/// Whose voice Bobby speaks with (`NeuralVoice.voiceGender`): the companion's own, feminine or masculine.
+/// The same menu as the language picker below it; choosing stops the current line.
+private struct VoiceGenderRow: View {
+    @ObservedObject var voice: NeuralVoice
+
+    private func name(_ gender: NeuralVoice.VoiceGender) -> String {
+        switch gender {
+        case .companion: return L.t("Companion's voice", "Voz de tu amigo")
+        case .female: return L.t("Feminine", "Femenina")
+        case .male: return L.t("Masculine", "Masculina")
+        }
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(NeuralVoice.VoiceGender.allCases, id: \.rawValue) { gender in
+                Button(name(gender)) { voice.voiceGender = gender }
+            }
+        } label: {
+            HStack(spacing: 12) {
+                ProfileIcon(symbol: "person.wave.2")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(L.t("Voice type", "Tipo de voz")).font(.system(size: 15)).foregroundStyle(Theme.cream)
+                    Text(name(voice.voiceGender)).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
+                }
+                Spacer()
+                Text(L.t("Change", "Cambiar")).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
+                Image(systemName: "chevron.down").font(.system(size: 10)).foregroundStyle(Theme.warmMuted)
+            }
+            .padding(.vertical, 12)
+            .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("account-voice-gender")
     }
 }
 

@@ -1,4 +1,4 @@
-import { REGIONAL_STOCKS, isListedStockSymbol, regionalDefaults, resolveRegionalStock, searchRegionalStocks, type RegionalStock } from '../src/lib/regional-stocks.js';
+import { REGIONAL_STOCKS, isListedStockSymbol, isRegionalHomonym, regionalDefaults, regionalMentions, resolveRegionalStock, searchRegionalStocks, type RegionalStock } from '../src/lib/regional-stocks.js';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
   browseOkxAssets,
@@ -6,6 +6,7 @@ import {
   OKX_SEARCH_INST_TYPES,
   resolveOkxAssetFromText,
   searchOkxInstruments,
+  type OkxAssetInstrument,
   type OkxSearchInstType,
 } from '../src/lib/okx-asset-search.js';
 
@@ -48,6 +49,13 @@ async function providerStocks(q: string): Promise<RegionalStock[]> {
 }
 
 
+/** The promise's value, or null once `ms` have passed: a slow crypto catalogue never holds back a cash listing. */
+function within<T>(ms: number, promise: Promise<T>): Promise<T | null> {
+  let timer: ReturnType<typeof setTimeout>;
+  return Promise.race([promise, new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), ms); })])
+    .finally(() => clearTimeout(timer));
+}
+
 function parseInstTypes(raw: unknown): OkxSearchInstType[] {
   const value = String(raw || '')
     .split(',')
@@ -76,7 +84,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const q = String(src.q || '').trim();
   const limit = Math.min(Math.max(Number(src.limit || 8) || 8, 1), 20);
   const instTypes = parseInstTypes(src.instTypes);
-  const language = src.language ?? src.lang;
+  // A caller that sends only its locale ("it-IT") still gets its own everyday words kept out of the tickers.
+  const language = src.language ?? src.lang ?? src.locale;
   const localStocks = regionalDefaults(language, src.locale, src.country);
   const rankedStocks = [...localStocks, ...REGIONAL_STOCKS.filter(s => !localStocks.includes(s))];
 
@@ -122,13 +131,42 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // beside the crypto catalogue: a ticker typed alone ("TON", "ENS", "SAP") is never swallowed by them.
   const listed = searchRegionalStocks(q, language, src.locale, src.country);
   const listedResolved = resolveRegionalStock(q, language, src.locale, src.country);
+  const listedRows = listed.map(stockResult);
+
+  // A sentence that names a cash listing can name a second asset beside it ("Bitcoin et LVMH", "LVMH et
+  // Siemens"). Two named assets are never answered for one of them: both come back, to be confirmed.
+  const mentions = regionalMentions(q, language, src.locale, src.country);
+  if (mentions.stocks.length) {
+    const beside = /[\p{L}\p{N}]/u.test(mentions.rest)
+      ? await within(2500, resolveOkxAssetFromText(mentions.rest, { instTypes, language, sentence: true }).catch(() => null))
+      : null;
+    // Only an asset named outright counts as a second one; a guess from a leftover word does not.
+    const other = beside && (beside.matchKind === 'proxy' || beside.candidates || (beside.matchKind === 'exact' && !beside.needsConfirmation)) ? beside : null;
+    if (mentions.stocks.length + (other ? 1 : 0) > 1) {
+      // In the order the question names them; the first one leads the confirmation.
+      const found = other ? mentions.rest.toUpperCase().indexOf(other.matchedTerm.normalize('NFD')) : -1;
+      const rows: Array<ReturnType<typeof stockResult> | OkxAssetInstrument> = [
+        ...mentions.stocks.map(({ stock, at }) => ({ at, row: stockResult(stock) })),
+        ...(other?.candidates ?? (other ? [other.instrument] : [])).map(row => ({ at: found < 0 ? Infinity : found, row })),
+      ].sort((a, b) => a.at - b.at).map(entry => entry.row);
+      const leadsWithOther = other !== null && rows[0] === other.instrument;
+      return res.status(200).json({ ok: true, query: q,
+        results: [...rows, ...listedRows.filter(row => !rows.some(named => named.instId === row.instId))].slice(0, limit),
+        resolved: rows[0],
+        resolution: { matchKind: leadsWithOther ? other.matchKind : 'exact', matchedTerm: q, needsConfirmation: true,
+          proxyNote: leadsWithOther ? other.proxyNote : null, candidates: rows.map(row => row.symbol) },
+        source: other ? 'Cash-market listings + OKX public instruments' : 'Cash-market listings (Yahoo Finance identifiers)',
+        catalogAgeMs: other ? getCatalogAgeMs() : null });
+    }
+  }
   if (listedResolved) {
+    // A name that is an everyday word at home ("intesa") is offered, never assumed.
+    const homonym = isRegionalHomonym(q);
     return res.status(200).json({ ok: true, query: q, results: listed.slice(0, limit).map(stockResult),
       resolved: stockResult(listedResolved),
-      resolution: { matchKind: 'exact', matchedTerm: q, needsConfirmation: false, proxyNote: null },
+      resolution: { matchKind: homonym ? 'partial' : 'exact', matchedTerm: q, needsConfirmation: homonym, proxyNote: null },
       source: 'Cash-market listings (Yahoo Finance identifiers)', catalogAgeMs: null });
   }
-  const listedRows = listed.map(stockResult);
 
   // An exchange-qualified cash ticker never falls through to fuzzy crypto resolution.
   // Only a literal exchange-qualified ticker is sent to external discovery;
@@ -148,16 +186,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const [results, resolution] = await Promise.all([
-      searchOkxInstruments(q, { instTypes, limit }),
+      searchOkxInstruments(q, { instTypes, limit, language }),
       resolveOkxAssetFromText(q, { instTypes, language }),
     ]);
+    // What the question names leads the rows: every candidate in the order named, or the one resolved.
+    const namedRows = resolution?.candidates ?? (resolution ? [resolution.instrument] : []);
+    const otherRows = results.filter(row => !namedRows.some(lead => lead.instId === row.instId));
 
     return res.status(200).json({
       ok: true,
       query: q,
       instTypes,
       // A resolved instrument leads; otherwise the cash listings that look like the query do.
-      results: (resolution ? [...results, ...listedRows] : [...listedRows, ...results]).slice(0, limit),
+      // A sentence that names nothing offers nothing: look-alikes of its ordinary words are not suggestions.
+      results: (resolution ? [...namedRows, ...otherRows, ...listedRows] : [...listedRows, ...(/\s/.test(q) ? [] : otherRows)]).slice(0, limit),
       resolved: resolution?.instrument ?? null,
       // Safety metadata: fuzzy/proxy matches must be user-confirmed before
       // any analysis runs — better to ask once than to confidently analyze
@@ -168,6 +210,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           matchedTerm: resolution.matchedTerm,
           needsConfirmation: resolution.needsConfirmation,
           proxyNote: resolution.proxyNote,
+          ...(resolution.candidates ? { candidates: resolution.candidates.map(row => row.symbol) } : {}),
         }
         : null,
       source: listedRows.length ? 'Cash-market listings + OKX public instruments' : 'OKX public instruments',

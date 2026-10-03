@@ -13,7 +13,7 @@ final class Store35Shots: XCTestCase {
     private func capture(spanish: Bool) {
         let suffix = spanish ? "es-MX" : "en-US"
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "4", "-agent.onboarded", "NO", "-avatar.voiceMuted", "YES"]
+        app.launchArguments = ["-store-shots", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "6", "-agent.onboarded", "NO", "-avatar.voiceMuted", "YES"]
         app.launch()
         let next = app.buttons["onboarding-next"]
         XCTAssertTrue(next.waitForExistence(timeout: 20))

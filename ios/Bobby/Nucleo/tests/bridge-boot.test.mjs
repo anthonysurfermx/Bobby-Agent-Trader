@@ -60,7 +60,7 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
   const session = {
     v: 1, page: 'app', onboarded: true, firstRun: false, language, localHour: 9,
     companion: momo, xp: 0, level: { number: 1, progress: 0.2 }, streak: 0,
-    signedIn: false, riskAccepted: true, riskVersion: 5, reducedMotion: false,
+    signedIn: false, riskAccepted: true, riskVersion: 6, reducedMotion: false,
     mic: { state: 'undetermined', onDevice: true }, hints: {}, pendingRead: null,
     platform: 'ios', appVersion: '1.5 (45)',
     analysisLevel: { id: 'rapido', label: language === 'es' ? 'Rápido' : 'Quick', color: '#A795EF' },
@@ -119,13 +119,13 @@ test('every literal event registered by either shipping page is allowed by the r
 });
 
 for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de']) {
-  test(language + ': native Momo/risk v5 session wakes, labels Profile, and opens the native account', async () => {
+  test(language + ': native Momo/risk v6 session wakes, labels Profile, and opens the native account', async () => {
     const app = harness({ language });
     app.boot(); await flush();
     assert.equal(app.calls[0].method, 'session');
     assert.deepEqual(app.calls[0].params, { page: 'app' });
     assert.equal(app.context.nucleo.state(), 'WAKE');
-    assert.equal(app.context.nucleo.session().riskVersion, 5);
+    assert.equal(app.context.nucleo.session().riskVersion, 6);
     assert.equal(app.context.nucleo.session().companion.id, 'momo');
     assert.equal(app.nodes.get('avatar').getAttribute('aria-label'), ({ en:'Momo. Account and progress', es:'Momo. Cuenta y progreso', fr:'Momo. Compte et progression', pt:'Momo. Conta e progresso', it:'Momo. Account e progressi', de:'Momo. Konto und Fortschritt' })[language]);
     app.advance(1.2); await flush();

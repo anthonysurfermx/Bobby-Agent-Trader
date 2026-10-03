@@ -61,10 +61,10 @@ function harness(language = 'en', bodyHeight = 180, titleHeights = [44, 22, 22, 
 }
 
 for (const language of ['en', 'es']) {
-  test(language + ': complete version-five copy fits in a scroll region above the full-notice button', () => {
+  test(language + ': complete version-six copy fits in a scroll region above the full-notice button', () => {
     const { ctx } = harness(language);
     const layout = ctx.RISK_LAYOUT;
-    assert.equal(fixture.version, 5);
+    assert.equal(fixture.version, 6);
     assert.equal(ctx.rbodyEl.textContent, fixture.statements[language][0].body);
     assert.equal(ctx.rbodyEl.attributes.role, 'region');
     assert.equal(ctx.rbodyEl.attributes['aria-label'], fixture.statements[language][0].title);

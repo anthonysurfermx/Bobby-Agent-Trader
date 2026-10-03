@@ -44,6 +44,38 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     static let mutePreferenceKey = "avatar.voiceMuted"
     private let defaults: UserDefaults
 
+    /// Whose voice speaks: each companion's own (the default), or one feminine or masculine voice for all of them.
+    enum VoiceGender: String, CaseIterable, Sendable {
+        case companion, female, male
+
+        /// The matching on-device voice gender; `.unspecified` keeps the fallback's usual choice.
+        var deviceGender: AVSpeechSynthesisVoiceGender {
+            switch self {
+            case .companion: return .unspecified
+            case .female: return .female
+            case .male: return .male
+            }
+        }
+    }
+    static let genderPreferenceKey = "voice.gender"
+    /// Read at use time, so every NeuralVoice follows the one device preference. Changing it stops the
+    /// current line (it was made with the previous voice); the next line uses the new one.
+    var voiceGender: VoiceGender {
+        get { defaults.string(forKey: Self.genderPreferenceKey).flatMap(VoiceGender.init(rawValue:)) ?? .companion }
+        set {
+            guard newValue != voiceGender else { return }
+            objectWillChange.send()
+            defaults.set(newValue.rawValue, forKey: Self.genderPreferenceKey)
+            stop()
+        }
+    }
+
+    /// The `voice` a network request carries: the companion's persona, or the chosen gender in its place.
+    private func requestVoice(_ companionVoice: String) -> String {
+        let gender = voiceGender
+        return gender == .companion ? companionVoice : gender.rawValue
+    }
+
     private var player: AVAudioPlayer?
     private let fallback = AVSpeechSynthesizer()
     private var fallbackUtterance: AVSpeechUtterance?
@@ -120,7 +152,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                     req.httpMethod = "POST"
                     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     req.timeoutInterval = Self.requestTimeoutSeconds
-                    var body = ["text": text, "lang": L.ttsLang, "language": L.language, "locale": L.localeIdentifier, "voice": persona ?? voiceId]
+                    var body = ["text": text, "lang": L.ttsLang, "language": L.language, "locale": L.localeIdentifier, "voice": self.requestVoice(persona ?? voiceId)]
                     if let country = L.country { body["country"] = country }
                     body["mode"] = free ? "free" : "persona"
                     if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
@@ -158,15 +190,18 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// while the current external-processing consent permits it (checked centrally in speak).
     /// Languages with no recorded clips yet (fr, pt, it, de) therefore keep the companion's own persona
     /// once the notice is accepted; before consent no text leaves the phone and they use the device voice.
+    /// The clips are recorded in the companion's own voice, so a chosen voice gender skips them in every
+    /// language: `fallbackText` goes to the network voice, or before consent to the device voice of that gender.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
         guard Self.avatarNarrationEnabled, !isMuted else { return }
-        if name.hasSuffix("-" + L.language),
+        let companionVoice = voiceGender == .companion
+        if companionVoice, name.hasSuffix("-" + L.language),
            let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
            let data = try? Data(contentsOf: url) {
             stop()
             if play(data, playbackRate: playbackRate) { return }
         }
-        if allowsExternalSpeech || ["en", "es"].contains(L.language) {
+        if allowsExternalSpeech || (companionVoice && ["en", "es"].contains(L.language)) {
             // speak() checks consent itself and, for the new languages, ends on the device voice if the network fails.
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
             return
@@ -194,13 +229,27 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     }
 
     /// Select only voices in the text's language; a missing voice must never use iOS's unrelated default.
-    static func deviceVoice(language: String) -> AVSpeechSynthesisVoice? {
+    /// A chosen `gender` is preferred inside that language only; with no such voice installed the choice
+    /// is exactly the one made without a preference.
+    static func deviceVoice(language: String, gender: AVSpeechSynthesisVoiceGender = .unspecified) -> AVSpeechSynthesisVoice? {
         let base = language.split(separator: "-").first.map(String.init) ?? language
         guard AppLanguage(rawValue: base) != nil else { return nil }
         let preferred = language.contains("-") ? [language] : Locale.preferredLanguages
         let resolution = LanguageResolution.resolve(selection: base, preferredLanguages: preferred,
                                                     region: Locale.current.region?.identifier)
         let available = AVSpeechSynthesisVoice.speechVoices().filter(isStandardDeviceVoice)
+        if gender != .unspecified {
+            // Same order as below (exact locale, then the language's other regions; best quality first).
+            for candidate in resolution.speechLocaleCandidates {
+                let matches = available.filter {
+                    $0.gender == gender && $0.language.caseInsensitiveCompare(candidate) == .orderedSame
+                }
+                for quality in [AVSpeechSynthesisVoiceQuality.premium, .enhanced] {
+                    if let best = matches.first(where: { $0.quality == quality }) { return best }
+                }
+                if let stock = matches.first { return stock }
+            }
+        }
         // Exact locale first (language and region), then the language's other regions.
         for candidate in resolution.speechLocaleCandidates {
             let matches = available.filter { $0.language.caseInsensitiveCompare(candidate) == .orderedSame }
@@ -227,7 +276,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private func playOnDevice(_ text: String, language: String, requiresConsent: Bool,
                               onFinish: ((NarrationEnd) -> Void)? = nil) -> Bool {
         guard Self.avatarNarrationEnabled, !isMuted, !requiresConsent || allowsExternalSpeech,
-              !text.isEmpty, let selectedVoice = Self.deviceVoice(language: language) else { return false }
+              !text.isEmpty,
+              let selectedVoice = Self.deviceVoice(language: language, gender: voiceGender.deviceGender) else { return false }
         stop()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)

@@ -49,12 +49,17 @@ final class ReleaseAuditTests: XCTestCase {
             else { defaults.removeObject(forKey: "agent.riskNoticeVersion") }
         }
         let profile = AgentProfile()
-        XCTAssertGreaterThan(RiskNotice.currentVersion, 4)
-        profile.riskNoticeVersion = 4
-        XCTAssertFalse(profile.acceptedRiskNotice)
-        XCTAssertEqual(NucleoPage.route(onboarded: true, companionId: "byte", riskAccepted: profile.acceptedRiskNotice), .onboardingRisk)
+        // 5 is what build 60 stored: the dictation statement changed after it, so it must be asked again.
+        XCTAssertGreaterThan(RiskNotice.currentVersion, 5)
+        for stale in [4, 5, RiskNotice.currentVersion - 1] {
+            profile.riskNoticeVersion = stale
+            XCTAssertFalse(profile.acceptedRiskNotice, "stored \(stale)")
+            XCTAssertFalse(BobbyStore.consented, "stored \(stale)")
+            XCTAssertEqual(NucleoPage.route(onboarded: true, companionId: "byte", riskAccepted: profile.acceptedRiskNotice), .onboardingRisk, "stored \(stale)")
+        }
         profile.riskNoticeVersion = RiskNotice.currentVersion
         XCTAssertTrue(profile.acceptedRiskNotice)
+        XCTAssertTrue(BobbyStore.consented)
         XCTAssertEqual(NucleoPage.route(onboarded: true, companionId: "byte", riskAccepted: profile.acceptedRiskNotice), .app)
     }
 

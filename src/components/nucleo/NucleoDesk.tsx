@@ -13,7 +13,7 @@ import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { pick, speechLocale, t } from '@/lib/companions/i18n';
 import { clientLanguagePath } from '@/lib/client-language';
-import { progressStore, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
+import { progressStore, quickAccessName, quickAccessRow, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
@@ -100,7 +100,7 @@ function Caption({ text, run }: { text: string; run: string | number }) {
 function Satellite({ k, v, q, dot, delay }: { k: string; v: string; q?: string | null; dot: string; delay: number }) {
   return (
     <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay, type: 'spring', stiffness: 260, damping: 22 }} className="n-sat">
-      <div className="flex items-center gap-1.5"><i style={{ background: dot }} /><span className="n-sat-k">{k}</span>{q && <span className="n-sat-q">{q}</span>}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1"><i style={{ background: dot }} /><span className="n-sat-k">{k}</span>{q && <span className="n-sat-q">{q}</span>}</div>
       <div className="n-sat-v">{v}</div>
     </motion.div>
   );
@@ -363,9 +363,11 @@ export default function NucleoDesk() {
     setLandEvent(result.eventId);
     if (result.evolvedTo) setEvolution(result.evolvedTo);
     if (result.drops.length) setDrops((d) => [...d, ...result.drops]);
-    const qa = [snap.symbol, ...progress.quickAccess.filter((s) => s !== snap.symbol)].slice(0, 3);
-    progressStore.setQuickAccess(qa);
-  }, [say, progress.quickAccess, refreshAccess]);
+    // History is only what the reader asked, newest first (the server keeps six); the automatic starters are not
+    // history. The visible row (quickAccessRow) adds them back, with the local stock anchored.
+    const asked = progress.quickAccessCustomized ? progress.quickAccess : [];
+    progressStore.setQuickAccess([snap.symbol, ...asked.filter((s) => s !== snap.symbol)].slice(0, 6));
+  }, [say, progress.quickAccess, progress.quickAccessCustomized, refreshAccess]);
 
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
@@ -682,7 +684,9 @@ export default function NucleoDesk() {
     <ClientReadPresentation receipt={readReceipt} blocked={sheet !== 'none' || inviteOpen || signInPrompt || !!limit || !!inspected || !!evolution || !!drops[0]}>
       <div className="n-verdict-row">
         <div className="n-sats left">{sats.filter((_, i) => i % 2 === 0).map((s, i) => <Satellite key={s.k} {...s} delay={0.15 + i * 0.14} />)}</div>
-        <div className="grid place-items-center" style={{ padding: desktop ? 36 : 22 }}>
+        {/* a verdict longer than six letters ("Aucune opération") is fitted to the glass by .n-verdict-glass[data-long] */}
+        <div className="n-verdict-glass grid place-items-center" data-long={verdictWord && verdictWord.length > 6 ? '' : undefined}
+          style={{ padding: desktop ? 36 : 22, '--vs': `${desktop ? 200 : 128}px`, '--vn': Math.max(1, ...(verdictWord ?? '').split(/\s+/).map((w) => w.length)) } as CSSProperties}>
           <NucleoSphere size={desktop ? 200 : 128} mode="verdict" verdict={verdictKind} word={verdictWord} sub={verdictSub} />
         </div>
         <div className="n-sats right">{sats.filter((_, i) => i % 2 === 1).map((s, i) => <Satellite key={s.k} {...s} delay={0.22 + i * 0.14} />)}</div>
@@ -870,11 +874,14 @@ export default function NucleoDesk() {
   const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
   const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = done && snapshot
     ? [
-      ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.toUpperCase().includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
+      // The follow-up carries the asset only when it writes the ticker itself, in capitals and as a whole word: "near
+      // resistance" is not NEAR, and "consolidación" does not name SOL. Otherwise the symbol leads the question.
+      ...(followUp ? [{ label: followUp, go: () => { void ask(followUp.split(/[^\p{L}\p{N}.]+/u).includes(snapshot.symbol) ? followUp : `${snapshot.symbol} · ${followUp}`, followUp); } }] : []),
       { label: t(`Another question about ${snapshot.symbol}`, `Otra pregunta sobre ${snapshot.symbol}`, `Outra pergunta sobre ${snapshot.symbol}`), go: () => { setInput(`${snapshot.symbol} `); inputRef.current?.focus(); } },
-      ...progress.quickAccess.filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
+      ...quickAccessRow(progress, 4).filter((q) => q !== snapshot.symbol).slice(0, followUp ? 1 : 2).map((sym) => ({ label: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } })),
     ]
-    : progress.quickAccess.slice(0, 3).map((sym) => ({ label: sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
+    // The chip shows the company (LVMH); the question it sends keeps the symbol the server resolves (MC.PA).
+    : quickAccessRow(progress).map((sym) => ({ label: quickAccessName(sym), ariaLabel: howLooks(sym), go: () => { void ask(sym, howLooks(sym)); } }));
   const chips = !reading && phase !== 'confirm' ? (
     <div className="w-full">
       {meterLine && <div className="mb-4 text-center text-[13px]" style={{ color: '#8A8378' }}>{meterLine}</div>}

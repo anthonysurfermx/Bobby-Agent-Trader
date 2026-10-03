@@ -91,10 +91,15 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 
 /* ---------- language: a small globe that unfolds into a glass capsule ---------- */
 .lang{position:relative; pointer-events:auto}
-.lang-btn{appearance:none; -webkit-appearance:none; margin:0; padding:0; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
-  color:var(--ink); background:rgba(0,0,0,.5); border:1px solid rgba(242,237,228,.14); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
+/* the globe wears the ask pill's purple: tinted glass, a lilac icon and a glow that breathes slowly */
+.lang-btn{appearance:none; -webkit-appearance:none; position:relative; margin:0; padding:0; width:30px; height:30px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+  color:#B79CFF; background:linear-gradient(rgba(154,92,255,.10), rgba(154,92,255,.10)), rgba(0,0,0,.5); border:1px solid rgba(154,92,255,.5); box-shadow:inset 0 1px 0 rgba(255,255,255,.06);
   -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:border-color .2s ease, background-color .2s ease}
-.lang-btn:hover, .lang-btn[aria-expanded="true"]{border-color:rgba(242,237,228,.32); background:rgba(20,18,16,.72)}
+.lang-btn::after{content:""; position:absolute; inset:-1px; border-radius:50%; pointer-events:none; box-shadow:0 0 22px -4px rgba(154,92,255,.65);
+  animation:lang-breathe 3.2s ease-in-out infinite; transition:box-shadow .2s ease}
+@keyframes lang-breathe{ 0%, 100%{opacity:.5} 50%{opacity:1} }
+.lang-btn:hover, .lang-btn[aria-expanded="true"]{border-color:rgba(154,92,255,.85); background:linear-gradient(rgba(154,92,255,.18), rgba(154,92,255,.18)), rgba(20,18,16,.72)}
+.lang-btn:hover::after, .lang-btn[aria-expanded="true"]::after{animation:none; opacity:1; box-shadow:0 0 26px -3px rgba(154,92,255,.95)}
 .lang-btn:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
 .lang-btn svg{display:block; width:16px; height:16px}
 /* the meridian narrows as the capsule opens: the globe turns a quarter */
@@ -301,6 +306,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
 @media (prefers-reduced-motion: reduce){
   .cue i{animation:none}
+  .lang-btn::after{animation:none}
   .lang-btn .mer{transition:none}
   .lang-menu, .lang-menu.open{clip-path:none; transition:opacity .12s linear, visibility 0s linear .12s}
   .lang-menu.open{transition:opacity .12s linear, visibility 0s}
@@ -844,15 +850,47 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 
   function valid(l){ return ['en','es','fr','pt','it','de'].indexOf(l) !== -1; }
   function supported(l){ var base = String(l || '').trim().toLowerCase().split(/[-_]/)[0]; return valid(base) ? base : ''; }
+  /* geo:start  first-visit language by visitor country: a default, never a stored choice. An inline copy of
+     src/lib/geo-language.ts (maps and rule); scripts/test-geo-language.mjs asserts the two agree. */
+  var GEO_SINGLE = { 'de-DE': 'DE AT', 'fr-FR': 'FR MC GF GP MQ RE YT PM BL MF NC PF WF TF', 'it-IT': 'IT SM VA', 'pt-PT': 'PT AO MZ CV', 'pt-BR': 'BR', 'es-ES': 'ES',
+    'es-MX': 'MX AR BO CL CO CR CU DO EC SV GT HN NI PA PY PE PR UY VE', 'en-GB': 'GB', 'en-IE': 'IE', 'en-AU': 'AU NZ' };
+  /* multilingual: the first browser language found in the list decides; with none, the first entry */
+  var GEO_MULTI = { CH: [['de','de-DE'],['fr','fr-FR'],['it','it-IT']], BE: [['fr','fr-FR'],['de','de-DE'],['nl','en-US']], LU: [['fr','fr-FR'],['de','de-DE']], CA: [['en','en-CA'],['fr','fr-FR']], US: [['en','en-US'],['es','es-US']] };
+  function geoLocale(country, languages){
+    var code = /^[A-Za-z]{2}$/.test(String(country || '')) ? String(country).toUpperCase() : ''; if (!code) return '';
+    var options = GEO_MULTI[code], i, j, base, key;
+    if (options){
+      for (i = 0; i < (languages || []).length; i++){
+        base = String(languages[i] || '').trim().toLowerCase().split(/[-_]/)[0];
+        for (j = 0; j < options.length; j++) if (options[j][0] === base) return options[j][1];
+      }
+      return options[0][1];
+    }
+    for (key in GEO_SINGLE) if ((' ' + GEO_SINGLE[key] + ' ').indexOf(' ' + code + ' ') !== -1) return key;
+    return '';
+  }
+  /* geo:end */
+  var GEO_KEY = 'bobby_geo', LOCALES = ['en-US','en-GB','en-AU','en-CA','en-IE','es-MX','es-ES','es-US','fr-FR','pt-PT','pt-BR','it-IT','de-DE'];
+  /* the cached country's locale ('' when unknown): the cache holds two letters, never an address */
+  function geo(){
+    var c = ''; try { c = localStorage.getItem(GEO_KEY) || ''; } catch (e) { /* private mode */ }
+    return /^[A-Z]{2}$/.test(c) ? geoLocale(c, navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language]) : '';
+  }
+  /* an explicit region (query, then storage) wins; then the country's when it speaks this language; Portuguese alone also reads the browser */
   function locale(l){
     var params = new URLSearchParams(location.search), requested = params.get('locale'), queryLanguage = params.get('lang');
     var saved = '', savedLanguage = ''; try { saved = localStorage.getItem('bobby_locale') || ''; savedLanguage = localStorage.getItem(KEY) || ''; } catch(e) {}
-    var candidate = /^pt[-_]/i.test(requested || '') ? requested : /^pt[-_]/i.test(queryLanguage || '') ? queryLanguage : /^pt[-_]/i.test(saved) ? saved : /^pt[-_]/i.test(savedLanguage) ? savedLanguage : navigator.language || '';
-    return l === 'pt' ? (/^pt[-_]BR$/i.test(candidate) ? 'pt-BR' : 'pt-PT') : HTML_LANG[l];
+    var own = new RegExp('^' + l + '[-_]', 'i'), g = geo();
+    var candidate = own.test(requested || '') ? requested : own.test(queryLanguage || '') ? queryLanguage : own.test(saved) ? saved : own.test(savedLanguage) ? savedLanguage : own.test(g) ? g : l === 'pt' ? navigator.language || '' : '';
+    candidate = String(candidate).replace('_', '-').toLowerCase();
+    for (var i = 0; i < LOCALES.length; i++) if (own.test(LOCALES[i]) && LOCALES[i].toLowerCase() === candidate) return LOCALES[i];
+    return HTML_LANG[l];
   }
+  /* ?lang, then the stored choice, then the visitor's country, then the browser, then English */
   function detect(){
     var q = supported(new URLSearchParams(location.search).get('lang')); if (q) return q;
     try { var s = supported(localStorage.getItem(KEY)); if (s) return s; } catch (e) { /* private mode */ }
+    var g = geo(); if (g) return g.slice(0, 2);
     var n = String(navigator.language || '').toLowerCase();
     var base = n.split('-')[0]; return valid(base) ? base : 'en';
   }
@@ -924,6 +962,26 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     onChange: function(fn){ listeners.push(fn); }
   };
   apply(detect());
+
+  /* First visit only (no ?lang, no stored choice, no cached country): ask once for the two-letter country, keep it in
+     `bobby_geo`, and switch once if it changes the language. `bobby_lang` is never written here: a default is not a choice.
+     Later visits read the cache in detect(), before the first paint, so nothing flashes. */
+  (function(){
+    if (supported(new URLSearchParams(location.search).get('lang')) || !window.fetch) return;
+    try { if (supported(localStorage.getItem(KEY)) || /^[A-Z]{2}$/.test(localStorage.getItem(GEO_KEY) || '')) return; } catch (e) { return; }
+    var ctl = window.AbortController ? new AbortController() : null, late = false;
+    var timer = setTimeout(function(){ late = true; if (ctl) ctl.abort(); }, 1500);
+    fetch('/api/geo', ctl ? { signal: ctl.signal } : {}).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+      clearTimeout(timer);
+      var c = d && typeof d.country === 'string' ? d.country.toUpperCase() : '';
+      if (!/^[A-Z]{2}$/.test(c)) return;
+      try { localStorage.setItem(GEO_KEY, c); } catch (e) { return; }
+      /* too late to switch politely, or the menu is open: the country applies from the next visit */
+      if (late || isOpen()) return;
+      var l = detect();
+      if (l !== current || locale(l) !== document.documentElement.lang) apply(l);
+    }).catch(function(){ clearTimeout(timer); });
+  })();
 })();
 </script>
 

@@ -59,22 +59,42 @@ for (const tree of Object.keys(TREES)) {
     assert.equal(RM.firstSentence('Das 2. Ziel liegt höher. Der Trend hält.'), 'Das 2. Ziel liegt höher.');
   });
 
-  test(`${tree}: with voice input unavailable a tap opens the keyboard and a hold explains`, () => {
+  test(`${tree}: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains`, async () => {
     const fsm = read(tree, 'app/60-fsm.js');
     const pill = fsm.slice(fsm.indexOf('function pillDown('), fsm.indexOf('/* ---------- PRE_PERMISSION'));
     for (const state of ['unavailable', 'denied', 'restricted']) {
-      const run = (seconds) => {
+      // `fresh` is what native answers to speech.permission during the hold (null: the bridge call fails).
+      const run = async (seconds, fresh = state) => {
         let time = 0; const calls = [];
-        const ctx = vm.createContext({ SES: { mic: { state } }, A: { press: { to() {} } }, tick() {}, noop() {}, nowT: () => time,
+        const ctx = vm.createContext({ SES: { mic: { state } }, ST: { name: 'IDLE' }, GEN: 0, A: { press: { to() {} } }, tick() {}, noop() {}, nowT: () => time,
           at: (_s, fn) => calls.push(['later', fn]), hint: (t) => calls.push(['hint', t]), tt: (k) => k,
+          pillMode: (m) => calls.push(['pill', m]), idleMode: () => 'icon',
+          bcall: (method) => { calls.push(['native', method]); return fresh ? Promise.resolve({ state: fresh, onDevice: false }) : Promise.reject(new Error('bridge')); },
           go: (...a) => calls.push(['go', ...a]), openTyping: (a) => calls.push(['typing', a]) });
         vm.runInContext(pill, ctx);
         const g = ctx.pillDown(null, false);
         time = seconds; g.up();
-        return JSON.parse(JSON.stringify(calls.filter((c) => c[0] !== 'later')));
+        for (let i = 0; i < 4; i++) await Promise.resolve();
+        return { calls: JSON.parse(JSON.stringify(calls.filter((c) => c[0] !== 'later' && c[0] !== 'pill'))), mic: ctx.SES.mic.state };
       };
-      assert.deepEqual(run(0.1), [['typing', { fromRead: false }]], state + ': tap types');
-      assert.deepEqual(run(0.6), [['hint', 'hint.micOff']], state + ': hold explains');
+      assert.deepEqual((await run(0.1)).calls, [['typing', { fromRead: false }]], state + ': tap types and asks nothing');
+      assert.deepEqual(await run(0.6), { calls: [['native', 'speech.permission'], ['hint', 'hint.micOff']], mic: state }, state + ': hold explains');
+      assert.deepEqual(await run(0.6, null), { calls: [['native', 'speech.permission'], ['hint', 'hint.micOff']], mic: state }, state + ': a failed re-query keeps the cache');
+      // The cache was stale: the button is not dead once native can listen again.
+      assert.deepEqual(await run(0.6, 'granted'), { calls: [['native', 'speech.permission'], ['hint', 'hint.hold']], mic: 'granted' }, state + ': stale cache');
+      // Without the agreement to Apple's speech service the page asks through native and captures nothing.
+      assert.deepEqual(await run(0.6, 'consent'), { calls: [['native', 'speech.permission'], ['native', 'speech.requestPermission'], ['typing', { fromRead: false }]], mic: 'consent' }, state + ': consent prompt');
+    }
+  });
+
+  test(`${tree}: the consent state keeps the mic pill, and both pages ask native before deciding a hold`, () => {
+    const actors = read(tree, 'app/50-actors.js');
+    const mode = (state) => vm.runInNewContext(actors.slice(actors.indexOf('function idleMode('), actors.indexOf('function ariaPill(')) + '; idleMode()', { SES: { mic: { state } } });
+    assert.deepEqual(['granted', 'undetermined', 'consent', 'unavailable', 'denied', 'restricted'].map(mode), ['mic', 'mic', 'mic', 'kbd', 'kbd', 'kbd']);
+    for (const file of ['app/60-fsm.js', 'onboarding/60-fsm.js']) {
+      const fsm = read(tree, file);
+      assert.match(fsm, /speech\.permission/, file + ' re-queries native');
+      assert.match(fsm, /=== 'consent'/, file + ' handles the consent state');
     }
   });
 

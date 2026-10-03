@@ -5,8 +5,8 @@
 //   · evidence needs ≥ 59 bars (a real 50-EMA) for stocks and crypto, and a
 //     rising chart is no longer forced to 'lateral';
 //   · post-generation check: guarantee / risk-free / personal buy-sell claims
-//     (EN/ES) and verdicts contradicting the CIO fail the analysis — while the
-//     desk's ordinary disclaimers pass;
+//     (six languages) and verdicts contradicting the CIO fail the analysis —
+//     while the desk's ordinary disclaimers pass; every pattern stays linear;
 //   · the question limit is measured in code points, with its own 400 code;
 //     an exhausted quota is a distinct 429 'daily_limit' (EN/ES);
 //   · quota identities: an IPv4 address or IPv6 /64 per caller, the /24 or
@@ -18,7 +18,7 @@ process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.OPENAI_API_KEY = 'test-model';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
-const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, publicTextViolation, DeskOutputRejected, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
+const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, publicTextViolation, DeskOutputRejected, GUARD_PATTERNS, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { default: stockCandles } = await import('../api/stock-candles.ts');
 const { getClientQuotaKeys, getClientIpKey } = await import('../api/_lib/rate-limit.ts');
@@ -215,6 +215,89 @@ try {
   passes({ red: 'Esto está lejos de ser una apuesta segura.' }, 'ES lejos de ser una apuesta segura');
   rejected({ alpha: 'This is a sure bet, far better than bonds.' }, 'guarantee', 'a sure bet with "far" elsewhere is still a claim');
   rejected({ alpha: 'Holding above the 50 EMA guarantees gains for the next session.' }, 'guarantee', 'guarantees gains is still a claim');
+
+  // Two reviews of 2026-10-03: personal instructions and guarantees got through in French, Portuguese,
+  // German and Italian (and one English form), in any role. A rejected answer fails the read, so the
+  // same languages' disclaimers and ordinary analysis are pinned next to them.
+  const roles = ['alpha', 'red', 'cio'] as const;
+  [
+    "Je te recommande d'acheter BTC maintenant", "Je vous conseille d'acheter BTC aujourd'hui", 'Tu dois acheter BTC',
+    'Deves comprar BTC agora', 'Recomendo que compres BTC agora', 'Du solltest jetzt BTC kaufen', 'Ich empfehle dir, BTC zu kaufen',
+    'Devi comprare BTC adesso', 'Ti consiglio di comprare BTC',
+    // A negation or a hedge in another clause excuses nothing; "no doubt" is emphasis, not a negation.
+    'Sans hésitation, tu dois acheter BTC', 'Senza dubbio, devi comprare BTC', 'Sans hésitation, vraiment, tu dois acheter BTC',
+    "Rien n'est sûr mais tu dois acheter BTC.", 'Sem dúvida, deves comprar BTC.', 'Kein Zweifel, du solltest BTC kaufen.', 'No doubt you should buy BTC.',
+    'It would be wrong to say otherwise, you should buy BTC now.', 'Not financial advice, you should buy BTC now.', 'No es consejo, deberías comprar BTC ya.',
+    // Other forms of the same instruction: "de" + verb, an adverb, Portuguese tu.
+    'Je te conseille de vendre BTC.', 'Tu devrais vraiment acheter.', 'Tens de comprar BTC agora.', 'Aconselho-te a comprar BTC.', 'Compra BTC agora.',
+    // Any adverb before the verb, and Italian "acquistare" (the usual verb in this register).
+    "Je vous recommande vivement d'acheter.", 'Je te recommande fortement de vendre.', 'Ti consiglio vivamente di comprare ETH.', 'Devi assolutamente comprare.', 'Dovresti acquistare BTC adesso.', 'Ti consiglio di acquistare ETH.',
+  ].forEach((instruction, i) => rejected({ [roles[i % 3]]: instruction }, 'advice', `personal instruction rejected: ${instruction}`));
+  [
+    'Aucun doute, mais cet achat est sans risque', 'Ohne Zweifel ist das risikofrei',
+    "Rien n'est sûr mais cet achat est sans risque.", 'Nichts ist sicher, aber das ist risikofrei.', 'Niente è certo, però questo è senza rischio.',
+    'Keine Sorge, das ist risikofrei.', 'Sin duda es una apuesta segura.', 'No doubt this is risk-free.', 'Nothing is certain, this is risk-free.',
+    "Il n'y a aucun doute que cet achat est sans risque.", 'No hay duda de que es una apuesta segura.', 'Non c’è dubbio che sia senza rischio.',
+    'Não há dúvida de que é sem risco.', 'Es gibt keinen Zweifel, dass das risikofrei ist.',
+    // Active and passive guarantees.
+    'Cette stratégie garantit des profits', 'I rendimenti sono garantiti', 'Deine Gewinne sind garantiert', 'Os lucros estão garantidos', 'Gewinne garantiert', 'profit garanti',
+    'Je vous garantis des profits.', 'Garantie totale sur vos gains.', 'Die Gewinne sind garantiert.', 'Garantierte Rendite.', 'Ohne Risiken.',
+    'Il profitto è garantito.', 'Guadagno sicuro.', 'Questa strategia garantisce profitti.', 'Esta estratégia garante lucros.',
+    'Votre capital est protégé.', 'Ihr Kapital ist geschützt.', 'Il tuo capitale è protetto.', 'Seu capital está protegido.', 'O teu capital está protegido.',
+    // English: a hyphenated prefix is not a negation of the guarantee.
+    'a non-negotiable, guaranteed profit', 'no-brainer: guaranteed returns', 'Guaranteed non-stop returns.', 'A no-loss setup with guaranteed returns.', "A can't-miss guaranteed profit.",
+    // German attributive forms, and the Portuguese enclitic pronoun (pt-PT).
+    'Das ist ein risikofreier Trade.', 'Eine risikolose Wette.', 'Esta operação garante-te lucro.', 'Garanto-te lucros com esta entrada.',
+  ].forEach((promise, i) => rejected({ [roles[i % 3]]: promise }, 'guarantee', `guarantee rejected: ${promise}`));
+  [
+    "Ce n'est pas un conseil financier.", "Rien n'est garanti.", "Aucun rendement n'est garanti.", 'Keine Gewinne sind garantiert.', 'Nichts ist garantiert.',
+    'Nessun rendimento è garantito.', 'Non è una raccomandazione.', 'Nenhum lucro está garantido.', 'Isto não é aconselhamento financeiro.',
+    'No car maker is risk-free.', 'Nothing here is guaranteed.', 'Far from a sure bet.', 'No es una recomendación de compra.',
+    'Les acheteurs défendent le support', 'Der Kurs könnte steigen, wenn das Volumen zunimmt',
+    // The usual disclaimers of each language, next to the forms they must not be confused with.
+    'Les rendements passés ne garantissent pas les rendements futurs.', 'Personne ne peut garantir des gains.', 'Aucune stratégie ne garantit des profits.',
+    "Je ne te recommande pas d'acheter.", "Je te déconseille d'acheter maintenant.", "Ton capital n'est pas protégé.", 'Les acheteurs reprennent la main, mais le volume reste faible.',
+    'I rendimenti passati non garantiscono rendimenti futuri.', 'Il rendimento non è garantito.', 'Non ti consiglio di comprare.', 'Il tuo capitale non è protetto.',
+    'Vergangene Gewinne garantieren keine künftigen Gewinne.', 'Gewinne garantiert dir niemand.', 'Gewinne sind nicht garantiert.', 'Dein Kapital ist nicht geschützt.',
+    // German sets a comma before a subordinate clause; the main clause's negation still governs it.
+    'Es gibt keine Strategie, die Gewinne garantiert.', 'Das heißt nicht, dass dieser Einstieg risikofrei ist.',
+    'Retornos passados não garantem retornos futuros.', 'O lucro não está garantido.', 'Não deves comprar apenas por esta análise.', 'O teu capital não está protegido.',
+    // Portuguese "mais" is "more", not the French "but".
+    'Mais uma vez não há lucro garantido.',
+    // A comma-delimited aside does not end the clause, a thousands separator is no comma, and a prefix
+    // hyphenated onto the claim itself does negate it.
+    'No setup, however clean, is risk-free.', 'This is not, in any sense, a sure bet.', 'This is not a guarantee, or a sure bet.', 'No close above 65,000 is risk-free.', 'These are non-guaranteed returns.',
+    'A non-zero risk remains on every entry.', 'No-one can promise guaranteed returns.', 'Risk-free trades are non-existent.', 'There is no question of guaranteed returns here.',
+    'Sin duda no es una apuesta segura.', 'Nadie puede decir que la subida está garantizada.',
+    // The risk-free rate is a term, not a promise; a negated attributive form or instruction is a disclaimer.
+    'Der risikofreie Zins liegt bei 3 %.', 'Risikofreie Staatsanleihen rentieren mit 3 %.', 'Das ist kein risikofreier Einstieg.', 'Ninguém te garante lucros.', 'Não te garanto lucros.',
+    "Je ne vous recommande vraiment pas d'acheter.", 'Non ti consiglio assolutamente di comprare.', 'Non dovresti acquistare solo per questo segnale.',
+  ].forEach((fine, i) => passes({ [roles[i % 3]]: fine }, `disclaimer or analysis passes: ${fine}`));
+
+  // Every guard pattern is linear. 2,000 adversarial characters take microseconds; the best of three runs is
+  // asserted, so the limit measures the pattern and not a busy runner.
+  {
+    const fill = (unit: string, head = '') => (head + unit.repeat(Math.ceil(2000 / unit.length))).slice(0, 2000);
+    const adversarial = [
+      ...['a', ' ', 'a ', "d'", 'non-', ', ', 'garanti', 'garanti a a a ', 'garantit des ', 'garantiert dir ', 'garanzia di ', 'Gewinne sind ', 'rendimenti sono ', 'lucros estão ',
+        'ton capital est ', 'dein Kapital ist ', 'il tuo capitale è ', 'o teu capital está ', 'je te ', 'je vous recommande de ', 'tu dois ', 'tens de ', 'recomendo que tu a ', 'Compra BTC ',
+        'sans aucun ', 'without a ', 'no ', 'ohne zu ', 'du solltest ', 'far from a ', 'guaranteed x y ', 'profit garanti, ', 'no gains garantis '].map(unit => fill(unit)),
+      fill(' ', 'garanti'), fill(' ', 'sans'), fill('a', 'garanti '), fill(' ', 'je te recommande'), fill(' ', 'Gewinne'), fill(' ', 'recomendo'),
+    ];
+    const bestOf3 = (run: () => unknown) => Math.min(...[0, 1, 2].map(() => { const started = performance.now(); run(); return performance.now() - started; }));
+    ok(adversarial.every(text => text.length === 2000) && GUARD_PATTERNS.length > 0, 'fixture: 2,000-character strings against every guard pattern');
+    for (const pattern of GUARD_PATTERNS) {
+      const slowest = Math.max(...adversarial.map(text => bestOf3(() => text.match(pattern))));
+      ok(slowest < 50, `linear pattern (${slowest.toFixed(2)} ms): ${pattern.source.slice(0, 70)}`);
+    }
+    const guard = Math.max(...adversarial.map(text => bestOf3(() => publicTextViolation(text))));
+    ok(guard < 50, `the whole guard on 2,000 adversarial characters (${guard.toFixed(2)} ms)`);
+    // One long clause of French "mais" before many claims: the turn scan is one pass per clause. It was quadratic
+    // per match (about 0.6 s here and 39 s at 32,000 characters) while every single pattern stayed linear.
+    const turns = ('mais '.repeat(800) + 'sans risque '.repeat(400)).slice(0, 8000);
+    const turned = bestOf3(() => publicTextViolation(turns));
+    ok(turns.length === 8000 && publicTextViolation(turns) === 'guarantee' && turned < 250, `8,000 characters of "mais" before claims (${turned.toFixed(1)} ms)`);
+  }
 
   // runDeskDebate: 'wait' carries no direction; a rejected answer is no answer.
   const evidence = { symbol: 'BTC', technicals: { price: 100 }, provenance: { provider: 'OKX', instrument: 'BTC-USDT', assetType: 'crypto', timeframe: '1H', asOf: new Date().toISOString() } } as never;

@@ -45,6 +45,7 @@ function environment(language, options = {}) {
     if (name === '../app-language' || name === './app-language') return load('src/lib/app-language.ts');
     if (name === '../client-language' || name === '@/lib/client-language') return load('src/lib/client-language.ts');
     if (name === '@/lib/companions/i18n') return load('src/lib/companions/i18n.ts');
+    if (name === './geo-language') return load('src/lib/geo-language.ts');
     throw new Error('Unexpected dependency: ' + name);
   };
   function load(filename) { if (cache[filename]) return cache[filename]; const module = { exports: {} }; cache[filename] = module.exports; const wrapper = vm.runInContext('(function(require,module,exports){' + transpile(filename) + '\n})', context); wrapper(requireModule, module, module.exports); cache[filename] = module.exports; return module.exports; }

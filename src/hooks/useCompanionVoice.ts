@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ttsLang, speechLocale } from '@/lib/companions/i18n';
 import { progressStore } from '@/lib/companions/progress';
 import { RISK_NOTICE_VERSION } from '@/lib/companions/progress';
+import { voiceGenderStore } from '@/lib/voice-gender';
 
 const canGenerateSpeech = () => progressStore.get().aiConsentGranted && progressStore.get().riskNoticeVersion >= RISK_NOTICE_VERSION;
 
@@ -129,7 +130,10 @@ export function useCompanionVoice() {
     // Character intros and ambient personality lines should feel snappy;
     // analytical answers keep their deliberate 1× cadence for clarity.
     const playbackRate = Math.min(1.25, Math.max(0.85, opts.playbackRate ?? (essential ? 1 : 1.12)));
-    const key = `${opts.mode ?? "default"}|${opts.voice}|${opts.vibe ?? ''}|${speechLocale()}|${text}`;
+    // The profile's voice preference: "female" / "male" replace the companion's persona, "companion" keeps it.
+    const gender = voiceGenderStore.get();
+    const voice = gender === 'companion' ? opts.voice : gender;
+    const key = `${opts.mode ?? "default"}|${voice}|${opts.vibe ?? ''}|${speechLocale()}|${text}`;
     try {
       let url = cache.current.get(key);
       if (!url) {
@@ -140,7 +144,7 @@ export function useCompanionVoice() {
             method: 'POST',
             signal: AbortSignal.timeout(8000),
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, mode: opts.mode, lang: ttsLang(), locale: speechLocale(), voice: opts.voice, ...(opts.vibe ? { vibe: opts.vibe } : {}) }),
+            body: JSON.stringify({ text, mode: opts.mode, lang: ttsLang(), locale: speechLocale(), voice, ...(opts.vibe ? { vibe: opts.vibe } : {}) }),
           });
           if (gen !== generation.current) return;
           if (res.ok) {
@@ -174,6 +178,8 @@ export function useCompanionVoice() {
 
   useEffect(() => () => { stop(); }, [stop]);
   useEffect(() => progressStore.subscribe(() => { if (!canGenerateSpeech()) stop(); }), [stop]);
+  // A new voice preference silences the line still playing in the old voice.
+  useEffect(() => voiceGenderStore.subscribe(stop), [stop]);
 
   return { speak, stop, speaking, level, analyser: analyserRef.current };
 }

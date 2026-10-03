@@ -27,6 +27,7 @@ if (!live) {
     spot('SONIC'), spot('NET'), spot('ARPA'), spot('MAIN'),
     spot('BTC'), spot('ETH'), spot('SOL'), spot('ADA'), spot('WLD'), spot('WIF'),
     spot('TIA'), spot('XAUT'), spot('XAG'), spot('USDT'), spot('CHZ'), spot('APE'),
+    spot('GRT'), spot('BCH'), spot('MEME'),
     equitySwap('NVDA'), equitySwap('PLTR'), equitySwap('TSM'), equitySwap('SPCX'),
     equitySwap('USO'), equitySwap('XNVDA'), equitySwap('TEST002'), equitySwap('AAPL'),
   ]);
@@ -46,8 +47,8 @@ async function resolves(query: string, symbol: string, label: string) {
   assert.equal(hit.symbol, symbol, `${label}: "${query}" → ${hit.symbol}, expected ${symbol}`);
   passed += 1;
 }
-async function kindOf(query: string, symbol: string, kind: string, confirm: boolean, label: string) {
-  const hit = await resolveOkxAssetFromText(query);
+async function kindOf(query: string, symbol: string, kind: string, confirm: boolean, label: string, language?: string) {
+  const hit = await resolveOkxAssetFromText(query, { language });
   assert.ok(hit, `${label}: "${query}" resolved nothing`);
   assert.equal(hit.instrument.symbol, symbol, `${label}: "${query}" → ${hit.instrument.symbol}, expected ${symbol}`);
   assert.equal(hit.matchKind, kind, `${label}: "${query}" kind ${hit.matchKind}, expected ${kind}`);
@@ -91,6 +92,27 @@ await kindOf('sonic', 'SONIC', 'exact', false, 'the real name still resolves');
 const oil = await resolveOkxAssetFromText('petroleo');
 assert.ok(oil?.proxyNote?.includes('ETF'), 'proxy note missing the honest ETF wording');
 passed += 1;
+
+// Review round 2: a sentence is answered without confirmation only for the
+// one asset it names outright; every asset it names is weighed, not the first.
+await kindOf('taiwan semiconductor hoy', 'TSM', 'exact', false, 'two-word name inside a sentence');
+await kindOf('Bitcoin Cash outlook', 'BCH', 'exact', false, 'two-word name, not its first word');
+await kindOf('show me the graph of Bitcoin', 'BTC', 'exact', false, 'an everyday word is not The Graph', 'en');
+await kindOf('graph', 'GRT', 'exact', false, 'the same word typed alone is');
+await kindOf('Price of BTC in USDT', 'BTC', 'exact', false, 'the quote currency is not a second asset');
+await kindOf('¿Cómo ves el oro hoy?', 'XAUT', 'proxy', true, 'proxy inside a sentence');
+const two = await resolveOkxAssetFromText('Bitcoin y Ethereum');
+assert.ok(two?.needsConfirmation, 'two named assets must be confirmed, not picked between');
+assert.deepEqual(two.candidates?.map((instrument) => instrument.symbol), ['BTC', 'ETH']);
+assert.equal(two.instrument.symbol, 'BTC', 'the first asset named leads the confirmation');
+assert.equal(await resolveOkxAssetFromText('el meme del dia', { language: 'es' }), null, 'an everyday word in a sentence is not the MEME token');
+assert.equal((await resolveOkxAssetFromText('MEME', { language: 'es' }))?.needsConfirmation, false, 'typed alone in capitals it is');
+const frGold = await resolveOkxAssetFromText('Quel est le prix de l’or ?', { language: 'fr' });
+assert.equal(frGold?.instrument.symbol, 'XAUT');
+assert.ok(frGold.needsConfirmation && frGold.matchKind === 'proxy' && frGold.proxyNote?.includes('l’or tokenisé'), 'French gold is the same proxy, with its note in French');
+const bareOr = await resolveOkxAssetFromText('Buy or sell?');
+assert.ok(!bareOr || (bareOr.instrument.symbol !== 'XAUT' && bareOr.needsConfirmation), 'the bare word "or" is never gold');
+passed += 11;
 
 // Dropped-on-purpose aliases: a levered ETF is not the index, a product is
 // not the company stock — these must NOT silently resolve via alias.
