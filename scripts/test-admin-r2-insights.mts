@@ -196,7 +196,7 @@ const at = (hhmm: string) => `2026-10-02T${hhmm}:00Z`;
   const inactive = money({ paidVerified: 1 }, 0, { proInactive: 2, proInactivePaid: 1, stages: { pro: 3 } }).find((i) => i.id === 'pro-inactive');
   ok(inactive?.detail.includes('pago verificado, sin verificar, prueba o regalo') && inactive.evidence.includes('de pago verificado: 1'), 'F01: inactive Pro says it is access, with the verified payers apart');
   ok(!one.some((i) => /\bPagan\b/.test(textOf(i))), 'F01: no finding says access means paying');
-  // The production state: the unverified membership's production charge is in gross revenue, never a payer. The copy
+  // Synthetic fixture: an unverified membership's production charge is in gross revenue, never a payer. The copy
   // says exactly that (it no longer claims the money is out of "ingresos").
   const prod = buildInsights({ days: 30, now: NOW, overview: { subscriptions: { active: 1, paidVerified: 0, unverified: 1, unverifiedReasons: { unknown_environment: 1, no_charge: 0 } },
     revenue: { grossUsd: 4.99, unverifiedGrossUsd: 4.99, newPaying: 0 } }, growth: {}, integrations: {}, searchConsole: {} }).find((i) => i.id === 'payers-unverified')!;

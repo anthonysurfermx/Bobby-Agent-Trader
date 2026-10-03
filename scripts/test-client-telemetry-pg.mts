@@ -37,8 +37,8 @@ async function reset(){
 }
 const block=async(label:string,fn:()=>Promise<void>)=>{await reset();await fn();console.log(`  ✓ ${label}`);};
 try{
- // api_cache is a late-created stand-in in this scratch chain. Production grants were checked read-only:
- // service_role select/insert/update=true at 2026-10-03T00:02:20Z. Match only its required read grant locally.
+ // api_cache is a late-created stand-in in this scratch chain.
+ // Match the service-only read grant required by the aggregate's sanitized health query.
  await pool.query('grant select on public.api_cache to service_role');
  const db=await pool.connect();
  try{
