@@ -138,7 +138,7 @@ var el = {
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),
   eyebrow: $('eyebrow'), chipRow: $('chipRow'), perm: $('perm'), wm: $('wm'), close: $('close'), dockQ: $('dockQ'), dockA: $('dockA'), avatar: $('avatar'), xpArc: $('xpArc'),
-  hint: $('hint'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
+  hint: $('hint'), hintS: $('hintS'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
   typeBox: $('typeBox'), ta: $('ta'), taSend: $('taSend')
 };
 el.micGlowI = el.micGlow.querySelector('i');
@@ -158,13 +158,13 @@ el.agSt = el.ag.map(function(a){ return a.querySelector('.st'); });
 el.cioSw = el.ag[2].querySelector('.sw'); el.cioVf = el.ag[2].querySelector('.vf');
 el.satK = el.sats.map(function(s){ return s.querySelector('.k'); }); el.satV = el.sats.map(function(s){ return s.querySelector('.v'); });
 el.satOdo = [0, 1, 2, 3].map(function(){ return new Odo(mk('span', 'od')); });
-el.card0 = { lb: el.cards[0].querySelector('.lb'), mt: el.cards[0].querySelector('.mt'), scr: el.cards[0].querySelector('.scr'), inn: el.cards[0].querySelector('.scr .in'), disc: el.cards[0].querySelector('.disc') };
+el.card0 = { ch: el.cards[0].querySelector('.ch'), lb: el.cards[0].querySelector('.lb'), mt: el.cards[0].querySelector('.mt'), scr: el.cards[0].querySelector('.scr'), inn: el.cards[0].querySelector('.scr .in'), disc: el.cards[0].querySelector('.disc') };
 el.card1 = { lb: el.cards[1].querySelector('.lb'), mt: el.cards[1].querySelector('.mt'), ct: el.cards[1].querySelector('.ct'), rows: el.cards[1].querySelector('.rows'),
   ln: el.cards[1].querySelector('.ln'), hz: el.cards[1].querySelector('.hz'), xp: el.cards[1].querySelector('.xp') };
 el.card2 = { lb: el.cards[2].querySelector('.lb'), mt: el.cards[2].querySelector('.mt'), ct: el.cards[2].querySelector('.ct'), rows: el.cards[2].querySelector('.rows'), go: el.cards[2].querySelector('.go') };
 el.permH = el.perm.querySelector('h4'); el.permP = el.perm.querySelector('p'); el.permBtn = el.perm.querySelector('button');
 
-var hintRoll = new Roll(el.hint), saveRoll = new Roll($('saveRoll')), vfRoll = new Roll(el.cioVf);
+var hintRoll = new Roll(el.hint), swipeRoll = new Roll(el.hintS), saveRoll = new Roll($('saveRoll')), vfRoll = new Roll(el.cioVf);
 (function(){ [el.d100, el.d10, el.d1].forEach(function(col){ for (var d = 0; d < 10; d++) col.appendChild(mk('span', null, String(d))); }); })();
 el.d100P = el.d100.parentNode; el.d10P = el.d10.parentNode;
 

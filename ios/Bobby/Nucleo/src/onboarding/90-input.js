@@ -17,7 +17,8 @@ function velocityOf(P){
 }
 function inDebate(x, y){ var ti = CARDS.indexOf(cardD); return ti >= 0 && Math.round(W.track.x) === ti && y > 286 && y < 610 && DSCROLL.max > 2; }
 function riskScrollMax(){ return rbodyEl ? Math.max(0, rbodyEl.scrollHeight - rbodyEl.clientHeight) : 0; }
-function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.body && y <= RISK_LAYOUT.body + RISK_LAYOUT.bodyHeight && riskScrollMax() > 0; }
+/* a drag that starts anywhere on the consent copy (the statements, the body, the gap above the full-notice button) scrolls the body */
+function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.top && y <= RISK_LAYOUT.notice && riskScrollMax() > 0; }
 function scrollRisk(y){ if (rbodyEl) rbodyEl.scrollTop = clamp(y, 0, riskScrollMax()); }
 function inDown(hit, idx, x, y){
   if (PTR) return;

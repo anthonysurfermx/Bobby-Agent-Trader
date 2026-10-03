@@ -130,7 +130,7 @@ function dropWords(ws, born, gone, dir, stag){
 }
 var titleEl = $('title'), subEl = $('sub'), cap2El = $('cap2'), promptEl = $('prompt'), wmBig = $('wmBig'), metaEl = $('meta');
 var wmEl = $('wm'), dqEl = $('dq'), closeEl = $('close'), avatarEl = $('avatar'), xpArcEl = $('xpArc'), noticeEl = $('notice'), pnameEl = $('pname'), pcountEl = $('pcount');
-var riskProfileEl = $('riskProfile');
+var riskProfileEl = $('riskProfile'), rmoreEl = $('rmore');
 var titleW = [], subW = [], cap2W = [], cap2K = null, promptW = null;
 function renderTexts(){
   if (W.title && titleEl._k !== W.title[0] + '|' + W.title[1]){ titleEl._k = W.title[0] + '|' + W.title[1]; titleW = spans(titleEl, W.title[0]); subW = spans(subEl, W.title[1]); }
@@ -163,6 +163,9 @@ function renderTexts(){
   st(wmEl, tf(wx, wy, ws), wo);
   if (T >= dk && T < dg + 0.2){
     var qt = String(W.question || '').slice(0, 90), nch = Math.max(0, Math.min(qt.length, Math.floor((T - dk - 0.16) / 0.01))); txt(dqEl, qt.slice(0, nch));
+    /* consent step: the Profile button holds the right end of the header, so the docked question stops 8 px before
+       it, cut with its own ellipsis; it has its full line back the moment the button leaves */
+    sc(dqEl, 'paddingRight', W.state === 'RISK' && !W.agreeBusy ? Math.max(0, dqEl.offsetLeft + dqEl.offsetWidth - riskProfileEl.offsetLeft + 8) + 'px' : '');
     var dqo = T > dg ? 1 - c01((T - dg) / 0.16) : 1; st(dqEl, null, dqo); st(closeEl, null, c01((T - dk - 0.16) / 0.16) * dqo * c01(W.closeK.x));
   } else { st(dqEl, null, 0); st(closeEl, null, 0); }
   cls(closeEl, 'on', closeActive());
@@ -213,7 +216,7 @@ function renderRiskProfile(){
 function renderLines(){
   renderRiskProfile();
   var b = tmB('lines'), g = tmG('lines'), n = lineEls.length;
-  if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); }
+  if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); st(rmoreEl, null, 0); }
   else {
     st(linesEl, null, 1);
     for (var i = 0; i < n; i++){
@@ -225,6 +228,8 @@ function renderLines(){
     var rb = b + 0.18 * n + 0.1, rp = TR ? sp('soft', T - rb) : 1, ry = 6 * (1 - rp) * TR, ro = c01((T - rb) / 0.3);
     if (T > g){ var q2 = INH(c01((T - g) / 0.3)); ry = -14 * q2 * TR; ro *= 1 - sstep(0.5, 1, q2); }
     st(rbodyEl, tf(0, ry), ro);
+    /* more copy below the body's viewport: the chevron under it breathes until the end has been scrolled into view */
+    st(rmoreEl, tf(0, ry + (1 + Math.sin(T * 3.6)) * TR), riskCue() ? ro : 0);
   }
   var nb = tmB('notice'), ng = tmG('notice'), no = T >= nb ? c01((T - nb) / 0.24) * (T > ng ? 1 - c01((T - ng) / 0.2) : 1) : 0;
   st(noticeEl, no > 0 ? tf(0, 6 * (1 - FOC(c01((T - nb) / 0.3))) * TR) : null, no);
@@ -361,6 +366,7 @@ function renderCards(){
     st(el, tf(x, ty, s), o * (isOn('tpill') && j === ti ? 1 - 0.15 * c01((T - tmB('tpill')) / 0.3) : 1));
   }
   st(dRows, 'translateY(' + f1(-DSCROLL.y) + 'px)');
+  cls(dRows.parentNode, 'more', DSCROLL.max - DSCROLL.y > 1); cls(dRows.parentNode, 'up', DSCROLL.y > 1);   /* fade only the edge the debate continues past */
   /* thesis: Save → label roll → one conic sweep in the verdict hue → the only XP reward */
   var sv = tmB('saved'), sg = tmG('saved'), su = T - sv, saved = su >= 0 && T < sg;
   cls(saveBtn, 'tap', W.state === 'CARDS' && Math.round(track) === ti && p > 0.8);

@@ -53,7 +53,11 @@ function setGreeting(){
 }
 function idleHint(){
   var n = SES && SES.hints ? (SES.hints.idle || 0) : 0;
-  if (n < 3){ hint(tt(idleMode() === 'mic' ? 'hint.idle' : 'hint.idleType')); if (!HINTED.idle){ HINTED.idle = true; markHint('idle'); } }
+  if (n < 3){
+    /* each hint next to what it is about: hold (or tap) above the pill, swipe under the sphere while it has other faces */
+    hint(tt(idleMode() === 'mic' ? 'hint.hold' : 'hint.idleType'), FACES.length > 1 && !HINTED.swipe ? tt('hint.swipe') : '');
+    if (!HINTED.idle){ HINTED.idle = true; markHint('idle'); }
+  }
   else hint('');
 }
 function agentNames(){ ['alpha', 'red', 'cio'].forEach(function(k, i){ el.agNm[i].textContent = RMOD.t(LANG, 'agent.' + k); }); el.agSt[0].textContent = ''; el.agSt[1].textContent = ''; el.cioSw.textContent = ''; vfRoll.set('', true); A.cioSwO.set(1); A.vfO.set(0); A.ag.forEach(function(a){ a.stW = []; a.stT = 1e9; }); }
@@ -755,7 +759,7 @@ STATES.SAVING = {
   enter: function(){
     var r = READ, m = r.model;
     A.savePress.to(1, 'emit'); saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
-    A.lnO.tween(0, 0.16, E.fade);
+    A.lnO.tween(0, 0.16, E.fade); op(el.card1.hz, 0);   /* the horizon is chosen: its selector leaves the row to the XP chip */
     var params = { requestId: r.requestId }; if (m.thesis.horizon.show) params.horizonHours = HZ;
     bcall('saveThesis', params).then(function(res){ onSaved(r, res); }, function(){ onSaved(r, { status: 'failed' }); });
     cue(1.8, function(){ go('FOLLOWUPS'); });
@@ -767,7 +771,9 @@ function onSaved(r, res){
   r.save = res;
   var m = r.model;
   if (!res || res.status !== 'saved'){
-    saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(1, 0.2, E.fade);
+    /* the card goes back to what it showed before the press: the horizon selector, or the note where there is none */
+    var hz = m.thesis.horizon.show;
+    saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(hz ? 0 : 1, 0.2, E.fade); op(el.card1.hz, hz ? 1 : 0);
     hint(tt(res && res.status === 'stale' ? 'save.stale' : 'save.failed')); tick('warning');
     return;
   }
@@ -974,7 +980,7 @@ function faceText(k, dir){
   A.ftxCur = slot;
 }
 STATES.FACES = {
-  enter: function(){ U.faceOn.to(1); att(el.sphereA, 'aria-label', tt('aria.faces')); if (!HINTED.swipe) hint(tt('hint.swipe')); },
+  enter: function(){ U.faceOn.to(1); att(el.sphereA, 'aria-label', tt('aria.faces')); if (!HINTED.swipe) hint('', tt('hint.swipe')); },
   tick: function(){
     if (A.fRel && !A.fDrag && Math.abs(A.th.x - A.th.t) < 0.002 && Math.abs(A.th.v) < 0.05){
       A.fRel = false; A.detT = clk; gulp(0.02); tick('selection');

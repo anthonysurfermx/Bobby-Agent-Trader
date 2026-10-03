@@ -505,6 +505,27 @@ private struct LandGestureSurface: UIViewRepresentable {
     }
 }
 
+/// The help opens by itself once per device: the first time someone enters the island.
+enum TraderLandFirstVisit {
+    static let key = "bobby.trader-land.help-shown"
+
+    /// UI-test and screenshot launches drive the island themselves and never get the automatic help.
+    static func scripted(_ arguments: [String] = ProcessInfo.processInfo.arguments) -> Bool {
+#if DEBUG
+        ["-trader-land-gate", "-trader-land-account-fixture", "-land-neighbors-fixture", "-store-shots", "-nucleo-fixtures"].contains(where: arguments.contains)
+#else
+        false
+#endif
+    }
+
+    /// True exactly once per device. The only place the flag is read or written.
+    static func claim(defaults: UserDefaults = .standard, scripted: Bool = TraderLandFirstVisit.scripted()) -> Bool {
+        guard !scripted, !defaults.bool(forKey: key) else { return false }
+        defaults.set(true, forKey: key)
+        return true
+    }
+}
+
 struct TraderLandGateHarnessView: View {
     var focus: TraderLandFocus? = nil
 
@@ -757,6 +778,7 @@ private struct TraderLandLoadedView: View {
                 }
             }
             .task { rebuildScene(); await loadNeighbors() }
+            .task { await openHelpOnFirstVisit() }
             .onReceive(sync.$world) { world in
                 guard accountIsland, let world else { return }
                 placements = world.placements.compactMap { placement in
@@ -1283,6 +1305,15 @@ private struct TraderLandLoadedView: View {
                     .buttonStyle(.borderedProminent).tint(Theme.accent).foregroundStyle(.white)
             }.padding(24)
         }.background(Theme.bg).foregroundStyle(Theme.text).preferredColorScheme(.dark)
+    }
+
+    /// The first visit on this device opens the help once the island is on screen. It waits beside the
+    /// loading tasks, never in them, and never opens over another sheet or the extend alert: that
+    /// visit leaves the flag for the next one.
+    private func openHelpOnFirstVisit() async {
+        try? await Task.sleep(nanoseconds: 600_000_000)
+        guard !Task.isCancelled, !communityOpen, !shareOpen, extendChoice == nil else { return }
+        if TraderLandFirstVisit.claim() { help = true }
     }
 
     /// Help step 4. Only an account island grows and has a core that moves; the practice island
