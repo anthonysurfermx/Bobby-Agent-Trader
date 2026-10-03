@@ -50,6 +50,7 @@ jobs:
       - run: npm run test:admin-api
       - run: npm run test:llm-ledger
       - run: npm run test:briefings
+      - run: npm run test:revenuecat-store-guard
       - run: npm run build
       - run: npm run lint -- --quiet
       - run: npm audit --audit-level=high
