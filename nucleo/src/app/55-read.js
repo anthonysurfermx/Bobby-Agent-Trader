@@ -306,13 +306,17 @@ function setHorizon(hrs){
 var DYING = [];
 function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
+  /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
+     (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
+  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
+    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
   ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
     var sym = String(item && item.symbol || '').toUpperCase();
     if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
     var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
-    list.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
   if (list.length) chipsShow(list, true); else chipsHide();
 }

@@ -118,14 +118,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // A cash listing answers alone only when the text names it. Rows that merely look alike are suggestions
+  // beside the crypto catalogue: a ticker typed alone ("TON", "ENS", "SAP") is never swallowed by them.
   const listed = searchRegionalStocks(q, language, src.locale, src.country);
-  const listedResolved = resolveRegionalStock(q);
-  if (listed.length) {
+  const listedResolved = resolveRegionalStock(q, language, src.locale, src.country);
+  if (listedResolved) {
     return res.status(200).json({ ok: true, query: q, results: listed.slice(0, limit).map(stockResult),
-      resolved: listedResolved ? stockResult(listedResolved) : null,
-      resolution: listedResolved ? { matchKind: 'exact', matchedTerm: q, needsConfirmation: false, proxyNote: null } : null,
+      resolved: stockResult(listedResolved),
+      resolution: { matchKind: 'exact', matchedTerm: q, needsConfirmation: false, proxyNote: null },
       source: 'Cash-market listings (Yahoo Finance identifiers)', catalogAgeMs: null });
   }
+  const listedRows = listed.map(stockResult);
 
   // An exchange-qualified cash ticker never falls through to fuzzy crypto resolution.
   // Only a literal exchange-qualified ticker is sent to external discovery;
@@ -146,14 +149,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const [results, resolution] = await Promise.all([
       searchOkxInstruments(q, { instTypes, limit }),
-      resolveOkxAssetFromText(q, { instTypes }),
+      resolveOkxAssetFromText(q, { instTypes, language }),
     ]);
 
     return res.status(200).json({
       ok: true,
       query: q,
       instTypes,
-      results,
+      // A resolved instrument leads; otherwise the cash listings that look like the query do.
+      results: (resolution ? [...results, ...listedRows] : [...listedRows, ...results]).slice(0, limit),
       resolved: resolution?.instrument ?? null,
       // Safety metadata: fuzzy/proxy matches must be user-confirmed before
       // any analysis runs — better to ask once than to confidently analyze
@@ -166,10 +170,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           proxyNote: resolution.proxyNote,
         }
         : null,
-      source: 'OKX public instruments',
+      source: listedRows.length ? 'Cash-market listings + OKX public instruments' : 'OKX public instruments',
       catalogAgeMs: getCatalogAgeMs(),
     });
   } catch (error) {
+    // The crypto catalogue is down: the cash listings that matched are still a true answer.
+    if (listedRows.length) {
+      return res.status(200).json({ ok: true, query: q, results: listedRows.slice(0, limit), resolved: null, resolution: null,
+        degraded: true, source: 'Cash-market listings (Yahoo Finance identifiers)', catalogAgeMs: null });
+    }
     const message = error instanceof Error ? error.message : 'Search unavailable';
     return res.status(503).json({ error: message });
   }

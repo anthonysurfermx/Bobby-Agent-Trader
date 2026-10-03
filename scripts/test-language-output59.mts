@@ -55,6 +55,16 @@ for(const lang of languages)for(const [i,expected]of ['intraday','week','month',
   assert.equal(s.sufficient,expected==='intraday');
   if(expected!=='intraday')assert.ok(s.missing.includes('1D'));
 });
+await check('horizon/fr: "mes" (my) is not the Spanish or Portuguese month',()=>{
+  for(const question of ['Dois-je garder mes actions LVMH ?','Que penses-tu de mes positions sur Bitcoin ?']){
+    assert.equal(horizonOf(question,'fr'),'unspecified',question);
+    assert.equal(sufficiencyOf(question,['1H'],'fr').sufficient,true,question);
+  }
+  assert.equal(horizonOf('BTC el próximo mes','es'),'month');
+  assert.equal(horizonOf('BTC no próximo mês','pt'),'month');
+  assert.equal(horizonOf('BTC le mois prochain','fr'),'month');
+  assert.equal(horizonOf('BTC in einem Jahr','de'),'long');
+});
 await check('horizon/negative: ordinary words and ambiguous German prepositions do not invent a horizon',()=>{
   for(const question of ['BTC an der Unterstützung','BTC Monatsbericht? Nein, nur das Volumen','Un actif intéressant','FRACTIONS everyday','Compare NVDA and BTC']){
     assert.equal(horizonOf(question),'unspecified',question);

@@ -127,6 +127,7 @@ enum NucleoDeskIO {
         var evidence: Evidence? = nil
         var level: String? = nil
         var access: BobbyReadAccess? = nil
+        var telemetry: BobbyTelemetryReceipt? = nil
         var agentsJSON: [String: Any] {
             var a: [String: Any] = ["alpha": alpha, "red": red, "cio": cio, "verdict": verdict, "direction": direction]
             if let rebuttal { a["rebuttal"] = rebuttal }
@@ -294,13 +295,21 @@ enum NucleoDeskIO {
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// Uses the same account-scoped retry as other private requests.
     static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
-                       auth: BobbyMeterAuth = .account, onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
+                       auth: BobbyMeterAuth = .account, requestId: String? = nil, onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
+            var body: [String: Any] = ["symbol": symbol, "question": question, "language": L.ttsLang,
+                                       "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
+                                       "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue]
+            if let requestId { body["requestId"] = requestId }
             let reply = try await BobbyAccessAPI.send("api/desk-debate", method: "POST",
-                                                               body: ["symbol": symbol, "question": question, "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
-                                                                      "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue],
+                                                               body: body,
                                                                auth: auth, timeout: level.timeout, onEvent: onEvent)
-            return parseDebate(status: reply.status, json: reply.json, headers: reply.headers)
+            var outcome = parseDebate(status: reply.status, json: reply.json, headers: reply.headers)
+            if let requestId, case var .ok(debate) = outcome {
+                debate.telemetry = BobbyTelemetryReceipt(json: (reply.json as? [String: Any])?["telemetry"], expectedRequestId: requestId)
+                outcome = .ok(debate)
+            }
+            return outcome
         } catch let error as URLError {
             switch error.code {
             case .timedOut: return .timeout
@@ -468,7 +477,8 @@ final class NucleoDesk {
     static let tokenLifetime: TimeInterval = 600
     static let readsKept = 5
     static let pendingReadWindow: TimeInterval = 1800
-    static let equitySymbolPattern = #"^[A-Z]{1,5}$"#
+    /// Same rule as the server (api/stock-candles.ts): exchange tickers carry a suffix (MC.PA, PETR4.SA).
+    static let equitySymbolPattern = #"^[A-Z0-9][A-Z0-9.^=-]{0,19}$"#
     static let uuidPattern = #"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"#
     static let marketCapSeconds: Double = 20
     static let pulseCapSeconds: Double = 20
@@ -826,7 +836,9 @@ final class NucleoDesk {
                 self?.receiveLive(event, requestId: job.requestId, generation: job.generation)
             }
         }
-        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level, auth: auth, onEvent: live)
+        if !fixtures { BobbyTelemetry.shared.readStarted(job.requestId) }
+        async let deskRead = NucleoDeskIO.debate(symbol: symbol, question: question, isEquity: isEquity, level: level,
+                                               auth: auth, requestId: job.requestId, onEvent: live)
         let market = await marketRead ?? NucleoDeskIO.Market(price: nil, changePct: nil)
         guard isCurrent(job) else { return Self.cancelledResult }
         emit("ask.stage", ["requestId": job.requestId, "stage": "market", "market": market.json])
@@ -835,6 +847,9 @@ final class NucleoDesk {
         debateStarted(level)
         let desk = await deskRead
         guard isCurrent(job) else { return Self.cancelledResult }
+        if !fixtures, case let .ok(debate) = desk, let receipt = debate.telemetry {
+            BobbyTelemetry.shared.readReceived(receipt)
+        }
         if case let .gated(status, message, access) = desk {
             return gated(status, message: message, access: access, job: job, asset: asset)
         }
@@ -944,6 +959,15 @@ final class NucleoDesk {
                 && $0.result["language"] as? String == language
                 && $0.result["locale"] as? String == locale
         }?.result
+    }
+
+    /// The trusted bundled page acknowledges its current visible frame, without seeing the receipt.
+    func readRendered(_ p: NucleoParams) throws -> [String: Any] {
+        let requestId = try p.string("requestId", maxLength: 36, pattern: Self.uuidPattern)!
+        guard !fixtures, !isBusy, profile.acceptedRiskNotice,
+              reads.last?.requestId == requestId, reads.last?.generation == generation()
+        else { return ["accepted": false] }
+        return ["accepted": BobbyTelemetry.shared.readRendered(requestId)]
     }
 
     // MARK: - saveThesis (the only XP)

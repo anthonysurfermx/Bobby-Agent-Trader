@@ -32,9 +32,9 @@ final class NativeSpeechPipelineTests: XCTestCase {
         ("de", "de-DE", "Überprüfe den Kurs: 1.234,56 € — heißt das Größe?")
     ]
 
-    private func context(_ item: (String, String, String)) -> SpeechPipelineContext {
+    private func context(_ item: (String, String, String), onDevice: Bool = true) -> SpeechPipelineContext {
         UserDefaults.standard.set(item.0, forKey: L.preferenceKey)
-        let context = SpeechPipelineContext(locale: item.1)
+        let context = SpeechPipelineContext(locale: item.1, onDevice: onDevice)
         contexts.append(context)
         return context
     }
@@ -60,6 +60,43 @@ final class NativeSpeechPipelineTests: XCTestCase {
             XCTAssertEqual(c.states, ["listening", "stopped"])
             XCTAssertEqual(c.recognizer.tasks[0].cancelCount, 1)
             XCTAssertEqual(c.capture.restoreCount, 1)
+        }
+    }
+
+    func testMissingOnDeviceModelRecognizesThroughAppleSpeechServiceInTheSameLanguageAndRegion() async {
+        for item in Self.cases {
+            let c = context(item, onDevice: false)
+            XCTAssertEqual(c.speech.permission(), .init(state: "granted", onDevice: false), item.1)
+            XCTAssertEqual(c.speech.start(), .listening, item.1)
+            XCTAssertEqual(c.speech.resolveRecognizer()?.locale.identifier, item.1, "The capture keeps its own recognizer")
+            // Without the local model the request must not demand it, or the hold would fail at once.
+            XCTAssertTrue(c.capture.request?.requiresOnDeviceRecognition == false, item.1)
+            XCTAssertTrue(c.capture.request?.shouldReportPartialResults == true)
+            c.recognizer.deliver(item.2, final: false)
+            await settle()
+            XCTAssertEqual(c.texts("speech.partial"), [item.2])
+            XCTAssertEqual(c.speech.stop(cancel: false), .stopped)
+            XCTAssertFalse(c.capture.opened)
+            c.recognizer.deliver(item.2, final: true)
+            await settle()
+            XCTAssertEqual(c.texts("speech.final"), [item.2])
+            XCTAssertEqual(c.states, ["listening", "stopped"])
+            XCTAssertEqual(c.recognizer.tasks.count, 1)
+        }
+    }
+
+    func testUnreachableSpeechServiceWithoutAModelNeverOpensTheMicrophoneAndRecoversOnTheNextHold() async {
+        for item in Self.cases {
+            let c = context(item, onDevice: false)
+            c.recognizer.isAvailable = false
+            XCTAssertEqual(c.speech.start(), .unavailable, item.1)
+            XCTAssertFalse(c.speech.isListening)
+            XCTAssertNil(c.capture.request, "No audio may be captured when nothing can recognize " + item.1)
+            XCTAssertEqual(c.recognizer.tasks.count, 0)
+            XCTAssertEqual(c.events.count, 0)
+            c.recognizer.isAvailable = true
+            XCTAssertEqual(c.speech.start(), .listening, item.1)
+            c.speech.cancel()
         }
     }
 
@@ -403,10 +440,10 @@ private final class SpeechPipelineContext {
     let speech: NucleoSpeech
     var events: [(String, [String: Any])] = []
 
-    init(locale: String) {
-        recognizer = PipelineRecognizerProbe(locale: locale)
+    init(locale: String, onDevice: Bool = true) {
+        recognizer = PipelineRecognizerProbe(locale: locale, onDevice: onDevice)
         let recognizer = self.recognizer, capture = self.capture, clock = self.clock
-        speech = NucleoSpeech(permissionInputs: { .init(mic: .granted, speech: .authorized, onDevice: true) },
+        speech = NucleoSpeech(permissionInputs: { .init(mic: .granted, speech: .authorized, available: true, onDevice: onDevice) },
             capture: capture, sleep: { try await clock.sleep($0) }, supportedLocales: { [locale] },
             makeRecognizer: { $0 == locale ? recognizer : nil })
         speech.vocabulary = ["BTC", "NVDA", "SAP.DE", "São Paulo"]
@@ -439,12 +476,15 @@ private final class SpeechCaptureProbe: NucleoSpeechCapturing {
 @MainActor
 private final class PipelineRecognizerProbe: NucleoSpeechRecognizing {
     let locale: Locale
-    let supportsOnDeviceRecognition = true
-    let isAvailable = true
+    let supportsOnDeviceRecognition: Bool
+    var isAvailable = true
     var tasks: [PipelineTaskProbe] = []
     private var deliveries: [@Sendable (String?, Bool, Bool) -> Void] = []
 
-    init(locale: String) { self.locale = Locale(identifier: locale) }
+    init(locale: String, onDevice: Bool = true) {
+        self.locale = Locale(identifier: locale)
+        supportsOnDeviceRecognition = onDevice
+    }
     func startRecognition(with request: SFSpeechRecognitionRequest,
                           deliver: @escaping @Sendable (String?, Bool, Bool) -> Void) -> any NucleoSpeechTask {
         let task = PipelineTaskProbe(); tasks.append(task); deliveries.append(deliver); return task

@@ -21,17 +21,18 @@ function useWidth<T extends HTMLElement>() {
   return [ref, width] as const;
 }
 
-interface Bucket { start: string; end: string; value: number }
+interface Bucket { start: string; end: string; value: number | null }
 
 /** Daily values, or weekly/biweekly sums when the bars would get thinner than ~22px. Buckets end today. */
-function bucketize(days: string[], values: number[], width: number): { buckets: Bucket[]; size: number } {
+function bucketize(days: string[], values: Array<number | null>, width: number): { buckets: Bucket[]; size: number } {
   const n = days.length;
   const fit = Math.max(1, Math.floor((width || 600) / 22));
-  const size = [1, 7, 14, 30].find((s) => Math.ceil(n / s) <= fit) ?? 30;
+  // Keep daily gaps visible; never turn an unpublished day into a weekly zero or a complete sum.
+  const size = values.some((v) => v == null) ? 1 : [1, 7, 14, 30].find((s) => Math.ceil(n / s) <= fit) ?? 30;
   const buckets: Bucket[] = [];
   for (let end = n; end > 0; end -= size) {
     const start = Math.max(0, end - size);
-    buckets.unshift({ start: days[start], end: days[end - 1], value: values.slice(start, end).reduce((a, b) => a + (b || 0), 0) });
+    buckets.unshift({ start: days[start], end: days[end - 1], value: size === 1 ? values[start] ?? null : values.slice(start, end).reduce((a, b) => a + (b ?? 0), 0) });
   }
   return { buckets, size };
 }
@@ -41,12 +42,12 @@ function bucketize(days: string[], values: number[], width: number): { buckets: 
  * or the hovered one, is the orange one.
  */
 export function BarsChart({ days, values, format = 'int', height = 220, emptyLabel = 'Sin datos en el periodo' }: {
-  days: string[]; values: number[]; format?: ValueFormat; height?: number; emptyLabel?: string;
+  days: string[]; values: Array<number | null>; format?: ValueFormat; height?: number; emptyLabel?: string;
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const { buckets, size } = useMemo(() => bucketize(days, values, width), [days, values, width]);
-  const max = Math.max(0, ...buckets.map((b) => b.value));
+  const max = Math.max(0, ...buckets.map((b) => b.value ?? 0));
   const peak = max > 0 ? buckets.findIndex((b) => b.value === max) : -1;
   const active = hover ?? peak;
   const gap = buckets.length > 20 ? 4 : buckets.length > 12 ? 6 : 8;
@@ -75,7 +76,7 @@ export function BarsChart({ days, values, format = 'int', height = 220, emptyLab
                         height: h,
                         borderRadius: radius,
                         background: on ? GRAD.orange : b.value > 0 ? GRAD.grey : '#1C1C1D',
-                        border: on ? '1px solid rgba(255,190,130,0.35)' : '1px solid rgba(255,255,255,0.06)',
+                        border: b.value == null ? '1px dashed rgba(255,255,255,0.25)' : on ? '1px solid rgba(255,190,130,0.35)' : '1px solid rgba(255,255,255,0.06)',
                         boxShadow: on ? '0 0 28px rgba(242,140,56,0.35), inset 0 1px 0 rgba(255,255,255,0.25)' : 'inset 0 1px 0 rgba(255,255,255,0.05)',
                       }}
                     />
@@ -96,7 +97,7 @@ export function BarsChart({ days, values, format = 'int', height = 220, emptyLab
                 style={{ left: `${((hover + 0.5) / buckets.length) * 100}%` }}
               >
                 <div className="whitespace-nowrap text-[#8B8B8B]">{size === 1 ? fmtDayLong(tip.start) : `${fmtDayShort(tip.start)} – ${fmtDayShort(tip.end)}`}</div>
-                <div className="text-[13px] text-[#EDEDED]">{fmtValue(tip.value, format)}</div>
+                <div className="text-[13px] text-[#EDEDED]">{tip.value == null ? 'Sin dato publicado' : fmtValue(tip.value, format)}</div>
               </div>
             )}
           </>
@@ -109,7 +110,7 @@ export function BarsChart({ days, values, format = 'int', height = 220, emptyLab
             <TableScroll minWidth={220}>
               <thead><tr><th className={th}>Día</th><th className={`${th} text-right`}>Valor</th></tr></thead>
               <tbody>
-                {days.map((d, i) => ({ d, v: values[i] ?? 0 })).reverse().map(({ d, v }) => (
+                {days.map((d, i) => ({ d, v: values[i] ?? null })).reverse().map(({ d, v }) => (
                   <tr key={d}>
                     <td className={`${td} font-mono text-[#8B8B8B]`}>{fmtTick(d)}</td>
                     <td className={`${td} text-right font-mono`}>{fmtValue(v, format)}</td>

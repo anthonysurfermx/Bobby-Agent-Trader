@@ -127,12 +127,12 @@ final class NativeRegionalQuickAccessTests: XCTestCase {
 
     func testEmptyHistorySuggestsListedRegionalSymbolsAndRetainsLegacyEnglishSpanish() {
         let cases: [(String, String, String?, [String])] = [
-            ("fr", "fr-FR", "FR", ["BTC", "NVDA", "MC.PA", "TTE.PA"]),
-            ("pt", "pt-PT", "PT", ["BTC", "NVDA", "EDP.LS", "GALP.LS"]),
-            ("pt", "pt-BR", "BR", ["BTC", "NVDA", "PETR4.SA", "VALE3.SA"]),
-            ("pt", "en-US", "BR", ["BTC", "NVDA", "PETR4.SA", "VALE3.SA"]),
-            ("it", "it-IT", "IT", ["BTC", "NVDA", "ENI.MI", "ENEL.MI"]),
-            ("de", "de-DE", "DE", ["BTC", "NVDA", "SAP.DE", "SIE.DE"]),
+            ("fr", "fr-FR", "FR", ["BTC", "MC.PA", "NVDA", "OR.PA"]),
+            ("pt", "pt-PT", "PT", ["BTC", "EDP.LS", "NVDA", "GALP.LS"]),
+            ("pt", "pt-BR", "BR", ["BTC", "PETR4.SA", "NVDA", "VALE3.SA"]),
+            ("pt", "en-US", "BR", ["BTC", "PETR4.SA", "NVDA", "VALE3.SA"]),
+            ("it", "it-IT", "IT", ["BTC", "ISP.MI", "NVDA", "ENEL.MI"]),
+            ("de", "de-DE", "DE", ["BTC", "SAP.DE", "NVDA", "SIE.DE"]),
             ("en", "en-US", "FR", ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]),
             ("es", "es-MX", "DE", ["BTC", "NVDA", "ETH", "TSLA", "ORO"])
         ]
@@ -140,8 +140,26 @@ final class NativeRegionalQuickAccessTests: XCTestCase {
             let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: [preferred], region: country)
             let defaults = DeskMemory.defaultQuickAccess(for: resolution)
             XCTAssertEqual(defaults, expected)
-            XCTAssertEqual(Array(defaults.prefix(2)), ["BTC", "NVDA"], "Common starters must appear before regional padding in every app language")
+            XCTAssertEqual(defaults.first, "BTC", "BTC leads in every app language")
+            XCTAssertTrue(defaults.contains("NVDA"), "NVDA stays a common starter in every app language")
             XCTAssertEqual(DeskMemory(defaults: MemoryDefaults()).quickAccess(fallback: defaults), expected)
+        }
+    }
+
+    /// Review regional-stocks F3/F4/F8: the local stock sits right after BTC, only symbols of the server
+    /// catalogue (src/lib/regional-stocks.ts) are suggested, and one personal ask keeps it in the three chips.
+    func testFirstLocalStockFollowsBTCAndStaysVisibleAfterOnePersonalAsk() {
+        let catalogue: Set<String> = ["MC.PA", "OR.PA", "EDP.LS", "GALP.LS", "PETR4.SA", "VALE3.SA", "ENEL.MI", "ISP.MI", "SAP.DE", "SIE.DE"]
+        let cases: [(String, String, String)] = [("fr", "fr-FR", "MC.PA"), ("pt", "pt-PT", "EDP.LS"), ("pt", "pt-BR", "PETR4.SA"),
+                                                 ("it", "it-IT", "ISP.MI"), ("de", "de-DE", "SAP.DE")]
+        for (language, preferred, local) in cases {
+            let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: [preferred], region: nil)
+            let defaults = DeskMemory.defaultQuickAccess(for: resolution)
+            XCTAssertEqual(Array(defaults.prefix(2)), ["BTC", local], preferred)
+            for symbol in defaults where symbol.contains(".") { XCTAssertTrue(catalogue.contains(symbol), "\(symbol) is not in the server catalogue") }
+            let memory = DeskMemory(defaults: MemoryDefaults())
+            memory.recordQuery(symbol: "SOL", isEquity: false, now: Date(timeIntervalSince1970: 1000))
+            XCTAssertEqual(Array(memory.quickAccess(fallback: defaults).prefix(3)), ["SOL", "BTC", local], preferred)
         }
     }
 

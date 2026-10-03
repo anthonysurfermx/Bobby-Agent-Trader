@@ -32,7 +32,7 @@ struct AuraCardView: View {
                         .foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer()
-                Text(Date.now.formatted(.dateTime.day().month(.abbreviated)))
+                Text(Date.now.formatted(.dateTime.day().month(.abbreviated).locale(L.locale)))   // the app language, not the phone's
                     .font(.mono(10 * scale, .bold))
                     .foregroundStyle(data.tintSoft)
             }

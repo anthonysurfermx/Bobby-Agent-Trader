@@ -74,7 +74,7 @@ export default function LimitDialog({ limit, state, billing, onClose, onSignIn, 
               </p>
               {canBuy && <><div className="n-dlg-pro">
                 <div>
-                  <b>Bobby Pro · {t('$5/month', '$5/mes', '$5/mês')}</b>
+                  <b>Bobby Pro · {t('US$4.90/month', 'US$4.90/mes', 'US$ 4,90/mês', '4,90 USD/mois', '4,90 USD/mese', '4,90 USD/Monat')}</b>
                   <small>{pro ? t(`Unlimited Quick reads (fair use), ${pro.profundo[0]} Deep and ${pro.maximo[0]} Max a month.`, `Lecturas Rápidas sin límite (uso razonable), ${pro.profundo[0]} Profundo y ${pro.maximo[0]} Máximo al mes.`, `Análises Rápidas ilimitadas (uso razoável), ${pro.profundo[0]} Profundo e ${pro.maximo[0]} Máximo por mês.`) : ''}</small>
                 </div>
                 <button type="button" className="n-dlg-pro-btn" disabled={billing.busy} onClick={onSubscribe}>

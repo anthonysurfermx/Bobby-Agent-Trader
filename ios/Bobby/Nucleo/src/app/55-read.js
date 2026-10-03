@@ -60,6 +60,27 @@ function onStage(p){
   if (p.stage === 'accepted'){ r.accepted = true; r.asset = p.asset || null; dockAsset(); fsmEvent('accepted', r); }
   else if (p.stage === 'market'){ r.market = p.market || null; dockAsset(); }
 }
+/* Acknowledgment after two real animation frames with a settled, visible result card.
+   Native retains the signed receipt; this trusted page only names the current request UUID. */
+function observePresentedRead(){
+  var r = READ;
+  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
+  var visible = false;
+  if (A.cardsOn){
+    for (var i = 0; i < el.cards.length; i++){
+      var c = el.cards[i];
+      if (!A.rev[i] || A.rev[i].x < 0.999 || !c.textContent.trim()) continue;
+      var box = c.getBoundingClientRect(), style = W.getComputedStyle(c);
+      if (style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) >= 0.5 &&
+          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visible = true; break; }
+    }
+  }
+  if (!visible){ r.visibleFrames = 0; return; }
+  r.visibleFrames = (r.visibleFrames || 0) + 1;
+  if (r.visibleFrames < 2) return;
+  r.presented = true;
+  bcall('read.rendered', { requestId: r.requestId }).catch(noop);
+}
 /* the header's second line: the real asset and price from ask.stage (never a JS guess) */
 function dockAsset(){
   var r = READ; if (!r || !r.asset) return;
@@ -312,13 +333,17 @@ function setHorizon(hrs){
 var DYING = [];
 function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
+  /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
+     (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
+  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
+    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
   ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
     var sym = String(item && item.symbol || '').toUpperCase();
     if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
     var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
-    list.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
   if (list.length) chipsShow(list, true); else chipsHide();
 }

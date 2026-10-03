@@ -195,6 +195,8 @@ final class NucleoSession: ObservableObject {
             return try await desk.ask(p)
         case "cancel":
             return desk.cancel()
+        case "read.rendered":
+            return try desk.readRendered(p)
         case "speech.permission":
             return speech.permission().json
         case "speech.requestPermission":
@@ -425,7 +427,8 @@ final class NucleoSession: ObservableObject {
         return nucleoVoice.speak(id: id, text: text, voiceId: profile.voiceId, persona: companions.companion?.voicePersona, vibe: profile.vibeId)
     }
 
-    /// Public pick lines: bundled EN/ES audio or localized on-device speech, with no provider request.
+    /// Public pick lines: bundled EN/ES audio. A language without clips uses the companion's network
+    /// voice once the risk notice is accepted, and on-device speech (no provider request) before that.
     func previewVoice(_ c: Companion) -> NucleoVoice.Status {
         let clip = "select-\(c.id)-\(L.ttsLang)"
         let needsBundledClip = ["en", "es"].contains(L.language)

@@ -43,6 +43,7 @@
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
       </array>
     </dict>
     <dict>
@@ -56,6 +57,7 @@
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
       </array>
     </dict>
     <dict>
@@ -78,7 +80,17 @@
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
       <key>NSPrivacyCollectedDataTypeTracking</key><false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
-      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeAnalytics</string></array>
+    </dict>
+    <dict>
+      <!-- Only WebKit content-process termination reports with install/account/build context;
+           this is operational diagnostics, not a native crash log or crash-reporting SDK. -->
+      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeOtherDiagnosticData</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key><true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeAnalytics</string></array>
     </dict>
     <dict>
       <!-- Existing authentication grants can include an email retained by the backend,

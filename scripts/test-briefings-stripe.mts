@@ -64,13 +64,14 @@ newShape.lines.data[0].parent.subscription_item_details.proration = true;
 no(proof(sub(), newShape), 'proration alone is not a paid full subscription period');
 
 let liveSub: any = sub(), liveInvoice: any = invoice();
-let liveCharge: any = { id: cid, payment_intent: pid, customer, livemode: true,
+let liveCharge: any = { id: cid, payment_intent: pid, customer, currency: 'usd', invoice: iid, livemode: true,
                         paid: true, captured: true, disputed: false, amount: 499, amount_refunded: 0 };
 let livePayments: any[] = [{
   invoice: iid, status: 'paid', livemode: true, currency: 'usd', amount_paid: 499,
   payment: { type: 'payment_intent', payment_intent: pid },
 }];
 let mirrored: any = null, paidProof: any = null;
+let liveRefunds: Array<Record<string, unknown>> = [];
 const purchaseRows: any[] = [], requests: string[] = [];
 const originalFetch = globalThis.fetch;
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
@@ -79,12 +80,22 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   if (url.includes('api.stripe.com/v1/subscriptions/')) return json(liveSub);
   if (url.includes('api.stripe.com/v1/invoices/')) return json(liveInvoice);
+  // As Stripe does: the payment filter is refused without its type.
+  if (url.includes('api.stripe.com/v1/invoice_payments') && url.includes('payment[payment_intent]') && !url.includes('payment[type]=payment_intent'))
+    return json({ error: { message: 'Missing required param: payment[type].' } }, 400);
   if (url.includes('api.stripe.com/v1/invoice_payments')) return json({ has_more: false, data: livePayments });
   if (url.includes('api.stripe.com/v1/payment_intents/'))
     return json({ id: pid, status: 'succeeded', customer, livemode: true, latest_charge: cid });
   if (url.includes('api.stripe.com/v1/charges/')) return json(liveCharge);
+  // The revenue ledger lists the charge's refunds and records one row per refund.
+  if (url.includes('api.stripe.com/v1/refunds?charge=')) return json({ has_more: false, data: liveRefunds });
+  if (url.includes('api.stripe.com/v1/customers/')) return json({ id: customer, metadata: {} });
+  if (url.includes('/bobby_subscriptions?stripe_customer_id'))
+    return json(mirrored?.stripe_customer_id === customer ? [{ identity_id: mirrored.identity_id }] : []);
   if (url.includes('/bobby_subscriptions?stripe_subscription_id'))
-    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id }] : []);
+    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id, stripe_customer_id: mirrored.stripe_customer_id }] : []);
+  // The webhook reads the account's current row before writing (a late state never overwrites another live plan).
+  if (url.includes('/bobby_subscriptions?identity_id=eq.')) return json(mirrored ? [mirrored] : []);
   if (url.includes('/bobby_subscriptions?on_conflict')) {
     mirrored = JSON.parse(String(init?.body)); return json(null, 201);
   }
@@ -93,8 +104,19 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     if (method === 'POST') { paidProof = JSON.parse(String(init?.body)); return json(null, 201); }
     if (method === 'DELETE') { paidProof = null; return new Response(null, { status: 204 }); }
   }
+  // The ledger falls back to the subscription's metadata owner while the row is not written yet.
+  if (url.includes('/bobby_identities?id=eq.')) return json([{ id: new URL(url).searchParams.get('id')!.replace('eq.', '') }]);
   if (url.includes('/bobby_purchase_events')) {
-    purchaseRows.push(JSON.parse(String(init?.body))); return json(null, 201);
+    const id = new URL(url).searchParams.get('id')?.replace(/^eq\./, '');
+    const row = purchaseRows.find((r) => r.id === id);
+    if (method === 'PATCH') {
+      if (!row || row.identity_id) return json([]);
+      row.identity_id = JSON.parse(String(init?.body)).identity_id; return json([{ identity_id: row.identity_id }]);
+    }
+    if (method === 'GET') return json(row ? [{ identity_id: row.identity_id }] : []);
+    const body = JSON.parse(String(init?.body));
+    if (!purchaseRows.some((r) => r.id === body.id)) purchaseRows.push(body);
+    return json(null, 201);
   }
   throw new Error(`unexpected ${method} ${url}`);
 }) as typeof fetch;
@@ -135,9 +157,13 @@ try {
   await POST(signed('invoice.paid', liveInvoice));
   yes(paidProof, 'new paid invoice restores proof');
   liveCharge = { ...liveCharge, amount_refunded: 499, refunded: true };
-  const refunded = { id: cid, payment_intent: pid, livemode: true, amount: 499, amount_refunded: 499, currency: 'usd' };
+  const refunded = { id: cid, payment_intent: pid, customer, livemode: true, amount: 499, amount_refunded: 499, currency: 'usd' };
+  liveRefunds = [{ id: 're_paid_54', status: 'succeeded', amount: 499, currency: 'usd', created: Math.floor(Date.now() / 1000), charge: cid }];
+  const rowsBeforeRefund = purchaseRows.length;
   eq((await POST(signed('charge.refunded', refunded))).status, 200, 'signed full refund processed');
   no(paidProof, 'full refund removes proof even if subscription snapshot still says active');
+  const refundRow = purchaseRows.slice(rowsBeforeRefund).find((row) => row.type === 'REFUND');
+  eq([refundRow?.id, refundRow?.price_usd ?? refundRow?.priceUsd], ['stripe-refund-re_paid_54', -4.99], 'the refund is recorded once, keyed to the Stripe refund');
   eq((await POST(signed('invoice.paid', liveInvoice))).status, 200, 'late invoice replay is processed');
   no(paidProof, 'late invoice replay cannot resurrect fully refunded proof');
 

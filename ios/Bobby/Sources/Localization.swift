@@ -47,6 +47,21 @@ struct LanguageResolution: Equatable, Sendable {
         }
         return [localeIdentifier] + alternatives.filter { $0 != localeIdentifier }
     }
+
+    /// Hold-to-ask recognition order. Apple keys dictation models to the keyboard's region, so the
+    /// device's own variants of the app language come first (fr-CA, fr-BE, fr-CH, de-AT, de-CH, it-CH,
+    /// pt-BR, en-GB, es-ES...): from its language list, then from its region. The defaults follow,
+    /// without duplicates. A pair Apple does not recognize is dropped by NucleoSpeech against
+    /// `SFSpeechRecognizer.supportedLocales()` before any recognizer is created.
+    func recognitionLocaleCandidates(preferredLanguages: [String]) -> [String] {
+        let regions = preferredLanguages.compactMap { tag -> String? in
+            let parts = tag.replacingOccurrences(of: "_", with: "-").split(separator: "-")
+            guard parts.first?.lowercased() == language.rawValue else { return nil }
+            return parts.dropFirst().first { $0.count == 2 }?.uppercased()
+        } + (country.map { [$0] } ?? [])
+        var seen = Set<String>()
+        return (regions.map { language.rawValue + "-" + $0 } + speechLocaleCandidates).filter { seen.insert($0).inserted }
+    }
 }
 
 /// Retains a stable catalog key and argument boundaries, so names, prices and tickers are never
@@ -90,7 +105,9 @@ enum L {
     static var ttsLang: String { language }
     static var localeIdentifier: String { resolution.localeIdentifier }
     static var country: String? { resolution.country }
-    static var speechLocaleCandidates: [String] { resolution.speechLocaleCandidates }
+    /// Recognition order for hold-to-ask: the device's regional variant first. Voice output keeps
+    /// `resolution.speechLocaleCandidates`.
+    static var speechLocaleCandidates: [String] { resolution.recognitionLocaleCandidates(preferredLanguages: Locale.preferredLanguages) }
     static var isSpanish: Bool { language == "es" }
     static var displayName: String { resolution.language.name }
     static var locale: Locale { Locale(identifier: localeIdentifier) }

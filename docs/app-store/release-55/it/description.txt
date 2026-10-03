@@ -1,6 +1,6 @@
 Scopri Bobby, il tuo compagno per ragionare sui mercati.
 
-Fai una domanda su un asset supportato, come un’azione o una criptovaluta, scrivendo oppure usando la dettatura facoltativa sul dispositivo. Bobby riunisce tre prospettive: le opportunità, una verifica dei rischi e una sintesi delle evidenze.
+Fai una domanda su un asset supportato, come un’azione o una criptovaluta, scrivendo oppure usando la dettatura facoltativa. Bobby riunisce tre prospettive: le opportunità, una verifica dei rischi e una sintesi delle evidenze.
 
 SEI LINGUE E CONTESTO LOCALE
 Usa Bobby in italiano, inglese, spagnolo, francese, portoghese o tedesco. Cambia lingua nel Profilo. La voce e la dettatura in portoghese seguono la variante del Portogallo o del Brasile impostata sul dispositivo. Cerca le azioni locali supportate per nome o simbolo; i simboli di borsa originali e la valuta delle quotazioni vengono mantenuti.
@@ -15,7 +15,7 @@ IL TUO COMPAGNO E I TUOI PROGRESSI
 Scegli un compagno, personalizza il profilo ed esplora Trader Land. Un account Apple facoltativo sincronizza i progressi. La tua isola rimane privata finché non scegli di pubblicarla. Le isole pubbliche consentono di segnalare contenuti e bloccare i creatori.
 
 SEI TU A DECIDERE SULL’IA
-L’elaborazione con IA esterna richiede il tuo consenso. Puoi leggere l’avviso e revocare il consenso dal Profilo. La dettatura usa il riconoscimento vocale Apple sui dispositivi compatibili; l’audio del microfono non viene caricato. Puoi sempre scrivere. La narrazione facoltativa può essere disattivata.
+L’elaborazione con IA esterna richiede il tuo consenso. Puoi leggere l’avviso e revocare il consenso dal Profilo. La dettatura viene riconosciuta sul tuo iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio. Puoi sempre scrivere. La narrazione facoltativa può essere disattivata.
 
 Bobby è uno strumento educativo di analisi di mercato. L’app per iPhone non collega wallet, non esegue operazioni e non trasferisce fondi. Le analisi possono essere incomplete o errate e i dati di mercato possono essere ritardati. Bobby non promette rendimenti e non offre consulenza di investimento personalizzata. Decidi tu cosa fare.
 

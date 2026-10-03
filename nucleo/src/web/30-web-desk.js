@@ -16,7 +16,7 @@
 
   var TOKEN_LIFETIME = 600000, MARKET_CAP = 20000, PULSE_CAP = 20000, PULSE_GRACE = 5000;
   var SEARCH_TIMEOUT = 60000, DESK_TIMEOUT = 100000, SUGGESTIONS_CACHE = 300000;
-  var EQUITY_SYMBOL = /^[A-Z]{1,5}$/;
+  var EQUITY_SYMBOL = /^[A-Z0-9][A-Z0-9.^=-]{0,19}$/; // the server's rule (api/stock-candles.ts): MC.PA, PETR4.SA
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   var MAX_QUESTION = 1200;
   var TREND = { alcista: 'up', bajista: 'down', lateral: 'sideways', up: 'up', down: 'down', sideways: 'sideways' };
@@ -27,7 +27,7 @@
   function fault(code, message) { var e = new Error(message || code); e.fault = code; return e; }
   D.fault = fault;
   function errorResult(code, message) { return { v: 1, status: 'error', code: code, message: message == null ? null : message }; }
-  function tooLongMessage() { return NW.t('Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.', 'A sua pergunta é demasiado longa. Use até 1 200 caracteres.', 'Votre question est trop longue. Utilisez au maximum 1 200 caractères.', 'La domanda è troppo lunga. Usa al massimo 1.200 caratteri.', 'Deine Frage ist zu lang. Verwende höchstens 1.200 Zeichen.'); }
+  function tooLongMessage() { return NW.t('Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.', 'A tua pergunta é demasiado longa. Usa até 1 200 caracteres.', 'Ta question est trop longue. Utilise au maximum 1 200 caractères.', 'La domanda è troppo lunga. Usa al massimo 1.200 caratteri.', 'Deine Frage ist zu lang. Verwende höchstens 1.200 Zeichen.'); }
   /** Unicode code points of the trimmed text, like /api/desk-debate counts them. */
   function codePoints(s) { return Array.from(String(s).trim()).length; }
   function given(v) { return v !== undefined && v !== null; }
@@ -167,9 +167,10 @@
   }
   /** BobbyAPI.debate: POST /api/desk-debate, 100 s. The browser sends this origin's Origin header itself. */
   function debate(symbol, question, isEquity, signal) {
+    var telemetry = window.BobbyClientTelemetry, request = telemetry ? telemetry.beginRead() : null;
     return NW.http('/api/desk-debate', { method: 'POST', timeoutMs: DESK_TIMEOUT, signal: signal,
-      body: { symbol: symbol, question: question, language: NW.lang, locale: NW.locale, country: NW.country, assetType: isEquity ? 'equity' : 'crypto' } })
-      .then(function (r) { return parseDebate(r.status, r.json, r.headers); },
+      body: { symbol: symbol, question: question, language: NW.lang, locale: NW.locale, country: NW.country, assetType: isEquity ? 'equity' : 'crypto', requestId: request ? request.requestId : undefined } })
+      .then(function (r) { var result = parseDebate(r.status, r.json, r.headers); if (result.kind === 'ok' && request && !(signal && signal.aborted)) result.telemetry = telemetry.received(request, r.json && r.json.telemetry); return result; },
         function (e) { return { kind: e.kind === 'timeout' ? 'timeout' : e.kind === 'cancelled' ? 'cancelled' : 'network' }; });
   }
 
@@ -321,7 +322,7 @@
     var result = {
       v: 1, status: 'ok', requestId: job.requestId, question: job.question, language: NW.lang,
       asset: assetJSON(a), market: mk, technicals: desk.technicals, pulse: pl, agents: desk.agents,
-      provenance: desk.provenance, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false
+      provenance: desk.provenance, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false, telemetry: desk.telemetry || null
     };
     // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
     S.recordQuery(a.symbol, a.isEquity);

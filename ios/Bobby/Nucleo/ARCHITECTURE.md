@@ -29,13 +29,13 @@ The goal is the app Anthony asked for. He asks his own question by voice or text
 | R5 | Conviction and plan levels come only from `voice-tool run_debate` (`pulse`, quota-free). They are **shown only when the engine agrees with the desk**: verdict `review`, the same direction, and the same instrument. Otherwise the ring is a **completion ring with no number**, and the thesis shows real support/resistance instead of plan rows. | `/api/desk-debate` returns no conviction or levels. Both real captures are `wait`, while BTC's engine says `strong_long 59%`. Showing that number under "Wait" would contradict the desk. |
 | R6 | Verdict words: `wait` becomes **Wait** (amber `#F6B94E`, scrim `#2A1C08`). `review` becomes **Review** (mint `#3FE0B5`, scrim `#082A20`). "Buy" and "Sell" never appear. Spanish: Espera / Revisa. | Colour lock (DIRECTION §2.1) and compliance. |
 | R7 | What Bobby speaks = up to 600 chars of **CIO sentences**, plus one closing line from the string table ("My call: wait." / "Mi lectura: esperar."). The verdict condenses on that closing word. The full agent texts live in the debate card. | Neither real CIO text contains the word "wait", so the condensation needs a deterministic sync point. The closing line is a label with the real verdict inserted; it is not invented analysis. |
-| R8 | Speech-to-text is **on-device only** (`requiresOnDeviceRecognition = true`). If the locale cannot recognize on device, the mic is `unavailable` and the pill offers typing. | Audio never leaves the phone, so the existing risk-notice copy stays true and `RiskNotice.currentVersion` stays 4. |
+| R8 | Speech-to-text runs **on device when the phone holds Apple's model for the app language**; otherwise Apple's speech service transcribes it in that same language (`requiresOnDeviceRecognition` follows the recognizer's `supportsOnDeviceRecognition`). If nothing can recognize the language right now (no local model and no connection), the mic is `unavailable` and the pill offers typing. | A language without a local model would otherwise have no voice input. The risk notice and the speech usage string say which of the two transcribes; Bobby never stores the audio. |
 | R9 | These are dropped until a data source exists: Google sign-in, "Watch & ping me" with price pings, the notifications prompt, the Record face, the earnings satellite and chart marker, follow-up suggestions written by an LLM, and "level 12". | `.claude/rules/no-hardcode.md`. |
 | R10 | The horizon control (24h/3d/7d) is shown only when the user is **signed in and the verdict is Review**. | Only a `read_complete` seed has a horizon, and extending one needs sign-in plus an `inventoryId`. |
 | R11 | Onboarding's risk beat shows the **4 real `RiskNotice` statements**, fetched from native, as a hold-to-agree. It never shows the prototype's 3 paraphrased lines. No bridge call can reach the network before acceptance. | Statement 1 is the consent to AI processing. |
 | R12 | Native keeps a **local thesis ledger** (`nucleo.theses.<owner>`, 20 newest). It feeds the Theses face, the ghost satellite and `theses()`, and it saves even at the daily XP cap. | Signed out, pending awards vanish after sync, and a capped award queues nothing. |
 | R13 | A single `NucleoSession` owns `AgentProfile`, `CompanionStore` and `NeuralVoice`. `openClassic` tears the Núcleo down before `ContentView` appears. The classic app sits behind a **long press (0.8 s) on the header wordmark**, in **DEBUG builds only** (dev pages and DEBUG native); Release refuses `openClassic` (`unknown_method`) and never shows `ContentView` (1.5 (40), App Review 2.3.1). | Two live stores clobber `pendingAwards`. |
-| R14 | Before any desk call, native runs a **preflight**: asset class must be equity or crypto, the equity symbol must match `^[A-Z]{1,5}$`, and candles must be fresh (crypto ≥59 bars with the last bar ≤3 h old; equity last bar ≤5 days old). A failure answers `unsupported` without spending quota. | The desk spends quota before it loads evidence. Every failure after that is a paid 503. |
+| R14 | Before any desk call, native runs a **preflight**: asset class must be equity or crypto, the equity symbol must match `^[A-Z0-9][A-Z0-9.^=-]{0,19}$`, and candles must be fresh (crypto ≥59 bars with the last bar ≤3 h old; equity last bar ≤5 days old). A failure answers `unsupported` without spending quota. | The desk spends quota before it loads evidence. Every failure after that is a paid 503. |
 | R15 | Fonts keep loading from Google Fonts (the CSP allows only those two hosts). Bundling Geist and Instrument Serif needs Anthony's OK to download them; see §7. | No local copies exist. |
 
 ---
@@ -235,7 +235,7 @@ Order is normative. The mock follows it too.
      - `needsConfirmation` gives `confirm`, with a token.
 6. **Preflight (R14).**
    - `assetClass ∉ {equity, crypto}` gives `unsupported/asset_class`.
-   - An equity symbol that fails `^[A-Z]{1,5}$` gives `unsupported/symbol_format`.
+   - An equity symbol that fails `^[A-Z0-9][A-Z0-9.^=-]{0,19}$` gives `unsupported/symbol_format`.
    - Emit `ask.stage{stage:"accepted", asset, startedAt}`.
    - Fetch candles exactly as `BobbyAPI.candles(symbol:isEquity:timeframe:.oneHour)`, but through `BobbyAPI.response`, so that a transport error (`error.network`) is told apart from an empty or non-2xx reply.
    - Gate: crypto needs ≥59 bars and a last bar ≤3 h old; equity needs a last bar ≤5 days old. A failure gives `unsupported/thin_data` or `unsupported/stale_data`.
@@ -321,10 +321,10 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 
 ### 2.6 Speech-to-text and voice (native details)
 
-- **Permission.** `state` = `granted` only if both `AVAudioApplication.shared.recordPermission` and `SFSpeechRecognizer.authorizationStatus()` are granted. It is `denied` if either is denied, `restricted` if speech is restricted, `undetermined` if either is undetermined, and `unavailable` if there is no recognizer for the locale or `!supportsOnDeviceRecognition`. The locale is `es-MX` when `L.isSpanish`, else `en-US`; the first supported of those.
+- **Permission.** `state` = `granted` only if both `AVAudioApplication.shared.recordPermission` and `SFSpeechRecognizer.authorizationStatus()` are granted. It is `denied` if either is denied, `restricted` if speech is restricted, `undetermined` if either is undetermined, and `unavailable` if no recognizer for the app language can run now, on the device or through Apple's speech service. `onDevice` is true only when the resolved recognizer holds the local model. The locale is `es-MX` when `L.isSpanish`, else `en-US`; the first supported of those.
 - **Start.**
   1. Call `voice.stop()`, then set `AVAudioSession` to `.playAndRecord` with mode `.measurement` and `.duckOthers`.
-  2. Use `SFSpeechAudioBufferRecognitionRequest` with `requiresOnDeviceRecognition = true`, `shouldReportPartialResults = true` and `addsPunctuation = true`. Set `contextualStrings` to `BobbyAPI.dictationVocabulary()`, prefetched once per session and quota-free.
+  2. Use `SFSpeechAudioBufferRecognitionRequest` with `requiresOnDeviceRecognition` set to the recognizer's `supportsOnDeviceRecognition`, `shouldReportPartialResults = true` and `addsPunctuation = true`. Set `contextualStrings` to `BobbyAPI.dictationVocabulary()`, prefetched once per session and quota-free.
   3. Install an `AVAudioEngine` input tap. The level is `clamp((20·log10(rms)+50)/45, 0, 1)`.
 - **Stop.** Call `endAudio()`, wait ≤1.5 s for the final result, emit `speech.final`, remove the tap and stop the engine. Then set the category back to `.playback`/`.spokenAudio`; `NeuralVoice.play` does this too.
 - **Cancel.** Call `task.cancel()`; no final is emitted.
@@ -553,10 +553,10 @@ Hooks:
     - en: "Bobby listens only while you hold the button, to hear your question."
     - es: "Bobby solo escucha mientras mantienes presionado el botón, para oír tu pregunta."
   - `NSSpeechRecognitionUsageDescription`
-    - en: "Bobby turns your spoken question into text on this iPhone. The audio never leaves your device."
-    - es: "Bobby convierte tu pregunta hablada en texto en este iPhone. El audio nunca sale de tu dispositivo."
-  - Update `Tests/ReleaseAuditTests.testAvatarNarrationDoesNotRequestMicrophoneOrSpeechRecognition` **deliberately**: rename it, then assert that both keys exist and are non-empty, and that recognition is on-device only (unit-test the request factory).
-- **Speech.** Recognition is on-device only (R8), so no audio is collected and `PrivacyInfo.xcprivacy` needs no new data type. The transcript is sent only when the user releases the pill, as the question, which is already declared as user content. The mic is active only while the user holds the pill, and it stops on background.
+    - en: "Bobby turns your spoken question into text: on this iPhone when the language is installed, otherwise through Apple's speech service. Bobby does not store the audio."
+    - es: "Bobby convierte tu pregunta hablada en texto: en este iPhone si el idioma está instalado; si no, mediante el servicio de voz de Apple. Bobby no guarda el audio."
+  - Update `Tests/ReleaseAuditTests.testAvatarNarrationDoesNotRequestMicrophoneOrSpeechRecognition` **deliberately**: rename it, then assert that both keys exist and are non-empty, and that the request is on-device whenever the recognizer holds the local model (unit-test the request factory).
+- **Speech.** Recognition is on-device when the language model is installed and otherwise goes through Apple's speech service (R8); Bobby itself collects no audio, so `PrivacyInfo.xcprivacy` needs no new data type. The transcript is sent only when the user releases the pill, as the question, which is already declared as user content. The mic is active only while the user holds the pill, and it stops on background.
 - **Two OS prompts, microphone then speech,** both after the in-app pre-permission card ("Continue", never "Allow", no "Not now"). The app never shows a fake alert. There is no notifications prompt and no ATT.
 - **No advice language.** The verdicts are Wait and Review only. Every read carries "Educational read · not financial advice". The app has no Buy, Sell, profit, win or returns strings; `tests/read-model.test.mjs` lints the read-model tables, and Builders B and C lint their own tables the same way. The conviction number appears only when it is real and agrees with the desk (R5).
 - **Consent before processing.** No `ask` reaches the network before `riskAccepted`; native enforces this (§2.4 step 2).
@@ -615,7 +615,7 @@ The three builders work in parallel, and no file is owned by two of them. None m
 - **A2.** On the simulator, `-nucleo-fixtures -nucleo-page contract -AppleLanguages (en)` gives the contract summary `PASS`, including the `-nucleo-reset-onboarding` run that exercises the risk gate. Attach a screenshot.
 - **A3.** The scenarios `quota`, `failed`, `hang`, `offline` and `slow` each produce the golden refusal or behaviour in the contract's ask calls. `URLProtocol` logs show no request left the process.
 - **A4.** Routing: a reset launch shows `onboarding.html`; after `finishOnboarding` the app shows `app.html`; with a stale risk version it shows `#risk`; a long press on the wordmark opens the classic `ContentView`; a relaunch returns to Núcleo.
-- **A5.** STT on the simulator: the first `speech.start` produces `needs_permission`; `requestPermission` shows two OS prompts in order; after granting, the partials and final flow. After stop, `speak` plays, which proves the audio session was restored. On-device recognition is required.
+- **A5.** STT on the simulator: the first `speech.start` produces `needs_permission`; `requestPermission` shows two OS prompts in order; after granting, the partials and final flow. After stop, `speak` plays, which proves the audio session was restored. Recognition is on-device when the model is installed, otherwise through Apple's speech service (R8).
 - **A6.** The Release configuration compiles with the fixture code absent (`#if DEBUG`), and `build.py --release` output contains no mock.
 - **A7.** No real desk-debate call. All tests use fixtures or stubs.
 

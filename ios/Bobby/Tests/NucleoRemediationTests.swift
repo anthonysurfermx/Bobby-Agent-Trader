@@ -243,6 +243,33 @@ final class NucleoRemediationTests: XCTestCase {
         XCTAssertNil(reply["agents"])
     }
 
+    /// Review regional-stocks F1: the ticker preflight allowed one to five letters, so every exchange
+    /// ticker (MC.PA, SAP.DE, PETR4.SA) was refused as `unsupported/symbol_format` before its candles.
+    func testResolvedRegionalStockPassesTheTickerPreflightAndReachesTheDesk() async throws {
+        let desk = makeDesk(Identity())
+        B34Stub.install { call in
+            if call.path == "/api/bobby-asset-search" {
+                return Self.json(200, ["resolution": ["needsConfirmation": false],
+                                       "resolved": ["baseSymbol": "MC.PA", "assetClass": "equity", "aliases": ["LVMH"],
+                                                    "currency": "EUR", "exchange": "Euronext Paris"]])
+            }
+            return Self.market(call)
+        }
+        let reply = try await desk.ask(NucleoParams(["question": "Que penser de MC.PA ?"]))
+        XCTAssertNotEqual(reply["reason"] as? String, "symbol_format", "The client rule must accept what the server resolves")
+        XCTAssertEqual(reply["status"] as? String, "ok")
+        XCTAssertEqual((reply["asset"] as? [String: Any])?["symbol"] as? String, "MC.PA")
+        let candles = try XCTUnwrap(B34Stub.requests.first { $0.path == "/api/stock-candles" }, "The preflight must go on to the candles")
+        XCTAssertEqual(candles.request.url?.query?.contains("symbol=MC.PA"), true)
+        XCTAssertTrue(B34Stub.requests.contains { $0.path == "/api/desk-debate" })
+        for symbol in ["OR.PA", "EDP.LS", "GALP.LS", "PETR4.SA", "VALE3.SA", "ISP.MI", "ENEL.MI", "SAP.DE", "SIE.DE", "NVDA"] {
+            XCTAssertNotNil(symbol.range(of: NucleoDesk.equitySymbolPattern, options: .regularExpression), symbol)
+        }
+        for symbol in ["", ".PA", "mc.pa", "MC PA", "ABCDEFGHIJKLMNOPQRSTU"] {
+            XCTAssertNil(symbol.range(of: NucleoDesk.equitySymbolPattern, options: .regularExpression), symbol)
+        }
+    }
+
     func testDeskReceiptOverridesTheTechnicalPulseAccessSnapshot() async throws {
         let desk = makeDesk(Identity())
         let access: [String: Any] = ["tier": "anon", "used": 2, "limit": 3, "remaining": 1, "paywall": false]

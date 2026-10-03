@@ -6,7 +6,7 @@
     "en": [
       {
         "title": "Allow AI processing of my questions.",
-        "body": "Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation audio stays on your iPhone. Avoid personal or account details. You can withdraw AI consent here at any time."
+        "body": "Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation is transcribed on your iPhone when the language is installed; otherwise Apple's speech service transcribes it. Bobby does not store the audio. Avoid personal or account details. You can withdraw AI consent here at any time."
       },
       {
         "title": "Not investment advice.",
@@ -24,7 +24,7 @@
     "es": [
       {
         "title": "Permito que la IA procese mis preguntas.",
-        "body": "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El audio del dictado permanece en tu iPhone. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras."
+        "body": "Bobby envía tu pregunta y datos de mercado a OpenAI o Anthropic, según el nivel de análisis. Con voz activa, el texto de respuesta va a OpenAI o Microsoft para narrarlo. El dictado se transcribe en tu iPhone si el idioma está instalado; si no, lo transcribe el servicio de voz de Apple. Bobby no guarda el audio. Evita datos personales o de cuentas. Puedes retirar aquí el consentimiento de IA cuando quieras."
       },
       {
         "title": "No es asesoría de inversión.",
@@ -42,43 +42,43 @@
     "fr": [
       {
         "title": "J’autorise le traitement de mes questions par l’IA.",
-        "body": "Bobby transmet votre question et les données de marché à OpenAI ou Anthropic selon le niveau d’analyse. Lorsque la voix est activée, le texte de réponse est envoyé à OpenAI ou Microsoft pour la synthèse vocale. L’audio de dictée reste sur votre iPhone. Évitez les données personnelles ou de compte. Vous pouvez retirer ce consentement ici à tout moment."
+        "body": "Bobby transmet ta question et les données de marché à OpenAI ou Anthropic selon le niveau d’analyse. Lorsque la voix est activée, le texte de réponse est envoyé à OpenAI ou Microsoft pour la synthèse vocale. La dictée est transcrite sur ton iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio. Évite les données personnelles ou de compte. Tu peux retirer ce consentement ici à tout moment."
       },
       {
         "title": "Aucun conseil en investissement.",
         "body": "Les conclusions, niveaux et seuils d’arrêt sont des analyses éducatives produites par un logiciel, sans recommandations personnelles."
       },
       {
-        "title": "Bobby ne touche jamais à votre argent.",
-        "body": "Il ne connecte pas de portefeuilles, ne déplace pas de fonds, n’exécute pas d’opérations et ne conserve pas vos clés."
+        "title": "Bobby ne touche jamais à ton argent.",
+        "body": "Il ne connecte pas de portefeuilles, ne déplace pas de fonds, n’exécute pas d’opérations et ne conserve pas tes clés."
       },
       {
-        "title": "Vous pouvez perdre de l’argent. Vous décidez.",
-        "body": "Les données peuvent être tardives ou incorrectes. Pour un conseil, consultez un professionnel agréé."
+        "title": "Tu peux perdre de l’argent. Tu décides.",
+        "body": "Les données peuvent être tardives ou incorrectes. Pour un conseil, consulte un professionnel agréé."
       }
     ],
     "pt": [
       {
         "title": "Autorizo o processamento das minhas perguntas por IA.",
-        "body": "O Bobby envia a pergunta e os dados de mercado à OpenAI ou Anthropic, conforme o nível de análise. Com voz ativa, o texto da resposta vai para a OpenAI ou Microsoft para gerar voz. O áudio do ditado fica no seu iPhone. Evite dados pessoais ou de contas. Pode retirar o consentimento de IA aqui a qualquer momento."
+        "body": "O Bobby envia a pergunta e os dados de mercado à OpenAI ou Anthropic, conforme o nível de análise. Com voz ativa, o texto da resposta vai para a OpenAI ou Microsoft para gerar voz. O ditado é transcrito no teu iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio. Evita dados pessoais ou de contas. Podes retirar o consentimento de IA aqui a qualquer momento."
       },
       {
         "title": "Não é aconselhamento de investimento.",
         "body": "Conclusões, níveis e limites de saída são análises educativas feitas por software, não recomendações pessoais."
       },
       {
-        "title": "O Bobby nunca toca no seu dinheiro.",
-        "body": "Não liga carteiras, não move fundos, não executa operações nem guarda as suas chaves."
+        "title": "O Bobby nunca toca no teu dinheiro.",
+        "body": "Não liga carteiras, não move fundos, não executa operações nem guarda as tuas chaves."
       },
       {
-        "title": "Pode perder dinheiro. A decisão é sua.",
+        "title": "Podes perder dinheiro. A decisão é tua.",
         "body": "Os dados podem chegar tarde ou estar errados. Se precisar de aconselhamento, consulte um profissional autorizado."
       }
     ],
     "it": [
       {
         "title": "Consento l’elaborazione delle mie domande tramite IA.",
-        "body": "Bobby invia la domanda e i dati di mercato a OpenAI o Anthropic, in base al livello di analisi. Con la voce attiva, il testo della risposta va a OpenAI o Microsoft per la sintesi vocale. L’audio della dettatura resta sull’iPhone. Evita dati personali o dell’account. Puoi revocare il consenso all’IA qui in qualsiasi momento."
+        "body": "Bobby invia la domanda e i dati di mercato a OpenAI o Anthropic, in base al livello di analisi. Con la voce attiva, il testo della risposta va a OpenAI o Microsoft per la sintesi vocale. La dettatura viene trascritta sull’iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio. Evita dati personali o dell’account. Puoi revocare il consenso all’IA qui in qualsiasi momento."
       },
       {
         "title": "Non è consulenza d’investimento.",
@@ -96,7 +96,7 @@
     "de": [
       {
         "title": "Ich erlaube die Verarbeitung meiner Fragen durch KI.",
-        "body": "Bobby sendet deine Frage und Marktdaten je nach Analysestufe an OpenAI oder Anthropic. Bei eingeschalteter Stimme geht der Antworttext zur Spracherzeugung an OpenAI oder Microsoft. Diktieraufnahmen bleiben auf deinem iPhone. Vermeide persönliche Daten und Kontodaten. Du kannst die KI-Einwilligung hier jederzeit widerrufen."
+        "body": "Bobby sendet deine Frage und Marktdaten je nach Analysestufe an OpenAI oder Anthropic. Bei eingeschalteter Stimme geht der Antworttext zur Spracherzeugung an OpenAI oder Microsoft. Diktate werden auf deinem iPhone transkribiert, wenn die Sprache installiert ist; andernfalls transkribiert sie Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht. Vermeide persönliche Daten und Kontodaten. Du kannst die KI-Einwilligung hier jederzeit widerrufen."
       },
       {
         "title": "Keine Anlageberatung.",

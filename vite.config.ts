@@ -54,6 +54,8 @@ export default defineConfig({
   base: '/',
   define: {
     global: 'globalThis',
+    __CLIENT_TELEMETRY_ENABLED__: JSON.stringify(process.env.VERCEL_ENV !== 'preview'),
+    'import.meta.env.VITE_APP_BUILD': JSON.stringify(process.env.VITE_APP_BUILD || process.env.VERCEL_GIT_COMMIT_SHA || ''),
     'process.env': {},
   },
   resolve: {

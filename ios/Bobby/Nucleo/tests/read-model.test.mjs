@@ -169,7 +169,7 @@ test('gate goldens: a retry token, the access shape, and no read in them', () =>
     const r = load(name);
     assert.equal(r.status, status);
     assert.equal(typeof r.token, 'string');
-    assert.deepEqual(Object.keys(r.access).sort(), ['limit', 'paywall', 'remaining', 'resetsAt', 'tier', 'used']);
+    assert.deepEqual(Object.keys(r.access).sort(), ['bonus', 'limit', 'paywall', 'remaining', 'resetsAt', 'tier', 'used']);
     assert.equal(r.access.tier, tier);
     assert.equal(r.access.remaining, 0);
     for (const k of ['agents', 'pulse', 'candles', 'technicals']) assert.ok(!(k in r), `${name} has ${k}`);

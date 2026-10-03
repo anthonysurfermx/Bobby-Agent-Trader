@@ -4,6 +4,8 @@
 // everything the iPhone cannot: the Base swap on a LONG, the wallet, and the rest of the desk
 // (sign-in, XP, gear, Trader Land) now living behind the avatar, in the profile.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import ClientReadPresentation from './ClientReadPresentation';
+import type { TelemetryReceipt } from '@/lib/client-telemetry';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -25,6 +27,7 @@ import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
+import { track } from '@/lib/track';
 import { accessHeaders, captureReferral, claimPendingReferral, fetchAccess, pendingReferral, startBilling, type Access, type AccessState, type DeskLevel } from '@/lib/access-client';
 import { accessOwner, AccessResponseGate } from '@/lib/access-response-gate';
 import NucleoChart from './NucleoChart';
@@ -118,6 +121,7 @@ function Voice({ k, line, active, align }: { k: AgentKey; line: string | null; a
 }
 
 export default function NucleoDesk() {
+  useEffect(() => { track('desk_entered', 'desk'); }, []);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const location = useLocation();
@@ -139,6 +143,7 @@ export default function NucleoDesk() {
   const [input, setInput] = useState(() => returned?.transcript?.at(-1)?.role === 'user' ? returned.transcript.at(-1)!.text : '');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [readReceipt, setReadReceipt] = useState<TelemetryReceipt | null>(null);
   const [series, setSeries] = useState<Candle[]>([]);
   const [pending, setPending] = useState<Resolution | null>(null);
   const [award, setAward] = useState<{ xp: number; noTrade: boolean } | null>(null);
@@ -237,6 +242,7 @@ export default function NucleoDesk() {
     setDeskRetry(null);
     setSnapshot(snap);
     setAnswer(null);
+    setReadReceipt(null);
     setAgents(null);
     setAgentsFailed(null);
     setLive({});
@@ -328,6 +334,7 @@ export default function NucleoDesk() {
     const g = run.agents;
     setAgents(g);
     setAnswer(a);
+    setReadReceipt(g ? run.telemetry ?? null : null);
     setReadSeq((n) => n + 1);
     if (!g) {
       // The agents did not finish: the market read stays, clearly marked; no verdict, no XP. A premium
@@ -672,7 +679,7 @@ export default function NucleoDesk() {
   }, [answer, snapshot, change]);
 
   const resultStage = done && debate && answer && snapshot ? (
-    <div className="flex w-full flex-col items-center">
+    <ClientReadPresentation receipt={readReceipt} blocked={sheet !== 'none' || inviteOpen || signInPrompt || !!limit || !!inspected || !!evolution || !!drops[0]}>
       <div className="n-verdict-row">
         <div className="n-sats left">{sats.filter((_, i) => i % 2 === 0).map((s, i) => <Satellite key={s.k} {...s} delay={0.15 + i * 0.14} />)}</div>
         <div className="grid place-items-center" style={{ padding: desktop ? 36 : 22 }}>
@@ -702,7 +709,7 @@ export default function NucleoDesk() {
       <div className="mt-8 w-full">
         <NucleoChart series={series} answer={answer} debate={agentsFailed ? null : debate} watch={agentsFailed ? null : agents?.synthesis?.watchLevel ?? null} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
       </div>
-    </div>
+    </ClientReadPresentation>
   ) : null;
 
   const thesisCard = done && debate && answer && snapshot ? (() => {
@@ -950,15 +957,19 @@ export default function NucleoDesk() {
                 ? giftedPro ? t('Bobby Pro · gifted', 'Bobby Pro · regalado', 'Bobby Pro · presente')
                   : t('Bobby Pro · active', 'Bobby Pro · activo', 'Bobby Pro · ativo')
                 : 'Bobby Pro',
-              detail: meter?.tier === 'pro'
+              // A card plan that can still charge is always reachable from here, whatever grants Pro today.
+              detail: subscription?.cardPlan
+                ? t('Manage or cancel card billing', 'Administrar o cancelar el cobro con tarjeta', 'Gerenciar ou cancelar a cobrança no cartão', 'Gérer ou résilier le paiement par carte', 'Gestisci o annulla l’addebito su carta', 'Kartenzahlung verwalten oder kündigen')
+                : meter?.tier === 'pro'
                 ? (giftedPro && grantExpiry ? t(`Gifted until ${grantExpiry}`, `Regalado hasta el ${grantExpiry}`, `Presente até ${grantExpiry}`)
                   : paidPro && subscription?.provider === 'apple' ? t('Managed in the App Store on your iPhone', 'Se administra en la App Store de tu iPhone', 'Gerenciado na App Store do seu iPhone')
                     : paidPro && subscription?.provider === 'stripe' ? t('Manage or cancel', 'Administrar o cancelar', 'Gerenciar ou cancelar')
                       : t('Pro access active', 'Acceso Pro activo', 'Acesso Pro ativo')) + scheduledGiftDetail
                 : meterLine ?? (accessState && !accessState.payments.stripe
                   ? t('Coming to the web · earn it by inviting friends', 'Muy pronto en la web · gánalo invitando amigos', 'Em breve na web · ganhe convidando amigos')
-                  : t('Unlimited Quick reads · fair use · $5/month', 'Lecturas Rápidas sin límite · uso razonable · $5/mes', 'Análises Rápidas ilimitadas · uso razoável · 5 $/mês', 'Analyses Rapides illimitées · usage raisonnable · 5 $/mois', 'Analisi Rapide illimitate · uso corretto · 5 $/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 5 $/Monat')),
-              action: meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
+                  : t('Unlimited Quick reads · fair use · US$4.90/month', 'Lecturas Rápidas sin límite · uso razonable · US$4.90/mes', 'Análises Rápidas ilimitadas · uso razoável · US$ 4,90/mês', 'Analyses Rapides illimitées · usage raisonnable · 4,90 USD/mois', 'Analisi Rapide illimitate · uso corretto · 4,90 USD/mese', 'Unbegrenzte Schnellanalysen · angemessene Nutzung · 4,90 USD/Monat')),
+              action: !subscription?.cardPlan && meter?.tier === 'pro' && (!paidPro || subscription?.provider !== 'stripe') ? undefined : () => {
+                if (subscription?.cardPlan) { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
                 if (meter?.tier === 'pro') { void startBilling('portal', { symbol: chartSymbol, timeframe: initialScreen.timeframe }); return; }
                 if (!accessState?.signedIn) { setSheet('none'); setSignInPrompt(true); return; }
                 // Web checkout is off until Stripe is live: a tap must still lead somewhere, and the invite is how Pro is earned today.

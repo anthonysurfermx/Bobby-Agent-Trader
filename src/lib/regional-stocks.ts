@@ -30,18 +30,23 @@ export function regionalDefaults(language?: unknown, locale?: unknown, country?:
   const region = marketRegion(language, locale, country);
   return region ? REGIONAL_STOCKS.filter(s => s.region === region) : [];
 }
-/** Whole provider ids/name phrases win; homonyms never resolve from incidental words. */
-export function resolveRegionalStock(text: string): RegionalStock | null {
+/**
+ * Whole provider ids/name phrases win; homonyms never resolve from incidental words. A short local name
+ * (SAP) resolves to the home listing only when the interface region is that market: elsewhere it stays the
+ * US listing's business.
+ */
+export function resolveRegionalStock(text: string, language?: unknown, locale?: unknown, country?: unknown): RegionalStock | null {
   const phrase = normalize(text);
+  const region = marketRegion(language, locale, country);
   // These bare words also name US ADRs or ordinary Portuguese vocabulary.
-  if (phrase === 'SAP' || phrase === 'VALE') return null;
+  if (phrase === 'VALE' || (phrase === 'SAP' && region !== 'DE')) return null;
   const exact = REGIONAL_STOCKS.filter(s => [s.symbol, s.name, ...s.aliases].some(v => normalize(v) === phrase));
   if (exact.length === 1) return exact[0];
   const tokens = new Set(phrase.split(/[^A-Z0-9.]+/).filter(Boolean));
   const hits = REGIONAL_STOCKS.filter(s => tokens.has(s.symbol) || [s.name, ...s.aliases].some(v => {
     const term = normalize(v);
-    // OR, MC, SAP and VALE are ordinary words or ambiguous tickers in sentences.
-    if ((term.length < 4 && term !== 'EDP') || term === 'VALE') return false;
+    // OR, MC, SAP and VALE are ordinary words or ambiguous tickers in sentences; a short name counts at home.
+    if (term === 'VALE' || (term.length < 4 && term !== 'EDP' && s.region !== region)) return false;
     return tokens.has(term) || (` ${phrase} `).includes(` ${term} `);
   }));
   return hits.length === 1 ? hits[0] : null;
@@ -49,8 +54,11 @@ export function resolveRegionalStock(text: string): RegionalStock | null {
 export function searchRegionalStocks(text: string, language?: unknown, locale?: unknown, country?: unknown): RegionalStock[] {
   const q = normalize(text);
   if (!q) return [...regionalDefaults(language, locale, country)];
-  const exact = resolveRegionalStock(text);
+  const exact = resolveRegionalStock(text, language, locale, country);
   const region = marketRegion(language, locale, country);
-  return REGIONAL_STOCKS.filter(s => s === exact || [s.symbol, s.name, ...s.aliases].some(v => normalize(v).includes(q) || (normalize(v).length >= 4 && normalize(v) !== 'VALE' && (` ${q} `).includes(` ${normalize(v)} `))))
+  // Search-as-you-type matches a whole id or name, or the start of one of its words from three letters on:
+  // never the middle of a company name ("TON" in Vuitton, "ENS" in Siemens), which hid crypto tickers.
+  const starts = (value: string) => value === q || (q.length >= 3 && (` ${value}`).includes(` ${q}`));
+  return REGIONAL_STOCKS.filter(s => s === exact || [s.symbol, s.name, ...s.aliases].some(v => starts(normalize(v)) || (normalize(v).length >= 4 && normalize(v) !== 'VALE' && (` ${q} `).includes(` ${normalize(v)} `))))
     .sort((a,b) => Number(b === exact) - Number(a === exact) || Number(b.region === region) - Number(a.region === region));
 }

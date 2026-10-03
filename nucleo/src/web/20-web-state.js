@@ -165,8 +165,11 @@
     var list = NW.lsGet(K.desk, []);
     var row = (Array.isArray(list) ? list : []).filter(function (x) { return NW.isObj(x) && typeof x.symbol === 'string'; })
       .slice(0, limit).map(function (x) { return x.symbol; });
-    var regional = { FR:['MC.PA', 'TTE.PA', 'BTC'], PT:['EDP.LS', 'GALP.LS', 'BTC'], BR:['PETR4.SA', 'VALE3.SA', 'BTC'], IT:['ENI.MI', 'ENEL.MI', 'BTC'], DE:['SAP.DE', 'SIE.DE', 'BTC'] };
-    ['BTC', 'NVDA'].concat(regional[NW.country] || CFG.quickAccess || []).forEach(function (t) { if (row.indexOf(t) < 0 && row.length < limit) row.push(t); });
+    // DeskMemory.defaultQuickAccess: BTC, first local stock, NVDA, second local stock. Every local symbol is in the
+    // server catalogue (src/lib/regional-stocks.ts), and the first one stays among the three chips after one personal ask.
+    var regional = { FR:['MC.PA', 'OR.PA'], PT:['EDP.LS', 'GALP.LS'], BR:['PETR4.SA', 'VALE3.SA'], IT:['ISP.MI', 'ENEL.MI'], DE:['SAP.DE', 'SIE.DE'] };
+    var local = regional[NW.country];
+    (local ? ['BTC', local[0], 'NVDA', local[1]] : ['BTC', 'NVDA'].concat(CFG.quickAccess || [])).forEach(function (t) { if (row.indexOf(t) < 0 && row.length < limit) row.push(t); });
     return row;
   };
 

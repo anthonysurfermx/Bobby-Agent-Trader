@@ -6,6 +6,8 @@ import { deskPrice as formatMoney } from '@/lib/desk-price';
 import { lang, speechLocale, t } from '@/lib/companions/i18n';
 import type { ChartLevel } from '@/components/adams/MarketCanvas';
 import { accessHeaders, type Access, type DeskLevel } from '@/lib/access-client';
+import { beginClientRead, receiveClientRead } from '@/lib/client-telemetry-browser';
+import type { TelemetryReceipt } from '@/lib/client-telemetry';
 
 export interface Snapshot { symbol: string; name?: string; isEquity: boolean; currency?: string; exchange?: string }
 export interface Resolution { snapshot: Snapshot; needsConfirmation: boolean; confirmName: string; proxyNote: string | null }
@@ -104,7 +106,7 @@ export interface Agents {
 }
 export interface AgentsRefusal { code: 'signin_required' | 'upgrade_required' | 'level_exhausted'; level: DeskLevel; resetsAt: string | null }
 /** failed: the agents did not finish (a premium use is given back by the server); budget_paused: the spend guard. */
-export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null; refunded?: boolean }
+export interface DebateRun { agents: Agents | null; refusal: AgentsRefusal | null; failure: 'failed' | 'budget_paused' | null; refunded?: boolean; telemetry?: TelemetryReceipt | null }
 export type DeskLiveEvent =
   | { type: 'accepted' }
   | { type: 'evidence'; timeframes: string[] }
@@ -137,6 +139,12 @@ function debateFrom(ok: boolean, data: Record<string, any> | null, level: DeskLe
 }
 
 export async function runAgents(symbol: string, isEquity: boolean, question: string, signal: AbortSignal, level: DeskLevel = 'rapido', onEvent?: (event: DeskLiveEvent) => void): Promise<DebateRun> {
+  const request = beginClientRead();
+  const finish = (ok: boolean, data: Record<string, any> | null) => {
+    const result = debateFrom(ok, data, level);
+    if (result.agents && !signal.aborted) result.telemetry = receiveClientRead(request, data?.telemetry);
+    return result;
+  };
   const controller = new AbortController();
   const cancel = () => controller.abort();
   if (signal.aborted) cancel();
@@ -146,11 +154,11 @@ export async function runAgents(symbol: string, isEquity: boolean, question: str
     const response = await fetch('/api/desk-debate', {
       signal: controller.signal, method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/x-ndjson, application/json', ...(await accessHeaders()) },
-      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), ...marketContext(), level }),
+      body: JSON.stringify({ symbol, assetType: isEquity ? 'equity' : 'crypto', question: question.slice(0, 1200), ...marketContext(), level, requestId: request.requestId }),
     });
     // Refusals (and a server without the live desk) answer plain JSON.
     if (!(response.headers.get('content-type') ?? '').includes('ndjson') || !response.body) {
-      return debateFrom(response.ok, await response.json().catch(() => null), level);
+      return finish(response.ok, await response.json().catch(() => null));
     }
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
@@ -165,7 +173,7 @@ export async function runAgents(symbol: string, isEquity: boolean, question: str
         if (!line) continue;
         let event: Record<string, any>;
         try { event = JSON.parse(line); } catch { continue; }
-        if (event.type === 'final') return debateFrom(true, event.data, level);
+        if (event.type === 'final') return finish(true, event.data);
         if (event.type === 'error') return { agents: null, refusal: null, failure: 'failed', refunded: event.refunded === true };
         if (event.type === 'accepted') onEvent?.({ type: 'accepted' });
         else if (event.type === 'evidence' && Array.isArray(event.timeframes)) onEvent?.({ type: 'evidence', timeframes: event.timeframes });

@@ -35,7 +35,7 @@ const realtimeCode=await compiled('src/hooks/useRealtimeVoice.ts');
 const bobbyCode=await compiled('src/hooks/useBobbyVoice.ts');
 const companionCode=await compiled('src/hooks/useCompanionVoice.ts');
 function mount(code:string,name:string,accepted=false,version=noticeVersion) {
-  const h:any={effects:[],listeners:new Set<Function>(),permission:{aiConsentGranted:accepted,riskNoticeVersion:version},fetches:[],audio:[],micCalls:0,authCalls:0,pcCount:0,tracksStopped:0,pcClosed:0,contextClosed:0,sent:[],cleanups:[]};
+  const h:any={effects:[],listeners:new Set<()=>void>(),permission:{aiConsentGranted:accepted,riskNoticeVersion:version},fetches:[],audio:[],micCalls:0,authCalls:0,pcCount:0,tracksStopped:0,pcClosed:0,contextClosed:0,sent:[],cleanups:[]};
   h.getSession=async()=>{h.authCalls++;return {data:{session:{access_token:'test-only'}}};};
   const track={enabled:true,stop(){h.tracksStopped++;}};
   const mic={getAudioTracks:()=>[track],getTracks:()=>[track]};
@@ -46,7 +46,7 @@ function mount(code:string,name:string,accepted=false,version=noticeVersion) {
   class ContextMock {state='running';destination={};resume(){return h.resume?.()??Promise.resolve();}close(){this.state='closed';h.contextClosed++;return Promise.resolve();}createAnalyser(){return node();}createMediaStreamSource(){return node();}createMediaElementSource(){return node();}}
   class PeerMock {connectionState='new';ontrack:any;onconnectionstatechange:any;constructor(){h.pcCount++;}addTrack(){}createDataChannel(){return {readyState:'open',send:(s:string)=>h.sent.push(s),close(){}};}createOffer(){return Promise.resolve({sdp:'test-only offer'});}setLocalDescription(){return Promise.resolve();}setRemoteDescription(){return Promise.resolve();}close(){h.pcClosed++;}}
   let timer=0;
-  const timeout=(f:Function,ms:number)=>{if(ms===0)queueMicrotask(()=>f());return ++timer;};
+  const timeout=(f:()=>void,ms:number)=>{if(ms===0)queueMicrotask(()=>f());return ++timer;};
   const world:any={h,exports:{},module:{exports:{}},console,Promise,Map,Set,Math,Date,JSON,Number,String,Boolean,Error,Object,Array,Uint8Array,ArrayBuffer,TextEncoder,TextDecoder,AbortController,AbortSignal,Blob,URL:{createObjectURL:()=> 'blob:test-only',revokeObjectURL(){}},Audio:AudioMock,AudioContext:ContextMock,RTCPeerConnection:PeerMock,
     navigator:{mediaDevices:{getUserMedia:()=>h.getMic()}},localStorage:{getItem:()=>null},setTimeout:timeout,clearTimeout(){},setInterval:()=>++timer,clearInterval(){},requestAnimationFrame:()=>++timer,cancelAnimationFrame(){},fetch:(url:string,init:any)=>h.fetch(url,init)};
   world.window={AudioContext:ContextMock,setTimeout:timeout,clearTimeout(){},addEventListener(){},removeEventListener(){},speechSynthesis:{cancel(){},getVoices:()=>[]}};

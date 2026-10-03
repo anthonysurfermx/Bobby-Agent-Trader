@@ -28,7 +28,7 @@ function harness(state = 'READING') {
     OWNER_GEN: 0, ST: { name: state }, SES: { signedIn: true, riskAccepted: true },
     LEDGER: [{ id: 'saved-A' }], ISLAND: { owner: 'A' }, ROSTER: { companions: ['A'] },
     SUGG: { quickAccess: ['NVDA'] }, SAVED: { points: 20 }, READ: { requestId: 'read-A' },
-    READS_DONE: 7, HINTED: { privateHint: 1 }, GATE_BUSY: true,
+    READS_DONE: 7, HINTED: { privateHint: 1 }, GATE_BUSY: true, SPEECH: { draft: 'private A draft', draftEpoch: 0 },
     A: { rev: [1, 1, 1].map(() => ({ value: 1, set(value) { this.value = value; } })), satG: { on: true } },
     el: { ta: { value: 'private A question' } },
     noop() {},
@@ -40,6 +40,7 @@ function harness(state = 'READING') {
     buildFaces() { draws.push(clean({ ledger: ctx.LEDGER, island: ctx.ISLAND })); },
     setGreeting() { calls.push('setGreeting'); },
     buildBelt(value) { calls.push(['buildBelt', value]); },
+    receiveSuggestions(reply) { ctx.SUGG = reply; },   // 55-read.js: stores the reply, then redraws the idle chips
   });
   vm.runInContext(handlers, ctx);
   return { ctx, replies, draws, calls };

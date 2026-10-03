@@ -803,6 +803,8 @@ ${finalCallInstruction}`;
   } catch (err) {
     console.error('[Debate] Multi-call failed:', err);
     sendChunk('\n\n[Error: debate engine failed. Retrying as single-call...]');
+    // Machine-readable failure: a paid MCP call must not settle on this text (audit 2026-10-02).
+    res.write(`data: ${JSON.stringify({ bobby_error: 'debate_failed' })}\n\n`);
     res.write('data: [DONE]\n\n');
   } finally {
     res.end();
@@ -855,11 +857,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   // allowed origin (the voice-room text surface, reachable from /desk), which
   // stays behind the public rate limit. A bare script with neither gets 401
   // instead of a free debate.
+  // Internal callers only (payments security audit 2026-10-02, OMR-1): an Origin header is not a credential, so
+  // the public path served the paid debate free and unmetered. The reader-facing debate is /api/desk-debate.
   const internal = isInternalRequest(req);
-  if (!internal && !requestOriginHost(req.headers)) {
-    return res.status(401).json({ error: 'Unauthorized' });
+  if (!internal) {
+    return res.status(403).json({ error: 'This chat moved to the Bobby desk.', code: 'use_desk', url: '/desk' });
   }
-  if (!internal && !await enforcePublicRateLimit(req, res, 'openclaw-chat', 30, 600)) return;
 
   const { message, history, language, locale } = req.body as {
     message: string;

@@ -52,7 +52,12 @@ const auto = realtimeConfig({ lang: 'en', voice: 'coral', symbol: 'ETH', timefra
 assert.equal(auto.model, 'gpt-realtime-2.1');
 assert.equal(auto.audio.output.voice, 'coral');
 assert.equal(auto.audio.input.transcription.language, undefined);
-assert.match(auto.instructions, /Spanish question means Mexican Spanish answer/);
+assert.match(auto.instructions, /Answer in the language of the question/);
+// Auto mode falls back to the page language before any clear speech, never to a fixed Spanish.
+assert.match(auto.instructions, /default to English before any clear speech/);
+assert.doesNotMatch(auto.instructions, /default to Spanish/);
+assert.match(realtimeConfig({ lang: 'fr' }).instructions, /default to French \(France\) before any clear speech/);
+assert.match(realtimeConfig({ lang: 'de' }).instructions, /default to German \(Germany\) before any clear speech/);
 assert.match(auto.instructions, /"symbol":"ETH","timeframe":"4H"/);
 assert.equal(auto.max_output_tokens, 1024);
 assert.equal(auto.truncation.token_limits.post_instructions, 6000);

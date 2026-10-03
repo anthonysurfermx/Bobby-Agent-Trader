@@ -156,23 +156,22 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
     /// A missing or unplayable clip falls back to the network voice for `fallbackText` only
     /// while the current external-processing consent permits it (checked centrally in speak).
+    /// Languages with no recorded clips yet (fr, pt, it, de) therefore keep the companion's own persona
+    /// once the notice is accepted; before consent no text leaves the phone and they use the device voice.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
         guard Self.avatarNarrationEnabled, !isMuted else { return }
-        // New languages use native narration for these public preview lines, with no provider spend.
-        if !["en", "es"].contains(L.language) {
-            if !playOnDevice(fallbackText, language: L.language, requiresConsent: false) { onFailure?() }
-            return
+        if name.hasSuffix("-" + L.language),
+           let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
+           let data = try? Data(contentsOf: url) {
+            stop()
+            if play(data, playbackRate: playbackRate) { return }
         }
-        guard name.hasSuffix("-" + L.language),
-              let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
-              let data = try? Data(contentsOf: url) else {
+        if allowsExternalSpeech || ["en", "es"].contains(L.language) {
+            // speak() checks consent itself and, for the new languages, ends on the device voice if the network fails.
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
             return
         }
-        stop()
-        if !play(data, playbackRate: playbackRate) {
-            speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
-        }
+        if !playOnDevice(fallbackText, language: L.language, requiresConsent: false) { onFailure?() }
     }
 
     /// Plays audio the caller already fetched (briefing narration). Mute and the external-processing consent
@@ -201,13 +200,27 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         let preferred = language.contains("-") ? [language] : Locale.preferredLanguages
         let resolution = LanguageResolution.resolve(selection: base, preferredLanguages: preferred,
                                                     region: Locale.current.region?.identifier)
-        let available = AVSpeechSynthesisVoice.speechVoices()
+        let available = AVSpeechSynthesisVoice.speechVoices().filter(isStandardDeviceVoice)
+        // Exact locale first (language and region), then the language's other regions.
         for candidate in resolution.speechLocaleCandidates {
             let matches = available.filter { $0.language.caseInsensitiveCompare(candidate) == .orderedSame }
-            if let best = matches.sorted(by: { $0.quality.rawValue > $1.quality.rawValue }).first { return best }
-            if let voice = AVSpeechSynthesisVoice(language: candidate), voice.language.lowercased().hasPrefix(base + "-") { return voice }
+            // A downloaded premium or enhanced voice wins. Stock voices all tie on quality, so there the
+            // system's own default for the locale is used instead of whichever the list happens to start with.
+            for quality in [AVSpeechSynthesisVoiceQuality.premium, .enhanced] {
+                if let best = matches.first(where: { $0.quality == quality }) { return best }
+            }
+            if let voice = AVSpeechSynthesisVoice(language: candidate), voice.language.lowercased().hasPrefix(base + "-"),
+               isStandardDeviceVoice(voice) { return voice }
+            if let stock = matches.first { return stock }
         }
         return nil
+    }
+
+    /// Novelty ("speech.synthesis.voice.*"), Eloquence and Personal Voice entries are never Bobby's fallback voice.
+    static func isStandardDeviceVoice(_ voice: AVSpeechSynthesisVoice) -> Bool {
+        let identifier = voice.identifier.lowercased()
+        if identifier.contains("eloquence") || identifier.contains("speech.synthesis.voice.") { return false }
+        return voice.voiceTraits.isDisjoint(with: [.isNoveltyVoice, .isPersonalVoice])
     }
 
     @discardableResult

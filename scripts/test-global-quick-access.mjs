@@ -14,11 +14,12 @@ function check(name,fn){try{fn();checks++;console.log('ok - '+name);}catch(error
 function expression(file,left){const source=ts.createSourceFile(file,read(file),ts.ScriptTarget.ES2022,true,ts.ScriptKind.JS);let found;function visit(node){if(ts.isBinaryExpression(node)&&node.left.getText(source)===left)found=node.right.getText(source);ts.forEachChild(node,visit);}visit(source);assert.ok(found,'Shipping assignment '+left);return found;}
 function declaration(file,name){const source=ts.createSourceFile(file,read(file),ts.ScriptTarget.ES2022,true,ts.ScriptKind.JS);let found;function visit(node){if(ts.isFunctionDeclaration(node)&&node.name?.text===name)found=node.getText(source);ts.forEachChild(node,visit);}visit(source);assert.ok(found,'Shipping consumer '+name);return found;}
 function suggestionsCallbacks(file){const source=ts.createSourceFile(file,read(file),ts.ScriptTarget.ES2022,true,ts.ScriptKind.JS),found=[];function visit(node){if(ts.isCallExpression(node)&&ts.isPropertyAccessExpression(node.expression)&&node.expression.name.text==='then'&&ts.isCallExpression(node.expression.expression)&&node.expression.expression.expression.getText(source)==='bcall'&&node.expression.expression.arguments[0]?.text==='suggestions')found.push(node.arguments[0].getText(source));ts.forEachChild(node,visit);}visit(source);assert.ok(found.length,'Actual asynchronous suggestions callback');return found;}
-const cases=[['en','en-US','US',null],['es','es-MX','MX',null],['fr','fr-FR','FR','MC.PA'],['pt','pt-PT','PT','EDP.LS'],['pt','pt-BR','BR','PETR4.SA'],['it','it-IT','IT','ENI.MI'],['de','de-DE','DE','SAP.DE']];
+// regional = the first local stock (second starter, after BTC), second = the fourth starter, name = what the Nucleo chip shows for the first.
+const cases=[['en','en-US','US',null],['es','es-MX','MX',null],['fr','fr-FR','FR','MC.PA','OR.PA','LVMH'],['pt','pt-PT','PT','EDP.LS','GALP.LS','EDP'],['pt','pt-BR','BR','PETR4.SA','VALE3.SA','Petrobras'],['it','it-IT','IT','ISP.MI','ENEL.MI','Intesa Sanpaolo'],['de','de-DE','DE','SAP.DE','SIE.DE','SAP']];
 function webMemory(lang,locale,country,history=[]){const records=new Map([['nucleo.deskMemory',history]]),NW={lang,locale,country,cfg:{quickAccess:['BTC','NVDA','ETH','TSLA','GOLD']},lsGet:(key,fallback)=>records.get(key)??fallback,lsSet:(key,value)=>records.set(key,value),isObj:x=>!!x&&typeof x==='object'&&!Array.isArray(x)};const context=vm.createContext({NW,CFG:NW.cfg,K:{desk:'nucleo.deskMemory'},WATCH_LIMIT:12,S:{},Date});vm.runInContext('S.quickAccess='+expression('nucleo/src/web/20-web-state.js','S.quickAccess')+';S.recordQuery='+expression('nucleo/src/web/20-web-state.js','S.recordQuery'),context);return{context,records,quick:limit=>context.S.quickAccess(limit)};}
-for(const[lang,locale,country,regional]of cases){
+for(const[lang,locale,country,regional,second,name]of cases){
  const memory=webMemory(lang,locale,country);
- check(locale+': actual web empty-history row begins with universal BTC/NVDA',()=>{const row=clean(memory.quick(5));assert.deepEqual(row.slice(0,2),['BTC','NVDA']);if(regional)assert.ok(row.includes(regional));assert.equal(new Set(row).size,row.length);});
+ check(locale+': actual web empty-history row is BTC, first local stock, NVDA, second local stock (BTC/NVDA first without a region)',()=>{const row=clean(memory.quick(5));if(regional)assert.deepEqual(row,['BTC',regional,'NVDA',second]);else assert.deepEqual(row.slice(0,2),['BTC','NVDA']);assert.equal(new Set(row).size,row.length);});
  const history=[{symbol:'VOW3.DE',lastAskedAt:20,count:2},{symbol:'SOL',lastAskedAt:10,count:1}],personal=webMemory(lang,locale,country,history),before=JSON.stringify(history);
  check(locale+': history remains first and unmodified while defaults pad missing slots',()=>{const row=clean(personal.quick(5));assert.deepEqual(row.slice(0,2),['VOW3.DE','SOL']);assert.ok(row.includes('BTC'));assert.ok(row.includes('NVDA'));assert.equal(JSON.stringify(history),before);});
  const full=Array.from({length:5},(_,n)=>({symbol:'CUSTOM'+n+'.PA',lastAskedAt:20-n,count:1})),owned=webMemory(lang,locale,country,full);
@@ -28,7 +29,7 @@ for(const[lang,locale,country,regional]of cases){
   const context=vm.createContext({W:{sugg:{quickAccess:memory.quick(5).map(symbol=>({symbol})),movers:[{symbol:'OTHER'}]}},LANG:lang,console});
   vm.runInContext(read(directory+'/src/onboarding/40-strings.js'),context);
   vm.runInContext(declaration(directory+'/src/onboarding/60-fsm.js','suggestionChips'),context);
-  check(directory+' '+locale+': actual onboarding uses compact visible starters and localized actions',()=>{const chips=clean(context.suggestionChips());assert.deepEqual(chips.slice(0,2).map(x=>x.label),['BTC','NVIDIA']);assert.equal(chips.length,3);if(regional)assert.equal(chips[2].label,regional);for(const chip of chips){assert.equal(chip.ariaLabel,chip.action.ask);assert.ok(chip.action.ask.includes(chip.action.symbol));assert.ok(chip.action.ask.length>chip.action.symbol.length);}});
+  check(directory+' '+locale+': actual onboarding uses compact visible starters and localized actions',()=>{const chips=clean(context.suggestionChips());assert.equal(chips.length,3);if(regional){assert.deepEqual(chips.map(x=>x.label),['BTC',name,'NVIDIA']);assert.deepEqual(chips.map(x=>x.action.symbol),['BTC',regional,'NVDA']);}else assert.deepEqual(chips.slice(0,2).map(x=>x.label),['BTC','NVIDIA']);for(const chip of chips){assert.equal(chip.ariaLabel,chip.action.ask);assert.ok(chip.action.ask.includes(chip.action.symbol));assert.ok(chip.action.ask.length>chip.action.symbol.length);}});
   context.W.sugg={quickAccess:[{symbol:'VOW3.DE'},{symbol:'SOL'},{symbol:'BTC'}],movers:[]};
   check(directory+' '+locale+': actual onboarding keeps personal suggestions instead of inventing history',()=>assert.deepEqual(clean(context.suggestionChips()).map(x=>x.label),['VOW3.DE','SOL','BTC']));
   check(directory+' '+locale+': actual idle entry shows returned suggestions',()=>{
@@ -36,7 +37,7 @@ for(const[lang,locale,country,regional]of cases){
    vm.runInContext(read(directory+'/src/shared/20-read-model.js'),ctx);ctx.RMOD=ctx.NucleoReadModel;
    vm.runInContext(declaration(directory+'/src/app/55-read.js','showIdleSuggestions'),ctx);
    vm.runInContext('STATES.IDLE='+expression(directory+'/src/app/60-fsm.js','STATES.IDLE'),ctx);
-   ctx.STATES.IDLE.enter();assert.equal(calls.length,1);assert.deepEqual(clean(calls[0]).slice(0,2).map(x=>x.label),['BTC','NVIDIA']);if(regional)assert.equal(calls[0][2].label,regional);for(const chip of calls[0])assert.equal(chip.ariaLabel,chip.action.question);
+   ctx.STATES.IDLE.enter();assert.equal(calls.length,1);if(regional){assert.deepEqual(clean(calls[0]).map(x=>x.label),['BTC',name,'NVIDIA']);assert.deepEqual(clean(calls[0]).map(x=>x.action.symbol),['BTC',regional,'NVDA']);}else assert.deepEqual(clean(calls[0]).slice(0,2).map(x=>x.label),['BTC','NVIDIA']);for(const chip of calls[0])assert.equal(chip.ariaLabel,chip.action.question);
    let tapped=0;ctx.chipG=()=>{tapped++;return'tap';};assert.equal(ctx.STATES.IDLE.down('chip',{},{}),'tap');assert.equal(tapped,1);
   });
  }
@@ -60,13 +61,13 @@ function reactProgress(lang,locale,saved){
  function load(file){if(cache.has(file))return cache.get(file);const module={exports:{}};cache.set(file,module.exports);const require=name=>{if(name==='react')return{useSyncExternalStore:(_subscribe,get)=>get()};const base=name.startsWith('@/')?'src/'+name.slice(2):path.posix.normalize(path.posix.join(path.posix.dirname(file),name));for(const candidate of[base,base+'.ts',base+'.tsx'])if(fs.existsSync(path.join(root,candidate)))return load(candidate);throw new Error('Unexpected dependency '+name);};const code=ts.transpileModule(read(file).replaceAll('import.meta.env.DEV','false'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;vm.runInContext('(function(require,module,exports){'+code+'})',context)(require,module,module.exports);cache.set(file,module.exports);return module.exports;}
  return{context,storage,load};
 }
-for(const[lang,locale,_country,regional]of cases){
+for(const[lang,locale,_country,regional,second,name]of cases){
  const b=reactProgress(lang,locale),store=b.load('src/lib/companions/progress.ts').progressStore,i=b.load('src/lib/companions/i18n.ts');
- check(locale+': actual React progress starts BTC/NVDA and retains its regional list',()=>{const symbols=clean(store.get().quickAccess);assert.deepEqual(symbols.slice(0,2),['BTC','NVDA']);if(regional)assert.ok(symbols.includes(regional));assert.equal(store.get().quickAccessCustomized,false);});
+ check(locale+': actual React progress starts BTC, first local stock, NVDA, second local stock (BTC/NVDA first without a region)',()=>{const symbols=clean(store.get().quickAccess);if(regional)assert.deepEqual(symbols,['BTC',regional,'NVDA',second]);else assert.deepEqual(symbols.slice(0,2),['BTC','NVDA']);assert.equal(store.get().quickAccessCustomized,false);});
  const source=ts.createSourceFile('desk.tsx',read('src/components/nucleo/NucleoDesk.tsx'),ts.ScriptTarget.ES2022,true,ts.ScriptKind.TSX);let initializer;function visit(node){if(ts.isVariableDeclaration(node)&&node.name.getText(source)==='suggestions')initializer=node.initializer.getText(source);ts.forEachChild(node,visit);}visit(source);assert.ok(initializer);
  const calls=[];Object.assign(b.context,{done:false,snapshot:null,progress:store.get(),howLooks:sym=>i.t('How does '+sym+' look?','¿Cómo se ve '+sym+'?','Como está '+sym+'?'),ask:(symbol,question)=>calls.push({symbol,question})});
  vm.runInContext('var actualSuggestions='+initializer+';',b.context);
- check(locale+': actual React idle consumer keeps short labels and translated click questions',()=>{const chips=b.context.actualSuggestions;assert.deepEqual(clean(chips).slice(0,2).map(x=>x.label),['BTC','NVIDIA']);if(regional)assert.equal(chips[2].label,regional);chips[0].go();chips[1].go();assert.equal(calls[0].symbol,'BTC');assert.equal(calls[1].symbol,'NVDA');assert.equal(chips[0].ariaLabel,calls[0].question);assert.equal(chips[1].ariaLabel,calls[1].question);});
+ check(locale+': actual React idle consumer keeps short labels and translated click questions',()=>{const chips=b.context.actualSuggestions,labels=clean(chips).map(x=>x.label);assert.equal(chips.length,3);chips.forEach(chip=>chip.go());if(regional){assert.deepEqual(calls.map(x=>x.symbol),['BTC',regional,'NVDA']);assert.equal(labels[0],'BTC');assert.equal(labels[2],'NVIDIA');/* the local chip is short: the company, or the ticker until the React desk adopts the company name */assert.ok([name,regional].includes(labels[1]),labels[1]);}else{assert.deepEqual(labels.slice(0,2),['BTC','NVIDIA']);assert.deepEqual(calls.slice(0,2).map(x=>x.symbol),['BTC','NVDA']);}chips.forEach((chip,n)=>assert.equal(chip.ariaLabel,calls[n].question));});
  for(const saved of[{quickAccess:['MC.PA','TTE.PA','BTC']},{quickAccess:['BTC','NVDA','MC.PA','TTE.PA'],quickAccessCustomized:false}]){const old=reactProgress(lang,locale,saved).load('src/lib/companions/progress.ts').progressStore;check(locale+': saved automatic rows refresh rather than become fake personal history',()=>{assert.deepEqual(clean(old.get().quickAccess),clean(store.get().quickAccess));assert.equal(old.get().quickAccessCustomized,false);});}
  const personal={quickAccess:['VOW3.DE','SOL','BTC'],quickAccessCustomized:true};
  check(locale+': explicit personal React choices survive the language change',()=>assert.deepEqual(clean(reactProgress(lang,locale,personal).load('src/lib/companions/progress.ts').progressStore.get().quickAccess),personal.quickAccess));
@@ -89,11 +90,11 @@ final class MemoryDefaults: UserDefaults {
 }
 var checks=0
 func require(_ condition:Bool,_ label:String) { guard condition else { fatalError(label) };checks += 1 }
-for (lang,locale,regional) in [("en","en-US",nil),("es","es-MX",nil),("fr","fr-FR","MC.PA"),("pt","pt-PT","EDP.LS"),("pt","pt-BR","PETR4.SA"),("it","it-IT","ENI.MI"),("de","de-DE","SAP.DE")] as [(String,String,String?)] {
+for (lang,locale,regional) in [("en","en-US",nil),("es","es-MX",nil),("fr","fr-FR",["MC.PA","OR.PA"]),("pt","pt-PT",["EDP.LS","GALP.LS"]),("pt","pt-BR",["PETR4.SA","VALE3.SA"]),("it","it-IT",["ISP.MI","ENEL.MI"]),("de","de-DE",["SAP.DE","SIE.DE"])] as [(String,String,[String]?)] {
  let resolution=LanguageResolution.resolve(selection:lang,preferredLanguages:[locale],region:nil)
  let fallback=DeskMemory.defaultQuickAccess(for:resolution)
- require(Array(fallback.prefix(2)) == ["BTC","NVDA"],locale+" universal starters")
- if let regional { require(fallback.contains(regional),locale+" regional starter retained") }
+ if let regional { require(fallback == ["BTC",regional[0],"NVDA",regional[1]],locale+" BTC, first local stock, NVDA, second local stock") }
+ else { require(Array(fallback.prefix(2)) == ["BTC","NVDA"],locale+" universal starters") }
  let defaults=MemoryDefaults(),memory=DeskMemory(defaults:defaults)
  require(memory.quickAccess(fallback:fallback)==fallback,locale+" empty history")
  memory.recordQuery(symbol:"VOW3.DE",isEquity:true,now:Date(timeIntervalSince1970:100))

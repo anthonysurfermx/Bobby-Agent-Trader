@@ -43,6 +43,14 @@ function ProbeLine({ result }: { result: ProbeResult | { error: string } | null 
 
 const dim = (text: string) => <span className="text-[#5C5C5C]">{text}</span>;
 
+/** Where the credit ran out, and whether Resend accepted the owner's alert email (accepted is not delivered). */
+function creditAlertHint(a: NonNullable<LlmProviderStats['creditAlert']>): string | undefined {
+  const email = !a.email ? null
+    : a.email.accepted ? 'aviso por correo: aceptado'
+    : `aviso por correo: no aceptado${a.email.error ? ` (${a.email.error === 'not_configured' ? 'sin destinatario' : a.email.error})` : ''}`;
+  return [a.endpoint, a.code, email].filter(Boolean).join(' · ') || undefined;
+}
+
 function ProviderCard({ provider, p, period, onMark, notify }: {
   provider: LlmProvider; p: LlmProviderStats; period: number; onMark: (kind: 'balance' | 'topup') => void; notify: Notify;
 }) {
@@ -112,7 +120,7 @@ function ProviderCard({ provider, p, period, onMark, notify }: {
         <Row
           label="Aviso de crédito agotado"
           value={p.lastCreditAlert ? <span className={state.key === 'no_credit' ? 'text-[#F06A6A]' : 'text-[#8B8B8B]'} title={fmtDateTime(p.lastCreditAlert)}>{fmtRelative(p.lastCreditAlert)}</span> : dim('ninguno')}
-          hint={p.lastCreditAlert && p.creditAlert ? [p.creditAlert.endpoint, p.creditAlert.code].filter(Boolean).join(' · ') || undefined : undefined}
+          hint={p.lastCreditAlert && p.creditAlert ? creditAlertHint(p.creditAlert) : undefined}
         />
       </div>
 
@@ -212,7 +220,8 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
     : 'Cobertura del ledger no disponible';
 
   // The caps compare the spend guard's own figures: desk only, UTC calendar day and month.
-  const capRow = (label: string, spent: number | null, cap: number) => {
+  const capRow = (label: string, spent: number | null, cap: number | null) => {
+    if (cap == null) return { label, value: 0, missing: 'tope pendiente de consulta', display: '—' };
     if (spent == null) return { label, value: 0, missing: 'dato no disponible', display: '—' };
     if (!cap) return { label, value: 0, missing: 'sin tope', display: fmtUsd(spent, true) };
     return {
@@ -259,13 +268,14 @@ export default function LlmTab({ data, period, cmp, notify, onChanged }: { data:
             <>
               <Row label="Terminados" value={fmtInt(runs.finished)} hint={<Share a={runs.finished} b={runs.runs} />} />
               <Row label="Sin terminar" value={<span className={unfinished > 0 ? 'text-[#F06A6A]' : undefined}>{fmtInt(unfinished)}</span>} hint={<Share a={unfinished} b={runs.runs} />} />
+              <Row label="Interrumpidos antes del final" value={runs.abandoned == null ? '—' : fmtInt(runs.abandoned)} hint="no son fallas ni cuentan en el total" />
               <div className="mt-4">
                 <BarsChart days={o.days} values={runValues} height={120} emptyLabel="Sin análisis en el periodo" />
               </div>
             </>
           )}
           <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-            Un análisis = un lote del ledger; terminado = el CIO respondió. Los fallos de cada proveedor (arriba) son por llamada; aquí son por análisis completo.
+            Un análisis = un lote del ledger; terminado = el CIO respondió; interrumpido = la conexión se cerró antes del CIO (aparte, no es falla). Los fallos de cada proveedor (arriba) son por llamada; aquí son por análisis completo.
           </p>
         </Card>
         <Card>

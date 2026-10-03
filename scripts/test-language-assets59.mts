@@ -8,8 +8,8 @@ import { resolveRegionalStock } from '../src/lib/regional-stocks.js';
 const spot = (base: string) => ({ instId: `${base}-USDT`, instType: 'SPOT' as const, state: 'live', baseCcy: base, quoteCcy: 'USDT' });
 const equity = (base: string) => ({ instId: `${base}-USDT-SWAP`, instType: 'SWAP' as const, state: 'live', ctValCcy: base, settleCcy: 'USDT', instCategory: '3' });
 __setTestCatalog([
-  ...['BTC','ETH','SOL','SONIC','MAIN','NET','XAUT','XAG','ONE','NEAR','HOT','GAS','OR','DE','ADA'].map(spot),
-  ...['NVDA','PLTR','USO','SAP'].map(equity),
+  ...['BTC','ETH','SOL','SONIC','MAIN','NET','XAUT','XAG','ONE','NEAR','HOT','GAS','OR','DE','ADA','TON','SEI','SUI','DAI','UMA','ENS','ONT','STABLE','PERP','COMP','DASH','MANA'].map(spot),
+  ...['NVDA','PLTR','USO','SAP','TSLA','COST'].map(equity),
 ]);
 const originalFetch = globalThis.fetch;
 globalThis.fetch = async () => { throw new Error('Unexpected network: multilingual discovery must use the fixture catalogue/local listings'); };
@@ -122,6 +122,50 @@ try {
     assert.ok(!result.resolved || result.resolution?.needsConfirmation);
   });
   await check('bare VALE remains ambiguous', () => assert.equal(resolveRegionalStock('vale'), null));
+  // A ticker that is an everyday word of the interface language is the asset only alone or in capitals.
+  const region = (locale: string) => locales.find(row => row.locale === locale)!;
+  for (const [locale, question, symbol] of [
+    ['fr-FR','Quel est ton avis sur Nvidia ?','NVDA'], ['fr-FR','Quel est ton avis sur Tesla ?','TSLA'], ['fr-FR','Quels risques ont les actions Tesla ?','TSLA'],
+    ['it-IT','Sei sicuro che Bitcoin salirà?','BTC'], ['it-IT','L’effetto dei tassi sui Bitcoin','BTC'], ['it-IT','Sei ottimista su Tesla?','TSLA'], ['it-IT','Dai dati, come va Ethereum?','ETH'],
+    ['pt-PT','É uma boa altura para comprar Tesla?','TSLA'], ['pt-BR','Sei que o Bitcoin caiu, e agora?','BTC'],
+    ['de-DE','Was hältst du von Tesla?','TSLA'],
+    ['fr-FR','Que penses-tu de TON ?','TON'], ['it-IT','Cosa pensi di SUI?','SUI'], ['fr-FR','ton','TON'], ['it-IT','sei','SEI'], ['it-IT','sui','SUI'], ['it-IT','dai','DAI'], ['pt-PT','uma','UMA'],
+    ['en-US','TON','TON'], ['es-MX','ENS','ENS'], ['en-US','SAP','SAP'], ['fr-FR','OR','OR'],
+  ] as const) {
+    await check(`${locale} homonym ticker: ${question}`, async () => {
+      const result = await request(question, region(locale));
+      assert.equal(result.resolved?.symbol, symbol);
+      assert.equal(result.resolution?.needsConfirmation, false);
+    });
+  }
+  for (const [locale, question] of [
+    ['fr-FR','Quel est ton avis sur le marché ?'], ['fr-FR','C’est le moment d’investir ?'], ['it-IT','Come sta il mercato oggi?'], ['it-IT','Sei sicuro?'],
+    ['pt-PT','É uma boa altura para investir?'], ['de-DE','Was ist mit dem Markt?'], ['de-DE','Wie steht das Gas heute?'], ['de-DE','Kann man jetzt kaufen?'],
+  ] as const) {
+    await check(`${locale} filler never names an asset: ${question}`, async () => {
+      const result = await request(question, region(locale));
+      assert.equal(result.resolved, null);
+    });
+  }
+  // A local company named inside a sentence resolves at home; elsewhere the short name stays the other listing.
+  await check('de-DE SAP inside a sentence is the Xetra listing', async () => {
+    assert.equal((await request('Was hältst du von SAP?', region('de-DE'))).resolved?.symbol, 'SAP.DE');
+    assert.equal((await request('SAP', region('de-DE'))).resolved?.symbol, 'SAP.DE');
+    assert.equal((await request('What do you think of SAP?', region('en-US'))).resolved?.symbol, 'SAP');
+    assert.equal(resolveRegionalStock('SAP'), null);
+  });
+  await check('search-as-you-type keeps cash listings beside the crypto catalogue', async () => {
+    assert.deepEqual((await request('Siem', region('de-DE'))).results.map((row: any) => row.symbol), ['SIE.DE']);
+    assert.ok((await request('SAP', region('en-US'))).results.some((row: any) => row.symbol === 'SAP.DE'));
+    assert.ok(!(await request('TON', region('fr-FR'))).results.some((row: any) => row.symbol === 'MC.PA'));
+    assert.ok(!(await request('ENS', region('de-DE'))).results.some((row: any) => row.symbol === 'SIE.DE'));
+  });
+  for (const symbol of ['MC.PA','OR.PA','EDP.LS','GALP.LS','PETR4.SA','VALE3.SA','ISP.MI','ENEL.MI','SAP.DE','SIE.DE']) {
+    await check(`canonical cash listing ${symbol}`, async () => {
+      assert.equal(resolveRegionalStock(symbol)?.symbol, symbol);
+      assert.equal((await request(symbol, locales[1])).resolved?.symbol, symbol);
+    });
+  }
 } finally { globalThis.fetch = originalFetch; }
 console.log(JSON.stringify({ checksPassed: checks, checksFailed: failures.length, failures, evidence: 'Actual text resolver and HTTP discovery; local fixture catalogue, no microphone or AI' }, null, 2));
 assert.equal(failures.length, 0, `${failures.length} multilingual asset checks failed`);

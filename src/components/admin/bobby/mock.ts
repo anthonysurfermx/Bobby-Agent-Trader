@@ -2,11 +2,12 @@
 // `import.meta.env.DEV`, so production builds never include it. It answers with real Response objects
 // shaped exactly like /api/admin (including Postgres numerics as strings) so the normalizers, the error
 // handling and every tab run the same code as in production.
-//   ?mock          admin with every integration connected
-//   ?mock=bare     admin, nothing connected (empty states, missing env list)
+//   ?mock          admin with every integration connected; one membership of each commercial class
+//   ?mock=bare     admin, nothing connected (empty states, missing env list, no purchase event ever, no memberships)
+//   ?mock=partial  the server omitted whole sections, the /admin mark failed and Apple's load ran out of time
 //   ?mock=401      not signed in      ?mock=403   signed in, not an admin      ?mock=500   server error
 //   ?mock=grant-lost  first gift commits to the fixture but its confirmation fails; same-key retry confirms once
-import type { AdminPostBody } from '@/lib/admin-client';
+import type { AdminPostBody, MemberCommercial, MemberCommercialReason } from '@/lib/admin-client';
 
 // ---------------------------------------------------------------- deterministic randomness
 function mulberry32(seed: number) {
@@ -105,6 +106,21 @@ const ME: MockUser = {
 USERS.push(ME);
 USERS[3].is_admin = true;
 Object.assign(USERS[5], { sub_provider: 'apple', sub_status: 'active', current_period_end: iso(NOW - 3 * DAY), pro: false, grant_source: null, pro_until: null });
+// One membership of each commercial class (the rest follow their random status): see SUB_STORE below.
+const liveSub = (provider: 'apple' | 'stripe', status: 'active' | 'trialing') => ({ sub_provider: provider, sub_status: status, current_period_end: iso(NOW + 20 * DAY), pro: true, grant_source: null, pro_until: null });
+Object.assign(USERS[3], liveSub('apple', 'active')); // the team's tester: sandbox, left out unless "Con equipo"
+for (const k of [10, 11, 13, 14]) Object.assign(USERS[k], liveSub('apple', k === 14 ? 'trialing' : 'active'));
+Object.assign(USERS[12], liveSub('stripe', 'active'));
+interface SubStore { environment: 'production' | 'sandbox' | 'unknown'; periodType: 'normal' | 'trial' | 'intro' | 'prepaid' | 'unknown'; storeCheckedAt: string | null; firstChargeAt: string | null; lastChargeAt: string | null; internal: boolean }
+const SUB_STORE = new Map<string, SubStore>([
+  [USERS[3].id, { environment: 'sandbox', periodType: 'normal', storeCheckedAt: iso(NOW - 2 * DAY), firstChargeAt: null, lastChargeAt: null, internal: true }],
+  [USERS[10].id, { environment: 'production', periodType: 'normal', storeCheckedAt: iso(NOW - 6 * HOUR), firstChargeAt: iso(NOW - 41 * DAY), lastChargeAt: iso(NOW - 11 * DAY), internal: false }],
+  // Like production after the r2 migration: a real charge on record, but the store's environment never read.
+  [USERS[11].id, { environment: 'unknown', periodType: 'unknown', storeCheckedAt: null, firstChargeAt: iso(NOW - 2 * DAY), lastChargeAt: iso(NOW - 2 * DAY), internal: false }],
+  [USERS[12].id, { environment: 'production', periodType: 'normal', storeCheckedAt: iso(NOW - DAY), firstChargeAt: null, lastChargeAt: null, internal: false }],
+  [USERS[13].id, { environment: 'sandbox', periodType: 'normal', storeCheckedAt: iso(NOW - 3 * HOUR), firstChargeAt: null, lastChargeAt: null, internal: false }],
+  [USERS[14].id, { environment: 'production', periodType: 'trial', storeCheckedAt: iso(NOW - 5 * HOUR), firstChargeAt: null, lastChargeAt: null, internal: false }],
+]);
 USERS.sort((a, b) => b.created_at.localeCompare(a.created_at));
 
 // ---------------------------------------------------------------- coupons, actions, credit
@@ -134,13 +150,13 @@ const ACTIONS: Array<{ id: string; admin_email: string | null; action: string; t
   { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'probe-llm', target: 'openai', detail: { result: 'no_credit', httpStatus: 429, status: 'ok' }, created_at: iso(NOW - 3 * HOUR) },
   { id: String(++ACTION_SEQ), admin_email: ME.email, action: 'add-cost', target: 'marketing', detail: { amountUsd: 60, status: 'started' }, created_at: iso(NOW - 20 * MIN) },
 ].reverse();
-const CREDIT: Record<'anthropic' | 'openai', { mark: { amount: number; at: string } | null; topups: number; alert: string | null; calls: number; failures: number }> = {
-  anthropic: { mark: { amount: 50, at: iso(NOW - 9 * DAY) }, topups: 0, alert: null, calls: 4120, failures: 3 },
-  openai: { mark: null, topups: 0, alert: iso(NOW - 2 * DAY - 5 * HOUR), calls: 986, failures: 41 },
+const CREDIT: Record<'anthropic' | 'openai', { mark: { amount: number; at: string } | null; topups: number; topupAt: string | null; alert: string | null; calls: number; failures: number }> = {
+  anthropic: { mark: { amount: 50, at: iso(NOW - 9 * DAY) }, topups: 0, topupAt: null, alert: null, calls: 4120, failures: 3 },
+  openai: { mark: null, topups: 0, topupAt: null, alert: iso(NOW - 2 * DAY - 5 * HOUR), calls: 986, failures: 41 },
 };
 
 // ---------------------------------------------------------------- views
-function llmProvider(p: 'anthropic' | 'openai') {
+function llmProvider(p: 'anthropic' | 'openai', bare: boolean) {
   const series = SERIES[p];
   const c = CREDIT[p];
   const spentSinceMark = c.mark ? sum(series.filter((_, i) => new Date(ALL_DAYS[i]).getTime() >= new Date(c.mark!.at).getTime() - DAY)) : 0;
@@ -148,7 +164,8 @@ function llmProvider(p: 'anthropic' | 'openai') {
     today: String(series[SPAN - 1]), week: String(round2(sum(tail(series, 7)) * 1000) / 1000), month: String(round2(sum(tail(series, 30)) * 1000) / 1000),
     period: String(round2(sum(tail(series, 30)) * 1000) / 1000), calls: c.calls, failures: c.failures,
     balanceMark: c.mark, estimatedLeft: c.mark ? round2(c.mark.amount + c.topups - spentSinceMark) : null, lastCreditAlert: c.alert,
-    creditAlert: c.alert ? { code: 'insufficient_quota', endpoint: 'tts' } : null, lastTopup: null,
+    creditAlert: c.alert ? { code: 'insufficient_quota', endpoint: 'tts', email: bare ? { accepted: false, error: 'not_configured' } : { accepted: true, id: 'mock-alert-0001' } } : null,
+    lastTopup: c.topupAt,
     lastOk: iso(NOW - (c.alert ? 3 * DAY : 4 * MIN)), lastFailure: c.failures ? { at: iso(NOW - 2 * DAY), stop: 'http_429', surface: 'desk' } : null,
     failures24h: c.alert ? 3 : 0, calls24h: c.alert ? 3 : 140,
   };
@@ -160,6 +177,65 @@ const COVERAGE = {
   activitySince: localDay(NOW - 40 * DAY), outcomesSince: iso(NOW - 5 * HOUR), locatedSince: iso(NOW - 4 * HOUR),
 };
 const BARE_COVERAGE = { ...COVERAGE, purchasesSince: null, ledgerSurfaces: ['desk'] };
+
+// ---------------------------------------------------------------- memberships (bobby_subscription_facts)
+/** The server's classification (section 2.3 of the r2 spec): access and commercial class are separate facts. */
+function classify(status: string | null, periodEnd: string | null, st: SubStore): { live: boolean; commercial: MemberCommercial; reason: MemberCommercialReason | null } {
+  const live = (status === 'active' || status === 'trialing') && (!periodEnd || new Date(periodEnd).getTime() > Date.now());
+  if (!live) return { live, commercial: 'inactive', reason: null };
+  if (st.environment === 'sandbox') return { live, commercial: 'test', reason: 'sandbox' };
+  if (status === 'trialing' || st.periodType === 'trial') return { live, commercial: 'test', reason: 'trial' };
+  if (st.environment === 'production' && st.periodType === 'unknown') return { live, commercial: 'unverified', reason: 'unknown_period' };
+  if (st.environment === 'production' && st.firstChargeAt) return { live, commercial: 'paid', reason: null };
+  if (st.environment === 'unknown') return { live, commercial: 'unverified', reason: 'unknown_environment' };
+  return { live, commercial: 'unverified', reason: 'no_charge' };
+}
+/** Random subscribers not pinned above: production, a charge on record when they ever paid. */
+function subStore(u: MockUser): SubStore {
+  const pinned = SUB_STORE.get(u.id);
+  if (pinned) return pinned;
+  const paidOnce = u.sub_status !== 'trialing';
+  const st: SubStore = {
+    environment: 'production', periodType: u.sub_status === 'trialing' ? 'trial' : 'normal', storeCheckedAt: u.last_seen_at,
+    firstChargeAt: paidOnce ? u.created_at : null, lastChargeAt: paidOnce ? u.last_seen_at : null, internal: false,
+  };
+  SUB_STORE.set(u.id, st);
+  return st;
+}
+function subscriptionRows() {
+  return USERS.filter((u) => u.sub_status).map((u) => {
+    const st = subStore(u);
+    const c = classify(u.sub_status, u.current_period_end, st);
+    return {
+      identityId: u.id, email: u.email, provider: u.sub_provider, status: u.sub_status,
+      productId: u.sub_provider === 'apple' ? 'bobby_pro_monthly' : 'price_bobby_pro_monthly',
+      currentPeriodEnd: u.current_period_end, updatedAt: u.last_seen_at, active: c.live,
+      environment: st.environment, periodType: st.periodType, storeCheckedAt: st.storeCheckedAt,
+      commercial: c.commercial, commercialReason: c.reason, firstChargeAt: st.firstChargeAt, lastChargeAt: st.lastChargeAt, internal: st.internal,
+    };
+  });
+}
+type SubRow = ReturnType<typeof subscriptionRows>[number];
+function subTotals(rows: SubRow[]) {
+  const n = (c: MemberCommercial, reason?: MemberCommercialReason) => rows.filter((x) => x.commercial === c && (!reason || x.commercialReason === reason)).length;
+  return { live: rows.filter((x) => x.active).length, paidVerified: n('paid'), unverified: n('unverified'), test: n('test'), n };
+}
+/** overview.subscriptions over the same rows the Membresías table lists (the team's left out, as by default). */
+function subscriptionsSummary(bare: boolean) {
+  const rows = bare ? [] : subscriptionRows().filter((x) => !x.internal);
+  const live = rows.filter((x) => x.active);
+  const t = subTotals(rows);
+  const tally = (xs: SubRow[], key: (x: SubRow) => string | null) => xs.reduce<Record<string, number>>((acc, x) => { const k = key(x); if (k) acc[k] = (acc[k] ?? 0) + 1; return acc; }, {});
+  return {
+    active: t.live, paid: t.paidVerified, trialing: live.filter((x) => x.status === 'trialing').length,
+    paidVerified: t.paidVerified, unverified: t.unverified, test: t.test,
+    unverifiedReasons: { unknown_environment: t.n('unverified', 'unknown_environment'), no_charge: t.n('unverified', 'no_charge'), unknown_period: t.n('unverified', 'unknown_period') },
+    testReasons: { sandbox: t.n('test', 'sandbox'), trial: t.n('test', 'trial') },
+    byEnvironment: tally(live, (x) => x.environment),
+    byStatus: tally(rows, (x) => x.status), byProvider: tally(live, (x) => x.provider),
+    giftedPro: bare ? 0 : USERS.filter((u) => u.grant_source && u.pro).length,
+  };
+}
 
 function couponStatus(c: MockCoupon) {
   if (!c.active) return 'inactive';
@@ -181,10 +257,15 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
   const newAccounts = sum(accountsDaily);
   const scale = n / 30;
   const visitors = Math.round(sum(visits) * 0.82);
-  const active = USERS.filter((u) => (u.sub_status === 'active' || u.sub_status === 'trialing') && (!u.current_period_end || new Date(u.current_period_end).getTime() > Date.now())).length;
-  const appDays = tail(ALL_DAYS, n);
-  const downloads = appDays.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - n + i)));
+  const subs = subscriptionsSummary(bare);
+  const active = subs.active;
+  // partial: Apple's load ran out of its time budget before the oldest days (it loads the newest first).
+  const allAppDays = tail(ALL_DAYS, n);
+  const missingDays = partial ? allAppDays.slice(0, Math.min(5, n - 1)) : [];
+  const appDays = allAppDays.slice(missingDays.length);
+  const downloads = appDays.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - appDays.length + i)));
   return {
+    internalMarkFailed: partial,
     overview: {
       days: d,
       since: d[0],
@@ -219,19 +300,19 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
           { referrer: 'apps.apple.com', visitors: Math.round(visitors * 0.05) }, { referrer: 'linkedin.com', visitors: Math.round(visitors * 0.02) },
         ],
       },
-      subscriptions: {
-        active, paid: Math.max(0, active - USERS.filter((u) => u.sub_status === 'trialing').length), trialing: USERS.filter((u) => u.sub_status === 'trialing').length,
-        byStatus: USERS.reduce<Record<string, number>>((acc, u) => { if (u.sub_status) acc[u.sub_status] = (acc[u.sub_status] ?? 0) + 1; return acc; }, {}),
-        byProvider: USERS.reduce<Record<string, number>>((acc, u) => { if (u.sub_provider && (u.sub_status === 'active' || u.sub_status === 'trialing')) acc[u.sub_provider] = (acc[u.sub_provider] ?? 0) + 1; return acc; }, {}),
-        giftedPro: USERS.filter((u) => u.grant_source && u.pro).length,
-      },
-      revenue: {
-        grossUsd: String(gross), netUsd: String(round2(gross * 0.85 - 4.99)), refundsUsd: '4.99',
-        newSubscriptions: Math.round(11 * scale), newPaying: Math.round(9 * scale), renewals: Math.round(19 * scale), cancellations: Math.round(4 * scale), expirations: Math.round(2 * scale), sandboxEvents: 7, internalEvents: 1,
+      subscriptions: subs,
+      revenue: bare ? {
+        grossUsd: '0', netUsd: '0', refundsUsd: '0', unverifiedGrossUsd: '0', unattributedGrossUsd: 0, unattributedEvents: 0, unattributedRefundsUsd: 0, unattributedNetUsd: 0, unconvertedEvents: 0, newSubscriptions: 0, newPaying: 0, payingInPeriod: 0, renewals: 0, cancellations: 0, expirations: 0,
+        sandboxEvents: 0, unknownEnvEvents: 0, internalEvents: 0, daily: revenue.map(String),
+      } : {
+        // One unverified membership's production charge is store money, never a payer.
+        grossUsd: String(gross), netUsd: String(round2(gross * 0.85 - 4.99)), refundsUsd: '4.99', unverifiedGrossUsd: '4.99', unattributedGrossUsd: 0, unattributedEvents: 0, unattributedRefundsUsd: 0, unattributedNetUsd: 0, unconvertedEvents: 0,
+        newSubscriptions: Math.round(11 * scale), newPaying: Math.round(4 * scale), payingInPeriod: Math.round(9 * scale), renewals: Math.round(19 * scale),
+        cancellations: Math.round(4 * scale), expirations: Math.round(2 * scale), sandboxEvents: 7, unknownEnvEvents: 2, internalEvents: 1,
         daily: revenue.map(String),
       },
       llm: {
-        providers: { anthropic: llmProvider('anthropic'), openai: llmProvider('openai') },
+        providers: { anthropic: llmProvider('anthropic', bare), openai: llmProvider('openai', bare) },
         daily: d.map((_, i) => ({ anthropic: tail(SERIES.anthropic, n)[i], openai: String(tail(SERIES.openai, n)[i]) })),
         bySurface: bare ? [{ surface: 'desk', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)))), calls: 812, failures: 2 }] : [
           { surface: 'desk', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.72)), calls: Math.round(2900 * scale), failures: 2 },
@@ -239,7 +320,11 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
           { surface: 'explain', provider: 'anthropic', usd: String(round2(sum(tail(SERIES.anthropic, n)) * 0.08)), calls: Math.round(360 * scale), failures: 0 },
           { surface: 'agent-run', provider: 'openai', usd: String(round2(sum(tail(SERIES.openai, n)))), calls: Math.round(986 * scale), failures: 41 },
         ],
-        deskRuns: { runs: Math.round(3100 * scale), finished: Math.round(3020 * scale), byDay: d.slice(-3).map((day) => ({ day, runs: 90, finished: 88 })) },
+        deskRuns: {
+          runs: Math.round(3100 * scale), finished: Math.round(3020 * scale), abandoned: Math.round(40 * scale), byDay: d.slice(-3).map((day) => ({ day, runs: 90, finished: 88 })),
+          // The last finished read is after the last unfinished one: the desk is answering again.
+          lastFinishedAt: iso(NOW - 4 * MIN), lastUnfinishedAt: iso(NOW - 3 * HOUR),
+        },
         guard: GUARD,
       },
       coupons: { active: COUPONS.filter((c) => couponStatus(c) === 'active').length, redemptions: REDEMPTIONS.length, giftedReadsLeft: 164, giftedLeft: { reads: 164, profundo: 12, maximo: 3 } },
@@ -263,9 +348,9 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
         revenuecat: {
           configured: true,
           metrics: [
-            { id: 'mrr', name: 'MRR', value: round2(active * 4.99 * 0.85), unit: '$', period: 'P28D' },
+            { id: 'mrr', name: 'MRR', value: round2(subs.paidVerified * 4.99 * 0.85), unit: '$', period: 'P28D' },
             { id: 'active_subscriptions', name: 'Suscripciones activas', value: active },
-            { id: 'active_trials', name: 'Pruebas activas', value: USERS.filter((u) => u.sub_status === 'trialing').length },
+            { id: 'active_trials', name: 'Pruebas activas', value: subs.testReasons.trial },
             { id: 'revenue', name: 'Ingresos', value: round2(gross * 1.1), unit: '$', period: 'P28D' },
             { id: 'new_customers', name: 'Clientes nuevos', value: 212, period: 'P28D' },
             { id: 'active_users', name: 'Usuarios activos', value: 1043, period: 'P28D' },
@@ -276,6 +361,7 @@ function overview(days: number, bare: boolean, compare = false, partial = false)
           totals: { downloads: sum(downloads), redownloads: Math.round(sum(downloads) * 0.11), updates: Math.round(sum(downloads) * 1.7), iap: Math.round(17 * scale) },
           byCountry: [{ country: 'MX', downloads: Math.round(sum(downloads) * 0.46) }, { country: 'US', downloads: Math.round(sum(downloads) * 0.21) }, { country: 'FR', downloads: Math.round(sum(downloads) * 0.09) }],
           coveredFrom: appDays[0], coveredTo: appDays.at(-2) ?? null, pendingDays: appDays.slice(-1),
+          partial, missingDays,
         },
         llmCaps: { dayUsd: 15, monthUsd: 300, alertUsd: 100 }, paywall: false, missing: [],
         llmGuard: { dayUsd: GUARD.day, monthUsd: GUARD.month },
@@ -308,12 +394,14 @@ function growth(n: number, bare: boolean) {
       newInPeriod: r(3400), active7d: r(1210), active30d: r(2900), readers7d: r(640), readers: r(1700),
       stages: { new: r(430), active: r(975), recurring: r(318), pro: r(24), atRisk: r(905), lost: r(1402) },
       byPlatform: { web: r(3310), ios: r(790) }, proInactive: bare ? 0 : 2, accountsNeverRead: r(14),
+      proPaidVerified: subscriptionsSummary(bare).paidVerified, proInactivePaid: bare ? 0 : 1,
     },
     cohorts: { web: cohort(3400, 1690, 690), ios: cohort(640, 512, 512) },
     history: { web: { installs: 8, readers: 8, reads: 13, read2: 4, linked: 0, since: iso(NOW - 40 * DAY), until: iso(NOW - 36 * DAY) }, ios: { installs: 4, readers: 4, reads: 6, read2: 2, linked: 0, since: iso(NOW - 39 * DAY), until: iso(NOW - 36 * DAY) } },
     outcomes: {
       consumed: r(2700), consumedInternal: r(110), consumedTotal: r(2810), byPlatform: { web: r(1500), ios: r(1200) }, delivered: r(2600), failed: r(40),
-      wallSignin: r(210), wallSigninInstalls: r(170), wallPaywall: r(12), wallLevel: r(66), blocked: bare ? {} : { daily_limit: r(4) }, byLevel: { rapido: r(2300), profundo: r(220), maximo: r(80) },
+      wallSignin: r(210), wallSigninInstalls: r(170), wallPaywall: r(12), wallLevel: r(66), abandoned: r(25),
+      blocked: bare ? {} : { daily_limit: r(4), no_address: r(1) }, byLevel: { rapido: r(2300), profundo: r(220), maximo: r(80) },
       outcomesSince: bare ? null : iso(NOW - 5 * HOUR),
     },
     acquisition: {
@@ -336,13 +424,13 @@ async function withGrowth(res: ReturnType<typeof overview>, days: number, bare: 
   const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
   const g = growth(n, bare);
   const life = lifecycle(n, bare);
-  // The same diagnosis engine the server runs (pure TypeScript), fed with the fixture.
-  const { buildInsights } = await import('../../../../api/_lib/admin-insights');
-  const insights = buildInsights({ days: n, overview: res.overview, growth: g, integrations: res.integrations, searchConsole: life.searchConsole });
+  // The same diagnosis engine the server runs (pure TypeScript), fed with the fixture and the same networks.
+  const { buildInsights } = await import('../../../../shared/admin-insights');
+  const insights = buildInsights({ days: n, overview: res.overview, growth: g, integrations: res.integrations, searchConsole: life.searchConsole, networks: internalView().networks });
   return { ...res, growth: g, searchConsole: life.searchConsole, insights };
 }
 
-/** ?mock=partial: the server omitted whole sections; the dashboard must say so instead of drawing zeros. */
+/** ?mock=partial: the server omitted whole sections, could not mark the browser and cut Apple's load short; the dashboard must say so instead of drawing zeros. */
 function partialOverview(days: number) {
   const full = overview(days, false, false, true) as { overview: Record<string, unknown> & { funnel: Record<string, unknown> }; integrations: unknown };
   delete full.overview.revenue;
@@ -359,6 +447,8 @@ function usersView(q: string, limit: number, offset: number) {
     ...u, reads: u.reads == null ? null : String(u.reads), activation_minutes: u.activation_minutes == null ? null : String(u.activation_minutes),
     wallet: u.wallet_only ? '0x8f3a…91c2' : null, guest_reads: i % 3 === 0 ? 2 : 0, last_active_day: u.last_read_at ? u.last_read_at.slice(0, 10) : u.created_at.slice(0, 10),
     is_internal: false, installs: u.wallet_only ? 0 : 1,
+    // One account the team rule reaches through an /admin install it signed in on (the D2 chain), with its reason.
+    ...(u === USERS[7] ? { is_team: true, team_seed: 'admin_session', team_seed_ref: 'd02abcdef1' } : {}),
   }));
   return { total: all.length, accounts: all.filter((u) => !u.wallet_only).length, wallets: all.filter((u) => u.wallet_only).length, internal: 1, readsSince: iso(NOW - 35 * DAY), users };
 }
@@ -373,7 +463,7 @@ const INSTALLS = Array.from({ length: 14 }, (_, i) => ({
 function internalView() {
   return {
     devices: INSTALLS,
-    networks: [{ network: 'a1b2c3d4e5', note: 'admin session', createdAt: iso(NOW - 2 * DAY), lastSeenAt: iso(NOW - 5 * MIN), installs: 3, onlyByNetwork: 1 }],
+    networks: [{ network: 'a1b2c3d4e5', note: 'admin session', createdAt: iso(NOW - 2 * DAY), lastSeenAt: iso(NOW - 5 * MIN), installs: 3, onlyByNetwork: 1, accountsOnlyByNetwork: 1 }],
     emails: INTERNAL_EMAILS,
     marks: [{ identity_id: USERS[3].id, email: null, provider: 'apple', note: 'iPhone de pruebas', created_at: iso(NOW - DAY) }],
   };
@@ -397,17 +487,19 @@ const GUARD = { day: 2.18, month: 41.37 };
 const LAST_PRICE_USD: number | null = 4.99;
 let ASSUMPTIONS: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number } = {};
 
-/** The server's unitEconomics (api/_lib/admin.ts), on fixture inputs. */
-function economics(n: number) {
+/** The server's unitEconomics (api/_lib/admin.ts), on fixture inputs. MRR and churn count verified payers only. */
+function economics(n: number, bare: boolean) {
   const since = tail(ALL_DAYS, n)[0];
   const r2 = (v: number | null, d = 2) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 10 ** d) / 10 ** d);
-  const gross = round2(sum(tail(SERIES.revenue, n)));
+  const gross = bare ? 0 : round2(sum(tail(SERIES.revenue, n)));
+  const subs = subscriptionsSummary(bare);
   // Like the server: the last real purchase sets the price; the store fee comes from the assumption until
   // purchase events carry a take-home rate.
-  const priceUsd = LAST_PRICE_USD ?? ASSUMPTIONS.priceUsd ?? 4.99;
+  const priceUsd = (bare ? null : LAST_PRICE_USD) ?? ASSUMPTIONS.priceUsd ?? 4.99;
   const takehome = 1 - (ASSUMPTIONS.storeFee ?? 0.15);
-  const active = USERS.filter((u) => u.sub_status === 'active' || u.sub_status === 'trialing').length;
-  const newPaying = Math.max(1, Math.round(11 * (n / 30)));
+  const paidVerified = subs.paidVerified;
+  const newPaying = bare ? 0 : Math.max(1, Math.round(4 * (n / 30)));
+  const payersEver = bare ? 0 : newPaying + 20;
   const monthlyChurn = ASSUMPTIONS.monthlyChurn ?? 0.1;
   const churnSource = ASSUMPTIONS.monthlyChurn ? 'assumed' : 'default';
   const llm = sum(tail(SERIES.anthropic, n)) + sum(tail(SERIES.openai, n));
@@ -428,8 +520,11 @@ function economics(n: number) {
   return {
     days: n, since,
     revenue: {
-      grossUsd: String(gross), netUsd: r2(net), refundsUsd: 4.99, mrrGrossUsd: r2(active * priceUsd), mrrNetUsd: r2(active * priceUsd * takehome), activeSubscriptions: active,
-      trialing: USERS.filter((u) => u.sub_status === 'trialing').length, newPaying, payersEver: newPaying + 20, priceUsd, takehome, priceSource: LAST_PRICE_USD ? 'observed' : 'default',
+      grossUsd: String(gross), netUsd: r2(net), refundsUsd: bare ? 0 : 4.99, unverifiedGrossUsd: bare ? 0 : 4.99, unconvertedEvents: 0, mrrGrossUsd: r2(paidVerified * priceUsd), mrrNetUsd: r2(paidVerified * priceUsd * takehome),
+      activeSubscriptions: paidVerified, paidVerified, unverifiedSubscriptions: subs.unverified, testSubscriptions: subs.test, liveSubscriptions: subs.active,
+      trialing: subs.trialing, newPaying, payingInPeriod: bare ? 0 : Math.round(9 * (n / 30)), payersEver, priceUsd, takehome,
+      priceSource: LAST_PRICE_USD && !bare ? 'observed' : 'default',
+      purchasesSince: bare ? null : COVERAGE.purchasesSince, measured: !bare,
     },
     costs: { marketingUsd: r2(marketing), infraUsd: r2(by('infra')), otherUsd: r2(by('other')), llmUsd: r2(llm, 4), totalUsd: r2(total), manualEntries: inWindow.length, byChannel: [...channels].sort((a, b) => b[1] - a[1]).map(([channel, usd]) => ({ channel, usd })) },
     acquisition: { newAccounts, newPaying, cacPerAccount: newAccounts ? r2(marketing / newAccounts) : null, cacPerPaying: r2(cacPaying) },
@@ -437,14 +532,14 @@ function economics(n: number) {
       monthlyNetPerSubUsd: r2(priceUsd * takehome), monthlyLlmPerUserUsd: r2(llmPerReader, 4), monthlyContributionUsd: r2(contribution),
       monthlyChurn, churnSource, lifetimeMonths: r2(lifetime, 1), ltvUsd: r2(ltv),
       ltvToCac: cacPaying ? r2(ltv / cacPaying) : null, paybackMonths: cacPaying && contribution > 0 ? r2(cacPaying / contribution, 1) : null,
-      scenario: false,
+      scenario: payersEver === 0,
     },
     roi: { profitUsd: r2(net - total), roi: total > 0 ? r2((net - total) / total, 4) : null },
     assumptions: { monthlyChurn: ASSUMPTIONS.monthlyChurn ?? null, priceUsd: ASSUMPTIONS.priceUsd ?? null, storeFee: ASSUMPTIONS.storeFee ?? null, maxLifetimeMonths: ASSUMPTIONS.maxLifetimeMonths ?? null },
   };
 }
 
-function lifecycle(days: number, bare: boolean) {
+function lifecycle(days: number, bare: boolean, partial = false) {
   const n = Math.min(Math.max(Math.round(days) || 30, 1), SPAN);
   const k = n / 30;
   const r = (v: number) => Math.round(v * k);
@@ -466,10 +561,13 @@ function lifecycle(days: number, bare: boolean) {
   const clicks = dayList.map((_, i) => (bare ? 0 : Math.round(between(18, 70) * ramp(SPAN - n + i))));
   const impressions = clicks.map((c) => Math.round(c * between(16, 34)));
   const tc = sum(clicks), ti = sum(impressions);
-  const downloads = dayList.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - n + i)));
+  const missingDays = partial ? dayList.slice(0, Math.min(5, n - 1)) : [];
+  const appDays = dayList.slice(missingDays.length);
+  const downloads = appDays.map((_, i) => Math.round(between(4, 26) * ramp(SPAN - appDays.length + i)));
   void web; void ios;
   return {
-    economics: economics(n),
+    internalMarkFailed: partial,
+    economics: economics(n, bare),
     instrumentation: { webVisits: true, webPaywall: true, iosVisits: false, iosOpens: true, iosPaywall: false, purchaseStart: false, deskOutcomes: true },
     searchConsole: bare ? { configured: false } : {
       configured: true, site: 'https://bobbyprotocol.xyz/', days: dayList, clicks, impressions,
@@ -489,8 +587,9 @@ function lifecycle(days: number, bare: boolean) {
       ],
     },
     appStore: bare ? { configured: false } : {
-      configured: true, days: dayList, downloads,
+      configured: true, days: appDays, downloads,
       totals: { downloads: sum(downloads), redownloads: Math.round(sum(downloads) * 0.11), updates: Math.round(sum(downloads) * 1.7), iap: Math.round(17 * k) },
+      coveredFrom: appDays[0], coveredTo: appDays.at(-1) ?? null, pendingDays: [], partial, missingDays,
     },
   };
 }
@@ -501,8 +600,11 @@ function audience(days: number, bare: boolean) {
   const r = (v: number) => Math.round(v * k);
   const since = iso(new Date(`${tail(ALL_DAYS, n)[0]}T00:00:00`).getTime());
   if (bare) {
-    return { geo: { since, days: n, locatedSince: null, web: { devices: 0, located: 0 }, countries: [], regions: [], purchases: [] },
-      searchConsole: { configured: false, error: null, countries: null }, appStore: { configured: false, error: null, countries: null } };
+    return {
+      internalMarkFailed: false,
+      geo: { since, days: n, locatedSince: null, web: { devices: 0, measurable: 0, located: 0, beforeLocation: 0 }, located: { total: 0, withRegion: 0 }, countries: [], regions: [], purchases: [], purchasesSince: null },
+      searchConsole: { configured: false, error: null, countries: null }, appStore: { configured: false, error: null, countries: null, partial: false, missingDays: [] },
+    };
   }
   const countries = [
     { country: 'MX', visitors: r(1840), readers: r(402), accounts: r(58), pro: Math.max(1, r(3)) },
@@ -513,41 +615,49 @@ function audience(days: number, bare: boolean) {
     { country: 'CL', visitors: r(94), readers: r(17), accounts: r(2), pro: 0 },
     { country: 'PE', visitors: r(71), readers: r(12), accounts: r(1), pro: 0 },
   ];
+  const located = sum(countries.map((c) => c.visitors));
+  const regions = [
+    { country: 'MX', region: 'CMX', visitors: r(712), readers: r(164) }, { country: 'MX', region: 'JAL', visitors: r(301), readers: r(70) },
+    { country: 'MX', region: 'NLE', visitors: r(244), readers: r(51) }, { country: 'MX', region: 'MEX', visitors: r(198), readers: r(39) },
+    { country: 'US', region: 'TX', visitors: r(141), readers: r(27) }, { country: 'MX', region: 'PUE', visitors: r(96), readers: r(18) },
+    { country: 'US', region: 'CA', visitors: r(88), readers: r(15) }, { country: 'CO', region: 'DC', visitors: r(84), readers: r(16) },
+  ];
   return {
+    internalMarkFailed: false,
     geo: {
       since, days: n, locatedSince: '2026-10-01T21:00:00Z',
-      web: { devices: r(3400), located: sum(countries.map((c) => c.visitors)) },
-      countries,
-      regions: [
-        { country: 'MX', region: 'CMX', visitors: r(712), readers: r(164) }, { country: 'MX', region: 'JAL', visitors: r(301), readers: r(70) },
-        { country: 'MX', region: 'NLE', visitors: r(244), readers: r(51) }, { country: 'MX', region: 'MEX', visitors: r(198), readers: r(39) },
-        { country: 'US', region: 'TX', visitors: r(141), readers: r(27) }, { country: 'MX', region: 'PUE', visitors: r(96), readers: r(18) },
-        { country: 'US', region: 'CA', visitors: r(88), readers: r(15) }, { country: 'CO', region: 'DC', visitors: r(84), readers: r(16) },
-      ],
-      purchases: [{ country: 'MX', newPaying: Math.max(1, r(7)), grossUsd: r(64.87) }, { country: 'US', newPaying: Math.max(1, r(3)), grossUsd: r(24.95) }, { country: '??', newPaying: 1, grossUsd: 4.99 }],
+      web: { devices: r(3400), measurable: r(3300), located, beforeLocation: r(100) },
+      located: { total: located, withRegion: sum(regions.map((x) => x.visitors)) },
+      countries, regions,
+      purchases: [{ country: 'MX', newPaying: Math.max(1, r(2)), grossUsd: r(64.87) }, { country: 'US', newPaying: Math.max(1, r(1)), grossUsd: r(24.95) }, { country: '??', newPaying: 1, grossUsd: 4.99 }],
+      purchasesSince: COVERAGE.purchasesSince,
     },
     searchConsole: { configured: true, error: null, countries: [
       { country: 'MX', clicks: r(702), impressions: r(17640) }, { country: 'US', clicks: r(198), impressions: r(6120) },
       { country: 'CO', clicks: r(121), impressions: r(3310) }, { country: 'ES', clicks: r(77), impressions: r(2804) }, { country: 'ARG', clicks: r(12), impressions: r(390) },
     ] },
-    appStore: { configured: true, error: null, countries: [
+    appStore: { configured: true, error: null, partial: false, missingDays: [], countries: [
       { country: 'MX', downloads: r(241) }, { country: 'US', downloads: r(88) }, { country: 'CO', downloads: r(31) }, { country: 'ES', downloads: r(19) },
     ] },
   };
 }
 
-function members() {
-  const subscriptions = USERS.filter((u) => u.sub_status).map((u) => ({
-    identityId: u.id, email: u.email, provider: u.sub_provider, status: u.sub_status,
-    productId: u.sub_provider === 'apple' ? 'bobby_pro_monthly' : 'price_bobby_pro_monthly',
-    currentPeriodEnd: u.current_period_end, updatedAt: u.last_seen_at,
-    active: (u.sub_status === 'active' || u.sub_status === 'trialing') && (!u.current_period_end || new Date(u.current_period_end).getTime() > Date.now()),
-  }));
-  const grants = USERS.filter((u) => u.grant_source).map((u) => ({
+/** view=members: the team's rows only with internal=1 (otherwise counted in `excluded`), like bobby_admin_members. */
+function members(internal: boolean, bare: boolean, partial: boolean) {
+  const all = bare ? [] : subscriptionRows();
+  const allGrants = bare ? [] : USERS.filter((u) => u.grant_source).map((u) => ({
     identityId: u.id, email: u.email, source: u.grant_source === 'coupon' ? 'admin' : u.grant_source, proUntil: u.pro_until,
-    active: !!u.pro_until && new Date(u.pro_until).getTime() > Date.now(),
+    active: !!u.pro_until && new Date(u.pro_until).getTime() > Date.now(), internal: u.id === ME.id || u.is_admin,
   }));
-  return { subscriptions, grants };
+  const subscriptions = all.filter((x) => internal || !x.internal);
+  const grants = allGrants.filter((g) => internal || !g.internal);
+  const t = subTotals(subscriptions);
+  return {
+    includeInternal: internal, subscriptions, grants,
+    excluded: { subscriptions: all.length - subscriptions.length, grants: allGrants.length - grants.length },
+    totals: { live: t.live, paidVerified: t.paidVerified, unverified: t.unverified, test: t.test },
+    internalMarkFailed: partial,
+  };
 }
 
 // ---------------------------------------------------------------- actions
@@ -561,7 +671,7 @@ const log = (action: string, target: string | null, detail: unknown) => {
 };
 const findUser = (id: string) => { const u = USERS.find((x) => x.id === id); if (!u) throw new Refuse(404, 'user_not_found'); return u; };
 
-function post(body: AdminPostBody): Record<string, unknown> {
+function post(body: AdminPostBody, bare: boolean): Record<string, unknown> {
   switch (body.action) {
     case 'create-coupon': {
       const code = body.code?.trim().toUpperCase() || `BOBBY-${Array.from({ length: 5 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[int(0, 31)]).join('')}`;
@@ -620,7 +730,11 @@ function post(body: AdminPostBody): Record<string, unknown> {
     case 'credit-mark': {
       const c = CREDIT[body.provider];
       if (body.kind === 'balance') { c.mark = { amount: body.amountUsd, at: iso(Date.now()) }; c.topups = 0; }
-      else { if (!c.mark) throw new Refuse(400, 'Registra primero un saldo; la recarga se suma a él.'); c.topups += body.amountUsd; }
+      else {
+        if (!(body.amountUsd > 0)) throw new Refuse(400, 'A top-up must be more than $0.');
+        if (!c.mark) throw new Refuse(400, 'Registra primero un saldo; la recarga se suma a él.');
+        c.topups += body.amountUsd; c.topupAt = iso(Date.now());
+      }
       log('credit-mark', body.provider, { kind: body.kind, amountUsd: body.amountUsd, note: body.note });
       return { ok: true };
     }
@@ -630,10 +744,11 @@ function post(body: AdminPostBody): Record<string, unknown> {
       return { ok: true, ...r };
     }
     case 'add-cost': {
-      const today = localDay(Date.now());
+      // Like the server: costs are dated in UTC.
+      const today = new Date().toISOString().slice(0, 10);
       const spentOn = body.spentOn && /^\d{4}-\d{2}-\d{2}$/.test(body.spentOn) ? body.spentOn : today;
       if (!['marketing', 'infra', 'other'].includes(body.kind) || !(body.amountUsd > 0) || body.amountUsd > 1_000_000) throw new Refuse(400, 'Invalid cost.');
-      if (spentOn > today) throw new Refuse(400, 'The date cannot be in the future.');
+      if (spentOn > today) throw new Refuse(400, 'The date cannot be in the future (UTC).');
       const channel = body.channel?.trim() ? body.channel.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 32) : null;
       const row: MockCost = { id: ++COST_SEQ, kind: body.kind, channel, amount_usd: Math.round(body.amountUsd * 100) / 100, spent_on: spentOn, note: body.note?.trim() || null, created_at: iso(Date.now()) };
       COSTS.push(row);
@@ -658,7 +773,25 @@ function post(body: AdminPostBody): Record<string, unknown> {
     case 'growth-plan': return { ok: true, plan: { generatedAt: iso(NOW), model: 'claude-sonnet-5-5', summary: 'Fixture de desarrollo: el plan real lo escribe Claude en el servidor.', cached: false, usd: 0.012,
       priorities: [{ title: 'Recargar OpenAI', why: 'Fixture.', steps: ['Recargar crédito'], measure: 'Fallos 24h en IA', findings: ['credit-openai'] }] } };
     case 'preview-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito', text: 'Vista previa del resumen (fixture de desarrollo).', fresh: 1, urgent: 2, weekly: false };
-    case 'send-digest': return { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito' };
+    // Accepted by Resend is not delivered: the fixture answers like the server (bare: no recipient configured).
+    case 'send-digest': return bare
+      ? { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito', accepted: false, emailId: null, emailError: 'not_configured' }
+      : { ok: true, subject: 'Bobby: 1 urgente — OpenAI sin crédito', accepted: true, emailId: 'mock-email-0001', emailError: null };
+    case 'resync-membership': {
+      if (bare) throw new Refuse(503, 'RevenueCat is not configured.');
+      const u = USERS.find((x) => x.id === body.identityId && x.sub_status);
+      if (!u) throw new Refuse(404, 'Account not found.');
+      if (u.wallet_only) throw new Refuse(400, 'Only Apple/Google accounts can be re-synced.');
+      const st = subStore(u);
+      const wasLive = classify(u.sub_status, u.current_period_end, st).live;
+      // What RevenueCat would say: a live row is confirmed (an unknown environment turns out to be production);
+      // a lapsed one has no entitlement, and the row is only stamped as checked (access is never lowered).
+      if (wasLive && st.environment === 'unknown') { st.environment = 'production'; st.periodType = 'normal'; }
+      st.storeCheckedAt = iso(Date.now());
+      const subscription = { status: u.sub_status, environment: st.environment, periodType: st.periodType, currentPeriodEnd: u.current_period_end, storeCheckedAt: st.storeCheckedAt };
+      log('resync-membership', u.email ?? u.id, { revenuecatActive: wasLive, environment: st.environment, periodType: st.periodType });
+      return { ok: true, revenuecatActive: wasLive, accessKept: false, subscription };
+    }
     case 'set-internal-emails': INTERNAL_EMAILS.splice(0, INTERNAL_EMAILS.length, ...body.emails.map((e) => e.trim().toLowerCase())); return { ok: true, emails: INTERNAL_EMAILS };
     case 'set-assumptions': {
       // Like the server: merge. Absent = keep, null = back to the default.
@@ -681,6 +814,56 @@ function post(body: AdminPostBody): Record<string, unknown> {
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { 'Content-Type': 'application/json' } });
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+function fixtureMeta(names: string[], partial = false, bare = false) {
+  const at = iso(Date.now());
+  return { generatedAt: at, durationMs: 280, partial, sources: Object.fromEntries(names.map((name) => [name, {
+    status: bare && ['appStore', 'revenuecat', 'searchConsole'].includes(name) ? 'not_configured' : partial && name === 'appStore' ? 'partial' : 'ok',
+    fetchedAt: at, ...(partial && name === 'appStore' ? { missingDays: [localDay(NOW - 20 * DAY)] } : {}),
+  }])) };
+}
+
+function liveFixture(bare: boolean, internal: boolean, partial: boolean) {
+  const at = Date.now();
+  const platform = (scale: number, ios: boolean) => ({ observedDevices: bare ? 0 : Math.round((ios ? 5 : 12) * scale),
+    observedAccounts: bare ? 0 : Math.round((ios ? 3 : 4) * scale), events: bare ? 0 : Math.round((ios ? 4 : 30) * scale),
+    consumed: bare ? 0 : Math.round((ios ? 6 : 13) * scale), completed: bare ? 0 : Math.round((ios ? 5 : 10) * scale),
+    failed: bare ? 0 : Math.round((ios ? 0 : 1) * scale), abandoned: bare ? 0 : Math.round((ios ? 1 : 2) * scale),
+    wallSignin: bare ? 0 : Math.round(2 * scale), wallPaywall: bare ? 0 : Math.round(scale), wallLevel: bare ? 0 : Math.round(scale),
+    blocked: bare ? {} : { daily_limit: Math.round(scale) } });
+  const times = { latestEventAt: bare ? null : iso(at - 2 * MIN), latestOutcomeAt: bare ? null : iso(at - MIN),
+    latestCompletedAt: bare ? null : iso(at - MIN), latestReadConsumptionAt: bare ? null : iso(at - MIN) };
+  const clientPlatform = (ios: boolean) => {
+    const measuredAt = bare ? null : iso(at - 2 * HOUR), renderedAt = bare || (partial && ios) ? null : measuredAt;
+    const signalAt = bare ? null : iso(at - 20_000);
+    return { presence: { reportedForegroundInstalls: bare ? 0 : ios ? 2 : 4, reportedForegroundAccounts: bare ? 0 : 1,
+      reportedForegroundSessions: bare ? 0 : ios ? 2 : 4, latestReportAt: signalAt },
+      windows: Object.fromEntries([['15m', 15, 1], ['1h', 60, 3], ['24h', 1440, 8]].map(([id, minutes, scale]) => [id, {
+        minutes, since: iso(at - Number(minutes) * MIN), foreground: bare ? 0 : 2 * Number(scale), background: bare ? 0 : Number(scale),
+        started: bare ? 0 : 3 * Number(scale), received: bare ? 0 : 2 * Number(scale), rendered: renderedAt ? 2 * Number(scale) : 0,
+        webviewTerminations: 0, reportedInstalls: bare ? 0 : 3 * Number(scale), reportedAccounts: bare ? 0 : Number(scale),
+      }])), latest: { eventAt: signalAt, receivedAt: bare ? null : iso(at - MIN), renderedAt: renderedAt ? iso(at - MIN) : null, webviewTerminationAt: null },
+      coverage: { rolloutSince: measuredAt, readStartedSince: measuredAt, readReceivedSince: measuredAt, readRenderedSince: renderedAt, webviewTerminationSince: null },
+      builds: bare ? [] : [{ appVersion: 'fixture-version', appBuild: ios ? 'fixture-ios-build' : 'fixture-web-build', reportedInstalls24h: 6,
+        foregroundInstalls: ios ? 2 : 4, latestReportAt: signalAt, coverageSince: measuredAt, readStartedSince: measuredAt,
+        readReceivedSince: measuredAt, readRenderedSince: renderedAt }],
+    };
+  };
+  return { live: { snapshotAt: iso(at), includeInternal: internal,
+    windows: Object.fromEntries([['15m', 15, 1], ['1h', 60, 3], ['24h', 1440, 12]].map(([id, minutes, scale]) => [id,
+      { minutes, since: iso(at - Number(minutes) * MIN), ios: platform(Number(scale), true), web: platform(Number(scale), false) }])),
+    platforms: { ios: times, web: times },
+    providers: bare ? [] : [{ provider: 'anthropic', model: 'fixture-model', calls24h: 120, failures24h: 1, usd24h: 0.41,
+      callLatencyP50Ms: 1450, callLatencyP95Ms: 3400, lastCallAt: iso(at - MIN), lastFailureAt: iso(at - HOUR) }],
+    client: { presenceTtlSeconds: 90, coverage: { protocolVersion: 1, scope: 'instrumented_clients_only', legacyClients: 'unmeasured', crashes: false, successRate: null },
+      platforms: { ios: clientPlatform(true), web: clientPlatform(false) },
+      health: { status: bare ? 'unknown' : partial ? 'failure_observed' : 'recovered', lastErrorAt: bare ? null : iso(at - 10 * MIN),
+        error: bare ? null : 'storage_unavailable', authenticated: bare ? null : true, lastReportAt: bare ? null : iso(at - (partial ? 15 * MIN : 20_000)), recovered: bare ? null : !partial } },
+    coverage: { readStarted: false, clientRendered: false, crashes: false, buildVersion: false, onlinePresence: false,
+      eventCoverageSince: bare ? null : COVERAGE.eventsSince, outcomeCoverageSince: bare ? null : COVERAGE.outcomesSince,
+      readConsumptionCoverageSince: bare ? null : COVERAGE.readsSince, llmLedgerCoverageSince: bare ? null : COVERAGE.ledgerSince } },
+    internalMarkFailed: partial, meta: fixtureMeta(['live'], partial) };
+}
+
 export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query: URLSearchParams | null, body?: AdminPostBody): Promise<Response> {
   await wait(method === 'POST' ? 450 : 280);
   if (mode === '401') return json({ error: 'unauthorized' }, 401);
@@ -691,7 +874,7 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
   if (method === 'POST') {
     if (!body) return json({ error: 'missing_body' }, 400);
     try {
-      const result = post(body);
+      const result = post(body, bare);
       // Dev-only fault: commit the fixture gift, then lose the first confirmation. Reopening the
       // dialog must reuse its saved operation and confirm exactly one addition/audit.
       if (mode === 'grant-lost' && body.action === 'grant' && !LOST_GRANT_RESPONSES.has(body.operationId)) {
@@ -707,16 +890,27 @@ export async function mockAdminFetch(mode: string, method: 'GET' | 'POST', query
     case 'overview': {
       const days = Number(query?.get('days') ?? 30);
       const compare = query?.get('compare') === '1';
-      if (compare) return json(overview(days, bare, true));
-      return json(partial ? partialOverview(days) : await withGrowth(overview(days, bare), days, bare));
+      if (compare) return json({ ...overview(days, bare, true), meta: fixtureMeta(['overview']) });
+      const r = partial ? partialOverview(days) : await withGrowth(overview(days, bare), days, bare);
+      if (r.overview) r.overview.includeInternal = query?.get('internal') === '1';
+      if ('growth' in r && r.growth) r.growth.includeInternal = query?.get('internal') === '1';
+      return json({ ...r, integrations: null, searchConsole: null, meta: fixtureMeta(['overview', 'growth', 'networks']) });
+    }
+    case 'live': return json(liveFixture(bare, query?.get('internal') === '1', partial));
+    case 'integrations': {
+      const r = overview(Number(query?.get('days') ?? 30), bare, false, partial);
+      const geo = audience(Number(query?.get('days') ?? 30), bare);
+      const sc = lifecycle(Number(query?.get('days') ?? 30), bare).searchConsole;
+      return json({ integrations: r.integrations, searchConsole: sc ? { ...sc, byCountry: geo.searchConsole.countries } : null,
+        meta: fixtureMeta(['appStore', 'revenuecat', 'searchConsole', 'health'], partial, bare) });
     }
     case 'users': return json(usersView(query?.get('q') ?? '', Number(query?.get('limit') ?? 50), Number(query?.get('offset') ?? 0)));
     case 'coupons': return json({ coupons: COUPONS.map((c) => ({ ...c, status: couponStatus(c) })), redemptions: REDEMPTIONS, totals: { coupons: COUPONS.length, redemptions: REDEMPTIONS.length + 120 } });
     case 'actions': return json({ actions: ACTIONS, total: ACTIONS.length + 40 });
-    case 'members': return json(members());
-    case 'lifecycle': return json(lifecycle(Number(query?.get('days') ?? 30), bare));
+    case 'members': return json(members(query?.get('internal') === '1', bare, partial));
+    case 'lifecycle': return json(lifecycle(Number(query?.get('days') ?? 30), bare, partial));
     case 'audience': return json(partial
-      ? { ...audience(Number(query?.get('days') ?? 30), false), appStore: { configured: true, error: 'appstore 401', countries: null } }
+      ? { ...audience(Number(query?.get('days') ?? 30), false), internalMarkFailed: true, appStore: { configured: true, error: 'appstore 401', countries: null, partial: false, missingDays: [] } }
       : audience(Number(query?.get('days') ?? 30), bare));
     case 'costs': return json({ costs: [...COSTS].sort((x, y) => y.spent_on.localeCompare(x.spent_on) || y.id - x.id) });
     case 'internal': return json(internalView());

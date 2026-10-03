@@ -115,15 +115,19 @@ final class ReleaseAuditTests: XCTestCase {
     }
 
     /// Deliberately changed for the Núcleo (Nucleo/ARCHITECTURE.md §5, R8): the user may now ASK by
-    /// voice (hold the pill). Both purpose strings must exist, and recognition is on-device only, so
-    /// no audio ever leaves the phone and the risk notice copy stays true.
+    /// voice (hold the pill). Both purpose strings must exist. Recognition stays on the phone whenever
+    /// the recognizer holds the local model; only without one does Apple's speech service transcribe
+    /// the same language, and the purpose string and risk notice say so.
     func testSpokenQuestionsDeclareMicrophoneAndSpeechAndRecognizeOnDeviceOnly() {
         let mic = Bundle.main.object(forInfoDictionaryKey: "NSMicrophoneUsageDescription") as? String
         let speech = Bundle.main.object(forInfoDictionaryKey: "NSSpeechRecognitionUsageDescription") as? String
         XCTAssertFalse((mic ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "NSMicrophoneUsageDescription must explain hold-to-ask")
-        XCTAssertFalse((speech ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "NSSpeechRecognitionUsageDescription must explain on-device dictation")
+        XCTAssertFalse((speech ?? "").trimmingCharacters(in: .whitespaces).isEmpty, "NSSpeechRecognitionUsageDescription must explain dictation")
+        XCTAssertFalse((speech ?? "").contains("never leaves"), "The purpose string must not promise on-device only (R8)")
+        XCTAssertFalse(RiskNotice.statements(spanish: false)[0].body.contains("stays on your iPhone"), "The risk notice must not promise on-device only")
+        XCTAssertFalse(NucleoSpeech.makeRequest(contextualStrings: [], onDevice: false).requiresOnDeviceRecognition)
         let request = NucleoSpeech.makeRequest(contextualStrings: ["NVDA", "Bitcoin"])
-        XCTAssertTrue(request.requiresOnDeviceRecognition, "Audio must never leave the device (R8)")
+        XCTAssertTrue(request.requiresOnDeviceRecognition, "With the local model, audio must stay on the device (R8)")
         XCTAssertTrue(request.shouldReportPartialResults)
         XCTAssertTrue(request.addsPunctuation)
         XCTAssertEqual(request.contextualStrings, ["NVDA", "Bitcoin"])

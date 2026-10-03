@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.app.json",
+  "include": [
+    "src/lib/admin-client.ts",
+    "src/pages/BobbyAdminPage.tsx",
+    "src/components/admin/bobby/**/*",
+    "shared/admin-insights.ts",
+    "src/vite-env.d.ts"
+  ]
+}

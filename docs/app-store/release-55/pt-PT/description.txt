@@ -1,6 +1,6 @@
 Conhece o Bobby, o teu companheiro para pensar o mercado.
 
-Faz uma pergunta sobre ativos disponíveis, como ações e criptoativos, por escrito ou através de ditado opcional no dispositivo. O Bobby reúne três perspetivas: uma leitura das oportunidades, um questionamento dos riscos e uma síntese das evidências.
+Faz uma pergunta sobre ativos disponíveis, como ações e criptoativos, por escrito ou através de ditado opcional. O Bobby reúne três perspetivas: uma leitura das oportunidades, um questionamento dos riscos e uma síntese das evidências.
 
 SEIS IDIOMAS E CONTEXTO LOCAL
 Usa o Bobby em português, inglês, espanhol, francês, italiano ou alemão. Muda o idioma no Perfil. A voz e o ditado em português seguem a variante de Portugal ou do Brasil definida no dispositivo. Pesquisa ações locais disponíveis pelo nome ou símbolo; os símbolos originais da bolsa e a moeda das cotações são preservados.
@@ -15,7 +15,7 @@ O TEU COMPANHEIRO E O TEU PROGRESSO
 Escolhe um companheiro, personaliza o teu perfil e explora o Trader Land. Uma conta Apple opcional sincroniza o teu progresso. A tua ilha permanece privada até decidires publicá-la. As ilhas públicas incluem opções para denunciar conteúdo e bloquear criadores.
 
 TU DECIDES SOBRE A IA
-O processamento com IA externa exige a tua autorização. Podes consultar o aviso e retirar a autorização no Perfil. O ditado usa reconhecimento de voz no dispositivo em equipamentos compatíveis; o áudio do microfone não é enviado. Podes sempre escrever. A narração opcional pode ser silenciada.
+O processamento com IA externa exige a tua autorização. Podes consultar o aviso e retirar a autorização no Perfil. O ditado é reconhecido no teu iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio. Podes sempre escrever. A narração opcional pode ser silenciada.
 
 O Bobby é uma ferramenta educativa de análise de mercado. A app para iPhone não liga carteiras, não executa operações e não movimenta fundos. As análises podem estar incompletas ou incorretas, e os dados de mercado podem apresentar atrasos. O Bobby não promete rendimentos nem presta aconselhamento de investimento personalizado. Tu decides o que fazer.
 

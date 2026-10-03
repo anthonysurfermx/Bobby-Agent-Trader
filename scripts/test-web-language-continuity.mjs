@@ -156,11 +156,16 @@ async function billingApi(body,{signedIn=true,host='bobbyprotocol.xyz'}={}){
   const identity={id:'inert-owner',authUserId:'inert-user'};
   const forbidden=()=>{throw new Error('Unrelated billing operation must not run');};
   const stubs={
-    'node:crypto':crypto,'@vercel/functions':{waitUntil:forbidden},
+    'node:crypto':crypto,'@vercel/functions':{waitUntil(){}},
     './_lib/request-security.js':{enforcePublicRateLimit:async()=>true},
     './_lib/user-identity.js':{requireIdentity:async(_req,res)=>{if(!signedIn){res.status(401).json({error:'Inert unauthenticated'});return null;}return identity;}},
     './_lib/access.js':{getSubscription:async()=>({stripe_customer_id:'cus_INERT'})},
     './_lib/referrals.js':{},'./_lib/coupons.js':{},'./_lib/rate-limit-persistent.js':{},'./_lib/rate-limit.js':{},'./_lib/desk-levels.js':{},'./_lib/bobby-db.js':{},'./_lib/revenuecat.js':{},
+    // Checkout reaches Stripe through these modules: reads find nothing open, and the one create is recorded like a fetch.
+    './_lib/stripe-api.js':{STRIPE_TERMINAL:new Set(['canceled','incomplete_expired']),customerFor:async()=>'cus_INERT',findCustomer:async(_id,stored)=>stored??null,expireCheckoutSession:forbidden,
+      stripeApi:async(method,path,form,key)=>{if(method==='GET')return{data:[]};assert.equal(path,'checkout/sessions');assert.equal(key,'bobby-checkout-00000000-0000-4000-8000-000000000000');requests.push({url:'https://api.stripe.com/v1/'+path,form:new URLSearchParams(form)});return{id:'cs_test_INERT',url:'https://checkout.stripe.test/INERT'};}},
+    './_lib/checkout-attempt.js':{claimCheckout:async(_identity,customer,price,origin)=>({state:'create',attemptId:'00000000-0000-4000-8000-000000000000',customer,price,origin,expiresAt:2000000000}),completeCheckout:async()=>{}},
+    './_lib/funnel.js':{recordCheckoutOpened:async()=>{}},
     '../src/lib/app-language.js':shared.exports,
   };
   const module={exports:{}};
@@ -174,17 +179,21 @@ for(const[language,locale]of locales)for(const action of['checkout','portal']){
     assert.equal(response.statusCode,200);assert.equal(requests.length,1);const form=requests[0].form;
     assert.equal(form.get('locale'),locale==='pt-BR'?'pt-BR':language==='es'?'es-419':language);
     const returns=action==='checkout'?['success_url','cancel_url']:['return_url'];
-    for(const key of returns){const url=new URL(form.get(key));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.pathname,'/desk');assert.equal(url.searchParams.get('lang'),language);assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('country'),'BR');assert.equal(url.searchParams.get('symbol'),'BNP.PA');assert.equal(url.searchParams.get('timeframe'),'1D');assert.ok(!url.href.includes('attacker'));}
+    for(const key of returns){const url=new URL(form.get(key));assert.equal(url.origin,'https://bobbyprotocol.xyz');assert.equal(url.pathname,'/desk');assert.equal(url.searchParams.get('lang'),language);assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('country'),'BR');assert.equal(url.searchParams.get('symbol'),action==='checkout'?null:'BNP.PA');assert.equal(url.searchParams.get('timeframe'),action==='checkout'?null:'1D');assert.ok(!url.href.includes('attacker'));}
     if(action==='checkout'){assert.equal(new URL(form.get('success_url')).searchParams.get('pro'),'welcome');assert.equal(new URL(form.get('cancel_url')).searchParams.get('pro'),'cancelled');assert.equal(form.get('line_items[0][price]'),'price_INERT');assert.equal(form.get('client_reference_id'),'inert-owner');}else assert.equal(form.get('customer'),'cus_INERT');
   });
 }
 for(const[language,locale,provider]of[['es','es-ES','es'],['es','es-US','es-419'],['en','en-GB','en-GB'],['en','en-AU','en'],['en','en-CA','en'],['en','en-IE','en']])for(const action of['checkout','portal']){
   const{requests,response}=await billingApi({action,language,locale,symbol:'^GSPC',timeframe:'1D'});
-  check(`${locale}: ${action} keeps supported provider dialect and index identifier`,()=>{assert.equal(response.statusCode,200);assert.equal(requests[0].form.get('locale'),provider);const url=new URL(requests[0].form.get(action==='checkout'?'success_url':'return_url'));assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('symbol'),'^GSPC');});
+  check(`${locale}: ${action} keeps supported provider dialect and index identifier`,()=>{assert.equal(response.statusCode,200);assert.equal(requests[0].form.get('locale'),provider);const url=new URL(requests[0].form.get(action==='checkout'?'success_url':'return_url'));assert.equal(url.searchParams.get('locale'),locale);assert.equal(url.searchParams.get('symbol'),action==='checkout'?null:'^GSPC');});
 }
 for(const symbol of['BRK-B','=F','BTC-USD','^GSPC','A'.repeat(20)]){
+  // Checkout is idempotent per attempt (Stripe rejects a retry whose form differs), so the asset stays out of its form;
+  // the billing portal, which has no idempotency key, still returns to the asset.
   const{requests}=await billingApi({action:'checkout',language:'fr',locale:'fr-FR',symbol});
-  check(`billing return preserves Desk contract symbol ${symbol}`,()=>{assert.equal(new URL(requests[0].form.get('success_url')).searchParams.get('symbol'),symbol);});
+  check(`checkout form does not vary with the Desk symbol ${symbol}`,()=>{assert.equal(new URL(requests[0].form.get('success_url')).searchParams.get('symbol'),null);});
+  const portal=await billingApi({action:'portal',language:'fr',locale:'fr-FR',symbol});
+  check(`portal return preserves Desk contract symbol ${symbol}`,()=>{assert.equal(new URL(portal.requests[0].form.get('return_url')).searchParams.get('symbol'),symbol);});
 }
 for(const action of['checkout','portal']){
   const legacy=await billingApi({action});

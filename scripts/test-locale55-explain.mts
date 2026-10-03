@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 
 // All provider/database traffic is replaced below. No credentials, paid calls or remote writes.
 process.env.OPENAI_API_KEY = 'test-only';
+// The chat endpoint answers internal callers only (payments audit OMR-1): these checks call it as the MCP tools do.
+process.env.INTERNAL_API_SECRET = 'test-only-internal';
 process.env.OPENCLAW_GATEWAY_URL = '';
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-only';
@@ -38,9 +40,9 @@ function response() {
     write(text: string) { this.headersSent = true; this.output += text; }, end() { this.ended = true; },
   };
 }
-async function call(handler: Function, body: unknown, method = 'POST') {
+async function call(handler: (...args: any[]) => unknown, body: unknown, method = 'POST') {
   const res = response();
-  await handler({ method, body, query: {}, headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': `192.0.2.${++ip}` } }, res);
+  await handler({ method, body, query: {}, headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': `192.0.2.${++ip}`, ...(handler === chat ? { 'x-internal-secret': 'test-only-internal' } : {}) } }, res);
   return res;
 }
 try {

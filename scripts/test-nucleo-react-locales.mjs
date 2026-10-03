@@ -44,6 +44,8 @@ function browser(language='fr',preferred='fr-FR',navigatorPreferred=preferred){
   './LangMenu':{default:()=>null},
   '@/lib/desk-request':{deskJson:async(url,init)=>{requests.push({url,init});return{ok:true,data:url.includes('asset-search')?{resolved:{baseSymbol:'MC.PA',displayName:'LVMH',assetClass:'equity',currency:'EUR',exchange:'Euronext Paris'}}:{market:{price:225.1,currency:'EUR'},technicals:{price:225.1,rsi14:50,trend:'bullish',support:220,resistance:230},technical_pulse:{signal:'wait',direction:'none'}}};}},
   '@/lib/access-client':{accessHeaders:async()=>({})},
+  // The browser telemetry entry reads import.meta (Vite only): the desk transport gets an inert request id here.
+  '@/lib/client-telemetry-browser':{beginClientRead:()=>({requestId:'00000000-0000-4000-8000-000000000000'}),receiveClientRead:()=>null},
  };
  function load(file){if(loaded.has(file))return loaded.get(file);const module={exports:{}};loaded.set(file,module.exports);const extra=file==='src/pages/BobbyRedeemPage.tsx'?'\nexports.__localization = { COPY, RESULT, giftLine, pageLang };':file==='src/components/adams/VoiceRoom.tsx'?'\nexports.__localization = { voiceStateCopy, formatDeskNumber, assetLabel };':file==='src/components/adams/SwapConfirm.tsx'?'\nexports.__localization = { localizedSwapError };':file==='src/components/adams/AdamsChat.tsx'?'\nexports.__localization = { technicalPrice, marketMoodLabel };':'';const src=ts.transpileModule(read(file).replaceAll('import.meta.env.DEV','false')+extra,{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText;
   const request=(name)=>{if(name in stubs)return stubs[name];const aliases={'@/lib/companions/i18n':'src/lib/companions/i18n.ts','@/lib/companions/progress':'src/lib/companions/progress.ts','@/lib/desk-price':'src/lib/desk-price.ts','@/lib/companions/data':'src/lib/companions/data.ts','@/components/nucleo/NucleoRisk':'src/components/nucleo/NucleoRisk.tsx','@/lib/voice-assets':'src/lib/voice-assets.ts','@/lib/realtime-context':'src/lib/realtime-context.ts','@/lib/mascot':'src/lib/mascot.ts'};if(name in aliases)return load(aliases[name]);if(name.startsWith('.')||name.startsWith('@/')){const target=(name.startsWith('@/')?'src/'+name.slice(2):path.posix.normalize(path.posix.join(path.posix.dirname(file),name))).replace(/\.js$/,'');for(const candidate of [target,target+'.ts',target+'.tsx']){if(fs.existsSync(path.join(root,candidate)))return load(candidate);}}throw new Error('Unexpected module '+name+' from '+file);};
@@ -72,7 +74,7 @@ for(const [language,locale] of [['en','en-US'],['es','es-MX'],['fr','fr-FR'],['p
 check('language selector changes a query-pinned language and keeps Portuguese region',()=>{const b=browser('fr','pt-BR');b.location.search='?lang=fr&locale=fr-FR';b.location.href='https://bobby.test/desk?lang=fr&locale=fr-FR';const menu=b.load('src/components/nucleo/LangMenu.tsx').LangSegment;const buttons=elements(menu()).filter(e=>e.type==='button');assert.equal(buttons.length,6);buttons.find(e=>e.props.children==='PT').props.onClick();assert.equal(b.saved.get('bobby_lang'),'pt');assert.equal(b.saved.get('bobby_locale'),'pt-BR');assert.equal(new URL(b.location.assigned).searchParams.get('lang'),'pt');assert.equal(new URL(b.location.assigned).searchParams.has('locale'),false);});
 check('changing locale refreshes automatic suggestions while keeping personal assets',()=>{
  const persisted='bobby.companion.progress.v1';
- for(const [language,locale,symbols] of [['pt','pt-PT',['BTC','NVDA','EDP.LS','GALP.LS']],['pt','pt-BR',['BTC','NVDA','PETR4.SA','VALE3.SA']],['it','it-IT',['BTC','NVDA','ENI.MI','ENEL.MI']],['de','de-DE',['BTC','NVDA','SAP.DE','SIE.DE']]]){
+ for(const [language,locale,symbols] of [['pt','pt-PT',['BTC','EDP.LS','NVDA','GALP.LS']],['pt','pt-BR',['BTC','PETR4.SA','NVDA','VALE3.SA']],['it','it-IT',['BTC','ISP.MI','NVDA','ENEL.MI']],['de','de-DE',['BTC','SAP.DE','NVDA','SIE.DE']]]){
   const b=browser(language,locale);b.saved.set(persisted,JSON.stringify({quickAccess:['MC.PA','TTE.PA','BTC'],aiConsentGranted:false}));
   const p=b.load('src/lib/companions/progress.ts').progressStore;assert.deepEqual(clean(p.get().quickAccess),symbols);assert.equal(p.get().quickAccessCustomized,false);
   p.setQuickAccess(['AAPL','MC.PA','BTC']);assert.equal(p.get().quickAccessCustomized,true);
@@ -203,6 +205,7 @@ check('regional charts retain provider currency and never invent a dollar price 
 });
 check('dictation uses the selected locale and aborts when the consent gate unmounts chat',()=>{
  const b=adamsFixture('pt','pt-BR');let started=0,aborted=0,recognition;
+ // eslint-disable-next-line @typescript-eslint/no-this-alias -- the test keeps the instance the page created
  b.context.window.SpeechRecognition=class {constructor(){recognition=this;}start(){started++;}stop(){}abort(){aborted++;}};
  b.toggleListening();assert.equal(started,1);assert.equal(recognition.lang,'pt-BR');
  b.progress.withdrawAIConsent();b.dispose();assert.equal(aborted,1);

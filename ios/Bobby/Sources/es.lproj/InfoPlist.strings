@@ -1,3 +1,3 @@
 "NSMicrophoneUsageDescription" = "Bobby escucha solo mientras mantienes pulsado el botón para oír tu pregunta.";
-"NSSpeechRecognitionUsageDescription" = "Bobby convierte tu pregunta hablada en texto en este iPhone. El audio nunca sale de tu dispositivo.";
+"NSSpeechRecognitionUsageDescription" = "Bobby convierte tu pregunta hablada en texto: en este iPhone si el idioma está instalado; si no, mediante el servicio de voz de Apple. Bobby no guarda el audio.";
 "NSPhotoLibraryAddUsageDescription" = "Bobby guarda la tarjeta de tu avatar en Fotos solo cuando tocas Guardar imagen.";

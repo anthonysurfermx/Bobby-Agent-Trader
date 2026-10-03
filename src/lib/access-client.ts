@@ -5,6 +5,7 @@ import { bobbySupabase } from '@/lib/bobby-db-client';
 import { progressHeaders } from '@/lib/companions/sync';
 import { t } from '@/lib/companions/i18n';
 import { clientLanguage, clientLocale } from '@/lib/client-language';
+import { browserDeviceId } from './device-id';
 
 export type Tier = 'anon' | 'free' | 'pro';
 /** `bonus`: gifted Quick reads, separate from `remaining`; Pro keeps its balance while reads are unlimited. */
@@ -18,25 +19,15 @@ export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMete
 export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; proSource?: 'admin' | 'referral' | null; friends: Array<{ joinedAt: string }> }
 export interface AccessState {
   access: Access; signedIn: boolean;
-  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null;
+  subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null; cardPlan?: boolean; appleActive?: boolean } | null;
   payments: { stripe: boolean; apple: boolean };
   levels?: LevelState | null; referral?: Referral | null;
   /** [uses, window days] per plan and premium level, and the invite terms (api/_lib/desk-levels.ts). */
   plans?: { limits: Record<Tier, Record<PremiumLevel, [number, number]>>; referral: { maxFriends: number; rewardDays: number }; freeReadsPerWeek: number | null };
 }
 
-const DEVICE_KEY = 'bobby:device:v1';
-
 export function deviceId(): string {
-  try {
-    const have = localStorage.getItem(DEVICE_KEY);
-    if (have && /^[A-Za-z0-9-]{16,64}$/.test(have)) return have;
-    const id = crypto.randomUUID();
-    localStorage.setItem(DEVICE_KEY, id);
-    return id;
-  } catch {
-    return crypto.randomUUID();
-  }
+  return browserDeviceId();
 }
 
 export async function accessHeaders(): Promise<Record<string, string>> {
@@ -60,19 +51,26 @@ export async function fetchAccess(headers?: Record<string, string>): Promise<Acc
 }
 
 /** Opens Stripe Checkout (or the billing portal) for Bobby Pro; returns an error message when it cannot. */
-function billingFailure(status?: number, error?: string): string {
-  if (status === 401 || status === 403) return t('Sign in first: Bobby Pro belongs to your Bobby account.', 'Inicia sesión primero: Bobby Pro pertenece a tu cuenta de Bobby.');
+function billingFailure(status?: number, error?: string, code?: string): string {
+  if (code === 'already_pro') return t('You already have Bobby Pro.', 'Ya tienes Bobby Pro.', 'Você já tem o Bobby Pro.', 'Tu as déjà Bobby Pro.', 'Hai già Bobby Pro.', 'Du hast Bobby Pro bereits.');
+  if (status === 401 || status === 403) return t('Sign in first: Bobby Pro belongs to your Bobby account.', 'Inicia sesión primero: Bobby Pro pertenece a tu cuenta de Bobby.', 'Entre primeiro: o Bobby Pro pertence à sua conta Bobby.', 'Connecte-toi d’abord : Bobby Pro est lié à ton compte Bobby.', 'Accedi prima: Bobby Pro appartiene al tuo account Bobby.', 'Melde dich zuerst an: Bobby Pro gehört zu deinem Bobby-Konto.');
   if (error === 'Card payments are not switched on yet.') return t('Card payments are not available yet.', 'Los pagos con tarjeta aún no están disponibles.', 'Os pagamentos com cartão ainda não estão disponíveis.', 'Les paiements par carte ne sont pas encore disponibles.', 'I pagamenti con carta non sono ancora disponibili.', 'Kartenzahlungen sind noch nicht verfügbar.');
   if (error === 'No card subscription on this account.') return t('This account has no card subscription to manage.', 'Esta cuenta no tiene una suscripción con tarjeta que administrar.', 'Esta conta não tem uma assinatura paga com cartão para gerenciar.', 'Ce compte n’a pas d’abonnement payé par carte à gérer.', 'Questo account non ha un abbonamento pagato con carta da gestire.', 'Für dieses Konto gibt es kein per Karte bezahltes Abo zu verwalten.');
   return t('Payments are temporarily unavailable. Please try again.', 'Los pagos no están disponibles por ahora. Inténtalo de nuevo.', 'Os pagamentos estão temporariamente indisponíveis. Tente novamente.', 'Les paiements sont momentanément indisponibles. Réessaie.', 'I pagamenti non sono disponibili al momento. Riprova.', 'Zahlungen sind vorübergehend nicht verfügbar. Versuche es erneut.');
 }
 export async function startBilling(action: 'checkout' | 'portal', market?: { symbol: string; timeframe: string }): Promise<string | null> {
   try {
+    if (action === 'checkout') {
+      // Load after this module initializes: the tracker shares accessHeaders and the install id.
+      void import('@/lib/track').then(({ track }) => track('purchase_start', 'desk')).catch(() => {});
+    }
     const params = new URLSearchParams(window.location.search);
     const r = await fetch('/api/bobby-access', { method: 'POST', headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) }, body: JSON.stringify({ action, language: clientLanguage(), locale: clientLocale(), country: params.get('country'), symbol: market?.symbol ?? params.get('symbol'), timeframe: market?.timeframe ?? params.get('timeframe') }) });
-    const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string };
+    const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; code?: string; provider?: string };
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
-    return billingFailure(r.status, body.error);
+    // Already paying by card (e.g. a past_due renewal): open the billing portal to fix it instead of a dead end.
+    if (action === 'checkout' && r.status === 409 && body.code === 'already_pro' && body.provider === 'stripe') return startBilling('portal', market);
+    return billingFailure(r.status, body.error, body.code);
   } catch { return billingFailure(); }
 }
 
@@ -133,7 +131,7 @@ export async function redeemCoupon(code: string): Promise<{ result: RedeemResult
 // After an Apple/Google sign-in started from /redeem or /admin, /auth/callback returns there instead of the desk.
 const RETURN_KEY = 'bobby:return:v1';
 const isReturnPath = (v: unknown): v is string =>
-  typeof v === 'string' && (v === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt))?$/.test(v));
+  typeof v === 'string' && (v === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt|fr|it|de))?$/.test(v));
 export function rememberReturn(path: string) { try { if (isReturnPath(path)) sessionStorage.setItem(RETURN_KEY, path); } catch { /* private mode */ } }
 export function takeReturn(): string | null {
   try {

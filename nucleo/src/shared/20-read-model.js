@@ -122,7 +122,7 @@
     "row.stop": "SEUIL D’ARRÊT",
     "row.target": "OBJECTIF",
     "row.trend": "TENDANCE · RSI",
-    "thesis.line.wait": "Aucune opération prévue. Enregistrer consigne votre décision.",
+    "thesis.line.wait": "Aucune opération prévue. Enregistrer consigne ta décision.",
     "thesis.line.review": "Délai de réexamen : {hours} h.",
     "thesis.save": "Enregistrer la thèse",
     "thesis.saved": "Enregistrée",
@@ -133,19 +133,19 @@
     "debate.title": "{n} agents · {s} s",
     "debate.header": "LE DÉBAT",
     "meta": "Analyse éducative · aucun conseil financier",
-    "confirm.prompt": "Voulez-vous dire {name} ({symbol}) ?",
+    "confirm.prompt": "Tu veux dire {name} ({symbol}) ?",
     "confirm.yes": "Oui, {symbol}",
     "confirm.no": "Un autre actif",
-    "err.unknown": "Je n’ai pas trouvé d’actif. Essayez son nom ou son symbole.",
-    "err.unsupported": "Bobby ne peut pas encore analyser {name}. Essayez une action ou une crypto.",
+    "err.unknown": "Je n’ai pas trouvé d’actif. Essaie son nom ou son symbole.",
+    "err.unsupported": "Bobby ne peut pas encore analyser {name}. Essaie une action ou une crypto.",
     "err.unsupportedStale": "Les données de {symbol} sont trop anciennes pour une analyse.",
-    "err.quota": "Bobby a atteint la limite d’analyses du jour. Réessayez demain.",
-    "err.tooLong": "Votre question est trop longue. Utilisez au maximum 1 200 caractères.",
+    "err.quota": "Bobby a atteint la limite d’analyses du jour. Réessaie demain.",
+    "err.tooLong": "Ta question est trop longue. Utilise au maximum 1 200 caractères.",
     "err.network": "Aucune connexion. Rien n’a été analysé.",
     "err.timeout": "L’analyse a pris trop de temps. Aucune conclusion n’a été rendue.",
     "err.bad": "L’analyse n’a pas abouti. Aucune conclusion n’a été rendue.",
     "err.risk": "D’abord, l’avertissement sur les risques.",
-    "err.riskSub": "Bobby ne lance aucune analyse avant votre accord. Votre question n’a pas été envoyée.",
+    "err.riskSub": "Bobby ne lance aucune analyse avant ton accord. Ta question n’a pas été envoyée.",
     "err.riskCta": "Ouvrir l’avertissement sur les risques",
     "follow.another": "Une autre question sur {symbol}",
     "follow.how": "Que penser de {symbol} ?",
@@ -191,7 +191,7 @@
     "row.stop": "LIMITE DE SAÍDA",
     "row.target": "OBJETIVO",
     "row.trend": "TENDÊNCIA · RSI",
-    "thesis.line.wait": "Sem operação planeada. Guardar regista a sua decisão.",
+    "thesis.line.wait": "Sem operação planeada. Guardar regista a tua decisão.",
     "thesis.line.review": "Prazo de revisão: {hours} h.",
     "thesis.save": "Guardar tese",
     "thesis.saved": "Guardada",
@@ -202,19 +202,19 @@
     "debate.title": "{n} agentes · {s} s",
     "debate.header": "O DEBATE",
     "meta": "Análise educativa · não é aconselhamento financeiro",
-    "confirm.prompt": "Refere-se a {name} ({symbol})?",
+    "confirm.prompt": "Referes-te a {name} ({symbol})?",
     "confirm.yes": "Sim, {symbol}",
     "confirm.no": "Outro ativo",
-    "err.unknown": "Não encontrei um ativo. Experimente o nome ou o símbolo.",
-    "err.unsupported": "O Bobby ainda não consegue analisar {name}. Experimente uma ação ou cripto.",
+    "err.unknown": "Não encontrei um ativo. Experimenta o nome ou o símbolo.",
+    "err.unsupported": "O Bobby ainda não consegue analisar {name}. Experimenta uma ação ou cripto.",
     "err.unsupportedStale": "Os dados de {symbol} são demasiado antigos para analisar agora.",
-    "err.quota": "O Bobby atingiu o limite de análises de hoje. Tente novamente amanhã.",
-    "err.tooLong": "A sua pergunta é demasiado longa. Use até 1 200 caracteres.",
+    "err.quota": "O Bobby atingiu o limite de análises de hoje. Tenta novamente amanhã.",
+    "err.tooLong": "A tua pergunta é demasiado longa. Usa até 1 200 caracteres.",
     "err.network": "Sem ligação. Nada foi analisado.",
     "err.timeout": "A análise demorou demasiado. Não foi emitida uma conclusão.",
     "err.bad": "A análise não foi concluída. Não foi emitida uma conclusão.",
     "err.risk": "Primeiro, o aviso de risco.",
-    "err.riskSub": "O Bobby só analisa após aceitar o aviso. A sua pergunta não foi enviada.",
+    "err.riskSub": "O Bobby só analisa depois de aceitares o aviso. A tua pergunta não foi enviada.",
     "err.riskCta": "Abrir o aviso de risco",
     "follow.another": "Outra pergunta sobre {symbol}",
     "follow.how": "Como está {symbol}?",
@@ -422,14 +422,34 @@
     return (v >= 0 ? '+' : '−') + s;
   }
 
-  /** Sentence split that survives decimals ("225.1") and tickers: a stop must be followed by space + capital/opening mark. */
+  /* Stops that do not end a sentence although a capital follows (German capitalizes nouns; French has "M. Dupont"):
+     a short abbreviation ("z. B.", "bzw.", "ca.", "Nr.", "Mio.") and an ordinal ("am 3. Oktober", "im 4. Quartal",
+     "der 1. Widerstand"). A number that closes a sentence ("… bei 85. Der Trend …", "RSI at 71. The trend …") still ends it:
+     an ordinal is a 1–2 digit number after a German article/preposition, or before a month or period noun. */
+  var ABBREV_STOP = /(?:^|[\s(])(?:z|z\. ?B|bzw|ca|Nr|Mio|Mrd|ggf|inkl|vgl|St|M|Mme|Dr|Prof)\.$/;
+  var ORDINAL_STOP = /(?:^|\s)((?:am|im|dem|den|der|des|die|das|zum|zur|vom|beim) )?\d{1,2}\.$/i;
+  var ORDINAL_NEXT = /^(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember|Quartal|Halbjahr|Jahrhundert)(?![A-Za-zÀ-ÿ])/;
+  /* The same letters end a sentence in the other languages: a figure in millions ("12 M. La tendencia …") and a number
+     after French "des" or Portuguese "das" ("au-dessus des 50. La tendance …", "antes das 10. O volume …"). What follows
+     an ordinal is the noun it counts, never a determiner or pronoun, so one of those opens a new sentence. */
+  var UNIT_M = /\d ?M\.$/;
+  var SENTENCE_OPENER = /^(?:(?:Der|Die|Das|Ein|Eine|Es|Er|Sie|Wir|Le|La|Les|Un|Une|Il|Elle|Ce|O|A|Os|As|Um|Uma)(?![A-Za-zÀ-ÿ’'])|L[’'])/;
+  function softStop(s, i) {
+    if (s[i] !== '.') return false;
+    var head = s.slice(Math.max(0, i - 12), i + 1), next = s.slice(i + 2);
+    if (ABBREV_STOP.test(head)) return !UNIT_M.test(head);
+    var m = ORDINAL_STOP.exec(head);
+    return !!m && (m[1] ? !SENTENCE_OPENER.test(next) : ORDINAL_NEXT.test(next));
+  }
+
+  /** Sentence split that survives decimals ("225.1"), tickers, ordinals and abbreviations: a stop must be followed by space + capital/opening mark. */
   function sentences(text) {
     var s = String(text || '').replace(/\s+/g, ' ').trim();
     if (!s) return [];
     var out = [], start = 0;
     for (var i = 0; i < s.length; i++) {
       var c = s[i];
-      if ((c === '.' || c === '!' || c === '?') && s[i + 1] === ' ' && /[A-ZÀ-ÖØ-Þ¿¡"“(]/.test(s[i + 2] || '')) {
+      if ((c === '.' || c === '!' || c === '?') && s[i + 1] === ' ' && /[A-ZÀ-ÖØ-Þ¿¡"“(]/.test(s[i + 2] || '') && !softStop(s, i)) {
         out.push(s.slice(start, i + 1).trim());
         start = i + 2;
       }

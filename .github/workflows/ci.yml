@@ -48,11 +48,17 @@ jobs:
       - run: npm run test:rpc-redaction
       - run: npm run test:mcp-payment-transport
       - run: npm run test:admin-api
+      - run: npm run test:payments-guards
+      - run: npm run test:dashboard-payments
+      - run: npm run test:admin-live
+      - run: npm run test:client-telemetry
       - run: npm run test:llm-ledger
       - run: npm run test:briefings
+      - run: npm run test:revenuecat-store-guard
       - run: npm run build
       - run: npm run lint -- --quiet
-      - run: npm audit --audit-level=high
+      # Whole tree, same bar as `npm audit --audit-level=high`; exceptions are listed, justified and expire.
+      - run: node scripts/ci/audit-gate.mjs
 
   # BP-06: the suites that need a real Postgres (RLS lock-down, swap ledger,
   # agent-registry CAS) and a real EVM (backend ABI vs compiled artifact). The
@@ -121,11 +127,14 @@ jobs:
       - run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f scripts/test-trader-land-growth.sql
       - run: npm run test:progress-atomic-pg
       - run: npm run test:levels-referrals-pg
+      - run: npm run test:payments-guards-pg
       - run: npm run test:coupons-pg
       - run: npm run test:admin-pg
       - run: npm run test:lifecycle-pg
       - run: npm run test:user-memory-pg
       - run: npm run test:admin-truth-pg
+      - run: npm run test:admin-live-pg
+      - run: npm run test:client-telemetry-pg
       - run: |
           psql "$DATABASE_URL" -c 'create database briefings_pg' -c 'create database briefings_api' -c 'create database briefings_worker'
       - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_pg npm run test:briefings-pg

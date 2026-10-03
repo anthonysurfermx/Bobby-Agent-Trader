@@ -23,7 +23,7 @@ const eq = (a: unknown, b: unknown) => { assert.deepEqual(a,b); checks++; };
 const ok = (v: unknown) => { assert.ok(v); checks++; };
 const json = (v: unknown) => new Response(JSON.stringify(v), { headers: { 'content-type': 'application/json' } });
 function response() { return { statusCode: 200, body: null as any, setHeader() {}, status(n: number) { this.statusCode=n;return this; }, json(v: unknown) { this.body=v;return this; } }; }
-async function call(handler: Function, query: Record<string,unknown>, body?: Record<string,unknown>) {
+async function call(handler: (...args: any[]) => unknown, query: Record<string,unknown>, body?: Record<string,unknown>) {
   const res=response(); await handler({ method: body ? 'POST' : 'GET', query, body, headers: { origin:'https://bobbyprotocol.xyz' } },res);return res;
 }
 const original=globalThis.fetch;

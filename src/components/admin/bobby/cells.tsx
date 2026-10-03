@@ -2,7 +2,7 @@
 import type { AdminUser } from '@/lib/admin-client';
 import { Tag } from './ui';
 import { T } from './tokens';
-import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, label, statusLabel, timeOf } from './format';
+import { ACTIVE_SUB, DASH, effectiveSubStatus, fmtDate, fmtDateTime, fmtInt, label, statusLabel, teamReason, timeOf } from './format';
 
 /** Apple lets people hide their email: such an account is told apart by its id. */
 export function identityName(u: AdminUser): string {
@@ -26,6 +26,8 @@ function lastActiveTime(u: AdminUser): number | null {
  */
 export function Identity({ u, self, team }: { u: AdminUser; self?: boolean; team?: boolean }) {
   const name = identityName(u);
+  // Why the team rule reaches an account that is neither admin nor marked (the D2 closure), from the server.
+  const why = !u.is_admin && !u.is_internal ? teamReason(u) ?? (team ? 'por su email (lista de emails del equipo)' : u.is_team ? 'por el vínculo con el equipo' : null) : null;
   return (
     <div className="flex min-w-0 flex-col gap-1">
       <span className="flex flex-wrap items-center gap-1.5">
@@ -37,11 +39,12 @@ export function Identity({ u, self, team }: { u: AdminUser; self?: boolean; team
       <span className="flex flex-wrap items-center gap-1">
         {u.is_admin && <Tag tone="orange" title="Admin: queda fuera de todas las cifras">Admin</Tag>}
         {u.is_internal && <Tag tone="blue" title="Marcada a mano como interna: queda fuera de todas las cifras">Interna</Tag>}
-        {team && !u.is_internal && <Tag tone="blue" title="Su email está en la lista del equipo: queda fuera de todas las cifras">Equipo</Tag>}
+        {why && <Tag tone="blue" title={`Del equipo ${why}: queda fuera de todas las cifras`}>Equipo</Tag>}
         {u.pro && <Tag tone="green">Pro</Tag>}
         {self && <Tag>Tú</Tag>}
         <span className="max-w-[150px] truncate font-mono text-[10.5px] text-[#5C5C5C]" title={u.id}>{u.id}</span>
       </span>
+      {why && <span className="max-w-[260px] font-mono text-[10.5px] leading-snug text-[#4FB3FF]/80">Del equipo {why}</span>}
     </div>
   );
 }

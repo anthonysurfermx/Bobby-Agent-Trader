@@ -3,9 +3,11 @@ import { ChevronLeft, ChevronRight, Gift, Search, Trash2 } from 'lucide-react';
 import { adminAction, fetchAdminUsers, type AdminMe, type AdminUser, type AdminPostBody, type InternalResponse } from '@/lib/admin-client';
 import { Btn, Card, CardHead, Empty, ErrorState, Field, FormMessage, Loading, Modal, Note, Segmented, StaleBanner, Switch, TableScroll, TextInput, td, tdWrap, th, tr } from './ui';
 import { GiftCell, Identity, Lifecycle, PlanCell, ProviderCell, identityName } from './cells';
-import { DASH, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtRelative, timeOf } from './format';
+import { DASH, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtRelative, teamReason, timeOf } from './format';
 import { toAdminError, useLoad } from './useLoad';
 import InternalTrafficCard from './InternalTrafficCard';
+import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 const PAGE = 50;
 
@@ -56,7 +58,9 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
     return () => window.clearTimeout(t);
   }, [input]);
 
-  const { data, error, loading, reload } = useLoad(() => fetchAdminUsers({ q, limit: PAGE, offset }), `${q}|${offset}|${refreshKey}|${localKey}`);
+  const queryKey = `${q}|${offset}|${refreshKey}|${localKey}`;
+  const { data: loaded, dataKey, error, loading, reload, updatedAt } = useLoad((signal) => fetchAdminUsers({ q, limit: PAGE, offset, signal }), queryKey, { intervalMs: CORE_REFRESH_MS });
+  const data = dataKey === queryKey ? loaded : null;
   const now = Date.now();
 
   const changed = useCallback(() => { setLocalKey((k) => k + 1); onChanged(); }, [onChanged]);
@@ -94,12 +98,13 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
 
   return (
     <div className="flex flex-col gap-4">
+    <SourceFreshness meta={sourceMetaForError(data?.meta, error?.message)} maxAgeMs={CORE_STALE_MS} label="Inventario de cuentas · cada 30 s" fallbackAt={data ? updatedAt : null} />
     <Card>
       <CardHead
         title="Usuarios"
         count={data ? `${fmtInt(data.accounts)} cuentas · ${fmtInt(data.wallets)} wallets · ${fmtInt(data.internal)} internas${q ? ` · para “${q}”` : ''}` : undefined}
         sub={data ? (
-          <>Internas = admins o marcadas a mano{teamEmails.size ? '; las de los emails del equipo también salen de las cifras y aquí se marcan «Equipo»' : ''}. Lecturas con cuenta desde {readsSince ? fmtDate(readsSince) : 'sin lecturas aún'}.</>
+          <>Inventario completo: incluye al equipo (el selector «Sin equipo» del encabezado no aplica aquí). «Ocultar cuentas internas» usa la misma regla que las cifras: el equipo son los admins, las cuentas marcadas a mano, los emails del equipo, las instalaciones marcadas o que abrieron /admin, las redes del equipo, y todo lo ligado a ellos en cadena (cuenta ↔ instalación); cada cuenta «Equipo» dice por qué. El switch «Interna» es solo la marca a mano. Lecturas con cuenta desde {readsSince ? fmtDate(readsSince) : 'sin lecturas aún'}.</>
         ) : undefined}
         right={(
           <form onSubmit={submit} className="w-full sm:w-[320px]" role="search">
@@ -161,6 +166,8 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
                   {rows.map((u) => {
                     const self = u.id === me.identityId;
                     const team = onTeamList(u);
+                    // The team by the D2 chain (not admin, not marked): the switch cannot take it out; its seed can.
+                    const chained = u.is_team && !u.is_admin && !u.is_internal && !team ? teamReason(u) ?? 'por el vínculo con el equipo' : null;
                     const created = timeOf(u.created_at);
                     const since = timeOf(readsSince);
                     const beforeMeasure = created != null && since != null && created < since;
@@ -215,6 +222,7 @@ export default function UsersTab({ me, refreshKey, notify, onChanged, focusSearc
                               : u.is_internal ? `Volver a contar a ${identityName(u)} en las cifras`
                               : u.is_admin ? `${identityName(u)} ya queda fuera por ser admin; marcarla la deja fuera aunque deje de serlo`
                               : team ? `${identityName(u)} ya queda fuera por estar en los emails del equipo; marcarla la deja fuera aunque se quite de la lista`
+                              : chained ? `${identityName(u)} ya queda fuera ${chained}; este switch no la devuelve a las cifras: para eso quita la marca de esa instalación o red (Tráfico interno) o aparta el vínculo. Marcarla la deja fuera aunque el vínculo cambie`
                               : `Marcar a ${identityName(u)} como interna (queda fuera de todas las cifras)`}
                             disabled={savingInternal != null}
                           />
@@ -407,7 +415,7 @@ function DeleteDialog({ user, onClose, onDone }: { user: AdminUser | null; onClo
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label={user?.email ? 'Escribe el email de la cuenta para confirmar' : 'Escribe el id completo de la cuenta para confirmar'}
-          hint={user && !user.email ? (user.wallet_only ? 'Las cuentas de wallet no tienen email.' : 'Esta cuenta no tiene email (Apple lo oculta).') : undefined}
+          hint={user && !user.email ? (user.wallet_only ? 'Esta identidad wallet no tiene email.' : user.provider === 'apple' ? 'Esta cuenta no tiene email; Apple permite ocultarlo.' : 'Esta cuenta no tiene email confirmado.') : undefined}
         >
           <TextInput mono value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={expected} autoComplete="off" autoCapitalize="none" spellCheck={false} />
         </Field>

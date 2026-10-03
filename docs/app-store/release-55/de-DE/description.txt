@@ -1,6 +1,6 @@
 Lerne Bobby kennen, deinen Begleiter beim Nachdenken über die Märkte.
 
-Stelle eine Frage zu einem unterstützten Vermögenswert, etwa einer Aktie oder Kryptowährung: per Texteingabe oder optionalem Diktieren auf dem Gerät. Bobby verbindet drei Perspektiven: Chancen, eine kritische Risikoprüfung und eine Zusammenfassung der verfügbaren Belege.
+Stelle eine Frage zu einem unterstützten Vermögenswert, etwa einer Aktie oder Kryptowährung: per Texteingabe oder optionalem Diktieren. Bobby verbindet drei Perspektiven: Chancen, eine kritische Risikoprüfung und eine Zusammenfassung der verfügbaren Belege.
 
 SECHS SPRACHEN UND LOKALER KONTEXT
 Nutze Bobby auf Deutsch, Englisch, Spanisch, Französisch, Portugiesisch oder Italienisch. Ändere die Sprache im Profil. Portugiesische Stimme und Diktierfunktion folgen der auf dem Gerät eingestellten Variante für Portugal oder Brasilien. Suche unterstützte lokale Aktien nach Namen oder Symbol; die ursprünglichen Börsensymbole und Kurswährungen bleiben erhalten.
@@ -15,7 +15,7 @@ DEIN BEGLEITER UND DEIN FORTSCHRITT
 Wähle einen Begleiter, passe dein Profil an und erkunde Trader Land. Ein optionales Apple-Konto synchronisiert deinen Fortschritt. Deine Insel bleibt privat, bis du sie veröffentlichst. Auf öffentlichen Inseln kannst du Inhalte melden und Ersteller blockieren.
 
 DU ENTSCHEIDEST ÜBER KI
-Die Verarbeitung durch externe KI erfordert deine Zustimmung. Lies den Hinweis und widerrufe deine Zustimmung im Profil. Die Diktierfunktion nutzt Apples Spracherkennung auf unterstützten Geräten; Mikrofonaufnahmen werden nicht hochgeladen. Du kannst jederzeit tippen. Die optionale Sprachausgabe lässt sich stummschalten.
+Die Verarbeitung durch externe KI erfordert deine Zustimmung. Lies den Hinweis und widerrufe deine Zustimmung im Profil. Diktate werden auf deinem iPhone erkannt, wenn die Sprache installiert ist; andernfalls transkribiert sie Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht. Du kannst jederzeit tippen. Die optionale Sprachausgabe lässt sich stummschalten.
 
 Bobby ist ein Lernwerkzeug zur Marktanalyse. Die iPhone-App verbindet keine Wallets, führt keine Trades aus und bewegt kein Geld. Analysen können unvollständig oder falsch sein, und Marktdaten können verzögert sein. Bobby verspricht keine Renditen und bietet keine persönliche Anlageberatung. Du entscheidest, was du tust.
 

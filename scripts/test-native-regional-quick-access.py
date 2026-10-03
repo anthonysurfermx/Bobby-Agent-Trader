@@ -34,18 +34,18 @@ func require(_ condition: Bool, _ message: String) {
     if !condition { FileHandle.standardError.write(Data(("FAIL: " + message + "\n").utf8)); exit(1) }
 }
 let cases: [(String, [String], String?, [String])] = [
-    ("fr", ["fr-FR"], "FR", ["MC.PA", "TTE.PA", "BTC"]),
-    ("fr", ["en-US"], "PT", ["MC.PA", "TTE.PA", "BTC"]),
-    ("pt", ["pt-PT"], "PT", ["EDP.LS", "GALP.LS", "BTC"]),
-    ("pt", ["pt-BR"], "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
-    ("pt", ["en-US"], "BR", ["PETR4.SA", "VALE3.SA", "BTC"]),
-    ("pt", ["pt-PT"], "BR", ["EDP.LS", "GALP.LS", "BTC"]),
-    ("pt", ["en-US"], nil, ["EDP.LS", "GALP.LS", "BTC"]),
-    ("it", ["it-IT"], "IT", ["ENI.MI", "ENEL.MI", "BTC"]),
-    ("de", ["de-DE"], "DE", ["SAP.DE", "SIE.DE", "BTC"]),
+    ("fr", ["fr-FR"], "FR", ["BTC", "MC.PA", "NVDA", "OR.PA"]),
+    ("fr", ["en-US"], "PT", ["BTC", "MC.PA", "NVDA", "OR.PA"]),
+    ("pt", ["pt-PT"], "PT", ["BTC", "EDP.LS", "NVDA", "GALP.LS"]),
+    ("pt", ["pt-BR"], "BR", ["BTC", "PETR4.SA", "NVDA", "VALE3.SA"]),
+    ("pt", ["en-US"], "BR", ["BTC", "PETR4.SA", "NVDA", "VALE3.SA"]),
+    ("pt", ["pt-PT"], "BR", ["BTC", "EDP.LS", "NVDA", "GALP.LS"]),
+    ("pt", ["en-US"], nil, ["BTC", "EDP.LS", "NVDA", "GALP.LS"]),
+    ("it", ["it-IT"], "IT", ["BTC", "ISP.MI", "NVDA", "ENEL.MI"]),
+    ("de", ["de-DE"], "DE", ["BTC", "SAP.DE", "NVDA", "SIE.DE"]),
     ("en", ["en-GB"], "FR", ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]),
     ("es", ["es-MX"], "DE", ["BTC", "NVDA", "ETH", "TSLA", "ORO"]),
-    ("system", ["de-DE"], nil, ["SAP.DE", "SIE.DE", "BTC"])
+    ("system", ["de-DE"], nil, ["BTC", "SAP.DE", "NVDA", "SIE.DE"])
 ]
 var payload: [[String: Any]] = []
 for (selection, preferred, country, expected) in cases {
@@ -54,6 +54,9 @@ for (selection, preferred, country, expected) in cases {
     require(defaults == expected, "\(selection)/\(resolution.localeIdentifier): expected \(expected), got \(defaults)")
     let storage = MemoryDefaults(), memory = DeskMemory(defaults: storage)
     require(memory.quickAccess(fallback: defaults) == expected, "Empty history must expose regional defaults")
+    let single = DeskMemory(defaults: MemoryDefaults())
+    single.recordQuery(symbol: "SOL", isEquity: false)
+    require(Array(single.quickAccess(fallback: defaults).prefix(3)) == ["SOL"] + expected.prefix(2), "One personal ask must keep BTC and the first default in the three chips")
     let now = Date(timeIntervalSince1970: 1000)
     memory.recordQuery(symbol: "VOW3.DE", isEquity: true, now: now)
     memory.recordQuery(symbol: "SOL", isEquity: false, now: now.addingTimeInterval(1))
@@ -68,11 +71,12 @@ for (selection, preferred, country, expected) in cases {
     for offset in 0..<5 { memory.recordQuery(symbol: "CUSTOM\(offset).PA", isEquity: true, now: now.addingTimeInterval(Double(offset + 2))) }
     require(memory.quickAccess(fallback: defaults) == memory.watchlist.prefix(5).map(\.symbol), "Five personal choices must not be replaced by regional seeds")
     payload.append(["language": resolution.language.rawValue, "locale": resolution.localeIdentifier,
-                    "fresh": expected.map { ["symbol": $0] }, "personal": row.map { ["symbol": $0] }])
+                    "fresh": expected.map { ["symbol": $0] }, "personal": row.map { ["symbol": $0] },
+                    "single": single.quickAccess(fallback: defaults).map { ["symbol": $0] }])
 }
 let memory = DeskMemory(defaults: MemoryDefaults())
 memory.recordQuery(symbol: "MC.PA", isEquity: true)
-require(memory.quickAccess(fallback: ["MC.PA", "TTE.PA", "BTC"]) == ["MC.PA", "TTE.PA", "BTC"], "Recent matching a default must not duplicate")
+require(memory.quickAccess(fallback: ["BTC", "MC.PA", "NVDA", "OR.PA"]) == ["MC.PA", "BTC", "NVDA", "OR.PA"], "Recent matching a default must not duplicate")
 print(String(data: try JSONSerialization.data(withJSONObject: payload), encoding: .utf8)!)
 '''.replace("__EXPRESSION__", expression)
 
@@ -101,28 +105,68 @@ const read=p=>fs.readFileSync(root+'/'+p,'utf8');
 const modelContext={globalThis:{}};
 vm.runInNewContext(read('ios/Bobby/Nucleo/src/shared/20-read-model.js'),modelContext);
 const RM=modelContext.globalThis.NucleoReadModel;
-const source=read('ios/Bobby/Nucleo/src/onboarding/60-fsm.js');
-const start=source.indexOf('function suggestionChips(){'), end=source.indexOf('\nfunction setChips(',start);
-assert.ok(start>=0&&end>start,'Use the actual onboarding consumer');
+// The first run's own chips, from both Nucleo trees: the real suggestionChips, table included.
+function onboardingChips(tree,language,quickAccess){
+ const source=read(tree+'/src/onboarding/60-fsm.js'), start=source.indexOf('function suggestionChips(){'), end=source.indexOf('\nfunction setChips(',start);
+ assert.ok(start>=0&&end>start,tree+': use the actual onboarding consumer');
+ const c={LANG:language,W:{sugg:{quickAccess,movers:[]}}};
+ vm.runInNewContext(read(tree+'/src/onboarding/40-strings.js'),c);
+ vm.runInNewContext(source.slice(start,end),c);
+ return JSON.parse(JSON.stringify(c.suggestionChips()));
+}
+// The server catalogue is the only source of local symbols and company names (src/lib/regional-stocks.ts).
+const catalogue=new Map([...read('src/lib/regional-stocks.ts').matchAll(/\{ symbol: '([^']+)', name: (?:'([^']*)'|"([^"]*)")/g)].map(m=>[m[1],m[2]||m[3]]));
+assert.equal(catalogue.size,10,'Read the ten catalogue rows');
+const plain=s=>s.normalize('NFD').replace(/[^A-Za-z ]/g,'').toLowerCase();
+// The app's own idle row, from both Nucleo trees: the real showIdleSuggestions, table included.
+function idleChips(tree,language,quickAccess){
+ const text=read(tree+'/src/app/55-read.js'), from=text.indexOf('function showIdleSuggestions(){'), to=text.indexOf('\nfunction receiveSuggestions(',from);
+ assert.ok(from>=0&&to>from,tree+': use the actual idle chip consumer');
+ let shown=null;
+ const c={ST:{name:'IDLE'},SUGG:{quickAccess,movers:[]},LANG:language,RMOD:RM,chipsShow:list=>{shown=list;},chipsHide(){shown=[];}};
+ vm.runInNewContext(text.slice(from,to)+'\nshowIdleSuggestions();',c);
+ return JSON.parse(JSON.stringify(shown));
+}
 let checks=0;
 for(const row of rows){
- for(const kind of ['fresh','personal']){
-  const c={LANG:row.language,W:{sugg:{quickAccess:row[kind],movers:[]}}};
-  vm.runInNewContext(read('ios/Bobby/Nucleo/src/onboarding/40-strings.js'),c);
-  vm.runInNewContext(source.slice(start,end),c);
-  const chips=JSON.parse(JSON.stringify(c.suggestionChips()));
-  assert.equal(chips.length,3);
-  for(let i=0;i<3;i++){
-   const symbol=row[kind][i].symbol;
-   assert.ok(chips[i].label.includes(symbol),`${row.locale} onboarding must retain ${symbol}`);
-   assert.equal(chips[i].action.ask,chips[i].label);
+ for(const symbol of row.fresh.map(x=>x.symbol))if(symbol.includes('.'))assert.ok(catalogue.has(symbol),`${row.locale}: ${symbol} is not in the server catalogue`);
+ for(const kind of ['fresh','personal','single']){
+  // The chip reads as the company (LVMH, not MC.PA); the catalogue name starts with it.
+  const named=(where,symbol,label)=>{
+   if(catalogue.has(symbol)){
+    assert.ok(!label.includes('.'),`${where} ${row.locale}: ${symbol} shows a raw exchange ticker`);
+    assert.ok(label.length>0&&plain(catalogue.get(symbol)).startsWith(plain(label)),`${where}: ${label} is not the catalogue name of ${symbol}`);
+   } else assert.equal(label,symbol==='NVDA'?'NVIDIA':symbol);
+  };
+  for(const tree of ['ios/Bobby/Nucleo','nucleo']){
+   const chips=onboardingChips(tree,row.language,row[kind]);
+   assert.equal(chips.length,3);
+   for(let i=0;i<3;i++){
+    const symbol=row[kind][i].symbol;
+    assert.equal(chips[i].action.symbol,symbol,`${tree} ${row.locale} onboarding must retain ${symbol}`);
+    assert.ok(chips[i].action.ask.includes(symbol),`${tree} ${row.locale} onboarding must send ${symbol}`);
+    named(tree+' onboarding',symbol,chips[i].label);
+   }
+   const idle=idleChips(tree,row.language,row[kind]);
+   assert.equal(idle.length,3);
+   for(let i=0;i<3;i++){
+    const symbol=row[kind][i].symbol, chip=idle[i];
+    assert.equal(chip.action.symbol,symbol);
+    assert.ok(chip.action.question.includes(symbol),`${tree} ${row.locale}: the chip must still send ${symbol}`);
+    named(tree,symbol,chip.label);
+   }
   }
   const follow=JSON.parse(JSON.stringify(RM.followUps({symbol:'UNRELATED',requestId:'offline-read'},{quickAccess:row[kind],movers:[]},row.language)));
   assert.deepEqual(follow.slice(1).map(x=>x.action.symbol),row[kind].slice(0,2).map(x=>x.symbol));
   for(const chip of follow.slice(1))assert.ok(chip.action.question.includes(chip.action.symbol));
   checks++;
  }
+ if(row.fresh.some(x=>catalogue.has(x.symbol))){
+  assert.equal(row.fresh[0].symbol,'BTC');
+  assert.ok(catalogue.has(row.fresh[1].symbol),`${row.locale}: the local stock must follow BTC`);
+  assert.deepEqual(row.single.slice(0,3).map(x=>x.symbol),['SOL','BTC',row.fresh[1].symbol],`${row.locale}: one personal ask must keep the local stock visible`);
+ }
 }
-console.log(`${rows.length} native locale/history cases and ${checks} real onboarding/follow-up cases passed; no network, Simulator, profile or OS settings writes.`);
+console.log(`${rows.length} native locale/history cases and ${checks} real onboarding/idle/follow-up cases passed; no network, Simulator, profile or OS settings writes.`);
 '''
 subprocess.run(["node", "-e", node, str(ROOT)], input=json.dumps(rows), text=True, check=True)

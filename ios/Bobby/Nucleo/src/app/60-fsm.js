@@ -44,9 +44,10 @@ function dockOut(){
   if (A.wmO.t < 1){ A.wmY.set(8); A.wmO.tween(1, 0.16, E.fade, 0.04); A.wmY.to(0, 'snap', null, 0.04); }
   A.qT0 = 1e9;
 }
+var EVENING_HOUR = { es: 20, pt: 20 };   /* "Buenas tardes" / "Boa tarde" run until 20:00; the other four languages turn to the evening at 18:00 */
 function setGreeting(){
   var h = SES && fin(SES.localHour) ? SES.localHour : new Date().getHours();
-  var k = (h >= 5 && h < 12) ? 'morning' : (h >= 12 && h < (LANG === 'es' ? 20 : 18)) ? 'afternoon' : 'evening';
+  var k = (h >= 5 && h < 12) ? 'morning' : (h >= 12 && h < (EVENING_HOUR[LANG] || 18)) ? 'afternoon' : 'evening';
   var sub = LEDGER.length ? tt('greet.saved', { symbol: LEDGER[0].symbol }) : tt(k === 'evening' ? 'greet.sub.night' : 'greet.sub.day');
   lineSet(A.greet, tt('greet.' + k), sub, el.greetT, el.greetS);
 }
@@ -261,7 +262,8 @@ function pillDown(p, fromRead){
       else go('PRE_PERMISSION');
     }, cancel: cancel };
   }
-  // A hold is a voice attempt. Explain unavailable dictation without raising the keyboard.
+  // Voice input cannot run right now (no speech model for this language and no connection, or access is off).
+  // A hold is a voice attempt: say so and offer typing. A tap opens the keyboard, as the hint promises.
   at(0.25, function(){ if (!ended) hint(tt('hint.micOff')); });
   return { move: move, up: function(){
     if (ended) return; ended = true; A.press.to(1, 'emit');

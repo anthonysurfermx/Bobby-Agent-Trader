@@ -1,3 +1,5 @@
+import { appLanguage, type AppLanguage } from './app-language.js';
+
 const OKX_BASE = 'https://www.okx.com';
 const CATALOG_TTL_MS = 15 * 60 * 1000;
 
@@ -199,6 +201,12 @@ const PROXY_ALIASES: Record<string, { symbol: string; note: string }> = {
   PETROLEO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
   CRUDO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF de petróleo — no petróleo spot' },
   'CRUDE OIL': { symbol: 'USO', note: 'United States Oil Fund (USO), an oil ETF — not spot oil' },
+  // Accent-free keys: the lookup strips accents ("pétrole", "petróleo", "Erdöl").
+  OURO: { symbol: 'XAUT', note: 'Tether Gold (XAUT), ouro tokenizado' },
+  PETROLE: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF pétrolier — pas le pétrole au comptant' },
+  PETROLIO: { symbol: 'USO', note: 'United States Oil Fund (USO), un ETF sul petrolio — non petrolio spot' },
+  ERDOL: { symbol: 'USO', note: 'United States Oil Fund (USO), ein Öl-ETF — kein Spot-Öl' },
+  ROHOL: { symbol: 'USO', note: 'United States Oil Fund (USO), ein Öl-ETF — kein Spot-Öl' },
   // ETF tickers that are not listed on OKX. Without these, "GLD" substring-
   // matched AGLD (Adventure Gold) and analyzed a game token with no warning.
   GLD: { symbol: 'XAUT', note: 'Tether Gold (XAUT), a tokenized gold product — GLD itself is not listed on OKX' },
@@ -207,6 +215,15 @@ const PROXY_ALIASES: Record<string, { symbol: string; note: string }> = {
 
 function normalizeQueryValue(value: string): string {
   return value.trim().toUpperCase();
+}
+
+/** Accent-free form for word lists: "PÉTROLE" → "PETROLE", "HÄLTST" → "HALTST". */
+function bareQueryValue(value: string): string {
+  return value.normalize('NFD').replace(/\p{M}/gu, '');
+}
+
+function proxyAlias(term: string): { symbol: string; note: string } | undefined {
+  return PROXY_ALIASES[term] ?? PROXY_ALIASES[bareQueryValue(term)];
 }
 
 function compactQueryValue(value: string): string {
@@ -539,7 +556,7 @@ function queryTerms(query: string): { direct: string[]; proxy: string[] } {
     }
   }
   const proxy = new Set<string>();
-  const proxyHit = PROXY_ALIASES[normalized];
+  const proxyHit = proxyAlias(normalized);
   if (proxyHit) proxy.add(proxyHit.symbol);
   return { direct: Array.from(direct).filter(Boolean), proxy: Array.from(proxy) };
 }
@@ -582,6 +599,8 @@ function fuzzyBudget(term: string): number {
 function fuzzyTermsFor(normalized: string): string[] {
   const seen = new Set<string>();
   for (const word of normalized.split(/\s+/)) {
+    // Filler is never a typo of an asset: Italian "come" is not COMP, Spanish "como" neither.
+    if (isFillerWord(word.replace(/[¿?¡!.,;:'’"]/g, ''))) continue;
     const clean = word.replace(/[^A-Z0-9]/g, '');
     if (clean.length >= 4 && !/^\d+$/.test(clean)) seen.add(clean);
   }
@@ -716,9 +735,11 @@ export async function resolveOkxInstrument(
 
 // ---- Canonical free-text resolution (the ONE brain for phrases) ----
 
-// Conversational filler in both product languages — never an asset name.
+// Conversational filler in the six product languages — never an asset name.
 // Only function words and question vocabulary: real tickers that are also
-// words (ONE, NEAR, SUN, GAS, HOT…) must stay searchable.
+// words (ONE, NEAR, SUN, GAS, HOT…) must stay searchable. Words are matched as
+// written and accent-free ("HÄLTST" → "HALTST"); an accented entry ("ÜBER",
+// "MÊME") keeps its plain twin (UBER, MEME) reachable as an asset.
 const QUERY_STOPWORDS = new Set([
   'QUE', 'QUÉ', 'PASA', 'PASARA', 'PASARÁ', 'CON', 'EL', 'LA', 'LO', 'LOS', 'LAS', 'DE', 'DEL',
   'UN', 'UNA', 'PARA', 'POR', 'COMO', 'CÓMO', 'VES', 'VA', 'VAN', 'HOY', 'MANANA', 'MAÑANA',
@@ -732,7 +753,70 @@ const QUERY_STOPWORDS = new Set([
   'ESO', 'PIENSAS', 'OPINAS', 'CREES', 'DEBERIA', 'DEBERÍA', 'SEMANA', 'MES', 'HAY', 'TIENE', 'PERO', 'MAS', 'MÁS',
   'ARE', 'MAIN', 'RISK', 'RISKS', 'CHART', 'CHARTS', 'CURRENT', 'TREND', 'THINK', 'SHOULD', 'DOES',
   'THIS', 'THAT', 'THESE', 'FOR', 'AND', 'WHY', 'WHEN', 'WILL', 'CAN', 'WEEK', 'MONTH', 'LOOK', 'LOOKS',
+  // ---- French ----
+  'QUEL', 'QUELLE', 'QUELS', 'QUELLES', 'QUOI', 'QUI', 'DONT', 'COMMENT', 'POURQUOI', 'QUAND', 'EST', 'SONT', 'SUIS',
+  'ETES', 'ETRE', 'ETAIT', 'SERA', 'SERAIT', 'AVOIR', 'AVEZ', 'AVONS', 'LES', 'DES', 'UNE', 'DANS', 'SUR', 'SOUS', 'AVEC',
+  'SANS', 'POUR', 'PAR', 'PAS', 'PLUS', 'MOINS', 'TRES', 'BIEN', 'MAIS', 'DONC', 'CAR', 'COMME', 'CET', 'CETTE', 'CES',
+  'CELA', 'CECI', 'TES', 'SES', 'NOS', 'VOS', 'LEUR', 'LEURS', 'NOTRE', 'VOTRE', 'MOI', 'TOI', 'LUI', 'ELLE', 'ELLES',
+  'ILS', 'NOUS', 'VOUS', 'AUX', 'AVIS', 'PENSES', 'PENSEZ', 'PENSER', 'CROIS', 'DOIS', 'PUIS', 'PEUX', 'PEUT', 'FAUT',
+  'FAIRE', 'FAIT', 'VAIS', 'VAS', 'ALLER', 'ACHETER', 'VENDRE', 'GARDER', 'INVESTIR', 'PRIX', 'COURS', 'RISQUE', 'RISQUES',
+  'ANALYSE', 'ANALYSER', 'TENDANCE', 'GRAPHIQUE', 'MARCHE', 'MARCHES', 'AUJOURDHUI', 'MAINTENANT', 'DEMAIN', 'SEMAINE',
+  'MOIS', 'ANNEE', 'MOMENT', 'BON', 'BONNE', 'MAUVAIS', 'ACTION', 'ACTIONS', 'ENCORE', 'DEJA', 'AUSSI', 'TOUT', 'TOUS',
+  'TOUTE', 'PEU', 'BEAUCOUP', 'NON', 'OUI', 'MERCI', 'BONJOUR', 'SALUT', 'DONNE', 'PARLE', 'VRAIMENT', 'ACTUEL',
+  'ACTUELLE', 'ACTUELLEMENT', 'MÊME',
+  // ---- Italian ----
+  'CHE', 'COSA', 'COME', 'QUALE', 'QUALI', 'QUANTO', 'PERCHE', 'DOVE', 'CHI', 'SONO', 'SIAMO', 'SIETE', 'ESSERE', 'AVERE',
+  'HAI', 'HANNO', 'ABBIAMO', 'STA', 'STO', 'STAI', 'STANNO', 'FARE', 'FACCIO', 'POSSO', 'PUOI', 'PUO', 'DEVO', 'DEVI', 'DEVE',
+  'DOVREI', 'VOGLIO', 'PENSI', 'PENSA', 'PENSATE', 'CREDI', 'DICI', 'DIMMI', 'PARLAMI', 'ANALIZZA', 'ANALISI', 'COMPRARE',
+  'VENDERE', 'TENERE', 'INVESTIRE', 'PREZZO', 'RISCHIO', 'RISCHI', 'TENDENZA', 'MERCATO', 'MERCATI', 'OGGI', 'ADESSO',
+  'ORA', 'DOMANI', 'SETTIMANA', 'MESE', 'ANNO', 'QUESTO', 'QUESTA', 'QUESTI', 'QUESTE', 'QUELLO', 'QUELLA', 'DELLA',
+  'DELLO', 'DEI', 'DEGLI', 'DELLE', 'NEL', 'NELLA', 'NEI', 'NELLE', 'SUL', 'SULLA', 'SULLE', 'DAL', 'DALLA', 'DALLE',
+  'ALLA', 'ALLO', 'AGLI', 'ALLE', 'PER', 'TRA', 'FRA', 'PIU', 'MENO', 'MOLTO', 'POCO', 'BENE', 'MALE', 'ANCHE', 'ANCORA',
+  'GIA', 'MAI', 'SEMPRE', 'TUTTO', 'TUTTI', 'MIO', 'MIA', 'TUO', 'TUA', 'SUO', 'SUA', 'NOI', 'VOI', 'LORO', 'LEI', 'UNO',
+  'GLI', 'ECCO', 'CIAO', 'GRAZIE', 'BUON', 'BUONO', 'BUONA', 'SICURO', 'OTTIMISTA', 'MOMENTO', 'AZIONE', 'AZIONI', 'CONVIENE',
+  // ---- German ----
+  'WAS', 'WIE', 'WER', 'WANN', 'WARUM', 'WIESO', 'WELCHE', 'WELCHER', 'WELCHES', 'WELCHEN', 'IST', 'SIND', 'BIN', 'BIST',
+  'SEID', 'WAR', 'WAREN', 'SEIN', 'HABE', 'HAST', 'HAT', 'HABEN', 'WIRD', 'WERDEN', 'WIRST', 'WERDE', 'KANN', 'KANNST',
+  'KONNEN', 'SOLL', 'SOLLTE', 'SOLLTEN', 'MUSS', 'MUSST', 'DARF', 'WILLST', 'MOCHTE', 'MACHT', 'MACHEN', 'MACHE', 'GEHT',
+  'GEHEN', 'STEHT', 'SIEHT', 'AUS', 'HALTST', 'HAELTST', 'HALTEN', 'DENKST', 'MEINST', 'GLAUBST', 'FINDEST', 'SAG', 'SAGE',
+  'ZEIG', 'ZEIGE', 'BITTE', 'DANKE', 'HALLO', 'DER', 'DIE', 'DAS', 'DEN', 'DEM', 'EIN', 'EINE', 'EINEN', 'EINEM', 'EINER',
+  'EINES', 'UND', 'ODER', 'ABER', 'DENN', 'WEIL', 'WENN', 'DASS', 'ALS', 'AUCH', 'NOCH', 'SCHON', 'NUR', 'SEHR', 'MEHR',
+  'WENIGER', 'VIEL', 'GUT', 'SCHLECHT', 'NICHT', 'KEIN', 'KEINE', 'MIT', 'OHNE', 'VON', 'VOM', 'FÜR', 'FUER', 'BEI', 'BEIM',
+  'AUF', 'NACH', 'VOR', 'ÜBER', 'UEBER', 'UNTER', 'ZUM', 'ZUR', 'DURCH', 'GEGEN', 'ICH', 'SIE', 'WIR', 'IHR', 'MICH', 'DICH',
+  'MIR', 'DIR', 'UNS', 'EUCH', 'MEIN', 'MEINE', 'DEIN', 'DEINE', 'DIESE', 'DIESER', 'DIESES', 'DIESEM', 'DIESEN', 'JETZT',
+  'HEUTE', 'MORGEN', 'GERADE', 'AKTUELL', 'AKTUELLE', 'WOCHE', 'MONAT', 'JAHR', 'KURS', 'PREIS', 'AKTIE', 'AKTIEN', 'RISIKO',
+  'RISIKEN', 'MARKT', 'ANALYSIERE', 'ANALYSIEREN', 'KAUFEN', 'VERKAUFEN', 'INVESTIEREN', 'MEINUNG', 'LOHNT', 'SICH',
+  'GIBT', 'DOCH', 'MAL', 'DANN', 'HIER', 'DORT', 'GANZ', 'IMMER', 'WIEDER', 'ZEIT', 'MAN',
+  // ---- Portuguese ----
+  'QUAL', 'QUAIS', 'QUANDO', 'ONDE', 'QUEM', 'PORQUE', 'SAO', 'ESTAO', 'ESTOU', 'SER', 'ESTAR', 'TEM', 'TENHO', 'TEMOS',
+  'TER', 'VAI', 'VOU', 'VAMOS', 'PODE', 'PODEMOS', 'DEVIA', 'DEVERIA', 'QUERO', 'ACHA', 'ACHAS', 'ACHO', 'PENSAS', 'DIZ',
+  'DIGA', 'FALA', 'FALE', 'ANALISA', 'ANALISE', 'ANALISAR', 'MANTER', 'PRECO', 'RISCO', 'RISCOS', 'MERCADO', 'MERCADOS',
+  'HOJE', 'AGORA', 'AMANHA', 'ANO', 'ALTURA', 'BOA', 'BOM', 'MAU', 'UNS', 'UMAS', 'DOS', 'DAS', 'NAS', 'NUM', 'NUMA',
+  'PELO', 'PELA', 'COM', 'SEM', 'PRA', 'MAIS', 'MENOS', 'MUITO', 'POUCO', 'BEM', 'MAL', 'TAMBEM', 'AINDA', 'NAO', 'SIM',
+  'ISTO', 'ISSO', 'ESSE', 'ESSA', 'AQUELE', 'MEU', 'MINHA', 'TEU', 'SEU', 'ELE', 'ELA', 'ELES', 'ELAS', 'VOCE', 'VOCES',
+  'PENA', 'FAVOR', 'OBRIGADO', 'OLA', 'ACAO', 'ACOES', 'OPINIAO',
 ]);
+
+/**
+ * Crypto tickers that are also everyday words in one interface language
+ * (French "ton avis", Italian "sei sicuro", "sui mercati", "dai dati";
+ * Portuguese "uma boa altura"). Inside a sentence such a word is the asset
+ * only when written in capitals ("TON"); typed alone it always is. English and
+ * Spanish keep their behaviour: their own filler is in the list above.
+ */
+const HOMONYM_TICKERS: Record<AppLanguage, ReadonlySet<string>> = {
+  en: new Set(),
+  es: new Set(),
+  fr: new Set(['TON', 'MON', 'ONT', 'FIL', 'DIS', 'MEME', 'ORDI', 'SUPER']),
+  it: new Set(['SEI', 'SUI', 'DAI', 'DIA', 'ERA', 'GAS', 'SOLO', 'SUPER']),
+  pt: new Set(['SEI', 'UMA', 'DAI', 'DIA', 'ERA', 'GAS', 'VALE', 'SUPER']),
+  de: new Set(['GAS', 'ALT', 'ACH', 'SUPER']),
+};
+
+/** A word, or every part of a hyphenated one ("penses-tu", "est-ce"), is filler or too short to name an asset. */
+function isFillerWord(word: string): boolean {
+  return word.split('-').every((part) => part.length < 3 || QUERY_STOPWORDS.has(part) || QUERY_STOPWORDS.has(bareQueryValue(part)));
+}
 
 export interface OkxResolvedAsset {
   instrument: OkxAssetInstrument;
@@ -772,9 +856,14 @@ async function bestScoredMatch(
  */
 export async function resolveOkxAssetFromText(
   text: string,
-  options?: { instTypes?: OkxSearchInstType[] },
+  options?: { instTypes?: OkxSearchInstType[]; language?: unknown },
 ): Promise<OkxResolvedAsset | null> {
   const allowedTypes = new Set(options?.instTypes || OKX_SEARCH_INST_TYPES);
+  text = text.normalize('NFC');
+  // The interface language decides which tickers are also ordinary words; none when it is unknown.
+  const homonyms = HOMONYM_TICKERS[appLanguage(options?.language)];
+  // Words the user wrote in capitals. A sentence typed entirely in capitals says nothing.
+  const capitals = new Set(text !== text.toUpperCase() ? text.match(/(?<![\p{L}\p{N}])[\p{Lu}\p{N}]{2,}(?![\p{L}\p{N}])/gu) ?? [] : []);
   // Possessives and Romance elisions are word boundaries, not ticker prefixes:
   // NVIDIA's → NVIDIA; l'Ethereum / dell'Ethereum → Ethereum. Keep the original
   // provider ids such as BTC-USDT intact. Only unambiguous names/tickers with
@@ -782,14 +871,14 @@ export async function resolveOkxAssetFromText(
   // are ordinary prose and must not turn into GAS, NEAR or ONE token requests.
   const upper = normalizeQueryValue(text)
     .replace(/([A-Z0-9])['’]S\b/g, '$1')
-    .replace(/\b(?:L|D|DELL|ALL|NELL|SULL|DALL)['’](?=[A-Z])/g, '')
-    .replace(/[¿?¡!.,;:'’"]/g, '');
+    .replace(/\b(?:L|D|QU|J|N|C|S|M|T|UN|DELL|ALL|NELL|SULL|DALL|COS|COM|DOV)['’](?=[A-ZÀ-Ý])/g, '')
+    .replace(/[¿?¡!.,;:'’"«»“”()]/g, '');
   if (!upper) return null;
 
   // Three characters minimum per word: "in video" must not resolve INJ via "IN".
   const words = upper.split(/\s+/)
     .map(word => /^(BITCOIN|BTC|ETHEREUM|ETH|SOLANA|SOL|NVIDIA|NVDA)-(?:PREIS|KURS|CHART|AKTIE|RISIKO|RISIKEN)$/.exec(word)?.[1] ?? word)
-    .filter((w) => w.length >= 3 && !QUERY_STOPWORDS.has(w));
+    .filter((w) => !isFillerWord(w) && !(homonyms.has(bareQueryValue(w)) && !capitals.has(w)));
   const candidates = [...new Set([upper, ...words])];
 
   let fallback: { resolved: OkxResolvedAsset; rank: number } | null = null;
@@ -804,7 +893,7 @@ export async function resolveOkxAssetFromText(
       matchedTerm: candidate,
       // Short substring hits ("GLD" inside AGLD) are guesses too — ask first.
       needsConfirmation: hit.kind === 'fuzzy' || hit.kind === 'proxy' || shortPrefix || (hit.kind === 'partial' && candidate.length <= 4),
-      proxyNote: hit.kind === 'proxy' ? (PROXY_ALIASES[candidate]?.note ?? null) : null,
+      proxyNote: hit.kind === 'proxy' ? (proxyAlias(candidate)?.note ?? null) : null,
     };
     if (hit.kind === 'exact' && hit.strong) return resolved;
     // Prefix exact (long word) > proxy > short prefix guess > partial > fuzzy.

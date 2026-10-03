@@ -203,10 +203,14 @@ final class BriefingsCenter: ObservableObject {
             // First enable: the report speaks the app's language and the phone's companion.
             let language = appLanguage()
             if BriefingSettings.languages.contains(language) {
-                if language != current.language { changes["language"] = language }
                 let locale = LanguageResolution.resolve(selection: language, preferredLanguages: Locale.preferredLanguages,
                                                         region: Locale.current.region?.identifier).localeIdentifier
-                if current.locale != locale { changes["locale"] = locale }
+                // The server rejects a locale sent without its language, and it reports en-US / es-MX for every
+                // English or Spanish region, so a regional locale (en-GB, es-ES…) always travels with the language.
+                if language != current.language || current.locale != locale {
+                    changes["language"] = language
+                    changes["locale"] = locale
+                }
             }
             if let companion = desiredCompanion ?? currentCompanion(), companion != current.companionId, companionAllowed(companion) {
                 changes["companionId"] = companion

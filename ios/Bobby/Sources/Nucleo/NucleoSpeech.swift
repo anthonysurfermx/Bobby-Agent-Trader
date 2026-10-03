@@ -1,9 +1,11 @@
 // Hold-to-ask speech for the Núcleo page (Nucleo/ARCHITECTURE.md §2.6, R8).
-// Recognition is ON-DEVICE ONLY: audio never leaves the phone. The microphone is live
-// only between `speech.start` (pill down) and `speech.stop` (pill up), stops on its own
-// after 60 s, on an audio interruption or a headset change, and when the app leaves
-// the foreground. If the locale cannot recognize on device, the mic is `unavailable`
-// and the page offers typing.
+// Recognition runs ON DEVICE when the phone holds Apple's model for the app language;
+// otherwise Apple's speech service transcribes it in that same language. It never falls
+// back to another language, and Bobby never stores or uploads the audio itself. The
+// microphone is live only between `speech.start` (pill down) and `speech.stop` (pill up),
+// stops on its own after 60 s, on an audio interruption or a headset change, and when the
+// app leaves the foreground. If nothing can recognize the language right now (no local
+// model and no connection), the mic is `unavailable` and the page offers typing.
 import AVFoundation
 import Foundation
 import Speech
@@ -104,10 +106,13 @@ final class NucleoSpeech {
     private let supportedLocales: () -> Set<String>
     private let makeRecognizer: (String) -> (any NucleoSpeechRecognizing)?
 
-    /// Authorization and local capability may change independently (for example after an OS prompt).
+    /// Authorization and recognizer capability may change independently (for example after an OS prompt).
     struct PermissionInputs {
         let mic: AVAudioApplication.recordPermission
         let speech: SFSpeechRecognizerAuthorizationStatus
+        /// A recognizer for the app language can run now, on the device or through Apple's speech service.
+        let available: Bool
+        /// That recognizer holds the local model, so the audio stays on the phone.
         let onDevice: Bool
     }
 
@@ -137,17 +142,25 @@ final class NucleoSpeech {
         var json: [String: Any] { ["state": state, "onDevice": onDevice] }
     }
 
-    /// Never prompts.
+    /// Never prompts. `onDevice` is true only when the resolved recognizer holds the local model.
     func permission() -> Permission {
-        let inputs = permissionInputs?() ?? PermissionInputs(
-            mic: AVAudioApplication.shared.recordPermission,
-            speech: SFSpeechRecognizer.authorizationStatus(),
-            onDevice: resolveRecognizer()?.supportsOnDeviceRecognition ?? false)
+        let inputs: PermissionInputs
+        if let permissionInputs {
+            inputs = permissionInputs()
+        } else {
+            let recognizer = resolveRecognizer()
+            inputs = PermissionInputs(
+                mic: AVAudioApplication.shared.recordPermission,
+                speech: SFSpeechRecognizer.authorizationStatus(),
+                available: recognizer != nil,
+                onDevice: recognizer?.supportsOnDeviceRecognition ?? false)
+        }
         let authorization = Self.state(mic: inputs.mic, speech: inputs.speech)
-        // The local model may not be ready before authorization. A hold must still offer the
-        // explicit OS permission flow; only an authorized attempt requires on-device capability.
-        let state = authorization == "granted" && !inputs.onDevice ? "unavailable" : authorization
-        return Permission(state: state, onDevice: inputs.onDevice)
+        // A recognizer may not be ready before authorization. A hold must still offer the explicit
+        // OS permission flow; only an authorized attempt needs a recognizer for the language, and
+        // it is `unavailable` only when neither the phone nor Apple's speech service can run one.
+        let state = authorization == "granted" && !inputs.available ? "unavailable" : authorization
+        return Permission(state: state, onDevice: inputs.available && inputs.onDevice)
     }
 
     nonisolated static func state(mic: AVAudioApplication.recordPermission, speech: SFSpeechRecognizerAuthorizationStatus) -> String {
@@ -173,43 +186,51 @@ final class NucleoSpeech {
         return permission()
     }
 
-    /// The selected app language, using only supported on-device recognizers in that language.
+    /// The selected app language only. The first candidate with the on-device model wins; when the
+    /// phone has none, the first candidate Apple's speech service can transcribe right now is used.
     func resolveRecognizer(requireAvailable: Bool = false) -> (any NucleoSpeechRecognizing)? {
         let candidates = L.speechLocaleCandidates
         let supported = Set(supportedLocales().map(Self.localeKey))
+        // An on-device recognizer is reused. A server-based one is re-resolved on every call (the
+        // model may have been installed since), except while a capture still owns it.
         if let recognizer, let recognizerLocale,
            recognizerCandidates == candidates, candidates.contains(recognizerLocale),
            supported.contains(Self.localeKey(recognizerLocale)),
            Self.localeKey(recognizer.locale.identifier) == Self.localeKey(recognizerLocale),
-           recognizer.supportsOnDeviceRecognition,
+           recognizer.supportsOnDeviceRecognition || listening || awaitingFinal,
            !requireAvailable || recognizer.isAvailable { return recognizer }
+        var server: (id: String, recognizer: any NucleoSpeechRecognizing)?
         for id in candidates {
             // Apple's locale initializer can fall back to the keyboard's dictation language.
             // Do not instantiate unsupported locales or accept a different actual locale.
             guard supported.contains(Self.localeKey(id)),
                   let r = makeRecognizer(id),
-                  Self.localeKey(r.locale.identifier) == Self.localeKey(id),
-                  r.supportsOnDeviceRecognition,
-                  !requireAvailable || r.isAvailable else { continue }
-            recognizer = r
-            recognizerLocale = id
-            recognizerCandidates = candidates
-            return r
+                  Self.localeKey(r.locale.identifier) == Self.localeKey(id) else { continue }
+            if r.supportsOnDeviceRecognition {
+                guard !requireAvailable || r.isAvailable else { continue }
+                recognizer = r
+                recognizerLocale = id
+                recognizerCandidates = candidates
+                return r
+            }
+            // No local model for this candidate: Apple's speech service must be reachable now.
+            if server == nil, r.isAvailable { server = (id, r) }
         }
-        recognizer = nil
-        recognizerLocale = nil
+        recognizer = server?.recognizer
+        recognizerLocale = server?.id
         recognizerCandidates = candidates
-        return nil
+        return server?.recognizer
     }
 
     nonisolated private static func localeKey(_ identifier: String) -> String {
         identifier.replacingOccurrences(of: "_", with: "-").lowercased()
     }
 
-    /// The one request shape this app ever sends: on-device only, partial results, punctuation.
-    nonisolated static func makeRequest(contextualStrings: [String]) -> SFSpeechAudioBufferRecognitionRequest {
+    /// The one request shape this app ever sends: partial results, punctuation, and on-device
+    /// whenever the recognizer holds the local model (`onDevice` = its `supportsOnDeviceRecognition`).
+    nonisolated static func makeRequest(contextualStrings: [String], onDevice: Bool = true) -> SFSpeechAudioBufferRecognitionRequest {
         let request = SFSpeechAudioBufferRecognitionRequest()
-        request.requiresOnDeviceRecognition = true
+        request.requiresOnDeviceRecognition = onDevice
         request.shouldReportPartialResults = true
         request.addsPunctuation = true
         request.contextualStrings = contextualStrings
@@ -239,7 +260,7 @@ final class NucleoSpeech {
         guard let recognizer = resolveRecognizer(requireAvailable: true), recognizer.isAvailable else { return .unavailable }
         willStart()
 
-        let request = Self.makeRequest(contextualStrings: vocabulary)
+        let request = Self.makeRequest(contextualStrings: vocabulary, onDevice: recognizer.supportsOnDeviceRecognition)
         activeLocaleIdentifier = L.localeIdentifier
         recognitionFinished = false
         session += 1

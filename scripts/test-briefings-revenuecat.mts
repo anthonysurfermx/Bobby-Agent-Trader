@@ -161,6 +161,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (url.includes('/bobby_subscriptions')) {
     if (method === 'GET') return json(currentSubscription ? [currentSubscription] : []);
     if (method === 'POST') { currentSubscription = JSON.parse(String(init?.body)); return json(null, 201); }
+    // The Apple mirror beside a card plan: RevenueCat's state is stored next to the Stripe row, never over it.
+    if (method === 'PATCH') { Object.assign(currentSubscription as object, JSON.parse(String(init?.body))); return json([{ identity_id: identity }]); }
   }
   if (url.includes('/bobby_brief_paid_periods')) {
     if (method === 'GET') return json(currentProof ? [currentProof] : []);
@@ -211,7 +213,10 @@ try {
   currentSubscription.current_period_end = new Date(Date.now() - 86400_000).toISOString();
   equal(await syncRevenueCat(auth, identity, event()), true,
         'expired card period cannot block a newly paid Apple subscriber');
-  equal(currentSubscription.provider, 'apple', 'new Apple purchase replaces stale card mirror');
+  // The card references stay on the row (deletion, checkout and the portal need them); the Apple plan is recorded
+  // beside them in the Apple mirror, which bobby_is_pro reads independently.
+  equal([currentSubscription.provider, currentSubscription.apple_status, currentSubscription.stripe_subscription_id], ['stripe', 'active', 'sub_external'],
+        'new Apple purchase is recorded in the Apple mirror beside the stale card row');
   yes(currentProof, 'new Apple purchase obtains its own verified paid proof');
 
   currentSubscriber = webBillingSub;

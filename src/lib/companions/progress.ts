@@ -72,8 +72,13 @@ export interface Progress {
   syncedAt: string | null;
 }
 
-const REGIONAL_QUICK_ACCESS: Record<string, string[]> = { 'fr-FR': ['BTC', 'NVDA', 'MC.PA', 'TTE.PA'], 'pt-PT': ['BTC', 'NVDA', 'EDP.LS', 'GALP.LS'], 'pt-BR': ['BTC', 'NVDA', 'PETR4.SA', 'VALE3.SA'], 'it-IT': ['BTC', 'NVDA', 'ENI.MI', 'ENEL.MI'], 'de-DE': ['BTC', 'NVDA', 'SAP.DE', 'SIE.DE'], 'en-US': ['BTC', 'NVDA', 'ETH'], 'es-MX': ['BTC', 'NVDA', 'ETH'] };
-const LEGACY_AUTOMATIC_QUICK_ACCESS = [['MC.PA', 'TTE.PA', 'BTC'], ['EDP.LS', 'GALP.LS', 'BTC'], ['PETR4.SA', 'VALE3.SA', 'BTC'], ['ENI.MI', 'ENEL.MI', 'BTC'], ['SAP.DE', 'SIE.DE', 'BTC']];
+// The local stock sits right after BTC (three chips render), and every symbol is one the server catalogue resolves.
+const REGIONAL_QUICK_ACCESS: Record<string, string[]> = { 'fr-FR': ['BTC', 'MC.PA', 'NVDA', 'OR.PA'], 'pt-PT': ['BTC', 'EDP.LS', 'NVDA', 'GALP.LS'], 'pt-BR': ['BTC', 'PETR4.SA', 'NVDA', 'VALE3.SA'], 'it-IT': ['BTC', 'ISP.MI', 'NVDA', 'ENEL.MI'], 'de-DE': ['BTC', 'SAP.DE', 'NVDA', 'SIE.DE'], 'en-US': ['BTC', 'NVDA', 'ETH'], 'es-MX': ['BTC', 'NVDA', 'ETH'] };
+// Every list that was once an automatic default: a stored copy is replaced by today's default, never kept as a personal choice.
+const LEGACY_AUTOMATIC_QUICK_ACCESS = [
+  ['MC.PA', 'TTE.PA', 'BTC'], ['EDP.LS', 'GALP.LS', 'BTC'], ['PETR4.SA', 'VALE3.SA', 'BTC'], ['ENI.MI', 'ENEL.MI', 'BTC'], ['SAP.DE', 'SIE.DE', 'BTC'],
+  ['BTC', 'NVDA', 'MC.PA', 'TTE.PA'], ['BTC', 'NVDA', 'EDP.LS', 'GALP.LS'], ['BTC', 'NVDA', 'PETR4.SA', 'VALE3.SA'], ['BTC', 'NVDA', 'ENI.MI', 'ENEL.MI'], ['BTC', 'NVDA', 'SAP.DE', 'SIE.DE'],
+];
 const regionalQuickAccess = () => [...(REGIONAL_QUICK_ACCESS[speechLocale()] ?? REGIONAL_QUICK_ACCESS['en-US'])];
 const isAutomaticQuickAccess = (symbols: string[]) => [...Object.values(REGIONAL_QUICK_ACCESS), ...LEGACY_AUTOMATIC_QUICK_ACCESS].some(defaults => defaults.length === symbols.length && defaults.every((symbol, i) => symbol === symbols[i]));
 
@@ -146,7 +151,7 @@ export const progressStore = {
   get: () => state,
   subscribe(listener: () => void) {
     listeners.add(listener);
-    return () => listeners.delete(listener);
+    return () => { listeners.delete(listener); };
   },
   acceptRiskNotice() { commit({ ...state, riskNoticeVersion: RISK_NOTICE_VERSION, aiConsentGranted: true }); },
   withdrawAIConsent() { commit({ ...state, aiConsentGranted: false, riskNoticeVersion: 0 }); },

@@ -86,10 +86,13 @@ function loadSugg(){
   SUGG_P = call('suggestions', {}).then(function(r){ W.sugg = r || null; return r; }, function(){ W.sugg = null; return null; });
   return SUGG_P;
 }
-/* Compact ticker labels keep three suggestions visible; questions remain localized actions and accessible labels. */
+/* Compact labels keep three suggestions visible; questions remain localized actions and accessible labels. */
 function suggestionChips(){
+  /* A starter chip reads as the company, as in the app's idle row (app/55-read.js); its action keeps the exchange symbol. */
+  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
+    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var s = W.sugg, out = [], seen = {}, qa = (s && s.quickAccess) || [], mv = (s && s.movers) || [];
-  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!/^[A-Z0-9.^=-]{1,20}$/.test(sym) || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:sym === 'NVDA' ? 'NVIDIA' : sym, ariaLabel:q, action:{ ask:q, symbol:sym } }); }
+  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!/^[A-Z0-9.^=-]{1,20}$/.test(sym) || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:q, action:{ ask:q, symbol:sym } }); }
   qa.slice(0, 3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   mv.forEach(function(x){ push(x && x.symbol, 'chip.move'); });
   qa.slice(3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });

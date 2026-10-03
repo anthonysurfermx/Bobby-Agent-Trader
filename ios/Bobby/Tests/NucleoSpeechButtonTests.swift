@@ -18,11 +18,11 @@ final class NucleoSpeechButtonTests: XCTestCase {
         super.tearDown()
     }
 
-    func testFirstHoldOffersPermissionBeforeLocalCapabilityIsReadyInEveryLanguage() {
+    func testFirstHoldOffersPermissionBeforeARecognizerIsReadyInEveryLanguage() {
         for language in AppLanguage.allCases {
             UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
             let speech = NucleoSpeech(permissionInputs: {
-                .init(mic: .undetermined, speech: .notDetermined, onDevice: false)
+                .init(mic: .undetermined, speech: .notDetermined, available: false, onDevice: false)
             })
             var audioStarts = 0
             speech.willStart = { audioStarts += 1 }
@@ -37,46 +37,59 @@ final class NucleoSpeechButtonTests: XCTestCase {
 
     func testUnrequestedSpeechPermissionIsNotHiddenAfterMicrophoneWasGranted() {
         let speech = NucleoSpeech(permissionInputs: {
-            .init(mic: .granted, speech: .notDetermined, onDevice: false)
+            .init(mic: .granted, speech: .notDetermined, available: false, onDevice: false)
         })
         XCTAssertEqual(speech.permission().state, "undetermined")
         XCTAssertEqual(speech.start(), .needsPermission)
         XCTAssertFalse(speech.isListening)
     }
 
-    func testDeniedAndRestrictedAuthorizationStayActionableWithoutALocalModel() {
+    func testDeniedAndRestrictedAuthorizationStayActionableWithoutARecognizer() {
         let denied = NucleoSpeech(permissionInputs: {
-            .init(mic: .denied, speech: .authorized, onDevice: false)
+            .init(mic: .denied, speech: .authorized, available: false, onDevice: false)
         })
         XCTAssertEqual(denied.permission().state, "denied")
         XCTAssertEqual(denied.start(), .denied)
         let restricted = NucleoSpeech(permissionInputs: {
-            .init(mic: .granted, speech: .restricted, onDevice: false)
+            .init(mic: .granted, speech: .restricted, available: false, onDevice: false)
         })
         XCTAssertEqual(restricted.permission().state, "restricted")
         XCTAssertEqual(restricted.start(), .denied)
     }
 
-    func testGrantedAuthorizationNeverStartsWithoutOnDeviceRecognition() {
+    func testGrantedAuthorizationIsUnavailableOnlyWhenNothingCanRecognizeTheLanguage() {
         let speech = NucleoSpeech(permissionInputs: {
-            .init(mic: .granted, speech: .authorized, onDevice: false)
+            .init(mic: .granted, speech: .authorized, available: false, onDevice: false)
         })
         var audioStarts = 0
         speech.willStart = { audioStarts += 1 }
-        XCTAssertEqual(speech.permission().state, "unavailable")
+        XCTAssertEqual(speech.permission(), .init(state: "unavailable", onDevice: false))
         XCTAssertEqual(speech.start(), .unavailable)
         XCTAssertEqual(audioStarts, 0)
         XCTAssertFalse(speech.isListening)
         XCTAssertEqual(speech.stop(cancel: false), .idle)
     }
 
+    func testGrantedAuthorizationWithoutALocalModelIsGrantedAndReportsOnDeviceTruthfully() {
+        let server = NucleoSpeech(permissionInputs: {
+            .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
+        })
+        XCTAssertEqual(server.permission(), .init(state: "granted", onDevice: false))
+        let local = NucleoSpeech(permissionInputs: {
+            .init(mic: .granted, speech: .authorized, available: true, onDevice: true)
+        })
+        XCTAssertEqual(local.permission(), .init(state: "granted", onDevice: true))
+    }
+
     func testNextHoldRechecksPermissionAndCapabilityAfterAPrompt() {
-        var inputs = NucleoSpeech.PermissionInputs(mic: .undetermined, speech: .notDetermined, onDevice: false)
+        var inputs = NucleoSpeech.PermissionInputs(mic: .undetermined, speech: .notDetermined, available: false, onDevice: false)
         let speech = NucleoSpeech(permissionInputs: { inputs })
         XCTAssertEqual(speech.start(), .needsPermission)
-        inputs = .init(mic: .granted, speech: .authorized, onDevice: false)
+        inputs = .init(mic: .granted, speech: .authorized, available: false, onDevice: false)
         XCTAssertEqual(speech.start(), .unavailable)
-        inputs = .init(mic: .granted, speech: .authorized, onDevice: true)
+        inputs = .init(mic: .granted, speech: .authorized, available: true, onDevice: false)
+        XCTAssertEqual(speech.permission(), .init(state: "granted", onDevice: false))
+        inputs = .init(mic: .granted, speech: .authorized, available: true, onDevice: true)
         XCTAssertEqual(speech.permission(), .init(state: "granted", onDevice: true))
         // No real recognizer/audio is injected: only the preflight snapshot is exercised.
         speech.cancel()
@@ -84,7 +97,7 @@ final class NucleoSpeechButtonTests: XCTestCase {
 
     func testASecondHoldDuringPendingFinalIsBusyAndCancelRestoresPreflight() {
         let speech = NucleoSpeech(finalWait: 5, permissionInputs: {
-            .init(mic: .undetermined, speech: .notDetermined, onDevice: false)
+            .init(mic: .undetermined, speech: .notDetermined, available: false, onDevice: false)
         })
         speech.waitForFinal()
         XCTAssertEqual(speech.start(), .busy)
@@ -95,7 +108,7 @@ final class NucleoSpeechButtonTests: XCTestCase {
 
     func testReleasedThenCancelledButtonDoesNotSendAPendingTranscript() async throws {
         let speech = NucleoSpeech(finalWait: 0.02, permissionInputs: {
-            .init(mic: .granted, speech: .authorized, onDevice: false)
+            .init(mic: .granted, speech: .authorized, available: false, onDevice: false)
         })
         var finals = 0
         speech.emit = { name, _ in if name == "speech.final" { finals += 1 } }
@@ -162,27 +175,118 @@ final class NucleoSpeechButtonTests: XCTestCase {
         XCTAssertNil(speech.resolveRecognizer())
     }
 
-    func testUnsupportedOnDeviceCapabilityNeverUsesCloudOrAnotherLanguage() {
+    func testMissingOnDeviceModelUsesAppleSpeechServiceInTheSameLanguageNeverAnother() throws {
         UserDefaults.standard.set("it", forKey: L.preferenceKey)
         var attempted: [String] = []
-        let speech = NucleoSpeech(supportedLocales: { ["it-IT", "es-MX"] }, makeRecognizer: { id in
+        let speech = NucleoSpeech(supportedLocales: { ["it-IT", "es-MX", "en-US"] }, makeRecognizer: { id in
             attempted.append(id)
             return SpeechRecognizerProbe(locale: id, onDevice: false)
         })
-        XCTAssertNil(speech.resolveRecognizer())
-        XCTAssertEqual(attempted, ["it-IT"])
+        let recognizer = try XCTUnwrap(speech.resolveRecognizer())
+        XCTAssertEqual(recognizer.locale.identifier, "it-IT")
+        XCTAssertFalse(recognizer.supportsOnDeviceRecognition)
+        XCTAssertEqual(try XCTUnwrap(speech.resolveRecognizer(requireAvailable: true)).locale.identifier, "it-IT")
+        XCTAssertTrue(attempted.allSatisfy { $0 == "it-IT" }, "Spanish and English recognizers must never be created for Italian")
     }
 
-    func testEveryLanguageKeepsTheAudioRequestOnDeviceAndInItsOwnLanguage() {
+    func testOnDeviceCandidateWinsOverAnEarlierServerOnlyCandidate() throws {
+        UserDefaults.standard.set("de", forKey: L.preferenceKey)
+        let speech = NucleoSpeech(supportedLocales: { ["de-DE", "de-AT", "de-CH"] }, makeRecognizer: { id in
+            SpeechRecognizerProbe(locale: id, onDevice: id == "de-CH")
+        })
+        let recognizer = try XCTUnwrap(speech.resolveRecognizer())
+        XCTAssertEqual(recognizer.locale.identifier, "de-CH")
+        XCTAssertTrue(recognizer.supportsOnDeviceRecognition)
+    }
+
+    func testModelInstalledAfterAServerHoldIsPreferredOnTheNextHold() throws {
+        UserDefaults.standard.set("fr", forKey: L.preferenceKey)
+        var installed = false
+        let speech = NucleoSpeech(supportedLocales: { ["fr-FR"] }, makeRecognizer: { id in
+            SpeechRecognizerProbe(locale: id, onDevice: installed)
+        })
+        XCTAssertFalse(try XCTUnwrap(speech.resolveRecognizer()).supportsOnDeviceRecognition)
+        installed = true
+        XCTAssertTrue(try XCTUnwrap(speech.resolveRecognizer()).supportsOnDeviceRecognition)
+    }
+
+    func testNothingRecognizesTheLanguageWithoutAModelWhenAppleSpeechServiceIsUnreachable() {
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            let speech = NucleoSpeech(supportedLocales: { Set(L.speechLocaleCandidates + ["es-MX", "en-US"]) }, makeRecognizer: { id in
+                // Only the app language is offline; another language being reachable must not rescue it.
+                let probe = SpeechRecognizerProbe(locale: id, onDevice: false)
+                probe.isAvailable = !id.hasPrefix(language.rawValue + "-")
+                return probe
+            })
+            XCTAssertNil(speech.resolveRecognizer(), language.rawValue)
+            XCTAssertNil(speech.resolveRecognizer(requireAvailable: true), language.rawValue)
+        }
+    }
+
+    func testNoRecognizerForTheLanguageIsUnavailable() {
+        UserDefaults.standard.set("it", forKey: L.preferenceKey)
+        let unsupported = NucleoSpeech(supportedLocales: { ["es-MX", "en-US"] }, makeRecognizer: { id in
+            SpeechRecognizerProbe(locale: id)
+        })
+        XCTAssertNil(unsupported.resolveRecognizer())
+        let missing = NucleoSpeech(supportedLocales: { ["it-IT"] }, makeRecognizer: { _ in nil })
+        XCTAssertNil(missing.resolveRecognizer())
+    }
+
+    func testEveryLanguageRecognizesInItsOwnLanguageAndTheRequestFollowsTheRecognizer() {
         for language in AppLanguage.allCases {
             let resolution = LanguageResolution.resolve(selection: language.rawValue, preferredLanguages: [], region: nil)
             XCTAssertFalse(resolution.speechLocaleCandidates.isEmpty)
             XCTAssertTrue(resolution.speechLocaleCandidates.allSatisfy { $0.hasPrefix(language.rawValue + "-") })
-            let request = NucleoSpeech.makeRequest(contextualStrings: ["BTC", "NVDA"])
-            XCTAssertTrue(request.requiresOnDeviceRecognition)
-            XCTAssertTrue(request.shouldReportPartialResults)
-            XCTAssertEqual(request.contextualStrings, ["BTC", "NVDA"])
+            for onDevice in [true, false] {
+                // Audio is pinned to the phone whenever the recognizer holds the local model.
+                let request = NucleoSpeech.makeRequest(contextualStrings: ["BTC", "NVDA"], onDevice: onDevice)
+                XCTAssertEqual(request.requiresOnDeviceRecognition, onDevice)
+                XCTAssertTrue(request.shouldReportPartialResults)
+                XCTAssertEqual(request.contextualStrings, ["BTC", "NVDA"])
+            }
         }
+    }
+
+    func testRecognitionTriesTheDeviceRegionVariantFirstWithoutDuplicatesOrOtherLanguages() {
+        let cases: [(String, [String], String?, [String])] = [
+            ("fr", ["fr-CA", "en-US"], "CA", ["fr-CA", "fr-FR"]),
+            ("fr", ["fr-BE"], "BE", ["fr-BE", "fr-FR", "fr-CA"]),
+            ("fr", ["de-CH", "fr-CH"], "CH", ["fr-CH", "fr-FR", "fr-CA"]),
+            ("fr", ["de-CH"], "CH", ["fr-CH", "fr-FR", "fr-CA"]),
+            ("fr", ["fr-FR"], "FR", ["fr-FR", "fr-CA"]),
+            ("de", ["de-AT"], "AT", ["de-AT", "de-DE", "de-CH"]),
+            ("de", ["de_CH"], "CH", ["de-CH", "de-DE", "de-AT"]),
+            ("it", ["it-CH"], "CH", ["it-CH", "it-IT"]),
+            ("pt", ["pt-BR"], "BR", ["pt-BR", "pt-PT"]),
+            ("pt", ["pt-PT"], "BR", ["pt-PT", "pt-BR"]),
+            ("en", ["en-GB"], "GB", ["en-GB", "en-US"]),
+            ("es", ["es-ES"], "ES", ["es-ES", "es-MX", "es-US"]),
+            ("es", ["en-US", "es-US"], "US", ["es-US", "es-MX", "es-ES"]),
+            ("it", ["en-US"], nil, ["it-IT"])
+        ]
+        for (language, preferred, region, expected) in cases {
+            let resolution = LanguageResolution.resolve(selection: language, preferredLanguages: preferred, region: region)
+            let candidates = resolution.recognitionLocaleCandidates(preferredLanguages: preferred)
+            XCTAssertEqual(candidates, expected, "\(language) \(preferred)")
+            XCTAssertEqual(Set(candidates).count, candidates.count)
+            XCTAssertTrue(candidates.allSatisfy { $0.hasPrefix(language + "-") })
+        }
+    }
+
+    func testRegionVariantAppleDoesNotRecognizeIsSkippedBeforeCreatingARecognizer() throws {
+        // French chosen in Profile on a Spanish (Mexico) phone: "fr-MX" is not a recognizer locale.
+        let resolution = LanguageResolution.resolve(selection: "fr", preferredLanguages: ["es-MX", "en-US"], region: "MX")
+        XCTAssertEqual(resolution.recognitionLocaleCandidates(preferredLanguages: ["es-MX", "en-US"]), ["fr-MX", "fr-FR", "fr-CA"])
+        UserDefaults.standard.set("fr", forKey: L.preferenceKey)
+        var attempted: [String] = []
+        let speech = NucleoSpeech(supportedLocales: { ["fr-FR", "fr-CA", "es-MX"] }, makeRecognizer: { id in
+            attempted.append(id)
+            return SpeechRecognizerProbe(locale: id, onDevice: false)
+        })
+        XCTAssertTrue(["fr-FR", "fr-CA"].contains(try XCTUnwrap(speech.resolveRecognizer()).locale.identifier))
+        XCTAssertTrue(attempted.allSatisfy { ["fr-FR", "fr-CA"].contains($0) }, "Only French recognizers Apple lists may be created")
     }
 }
 

@@ -135,14 +135,14 @@
   };
 
   SH.account = function () {
-    return present('account', NW.t('Your progress', 'Tu progreso', 'O seu progresso', 'Votre progression', 'I tuoi progressi', 'Dein Fortschritt'), function (panel) {
+    return present('account', NW.t('Your progress', 'Tu progreso', 'O teu progresso', 'Ta progression', 'I tuoi progressi', 'Dein Fortschritt'), function (panel) {
       var prof = S.profile(), prog = S.progress(), lvl = S.levelJSON(prog.xp), c = prof.companionId ? S.companion(prof.companionId) : null;
-      panel.appendChild(el('h2', NW.t('Your progress', 'Tu progreso', 'O seu progresso', 'Votre progression', 'I tuoi progressi', 'Dein Fortschritt')));
+      panel.appendChild(el('h2', NW.t('Your progress', 'Tu progreso', 'O teu progresso', 'Ta progression', 'I tuoi progressi', 'Dein Fortschritt')));
       if (c) {
         var name = c.label.charAt(0) + c.label.slice(1).toLowerCase();
         panel.appendChild(el('h3', name + ' · ' + NW.t('Level', 'Nivel', 'Nível', 'Niveau', 'Livello', 'Stufe') + ' ' + lvl.number + ' · ' + prog.xp + ' XP'));
       }
-      panel.appendChild(el('p', NW.t('Your companion, XP and saved theses live in this browser. Signing in is not available on the web.', 'Tu compañero, tu XP y tus tesis guardadas viven en este navegador. En la web no se puede iniciar sesión.', 'O seu companheiro, XP e teses guardadas ficam neste navegador. O início de sessão não está disponível na web.', 'Votre compagnon, votre XP et vos thèses enregistrées sont conservés dans ce navigateur. La connexion n’est pas disponible sur le web.', 'Il tuo compagno, i tuoi XP e le tesi salvate restano in questo browser. L’accesso non è disponibile sul web.', 'Dein Begleiter, XP und gespeicherte Thesen bleiben in diesem Browser. Die Anmeldung ist im Web nicht verfügbar.')));
+      panel.appendChild(el('p', NW.t('Your companion, XP and saved theses live in this browser. Signing in is not available on the web.', 'Tu compañero, tu XP y tus tesis guardadas viven en este navegador. En la web no se puede iniciar sesión.', 'O teu companheiro, XP e teses guardadas ficam neste navegador. O início de sessão não está disponível na web.', 'Ton compagnon, ton XP et tes thèses enregistrées sont conservés dans ce navigateur. La connexion n’est pas disponible sur le web.', 'Il tuo compagno, i tuoi XP e le tesi salvate restano in questo browser. L’accesso non è disponibile sul web.', 'Dein Begleiter, XP und gespeicherte Thesen bleiben in diesem Browser. Die Anmeldung ist im Web nicht verfügbar.')));
       var pp = el('p'); pp.style.marginTop = '16px';
       var a = el('a', NW.t('Privacy Policy', 'Aviso de privacidad', 'Política de privacidade', 'Politique de confidentialité', 'Informativa sulla privacy', 'Datenschutzerklärung')); a.href = NW.ROUTES.privacy;
       pp.appendChild(a); panel.appendChild(pp);
