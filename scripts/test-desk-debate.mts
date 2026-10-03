@@ -4,6 +4,9 @@
 //     closing/live point): closed week, live session, half-day, a null bar;
 //   · evidence needs ≥ 59 bars (a real 50-EMA) for stocks and crypto, and a
 //     rising chart is no longer forced to 'lateral';
+//   · a daily chart asked for by name reads Yahoo 3mo at 1d through the same
+//     handler, beside the hourly evidence, and leads the read (the detector and
+//     every other path: scripts/test-desk-timeframe.mts);
 //   · post-generation check: guarantee / risk-free / personal buy-sell claims
 //     (six languages) and verdicts contradicting the CIO fail the analysis —
 //     while the desk's ordinary disclaimers pass; every pattern stays linear;
@@ -18,7 +21,7 @@ process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.OPENAI_API_KEY = 'test-model';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
-const { loadDeskEvidence, runDeskDebate, reviewDeskOutput, publicTextViolation, DeskOutputRejected, GUARD_PATTERNS, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
+const { loadDeskEvidence, loadDeskEvidenceFor, timeframeRequestOf, runDeskDebate, reviewDeskOutput, publicTextViolation, DeskOutputRejected, GUARD_PATTERNS, MIN_DESK_BARS, DESK_QUESTION_MAX } = await import('../api/_lib/desk-debate.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
 const { default: stockCandles } = await import('../api/stock-candles.ts');
 const { getClientQuotaKeys, getClientIpKey } = await import('../api/_lib/rate-limit.ts');
@@ -51,13 +54,21 @@ function yahooChart(sessions: Session[], opts: { nullAt?: number } = {}) {
   return { chart: { result: [{ meta: { symbol: 'NVDA' }, timestamp, indicators: { quote: [quote] } }] } };
 }
 const week = (n: number, bars = 7): Session[] => Array.from({ length: n }, () => ({ bars }));
+/** Yahoo at 1d: one bar per session, stamped at the session's open; the last session closed 2 h ago. */
+function yahooDaily(sessions: number, symbol = 'NVDA') {
+  const lastOpen = Math.floor(Date.now() / 1000) - 8.5 * H;
+  const timestamp = Array.from({ length: sessions }, (_, i) => lastOpen - (sessions - 1 - i) * DAY);
+  const close = timestamp.map((_, i) => 400 + i * 1.5);
+  const quote = { close, open: close.map(c => c - 1), high: close.map(c => c + 2), low: close.map(c => c - 2), volume: close.map(() => 1_000_000) };
+  return { chart: { result: [{ meta: { symbol, currency: 'USD', fullExchangeName: 'NasdaqGS' }, timestamp, indicators: { quote: [quote] } }] } };
+}
 
-/** fetch: the desk → the real stock-candles handler → a Yahoo fixture. */
-function yahooWorld(chart: unknown) {
+/** fetch: the desk → the real stock-candles handler → a Yahoo fixture (`daily` answers the 1d interval). */
+function yahooWorld(chart: unknown, daily: unknown = chart) {
   const seen: { desk: string[]; yahoo: string[] } = { desk: [], yahoo: [] };
   globalThis.fetch = (async (input: string | URL) => {
     const url = new URL(String(input));
-    if (url.hostname === 'query1.finance.yahoo.com') { seen.yahoo.push(url.pathname + url.search); return json(chart); }
+    if (url.hostname === 'query1.finance.yahoo.com') { seen.yahoo.push(url.pathname + url.search); return json(url.searchParams.get('interval') === '1d' ? daily : chart); }
     if (url.pathname === '/api/stock-candles') {
       seen.desk.push(url.pathname + url.search);
       let status = 200, body: unknown = null;
@@ -109,6 +120,27 @@ try {
   for (const [what, sessions] of [['closed 7d week (50 bars)', week(7)], ['live 7d week (47 bars)', [...week(6), { bars: 4, live: 3.5 }]]] as const) {
     yahooWorld(yahooChart(sessions as Session[]));
     await assert.rejects(loadDeskEvidence('NVDA', 'equity'), /Insufficient market evidence/, what); checks++;
+  }
+  // A daily chart asked for by name: 3mo at 1d through the same handler, beside the hourly evidence.
+  {
+    eq(timeframeRequestOf('¿Cómo ves NVDA en diario?'), ['1D'], 'the question names the daily chart');
+    const seen = yahooWorld(yahooChart(week(22)), yahooDaily(63));
+    const hourly = await loadDeskEvidence('NVDA', 'equity');
+    const evidence = await loadDeskEvidenceFor('NVDA', 'equity', 'v1', ['1D']);
+    eq(seen.desk.slice(1), ['/api/stock-candles?symbol=NVDA&range=30d&interval=1h', '/api/stock-candles?symbol=NVDA&range=90d&interval=1d'], 'the desk asks for 90d at 1d beside 30d at 1h');
+    eq(seen.yahoo.slice(1), ['/v8/finance/chart/NVDA?range=1mo&interval=1h', '/v8/finance/chart/NVDA?range=3mo&interval=1d'], 'stock-candles maps it to Yahoo 3mo/1d');
+    eq([evidence.provenance.provider, evidence.provenance.instrument, evidence.provenance.timeframe, evidence.provenance.currency, evidence.provenance.exchange], ['Yahoo Finance', 'NVDA', '1D', hourly.provenance.currency, hourly.provenance.exchange], 'the same instrument, named as daily');
+    eq([evidence.technicals.price, evidence.technicals.support, evidence.technicals.resistance, evidence.technicals.trend], [493, 447.5, 495, 'alcista'], 'price, support, resistance and trend are the daily block\'s');
+    // The session's bar is stamped at its open, 8.5 h ago; its numbers are as recent as the hourly evidence.
+    eq(evidence.provenance.asOf, hourly.provenance.asOf, 'asOf is the last point of that session, not its open');
+    eq((evidence as any).timeframes['1H'], hourly.technicals, 'the hourly block stays as context');
+    // Another listing's daily bars are never read as this instrument's.
+    yahooWorld(yahooChart(week(22)), yahooDaily(63, 'NVDL'));
+    eq((await loadDeskEvidenceFor('NVDA', 'equity', 'v1', ['1D'])).provenance.timeframe, '1H', 'a mismatched daily series is refused: the hourly evidence leads');
+    // 3mo can hold fewer sessions than a 50-EMA trend needs: the block says so, never 'lateral'.
+    yahooWorld(yahooChart(week(22)), yahooDaily(55));
+    const thin = await loadDeskEvidenceFor('NVDA', 'equity', 'v1', ['1D']);
+    eq([thin.provenance.timeframe, thin.technicals.trend, (thin.technicals as any).bars], ['1D', 'insufficient_history', 55], '55 daily bars: insufficient history, not a sideways trend');
   }
   // Crypto (OKX, 100 bars asked): the same 59-bar floor.
   {
