@@ -1,0 +1,16 @@
+{
+  "checked_at_utc": "2026-10-03T23:05:48.701721+00:00",
+  "scope": "Canonical iOS pure geometry contract; no UI or physical proof",
+  "exit_code": 0,
+  "output": "PASS: 658 geometry cases \u2014 drag at five zoom levels, and at N = 8/10/12/16 tiles, slab, iso/cellAt round trips, drag steps, sprite anchoring, the dormant core, core motes, zoom and pan limits",
+  "sources": [
+    {
+      "path": "ios/Bobby/scripts/TraderLandGeometryContract.swift",
+      "sha256": "0c21e6d823851c3a14e9dbb9bf24e465b8bbe7538bb48508a2af74e1bd39435c"
+    },
+    {
+      "path": "ios/Bobby/Sources/TraderLandGeometry.swift",
+      "sha256": "f55c8a4af4af41978ab2a7dd1c4dce5ec2c487e9135a96c62b4d5e54494f1a8b"
+    }
+  ]
+}

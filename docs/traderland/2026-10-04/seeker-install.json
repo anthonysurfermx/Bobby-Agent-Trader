@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "status": "SIGNED_CODE8_INSTALL_BYTE_VERSION_VERIFIED_PHONE_LOCKED_OR_LOCK_UNKNOWN",
+  "started_at_utc": "2026-10-03T23:45:14.370771+00:00",
+  "package": "xyz.bobbyprotocol.bobby",
+  "version_name": "1.1.3",
+  "version_code": 8,
+  "source_sha256": "28ceca2d8b9ceb8c9844e2d761b34e8155e1efe47ac882390f5f491ab0760ac7",
+  "source_files": 421,
+  "source_manifest": "traderland-code8-20261003T234251Z-source.json",
+  "source_manifest_sha256": "640c4320166bc6a96fb0029fa85e160bbb1b95a6f19c1bcb1eb2e9a8aad89d4a",
+  "selected_apk": {
+    "path_in_worktree": "android/app/build/outputs/apk/release/app-release.apk",
+    "sha256": "982fd93538b8726550dff767f1bf99a23f387cd0a86c964f742a94b4bcc4237f",
+    "bytes": 58588278
+  },
+  "owner_authorization": "Owner explicitly authorized installation during the voice session; this execution additionally requires authorized USB debugging/RSA on the selected Seeker.",
+  "operator_confirmed_existing_authorization": true,
+  "device": {
+    "serial_stored": false,
+    "transport_id_stored": false,
+    "hardware_identifier_stored": false,
+    "authorized_physical_seeker_matches": 1,
+    "authorized": true,
+    "seeker_model_and_product_matched": true,
+    "usb_transport": true,
+    "non_emulator_hardware_guards_passed": true,
+    "api": 36,
+    "page_size_bytes": 4096
+  },
+  "operations": [
+    {
+      "operation": "input.apk_metadata",
+      "return_code": 0
+    },
+    {
+      "operation": "input.apk_signature",
+      "return_code": 0
+    },
+    {
+      "operation": "device.enumeration",
+      "return_code": 0
+    },
+    {
+      "operation": "device.model",
+      "return_code": 0
+    },
+    {
+      "operation": "device.product",
+      "return_code": 0
+    },
+    {
+      "operation": "device.hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.kernel_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.authorized_state",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_completed",
+      "return_code": 0
+    },
+    {
+      "operation": "device.api",
+      "return_code": 0
+    },
+    {
+      "operation": "device.page_size",
+      "return_code": 0
+    },
+    {
+      "operation": "package.version",
+      "return_code": 0
+    },
+    {
+      "operation": "package.path",
+      "return_code": 0
+    },
+    {
+      "operation": "package.actual_apk",
+      "return_code": 0
+    },
+    {
+      "operation": "device.enumeration",
+      "return_code": 0
+    },
+    {
+      "operation": "device.model",
+      "return_code": 0
+    },
+    {
+      "operation": "device.product",
+      "return_code": 0
+    },
+    {
+      "operation": "device.hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.kernel_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "package.version",
+      "return_code": 0
+    },
+    {
+      "operation": "install.replace_without_wipe",
+      "return_code": 0
+    },
+    {
+      "operation": "package.path",
+      "return_code": 0
+    },
+    {
+      "operation": "package.actual_apk",
+      "return_code": 0
+    },
+    {
+      "operation": "package.version",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.keyguard_read_only",
+      "return_code": 0
+    }
+  ],
+  "install_attempted": true,
+  "install_reported_success": true,
+  "installed_payload_verified": true,
+  "launch_requested": false,
+  "mutation_outcome": "install_success_observed",
+  "uninstall_requested": false,
+  "data_clearing_requested": false,
+  "runtime_permissions_granted_by_tool": false,
+  "fixtures_or_preferences_injected": false,
+  "app_or_AI_consent_accepted_by_tool": false,
+  "purchase_or_authenticated_flow_executed": false,
+  "play_upload_or_distribution_performed": false,
+  "limits": [
+    "Installation and explicit launch/focus/resume do not prove rendered UI or functional physical acceptance.",
+    "Audio, dictation, analysis, login, purchases, backend behavior and Google Play remain unverified by this script.",
+    "Only package/APK mutation is audited; private application data is neither read nor compared."
+  ],
+  "installed_before_version_code": 8,
+  "installed_before_apk": {
+    "sha256": "a17bedf56bd413c897d2920bfc1649809f2f63e24448cb06c73c1f8ac7a24ab0",
+    "bytes": 58588278
+  },
+  "actual_installed_apk": {
+    "sha256": "982fd93538b8726550dff767f1bf99a23f387cd0a86c964f742a94b4bcc4237f",
+    "bytes": 58588278
+  },
+  "actual_installed_version": {
+    "version_code": 8,
+    "version_name": "1.1.3"
+  },
+  "source_and_apk_pins_unchanged_after_install": true,
+  "keyguard_state_known": true,
+  "keyguard_showing": true,
+  "bobby_main_activity_focused": false,
+  "bobby_main_activity_resumed": false,
+  "completed_at_utc": "2026-10-03T23:45:32.210161+00:00"
+}

@@ -22,8 +22,8 @@ android {
         applicationId = "xyz.bobbyprotocol.bobby"
         minSdk = 26
         targetSdk = 36
-        versionCode = 7
-        versionName = "1.1.2"
+        versionCode = 8
+        versionName = "1.1.3"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "API_BASE_URL", quoted(config("BOBBY_API_BASE_URL", "https://bobbyprotocol.xyz")))
         buildConfigField("String", "SUPABASE_URL", quoted(config("BOBBY_SUPABASE_URL")))

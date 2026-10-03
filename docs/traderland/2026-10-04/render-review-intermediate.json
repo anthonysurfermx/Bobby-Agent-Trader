@@ -1,0 +1,68 @@
+{
+  "status": "READ_ONLY_RENDER_REVIEW_COMPLETE",
+  "recorded_at": "2026-10-03T23:31:59.469731+00:00",
+  "scope": "Code comparison to canonical iOS Canvas and local inspection of first offline Android production-Canvas captures; no physical-device/account/backend evidence",
+  "sources_at_review": [
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandScene.kt",
+      "sha256": "3ba850970b47cf7b7c8ea252abc571a50cb01895a6a709189c0187e9eabb93be"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandSheet.kt",
+      "sha256": "c46b0a443281ab917505aa6fc525d2586836290c3389a5d75ea23d69ed5a1304"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandProjection.kt",
+      "sha256": "2605c307fe15e386b17ad6078fa96d3ba8d27aa22cc369673ae3d920efb5e11d"
+    }
+  ],
+  "captures": [
+    {
+      "file": "/private/tmp/bobby-traderland-evidence/first-map-captures/archipelago.png",
+      "sha256": "74e50b56a3e19c1348640da7ad90ed0dbb91b3832ed1498a986779ffabc5bf1b",
+      "dimensions": [
+        1016,
+        1004
+      ],
+      "visual_inspection": "Actual anchored bitmap artwork and dimensional slab. Showcase: occlusion and core; lifted-draft: lifted real sprite with visible handle; archipelago: multiple islands on one continuous canvas. Initial256px-art candidate only, not final regenerated42test proof."
+    },
+    {
+      "file": "/private/tmp/bobby-traderland-evidence/first-map-captures/lifted-draft.png",
+      "sha256": "c6164e5b8c5a6b32e5325dfe80c420d2dac6a4fca568fb969652bec53b19acd8",
+      "dimensions": [
+        1016,
+        1004
+      ],
+      "visual_inspection": "Actual anchored bitmap artwork and dimensional slab. Showcase: occlusion and core; lifted-draft: lifted real sprite with visible handle; archipelago: multiple islands on one continuous canvas. Initial256px-art candidate only, not final regenerated42test proof."
+    },
+    {
+      "file": "/private/tmp/bobby-traderland-evidence/first-map-captures/showcase.png",
+      "sha256": "eb4200e2964253143afe27a5aa744ee902a1ff6ee032a2c7ede4a647e3cfcad9",
+      "dimensions": [
+        1016,
+        1004
+      ],
+      "visual_inspection": "Actual anchored bitmap artwork and dimensional slab. Showcase: occlusion and core; lifted-draft: lifted real sprite with visible handle; archipelago: multiple islands on one continuous canvas. Initial256px-art candidate only, not final regenerated42test proof."
+    }
+  ],
+  "verified": [
+    "Six new core layer/glow assets byte-equal local canonical approved public sources",
+    "28 albedo1024 PNG sources and28 albedo512 WebP sources byte-equal gitshow bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+    "26 pieceglow1024 sources byte-equal canonical commit, total972394bytes",
+    "Fullsquare bitmapframe is canonical; optional topFace applies only to filamentoverlay, not imagecrop",
+    "Groundslab22-unitdepth, gridopen-cells, footprintshadows, lift6unit anddepthsortedimages represented",
+    "Reducedmotion fixes corelayerpose/motes; publicneighbor cores static; actual motion acceptance remains final instrumentation"
+  ],
+  "remaining_fidelity": [
+    "Overview has no per-island titlelabels/free-lot dashedslabs unlike iOSArchipelago; title only afterfocus",
+    "Visited rim lacks stronger iOSCIO highlight",
+    "Ambient groundhalo mint instead ofcanonicalTheme.accent violet",
+    "Contact/pickup shadow kernels approximate rather than identical iOSGaussianblur",
+    "Highzoom lowerresolution/glow gap is addressed only when rootplannedcanonicalartupgrade +finalbuild/retest actually complete"
+  ],
+  "hardening": [
+    "Fresh finalsource-bound captures required afterupgradingart; firstinstrumentation receiptFAILED andSheetcurrentSHA differs",
+    "No Seeker hardware visual/performance/touchacceptance can be inferred",
+    "Matched iOS/Androidlayout/stage/zoom/orientation snapshots andperformance onlarge/neighborlayouts stillrecommended"
+  ]
+}
