@@ -85,6 +85,26 @@
     "api/_lib/base-swap.ts",
     "api/_lib/mcp-uniswap-quote.ts",
     "api/_lib/swap-receipts.ts",
-    "api/_lib/stock-signals.ts"
+    "api/_lib/stock-signals.ts",
+    "api/_lib/briefings/types.ts",
+    "api/_lib/briefings/macro-events.ts",
+    "api/_lib/briefings/config.ts",
+    "api/_lib/briefings/db.ts",
+    "api/_lib/briefings/calendar.ts",
+    "api/_lib/briefings/evidence.ts",
+    "api/_lib/briefings/narrative.ts",
+    "api/_lib/briefings/compose.ts",
+    "api/_lib/briefings/push-crypto.ts",
+    "api/_lib/briefings/providers.ts",
+    "api/_lib/briefings/budget.ts",
+    "api/_lib/briefings/apns.ts",
+    "api/_lib/briefings/audio-store.ts",
+    "api/_lib/briefings/voice.ts",
+    "api/_lib/briefings/worker.ts",
+    "api/_lib/briefings/http.ts",
+    "api/_lib/market-snapshot.ts",
+    "api/briefings.ts",
+    "api/briefing-worker.ts",
+    "api/bobby-intel.ts"
   ]
 }

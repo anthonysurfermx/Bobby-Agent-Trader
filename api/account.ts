@@ -56,6 +56,7 @@ function accountClientVersion(headers: Record<string, string | string[] | undefi
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'DELETE' && req.method !== 'GET') {
     res.setHeader('Allow', 'GET, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -97,7 +98,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   let appleRevocation = 'not_applicable';
   try {
     auth = authAdminConfig();
-    res.setHeader('Cache-Control', 'no-store');
     const userResponse = await fetch(`${auth.url}/auth/v1/admin/users/${encodeURIComponent(identity.authUserId)}`, {
       headers: { apikey: auth.key, Authorization: `Bearer ${auth.key}` }, signal: AbortSignal.timeout(5000),
     });

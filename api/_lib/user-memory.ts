@@ -26,11 +26,12 @@ export const MEMORY_SYMBOL = /^[A-Z0-9.^=-]{1,20}$/;
 export const MEMORY_RETENTION_DAYS = 90;
 export const MEMORY_MAX_ASSETS = 50;
 /**
- * Platforms whose desk reads use memory: those whose app can show and delete it. The iPhone app already sends
- * its account token to the desk; it joins once it has the memory screen and its App Store privacy answers
- * cover this data. /api/memory itself serves every platform.
+ * Platforms whose desk reads can use memory. iOS additionally requires an explicit per-account opt-in
+ * affirmation on each desk request; a web preference alone never opts the phone in. /api/memory remains
+ * available on every platform so an account can always inspect, correct and erase what is stored.
  */
-export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web']);
+export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web', 'ios']);
+export const NATIVE_MEMORY_OPT_IN_HEADER = 'x-bobby-memory-opt-in';
 /**
  * Kill switch: the desk personalizes with memory and records asks only when BOBBY_MEMORY is exactly 'on'.
  * Unset or anything else = off (no memory call from the desk at all). /api/memory (view, correct, delete)
@@ -38,6 +39,14 @@ export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web']);
  */
 export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.BOBBY_MEMORY === 'on';
+}
+
+/** Fail closed for every iOS desk path unless this request explicitly affirms native consent. */
+export function memoryDeskAllowed(req: VercelRequest, platform: string, env: NodeJS.ProcessEnv = process.env): boolean {
+  if (!memoryPersonalizationOn(env) || !MEMORY_PLATFORMS.has(platform)) return false;
+  if (platform !== 'ios') return true;
+  const raw = req.headers[NATIVE_MEMORY_OPT_IN_HEADER];
+  return !Array.isArray(raw) && raw === '1';
 }
 /** How long the desk waits for the summary before answering without it. */
 export const MEMORY_SUMMARY_TIMEOUT_MS = 800;
@@ -76,8 +85,9 @@ export function carriesAccountToken(req: VercelRequest): boolean {
  * resolved (the premium meter does): null there means nobody, undefined means not resolved yet.
  */
 export async function memoryIdentity(req: VercelRequest, known?: Identity | null): Promise<Identity | null> {
-  if (known !== undefined) return hasMemory(known) ? known : null;
+  // A verified identity from a read meter does not grant memory to a request lacking its own account token.
   if (!carriesAccountToken(req)) return null;
+  if (known !== undefined) return hasMemory(known) ? known : null;
   try {
     const identity = await resolveIdentity(req);
     return hasMemory(identity) ? identity : null;
