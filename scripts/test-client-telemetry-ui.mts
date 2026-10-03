@@ -177,7 +177,7 @@ const deskBundle = await build({ entryPoints: [fileURLToPath(new URL('../src/com
   b.onLoad({ filter: /.*/, namespace: 'stub' }, ({ path }) => {
     if (path.endsWith('client-telemetry-browser')) return stub('export const beginClientRead=()=>globalThis.__readTest.begin(); export const receiveClientRead=(r,v)=>globalThis.__readTest.receive(r,v);');
     if (path.endsWith('access-client')) return stub('export const accessHeaders=async()=>({"x-bobby-device":"fixed-install","x-bobby-platform":"web"});');
-    if (path.endsWith('i18n')) return stub('export const lang=()=>"en"; export const t=(en)=>en;');
+    if (path.endsWith('i18n')) return stub('export const lang=()=>"en"; export const speechLocale=()=>"en-US"; export const t=(en)=>en;');
     if (path.endsWith('desk-price')) return stub('export const deskPrice=(x)=>String(x);');
     return stub('export const deskJson=async()=>({ok:false,data:null});');
   });

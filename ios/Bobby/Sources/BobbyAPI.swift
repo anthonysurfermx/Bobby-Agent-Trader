@@ -53,7 +53,7 @@ struct MarketSnapshot {
     var changePct: Double?
 
     /// The data source line under the chart, in the desk's language like the card around it.
-    static func sourceLabel(isEquity: Bool, spanish: Bool = L.isSpanish) -> String {
+    static func sourceLabel(isEquity: Bool, spanish: Bool? = nil) -> String {
         isEquity ? L.t("EQUITIES · YAHOO", "ACCIONES · YAHOO", spanish: spanish) : L.t("CRYPTO · OKX", "CRIPTO · OKX", spanish: spanish)
     }
 }
@@ -206,7 +206,7 @@ struct BobbyAnswer {
                              "Soporte \(Self.money(sup)), resistencia \(Self.money(res))."))
         }
         if let d = direction, let c = convictionPct, d == "long" || d == "short" {
-            let dirEn = d == "long" ? "bullish" : "bearish"
+            let dirEn = Self.localizedTrend(d == "long" ? "bullish" : "bearish")
             let dirEs = d == "long" ? "alcista" : "bajista"
             lines.append(L.t("My read: \(dirEn) bias with \(Int(c))% conviction.",
                              "Mi lectura: sesgo \(dirEs) con \(Int(c))% de convicción."))
@@ -319,7 +319,7 @@ enum BobbyAPI {
     /// The explorable board: sections ranked by real 24h volume server-side,
     /// plus the honest total the search can actually reach.
     static func browseBoard() async -> (sections: [(title: String, assets: [BoardAsset])], totalBases: Int) {
-        guard let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],
+        guard let obj = try? await json(browsePath) as? [String: Any],
               let browse = obj["browse"] as? [String: Any] else { return ([], 0) }
         let totalBases = (obj["totalBases"] as? Int) ?? 0
         func parse(_ key: String) -> [BoardAsset] {
@@ -337,6 +337,15 @@ enum BobbyAPI {
         return (sections, totalBases)
     }
 
+    static var browsePath: String {
+        var components = URLComponents()
+        components.path = "api/bobby-asset-search"
+        components.queryItems = [URLQueryItem(name: "browse", value: "1"), URLQueryItem(name: "language", value: L.language),
+                                 URLQueryItem(name: "locale", value: L.localeIdentifier)]
+        if let country = L.country { components.queryItems?.append(URLQueryItem(name: "country", value: country)) }
+        return components.string!
+    }
+
     struct Mover: Identifiable, Equatable {
         let symbol: String
         let name: String
@@ -349,7 +358,7 @@ enum BobbyAPI {
     /// public ticker fallback, so the greeting always has a real number.
     static func topMovers(limit: Int = 2) async -> [Mover] {
         var out: [Mover] = []
-        if let obj = try? await json("api/bobby-asset-search?browse=1") as? [String: Any],
+        if let obj = try? await json(browsePath) as? [String: Any],
            let rows = obj["movers"] as? [[String: Any]] {
             for r in rows {
                 guard let sym = r["symbol"] as? String, let chg = r["change24h"] as? Double else { continue }
@@ -393,7 +402,8 @@ enum BobbyAPI {
     /// URL query string lands in platform runtime logs (api/bobby-asset-search.ts).
     /// A failed POST is a failed search — it is never resent as GET `?q=`.
     static func assetSearch(_ q: String, limit: Int? = nil) async -> [String: Any]? {
-        var body: [String: Any] = ["q": q]
+        var body: [String: Any] = ["q": q, "language": L.language, "locale": L.localeIdentifier]
+        if let country = L.country { body["country"] = country }
         if let limit { body["limit"] = limit }
         return try? await json("api/bobby-asset-search", method: "POST", body: body, allowedStatus: 200...299) as? [String: Any]
     }
@@ -618,7 +628,7 @@ enum BobbyAPI {
         let generation = await AccountSession.shared.generation
         await BobbyTelemetry.shared.readStarted(requestId)
         guard let reply = try? await BobbyAccessAPI.send("api/desk-debate", method: "POST",
-                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "assetType": isEquity ? "equity" : "crypto", "requestId": requestId],
+                                                         body: ["symbol": symbol, "question": question, "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "assetType": isEquity ? "equity" : "crypto", "requestId": requestId],
                                                          auth: .account, timeout: 100)
         else { return BobbyAnswer(symbol: symbol) }
         if let failure = DeskFailure(status: reply.status, body: reply.json) {

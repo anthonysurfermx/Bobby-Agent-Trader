@@ -14,6 +14,7 @@
 // bubble; 'mp3' is for web playback (Safari iOS can't play opus).
 // ============================================================
 
+import { appLanguage, appLocale, type AppLocale } from '../../src/lib/app-language.js';
 import { Communicate } from 'edge-tts-universal';
 import { alertProviderCredit } from './provider-alert.js';
 
@@ -28,6 +29,7 @@ export interface SpeechResult {
 
 export interface SpeechOptions {
   lang?: string;
+  locale?: string;
   /** Voice persona id: coral | ballad | sage | ash | mellow | male | female | alpha | red | cio */
   voice?: string;
   /** Agent vibe — modulates delivery style: direct | analytical | wise */
@@ -90,6 +92,10 @@ export function resolveOpenAIVoice(voice?: string): string {
 // audience. Gendered variants match the voice actually speaking.
 
 const BASE_INSTRUCTIONS: Record<string, string> = {
+  fr: 'Parle en français natif de France, avec une voix jeune, chaleureuse, naturelle et posée. Prononce les nombres et les symboles boursiers clairement. Ralentis légèrement pour les risques. Aucune voix robotique ni emphase commerciale.',
+  it: 'Parla in italiano madrelingua, con una voce giovane, calda, naturale e tranquilla. Pronuncia chiaramente numeri e simboli di borsa. Rallenta leggermente quando descrivi i rischi. Niente voce robotica né enfasi commerciale.',
+  de: 'Sprich muttersprachliches Deutsch aus Deutschland, mit einer jungen, warmen, natürlichen und ruhigen Stimme. Sprich Zahlen und Börsensymbole deutlich aus. Sprich bei Risiken etwas langsamer. Keine Roboterstimme und keine Werbeübertreibung.',
+  'pt-PT': 'Fala em português europeu nativo de Portugal, com uma voz jovem, calorosa, natural e tranquila. Pronuncia os números e símbolos de bolsa com clareza. Abranda ligeiramente ao explicar riscos. Sem voz robótica nem exagero comercial.',
   es: 'Eres una chava mexicana de 22 años de la CDMX platicando con tu mejor amiga. Voz joven, fresca y con energía natural — pero relajada y segura, nada de caricatura ni ánimo forzado. Español mexicano nativo auténtico; JAMÁS suenes como extranjera. Habla como Gen Z real: fluida, cercana, con confianza. Baja un poco el tono al hablar de riesgo, como cuidando a tu amiga. Pronuncia siglas y números con naturalidad. Cero robot, cero locutora, sin muletillas.',
   en: 'You are a 22-year-old talking with your best friend. Young, fresh, naturally energetic — but relaxed and confident, never cartoonish or forced. Native American English. Talk like real Gen Z: fluid, close, self-assured. Lower your tone a bit when mentioning risk, like you are looking out for them. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.',
   pt: 'Você é um jovem brasileiro de 22 anos conversando com seu melhor amigo. Voz jovem, fresca e com energia natural — mas relaxada e segura, nada de caricatura. Português brasileiro nativo autêntico. Fale como Gen Z de verdade: fluido, próximo, confiante. Abaixe um pouco o tom ao falar de risco. Zero robô, zero locutor.',
@@ -101,16 +107,25 @@ const VIBE_INSTRUCTIONS: Record<string, Record<string, string>> = {
   direct: {
     es: ' Energía un poco más viva y franca: di las cosas sin rodeos, pero siempre con calidez, nunca agresivo.',
     en: ' Slightly livelier and franker energy: say it straight, but always warm, never aggressive.',
+    fr: ' Un ton franc, vivant et chaleureux, sans agressivité.',
+    it: ' Un tono schietto, vivace e caloroso, senza aggressività.',
+    de: ' Ein offener, lebendiger und warmer Ton, ohne Aggressivität.',
     pt: ' Energia um pouco mais viva e franca: fale sem rodeios, mas sempre com calor humano.',
   },
   analytical: {
     es: ' Frases claras y concentradas, dicción precisa. Prioriza datos, riesgo y siguiente paso, sin sonar frío.',
     en: ' Clear, focused sentences with precise diction. Prioritize data, risk and next step, without sounding cold.',
+    fr: ' Des phrases claires, une diction précise, centrées sur les données et les risques.',
+    it: ' Frasi chiare e dizione precisa, con attenzione ai dati e ai rischi.',
+    de: ' Klare Sätze und präzise Aussprache, mit Fokus auf Daten und Risiken.',
     pt: ' Frases claras e concentradas, dicção precisa. Priorize dados e risco, sem soar frio.',
   },
   wise: {
     es: ' Tono sereno y cómplice, como quien explica con calma y sin juzgar. Transmite: "te cuido la espalda".',
     en: ' Serene, understanding tone, explaining calmly without judging. The feeling: "I\'ve got your back".',
+    fr: ' Un ton serein et complice, qui explique calmement sans juger.',
+    it: ' Un tono sereno e comprensivo, che spiega con calma senza giudicare.',
+    de: ' Ein ruhiger, verständnisvoller Ton, der ohne Wertung erklärt.',
     pt: ' Tom sereno e cúmplice, explicando com calma e sem julgar.',
   },
 };
@@ -129,14 +144,19 @@ const BASE_INSTRUCTIONS_MASC_EN = 'You are a 23-year-old guy talking with your b
 // verbatim, because it is what kept Spanish from sounding foreign.
 const PERSONA_INSTRUCTIONS: Record<string, Record<string, string>> = {
   mellow: {
+    fr: 'Tu es un surfeur d’environ trente-cinq ans qui discute avec un ami sur le sable. Voix grave, calme et sans hâte, avec des pauses naturelles. Français natif de France. Aucune énergie forcée. Baisse encore le ton pour les risques.',
+    it: 'Sei un surfista di circa trentacinque anni che parla con un amico sulla sabbia. Voce bassa, calma e senza fretta, con pause naturali. Italiano madrelingua. Nessuna energia forzata. Abbassa ancora il tono parlando di rischi.',
+    de: 'Du bist ein Surfer Mitte dreißig und sprichst mit einem Freund am Strand. Tiefe, ruhige Stimme ohne Eile, mit natürlichen Pausen. Muttersprachliches Deutsch. Keine erzwungene Energie. Senke bei Risiken den Ton weiter.',
+    'pt-PT': 'És um surfista de cerca de trinta e cinco anos a conversar com um amigo na areia. Voz grave, calma e sem pressa, com pausas naturais. Português europeu nativo de Portugal. Sem energia forçada. Baixa ainda mais o tom ao explicar riscos.',
     es: 'Eres un surfista mexicano de unos treinta y cinco años, de costa, platicando con un amigo en la arena. Voz grave, tranquila y sin ninguna prisa: hablas despacio, con pausas cómodas, como quien lleva media vida esperando la ola buena y sabe que llega. Español mexicano nativo auténtico; JAMÁS suenes como extranjero. Nada de energía forzada, nada de vender: solo calma. Baja todavía más el tono al hablar de riesgo. Pronuncia siglas y números con naturalidad. Cero robot, cero locutor, sin muletillas.',
     en: 'You are a Mexican surfer in your mid-thirties talking with a friend on the sand. Low, calm voice with no hurry at all: you speak slowly, with comfortable pauses, like someone who has spent half a life waiting for the good wave and knows it comes. Native English, warm and unhurried. No forced energy, nothing to sell: just calm. Drop your tone further when mentioning risk. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.',
     pt: 'Você é um surfista de uns trinta e cinco anos conversando com um amigo na areia. Voz grave, tranquila e sem nenhuma pressa: fala devagar, com pausas confortáveis, como quem passou meia vida esperando a onda boa e sabe que ela vem. Português brasileiro nativo. Nada de energia forçada. Abaixe ainda mais o tom ao falar de risco. Zero robô, zero locutor.',
   },
 };
 
-export function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string, persona?: string): string {
-  let base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[lang] || BASE_INSTRUCTIONS.es;
+export function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string, persona?: string, locale?: string): string {
+  const key = lang === 'pt' && appLocale('pt', locale) === 'pt-PT' ? 'pt-PT' : appLanguage(lang, 'es');
+  let base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[key] || BASE_INSTRUCTIONS.es;
   // A masculine voice reading feminine self-references ("una chava…
   // extranjera") breaks the illusion instantly, and the reverse leaves the
   // feminine voices reading flat.
@@ -146,8 +166,8 @@ export function buildInstructions(lang: string, vibe?: string, resolvedVoice?: s
     else if (lang === 'en') base = feminine ? BASE_INSTRUCTIONS_FEM_EN : BASE_INSTRUCTIONS_MASC_EN;
   }
   const character = persona ? PERSONA_INSTRUCTIONS[persona] : undefined;
-  if (!process.env.TTS_INSTRUCTIONS && character) base = character[lang] || character.es;
-  const extra = vibe && VIBE_INSTRUCTIONS[vibe] ? (VIBE_INSTRUCTIONS[vibe][lang] || VIBE_INSTRUCTIONS[vibe].es) : '';
+  if (!process.env.TTS_INSTRUCTIONS && character) base = character[key] || character.en;
+  const extra = vibe && VIBE_INSTRUCTIONS[vibe] ? (VIBE_INSTRUCTIONS[vibe][appLanguage(lang, 'es')] || VIBE_INSTRUCTIONS[vibe].en) : '';
   return base + extra;
 }
 
@@ -157,6 +177,8 @@ const EDGE_VOICE: Record<string, string> = {
   es: process.env.TTS_EDGE_VOICE_ES || 'es-MX-DaliaNeural',
   en: process.env.TTS_EDGE_VOICE_EN || 'en-US-AriaNeural',
   pt: process.env.TTS_EDGE_VOICE_PT || 'pt-BR-FranciscaNeural',
+  fr: 'fr-FR-DeniseNeural', it: 'it-IT-ElsaNeural', de: 'de-DE-KatjaNeural',
+  'pt-PT': 'pt-PT-RaquelNeural',
 };
 
 const MAX_CHARS = 4000;
@@ -171,6 +193,11 @@ const EDGE_VOICE_MENU = new Set([
   'es-US-AlonsoNeural',
   'en-US-AriaNeural',
   'en-US-GuyNeural',
+  'fr-FR-DeniseNeural', 'fr-FR-HenriNeural',
+  'pt-PT-RaquelNeural', 'pt-PT-DuarteNeural',
+  'pt-BR-FranciscaNeural', 'pt-BR-AntonioNeural',
+  'it-IT-ElsaNeural', 'it-IT-DiegoNeural',
+  'de-DE-KatjaNeural', 'de-DE-ConradNeural',
 ]);
 
 type TtsProvider = SpeechResult['provider'];
@@ -182,10 +209,10 @@ type TtsProvider = SpeechResult['provider'];
  * All agents share one Edge identity per language, so `agent` is accepted for
  * API stability but doesn't change the fallback.
  */
-export function resolveEdgeVoice(lang: string, _agent = 'cio', edgeVoice?: string): string {
+export function resolveEdgeVoice(lang: string, _agent = 'cio', edgeVoice?: string, locale?: string): string {
   return (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
     ? edgeVoice
-    : EDGE_VOICE[lang] || EDGE_VOICE.es;
+    : EDGE_VOICE[lang === 'pt' && appLocale('pt', locale) === 'pt-PT' ? 'pt-PT' : lang] || EDGE_VOICE.es;
 }
 
 /**
@@ -198,8 +225,8 @@ export function ttsProviderOrder(provider: string, edgeVoice?: string): TtsProvi
   return provider === 'openai' ? ['openai', 'edge'] : ['edge', 'openai'];
 }
 
-async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'edgeVoice'>): Promise<SpeechResult> {
-  const voice = resolveEdgeVoice(opts.lang, opts.voice, opts.edgeVoice);
+async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'edgeVoice' | 'locale'>): Promise<SpeechResult> {
+  const voice = resolveEdgeVoice(opts.lang, opts.voice, opts.edgeVoice, opts.locale);
   const communicate = new Communicate(text.slice(0, MAX_CHARS), { voice });
   const chunks: Uint8Array[] = [];
   for await (const msg of communicate.stream()) {
@@ -217,7 +244,7 @@ async function edgeTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' |
 
 // ---- OpenAI TTS (warm default) ----
 
-async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'vibe'>): Promise<SpeechResult> {
+async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang' | 'format'>> & Pick<SpeechOptions, 'voice' | 'vibe' | 'locale'>): Promise<SpeechResult> {
   const key = process.env.OPENAI_API_KEY;
   if (!key) throw new Error('openai-tts: OPENAI_API_KEY missing');
   const model = process.env.TTS_OPENAI_MODEL || 'gpt-4o-mini-tts';
@@ -230,7 +257,7 @@ async function openaiTTS(text: string, opts: Required<Pick<SpeechOptions, 'lang'
   };
   // gpt-4o-mini-tts steers delivery via `instructions`; tts-1 only has `speed`.
   if (model.includes('gpt-4o')) {
-    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice, opts.voice);
+    body.instructions = buildInstructions(opts.lang, opts.vibe, resolvedVoice, opts.voice, opts.locale);
   } else {
     body.speed = Number(process.env.TTS_SPEED || '1.0');
   }
@@ -272,7 +299,8 @@ export async function generateSpeech(
   if (!clean) return null;
 
   const resolved = {
-    lang: opts.lang || 'es',
+    lang: appLanguage(opts.lang, 'es'),
+    locale: appLocale(appLanguage(opts.lang, 'es'), opts.locale ?? opts.lang),
     format: opts.format || 'opus' as const,
     voice: opts.voice,
     vibe: opts.vibe,

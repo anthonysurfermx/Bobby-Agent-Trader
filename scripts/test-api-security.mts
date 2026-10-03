@@ -246,7 +246,8 @@ try {
   assert.match(adminAdvocatesSource, /allowedHosts\.has\(parsed\.hostname\.toLowerCase\(\)\)/, 'profile URLs must use exact host allowlisting');
   assert.match(polymarketSource, /\['polymarket\.com', 'www\.polymarket\.com'\]\.includes\(u\.hostname\.toLowerCase\(\)\)/, 'Polymarket URLs must use an exact HTTPS host allowlist');
   assert.match(analyzePanelSource, /encodeURIComponent\(/, 'market slugs must be encoded before reaching a DOM URL sink');
-  assert.match(detectIntentSource, /const escapedKey = key\.replace/, 'dynamic regular-expression keys must be fully escaped');
+  // The key is accent-folded first (six languages); the escape must still cover every regex metacharacter.
+  assert.match(detectIntentSource, /const escapedKey = (?:normalizeWords\(key\)|key)\.replace\(\/\[\.\*\+\?\^\$\{\}\(\)\|\[\\\]\\\\\]\/g/, 'dynamic regular-expression keys must be fully escaped');
   assert.match(blogServiceSource, /new DOMParser\(\)\.parseFromString/, 'blog excerpts must use an HTML parser instead of incomplete regex sanitization');
 
   console.log('api-security: 51/51 checks passed');

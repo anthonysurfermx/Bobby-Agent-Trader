@@ -13,6 +13,7 @@ import { Apple, Loader2, Wallet, X } from 'lucide-react';
 import { useAppKit } from '@reown/appkit/react';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { t } from '@/lib/companions/i18n';
+import { clientLanguagePath, rememberClientLanguage } from '@/lib/client-language';
 import { track } from '@/lib/track';
 
 
@@ -108,7 +109,8 @@ export default function SignInPrompt({ xp, onClose, voiceAccess = false, require
     setError('');
     setProviderUrl(null);
     try {
-      const redirectTo = `${window.location.origin}/auth/callback`;
+      rememberClientLanguage();
+      const redirectTo = `${window.location.origin}${clientLanguagePath('/auth/callback?source=bobby')}`;
       // Ask for the URL instead of letting the library navigate: a bad build
       // (no Supabase URL) or a browser that swallows the redirect used to leave
       // this button spinning forever with nothing to show for it.

@@ -290,7 +290,7 @@ var eyebrow = $('eyebrow');
 function renderChips(){
   var b = tmB('chips'), g = tmG('chips'), set = W.chips;
   if (T < b || T > g + 0.5 || !set.length){ for (var ci2 = 0; ci2 < 3; ci2++){ st(chipEls[ci2], null, 0); cls(chipEls[ci2], 'on', false); } st(eyebrow, null, 0); return; }
-  if (chipsEl._set !== W.chipsKey){ chipsEl._set = W.chipsKey; chipEls.forEach(function(c, i){ c.textContent = set[i] ? set[i].label : ''; c._w = 0; c.style.display = set[i] ? '' : 'none'; }); }
+  if (chipsEl._set !== W.chipsKey){ chipsEl._set = W.chipsKey; chipEls.forEach(function(c, i){ c.textContent = set[i] ? set[i].label : ''; c._w = 0; c.style.display = set[i] ? '' : 'none'; if (set[i] && set[i].ariaLabel) c.setAttribute('aria-label', set[i].ariaLabel); else c.removeAttribute('aria-label'); }); }
   var x = 20;
   for (var i = 0; i < 3; i++){
     var c = chipEls[i]; if (!set[i]){ cls(c, 'on', false); continue; }

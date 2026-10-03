@@ -103,7 +103,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #lvl.on{opacity:1;pointer-events:auto}
 #lvl::before{content:'';position:absolute;inset:-9px -4px}   /* 28 pt to the eye, 44 pt to the finger */
 #pill{position:absolute;left:0;top:742px;width:96px;height:56px;border-radius:28px;background:#000;border:1px solid rgba(242,237,228,.10);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%}
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 18px 40px -14px rgba(0,0,0,.9);overflow:hidden;cursor:pointer;padding:0;transform-origin:50% 50%;touch-action:none;-webkit-user-select:none;user-select:none}
 #pill > .c{position:absolute;left:50%;top:50%;pointer-events:none}
 #pill .mic{width:22px;height:22px;margin:-11px 0 0 -11px}
 #pill .kbd{width:24px;height:24px;margin:-12px 0 0 -12px}
@@ -230,6 +230,11 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #taSend{position:absolute;right:7px;bottom:7px;width:36px;height:36px;border-radius:18px;background:#F2EDE4;color:#141210;display:grid;place-items:center;cursor:pointer}
 #taSend::before{content:'';position:absolute;inset:-4px;border-radius:22px}   /* 44 pt hit area */
 #taSend[disabled]{opacity:.3}
+/* Translated copy can use two lines inside the existing controls. */
+#hint .roll,#hint .roll>span{height:28px;white-space:normal;line-height:13px}
+#hint{height:28px}
+.card dt{max-width:52%;white-space:normal;line-height:13px;overflow-wrap:anywhere}
+.card dd{max-width:48%;overflow-wrap:anywhere}
 </style>
 </head>
 <body data-page="app">
@@ -422,7 +427,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   </div>
   <div id="pauseTag" class="a" aria-hidden="true"><span>Paused</span></div>
 </div>
-<div id="typeBox"><textarea id="ta" rows="1" enterkeyhint="send" autocapitalize="sentences" autocomplete="off" spellcheck="false" maxlength="2000"></textarea><button id="taSend" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+<div id="typeBox"><textarea id="ta" rows="1" enterkeyhint="send" autocapitalize="sentences" autocomplete="off" spellcheck="false"></textarea><button id="taSend" type="button"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
 <script id="companions" type="application/json">__COMPANIONS_JSON__</script>
 <!--NUCLEO:FIXTURES-->
 <!--NUCLEO:SHARED-->

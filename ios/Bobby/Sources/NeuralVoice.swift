@@ -1,5 +1,5 @@
 // One-way persona narration served by bobby-voice-free. Bundled previews and
-// generated answers use the same persona; failures never switch to Apple speech.
+// generated answers use the selected persona; localized on-device speech is the bounded fallback.
 // Build 53 adds prepared playback (authenticated briefing audio fetched by the caller): one completion per
 // request, keyed by the request's generation so an older completion can never end a newer request; stop()
 // stays the universal cancel and answers a pending request with `.stopped` exactly once.
@@ -101,8 +101,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
-    /// Generated narration keeps the selected companion identity. Network failures
-    /// retry once and report failure; they never replace Bobby with a system voice.
+    /// Generated narration keeps the selected persona. New languages may use a matching
+    /// on-device voice after the bounded network retry; existing EN/ES narration keeps its persona.
     static let requestTimeoutSeconds: TimeInterval = 20
     static let maximumNarrationWaitSeconds: TimeInterval = requestTimeoutSeconds * 2 + 1.2
     var onFailure: (() -> Void)?
@@ -120,7 +120,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                     req.httpMethod = "POST"
                     req.setValue("application/json", forHTTPHeaderField: "Content-Type")
                     req.timeoutInterval = Self.requestTimeoutSeconds
-                    var body = ["text": text, "lang": L.ttsLang, "voice": persona ?? voiceId]
+                    var body = ["text": text, "lang": L.ttsLang, "language": L.language, "locale": L.localeIdentifier, "voice": persona ?? voiceId]
+                    if let country = L.country { body["country"] = country }
                     body["mode"] = free ? "free" : "persona"
                     if let serverVibe = Self.serverVibe(vibe) { body["vibe"] = serverVibe }
                     req.httpBody = try JSONSerialization.data(withJSONObject: body)
@@ -144,8 +145,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
                 }
             }
             guard gen == self.generation, !self.isMuted, self.allowsExternalSpeech, !Task.isCancelled else { return }
-            self.speaking = false
-            self.onFailure?()
+            if ["en", "es"].contains(L.language) || !self.playOnDevice(text, language: L.language, requiresConsent: true) {
+                self.speaking = false
+                self.onFailure?()
+            }
         }
     }
 
@@ -153,17 +156,22 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// /api/bobby-voice-free voice: it starts instantly and needs no network.
     /// A missing or unplayable clip falls back to the network voice for `fallbackText` only
     /// while the current external-processing consent permits it (checked centrally in speak).
+    /// Languages with no recorded clips yet (fr, pt, it, de) therefore keep the companion's own persona
+    /// once the notice is accepted; before consent no text leaves the phone and they use the device voice.
     func speakClip(_ name: String, fallbackText: String, persona: String, vibe: String? = nil, playbackRate: Float = 1.0) {
         guard Self.avatarNarrationEnabled, !isMuted else { return }
-        guard let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
-              let data = try? Data(contentsOf: url) else {
+        if name.hasSuffix("-" + L.language),
+           let url = Bundle.main.url(forResource: name, withExtension: "mp3"),
+           let data = try? Data(contentsOf: url) {
+            stop()
+            if play(data, playbackRate: playbackRate) { return }
+        }
+        if allowsExternalSpeech || ["en", "es"].contains(L.language) {
+            // speak() checks consent itself and, for the new languages, ends on the device voice if the network fails.
             speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
             return
         }
-        stop()
-        if !play(data, playbackRate: playbackRate) {
-            speak(fallbackText, voiceId: persona, persona: persona, vibe: vibe, essential: false, playbackRate: playbackRate)
-        }
+        if !playOnDevice(fallbackText, language: L.language, requiresConsent: false) { onFailure?() }
     }
 
     /// Plays audio the caller already fetched (briefing narration). Mute and the external-processing consent
@@ -182,18 +190,54 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     /// Speaks the locally stored Apple name on this device. No HTTP request or provider text is involved.
     @discardableResult
     func playLocalGreeting(_ text: String, language: String, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
-        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech, !text.isEmpty,
-              language == "en" || language == "es" else { return false }
+        playOnDevice(text, language: language, requiresConsent: true, onFinish: onFinish)
+    }
+
+    /// Select only voices in the text's language; a missing voice must never use iOS's unrelated default.
+    static func deviceVoice(language: String) -> AVSpeechSynthesisVoice? {
+        let base = language.split(separator: "-").first.map(String.init) ?? language
+        guard AppLanguage(rawValue: base) != nil else { return nil }
+        let preferred = language.contains("-") ? [language] : Locale.preferredLanguages
+        let resolution = LanguageResolution.resolve(selection: base, preferredLanguages: preferred,
+                                                    region: Locale.current.region?.identifier)
+        let available = AVSpeechSynthesisVoice.speechVoices().filter(isStandardDeviceVoice)
+        // Exact locale first (language and region), then the language's other regions.
+        for candidate in resolution.speechLocaleCandidates {
+            let matches = available.filter { $0.language.caseInsensitiveCompare(candidate) == .orderedSame }
+            // A downloaded premium or enhanced voice wins. Stock voices all tie on quality, so there the
+            // system's own default for the locale is used instead of whichever the list happens to start with.
+            for quality in [AVSpeechSynthesisVoiceQuality.premium, .enhanced] {
+                if let best = matches.first(where: { $0.quality == quality }) { return best }
+            }
+            if let voice = AVSpeechSynthesisVoice(language: candidate), voice.language.lowercased().hasPrefix(base + "-"),
+               isStandardDeviceVoice(voice) { return voice }
+            if let stock = matches.first { return stock }
+        }
+        return nil
+    }
+
+    /// Novelty ("speech.synthesis.voice.*"), Eloquence and Personal Voice entries are never Bobby's fallback voice.
+    static func isStandardDeviceVoice(_ voice: AVSpeechSynthesisVoice) -> Bool {
+        let identifier = voice.identifier.lowercased()
+        if identifier.contains("eloquence") || identifier.contains("speech.synthesis.voice.") { return false }
+        return voice.voiceTraits.isDisjoint(with: [.isNoveltyVoice, .isPersonalVoice])
+    }
+
+    @discardableResult
+    private func playOnDevice(_ text: String, language: String, requiresConsent: Bool,
+                              onFinish: ((NarrationEnd) -> Void)? = nil) -> Bool {
+        guard Self.avatarNarrationEnabled, !isMuted, !requiresConsent || allowsExternalSpeech,
+              !text.isEmpty, let selectedVoice = Self.deviceVoice(language: language) else { return false }
         stop()
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
         try? AVAudioSession.sharedInstance().setActive(true)
         let utterance = AVSpeechUtterance(string: text)
-        utterance.voice = AVSpeechSynthesisVoice(language: language == "es" ? "es-ES" : "en-US")
+        utterance.voice = selectedVoice
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         fallbackUtterance = utterance
         engine = .device
         speaking = true
-        preparedFinish = (generation, onFinish)
+        if let onFinish { preparedFinish = (generation, onFinish) }
         fallback.speak(utterance)
         return true
     }

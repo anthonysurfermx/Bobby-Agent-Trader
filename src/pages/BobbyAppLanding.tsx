@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion } from 'framer-motion';
 import { ArrowRight, ShieldCheck } from 'lucide-react';
+import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, t } from '@/lib/companions/i18n';
 
 interface DebateActivity {
   commitmentsCreated?: number;
@@ -12,12 +13,11 @@ interface ProtocolStats {
   debateActivity?: DebateActivity;
 }
 
-const PAGE_TITLE = 'Bobby — Ask. Challenge. Decide.';
 const DESK_URL = '/desk';
 
 const formatNumber = (value: unknown) => {
   const number = Number(value);
-  return Number.isFinite(number) ? number.toLocaleString('en-US') : '—';
+  return Number.isFinite(number) ? number.toLocaleString(currentLocale()) : '—';
 };
 
 function useProtocolStats() {
@@ -49,9 +49,18 @@ function useProtocolStats() {
   return stats;
 }
 
+function setLang(next: Lang) {
+  try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  const requestedLocale = url.searchParams.get('locale');
+  if (requestedLocale && requestedLocale.split(/[-_]/)[0].toLowerCase() !== next) url.searchParams.delete('locale');
+  window.location.replace(url.href);
+}
+
 function BrandMark() {
   return (
-    <a href="/app" className="flex items-center gap-2.5 text-white" aria-label="Bobby home">
+    <a href="/app" className="flex items-center gap-2.5 text-white" aria-label={t('Bobby home', 'Inicio de Bobby')}>
       <span className="grid h-9 w-9 place-items-center rounded-xl border border-[#8fb6ff]/45 bg-[radial-gradient(circle_at_30%_20%,#c9a8ff_0%,#7c52ff_26%,#2670ff_62%,#0035b8_100%)] text-[19px] font-black tracking-[-0.12em] shadow-[0_0_28px_rgba(124,82,255,.38)]">
         B
       </span>
@@ -66,7 +75,7 @@ function PhoneFrame() {
       <div className="pointer-events-none absolute left-1/2 top-[14px] z-10 h-[18px] w-[86px] -translate-x-1/2 rounded-full bg-black" />
       <img
         src="/app/iphone-desk.png"
-        alt="Bobby desk on iPhone"
+        alt={t('Bobby desk on iPhone', 'Desk de Bobby en iPhone')}
         fetchPriority="high"
         className="w-full rounded-[2.05rem]"
       />
@@ -74,45 +83,55 @@ function PhoneFrame() {
   );
 }
 
-const steps = [
-  ['01', 'Ask', 'Name the asset.'],
-  ['02', 'Challenge', 'Risk tests the case.'],
-  ['03', 'Decide', 'Read the verdict.'],
-];
 
 export default function BobbyAppLanding() {
   const stats = useProtocolStats();
   const record = stats?.debateActivity;
+  const pageTitle = t('Bobby — Ask. Challenge. Decide.', 'Bobby — Pregunta. Cuestiona. Decide.');
+  const steps = [
+    ['01', t('Ask', 'Pregunta'), t('Name the asset.', 'Indica el activo.')],
+    ['02', t('Challenge', 'Cuestiona'), t('Risk tests the case.', 'Risk pone a prueba el caso.')],
+    ['03', t('Decide', 'Decide'), t('Read the verdict.', 'Lee el veredicto.')],
+  ];
 
   useEffect(() => {
-    document.title = PAGE_TITLE;
-  }, []);
+    document.title = pageTitle;
+  }, [pageTitle]);
 
   return (
     <div className="min-h-screen overflow-hidden bg-[#050505] font-sans text-white antialiased">
       <Helmet>
-        <title>{PAGE_TITLE}</title>
+        <html lang={currentLocale()} />
+        <title>{pageTitle}</title>
         <meta
           name="description"
-          content="Bobby challenges every market answer before you act."
+          content={t('Bobby challenges every market answer before you act.', 'Bobby cuestiona cada respuesta del mercado antes de que actúes.')}
         />
       </Helmet>
 
       <header className="sticky top-0 z-50 border-b border-white/10 bg-[#050505]/85 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-3.5 sm:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3.5 sm:px-8">
           <BrandMark />
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-2 sm:gap-5">
+            <select
+              aria-label={t('Language', 'Idioma')}
+              value={lang()}
+              onChange={(event) => setLang(event.target.value as Lang)}
+              className="max-w-[75px] sm:max-w-[100px] rounded border border-white/15 bg-[#050505] px-2 py-2 font-mono text-[10px] text-white/65"
+            >
+              {LANGS.map((language) => <option key={language} value={language}>{LANG_NAME[language]}</option>)}
+            </select>
             <a
               href="/protocol"
               className="hidden font-mono text-xs uppercase tracking-[0.14em] text-white/55 transition hover:text-white sm:block"
             >
-              Protocol
+              {t('Protocol', 'Protocolo')}
             </a>
             <a
               href={DESK_URL}
-              className="rounded-lg bg-white px-4 py-2.5 font-mono text-[11px] font-bold uppercase tracking-[0.12em] text-black transition hover:bg-[#8e72ff] hover:text-white"
+              className="rounded-lg bg-white px-3 sm:px-4 py-2.5 font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.12em] text-black transition hover:bg-[#8e72ff] hover:text-white"
             >
-              Open desk
+              {t('Open desk', 'Abrir desk')}
             </a>
           </div>
         </div>
@@ -122,25 +141,25 @@ export default function BobbyAppLanding() {
         <section className="relative mx-auto grid min-h-[calc(100svh-65px)] max-w-6xl items-center gap-12 px-5 py-16 sm:px-8 lg:grid-cols-[1fr_.8fr] lg:py-20">
           <div className="relative z-10 max-w-xl">
             <p className="mb-6 font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#a99aff]">
-              Market intelligence, challenged
+              {t('Market intelligence, challenged', 'Inteligencia de mercado, cuestionada')}
             </p>
             <h1 className="text-[clamp(3.6rem,9vw,7.4rem)] font-black leading-[.87] tracking-[-0.075em]">
-              Ask.
+              {t('Ask.', 'Pregunta.')}
               <br />
-              <span className="bg-[linear-gradient(110deg,#fafafa_10%,#9d8bff_58%,#4c88ff)] bg-clip-text text-transparent">Challenge.</span>
+              <span className="bg-[linear-gradient(110deg,#fafafa_10%,#9d8bff_58%,#4c88ff)] bg-clip-text text-transparent">{t('Challenge.', 'Cuestiona.')}</span>
               <br />
-              Decide.
+              {t('Decide.', 'Decide.')}
             </h1>
             <p className="mt-7 max-w-sm text-base leading-7 text-white/62">
-              Bobby tests every market answer before you act.
+              {t('Bobby tests every market answer before you act.', 'Bobby pone a prueba cada respuesta del mercado antes de que actúes.')}
             </p>
             <a
               href={DESK_URL}
               className="mt-9 inline-flex items-center gap-3 rounded-xl bg-[#6954ef] px-5 py-3.5 font-mono text-xs font-bold uppercase tracking-[0.13em] transition hover:bg-[#886fff]"
             >
-              Open the desk <ArrowRight className="h-4 w-4" />
+              {t('Open the desk', 'Abrir el desk')} <ArrowRight className="h-4 w-4" />
             </a>
-            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.12em] text-white/35">iPhone beta soon</p>
+            <p className="mt-4 font-mono text-[11px] uppercase tracking-[0.12em] text-white/35">{t('Available on iPhone', 'Disponible en iPhone')}</p>
           </div>
 
           <motion.div
@@ -168,14 +187,14 @@ export default function BobbyAppLanding() {
 
         <section id="record" className="mx-auto grid max-w-6xl gap-10 px-5 py-20 sm:px-8 lg:grid-cols-[1fr_.8fr] lg:py-28">
           <div>
-            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#a99aff]">On the record</p>
+            <p className="font-mono text-[11px] font-semibold uppercase tracking-[0.22em] text-[#a99aff]">{t('On the record', 'En el registro')}</p>
             <h2 className="mt-5 max-w-md text-4xl font-black leading-[.94] tracking-[-0.065em] sm:text-5xl">
-              Calls stay visible.
+              {t('Calls stay visible.', 'Los escenarios siguen visibles.')}
               <br />
-              Wins and misses.
+              {t('Wins and misses.', 'Aciertos y fallos.')}
             </h2>
             <p className="mt-6 max-w-sm text-base leading-7 text-white/58">
-              Bobby writes the case before the market settles it.
+              {t('Bobby writes the case before the market settles it.', 'Bobby registra el caso antes de que el mercado lo resuelva.')}
             </p>
           </div>
 
@@ -183,19 +202,19 @@ export default function BobbyAppLanding() {
             <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="font-mono text-3xl font-bold tracking-[-0.06em]">{formatNumber(record?.commitmentsCreated)}</p>
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/42">published</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/42">{t('published', 'publicados')}</p>
               </div>
               <div>
                 <p className="font-mono text-3xl font-bold tracking-[-0.06em]">{formatNumber(record?.decisionsResolved)}</p>
-                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/42">resolved</p>
+                <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.12em] text-white/42">{t('resolved', 'resueltos')}</p>
               </div>
             </div>
             <details className="mt-7 border-t border-white/10 pt-5">
               <summary className="cursor-pointer list-none font-mono text-[11px] font-semibold uppercase tracking-[0.12em] text-white/65">
-                What Bobby does not do
+                {t('What Bobby does not do', 'Lo que Bobby no hace')}
               </summary>
               <p className="mt-3 text-sm leading-6 text-white/48">
-                No custody. No execution. No promises.
+                {t('No custody. No execution. No promises.', 'Sin custodia. Sin ejecución. Sin promesas.')}
               </p>
             </details>
           </div>
@@ -204,20 +223,20 @@ export default function BobbyAppLanding() {
         <section className="border-t border-white/10 bg-[#09090d] px-5 py-20 text-center sm:px-8">
           <ShieldCheck className="mx-auto h-5 w-5 text-[#a99aff]" />
           <h2 className="mx-auto mt-5 max-w-lg text-4xl font-black leading-[.94] tracking-[-0.06em] sm:text-5xl">
-            One clear answer is enough.
+            {t('One clear answer is enough.', 'Una respuesta clara es suficiente.')}
           </h2>
           <a
             href={DESK_URL}
             className="mt-8 inline-flex items-center gap-3 rounded-xl bg-white px-5 py-3.5 font-mono text-xs font-bold uppercase tracking-[0.13em] text-black transition hover:bg-[#8e72ff] hover:text-white"
           >
-            Open the desk <ArrowRight className="h-4 w-4" />
+            {t('Open the desk', 'Abrir el desk')} <ArrowRight className="h-4 w-4" />
           </a>
         </section>
       </main>
 
       <footer className="mx-auto flex max-w-6xl items-center justify-between px-5 py-7 sm:px-8">
         <span className="font-mono text-[10px] uppercase tracking-[0.13em] text-white/35">Bobby Protocol</span>
-        <a href="/protocol" className="font-mono text-[10px] uppercase tracking-[0.13em] text-white/45 transition hover:text-white">Protocol</a>
+        <a href="/protocol" className="font-mono text-[10px] uppercase tracking-[0.13em] text-white/45 transition hover:text-white">{t('Protocol', 'Protocolo')}</a>
       </footer>
     </div>
   );

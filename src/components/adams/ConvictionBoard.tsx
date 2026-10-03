@@ -1,3 +1,4 @@
+import { speechLocale, t as ui, translatedEnglish, lang } from '@/lib/companions/i18n';
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { TrendingUp, TrendingDown } from 'lucide-react';
@@ -35,13 +36,13 @@ function AssetCell({ asset }: { asset: AssetData }) {
         <span className="font-mono font-bold text-white tracking-wider text-[11px]">{asset.symbol}</span>
         <span className={`flex items-center gap-0.5 font-mono font-bold text-[10px] ${isUp ? 'text-green-400' : 'text-red-400'}`}>
           {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-          {isUp ? '+' : ''}{asset.change24h.toFixed(2)}%
+          {isUp ? '+' : ''}{(asset.change24h).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
         </span>
       </div>
 
       <div className="flex flex-col pl-2">
         <span className="font-mono text-white/90 text-[13px] font-medium">
-          ${asset.price.toLocaleString(undefined, { maximumFractionDigits: asset.price < 1 ? 4 : 2 })}
+          ${asset.price.toLocaleString(speechLocale(), { maximumFractionDigits: asset.price < 1 ? 4 : 2 })}
         </span>
       </div>
 
@@ -81,10 +82,9 @@ export function ConvictionBoard({ isVisible, bobbyThinking, marketData }: Convic
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-mono text-[10px] uppercase tracking-[2px] text-white/50 flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
-                Bobby's Radar
-              </h3>
+                {ui("Bobby's Radar", "Radar de Bobby")}</h3>
               <span className="font-mono text-[9px] text-white/30 px-2 py-0.5">
-                {assets.length} ASSETS LIVE
+                {ui(`${assets.length} assets live`, `${assets.length} activos en vivo`)}
               </span>
             </div>
 

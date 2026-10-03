@@ -1,0 +1,28 @@
+Découvre Bobby, ton compagnon pour réfléchir aux marchés.
+
+Pose une question sur un actif pris en charge, comme une action ou un cryptoactif, en écrivant ou en utilisant la dictée facultative. Bobby réunit trois perspectives : les opportunités, la mise à l’épreuve des risques et une synthèse des éléments disponibles.
+
+SIX LANGUES ET UN CONTEXTE LOCAL
+Utilise Bobby en français, anglais, espagnol, portugais, italien ou allemand. Change de langue dans le Profil. La voix et la dictée en portugais suivent la variante du Portugal ou du Brésil définie sur l’appareil. Recherche les actions locales prises en charge par nom ou symbole ; les symboles de cotation et la devise d’origine sont conservés.
+
+UNE LECTURE À RETROUVER
+Consulte le contexte du marché, un graphique, les horodatages des sources et une conclusion conditionnelle. Enregistre une lecture sur ton appareil pour retrouver son raisonnement. Attendre est aussi une réponse utile lorsque les éléments sont insuffisants.
+
+CHOISIS LA PROFONDEUR
+Rapide, Approfondie et Maximale proposent différentes profondeurs d’analyse. Les lectures sans compte et les niveaux avec compte ont des limites d’utilisation ; l’app affiche leur disponibilité et les quotas restants. Certains niveaux nécessitent Se connecter avec Apple.
+
+TON COMPAGNON ET TA PROGRESSION
+Choisis un compagnon, personnalise ton profil et explore Trader Land. Un compte Apple facultatif synchronise ta progression. Ton île reste privée tant que tu ne choisis pas de la publier. Les îles publiques permettent de signaler du contenu et de bloquer des créateurs.
+
+TU DÉCIDES POUR L’IA
+Le traitement par une IA externe nécessite ton autorisation. Consulte l’avis et retire ton autorisation depuis le Profil. La dictée est reconnue sur ton iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio. Tu peux toujours écrire. La narration facultative peut être coupée.
+
+Bobby est un outil éducatif d’analyse de marché. L’app iPhone ne connecte pas de portefeuilles, n’exécute pas d’ordres et ne déplace pas de fonds. Les analyses peuvent être incomplètes ou erronées et les données de marché retardées. Bobby ne promet aucun rendement et ne fournit pas de conseil d’investissement personnalisé. Tu décides de tes actions.
+
+Confidentialité : https://bobbyprotocol.xyz/privacy?lang=fr
+Assistance : https://bobbyprotocol.xyz/support?lang=fr
+
+BOBBY PRO (FACULTATIF)
+Bobby Pro est un abonnement mensuel facultatif à renouvellement automatique : lectures Rapides illimitées (usage raisonnable), plus 60 analyses Approfondies et 10 Maximales tous les 30 jours. Le prix est affiché dans ta devise avant l’achat. Le paiement est débité de ton compte Apple à la confirmation. L’abonnement se renouvelle automatiquement sauf annulation au moins 24 heures avant la fin de la période en cours ; gère-le ou annule-le dans Réglages › Compte Apple › Abonnements. Restaurer les achats se trouve dans le Profil.
+
+Conditions d’utilisation (EULA) : https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

@@ -6,6 +6,7 @@ import vm from 'node:vm';
 import test from 'node:test';
 
 const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8');
+const locale = read('../src/shared/05-locale.js');
 const bridge = read('../src/shared/10-bridge.js');
 const readModel = read('../src/shared/20-read-model.js');
 const template = read('../src/app/template.html');
@@ -87,7 +88,7 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
   });
   context.window = context;
   const client = legacyEvents ? bridge.replace("'account.changed', 'consent.withdrawn', ", '') : bridge;
-  vm.runInContext(client + '\n' + readModel, context, { filename: 'shipping-shared.js' });
+  vm.runInContext(locale + '\n' + client + '\n' + readModel, context, { filename: 'shipping-shared.js' });
   return {
     context, calls, errors, nodes, session,
     boot() { vm.runInContext(engine, context, { filename: 'shipping-app.js' }); },
@@ -117,7 +118,7 @@ test('every literal event registered by either shipping page is allowed by the r
   }
 });
 
-for (const language of ['en', 'es']) {
+for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de']) {
   test(language + ': native Momo/risk v5 session wakes, labels Profile, and opens the native account', async () => {
     const app = harness({ language });
     app.boot(); await flush();
@@ -126,7 +127,7 @@ for (const language of ['en', 'es']) {
     assert.equal(app.context.nucleo.state(), 'WAKE');
     assert.equal(app.context.nucleo.session().riskVersion, 5);
     assert.equal(app.context.nucleo.session().companion.id, 'momo');
-    assert.equal(app.nodes.get('avatar').getAttribute('aria-label'), language === 'es' ? 'Momo. Cuenta y progreso' : 'Momo. Account and progress');
+    assert.equal(app.nodes.get('avatar').getAttribute('aria-label'), ({ en:'Momo. Account and progress', es:'Momo. Cuenta y progreso', fr:'Momo. Compte et progression', pt:'Momo. Conta e progresso', it:'Momo. Account e progressi', de:'Momo. Konto und Fortschritt' })[language]);
     app.advance(1.2); await flush();
     assert.equal(app.context.nucleo.state(), 'IDLE');
     app.nodes.get('stage').listeners.click({ target: app.nodes.get('avatar') });

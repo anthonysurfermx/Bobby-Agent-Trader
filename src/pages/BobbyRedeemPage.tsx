@@ -1,69 +1,64 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Helmet } from 'react-helmet-async';
-import { lang, type Lang } from '@/lib/companions/i18n';
+import { lang, speechLocale, type Lang } from '@/lib/companions/i18n';
 import { fetchAccess, redeemCoupon, rememberReturn, type AccessState, type RedeemResult, type UsageGift } from '@/lib/access-client';
 
 /**
  * /redeem — redeem a Bobby coupon (api/_lib/coupons.ts) for extra reads, Profundo and Máximo.
  * /redeem?code=AMIGOS20 pre-fills the code. Needs an Apple/Google account: without one the page sends the
  * visitor through /signin and /auth/callback brings them back here. The gift lives on the account, so the
- * iPhone app sees it too. One language per visit: ?lang=en|es|pt, else the stored or browser language.
+ * iPhone app sees it too. One language per visit: ?lang=en|es|fr|pt|it|de, else the stored or browser language.
  */
 type Copy = Record<Lang, string>;
 const COPY = {
-  title: { en: 'Redeem a coupon', es: 'Canjea un cupón', pt: 'Resgate um cupom' },
+  title: { en: 'Redeem a coupon', es: 'Canjea un cupón', pt: 'Resgate um cupom' , fr: "Utiliser un coupon", it: "Riscatta un coupon", de: "Gutschein einlösen" },
   lead: {
     en: 'Coupons add extra reads to your Bobby account. They are used once your free reads run out, on the web and on iPhone.',
     es: 'Los cupones suman lecturas extra a tu cuenta de Bobby. Se usan cuando se acaban tus lecturas gratis, en la web y en el iPhone.',
-    pt: 'Os cupons somam leituras extras à sua conta do Bobby. Elas são usadas quando suas leituras grátis acabam, na web e no iPhone.',
-  },
-  label: { en: 'Coupon code', es: 'Código del cupón', pt: 'Código do cupom' },
-  redeem: { en: 'Redeem', es: 'Canjear', pt: 'Resgatar' },
-  redeeming: { en: 'Redeeming…', es: 'Canjeando…', pt: 'Resgatando…' },
+    pt: 'Os cupons somam leituras extras à sua conta do Bobby. Elas são usadas quando suas leituras grátis acabam, na web e no iPhone.', fr: "Les coupons ajoutent des analyses à votre compte Bobby. Elles sont utilisées après vos analyses gratuites, sur le web et l’iPhone.", it: "I coupon aggiungono analisi al tuo account Bobby. Vengono usate quando esaurisci le analisi gratuite, sul web e su iPhone.", de: "Gutscheine geben deinem Bobby-Konto zusätzliche Analysen. Sie werden nach den kostenlosen Analysen im Web und auf dem iPhone verwendet." },
+  label: { en: 'Coupon code', es: 'Código del cupón', pt: 'Código do cupom' , fr: "Code du coupon", it: "Codice coupon", de: "Gutscheincode" },
+  redeem: { en: 'Redeem', es: 'Canjear', pt: 'Resgatar' , fr: "Utiliser", it: "Riscatta", de: "Einlösen" },
+  redeeming: { en: 'Redeeming…', es: 'Canjeando…', pt: 'Resgatando…' , fr: "Utilisation…", it: "Riscatto…", de: "Wird eingelöst…" },
   signinLead: {
     en: 'Sign in with the same Apple or Google account you use in Bobby to redeem it.',
     es: 'Inicia sesión con la misma cuenta de Apple o Google que usas en Bobby para canjearlo.',
-    pt: 'Entre com a mesma conta Apple ou Google que você usa no Bobby para resgatar.',
-  },
-  apple: { en: 'Continue with Apple', es: 'Continuar con Apple', pt: 'Continuar com Apple' },
-  google: { en: 'Continue with Google', es: 'Continuar con Google', pt: 'Continuar com Google' },
-  balance: { en: 'Your gifted balance', es: 'Tu saldo de regalo', pt: 'Seu saldo de presente' },
-  desk: { en: 'Go to Bobby', es: 'Ir a Bobby', pt: 'Ir para o Bobby' },
+    pt: 'Entre com a mesma conta Apple ou Google que você usa no Bobby para resgatar.', fr: "Connectez-vous avec le même compte Apple ou Google que dans Bobby pour l’utiliser.", it: "Accedi con lo stesso account Apple o Google che usi in Bobby per riscattarlo.", de: "Melde dich mit demselben Apple- oder Google-Konto wie in Bobby an, um ihn einzulösen." },
+  apple: { en: 'Continue with Apple', es: 'Continuar con Apple', pt: 'Continuar com Apple' , fr: "Continuer avec Apple", it: "Continua con Apple", de: "Mit Apple fortfahren" },
+  google: { en: 'Continue with Google', es: 'Continuar con Google', pt: 'Continuar com Google' , fr: "Continuer avec Google", it: "Continua con Google", de: "Mit Google fortfahren" },
+  balance: { en: 'Your gifted balance', es: 'Tu saldo de regalo', pt: 'Seu saldo de presente' , fr: "Votre solde offert", it: "Il tuo saldo in regalo", de: "Dein geschenktes Guthaben" },
+  desk: { en: 'Go to Bobby', es: 'Ir a Bobby', pt: 'Ir para o Bobby' , fr: "Ouvrir Bobby", it: "Vai a Bobby", de: "Zu Bobby" },
   iphone: {
     en: 'On iPhone, open Bobby signed in with the same account.',
     es: 'En el iPhone, abre Bobby con la misma cuenta.',
-    pt: 'No iPhone, abra o Bobby com a mesma conta.',
-  },
-  loading: { en: 'Checking your account…', es: 'Revisando tu cuenta…', pt: 'Verificando sua conta…' },
-  retry: { en: 'Try again', es: 'Reintentar', pt: 'Tentar de novo' },
+    pt: 'No iPhone, abra o Bobby com a mesma conta.', fr: "Sur l’iPhone, ouvrez Bobby avec le même compte.", it: "Su iPhone apri Bobby con lo stesso account.", de: "Öffne Bobby auf dem iPhone mit demselben Konto." },
+  loading: { en: 'Checking your account…', es: 'Revisando tu cuenta…', pt: 'Verificando sua conta…' , fr: "Vérification de votre compte…", it: "Verifica dell’account…", de: "Dein Konto wird geprüft…" },
+  retry: { en: 'Try again', es: 'Reintentar', pt: 'Tentar de novo' , fr: "Réessayer", it: "Riprova", de: "Erneut versuchen" },
 } satisfies Record<string, Copy>;
 
 const RESULT: Record<Exclude<RedeemResult, 'redeemed'>, Copy> = {
-  invalid_code: { en: 'That coupon does not exist. Check the code.', es: 'Ese cupón no existe. Revisa el código.', pt: 'Esse cupom não existe. Confira o código.' },
-  expired: { en: 'That coupon has expired.', es: 'Ese cupón ya venció.', pt: 'Esse cupom expirou.' },
-  exhausted: { en: 'That coupon has run out.', es: 'Ese cupón ya se agotó.', pt: 'Esse cupom esgotou.' },
-  already_redeemed: { en: 'You already redeemed this coupon.', es: 'Ya canjeaste este cupón.', pt: 'Você já resgatou este cupom.' },
+  invalid_code: { en: 'That coupon does not exist. Check the code.', es: 'Ese cupón no existe. Revisa el código.', pt: 'Esse cupom não existe. Confira o código.' , fr: "Ce coupon n’existe pas. Vérifiez le code.", it: "Il coupon non esiste. Controlla il codice.", de: "Diesen Gutschein gibt es nicht. Prüfe den Code." },
+  expired: { en: 'That coupon has expired.', es: 'Ese cupón ya venció.', pt: 'Esse cupom expirou.' , fr: "Ce coupon a expiré.", it: "Il coupon è scaduto.", de: "Dieser Gutschein ist abgelaufen." },
+  exhausted: { en: 'That coupon has run out.', es: 'Ese cupón ya se agotó.', pt: 'Esse cupom esgotou.' , fr: "Ce coupon est épuisé.", it: "Il coupon è esaurito.", de: "Dieser Gutschein ist aufgebraucht." },
+  already_redeemed: { en: 'You already redeemed this coupon.', es: 'Ya canjeaste este cupón.', pt: 'Você já resgatou este cupom.' , fr: "Vous avez déjà utilisé ce coupon.", it: "Hai già riscattato il coupon.", de: "Du hast diesen Gutschein bereits eingelöst." },
   account_required: {
     en: 'Coupons need an Apple or Google account. Sign in and try again.',
     es: 'Los cupones necesitan una cuenta de Apple o Google. Inicia sesión e inténtalo de nuevo.',
-    pt: 'Os cupons precisam de uma conta Apple ou Google. Entre e tente de novo.',
-  },
-  rate_limited: { en: 'Too many attempts. Wait a few minutes.', es: 'Demasiados intentos. Espera unos minutos.', pt: 'Muitas tentativas. Aguarde alguns minutos.' },
-  unavailable: { en: 'Coupons are not available right now. Try again.', es: 'Los cupones no están disponibles ahora. Inténtalo de nuevo.', pt: 'Os cupons não estão disponíveis agora. Tente de novo.' },
+    pt: 'Os cupons precisam de uma conta Apple ou Google. Entre e tente de novo.', fr: "Les coupons nécessitent un compte Apple ou Google. Connectez-vous et réessayez.", it: "I coupon richiedono un account Apple o Google. Accedi e riprova.", de: "Gutscheine benötigen ein Apple- oder Google-Konto. Melde dich an und versuche es erneut." },
+  rate_limited: { en: 'Too many attempts. Wait a few minutes.', es: 'Demasiados intentos. Espera unos minutos.', pt: 'Muitas tentativas. Aguarde alguns minutos.' , fr: "Trop de tentatives. Attendez quelques minutes.", it: "Troppi tentativi. Attendi qualche minuto.", de: "Zu viele Versuche. Warte einige Minuten." },
+  unavailable: { en: 'Coupons are not available right now. Try again.', es: 'Los cupones no están disponibles ahora. Inténtalo de nuevo.', pt: 'Os cupons não estão disponíveis agora. Tente de novo.' , fr: "Les coupons sont indisponibles pour le moment. Réessayez.", it: "I coupon non sono disponibili ora. Riprova.", de: "Gutscheine sind gerade nicht verfügbar. Versuche es erneut." },
 };
 
 function pageLang(): Lang {
-  const requested = new URLSearchParams(window.location.search).get('lang');
-  return requested === 'es' || requested === 'en' || requested === 'pt' ? requested : lang();
+  return lang();
 }
 const normalize = (v: string) => v.toUpperCase().replace(/\s+/g, '').slice(0, 32);
 const validCode = (v: string) => /^[A-Z0-9][A-Z0-9-]{3,31}$/.test(v);
 
 function giftLine(g: UsageGift, l: Lang): string {
   const parts: string[] = [];
-  if (g.reads) parts.push({ en: `${g.reads} reads`, es: `${g.reads} lecturas`, pt: `${g.reads} leituras` }[l]);
-  if (g.profundo) parts.push(`${g.profundo} ${{ en: 'Deep', es: 'Profundo', pt: 'Profundo' }[l]}`);
-  if (g.maximo) parts.push(`${g.maximo} ${{ en: 'Max', es: 'Máximo', pt: 'Máximo' }[l]}`);
+  if (g.reads) parts.push({ en: `${g.reads} reads`, es: `${g.reads} lecturas`, pt: `${g.reads} leituras`, fr: `${g.reads} analyses`, it: `${g.reads} analisi`, de: `${g.reads} Analysen` }[l]);
+  if (g.profundo) parts.push(`${g.profundo} ${{ en: 'Deep', es: 'Profundo', pt: 'Profundo', fr: 'Approfondie', it: 'Approfondita', de: 'Vertieft' }[l]}`);
+  if (g.maximo) parts.push(`${g.maximo} ${{ en: 'Max', es: 'Máximo', pt: 'Máximo', fr: 'Maximale', it: 'Massima', de: 'Maximal' }[l]}`);
   return parts.join(' · ');
 }
 
@@ -81,7 +76,7 @@ export default function BobbyRedeemPage() {
 
   const signIn = (provider: 'apple' | 'google') => {
     rememberReturn(validCode(code) ? `/redeem?code=${code}&lang=${l}` : `/redeem?lang=${l}`);
-    window.location.assign(`/signin?provider=${provider}`);
+    window.location.assign(`/signin?provider=${provider}&lang=${encodeURIComponent(l)}&locale=${encodeURIComponent(speechLocale())}`);
   };
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -94,7 +89,7 @@ export default function BobbyRedeemPage() {
     setBusy(false);
     if (result === 'redeemed') {
       const line = granted ? giftLine(granted, l) : '';
-      setMessage({ ok: true, text: { en: `Done: ${line} added to your account.`, es: `Listo: ${line} en tu cuenta.`, pt: `Pronto: ${line} na sua conta.` }[l] });
+      setMessage({ ok: true, text: { en: `Done: ${line} added to your account.`, es: `Listo: ${line} en tu cuenta.`, pt: `Pronto: ${line} na sua conta.`, fr: `Terminé : ${line} ajoutés à votre compte.`, it: `Fatto: ${line} aggiunti al tuo account.`, de: `Fertig: ${line} wurden deinem Konto hinzugefügt.` }[l] });
       setCode('');
       void refresh();
     } else {
@@ -116,7 +111,7 @@ export default function BobbyRedeemPage() {
   return (
     <main className="min-h-[100svh] bg-[#0B0A09] text-[#F2EDE4] flex items-center justify-center px-4 py-12">
       <Helmet>
-        <html lang={l} />
+        <html lang={speechLocale()} />
         <title>{`${t(COPY.title)} | Bobby`}</title>
         <meta name="robots" content="noindex" />
       </Helmet>

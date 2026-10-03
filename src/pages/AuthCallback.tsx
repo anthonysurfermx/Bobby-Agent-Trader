@@ -8,6 +8,9 @@ import { bobbySupabase } from '@/lib/bobby-db-client';
 import { takeReturn } from '@/lib/access-client';
 import { toast } from 'sonner';
 import { Loader2, CheckCircle2, AlertCircle, ShieldCheck } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
+import { locale, t } from '@/lib/companions/i18n';
+import { clientLanguagePath, rememberQueryLanguage } from '@/lib/client-language';
 
 type CallbackType = 'signup' | 'recovery' | 'invite' | 'magiclink' | 'email_change' | null;
 type CallbackError =
@@ -52,7 +55,7 @@ export default function AuthCallback() {
   const processedRef = useRef(false);
 
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
-  const [message, setMessage] = useState('Procesando...');
+  const [message, setMessage] = useState(() => t('Processing...', 'Procesando...'));
 
   // Leer parámetros de search o hash (algunos providers usan hash)
   const type = (searchParams.get('type') || hashParams.get('type')) as CallbackType;
@@ -60,6 +63,7 @@ export default function AuthCallback() {
   const errorDescription = searchParams.get('error_description') || hashParams.get('error_description');
   const code = searchParams.get('code') || hashParams.get('code');
   const token = searchParams.get('token') || hashParams.get('token');
+  const bobbyCallback = searchParams.get('source') === 'bobby';
   const redirectTo = sanitizeRedirect(
     searchParams.get('redirect_to') || hashParams.get('redirect_to'),
     '/'
@@ -95,7 +99,9 @@ export default function AuthCallback() {
     const processCallback = async () => {
       // Read once whatever the outcome: a cancelled sign-in must not send a later one to /redeem.
       const back = takeReturn();
+      const failureDestination = bobbyCallback ? clientLanguagePath('/signin') : '/login';
       try {
+        if (bobbyCallback) rememberQueryLanguage();
         // Bobby's own auth project (Apple / Google from the desk) lands here with
         // the session in the URL hash. Its client parses that when it is created;
         // the legacy DeFi México client below never sees it and used to answer
@@ -103,10 +109,12 @@ export default function AuthCallback() {
         if (!error && (hashParams.get('access_token') || searchParams.get('code'))) {
           const { data } = await bobbySupabase().auth.getSession();
           if (data.session) {
+            rememberQueryLanguage();
             setStatus('success');
-            setMessage(back ? 'Sesión iniciada. Volviendo…' : 'Sesión iniciada. Volviendo al desk…');
+            setMessage(back ? t('Signed in. Returning…', 'Sesión iniciada. Volviendo…') : t('Signed in. Returning to the desk…', 'Sesión iniciada. Volviendo al desk…'));
             cleanUrl();
-            setTimeout(() => navigate(back ?? '/desk', { replace: true }), 600);
+            const destination = clientLanguagePath(back ?? '/desk');
+            setTimeout(() => navigate(destination, { replace: true }), 600);
             return;
           }
         }
@@ -120,27 +128,29 @@ export default function AuthCallback() {
           
           switch (error) {
             case 'access_denied':
-              errorMessage = 'Acceso denegado. Por favor intenta de nuevo.';
+              errorMessage = t('Access denied. Please try again.', 'Acceso denegado. Por favor intenta de nuevo.');
               break;
             case 'server_error':
-              errorMessage = 'Error del servidor. Por favor intenta más tarde.';
+              errorMessage = t('Server error. Please try again later.', 'Error del servidor. Por favor intenta más tarde.');
               break;
             case 'invalid_token':
-              errorMessage = 'Token inválido o expirado.';
+              errorMessage = t('Invalid or expired token.', 'Token inválido o expirado.');
               break;
             case 'expired_token':
-              errorMessage = 'El enlace ha expirado. Solicita uno nuevo.';
+              errorMessage = t('The link has expired. Request a new one.', 'El enlace ha expirado. Solicita uno nuevo.');
               break;
             case 'user_already_confirmed':
-              errorMessage = 'Tu correo ya estaba verificado.';
+              errorMessage = t('Your email was already verified.', 'Tu correo ya estaba verificado.');
               showToast = false; // No es un error real
-              toast.info('Tu cuenta ya está verificada. Puedes iniciar sesión.');
+              toast.info(t('Your account is already verified. You can sign in.', 'Tu cuenta ya está verificada. Puedes iniciar sesión.'));
               break;
             case 'email_link_handled':
-              errorMessage = 'Este enlace ya fue procesado.';
+              errorMessage = t('This link has already been processed.', 'Este enlace ya fue procesado.');
               break;
             default:
-              errorMessage = errorDescription || 'Ocurrió un error de autenticación.';
+              errorMessage = bobbyCallback
+                ? t('An authentication error occurred.', 'Ocurrió un error de autenticación.')
+                : errorDescription || t('An authentication error occurred.', 'Ocurrió un error de autenticación.');
           }
           
           setMessage(errorMessage);
@@ -150,15 +160,25 @@ export default function AuthCallback() {
           
           // Redirigir más rápido si no es un error crítico
           const delay = error === 'user_already_confirmed' ? 1500 : 2500;
-          setTimeout(() => navigate('/login', { replace: true }), delay);
+          setTimeout(() => navigate(failureDestination, { replace: true }), delay);
+          return;
+        }
+
+        // Bobby OAuth never belongs to the legacy account or recovery handler.
+        if (bobbyCallback) {
+          setStatus('error');
+          const errorMessage = t('Authentication could not be completed.', 'No se pudo completar la autenticación.');
+          setMessage(errorMessage);
+          toast.error(errorMessage);
+          setTimeout(() => navigate(failureDestination, { replace: true }), 2000);
           return;
         }
 
         // Validar que tengamos código o token
         if (!code && !token) {
           setStatus('error');
-          setMessage('Parámetros de autenticación faltantes.');
-          toast.error('Enlace inválido');
+          setMessage(t('Authentication parameters are missing.', 'Parámetros de autenticación faltantes.'));
+          toast.error(t('Invalid link', 'Enlace inválido'));
           setTimeout(() => navigate('/login', { replace: true }), 2000);
           return;
         }
@@ -170,7 +190,7 @@ export default function AuthCallback() {
           type === 'invite' ? 'Procesando invitación...' :
           type === 'magiclink' ? 'Verificando enlace mágico...' :
           type === 'email_change' ? 'Confirmando cambio de email...' :
-          'Procesando autenticación...';
+          t('Processing authentication...', 'Procesando autenticación...');
         
         setMessage(processingMessage);
 
@@ -183,13 +203,13 @@ export default function AuthCallback() {
           // Mapear errores comunes
           let errorMsg: string;
           if (callbackError.message?.includes('invalid_grant') || callbackError.code === 'invalid_grant') {
-            errorMsg = 'Enlace inválido o ya utilizado.';
+            errorMsg = t('Invalid or already used link.', 'Enlace inválido o ya utilizado.');
           } else if (callbackError.message?.includes('expired') || callbackError.code === 'expired_token') {
-            errorMsg = 'El enlace ha expirado. Solicita uno nuevo.';
+            errorMsg = t('The link has expired. Request a new one.', 'El enlace ha expirado. Solicita uno nuevo.');
           } else if (callbackError.message?.includes('User already registered')) {
-            errorMsg = 'Este usuario ya está registrado.';
+            errorMsg = t('This user is already registered.', 'Este usuario ya está registrado.');
           } else {
-            errorMsg = 'No se pudo completar la autenticación.';
+            errorMsg = t('Authentication could not be completed.', 'No se pudo completar la autenticación.');
           }
           
           setMessage(errorMsg);
@@ -244,8 +264,8 @@ export default function AuthCallback() {
             break;
 
           default: {
-            setMessage('¡Autenticación exitosa!');
-            toast.success('Bienvenido');
+            setMessage(t('Authentication successful!', '¡Autenticación exitosa!'));
+            toast.success(t('Welcome', 'Bienvenido'));
             
             // Verificar si el usuario tiene acceso al admin
             const currentUser = await refreshUser();
@@ -284,10 +304,10 @@ export default function AuthCallback() {
       } catch (error: any) {
         console.error('Callback processing error:', error);
         setStatus('error');
-        setMessage('Ocurrió un error inesperado.');
-        toast.error('Error al procesar la autenticación');
+        setMessage(t('An unexpected error occurred.', 'Ocurrió un error inesperado.'));
+        toast.error(t('Unable to process authentication', 'Error al procesar la autenticación'));
         
-        setTimeout(() => navigate('/login', { replace: true }), 2500);
+        setTimeout(() => navigate(failureDestination, { replace: true }), 2500);
       } finally {
         // Limpiar URL de parámetros sensibles
         cleanUrl();
@@ -300,6 +320,10 @@ export default function AuthCallback() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+      <Helmet htmlAttributes={{ lang: locale() }}>
+        <title>{t('Authentication status', 'Estado de autenticación')}</title>
+        <meta name="robots" content="noindex" />
+      </Helmet>
       <Card className="w-full max-w-md shadow-xl">
         <CardContent className="py-12">
           <div className="flex flex-col items-center justify-center space-y-6">
@@ -341,19 +365,19 @@ export default function AuthCallback() {
               
               {status === 'loading' && (
                 <p className="text-sm text-muted-foreground">
-                  Por favor espera mientras procesamos tu solicitud...
+                  {t('Please wait while we process your request...', 'Por favor espera mientras procesamos tu solicitud...')}
                 </p>
               )}
               
               {status === 'success' && (
                 <p className="text-sm text-muted-foreground">
-                  Serás redirigido automáticamente.
+                  {t('You will be redirected automatically.', 'Serás redirigido automáticamente.')}
                 </p>
               )}
               
               {status === 'error' && (
                 <p className="text-sm text-muted-foreground">
-                  Serás redirigido al login.
+                  {t('You will be redirected to sign in.', 'Serás redirigido al login.')}
                 </p>
               )}
             </div>

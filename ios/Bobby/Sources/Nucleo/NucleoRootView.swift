@@ -93,6 +93,16 @@ private struct NucleoStage: View {
             .sheet(item: $session.sheet, onDismiss: { session.sheetDismissed() }) { route in
                 sheet(route)
             }
+            .onReceive(NotificationCenter.default.publisher(for: L.didChange)) { _ in
+                session.voice.stop()
+                session.speech.cancel()
+                _ = session.desk.cancel()
+                _ = session.sessionChanged()
+                if session.profile.acceptedRiskNotice, AccountSession.shared.isSignedIn {
+                    Task { _ = await BriefingsCenter.shared.setLanguage(L.language) }
+                }
+                controller.load(session.page, crossFade: false)
+            }
             .onChange(of: session.classicRequested) { _, requested in
                 if requested { onClassic() }
             }

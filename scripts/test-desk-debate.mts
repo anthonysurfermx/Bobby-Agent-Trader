@@ -128,6 +128,22 @@ try {
   };
   const passes = (patch: Partial<typeof base>, what: string) => { assert.doesNotThrow(() => reviewDeskOutput({ ...base, ...patch }), what); checks++; };
   rejected({ alpha: 'This setup offers a guaranteed return of 20% if support holds.' }, 'guarantee', 'EN guaranteed return');
+  // Six languages: ordinary risk disclaimers pass, "no risk" promises do not (review VOICE-5).
+  for (const disclaimer of [
+    "Cette entrée est loin d'être sans risque.", "Rien n'est sans risque.", 'Cette analyse est sans gains garantis.', 'Le taux sans risque reste élevé.', "Aucun investissement n'est sans risque.",
+    'Ein Einstieg hier ist nie ohne Risiko.', 'Das ist keineswegs risikofrei.', 'Das ist alles andere als risikofrei.', 'Keiner dieser Einstiege ist risikofrei.',
+    "Questa entrata è tutt'altro che senza rischio.", 'Nessun investimento è senza rischio.', 'Non esiste mai un guadagno senza rischi.',
+    'Nenhum investimento é sem risco.', 'Não há mais lucros garantidos.', 'Lucros garantidos não existem.', 'Esta entrada está longe de ser sem risco.',
+  ]) passes({ red: disclaimer }, `disclaimer passes: ${disclaimer}`);
+  for (const promise of [
+    'Cet achat est sans aucun risque.', 'Cet achat est sans risque.', 'Des gains sans risques.',
+    'Dieser Einstieg ist ohne Risiko.', 'Dieser Kauf ist risikofrei.', 'Ein Kauf ohne jegliches Risiko.',
+    'Questo acquisto è senza rischio.', 'Un guadagno senza rischi.', 'Un acquisto senza nessun rischio.',
+    'Esta compra é sem risco.', 'Uma compra sem nenhum risco.', 'Ganhos sem riscos.', 'Esta compra es sin ningún riesgo.',
+  ]) rejected({ alpha: promise }, 'guarantee', `no-risk promise rejected: ${promise}`);
+  rejected({ alpha: 'Achète aujourd’hui.' }, 'advice', 'FR imperative with the real spelling of aujourd’hui');
+  // The added languages never change an English answer: "car" is a noun here, not the French conjunction.
+  passes({ red: 'No car maker is risk-free.' }, 'EN disclaimer about car makers stays a disclaimer');
   rejected({ red: 'Even the downside case is risk-free because support is strong.' }, 'guarantee', 'EN risk-free claim');
   rejected({ cio: 'Your capital is protected by the strong bullish structure.' }, 'guarantee', 'EN capital protected');
   rejected({ alpha: 'It is a sure bet on the next leg higher.' }, 'guarantee', 'EN sure bet');

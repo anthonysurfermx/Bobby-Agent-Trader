@@ -300,7 +300,7 @@ struct WorldMapSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var breathe = false
     static let gold = Color(red: 0.96, green: 0.77, blue: 0.26)
-    static let regions = [L.t("CRYPTO BAY", "BAHÍA CRIPTO"), L.t("GOLD MINES", "MINAS DE ORO"), L.t("WALL STREET CITADEL", "CIUDADELA WALL STREET"), L.t("RISK REEF", "ARRECIFE DE RIESGO")]
+    static var regions: [String] { [L.t("CRYPTO BAY", "BAHÍA CRIPTO"), L.t("GOLD MINES", "MINAS DE ORO"), L.t("WALL STREET CITADEL", "CIUDADELA WALL STREET"), L.t("RISK REEF", "ARRECIFE DE RIESGO")] }
 
     var body: some View {
         ScrollView {

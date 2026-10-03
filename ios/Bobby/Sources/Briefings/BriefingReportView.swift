@@ -162,7 +162,7 @@ struct BriefingWeeklyPresentation {
     let commonTitle: String
     let personalNotice: String?
 
-    init(report: BriefingReport, spanish: Bool = L.isSpanish) {
+    init(report: BriefingReport, spanish: Bool? = nil) {
         personalSections = report.sections.filter { $0.kind == "asset" }
         commonSections = report.sections.filter { $0.kind != "asset" }
         if report.personalBasis == .askedAssets {

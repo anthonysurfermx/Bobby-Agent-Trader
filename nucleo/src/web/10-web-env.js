@@ -43,14 +43,20 @@
   NW.ssSet = function (key, value) { return set(SS, key, value); };
 
   /* ---- language: ?lang= > bobby_lang (the key the rest of the web honours) > the browser ---- */
+  var storedLocale = null;
+  try { storedLocale = LS && LS.getItem('bobby_locale'); } catch (e) {}
+  var browserLocale = (navigator.languages && navigator.languages[0]) || navigator.language || 'en-US';
   NW.lang = (function () {
     var p = q.get('lang');
-    if (p === 'es' || p === 'en') return p;
-    try { var s = LS && LS.getItem('bobby_lang'); if (s === 'es' || s === 'en') return s; } catch (e) {}
-    var n = (navigator.languages && navigator.languages[0]) || navigator.language || 'en';
-    return /^es\b/i.test(n) ? 'es' : 'en';
+    if (p && /^(en|es|fr|pt|it|de)(?:[-_]|$)/i.test(p)) return NucleoLocale.language(p);
+    try { var s = LS && LS.getItem('bobby_lang'); if (s && /^(en|es|fr|pt|it|de)(?:[-_]|$)/i.test(s)) return NucleoLocale.language(s); } catch (e) {}
+    return NucleoLocale.language(browserLocale);
   })();
-  NW.t = function (en, es) { return NW.lang === 'es' ? es : en; };
+  NW.locale = NucleoLocale.locale(NW.lang, q.get('locale') || storedLocale || q.get('lang') || browserLocale);
+  var region = String(q.get('country') || (NW.locale.split('-')[1]) || '').toUpperCase();
+  NW.country = /^[A-Z]{2}$/.test(region) ? region : null;
+  NW.t = function (en, es, pt, fr, it, de) { return { en:en, es:es, pt:pt, fr:fr, it:it, de:de }[NW.lang] || en; };
+
 
   /* ---- small helpers ---- */
   NW.isObj = function (v) { return !!v && typeof v === 'object' && !Array.isArray(v); };

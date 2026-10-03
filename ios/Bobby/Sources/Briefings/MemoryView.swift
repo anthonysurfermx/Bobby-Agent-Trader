@@ -210,7 +210,7 @@ private extension RelativeDateTimeFormatter {
     /// "2 days ago" / "hace 2 días", in the app's language.
     static var bobby: RelativeDateTimeFormatter {
         let f = RelativeDateTimeFormatter()
-        f.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
+        f.locale = L.locale
         f.unitsStyle = .full
         return f
     }

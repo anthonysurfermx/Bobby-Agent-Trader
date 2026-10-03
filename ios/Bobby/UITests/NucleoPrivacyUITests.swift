@@ -128,7 +128,7 @@ final class NucleoPrivacyUITests: XCTestCase {
         XCTAssertTrue(disclosure.waitForExistence(timeout: 20))
         XCTAssertTrue(disclosure.label.contains("OpenAI or Anthropic"))
         XCTAssertTrue(disclosure.label.contains("OpenAI or Microsoft for speech"))
-        XCTAssertTrue(disclosure.label.contains("Dictation audio stays on your iPhone."))
+        XCTAssertTrue(disclosure.label.contains("Bobby does not store the audio."))
         XCTAssertTrue(disclosure.label.hasSuffix(disclosureEnd), "The withdrawal sentence must not be truncated")
 
         // WebKit adds the ARIA role to the AX label ("...questions., region").

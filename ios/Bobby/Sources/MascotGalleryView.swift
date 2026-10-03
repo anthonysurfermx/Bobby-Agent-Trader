@@ -133,6 +133,7 @@ struct MascotGalleryView: View {
                     .frame(width: 30, height: 30)
                     .background(Circle().fill(Theme.nucleoGlass))
             }
+            .accessibilityLabel(L.t("Close", "Cerrar"))
             .accessibilityIdentifier("squad-close")
         }
         .padding(.horizontal, 16)

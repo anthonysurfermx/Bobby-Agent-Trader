@@ -243,6 +243,33 @@ final class NucleoRemediationTests: XCTestCase {
         XCTAssertNil(reply["agents"])
     }
 
+    /// Review regional-stocks F1: the ticker preflight allowed one to five letters, so every exchange
+    /// ticker (MC.PA, SAP.DE, PETR4.SA) was refused as `unsupported/symbol_format` before its candles.
+    func testResolvedRegionalStockPassesTheTickerPreflightAndReachesTheDesk() async throws {
+        let desk = makeDesk(Identity())
+        B34Stub.install { call in
+            if call.path == "/api/bobby-asset-search" {
+                return Self.json(200, ["resolution": ["needsConfirmation": false],
+                                       "resolved": ["baseSymbol": "MC.PA", "assetClass": "equity", "aliases": ["LVMH"],
+                                                    "currency": "EUR", "exchange": "Euronext Paris"]])
+            }
+            return Self.market(call)
+        }
+        let reply = try await desk.ask(NucleoParams(["question": "Que penser de MC.PA ?"]))
+        XCTAssertNotEqual(reply["reason"] as? String, "symbol_format", "The client rule must accept what the server resolves")
+        XCTAssertEqual(reply["status"] as? String, "ok")
+        XCTAssertEqual((reply["asset"] as? [String: Any])?["symbol"] as? String, "MC.PA")
+        let candles = try XCTUnwrap(B34Stub.requests.first { $0.path == "/api/stock-candles" }, "The preflight must go on to the candles")
+        XCTAssertEqual(candles.request.url?.query?.contains("symbol=MC.PA"), true)
+        XCTAssertTrue(B34Stub.requests.contains { $0.path == "/api/desk-debate" })
+        for symbol in ["OR.PA", "EDP.LS", "GALP.LS", "PETR4.SA", "VALE3.SA", "ISP.MI", "ENEL.MI", "SAP.DE", "SIE.DE", "NVDA"] {
+            XCTAssertNotNil(symbol.range(of: NucleoDesk.equitySymbolPattern, options: .regularExpression), symbol)
+        }
+        for symbol in ["", ".PA", "mc.pa", "MC PA", "ABCDEFGHIJKLMNOPQRSTU"] {
+            XCTAssertNil(symbol.range(of: NucleoDesk.equitySymbolPattern, options: .regularExpression), symbol)
+        }
+    }
+
     func testDeskReceiptOverridesTheTechnicalPulseAccessSnapshot() async throws {
         let desk = makeDesk(Identity())
         let access: [String: Any] = ["tier": "anon", "used": 2, "limit": 3, "remaining": 1, "paywall": false]
@@ -273,6 +300,42 @@ final class NucleoRemediationTests: XCTestCase {
         identity.replace("token-C")
         let cached = try await desk.saveThesis(NucleoParams(["requestId": ownID]))
         XCTAssertEqual(cached["status"] as? String, "stale", "Owner validation must precede the saved cache hit")
+    }
+
+    func testLanguageChangesDoNotRestoreOrRewriteOtherLanguageReads() async throws {
+        let previous = UserDefaults.standard.object(forKey: L.preferenceKey)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        B34Stub.install(Self.market)
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            let desk = makeDesk(Identity())
+            let read = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+            let id = try XCTUnwrap(read["requestId"] as? String)
+            XCTAssertEqual(read["language"] as? String, language.rawValue)
+            XCTAssertEqual(desk.pendingRead()?["requestId"] as? String, id)
+            let requests = B34Stub.requests.count
+            let xp = desk.companions.disciplineXP
+            for other in AppLanguage.allCases where other != language {
+                UserDefaults.standard.set(other.rawValue, forKey: L.preferenceKey)
+                _ = desk.cancel()
+                XCTAssertNil(desk.pendingRead(), "An unsaved \(language.rawValue) answer cannot return under \(other.rawValue) UI")
+                XCTAssertEqual(desk.companions.disciplineXP, xp, "Changing language preserves progress")
+            }
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            XCTAssertEqual(desk.pendingRead()?["requestId"] as? String, id, "The original read is retained")
+            XCTAssertEqual(B34Stub.requests.count, requests, "Changing language never submits another analysis")
+            let saved = try await desk.saveThesis(NucleoParams(["requestId": id]))
+            XCTAssertEqual(saved["status"] as? String, "saved")
+            let history = desk.theses()["items"] as? [[String: Any]]
+            UserDefaults.standard.set(language == .de ? "fr" : "de", forKey: L.preferenceKey)
+            XCTAssertNil(desk.pendingRead(), "Saved reads stay in history")
+            XCTAssertEqual((desk.theses()["items"] as? [[String: Any]])?.count, history?.count)
+            XCTAssertTrue((desk.theses()["items"] as? [[String: Any]])?.contains { $0["id"] as? String == id } == true)
+            desk.teardown()
+        }
     }
 
     func testOldFollowUpAndConfirmationTokenAreRejectedLocally() async throws {

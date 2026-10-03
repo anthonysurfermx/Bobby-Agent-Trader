@@ -5,8 +5,8 @@
 // resistance, EMA 20/50 over the price, volume under it and an RSI 14 strip beneath. The levels
 // come from the read; the indicators are computed from the same 1H candles. Nothing is invented.
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { t } from '@/lib/companions/i18n';
-import { AGENT_TONE, money, type AgentKey, type Answer, type Candle, type Debate } from './deskData';
+import { speechLocale, t } from '@/lib/companions/i18n';
+import { AGENT_TONE, money as formatMoney, type AgentKey, type Answer, type Candle, type Debate } from './deskData';
 
 interface Props {
   series: Candle[];
@@ -65,9 +65,9 @@ function niceTicks(lo: number, hi: number): number[] {
 }
 
 function axis(v: number): string {
-  if (v >= 1000) return Math.round(v).toLocaleString('en-US');
-  if (v >= 1) return v.toFixed(2);
-  return v.toLocaleString('en-US', { maximumSignificantDigits: 3 });
+  if (v >= 1000) return Math.round(v).toLocaleString(speechLocale());
+  if (v >= 1) return v.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v.toLocaleString(speechLocale(), { maximumSignificantDigits: 3 });
 }
 
 const path = (pts: Array<[number, number] | null>) => {
@@ -78,16 +78,17 @@ const path = (pts: Array<[number, number] | null>) => {
 
 /** What each voice says, in chart terms: the level it owns and its claim about it. */
 function agentClaims(debate: Debate | null, answer: Answer | null): Array<{ key: AgentKey; claim: string }> {
+  const money = (value: number) => formatMoney(value, answer?.currency);
   if (!debate || !answer) return [];
   const [alpha, red, cio] = debate.stances;
   const trade = debate.direction !== 'none';
   const long = debate.direction === 'long';
   const conv = answer.convictionPct != null ? `${Math.round(answer.convictionPct)}%` : null;
-  const rr = answer.rewardRisk != null ? ` · R:R ${answer.rewardRisk.toFixed(1)}` : '';
+  const rr = answer.rewardRisk != null ? ` · R:R ${answer.rewardRisk.toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}` : '';
   if (trade) {
     return [
-      { key: 'alpha', claim: alpha.level ? t(`${long ? 'Buy' : 'Sell'} zone at ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venta'} en ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venda'} em ${money(alpha.level.price)}`) : alpha.line },
-      { key: 'red', claim: red.level ? t(`Thesis breaks ${long ? 'below' : 'above'} ${money(red.level.price)}`, `La tesis se rompe ${long ? 'bajo' : 'sobre'} ${money(red.level.price)}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(red.level.price)}`) : red.line },
+      { key: 'alpha', claim: alpha.level ? t(`${long ? t('Buy', 'compra', 'compra') : t('Sell', 'venta', 'venda')} zone at ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venta'} en ${money(alpha.level.price)}`, `Zona de ${long ? 'compra' : 'venda'} em ${money(alpha.level.price)}`) : alpha.line },
+      { key: 'red', claim: red.level ? t(`Thesis breaks ${long ? t('below', 'debajo de', 'abaixo de') : t('above', 'encima de', 'acima de')} ${money(red.level.price)}`, `La tesis se rompe ${long ? 'bajo' : 'sobre'} ${money(red.level.price)}`, `A tese quebra ${long ? 'abaixo de' : 'acima de'} ${money(red.level.price)}`) : red.line },
       { key: 'cio', claim: cio.level ? t(`Target ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`, `Objetivo ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`, `Alvo ${money(cio.level.price)}${conv ? ` · ${conv}` : ''}${rr}`) : cio.line },
     ];
   }
@@ -100,6 +101,7 @@ function agentClaims(debate: Debate | null, answer: Answer | null): Array<{ key:
 }
 
 export default function NucleoChart({ series, answer, debate, symbol, isEquity, drawKey, watch = null, height = 230 }: Props) {
+  const money = (value: number) => formatMoney(value, answer?.currency);
   const wrap = useRef<HTMLDivElement | null>(null);
   const [w, setW] = useState(0);
   const uid = useId().replace(/:/g, '');
@@ -192,7 +194,7 @@ export default function NucleoChart({ series, answer, debate, symbol, isEquity, 
     for (let i = 1; i < labeled.length; i++) if (labeled[i].ly - labeled[i - 1].ly < 13) labeled[i].ly = labeled[i - 1].ly + 13;
     const ticks = levels.some((l) => l.hair) ? [] : niceTicks(lo, hi).map((v) => ({ v, y: y(v) }));
     const lastTs = pts[pts.length - 1].ts;
-    const asOf = Number.isFinite(lastTs) ? new Date(lastTs).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : '';
+    const asOf = Number.isFinite(lastTs) ? new Date(lastTs).toLocaleTimeString(speechLocale(), { hour: 'numeric', minute: '2-digit' }) : '';
     const e20Last = [...e20].reverse().find((v) => v !== null) ?? null;
     const e50Last = [...e50].reverse().find((v) => v !== null) ?? null;
     return { levels, labeled, line, area, tail, ema20, ema50, volume, barW, rsiLine, rsiLast, rTop, rBot, ry, nowX, nowY, top, plotBottom, bottom, y, price, zones, ticks, asOf, len: pts.length, e20Last, e50Last };

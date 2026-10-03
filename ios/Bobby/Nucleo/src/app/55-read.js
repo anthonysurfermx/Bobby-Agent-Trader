@@ -49,7 +49,7 @@ function onAskReply(r, res){
   if (!res || typeof res.status !== 'string') res = { v: 1, status: 'error', code: 'bad_response', message: null };
   r.reply = res;
   if (res.status === 'ok'){
-    try { r.model = RMOD.build(res, { lang: LANG, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); r.requestId = res.requestId; }
     catch (e){ logErr('model', e); r.model = null; r.reply = { v: 1, status: 'error', code: 'bad_response', message: null }; }
   }
   fsmEvent('reply', r);
@@ -85,7 +85,7 @@ function observePresentedRead(){
 function dockAsset(){
   var r = READ; if (!r || !r.asset) return;
   var parts = [r.asset.symbol];
-  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct) : ''));
+  if (r.market && fin(r.market.price)) parts.push(RMOD.money(r.market.price, LANG, RMOD.currencyOf(r), LOCALE) + (fin(r.market.changePct) ? ' ' + RMOD.signedPct(r.market.changePct, LANG, LOCALE) : ''));
   A.aText = parts.join(' · '); el.dockA.textContent = A.aText; A.dockAO.tween(1, 0.24, E.fade);
 }
 
@@ -190,7 +190,7 @@ function fillSats(model){
 /* ---- the chart: 48 real closes, exhaled from the sphere (geometry built once per read) ---- */
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
-function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString('en-US'); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toFixed(dp); }
+function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }
@@ -331,6 +331,26 @@ function setHorizon(hrs){
 
 /* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
 var DYING = [];
+function showIdleSuggestions(){
+  if (ST.name !== 'IDLE') return;
+  /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
+     (src/lib/regional-stocks.ts). A symbol without an entry shows as itself. */
+  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
+    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
+  var list = [], seen = {};
+  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+    var sym = String(item && item.symbol || '').toUpperCase();
+    if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
+    seen[sym] = 1;
+    var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
+    list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
+  });
+  if (list.length) chipsShow(list, true); else chipsHide();
+}
+function receiveSuggestions(reply){
+  SUGG = reply;
+  if (ST.name === 'IDLE') showIdleSuggestions();
+}
 function chipsShow(list, eyebrow){
   chipsHide(true);
   A.chipX.set(0);
@@ -340,6 +360,7 @@ function chipsShow(list, eyebrow){
     var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
     var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '\uF8FF'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
+    else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
     el.chipRow.appendChild(b);
     var w = b.offsetWidth || 160, ch = { el: b, x: x, w: w, p: new V(0, 'emit'), o: new V(0, 'soft'), press: new V(1, 'snap'), action: c.action, label: c.label };
     x += w + 8; A.chips.push(ch);

@@ -1,6 +1,8 @@
 // Shared worlds — what the web needs to show islands other builders published:
 // routes, the district roster, the art manifest loader and the public API.
-import { isSpanish } from '@/lib/companions/i18n';
+import { pick, type Bi } from '@/lib/companions/i18n';
+
+import { landPieceLabel } from './piece-labels';
 
 export const STUDIO_PATH = '/trader-land';
 export const WORLDS_PATH = '/agentic-world/bobby/trader-land/worlds';
@@ -9,12 +11,12 @@ export const shareUrl = (code: string) => `${window.location.origin}${visitorPat
 
 export type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef' | 'axiom_archive';
 export const DISTRICTS: District[] = ['crypto_bay', 'evidence_mines', 'thesis_citadel', 'risk_reef', 'axiom_archive'];
-export const DISTRICT_META: Record<District, { name: string; color: string; trait: [string, string]; line: [string, string] }> = {
-  crypto_bay: { name: 'Crypto Bay', color: '#56d9e8', trait: ['Patience', 'Paciencia'], line: ['Docks and towers for those who wait for the setup.', 'Muelles y torres para quien espera el setup.'] },
-  evidence_mines: { name: 'Evidence Mines', color: '#a7f38a', trait: ['Clarity', 'Claridad'], line: ['Crystals grow where the data was checked.', 'Los cristales crecen donde se comprobó el dato.'] },
-  thesis_citadel: { name: 'Thesis Citadel', color: '#8ba8ff', trait: ['Risk', 'Riesgo'], line: ['Walls and gates: every thesis has a stop.', 'Murallas y puertas: toda tesis tiene un stop.'] },
-  risk_reef: { name: 'Risk Reef', color: '#c3a1ff', trait: ['Contradiction', 'Contradicción'], line: ['Antennas that listen to the other side.', 'Antenas que escuchan al otro lado.'] },
-  axiom_archive: { name: 'Axiom Archive', color: '#f5d68b', trait: ['Closure', 'Cierre'], line: ['Paths and flowers for closed theses.', 'Caminos y flores para las tesis cerradas.'] },
+export const DISTRICT_META: Record<District, { name: string; nameEs: string; color: string; trait: [string, string]; line: [string, string] }> = {
+  crypto_bay: { name: 'Crypto Bay', nameEs: 'Bahía Cripto', color: '#56d9e8', trait: ['Patience', 'Paciencia'], line: ['Docks and towers for those who wait for the setup.', 'Muelles y torres para quien espera el setup.'] },
+  evidence_mines: { name: 'Evidence Mines', nameEs: 'Minas de Evidencias', color: '#a7f38a', trait: ['Clarity', 'Claridad'], line: ['Crystals grow where the data was checked.', 'Los cristales crecen donde se comprobó el dato.'] },
+  thesis_citadel: { name: 'Thesis Citadel', nameEs: 'Ciudadela de las Tesis', color: '#8ba8ff', trait: ['Risk', 'Riesgo'], line: ['Walls and gates: every thesis has a stop.', 'Murallas y puertas: toda tesis tiene un stop.'] },
+  risk_reef: { name: 'Risk Reef', nameEs: 'Arrecife de Riesgo', color: '#c3a1ff', trait: ['Contradiction', 'Contradicción'], line: ['Antennas that listen to the other side.', 'Antenas que escuchan al otro lado.'] },
+  axiom_archive: { name: 'Axiom Archive', nameEs: 'Archivo de Axiomas', color: '#f5d68b', trait: ['Closure', 'Cierre'], line: ['Paths and flowers for closed theses.', 'Caminos y flores para las tesis cerradas.'] },
 };
 export const KIND_LABEL: Record<string, [string, string]> = {
   ground: ['Ground', 'Suelo'], path_pavement: ['Path', 'Camino'], path: ['Path', 'Camino'], decor: ['Decor', 'Decoración'], building: ['Building', 'Edificio'], landmark: ['Landmark', 'Monumento'], core: ['Core', 'Núcleo'],
@@ -67,8 +69,9 @@ export function pretty(value: string) {
 
 /** Display name from the catalog (the database is the source of names); the id is the fallback. */
 export function itemLabel(id: string, district: string, catalog?: Map<string, CatalogItem>): string {
-  const name = catalog?.get(id)?.name as { en?: string; es?: string } | undefined;
-  return (isSpanish() ? name?.es : name?.en) ?? name?.en ?? pretty(id.replace(district + '_', ''));
+  const name = catalog?.get(id)?.name as Bi | undefined;
+  const fallback = pretty(id.replace(district + '_', ''));
+  return name?.en ? pick(name) : landPieceLabel(fallback);
 }
 
 async function readJson<T>(url: string, signal?: AbortSignal): Promise<T> {

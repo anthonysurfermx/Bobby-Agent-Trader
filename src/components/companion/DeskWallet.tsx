@@ -7,7 +7,7 @@ import { useAccount, useBalance, useReadContracts } from 'wagmi';
 import { Wallet } from 'lucide-react';
 import { BASE_CHAIN_ID } from '@/config/chains';
 import { findBaseToken, type BaseSwapToken } from '@/lib/base-swap/tokens';
-import { t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 
 const REFRESH_MS = 30_000;
 
@@ -16,10 +16,10 @@ export interface TokenBalance { token: BaseSwapToken; raw: bigint; units: number
 /** Enough digits to be useful, never scientific notation: 12,345 · 12.40 · 0.004436 */
 function formatUnitsText(units: number, token: BaseSwapToken): string {
   if (!Number.isFinite(units)) return '—';
-  if (units >= 1000) return units.toLocaleString('en-US', { maximumFractionDigits: 0 });
-  if (units >= 1) return units.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (units >= 1000) return units.toLocaleString(speechLocale(), { maximumFractionDigits: 0 });
+  if (units >= 1) return units.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   if (units === 0) return '0';
-  return units.toLocaleString('en-US', { maximumFractionDigits: token.decimals >= 8 ? 6 : 4 });
+  return units.toLocaleString(speechLocale(), { maximumFractionDigits: token.decimals >= 8 ? 6 : 4 });
 }
 
 /**
@@ -71,7 +71,7 @@ export function WalletBalancePill({ onClick }: { onClick?: () => void }) {
   const { isConnected, balances, ethUnits, loading } = useBaseBalances(PILL_SYMBOLS);
   if (!isConnected) return null;
   const usdc = balances.USDC;
-  const eth = ethUnits === null ? null : ethUnits >= 0.001 ? ethUnits.toFixed(3) : ethUnits === 0 ? '0' : ethUnits.toFixed(5);
+  const eth = ethUnits === null ? null : ethUnits >= 0.001 ? ethUnits.toLocaleString(speechLocale(), { minimumFractionDigits: 3, maximumFractionDigits: 3 }) : ethUnits === 0 ? '0' : ethUnits.toLocaleString(speechLocale(), { minimumFractionDigits: 5, maximumFractionDigits: 5 });
   return (
     <button
       type="button"

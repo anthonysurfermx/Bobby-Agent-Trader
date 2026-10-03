@@ -1,12 +1,14 @@
+import { appLanguage, appLocale } from '../../src/lib/app-language.js';
 import { VOICE_TOOLS, voiceInstructions } from './voice-tools.js';
 import { voiceScreenContext } from '../../src/lib/realtime-context.js';
 const REALTIME_MODEL = 'gpt-realtime-2.1';
 export function realtimeConfig(body: Record<string, unknown>) {
   const { lang, voice, autoLanguage, symbol, timeframe } = body;
-  const sessionLang = lang === 'en' ? 'en' : 'es';
+  const sessionLang = appLanguage(lang, 'es');
+  const locale = appLocale(sessionLang, body.locale);
   const languageMode = autoLanguage === false ? sessionLang : 'auto';
   const screen = voiceScreenContext(symbol, timeframe);
-  const instructions = voiceInstructions(languageMode);
+  const instructions = voiceInstructions(languageMode, locale);
 
   // Honor the persona voice picked in onboarding — whitelisted, with the
   // env default as fallback. Legacy male/female map to their personas.
@@ -34,7 +36,7 @@ export function realtimeConfig(body: Record<string, unknown>) {
               transcription: {
                 model: 'gpt-4o-mini-transcribe',
                 ...(languageMode === 'auto' ? {} : { language: sessionLang }),
-                prompt: 'Bitcoin, Ethereum, BTC, ETH, SOL, Nvidia, NVDA, Apple, Tesla, oro, gold, long, short, stop, soporte, resistencia.',
+                prompt: 'Bitcoin, Ethereum, BTC, ETH, SOL, Nvidia, NVDA, Apple, Tesla, LVMH, MC.PA, L’Oréal, OR.PA, EDP.LS, GALP.LS, PETR4.SA, VALE3.SA, Enel, ENEL.MI, Intesa Sanpaolo, ISP.MI, SAP.DE, Siemens, SIE.DE, oro, gold, long, short, stop, soporte, resistencia.',
               },
               turn_detection: {
                 type: 'server_vad',

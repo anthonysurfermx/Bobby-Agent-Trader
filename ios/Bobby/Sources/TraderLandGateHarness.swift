@@ -18,7 +18,7 @@ private func landName(_ item: LandItem) -> String { TraderLandCatalog.name(item.
 private func districtName(_ id: String) -> String { TraderLandCatalog.districtName(id) }
 /// Server direction values ("long"/"short") in the reader's language; English keeps the raw value.
 private func landDirection(_ raw: String) -> String {
-    L.t(raw, raw == "long" ? "alcista" : raw == "short" ? "bajista" : raw)
+    raw == "long" ? L.t("long", "alcista") : raw == "short" ? L.t("short", "bajista") : raw
 }
 enum LandImageCache {
     static let images = NSCache<NSString, UIImage>()

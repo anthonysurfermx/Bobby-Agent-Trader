@@ -12,6 +12,15 @@
 	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>es</string>
+		<string>fr</string>
+		<string>pt</string>
+		<string>it</string>
+		<string>de</string>
+	</array>
 	<key>CFBundleName</key>
 	<string>$(PRODUCT_NAME)</string>
 	<key>CFBundlePackageType</key>
@@ -44,7 +53,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Bobby saves your skin card to Photos only when you tap Save Image.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Bobby turns your spoken question into text on this iPhone. The audio never leaves your device.</string>
+	<string>Bobby turns your spoken question into text: on this iPhone when the language is installed, otherwise through Apple's speech service. Bobby does not store the audio.</string>
 	<key>REVENUECAT_IOS_API_KEY</key>
 	<string>$(REVENUECAT_IOS_API_KEY)</string>
 	<key>UILaunchScreen</key>

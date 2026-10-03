@@ -17,7 +17,7 @@ import { ArrowLeftRight, Wallet, X } from 'lucide-react';
 import { SwapConfirm, type TradeExecution } from '@/components/adams/SwapConfirm';
 import { BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, findBaseToken, isStockToken, type BaseSwapToken } from '@/lib/base-swap/tokens';
 import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
-import { t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { useBaseBalances } from './DeskWallet';
 
 const DEFAULT_TICKET_USD = 25;
@@ -171,7 +171,7 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
               <span className="text-white/45">$</span>
               <input type="number" inputMode="decimal" min={BASE_SWAP_LIMITS.minTicketUsd} max={cap} step="0.01" value={Number.isFinite(usd) ? usd : ''} onChange={(e) => { setTouched(true); setUsd(Number(e.target.value)); }} aria-label={t('Amount in USDC', 'Monto en USDC', 'Valor em USDC')} className="w-full min-w-0 bg-transparent pl-1 outline-none" />
               {usdcBalance && usdcBalance.units >= BASE_SWAP_LIMITS.minTicketUsd && (
-                <button type="button" onClick={() => { setTouched(true); setUsd(Math.floor(Math.min(usdcBalance.units, cap) * 100) / 100); }} className="ml-1 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
+                <button type="button" onClick={() => { setTouched(true); setUsd(Math.floor(Math.min(usdcBalance.units, cap) * 100) / 100); }} className="ml-1 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">{t("MAX", "MÁX.", "MÁX.")}</button>
               )}
             </div>
           </label>
@@ -182,7 +182,7 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
               <input type="number" inputMode="decimal" min={0} step="any" value={qty} onChange={(e) => setQty(e.target.value)} placeholder="0" aria-label={t(`Amount of ${token.symbol} to sell`, `Cantidad de ${token.symbol} a vender`, `Quantidade de ${token.symbol} para vender`)} className="w-full min-w-0 bg-transparent outline-none" />
               <span className="ml-1 text-[10px] text-white/45">{token.symbol}</span>
               {assetBalance && assetBalance.units > 0 && !token.native && (
-                <button type="button" onClick={() => setQty(formatUnits(assetBalance.raw, token.decimals))} className="ml-2 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">MAX</button>
+                <button type="button" onClick={() => setQty(formatUnits(assetBalance.raw, token.decimals))} className="ml-2 font-mono text-[9px] tracking-[0.12em] text-sky-300 hover:text-sky-200">{t("MAX", "MÁX.", "MÁX.")}</button>
               )}
             </div>
           </label>
@@ -200,8 +200,8 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
             ? <span className="text-amber-300">{error}</span>
             : preview
               ? side === 'buy'
-                ? <>≈ {preview.amountOut} {token.symbol}{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
-                : <>≈ ${preview.amountOut} USDC{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toFixed(2)}%` : ''}</>
+                ? <>≈ {preview.amountOut} {token.symbol}{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}</>
+                : <>≈ ${preview.amountOut} USDC{preview.priceImpactPct !== null ? ` · ${t('impact', 'impacto', 'impacto')} ${preview.priceImpactPct.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%` : ''}</>
               : t('Quoting on Uniswap V3…', 'Cotizando en Uniswap V3…', 'Cotando na Uniswap V3…')}
       </div>
       {preview?.withheld.length ? (

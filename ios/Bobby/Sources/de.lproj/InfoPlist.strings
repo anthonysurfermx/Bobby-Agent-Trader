@@ -1,0 +1,3 @@
+"NSMicrophoneUsageDescription" = "Bobby hört nur zu, solange du die Taste gedrückt hältst, um deine Frage zu hören.";
+"NSSpeechRecognitionUsageDescription" = "Bobby wandelt deine gesprochene Frage in Text um: auf diesem iPhone, wenn die Sprache installiert ist, sonst über Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht.";
+"NSPhotoLibraryAddUsageDescription" = "Bobby speichert deine Avatar-Karte nur in Fotos, wenn du auf Bild speichern tippst.";

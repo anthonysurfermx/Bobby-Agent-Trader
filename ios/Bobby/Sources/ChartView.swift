@@ -275,7 +275,7 @@ struct ChartView: View {
 
     private func axisLabel(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
+        formatter.locale = L.locale
         // "TUE 03H" — the trailing H keeps an hour from reading like a date.
         formatter.dateFormat = timeframe == .oneDay || timeframe == .fourHours ? "d MMM" : "E HH'h'"
         return formatter.string(from: date).uppercased()
@@ -283,7 +283,7 @@ struct ChartView: View {
 
     private func formatTimestamp(_ date: Date) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: L.isSpanish ? "es_MX" : "en_US")
+        formatter.locale = L.locale
         formatter.dateFormat = "d MMM · HH:mm"
         return formatter.string(from: date).uppercased()
     }

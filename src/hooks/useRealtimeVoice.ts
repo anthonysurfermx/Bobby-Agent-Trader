@@ -1,3 +1,5 @@
+import { translateText, locale as currentLocale } from '@/lib/companions/i18n';
+import { appLocale, type AppLanguage } from '@/lib/app-language';
 // ============================================================
 // useRealtimeVoice — one live voice session with Bobby.
 //
@@ -10,7 +12,11 @@ import { matchAssetInText, normalizeAssetSymbol } from '@/lib/voice-assets';
 import { voiceScreenContext, voiceScreenState } from '@/lib/realtime-context';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { getConfiguredVoice } from '@/lib/agent-voice';
+import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
+
 import type { DeskBrief } from '@/lib/voice-desk-brief';
+
+const canUseVoice = () => progressStore.get().aiConsentGranted && progressStore.get().riskNoticeVersion >= RISK_NOTICE_VERSION;
 
 export type VoiceState = 'idle' | 'connecting' | 'listening' | 'thinking' | 'speaking' | 'error';
 export type VoiceInputMode = 'tap-to-talk' | 'hands-free';
@@ -79,14 +85,14 @@ export interface DeskBriefState {
 }
 
 const TOOL_LABELS: Record<string, string> = {
-  get_market: 'Leyendo mercado',
-  run_debate: 'Analizando activo',
-  get_protocol_stats: 'Leyendo récord on-chain',
-  propose_trade: 'Preparando propuesta',
-  set_chart: 'Cambiando gráfica',
-  show_debate: 'Publicando debate',
-  draw_levels: 'Marcando niveles',
-  update_thesis: 'Actualizando veredicto',
+  get_market: 'Reading market data',
+  run_debate: 'Analyzing asset',
+  get_protocol_stats: 'Reading the on-chain record',
+  propose_trade: 'Preparing proposal',
+  set_chart: 'Changing chart',
+  show_debate: 'Publishing debate',
+  draw_levels: 'Marking levels',
+  update_thesis: 'Updating verdict',
 };
 
 /** Tools resolved in the browser — they drive the UI, so a server hop would only add latency. */
@@ -122,11 +128,12 @@ function debateLevel(
 }
 
 export function useRealtimeVoice(
-  lang: 'es' | 'en' = 'es',
+  lang: AppLanguage = 'es',
   inputMode: VoiceInputMode = 'tap-to-talk',
-  options: { voice?: string; autoLanguage?: boolean; initialSymbol?: string; initialTimeframe?: string } = {},
+  options: { voice?: string; locale?: string; autoLanguage?: boolean; initialSymbol?: string; initialTimeframe?: string } = {},
 ) {
   const { voice, autoLanguage = true } = options;
+  const voiceLocale = appLocale(lang, options.locale ?? currentLocale());
   const initialScreen = voiceScreenState(options.initialSymbol, options.initialTimeframe);
   const [state, setState] = useState<VoiceState>('idle');
   const [needsSignIn, setNeedsSignIn] = useState(false);
@@ -172,6 +179,7 @@ export function useRealtimeVoice(
   const timeframeRef = useRef(initialScreen.timeframe);
   const connectionGenerationRef = useRef(0);
   const connectAbortRef = useRef<AbortController | null>(null);
+  const toolAbortControllersRef = useRef(new Set<AbortController>());
   const sessionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const baseInstructionsRef = useRef('');
   const playbackActiveRef = useRef(false);
@@ -198,6 +206,7 @@ export function useRealtimeVoice(
   const briefGenerationRef = useRef(0);
 
   const setMicEnabled = useCallback((enabled: boolean) => {
+    enabled = enabled && canUseVoice();
     micRef.current?.getAudioTracks().forEach((track) => { track.enabled = enabled; });
     setMicMuted(!enabled);
   }, []);
@@ -228,6 +237,7 @@ export function useRealtimeVoice(
   }, []);
 
   const send = useCallback((payload: unknown) => {
+    if (!canUseVoice()) return;
     const dc = dcRef.current;
     if (dc?.readyState === 'open') dc.send(JSON.stringify(payload));
   }, []);
@@ -259,7 +269,22 @@ export function useRealtimeVoice(
     else send({ type: 'response.create' });
   }, [send]);
 
+  const fetchVoiceTool = useCallback(async (body: Record<string, unknown>): Promise<Record<string, unknown>> => {
+    if (!canUseVoice()) throw new Error('ai_consent_required');
+    const controller = new AbortController();
+    toolAbortControllersRef.current.add(controller);
+    const timeout = window.setTimeout(() => controller.abort(), 25_000);
+    try {
+      const response = await fetch('/api/voice-tool', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: controller.signal });
+      const payload = await response.json() as Record<string, unknown>;
+      if (!canUseVoice() || controller.signal.aborted) throw new Error('ai_consent_required');
+      if (!response.ok) throw new Error('tool_request_failed');
+      return payload;
+    } finally { window.clearTimeout(timeout); toolAbortControllersRef.current.delete(controller); }
+  }, []);
+
   const requestAssetBrief = useCallback(async (nextSymbol: string, context?: string) => {
+    if (!canUseVoice()) return { error: 'ai_consent_required' } as Record<string, unknown>;
     const next = normalizeSymbol(nextSymbol);
     if (!next) return { error: 'symbol_required' } as Record<string, unknown>;
     const generation = briefGenerationRef.current;
@@ -281,20 +306,7 @@ export function useRealtimeVoice(
     const cached = briefRequestsRef.current.get(cacheKey);
     const request = cached && startedAt - cached.createdAt < 30_000
       ? cached.promise
-      : (() => {
-          const controller = new AbortController();
-          const timeout = window.setTimeout(() => controller.abort(), 25_000);
-          return fetch('/api/voice-tool', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({ tool: 'run_debate', args: { symbol: next, context, lang } }),
-          }).then(async (response) => {
-            const payload = await response.json() as Record<string, unknown>;
-            if (!response.ok) throw new Error('brief_request_failed');
-            return payload;
-          }).finally(() => window.clearTimeout(timeout));
-        })();
+      : fetchVoiceTool({ tool: 'run_debate', args: { symbol: next, context, lang, locale: voiceLocale } });
 
     if (!cached || startedAt - cached.createdAt >= 30_000) {
       briefRequestsRef.current.set(cacheKey, { createdAt: startedAt, promise: request });
@@ -309,7 +321,7 @@ export function useRealtimeVoice(
       const output = await request;
       const quickBrief = output.quick_brief as DeskBrief | undefined;
       if (!quickBrief) throw new Error('brief_unavailable');
-      if (briefGenerationRef.current === generation && symbolRef.current === next) {
+      if (canUseVoice() && briefGenerationRef.current === generation && symbolRef.current === next) {
         setDeskBrief(quickBrief);
         setBriefState({
           status: 'ready',
@@ -321,19 +333,20 @@ export function useRealtimeVoice(
       return output;
     } catch {
       briefRequestsRef.current.delete(cacheKey);
-      if (briefGenerationRef.current === generation && symbolRef.current === next) {
+      if (canUseVoice() && briefGenerationRef.current === generation && symbolRef.current === next) {
         setBriefState({ status: 'error', symbol: next, startedAt, elapsedMs: Date.now() - startedAt });
       }
       return { error: 'tool_failed', symbol: next } as Record<string, unknown>;
     }
-  }, [lang]);
+  }, [lang, voiceLocale, fetchVoiceTool]);
 
   const runTool = useCallback(async (name: string, callId: string, rawArgs: string) => {
+    if (!canUseVoice()) return;
     const generation = connectionGenerationRef.current;
     const eventId = `${callId}-${name}`;
     setTools((prev) => [
       ...prev.slice(-4),
-      { id: eventId, tool: name, status: 'running', label: TOOL_LABELS[name] ?? name },
+      { id: eventId, tool: name, status: 'running', label: lang === 'es' ? {"Reading market data": "Leyendo mercado", "Analyzing asset": "Analizando activo", "Reading the on-chain record": "Leyendo récord on-chain", "Preparing proposal": "Preparando propuesta", "Changing chart": "Cambiando gráfica", "Publishing debate": "Publicando debate", "Marking levels": "Marcando niveles", "Updating verdict": "Actualizando veredicto"}[TOOL_LABELS[name]] ?? name : translateText(lang, TOOL_LABELS[name] ?? name) },
     ]);
 
     let output: unknown;
@@ -403,12 +416,7 @@ export function useRealtimeVoice(
       if (name === 'run_debate' && args.symbol) {
         output = await requestAssetBrief(String(args.symbol), args.context ? String(args.context) : undefined);
       } else {
-        const response = await fetch('/api/voice-tool', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ tool: name, args: { ...args, lang } }),
-        });
-        output = await response.json();
+        output = await fetchVoiceTool({ tool: name, args: { ...args, lang, locale: voiceLocale } });
       }
 
       if (generation !== connectionGenerationRef.current) return;
@@ -423,7 +431,7 @@ export function useRealtimeVoice(
     }
 
     if (generation === connectionGenerationRef.current) submitToolOutput(callId, output);
-  }, [lang, requestAssetBrief, submitToolOutput]);
+  }, [lang, voiceLocale, requestAssetBrief, submitToolOutput, fetchVoiceTool]);
 
   /** Run a tool exactly once, whichever event surfaces it first. */
   const dispatchTool = useCallback((name: string | undefined, callId: string, args: string) => {
@@ -468,7 +476,7 @@ export function useRealtimeVoice(
       if (text) {
         const rejectedNoise = hasUnexpectedScript(text);
         const visibleText = rejectedNoise
-          ? (lang === 'es' ? 'Audio no reconocido — intenta de nuevo.' : 'Audio not recognized — please try again.')
+          ? (lang === 'es' ? 'Audio no reconocido — intenta de nuevo.' : translateText(lang, 'Audio not recognized — please try again.'))
           : text;
         const mentioned = rejectedNoise ? null : symbolMentioned(text);
         if (mentioned) {
@@ -539,6 +547,8 @@ export function useRealtimeVoice(
     countdownRef.current = null;
     connectAbortRef.current?.abort();
     connectAbortRef.current = null;
+    for (const controller of toolAbortControllersRef.current) controller.abort();
+    toolAbortControllersRef.current.clear();
     if (sessionTimerRef.current) clearTimeout(sessionTimerRef.current);
     sessionTimerRef.current = null;
     baseInstructionsRef.current = '';
@@ -570,7 +580,7 @@ export function useRealtimeVoice(
     setState('idle');
   }, []);
 
-  fallbackRef.current = () => { disconnect(); setFallback(true); };
+  fallbackRef.current = () => { disconnect(); if (canUseVoice()) setFallback(true); };
 
   const resetConversation = useCallback(() => {
     briefGenerationRef.current += 1;
@@ -586,9 +596,10 @@ export function useRealtimeVoice(
   }, []);
 
   const connect = useCallback(async () => {
+    if (!canUseVoice()) return;
     if (stateRef.current !== 'idle' && stateRef.current !== 'error') return;
     const generation = ++connectionGenerationRef.current;
-    const isCurrent = () => generation === connectionGenerationRef.current;
+    const isCurrent = () => canUseVoice() && generation === connectionGenerationRef.current;
     stateRef.current = 'connecting';
     setError(null);
     setFallback(false);
@@ -603,7 +614,7 @@ export function useRealtimeVoice(
       const accessToken = auth.session?.access_token;
       if (!accessToken) {
         setNeedsSignIn(true);
-        throw new Error(lang === 'es' ? 'Inicia sesión para usar tus 3 min diarios.' : 'Sign in for your 3 daily minutes.');
+        throw Object.assign(new Error(lang === 'es' ? 'Inicia sesión para usar tus 3 min diarios.' : translateText(lang, 'Sign in for your 3 daily minutes.')), { name: 'VoiceSignInError' });
       }
       // Permission delays must not consume the account's allowance.
       const mic = await navigator.mediaDevices.getUserMedia({
@@ -615,6 +626,7 @@ export function useRealtimeVoice(
       const ctx = new AudioContext();
       ctxRef.current = ctx;
       await ctx.resume();
+      if (!isCurrent()) return;
 
       armWatchdog();
       const pc = new RTCPeerConnection();
@@ -654,11 +666,13 @@ export function useRealtimeVoice(
         syncScreen();
       };
       const offer = await pc.createOffer();
+      if (!isCurrent()) return;
       await pc.setLocalDescription(offer);
+      if (!isCurrent()) return;
       // The server keeps the provider credential and owns the hangup deadline.
       const sessionRes = await fetch('/api/realtime-session', {
-        method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sdp: offer.sdp, lang, autoLanguage, voice: voice ?? getConfiguredVoice() ?? undefined,
+        method: 'POST', headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' }, signal: controller.signal,
+        body: JSON.stringify({ sdp: offer.sdp, lang, locale: voiceLocale, autoLanguage, voice: voice ?? getConfiguredVoice() ?? undefined,
           symbol: symbolRef.current, timeframe: timeframeRef.current }),
       });
       const session = await sessionRes.json();
@@ -682,7 +696,7 @@ export function useRealtimeVoice(
           voice_sign_in: ['Inicia sesión para usar tus 3 min diarios.', 'Sign in for your 3 daily minutes.'],
         };
         const message = messages[sessionRes.status === 401 ? 'voice_sign_in' : session.error];
-        throw new Error(message?.[lang === 'es' ? 0 : 1] ?? (lang === 'es' ? 'Voz no disponible. Intenta de nuevo.' : 'Voice unavailable. Please try again.'));
+        throw Object.assign(new Error(lang === 'es' ? message?.[0] ?? 'Voz no disponible. Intenta de nuevo.' : translateText(lang, message?.[1] ?? 'Voice unavailable. Please try again.')), { name: sessionRes.status === 401 ? 'VoiceSignInError' : 'VoiceUnavailableError' });
       }
       baseInstructionsRef.current = typeof session.instructions === 'string' ? session.instructions : '';
       const seconds = Math.max(0, Math.min(180, Number(session.max_duration_seconds) || 0));
@@ -698,17 +712,21 @@ export function useRealtimeVoice(
     } catch (err) {
       if (!isCurrent()) return;
       disconnect();
-      if (!(err instanceof Error && (err.message.includes('3 min') || err.message.includes('3 daily') || err.name === 'NotAllowedError'))) setFallback(true);
-      setError(err instanceof Error ? err.message : 'Voice failed to start');
+      if (!(err instanceof Error && (err.message.includes('3 min') || err.message.includes('3 daily') || err.name === 'NotAllowedError' || err.name === 'VoiceSignInError'))) setFallback(true);
+      setError(err instanceof Error ? (err.name === 'NotAllowedError' ? translateText(lang, 'Microphone access was denied. Enable it in your browser.') : translateText(lang, err.message)) : translateText(lang, 'Voice failed to start'));
       stateRef.current = 'error';
       setState('error');
     }
-  }, [lang, autoLanguage, voice, handleEvent, meter, disconnect, syncScreen]);
+  }, [lang, voiceLocale, autoLanguage, voice, handleEvent, meter, disconnect, syncScreen]);
 
-  useEffect(() => () => disconnect(), [disconnect]);
+  useEffect(() => {
+    const unsubscribe = progressStore.subscribe(() => { if (!canUseVoice()) disconnect(); });
+    return () => { unsubscribe(); disconnect(); };
+  }, [disconnect]);
 
   /** Tap-to-talk prevents room audio from becoming a new user turn while Bobby speaks. */
   const startTalking = useCallback(() => {
+    if (!canUseVoice()) return;
     if (inputModeRef.current !== 'tap-to-talk') return;
     if (stateRef.current === 'speaking' || stateRef.current === 'thinking') {
       send({ type: 'response.cancel' });

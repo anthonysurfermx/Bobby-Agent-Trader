@@ -3,13 +3,14 @@ import { ArrowLeft, Check, ChevronDown, Copy, ExternalLink, Globe, Hand, HelpCir
 import { Link, useParams } from 'react-router-dom';
 import { useAppKit } from '@reown/appkit/react';
 import { Helmet } from 'react-helmet-async';
-import { isSpanish, t } from '@/lib/companions/i18n';
+import { pick, speechLocale, t } from '@/lib/companions/i18n';
 import { findBaseToken } from '@/lib/base-swap/tokens';
 import { canvasPoint, draggedGridPosition } from '@/lib/trader-land-gestures';
 import { CATALOG_ALIASES, STUDIO_PATH, WORLDS_PATH, shareUrl, withCatalogAliases } from '@/lib/trader-land/public';
 import { CAMERA_ZOOM, CORE_FOOTPRINT, DORMANT_CORE_SCALE, coreCells, footprintCells, landGeometry, maxZoom, spriteFrame, type LandGeometry } from '@/lib/trader-land/geometry';
 import { CORE_UID, FALLBACK_CORE, FIT_ZOOM, NO_SHORTEN, TRADER_LAND_CLIENT_HEADER, coreHitBox, coreStateLabel, draftFits, extendChoices, extendErrorMessage, extendedNotice, findSpawn, grewNotice, growthLabel, horizonLabel, horizonOptionLabel, isExtendRefusal, landChanged, landCore, occupiedCells, pieceHitBox, pieceName, studioHomeZoom, type Extended, type Grew, type Horizon, type HorizonHours, type LandCore, type LandGrowth, type PieceSummary, type TierInfo } from '@/lib/trader-land/growth';
 import { useLandCredential } from '@/lib/trader-land/useLandCredential';
+import { landPieceLabel } from '@/lib/trader-land/piece-labels';
 import LandGrowthGuide from '@/components/companion/LandGrowthGuide';
 import './trader-land.css';
 
@@ -218,7 +219,7 @@ function PathFilament({ placement, placements, itemsById, selected, geom }: { pl
   // Stroke widths scale with the tile (8/N) so filaments never swamp a grown island's small tiles.
   const u = geom.unit, cx = face.w / 2, cy = face.h / 2;
   return (
-    <svg className="pointer-events-none absolute overflow-visible" style={{ left: face.x, top: face.y, zIndex: 101 + Math.round(frame.depth) }} width={face.w} height={face.h} aria-label="Procedural path connectors">
+    <svg className="pointer-events-none absolute overflow-visible" style={{ left: face.x, top: face.y, zIndex: 101 + Math.round(frame.depth) }} width={face.w} height={face.h} aria-label={t("Procedural path connectors", "Conectores de caminos procedurales")}>
       {active.map((connector) => <line key={`halo-${connector}`} x1={cx} y1={cy} x2={face.w * connectorEnd[connector][0]} y2={face.h * connectorEnd[connector][1]} stroke="#2cf5a4" strokeOpacity=".25" strokeWidth={13 * u} filter={`blur(${5 * u}px)`} />)}
       {active.map((connector) => <line key={connector} x1={cx} y1={cy} x2={face.w * connectorEnd[connector][0]} y2={face.h * connectorEnd[connector][1]} stroke={selected ? '#ffe071' : '#62ffc5'} strokeWidth={4 * u} strokeLinecap="round" />)}
       <circle cx={cx} cy={cy} r={4 * u} fill="#baffdd" />
@@ -237,8 +238,8 @@ type Camera = { x: number; y: number; scale: number };
 type Fixture = { placements: Placement[] };
 const DEMO_KEY = 'bobby.trader-land.studio-demo.v1';
 const districtColors: Record<District, string> = { crypto_bay: '#56d9e8', evidence_mines: '#a7f38a', thesis_citadel: '#8ba8ff', risk_reef: '#c3a1ff', axiom_archive: '#f5d68b' };
-function itemName(item: ManifestItem) { return pretty(item.id.replace(item.district + '_', '')); }
-function when(iso: string) { return new Date(iso).toLocaleString(isSpanish() ? 'es-MX' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+function itemName(item: ManifestItem) { return landPieceLabel(pretty(item.id.replace(item.district + '_', ''))); }
+function when(iso: string) { return new Date(iso).toLocaleString(speechLocale(), { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 /** One line on what a seed is waiting on, from the server's review record. */
 function seedLine(review: SeedReview) {
   const read = review.thesis ? `${review.thesis.symbol} ${review.thesis.direction === 'none' ? t('no edge', 'sin sesgo') : review.thesis.direction}${review.thesis.entry ?? review.thesis.price ? ` @ ${review.thesis.entry ?? review.thesis.price}` : ''}` : t('Read without a saved thesis', 'Lectura sin tesis guardada');
@@ -254,7 +255,7 @@ function outcomeLabel(outcome: ClosedThesis['outcome']) {
 function closeNotice(closed: ClosedThesis, item?: ManifestItem, seasonItem?: ManifestItem) {
   const piece = item ? itemName(item) : t('Your piece', 'Tu pieza');
   const move = closed.movePct !== null ? ` (${closed.movePct > 0 ? '+' : ''}${closed.movePct}%)` : '';
-  const head = closed.symbol ? `${closed.symbol} ${closed.direction && closed.direction !== 'none' ? closed.direction : ''}: ${outcomeLabel(closed.outcome)}${move}. ` : '';
+  const head = closed.symbol ? `${closed.symbol} ${closed.direction && closed.direction !== 'none' ? (closed.direction === 'long' ? t('long', 'alcista', 'comprador') : t('short', 'bajista', 'vendedor')) : ''}: ${outcomeLabel(closed.outcome)}${move}. ` : '';
   const executed = closed.executed ? ` ${t('Executed on Base', 'Ejecutada en Base')} (+${closed.executed.xp} XP · +${closed.executed.aura} Aura).` : '';
   const season = closed.season?.piece ? ` ${t('Season piece', 'Pieza de temporada')}: ${seasonItem ? itemName(seasonItem) : pretty(closed.season.piece.id)}.` : '';
   return `${head}${piece} ${t('bloomed.', 'floreció.')} +${closed.xp} XP · +${closed.aura} Aura.${executed}${season}`;
@@ -400,7 +401,7 @@ export default function TraderLandGatePage() {
       return response.json();
     })).then(([loaded, fixture]: [Manifest, Fixture]) => {
       let art = loaded;
-      if (!art.layer_encoding || !art.items.find((item) => item.id === 'aura_core')) throw new Error('Incomplete art catalog');
+      if (!art.layer_encoding || !art.items.find((item) => item.id === 'aura_core')) throw new Error(t('The art catalog could not load. Reload the page.', 'No se pudo cargar el catálogo de arte. Recarga la página.'));
       art = { ...art, items: withCatalogAliases(art.items) };
       const initial = demoWorld(art, fixture);
       try {
@@ -419,7 +420,7 @@ export default function TraderLandGatePage() {
         } else setDemo(initial);
       } catch { setDemo(initial); }
       setManifest(art);
-    }).catch((err) => { if (!controller.signal.aborted) setArtError(String(err.message || err)); });
+    }).catch((err) => { if (!controller.signal.aborted) setArtError(t('The art catalog could not load. Reload the page.', 'No se pudo cargar el catálogo de arte. Recarga la página.')); });
     return () => controller.abort();
   }, []);
   useEffect(() => {
@@ -440,7 +441,7 @@ export default function TraderLandGatePage() {
     setBusy(true);
     fetch('/api/trader-land', { headers: { ...headers(), ...TRADER_LAND_CLIENT_HEADER } }).then(async (response) => {
       const value = await response.json();
-      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(value.error || 'Could not load your world');
+      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(t('The island could not load.', 'No se pudo cargar la isla.'));
       if (epoch === requestEpoch.current) setRemote(value);
     }).catch((err) => { if (epoch === requestEpoch.current) setError(err.message); }).finally(() => { if (epoch === requestEpoch.current) setBusy(false); });
     return () => { requestEpoch.current += 1; };
@@ -454,7 +455,7 @@ export default function TraderLandGatePage() {
     setBusy(true); setError(''); setDraft(null); setSelectedId(null);
     fetch(`/api/trader-land-public?code=${encodeURIComponent(visitorCode)}`, { signal: controller.signal, headers: { Accept: 'application/json' } }).then(async (response) => {
       const value = await response.json().catch(() => ({}));
-      if (!response.ok || !value.world || !Array.isArray(value.world.placements)) throw new Error(response.status === 404 ? t('This island is not published or does not exist.', 'Esta isla no está publicada o no existe.') : (value.error || t('The island could not load.', 'No se pudo cargar la isla.')));
+      if (!response.ok || !value.world || !Array.isArray(value.world.placements)) throw new Error(response.status === 404 ? t('This island is not published or does not exist.', 'Esta isla no está publicada o no existe.') : (t('The island could not load.', 'No se pudo cargar la isla.')));
       const payload = value.world as PublicWorldPayload;
       setVisited(visitorWorld(payload)); setVisitorMeta({ title: payload.title, publishedAt: payload.publishedAt, pieces: payload.stats?.pieces ?? payload.placements.length, districts: payload.stats?.districts ?? [] });
     }).catch((err) => { if (!controller.signal.aborted) setError(err instanceof Error ? err.message : String(err)); }).finally(() => { if (!controller.signal.aborted) setBusy(false); });
@@ -486,7 +487,7 @@ export default function TraderLandGatePage() {
         refusal.explain(response.status, value.error);
         return null;
       }
-      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(value.error || 'Could not save your world');
+      if (!response.ok || !Array.isArray(value.inventory) || !Array.isArray(value.placements)) throw new Error(t('Your island could not be saved. Try again.', 'No se pudo guardar tu isla. Inténtalo de nuevo.'));
       if (epoch !== requestEpoch.current) return null;
       apply(value);
       return value;
@@ -598,7 +599,7 @@ export default function TraderLandGatePage() {
     setNotice(next.extended.item ? extendedNotice(next.extended.horizon.hours, tierPieceName(next.extended.item)) : t('Horizon extended.', 'Horizonte extendido.'));
   };
   /** Name of a server piece: the art catalog's when it has the piece, else the server's. */
-  const tierPieceName = (piece: PieceSummary) => { const item = items.get(piece.id); return item ? itemName(item) : pieceName(piece, isSpanish()); };
+  const tierPieceName = (piece: PieceSummary) => { const item = items.get(piece.id); return item ? itemName(item) : pieceName(piece); };
   const jumpToReady = () => {
     const first = readySeeds[0]; if (!first) return;
     const district = items.get(first.item_id)?.district;
@@ -775,13 +776,13 @@ export default function TraderLandGatePage() {
               waitingUntil={(() => { const date = world.inventory.filter((entry)=>entry.state==='seed' && entry.review && !entry.review.ready).map((entry)=>entry.review!.reviewAt).sort()[0]; return date ? when(date) : undefined; })()}
               disabled={editingBlocked} onReview={()=>{setHelp(false);jumpToReady();}}
               onBuild={()=>{setHelp(false);const entry=world.inventory.find((entry)=>!entry.placed&&entry.state==='bloomed'&&items.has(entry.item_id));if(entry){setDistrict(items.get(entry.item_id)!.district as District);startDraft(entry);}}}
-              onSignIn={()=>{void(wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}} />}</div>}
+              onSignIn={()=>{void(wallet?ensureSession():open()).catch((err:unknown)=>setError(t('Sign in is unavailable. Try again.', 'No se pudo iniciar sesión. Inténtalo de nuevo.')));}} />}</div>}
           {shareOpen && !visitor && <div className="land-help land-share" data-land-ui role="region" aria-label={t('Share island','Compartir isla')}>
             <button className="land-icon" onClick={()=>setShareOpen(false)} aria-label={t('Close','Cerrar')}><X size={18}/></button>
             {isDemo ? <>
               <h3>{t('Share your earned island.','Comparte tu isla ganada.')}</h3>
               <p>{t('The practice island lives only in this browser. Sign in to publish the island you build with real decisions and get a link anyone can visit.','La isla de práctica vive solo en este navegador. Inicia sesión para publicar la isla que construyes con decisiones reales y obtener un enlace que cualquiera puede visitar.')}</p>
-              <div className="land-selected-actions"><button className="land-primary" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Open my earned island','Abrir mi isla ganada')}</button><Link className="land-subtle" to={WORLDS_PATH}>{t('See worlds','Ver mundos')}</Link></div>
+              <div className="land-selected-actions"><button className="land-primary" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(t('Sign in is unavailable. Try again.', 'No se pudo iniciar sesión. Inténtalo de nuevo.')));}}>{t('Open my earned island','Abrir mi isla ganada')}</button><Link className="land-subtle" to={WORLDS_PATH}>{t('See worlds','Ver mundos')}</Link></div>
             </> : <>
               <h3>{world?.share?.public?t('Your island is public.','Tu isla es pública.'):t('Share your island.','Comparte tu isla.')}</h3>
               <p>{world?.share?.public?t('Anyone with the link can visit it and it appears in Worlds. Hide it whenever you want.','Cualquiera con el enlace puede visitarla y aparece en Mundos. Ocúltala cuando quieras.'):t('Publish it so others can visit it and it appears in Worlds. You can hide it at any time.','Publícala para que otros la visiten y aparezca en Mundos. Puedes ocultarla cuando quieras.')}</p>
@@ -813,10 +814,10 @@ export default function TraderLandGatePage() {
                 <img src={art.thumb?.url??art.albedo.url} alt="" draggable={false}/><span>{itemName(item)}</span><small>{entry.placed?<><Check size={11}/>{t('On island','En la isla')}</>:ready?<><Sprout size={11}/>{t('Ready to review','Lista para revisar')}</>:entry.state==='seed'?(entry.horizon?`${t('Growing','Creciendo')} · ${horizonLabel(entry.horizon.hours)}`:t('Growing','Creciendo')):entry.source==='season'?<><Sparkles size={11}/>{t('Season','Temporada')} · {item.footprint.cols} × {item.footprint.rows}</>:`${item.footprint.cols} × ${item.footprint.rows}`}</small>
               </button>;
             })}{!visibleInventory.length&&<p className="land-empty">{t('No pieces yet. Explore the desk to earn them.','Aún no hay piezas. Explora el desk para conseguirlas.')}</p>}</div>
-            {!isDemo&&world?.season&&<details className="land-season" aria-label={isSpanish()?world.season.name.es:world.season.name.en}><summary>{t('Season progress','Progreso de temporada')}</summary><h4>{isSpanish()?world.season.name.es:world.season.name.en}<small>{world.season.earned} / {world.season.total}</small></h4><p>{isSpanish()?world.season.rule.es:world.season.rule.en}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</details>}
-            <div className="land-collection-footer">{isDemo?<button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(err instanceof Error?err.message:String(err)));}}>{t('Sign in to save your earned island','Inicia sesión para guardar tu isla ganada')}</button>:<Link className="land-text-link" to="/desk">{t('Back to desk','Volver al desk')}</Link>}</div>
+            {!isDemo&&world?.season&&<details className="land-season" aria-label={pick(world.season.name)}><summary>{t('Season progress','Progreso de temporada')}</summary><h4>{pick(world.season.name)}<small>{world.season.earned} / {world.season.total}</small></h4><p>{pick(world.season.rule)}</p>{world.season.complete?<p className="land-season-next"><Check size={12}/>{t('Season complete.','Temporada completa.')}</p>:world.season.next&&items.get(world.season.next)&&<p className="land-season-next"><Sprout size={12}/>{t('Next piece','Siguiente pieza')}: {itemName(items.get(world.season.next)!)}</p>}</details>}
+            <div className="land-collection-footer">{isDemo?<button className="land-text-link" disabled={busy} onClick={()=>{void (wallet?ensureSession():open()).catch((err:unknown)=>setError(t('Sign in is unavailable. Try again.', 'No se pudo iniciar sesión. Inténtalo de nuevo.')));}}>{t('Sign in to save your earned island','Inicia sesión para guardar tu isla ganada')}</button>:<Link className="land-text-link" to="/desk">{t('Back to desk','Volver al desk')}</Link>}</div>
           </div>}
-          {libraryOpen && coreSelected && coreItem && <div className="land-selected-detail" data-testid="land-core-detail"><div><span className="land-eyebrow">{t('ON YOUR ISLAND','EN TU ISLA')}</span><h3>Aura Core</h3><p>2 × 2 {t('tiles','casillas')} · {coreStateLabel(core,placements.length)}</p>{!canMoveCore&&<p>{t('Moving the Aura Core is coming soon.','Mover el Aura Core estará disponible pronto.')}</p>}</div><div className="land-selected-actions"><button className="land-primary" disabled={editingBlocked||Boolean(draft)||!canMoveCore} onClick={startCoreDraft}><Move size={17}/> {t('Move','Mover')}</button></div></div>}
+          {libraryOpen && coreSelected && coreItem && <div className="land-selected-detail" data-testid="land-core-detail"><div><span className="land-eyebrow">{t('ON YOUR ISLAND','EN TU ISLA')}</span><h3>{landPieceLabel("Aura Core")}</h3><p>2 × 2 {t('tiles','casillas')} · {coreStateLabel(core,placements.length)}</p>{!canMoveCore&&<p>{t('Moving the Aura Core is coming soon.','Mover el Aura Core estará disponible pronto.')}</p>}</div><div className="land-selected-actions"><button className="land-primary" disabled={editingBlocked||Boolean(draft)||!canMoveCore} onClick={startCoreDraft}><Move size={17}/> {t('Move','Mover')}</button></div></div>}
           {libraryOpen && selectedItem && selected && <div className="land-selected-detail"><div>
             <span className="land-eyebrow">{selectedPlacement?t('ON YOUR ISLAND','EN TU ISLA'):selected.state==='seed'?t('SEED','SEMILLA'):t('BLUEPRINT','PLANO')}</span><h3>{itemName(selectedItem)}</h3><p>{footprint(selectedItem,draft?.orientation).cols} × {footprint(selectedItem,draft?.orientation).rows} {t('tiles','casillas')}</p>
             {/* The seed's horizon and the tier it blooms into; longer horizons stay open until its review does. */}

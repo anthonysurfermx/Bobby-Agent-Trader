@@ -6,7 +6,7 @@ import { useMemo, useState, type CSSProperties } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import * as Slider from '@radix-ui/react-slider';
 import { ChevronDown, ChevronRight, Layers, RotateCcw, Sparkles, Zap } from 'lucide-react';
-import { t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { sfxTock } from '@/lib/companions/sfx';
 import type { AccessState, DeskLevel } from '@/lib/access-client';
 
@@ -87,7 +87,7 @@ export default function LevelControl({ level, onChange, state, disabled, onSignI
     return { left: Math.random() * 96 + 1, top: Math.random() * 70 + 15, size: 1 + z * 1.3, o: 0.45 + z * 0.5, d: 2.4 + Math.random() * 3, dl: Math.random() * 5 };
   }), []);
   const pick = (l: DeskLevel) => { if (l !== level) { sfxTock(); onChange(l); } };
-  const resetDate = allowance?.resetsAt ? new Date(allowance.resetsAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null;
+  const resetDate = allowance?.resetsAt ? new Date(allowance.resetsAt).toLocaleDateString(speechLocale(), { month: 'short', day: 'numeric' }) : null;
 
   return (
     <Popover.Root open={open} onOpenChange={(o) => { setOpen(o); if (!o) setMore(false); }}>

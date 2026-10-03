@@ -43,10 +43,12 @@ body.nucleo-pages :is(a, button, input, select, textarea, [role="button"]):focus
 .np-app { font: 500 12px/1 var(--n-sans); letter-spacing: .01em; padding: 9px 16px; border-radius: 999px; color: var(--n-ink); text-decoration: none;
   background: rgba(0, 0, 0, .5); border: 1px solid rgba(242, 237, 228, .14); box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06); transition: border-color .2s ease; }
 .np-app:hover { border-color: rgba(242, 237, 228, .32); }
+.np-actions { display: flex; align-items: center; gap: 10px; }
+.np-language { max-width: 110px; min-height: 36px; color: var(--n-ink); background: #15121c; border: 1px solid var(--n-hair); border-radius: 999px; padding: 6px 8px; font: 500 11px/1 var(--n-sans); }
 @media (max-width: 860px) {
   .np-topbar { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "mark app" "nav nav"; row-gap: 2px; padding-top: calc(env(safe-area-inset-top, 0px) + 12px); }
   .np-wordmark { grid-area: mark; }
-  .np-app { grid-area: app; }
+  .np-actions { grid-area: app; }
   .np-nav { grid-area: nav; justify-content: flex-start; overflow-x: auto; scrollbar-width: none; overscroll-behavior-x: contain;
     margin-inline: calc(-1 * clamp(16px, 3vw, 32px)); padding-inline: clamp(16px, 3vw, 32px);
     -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent); }

@@ -11,7 +11,8 @@ import { ArrowLeft, Mic, MicOff, X, ChevronDown } from 'lucide-react';
 import { useRealtimeVoice, type VoiceState } from '@/hooks/useRealtimeVoice';
 import { getVoiceAsset, isEquitySymbol } from '@/lib/voice-assets';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { lang as interfaceLanguage } from '@/lib/companions/i18n';
+import { lang as interfaceLanguage, speechLocale, t as ui, type Lang } from '@/lib/companions/i18n';
+import { appLanguage, appLocale, isAppLanguage } from '@/lib/app-language';
 import { useProgress } from '@/lib/companions/progress';
 import { COMPANIONS, getCompanion, wornGear, toolHasArt, toolArt, toolSlot, petUnlocked, petFor, petArt } from '@/lib/companions/data';
 import { voiceScreenState } from '@/lib/realtime-context';
@@ -31,24 +32,17 @@ function assetLabel(symbol: string): string {
   return `${symbol}/USDT`;
 }
 
-const STATE_COPY: Record<'es' | 'en', Record<VoiceState, { label: string; hint: string }>> = {
-  es: {
-    idle: { label: 'En reposo', hint: 'Toca el micrófono y háblale a Bobby' },
-    connecting: { label: 'Conectando', hint: 'Abriendo sesión de voz segura…' },
-    listening: { label: 'Escuchando', hint: 'Habla normal — puedes interrumpirlo cuando quieras' },
-    thinking: { label: 'Procesando', hint: 'Cruzando datos mientras te responde' },
-    speaking: { label: 'Bobby habla', hint: 'Interrúmpelo si quieres' },
-    error: { label: 'Voz en pausa', hint: 'Reintenta la conexión' },
-  },
-  en: {
-    idle: { label: 'Idle', hint: 'Tap the microphone and talk to Bobby' },
-    connecting: { label: 'Connecting', hint: 'Opening a secure voice session…' },
-    listening: { label: 'Listening', hint: 'Speak naturally — interrupt whenever you want' },
-    thinking: { label: 'Processing', hint: 'Cross-checking data while Bobby responds' },
-    speaking: { label: 'Bobby is speaking', hint: 'Interrupt whenever you want' },
-    error: { label: 'Voice paused', hint: 'Try connecting again' },
-  },
-};
+function voiceStateCopy(state: VoiceState): { label: string; hint: string } {
+  const copy: Record<VoiceState, { label: string; hint: string }> = {
+    idle: { label: ui('Idle', "En reposo"), hint: ui('Tap the microphone and talk to Bobby', "Toca el micrófono y habla con Bobby") },
+    connecting: { label: ui('Connecting', "Conectando"), hint: ui('Opening a secure voice session…', "Abriendo una sesión de voz segura…") },
+    listening: { label: ui('Listening', "Escuchando"), hint: ui('Speak naturally — interrupt whenever you want', "Habla con naturalidad; interrumpe cuando quieras") },
+    thinking: { label: ui('Processing', "Procesando"), hint: ui('Cross-checking data while Bobby responds', "Contrastando datos mientras Bobby responde") },
+    speaking: { label: ui('Bobby is speaking', "Bobby habla"), hint: ui('Interrupt whenever you want', "Interrumpe cuando quieras") },
+    error: { label: ui('Voice paused', "Voz en pausa"), hint: ui('Try connecting again', "Intenta conectar de nuevo") },
+  };
+  return copy[state];
+}
 
 const VERDICT_STYLE: Record<string, string> = {
   buy: 'text-green-400 border-green-400/40 bg-green-400/10',
@@ -57,9 +51,6 @@ const VERDICT_STYLE: Record<string, string> = {
   wait: 'text-[#fcc025] border-[#fcc025]/40 bg-[#fcc025]/10',
 };
 
-const VERDICT_LABEL: Record<string, string> = {
-  buy: 'Comprar', sell: 'Vender', avoid: 'Evitar', wait: 'Esperar',
-};
 
 function playActivationChime() {
   try {
@@ -81,7 +72,16 @@ function playActivationChime() {
 
 function formatDeskNumber(value: number | null): string {
   if (value === null) return '—';
-  return value.toLocaleString('en-US', { maximumFractionDigits: value < 10 ? 4 : 2 });
+  return value.toLocaleString(speechLocale(), { maximumFractionDigits: value < 10 ? 4 : 2 });
+}
+
+/** Keep the resolved interface locale and explicit market when leaving the voice room. */
+function deskPath(symbol: string, timeframe: string, freeVoice = false): string {
+  const query = new URLSearchParams({ symbol, timeframe, lang: interfaceLanguage(), locale: speechLocale() });
+  if (freeVoice) query.set('voice', 'free');
+  const country = new URLSearchParams(window.location.search).get('country');
+  if (country !== null) query.set('country', country);
+  return `/desk?${query.toString()}`;
 }
 
 export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToChat?: () => void; autoStart?: boolean } = {}) {
@@ -89,16 +89,14 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
   const [params] = useSearchParams();
   const progress = useProgress();
   const companion = getCompanion(progress.companionId) ?? COMPANIONS[1];
-  const [languageMode, setLanguageMode] = useState<'auto' | 'es' | 'en'>(() => {
+  const [languageMode, setLanguageMode] = useState<'auto' | Lang>(() => {
     try {
       const stored = localStorage.getItem('bobby_voice_language');
-      return stored === 'es' || stored === 'en' ? stored : 'auto';
+      return isAppLanguage(stored) ? stored : 'auto';
     } catch { return 'auto'; }
   });
-  // The voice room speaks Spanish or English; a Portuguese interface falls back to English here
-  // (the web's rule for strings that have no Portuguese yet) and auto-language still hears Portuguese.
-  const voiceLang: 'es' | 'en' = languageMode === 'auto'
-    ? (interfaceLanguage() === 'es' ? 'es' : 'en') : languageMode;
+  const voiceLang: Lang = languageMode === 'auto' ? interfaceLanguage() : languageMode;
+  const voiceLocale = appLocale(voiceLang, speechLocale());
   const initialScreen = voiceScreenState(params.get('symbol'), params.get('timeframe'));
   const mascotLook = { ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id };
   const attachments = useMemo(() => {
@@ -117,12 +115,12 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
     connect, disconnect, startTalking, stopTalking, micMuted, setSymbol, setTimeframe,
     dismissProposal, resetConversation,
   } = useRealtimeVoice(voiceLang, inputMode, {
-    voice: companion.voicePersona, autoLanguage: languageMode === 'auto',
+    voice: companion.voicePersona, locale: voiceLocale, autoLanguage: languageMode === 'auto',
     initialSymbol: initialScreen.symbol, initialTimeframe: initialScreen.timeframe,
   });
   useEffect(() => {
     if (!fallback) return;
-    navigate(`/desk?voice=free&symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`, {
+    navigate(deskPath(symbol, timeframe, true), {
       replace: true, state: { voiceFallback: true, transcript },
     });
   }, [fallback, navigate, symbol, timeframe, transcript]);
@@ -150,7 +148,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
     return () => window.clearTimeout(timer);
   }, [activateVoice, state]);
 
-  const changeLanguage = (next: 'auto' | 'es' | 'en') => {
+  const changeLanguage = (next: 'auto' | Lang) => {
     if (live) disconnect();
     resetConversation();
     setLanguageMode(next);
@@ -161,51 +159,54 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
     railRef.current?.scrollTo({ top: railRef.current.scrollHeight, behavior: 'smooth' });
   }, [transcript]);
 
-  const copy = STATE_COPY[voiceLang][state];
+  const copy = voiceStateCopy(state);
   const lastBobby = [...transcript].reverse().find((l) => l.role === 'bobby');
 
   return (
     <div className="relative flex h-full w-full flex-col overflow-hidden bg-[#050505] text-white">
       <div className="pointer-events-none absolute inset-0 opacity-[0.04] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:64px_64px]" />
 
-      {needsSignIn && <SignInPrompt xp={progress.xp} voiceAccess onClose={() => { dismissSignIn(); navigate(`/desk?voice=free&symbol=${encodeURIComponent(symbol)}&timeframe=${encodeURIComponent(timeframe)}`); }} />}
+      {needsSignIn && <SignInPrompt xp={progress.xp} voiceAccess onClose={() => { dismissSignIn(); navigate(deskPath(symbol, timeframe, true)); }} />}
       {/* ---- top bar ---- */}
       <header className="relative z-20 flex shrink-0 items-center justify-between gap-3 border-b border-white/10 px-5 py-3 lg:px-6">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => { disconnect(); navigate('/desk'); }}
-            aria-label={voiceLang === 'es' ? 'Volver al desk' : 'Back to desk'}
+          <button type="button" onClick={() => { disconnect(); navigate(deskPath(symbol, timeframe)); }}
+            aria-label={ui('Back to desk', 'Volver al desk')}
             className="flex h-11 w-11 items-center justify-center rounded-full text-white/60 hover:bg-white/10 hover:text-white">
             <ArrowLeft className="h-5 w-5" />
           </button>
           <span className={`h-2 w-2 rounded-full ${live ? 'animate-pulse bg-[#0052ff]' : 'bg-white/25'}`} />
           <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/60">
-            Bobby · Live desk
-          </span>
+            {ui("Bobby · Live desk", "Bobby · Mesa en vivo")}</span>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/45">
-            <span>LANG</span>
-            <select aria-label={voiceLang === 'es' ? 'Idioma de voz' : 'Voice language'} value={languageMode} onChange={(event) => changeLanguage(event.target.value as 'auto' | 'es' | 'en')} className="bg-transparent text-[#7da6ff] outline-none">
-              <option value="auto">AUTO</option>
+            <span>{ui("LANG", "IDIOMA")}</span>
+            <select aria-label={ui('Voice language', 'Idioma de voz')} value={languageMode} onChange={(event) => changeLanguage(event.target.value as 'auto' | Lang)} className="bg-transparent text-[#7da6ff] outline-none">
+              <option value="auto">{ui("AUTO", "AUTO")}</option>
               <option value="es">ES · MX</option>
               <option value="en">EN · US</option>
+              <option value="fr">FR · FR</option>
+              <option value="pt">PT · {appLocale('pt', speechLocale()) === 'pt-BR' ? 'BR' : 'PT'}</option>
+              <option value="it">IT · IT</option>
+              <option value="de">DE · DE</option>
             </select>
           </label>
           <label className="hidden items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/45 sm:flex">
-            <span>MIC</span>
+            <span>{ui("MIC", "MIC")}</span>
             <select value={inputMode} onChange={(event) => setInputMode(event.target.value as 'tap-to-talk' | 'hands-free')} className="bg-transparent text-[#7da6ff] outline-none">
-              <option value="tap-to-talk">{voiceLang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK'}</option>
-              <option value="hands-free">{voiceLang === 'es' ? 'AUDÍFONOS' : 'HEADSET'}</option>
+              <option value="tap-to-talk">{ui('TAP TO TALK', 'TOCA PARA HABLAR')}</option>
+              <option value="hands-free">{ui('HEADSET', 'AUDÍFONOS')}</option>
             </select>
           </label>
           {onSwitchToChat && (
             <button
               onClick={onSwitchToChat}
-              title={voiceLang === 'es' ? 'Usa texto si hay ruido alrededor' : 'Use text when the room is noisy'}
+              title={ui('Use text when the room is noisy', 'Usa texto si hay ruido alrededor')}
               className="min-h-11 rounded-lg border border-white/10 bg-white/[0.04] px-2 py-1.5 font-mono text-[9px] uppercase tracking-[0.14em] text-white/45 transition hover:border-[#0052ff]/40 hover:text-white sm:min-h-0 sm:px-3"
             >
-              <span className="sm:hidden">{voiceLang === 'es' ? 'Texto' : 'Text'}</span>
-              <span className="hidden sm:inline">{voiceLang === 'es' ? 'Texto · ruido' : 'Text · noisy room'}</span>
+              <span className="sm:hidden">{ui('Text', 'Texto')}</span>
+              <span className="hidden sm:inline">{ui('Text · noisy room', 'Texto · ruido')}</span>
             </button>
           )}
         </div>
@@ -260,10 +261,10 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                   ? (micMuted ? startTalking : stopTalking)
                   : undefined}
               aria-label={!live
-                ? (voiceLang === 'es' ? 'Abrir sesión de voz' : 'Start voice session')
+                ? (ui('Start voice session', 'Abrir sesión de voz'))
                 : inputMode === 'tap-to-talk'
-                  ? (micMuted ? (voiceLang === 'es' ? 'Toca para hablar' : 'Tap to talk') : (voiceLang === 'es' ? 'Silenciar micrófono' : 'Mute microphone'))
-                  : (voiceLang === 'es' ? 'Sesión de voz activa' : 'Voice session active')}
+                  ? (micMuted ? (ui('Tap to talk', 'Toca para hablar')) : (ui('Mute microphone', 'Silenciar micrófono')))
+                  : (ui('Voice session active', 'Sesión de voz activa'))}
               className={`group relative grid h-14 w-14 place-items-center rounded-full transition ${
                 live ? 'scale-105 bg-[#42e6a4] text-[#04130c] shadow-[0_0_36px_rgba(66,230,164,.55)] active:scale-95' : 'bg-[#0052ff] text-white shadow-[0_0_28px_rgba(0,82,255,.45)] hover:bg-[#1c6cff] active:scale-95'
               }`}
@@ -274,11 +275,11 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
             </button>
             <p className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/25">
               {live ? `${Math.floor(remainingSeconds / 60)}:${String(remainingSeconds % 60).padStart(2, '0')}`
-                : (voiceLang === 'es' ? '3 min de voz al día' : '3 voice minutes a day')}
+                : (ui('3 voice minutes a day', '3 min de voz al día'))}
             </p>
             {live && (
               <button onClick={disconnect} className="font-mono text-[8px] uppercase tracking-[0.12em] text-white/30 transition hover:text-white">
-                {voiceLang === 'es' ? 'Cerrar voz' : 'End voice'}
+                {ui('End voice', 'Cerrar voz')}
               </button>
             )}
           </div>
@@ -290,7 +291,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
             onClick={() => setChartOpenMobile((open) => !open)}
             className="mb-3 flex w-full items-center justify-between rounded-lg border border-white/10 bg-white/[0.04] px-4 py-2.5 font-mono text-[10px] uppercase tracking-[0.14em] text-white/60 lg:hidden"
           >
-            {assetLabel(symbol)} · gráfica en vivo
+            {assetLabel(symbol)} · {ui('Live chart', 'Gráfica en vivo')}
             <ChevronDown className={`h-4 w-4 transition ${chartOpenMobile ? 'rotate-180' : ''}`} />
           </button>
           {/* The candles are the evidence — the debate cards below never get to
@@ -323,30 +324,26 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                 <div className="flex items-center justify-between gap-3 font-mono text-[9px] uppercase tracking-[0.14em]">
                   <span className="flex items-center gap-2 text-[#7da6ff]">
                     <span className={`h-1.5 w-1.5 rounded-full ${briefState.status === 'loading' ? 'animate-pulse bg-[#0052ff]' : briefState.status === 'error' ? 'bg-red-400' : 'bg-green-400'}`} />
-                    {voiceLang === 'es' ? 'Lectura técnica en vivo' : 'Live technical read'}
+                    {ui('Live technical read', 'Lectura técnica en vivo')}
                   </span>
                   <span className="text-white/35">
                     {briefState.status === 'ready' && briefState.elapsedMs !== null
-                      ? `${(briefState.elapsedMs / 1000).toFixed(1)}s · ${voiceLang === 'es' ? 'objetivo <60s' : 'target <60s'}`
+                      ? `${((briefState.elapsedMs / 1000)).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}s · ${ui('target <60s', 'objetivo <60s')}`
                       : briefState.status === 'loading'
-                        ? (voiceLang === 'es' ? 'gráfica lista · leyendo velas' : 'chart ready · reading candles')
-                        : (voiceLang === 'es' ? 'datos no disponibles' : 'data unavailable')}
+                        ? (ui('chart ready · reading candles', 'gráfica lista · leyendo velas'))
+                        : (ui('data unavailable', 'datos no disponibles'))}
                   </span>
                 </div>
 
                 {briefState.status === 'loading' && (
                   <p className="mt-2 text-sm leading-5 text-white/60">
-                    {voiceLang === 'es'
-                      ? `${briefState.symbol} ya está en pantalla. Cruzando precio, estructura y momentum…`
-                      : `${briefState.symbol} is already on screen. Cross-checking price, structure and momentum…`}
+                    {ui(`${briefState.symbol} is already on screen. Cross-checking price, structure and momentum…`, `${briefState.symbol} ya está en pantalla. Cruzando precio, estructura y momentum…`)}
                   </p>
                 )}
 
                 {briefState.status === 'error' && (
                   <p className="mt-2 text-sm leading-5 text-white/60">
-                    {voiceLang === 'es'
-                      ? 'La gráfica sigue viva, pero la lectura técnica no respondió. Cambia de activo o reintenta.'
-                      : 'The chart is still live, but the technical read did not respond. Switch assets or retry.'}
+                    {ui('The chart is still live, but the technical read did not respond. Switch assets or retry.', 'La gráfica sigue viva, pero la lectura técnica no respondió. Cambia de activo o reintenta.')}
                   </p>
                 )}
 
@@ -359,8 +356,8 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                     <div className="grid grid-cols-3 gap-2 sm:grid-cols-1">
                       {[
                         ['RSI', formatDeskNumber(deskBrief.rsi14)],
-                        [voiceLang === 'es' ? 'SOPORTE' : 'SUPPORT', formatDeskNumber(deskBrief.support)],
-                        [voiceLang === 'es' ? 'RESIST.' : 'RESIST.', formatDeskNumber(deskBrief.resistance)],
+                        [ui('SUPPORT', 'SOPORTE'), formatDeskNumber(deskBrief.support)],
+                        [ui('RESIST.', 'RESIST.'), formatDeskNumber(deskBrief.resistance)],
                       ].map(([label, value]) => (
                         <div key={label} className="min-w-24 rounded-lg border border-white/10 bg-black/20 px-2.5 py-1.5 font-mono">
                           <div className="text-[8px] uppercase tracking-[0.12em] text-white/30">{label}</div>
@@ -386,38 +383,38 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
               >
                 <div className="sm:col-span-3 flex items-center justify-between px-1">
                   <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-white/40">
-                    {voiceLang === 'es' ? 'Debate en 3 lecturas' : 'Debate in 3 reads'}
+                    {ui('Debate in 3 reads', 'Debate en 3 lecturas')}
                   </span>
                   <span className="font-mono text-[9px] uppercase tracking-[0.12em] text-white/25">
-                    {voiceLang === 'es' ? 'Resumen por Bobby · niveles en gráfica' : 'Bobby summary · levels on chart'}
+                    {ui('Bobby summary · levels on chart', 'Resumen por Bobby · niveles en gráfica')}
                   </span>
                 </div>
                 {([
                   {
                     key: 'alpha' as const,
                     name: 'Alpha Hunter',
-                    stance: voiceLang === 'es' ? 'el caso a favor' : 'the bullish case',
+                    stance: ui('the bullish case', 'el caso a favor'),
                     text: debate.alpha,
                     score: debate.alphaConviction,
-                    scoreLabel: voiceLang === 'es' ? 'convicción' : 'conviction',
+                    scoreLabel: ui('conviction', 'convicción'),
                     accent: 'border-green-400/40 bg-green-400/[0.08]', dot: 'bg-green-400', tone: 'text-green-300',
                   },
                   {
                     key: 'red' as const,
                     name: 'Red Team',
-                    stance: voiceLang === 'es' ? 'el ataque' : 'the attack',
+                    stance: ui('the attack', 'el ataque'),
                     text: debate.redTeam,
                     score: debate.redTeamSeverity,
-                    scoreLabel: voiceLang === 'es' ? 'severidad' : 'severity',
+                    scoreLabel: ui('severity', 'severidad'),
                     accent: 'border-[#ff716a]/40 bg-[#ff716a]/[0.08]', dot: 'bg-[#ff716a]', tone: 'text-[#ff9d97]',
                   },
                   {
                     key: 'cio' as const,
                     name: 'Bobby CIO',
-                    stance: voiceLang === 'es' ? 'la decisión final' : 'the final decision',
+                    stance: ui('the final decision', 'la decisión final'),
                     text: debate.cio,
                     score: debate.cioConviction,
-                    scoreLabel: voiceLang === 'es' ? 'convicción' : 'conviction',
+                    scoreLabel: ui('conviction', 'convicción'),
                     accent: 'border-yellow-300/40 bg-yellow-300/[0.08]', dot: 'bg-yellow-300', tone: 'text-yellow-200',
                   },
                 ] as const).map((side) => (
@@ -438,7 +435,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                     <div className="mb-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-white/30">
                       {side.stance}
                     </div>
-                    <p className="max-h-24 min-h-[3.75rem] overflow-y-auto text-[13px] leading-5 text-white/75">{side.text || (voiceLang === 'es' ? 'Esperando análisis…' : 'Waiting for analysis…')}</p>
+                    <p className="max-h-24 min-h-[3.75rem] overflow-y-auto text-[13px] leading-5 text-white/75">{side.text || (ui('Waiting for analysis…', 'Esperando análisis…'))}</p>
                     {/* Ties the card to the line of the same colour on the chart. */}
                     {(() => {
                       const line = debate.levels.find((level) => level.agent === side.key);
@@ -446,7 +443,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                         <div className="mt-2 flex items-baseline justify-between gap-2 border-t border-white/10 pt-2 font-mono text-[10px]">
                           <span className="uppercase tracking-[0.1em] text-white/30">{line.label}</span>
                           <span className={side.tone}>
-                            {line.price.toLocaleString('en-US', { maximumFractionDigits: line.price < 10 ? 4 : 2 })}
+                            {line.price.toLocaleString(speechLocale(), { maximumFractionDigits: line.price < 10 ? 4 : 2 })}
                           </span>
                         </div>
                       ) : null;
@@ -465,7 +462,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
                   line.role === 'bobby' ? 'border-[#0052ff]/30 bg-[#0052ff]/[0.08] text-white/75' : 'border-white/10 bg-white/[0.03] text-white/50'
                 }`}>
                 <span className="mr-2 font-mono text-[9px] uppercase tracking-[0.14em] text-white/30">
-                  {line.role === 'bobby' ? 'Bobby' : 'Tú'}
+                  {line.role === 'bobby' ? 'Bobby' : ui('You', 'Tú')}
                 </span>
                 {line.text}
               </div>
@@ -479,25 +476,25 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
         {thesis ? (
           <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
             <span className={`rounded-lg border px-3 py-1.5 font-mono text-[11px] font-bold uppercase tracking-[0.14em] ${VERDICT_STYLE[thesis.verdict] ?? VERDICT_STYLE.wait}`}>
-              {voiceLang === 'es' ? (VERDICT_LABEL[thesis.verdict] ?? thesis.verdict) : thesis.verdict}
+              {({ buy: ui('Buy', 'Comprar'), sell: ui('Sell', 'Vender'), avoid: ui('Avoid', 'Evitar'), wait: ui('Wait', 'Esperar') })[thesis.verdict] ?? thesis.verdict}
             </span>
             {thesis.conviction !== null && (
               <div className="flex items-center gap-2">
-                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">{voiceLang === 'es' ? 'Convicción' : 'Conviction'}</span>
+                <span className="font-mono text-[9px] uppercase tracking-[0.14em] text-white/35">{ui('Conviction', 'Convicción')}</span>
                 <span className="font-mono text-sm font-bold text-white">{thesis.conviction}%</span>
               </div>
             )}
             <p className="min-w-0 flex-1 truncate text-sm text-white/70">{thesis.reason}</p>
             {thesis.invalidation && (
               <span className="hidden font-mono text-[10px] text-white/35 xl:inline">
-                {voiceLang === 'es' ? 'Invalida' : 'Invalidates'}: {thesis.invalidation}
+                {ui('Invalidates', 'Invalida')}: {thesis.invalidation}
               </span>
             )}
           </div>
         ) : (
           <div className="flex items-center gap-3 font-mono text-[10px] uppercase tracking-[0.14em] text-white/30">
             <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-            {voiceLang === 'es' ? 'Sin veredicto todavía — pregúntale a Bobby por un activo' : 'No verdict yet — ask Bobby about an asset'}
+            {ui('No verdict yet — ask Bobby about an asset', 'Sin veredicto todavía — pregúntale a Bobby por un activo')}
           </div>
         )}
       </footer>
@@ -511,23 +508,23 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
           >
             <div className="mb-4 flex items-start justify-between">
               <div className="font-mono text-[10px] uppercase tracking-[0.18em] text-[#7da6ff]">
-                Propuesta · requiere tu confirmación
+                {ui('Proposal · requires your confirmation', 'Propuesta · requiere tu confirmación')}
               </div>
-              <button onClick={dismissProposal} aria-label="Descartar propuesta" className="text-white/35 transition hover:text-white">
+              <button onClick={dismissProposal} aria-label={ui('Dismiss proposal', 'Descartar propuesta')} className="text-white/35 transition hover:text-white">
                 <X className="h-4 w-4" />
               </button>
             </div>
             <div className="mb-4 flex items-baseline gap-3">
               <span className="text-3xl font-extrabold tracking-[-0.05em]">{proposal.symbol}</span>
               <span className={`font-mono text-sm uppercase ${proposal.direction === 'long' ? 'text-green-400' : 'text-red-400'}`}>
-                {proposal.direction}
+                {proposal.direction === 'long' ? ui('Long', 'Largo') : ui('Short', 'Corto')}
               </span>
             </div>
             {proposal.rationale && <p className="mb-5 text-sm leading-6 text-white/60">{proposal.rationale}</p>}
             <div className="mb-5 grid grid-cols-3 gap-3 border-t border-white/10 pt-4 font-mono text-xs">
-              {([['Tamaño', proposal.size_usd ? `$${proposal.size_usd}` : '—'],
-                 ['Entrada', proposal.entry ?? '—'],
-                 ['Stop', proposal.stop ?? '—']] as const).map(([label, value]) => (
+              {([[ui('Size', 'Tamaño'), proposal.size_usd ? `$${formatDeskNumber(proposal.size_usd)}` : '—'],
+                 [ui('Entry', 'Entrada'), proposal.entry === null ? '—' : formatDeskNumber(proposal.entry)],
+                 [ui('Stop', 'Stop'), proposal.stop === null ? '—' : formatDeskNumber(proposal.stop)]] as const).map(([label, value]) => (
                 <div key={label}>
                   <div className="mb-1 uppercase tracking-[0.12em] text-white/35">{label}</div>
                   <div className="text-white/85">{value}</div>
@@ -535,7 +532,7 @@ export function VoiceRoom({ onSwitchToChat, autoStart = false }: { onSwitchToCha
               ))}
             </div>
             <p className="font-mono text-[10px] leading-5 text-white/40">
-              Bobby no puede ejecutar esta orden. Si la quieres tomar, colócala tú en tu exchange.
+              {ui('Bobby cannot execute this order. If you choose to act, place it yourself on your exchange.', 'Bobby no puede ejecutar esta orden. Si decides tomarla, colócala tú en tu exchange.')}
             </p>
           </motion.div>
         )}

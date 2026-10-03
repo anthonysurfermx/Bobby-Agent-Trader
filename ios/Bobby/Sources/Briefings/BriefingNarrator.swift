@@ -333,9 +333,7 @@ final class BriefingNarrator: BriefingPlayback {
         if report.cadence == .weekly, let name = env.localGivenName()?.trimmingCharacters(in: .whitespacesAndNewlines),
            !name.isEmpty, name.count <= 80 {
             guard isCurrent(r), narrationAllowed, !env.micActive(), !env.analysisBusy() else { end(.idle); return }
-            let greeting = report.language == "es"
-                ? "Hola, \(name). Este es tu resumen semanal."
-                : "Hi, \(name). This is your weekly briefing."
+            let greeting = L.weeklyGreeting(name: name, language: report.language)
             currentSegment = nil
             phase = .playing
             let outcome = await playGreeting(greeting, language: report.language)

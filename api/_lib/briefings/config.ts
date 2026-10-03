@@ -147,6 +147,11 @@ export const voiceForCompanion = (companionId: string | null | undefined): strin
 export const PUSH_COPY: Readonly<Record<BriefLanguage, { title: string; body: string }>> = {
   es: { title: 'Bobby', body: 'Bobby tiene tu resumen de mercado listo' },
   en: { title: 'Bobby', body: 'Bobby has your market briefing ready' },
+  fr: { title: 'Bobby', body: 'Votre résumé de marché est prêt dans Bobby' },
+  pt: { title: 'Bobby', body: 'O teu resumo de mercado está pronto no Bobby' },
+  'pt-BR': { title: 'Bobby', body: 'Seu resumo de mercado está pronto no Bobby' },
+  it: { title: 'Bobby', body: 'Il tuo riepilogo di mercato è pronto in Bobby' },
+  de: { title: 'Bobby', body: 'Dein Marktüberblick ist in Bobby bereit' },
 };
 
 // ---- APNs ----

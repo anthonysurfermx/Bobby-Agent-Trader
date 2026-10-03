@@ -12,27 +12,28 @@
 // Account deletion copy must hold with or without the APPLE_SIGN_IN_* keys:
 // without them the app skips Apple's sheet and shows the manual steps.
 // Update EFFECTIVE_DATE whenever the substance changes.
-// Language: ?lang=es|en wins (App Store Connect can link a localized URL),
-// then the web's stored choice, then a Spanish browser, then English.
+// Language: a supported ?lang value wins, then the saved choice and browser locale.
 import type { ReactNode } from 'react';
 import { Helmet } from 'react-helmet-async';
 import NucleoTopBar from '@/components/protocol/NucleoTopBar';
 import { useNucleoPages } from '@/hooks/useNucleoPages';
-import { lang } from '@/lib/companions/i18n';
+import { lang, LANGS, LANG_NAME, htmlLang, translateText, type Lang } from '@/lib/companions/i18n';
+import { appLanguage, isAppLanguage } from '@/lib/app-language';
+import { clientLanguagePath } from '@/lib/client-language';
 
-/** The policy exists in English and Spanish; a Portuguese reader gets the English text. */
-type PolicyLang = 'en' | 'es';
-const EFFECTIVE_DATE: Record<PolicyLang, string> = { en: 'October 2, 2026', es: '2 de octubre de 2026' };
+type PolicyLang = Lang;
+const EFFECTIVE_DATE: Record<PolicyLang, string> = {
+  en: 'October 2, 2026', es: '2 de octubre de 2026', fr: '2 octobre 2026',
+  pt: '2 de outubro de 2026', it: '2 ottobre 2026', de: '2. Oktober 2026',
+};
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
 function policyLang(): PolicyLang {
   try {
     const requested = new URLSearchParams(window.location.search).get('lang');
-    if (requested === 'es' || requested === 'en') return requested;
-    const stored = localStorage.getItem('bobby_lang');
-    if (!stored && navigator.language?.toLowerCase().startsWith('es')) return 'es';
+    if (isAppLanguage(requested?.toLowerCase().split(/[-_]/)[0])) return appLanguage(requested);
   } catch { /* private mode or no window */ }
-  return lang() === 'es' ? 'es' : 'en';
+  return lang();
 }
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
@@ -53,14 +54,14 @@ const linkClass = 'text-white underline decoration-white/30 underline-offset-4 h
 export default function PrivacyPage() {
   useNucleoPages();
   const language = policyLang();
-  const tr = (en: string, es: string) => (language === 'es' ? es : en);
+  const tr = (en: string, es: string) => (language === 'es' ? es : translateText(language, en));
   const strong = (text: string) => <span className="text-white">{text}</span>;
 
   return (
     <div className="min-h-screen bg-[#050505] text-white">
       <NucleoTopBar />
       <Helmet>
-        <html lang={language} />
+        <html lang={htmlLang()} />
         <title>{tr('Privacy Policy | Bobby', 'Aviso de privacidad | Bobby')}</title>
         <meta
           name="description"
@@ -74,9 +75,8 @@ export default function PrivacyPage() {
       <div className="mx-auto max-w-3xl px-5 py-16 lg:py-24">
         <div className="mb-2 flex items-center justify-between gap-4">
           <div className="font-mono text-xs font-bold uppercase tracking-[0.22em] text-white/40">Bobby Protocol</div>
-          <nav aria-label={tr('Language', 'Idioma')} className="flex gap-3 font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
-            <a href="?lang=en" aria-current={language === 'en' ? 'true' : undefined} className={language === 'en' ? 'text-white' : 'text-white/40 hover:text-white'}>EN</a>
-            <a href="?lang=es" aria-current={language === 'es' ? 'true' : undefined} className={language === 'es' ? 'text-white' : 'text-white/40 hover:text-white'}>ES</a>
+          <nav aria-label={tr('Language', 'Idioma')} className="flex flex-wrap gap-3 font-mono text-[11px] font-bold uppercase tracking-[0.14em]">
+            {LANGS.map(code => <a key={code} href={`?lang=${code}`} title={LANG_NAME[code]} aria-current={language === code ? 'true' : undefined} className={language === code ? 'text-white' : 'text-white/40 hover:text-white'}>{code.toUpperCase()}</a>)}
           </nav>
         </div>
         <h1 className="mb-2 text-3xl font-bold tracking-tight">{tr('Privacy Policy', 'Aviso de privacidad')}</h1>
@@ -378,9 +378,9 @@ export default function PrivacyPage() {
               'Si publicas desde iPhone o el sitio web, su nombre y distribución serán visibles en la galería y enlaces compartidos hasta que la vuelvas privada. Antes de publicar, enviamos el nombre a OpenAI para moderarlo. No publicamos tu identificador de cuenta, XP ni lecturas. Terceros pueden conservar copias de vistas previas ya compartidas.',
             )}
           </p>
-          <p>{tr('Avatar introductions and style previews are bundled recordings and play without sending text to a provider. With voice enabled, dynamic reply text, language, avatar voice and style are sent to our speech endpoint and then OpenAI or Microsoft to generate audio. No Bobby account token or microphone audio accompanies that request. Bobby Pro briefing narration is different: those audio requests carry your account token to Bobby’s server, which checks access and sends only the shared report text, language and voice to OpenAI (see “Market briefings and notifications (Bobby Pro)”). Muting stops narration and new speech requests, and is remembered on this device. Providers may retain requests under their own terms.', 'Las presentaciones de avatares y muestras de estilo son grabaciones incluidas en la app; no envían texto a un proveedor. Con la voz activa, enviamos el texto de respuesta, idioma, voz y estilo a nuestro servidor y después a OpenAI o Microsoft para generar audio. Esa solicitud no incluye un token de cuenta de Bobby ni audio del micrófono. La narración de los resúmenes de Bobby Pro es distinta: esas solicitudes de audio llevan el token de tu cuenta al servidor de Bobby, que comprueba el acceso y envía a OpenAI solo el texto compartido del reporte, el idioma y la voz (consulta “Resúmenes de mercado y notificaciones (Bobby Pro)”). Silenciar detiene la narración y nuevas solicitudes de voz; se recuerda en este dispositivo. Los proveedores pueden conservar solicitudes según sus términos.')}</p>
+          <p>{tr('Avatar introductions and style previews use bundled recordings where available. On current iPhone versions, previews in French, Portuguese, Italian and German use on-device speech. On the website, previews without bundled recordings can request generated speech only after AI consent. With voice enabled and consent, dynamic reply text, language, avatar voice and style are sent to our speech endpoint and then OpenAI or Microsoft to generate audio. No Bobby account token or microphone audio accompanies that request. Bobby Pro briefing narration is different: those audio requests carry your account token to Bobby’s server, which checks access and sends only the shared report text, language and voice to OpenAI (see “Market briefings and notifications (Bobby Pro)”). Muting stops narration and new speech requests, and is remembered on this device. Providers may retain requests under their own terms.', 'Las presentaciones de avatares y muestras de estilo usan grabaciones incluidas cuando están disponibles. En las versiones actuales de iPhone, las muestras en francés, portugués, italiano y alemán usan voz generada en el dispositivo. En el sitio web, las muestras sin grabación incluida solo pueden solicitar voz generada después del consentimiento de IA. Con la voz activa y consentimiento, enviamos el texto de respuesta, idioma, voz y estilo a nuestro servidor y después a OpenAI o Microsoft para generar audio. Esa solicitud no incluye un token de cuenta de Bobby ni audio del micrófono. La narración de los resúmenes de Bobby Pro es distinta: esas solicitudes de audio llevan el token de tu cuenta al servidor de Bobby, que comprueba el acceso y envía a OpenAI solo el texto compartido del reporte, el idioma y la voz (consulta “Resúmenes de mercado y notificaciones (Bobby Pro)”). Silenciar detiene la narración y nuevas solicitudes de voz; se recuerda en este dispositivo. Los proveedores pueden conservar solicitudes según sus términos.')}</p>
           <p>{tr('Reports include the island code, a snapshot of its name, reason and optional details. A random installation identifier is sent and stored only as a hash to limit duplicate reports. It is not an advertising identifier and is not linked to your Bobby account. Reports are kept in a private review queue. Resolved reports are eligible for deletion after 90 days; open reports remain until reviewed. Avoid personal information in reports. Creator blocks are stored only on this device and can be removed from Community safety.', 'Los reportes incluyen el código de la isla, una copia de su nombre, el motivo y detalles opcionales. Se envía un identificador aleatorio de instalación, guardado solo como hash para limitar duplicados. No es un identificador publicitario ni se vincula a tu cuenta de Bobby. Los reportes se guardan en una cola privada. Los resueltos pueden eliminarse después de 90 días; los abiertos se conservan hasta su revisión. Evita datos personales. Los bloqueos de creadores se guardan solo en este dispositivo y se quitan desde Seguridad de la comunidad.')}</p>
-          <a className={linkClass} href={`/support?lang=${language}`}>{tr('Community rules and support', 'Reglas de la comunidad y soporte')}</a>
+          <a className={linkClass} href={clientLanguagePath('/support')}>{tr('Community rules and support', 'Reglas de la comunidad y soporte')}</a>
         </Section>
 
         <Section title={tr('Earlier iPhone versions', 'Versiones anteriores para iPhone')}>
@@ -443,7 +443,7 @@ export default function PrivacyPage() {
         <Section title={tr('Contact', 'Contacto')}>
           <p>
             {tr('For privacy questions or requests to access, correct or delete your data, use the ', 'Para dudas de privacidad o solicitudes de acceso, corrección o borrado de tus datos, usa el ')}
-            <a href={`/support?lang=${language}#contact`} className={linkClass}>{tr('private support form', 'formulario privado de soporte')}</a>.
+            <a href={clientLanguagePath('/support#contact')} className={linkClass}>{tr('private support form', 'formulario privado de soporte')}</a>.
             {tr(' It sends your message and optional reply email to Bobby’s private support queue. It does not publish them as a GitHub issue. Include only the information needed to explain the request, never passwords or identity documents. Support requests have no automatic deletion deadline; request deletion through the same form. Public GitHub issues remain available for non-sensitive bugs.', ' Envía tu mensaje y un correo opcional para responderte a la cola privada de soporte de Bobby. No los publica como un issue de GitHub. Incluye solo lo necesario para explicar la solicitud, nunca contraseñas ni documentos de identidad. Las solicitudes de soporte no tienen un plazo automático de borrado; puedes pedir que las borremos en el mismo formulario. Los issues públicos de GitHub siguen disponibles para errores que no contengan información privada.')}
           </p>
         </Section>

@@ -28,6 +28,7 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
+import { appLocale, isAppLanguage } from '../src/lib/app-language.js';
 import { customerFor, expireCheckoutSession, findCustomer, STRIPE_TERMINAL, stripeApi } from './_lib/stripe-api.js';
 import { claimCheckout, completeCheckout } from './_lib/checkout-attempt.js';
 import { recordCheckoutOpened } from './_lib/funnel.js';
@@ -40,6 +41,27 @@ const APPLE_PRODUCT_IDS = new Set(['xyz.bobbyprotocol.bobby.pro.monthly']);
 const APPLE_ROOT_G3_SHA256 = '63343abfb89a6a03ebb57e9b3f5fa7be7c4f5c756f3017b3a8c488c3653e9179';
 
 const stripeReady = () => Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_PRICE_ID);
+
+/** Only bounded interface state returns from billing; callers cannot choose a return host or path. */
+function billingInterface(body: Record<string, unknown>): { query: URLSearchParams; stripeLocale?: string } {
+  const query = new URLSearchParams();
+  if (!isAppLanguage(body.language)) return { query };
+  const language = body.language, locale = appLocale(language, body.locale);
+  query.set('lang', language); query.set('locale', locale);
+  if (typeof body.country === 'string' && /^[A-Z]{2}$/.test(body.country)) query.set('country', body.country);
+  if (typeof body.symbol === 'string' && /^[A-Z0-9.^=-]{1,20}$/.test(body.symbol)) query.set('symbol', body.symbol);
+  if (typeof body.timeframe === 'string' && ['5m', '15m', '1H', '4H', '1D'].includes(body.timeframe)) query.set('timeframe', body.timeframe);
+  const stripeLocale = locale === 'pt-BR' ? 'pt-BR'
+    : language === 'es' ? (locale === 'es-ES' ? 'es' : 'es-419')
+    : locale === 'en-GB' ? 'en-GB'
+    : language;
+  return { query, stripeLocale };
+}
+function billingReturn(origin: string, query: URLSearchParams, outcome?: string): string {
+  const params = new URLSearchParams(query);
+  if (outcome) params.set('pro', outcome);
+  return origin + '/desk' + (params.size ? '?' + params.toString() : '');
+}
 
 function observeCheckout(req: VercelRequest, identity: Parameters<typeof recordCheckoutOpened>[1], sessionId: string): void {
   // Funnel storage must never turn a valid Stripe Checkout into a failed sale.
@@ -123,7 +145,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  const { action, signedTransaction, code } = (req.body ?? {}) as { action?: string; signedTransaction?: string; code?: string };
+  const body = (req.body ?? {}) as Record<string, unknown>;
+  const { action, signedTransaction, code } = body as { action?: string; signedTransaction?: string; code?: string };
   const identity = await requireIdentity(req, res);
   if (!identity) return;
 
@@ -211,19 +234,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         observeCheckout(req, identity, openSession.id);
         return res.status(200).json({ url: openSession.url });
       }
+      // Interface language only shapes the return address and Stripe's page language. The symbol and timeframe stay
+      // out of this form: the create call is idempotent per checkout attempt, and Stripe rejects a retry of the same
+      // attempt whose parameters differ (a retry after the reader switched asset would fail with a 400).
+      const context = billingInterface(body);
+      context.query.delete('symbol'); context.query.delete('timeframe');
       const form: Record<string, string> = {
         mode: 'subscription',
         customer: claim.customer,
         expires_at: String(claim.expiresAt),
         'line_items[0][price]': claim.price,
         'line_items[0][quantity]': '1',
-        success_url: `${claim.origin}/desk?pro=welcome`,
-        cancel_url: `${claim.origin}/desk?pro=cancelled`,
+        success_url: billingReturn(claim.origin, context.query, 'welcome'),
+        cancel_url: billingReturn(claim.origin, context.query, 'cancelled'),
         client_reference_id: identity.id,
         'metadata[identity_id]': identity.id,
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
+      if (context.stripeLocale) form.locale = context.stripeLocale;
       const session = await stripeApi<{ id?: string; url?: string }>('POST', 'checkout/sessions', form, `bobby-checkout-${claim.attemptId}`);
       if (typeof session.id !== 'string' || typeof session.url !== 'string') throw new Error('Stripe checkout has no id or URL');
       try { await completeCheckout(identity.id, claim.attemptId, session.url, session.id); }
@@ -243,7 +272,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // The row may not carry the customer yet (webhook pending or retrying): Stripe is asked by metadata, never created.
       const portalCustomer = await findCustomer(identity.id, existing?.stripe_customer_id).catch(() => null);
       if (!portalCustomer) return res.status(404).json({ error: 'No card subscription on this account.' });
-      const portal = await stripe('billing_portal/sessions', { customer: portalCustomer, return_url: `${siteOrigin(req)}/desk` });
+      const context = billingInterface(body);
+      const portal = await stripe('billing_portal/sessions', { customer: portalCustomer, return_url: billingReturn(siteOrigin(req), context.query), ...(context.stripeLocale ? { locale: context.stripeLocale } : {}) });
       return res.status(200).json({ url: portal.url });
     }
 

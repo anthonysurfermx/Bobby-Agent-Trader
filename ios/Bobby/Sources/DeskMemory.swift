@@ -87,6 +87,26 @@ final class DeskMemory {
 
     // MARK: implicit watchlist
 
+    /// Automatic suggestions follow the app's speech locale, as on the web. These are listed
+    /// market identifiers, never translated labels. They only pad empty slots in personal history.
+    /// Regional rows read BTC, first local stock, NVDA, second local stock, so the local stock is
+    /// still among the three visible chips after one personal ask. Every local symbol must exist
+    /// in the server catalogue (src/lib/regional-stocks.ts); the chip sends a sentence that only
+    /// the catalogue resolves.
+    static func defaultQuickAccess(for resolution: LanguageResolution) -> [String] {
+        switch resolution.language {
+        case .fr: return ["BTC", "MC.PA", "NVDA", "OR.PA"]
+        case .pt:
+            return resolution.localeIdentifier == "pt-BR"
+                ? ["BTC", "PETR4.SA", "NVDA", "VALE3.SA"]
+                : ["BTC", "EDP.LS", "NVDA", "GALP.LS"]
+        case .it: return ["BTC", "ISP.MI", "NVDA", "ENEL.MI"]
+        case .de: return ["BTC", "SAP.DE", "NVDA", "SIE.DE"]
+        case .en: return ["BTC", "NVDA", "ETH", "TSLA", "GOLD"]
+        case .es: return ["BTC", "NVDA", "ETH", "TSLA", "ORO"]
+        }
+    }
+
     var watchlist: [WatchedAsset] {
         guard let data = defaults.data(forKey: key(Key.watchlist)),
               let list = try? JSONDecoder().decode([WatchedAsset].self, from: data) else { return [] }

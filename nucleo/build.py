@@ -11,9 +11,9 @@
 CSP (connect-src 'self'), no mock and no fixtures. app -> public/nucleo/index.html,
 onboarding -> public/nucleo/onboarding.html, plus public/nucleo/voice/select-*.mp3 (the pick
 clips the iOS app bundles). The catalog the web transport needs (roster, levels, gear, quick
-access, risk notice v4) is read from the site's own src/lib/companions/data.ts (the web port of
+access, browser risk notice v6) is read from the site's own src/lib/companions/data.ts (the web port of
 Companion.swift), companions.json (palettes) and nucleo/native/*.json (Companion.swift level
-names in Spanish and RiskNotice v4, snapshots from the iOS branch), and inlined as NUCLEO_WEB.
+names in all six languages, plus web/risk-notice.json browser disclosures), and inlined as NUCLEO_WEB.
 
 For every page P in PAGES with a src/P/template.html:
   src/shared/*.js (sorted; 9*-dev-*.js skipped in --release) -> <!--NUCLEO:SHARED-->
@@ -65,21 +65,9 @@ WEB_PATCHES = [
     ("app/80-render.js", "function render(){", "function render(){\n  if (window.BobbyClientTelemetry && READ && READ.model && READ.telemetry && ['VERDICT','HANDBACK','CARDS','PULLING','SAVING','FOLLOWUPS'].indexOf(ST.name) >= 0){ var reportedRead = READ; window.BobbyClientTelemetry.reportVisible(reportedRead.telemetry, ST.name === 'CARDS' ? '#card1' : '#vWord', function(){ return READ === reportedRead && !!reportedRead.model; }, function(){ return !SHEET; }); }"),
     ("onboarding/99-boot.js", "  renderGhost(); renderTyping();", "  renderGhost(); renderTyping();\n  if (window.BobbyClientTelemetry && W.reply && M && W.reply.telemetry && ['VERDICT','HANDBACK','CARDS','PULLING','SAVING'].indexOf(W.state) >= 0){ var reportedReply = W.reply; window.BobbyClientTelemetry.reportVisible(reportedReply.telemetry, W.state === 'CARDS' ? '#card1' : '#vword', function(){ return W.reply === reportedReply && !!M; }, function(){ return !W.sheetOpen; }); }"),
     # The pre-permission card must not promise an iOS prompt, nor on-device speech, in a browser.
-    ("app/40-strings.js",
-     "'perm.body': 'iOS will ask for the microphone and speech recognition once.',",
-     "'perm.body': 'iOS will ask for the microphone and speech recognition once.', 'perm.bodyWeb': 'Your browser will ask for the microphone once. Its speech service turns your voice into text.',"),
-    ("app/40-strings.js",
-     "'perm.body': 'iOS pedirá el micrófono y el reconocimiento de voz una vez.',",
-     "'perm.body': 'iOS pedirá el micrófono y el reconocimiento de voz una vez.', 'perm.bodyWeb': 'Tu navegador pedirá el micrófono una vez. Su servicio de voz convierte tu voz en texto.',"),
     ("app/60-fsm.js",
      "el.permP.textContent = tt('perm.body');",
      "el.permP.textContent = tt(SES && SES.platform === 'web' ? 'perm.bodyWeb' : 'perm.body');"),
-    ("onboarding/40-strings.js",
-     "'perm.body': 'iOS will ask for the microphone and speech recognition once.',",
-     "'perm.body': 'iOS will ask for the microphone and speech recognition once.',\n    'perm.bodyWeb': 'Your browser will ask for the microphone once. Its speech service turns your voice into text.',"),
-    ("onboarding/40-strings.js",
-     "'perm.body': 'iOS te pedirá una vez el micrófono y el reconocimiento de voz.',",
-     "'perm.body': 'iOS te pedirá una vez el micrófono y el reconocimiento de voz.',\n    'perm.bodyWeb': 'Tu navegador pedirá el micrófono una vez. Su servicio de voz convierte tu voz en texto.',"),
     ("onboarding/60-fsm.js",
      "txt($('permB'), Ls('perm.body'));",
      "txt($('permB'), Ls(SESSION && SESSION.platform === 'web' ? 'perm.bodyWeb' : 'perm.body'));"),
@@ -185,7 +173,7 @@ def build_page(page, release, companions_payload, fixtures_payload):
 
 EXTRACT_JS = r"""
 const m = await import(process.argv[1]);
-const bi = (x) => ({ en: String(x.en), es: String(x.es) });
+const bi = (x) => Object.fromEntries(['en', 'es', 'fr', 'pt', 'it', 'de'].map((l) => { if (typeof x[l] !== 'string') throw new Error('Missing catalog locale ' + l + ': ' + x.en); return [l, x[l]]; }));
 const tools = {};
 for (const [id, list] of Object.entries(m.TOOLS)) tools[id] = list.map((t) => ({ tier: t.tier, unlockXP: m.toolUnlockXP(t.tier), name: bi(t.name) }));
 process.stdout.write(JSON.stringify({
@@ -207,7 +195,7 @@ def web_catalog(companions):
     data = json.loads(r.stdout)
     art = {c["id"]: c for c in companions}
     levels_es = {l["number"]: l for l in json.load(open(os.path.join(WEB_NATIVE, "levels.json")))["levels"]}
-    risk = json.load(open(os.path.join(WEB_NATIVE, "risk-notice.json")))
+    risk = json.load(open(os.path.join(HERE, "web", "risk-notice.json")))
     roster = []
     for c in data["companions"]:
         web_id = "bobby" if c["id"] == "orb" else c["id"]           # NucleoSession.webId
@@ -219,9 +207,14 @@ def web_catalog(companions):
         snap = levels_es.get(l["number"])
         if not snap or snap["en"] != l["name"] or snap["minXP"] != l["minXP"]:
             sys.exit(f"--web: level {l['number']} differs between data.ts and native/levels.json; resync them")
-        levels.append({"number": l["number"], "minXP": l["minXP"], "en": snap["en"], "es": snap["es"]})
-    if len(risk["statements"]["en"]) != 4 or len(risk["statements"]["es"]) != 4:
-        sys.exit("--web: native/risk-notice.json must carry the 4 statements in en and es (R11)")
+        for lang in ["en", "es", "fr", "pt", "it", "de"]:
+            if not isinstance(snap.get(lang), str) or not snap[lang]:
+                sys.exit(f"--web: level {l['number']} missing {lang}")
+        levels.append({"number": l["number"], "minXP": l["minXP"], **{lang: snap[lang] for lang in ["en", "es", "fr", "pt", "it", "de"]}})
+    for lang in ["en", "es", "fr", "pt", "it", "de"]:
+        statements = risk["statements"].get(lang)
+        if not isinstance(statements, list) or len(statements) != 4 or any(not isinstance(item.get(key), str) or not item[key] for item in statements for key in ["title", "body"]):
+            sys.exit(f"--web: native/risk-notice.json must carry 4 complete statements in {lang} (R11)")
     clips = sorted(n[:-4] for n in os.listdir(WEB_VOICE_SRC) if n.startswith("select-") and n.endswith(".mp3")) \
         if os.path.isdir(WEB_VOICE_SRC) else []
     return {

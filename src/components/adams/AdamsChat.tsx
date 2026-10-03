@@ -28,6 +28,12 @@ import { useBobbySession } from '@/hooks/useBobbySession';
 import { sessionFetch, sessionHeaders } from '@/lib/bobby-session';
 import { clearStoredVibe, getStoredVibe, inferUserVibe, saveStoredVibe, shouldClearStoredVibe } from '@/lib/bobby-vibe';
 import { ResponsiveContainer, AreaChart, ComposedChart, Area, Line, XAxis, YAxis, Tooltip, ReferenceLine, CartesianGrid } from 'recharts';
+import { lang as interfaceLanguage, speechLocale, t as ui, type Lang } from '@/lib/companions/i18n';
+import { regionalDefaults } from '@/lib/regional-stocks';
+import { isEquitySymbol } from '@/lib/voice-assets';
+import { deskPrice } from '@/lib/desk-price';
+import { marketContext } from '@/components/nucleo/deskData';
+import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
 import { BOBBY_DB_URL, BOBBY_DB_ANON } from '@/lib/bobby-db-client';
 
 // ---- Supabase ----
@@ -54,7 +60,7 @@ async function fetchDBMessages(wallet: string): Promise<DBMessage[]> {
   } catch { return []; }
 }
 
-async function fetchStockPrices(symbols: string[]): Promise<Array<{ symbol: string; name: string; price: number; change24h: number; dayHigh: number; dayLow: number; volume: number }>> {
+async function fetchStockPrices(symbols: string[]): Promise<Array<{ symbol: string; name: string; price: number; currency?: string; change24h: number; dayHigh: number; dayLow: number; volume: number }>> {
   try {
     const res = await fetch(`/api/stock-price?symbols=${symbols.join(',')}`);
     if (!res.ok) return [];
@@ -78,11 +84,27 @@ async function saveInterestTags(wallet: string, tokens: string[], context: strin
   } catch { /* silent — don't block chat for interest tracking */ }
 }
 
+// Browser recognition is optional and is not exposed by every TypeScript DOM library.
+interface BrowserRecognitionResult { 0: { transcript: string }; isFinal: boolean }
+interface BrowserRecognitionEvent { results: ArrayLike<BrowserRecognitionResult> }
+interface BrowserRecognition {
+  lang: string; interimResults: boolean; continuous: boolean;
+  onresult: ((event: BrowserRecognitionEvent) => void) | null;
+  onend: (() => void) | null; onerror: (() => void) | null;
+  start(): void; stop(): void; abort(): void;
+}
+type BrowserRecognitionConstructor = new () => BrowserRecognition;
+function hasCurrentAIConsent(): boolean {
+  const progress = progressStore.get();
+  return progress.aiConsentGranted && progress.riskNoticeVersion >= RISK_NOTICE_VERSION;
+}
+
 // ---- Chat message types ----
 
 interface PriceCard {
   symbol: string;
   price: number;
+  currency?: string;
   change24h: number;
   high24h: number;
   low24h: number;
@@ -104,6 +126,7 @@ interface ChatMsg {
   polymarket?: PolyData[];
   technicalAnalysis?: {
     symbol: string;
+    currency?: string;
     candles: Array<{ ts: number; o: number; h: number; l: number; c: number; vol: number }>;
     indicators: { sma20: (number | null)[]; sma50: (number | null)[]; rsi14: (number | null)[]; bollingerUpper: (number | null)[]; bollingerLower: (number | null)[] };
     support: number[];
@@ -158,7 +181,7 @@ function Typewriter({ text, speed = 8, onDone }: { text: string; speed?: number;
 
 function timeStr(ts: number | string): string {
   const d = typeof ts === 'string' ? new Date(ts) : new Date(ts);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleTimeString(speechLocale(), { hour: '2-digit', minute: '2-digit' });
 }
 
 function uid(): string {
@@ -166,9 +189,9 @@ function uid(): string {
 }
 
 function fmtPrice(n: number): string {
-  if (n >= 1000) return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (n >= 1) return n.toFixed(4);
-  return n.toFixed(6);
+  if (n >= 1000) return n.toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (n >= 1) return (n).toLocaleString(speechLocale(), { minimumFractionDigits: 4, maximumFractionDigits: 4 });
+  return (n).toLocaleString(speechLocale(), { minimumFractionDigits: 6, maximumFractionDigits: 6 });
 }
 
 // ---- Inline Price Card with Expandable Chart ----
@@ -196,7 +219,7 @@ async function fetchCandles(symbol: string): Promise<CandlePoint[]> {
       candles = (json.candles || []).map((c: { ts: number; close: number }) => ({
         ts: c.ts,
         close: c.close,
-        date: new Date(c.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: new Date(c.ts).toLocaleDateString(speechLocale(), { month: 'short', day: 'numeric' }),
       }));
     } else {
       // Crypto → OKX candles API
@@ -207,7 +230,7 @@ async function fetchCandles(symbol: string): Promise<CandlePoint[]> {
       candles = (json.candles || []).map((c: { ts: number; close: number }) => ({
         ts: c.ts,
         close: c.close,
-        date: new Date(c.ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        date: new Date(c.ts).toLocaleDateString(speechLocale(), { month: 'short', day: 'numeric' }),
       }));
     }
 
@@ -216,7 +239,7 @@ async function fetchCandles(symbol: string): Promise<CandlePoint[]> {
   } catch { return []; }
 }
 
-function MiniChart({ symbol, isUp }: { symbol: string; isUp: boolean }) {
+function MiniChart({ symbol, isUp, currency = 'USD' }: { symbol: string; isUp: boolean; currency?: string }) {
   const [data, setData] = useState<CandlePoint[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -239,8 +262,7 @@ function MiniChart({ symbol, isUp }: { symbol: string; isUp: boolean }) {
   if (data.length < 2) {
     return (
       <div className="h-[120px] flex items-center justify-center text-[10px] text-neutral-600 font-mono">
-        No chart data available
-      </div>
+        {ui("No chart data available", "No hay datos de gráfica disponibles")}</div>
     );
   }
 
@@ -277,7 +299,7 @@ function MiniChart({ symbol, isUp }: { symbol: string; isUp: boolean }) {
               fontFamily: 'monospace',
               color: '#E5E7EB',
             }}
-            formatter={(value: number) => [`$${fmtPrice(value)}`, 'Price']}
+            formatter={(value: number) => [deskPrice(value, currency, speechLocale()), ui('Price', 'Precio')]}
             labelStyle={{ color: '#6B7280', fontSize: 9 }}
           />
           <Area
@@ -314,22 +336,22 @@ function InlinePriceCard({ price, highlighted, labels }: { price: PriceCard; hig
           <span className={`flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded ${isUp ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
             }`}>
             {isUp ? <TrendingUp className="w-2.5 h-2.5" /> : <TrendingDown className="w-2.5 h-2.5" />}
-            {isUp ? '+' : ''}{price.change24h.toFixed(2)}%
+            {isUp ? '+' : ''}{(price.change24h).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[15px] font-bold text-white">${fmtPrice(price.price)}</span>
+          <span className="text-[15px] font-bold text-white">{deskPrice(price.price, price.currency ?? 'USD', speechLocale())}</span>
           <span className={`text-[9px] transition-transform duration-200 ${expanded ? 'rotate-180' : ''} text-neutral-600`}>▼</span>
         </div>
       </div>
       <div className="grid grid-cols-3 gap-2 text-neutral-500">
         <div>
           <div className="text-[9px] text-neutral-600 uppercase">{lb.high}</div>
-          <div className="text-neutral-400">${fmtPrice(price.high24h)}</div>
+          <div className="text-neutral-400">{deskPrice(price.high24h, price.currency ?? 'USD', speechLocale())}</div>
         </div>
         <div>
           <div className="text-[9px] text-neutral-600 uppercase">{lb.low}</div>
-          <div className="text-neutral-400">${fmtPrice(price.low24h)}</div>
+          <div className="text-neutral-400">{deskPrice(price.low24h, price.currency ?? 'USD', speechLocale())}</div>
         </div>
         <div>
           <div className="text-[9px] text-neutral-600 uppercase">{lb.volume}</div>
@@ -340,18 +362,18 @@ function InlinePriceCard({ price, highlighted, labels }: { price: PriceCard; hig
         <div className="mt-2 pt-2 border-t border-neutral-800 flex items-center gap-3">
           <span className="text-neutral-600">{lb.funding}:</span>
           <span className={price.funding.rate > 0 ? 'text-green-400' : 'text-red-400'}>
-            {(price.funding.rate * 100).toFixed(4)}%
+            {((price.funding.rate * 100)).toLocaleString(speechLocale(), { minimumFractionDigits: 4, maximumFractionDigits: 4 })}%
           </span>
-          <span className="text-neutral-600">({price.funding.annualized.toFixed(1)}% APR)</span>
+          <span className="text-neutral-600">({(price.funding.annualized).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}% {ui('APR', 'TAE')})</span>
         </div>
       )}
       {/* Expandable 7-day chart */}
       {expanded && (
         <div className="mt-3 pt-3 border-t border-neutral-800/50">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[9px] text-neutral-600 uppercase tracking-wider">7D Price</span>
+            <span className="text-[9px] text-neutral-600 uppercase tracking-wider">{ui("7D Price", "Precio de 7 días")}</span>
           </div>
-          <MiniChart symbol={price.symbol} isUp={isUp} />
+          <MiniChart symbol={price.symbol} isUp={isUp} currency={price.currency} />
         </div>
       )}
     </div>
@@ -427,7 +449,7 @@ function DebateText({ text }: { text: string }) {
             <div className="whitespace-pre-line">{part.content}</div>
             {conviction !== null && (
               <div className="mt-2 flex items-center gap-2">
-                <span className="text-[9px] font-mono text-yellow-400/70">CONVICTION</span>
+                <span className="text-[9px] font-mono text-yellow-400/70">{ui("CONVICTION", "CONVICCIÓN")}</span>
                 <div className="flex-1 h-1.5 bg-white/[0.05] rounded-full overflow-hidden max-w-[150px]">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${conviction >= 0.7 ? 'bg-green-500' : conviction >= 0.4 ? 'bg-yellow-500' : 'bg-red-500'
@@ -437,7 +459,7 @@ function DebateText({ text }: { text: string }) {
                 </div>
                 <span className={`text-[10px] font-mono font-bold ${conviction >= 0.7 ? 'text-green-400' : conviction >= 0.4 ? 'text-yellow-400' : 'text-red-400'
                   }`}>
-                  {(conviction * 10).toFixed(0)}/10
+                  {((conviction * 10)).toLocaleString(speechLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/10
                 </span>
               </div>
             )}
@@ -446,6 +468,16 @@ function DebateText({ text }: { text: string }) {
       })}
     </div>
   );
+}
+
+function technicalPrice(value: number, symbol: string, currency?: string): string {
+  if (currency && /^[A-Z]{3}$/.test(currency)) return deskPrice(value, currency, speechLocale());
+  // Unknown equity currency is left unspecified until the provider supplies it.
+  if (isEquitySymbol(symbol)) return value.toLocaleString(speechLocale(), { maximumFractionDigits: 2 });
+  return deskPrice(value, 'USD', speechLocale());
+}
+function marketMoodLabel(value: string): string {
+  return ({ 'extreme fear': ui('Extreme fear', 'Miedo extremo'), fear: ui('Fear', 'Miedo'), neutral: ui('Neutral', 'Neutral'), greed: ui('Greed', 'Codicia'), 'extreme greed': ui('Extreme greed', 'Codicia extrema') })[value.toLowerCase()] ?? ui('Unavailable', 'No disponible');
 }
 
 // ---- Technical Analysis Chart ----
@@ -461,7 +493,7 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
   // For now, show candles + SMA + S/R levels
 
   const chartData = candles.map((c, i) => ({
-    time: new Date(c.ts).toLocaleDateString('en', { month: 'short', day: 'numeric', hour: '2-digit' }),
+    time: new Date(c.ts).toLocaleDateString(speechLocale(), { month: 'short', day: 'numeric', hour: '2-digit' }),
     price: c.c,
     high: c.h,
     low: c.l,
@@ -477,6 +509,8 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
   const maxPrice = Math.max(...allPrices) * 1.002;
   const isUp = prices[prices.length - 1] >= prices[0];
   const trend = summary?.trend as string || 'NEUTRAL';
+  const currency = data.currency ?? (typeof summary?.currency === 'string' ? summary.currency : undefined);
+  const displayPrice = (value: number) => technicalPrice(value, data.symbol, currency);
 
   return (
     <motion.div
@@ -491,15 +525,15 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
           <span className="text-[12px] font-mono font-bold text-white/70">{data.symbol}</span>
           <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded ${trend === 'BULLISH' ? 'bg-green-500/10 text-green-400' : trend === 'BEARISH' ? 'bg-red-500/10 text-red-400' : 'bg-white/5 text-white/30'
             }`}>
-            {trend}
+            {({ BULLISH: ui('bullish', 'alcista'), BEARISH: ui('bearish', 'bajista'), NEUTRAL: ui('Neutral', 'Neutral') })[trend] ?? ui('Unavailable', 'No disponible')}
           </span>
           {rsiValue !== undefined && (
             <span className={`text-[9px] font-mono ${rsiValue > 70 ? 'text-red-400' : rsiValue < 30 ? 'text-green-400' : 'text-white/30'}`}>
-              RSI {rsiValue.toFixed(0)}
+              RSI {(rsiValue).toLocaleString(speechLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
             </span>
           )}
           {summary?.bollinger_squeeze && (
-            <span className="text-[8px] font-mono px-1 py-0.5 bg-amber-500/10 text-amber-400 rounded animate-pulse">SQUEEZE</span>
+            <span className="text-[8px] font-mono px-1 py-0.5 bg-amber-500/10 text-amber-400 rounded animate-pulse">{ui("SQUEEZE", "COMPRESIÓN")}</span>
           )}
         </div>
         <div className="flex items-center gap-3 text-[8px] font-mono text-white/20">
@@ -514,11 +548,11 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
           <ComposedChart data={chartData} margin={{ top: 5, right: 5, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" />
             <XAxis dataKey="time" tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.15)' }} tickLine={false} axisLine={false} interval={Math.floor(chartData.length / 6)} />
-            <YAxis domain={[minPrice, maxPrice]} tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.15)' }} tickLine={false} axisLine={false} width={55} tickFormatter={v => `$${v.toLocaleString()}`} />
+            <YAxis domain={[minPrice, maxPrice]} tick={{ fontSize: 8, fill: 'rgba(255,255,255,0.15)' }} tickLine={false} axisLine={false} width={55} tickFormatter={v => displayPrice(v)} />
             <Tooltip
               contentStyle={{ background: '#111', border: '1px solid rgba(255,255,255,0.1)', fontSize: 10, fontFamily: 'monospace' }}
               labelStyle={{ color: 'rgba(255,255,255,0.4)' }}
-              formatter={(value: number, name: string) => [`$${value?.toLocaleString()}`, name]}
+              formatter={(value: number, name: string) => [displayPrice(value), name === 'price' ? ui('Price', 'Precio') : name === 'bbUpper' ? ui('Upper Bollinger band', 'Banda superior de Bollinger') : name === 'bbLower' ? ui('Lower Bollinger band', 'Banda inferior de Bollinger') : name]}
             />
 
             {/* Bollinger Bands (shaded area) */}
@@ -537,12 +571,12 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
 
             {/* Support levels */}
             {support.map((level, i) => (
-              <ReferenceLine key={`s${i}`} y={level} stroke="#22c55e" strokeDasharray="6 3" strokeWidth={0.8} label={{ value: `S $${level.toLocaleString()}`, position: 'left', fontSize: 8, fill: '#22c55e80' }} />
+              <ReferenceLine key={`s${i}`} y={level} stroke="#22c55e" strokeDasharray="6 3" strokeWidth={0.8} label={{ value: `S ${displayPrice(level)}`, position: 'left', fontSize: 8, fill: '#22c55e80' }} />
             ))}
 
             {/* Resistance levels */}
             {resistance.map((level, i) => (
-              <ReferenceLine key={`r${i}`} y={level} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={0.8} label={{ value: `R $${level.toLocaleString()}`, position: 'right', fontSize: 8, fill: '#ef444480' }} />
+              <ReferenceLine key={`r${i}`} y={level} stroke="#ef4444" strokeDasharray="6 3" strokeWidth={0.8} label={{ value: `R ${displayPrice(level)}`, position: 'right', fontSize: 8, fill: '#ef444480' }} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>
@@ -551,10 +585,10 @@ function TechnicalChart({ data }: { data: ChatMsg['technicalAnalysis'] }) {
       {/* Support/Resistance summary */}
       <div className="flex items-center justify-between mt-2 text-[8px] font-mono text-white/20">
         <div className="flex items-center gap-2">
-          {support.length > 0 && <span className="text-green-400/40">Support: {support.map(s => `$${s.toLocaleString()}`).join(', ')}</span>}
+          {support.length > 0 && <span className="text-green-400/40">{ui("Support:", "Soporte:")}{support.map(s => displayPrice(s)).join(', ')}</span>}
         </div>
         <div className="flex items-center gap-2">
-          {resistance.length > 0 && <span className="text-red-400/40">Resistance: {resistance.map(r => `$${r.toLocaleString()}`).join(', ')}</span>}
+          {resistance.length > 0 && <span className="text-red-400/40">{ui("Resistance:", "Resistencia:")}{resistance.map(r => displayPrice(r)).join(', ')}</span>}
         </div>
       </div>
     </motion.div>
@@ -657,8 +691,8 @@ function QuickActions({ onAction, disabled }: { onAction: (text: string) => void
   const actions = [
     { label: 'BTC', icon: '₿' },
     { label: 'ETH', icon: 'Ξ' },
-    { label: 'All Prices', icon: '$' },
-    { label: 'Analyze Market', icon: '>' },
+    { label: ui('All Prices', "Todos los precios"), icon: '$' },
+    { label: ui('Analyze Market', "Analizar mercado"), icon: '>' },
   ];
   return (
     <div className="flex gap-2 flex-wrap">
@@ -740,9 +774,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   }, []);
 
   // Language must be declared early — used by voice, i18n, and intent detection
-  // Detect from profile, localStorage, or browser language
-  const [detectedLang, setDetectedLang] = useState<string | null>(null);
-  const lang = detectedLang || profile?.language || localStorage.getItem('bobby_lang') || (navigator.language.startsWith('es') ? 'es' : 'en');
+  // The shared preference remains authoritative when a question uses another language.
+  const lang: Lang = interfaceLanguage();
   const advisorName = profile?.advisorName || localStorage.getItem('bobby_agent_name') || 'Bobby';
 
   // ---- Bobby's Voice ----
@@ -1003,7 +1036,24 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
   // ---- Speech Recognition (user talks back to Bobby) ----
   const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<BrowserRecognition | null>(null);
+  const mountedRef = useRef(true);
+  const aiRequestControllers = useRef(new Set<AbortController>());
+  const speechSendTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const canProcessAI = () => mountedRef.current && hasCurrentAIConsent();
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      recognitionRef.current?.abort();
+      recognitionRef.current = null;
+      if (speechSendTimerRef.current) clearTimeout(speechSendTimerRef.current);
+      aiRequestControllers.current.forEach(controller => controller.abort());
+      aiRequestControllers.current.clear();
+      phaseTimerRef.current.forEach(clearTimeout);
+      stopVoice();
+    };
+  }, [stopVoice]);
   const sendMessageRef = useRef<(text?: string) => void>(() => { });
 
   const toggleListening = useCallback(() => {
@@ -1013,16 +1063,19 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       return;
     }
 
-    const SpeechRecognitionAPI = window.SpeechRecognition || (window as typeof window & { webkitSpeechRecognition: typeof window.SpeechRecognition }).webkitSpeechRecognition;
+    if (!canProcessAI()) return;
+    const speechWindow = window as typeof window & { SpeechRecognition?: BrowserRecognitionConstructor; webkitSpeechRecognition?: BrowserRecognitionConstructor };
+    const SpeechRecognitionAPI = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
     if (!SpeechRecognitionAPI) return;
 
     const recognition = new SpeechRecognitionAPI();
-    recognition.lang = lang === 'es' ? 'es-MX' : lang === 'pt' ? 'pt-BR' : 'en-US';
+    recognition.lang = speechLocale();
     recognition.interimResults = true;
     recognition.continuous = false;
     recognitionRef.current = recognition;
 
-    recognition.onresult = (event: SpeechRecognitionEvent) => {
+    recognition.onresult = (event: BrowserRecognitionEvent) => {
+      if (!canProcessAI()) return;
       const transcript = Array.from(event.results)
         .map(r => r[0].transcript)
         .join('');
@@ -1031,7 +1084,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       // Auto-send on final result
       if (event.results[event.results.length - 1].isFinal) {
         setIsListening(false);
-        setTimeout(() => sendMessageRef.current(transcript), 300);
+        speechSendTimerRef.current = setTimeout(() => { if (canProcessAI()) sendMessageRef.current(transcript); }, 300);
       }
     };
 
@@ -1040,19 +1093,19 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
     recognition.start();
     setIsListening(true);
-  }, [isListening]);
+  }, [isListening, lang]);
 
   // ---- i18n strings keyed by language ----
   const i18n = {
     intro: {
-      es: `Soy Bobby, tu CIO. Tres agentes debaten cada decisión antes de que yo hable: Alpha Hunter busca la oportunidad, Red Team intenta destruirla, y yo decido. 15 fuentes de datos — whale flows, funding, Polymarket, Fear & Greed, DXY, stocks, y más.\n\nDame un ticker, un vibe macro, o pide un debate.`,
-      en: `I'm Bobby, your CIO. Three agents debate every decision before I speak: Alpha Hunter finds the opportunity, Red Team tries to destroy it, and I decide. 15 data sources — whale flows, funding, Polymarket, Fear & Greed, DXY, stocks, and more.\n\nGive me a ticker, a macro vibe, or ask for a debate.`,
-      pt: `Sou Bobby, seu CIO. Tenho minha Alpha Hunter buscando oportunidades e meu Red Team destruindo cada tese fraca. 9 fontes de dados em tempo real — whale flows, funding rates, Fear & Greed, DXY, e mais. Quando falo, é porque sobrevivi meu próprio debate interno.\n\nO que quer que eu analise?`,
+      es: 'Soy Bobby. Alpha Hunter plantea la tesis, Red Team la cuestiona y el CIO sopesa la evidencia. Pregunta por un activo o por el mercado. Este análisis es educativo; tú revisas cualquier acción propuesta.',
+      en: ui("I'm Bobby. Alpha Hunter builds the case, Red Team challenges it, and the CIO weighs the evidence. Ask about an asset or a market question. This is educational analysis; you review any proposed action.", "Soy Bobby. Alpha Hunter plantea la tesis, Red Team la cuestiona y el CIO sopesa la evidencia. Pregunta por un activo o por el mercado. Este análisis es educativo; tú revisas cualquier acción propuesta."),
+      pt: 'Sou Bobby. Alpha Hunter apresenta a tese, Red Team questiona-a e o CIO pondera as evidências. Pergunte por um ativo ou pelo mercado. Esta análise é educativa; revê qualquer ação proposta.',
     },
     introShort: {
-      es: `Soy Bobby. 3 agentes + 15 fuentes de datos. Dame un ticker o un vibe.`,
-      en: `I'm Bobby. 3 agents + 15 data sources. Give me a ticker or a vibe.`,
-      pt: `Sou Bobby, seu CIO. Alpha Hunter + Red Team + 9 fontes de dados. Pergunte o que quiser.`,
+      es: 'Soy Bobby. Pregunta por un activo o plantea una tesis de mercado.',
+      en: ui("I'm Bobby. Ask about an asset or share a market thesis.", "Soy Bobby. Pregunta por un activo o plantea una tesis de mercado."),
+      pt: 'Sou Bobby. Pergunte por um ativo ou apresente uma tese de mercado.',
     },
     analyzeFillers: {
       es: [
@@ -1061,9 +1114,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         "Iniciando escaneo soberano. Señales de ballenas, consenso de Polymarket, conviction scoring. El trabajo real empieza ahora.",
       ],
       en: [
-        "Full scan. Deploying Alpha Hunter, Red Team, and running the dialectic. This takes a minute — I don't rush decisions.",
-        "Running the complete intelligence cycle. Three agents debating your money. Give me a moment.",
-        "Initiating sovereign scan. Whale signals, Polymarket consensus, conviction scoring. The real work starts now.",
+        ui("Full scan. Deploying Alpha Hunter, Red Team, and running the dialectic. This takes a minute — I don't rush decisions.", "Escaneo completo. Iniciando Alpha Hunter, Red Team y el debate. Toma un momento; no apresuro las decisiones."),
+        ui("Running the complete intelligence cycle. Three agents debating your money. Give me a moment.", "Iniciando el ciclo completo de inteligencia. Tres agentes debaten la tesis. Dame un momento."),
+        ui("Initiating sovereign scan. Whale signals, Polymarket consensus, conviction scoring. The real work starts now.", "Iniciando el escaneo. Señales de grandes actores, consenso de Polymarket y convicción. Empieza el análisis."),
       ],
       pt: [
         "Escaneamento completo. Implantando Alpha Hunter, Red Team, e rodando a dialética. Isso leva um minuto — não apresso decisões.",
@@ -1082,13 +1135,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         "Checando las señales de los whales... esto se pone bueno...",
       ],
       en: [
-        "The tape is moving fast, let me cross-reference the flows...",
-        "Give me a second, I'm scanning the whale activity...",
-        "Let me check what the smart money is doing...",
-        "Interesting question. Let me pull the real data before I answer...",
-        "Hold on, I want to see what's actually happening on-chain...",
-        "One sec, analyzing the capital flows...",
-        "Checking the whale signals... this is getting interesting...",
+        ui("The tape is moving fast, let me cross-reference the flows...", "El mercado se mueve rápido; contrastaré los flujos…"),
+        ui("Give me a second, I'm scanning the whale activity...", "Un momento; reviso la actividad de grandes actores…"),
+        ui("Let me check what the smart money is doing...", "Revisaré qué hace el capital profesional…"),
+        ui("Interesting question. Let me pull the real data before I answer...", "Pregunta interesante. Revisaré los datos reales antes de responder…"),
+        ui("Hold on, I want to see what's actually happening on-chain...", "Un momento; revisaré qué ocurre en la cadena…"),
+        ui("One sec, analyzing the capital flows...", "Un momento; analizando flujos de capital…"),
+        ui("Checking the whale signals... this is getting interesting...", "Revisando señales de grandes actores…"),
       ],
       pt: [
         "O mercado se move rápido, deixa eu cruzar os fluxos...",
@@ -1114,18 +1167,18 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         { text: 'Casi listo...', delay: 90000 },
       ],
       en: [
-        { text: 'Loading live market context...', delay: 0 },
-        { text: 'Scanning whale signals across ETH, SOL, Base...', delay: 1200 },
-        { text: 'Filtering signals (score > 20)...', delay: 3000 },
-        { text: 'Fetching Polymarket leaderboard (top 15)...', delay: 5000 },
-        { text: 'Self-optimizing Alpha prompt...', delay: 7500 },
-        { text: 'Alpha Hunter analyzing...', delay: 10000 },
-        { text: 'Red Team stress-testing...', delay: 15000 },
-        { text: 'Judge making final verdict...', delay: 20000 },
-        { text: 'Kelly Criterion sizing...', delay: 25000 },
-        { text: 'Generating report...', delay: 28000 },
-        { text: 'Still working (agent runs can take up to 2 min)...', delay: 60000 },
-        { text: 'Almost done...', delay: 90000 },
+        { text: ui('Loading live market context...', "Cargando contexto de mercado en vivo…"), delay: 0 },
+        { text: ui('Scanning whale signals across ETH, SOL, Base...', "Revisando señales de grandes actores en ETH, SOL y Base…"), delay: 1200 },
+        { text: ui('Filtering signals (score > 20)...', "Filtrando señales (puntuación > 20)…"), delay: 3000 },
+        { text: ui('Fetching Polymarket leaderboard (top 15)...', "Obteniendo clasificación de Polymarket (15 primeros)…"), delay: 5000 },
+        { text: ui('Self-optimizing Alpha prompt...', "Ajustando instrucciones de Alpha…"), delay: 7500 },
+        { text: ui('Alpha Hunter analyzing...', "Alpha Hunter analiza…"), delay: 10000 },
+        { text: ui('Red Team stress-testing...', "Red Team contrasta la tesis…"), delay: 15000 },
+        { text: ui('Judge making final verdict...', "El juez sopesa el veredicto final…"), delay: 20000 },
+        { text: ui('Kelly Criterion sizing...', "Calculando tamaño con el criterio de Kelly…"), delay: 25000 },
+        { text: ui('Generating report...', "Generando reporte…"), delay: 28000 },
+        { text: ui('Still working (agent runs can take up to 2 min)...', "Sigo trabajando (puede tomar hasta 2 min)…"), delay: 60000 },
+        { text: ui('Almost done...', "Casi listo…"), delay: 90000 },
       ],
       pt: [
         { text: 'Carregando contexto de mercado ao vivo...', delay: 0 },
@@ -1146,124 +1199,125 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       es: (sym: string, price: string, up: boolean, change: string) =>
         `${sym} está en $${price} — ${up ? 'subió' : 'bajó'} ${change}% en las últimas 24 horas.`,
       en: (sym: string, price: string, up: boolean, change: string) =>
-        `${sym} is at $${price} — ${up ? 'up' : 'down'} ${change}% in the last 24h.`,
+        ui(`${sym} is at $${price} — ${up ? ui('up', 'subió') : ui('down', 'bajó')} ${change}% in the last 24h.`, `${sym} está en $${price} — ${up ? ui('up', 'subió') : ui('down', 'bajó')} ${change}% en las últimas 24 h.`),
       pt: (sym: string, price: string, up: boolean, change: string) =>
         `${sym} está em $${price} — ${up ? 'subiu' : 'caiu'} ${change}% nas últimas 24h.`,
     },
     priceMulti: {
       es: (names: string) => `Aquí tienes lo último de ${names}:`,
-      en: (names: string) => `Here's the latest on ${names}:`,
+      en: (names: string) => ui(`Here's the latest on ${names}:`, `Lo más reciente de ${names}:`),
       pt: (names: string) => `Aqui está o mais recente de ${names}:`,
     },
     priceError: {
-      es: (err: string) => `No pude obtener precios ahorita: ${err}. Intenta de nuevo en un momento.`,
-      en: (err: string) => `Couldn't fetch prices right now: ${err}. Try again in a moment.`,
-      pt: (err: string) => `Não consegui obter preços agora: ${err}. Tente de novo em um momento.`,
+      es: (err: string) => 'No pude obtener precios ahora. Intenta de nuevo en un momento.',
+      en: (err: string) => ui('Could not fetch prices right now. Try again in a moment.', "No pude obtener precios ahora. Intenta de nuevo en un momento."),
+      pt: (err: string) => 'Não consegui obter preços agora. Tente de novo em um momento.',
     },
     scanSummary: {
       es: (time: string, found: number, filtered: number, trades: number, usd: string | null) =>
         [`Escaneo completo en ${time}s`, `${found} señales encontradas, ${filtered} pasaron filtros`, `${trades} trades recomendados`, usd ? `$${usd} posición total` : null].filter(Boolean).join('\n'),
       en: (time: string, found: number, filtered: number, trades: number, usd: string | null) =>
-        [`Scan complete in ${time}s`, `${found} signals found, ${filtered} passed filters`, `${trades} trades recommended`, usd ? `$${usd} total position` : null].filter(Boolean).join('\n'),
+        [ui(`Scan complete in ${time}s`, `Escaneo completo en ${time} s`), ui(`${found} signals found, ${filtered} passed filters`, `${found} señales encontradas, ${filtered} pasaron filtros`), ui(`${trades} trades recommended`, `${trades} operaciones propuestas`), usd ? ui(`$${usd} total position`, `$${usd} de posición total`) : null].filter(Boolean).join('\n'),
       pt: (time: string, found: number, filtered: number, trades: number, usd: string | null) =>
         [`Escaneamento completo em ${time}s`, `${found} sinais encontrados, ${filtered} passaram filtros`, `${trades} trades recomendados`, usd ? `$${usd} posição total` : null].filter(Boolean).join('\n'),
     },
     noTrades: {
       es: (reason: string) => `Análisis completo, pero no recomiendo trades. ${reason}`,
-      en: (reason: string) => `Analysis complete but no trades recommended. ${reason}`,
+      en: (reason: string) => ui(`Analysis complete but no trades recommended. ${reason}`, `Análisis completo, sin operaciones propuestas. ${reason}`),
       pt: (reason: string) => `Análise completa, mas não recomendo trades. ${reason}`,
     },
     timeout: {
       es: 'El análisis tardó demasiado (>2 min). El ciclo puede seguir corriendo en segundo plano. Intenta "Analyze Market" de nuevo en unos minutos.',
-      en: 'Analysis timed out (>2 min). The agent cycle may still be running in the background. Try "Analyze Market" again in a few minutes.',
+      en: ui('Analysis timed out (>2 min). The agent cycle may still be running in the background. Try "Analyze Market" again in a few minutes.', "El análisis agotó el tiempo (>2 min). El ciclo puede seguir en segundo plano. Prueba «Analizar mercado» en unos minutos."),
       pt: 'A análise demorou demais (>2 min). O ciclo pode estar rodando em segundo plano. Tente "Analyze Market" de novo em alguns minutos.',
     },
     analysisError: {
-      es: (err: string) => `Error en el análisis: ${err}. Suele ser temporal — intenta de nuevo.`,
-      en: (err: string) => `Analysis error: ${err}. This is usually temporary — try again.`,
-      pt: (err: string) => `Erro na análise: ${err}. Geralmente é temporário — tente de novo.`,
+      es: (err: string) => 'El análisis no está disponible temporalmente. Intenta de nuevo.',
+      en: (err: string) => ui('Analysis is temporarily unavailable. Try again.', "El análisis no está disponible temporalmente. Intenta de nuevo."),
+      pt: (err: string) => 'A análise está temporariamente indisponível. Tente de novo.',
     },
     noData: {
       es: (msg: string) => `No tengo datos sobre "${msg}". Prueba con "BTC", "ETH", o "Analyze Market".`,
-      en: (msg: string) => `I don't have data on "${msg}". Try "BTC", "ETH", or "Analyze Market".`,
+      en: (msg: string) => ui(`I don't have data on "${msg}". Try "BTC", "ETH", or "Analyze Market".`, `No tengo datos sobre «${msg}». Prueba «BTC», «ETH» o «Analizar mercado».`),
       pt: (msg: string) => `Não tenho dados sobre "${msg}". Tente "BTC", "ETH", ou "Analyze Market".`,
     },
     fallbackWithPrices: {
       es: 'Aquí tienes los datos más recientes. Para un análisis completo, prueba "Analyze Market" — ahí despliego el debate multi-agente completo.',
-      en: 'Here\'s the latest data. For a full Bobby analysis, try "Analyze Market" — that\'s where I deploy the full multi-agent debate.',
+      en: ui('Here\'s the latest data. For a full Bobby analysis, try "Analyze Market" — that\'s where I deploy the full multi-agent debate.', "Estos son los datos recientes. Para el debate completo, prueba «Analizar mercado»."),
       pt: 'Aqui estão os dados mais recentes. Para uma análise completa, tente "Analyze Market" — é onde eu faço o debate multi-agente completo.',
     },
     fallbackNoPrices: {
       es: 'Te puedo ayudar con precios y análisis de mercado. Prueba:\n\n"BTC" o "ETH" — Precio en vivo\n"All Prices" — Panorama del mercado\n"Analyze Market" — Escaneo completo',
-      en: 'I can help with prices and market analysis. Try:\n\n"BTC" or "ETH" — Live price\n"All Prices" — Market overview\n"Analyze Market" — Full agent scan',
+      en: ui('I can help with prices and market analysis. Try:\n\n"BTC" or "ETH" — Live price\n"All Prices" — Market overview\n"Analyze Market" — Full agent scan', "Puedo ayudarte con precios y análisis de mercado. Prueba:\n\n«BTC» o «ETH» — Precio en vivo\n«Todos los precios» — Panorama del mercado\n«Analizar mercado» — Análisis completo"),
       pt: 'Posso ajudar com preços e análise de mercado. Tente:\n\n"BTC" ou "ETH" — Preço ao vivo\n"All Prices" — Visão do mercado\n"Analyze Market" — Escaneamento completo',
     },
     walletConnected: {
-      es: (addr: string) => `Wallet conectada: ${addr}\n\nPortfolio tracking próximamente en v2. Por ahora, corre "Analyze Market" — escaneo señales y recomiendo trades con Kelly Criterion para tu perfil de riesgo.`,
-      en: (addr: string) => `Wallet connected: ${addr}\n\nPortfolio tracking coming in v2. For now, run "Analyze Market" — I'll scan signals and recommend trades sized with Kelly Criterion for your risk profile.`,
-      pt: (addr: string) => `Wallet conectada: ${addr}\n\nPortfolio tracking em breve na v2. Por agora, rode "Analyze Market" — escaneio sinais e recomendo trades com Kelly Criterion para seu perfil de risco.`,
+      es: (addr: string) => `Wallet conectada: ${addr}\n\nConsulta «Portfolio» para revisar tus recibos confirmados en Base. Revisa cualquier propuesta antes de firmar.`,
+      en: (addr: string) => ui(`Wallet connected: ${addr}\n\nAsk for Portfolio to review your confirmed Base receipts. Review any proposal before signing.`, `Wallet conectada: ${addr}\n\nConsulta «Portfolio» para revisar tus recibos confirmados en Base. Revisa cualquier propuesta antes de firmar.`),
     },
     help: {
       es: 'Esto es lo que puedo hacer:\n\n"BTC" o "ETH" — Precio en vivo + funding rate\n"All Prices" — Panorama del mercado\n"What\'s trending?" — Mayores movimientos\n"Analyze Market" — Contexto público + mercados de predicción (debate multi-agente + Kelly sizing)\n"Portfolio" — Revisar wallet conectada\n\nO escribe cualquier token — SOL, MATIC, PEPE...',
-      en: 'Here\'s what I can do:\n\n"BTC" or "ETH" — Live price + funding rate\n"All Prices" — Full market overview\n"What\'s trending?" — Biggest movers\n"Analyze Market" — Public market + prediction-market context (multi-agent debate + Kelly sizing)\n"Portfolio" — Check connected wallet\n\nOr just type any token name — SOL, MATIC, PEPE...',
+      en: ui('Here\'s what I can do:\n\n"BTC" or "ETH" — Live price + funding rate\n"All Prices" — Full market overview\n"What\'s trending?" — Biggest movers\n"Analyze Market" — Public market + prediction-market context (multi-agent debate + Kelly sizing)\n"Portfolio" — Check connected wallet\n\nOr just type any token name — SOL, MATIC, PEPE...', "Puedo ayudarte con:\n\n«BTC» o «ETH» — Precio en vivo y tasa de financiación\n«Todos los precios» — Panorama del mercado\n«¿Qué está en tendencia?» — Mayores movimientos\n«Analizar mercado» — Contexto público y mercados de predicción\n«Portfolio» — Revisar wallet conectada\n\nTambién puedes escribir un token: SOL, MATIC, PEPE…"),
       pt: 'Aqui está o que posso fazer:\n\n"BTC" ou "ETH" — Preço ao vivo + funding rate\n"All Prices" — Visão do mercado\n"What\'s trending?" — Maiores movimentos\n"Analyze Market" — Contexto público + mercados de previsão (debate multi-agente + Kelly sizing)\n"Portfolio" — Verificar wallet conectada\n\nOu digite qualquer token — SOL, MATIC, PEPE...',
     },
     marketOverview: {
       es: (sym: string, change: string) => `Panorama del mercado — ${sym} liderando con ${change}%:`,
-      en: (sym: string, change: string) => `Market overview — ${sym} leading with ${change}%:`,
+      en: (sym: string, change: string) => ui(`Market overview — ${sym} leading with ${change}%:`, `Panorama del mercado: ${sym} lidera con ${change}%:`),
       pt: (sym: string, change: string) => `Panorama do mercado — ${sym} liderando com ${change}%:`,
     },
     marketError: {
       es: 'No pude obtener datos del mercado. La fuente pública puede estar temporalmente fuera de servicio.',
-      en: 'Failed to fetch market data. The public feed might be temporarily unavailable.',
+      en: ui('Failed to fetch market data. The public feed might be temporarily unavailable.', "No pude cargar datos del mercado. La fuente pública puede estar temporalmente fuera de servicio."),
       pt: 'Não consegui obter dados do mercado. A fonte pública pode estar temporariamente indisponível.',
     },
     trending: {
       es: (movers: string) => `Mayores movimientos ahorita: ${movers}\n\nPara posiciones de smart money y señales de ballenas, corre "Analyze Market".`,
-      en: (movers: string) => `Biggest movers right now: ${movers}\n\nFor smart money positions and whale signals, run "Analyze Market".`,
+      en: (movers: string) => ui(`Biggest movers right now: ${movers}\n\nFor smart money positions and whale signals, run "Analyze Market".`, `Mayores movimientos: ${movers}
+
+Para señales de grandes actores, prueba «Analizar mercado».`),
       pt: (movers: string) => `Maiores movimentos agora: ${movers}\n\nPara posições de smart money e sinais de baleias, rode "Analyze Market".`,
     },
     trendingError: {
       es: 'No pude obtener datos de tendencia. Intenta de nuevo en un momento.',
-      en: 'Failed to fetch trending data. Try again in a moment.',
+      en: ui('Failed to fetch trending data. Try again in a moment.', "No pude cargar las tendencias. Intenta de nuevo en un momento."),
       pt: 'Não consegui obter dados de tendência. Tente de novo em um momento.',
     },
     connectWallet: {
       es: 'Conecta tu wallet primero — usa el botón "Connect" arriba a la derecha. Una vez conectada, puedo mostrar tus posiciones on-chain.',
-      en: 'Connect your wallet first — use the "Connect" button in the top right. Once connected, I can show your on-chain positions.',
+      en: ui('Connect your wallet first — use the "Connect" button in the top right. Once connected, I can show your on-chain positions.', "Conecta tu wallet con el botón «Conectar» de arriba a la derecha. Después podré mostrar tus posiciones en la cadena."),
       pt: 'Conecte sua wallet primeiro — use o botão "Connect" no canto superior direito. Uma vez conectada, posso mostrar suas posições on-chain.',
     },
     streamFallback: {
       es: (msg: string) => `Entendí "${msg}" pero no pude generar respuesta. Prueba con precios ("BTC", "ETH") o corre "Analyze Market".`,
-      en: (msg: string) => `I understood "${msg}" but couldn't generate a response. Try asking about prices ("BTC", "ETH") or run "Analyze Market".`,
+      en: (msg: string) => ui(`I understood "${msg}" but couldn't generate a response. Try asking about prices ("BTC", "ETH") or run "Analyze Market".`, `Entendí «${msg}», pero no pude generar respuesta. Pregunta por precios («BTC», «ETH») o prueba «Analizar mercado».`),
       pt: (msg: string) => `Entendi "${msg}" mas não consegui gerar resposta. Tente preços ("BTC", "ETH") ou rode "Analyze Market".`,
     },
     thinkingLabel: {
       es: 'Escaneando feeds de inteligencia...',
-      en: 'Scanning intelligence feeds...',
+      en: ui('Scanning intelligence feeds...', "Revisando fuentes de inteligencia…"),
       pt: 'Escaneando feeds de inteligência...',
     },
     listening: {
       es: 'Escuchando...',
-      en: 'Listening...',
+      en: ui('Listening...', "Escuchando…"),
       pt: 'Ouvindo...',
     },
     quickActions: {
       es: { gold: 'Oro', silver: 'Plata', allPrices: 'Todos', analyze: 'Analizar Mercado' },
-      en: { gold: 'Gold', silver: 'Silver', allPrices: 'All Prices', analyze: 'Analyze Market' },
+      en: { gold: ui('Gold', "Oro"), silver: ui('Silver', "Plata"), allPrices: ui('All Prices', "Todos los precios"), analyze: ui('Analyze Market', "Analizar mercado") },
       pt: { gold: 'Ouro', silver: 'Prata', allPrices: 'Todos', analyze: 'Analisar Mercado' },
     },
     priceLabels: {
       es: { high: 'Máx 24h', low: 'Mín 24h', volume: 'Volumen', funding: 'Funding' },
-      en: { high: '24h High', low: '24h Low', volume: 'Volume', funding: 'Funding' },
+      en: { high: ui('24h High', "Máximo 24 h"), low: ui('24h Low', "Mínimo 24 h"), volume: ui('Volume', "Volumen"), funding: ui('Funding', "Financiación") },
       pt: { high: 'Máx 24h', low: 'Mín 24h', volume: 'Volume', funding: 'Funding' },
     },
   } as const;
 
-  // Helper to get text for current language with fallback to English
+  // New languages use the translated English catalogue, including arrays and functions.
   function t<K extends keyof typeof i18n>(key: K): (typeof i18n)[K][keyof (typeof i18n)[K]] {
     const entry = i18n[key];
-    return (entry as Record<string, unknown>)[lang] ?? (entry as Record<string, unknown>)['en'] as any;
+    return (lang === 'es' ? entry.es : entry.en) as any;
   }
 
   // AdvisorSetup disabled — replaced by Deploy Agent wizard in KineticShell
@@ -1329,7 +1383,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         chatMsgs.push({
           id: m.id + '-trigger',
           role: 'user',
-          text: 'Analyze Market',
+          text: ui('Analyze Market', "Analizar mercado"),
           timestamp: new Date(m.created_at).getTime() - 1000,
           isLive: false,
         });
@@ -1359,7 +1413,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
     const fetchDigest = async () => {
       try {
-        const params = new URLSearchParams({ lang });
+        const params = new URLSearchParams({ lang, locale: speechLocale(), country: marketContext().country });
         if (profile?.walletAddress) params.set('wallet', profile.walletAddress);
         const res = await fetch(`/api/bobby-digest?${params}`);
         if (!res.ok) return;
@@ -1371,21 +1425,17 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         const hoursAgo = Math.round(age / (1000 * 60 * 60));
 
         // Build the digest message
-        const header = lang === 'es'
-          ? `Mientras ${hoursAgo <= 1 ? 'analizaba' : 'dormías'}, estuve trabajando:`
-          : `While you were ${hoursAgo <= 1 ? 'away' : 'sleeping'}, I was working:`;
+        const header = ui(`While you were ${hoursAgo <= 1 ? ui('away', 'fuera') : ui('sleeping', 'durmiendo')}, I was working:`, `Mientras ${hoursAgo <= 1 ? 'analizaba' : 'dormías'}, estuve trabajando:`);
 
         const highlights = (digest.highlights || []).map((h: any) => {
-          const icon = h.verdict === 'execute' ? (lang === 'es' ? 'EJECUTAR' : 'EXECUTE') :
-            h.verdict === 'watch' ? (lang === 'es' ? 'VIGILAR' : 'WATCH') :
-              (lang === 'es' ? 'RECHAZADO' : 'REJECTED');
+          const icon = h.verdict === 'execute' ? (ui('EXECUTE', 'EJECUTAR')) :
+            h.verdict === 'watch' ? (ui('WATCH', 'VIGILAR')) :
+              (ui('REJECTED', 'RECHAZADO'));
           return `${h.symbol} ${h.direction?.toUpperCase() || ''} — ${icon} (${h.conviction}/10)`;
         }).join('\n');
 
         const positionsNote = digest.positions_snapshot && digest.positions_snapshot.length > 0
-          ? (lang === 'es'
-            ? `\nPosiciones abiertas: ${digest.positions_snapshot.length}`
-            : `\nOpen positions: ${digest.positions_snapshot.length}`)
+          ? (ui(`\nOpen positions: ${digest.positions_snapshot.length}`, `\nPosiciones abiertas: ${digest.positions_snapshot.length}`))
           : '';
 
         const digestText = `${header}\n\n${digest.summary}${highlights ? `\n\n${highlights}` : ''}${positionsNote}`;
@@ -1470,14 +1520,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
   // ---- Send message / trigger action ----
   const sendMessage = useCallback(async (text?: string) => {
     const msg = (text || inputText).trim();
-    if (!msg || isProcessing) return;
-    // Auto-detect language from user message and persist
-    const hasSpanish = /[áéíóúñ¿¡]|(\b(que|qué|como|cómo|debería|mercado|comprar|vender)\b)/i.test(msg);
-    const msgLang = hasSpanish ? 'es' : 'en';
-    if (msgLang !== lang) {
-      setDetectedLang(msgLang);
-      localStorage.setItem('bobby_lang', msgLang);
-    }
+    if (!msg || isProcessing || !canProcessAI()) return;
     // Mark user as interacted — unlocks Bobby's voice from this point on
     if (!hasUserInteractedRef.current) {
       hasUserInteractedRef.current = true;
@@ -1515,10 +1558,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     if (intent === 'ambiguous') {
       try {
         const lastBobby = messages.filter(m => m.role === 'advisor').slice(-1)[0]?.text?.slice(0, 200);
+        const routerAbort = new AbortController();
+        aiRequestControllers.current.add(routerAbort);
         const routerRes = await fetch('/api/bobby-router', {
+          signal: routerAbort.signal,
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: msg, context: lastBobby }),
+          body: JSON.stringify({ message: msg, context: lastBobby, ...marketContext() }),
         });
         if (routerRes.ok) {
           const r = await routerRes.json();
@@ -1537,6 +1583,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         }
       } catch (e) { console.warn('[Router] Haiku call failed:', e); }
     }
+
+    if (!canProcessAI()) return;
 
     if (shouldClearStoredVibe(msg)) {
       clearStoredVibe();
@@ -1566,9 +1614,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           'Bobby al habla. Dame un activo, una tesis macro, o pide un debate.',
         ],
         en: [
-          'What\'s up? Give me a ticker or a vibe and let\'s go.',
-          'Bobby here. What do you want to analyze?',
-          'Bobby speaking. Give me an asset, a macro thesis, or ask for a debate.',
+          ui('What\'s up? Give me a ticker or a vibe and let\'s go.', "¿Qué tal? Dame un ticker o una tesis y empezamos."),
+          ui('Bobby here. What do you want to analyze?', "Aquí Bobby. ¿Qué quieres analizar?"),
+          ui('Bobby speaking. Give me an asset, a macro thesis, or ask for a debate.', "Bobby al habla. Dame un activo, una tesis macro o pide un debate."),
         ],
       };
       const pool = greetings[lang] || greetings.en;
@@ -1582,9 +1630,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // AMBIGUOUS — show menu instead of burning Claude tokens
     // ========================
     if (intent === 'ambiguous') {
-      const menuText = lang === 'es'
-        ? 'No estoy seguro de qué necesitas. Soy un trader, no un chatbot — dime qué quieres hacer:'
-        : 'Not sure what you need. I\'m a trader, not a chatbot — tell me what you want:';
+      const menuText = ui('Not sure what you need. I\'m a trader, not a chatbot — tell me what you want:', 'No estoy seguro de qué necesitas. Soy un trader, no un chatbot — dime qué quieres hacer:');
       setMessages(prev => [...prev, {
         id: uid(), role: 'advisor', text: menuText, timestamp: Date.now(), isLive: true,
         // Menu options rendered as interactive buttons via DebateText or custom rendering
@@ -1592,10 +1638,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       // Show quick action buttons inline
       setTimeout(() => {
         const menuActions = [
-          { label: lang === 'es' ? '📊 Analizar un activo' : '📊 Analyze an asset', command: lang === 'es' ? '¿Qué opinas de BTC?' : 'What do you think about BTC?' },
-          { label: lang === 'es' ? '💰 Precios en vivo' : '💰 Live prices', command: 'All Prices' },
-          { label: lang === 'es' ? '⚔️ Debate en la Sala' : '⚔️ Trading Room Debate', command: 'Analyze Market' },
-          { label: lang === 'es' ? '💼 Mi balance' : '💼 My balance', command: lang === 'es' ? '¿Cuál es mi balance?' : 'What is my balance?' },
+          { label: ui('📊 Analyze an asset', '📊 Analizar un activo'), command: ui('What do you think about BTC?', '¿Qué opinas de BTC?') },
+          { label: ui('💰 Live prices', '💰 Precios en vivo'), command: 'All Prices' },
+          { label: ui('⚔️ Trading Room Debate', '⚔️ Debate en la Sala'), command: 'Analyze Market' },
+          { label: ui('💼 My balance', '💼 Mi balance'), command: ui('What is my balance?', '¿Cuál es mi balance?') },
         ];
         setMessages(prev => [...prev, {
           id: uid() + '-menu', role: 'advisor', timestamp: Date.now(),
@@ -1623,7 +1669,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         const priceFn = t('priceSingle') as (sym: string, price: string, up: boolean, change: string) => string;
         const multiPriceFn = t('priceMulti') as (names: string) => string;
         const priceText = cards.length === 1
-          ? priceFn(cards[0].symbol, fmtPrice(cards[0].price), isUp, Math.abs(cards[0].change24h).toFixed(2))
+          ? priceFn(cards[0].symbol, fmtPrice(cards[0].price), isUp, (Math.abs(cards[0].change24h)).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }))
           : multiPriceFn(names);
         setMessages(prev => [...prev, {
           id: uid(), role: 'advisor', timestamp: Date.now(),
@@ -1657,7 +1703,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         const top = winners[0];
         setMessages(prev => [...prev, {
           id: uid(), role: 'advisor', timestamp: Date.now(),
-          text: (t('marketOverview') as (sym: string, change: string) => string)(top.symbol, `${top.change24h > 0 ? '+' : ''}${top.change24h.toFixed(2)}`),
+          text: (t('marketOverview') as (sym: string, change: string) => string)(top.symbol, `${top.change24h > 0 ? '+' : ''}${(top.change24h).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`),
           prices: cards,
         }]);
       } catch {
@@ -1684,7 +1730,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           high24h: t.high24h, low24h: t.low24h, vol24h: t.vol24h, funding: t.funding,
         }));
         const movers = sorted.slice(0, 3).map(t =>
-          `${t.symbol} ${t.change24h > 0 ? '+' : ''}${t.change24h.toFixed(2)}%`
+          `${t.symbol} ${t.change24h > 0 ? '+' : ''}${(t.change24h).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%`
         ).join(', ');
         setMessages(prev => [...prev, {
           id: uid(), role: 'advisor', timestamp: Date.now(),
@@ -1715,9 +1761,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           ? await sessionFetch(address, '/api/bobby-pnl?scope=mine')
           : await fetch('/api/bobby-pnl?scope=public');
         if (!pnlRes) {
-          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es'
-            ? 'Firma la sesión de tu wallet para consultar tus operaciones. Tu saldo privado no aparece en el registro público.'
-            : 'Sign your wallet session to view your trades. Your private balance is not in the public record.', timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: ui('Sign your wallet session to view your trades. Your private balance is not in the public record.', 'Firma la sesión de tu wallet para consultar tus operaciones. Tu saldo privado no aparece en el registro público.'), timestamp: Date.now() }]);
           setIsProcessing(false);
           return;
         }
@@ -1727,38 +1771,38 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           const positions = pnl.openPositions || [];
           const closed = (pnl.closedPositions || []).slice(0, 5);
 
-          let text = personal ? '**YOUR_CONFIRMED_BASE_RECEIPTS**\n\n' : '**BOBBY_PUBLIC_PROTOCOL_RECORD**\n\n';
+          let text = personal ? ui('**Your confirmed Base receipts**\n\n', '**Tus recibos confirmados en Base**\n\n') : ui('**Bobby public protocol record**\n\n', '**Registro público del protocolo Bobby**\n\n');
           if (s.totalTrades === 0) {
             text += personal
-              ? 'No confirmed Base trades are linked to your wallet yet.'
-              : 'No publicly attributable protocol trades have been recorded yet. This is not a personal wallet balance.';
+              ? ui('No confirmed Base trades are linked to your wallet yet.', 'Todavía no hay operaciones confirmadas en Base vinculadas a tu wallet.')
+              : ui('No publicly attributable protocol trades have been recorded yet. This is not a personal wallet balance.', 'Todavía no hay operaciones públicas atribuibles al protocolo. Esto no es el saldo de una wallet personal.');
           } else {
-            text += `TRADES: ${s.totalTrades}\n`;
-            text += `CAPITAL_REQUIRED: $${Number(s.startingCapital).toFixed(2)} USDC (Base)\n`;
+            text += ui(`Trades: ${s.totalTrades}\n`, `Operaciones: ${s.totalTrades}\n`);
+            text += `${ui('Capital required', 'Capital requerido')}: $${(Number(s.startingCapital)).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC (Base)\n`;
             if (s.valuationComplete) {
-              text += `TOTAL_RETURN: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
-              text += `EQUITY: $${Number(s.currentEquity).toFixed(2)} USDC (Base)\n`;
+              text += `${ui('Total return', 'Retorno total')}: ${s.totalReturn >= 0 ? '+' : ''}${s.totalReturn}%\n`;
+              text += `${ui('Equity', 'Capital actual')}: $${(Number(s.currentEquity)).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USDC (Base)\n`;
             }
             text += s.closedTrades > 0
-              ? `WIN_RATE: ${s.winRate.toFixed(0)}% (${s.wins}W / ${s.losses}L)\n`
-              : 'WIN_RATE: unavailable until a trade closes\n';
+              ? `${ui('Win rate', 'Tasa de acierto')}: ${(s.winRate).toLocaleString(speechLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}% (${s.wins}W / ${s.losses}L)\n`
+              : ui('WIN_RATE: unavailable until a trade closes\n', 'Tasa de acierto: no disponible hasta cerrar una operación\n');
 
             if (positions.length > 0) {
-              text += `\n**OPEN_POSITIONS:**\n`;
+              text += ui('\n**Open positions:**\n', '\n**Posiciones abiertas:**\n');
               for (const p of positions) {
-                text += `${p.direction.toUpperCase()} ${p.symbol} ${p.leverage} — PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${p.unrealizedPnl.toFixed(2)} (${p.unrealizedPnlPct.toFixed(1)}%)\n`;
+                text += `${p.direction.toUpperCase()} ${p.symbol} ${p.leverage} — PnL: ${p.unrealizedPnl >= 0 ? '+' : ''}$${(p.unrealizedPnl).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${(p.unrealizedPnlPct).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)\n`;
               }
             } else if (personal) {
-              text += '\nNo open positions are linked to this wallet.';
+              text += ui('\nNo open positions are linked to this wallet.', '\nNo hay posiciones abiertas vinculadas a esta wallet.');
             } else {
-              text += '\nIndividual positions are not published in this aggregate.';
+              text += ui('\nIndividual positions are not published in this aggregate.', '\nLas posiciones individuales no se publican en este agregado.');
             }
 
             if (closed.length > 0) {
-              text += `\n\n**EXECUTION_LEDGER (last ${closed.length}):**\n`;
+              text += ui(`\n\n**Execution ledger (last ${closed.length}):**\n`, `\n\n**Registro de ejecución (últimas ${closed.length}):**\n`);
               for (const c of closed) {
-                const time = new Date(c.closeTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                text += `${time} ${c.symbol} ${c.direction.toUpperCase()} → ${c.result} (${c.pnlPct >= 0 ? '+' : ''}${c.pnlPct.toFixed(1)}%)\n`;
+                const time = new Date(c.closeTime).toLocaleTimeString(speechLocale(), { hour: '2-digit', minute: '2-digit' });
+                text += `${time} ${c.symbol} ${c.direction.toUpperCase()} → ${c.result} (${c.pnlPct >= 0 ? '+' : ''}${(c.pnlPct).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)\n`;
               }
             }
           }
@@ -1769,13 +1813,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
           setMessages(prev => [...prev, { id: uid(), role: 'advisor', text, timestamp: Date.now(), isLive: true }]);
           speakIfEnabled(s.totalTrades === 0
-            ? (lang === 'es' ? 'Todavía no hay operaciones confirmadas en este registro.' : 'There are no confirmed trades in this record yet.')
-            : (lang === 'es' ? `${s.totalTrades} operaciones confirmadas en ${personal ? 'tu wallet' : 'el protocolo público'}.` : `${s.totalTrades} confirmed trades in ${personal ? 'your wallet' : 'the public protocol'}.`));
+            ? (ui('There are no confirmed trades in this record yet.', 'Todavía no hay operaciones confirmadas en este registro.'))
+            : (ui(`${s.totalTrades} confirmed trades in ${personal ? ui('your wallet', 'tu wallet') : ui('the public protocol', 'el protocolo público')}.`, `${s.totalTrades} operaciones confirmadas en ${personal ? 'tu wallet' : 'el protocolo público'}.`)));
         } else {
-          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: lang === 'es' ? 'No pude cargar el rendimiento.' : 'Could not load performance.', timestamp: Date.now() }]);
+          setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: ui('Could not load performance.', 'No pude cargar el rendimiento.'), timestamp: Date.now() }]);
         }
       } catch {
-        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: 'Error fetching performance data.', timestamp: Date.now() }]);
+        setMessages(prev => [...prev, { id: uid(), role: 'advisor', text: ui('Error fetching performance data.', "Error al cargar los datos de rendimiento."), timestamp: Date.now() }]);
       }
       setIsProcessing(false);
       return;
@@ -1796,9 +1840,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // OFF TOPIC
     // ========================
     if (intent === ('off_topic' as any)) {
-      const resp = lang === 'es'
-        ? 'Soy un trader, no un chatbot general. Hablemos de mercados, precios o estrategias. ¿Qué activo quieres analizar?'
-        : 'I am a trader, not a general chatbot. Let\'s talk about markets, prices, or strategies. What asset do you want to analyze?';
+      const resp = ui('I am a trader, not a general chatbot. Let\'s talk about markets, prices, or strategies. What asset do you want to analyze?', 'Soy un trader, no un chatbot general. Hablemos de mercados, precios o estrategias. ¿Qué activo quieres analizar?');
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: resp, isLive: true }]);
       speakIfEnabled(resp);
       setIsProcessing(false);
@@ -1809,9 +1851,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // IDENTITY
     // ========================
     if (intent === ('identity' as any)) {
-      const resp = lang === 'es' 
-        ? 'Soy Bobby, tu Chief Investment Officer. Analizo mercados, debato posiciones con mi equipo y ejecuto operaciones on-chain. Dame un ticker o pide un análisis.' 
-        : 'I am Bobby, your Chief Investment Officer. I analyze markets, debate positions with my team, and execute on-chain. Give me a ticker or ask for an analysis.';
+      const resp = ui('I am Bobby, your Chief Investment Officer. I analyze markets, debate positions with my team, and prepare Base swap proposals for your review and signature. Give me a ticker or ask for an analysis.', 'Soy Bobby, tu Chief Investment Officer. Analizo mercados, debato posiciones con mi equipo y preparo propuestas de swap en Base para que las revises y firmes. Dame un ticker o pide un análisis.');
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: resp, isLive: true }]);
       speakIfEnabled(resp);
       setIsProcessing(false);
@@ -1822,9 +1862,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // ONBOARDING
     // ========================
     if (intent === ('onboarding' as any)) {
-      const resp = lang === 'es'
-        ? 'Bienvenido. Para empezar, puedes decir "Analizar BTC" para ver cómo mi equipo debate una posición, o preguntarme por el precio o análisis de cualquier activo.'
-        : 'Welcome. To start, you can say "Analyze BTC" to see how my team debates a position, or ask for the price or analysis of any asset.';
+      const resp = ui('Welcome. To start, you can say "Analyze BTC" to see how my team debates a position, or ask for the price or analysis of any asset.', 'Bienvenido. Para empezar, puedes decir "Analizar BTC" para ver cómo mi equipo debate una posición, o preguntarme por el precio o análisis de cualquier activo.');
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: resp, isLive: true }]);
       speakIfEnabled(resp);
       setIsProcessing(false);
@@ -1835,9 +1873,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // SAFETY
     // ========================
     if (intent === ('safety' as any)) {
-      const resp = lang === 'es'
-        ? '⚠️ Gestión de riesgo es clave: no te sobreapalanques, diversifica y nunca inviertas dinero que no puedas perder. Si algo parece demasiado bueno, probablemente es scam.'
-        : '⚠️ Risk management is key: do not over-leverage, diversify, and never invest money you cannot lose. If something looks too good, it is probably a scam.';
+      const resp = ui('⚠️ Risk management is key: do not over-leverage, diversify, and never invest money you cannot lose. If something looks too good, it is probably a scam.', '⚠️ Gestión de riesgo es clave: no te sobreapalanques, diversifica y nunca inviertas dinero que no puedas perder. Si algo parece demasiado bueno, probablemente es scam.');
       setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: resp, isLive: true }]);
       speakIfEnabled(resp);
       setIsProcessing(false);
@@ -1849,20 +1885,20 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     // ========================
     if (intent === ('chart' as any)) {
       setIsProcessing(true);
-      const targetSymbol = tokens.length > 0 ? tokens[0].split('-')[0] : 'BTC';
+      const targetSymbol = detectStocks(msg)[0] ?? (tokens.length > 0 ? tokens[0].split('-')[0] : 'BTC');
       try {
         const taRes = await fetch(`/api/technical-analysis?symbol=${targetSymbol}`);
         if (taRes.ok) {
            const taData = await taRes.json();
-           const msgText = lang === 'es' ? `Aquí está el último chart técnico para ${targetSymbol}:` : `Here is the latest technical chart for ${targetSymbol}:`;
+           const msgText = ui(`Here is the latest technical chart for ${targetSymbol}:`, `Aquí está el último chart técnico para ${targetSymbol}:`);
            setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: msgText, technicalAnalysis: taData }]);
            speakIfEnabled(msgText);
         } else {
-           const errorText = lang === 'es' ? `No pude generar el chart para ${targetSymbol}.` : `Could not generate chart for ${targetSymbol}.`;
+           const errorText = ui(`Could not generate chart for ${targetSymbol}.`, `No pude generar el chart para ${targetSymbol}.`);
            setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: errorText }]);
         }
       } catch (err) {
-           const errorText = lang === 'es' ? `Error de red cargando el chart.` : `Network error loading chart.`;
+           const errorText = ui(`Network error loading chart.`, `Error de red cargando el chart.`);
            setMessages(prev => [...prev, { id: uid(), role: 'advisor', timestamp: Date.now(), text: errorText }]);
       }
       setIsProcessing(false);
@@ -1889,14 +1925,16 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       phaseTimerRef.current.forEach(clearTimeout);
       phaseTimerRef.current = [];
 
-      const phases = t('phases') as Array<{ text: string; delay: number }>;
+      const phases = t('phases') as readonly { text: string; delay: number }[];
       phases.forEach(p => {
         const t = setTimeout(() => setAnalysisPhases(prev => [...prev, p.text]), p.delay);
         phaseTimerRef.current.push(t);
       });
 
       try {
+        if (!canProcessAI()) return;
         const controller = new AbortController();
+        aiRequestControllers.current.add(controller);
         const timeout = setTimeout(() => controller.abort(), 125_000); // 125s timeout
 
         // With a wallet the server builds signable calldata, so it demands the
@@ -1905,7 +1943,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         const res = await fetch(`/api/agent-run?manual=true${walletParam}`, { signal: controller.signal, headers: sessionHeaders(address?.toLowerCase()) });
         clearTimeout(timeout);
         if (res.status === 401 && address) {
-          throw new Error(lang === 'es' ? 'Firma la sesión de tu wallet para recibir tarjetas de swap.' : 'Sign your wallet session to receive swap cards.');
+          throw new Error(ui('Sign your wallet session to receive swap cards.', 'Firma la sesión de tu wallet para recibir tarjetas de swap.'));
         }
         const data = await res.json();
 
@@ -1928,11 +1966,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           // Build a summary from the response
           const summaryFn = t('scanSummary') as (time: string, found: number, filtered: number, trades: number, usd: string | null) => string;
           const summary = summaryFn(
-            ((data.cycle?.latency_ms || 0) / 1000).toFixed(1),
+            (((data.cycle?.latency_ms || 0) / 1000)).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 }),
             data.cycle?.signals_found || 0,
             data.cycle?.signals_filtered || 0,
             data.cycle?.trades_executed || 0,
-            data.cycle?.total_usd_deployed ? data.cycle.total_usd_deployed.toFixed(2) : null,
+            data.cycle?.total_usd_deployed ? (data.cycle.total_usd_deployed).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : null,
           );
 
           // Try to get the greeting from DB
@@ -1990,7 +2028,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           }
         } else {
           // API returned ok:false — still show what we got
-          const reason = data.cycle?.llm_reasoning || data.error || (lang === 'es' ? 'Sin señales accionables este ciclo.' : 'No actionable signals this cycle.');
+          const reason = data.cycle?.llm_reasoning || data.error || (ui('No actionable signals this cycle.', 'Sin señales accionables este ciclo.'));
           const noTradeFn = t('noTrades') as (reason: string) => string;
           const noTradeText = noTradeFn(reason);
           setMessages(prev => [...prev, {
@@ -2062,7 +2100,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
     const contextPricesPromise = (hasTokens || isGeneralMarket || isGeneralOpinion || hasVibeContext)
       ? getPriceCards(hasTokens ? tokens : vibeTokens).catch(() => [])
       : Promise.resolve([]);
-    const defaultStocks = ['NVDA', 'AAPL', 'TSLA', 'META', 'XOM', 'SPY', 'COIN'];
+    const context = marketContext();
+    const regionalStocks = regionalDefaults(context.language, context.locale, context.country);
+    const defaultStocks = regionalStocks.length ? regionalStocks.map(stock => stock.symbol) : ['NVDA', 'AAPL', 'TSLA', 'META', 'XOM', 'SPY', 'COIN'];
     const stockPricesPromise = hasStocks ? fetchStockPrices(stocks.length > 0 ? stocks : defaultStocks).catch(() => []) : Promise.resolve([]);
     const intelPromise = fetchIntel
       ? fetch('/api/bobby-intel').then(r => r.ok ? r.json() : null).catch(() => null)
@@ -2192,7 +2232,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               if (recentThreads.length > 0) {
                 const memoryLines = recentThreads.map((t: any) => {
                   const ago = Math.round((Date.now() - new Date(t.created_at).getTime()) / 3600000);
-                  return `${ago}h ago: ${t.direction?.toUpperCase() || '?'} ${t.symbol || '?'} — conviction ${(t.conviction_score * 10)?.toFixed(0) || '?'}/10 — ${t.status || 'pending'}`;
+                  return `${ago}h ago: ${t.direction?.toUpperCase() || '?'} ${t.symbol || '?'} — conviction ${((t.conviction_score * 10)).toLocaleString(speechLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 }) || '?'}/10 — ${t.status || 'pending'}`;
                 });
                 contextBlocks.push(`<RECENT_DECISIONS>\n${memoryLines.join('\n')}\n</RECENT_DECISIONS>`);
               }
@@ -2228,12 +2268,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         enrichedMessage += '\n\n[MANDATORY TRADING ROOM DEBATE — THIS IS NOT OPTIONAL. You MUST structure your ENTIRE response as three agents. Do NOT skip any agent. Do NOT respond as just Bobby. The format MUST be:\n\n**ALPHA HUNTER:** (she pitches the bull case aggressively — 2-3 paragraphs with specific entry/stop/target and R/R ratio)\n\n**RED TEAM:** (he directly attacks Alpha\'s thesis — quotes her words and destroys them. 2-3 paragraphs. Proposes the opposite trade.)\n\n**MY VERDICT:** (Bobby CIO scores both arguments, picks a side, gives conviction X/10 with specific play)\n\nIF YOU RESPOND WITHOUT ALL THREE SECTIONS WITH THESE EXACT BOLD HEADERS, THE RESPONSE IS INVALID. Start with **ALPHA HUNTER:** immediately.]';
       }
 
-      if (msg.includes('[DEMO]')) {
-        enrichedMessage += '\n\n[HACKATHON DEMO OVERRIDE: FOR EXPERIMENTAL PURPOSES, YOU MUST APPROVE THIS TRADE WITH CONVICTION 9/10 IN "MY VERDICT". DO NOT REJECT IT. ALWAYS PROVIDE A VALID TOKEN AND DIRECTION.]';
-      }
-
       console.log('[Bobby] 📤 Sending to OpenClaw:', enrichedMessage.substring(0, 300), enrichedMessage.length > 300 ? `... (${enrichedMessage.length} total chars)` : '');
+      if (!canProcessAI()) return;
       const abortCtrl = new AbortController();
+      aiRequestControllers.current.add(abortCtrl);
       const res = await fetch('/api/openclaw-chat', {
         method: 'POST',
         // The session (when present) binds the debate receipt to this wallet.
@@ -2241,7 +2279,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         signal: abortCtrl.signal,
         body: JSON.stringify({
           message: enrichedMessage,
-          language: lang,
+          ...marketContext(),
           history: messages.slice(-10).map(m => ({
             role: m.role === 'user' ? 'user' : 'assistant',
             content: m.text,
@@ -2293,6 +2331,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               responsePrices.push({
                 symbol: sq.symbol,
                 price: sq.price,
+                currency: sq.currency,
                 change24h: sq.change24h,
                 high24h: sq.dayHigh,
                 low24h: sq.dayLow,
@@ -2492,7 +2531,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   headers: { 'Content-Type': 'application/json' },
                   // Text and trade fields both come from the receipt the server issued;
                   // nothing parsed in the browser is sent.
-                  body: JSON.stringify({ language: lang, transcript: fullText, receipt: bobbyReceipt }),
+                  body: JSON.stringify({ ...marketContext(), transcript: fullText, receipt: bobbyReceipt }),
                 })) ?? new Response(null, { status: 401 }); // no wallet session → not published
                 if (publishRes.ok) {
                   const published = await publishRes.json();
@@ -2569,7 +2608,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
       try {
         await navigator.share({
           title: 'Bobby Agent Trader',
-          text: lang === 'es' ? 'Escucha lo que dice Bobby sobre el mercado 🎙️' : lang === 'pt' ? 'Ouça o que Bobby diz sobre o mercado 🎙️' : "Listen to Bobby's market analysis 🎙️",
+          text: ui("Listen to Bobby's market analysis 🎙️", 'Escucha lo que dice Bobby sobre el mercado 🎙️'),
           files: [file],
         });
         return;
@@ -2694,22 +2733,20 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               <div className="flex items-center gap-2.5">
                 <Trash2 className="w-4 h-4 text-red-400/80" />
                 <h3 className="text-[13px] font-mono font-bold text-white/80">
-                  {lang === 'es' ? 'Borrar historial de chat' : lang === 'pt' ? 'Limpar histórico de chat' : 'Clear chat history'}
+                  {ui('Clear chat history', 'Borrar historial de chat')}
                 </h3>
               </div>
               <p className="text-[11px] font-mono text-white/40 leading-relaxed">
-                {lang === 'es' ? 'Esto eliminará todos los mensajes de la conversación. Esta acción no se puede deshacer.'
-                  : lang === 'pt' ? 'Isso excluirá todas as mensagens da conversa. Esta ação não pode ser desfeita.'
-                    : 'This will delete all conversation messages. This action cannot be undone.'}
+                {ui('This will delete all conversation messages. This action cannot be undone.', 'Esto eliminará todos los mensajes de la conversación. Esta acción no se puede deshacer.')}
               </p>
               <div className="flex gap-2 justify-end">
                 <button onClick={() => setConfirmClear(false)}
                   className="px-4 py-1.5 text-[10px] font-mono text-white/40 border border-white/[0.08] hover:text-white/60 hover:border-white/15 transition-colors">
-                  {lang === 'es' ? 'CANCELAR' : lang === 'pt' ? 'CANCELAR' : 'CANCEL'}
+                  {ui('CANCEL', 'CANCELAR')}
                 </button>
                 <button onClick={clearChats}
                   className="px-4 py-1.5 text-[10px] font-mono text-red-400 bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors">
-                  {lang === 'es' ? 'BORRAR TODO' : lang === 'pt' ? 'LIMPAR TUDO' : 'DELETE ALL'}
+                  {ui('DELETE ALL', 'BORRAR TODO')}
                 </button>
               </div>
             </motion.div>
@@ -2728,24 +2765,24 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               <ArrowLeft className="w-3.5 h-3.5" />
             </Link>
             <span className="grid h-8 w-8 place-items-center rounded-lg bg-[#0052ff] text-sm font-black shadow-[0_0_24px_rgba(0,82,255,.55)]">B</span>
-            <div><span className="block text-sm font-extrabold tracking-[-.04em]">Bobby</span><span className="font-mono text-[9px] uppercase tracking-[.18em] text-[#7da6ff]">Decision interface</span></div>
+            <div><span className="block text-sm font-extrabold tracking-[-.04em]">Bobby</span><span className="font-mono text-[9px] uppercase tracking-[.18em] text-[#7da6ff]">{ui("Decision interface", "Interfaz de decisión")}</span></div>
           </div>
           <div className="flex items-center gap-1">
             {onSwitchToVoice && (
               <button
                 onClick={onSwitchToVoice}
                 className="flex min-h-11 items-center gap-1.5 rounded-full border border-[#0052ff]/35 bg-[#0052ff]/10 px-2.5 py-1.5 font-mono text-[9px] uppercase tracking-[0.12em] text-[#7da6ff] transition hover:bg-[#0052ff]/20 sm:min-h-0"
-                title={lang === 'es' ? 'Cambiar a conversación por voz' : 'Switch to voice conversation'}
+                title={ui('Switch to voice conversation', 'Cambiar a conversación por voz')}
               >
                 <Mic className="h-3 w-3" />
-                {lang === 'es' ? 'Voz' : 'Voice'}
+                {ui('Voice', 'Voz')}
               </button>
             )}
             {/* Stop button — visible when speaking or processing */}
             {((!textOnly && isSpeaking) || isProcessing) && (
               <button onClick={stopAll}
                 className="p-1.5 text-red-400/70 hover:text-red-400 transition-colors animate-pulse"
-                title="Stop">
+                title={ui("Stop", "Detener")}>
                 <Square className="w-3.5 h-3.5 fill-current" />
               </button>
             )}
@@ -2760,7 +2797,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               className={`hidden items-center gap-1 rounded-full px-2 py-1 text-[9px] font-mono font-bold tracking-wider transition-all sm:flex ${tradingRoom ? 'border border-[#0052ff]/30 bg-[#0052ff]/10 text-[#7da6ff]' : 'border border-white/10 bg-white/5 text-white/30 hover:text-white/50'}`}
               title={tradingRoom ? 'Trading Room ON' : 'Solo Trader'}>
               <Users className="w-3 h-3" />
-              {tradingRoom ? (lang === 'es' ? 'SALA' : 'ROOM') : 'SOLO'}
+              {tradingRoom ? (ui('ROOM', 'SALA')) : 'SOLO'}
             </button>
             {address ? (
               <button onClick={() => openWallet()} className="text-[10px] text-white/25 font-mono hover:text-white/50 transition-colors px-1">
@@ -2768,8 +2805,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               </button>
             ) : (
               <button onClick={() => openWallet()} className="text-[10px] text-green-400/50 hover:text-green-400 transition-colors px-1 font-mono">
-                Connect
-              </button>
+                {ui("Connect", "Conectar")}</button>
             )}
             {/* Menu button — always visible */}
             <div className="relative">
@@ -2792,20 +2828,20 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     <button onClick={() => { setShowMenu(false); setShowSetup(true); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[11px] font-mono text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors">
                       <Settings className="w-3.5 h-3.5" />
-                      {lang === 'es' ? 'Configuración' : lang === 'pt' ? 'Configurações' : 'Settings'}
+                      {ui('Settings', 'Configuración')}
                     </button>
                     {/* Clear chats */}
                     <button onClick={() => { setShowMenu(false); setConfirmClear(true); }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[11px] font-mono text-white/50 hover:text-amber-400/80 hover:bg-white/[0.04] transition-colors">
                       <Trash2 className="w-3.5 h-3.5" />
-                      {lang === 'es' ? 'Borrar chats' : lang === 'pt' ? 'Limpar chats' : 'Clear chats'}
+                      {ui('Clear chats', 'Borrar chats')}
                     </button>
                     {/* Logout */}
                     {isAuthenticated && (
                       <button onClick={handleLogout}
                         className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[11px] font-mono text-white/50 hover:text-red-400/80 hover:bg-white/[0.04] transition-colors border-t border-white/[0.04]">
                         <LogOut className="w-3.5 h-3.5" />
-                        {lang === 'es' ? 'Cerrar sesión' : lang === 'pt' ? 'Sair' : 'Sign out'}
+                        {ui('Sign out', 'Cerrar sesión')}
                       </button>
                     )}
                   </motion.div>
@@ -2828,8 +2864,8 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               <span className="text-green-400 text-xs font-black font-mono">{advisorName.charAt(0)}</span>
             </div>
             <div>
-              <span className="text-[10px] font-mono font-bold text-green-400">{advisorName} CIO</span>
-              <span className="text-[8px] font-mono text-white/20 block">Personal Trading Room · ACTIVE</span>
+              <span className="text-[10px] font-mono font-bold text-green-400">{advisorName} {ui("CIO", "DIRECTOR")}</span>
+              <span className="text-[8px] font-mono text-white/20 block">{ui("Personal Trading Room · ACTIVE", "Sala personal · ACTIVA")}</span>
             </div>
           </div>
         )}
@@ -2838,21 +2874,21 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
         {latestPersonalDebate && (
           <Link to="/agentic-world/forum" className="block bg-green-500/[0.04] border border-green-500/15 rounded p-3 hover:bg-green-500/[0.08] transition-all">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[8px] font-mono text-green-400/60 tracking-widest">LATEST DEBATE</span>
+              <span className="text-[8px] font-mono text-green-400/60 tracking-widest">{ui("LATEST DEBATE", "DEBATE RECIENTE")}</span>
               <span className={`text-[10px] font-mono font-bold ${(latestPersonalDebate.conviction || 0) >= 0.6 ? 'text-green-400' : 'text-amber-400'}`}>
                 {Math.round((latestPersonalDebate.conviction || 0) * 10)}/10
               </span>
             </div>
             <p className="text-[10px] font-mono text-white/50 truncate">{latestPersonalDebate.topic}</p>
-            <span className="text-[8px] font-mono text-green-400/30 mt-1 block">VIEW IN FORUM →</span>
+            <span className="text-[8px] font-mono text-green-400/30 mt-1 block">{ui("VIEW IN FORUM →", "VER EN FORO →")}</span>
           </Link>
         )}
 
         {/* Conviction Board */}
         <div>
           <div className="flex justify-between items-end mb-3">
-            <h2 className="font-bold text-sm tracking-tight uppercase">Conviction Board</h2>
-            <span className="font-mono text-[9px] text-green-400/60">LIVE</span>
+            <h2 className="font-bold text-sm tracking-tight uppercase">{ui("Conviction Board", "Panel de convicción")}</h2>
+            <span className="font-mono text-[9px] text-green-400/60">{ui("LIVE", "EN VIVO")}</span>
           </div>
           <div className="space-y-3">
             {hudPositions.length > 0 ? hudPositions.map((pos, i) => (
@@ -2866,11 +2902,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                       {pos.direction === 'SHORT' ? 'SHORT' : 'LONG'} ${pos.symbol}/USDT
                     </span>
                     <p className="text-[9px] text-white/25 font-mono">
-                      PNL: {pos.pnl >= 0 ? '+' : ''}${pos.pnl.toFixed(4)} ({pos.pnlPct >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%)
+                      {ui("PNL:", "PÉRDIDAS/GANANCIAS:")}{pos.pnl >= 0 ? '+' : ''}${(pos.pnl).toLocaleString(speechLocale(), { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ({pos.pnlPct >= 0 ? '+' : ''}{(pos.pnlPct).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%)
                     </p>
                   </div>
                   <span className={`font-mono text-lg font-bold ${pos.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {pos.pnlPct >= 0 ? '+' : ''}{pos.pnlPct.toFixed(0)}%
+                    {pos.pnlPct >= 0 ? '+' : ''}{(pos.pnlPct).toLocaleString(speechLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 0 })}%
                   </span>
                 </div>
                 <div className="h-1 w-full bg-white/[0.04] rounded-full overflow-hidden">
@@ -2880,7 +2916,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               </div>
             )) : (
               <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded text-center">
-                <span className="text-[9px] font-mono text-white/20">NO ACTIVE POSITIONS</span>
+                <span className="text-[9px] font-mono text-white/20">{ui("NO ACTIVE POSITIONS", "SIN POSICIONES ACTIVAS")}</span>
               </div>
             )}
           </div>
@@ -2888,7 +2924,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
         {/* Agent Status — Stitch "Active Neural Nodes" */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">Active Neural Nodes</h3>
+          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">{ui("Active Neural Nodes", "Agentes activos")}</h3>
           <div className="grid grid-cols-1 gap-2">
             {(() => {
               // Personality-based CIO styling (Gemini design)
@@ -2918,7 +2954,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   <div className="flex-1">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-xs">{agent.name}</span>
-                      {isActive && <span className={`font-mono text-[9px] ${agent.textColor}`}>SPEAKING...</span>}
+                      {isActive && <span className={`font-mono text-[9px] ${agent.textColor}`}>{ui("SPEAKING...", "HABLANDO…")}</span>}
                     </div>
                     {isActive ? (
                       <div className="flex gap-[3px] mt-1.5 h-3 items-end">
@@ -2928,7 +2964,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                         ))}
                       </div>
                     ) : (
-                      <p className="font-mono text-[8px] text-white/20 mt-0.5">IDLE: {agent.idleText}</p>
+                      <p className="font-mono text-[8px] text-white/20 mt-0.5">{ui("IDLE:", "EN REPOSO:")}{agent.idleText}</p>
                     )}
                   </div>
                 </div>
@@ -2939,24 +2975,24 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
 
         {/* Macro Stream */}
         <div className="space-y-3">
-          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">Macro Stream</h3>
+          <h3 className="font-mono text-[9px] text-white/25 uppercase tracking-widest">{ui("Macro Stream", "Panorama macro")}</h3>
           <div className="grid grid-cols-2 gap-2">
             {marketBadge ? (
               <>
                 <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded">
-                  <p className="font-mono text-[8px] text-white/25">FEAR & GREED</p>
+                  <p className="font-mono text-[8px] text-white/25">{ui("FEAR & GREED", "MIEDO Y CODICIA")}</p>
                   <p className={`font-mono text-lg font-bold ${marketBadge.fgi >= 60 ? 'text-green-400' : marketBadge.fgi <= 40 ? 'text-red-400' : 'text-amber-400'}`}>{marketBadge.fgi}</p>
-                  <p className="font-mono text-[7px] text-white/20">{marketBadge.fgiLabel}</p>
+                  <p className="font-mono text-[7px] text-white/20">{marketMoodLabel(marketBadge.fgiLabel)}</p>
                 </div>
                 <div className="bg-white/[0.02] border border-white/[0.04] p-3 rounded">
-                  <p className="font-mono text-[8px] text-white/25">DXY INDEX</p>
+                  <p className="font-mono text-[8px] text-white/25">{ui("DXY INDEX", "ÍNDICE DXY")}</p>
                   <p className="font-mono text-lg font-bold text-white/80">{marketBadge.dxy}</p>
                   <p className={`font-mono text-[7px] ${marketBadge.dxy > 104 ? 'text-red-400/60' : 'text-green-400/60'}`}>{marketBadge.dxy > 104 ? 'STRONG' : 'WEAK'}</p>
                 </div>
               </>
             ) : (
               <div className="col-span-2 text-center py-4">
-                <span className="text-[8px] font-mono text-white/15 animate-pulse">LOADING MACRO DATA...</span>
+                <span className="text-[8px] font-mono text-white/15 animate-pulse">{ui("LOADING MACRO DATA...", "CARGANDO DATOS MACRO…")}</span>
               </div>
             )}
           </div>
@@ -2978,7 +3014,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                       ))}
                     </div>
                     <span className={`font-mono text-[10px] font-bold ${isUp ? 'text-green-400' : 'text-red-400'}`}>
-                      ${t.last?.toLocaleString(undefined, { maximumFractionDigits: t.last < 1 ? 4 : 2 })}
+                      ${t.last?.toLocaleString(speechLocale(), { maximumFractionDigits: t.last < 1 ? 4 : 2 })}
                     </span>
                   </div>
                 );
@@ -3010,18 +3046,18 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             className="block w-full bg-green-500/[0.06] border border-green-500/15 rounded p-3 hover:bg-green-500/[0.1] transition-all text-left">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm">✈️</span>
-              <span className="text-[9px] font-mono font-bold text-green-400">ROUTE INTEL TO TELEGRAM</span>
+              <span className="text-[9px] font-mono font-bold text-green-400">{ui("ROUTE INTEL TO TELEGRAM", "RECIBE ANÁLISIS EN TELEGRAM")}</span>
             </div>
-            <p className="text-[8px] font-mono text-white/25">Get your debates as DM · 100 free reports</p>
+            <p className="text-[8px] font-mono text-white/25">{ui("Get your debates as DM · 100 free reports", "Recibe debates por mensaje · 100 reportes gratis")}</p>
           </button>
 
           {/* B2B: Group activation */}
           <Link to="/agentic-world/bobby/b2b" className="block bg-blue-500/[0.06] border border-blue-500/15 rounded p-3 hover:bg-blue-500/[0.1] transition-all">
             <div className="flex items-center gap-2 mb-1">
               <span className="text-sm">⚡</span>
-              <span className="text-[9px] font-mono font-bold text-blue-400">TELEGRAM GROUPS</span>
+              <span className="text-[9px] font-mono font-bold text-blue-400">{ui("TELEGRAM GROUPS", "GRUPOS DE TELEGRAM")}</span>
             </div>
-            <p className="text-[8px] font-mono text-white/25">Add Bobby to your trading group · $8/mo</p>
+            <p className="text-[8px] font-mono text-white/25">{ui("Add Bobby to your trading group · $8/mo", "Añade Bobby a tu grupo · $8/mes")}</p>
           </Link>
         </div>
       </aside>
@@ -3037,25 +3073,25 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             <span className="text-[7px] font-mono text-white/20 uppercase tracking-wider" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
               {tradingMode === 'auto' ? '🤖 AUTO' : tradingMode === 'confirm' ? '👤 CONFIRM' : '📄 PAPER'}
             </span>
-            {tradingRoom && <span className="text-[7px] font-mono text-green-400/40 uppercase">ROOM</span>}
+            {tradingRoom && <span className="text-[7px] font-mono text-green-400/40 uppercase">{ui("ROOM", "SALA")}</span>}
             {currentVibe && (
               <span className={`text-[7px] font-mono px-1 py-0.5 rounded ${currentVibe.regimeBias === 'RISK_ON' ? 'text-green-400/60 bg-green-500/10' :
                   currentVibe.regimeBias === 'RISK_OFF' ? 'text-red-400/60 bg-red-500/10' :
                     currentVibe.regimeBias === 'PANIC' ? 'text-red-400/80 bg-red-500/15' :
                       'text-white/30 bg-white/5'
                 }`}>
-                VIBE: {currentVibe.regimeBias}
+                {ui("VIBE:", "ENFOQUE:")}{currentVibe.regimeBias}
               </span>
             )}
           </div>
           <div className="flex items-center gap-2">
             {hudEquity !== null && (
               <span className="text-[8px] font-mono text-white/30">
-                ${hudEquity.toFixed(2)}
+                ${(hudEquity).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             )}
             {hudPositions.length > 0 && (
-              <span className="text-[7px] font-mono text-white/20">{hudPositions.length} pos</span>
+              <span className="text-[7px] font-mono text-white/20">{hudPositions.length} {ui("pos", "posiciones")}</span>
             )}
           </div>
         </div>
@@ -3067,9 +3103,9 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               {[...tickerTape, ...tickerTape].map((t, i) => (
                 <span key={`${t.symbol}-${i}`} className="inline-flex items-center gap-1.5 mx-4 text-[9px] font-mono">
                   <span className="text-white/50">{t.symbol}</span>
-                  <span className="text-white/70">${t.last?.toLocaleString(undefined, { maximumFractionDigits: t.last < 1 ? 4 : 2 })}</span>
+                  <span className="text-white/70">${t.last?.toLocaleString(speechLocale(), { maximumFractionDigits: t.last < 1 ? 4 : 2 })}</span>
                   <span className={t.change24h >= 0 ? 'text-green-400/60' : 'text-red-400/60'}>
-                    {t.change24h >= 0 ? '▲' : '▼'}{Math.abs(t.change24h).toFixed(2)}%
+                    {t.change24h >= 0 ? '▲' : '▼'}{(Math.abs(t.change24h)).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
                   </span>
                 </span>
               ))}
@@ -3091,14 +3127,14 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
           <div className="pointer-events-none absolute inset-x-0 top-0 h-full opacity-35 [background-image:linear-gradient(rgba(0,82,255,.22)_1px,transparent_1px),linear-gradient(90deg,rgba(0,82,255,.22)_1px,transparent_1px)] [background-size:42px_42px]" />
           <div className="pointer-events-none absolute h-[420px] w-[420px] rounded-full border border-[#0052ff]/20" />
           <div className="pointer-events-none absolute h-[280px] w-[280px] rounded-full border border-[#0052ff]/25 shadow-[0_0_100px_rgba(0,82,255,.25)]" />
-          <div className="relative z-10 mb-2 text-center"><div className="font-mono text-[10px] font-bold uppercase tracking-[.24em] text-[#7da6ff]">Voice-first decision room</div><h1 className="mt-3 text-3xl font-extrabold tracking-[-.065em] sm:text-5xl">Talk it through.</h1><p className="mt-2 text-sm text-white/45">Bobby listens, challenges the thesis, then answers.</p></div>
+          <div className="relative z-10 mb-2 text-center"><div className="font-mono text-[10px] font-bold uppercase tracking-[.24em] text-[#7da6ff]">{ui("Voice-first decision room", "Sala de decisión por voz")}</div><h1 className="mt-3 text-3xl font-extrabold tracking-[-.065em] sm:text-5xl">{ui("Talk it through.", "Conversemos.")}</h1><p className="mt-2 text-sm text-white/45">{ui("Bobby listens, challenges the thesis, then answers.", "Bobby escucha, cuestiona la tesis y responde.")}</p></div>
           {/* Orbital position chips — float around the orb */}
           {hudPositions.length > 0 && orbState === 'idle' && (
             <div className="flex items-center gap-1.5 mb-1">
               {hudPositions.slice(0, 3).map((pos, i) => (
                 <span key={i} className={`text-[7px] font-mono px-1.5 py-0.5 rounded ${pos.pnl >= 0 ? 'text-green-400/60 bg-green-500/8' : 'text-red-400/60 bg-red-500/8'
                   }`}>
-                  {pos.direction === 'SHORT' ? '↓' : '↑'} {pos.symbol} {pos.pnl >= 0 ? '+' : ''}{pos.pnlPct.toFixed(1)}%
+                  {pos.direction === 'SHORT' ? '↓' : '↑'} {pos.symbol} {pos.pnl >= 0 ? '+' : ''}{(pos.pnlPct).toLocaleString(speechLocale(), { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%
                 </span>
               ))}
             </div>
@@ -3113,7 +3149,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             </>
           )}
           <span className="relative z-10 mt-2 font-mono text-[9px] tracking-[.18em] text-[#7da6ff]">
-            {orbState === 'listening' ? (lang === 'es' ? 'TOCA PARA PARAR · ESCUCHANDO...' : 'TAP TO STOP · LISTENING...') : orbState === 'thinking' ? (lang === 'es' ? 'PROCESANDO...' : 'PROCESSING...') : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (lang === 'es' ? 'TOCA PARA INTERRUMPIR' : 'TAP TO INTERRUPT')) : (lang === 'es' ? 'TOCA PARA HABLAR' : 'TAP TO TALK')}
+            {orbState === 'listening' ? (ui('TAP TO STOP · LISTENING...', 'TOCA PARA PARAR · ESCUCHANDO...')) : orbState === 'thinking' ? (ui('PROCESSING...', 'PROCESANDO...')) : orbState === 'speaking' ? (activeAgent === 'alpha' ? '🟢 ALPHA HUNTER' : activeAgent === 'redteam' ? '🔴 RED TEAM' : activeAgent === 'cio' ? '🟡 BOBBY CIO' : (ui('TAP TO INTERRUPT', 'TOCA PARA INTERRUMPIR'))) : (ui('TAP TO TALK', 'TOCA PARA HABLAR'))}
           </span>
           {/* Live market sentiment badges */}
           {marketBadge && orbState === 'idle' && (
@@ -3122,7 +3158,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   marketBadge.fgi >= 75 ? 'text-green-400/80 bg-green-500/8' :
                     'text-amber-400/80 bg-amber-500/8'
                 }`}>
-                FGI {marketBadge.fgi} · {marketBadge.fgiLabel}
+                FGI {marketBadge.fgi} · {marketMoodLabel(marketBadge.fgiLabel)}
               </span>
               <span className={`text-[8px] font-mono px-1.5 py-0.5 rounded-full ${marketBadge.dxy > 104 ? 'text-red-400/60 bg-red-500/8' :
                   marketBadge.dxy < 100 ? 'text-green-400/60 bg-green-500/8' :
@@ -3195,15 +3231,13 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               {textOnly && !latestAdvisor && !isProcessing && (
                 <div className="mx-auto w-full max-w-xl rounded-2xl border border-[#0052ff]/20 bg-[#0052ff]/[0.06] p-6 text-center shadow-[0_20px_70px_rgba(0,0,0,.25)] sm:p-8">
                   <div className="font-mono text-[10px] font-bold uppercase tracking-[.22em] text-[#7da6ff]">
-                    {lang === 'es' ? 'Canal de texto' : 'Text channel'}
+                    {ui('Text channel', 'Canal de texto')}
                   </div>
                   <h1 className="mt-3 text-2xl font-extrabold tracking-[-.05em] text-white sm:text-3xl">
-                    {lang === 'es' ? 'Escribe antes de actuar.' : 'Type before you act.'}
+                    {ui('Type before you act.', 'Escribe antes de actuar.')}
                   </h1>
                   <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-white/45">
-                    {lang === 'es'
-                      ? 'Plantea tu tesis o pregunta. Bobby la contrasta con datos, riesgo y una decisión explicable.'
-                      : 'Share your thesis or question. Bobby will test it against data, risk, and an explainable decision.'}
+                    {ui('Share your thesis or question. Bobby will test it against data, risk, and an explainable decision.', 'Plantea tu tesis o pregunta. Bobby la contrasta con datos, riesgo y una decisión explicable.')}
                   </p>
                 </div>
               )}
@@ -3238,23 +3272,19 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                     >
                       {/* Deep dive — expand the argument */}
                       <button
-                        onClick={() => sendMessage(lang === 'es'
-                          ? 'Profundiza más en el análisis. ¿Por qué exactamente? Dame los datos específicos, los precedentes históricos, y los escenarios de riesgo que no mencionaste.'
-                          : 'Deep dive. Why exactly? Give me the specific data, historical precedents, and risk scenarios you didn\'t mention.'
+                        onClick={() => sendMessage(ui('Deep dive. Why exactly? Give me the specific data, historical precedents, and risk scenarios you didn\'t mention.', 'Profundiza más en el análisis. ¿Por qué exactamente? Dame los datos específicos, los precedentes históricos, y los escenarios de riesgo que no mencionaste.')
                         )}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-yellow-400/70 hover:border-yellow-500/20 hover:bg-yellow-500/[0.05] transition-all active:scale-[0.97]"
                       >
-                        🔍 {lang === 'es' ? 'Profundizar' : 'Deep Dive'}
+                        🔍 {ui('Deep Dive', 'Profundizar')}
                       </button>
                       {/* Challenge — argue against Bobby */}
                       <button
-                        onClick={() => sendMessage(lang === 'es'
-                          ? 'No estoy de acuerdo. Arguye en contra de tu propia posición. ¿Qué podría salir mal?'
-                          : 'I disagree. Argue against your own position. What could go wrong?'
+                        onClick={() => sendMessage(ui('I disagree. Argue against your own position. What could go wrong?', 'No estoy de acuerdo. Arguye en contra de tu propia posición. ¿Qué podría salir mal?')
                         )}
                         className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-red-400/70 hover:border-red-500/20 hover:bg-red-500/[0.05] transition-all active:scale-[0.97]"
                       >
-                        ⚡ {lang === 'es' ? 'Desafiar' : 'Challenge'}
+                        ⚡ {ui('Challenge', 'Desafiar')}
                       </button>
                       {/* Share voice note */}
                       {hasResponseAudio && (
@@ -3263,7 +3293,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                           className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-mono text-white/30 border border-white/[0.06] bg-white/[0.02] hover:text-green-400/70 hover:border-green-500/20 hover:bg-green-500/[0.05] transition-all active:scale-[0.97]"
                         >
                           <Share2 className="w-3 h-3" />
-                          {lang === 'es' ? 'Compartir' : 'Share'}
+                          {ui('Share', 'Compartir')}
                         </button>
                       )}
                     </motion.div>
@@ -3325,14 +3355,12 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   >
                     <div className="border border-green-500/15 bg-green-500/[0.03] backdrop-blur-sm p-3 flex items-center justify-between gap-3">
                       <span className="text-[10px] font-mono text-green-400/50">
-                        {pendingBlocks.length} {lang === 'es' ? (pendingBlocks.length === 1 ? 'bloque restante' : 'bloques restantes')
-                          : lang === 'pt' ? (pendingBlocks.length === 1 ? 'bloco restante' : 'blocos restantes')
-                            : (pendingBlocks.length === 1 ? 'block remaining' : 'blocks remaining')}
+                        {pendingBlocks.length} {pendingBlocks.length === 1 ? ui('block remaining', 'bloque restante') : ui('blocks remaining', 'bloques restantes')}
                       </span>
                       <button
                         onClick={() => { setAwaitingContinue(false); revealNextBlock(); }}
                         className="text-[11px] px-4 py-1.5 bg-green-500/20 border border-green-500/30 text-green-400 hover:bg-green-500/30 transition-colors font-mono tracking-wider animate-pulse">
-                        {lang === 'es' ? 'CONTINUAR ▸' : lang === 'pt' ? 'CONTINUAR ▸' : 'CONTINUE ▸'}
+                        {ui('CONTINUE ▸', 'CONTINUAR ▸')}
                       </button>
                     </div>
                   </motion.div>
@@ -3368,9 +3396,7 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
             {isGuest && (
               <div className="max-w-4xl mx-auto px-4 py-1">
                 <span className="text-[9px] font-mono text-amber-400/50">
-                  {lang === 'es'
-                    ? `${GUEST_MAX_MESSAGES - guestMessageCount} mensaje${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} gratis restante${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'}`
-                    : `${GUEST_MAX_MESSAGES - guestMessageCount} free message${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} remaining`}
+                  {ui(`${GUEST_MAX_MESSAGES - guestMessageCount} free messages remaining`, `${GUEST_MAX_MESSAGES - guestMessageCount} mensaje${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'} gratis restante${GUEST_MAX_MESSAGES - guestMessageCount === 1 ? '' : 's'}`)}
                 </span>
               </div>
             )}
@@ -3381,12 +3407,11 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   return [
                     { label: 'BTC', display: 'BTC', icon: '₿' },
                     { label: 'ETH', display: 'ETH', icon: 'Ξ' },
-                    { label: 'NVDA', display: 'NVDA', icon: '◈' },
-                    { label: 'SPY', display: 'S&P 500', icon: '◉' },
-                    { label: 'Gold', display: qa.gold, icon: '◆' },
-                    { label: 'All Prices', display: qa.allPrices, icon: '$' },
-                    { label: 'Analyze Market', display: qa.analyze, icon: '>' },
-                    { label: lang === 'es' ? '¿Cómo ves el mercado hoy? Dame el debate completo.' : "What's your read on the market right now? Give me the full debate.", display: 'Debate', icon: '⚔' },
+                    ...(() => { const c = marketContext(); const stocks = regionalDefaults(c.language, c.locale, c.country); return (stocks.length ? stocks.slice(0, 2).map(stock => ({ label: stock.symbol, display: stock.name, icon: '◈' })) : [{ label: 'NVDA', display: 'NVDA', icon: '◈' }, { label: 'SPY', display: 'S&P 500', icon: '◉' }]); })(),
+                    { label: ui('Gold', "Oro"), display: qa.gold, icon: '◆' },
+                    { label: ui('All Prices', "Todos los precios"), display: qa.allPrices, icon: '$' },
+                    { label: ui('Analyze Market', "Analizar mercado"), display: qa.analyze, icon: '>' },
+                    { label: ui("What's your read on the market right now? Give me the full debate.", '¿Cómo ves el mercado hoy? Dame el debate completo.'), display: 'Debate', icon: '⚔' },
                   ];
                 })().map(a => (
                   <button key={a.label} onClick={() => sendMessage(a.label)} disabled={isProcessing}
@@ -3397,12 +3422,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                 ))}
                 <Link to="/agentic-world/forum"
                   className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-yellow-500/10 bg-yellow-500/[0.03] text-yellow-400/50 hover:bg-yellow-500/[0.08] hover:text-yellow-400/80 hover:border-yellow-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
-                  <span>⚔</span> Forum
-                </Link>
+                  <span>⚔</span> {ui("Forum", "Foro")}</Link>
                 <Link to="/agentic-world/polymarket"
                   className="flex items-center gap-0.5 sm:gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[9px] sm:text-[10px] border border-cyan-500/10 bg-cyan-500/[0.03] text-cyan-400/50 hover:bg-cyan-500/[0.08] hover:text-cyan-400/80 hover:border-cyan-500/20 transition-all font-mono whitespace-nowrap flex-shrink-0">
-                  <span>◉</span> Dashboard
-                </Link>
+                  <span>◉</span> {ui("Dashboard", "Panel")}</Link>
               </div>
             </div>
             <div className="mx-auto flex max-w-3xl items-center gap-3 px-4 py-2 sm:px-6">
@@ -3419,14 +3442,14 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
               {!inputText && !isProcessing && messages.length < 3 && (
                 <div className="flex items-center gap-1 mr-1 overflow-x-auto no-scrollbar">
                   {[
-                    { label: '⚔ Pressure-test', cmd: 'Pressure-test this trade: long BTC at current price, 3x leverage, stop at -5%. Walk me through the debate.' },
-                    { label: '◎ Playbook', cmd: 'Run a wheel playbook on ETH: sell cash-secured put one week out, target 15 delta. What breaks it?' },
-                    { label: '⬡ Audit debate', cmd: 'Show me the latest resolved debate on-chain. Which guardrails fired and why?' },
-                    { label: '₿ BTC', cmd: 'Analyze BTC' },
-                    { label: 'Ξ ETH', cmd: 'Analyze ETH' },
-                    { label: '◆ NVDA', cmd: 'Analyze NVDA' },
-                    { label: '> Full scan', cmd: 'Full market analysis with all indicators' },
-                    { label: '× Debate', cmd: 'Should I long BTC right now?' },
+                    { label: ui('⚔ Pressure-test', "⚔ Contrastar"), cmd: ui('Pressure-test this trade: long BTC at current price, 3x leverage, stop at -5%. Walk me through the debate.', "Contrasta esta hipótesis: largo BTC al precio actual, apalancamiento 3x y stop al -5%. Explica el debate.") },
+                    { label: ui('◎ Playbook', "◎ Guía de escenarios"), cmd: ui('Run a wheel playbook on ETH: sell cash-secured put one week out, target 15 delta. What breaks it?', "Revisa una estrategia wheel de ETH: put respaldada por efectivo a una semana, delta objetivo 15. ¿Qué la invalidaría?") },
+                    { label: ui('⬡ Audit debate', "⬡ Revisar debate"), cmd: ui('Show me the latest resolved debate on-chain. Which guardrails fired and why?', "Muéstrame el último debate resuelto en cadena. ¿Qué controles se activaron y por qué?") },
+                    { label: '₿ BTC', cmd: ui('Analyze BTC', "Analizar BTC") },
+                    { label: 'Ξ ETH', cmd: ui('Analyze ETH', "Analizar ETH") },
+                    { label: '◆ NVDA', cmd: ui('Analyze NVDA', "Analizar NVDA") },
+                    { label: ui('> Full scan', "> Análisis completo"), cmd: ui('Full market analysis with all indicators', "Análisis de mercado con todos los indicadores") },
+                    { label: ui('× Debate', "× Debate"), cmd: ui('Should I long BTC right now?', "¿Qué riesgos tendría una posición larga en BTC ahora?") },
                   ].map(btn => (
                     <button key={btn.label} onClick={() => { setInputText(btn.cmd); setTimeout(() => sendMessage(), 100); }}
                       className="shrink-0 font-mono text-[9px] px-2 py-1 rounded bg-white/[0.04] border border-white/[0.08] text-white/50 hover:text-green-400 hover:border-green-500/30 hover:bg-green-500/5 transition-all whitespace-nowrap">
@@ -3446,10 +3469,10 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                   }, 300);
                 }}
                 placeholder={textOnly
-                  ? `${lang === 'es' ? 'Escribe a' : lang === 'pt' ? 'Escreva para' : 'Type to'} ${advisorName}...`
+                  ? `${ui('Type to', 'Escribe a')} ${advisorName}...`
                   : isListening
                     ? t('listening') as string
-                    : `${lang === 'es' ? 'Habla con' : lang === 'pt' ? 'Fale com' : 'Talk to'} ${advisorName}...`}
+                    : `${ui('Talk to', 'Habla con')} ${advisorName}...`}
                 className={`flex-1 rounded-xl border bg-white/[.035] px-4 py-3 text-[13px] text-white/90 placeholder:text-white/30 outline-none transition-colors ${isListening ? 'border-[#0052ff]/60' : 'border-white/10 focus:border-[#0052ff]/60'
                   }`}
                 disabled={isProcessing} />
@@ -3468,20 +3491,20 @@ export function AdamsChat({ onSwitchToVoice, textOnly = false }: { onSwitchToVoi
                 <Lock className="w-4 h-4 text-amber-400/80 flex-shrink-0" />
                 <span className="text-amber-400/80 text-[11px] font-mono">
                   {guestMessageCount >= GUEST_MAX_MESSAGES
-                    ? (lang === 'es' ? '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby' : 'Like what you saw? Sign up to keep debating with Bobby')
-                    : (lang === 'es' ? 'Inicia sesión para hablar con Bobby' : 'Sign in to talk to Bobby')}
+                    ? (ui('Like what you saw? Sign up to keep debating with Bobby', '¿Te gustó? Crea una cuenta para seguir debatiendo con Bobby'))
+                    : (ui('Sign in to talk to Bobby', 'Inicia sesión para hablar con Bobby'))}
                 </span>
               </div>
               <div className="flex gap-2">
                 <button
                   onClick={() => navigate('/login?redirect=' + encodeURIComponent(window.location.pathname))}
                   className="text-[10px] px-4 py-1.5 bg-amber-500/20 border border-amber-500/40 text-amber-300 hover:bg-amber-500/30 transition-colors font-mono tracking-wider">
-                  {lang === 'es' ? 'INICIAR SESIÓN' : lang === 'pt' ? 'ENTRAR' : 'SIGN IN'}
+                  {ui('SIGN IN', 'INICIAR SESIÓN')}
                 </button>
                 <button
                   onClick={() => navigate('/register?redirect=' + encodeURIComponent(window.location.pathname))}
                   className="text-[10px] px-4 py-1.5 border border-green-500/30 text-green-400/60 hover:text-green-400 hover:border-green-500/50 transition-colors font-mono tracking-wider">
-                  {lang === 'es' ? 'CREAR CUENTA' : lang === 'pt' ? 'CRIAR CONTA' : 'SIGN UP'}
+                  {ui('SIGN UP', 'CREAR CUENTA')}
                 </button>
               </div>
             </div>

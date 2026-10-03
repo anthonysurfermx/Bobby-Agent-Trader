@@ -15,7 +15,7 @@ import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { Check, Sprout, X } from 'lucide-react';
-import { isSpanish, speechLocale, t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { sfxSuccess, sfxTock } from '@/lib/companions/sfx';
 import { getGrant, onGrants, progressHeaders, setGrant } from '@/lib/companions/sync';
 import { artOf, STUDIO_PATH } from '@/lib/trader-land/public';
@@ -31,14 +31,13 @@ export default function LandSeedCard({ eventId, onClose, compact = false }: { ev
   const onScreen = useRef(true);
   useEffect(() => { onScreen.current = true; return () => { onScreen.current = false; }; }, []);
   if (!grant || !grant.item) return null;
-  const spanish = isSpanish();
   const art = (piece: PieceSummary | null) => {
     const item = piece ? manifest?.items.find((entry) => entry.id === piece.id) : undefined;
     if (!item) return null;
     const value = artOf(item);
     return value.thumb?.url ?? value.albedo.url;
   };
-  const name = (piece: PieceSummary | null) => pieceName(piece, spanish);
+  const name = (piece: PieceSummary | null) => pieceName(piece);
   const shell = `relative rounded-2xl border border-emerald-200/20 bg-emerald-200/[0.04] ${compact ? 'p-4' : 'p-5'}`;
   const close = <button type="button" onClick={onClose} className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.05] text-white/60" aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={14} /></button>;
 

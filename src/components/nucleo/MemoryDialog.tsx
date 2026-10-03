@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { isPortuguese, isSpanish, t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { sfxTock } from '@/lib/companions/sfx';
 import {
   fetchMemory, forgetAllMemory, forgetAsset, patchMemory,
@@ -29,7 +29,7 @@ function ago(iso: string): string {
   const days = Math.floor((Date.now() - Date.parse(iso)) / 86_400_000);
   if (!Number.isFinite(days) || days <= 0) return t('today', 'hoy', 'hoje');
   try {
-    return new Intl.RelativeTimeFormat(isSpanish() ? 'es' : isPortuguese() ? 'pt-BR' : 'en', { numeric: 'auto' }).format(-days, 'day');
+    return new Intl.RelativeTimeFormat(speechLocale(), { numeric: 'auto' }).format(-days, 'day');
   } catch { return t(`${days} days ago`, `hace ${days} días`, `há ${days} dias`); }
 }
 const times = (n: number) => (n === 1 ? t('1 time', '1 vez', '1 vez') : t(`${n} times`, `${n} veces`, `${n} vezes`));

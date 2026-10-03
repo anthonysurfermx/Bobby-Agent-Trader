@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useReducedMotion } from 'framer-motion';
-import { isSpanish, t } from '@/lib/companions/i18n';
+import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, t } from '@/lib/companions/i18n';
 import { APP_STORE_URL } from '@/lib/app-store';
 
 const DESK_URL = '/desk';
@@ -36,9 +36,13 @@ function useProtocolStats() {
   return stats;
 }
 
-function setLang(next: 'en' | 'es') {
+function setLang(next: Lang) {
   try { localStorage.setItem('bobby_lang', next); } catch { /* private mode */ }
-  window.location.reload();
+  const url = new URL(window.location.href);
+  url.searchParams.set('lang', next);
+  const requestedLocale = url.searchParams.get('locale');
+  if (requestedLocale && requestedLocale.split(/[-_]/)[0].toLowerCase() !== next) url.searchParams.delete('locale');
+  window.location.replace(url.href);
 }
 
 function AppleGlyph({ className = 'h-5 w-4' }: { className?: string }) {
@@ -64,7 +68,7 @@ export default function BobbyAppLandingB() {
   const stats = useProtocolStats();
   const reduceMotion = useReducedMotion();
   const record = stats?.debateActivity;
-  const locale = isSpanish() ? 'es-MX' : 'en-US';
+  const locale = currentLocale();
 
   const numbers = useMemo(() => {
     const written = Number(record?.commitmentsCreated);
@@ -94,6 +98,7 @@ export default function BobbyAppLandingB() {
   return (
     <div className="min-h-screen antialiased" style={{ background: CREAM, color: INK, fontFamily: "'Instrument Sans', system-ui, sans-serif" }}>
       <Helmet>
+        <html lang={currentLocale()} />
         <title>{pageTitle}</title>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700;12..96,800&family=Instrument+Sans:wght@400;500;600&display=swap" />
         <meta name="robots" content="noindex" />
@@ -111,9 +116,9 @@ export default function BobbyAppLandingB() {
             <a href="#record" className="text-[15px] font-medium text-[#14120F]/70 transition hover:text-[#0D3325]">{t('The record', 'El historial')}</a>
           </nav>
           <div className="flex items-center gap-3 lg:gap-6">
-            <button type="button" onClick={() => setLang(isSpanish() ? 'en' : 'es')} className="min-h-11 px-1 text-[13px] font-semibold text-[#14120F]/60 transition hover:text-[#14120F] lg:text-[15px]">
-              {isSpanish() ? 'EN' : 'ES'}
-            </button>
+            <select aria-label={t('Language', 'Idioma')} value={lang()} onChange={(event) => setLang(event.target.value as Lang)} className="min-h-11 px-1 text-[13px] font-semibold text-[#14120F]/60 transition hover:text-[#14120F] lg:text-[15px] bg-transparent">
+              {LANGS.map((language) => <option key={language} value={language} className="bg-[#111] text-white">{LANG_NAME[language]}</option>)}
+            </select>
             <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer" className="inline-flex h-9 items-center rounded-full px-4 text-[13px] font-semibold transition hover:opacity-85 lg:h-11 lg:px-6 lg:text-[15px]" style={{ background: INK, color: CREAM }}>
               {t('Get the app', 'Descárgala')}
             </a>
@@ -174,8 +179,7 @@ export default function BobbyAppLandingB() {
               {t('Ask out loud.', 'Dilo en voz alta.')}<br />{t('Any market.', 'Cualquier mercado.')}
             </h2>
             <p className="mt-4 max-w-[330px] text-[17px] leading-[1.5] text-[#F4EDE1]/76 lg:max-w-lg lg:text-xl">
-              {t('Say it in the elevator, type it in bed. Bitcoin, Nvidia, gold, 600 more — in Spanish or English, whichever comes out first.',
-                'Dilo en el elevador, escríbelo en la cama. Bitcoin, Nvidia, oro y 600 más — en español o en inglés, el que te salga primero.')}
+              {t("Say it in the elevator, type it in bed. Bitcoin, Nvidia, gold, 600 more — in six supported languages.", "Dilo en el ascensor, escríbelo en la cama. Bitcoin, Nvidia, oro y más de 600 activos, en seis idiomas disponibles.")}
             </p>
           </motion.div>
           <div className="relative mx-auto -mb-10 w-[62%] max-w-[240px] lg:mx-0 lg:-mb-16 lg:w-[300px] lg:max-w-none lg:justify-self-center">

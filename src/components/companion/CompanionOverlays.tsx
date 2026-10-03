@@ -24,7 +24,7 @@ export function EvolutionOverlay({ companion, level, onDone }: { companion: Comp
         <img src={`/mascots/${companion.id}.webp`} alt="" className="h-28 w-28 rounded-full object-cover" style={{ boxShadow: '0 0 0 1px rgba(242,237,228,.14), 0 0 60px -10px rgba(242,237,228,.35)' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
         <div className="n-label mt-7">{t('Your avatar evolved', 'Tu avatar evolucionó', 'Seu avatar evoluiu')}</div>
         <div className="n-display mt-3 text-[44px] leading-none" style={{ color: '#FFF8EC' }}>{companionName(companion, level.number)}</div>
-        <div className="n-label mt-4" style={{ color: '#A39C91' }}>{t('Level', 'Nivel', 'Nível')} {level.number} · {level.name}</div>
+        <div className="n-label mt-4" style={{ color: '#A39C91' }}>{t('Level', 'Nivel', 'Nível')} {level.number} · {pick(level.label)}</div>
         <div className="mt-4 text-[15px] leading-relaxed" style={{ color: '#A39C91' }}>{t('Earned with discipline, never with volume.', 'Ganado con disciplina, nunca con volumen.', 'Conquistado com disciplina, nunca com volume.')}{pick(LEVEL_TONE[level.number] ?? { en: '', es: '' })}</div>
         <button onClick={onDone} className="n-cta on mt-8 max-w-[260px]">{t('Continue', 'Continuar', 'Continuar')}</button>
       </motion.div>
@@ -105,7 +105,7 @@ export function WorldMapTeaser({ xp, level, onClose }: { xp: number; level: numb
           <motion.div className="absolute inset-0 pointer-events-none" style={{ background: 'radial-gradient(ellipse at 30% 22%, rgba(130,140,160,0.38), transparent 55%)' }} animate={{ x: [-24, 24, -24], y: [0, 14, 0] }} transition={{ repeat: Infinity, duration: 14, ease: 'easeInOut' }} />
           <div className="absolute inset-x-0 top-0 p-4 flex items-center justify-between">
             <div className="text-[10px] font-mono tracking-[0.3em] text-white/85 bg-black/45 backdrop-blur px-3 py-1 rounded-full">{t('TRADER LAND', 'TRADER LAND', 'TRADER LAND')}</div>
-            <button onClick={onClose} aria-label="close" className="h-9 w-9 rounded-full bg-black/55 text-white/85">✕</button>
+            <button onClick={onClose} aria-label={t("Close", "Cerrar", "Fechar")} className="h-9 w-9 rounded-full bg-black/55 text-white/85">✕</button>
           </div>
           <div className="absolute inset-x-0 bottom-0 p-5 pt-20 bg-gradient-to-t from-[#07090c] via-[#07090c]/85 to-transparent">
             <motion.div animate={{ scale: [1, 1.07, 1] }} transition={{ repeat: Infinity, duration: 1.6 }} className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-[11px] font-mono tracking-[0.3em] text-black" style={{ background: GOLD, boxShadow: `0 0 24px ${GOLD}88` }}><Lock size={11} /> {t('SOON', 'PRONTO', 'EM BREVE')}</motion.div>
@@ -120,7 +120,7 @@ export function WorldMapTeaser({ xp, level, onClose }: { xp: number; level: numb
           </div>
           <div className="grid grid-cols-2 gap-2">
             {WORLD_REGIONS.map((name) => (
-              <div key={name} className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 text-[10px] font-mono tracking-[0.12em] text-white/55"><Lock size={10} />{name}</div>
+              <div key={name} className="flex items-center gap-2 rounded-lg bg-white/[0.03] border border-white/[0.06] px-3 py-2 text-[10px] font-mono tracking-[0.12em] text-white/55"><Lock size={10} />{t(name, ({'CRYPTO BAY':'BAHÍA CRIPTO','GOLD MINES':'MINAS DE ORO','WALL STREET CITADEL':'CIUDADELA DE WALL STREET','RISK REEF':'ARRECIFE DE RIESGO'} as Record<string,string>)[name] ?? name)}</div>
             ))}
           </div>
           <button onClick={onClose} className="w-full py-3 rounded-full font-mono text-xs tracking-[0.2em] text-black" style={{ background: GOLD }}>{t('BACK TO THE DESK', 'VOLVER AL DESK', 'VOLTAR AO DESK')}</button>
@@ -211,7 +211,7 @@ export function ItemPreview({ item, xp, level, onClose }: { item: CatalogItem; x
       <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }} className="w-full max-w-md bg-[#0a0a0c] border border-white/[0.06] rounded-t-3xl md:rounded-3xl p-5 text-center" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between text-[10px] font-mono tracking-[0.2em]">
           <div className="flex items-center gap-2" style={{ color: tintFor(companion) }}><img src={`/mascots/${companion.id}.webp`} alt="" className="h-6 w-6 rounded-full object-cover" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />{t(`WORN BY ${companion.label}`, `LO LLEVA ${companion.label}`, `USADO POR ${companion.label}`)}</div>
-          <div className="text-white/45">PREVIEW</div>
+          <div className="text-white/45">{t("PREVIEW", "VISTA PREVIA", "PRÉ-VISUALIZAÇÃO")}</div>
         </div>
         <div className="relative mx-auto mt-3 rounded-2xl overflow-hidden" style={{ width: 300, height: 300, background: `radial-gradient(circle at 50% 45%, ${tint}30, transparent 65%)`, border: `1px solid ${tint}55` }}>
           <BobbyMascot3D look={{ ...DEFAULT_MASCOT, body: companion.palette, avatar: companion.id }} state="idle" size={300} attachments={attachments} />
@@ -245,7 +245,7 @@ export function GearCatalog({ current, xp, level, onClose }: { current: Companio
           header, and the list itself is taller than any screen. */}
       <div className="sticky top-0 z-10 border-b border-white/[0.06] bg-black/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
-          <button onClick={onClose} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.05] pl-2 pr-3.5 font-mono text-[10px] tracking-[0.2em] text-white/80 hover:bg-white/[0.09]" aria-label={t('Back to the desk', 'Volver al desk', 'Voltar ao desk')}><ChevronLeft size={14} />DESK</button>
+          <button onClick={onClose} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white/[0.05] pl-2 pr-3.5 font-mono text-[10px] tracking-[0.2em] text-white/80 hover:bg-white/[0.09]" aria-label={t('Back to the desk', 'Volver al desk', 'Voltar ao desk')}><ChevronLeft size={14} />{t("DESK", "ANÁLISIS", "ANÁLISE")}</button>
           <div className="min-w-0 text-center"><div className="text-white font-mono text-xs tracking-[0.2em]">{t('STILL TO EARN', 'POR CONSEGUIR', 'AINDA POR CONQUISTAR')}</div><div className="truncate text-[9px] font-mono text-white/40 tracking-[0.15em]">{t('DISCIPLINE XP ONLY · NEVER VOLUME', 'SOLO XP DE DISCIPLINA · NUNCA VOLUMEN', 'SÓ DISCIPLINA · NUNCA VOLUME')}</div></div>
           <button onClick={onClose} className="h-9 w-9 shrink-0 rounded-full bg-white/[0.05] text-white/70 hover:bg-white/[0.09]" aria-label={t('Close', 'Cerrar', 'Fechar')}>✕</button>
         </div>
@@ -303,8 +303,8 @@ export function NoTradeCard({ symbol, reason, xp, onClose, compact = false }: { 
   if (compact) {
     return (
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="relative rounded-2xl border border-sky-300/25 bg-sky-300/[0.05] p-4">
-        <button onClick={onClose} className="absolute right-3 top-3 h-8 w-8 rounded-full bg-white/[0.05] text-white/60" aria-label="close">✕</button>
-        <div className="font-mono text-sm tracking-[0.18em] text-sky-200">NO TRADE</div>
+        <button onClick={onClose} className="absolute right-3 top-3 h-8 w-8 rounded-full bg-white/[0.05] text-white/60" aria-label={t("Close", "Cerrar", "Fechar")}>✕</button>
+        <div className="font-mono text-sm tracking-[0.18em] text-sky-200">{t("NO TRADE", "NO OPERAR", "NÃO OPERAR")}</div>
         <div className="mt-2 pr-8 text-sm text-white/70">{reason}</div>
         {xp > 0 && <div className="mt-3 font-mono text-[10px] tracking-[0.12em] text-amber-300">+{xp} XP</div>}
       </motion.div>
@@ -314,8 +314,8 @@ export function NoTradeCard({ symbol, reason, xp, onClose, compact = false }: { 
     <AnimatePresence>
       <motion.div initial={{ opacity: 0, scale: 0.94 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0 }} className="rounded-2xl px-6 pt-5 pb-6 border border-sky-300/30 relative overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 30%, rgba(125,211,252,0.14), rgba(255,255,255,0.02) 55%, transparent 80%)' }}>
         <div className="flex items-center justify-between">
-          <div className="text-[10px] font-mono tracking-[0.25em] text-sky-300">HALO // RISK GATE</div>
-          <button onClick={onClose} className="h-7 w-7 rounded-full bg-white/[0.05] text-white/60 text-xs font-mono" aria-label="close">✕</button>
+          <div className="text-[10px] font-mono tracking-[0.25em] text-sky-300">{t("HALO // RISK GATE", "HALO // FILTRO DE RIESGO", "HALO // FILTRO DE RISCO")}</div>
+          <button onClick={onClose} className="h-7 w-7 rounded-full bg-white/[0.05] text-white/60 text-xs font-mono" aria-label={t("Close", "Cerrar", "Fechar")}>✕</button>
         </div>
         {/* The halo: HALO's own face inside the ring, the shield as its badge — the same beat as the iOS card. */}
         <div className="relative mx-auto mt-6 h-36 w-36">
@@ -327,7 +327,7 @@ export function NoTradeCard({ symbol, reason, xp, onClose, compact = false }: { 
             <ShieldCheck className="text-sky-300" size={22} />
           </div>
         </div>
-        <div className="mt-8 text-center text-4xl md:text-5xl font-mono tracking-[0.22em] text-sky-200">NO TRADE</div>
+        <div className="mt-8 text-center text-4xl md:text-5xl font-mono tracking-[0.22em] text-sky-200">{t("NO TRADE", "NO OPERAR", "NÃO OPERAR")}</div>
         <div className="mt-3 text-center text-white text-lg md:text-xl font-medium">{t('No setup yet. Capital protected.', 'Sin setup todavía. Capital protegido.', 'Sem setup ainda. Capital protegido.')}</div>
         <div className="mt-1 text-center text-white/55 text-xs font-mono">{reason}</div>
         <div className="mt-5 flex items-center justify-between text-[11px] font-mono border border-white/[0.08] rounded-lg px-3 py-2 bg-black/30">

@@ -1,3 +1,5 @@
+import { appLanguage, appLocale, isAppLocale } from '../src/lib/app-language.js';
+import { isListedStockSymbol } from '../src/lib/regional-stocks.js';
 // ============================================================
 // POST /api/voice-tool
 // Executes a tool the Realtime voice session asked for, server-side.
@@ -64,6 +66,7 @@ interface AssetVenue {
 }
 
 async function resolveVenue(ticker: string): Promise<AssetVenue> {
+  if (isListedStockSymbol(ticker)) return { isEquity: true, okxInstId: null };
   const venues = await getBaseVenues(ticker).catch(() => ({ spotId: null, swapId: null }));
   let isEquity = isEquitySymbol(ticker);
   if (!isEquity && !venues.spotId) {
@@ -103,13 +106,13 @@ async function getMarket(symbol: string, venue?: AssetVenue) {
     const quote = stock.quotes?.[0];
     if (quote && Number(quote.price)) {
       return {
-        symbol: ticker, assetType: 'equity', currency: 'USD', marketStatus: 'market-data', available: true,
+        symbol: ticker, assetType: 'equity', currency: quote.currency ?? null, exchange: quote.exchange ?? null, asOf: quote.asOf ?? null, marketStatus: 'market-data', available: true,
         price: Number(quote.price), change_24h_pct: Number(quote.change24h || 0), high_24h: Number(quote.dayHigh || 0), low_24h: Number(quote.dayLow || 0),
       };
     }
     // Yahoo has no quote (OKX-only listing, > 5-letter symbol): the tokenized
     // swap is a real 24/7 market with its own last price.
-    if (resolved.okxInstId) {
+    if (resolved.okxInstId && !isListedStockSymbol(ticker)) {
       const data = await getJson(`${SELF}/api/okx-market?instId=${resolved.okxInstId}&type=all`).catch(() => ({}));
       const t = (data as { ticker?: Record<string, string> }).ticker;
       if (t?.last) {
@@ -208,7 +211,7 @@ async function pulseFromOkxIndicators(ticker: string, instId: string | null, pri
   };
 }
 
-async function runDebate(symbol: string, context?: string, lang: DeskBriefLanguage = 'es') {
+async function runDebate(symbol: string, context?: string, lang: DeskBriefLanguage = 'es', locale?: string) {
   const startedAt = Date.now();
   const ticker = normalizeAssetSymbol(symbol);
   const venue = await resolveVenue(ticker);
@@ -229,6 +232,7 @@ async function runDebate(symbol: string, context?: string, lang: DeskBriefLangua
     market,
     technicals,
     lang,
+    locale,
     latencyMs: Date.now() - startedAt,
   });
 
@@ -303,10 +307,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'run_debate': {
         // Technical pulse only. desk-debate owns authorization and metering of an analysis.
+        const requestedLanguage = args?.language ?? args?.lang;
+        const lang = appLanguage(requestedLanguage, 'es');
+        if (args?.locale !== undefined && !isAppLocale(args.locale, lang)) {
+          return res.status(400).json({ error: 'invalid_request' });
+        }
         const result = await runDebate(
           String(args?.symbol ?? ''),
           args?.context ? String(args.context) : undefined,
-          args?.lang === 'en' ? 'en' : 'es',
+          lang,
+          appLocale(lang, args?.locale ?? requestedLanguage),
         );
         return res.status(200).json({ ...result, access: await readAccess(req) });
       }

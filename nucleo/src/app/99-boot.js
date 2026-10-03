@@ -7,7 +7,18 @@ function applySession(s, first){
   var prevId = SES && SES.companion ? SES.companion.id : null;
   SES = s;
   SES.mic = SES.mic || { state: 'undetermined', onDevice: true };
-  if (first){ LANG = s.language === 'es' ? 'es' : 'en'; D.documentElement.lang = LANG; if (s.reducedMotion) RM = true; }
+  var oldLang = LANG, oldLocale = LOCALE;
+  LANG = NucleoLocale.language(s.language); LOCALE = NucleoLocale.locale(LANG, s.locale || s.speechLocale || s.localeRegion);
+  D.documentElement.lang = LANG;
+  if (!first && oldLocale !== LOCALE){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; }
+  if (first && s.reducedMotion) RM = true;
+  if (!first && oldLocale !== LOCALE && ST && ST.name === 'LISTENING') STATES.LISTENING.interrupt();
+  if (!first && oldLang !== LANG){
+    if (typeof agentNames === 'function') agentNames();
+    if (typeof buildFaces === 'function') buildFaces();
+    if (ST && ST.name === 'IDLE') setGreeting();
+    if (ST && ST.name === 'TYPING'){ el.ta.placeholder = tt('type.placeholder'); att(el.taSend, 'aria-label', tt('type.send')); }
+  }
   var c = s.companion || null, id = c ? c.id : null;
   if (first || id !== prevId){
     ME.id = id; ME.webId = c ? c.webId : null; ME.art = c ? artFor(c.webId) : null; ME.label = c ? titleCase(c.label) : '';
@@ -29,7 +40,8 @@ function refreshCollections(){
 function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
-  BR.on('app.state', function(p){ fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
+  BR.on('account.changed', function(){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; el.ta.value = ''; taAutosize(); });
+  BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
   BR.on('speech.level', function(p){ SPEECH.lvl = clamp(+(p && p.level) || 0, 0, 1); SPEECH.at = clk; });
@@ -84,7 +96,7 @@ function boot(){
     });
     at(0.5, start);
     bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE' || ST.name === 'WAKE') buildFaces(); }).catch(noop);
-    bcall('suggestions').then(function(x){ SUGG = x; }).catch(noop);
+    bcall('suggestions').then(function(x){ receiveSuggestions(x); }).catch(noop);
     BOOTED = true;
   }, function(e){ logErr('session', e); });
 }

@@ -33,7 +33,7 @@ struct Companion: Identifiable, Equatable {
     }
 }
 
-let bobbyCompanions: [Companion] = [
+var bobbyCompanions: [Companion] { [
     .init(id: "orb", label: "BOBBY", role: L.t("ORB · CORE", "ORBE · NÚCLEO"),
           personality: L.t("the core that orchestrates the squad", "el núcleo que orquesta al equipo"),
           selectLine: L.t("Ready. We read the market together, calmly.", "Listo. Leemos el mercado juntos, con calma."),
@@ -163,7 +163,7 @@ let bobbyCompanions: [Companion] = [
           hue: 0.115, requiredLevel: 1,
           voicePersona: "mellow",
           evolutionNames: ["KEO", "KEO DRIFT", "KEO GLIDE", "KEO SOUL", "KEO ETERNAL"]),
-]
+] }
 
 // ---- Portrait (bundled PNG with tinted-initial fallback) ------
 
@@ -242,13 +242,13 @@ struct CompanionEmoteEvent: Equatable {
     }
 }
 
-let companionLevels: [CompanionLevel] = [
+var companionLevels: [CompanionLevel] { [
     .init(number: 1, name: L.t("SPAWNED", "EN ESCENA"), minXP: 0),
     .init(number: 2, name: L.t("LOCKED IN", "EN LA ZONA"), minXP: 50),
     .init(number: 3, name: L.t("MARKET READER", "LEE EL MERCADO"), minXP: 150),
     .init(number: 4, name: L.t("RISK GUARDIAN", "CUIDA EL RIESGO"), minXP: 400),
     .init(number: 5, name: L.t("ON-CHAIN LEGEND", "LEYENDA ON-CHAIN"), minXP: 1000),
-]
+] }
 
 /// How the companion SPEAKS at each level — the same character, more
 /// earned confidence. Appended to greetings; never changes analysis.

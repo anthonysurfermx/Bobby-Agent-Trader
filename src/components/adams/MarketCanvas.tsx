@@ -17,6 +17,7 @@ import {
   type ISeriesApi,
   type IPriceLine,
 } from 'lightweight-charts';
+import { speechLocale, t as ui, type Lang } from '@/lib/companions/i18n';
 import { deskPrice } from '@/lib/desk-price';
 import { ASSET_GROUPS, getVoiceAsset, isEquitySymbol, type AssetVenue } from '@/lib/voice-assets';
 import { analyzeCandles, type Candle, type MarketAnalysis } from '@/lib/market-indicators';
@@ -91,7 +92,7 @@ export function MarketCanvas({
     indicators: string[];
     levels: ChartLevel[];
   } | null;
-  language: 'es' | 'en';
+  language: Lang;
   onSymbolChange: (symbol: string) => void;
   showSymbolSelector?: boolean;
   compact?: boolean;
@@ -112,6 +113,7 @@ export function MarketCanvas({
    *  once candles arrive, otherwise a debate that lands first never gets drawn. */
   const [span, setSpan] = useState<{ from: number; to: number } | null>(null);
   const [last, setLast] = useState<{ price: number; change: number } | null>(null);
+  const [quoteCurrency, setQuoteCurrency] = useState<string | null>(null);
   const [analysis, setAnalysis] = useState<MarketAnalysis | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const [error, setError] = useState(false);
@@ -149,7 +151,7 @@ export function MarketCanvas({
   );
 
   const formatPrice = (price: number) =>
-    price.toLocaleString('en-US', { maximumFractionDigits: price < 10 ? 4 : 2 });
+    price.toLocaleString(speechLocale(), { maximumFractionDigits: price < 10 ? 4 : 2 });
 
   // --- create chart once ---
   useEffect(() => {
@@ -167,6 +169,7 @@ export function MarketCanvas({
         horzLines: { color: 'rgba(255,255,255,0.04)' },
       },
       rightPriceScale: { borderColor: 'rgba(255,255,255,0.08)' },
+      localization: { locale: speechLocale(), priceFormatter: price => price.toLocaleString(speechLocale(), { maximumFractionDigits: price < 10 ? 4 : 2 }) },
       timeScale: { borderColor: 'rgba(255,255,255,0.08)', timeVisible: true },
       crosshair: {
         vertLine: { color: 'rgba(0,82,255,0.5)', labelBackgroundColor: '#0052ff' },
@@ -261,6 +264,7 @@ export function MarketCanvas({
       ema50Ref.current?.setData([] as never);
       setAnalysis(null);
       setLast(null);
+      setQuoteCurrency(null);
       setSpan(null);
       setUpdatedAt(null);
     };
@@ -313,7 +317,9 @@ export function MarketCanvas({
               hadFetchError = true;
               return [];
             }
-            return parseRows(await response.json());
+            const payload = await response.json();
+            if (!cancelled) setQuoteCurrency(venue === 'equity' && typeof payload.currency === 'string' && /^[A-Z]{3}$/.test(payload.currency) ? payload.currency : venue === 'okx' ? 'USD' : null);
+            return parseRows(payload);
           } catch {
             hadFetchError = true;
             return [];
@@ -490,17 +496,17 @@ export function MarketCanvas({
           {last && (
             <>
               <span className="font-mono text-lg font-bold text-white">
-                {deskPrice(last.price)}
+                {quoteCurrency ? deskPrice(last.price, quoteCurrency, speechLocale()) : formatPrice(last.price)}
               </span>
               <span className={`font-mono text-xs ${positive ? 'text-green-400' : 'text-red-400'}`}>
-                {positive ? '+' : ''}{last.change.toFixed(2)}%
+                {positive ? '+' : ''}{(last.change).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%
               </span>
             </>
           )}
         </div>
         <div className="flex items-center gap-2">
           {showSymbolSelector && <select
-            aria-label={language === 'es' ? 'Seleccionar activo' : 'Select asset'}
+            aria-label={ui('Select asset', 'Seleccionar activo')}
             value={symbol}
             onChange={(event) => onSymbolChange(event.target.value)}
             className="max-w-[118px] rounded-md border border-white/10 bg-white/[0.05] px-2 py-1 font-mono text-[10px] uppercase text-white/70 outline-none transition hover:border-white/25"
@@ -510,7 +516,7 @@ export function MarketCanvas({
                 silently snapping the picker back to BTC. */}
             {!getVoiceAsset(symbol) && <option value={symbol}>{symbol}</option>}
             {ASSET_GROUPS.map((group) => (
-              <optgroup key={group.label} label={language === 'es' ? group.label : ({ Cripto: 'Crypto', Acciones: 'Stocks' }[group.label] ?? group.label)}>
+              <optgroup key={group.label} label={group.label === 'Cripto' ? ui('Crypto', 'Cripto') : group.label === 'Acciones' ? ui('Stocks', 'Acciones') : group.label}>
                 {group.assets.map((asset) => (
                   <option key={asset.symbol} value={asset.symbol}>
                     {asset.symbol} · {asset.name}
@@ -538,15 +544,15 @@ export function MarketCanvas({
       {/* The reading behind the call: computed from the same candles on screen,
           and from the same function the voice tool runs server-side. */}
       <details open={compact ? undefined : true} className="border-b border-white/10">
-        <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{language === 'es' ? 'Indicadores' : 'Indicators'}</summary>
+        <summary className="cursor-pointer px-4 py-2 font-mono text-[10px] text-white/40">{ui('Indicators', 'Indicadores')}</summary>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-white/10 bg-black/25 px-3 py-1.5 font-mono text-[9px] uppercase tracking-[0.08em]">
         {([
-          { label: language === 'es' ? 'Tendencia' : 'Trend', value: language === 'es' ? analysis?.trend : ({ alcista: 'bullish', bajista: 'bearish', lateral: 'sideways' }[analysis?.trend ?? ''] ?? analysis?.trend), tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
+          { label: ui('Trend', 'Tendencia'), value: ({ alcista: ui('bullish', 'alcista'), bajista: ui('bearish', 'bajista'), lateral: ui('sideways', 'lateral') }[analysis?.trend ?? ''] ?? analysis?.trend), tone: analysis?.trend === 'alcista' ? 'text-green-400' : analysis?.trend === 'bajista' ? 'text-[#ff716a]' : 'text-white/50' },
           { label: 'RSI 14', value: analysis?.rsi14, tone: analysis?.momentum === 'sobrecompra' ? 'text-[#ff716a]' : analysis?.momentum === 'sobreventa' ? 'text-green-400' : 'text-white/55' },
           { label: 'EMA 20', value: analysis?.ema20 && formatPrice(analysis.ema20), tone: 'text-[#7da6ff]' },
           { label: 'EMA 50', value: analysis?.ema50 && formatPrice(analysis.ema50), tone: 'text-[#c4b5fd]' },
-          { label: language === 'es' ? 'Soporte' : 'Support', value: analysis?.support && formatPrice(analysis.support), tone: 'text-white/55' },
-          { label: language === 'es' ? 'Resist.' : 'Resistance', value: analysis?.resistance && formatPrice(analysis.resistance), tone: 'text-white/55' },
+          { label: ui('Support', 'Soporte'), value: analysis?.support && formatPrice(analysis.support), tone: 'text-white/55' },
+          { label: ui('Resistance', 'Resist.'), value: analysis?.resistance && formatPrice(analysis.resistance), tone: 'text-white/55' },
           { label: 'ATR', value: analysis?.atrPct !== null && analysis?.atrPct !== undefined ? `${analysis.atrPct}%` : null, tone: 'text-white/55' },
         ] as const).map((item) => (
           <span key={item.label} className="flex items-baseline gap-1">
@@ -564,9 +570,9 @@ export function MarketCanvas({
           the chart in VoiceRoom, so it is not repeated here. */}
       {(!compact || showAgents) && <div className="grid grid-cols-3 gap-1 border-b border-white/10 bg-black/20 px-2 py-2">
         {([
-          { key: 'alpha', label: 'ALPHA', score: debate?.alphaConviction, waiting: language === 'es' ? 'busca el setup' : 'finds the setup' },
-          { key: 'red', label: 'RED TEAM', score: debate?.redTeamSeverity, waiting: language === 'es' ? 'ataca la tesis' : 'tests the thesis' },
-          { key: 'cio', label: 'CIO', score: debate?.cioConviction, waiting: language === 'es' ? 'decide' : 'decides' },
+          { key: 'alpha', label: ui('ALPHA', "CAZADOR"), score: debate?.alphaConviction, waiting: ui('finds the setup', 'busca el setup') },
+          { key: 'red', label: ui('RED TEAM', "ABOGADO DEL DIABLO"), score: debate?.redTeamSeverity, waiting: ui('tests the thesis', 'ataca la tesis') },
+          { key: 'cio', label: 'CIO', score: debate?.cioConviction, waiting: ui('decides', 'decide') },
         ] as const).map((agent) => {
           const line = thesisPrices[agent.key];
           return (
@@ -604,29 +610,19 @@ export function MarketCanvas({
             {PRIVATE_COMPANIES[symbol] ? (
               <>
                 <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/60">
-                  {language === 'es'
-                    ? `${symbol} es una empresa privada — no cotiza en ningún mercado público`
-                    : `${symbol} is a private company — it does not trade on any public market`}
+                  {ui(`${symbol} is a private company — it does not trade on any public market`, `${symbol} es una empresa privada — no cotiza en ningún mercado público`)}
                 </span>
                 <span className="font-mono text-[9px] text-[#7da6ff]">
-                  {language === 'es'
-                    ? `exposición listada más cercana: ${PRIVATE_COMPANIES[symbol].join(' · ')}`
-                    : `closest listed exposure: ${PRIVATE_COMPANIES[symbol].join(' · ')}`}
+                  {ui(`closest listed exposure: ${PRIVATE_COMPANIES[symbol].join(' · ')}`, `exposición listada más cercana: ${PRIVATE_COMPANIES[symbol].join(' · ')}`)}
                 </span>
               </>
             ) : (
               <>
                 <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-white/50">
-                  {language === 'es' ? `sin datos para ${symbol}` : `no data for ${symbol}`}
+                  {ui(`no data for ${symbol}`, `sin datos para ${symbol}`)}
                 </span>
                 <span className="font-mono text-[9px] text-white/25">
-                  {language === 'es'
-                    ? (!getVoiceAsset(symbol)
-                        ? 'no hay velas en las fuentes públicas para este activo'
-                        : `no hay velas en el feed público de ${isStock ? 'acciones' : 'cripto'} para este activo`)
-                    : (!getVoiceAsset(symbol)
-                        ? 'no candles from public sources for this asset'
-                        : `no candles from the public ${isStock ? 'equity' : 'crypto'} feed for this asset`)}
+                  {!getVoiceAsset(symbol) ? ui('no candles from public sources for this asset', 'sin velas en las fuentes públicas de este activo') : ui(`no candles from the public ${isStock ? ui('equity', 'acciones') : ui('crypto', 'cripto')} feed for this asset`, `sin velas en la fuente pública de ${isStock ? ui('equity', 'acciones') : ui('crypto', 'cripto')} para este activo`)}
                 </span>
               </>
             )}
@@ -636,15 +632,15 @@ export function MarketCanvas({
 
       <div className="flex items-center justify-between border-t border-white/10 px-4 py-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white/30">
         <span>{isStock
-          ? (language === 'es' ? 'Yahoo Finance · mercado accionario' : 'Yahoo Finance · equities')
-          : (language === 'es' ? 'feed público · mercado cripto' : 'public feed · crypto market')}
+          ? (ui('Yahoo Finance · equities', 'Yahoo Finance · mercado accionario'))
+          : (ui('public feed · crypto market', 'feed público · mercado cripto'))}
         </span>
         <span className={error ? 'text-red-400' : undefined}>
           {error
-            ? (language === 'es' ? 'sin datos' : 'no data')
+            ? (ui('no data', 'sin datos'))
             : updatedAt
-              ? `${language === 'es' ? 'actualizado' : 'updated'} ${updatedAt.toLocaleTimeString(language === 'es' ? 'es-MX' : 'en-US')}`
-              : (language === 'es' ? 'cargando…' : 'loading…')}
+              ? `${ui('updated', 'actualizado')} ${updatedAt.toLocaleTimeString(speechLocale())}`
+              : (ui('loading…', 'cargando…'))}
         </span>
       </div>
     </div>

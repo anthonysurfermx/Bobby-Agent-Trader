@@ -32,6 +32,7 @@ function inMove(x, y){
   P.x = x; P.y = y; P.hist.push([nowS(), x, y]); if (P.hist.length > 16) P.hist.shift();
   var dx = x - P.x0, dy = y - P.y0, ad = Math.max(Math.abs(dx), Math.abs(dy));
   if (ad > 8) P.moved = true;
+  if (P.hit === 'pill' && W.press && Math.hypot(dx, dy) > 32){ if (W.pr.pill) W.pr.pill[1] = T; askRelease(true); }
   if (P.kind === 'pick?' && ad > 6){
     if (Math.abs(dx) >= Math.abs(dy) && W.state === 'PICK'){ P.kind = 'pick'; W.drag = { kind:'pick', x0:P.x0, x:x, th0:W.theta.x }; } else P.kind = null;
   } else if (P.kind === 'pull?' && ad > 6){
@@ -72,6 +73,7 @@ function inUp(x, y, upHit, cancelled){
   }
   if (P.kind === 'scroll'){ W.drag = null; }
 }
+function cancelInput(){ if (typeof releasePointer === 'function') releasePointer(); PTR_ID = null; inUp(null, null, null, true); }
 /* the pill: hold to ask, hold to agree, tap to choose / cancel / skip / open the read */
 function pillDown(){
   var s = W.state;
@@ -80,7 +82,7 @@ function pillDown(){
 }
 function pillUp(cancelled){
   var s = W.state;
-  if (W.press){ askRelease(); return; }            /* the mic is live only between speech.start and speech.stop */
+  if (W.press){ askRelease(cancelled); return; }   /* a cancelled pointer discards dictation */
   if (s === 'RISK'){ agreeRelease(); return; }
   if (cancelled) return;
   if (s === 'PICK') choose();
@@ -103,22 +105,41 @@ function action(hit, idx){
 function hitOf(t){ var el = t && t.closest ? t.closest('[data-hit]') : null; return el ? [el.getAttribute('data-hit'), +(el.getAttribute('data-i') || -1)] : [null, -1]; }
 function inTypeBox(t){ return !!(t && t.closest && t.closest('#typeBox')); }
 var HP = null;   /* harness: a real tap (< 8 px) toggles pause */
+var PTR_CAPTURE = null;
+function releasePointer(){ var el = PTR_CAPTURE, id = PTR_ID; PTR_CAPTURE = null; PTR_ID = null; if (el && el.releasePointerCapture) try { el.releasePointerCapture(id); } catch(e){} }
 window.addEventListener('pointerdown', function(e){
-  if (inTypeBox(e.target) || !e.isPrimary) return;
+  if (inTypeBox(e.target) || e.isPrimary === false || e.button != null && e.button !== 0) return;
   if (HARNESS){ HP = { id:e.pointerId, x:e.clientX, y:e.clientY }; return; }
   if (PTR_ID != null) return;
   PTR_ID = e.pointerId;
   var h = hitOf(e.target), p = toStage(e.clientX, e.clientY);
+  if (h[0] === 'pill'){
+    if (e.cancelable) e.preventDefault();
+    PTR_CAPTURE = pill; try { pill.setPointerCapture(e.pointerId); } catch(e){}
+  }
   inDown(h[0], h[1], p[0], p[1]);
-}, { passive:true });
-window.addEventListener('pointermove', function(e){ if (HARNESS || e.pointerId !== PTR_ID) return; var p = toStage(e.clientX, e.clientY); inMove(p[0], p[1]); }, { passive:true });
+}, { passive:false });
+window.addEventListener('pointermove', function(e){ if (HARNESS || e.pointerId !== PTR_ID) return; if (PTR && PTR.hit === 'pill' && e.cancelable) e.preventDefault(); var p = toStage(e.clientX, e.clientY); inMove(p[0], p[1]); }, { passive:false });
 window.addEventListener('pointerup', function(e){
   if (HARNESS){ if (HP && HP.id === e.pointerId){ var dx = e.clientX - HP.x, dy = e.clientY - HP.y; HP = null; if (dx * dx + dy * dy < 64) togglePause(); } return; }
-  if (e.pointerId !== PTR_ID) return; PTR_ID = null;
+  if (e.pointerId !== PTR_ID) return; releasePointer(); PTR_ID = null;
   var p = toStage(e.clientX, e.clientY), h = hitOf(document.elementFromPoint(e.clientX, e.clientY));
   inUp(p[0], p[1], h[0], false);
 }, { passive:true });
-window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; return; } if (e.pointerId !== PTR_ID) return; PTR_ID = null; inUp(null, null, null, true); }, { passive:true });
+window.addEventListener('pointercancel', function(e){ if (HARNESS){ HP = null; return; } if (e.pointerId !== PTR_ID) return; releasePointer(); PTR_ID = null; inUp(null, null, null, true); }, { passive:true });
+window.addEventListener('lostpointercapture', function(e){ if (e.pointerId !== PTR_ID) return; PTR_CAPTURE = null; PTR_ID = null; inUp(null, null, null, true); });
+document.addEventListener('contextmenu', function(e){ if (hitOf(e.target)[0] === 'pill') e.preventDefault(); });
+if (!window.PointerEvent){
+  function touchOf(e){ var list = e.changedTouches || []; for (var i = 0; i < list.length; i++) if (list[i].identifier === PTR_ID) return list[i]; return null; }
+  window.addEventListener('touchstart', function(e){
+    if (HARNESS || inTypeBox(e.target) || PTR_ID != null || !e.changedTouches || !e.changedTouches.length) return;
+    var t = e.changedTouches[0], h = hitOf(e.target), p = toStage(t.clientX, t.clientY); PTR_ID = t.identifier;
+    inDown(h[0], h[1], p[0], p[1]); if (e.cancelable) e.preventDefault();
+  }, { passive:false });
+  window.addEventListener('touchmove', function(e){ var t = touchOf(e); if (!t) return; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY); inMove(p[0], p[1]); }, { passive:false });
+  window.addEventListener('touchend', function(e){ var t = touchOf(e); if (!t) return; PTR_ID = null; if (e.cancelable) e.preventDefault(); var p = toStage(t.clientX, t.clientY), h = hitOf(document.elementFromPoint(t.clientX, t.clientY)); inUp(p[0], p[1], h[0], false); }, { passive:false });
+  window.addEventListener('touchcancel', function(e){ if (!touchOf(e)) return; PTR_ID = null; inUp(null, null, null, true); }, { passive:false });
+}
 /* VoiceOver / keyboard activation arrives as a click with detail 0: a tap on the same handlers */
 document.addEventListener('click', function(e){
   if (e.detail !== 0 || HARNESS || inTypeBox(e.target)) return;
@@ -130,17 +151,21 @@ document.addEventListener('click', function(e){
 if (HARNESS) document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
 
 /* ---------- typing: a real textarea outside the scaled stage, lifted with visualViewport ---------- */
-var typeBox = $('typeBox'), typeIn = $('typeIn'), typeSend = $('typeSend');
+var typeBox = $('typeBox'), typeIn = $('typeIn'), typeSend = $('typeSend'), typeComposing = false;
 function showTypeBox(on){
+  if (!on) typeComposing = false;
   if (on){ if (!typeBox.classList.contains('on')){ typeBox.classList.add('on'); tb('typing'); tb('pillHide'); } typeSend.disabled = !String(typeIn.value || '').trim(); focusType(); }
   else if (typeBox.classList.contains('on')){ typeBox.classList.remove('on'); tg('typing'); if (isOn('pillHide')) tg('pillHide'); }
 }
 function focusType(){ try { typeIn.focus({ preventScroll:true }); } catch(e){ try { typeIn.focus(); } catch(x){} } }
-typeIn.addEventListener('keydown', function(e){ if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){ e.preventDefault(); typeSubmit(); } else if (e.key === 'Escape'){ e.preventDefault(); typeCancel(); } });
-typeIn.addEventListener('input', function(){ typeSend.disabled = !String(typeIn.value || '').trim(); typeIn.style.height = 'auto'; typeIn.style.height = Math.min(120, typeIn.scrollHeight) + 'px'; });
+typeIn.addEventListener('keydown', function(e){ if (typeComposing || e.isComposing || e.keyCode === 229) return; if (e.key === 'Enter' && !e.shiftKey){ e.preventDefault(); typeSubmit(); } else if (e.key === 'Escape'){ e.preventDefault(); typeCancel(); } });
+function typeAutosize(){ typeSend.disabled = typeComposing || !String(typeIn.value || '').trim(); typeIn.style.height = 'auto'; typeIn.style.height = Math.min(120, typeIn.scrollHeight) + 'px'; }
+typeIn.addEventListener('compositionstart', function(){ typeComposing = true; typeAutosize(); });
+typeIn.addEventListener('compositionend', function(){ typeComposing = false; typeAutosize(); });
+typeIn.addEventListener('input', typeAutosize);
 typeSend.addEventListener('pointerdown', function(e){ e.preventDefault(); });   /* keep the keyboard up */
 typeSend.addEventListener('click', function(){ typeSubmit(); });
-typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && document.activeElement !== typeIn) typeCancel(); }, 180); });
+typeIn.addEventListener('blur', function(){ setTimeout(function(){ if (W.state === 'TYPING' && !typeComposing && document.activeElement !== typeIn) typeCancel(); }, 180); });
 function renderTyping(){
   if (!typeBox.classList.contains('on')) return;
   var vv = window.visualViewport, vb = vv ? vv.offsetTop + vv.height : window.innerHeight;

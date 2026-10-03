@@ -1,6 +1,7 @@
+import { appLocale, type AppLanguage } from './app-language';
 import type { MarketAnalysis } from './market-indicators';
 
-export type DeskBriefLanguage = 'es' | 'en';
+export type DeskBriefLanguage = AppLanguage;
 export type DeskBias = 'bullish' | 'bearish' | 'neutral';
 export type TechnicalSnapshot = Omit<MarketAnalysis, 'ema20Series' | 'ema50Series'>;
 
@@ -37,6 +38,7 @@ interface BuildDeskBriefInput {
   market?: BriefMarket | null;
   technicals?: TechnicalSnapshot | null;
   lang?: DeskBriefLanguage;
+  locale?: string;
   latencyMs?: number;
   generatedAt?: string;
 }
@@ -47,9 +49,9 @@ function finite(value: unknown): number | null {
   return Number.isFinite(number) ? number : null;
 }
 
-function priceText(value: number | null, lang: DeskBriefLanguage): string {
-  if (value === null) return lang === 'es' ? 'sin precio disponible' : 'price unavailable';
-  return new Intl.NumberFormat(lang === 'es' ? 'es-MX' : 'en-US', {
+function priceText(value: number | null, lang: DeskBriefLanguage, locale?: string): string {
+  if (value === null) return ({ en: 'price unavailable', es: 'sin precio disponible', fr: 'prix indisponible', pt: 'preço indisponível', it: 'prezzo non disponibile', de: 'Kurs nicht verfügbar' })[lang];
+  return new Intl.NumberFormat(appLocale(lang, locale), {
     maximumFractionDigits: value < 10 ? 4 : 2,
   }).format(value);
 }
@@ -59,6 +61,7 @@ export function buildDeskBrief({
   market,
   technicals,
   lang = 'es',
+  locale,
   latencyMs = 0,
   generatedAt = new Date().toISOString(),
 }: BuildDeskBriefInput): DeskBrief {
@@ -72,9 +75,9 @@ export function buildDeskBrief({
   const support = finite(technicals?.support);
   const resistance = finite(technicals?.resistance);
   const rsi14 = finite(technicals?.rsi14);
-  const formattedPrice = priceText(price, lang);
-  const formattedSupport = priceText(support, lang);
-  const formattedResistance = priceText(resistance, lang);
+  const formattedPrice = priceText(price, lang, locale);
+  const formattedSupport = priceText(support, lang, locale);
+  const formattedResistance = priceText(resistance, lang, locale);
 
   let summary: string;
   let risk: string;
@@ -109,6 +112,47 @@ export function buildDeskBrief({
       : 'Inside the range there is more noise than edge; wait for confirmation beyond either boundary.';
   }
 
+  if (lang !== 'en' && lang !== 'es') {
+    const values = { fr: {
+      absent: `${ticker} : prix disponible ${formattedPrice}. Les données ne suffisent pas pour une lecture technique fiable.`,
+      bullish: `${ticker} : ${formattedPrice}, structure haussière en 1H. Support visible : ${formattedSupport}. RSI : ${rsi14 ?? '—'}.`,
+      bearish: `${ticker} : ${formattedPrice}, structure baissière en 1H. Résistance visible : ${formattedResistance}. RSI : ${rsi14 ?? '—'}.`,
+      neutral: `${ticker} : ${formattedPrice}, structure latérale en 1H entre ${formattedSupport} et ${formattedResistance}. RSI : ${rsi14 ?? '—'}.`,
+      absentRisk: 'Structure non confirmée : une lecture incomplète ne constitue pas un signal.',
+      bullishRisk: `La thèse s’affaiblit sous ${formattedSupport} ; résistance immédiate : ${formattedResistance}.`,
+      bearishRisk: `La pression baissière s’affaiblit au-dessus de ${formattedResistance} ; support immédiat : ${formattedSupport}.`,
+      neutralRisk: 'Le mouvement dans l’intervalle reste incertain ; aucune confirmation hors des limites.',
+    }, pt: {
+      absent: `${ticker}: preço disponível ${formattedPrice}. Não há dados suficientes para uma leitura técnica responsável.`,
+      bullish: `${ticker}: ${formattedPrice}, estrutura ascendente em 1H. Suporte visível: ${formattedSupport}. RSI: ${rsi14 ?? '—'}.`,
+      bearish: `${ticker}: ${formattedPrice}, estrutura descendente em 1H. Resistência visível: ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      neutral: `${ticker}: ${formattedPrice}, estrutura lateral em 1H entre ${formattedSupport} e ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      absentRisk: 'Estrutura não confirmada: uma leitura incompleta não constitui um sinal.',
+      bullishRisk: `A tese perde força abaixo de ${formattedSupport}; resistência imediata: ${formattedResistance}.`,
+      bearishRisk: `A pressão descendente perde força acima de ${formattedResistance}; suporte imediato: ${formattedSupport}.`,
+      neutralRisk: 'O movimento dentro do intervalo permanece incerto; sem confirmação fora dos limites.',
+    }, it: {
+      absent: `${ticker}: prezzo disponibile ${formattedPrice}. I dati non bastano per una lettura tecnica responsabile.`,
+      bullish: `${ticker}: ${formattedPrice}, struttura rialzista a 1H. Supporto visibile: ${formattedSupport}. RSI: ${rsi14 ?? '—'}.`,
+      bearish: `${ticker}: ${formattedPrice}, struttura ribassista a 1H. Resistenza visibile: ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      neutral: `${ticker}: ${formattedPrice}, struttura laterale a 1H tra ${formattedSupport} e ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      absentRisk: 'Struttura non confermata: una lettura incompleta non costituisce un segnale.',
+      bullishRisk: `La tesi si indebolisce sotto ${formattedSupport}; resistenza immediata: ${formattedResistance}.`,
+      bearishRisk: `La pressione ribassista si indebolisce sopra ${formattedResistance}; supporto immediato: ${formattedSupport}.`,
+      neutralRisk: 'Il movimento nell’intervallo resta incerto; nessuna conferma oltre i limiti.',
+    }, de: {
+      absent: `${ticker}: verfügbarer Preis ${formattedPrice}. Die Daten reichen nicht für eine verantwortungsvolle technische Analyse.`,
+      bullish: `${ticker}: ${formattedPrice}, bullische Struktur im 1H-Zeitrahmen. Sichtbare Unterstützung: ${formattedSupport}. RSI: ${rsi14 ?? '—'}.`,
+      bearish: `${ticker}: ${formattedPrice}, bärische Struktur im 1H-Zeitrahmen. Sichtbarer Widerstand: ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      neutral: `${ticker}: ${formattedPrice}, Seitwärtsstruktur im 1H-Zeitrahmen zwischen ${formattedSupport} und ${formattedResistance}. RSI: ${rsi14 ?? '—'}.`,
+      absentRisk: 'Keine bestätigte Struktur: eine unvollständige Analyse ist kein Signal.',
+      bullishRisk: `Die These wird unter ${formattedSupport} schwächer; unmittelbarer Widerstand: ${formattedResistance}.`,
+      bearishRisk: `Der bärische Druck wird über ${formattedResistance} schwächer; unmittelbare Unterstützung: ${formattedSupport}.`,
+      neutralRisk: 'Die Bewegung innerhalb der Spanne bleibt unsicher; keine Bestätigung außerhalb der Grenzen.',
+    } }[lang];
+    const state = !technicals || technicalPrice === null ? 'absent' : bias;
+    summary = values[state]; risk = values[`${state}Risk` as 'absentRisk' | 'bullishRisk' | 'bearishRisk' | 'neutralRisk'];
+  }
   return {
     symbol: ticker,
     assetType: market?.assetType === 'equity' ? 'equity' : 'crypto',

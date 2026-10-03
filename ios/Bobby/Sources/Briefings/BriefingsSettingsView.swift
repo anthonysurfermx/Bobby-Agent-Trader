@@ -18,7 +18,7 @@ import SwiftUI
 // MARK: - Copy and formatting shared by the briefing screens
 
 enum BriefingCopy {
-    static func cadence(_ c: BriefingCadence, spanish: Bool = L.isSpanish) -> String {
+    static func cadence(_ c: BriefingCadence, spanish: Bool? = nil) -> String {
         switch c {
         case .morning: return L.t("Market opening", "Apertura de mercado", spanish: spanish)
         case .close: return L.t("Market close", "Cierre de mercado", spanish: spanish)
@@ -27,7 +27,7 @@ enum BriefingCopy {
     }
 
     /// What each briefing covers (the product design's table, not report content).
-    static func cadenceDetail(_ c: BriefingCadence, spanish: Bool = L.isSpanish) -> String {
+    static func cadenceDetail(_ c: BriefingCadence, spanish: Bool? = nil) -> String {
         switch c {
         case .morning: return L.t("Before the US open: overnight context, your assets, risks and the day’s agenda",
                                   "Antes de la apertura en EE. UU.: lo de la noche, tus activos, riesgos y la agenda del día", spanish: spanish)
@@ -39,13 +39,13 @@ enum BriefingCopy {
     }
 
     /// The Profile row detail: the briefings this account has on, or "Bobby Pro" when none.
-    static func summary(_ settings: BriefingSettings?, spanish: Bool = L.isSpanish) -> String {
+    static func summary(_ settings: BriefingSettings?, spanish: Bool? = nil) -> String {
         let on = BriefingCadence.offeredCadences.filter { settings?.isOn($0) == true }
         guard !on.isEmpty else { return "Bobby Pro" }
         return on.map { cadence($0, spanish: spanish) }.joined(separator: " · ")
     }
 
-    static func quality(_ raw: String?, spanish: Bool = L.isSpanish) -> String? {
+    static func quality(_ raw: String?, spanish: Bool? = nil) -> String? {
         switch raw {
         case "partial": return L.t("Partial data", "Datos parciales", spanish: spanish)
         case "facts_only": return L.t("Facts only", "Solo datos", spanish: spanish)
@@ -54,7 +54,7 @@ enum BriefingCopy {
     }
 
     /// A section's freshness badge; nil for live data (no badge needed).
-    static func status(_ raw: String, spanish: Bool = L.isSpanish) -> String? {
+    static func status(_ raw: String, spanish: Bool? = nil) -> String? {
         switch raw {
         case "closed": return L.t("Closed", "Cerrado", spanish: spanish)
         case "stale": return L.t("Stale", "Desactualizado", spanish: spanish)
@@ -67,7 +67,7 @@ enum BriefingCopy {
     }
 
     /// The honest line for a period whose report is not (yet) there; nil when it is ready.
-    static func latestNotice(_ latest: BriefingLatest, spanish: Bool = L.isSpanish) -> String? {
+    static func latestNotice(_ latest: BriefingLatest, spanish: Bool? = nil) -> String? {
         guard BriefingCadence.offeredCadences.contains(latest.cadence) else { return nil }
         switch latest.state {
         case .ready: return nil
@@ -84,7 +84,7 @@ enum BriefingCopy {
     }
 
     /// The US equity session label of a report (never implies a live session when it is closed).
-    static func equitySession(_ s: BriefingEquitySession?, spanish: Bool = L.isSpanish) -> String? {
+    static func equitySession(_ s: BriefingEquitySession?, spanish: Bool? = nil) -> String? {
         guard let s else { return nil }
         let early = s.earlyClose ? s.closeAt.map {
             L.t(" · early close \(BriefingFormat.time($0, spanish: spanish, zone: BriefingFormat.newYork)) New York",
@@ -104,34 +104,34 @@ enum BriefingCopy {
 enum BriefingFormat {
     static let newYork = TimeZone(identifier: "America/New_York") ?? TimeZone(secondsFromGMT: -5 * 3600)!
 
-    static func formatter(_ template: String, spanish: Bool, zone: TimeZone) -> DateFormatter {
+    static func formatter(_ template: String, spanish: Bool?, zone: TimeZone) -> DateFormatter {
         let f = DateFormatter()
-        f.locale = Locale(identifier: spanish ? "es_MX" : "en_US")
+        f.locale = L.formatLocale(spanish: spanish)
         f.timeZone = zone
         f.setLocalizedDateFormatFromTemplate(template)
         return f
     }
 
-    static func time(_ d: Date, spanish: Bool = L.isSpanish, zone: TimeZone = .current) -> String {
+    static func time(_ d: Date, spanish: Bool? = nil, zone: TimeZone = .current) -> String {
         formatter("jmm", spanish: spanish, zone: zone).string(from: d)
     }
 
-    static func weekdayTime(_ d: Date, spanish: Bool = L.isSpanish, zone: TimeZone = .current) -> String {
+    static func weekdayTime(_ d: Date, spanish: Bool? = nil, zone: TimeZone = .current) -> String {
         formatter("EEEjmm", spanish: spanish, zone: zone).string(from: d)
     }
 
     /// "Friday, October 2" in New York (a report's market date).
-    static func newYorkDay(_ d: Date, spanish: Bool = L.isSpanish) -> String {
+    static func newYorkDay(_ d: Date, spanish: Bool? = nil) -> String {
         formatter("EEEEMMMMd", spanish: spanish, zone: newYork).string(from: d)
     }
 
     /// An inbox row's date in the phone's zone: "Oct 2, 8:00 AM".
-    static func inboxDate(_ d: Date, spanish: Bool = L.isSpanish, zone: TimeZone = .current) -> String {
+    static func inboxDate(_ d: Date, spanish: Bool? = nil, zone: TimeZone = .current) -> String {
         formatter("MMMdjmm", spanish: spanish, zone: zone).string(from: d)
     }
 
     /// "Data as of" in the phone's zone; the day is added when it is not today.
-    static func asOf(_ d: Date, now: Date = Date(), spanish: Bool = L.isSpanish, zone: TimeZone = .current) -> String {
+    static func asOf(_ d: Date, now: Date = Date(), spanish: Bool? = nil, zone: TimeZone = .current) -> String {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
         let sameDay = calendar.isDate(d, inSameDayAs: now)
@@ -144,18 +144,25 @@ enum BriefingFormat {
     }
 
     /// The server's English weekday name ("Sunday") in the app's language, plural ("Sundays" / "Domingos").
-    static func weekdays(_ english: String?, spanish: Bool) -> String? {
+    static func weekdays(_ english: String?, spanish: Bool? = nil) -> String? {
         guard let english else { return nil }
         let names = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
         guard let index = names.firstIndex(of: english) else { return nil }
         let en = ["Sundays", "Mondays", "Tuesdays", "Wednesdays", "Thursdays", "Fridays", "Saturdays"]
         let es = ["Domingos", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábados"]
-        return spanish ? es[index] : en[index]
+        if let spanish { return spanish ? es[index] : en[index] }
+        let localized: [String: [String]] = [
+            "fr": ["Dimanches", "Lundis", "Mardis", "Mercredis", "Jeudis", "Vendredis", "Samedis"],
+            "pt": ["Domingos", "Segundas-feiras", "Terças-feiras", "Quartas-feiras", "Quintas-feiras", "Sextas-feiras", "Sábados"],
+            "it": ["Domeniche", "Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabati"],
+            "de": ["Sonntags", "Montags", "Dienstags", "Mittwochs", "Donnerstags", "Freitags", "Samstags"]
+        ]
+        return localized[L.language]?[index] ?? (L.isSpanish ? es[index] : en[index])
     }
 
     /// The schedule line under a switch: New York time from the server policy, then the phone's
     /// equivalent from `nextAt` when its zone shows another time. Unadopted: "Schedule pending".
-    static func schedule(_ cadence: BriefingCadence, _ s: BriefingSchedule?, spanish: Bool = L.isSpanish,
+    static func schedule(_ cadence: BriefingCadence, _ s: BriefingSchedule?, spanish: Bool? = nil,
                          zone: TimeZone = .current) -> String {
         guard let s, s.configured else { return L.t("Schedule pending", "Horario en revisión", spanish: spanish) }
         let yours = L.t("your time", "tu hora", spanish: spanish)

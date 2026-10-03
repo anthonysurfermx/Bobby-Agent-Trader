@@ -55,7 +55,7 @@ struct RouteGrant: Equatable {
         let footprint: [Int]
         /// The database keeps English on both sides; Spanish comes from the bundled names.
         var displayName: String {
-            L.isSpanish ? TraderLandCatalog.name(id, district: world) : (nameEN ?? TraderLandCatalog.name(id, district: world))
+            L.language == "en" ? (nameEN ?? TraderLandCatalog.name(id, district: world)) : TraderLandCatalog.name(id, district: world)
         }
 
         /// Reads a PieceSummary `{ id, world, attribution, kind, name: { en, es }, footprint: [w, h] }`,

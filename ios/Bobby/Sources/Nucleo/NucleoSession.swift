@@ -79,7 +79,7 @@ final class NucleoSession: ObservableObject {
     let voice: NeuralVoice
     let fixtures: Bool
     let desk: NucleoDesk
-    let speech = NucleoSpeech()
+    let speech: NucleoSpeech
     let nucleoVoice: NucleoVoice
     let haptics = NucleoHaptics()
     private let defaults: UserDefaults
@@ -114,6 +114,7 @@ final class NucleoSession: ObservableObject {
          profile: AgentProfile = AgentProfile(),
          companions: CompanionStore = CompanionStore(),
          voice: NeuralVoice? = nil,
+         speech: NucleoSpeech? = nil,
          ledger: NucleoLedger = NucleoLedger(),
          defaults: UserDefaults = .standard,
          briefingIntent: BriefingIntent? = nil) {
@@ -123,6 +124,8 @@ final class NucleoSession: ObservableObject {
         self.companions = companions
         let voice = voice ?? NeuralVoice()
         self.voice = voice
+        self.speech = speech ?? NucleoSpeech()
+        let speech = self.speech
         self.defaults = defaults
         desk = NucleoDesk(profile: profile, companions: companions, ledger: ledger, fixtures: fixtures)
         nucleoVoice = NucleoVoice(voice: voice)
@@ -298,7 +301,7 @@ final class NucleoSession: ObservableObject {
         } ?? NSNull()
         return [
             "v": 1, "page": NucleoDeskIO.orNull(currentPage), "firstRun": !onboarded, "onboarded": onboarded,
-            "language": L.ttsLang, "localHour": Calendar.current.component(.hour, from: Date()),
+            "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "localHour": Calendar.current.component(.hour, from: Date()),
             "companion": companion, "xp": companions.disciplineXP, "level": companions.nucleoLevel,
             "streak": companions.disciplineStreak, "signedIn": signedIn,
             "riskAccepted": profile.acceptedRiskNotice, "riskVersion": RiskNotice.currentVersion,
@@ -424,10 +427,12 @@ final class NucleoSession: ObservableObject {
         return nucleoVoice.speak(id: id, text: text, voiceId: profile.voiceId, persona: companions.companion?.voicePersona, vibe: profile.vibeId)
     }
 
-    /// The bundled pick line (`select-<id>-<en|es>`): free, instant, no network.
+    /// Public pick lines: bundled EN/ES audio. A language without clips uses the companion's network
+    /// voice once the risk notice is accepted, and on-device speech (no provider request) before that.
     func previewVoice(_ c: Companion) -> NucleoVoice.Status {
         let clip = "select-\(c.id)-\(L.ttsLang)"
-        if !profile.acceptedRiskNotice, Bundle.main.url(forResource: clip, withExtension: "mp3") == nil { return .muted }
+        let needsBundledClip = ["en", "es"].contains(L.language)
+        if !profile.acceptedRiskNotice, needsBundledClip, Bundle.main.url(forResource: clip, withExtension: "mp3") == nil { return .muted }
         return nucleoVoice.speakClip(id: "preview-\(c.id)", clip: clip, fallbackText: c.selectLine, persona: c.voicePersona)
     }
 
@@ -435,7 +440,7 @@ final class NucleoSession: ObservableObject {
 
     func riskNotice() -> [String: Any] {
         ["version": RiskNotice.currentVersion,
-         "statements": RiskNotice.statements(spanish: L.isSpanish).map { ["title": $0.title, "body": $0.body] }]
+         "statements": RiskNotice.statements().map { ["title": $0.title, "body": $0.body] }]
     }
 
     func acceptRisk(_ version: Int) -> [String: Any] {

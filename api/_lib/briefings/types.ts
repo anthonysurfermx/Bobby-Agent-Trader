@@ -1,3 +1,4 @@
+import { APP_LANGUAGES, type AppLanguage } from '../../../src/lib/app-language.js';
 // ============================================================
 // Bobby Pro market briefings — shared types (build 53).
 // Contract: docs/product/pro-market-briefings-implementation.md (implementation spec) and
@@ -9,8 +10,9 @@
 export type Cadence = 'morning' | 'close' | 'weekly';
 export const CADENCES: readonly Cadence[] = ['morning', 'close', 'weekly'];
 
-export type BriefLanguage = 'en' | 'es';
-export const BRIEF_LANGUAGES: readonly BriefLanguage[] = ['en', 'es'];
+export type BriefLanguage = AppLanguage | 'pt-BR';
+/** pt-BR is a stored regional variant; the public settings language remains pt. */
+export const BRIEF_LANGUAGES = [...APP_LANGUAGES, 'pt-BR'] as const;
 
 /** A canonical period: identity of a report together with (identity_id, cadence). */
 export interface Period {

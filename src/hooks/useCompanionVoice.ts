@@ -5,6 +5,10 @@
 // waiting for may fall back to the browser's speech synthesis.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ttsLang, speechLocale } from '@/lib/companions/i18n';
+import { progressStore } from '@/lib/companions/progress';
+import { RISK_NOTICE_VERSION } from '@/lib/companions/progress';
+
+const canGenerateSpeech = () => progressStore.get().aiConsentGranted && progressStore.get().riskNoticeVersion >= RISK_NOTICE_VERSION;
 
 export interface SpeakOptions {
   voice: string;
@@ -101,9 +105,15 @@ export function useCompanionVoice() {
 
   const speakFallback = (text: string, playbackRate: number) => {
     try {
+      if (!canGenerateSpeech()) return;
       const gen = generation.current;
+      const locale = speechLocale();
+      const voices = window.speechSynthesis.getVoices().filter(voice => voice.localService && voice.lang.split('-')[0] === locale.split('-')[0]);
+      const voice = voices.find(voice => voice.lang.toLowerCase() === locale.toLowerCase()) ?? voices[0];
+      if (!voice) { setSpeaking(false); return; }
       const u = new SpeechSynthesisUtterance(text);
-      u.lang = speechLocale();
+      u.lang = locale;
+      u.voice = voice;
       u.rate = playbackRate;
       u.onend = u.onerror = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       setSpeaking(true);
@@ -113,22 +123,24 @@ export function useCompanionVoice() {
 
   const speak = useCallback(async (text: string, opts: SpeakOptions) => {
     stop();
+    if (!canGenerateSpeech()) return;
     const gen = ++generation.current;
     const essential = opts.essential ?? true;
     // Character intros and ambient personality lines should feel snappy;
     // analytical answers keep their deliberate 1× cadence for clarity.
     const playbackRate = Math.min(1.25, Math.max(0.85, opts.playbackRate ?? (essential ? 1 : 1.12)));
-    const key = `${opts.mode ?? "default"}|${opts.voice}|${opts.vibe ?? ''}|${ttsLang()}|${text}`;
+    const key = `${opts.mode ?? "default"}|${opts.voice}|${opts.vibe ?? ''}|${speechLocale()}|${text}`;
     try {
       let url = cache.current.get(key);
       if (!url) {
         let blob: Blob | null = null;
         for (let attempt = 0; attempt < 2 && !blob; attempt += 1) {
+          if (!canGenerateSpeech() || gen !== generation.current) return;
           const res = await fetch('/api/bobby-voice-free', {
             method: 'POST',
             signal: AbortSignal.timeout(8000),
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, mode: opts.mode, lang: ttsLang(), voice: opts.voice, ...(opts.vibe ? { vibe: opts.vibe } : {}) }),
+            body: JSON.stringify({ text, mode: opts.mode, lang: ttsLang(), locale: speechLocale(), voice: opts.voice, ...(opts.vibe ? { vibe: opts.vibe } : {}) }),
           });
           if (gen !== generation.current) return;
           if (res.ok) {
@@ -150,8 +162,9 @@ export function useCompanionVoice() {
       audio.onended = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       audio.onerror = () => { if (gen === generation.current) { setSpeaking(false); stopMeter(); } };
       await ctxRef.current?.resume?.();
+      if (!canGenerateSpeech() || gen !== generation.current) return;
       await audio.play();
-      if (gen !== generation.current) { audio.pause(); return; }
+      if (!canGenerateSpeech() || gen !== generation.current) { audio.pause(); return; }
       setSpeaking(true);
       meter();
     } catch {
@@ -160,6 +173,7 @@ export function useCompanionVoice() {
   }, [stop]);
 
   useEffect(() => () => { stop(); }, [stop]);
+  useEffect(() => progressStore.subscribe(() => { if (!canGenerateSpeech()) stop(); }), [stop]);
 
   return { speak, stop, speaking, level, analyser: analyserRef.current };
 }

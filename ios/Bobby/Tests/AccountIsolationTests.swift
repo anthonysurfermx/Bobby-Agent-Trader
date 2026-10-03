@@ -79,6 +79,49 @@ final class AccountIsolationTests: XCTestCase {
         XCTAssertEqual(defaults.data(forKey: NucleoLedger.key(owner: nil)), Data("local".utf8))
     }
 
+    func testDeletionFailuresUseAppLanguageInsteadOfRawServerProse() async {
+        let previous = UserDefaults.standard.object(forKey: L.preferenceKey)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            for failingMethod in ["GET", "DELETE"] {
+                let account = account()
+                IsolationHTTP.handler = { request in
+                    request.respond(request.request.httpMethod == failingMethod ? 503 : 200,
+                                    request.request.httpMethod == failingMethod
+                                      ? #"{"error":"UNTRUSTED ENGLISH PROVIDER ERROR"}"#
+                                      : #"{"appleAuthorizationRequired":false}"#)
+                }
+                let result = await account.deleteAccount()
+                XCTAssertEqual(result, .failed)
+                XCTAssertEqual(account.lastError, L.t("Could not delete the account — try again", "No se pudo borrar la cuenta — inténtalo de nuevo"))
+                XCTAssertFalse(account.lastError?.contains("UNTRUSTED") == true)
+                XCTAssertEqual(account.session?.userId, "a", "A refusal does not delete the current account")
+            }
+        }
+    }
+
+    func testAppleExchangeFailureUsesAppLanguageWithoutProviderErrorSuffix() async {
+        let previous = UserDefaults.standard.object(forKey: L.preferenceKey)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        for language in AppLanguage.allCases {
+            UserDefaults.standard.set(language.rawValue, forKey: L.preferenceKey)
+            let account = account()
+            account.prepareAppleRequest(ASAuthorizationAppleIDProvider().createRequest())
+            IsolationHTTP.handler = { $0.respond(400, #"{"error_description":"UNTRUSTED ENGLISH PROVIDER ERROR"}"#) }
+            await account.completeAppleExchange(idToken: "synthetic-apple-id-token", appleUserId: "apple-a", givenName: "Ana")
+            XCTAssertEqual(account.lastError, L.t("Sign in with Apple did not finish — try again.", "Iniciar sesión con Apple no terminó — inténtalo de nuevo."))
+            XCTAssertFalse(account.lastError?.contains("UNTRUSTED") == true)
+            XCTAssertEqual(account.session?.userId, "a", "A failed exchange preserves the current account")
+        }
+    }
+
     func testRefreshCannotRestoreASignedOutSession() async {
         let account = account(expired: true)
         let started = expectation(description: "refresh is suspended")

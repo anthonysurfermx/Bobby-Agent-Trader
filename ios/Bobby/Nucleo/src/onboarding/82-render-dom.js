@@ -307,6 +307,7 @@ function renderChips(){
     /* the Sign in with Apple chip: white, the Apple logo in the system font; the Bobby Pro chip: ink */
     cls(c, 'apple', sty === 'apple'); cls(c, 'pro', sty === 'pro');
     if (sty === 'apple'){ var lg = document.createElement('span'); lg.className = 'lg'; lg.setAttribute('aria-hidden', 'true'); lg.textContent = '\uF8FF'; c.insertBefore(lg, c.firstChild); c.setAttribute('aria-label', ch.label); }
+    else if (ch && ch.ariaLabel) c.setAttribute('aria-label', ch.ariaLabel);
     else c.removeAttribute('aria-label');
   }); }
   var x = 20;

@@ -1,3 +1,4 @@
+import { appLocale, type AppLanguage } from '../../src/lib/app-language.js';
 // ============================================================
 // Per-user memory (migration 20260929190000_user_memory.sql): which assets an Apple/Google account asks
 // about (symbol, count, last date, the horizon its question named) and the preferences it set itself in the
@@ -215,7 +216,7 @@ export interface ReaderContext {
 const positive = (v: unknown): number | null => { const n = Number(v); return Number.isFinite(n) && n > 0 && n < 1e12 ? n : null; };
 
 /** Compact the summary for the model; null when memory is off or holds nothing useful. */
-export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: 'en' | 'es' | 'pt' = 'en'): ReaderContext | null {
+export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: AppLanguage = 'en', locale?: string): ReaderContext | null {
   if (!summary?.enabled) return null;
   const ctx: ReaderContext = {};
   if (firstName) ctx.firstName = firstName;
@@ -228,7 +229,7 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
     ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
     if (days >= 1 && days <= 6) {
-      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(language === 'es' ? 'es-MX' : language === 'pt' ? 'pt-BR' : 'en-US', { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
+      ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(appLocale(language, locale), { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
     }
     const then = summary.thisAsset.lastPrice ?? null;
     // A callback only across days: the same-day move is just the chart.

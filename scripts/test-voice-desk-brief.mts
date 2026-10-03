@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { buildDeskBrief, type TechnicalSnapshot } from '../src/lib/voice-desk-brief.ts';
 import { matchAssetInText } from '../src/lib/voice-assets.ts';
+import { APP_LANGUAGES, appLocale } from '../src/lib/app-language.ts';
 
 const bullish: TechnicalSnapshot = {
   price: 64_514,
@@ -61,4 +62,60 @@ assert.equal(matchAssetInText('Háblame de envidia'), 'NVDA', 'Spanish phonetic 
 assert.equal(matchAssetInText('Analyze NVDA for me'), 'NVDA');
 assert.equal(matchAssetInText('MBC 뉴스 이덕영입니다.'), null, 'unexpected Korean noise must not select an asset');
 
-console.log('voice desk brief: 18/18 assertions passed');
+const missingPrice = { en: 'price unavailable', es: 'sin precio disponible', fr: 'prix indisponible', pt: 'preço indisponível', it: 'prezzo non disponibile', de: 'Kurs nicht verfügbar' };
+for (const lang of APP_LANGUAGES) {
+  const missing = buildDeskBrief({ symbol: 'MC.PA', market: { assetType: 'equity', price: null }, technicals: null, lang });
+  assert.equal(missing.price, null);
+  assert.equal(missing.symbol, 'MC.PA');
+  assert.ok(missing.summary.includes(missingPrice[lang]), `Missing price must be localized in ${lang}`);
+  if (lang !== 'en') assert.doesNotMatch(missing.summary, /price unavailable/);
+}
+for (const locale of ['pt-PT', 'pt-BR', 'PT_br']) {
+  const localized = buildDeskBrief({ symbol: 'PETR4.SA', technicals: bullish, lang: 'pt', locale });
+  const formatter = new Intl.NumberFormat(appLocale('pt', locale), { maximumFractionDigits: 2 });
+  assert.ok(localized.summary.includes(formatter.format(bullish.price)));
+  assert.ok(localized.summary.includes(formatter.format(bullish.support!)));
+  assert.ok(localized.risk.includes(formatter.format(bullish.resistance!)));
+  assert.equal(localized.price, bullish.price);
+  assert.equal(localized.support, bullish.support);
+  assert.equal(localized.resistance, bullish.resistance);
+  assert.equal(localized.symbol, 'PETR4.SA');
+}
+
+// The actual voice-tool handler must carry the browser's Portuguese region into the first brief.
+process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
+process.env.BOBBY_SUPABASE_URL = 'https://db.test';
+process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
+process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
+process.env.SUPABASE_URL = 'https://db.test';
+process.env.SUPABASE_SERVICE_ROLE_KEY = 'test-service';
+const { default: voiceTool } = await import('../api/voice-tool.ts');
+const originalFetch = globalThis.fetch;
+const requestUrls: string[] = [];
+try {
+  globalThis.fetch = async (input) => {
+    const url = new URL(String(input));
+    requestUrls.push(url.href);
+    assert.ok(['bobby.test', 'db.test'].includes(url.hostname), `Unexpected provider URL: ${url.href}`);
+    let body: unknown;
+    if (url.hostname === 'db.test') body = [];
+    else if (url.pathname === '/api/stock-price') body = { quotes: [{ symbol: 'PETR4.SA', currency: 'BRL', price: 12_345.67 }] };
+    else if (url.pathname === '/api/stock-candles') body = { candles: [] };
+    else if (url.pathname === '/api/bobby-intel') body = {};
+    else throw new Error(`Unexpected test path: ${url.pathname}`);
+    return new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } });
+  };
+  for (const locale of ['pt-PT', 'pt-BR']) {
+    const response = { statusCode: 200, body: null as any, setHeader() {}, status(code: number) { this.statusCode = code; return this; }, json(body: unknown) { this.body = body; return this; } };
+    await voiceTool({ method: 'POST', headers: {}, body: { tool: 'run_debate', args: { symbol: 'PETR4.SA', lang: 'pt', locale } } } as never, response as never);
+    assert.equal(response.statusCode, 200);
+    assert.equal(response.body.quick_brief.symbol, 'PETR4.SA');
+    assert.equal(response.body.quick_brief.price, 12_345.67);
+    assert.ok(response.body.quick_brief.summary.includes(new Intl.NumberFormat(locale, { maximumFractionDigits: 2 }).format(12_345.67)), `Handler lost ${locale}`);
+  }
+  assert.ok(requestUrls.length > 0);
+  assert.ok(requestUrls.every((url) => !url.includes('okx') && !url.includes('openai') && !url.includes('anthropic')));
+} finally {
+  globalThis.fetch = originalFetch;
+}
+console.log('voice desk brief: legacy assertions, missing prices in six languages, Portuguese regional numbers and two mocked handler paths passed');

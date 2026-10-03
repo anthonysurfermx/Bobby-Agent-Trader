@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { LANGS, LANG_NAME, lang as currentLanguage, setLang as saveLanguage, setLocale, t, type Lang } from '@/lib/companions/i18n';
+import { appLanguage, appLocale } from '@/lib/app-language';
 
 export type TradingMode = 'paper' | 'confirm' | 'auto';
 
@@ -17,11 +19,12 @@ interface TradingModeSelectorProps {
 const MODES = [
   {
     id: 'paper' as TradingMode,
-    titleEs: 'Paper Trading',
+    titleEs: 'Trading simulado',
     titleEn: 'Paper Trading',
     descEs: 'Entorno simulado para probar estrategias. Cero riesgo.',
     descEn: 'Simulated environment for strategy testing. Zero risk.',
     tag: 'SAFE',
+    tagEs: 'SEGURO',
     tagColor: '#7da6ff',
   },
   {
@@ -31,19 +34,34 @@ const MODES = [
     descEs: 'Bobby identifica señales; tú autorizas cada ejecución.',
     descEn: 'Bobby identifies signals; you authorize each execution.',
     tag: 'BALANCED',
+    tagEs: 'EQUILIBRADO',
     tagColor: '#7da6ff',
   },
 ];
 
-export default function TradingModeSelector({ onSelect, language = 'es', onInitVoice }: TradingModeSelectorProps) {
+export default function TradingModeSelector({ onSelect, language = currentLanguage(), onInitVoice }: TradingModeSelectorProps) {
   const [selected, setSelected] = useState<TradingMode | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [showSelector, setShowSelector] = useState(true);
-  const [lang, setLang] = useState(language);
-  const isEs = lang === 'es';
+  const [lang, setLang] = useState<Lang>(() => appLanguage(language, currentLanguage()));
   // AdamsChat omits the audio initializer in its text-only fallback. Use that
   // signal to keep first-run onboarding honest about the interaction mode.
   const textOnly = !onInitVoice;
+  const selectedMode = MODES.find(mode => mode.id === selected);
+
+  useEffect(() => { setLang(appLanguage(language, currentLanguage())); }, [language]);
+
+  const chooseLanguage = (next: Lang) => {
+    let preferred = navigator.language;
+    try { const saved = localStorage.getItem('bobby_locale'); if (saved?.startsWith('pt')) preferred = saved; } catch {}
+    saveLanguage(next);
+    setLocale(appLocale(next, preferred));
+    const url = new URL(window.location.href);
+    url.searchParams.set('lang', next);
+    url.searchParams.delete('locale');
+    window.history.replaceState(null, '', url.toString());
+    setLang(next);
+  };
 
   useEffect(() => {
     const saved = localStorage.getItem('bobby_trading_mode');
@@ -92,38 +110,34 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
                 <div>
                   <h1 className="text-white font-extrabold text-base tracking-[-.04em]">Bobby</h1>
                   <span className="text-[9px] font-mono text-[#7da6ff] tracking-[.18em]">
-                    {textOnly ? 'TEXT DECISION ROOM' : 'VOICE DECISION ROOM'}
+                    {textOnly ? t('TEXT DECISION ROOM', 'SALA DE DECISIONES POR TEXTO') : t('VOICE DECISION ROOM', 'SALA DE DECISIONES POR VOZ')}
                   </span>
                 </div>
               </div>
-              <button onClick={() => setLang(l => l === 'es' ? 'en' : 'es')}
-                className="text-[9px] font-mono text-white/30 border border-white/10 px-2 py-0.5 hover:text-white/60 transition-colors">
-                {isEs ? 'EN' : 'ES'}
-              </button>
+              <select value={lang} onChange={(event) => chooseLanguage(event.target.value as Lang)} aria-label={t('Language', 'Idioma')}
+                className="max-w-[110px] bg-[#090b14] text-[9px] font-mono text-white/60 border border-white/10 px-2 py-0.5 hover:text-white/80 transition-colors">
+                {LANGS.map((choice) => <option key={choice} value={choice}>{LANG_NAME[choice]}</option>)}
+              </select>
             </div>
 
             <h2 className="text-white text-xl font-bold mt-5 mb-1">
               {textOnly
-                ? (isEs ? 'Escribe antes de actuar.' : 'Type before you act.')
-                : (isEs ? 'Habla antes de actuar.' : 'Talk before you act.')}
+                ? t('Type before you act.', 'Escribe antes de actuar.')
+                : t('Talk before you act.', 'Habla antes de actuar.')}
             </h2>
             <p className="text-white/40 text-xs leading-relaxed">
-              {isEs
-                ? 'Bobby escucha tu tesis, la presiona contra datos y riesgo, y responde con una decisión explicable. Elige el nivel de control que quieres conservar.'
-                : 'Bobby hears your thesis, pressure-tests it against data and risk, then returns an explainable decision. Choose how much control you retain.'}
+              {t('Bobby hears your thesis, pressure-tests it against data and risk, then returns an explainable decision. Choose how much control you retain.', 'Bobby escucha tu tesis, la presiona contra datos y riesgo, y responde con una decisión explicable. Elige el nivel de control que quieres conservar.')}
             </p>
           </div>
 
           {/* Risk Disclaimer */}
           <div className="mx-6 mb-4 rounded-xl border border-[#0052ff]/20 bg-[#0052ff]/[.055] p-3">
             <div className="flex items-start gap-2">
-              <span className="mt-0.5 text-[#7da6ff] text-sm">◌</span>
+              <span aria-hidden="true" className="mt-0.5 text-[#7da6ff] text-sm">◌</span>
               <div>
-                  <span className="text-[#7da6ff] text-[10px] font-mono font-bold tracking-wider">HUMAN CONTROL</span>
+                  <span className="text-[#7da6ff] text-[10px] font-mono font-bold tracking-wider">{t('HUMAN CONTROL', 'CONTROL HUMANO')}</span>
                 <p className="text-white/45 text-[9px] mt-1 leading-relaxed font-mono">
-                  {isEs
-                    ? 'TRADING INVOLUCRA RIESGO SIGNIFICATIVO. PARÁMETROS DEL SISTEMA PUEDEN RESULTAR EN PÉRDIDA TOTAL DE CAPITAL. BOBBY ES UN SISTEMA AGÉNTICO; LA RESPONSABILIDAD DE EJECUCIÓN PERMANECE CON EL OPERADOR.'
-                    : 'TRADING INVOLVES SIGNIFICANT RISK. SYSTEM PARAMETERS MAY RESULT IN TOTAL CAPITAL DEPLETION. BOBBY IS AN AGENTIC SYSTEM; FINAL EXECUTION RESPONSIBILITY REMAINS WITH THE OPERATOR.'}
+                  {t('TRADING INVOLVES SIGNIFICANT RISK. SYSTEM PARAMETERS MAY RESULT IN TOTAL CAPITAL DEPLETION. BOBBY IS AN AGENTIC SYSTEM; FINAL EXECUTION RESPONSIBILITY REMAINS WITH THE OPERATOR.', 'TRADING INVOLUCRA RIESGO SIGNIFICATIVO. PARÁMETROS DEL SISTEMA PUEDEN RESULTAR EN PÉRDIDA TOTAL DE CAPITAL. BOBBY ES UN SISTEMA AGÉNTICO; LA RESPONSABILIDAD DE EJECUCIÓN PERMANECE CON EL OPERADOR.')}
                 </p>
               </div>
             </div>
@@ -131,10 +145,10 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
 
           {/* Mode Selection */}
           <div className="px-6 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-white/50 text-[10px] font-mono tracking-[2px]">SELECT TRADING MODE</span>
+            <div className="flex flex-wrap gap-2 items-center justify-between mb-3">
+              <span className="text-white/50 text-[10px] font-mono tracking-[2px]">{t('SELECT TRADING MODE', 'ELIGE EL MODO DE TRADING')}</span>
               <span className="text-white/20 text-[9px] font-mono">
-                {selected ? `${isEs ? 'MODO' : 'MODE'}: ${selected.toUpperCase()}` : `${isEs ? 'PENDIENTE' : 'PENDING'}...`}
+                {selectedMode ? `${t('MODE', 'MODO')}: ${t(selectedMode.titleEn, selectedMode.titleEs).toLocaleUpperCase()}` : `${t('PENDING', 'PENDIENTE')}...`}
               </span>
             </div>
 
@@ -154,13 +168,13 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-white text-sm font-semibold">{isEs ? mode.titleEs : mode.titleEn}</span>
+                      <span className="text-white text-sm font-semibold">{t(mode.titleEn, mode.titleEs)}</span>
                       <span className="text-[8px] font-mono font-bold px-1.5 py-0.5 rounded tracking-wider"
                         style={{ background: `${mode.tagColor}22`, color: mode.tagColor }}>
-                        {mode.tag}
+                        {t(mode.tag, mode.tagEs)}
                       </span>
                     </div>
-                    <p className="text-white/30 text-[10px] mt-1">{isEs ? mode.descEs : mode.descEn}</p>
+                    <p className="text-white/30 text-[10px] mt-1">{t(mode.descEn, mode.descEs)}</p>
                   </div>
                   {selected === mode.id && (
                     <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}
@@ -179,14 +193,14 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
               <input type="checkbox" checked={accepted} onChange={e => setAccepted(e.target.checked)}
                 className="w-3.5 h-3.5 rounded border-white/20 bg-transparent accent-[#0052ff]" />
               <span className="text-white/40 text-[10px] font-mono">
-                {isEs ? 'ASUMO_RIESGO' : 'READ_RISK'}
+                {t('READ_RISK', 'ASUMO_RIESGO')}
               </span>
             </label>
 
             <div className="flex items-center gap-3">
               <button onClick={() => { setShowSelector(false); onSelect('paper'); localStorage.setItem('bobby_trading_mode', 'paper'); }}
                 className="text-white/30 text-[10px] font-mono hover:text-white/60 transition-colors">
-                CANCEL
+                {t('CANCEL', 'CANCELAR')}
               </button>
               <button
                 onClick={handleInitialize}
@@ -197,15 +211,15 @@ export default function TradingModeSelector({ onSelect, language = 'es', onInitV
                     : 'bg-white/[0.04] text-white/15 cursor-not-allowed'
                 }`}
               >
-                {isEs ? 'INICIALIZAR AGENTE ›' : 'INITIALIZE AGENT ›'}
+                {t('INITIALIZE AGENT ›', 'INICIALIZAR AGENTE ›')}
               </button>
             </div>
 
             {/* System status footer */}
-            <div className="mt-4 flex items-center gap-4 text-[8px] font-mono text-white/15">
-              <span>{textOnly ? 'TEXT_READY: TRUE' : 'VOICE_READY: TRUE'}</span>
-              <span>HUMAN_IN_LOOP</span>
-              <span>AGENTS: {selected ? '3' : '0'}</span>
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-[8px] font-mono text-white/15">
+              <span>{textOnly ? t('Text ready', 'Texto preparado') : t('Voice ready', 'Voz preparada')}</span>
+              <span>{t('Human control', 'Control humano')}</span>
+              <span>{t('Agents', 'Agentes')}: {selected ? '3' : '0'}</span>
             </div>
           </div>
         </motion.div>

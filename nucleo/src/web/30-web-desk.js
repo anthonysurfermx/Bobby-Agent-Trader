@@ -16,7 +16,7 @@
 
   var TOKEN_LIFETIME = 600000, MARKET_CAP = 20000, PULSE_CAP = 20000, PULSE_GRACE = 5000;
   var SEARCH_TIMEOUT = 60000, DESK_TIMEOUT = 100000, SUGGESTIONS_CACHE = 300000;
-  var EQUITY_SYMBOL = /^[A-Z]{1,5}$/;
+  var EQUITY_SYMBOL = /^[A-Z0-9][A-Z0-9.^=-]{0,19}$/; // the server's rule (api/stock-candles.ts): MC.PA, PETR4.SA
   var UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   var MAX_QUESTION = 1200;
   var TREND = { alcista: 'up', bajista: 'down', lateral: 'sideways', up: 'up', down: 'down', sideways: 'sideways' };
@@ -27,7 +27,7 @@
   function fault(code, message) { var e = new Error(message || code); e.fault = code; return e; }
   D.fault = fault;
   function errorResult(code, message) { return { v: 1, status: 'error', code: code, message: message == null ? null : message }; }
-  function tooLongMessage() { return NW.t('Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'); }
+  function tooLongMessage() { return NW.t('Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.', 'A tua pergunta é demasiado longa. Usa até 1 200 caracteres.', 'Ta question est trop longue. Utilise au maximum 1 200 caractères.', 'La domanda è troppo lunga. Usa al massimo 1.200 caratteri.', 'Deine Frage ist zu lang. Verwende höchstens 1.200 Zeichen.'); }
   /** Unicode code points of the trimmed text, like /api/desk-debate counts them. */
   function codePoints(s) { return Array.from(String(s).trim()).length; }
   function given(v) { return v !== undefined && v !== null; }
@@ -40,13 +40,13 @@
   }
   function aliasesOf(o) { return Array.isArray(o.aliases) ? o.aliases.filter(function (a) { return typeof a === 'string'; }) : []; }
   function firstOther(list, symbol) { for (var i = 0; i < list.length; i++) if (list[i] !== symbol) return list[i]; return symbol; }
-  function asset(symbol, name, assetClass) { return { symbol: symbol, name: name, isEquity: assetClass === 'equity', assetClass: assetClass }; }
-  function assetJSON(a) { return { symbol: a.symbol, name: a.name, isEquity: a.isEquity }; }
-  function assetWithClass(a) { return { symbol: a.symbol, name: a.name, isEquity: a.isEquity, assetClass: a.assetClass }; }
+  function asset(symbol, name, assetClass, currency, exchange) { return { symbol: symbol, name: name, isEquity: assetClass === 'equity', assetClass: assetClass, currency: currency || null, exchange: exchange || null }; }
+  function assetJSON(a) { var out = { symbol: a.symbol, name: a.name, isEquity: a.isEquity }; if (a.currency) out.currency = a.currency; if (a.exchange) out.exchange = a.exchange; return out; }
+  function assetWithClass(a) { var out = assetJSON(a); out.assetClass = a.assetClass; return out; }
 
   /* ---- asset search (POST only: the typed text is often the whole question; a query string lands in logs) ---- */
   function assetSearch(q, limit, signal) {
-    var body = { q: q };
+    var body = { q: q, language: NW.lang, locale: NW.locale, country: NW.country };
     if (limit != null) body.limit = limit;
     return NW.http('/api/bobby-asset-search', { method: 'POST', body: body, timeoutMs: SEARCH_TIMEOUT, signal: signal })
       .then(function (r) { return r.status >= 200 && r.status < 300 && isObj(r.json) ? r.json : null; }, function () { return null; });
@@ -59,7 +59,7 @@
     if (!symbol) return { kind: 'unresolved' };
     var assetClass = typeof resolved.assetClass === 'string' ? resolved.assetClass : 'crypto';
     return {
-      kind: 'resolved', asset: asset(symbol, prettyName(firstOther(aliasesOf(resolved), symbol), symbol), assetClass),
+      kind: 'resolved', asset: asset(symbol, prettyName(firstOther(aliasesOf(resolved), symbol), symbol), assetClass, NW.str(resolved.currency), NW.str(resolved.exchange)),
       needsConfirmation: resolution.needsConfirmation === true,
       matchKind: typeof resolution.matchKind === 'string' ? resolution.matchKind : null,
       proxyNote: typeof resolution.proxyNote === 'string' ? resolution.proxyNote : null
@@ -73,7 +73,7 @@
         var r = rows[i];
         if (!isObj(r) || typeof r.symbol !== 'string' || seen[r.symbol]) continue;
         seen[r.symbol] = true;
-        hits.push(asset(r.symbol, prettyName(firstOther(aliasesOf(r), r.symbol), r.symbol), typeof r.assetClass === 'string' ? r.assetClass : 'crypto'));
+        hits.push(asset(r.symbol, prettyName(firstOther(aliasesOf(r), r.symbol), r.symbol), typeof r.assetClass === 'string' ? r.assetClass : 'crypto', NW.str(r.currency), NW.str(r.exchange)));
       }
       return hits;
     });
@@ -132,7 +132,7 @@
       overview: NW.str(p.overview), source: NW.str(p.source), instrument: NW.str(p.instrument), plan: plan };
   }
   function pulse(symbol, signal) {
-    return NW.http('/api/voice-tool', { method: 'POST', body: { tool: 'run_debate', args: { symbol: symbol, lang: NW.lang } }, timeoutMs: SEARCH_TIMEOUT, signal: signal })
+    return NW.http('/api/voice-tool', { method: 'POST', body: { tool: 'run_debate', args: { symbol: symbol, lang: NW.lang, locale: NW.locale } }, timeoutMs: SEARCH_TIMEOUT, signal: signal })
       .then(function (r) { return isObj(r.json) ? parsePulse(r.json) : null; }, function () { return null; });
   }
 
@@ -169,7 +169,7 @@
   function debate(symbol, question, isEquity, signal) {
     var telemetry = window.BobbyClientTelemetry, request = telemetry ? telemetry.beginRead() : null;
     return NW.http('/api/desk-debate', { method: 'POST', timeoutMs: DESK_TIMEOUT, signal: signal,
-      body: { symbol: symbol, question: question, language: NW.lang, assetType: isEquity ? 'equity' : 'crypto', requestId: request ? request.requestId : undefined } })
+      body: { symbol: symbol, question: question, language: NW.lang, locale: NW.locale, country: NW.country, assetType: isEquity ? 'equity' : 'crypto', requestId: request ? request.requestId : undefined } })
       .then(function (r) { var result = parseDebate(r.status, r.json, r.headers); if (result.kind === 'ok' && request && !(signal && signal.aborted)) result.telemetry = telemetry.received(request, r.json && r.json.telemetry); return result; },
         function (e) { return { kind: e.kind === 'timeout' ? 'timeout' : e.kind === 'cancelled' ? 'cancelled' : 'network' }; });
   }
@@ -353,7 +353,7 @@
     var thesis = { symbol: read.asset.symbol, isEquity: read.asset.isEquity, direction: read.direction, price: read.price, entry: null, stop: null, target: null };
     var award = S.award(wait ? 20 : 10, kind, thesis);
     var entry = {
-      id: read.requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity,
+      id: read.requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity, currency: read.asset.currency || null,
       verdict: read.verdict, direction: read.direction, price: orNull(read.price), support: orNull(read.support), resistance: orNull(read.resistance),
       entry: null, stop: null, target: null, asOf: read.asOf, provider: read.provider, savedAt: NW.iso(),
       horizonHours: wait ? null : (horizon || 24), points: award.points, synced: false
@@ -379,7 +379,7 @@
   /* ---- suggestions: the local row, plus live movers only after consent (R11); cached 5 min ---- */
   var suggestionsCache = null;
   function topMovers(limit) {
-    return NW.http('/api/bobby-asset-search?browse=1', { timeoutMs: SEARCH_TIMEOUT }).then(function (r) {
+    return NW.http('/api/bobby-asset-search?browse=1&lang=' + encodeURIComponent(NW.lang) + '&locale=' + encodeURIComponent(NW.locale) + '&country=' + encodeURIComponent(NW.country || ''), { timeoutMs: SEARCH_TIMEOUT }).then(function (r) {
       var out = [], rows = isObj(r.json) && Array.isArray(r.json.movers) ? r.json.movers : [];
       rows.forEach(function (x) {
         if (!isObj(x) || typeof x.symbol !== 'string' || typeof x.change24h !== 'number' || !isFinite(x.change24h)) return;

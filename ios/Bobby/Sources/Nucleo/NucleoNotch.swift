@@ -22,6 +22,7 @@ final class NucleoNotch: ObservableObject {
 
     private var requestID: String?
     private var symbol: String?
+    private var currency: String?
     private var level: NucleoAnalysisLevel = .rapido
     /// Live desk lines that beat the "debating" line here (the debate starts beside the market read).
     private var pending: [[String: Any]] = []
@@ -42,12 +43,13 @@ final class NucleoNotch: ObservableObject {
         case "accepted":
             let asset = payload["asset"] as? [String: Any]
             symbol = asset?["symbol"] as? String
+            currency = asset?["currency"] as? String
             push(L.t("Reading \(symbol ?? "the asset")", "Leyendo \(symbol ?? "el activo")"))
         case "market":
             let market = payload["market"] as? [String: Any]
             if let price = market?["price"] as? Double {
-                var text = "\(symbol ?? "") \(Self.price(price))"
-                if let change = market?["changePct"] as? Double { text += String(format: " · %+.1f%%", change) }
+                var text = "\(symbol ?? "") \(Self.price(price, currency: market?["currency"] as? String ?? currency ?? "USD"))"
+                if let change = market?["changePct"] as? Double { text += " · " + Self.percent(change) }
                 push(text.trimmingCharacters(in: .whitespaces))
             }
         case "candles":
@@ -134,6 +136,7 @@ final class NucleoNotch: ObservableObject {
         hideTask = nil
         requestID = nil
         symbol = nil
+        currency = nil
         level = .rapido
         pending = []
         debateOpen = false
@@ -163,12 +166,22 @@ final class NucleoNotch: ObservableObject {
         }
     }
 
-    private static func price(_ value: Double) -> String {
+    private static func price(_ value: Double, currency: String) -> String {
         let f = NumberFormatter()
         f.numberStyle = .currency
-        f.currencyCode = "USD"
+        f.locale = L.locale
+        f.currencyCode = currency
         f.maximumFractionDigits = value >= 100 ? 0 : (value >= 1 ? 2 : 4)
         return f.string(from: NSNumber(value: value)) ?? String(value)
+    }
+    private static func percent(_ value: Double) -> String {
+        let f = NumberFormatter()
+        f.locale = L.locale
+        f.numberStyle = .percent
+        f.minimumFractionDigits = 1
+        f.maximumFractionDigits = 1
+        if value >= 0 { f.positivePrefix = "+" }
+        return f.string(from: NSNumber(value: value / 100)) ?? String(value)
     }
 }
 

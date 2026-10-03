@@ -1,3 +1,4 @@
+import { speechLocale, t as ui, translatedEnglish, lang } from '@/lib/companions/i18n';
 // ============================================================
 // SwapConfirm — Inline trade execution card in chat (Base · Uniswap V3 ·
 // Coinbase B20 tokenized stocks)
@@ -95,7 +96,14 @@ export interface TradeExecution {
 
 type SwapState = 'intent' | 'building' | 'idle' | 'approving' | 'requoting' | 'ready' | 'swapping' | 'verifying' | 'confirmed' | 'unrecorded' | 'skipped' | 'error';
 
-export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' }: { trade: TradeExecution; walletAddress?: string; title?: string }) {
+function localizedSwapError(error: unknown, fallback: string): string {
+  const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+  if (!message) return fallback;
+  if (lang() === 'en') return message;
+  return translatedEnglish(message) ?? fallback;
+}
+
+export function SwapConfirm({ trade, walletAddress, title = ui('Bobby proposes:', 'Bobby propone:') }: { trade: TradeExecution; walletAddress?: string; title?: string }) {
   const [acknowledged, setAcknowledged] = useState(false);
   const [state, setState] = useState<SwapState>(trade.execution ? (trade.execution.swapTx ? 'ready' : 'idle') : 'intent');
   const [execution, setExecution] = useState(trade.execution);
@@ -208,7 +216,7 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
       setState(stateFor(exec));
     } catch (err) {
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Build failed');
+      setErrorMsg(localizedSwapError(err, ui('Could not prepare the transaction. Review the wallet and quote, then retry.', 'No pude preparar la transacción. Revisa la wallet y la cotización y reintenta.')));
     }
   };
 
@@ -230,7 +238,7 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
       setState('ready');
     } catch (err) {
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Approval failed');
+      setErrorMsg(localizedSwapError(err, ui('Approval failed. Review the wallet and retry.', 'La aprobación falló. Revisa la wallet y reintenta.')));
     }
   };
 
@@ -249,12 +257,12 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
       });
       const data = await res.json().catch(() => ({}));
       if (res.status === 202) { await new Promise((r) => setTimeout(r, 2000 * (attempt + 1))); continue; }
-      if (res.ok && data.ok) { setReceiptNote(`Verified on-chain and recorded (${data.receipt?.outcome})`); setState('confirmed'); return; }
-      setReceiptNote(`Mined on ${BASE.name}, but NOT recorded (${res.status}): ${data.error || 'unknown'}`);
+      if (res.ok && data.ok) { setReceiptNote(ui('Verified on-chain and recorded', 'Verificado en cadena y registrado')); setState('confirmed'); return; }
+      setReceiptNote(ui(`Mined on ${BASE.name}, but not recorded (status ${res.status}). Retry the record check.`, `Minada en ${BASE.name}, sin registrar (estado ${res.status}). Reintenta la verificación.`));
       setState('unrecorded');
       return;
     }
-    setReceiptNote('Mined, but the receipt is still indexing. Retry in a moment.');
+    setReceiptNote(ui('Mined, but the receipt is still indexing. Retry in a moment.', "Minada, pero el recibo aún se está indexando. Reintenta en un momento."));
     setState('unrecorded');
   };
 
@@ -279,7 +287,7 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
       await submitReceipt(hash);
     } catch (err) {
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Swap failed');
+      setErrorMsg(localizedSwapError(err, ui('Swap failed. Review the wallet and retry.', 'El swap falló. Revisa la wallet y reintenta.')));
     }
   };
 
@@ -295,7 +303,7 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
       setState(stateFor(exec));
     } catch (err) {
       setState('error');
-      setErrorMsg(err instanceof Error ? err.message : 'Revoke failed');
+      setErrorMsg(localizedSwapError(err, ui('Revocation failed. Review the wallet and retry.', 'La revocación falló. Revisa la wallet y reintenta.')));
     }
   };
 
@@ -317,99 +325,99 @@ export function SwapConfirm({ trade, walletAddress, title = 'Bobby recommends:' 
 
       <div className="space-y-1 mb-3">
         {selling
-          ? <div className="text-green-300">SELL {fromAmount} {fromToken} for ≈ ${trade.amountUsd.toFixed(2)} USDC</div>
-          : <div className="text-green-300">BUY {toToken} for ${trade.amountUsd.toFixed(2)}{trade.intent ? ` · ≈ ${Number(trade.intent.preview.amountOut).toLocaleString(undefined, { maximumFractionDigits: 6 })} ${toToken}` : ''}</div>}
-        <div className="text-green-400/50">via {disclosure?.venue ?? 'Uniswap V3'} on {BASE.name}{stock ? ' · Coinbase Tokenized Stock (B20)' : ''}</div>
+          ? <div className="text-green-300">{ui(`Sell ${fromAmount} ${fromToken} for approximately $${trade.amountUsd.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})} USDC`, `Vender ${fromAmount} ${fromToken} por aproximadamente $${trade.amountUsd.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})} USDC`)}</div>
+          : <div className="text-green-300">{ui(`Buy ${toToken} for $${trade.amountUsd.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})}`, `Comprar ${toToken} por $${trade.amountUsd.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})}`)}{trade.intent ? ` · ≈ ${Number(trade.intent.preview.amountOut).toLocaleString(speechLocale(), { maximumFractionDigits: 6 })} ${toToken}` : ''}</div>}
+        <div className="text-green-400/50">{ui("via", "vía")}{disclosure?.venue ?? 'Uniswap V3'} {ui("on", "en")}{BASE.name}{stock ? ui(' · Coinbase Tokenized Stock (B20)', " · Acción tokenizada Coinbase (B20)") : ''}</div>
         <div className="mt-2 rounded-lg border border-amber-500/20 bg-amber-500/5 p-2 font-mono text-[10px] text-white/70 space-y-1">
-          <div>CHAIN · {BASE.name} ({BASE_CHAIN_ID})</div>
-          <div>SWAP CONTRACT · {disclosure?.router ?? execution?.swapTx?.to ?? trade.intent?.preview.venue.router ?? '—'}</div>
-          {(disclosure?.route ?? trade.intent?.preview.route.description) && <div>ROUTE · {disclosure?.route ?? trade.intent?.preview.route.description}</div>}
+          <div>{ui("CHAIN ·", "RED ·")}{BASE.name} ({BASE_CHAIN_ID})</div>
+          <div>{ui("SWAP CONTRACT ·", "CONTRATO SWAP ·")}{disclosure?.router ?? execution?.swapTx?.to ?? trade.intent?.preview.venue.router ?? '—'}</div>
+          {(disclosure?.route ?? trade.intent?.preview.route.description) && <div>{ui("ROUTE ·", "RUTA ·")}{disclosure?.route ?? trade.intent?.preview.route.description}</div>}
           {execution?.approveTx && state !== 'ready' && (
             <>
-              <div>APPROVE TOKEN · {disclosure?.tokenContract ?? execution.approveTx.to}</div>
-              <div>APPROVE SPENDER · {disclosure?.spender ?? '—'} · exact {fromAmount} {fromToken}</div>
-              <div className="text-amber-300/80">If you approve and do not complete the swap, or the swap reverts, that allowance stays until spent or revoked.</div>
+              <div>{ui("APPROVE TOKEN ·", "TOKEN A APROBAR ·")}{disclosure?.tokenContract ?? execution.approveTx.to}</div>
+              <div>{ui("APPROVE SPENDER ·", "CONTRATO AUTORIZADO ·")}{disclosure?.spender ?? '—'} {ui("· exact", "· importe exacto")}{fromAmount} {fromToken}</div>
+              <div className="text-amber-300/80">{ui("If you approve and do not complete the swap, or the swap reverts, that allowance stays until spent or revoked.", "Si apruebas y no completas el swap, o si falla, el permiso permanece hasta usarse o revocarse.")}</div>
             </>
           )}
-          <div>MIN RECEIVED · {minReceived} {toToken}</div>
-          {typeof (disclosure?.priceImpactPct ?? trade.intent?.preview.priceImpactPct) === 'number' && <div>PRICE IMPACT · {(disclosure?.priceImpactPct ?? trade.intent!.preview.priceImpactPct)!.toFixed(2)}%</div>}
+          <div>{ui("MIN RECEIVED ·", "MÍNIMO RECIBIDO ·")}{minReceived} {toToken}</div>
+          {typeof (disclosure?.priceImpactPct ?? trade.intent?.preview.priceImpactPct) === 'number' && <div>{ui("PRICE IMPACT ·", "IMPACTO EN PRECIO ·")}{((disclosure?.priceImpactPct ?? trade.intent!.preview.priceImpactPct)!).toLocaleString(speechLocale(), { minimumFractionDigits: 2, maximumFractionDigits: 2 })}%</div>}
           {stockReference && (
             <>
-              <div>B20 REFERENCE · ${stockReference.usdPrice.toFixed(2)} · Uniswap {stockReference.marketDeviationPct.toFixed(2)}% away · feed {Math.round(stockReference.ageSec / 3600)}h old</div>
-              <div>B20 MULTIPLIER · {stockReference.multiplierHuman}× {stockReference.transferPaused ? '· TRANSFERS PAUSED' : stockReference.pausedFeatures !== '0' ? '· issuer paused mint/redeem' : ''}</div>
+              <div>{ui(`B20 reference: $${stockReference.usdPrice.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})} · Uniswap deviation ${stockReference.marketDeviationPct.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})}% · feed age ${Math.round(stockReference.ageSec / 3600)} h`, `Referencia B20: $${stockReference.usdPrice.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})} · desvío Uniswap ${stockReference.marketDeviationPct.toLocaleString(speechLocale(), {minimumFractionDigits:2,maximumFractionDigits:2})}% · antigüedad ${Math.round(stockReference.ageSec / 3600)} h`)}</div>
+              <div>{ui("B20 MULTIPLIER ·", "MULTIPLICADOR B20 ·")}{stockReference.multiplierHuman}× {stockReference.transferPaused ? ui('· TRANSFERS PAUSED', "· TRANSFERENCIAS PAUSADAS") : stockReference.pausedFeatures !== '0' ? ui('· issuer paused mint/redeem', "· emisor pausó emisión/canje") : ''}</div>
             </>
           )}
-          {deadlineLeftMin !== null && <div>VALID FOR · {deadlineLeftMin} min</div>}
-          <div>SIMULATED · {execution?.swapTx ? (disclosure?.simulated ? 'yes (eth_call passed)' : 'no') : execution ? 'after approval + re-quote' : 'after you attest and the server builds'}</div>
+          {deadlineLeftMin !== null && <div>{ui("VALID FOR ·", "VÁLIDO POR ·")}{deadlineLeftMin} min</div>}
+          <div>{ui("SIMULATED ·", "SIMULADO ·")}{execution?.swapTx ? (disclosure?.simulated ? ui('yes (eth_call passed)', "sí (eth_call aprobado)") : ui('no', "no")) : execution ? ui('after approval + re-quote', "tras aprobación y nueva cotización") : ui('after you attest and the server builds', "tras tu confirmación y preparación del servidor")}</div>
           {(state === 'intent' || state === 'idle' || state === 'ready') && (
             <label className="flex items-center gap-2 pt-1 cursor-pointer">
               <input type="checkbox" checked={acknowledged} onChange={(e) => setAcknowledged(e.target.checked)} />
               <span>
                 {stock
-                  ? 'I am in an eligible jurisdiction outside the U.S. I understand this B20 token is not the underlying share, and I checked the contract and the minimum. Bobby never signs for me.'
-                  : 'I checked the contract and the minimum received. Bobby never signs for me.'}
+                  ? ui('I am in an eligible jurisdiction outside the U.S. I understand this B20 token is not the underlying share, and I checked the contract and the minimum. Bobby never signs for me.', "Estoy en una jurisdicción elegible fuera de EE. UU. Entiendo que el token B20 no es la acción subyacente y revisé contrato y mínimo. Bobby nunca firma por mí.")
+                  : ui('I checked the contract and the minimum received. Bobby never signs for me.', "Revisé contrato y mínimo recibido. Bobby nunca firma por mí.")}
               </span>
             </label>
           )}
         </div>
-        <div className="text-green-400/50">Confidence: {trade.confidence}% ({trade.sizingMethod})</div>
+        <div className="text-green-400/50">{ui("Confidence:", "Convicción:")}{trade.confidence}% ({trade.sizingMethod})</div>
       </div>
 
       {state === 'intent' && (
         <div className="flex gap-2">
-          <button disabled={!canBuild} onClick={handleBuild} className={button}>Build transaction for my wallet</button>
-          <button onClick={() => setState('skipped')} className={skip}>Skip</button>
+          <button disabled={!canBuild} onClick={handleBuild} className={button}>{ui("Build transaction for my wallet", "Preparar transacción para mi wallet")}</button>
+          <button onClick={() => setState('skipped')} className={skip}>{ui("Skip", "Omitir")}</button>
         </div>
       )}
-      {state === 'building' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Building and simulating for your wallet…</div>}
+      {state === 'building' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />{ui("Building and simulating for your wallet…", "Preparando y simulando para tu wallet…")}</div>}
       {state === 'idle' && execution && (
         <div className="space-y-2">
           <div className="flex gap-2">
-            <button disabled={!canSign} onClick={handleApprove} className={button}>Approve {fromToken} (exact)</button>
-            <button onClick={() => setState('skipped')} className={skip}>Skip</button>
+            <button disabled={!canSign} onClick={handleApprove} className={button}>{ui(`Approve ${fromToken} (exact amount)`, `Aprobar ${fromToken} (importe exacto)`)}</button>
+            <button onClick={() => setState('skipped')} className={skip}>{ui("Skip", "Omitir")}</button>
           </div>
-          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke existing {fromToken} allowance (approve 0)</button>}
+          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">{ui(`Revoke existing ${fromToken} allowance (approve 0)`, `Revocar permiso de ${fromToken} (aprobar 0)`)}</button>}
         </div>
       )}
-      {state === 'approving' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approving {fromToken}… waiting for the receipt</div>}
-      {state === 'requoting' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Approval mined. Re-quoting and simulating the swap…</div>}
+      {state === 'approving' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />{ui(`Approving ${fromToken}… waiting for the receipt`, `Aprobando ${fromToken}… esperando el recibo`)}</div>}
+      {state === 'requoting' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />{ui("Approval mined. Re-quoting and simulating the swap…", "Aprobación minada. Actualizando cotización y simulando el swap…")}</div>}
       {state === 'ready' && execution && (
         <div className="space-y-2">
           {!execution.approveTx && execution.swapTx && (
-            <div className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3 h-3" />Approval confirmed · quote refreshed and simulation passed</div>
+            <div className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3 h-3" />{ui("Approval confirmed · quote refreshed and simulation passed", "Aprobación confirmada · cotización actualizada y simulación aprobada")}</div>
           )}
           <div className="flex gap-2">
-            <button disabled={!canSign} onClick={handleSwap} className={button}>Execute Swap</button>
-            <button onClick={() => setState('skipped')} className={skip}>Skip</button>
+            <button disabled={!canSign} onClick={handleSwap} className={button}>{ui("Execute Swap", "Firmar y ejecutar swap")}</button>
+            <button onClick={() => setState('skipped')} className={skip}>{ui("Skip", "Omitir")}</button>
           </div>
-          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">Revoke {fromToken} allowance instead (approve 0)</button>}
+          {execution.revokeTx && <button onClick={handleRevoke} className="w-full py-1 text-white/40 hover:text-white/70 border border-white/10 rounded">{ui(`Revoke ${fromToken} allowance instead (approve 0)`, `Revocar permiso de ${fromToken} (aprobar 0)`)}</button>}
         </div>
       )}
-      {state === 'swapping' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Swapping… waiting for the receipt</div>}
-      {state === 'verifying' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />Mined. Verifying the receipt on {BASE.name}…</div>}
+      {state === 'swapping' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />{ui("Swapping… waiting for the receipt", "Procesando swap… esperando el recibo")}</div>}
+      {state === 'verifying' && <div className="flex items-center gap-2 text-amber-400"><Loader2 className="w-3 h-3 animate-spin" />{ui(`Mined. Verifying the receipt on ${BASE.name}…`, `Minada. Verificando el recibo en ${BASE.name}…`)}</div>}
       {state === 'confirmed' && swapTxHash && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3 h-3" />Confirmed on-chain</div>
+          <div className="flex items-center gap-2 text-green-400"><CheckCircle className="w-3 h-3" />{ui("Confirmed on-chain", "Confirmado en cadena")}</div>
           {receiptNote && <div className="text-white/50">{receiptNote}</div>}
           <a href={`${BASE.explorerUrl}/tx/${swapTxHash}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-green-400/60 hover:text-green-400 transition-colors">
-            <ExternalLink className="w-3 h-3" />View on {BASE.explorerName}
+            <ExternalLink className="w-3 h-3" />{ui(`View on ${BASE.explorerName}`, `Ver en ${BASE.explorerName}`)}
           </a>
         </div>
       )}
       {state === 'unrecorded' && swapTxHash && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-amber-400"><XCircle className="w-3 h-3" />Mined, not recorded</div>
+          <div className="flex items-center gap-2 text-amber-400"><XCircle className="w-3 h-3" />{ui("Mined, not recorded", "Minada, sin registrar")}</div>
           {receiptNote && <div className="text-white/50">{receiptNote}</div>}
           <div className="flex gap-2">
-            <button onClick={() => { setState('verifying'); void submitReceipt(swapTxHash).catch((e) => { setState('unrecorded'); setReceiptNote(e instanceof Error ? e.message : 'retry failed'); }); }} className={button}>Retry record</button>
+            <button onClick={() => { setState('verifying'); void submitReceipt(swapTxHash).catch((e) => { setState('unrecorded'); setReceiptNote(localizedSwapError(e, ui('Could not record the receipt. Retry in a moment.', 'No pude registrar el recibo. Reintenta en un momento.'))); }); }} className={button}>{ui("Retry record", "Reintentar registro")}</button>
             <a href={`${BASE.explorerUrl}/tx/${swapTxHash}`} target="_blank" rel="noopener noreferrer" className={`${skip} flex items-center gap-1`}><ExternalLink className="w-3 h-3" />{BASE.explorerName}</a>
           </div>
         </div>
       )}
       {state === 'error' && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-red-400"><XCircle className="w-3 h-3" />{errorMsg || 'Transaction failed'}</div>
-          <button onClick={() => { setState(execution ? stateFor(execution) : 'intent'); setErrorMsg(''); }} className="text-white/30 hover:text-white/60 transition-colors">Retry</button>
+          <div className="flex items-center gap-2 text-red-400"><XCircle className="w-3 h-3" />{errorMsg || ui('Transaction failed', "La transacción falló")}</div>
+          <button onClick={() => { setState(execution ? stateFor(execution) : 'intent'); setErrorMsg(''); }} className="text-white/30 hover:text-white/60 transition-colors">{ui("Retry", "Reintentar")}</button>
         </div>
       )}
     </div>

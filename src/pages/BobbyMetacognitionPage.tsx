@@ -1,3 +1,5 @@
+import { kineticText as text, kineticStatus as status } from '@/lib/companions/kinetic-copy';
+import { locale } from '@/lib/companions/i18n';
 // ============================================================
 // Bobby Metacognition Dashboard — Self-Awareness Engine
 // Shows calibration curve, debate quality, self-correction log
@@ -82,10 +84,10 @@ interface IntelData {
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
   const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 60) return new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' }).format(-mins, 'minute');
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+  if (hrs < 24) return new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' }).format(-hrs, 'hour');
+  return new Intl.RelativeTimeFormat(locale(), { numeric: 'auto' }).format(-Math.floor(hrs / 24), 'day');
 }
 
 function calibrationColor(error: number): string {
@@ -96,9 +98,9 @@ function calibrationColor(error: number): string {
 
 function moodBadge(mood: string): { color: string; label: string } {
   switch (mood) {
-    case 'confident': return { color: 'bg-green-500/20 text-green-400', label: 'CONFIDENT' };
-    case 'cautious': return { color: 'bg-amber-500/20 text-amber-400', label: 'CAUTIOUS' };
-    case 'tilted': return { color: 'bg-red-500/20 text-red-400', label: 'TILTED' };
+    case 'confident': return { color: 'bg-green-500/20 text-green-400', label: text('CONFIDENT') };
+    case 'cautious': return { color: 'bg-amber-500/20 text-amber-400', label: text('CAUTIOUS') };
+    case 'tilted': return { color: 'bg-red-500/20 text-red-400', label: text('TILTED') };
     default: return { color: 'bg-white/10 text-white/50', label: mood.toUpperCase() };
   }
 }
@@ -145,7 +147,7 @@ function MetacognitionLoader() {
         <div className="bg-white/[0.02] border border-white/[0.04] rounded-xl p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-ping" />
-            <span className="text-[10px] font-mono text-green-400/60 tracking-widest">BOBBY_METACOGNITION_ENGINE</span>
+            <span className="text-[10px] font-mono text-green-400/60 tracking-widest">{text("BOBBY_METACOGNITION_ENGINE")}</span>
           </div>
           <div className="space-y-2 font-mono text-xs">
             {lines.map((line, idx) => (
@@ -155,7 +157,7 @@ function MetacognitionLoader() {
                 animate={{ opacity: 1, x: 0 }}
                 className={idx === lines.length - 1 ? 'text-green-400' : 'text-white/30'}
               >
-                {line}
+                {text(line)}
               </motion.p>
             ))}
             {lines.length < steps.length && (
@@ -183,9 +185,9 @@ function CalibrationTooltip({ active, payload }: any) {
   if (!d) return null;
   return (
     <div className="bg-[#1a1a1a] border border-white/10 rounded p-2 font-mono text-[10px]">
-      <p className="text-white/60">Bucket: {d.name}</p>
-      <p className="text-green-400">Perfect: {(d.perfect * 100).toFixed(0)}%</p>
-      <p className="text-amber-400">Actual: {(d.actual * 100).toFixed(0)}%</p>
+      <p className="text-white/60">{text("Bucket:")}{' '}{d.name}</p>
+      <p className="text-green-400">{text("Perfect:")}{' '}{(d.perfect * 100).toFixed(0)}%</p>
+      <p className="text-amber-400">{text("Actual:")}{' '}{(d.actual * 100).toFixed(0)}%</p>
       <p className="text-white/40">n = {d.count}</p>
     </div>
   );
@@ -315,7 +317,7 @@ export default function BobbyMetacognitionPage() {
   return (
     <KineticShell activeTab="metacognition" nucleo>
       <Helmet>
-        <title>Metacognition | Bobby Agent Trader</title>
+        <title>{text("Metacognition | Bobby Agent Trader")}</title>
       </Helmet>
 
       {loading ? (
@@ -327,11 +329,9 @@ export default function BobbyMetacognitionPage() {
           <Brain className="w-6 h-6 text-green-400" />
           <div>
             <h1 className="text-xl font-black tracking-tight text-white font-mono">
-              METACOGNITION MODULE
-            </h1>
+              {text("METACOGNITION MODULE")}</h1>
             <p className="text-[9px] font-mono text-green-400/40 tracking-[0.2em]">
-              BOBBY_CORE_V1.0 // SELF-AWARENESS ENGINE
-            </p>
+              {text("BOBBY_CORE_V1.0 // SELF-AWARENESS ENGINE")}</p>
           </div>
         </motion.div>
 
@@ -340,7 +340,7 @@ export default function BobbyMetacognitionPage() {
           {/* Calibration Error */}
           <motion.div {...fadeUp} transition={{ delay: 0.05 }}
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
-            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">CALIBRATION ERROR</p>
+            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">{text("CALIBRATION ERROR")}</p>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
@@ -349,7 +349,7 @@ export default function BobbyMetacognitionPage() {
                   {cal?.calibrationError != null ? cal.calibrationError.toFixed(3) : '--'}
                 </p>
                 <p className="text-[8px] font-mono text-white/20 mt-1">
-                  {cal?.isOverconfident ? 'OVERCONFIDENT' : cal?.calibrationError != null && cal.calibrationError < 0.1 ? 'WELL CALIBRATED' : 'NEEDS DATA'}
+                  {text(cal?.isOverconfident ? 'OVERCONFIDENT' : cal?.calibrationError != null && cal.calibrationError < 0.1 ? 'WELL CALIBRATED' : 'NEEDS DATA')}
                 </p>
               </>
             )}
@@ -358,7 +358,7 @@ export default function BobbyMetacognitionPage() {
           {/* Win Rate */}
           <motion.div {...fadeUp} transition={{ delay: 0.1 }}
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
-            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">WIN RATE</p>
+            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">{text("WIN RATE")}</p>
             {loading ? (
               <Skeleton className="h-8 w-20" />
             ) : (
@@ -378,7 +378,7 @@ export default function BobbyMetacognitionPage() {
           {/* Regime */}
           <motion.div {...fadeUp} transition={{ delay: 0.15 }}
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
-            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">MARKET REGIME</p>
+            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">{text("MARKET REGIME")}</p>
             {loading ? (
               <Skeleton className="h-8 w-28" />
             ) : (
@@ -388,10 +388,10 @@ export default function BobbyMetacognitionPage() {
                 </p>
                 {intel?.fearGreed && (
                   <p className="text-[8px] font-mono text-white/30 mt-1">
-                    Fear & Greed: <span className={
+                    {text("Fear & Greed:")}{' '}<span className={
                       intel.fearGreed.value <= 25 ? 'text-red-400' :
                       intel.fearGreed.value >= 75 ? 'text-green-400' : 'text-amber-400'
-                    }>{intel.fearGreed.value}</span> ({intel.fearGreed.classification})
+                    }>{intel.fearGreed.value}</span> ({status(intel.fearGreed.classification)})
                   </p>
                 )}
               </>
@@ -401,7 +401,7 @@ export default function BobbyMetacognitionPage() {
           {/* Self-Corrections */}
           <motion.div {...fadeUp} transition={{ delay: 0.2 }}
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4 hover:bg-white/[0.04] transition-all duration-300">
-            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">SELF-CORRECTIONS</p>
+            <p className="text-[8px] font-mono text-green-400/40 tracking-widest mb-1">{text("SELF-CORRECTIONS")}</p>
             {loading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
@@ -410,8 +410,7 @@ export default function BobbyMetacognitionPage() {
                   {contradictions.length}
                 </p>
                 <p className="text-[8px] font-mono text-white/20 mt-1">
-                  ERRORS ACKNOWLEDGED (72H)
-                </p>
+                  {text("ERRORS ACKNOWLEDGED (72H)")}</p>
               </>
             )}
           </motion.div>
@@ -424,8 +423,8 @@ export default function BobbyMetacognitionPage() {
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">CALIBRATION CURVE</p>
-                <p className="text-[8px] font-mono text-white/20">PREDICTED vs ACTUAL WIN RATE</p>
+                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("CALIBRATION CURVE")}</p>
+                <p className="text-[8px] font-mono text-white/20">{text("PREDICTED vs ACTUAL WIN RATE")}</p>
               </div>
               {cal && cal.sampleSize > 0 && (
                 <span className="text-[8px] font-mono text-white/20">n = {cal.sampleSize}</span>
@@ -436,7 +435,7 @@ export default function BobbyMetacognitionPage() {
               <Skeleton className="h-52 w-full" />
             ) : chartData.length === 0 ? (
               <div className="h-52 flex items-center justify-center">
-                <p className="text-[10px] font-mono text-white/20">Collecting data... Need 5+ resolved debates.</p>
+                <p className="text-[10px] font-mono text-white/20">{text("Collecting data... Need 5+ resolved debates.")}</p>
               </div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
@@ -463,7 +462,7 @@ export default function BobbyMetacognitionPage() {
                     strokeWidth={1.5}
                     strokeDasharray="6 3"
                     dot={false}
-                    name="Perfect"
+                    name={text('Perfect')}
                   />
                   {/* Bobby's actual */}
                   <Line
@@ -499,11 +498,9 @@ export default function BobbyMetacognitionPage() {
             {/* Legend */}
             <div className="flex gap-4 mt-2">
               <span className="flex items-center gap-1.5 text-[8px] font-mono text-white/30">
-                <span className="w-3 h-px bg-green-500 inline-block" style={{ borderTop: '1.5px dashed #22c55e' }} /> PERFECT
-              </span>
+                <span className="w-3 h-px bg-green-500 inline-block" style={{ borderTop: '1.5px dashed #22c55e' }} /> {text("PERFECT")}</span>
               <span className="flex items-center gap-1.5 text-[8px] font-mono text-white/30">
-                <span className="w-3 h-0.5 bg-amber-500 inline-block rounded" /> BOBBY_ACTUAL
-              </span>
+                <span className="w-3 h-0.5 bg-amber-500 inline-block rounded" /> {text("BOBBY_ACTUAL")}</span>
             </div>
           </motion.div>
 
@@ -512,9 +509,9 @@ export default function BobbyMetacognitionPage() {
             className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">METACOGNITION_METRICS</p>
+                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("METACOGNITION_METRICS")}</p>
                 <p className="text-[8px] font-mono text-white/20">
-                  {quality ? `AGGREGATE AVERAGE • LAST ${debatesScoredCount} DEBATE${debatesScoredCount !== 1 ? 'S' : ''}` : 'AWAITING EVALUATION'}
+                  {quality ? text('AGGREGATE AVERAGE • LAST {0} DEBATES', debatesScoredCount) : text('AWAITING EVALUATION')}
                 </p>
               </div>
               <span className="text-[8px] font-mono text-white/30 border border-white/10 px-2 py-0.5 rounded-sm">
@@ -531,35 +528,32 @@ export default function BobbyMetacognitionPage() {
                 {debatesScoredCount < 5 && (
                   <div className="text-[9px] font-mono text-amber-400/60 bg-amber-500/[0.06] border border-amber-500/10 rounded px-2 py-1 mb-2">
                     {debatesScoredCount === 0
-                      ? 'AWAITING_POST_MORTEM_EVALUATION'
-                      : `PRELIMINARY_DATA • n=${debatesScoredCount}`}
+                      ? text('AWAITING_POST_MORTEM_EVALUATION')
+                      : text('PRELIMINARY_DATA • n={0}', debatesScoredCount)}
                   </div>
                 )}
-                <QualityBar label="Specificity" value={quality.specificity} delay={0.1} />
-                <QualityBar label="Data Citation" value={quality.data_citation} delay={0.2} />
-                <QualityBar label="Actionability" value={quality.actionability} delay={0.3} />
-                <QualityBar label="Novel Insight" value={quality.novel_insight} delay={0.4} />
-                <QualityBar label="Red Team Rigor" value={quality.red_team_rigor} delay={0.5} />
+                <QualityBar label={text("Specificity")} value={quality.specificity} delay={0.1} />
+                <QualityBar label={text("Data Citation")} value={quality.data_citation} delay={0.2} />
+                <QualityBar label={text("Actionability")} value={quality.actionability} delay={0.3} />
+                <QualityBar label={text("Novel Insight")} value={quality.novel_insight} delay={0.4} />
+                <QualityBar label={text("Red Team Rigor")} value={quality.red_team_rigor} delay={0.5} />
               </div>
             ) : (
               <div className="space-y-4 opacity-30">
                 {['Specificity', 'Data Citation', 'Actionability', 'Novel Insight', 'Red Team Rigor'].map(l => (
-                  <QualityBar key={l} label={l} value={0} />
+                  <QualityBar key={l} label={text(l)} value={0} />
                 ))}
                 <p className="text-center text-[9px] font-mono text-amber-400/40 mt-3">
-                  AWAITING_POST_MORTEM_EVALUATION
-                </p>
+                  {text("AWAITING_POST_MORTEM_EVALUATION")}</p>
                 <p className="text-center text-[8px] font-mono text-white/20">
-                  The AI judge evaluates debates asynchronously.
-                </p>
+                  {text("The AI judge evaluates debates asynchronously.")}</p>
               </div>
             )}
 
             {quality?.weakness && (
               <div className="mt-4 pt-3 border-t border-white/[0.06]">
                 <p className="text-[8px] font-mono text-red-400/60 tracking-wider mb-1 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> LATEST_CRITICAL_WEAKNESS
-                </p>
+                  <AlertTriangle className="w-3 h-3" /> {text("LATEST_CRITICAL_WEAKNESS")}</p>
                 <p className="text-[10px] font-mono text-white/60 italic border-l-2 border-red-500/30 pl-3 leading-relaxed line-clamp-2">
                   {quality.weakness}
                 </p>
@@ -569,11 +563,11 @@ export default function BobbyMetacognitionPage() {
             {/* Stats row */}
             <div className="grid grid-cols-2 gap-3 mt-5 pt-4 border-t border-white/[0.04]">
               <div>
-                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">TOTAL DEBATES</p>
+                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("TOTAL DEBATES")}</p>
                 <p className="text-lg font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>{totalDebates}</p>
               </div>
               <div>
-                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">AGREEMENT RATE</p>
+                <p className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("AGREEMENT RATE")}</p>
                 <p className="text-lg font-black text-white font-mono" style={{ fontVariantNumeric: 'tabular-nums' }}>
                   {agreementRate != null ? `${agreementRate}%` : '--'}
                 </p>
@@ -587,8 +581,8 @@ export default function BobbyMetacognitionPage() {
           className="bg-white/[0.02] border border-white/[0.04] rounded-lg p-4">
           <div className="flex items-center gap-2 mb-4">
             <AlertTriangle className="w-3.5 h-3.5 text-red-400/60" />
-            <p className="text-[8px] font-mono text-green-400/40 tracking-widest">SELF-CORRECTION LOG</p>
-            <p className="text-[8px] font-mono text-white/20">// RECENT LOSSES & CONTRADICTIONS</p>
+            <p className="text-[8px] font-mono text-green-400/40 tracking-widest">{text("SELF-CORRECTION LOG")}</p>
+            <p className="text-[8px] font-mono text-white/20">{text("// RECENT LOSSES & CONTRADICTIONS")}</p>
           </div>
 
           {loading ? (
@@ -598,7 +592,7 @@ export default function BobbyMetacognitionPage() {
           ) : contradictions.length === 0 ? (
             <div className="py-6 text-center">
               <Shield className="w-5 h-5 text-green-400/30 mx-auto mb-2" />
-              <p className="text-[10px] font-mono text-green-400/40">No recent contradictions — record clean.</p>
+              <p className="text-[10px] font-mono text-green-400/40">{text("No recent contradictions — record clean.")}</p>
             </div>
           ) : (
             <div className="space-y-1">
@@ -613,10 +607,10 @@ export default function BobbyMetacognitionPage() {
                   <TrendingDown className="w-3 h-3 text-red-400/60 shrink-0" />
                   <span className="text-[10px] font-mono text-white/40 shrink-0 w-14">{timeAgo(c.created_at)}</span>
                   <span className="text-[10px] font-mono text-white/70">
-                    {c.direction?.toUpperCase() || 'TRADE'} {c.symbol || '?'} @ {c.conviction_score != null ? `${Math.round(c.conviction_score * 10)}/10` : '?'}
+                    {c.direction?.toUpperCase() || text('TRADE')} {c.symbol || '?'} @ {c.conviction_score != null ? `${Math.round(c.conviction_score * 10)}/10` : '?'}
                   </span>
                   <span className="text-[10px] font-mono text-red-400 ml-auto shrink-0">
-                    LOSS {c.resolution_pnl_pct != null ? `${c.resolution_pnl_pct > 0 ? '+' : ''}${c.resolution_pnl_pct.toFixed(1)}%` : ''}
+                    {text("LOSS")}{' '}{c.resolution_pnl_pct != null ? `${c.resolution_pnl_pct > 0 ? '+' : ''}${c.resolution_pnl_pct.toFixed(1)}%` : ''}
                   </span>
                 </motion.div>
               ))}
@@ -640,7 +634,7 @@ export default function BobbyMetacognitionPage() {
                 userName: (() => { try { return localStorage.getItem('bobby_agent_name') || null; } catch { return null; } })(),
               }}
               commandLabel="bobby --explain metacognition"
-              buttonLabel="EXPLAIN DASHBOARD WITH AI"
+              buttonLabel={text("EXPLAIN DASHBOARD WITH AI")}
             />
           </motion.div>
         )}
@@ -649,12 +643,11 @@ export default function BobbyMetacognitionPage() {
         <motion.div {...fadeUp} transition={{ delay: 0.45 }}
           className="flex flex-wrap items-center gap-4 text-[8px] font-mono text-white/15 tracking-wider">
           <span>CALIBRATION_MODULE_V2</span>
-          <span>SAMPLE_SIZE: {cal?.sampleSize ?? 0}</span>
-          <span>BREAK_EVEN_EXCLUDED: {cal?.breakEvenCount ?? 0}</span>
-          <span>ADJUSTMENT: {cal?.adjustment?.toFixed(3) ?? '1.000'}x</span>
+          <span>{text("SAMPLE_SIZE:")}{' '}{cal?.sampleSize ?? 0}</span>
+          <span>{text("BREAK_EVEN_EXCLUDED:")}{' '}{cal?.breakEvenCount ?? 0}</span>
+          <span>{text("ADJUSTMENT:")}{' '}{cal?.adjustment?.toFixed(3) ?? '1.000'}x</span>
           <span className="flex items-center gap-1">
-            <Activity className="w-2.5 h-2.5" /> LIVE
-          </span>
+            <Activity className="w-2.5 h-2.5" /> {text("LATEST SNAPSHOT")}</span>
         </motion.div>
       </div>
       )}

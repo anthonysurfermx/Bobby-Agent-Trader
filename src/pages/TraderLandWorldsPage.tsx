@@ -7,7 +7,7 @@ import { ArrowUpRight, Globe, Hammer, Link2, RotateCw, Sparkles } from 'lucide-r
 import KineticShell from '@/components/kinetic/KineticShell';
 import IslandThumb from '@/components/companion/IslandThumb';
 import { useLandManifest } from '@/lib/trader-land/useLandManifest';
-import { isSpanish, t } from '@/lib/companions/i18n';
+import { speechLocale, t } from '@/lib/companions/i18n';
 import { CATALOG_ALIASES, DISTRICTS, DISTRICT_META, KIND_LABEL, STUDIO_PATH, artOf, fetchPublicWorlds, itemLabel, visitorPath, type CatalogItem, type PublicWorld } from '@/lib/trader-land/public';
 
 const KIND_ORDER = ['ground', 'path_pavement', 'decor', 'building', 'landmark'];
@@ -31,7 +31,7 @@ export default function TraderLandWorldsPage() {
   }, [attempt]);
   const visibleWorlds = (worlds ?? []).filter((world) => filter === 'all' || world.stats.districts.includes(filter)).sort((a, b) =>
     sort === 'districts' ? b.stats.districts.length - a.stats.districts.length : (b.publishedAt ?? '').localeCompare(a.publishedAt ?? ''));
-  const locale = isSpanish() ? 'es-MX' : 'en-US';
+  const locale = speechLocale();
 
   return (
     <KineticShell minimalNav nucleo>
@@ -54,7 +54,7 @@ export default function TraderLandWorldsPage() {
           </div>
           <p className="mt-3 max-w-2xl text-sm text-[#A39C91]">{t('Find one idea to try: a connected path, a quiet corner or a new district. Visits do not award pieces or XP.', 'Encuentra una idea para probar: un camino conectado, un rincón tranquilo o un nuevo distrito. Las visitas no dan piezas ni XP.')}</p>
           {worlds && worlds.length > 0 && <div className="mt-4 flex flex-wrap gap-4 text-sm">
-            <label className="flex items-center gap-2">{t('District', 'Distrito')}<select className="min-h-11 rounded-lg border border-white/15 bg-[#14110F] px-3" value={filter} onChange={(event)=>setFilter(event.target.value)}><option value="all">{t('All', 'Todos')}</option>{DISTRICTS.map((district)=><option key={district} value={district}>{DISTRICT_META[district].name}</option>)}</select></label>
+            <label className="flex items-center gap-2">{t('District', 'Distrito')}<select className="min-h-11 rounded-lg border border-white/15 bg-[#14110F] px-3" value={filter} onChange={(event)=>setFilter(event.target.value)}><option value="all">{t('All', 'Todos')}</option>{DISTRICTS.map((district)=><option key={district} value={district}>{t(DISTRICT_META[district].name, DISTRICT_META[district].nameEs)}</option>)}</select></label>
             <label className="flex items-center gap-2">{t('Sort', 'Ordenar')}<select className="min-h-11 rounded-lg border border-white/15 bg-[#14110F] px-3" value={sort} onChange={(event)=>setSort(event.target.value)}><option value="recent">{t('Recently shared', 'Recién compartidas')}</option><option value="districts">{t('District variety', 'Variedad de distritos')}</option></select></label>
           </div>}
           {worlds && worlds.length > 0 && visibleWorlds.length === 0 && <p className="mt-6 text-sm text-[#A39C91]" role="status">{t('No shared islands in this district yet. Try another district.', 'Aún no hay islas compartidas con este distrito. Prueba otro distrito.')}</p>}
@@ -106,7 +106,7 @@ export default function TraderLandWorldsPage() {
                 <article key={district} className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5" style={{ boxShadow: `inset 0 1px 0 ${meta.color}22` }}>
                   <div className="flex items-center gap-3">
                     <span className="h-3 w-3 rounded-full" style={{ background: meta.color, boxShadow: `0 0 12px ${meta.color}88` }} aria-hidden="true" />
-                    <h3 className="text-lg font-semibold">{meta.name}</h3>
+                    <h3 className="text-lg font-semibold">{t(meta.name, meta.nameEs)}</h3>
                     <span className="ml-auto rounded-full border border-white/10 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.16em] text-[#A39C91]">{t(...meta.trait)}</span>
                   </div>
                   <p className="mt-2 text-sm text-[#A39C91]">{t(...meta.line)}</p>

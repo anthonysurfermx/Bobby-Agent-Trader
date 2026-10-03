@@ -1,3 +1,4 @@
+import { kineticText as text } from '@/lib/companions/kinetic-copy';
 // ============================================================
 // Mascot Showcase — internal viewer for the Bobby squad
 // Route: /mascots (standalone, no layout — like the wizard)
@@ -15,32 +16,32 @@ import type { OrbState } from '@/components/adams/VoiceOrb';
 
 // Squad roles from the product vision (character = face, role = subtitle)
 const ROLES: Record<string, string> = {
-  bobby: 'ORB · NÚCLEO',
-  byte: 'VOZ SIMPLE',
-  kora: 'CONVERSACIÓN',
-  zip: 'ALERTAS',
+  bobby: 'ORB · CORE',
+  byte: 'SIMPLE VOICE',
+  kora: 'CONVERSATION',
+  zip: 'ALERTS',
   glitch: 'RED TEAM',
-  momo: 'EXPLORACIÓN',
-  flux: 'SEÑALES',
-  rook: 'TESIS',
+  momo: 'EXPLORATION',
+  flux: 'SIGNALS',
+  rook: 'THESIS',
   axiom: 'TRACK RECORD',
   halo: 'RISK GATE',
   // Wave 2
-  iris: 'RÉGIMEN DE MERCADO',
-  sol: 'CRECIMIENTO',
-  zuri: 'FLUJOS ON-CHAIN',
-  mira: 'PRÁCTICA',
-  nalu: 'LIQUIDEZ',
-  vega: 'PROBABILIDAD',
-  noor: 'MENTORÍA',
-  keo: 'PACIENCIA',
+  iris: 'MARKET REGIME',
+  sol: 'GROWTH',
+  zuri: 'ON-CHAIN FLOWS',
+  mira: 'PRACTICE',
+  nalu: 'LIQUIDITY',
+  vega: 'PROBABILITY',
+  noor: 'MENTORING',
+  keo: 'PATIENCE',
 };
 
 const STATES: Array<{ id: OrbState; label: string }> = [
-  { id: 'idle', label: 'REPOSO' },
-  { id: 'listening', label: 'ESCUCHA' },
-  { id: 'thinking', label: 'PIENSA' },
-  { id: 'speaking', label: 'HABLA' },
+  { id: 'idle', label: 'IDLE' },
+  { id: 'listening', label: 'LISTENING' },
+  { id: 'thinking', label: 'THINKING' },
+  { id: 'speaking', label: 'SPEAKING' },
 ];
 
 export default function MascotShowcasePage() {
@@ -59,7 +60,7 @@ export default function MascotShowcasePage() {
               ? 'bg-green-500/15 border border-green-500/30 text-green-400'
               : 'bg-white/[0.02] border border-white/[0.04] text-white/30 hover:text-white/50'
           }`}>
-          {s.label}
+          {text(s.label)}
         </button>
       ))}
     </div>
@@ -67,18 +68,17 @@ export default function MascotShowcasePage() {
 
   return (
     <div className="fixed inset-0 z-[9999] bg-[#050505] flex flex-col text-white overflow-y-auto">
-      <Helmet><title>Squad Showcase | Bobby Agent Trader</title></Helmet>
+      <Helmet><title>{text("Squad Showcase | Bobby Agent Trader")}</title></Helmet>
 
       <div className="flex items-center justify-between px-5 h-12 border-b border-white/5 flex-shrink-0">
-        <span className="font-mono text-[9px] text-white/25 tracking-widest">BOBBY SQUAD // SHOWCASE 3D</span>
+        <span className="font-mono text-[9px] text-white/25 tracking-widest">{text("BOBBY SQUAD // SHOWCASE 3D")}</span>
         <div className="flex items-center gap-4">
           {focused && (
             <button onClick={() => setFocusId(null)}
               className="font-mono text-[9px] text-green-400/70 hover:text-green-400 tracking-widest transition-colors">
-              ← VER TODOS
-            </button>
+              {text("← VIEW ALL")}</button>
           )}
-          <span className="font-mono text-[9px] text-white/25">{MASCOT_AVATARS.length} COMPANIONS</span>
+          <span className="font-mono text-[9px] text-white/25">{MASCOT_AVATARS.length} {text("COMPANIONS")}</span>
         </div>
       </div>
 
@@ -93,7 +93,7 @@ export default function MascotShowcasePage() {
             <div className="text-2xl font-black tracking-wider" style={{ color: getPalette({ ...DEFAULT_MASCOT, body: focused.palette }).base }}>
               {focused.label.toUpperCase()}
             </div>
-            <div className="font-mono text-[10px] text-white/35 tracking-[0.2em] mt-1">{ROLES[focused.id] || ''}</div>
+            <div className="font-mono text-[10px] text-white/35 tracking-[0.2em] mt-1">{text(ROLES[focused.id] || '')}</div>
           </motion.div>
           <div className="mt-5">{stateButtons}</div>
         </div>
@@ -113,15 +113,14 @@ export default function MascotShowcasePage() {
                     <div className="text-sm font-black tracking-wider group-hover:brightness-125 transition-all" style={{ color: palette.base }}>
                       {a.label.toUpperCase()}
                     </div>
-                    <div className="font-mono text-[8px] text-white/30 tracking-[0.18em] mt-0.5">{ROLES[a.id] || ''}</div>
+                    <div className="font-mono text-[8px] text-white/30 tracking-[0.18em] mt-0.5">{text(ROLES[a.id] || '')}</div>
                   </div>
                 </button>
               );
             })}
           </div>
           <p className="text-center font-mono text-[9px] text-white/20 mt-8">
-            Todos te siguen con la mirada · toca cualquiera para verlo en grande · HABLA los pone a hablar a todos
-          </p>
+            {text("They all follow your gaze · tap one for a larger view · SPEAKING animates their mouths")}</p>
         </div>
       )}
     </div>

@@ -32,7 +32,7 @@ struct AuraCardView: View {
                         .foregroundStyle(.white.opacity(0.75))
                 }
                 Spacer()
-                Text(Date.now.formatted(.dateTime.day().month(.abbreviated)))
+                Text(Date.now.formatted(.dateTime.day().month(.abbreviated).locale(L.locale)))   // the app language, not the phone's
                     .font(.mono(10 * scale, .bold))
                     .foregroundStyle(data.tintSoft)
             }
@@ -180,6 +180,7 @@ struct AuraCardSheet: View {
                         .frame(width: 30, height: 30)
                         .background(Circle().fill(Theme.card))
                 }
+                .accessibilityLabel(L.t("Close", "Cerrar"))
             }
             // Preview scales to the sheet so the whole 4:5 card is visible on
             // every phone; the shared image still renders at 3× (1080×1350).

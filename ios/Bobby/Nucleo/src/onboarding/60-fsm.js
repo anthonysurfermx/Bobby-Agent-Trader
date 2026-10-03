@@ -39,9 +39,13 @@ var RISK_NOTICE = null, ROSTER_P = null, RISK_P = null, SUGG_P = null, PICK_DEFA
 /* ---------- native data ---------- */
 function applySession(s){
   if (!s || typeof s !== 'object') return;
+  var oldLocale = LOCALE;
   SESSION = s;
-  var lang = s.language === 'es' ? 'es' : 'en';
+  var lang = NucleoLocale.language(s.language);
+  LOCALE = NucleoLocale.locale(lang, s.locale || s.speechLocale || s.localeRegion);
   if (lang !== LANG){ LANG = lang; applyStaticStrings(); }
+  if (oldLocale !== LOCALE){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; }
+  if (oldLocale !== LOCALE && W && W.state === 'LISTENING') cancelListening();
   if (s.companion && s.companion.webId){
     var a = artFor(s.companion.webId, s.companion.palette, titleCase(s.companion.label));
     if (a !== CHOSEN_ART){ CHOSEN_ART = a; setAvatar(a); buildMatte(a, onMatte); }
@@ -84,13 +88,16 @@ function loadSugg(){
   SUGG_P = call('suggestions', {}).then(function(r){ W.sugg = r || null; return r; }, function(){ W.sugg = null; return null; });
   return SUGG_P;
 }
-/* chips from suggestions(): quick access "How is X looking?", movers "Why is X moving today?" (max 3, no repeats) */
+/* Compact labels keep three suggestions visible; questions remain localized actions and accessible labels. */
 function suggestionChips(){
+  /* A starter chip reads as the company, as in the app's idle row (app/55-read.js); its action keeps the exchange symbol. */
+  var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
+    'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var s = W.sugg, out = [], seen = {}, qa = (s && s.quickAccess) || [], mv = (s && s.movers) || [];
-  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!sym || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:q, action:{ ask:q } }); }
-  qa.slice(0, 2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  function push(sym, key){ sym = String(sym || '').toUpperCase(); if (!/^[A-Z0-9.^=-]{1,20}$/.test(sym) || seen[sym] || out.length >= 3) return; seen[sym] = 1; var q = Ls(key, { sym:sym }); out.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:q, action:{ ask:q, symbol:sym } }); }
+  qa.slice(0, 3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   mv.forEach(function(x){ push(x && x.symbol, 'chip.move'); });
-  qa.slice(2).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
+  qa.slice(3).forEach(function(x){ push(x && x.symbol, 'chip.look'); });
   return out;
 }
 function setChips(list){ W.chips = list || []; W.chipsKey = W.chips.map(function(c){ return c.label; }).join('|') + '#' + T.toFixed(3); tb('chips'); }
@@ -210,47 +217,57 @@ function askPress(){
   if (W.gotLine){ capGone(W.gotLine); }
   to(W.lean, 1); W.micBreath = false;
   if (mic === 'granted') startListening(p);
+  else if (mic !== 'undetermined') at(0.25, function(){ if (W.press === p && !p.released && !p.cancelled) setHint(Ls('hint.micOff')); });
 }
-function askRelease(){
+function askRelease(cancelled){
   var p = W.press; if (!p) return; W.press = null; p.released = true;
   var dt = T - p.t;
+  if (cancelled){
+    p.cancelled = true; W.listenSeq++;
+    if (p.mic === 'granted' || p.listening) fire('speech.stop', { cancel:true });
+    endListenVisual(); go('ASK_TEACH', { quiet:true }); return;
+  }
   if (p.mic === 'granted'){
-    if (dt < 0.25){ p.cancelled = true; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
+    if (dt < 0.25){ p.cancelled = true; W.listenSeq++; fire('speech.stop', { cancel:true }); endListenVisual(); go('TYPING'); return; }
     if (W.state === 'LISTENING') stopListening();
     return;
   }
   to(W.lean, 0);
+  if (dt < 0.25){ go('TYPING'); return; }
   if (p.mic === 'undetermined'){ go('PRE_PERMISSION'); return; }
-  go('TYPING', { reason:'denied' });
+  go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
 }
 function startListening(p){
   var req = ++W.listenSeq;
   go('LISTENING');
   call('speech.start', {}).then(function(r){
     var s = r && r.status;
-    if (req !== W.listenSeq || p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
+    if (req !== W.listenSeq) return;   /* an old reply must never stop the newer microphone session */
+    if (p.cancelled){ if (s === 'listening') fire('speech.stop', { cancel:true }); return; }
     if (s === 'listening'){ p.listening = true; if (p.released && W.state === 'LISTENING') fire('speech.stop', {}); return; }
     endListenVisual();
     if (s === 'busy'){ go('ASK_TEACH', { quiet:true }); return; }
     var mic = s === 'needs_permission' ? 'undetermined' : (s === 'unavailable' ? 'unavailable' : 'denied');
     if (SESSION) SESSION.mic = { state:mic, onDevice:mic !== 'unavailable' };
     p.mic = mic;
-    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('TYPING', { reason:'denied' }); }
+    if (p.released){ if (mic === 'undetermined') go('PRE_PERMISSION'); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); }
     else { W.press = p; W.state = 'ASK_TEACH'; }   /* the release decides (card or typing) */
   }, function(){ if (req !== W.listenSeq) return; endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); });
 }
 ENTER.PRE_PERMISSION = function(){ tb('perm'); W.micBreath = false; setHint(''); W.permBusy = false; };
 function permContinue(){
   if (W.state !== 'PRE_PERMISSION' || W.permBusy) return;
+  var generation = W.gen;
   W.permBusy = true; buzz('light', 0.5);
   after(0.10, function(){ tg('perm'); });
   call('speech.requestPermission', {}).then(function(m){
+    if (generation !== W.gen || W.state !== 'PRE_PERMISSION') return;
     W.permBusy = false; if (m && m.state && SESSION) SESSION.mic = m;
-    if (W.state !== 'PRE_PERMISSION') return;
-    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('TYPING', { reason:'denied' });
-  }, function(){ W.permBusy = false; if (W.state === 'PRE_PERMISSION') go('TYPING', { reason:'denied' }); });
+    if (m && m.state === 'granted') go('ASK_TEACH', { granted:true }); else go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') });
+  }, function(){ if (generation !== W.gen || W.state !== 'PRE_PERMISSION') return; W.permBusy = false; go('ASK_TEACH', { quiet:true, hint:Ls('hint.micOff') }); });
 }
 ENTER.LISTENING = function(){
+  W.speechText = '';
   setPill('listen', '', 236); tb('listen'); moveSphere(340, 132); to(W.lean, 1); setHint(Ls('hint.release'));
   clearWords(); W.qFinal = false; W.awaitFinal = 0; W.micLevel = 0; W.txShift.x = W.txShift.t = 0; W.txShift.v = 0; tb('words');
 };
@@ -260,10 +277,18 @@ function stopListening(){
   W.awaitFinal = T + 2.5;
 }
 function endListenVisual(){ if (isOn('listen')) tg('listen'); setPill('mic', '', 96); setHint(''); to(W.lean, 0); moveSphere(340, 120); tg('words'); W.awaitFinal = 0; }
+function cancelListening(hint){
+  if (W.press) W.press.cancelled = true;
+  W.press = null; W.listenSeq++; fire('speech.stop', { cancel:true });
+  if (typeof cancelInput === 'function') cancelInput();
+  endListenVisual(); go('ASK_TEACH', { quiet:true, hint:hint || null });
+}
 function onSpeechFinal(text){
   if (W.state !== 'LISTENING') return;
   W.awaitFinal = 0;
   var q = String(text || '').trim();
+  W.speechText = q;
+  if (W.press && !W.press.released){ updateWords(q); return; }   /* the user's release owns submission */
   if (!q){ endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttEmpty') }); return; }
   updateWords(q); commitQuestion(q, 'voice');
 }
@@ -288,6 +313,7 @@ function updateWords(text, stagger){
 function commitQuestion(text, src){
   text = String(text || '').trim(); if (!text) return;
   W.question = text; W.qSrc = src; W.qFinal = true;
+  W.questionEpoch = W.draftEpoch || 0;
   if (src !== 'voice'){ clearWords(); tb('words'); W.txShift.x = W.txShift.t = 0; updateWords(text, Math.min(0.06, 0.6 / Math.max(1, text.split(/\s+/).length))); }
   else updateWords(text);
   go('COMMIT');
@@ -307,9 +333,10 @@ ENTER.COMMIT = function(){
 ENTER.TYPING = function(a){
   W.micBreath = false; if (isOn('title')) tg('title'); if (isOn('chips')) tg('chips'); if (isOn('perm')) tg('perm');
   setHint(Ls('hint.type')); setPill('mic', '', 96); to(W.lean, 0);
+  if (W.speechDraft){ typeIn.value = W.speechDraft; W.speechDraft = ''; }
   showTypeBox(true);
 };
-function typeSubmit(){ if (W.state !== 'TYPING') return; var v = String(typeIn.value || '').trim(); if (!v) return; typeIn.value = ''; showTypeBox(false); try { typeIn.blur(); } catch(e){} commitQuestion(v, 'typed'); }
+function typeSubmit(){ if (W.state !== 'TYPING' || typeComposing) return; var v = String(typeIn.value || '').trim(); if (!v) return; typeIn.value = ''; showTypeBox(false); try { typeIn.blur(); } catch(e){} commitQuestion(v, 'typed'); }
 function typeCancel(){ if (W.state !== 'TYPING') return; showTypeBox(false); go('ASK_TEACH', { quiet:true }); }
 
 /* ---------- O4 risk notice: the 4 real statements, hold to agree ---------- */
@@ -368,7 +395,7 @@ function startAsk(params){
 function onAskReply(r){
   if (!r || typeof r !== 'object') r = { v:1, status:'error', code:'bad_response' };
   if (r.status === 'ok'){
-    try { M = RMOD.build(r, { lang:LANG, firstRead:true, signedIn:!!(SESSION && SESSION.signedIn) }); }
+    try { M = RMOD.build(r, { lang:LANG, locale:LOCALE, firstRead:true, signedIn:!!(SESSION && SESSION.signedIn) }); }
     catch(e){ report('build', e); go('ERROR', { v:1, status:'error', code:'bad_response' }); return; }
     W.reply = r;
     if (W.state === 'RESOLVING') go('THINK_WAIT');
@@ -634,8 +661,9 @@ function teardownRead(){
   setPill('mic', '', 96); setHint(''); W.micBreath = true;
 }
 ENTER.ERROR = function(r){
+  if (r && r.status === 'too_long' && W.questionEpoch === (W.draftEpoch || 0)) W.speechDraft = W.question || '';
   if (r && r.code === 'risk_not_accepted'){ if (SESSION) SESSION.riskAccepted = false; teardownRead(); go('RISK'); return; }
-  var f = RMOD ? RMOD.failure(r, LANG) : { kind:'error', caption:null, chips:[] };
+  var f = RMOD ? RMOD.failure(r, LANG, { locale:LOCALE }) : { kind:'error', caption:null, chips:[] };
   teardownRead(); buzz('warning', 0.4);
   /* a metered read (§8.3) keeps its question natively: the Apple / Bobby Pro chip, then "Try another question" */
   var chips = (f.chips || []).filter(function(c){ return !(c.action && c.action.dismiss); })
@@ -694,12 +722,13 @@ function closeActive(){ var s = W.state; return isOn('dock') && (s === 'RESOLVIN
 function wireEvents(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s); });
-  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg && W.state === 'LISTENING'){ endListenVisual(); go('ASK_TEACH', { quiet:true }); } });
+  BR.on('app.state', function(p){ W.bg = p && p.state === 'background'; if (W.bg){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; } if (W.bg && W.state === 'LISTENING') cancelListening(); });
+  BR.on('account.changed', function(){ W.speechDraft = ''; W.draftEpoch = (W.draftEpoch || 0) + 1; typeIn.value = ''; typeAutosize(); });
   BR.on('ask.stage', function(p){ if (p && p.stage === 'accepted' && W.state === 'RESOLVING') go('THINK_WAIT'); });
   BR.on('speech.level', function(p){ W.micLevel = p && fin(p.level) ? p.level : 0; W.micLevelT = T; });
-  BR.on('speech.partial', function(p){ if (W.state === 'LISTENING' && p) updateWords(p.text); });
+  BR.on('speech.partial', function(p){ if (W.state === 'LISTENING' && p){ W.speechText = String(p.text || ''); updateWords(p.text); } });
   BR.on('speech.final', function(p){ onSpeechFinal(p && p.text); });
-  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ endListenVisual(); go('ASK_TEACH', { quiet:true, hint:Ls('hint.sttError') }); } });
+  BR.on('speech.error', function(p){ if (W.state === 'LISTENING'){ if (p && p.code === 'interrupted') W.speechDraft = W.speechText || ''; cancelListening(Ls('hint.sttError')); } });
   ['voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end'].forEach(function(n){
     BR.on(n, function(p){ if (p && typeof p.id === 'string' && p.id.indexOf('preview-') === 0){ if (n === 'voice.level'){ W.pvLevel = fin(p.level) ? p.level : 0; W.pvLevelT = T; } return; } onVoice(n, p); });
   });

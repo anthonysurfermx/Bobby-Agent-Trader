@@ -176,7 +176,7 @@ body.nucleo-ui .n-ask input:focus-visible { outline: none; }
 .n-land { grid-column: 1 / -1; }
 .n-plan { padding: 22px 22px 20px; border-radius: 26px; }
 .n-kv { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1px solid rgba(242, 237, 228, .06); }
-.n-kv-k { display: inline-flex; align-items: center; gap: 8px; font: 500 11px/1 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink2); }
+.n-kv-k { display: inline-flex; align-items: center; gap: 8px; font: 500 11px/1 var(--n-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--n-ink2); line-height: 1.35; max-width: 52%; overflow-wrap: anywhere; }
 .n-kv-k i { width: 6px; height: 6px; border-radius: 50%; }
 .n-kv-v { font: 400 16px/1.2 var(--n-sans); color: var(--n-ink); font-variant-numeric: tabular-nums; text-align: right; }
 .n-xp { display: inline-flex; align-items: center; height: 30px; padding: 0 12px; border-radius: 999px; background: rgba(246, 185, 78, .1); border: 1px solid rgba(246, 185, 78, .28);
@@ -278,7 +278,7 @@ body.nucleo-ui .n-lang-opt:focus-visible { outline: none; background: rgba(242, 
 .n-lang-opt[aria-checked="true"] { color: var(--n-inkb); background: rgba(242, 237, 228, .05); }
 .n-lang-opt i { flex: none; width: 6px; height: 6px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(242, 237, 228, .22); transition: background-color .2s ease, box-shadow .2s ease; }
 .n-lang-opt[aria-checked="true"] i { background: var(--n-listen); box-shadow: 0 0 10px rgba(92, 225, 255, .65); }
-.n-lang-seg { flex: none; }
+.n-lang-seg { flex: none; flex-wrap: wrap; max-width: 100%; border-radius: 20px; }
 .n-lang-seg button { padding: 0 10px; }
 @media (prefers-reduced-motion: reduce) {
   .n-lang-btn .n-lang-mer { transition: none; }

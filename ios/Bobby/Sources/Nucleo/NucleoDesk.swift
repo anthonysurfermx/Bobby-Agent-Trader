@@ -12,9 +12,16 @@ struct NucleoAsset: Equatable, Sendable {
     let name: String
     let isEquity: Bool
     let assetClass: String
+    var currency: String? = nil
+    var exchange: String? = nil
 
-    var json: [String: Any] { ["symbol": symbol, "name": name, "isEquity": isEquity] }
-    var jsonWithClass: [String: Any] { ["symbol": symbol, "name": name, "isEquity": isEquity, "assetClass": assetClass] }
+    var json: [String: Any] {
+        var result: [String: Any] = ["symbol": symbol, "name": name, "isEquity": isEquity]
+        if let currency { result["currency"] = currency }
+        if let exchange { result["exchange"] = exchange }
+        return result
+    }
+    var jsonWithClass: [String: Any] { var result = json; result["assetClass"] = assetClass; return result }
 }
 
 /// Network reads for a desk question, parsed off the main actor into plain values.
@@ -40,7 +47,16 @@ enum NucleoDeskIO {
     struct Market: Sendable, Equatable {
         let price: Double?
         let changePct: Double?
-        var json: [String: Any] { ["price": NucleoDeskIO.orNull(price), "changePct": NucleoDeskIO.orNull(changePct)] }
+        var currency: String? = nil
+        var exchange: String? = nil
+        var asOf: String? = nil
+        var json: [String: Any] {
+            var result: [String: Any] = ["price": NucleoDeskIO.orNull(price), "changePct": NucleoDeskIO.orNull(changePct)]
+            if let currency { result["currency"] = currency }
+            if let exchange { result["exchange"] = exchange }
+            if let asOf { result["asOf"] = asOf }
+            return result
+        }
     }
 
     struct Plan: Sendable {
@@ -167,7 +183,8 @@ enum NucleoDeskIO {
         let assetClass = (resolved["assetClass"] as? String) ?? "crypto"
         let aliases = (resolved["aliases"] as? [String]) ?? []
         let name = BobbyAPI.prettyName(aliases.first(where: { $0 != symbol }) ?? symbol, symbol: symbol)
-        return .resolved(NucleoAsset(symbol: symbol, name: name, isEquity: assetClass == "equity", assetClass: assetClass),
+        return .resolved(NucleoAsset(symbol: symbol, name: name, isEquity: assetClass == "equity", assetClass: assetClass,
+                                     currency: resolved["currency"] as? String, exchange: resolved["exchange"] as? String),
                          needsConfirmation: (resolution["needsConfirmation"] as? Bool) ?? false,
                          matchKind: resolution["matchKind"] as? String,
                          proxyNote: resolution["proxyNote"] as? String)
@@ -223,7 +240,8 @@ enum NucleoDeskIO {
         guard let reply = try? await BobbyAPI.response("api/voice-tool", method: "POST",
                                                        body: ["tool": "get_market", "args": ["symbol": symbol]]),
               let obj = reply.json as? [String: Any] else { return Market(price: nil, changePct: nil) }
-        return Market(price: num(obj["price"]), changePct: num(obj["change_24h_pct"]))
+        return Market(price: num(obj["price"]), changePct: num(obj["change_24h_pct"]),
+                      currency: obj["currency"] as? String, exchange: obj["exchange"] as? String, asOf: obj["asOf"] as? String)
     }
 
     /// What the metered read (`voice-tool run_debate`) came to (§8.2).
@@ -239,7 +257,7 @@ enum NucleoDeskIO {
     /// The metered read. It carries the access headers (device, platform, bearer when signed in).
     static func pulse(_ symbol: String, auth: BobbyMeterAuth) async -> PulseOutcome {
         guard let reply = try? await BobbyAccessAPI.send("api/voice-tool", method: "POST",
-                                                         body: ["tool": "run_debate", "args": ["symbol": symbol, "lang": L.ttsLang]],
+                                                         body: ["tool": "run_debate", "args": ["symbol": symbol, "lang": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any]],
                                                          auth: auth)
         else { return .unreachable }
         return parsePulseReply(status: reply.status, json: reply.json)
@@ -280,6 +298,7 @@ enum NucleoDeskIO {
                        auth: BobbyMeterAuth = .account, requestId: String? = nil, onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
             var body: [String: Any] = ["symbol": symbol, "question": question, "language": L.ttsLang,
+                                       "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
                                        "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue]
             if let requestId { body["requestId"] = requestId }
             let reply = try await BobbyAccessAPI.send("api/desk-debate", method: "POST",
@@ -458,7 +477,8 @@ final class NucleoDesk {
     static let tokenLifetime: TimeInterval = 600
     static let readsKept = 5
     static let pendingReadWindow: TimeInterval = 1800
-    static let equitySymbolPattern = #"^[A-Z]{1,5}$"#
+    /// Same rule as the server (api/stock-candles.ts): exchange tickers carry a suffix (MC.PA, PETR4.SA).
+    static let equitySymbolPattern = #"^[A-Z0-9][A-Z0-9.^=-]{0,19}$"#
     static let uuidPattern = #"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"#
     static let marketCapSeconds: Double = 20
     static let pulseCapSeconds: Double = 20
@@ -899,7 +919,7 @@ final class NucleoDesk {
             guard isCurrent(job) else { return Self.cancelledResult }
             let receivedAt = clock.receivedAt(symbol)
             var result: [String: Any] = [
-                "v": 1, "status": "ok", "requestId": job.requestId, "question": job.question, "language": L.ttsLang,
+                "v": 1, "status": "ok", "requestId": job.requestId, "question": job.question, "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
                 "asset": asset.json,
                 "market": market.json,
                 "technicals": debate.technicals.json,
@@ -928,10 +948,17 @@ final class NucleoDesk {
         }
     }
 
-    /// The latest ok read not saved yet and under 30 min old (restore after a web content crash).
+    /// Restore an unsaved recent read only in its original language/locale. Changing app language
+    /// never relabels or narrates an older answer as if the provider had generated it in the new one.
     func pendingRead(now: Date = Date()) -> [String: Any]? {
         guard profile.acceptedRiskNotice else { return nil }
-        return reads.last { $0.generation == generation() && $0.saved == nil && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow }?.result
+        let language = L.ttsLang, locale = L.localeIdentifier
+        return reads.last {
+            $0.generation == generation() && $0.saved == nil
+                && now.timeIntervalSince($0.storedAt) < Self.pendingReadWindow
+                && $0.result["language"] as? String == language
+                && $0.result["locale"] as? String == locale
+        }?.result
     }
 
     /// The trusted bundled page acknowledges its current visible frame, without seeing the receipt.

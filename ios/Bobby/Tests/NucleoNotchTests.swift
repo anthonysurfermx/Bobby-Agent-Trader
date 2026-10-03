@@ -5,6 +5,33 @@ import XCTest
 /// Native progress, driven only by actual desk stages and NDJSON provider responses.
 @MainActor
 final class NucleoNotchTests: XCTestCase {
+    private var previousLanguage: String?
+    override func setUp() {
+        super.setUp()
+        previousLanguage = UserDefaults.standard.string(forKey: L.preferenceKey)
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
+    }
+    override func tearDown() {
+        if let previousLanguage { UserDefaults.standard.set(previousLanguage, forKey: L.preferenceKey) }
+        else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        super.tearDown()
+    }
+
+    func testRegionalPricesUseReceivedCurrencyAndSelectedLocale() {
+        let notch = NucleoNotch()
+        UserDefaults.standard.set("fr", forKey: L.preferenceKey)
+        notch.stage(["stage": "resolving", "requestId": "fr"])
+        notch.stage(["stage": "accepted", "requestId": "fr", "asset": ["symbol": "MC.PA", "currency": "EUR"]])
+        notch.stage(["stage": "market", "requestId": "fr", "market": ["price": 650.5, "changePct": 1.3]])
+        XCTAssertTrue(notch.current?.text.contains("€") == true)
+        XCTAssertFalse(notch.current?.text.contains("$") == true)
+        XCTAssertTrue(notch.current?.text.contains("+1,3") == true)
+        notch.stage(["stage": "resolving", "requestId": "br"])
+        notch.stage(["stage": "accepted", "requestId": "br", "asset": ["symbol": "PETR4.SA"]])
+        notch.stage(["stage": "market", "requestId": "br", "market": ["price": 32.5, "currency": "BRL"]])
+        XCTAssertTrue(notch.current?.text.contains("R$") == true)
+        XCTAssertFalse(notch.current?.text.contains("€") == true)
+    }
     private func start(_ notch: NucleoNotch, id: String = "read-a") {
         notch.stage(["stage": "resolving", "requestId": id])
         notch.stage(["stage": "accepted", "requestId": id, "asset": ["symbol": "BTC"]])

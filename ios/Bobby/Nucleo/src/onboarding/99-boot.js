@@ -65,7 +65,7 @@ function heroes(){
 function reloadAt(t){ var u = new URL(location.href); u.searchParams.set('t', String(t)); location.href = u.toString(); }
 
 function boot(){
-  LANG = Q.lang === 'es' ? 'es' : 'en';
+  LANG = NucleoLocale.language(Q.lang); LOCALE = NucleoLocale.locale(Q.lang);
   W = world(); applyStaticStrings();
   requestAnimationFrame(function(n){ last = n; frame(n); });
   if (!BR){ report('boot', 'no bridge (no native handler and no dev mock)'); return; }
