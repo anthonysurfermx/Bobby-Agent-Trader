@@ -1,0 +1,1074 @@
+{
+  "schema_version": 1,
+  "status": "PASS_LOCAL_SIGNED_CODE6_TRADERLAND_STATIC_VALIDATION",
+  "recorded_at": "2026-10-03T20:02:31.505403+00:00",
+  "scope": "Actual signed local APK/AAB verification. No physical-device, emulator runtime, consent, account mutation, audio, provider, Google Play, deployment or delivery claim.",
+  "source_sha256": "4000f0aa35575b646c4c270728934ba61cdbc0b4e1e140106ba90efe0673f611",
+  "source_files": 364,
+  "source_algorithm": "SHA-256 of UTF-8 compact JSON array sorted by relative path, each record contains path then sha256",
+  "source_snapshot": {
+    "path": "docs/android/evidence/parity-code6-traderland-20261003T200103Z-source.json",
+    "sha256": "0df6f2c9f04ad9a9fbf41eb105a35026cefbbf228367cf1d8592f375d17373b6",
+    "bytes": 62853
+  },
+  "signed_build_receipt": {
+    "path": "docs/android/evidence/parity-code6-traderland-20261003T200103Z-build.json",
+    "sha256": "0e147b4a4a039e75fcb9822457e40497d64e26e4888307253e5a5d822cdbacfc",
+    "bytes": 13781
+  },
+  "source_and_artifact_hashes_checked_before_after": true,
+  "source_timestamp_scope": {
+    "release_apk": {
+      "package_inputs_predate_artifact": true,
+      "newer_policy_paths": []
+    },
+    "release_aab": {
+      "package_inputs_predate_artifact": true,
+      "newer_policy_paths": []
+    }
+  },
+  "validator": {
+    "path": "/private/tmp/bobby-android-toolchain/validate-parity-code6-traderland.py",
+    "sha256": "6ecc68bbae07e2dd624e982ffc09ae708238f9bb97a87a991b6c485aaf2effbe"
+  },
+  "package_identity": {
+    "package": "xyz.bobbyprotocol.bobby",
+    "version_code": 6,
+    "version_name": "1.1.1",
+    "min_sdk": 26,
+    "target_sdk": 36,
+    "compile_sdk": 36
+  },
+  "artifacts": {
+    "release_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk",
+      "sha256": "94d731063348452a9558069b0e0888593ab2bfce2d8e16c8432be3cd416b39c1",
+      "bytes": 47058496
+    },
+    "release_aab": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab",
+      "sha256": "6c5668280656eec0365759023b487b92d10dc2e85494a7eea9199a3c294743b6",
+      "bytes": 50360495
+    }
+  },
+  "certificate_sha256": "fe59fa16b0052851d741539d467d36e9f66e4c012204a2c1bb13e15ca3d6bccf",
+  "tools": {
+    "apksigner": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/sdk/build-tools/35.0.0/apksigner",
+        "verify",
+        "--verbose",
+        "--print-certs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.327781+00:00",
+      "completed_at": "2026-10-03T20:02:29.524720+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-apksigner.log",
+      "sha256": "fb92afcdce2504281e03d10b0c0acddeb603754ad7c3f0a70ebb24a7f6435214",
+      "bytes": 945
+    },
+    "jarsigner": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/jarsigner",
+        "-verify",
+        "-verbose",
+        "-certs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.329922+00:00",
+      "completed_at": "2026-10-03T20:02:30.238202+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-jarsigner.log",
+      "sha256": "2b8f16dcf73ead92b04a6076b260de64def40f98d0a2dda63a7b86ffbc15f3c9",
+      "bytes": 198681
+    },
+    "bundletool": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/java",
+        "-Xmx256m",
+        "-jar",
+        "/private/tmp/bobby-android-toolchain/bundletool-all-1.18.3.jar",
+        "validate",
+        "--bundle=/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.331124+00:00",
+      "completed_at": "2026-10-03T20:02:29.656127+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-bundletool.log",
+      "sha256": "51f2c2003762d8727cc0e89cc676e69366305e29376cf6e8a27f194c98016a62",
+      "bytes": 17240
+    },
+    "zipalign-p16": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/sdk/build-tools/35.0.0/zipalign",
+        "-c",
+        "-P",
+        "16",
+        "-v",
+        "4",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.332252+00:00",
+      "completed_at": "2026-10-03T20:02:29.343897+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-zipalign-p16.log",
+      "sha256": "ff7db09cef4d142cb99fa365777400bd11dca12d733d78f7a20bbcae6cf99d0d",
+      "bytes": 19409
+    },
+    "apk-badging": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/sdk/build-tools/35.0.0/aapt2",
+        "dump",
+        "badging",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.344112+00:00",
+      "completed_at": "2026-10-03T20:02:29.368476+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-apk-badging.log",
+      "sha256": "6fa125b54726a07874c8a658227939f8d31e9f580955c6e43d1d97f2cb1ff423",
+      "bytes": 4728
+    },
+    "aab-manifest": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/java",
+        "-Xmx256m",
+        "-jar",
+        "/private/tmp/bobby-android-toolchain/bundletool-all-1.18.3.jar",
+        "dump",
+        "manifest",
+        "--bundle=/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab",
+        "--module=base"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.368713+00:00",
+      "completed_at": "2026-10-03T20:02:29.554008+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-aab-manifest.log",
+      "sha256": "d21b75d912a2a059c1e1b66bf128377d7c10151b5451e50d850f131d3443b18a",
+      "bytes": 12161
+    },
+    "aab-config": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/java",
+        "-Xmx256m",
+        "-jar",
+        "/private/tmp/bobby-android-toolchain/bundletool-all-1.18.3.jar",
+        "dump",
+        "config",
+        "--bundle=/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.525008+00:00",
+      "completed_at": "2026-10-03T20:02:29.698161+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-aab-config.log",
+      "sha256": "14ca18c6d109ad46db8d67efadc6f1be74a71a7303f800bf220a8a1d2ee47bdf",
+      "bytes": 978
+    },
+    "aab-certificate": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/keytool",
+        "-printcert",
+        "-jarfile",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.554223+00:00",
+      "completed_at": "2026-10-03T20:02:29.916250+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-aab-certificate.log",
+      "sha256": "686ee8c4cdb928110c6dbd97b945a42df118042925e5985d1ff021d374431cfc",
+      "bytes": 785
+    },
+    "apk-launcher-manifest": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/sdk/build-tools/35.0.0/aapt2",
+        "dump",
+        "xmltree",
+        "--file",
+        "AndroidManifest.xml",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.656389+00:00",
+      "completed_at": "2026-10-03T20:02:29.670859+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-apk-launcher-manifest.log",
+      "sha256": "10f3e4ec2efa0426b004a2c2c5e6ebc67d6223905094e25b13c00d2858c21d6e",
+      "bytes": 25544
+    },
+    "apk-launcher-resources": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/sdk/build-tools/35.0.0/aapt2",
+        "dump",
+        "resources",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.671082+00:00",
+      "completed_at": "2026-10-03T20:02:29.686299+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-apk-launcher-resources.log",
+      "sha256": "9410c1f700fa79fbacfbd21c7b25cd9e467580f81fe78430fcad3815c0abaa70",
+      "bytes": 249289
+    },
+    "aab-launcher-resources": {
+      "command": [
+        "/private/tmp/bobby-android-toolchain/jdk-21.0.12.1+1/Contents/Home/bin/java",
+        "-Xmx128m",
+        "-jar",
+        "/private/tmp/bobby-android-toolchain/bundletool-all-1.18.3.jar",
+        "dump",
+        "resources",
+        "--bundle=/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab",
+        "--resource=mipmap/ic_launcher",
+        "--values"
+      ],
+      "exit_code": 0,
+      "started_at": "2026-10-03T20:02:29.686686+00:00",
+      "completed_at": "2026-10-03T20:02:29.849503+00:00",
+      "path": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-aab-launcher-resources.log",
+      "sha256": "0f5491e7e71be54e199286c82ca0720a4f1000bdfc806e577f42f5404ba7dd91",
+      "bytes": 129
+    }
+  },
+  "build_xml_recount": {
+    "node": {
+      "tests": 101,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "jvm": {
+      "tests": 173,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "lint_errors": 0,
+    "lint_warnings": 59
+  },
+  "assets": [
+    {
+      "artifact": "release_apk",
+      "authored_assets": 190,
+      "all_assets_match_frozen_source_manifest": true,
+      "approved_png_glb_decoder_entries_byte_equal_code5": [
+        "assets/equipment-stage/draco/draco_decoder.wasm",
+        "assets/equipment-stage/draco/draco_wasm_wrapper.js",
+        "assets/equipment-stage/models/axiom.glb",
+        "assets/equipment-stage/models/byte.glb",
+        "assets/equipment-stage/models/flux.glb",
+        "assets/equipment-stage/models/glitch.glb",
+        "assets/equipment-stage/models/halo.glb",
+        "assets/equipment-stage/models/iris.glb",
+        "assets/equipment-stage/models/keo.glb",
+        "assets/equipment-stage/models/kora.glb",
+        "assets/equipment-stage/models/mira.glb",
+        "assets/equipment-stage/models/momo.glb",
+        "assets/equipment-stage/models/nalu.glb",
+        "assets/equipment-stage/models/noor.glb",
+        "assets/equipment-stage/models/orb.glb",
+        "assets/equipment-stage/models/rook.glb",
+        "assets/equipment-stage/models/sol.glb",
+        "assets/equipment-stage/models/vega.glb",
+        "assets/equipment-stage/models/zip.glb",
+        "assets/equipment-stage/models/zuri.glb",
+        "assets/equipment/axiom_thumb.png",
+        "assets/equipment/byte_thumb.png",
+        "assets/equipment/flux_thumb.png",
+        "assets/equipment/glitch_thumb.png",
+        "assets/equipment/halo_thumb.png",
+        "assets/equipment/iris_thumb.png",
+        "assets/equipment/keo_thumb.png",
+        "assets/equipment/kora_thumb.png",
+        "assets/equipment/mira_thumb.png",
+        "assets/equipment/momo_thumb.png",
+        "assets/equipment/nalu_thumb.png",
+        "assets/equipment/noor_thumb.png",
+        "assets/equipment/orb_thumb.png",
+        "assets/equipment/pet_axiom.png",
+        "assets/equipment/pet_byte.png",
+        "assets/equipment/pet_flux.png",
+        "assets/equipment/pet_glitch.png",
+        "assets/equipment/pet_halo.png",
+        "assets/equipment/pet_iris.png",
+        "assets/equipment/pet_keo.png",
+        "assets/equipment/pet_kora.png",
+        "assets/equipment/pet_mira.png",
+        "assets/equipment/pet_momo.png",
+        "assets/equipment/pet_nalu.png",
+        "assets/equipment/pet_noor.png",
+        "assets/equipment/pet_orb.png",
+        "assets/equipment/pet_rook.png",
+        "assets/equipment/pet_sol.png",
+        "assets/equipment/pet_vega.png",
+        "assets/equipment/pet_zip.png",
+        "assets/equipment/pet_zuri.png",
+        "assets/equipment/rook_thumb.png",
+        "assets/equipment/sol_thumb.png",
+        "assets/equipment/tool_axiom_1.png",
+        "assets/equipment/tool_axiom_2.png",
+        "assets/equipment/tool_axiom_3.png",
+        "assets/equipment/tool_byte_1.png",
+        "assets/equipment/tool_byte_2.png",
+        "assets/equipment/tool_byte_3.png",
+        "assets/equipment/tool_flux_1.png",
+        "assets/equipment/tool_flux_2.png",
+        "assets/equipment/tool_flux_3.png",
+        "assets/equipment/tool_glitch_1.png",
+        "assets/equipment/tool_glitch_2.png",
+        "assets/equipment/tool_glitch_3.png",
+        "assets/equipment/tool_halo_1.png",
+        "assets/equipment/tool_halo_2.png",
+        "assets/equipment/tool_halo_3.png",
+        "assets/equipment/tool_iris_1.png",
+        "assets/equipment/tool_iris_2.png",
+        "assets/equipment/tool_iris_3.png",
+        "assets/equipment/tool_keo_1.png",
+        "assets/equipment/tool_keo_2.png",
+        "assets/equipment/tool_keo_3.png",
+        "assets/equipment/tool_kora_1.png",
+        "assets/equipment/tool_kora_2.png",
+        "assets/equipment/tool_kora_3.png",
+        "assets/equipment/tool_mira_1.png",
+        "assets/equipment/tool_mira_2.png",
+        "assets/equipment/tool_mira_3.png",
+        "assets/equipment/tool_momo_1.png",
+        "assets/equipment/tool_momo_2.png",
+        "assets/equipment/tool_momo_3.png",
+        "assets/equipment/tool_nalu_1.png",
+        "assets/equipment/tool_nalu_2.png",
+        "assets/equipment/tool_nalu_3.png",
+        "assets/equipment/tool_noor_1.png",
+        "assets/equipment/tool_noor_2.png",
+        "assets/equipment/tool_noor_3.png",
+        "assets/equipment/tool_orb_1.png",
+        "assets/equipment/tool_orb_2.png",
+        "assets/equipment/tool_orb_3.png",
+        "assets/equipment/tool_rook_1.png",
+        "assets/equipment/tool_rook_2.png",
+        "assets/equipment/tool_rook_3.png",
+        "assets/equipment/tool_sol_1.png",
+        "assets/equipment/tool_sol_2.png",
+        "assets/equipment/tool_sol_3.png",
+        "assets/equipment/tool_vega_1.png",
+        "assets/equipment/tool_vega_2.png",
+        "assets/equipment/tool_vega_3.png",
+        "assets/equipment/tool_zip_1.png",
+        "assets/equipment/tool_zip_2.png",
+        "assets/equipment/tool_zip_3.png",
+        "assets/equipment/tool_zuri_1.png",
+        "assets/equipment/tool_zuri_2.png",
+        "assets/equipment/tool_zuri_3.png",
+        "assets/equipment/vega_thumb.png",
+        "assets/equipment/zip_thumb.png",
+        "assets/equipment/zuri_thumb.png",
+        "assets/traderland/aura_core_stage0.png",
+        "assets/traderland/aura_core_stage1.png",
+        "assets/traderland/axiom_archive_archive_ring_tile_bloom.png",
+        "assets/traderland/axiom_archive_aura_flower_bloom.png",
+        "assets/traderland/axiom_archive_base_ring_seal_bloom.png",
+        "assets/traderland/axiom_archive_lit_archive_bloom.png",
+        "assets/traderland/axiom_archive_path_straight_bloom.png",
+        "assets/traderland/axiom_archive_return_path_curve_bloom.png",
+        "assets/traderland/crypto_bay_candle_tower_bloom.png",
+        "assets/traderland/crypto_bay_context_buoy_bloom.png",
+        "assets/traderland/crypto_bay_data_dock_bloom.png",
+        "assets/traderland/crypto_bay_waiting_lighthouse_bloom.png",
+        "assets/traderland/crypto_bay_water_walkway_bloom.png",
+        "assets/traderland/evidence_mines_crystal_vein_rock_bloom.png",
+        "assets/traderland/evidence_mines_evidence_workshop_bloom.png",
+        "assets/traderland/evidence_mines_lantern_drone_bloom.png",
+        "assets/traderland/evidence_mines_mother_crystal_bloom.png",
+        "assets/traderland/evidence_mines_open_tunnel_bloom.png",
+        "assets/traderland/risk_reef_blue_sluice_bloom.png",
+        "assets/traderland/risk_reef_double_bridge_bloom.png",
+        "assets/traderland/risk_reef_dual_orbit_antenna_bloom.png",
+        "assets/traderland/risk_reef_red_team_observatory_bloom.png",
+        "assets/traderland/risk_reef_reef_tile_bloom.png",
+        "assets/traderland/thesis_citadel_double_gate_bloom.png",
+        "assets/traderland/thesis_citadel_fortified_ramp_bloom.png",
+        "assets/traderland/thesis_citadel_risk_shield_bloom.png",
+        "assets/traderland/thesis_citadel_three_gate_citadel_bloom.png",
+        "assets/traderland/thesis_citadel_wall_slab_bloom.png"
+      ],
+      "land_png_count": 28,
+      "model_count": 18,
+      "decoder_count": 2,
+      "generated_assets": [
+        "assets/dexopt/baseline.prof",
+        "assets/dexopt/baseline.profm"
+      ]
+    },
+    {
+      "artifact": "release_aab",
+      "authored_assets": 190,
+      "all_assets_match_frozen_source_manifest": true,
+      "approved_png_glb_decoder_entries_byte_equal_code5": [
+        "base/assets/equipment-stage/draco/draco_decoder.wasm",
+        "base/assets/equipment-stage/draco/draco_wasm_wrapper.js",
+        "base/assets/equipment-stage/models/axiom.glb",
+        "base/assets/equipment-stage/models/byte.glb",
+        "base/assets/equipment-stage/models/flux.glb",
+        "base/assets/equipment-stage/models/glitch.glb",
+        "base/assets/equipment-stage/models/halo.glb",
+        "base/assets/equipment-stage/models/iris.glb",
+        "base/assets/equipment-stage/models/keo.glb",
+        "base/assets/equipment-stage/models/kora.glb",
+        "base/assets/equipment-stage/models/mira.glb",
+        "base/assets/equipment-stage/models/momo.glb",
+        "base/assets/equipment-stage/models/nalu.glb",
+        "base/assets/equipment-stage/models/noor.glb",
+        "base/assets/equipment-stage/models/orb.glb",
+        "base/assets/equipment-stage/models/rook.glb",
+        "base/assets/equipment-stage/models/sol.glb",
+        "base/assets/equipment-stage/models/vega.glb",
+        "base/assets/equipment-stage/models/zip.glb",
+        "base/assets/equipment-stage/models/zuri.glb",
+        "base/assets/equipment/axiom_thumb.png",
+        "base/assets/equipment/byte_thumb.png",
+        "base/assets/equipment/flux_thumb.png",
+        "base/assets/equipment/glitch_thumb.png",
+        "base/assets/equipment/halo_thumb.png",
+        "base/assets/equipment/iris_thumb.png",
+        "base/assets/equipment/keo_thumb.png",
+        "base/assets/equipment/kora_thumb.png",
+        "base/assets/equipment/mira_thumb.png",
+        "base/assets/equipment/momo_thumb.png",
+        "base/assets/equipment/nalu_thumb.png",
+        "base/assets/equipment/noor_thumb.png",
+        "base/assets/equipment/orb_thumb.png",
+        "base/assets/equipment/pet_axiom.png",
+        "base/assets/equipment/pet_byte.png",
+        "base/assets/equipment/pet_flux.png",
+        "base/assets/equipment/pet_glitch.png",
+        "base/assets/equipment/pet_halo.png",
+        "base/assets/equipment/pet_iris.png",
+        "base/assets/equipment/pet_keo.png",
+        "base/assets/equipment/pet_kora.png",
+        "base/assets/equipment/pet_mira.png",
+        "base/assets/equipment/pet_momo.png",
+        "base/assets/equipment/pet_nalu.png",
+        "base/assets/equipment/pet_noor.png",
+        "base/assets/equipment/pet_orb.png",
+        "base/assets/equipment/pet_rook.png",
+        "base/assets/equipment/pet_sol.png",
+        "base/assets/equipment/pet_vega.png",
+        "base/assets/equipment/pet_zip.png",
+        "base/assets/equipment/pet_zuri.png",
+        "base/assets/equipment/rook_thumb.png",
+        "base/assets/equipment/sol_thumb.png",
+        "base/assets/equipment/tool_axiom_1.png",
+        "base/assets/equipment/tool_axiom_2.png",
+        "base/assets/equipment/tool_axiom_3.png",
+        "base/assets/equipment/tool_byte_1.png",
+        "base/assets/equipment/tool_byte_2.png",
+        "base/assets/equipment/tool_byte_3.png",
+        "base/assets/equipment/tool_flux_1.png",
+        "base/assets/equipment/tool_flux_2.png",
+        "base/assets/equipment/tool_flux_3.png",
+        "base/assets/equipment/tool_glitch_1.png",
+        "base/assets/equipment/tool_glitch_2.png",
+        "base/assets/equipment/tool_glitch_3.png",
+        "base/assets/equipment/tool_halo_1.png",
+        "base/assets/equipment/tool_halo_2.png",
+        "base/assets/equipment/tool_halo_3.png",
+        "base/assets/equipment/tool_iris_1.png",
+        "base/assets/equipment/tool_iris_2.png",
+        "base/assets/equipment/tool_iris_3.png",
+        "base/assets/equipment/tool_keo_1.png",
+        "base/assets/equipment/tool_keo_2.png",
+        "base/assets/equipment/tool_keo_3.png",
+        "base/assets/equipment/tool_kora_1.png",
+        "base/assets/equipment/tool_kora_2.png",
+        "base/assets/equipment/tool_kora_3.png",
+        "base/assets/equipment/tool_mira_1.png",
+        "base/assets/equipment/tool_mira_2.png",
+        "base/assets/equipment/tool_mira_3.png",
+        "base/assets/equipment/tool_momo_1.png",
+        "base/assets/equipment/tool_momo_2.png",
+        "base/assets/equipment/tool_momo_3.png",
+        "base/assets/equipment/tool_nalu_1.png",
+        "base/assets/equipment/tool_nalu_2.png",
+        "base/assets/equipment/tool_nalu_3.png",
+        "base/assets/equipment/tool_noor_1.png",
+        "base/assets/equipment/tool_noor_2.png",
+        "base/assets/equipment/tool_noor_3.png",
+        "base/assets/equipment/tool_orb_1.png",
+        "base/assets/equipment/tool_orb_2.png",
+        "base/assets/equipment/tool_orb_3.png",
+        "base/assets/equipment/tool_rook_1.png",
+        "base/assets/equipment/tool_rook_2.png",
+        "base/assets/equipment/tool_rook_3.png",
+        "base/assets/equipment/tool_sol_1.png",
+        "base/assets/equipment/tool_sol_2.png",
+        "base/assets/equipment/tool_sol_3.png",
+        "base/assets/equipment/tool_vega_1.png",
+        "base/assets/equipment/tool_vega_2.png",
+        "base/assets/equipment/tool_vega_3.png",
+        "base/assets/equipment/tool_zip_1.png",
+        "base/assets/equipment/tool_zip_2.png",
+        "base/assets/equipment/tool_zip_3.png",
+        "base/assets/equipment/tool_zuri_1.png",
+        "base/assets/equipment/tool_zuri_2.png",
+        "base/assets/equipment/tool_zuri_3.png",
+        "base/assets/equipment/vega_thumb.png",
+        "base/assets/equipment/zip_thumb.png",
+        "base/assets/equipment/zuri_thumb.png",
+        "base/assets/traderland/aura_core_stage0.png",
+        "base/assets/traderland/aura_core_stage1.png",
+        "base/assets/traderland/axiom_archive_archive_ring_tile_bloom.png",
+        "base/assets/traderland/axiom_archive_aura_flower_bloom.png",
+        "base/assets/traderland/axiom_archive_base_ring_seal_bloom.png",
+        "base/assets/traderland/axiom_archive_lit_archive_bloom.png",
+        "base/assets/traderland/axiom_archive_path_straight_bloom.png",
+        "base/assets/traderland/axiom_archive_return_path_curve_bloom.png",
+        "base/assets/traderland/crypto_bay_candle_tower_bloom.png",
+        "base/assets/traderland/crypto_bay_context_buoy_bloom.png",
+        "base/assets/traderland/crypto_bay_data_dock_bloom.png",
+        "base/assets/traderland/crypto_bay_waiting_lighthouse_bloom.png",
+        "base/assets/traderland/crypto_bay_water_walkway_bloom.png",
+        "base/assets/traderland/evidence_mines_crystal_vein_rock_bloom.png",
+        "base/assets/traderland/evidence_mines_evidence_workshop_bloom.png",
+        "base/assets/traderland/evidence_mines_lantern_drone_bloom.png",
+        "base/assets/traderland/evidence_mines_mother_crystal_bloom.png",
+        "base/assets/traderland/evidence_mines_open_tunnel_bloom.png",
+        "base/assets/traderland/risk_reef_blue_sluice_bloom.png",
+        "base/assets/traderland/risk_reef_double_bridge_bloom.png",
+        "base/assets/traderland/risk_reef_dual_orbit_antenna_bloom.png",
+        "base/assets/traderland/risk_reef_red_team_observatory_bloom.png",
+        "base/assets/traderland/risk_reef_reef_tile_bloom.png",
+        "base/assets/traderland/thesis_citadel_double_gate_bloom.png",
+        "base/assets/traderland/thesis_citadel_fortified_ramp_bloom.png",
+        "base/assets/traderland/thesis_citadel_risk_shield_bloom.png",
+        "base/assets/traderland/thesis_citadel_three_gate_citadel_bloom.png",
+        "base/assets/traderland/thesis_citadel_wall_slab_bloom.png"
+      ],
+      "land_png_count": 28,
+      "model_count": 18,
+      "decoder_count": 2,
+      "generated_assets": []
+    }
+  ],
+  "canonical_land_art": [
+    {
+      "item_id": "aura_core",
+      "state": "stage0",
+      "asset": "aura_core_stage0.png",
+      "sha256": "7736beb70f4bf1b98e0ff5010d1fc116a03d38ef987772d2b9cdd747393d4ad9"
+    },
+    {
+      "item_id": "aura_core",
+      "state": "stage1",
+      "asset": "aura_core_stage1.png",
+      "sha256": "5f1640cae27425e62098775937389fb97186aa31f98decea041b61e533da66f9"
+    },
+    {
+      "item_id": "crypto_bay_data_dock",
+      "state": "bloom",
+      "asset": "crypto_bay_data_dock_bloom.png",
+      "sha256": "79db9f015e3f741cbeba895cb2492480d28adda12a7a2816a76384d5537f8a84"
+    },
+    {
+      "item_id": "crypto_bay_water_walkway",
+      "state": "bloom",
+      "asset": "crypto_bay_water_walkway_bloom.png",
+      "sha256": "1ab323e833f66ae522dc15bda70ffdb0ef44069e6a3d75aabbdbdd2175da5ac5"
+    },
+    {
+      "item_id": "crypto_bay_context_buoy",
+      "state": "bloom",
+      "asset": "crypto_bay_context_buoy_bloom.png",
+      "sha256": "4680ff25d32e87934ff5948d90d3764f2064ba846a72c23a79122211376c3eda"
+    },
+    {
+      "item_id": "crypto_bay_candle_tower",
+      "state": "bloom",
+      "asset": "crypto_bay_candle_tower_bloom.png",
+      "sha256": "72fbbd408cfd66e58a13152168122256e243c377dcc254bab0b8bdd24949cd34"
+    },
+    {
+      "item_id": "crypto_bay_waiting_lighthouse",
+      "state": "bloom",
+      "asset": "crypto_bay_waiting_lighthouse_bloom.png",
+      "sha256": "23a7b04250c9419f5a49adc32aa1780b9224dea5614f35aa631714ea5b9f85d6"
+    },
+    {
+      "item_id": "evidence_mines_crystal_vein_rock",
+      "state": "bloom",
+      "asset": "evidence_mines_crystal_vein_rock_bloom.png",
+      "sha256": "c069a9efa363e0da87963164b0312d1a93787d5584d00b329a2cadc6da5e96ff"
+    },
+    {
+      "item_id": "evidence_mines_open_tunnel",
+      "state": "bloom",
+      "asset": "evidence_mines_open_tunnel_bloom.png",
+      "sha256": "37c31bc954435395cdc379e602bb2d8089cdb74733d0496c74f2cc2fa80471e8"
+    },
+    {
+      "item_id": "evidence_mines_lantern_drone",
+      "state": "bloom",
+      "asset": "evidence_mines_lantern_drone_bloom.png",
+      "sha256": "61d25a95a159eab7747b4c7ea1e65eea0997d1f8608f2ed77565ee959cc85972"
+    },
+    {
+      "item_id": "evidence_mines_evidence_workshop",
+      "state": "bloom",
+      "asset": "evidence_mines_evidence_workshop_bloom.png",
+      "sha256": "f519ebcd57fa665ff6bdeeb2467692a1dcf2153b4e08dc619037b11c6f4318fc"
+    },
+    {
+      "item_id": "evidence_mines_mother_crystal",
+      "state": "bloom",
+      "asset": "evidence_mines_mother_crystal_bloom.png",
+      "sha256": "3bd1cd405d1583be198baa1fa7a9898ac6a21c2384ebf76b220e9c5d6bc57580"
+    },
+    {
+      "item_id": "thesis_citadel_wall_slab",
+      "state": "bloom",
+      "asset": "thesis_citadel_wall_slab_bloom.png",
+      "sha256": "c310f75721d354918616ce389e50d178ea057cde585103b57c89fbbe99c7f7f0"
+    },
+    {
+      "item_id": "thesis_citadel_fortified_ramp",
+      "state": "bloom",
+      "asset": "thesis_citadel_fortified_ramp_bloom.png",
+      "sha256": "95531f134e74b34b0d7bd0d2be074c6f8f91900594b5c91bf1c0ba5c15986206"
+    },
+    {
+      "item_id": "thesis_citadel_risk_shield",
+      "state": "bloom",
+      "asset": "thesis_citadel_risk_shield_bloom.png",
+      "sha256": "c76dd3215e2ff2d09470e1e1d8da9609ffc3521593b96de89ab0abe65aceddf9"
+    },
+    {
+      "item_id": "thesis_citadel_double_gate",
+      "state": "bloom",
+      "asset": "thesis_citadel_double_gate_bloom.png",
+      "sha256": "66f3d1cfdaaa5f389fbe53324840c69e95c8c7bb6da72660f322382b981c458d"
+    },
+    {
+      "item_id": "thesis_citadel_three_gate_citadel",
+      "state": "bloom",
+      "asset": "thesis_citadel_three_gate_citadel_bloom.png",
+      "sha256": "3cbadc07862fc7704e6859888877e66111ad4d3aa25030b71cece930b63ff23a"
+    },
+    {
+      "item_id": "risk_reef_reef_tile",
+      "state": "bloom",
+      "asset": "risk_reef_reef_tile_bloom.png",
+      "sha256": "bf8f0d7af65d8ae7bf3c54c373de860b826cd98918af8d22851bd0882ba57ca7"
+    },
+    {
+      "item_id": "risk_reef_blue_sluice",
+      "state": "bloom",
+      "asset": "risk_reef_blue_sluice_bloom.png",
+      "sha256": "8867fb4baaa3dcd581f4966213031ff78b53ce3f28af073e846e0b451398cb82"
+    },
+    {
+      "item_id": "risk_reef_dual_orbit_antenna",
+      "state": "bloom",
+      "asset": "risk_reef_dual_orbit_antenna_bloom.png",
+      "sha256": "fa1272b16719a51bdbe920609e45f405305f762174d6634ba6ece5ffda9663f7"
+    },
+    {
+      "item_id": "risk_reef_red_team_observatory",
+      "state": "bloom",
+      "asset": "risk_reef_red_team_observatory_bloom.png",
+      "sha256": "bead8ef911a15036a672869f2bee1d1e92ca37cf14d26a43777eaca3a27dcbc8"
+    },
+    {
+      "item_id": "risk_reef_double_bridge",
+      "state": "bloom",
+      "asset": "risk_reef_double_bridge_bloom.png",
+      "sha256": "73ccef81aece2cae62e3e5f6e56177e973d983e1e76fc9eb899a36147181eac1"
+    },
+    {
+      "item_id": "axiom_archive_archive_ring_tile",
+      "state": "bloom",
+      "asset": "axiom_archive_archive_ring_tile_bloom.png",
+      "sha256": "1fe1e3a77a909ef44f675eb2a98b0d370ba423193aa4f5725be9341b8b184b35"
+    },
+    {
+      "item_id": "axiom_archive_path_straight",
+      "state": "bloom",
+      "asset": "axiom_archive_path_straight_bloom.png",
+      "sha256": "f34d862363668bd67c607df93c9c4ef11d79dd3656d4d9e95d15833465d9338f"
+    },
+    {
+      "item_id": "axiom_archive_return_path_curve",
+      "state": "bloom",
+      "asset": "axiom_archive_return_path_curve_bloom.png",
+      "sha256": "a37add380de81eb4084579325cbec96cdc1c54e508733407ceeb6354365e527f"
+    },
+    {
+      "item_id": "axiom_archive_aura_flower",
+      "state": "bloom",
+      "asset": "axiom_archive_aura_flower_bloom.png",
+      "sha256": "bae887c67525276c55c721712130c4cda018f80eae51f4728e565e43dcc2009b"
+    },
+    {
+      "item_id": "axiom_archive_lit_archive",
+      "state": "bloom",
+      "asset": "axiom_archive_lit_archive_bloom.png",
+      "sha256": "cddd1109d19f46a8eff7314a56c605e069e9c45bfa3f521bef287303c272610c"
+    },
+    {
+      "item_id": "axiom_archive_base_ring_seal",
+      "state": "bloom",
+      "asset": "axiom_archive_base_ring_seal_bloom.png",
+      "sha256": "997e561420752d0f7db98d09091b4aa0dad7495b6c8b98b10030739689be55d5"
+    }
+  ],
+  "canonical_land_geometry_metadata": {
+    "projection_source": {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandProjection.kt",
+      "sha256": "5fb51c835b81a5b3a023a811e91e8d6eab65ef363a433173f45e4a5395add733",
+      "bytes": 6845
+    },
+    "canonical_reference": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+    "canonical_manifest_sha256": "0431d78d005864d3fae81aeda027837ab6ceab4704a3fb48099f59cceb7fefd0",
+    "bundled_art_states": 28,
+    "all_anchors_and_bounds_equal_canonical_manifest": true,
+    "scope": "Source metadata only; actual GPU/Compose appearance and gestures require runtime evidence"
+  },
+  "native_elf": [
+    {
+      "artifact": "release_apk",
+      "path": "lib/arm64-v8a/libandroidx.graphics.path.so",
+      "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+      "bytes": 10096,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7232,
+          "virtual_address": 23616,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 8144,
+          "virtual_address": 40912,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_apk",
+      "path": "lib/armeabi-v7a/libandroidx.graphics.path.so",
+      "sha256": "41399eba6fc2a60f6f14642375c1824f3cf25eb8fec7397d753730a3ceda3e2b",
+      "bytes": 7252,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 5312,
+          "virtual_address": 21696,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 5772,
+          "virtual_address": 38540,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_apk",
+      "path": "lib/x86/libandroidx.graphics.path.so",
+      "sha256": "eb0570b41fd3bff25d8204a967c03bd7550719e768b791f680cc40cbe35f29af",
+      "bytes": 9284,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7456,
+          "virtual_address": 23840,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7912,
+          "virtual_address": 40680,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_apk",
+      "path": "lib/x86_64/libandroidx.graphics.path.so",
+      "sha256": "4e56c996f13670e70082658de7880c4020eabf4f25e43387f88ed78a713fc9f0",
+      "bytes": 10760,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7872,
+          "virtual_address": 24256,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 8808,
+          "virtual_address": 41576,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_aab",
+      "path": "base/lib/arm64-v8a/libandroidx.graphics.path.so",
+      "sha256": "41e9a793c43a0f4fddb19e33f346bace464f30f888ba7b9eaf96294ea115bfb6",
+      "bytes": 10096,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7232,
+          "virtual_address": 23616,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 8144,
+          "virtual_address": 40912,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_aab",
+      "path": "base/lib/armeabi-v7a/libandroidx.graphics.path.so",
+      "sha256": "41399eba6fc2a60f6f14642375c1824f3cf25eb8fec7397d753730a3ceda3e2b",
+      "bytes": 7252,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 5312,
+          "virtual_address": 21696,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 5772,
+          "virtual_address": 38540,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_aab",
+      "path": "base/lib/x86/libandroidx.graphics.path.so",
+      "sha256": "eb0570b41fd3bff25d8204a967c03bd7550719e768b791f680cc40cbe35f29af",
+      "bytes": 9284,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7456,
+          "virtual_address": 23840,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7912,
+          "virtual_address": 40680,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_aab",
+      "path": "base/lib/x86_64/libandroidx.graphics.path.so",
+      "sha256": "4e56c996f13670e70082658de7880c4020eabf4f25e43387f88ed78a713fc9f0",
+      "bytes": 10760,
+      "load_segments": [
+        {
+          "file_offset": 0,
+          "virtual_address": 0,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 7872,
+          "virtual_address": 24256,
+          "alignment": 16384
+        },
+        {
+          "file_offset": 8808,
+          "virtual_address": 41576,
+          "alignment": 16384
+        }
+      ],
+      "all_segments_16kb_aligned": true,
+      "bytes_equal_code5": true
+    }
+  ],
+  "zipalign_16kb_passed": true,
+  "aab_manifest_payload_digests": {
+    "payload_entries": 352,
+    "manifest_digest_sections": 352,
+    "all_payload_digests_match": true,
+    "actual_jarsigner_crypto_verification": true
+  },
+  "bundle_native_alignment": "PAGE_ALIGNMENT_16K",
+  "compiled_purple_orb": [
+    {
+      "artifact": "release_apk",
+      "path": "res/Ko.png",
+      "sha256": "d75a952e0d6bf6b2a0e0911185886f95cd2a1b8ed82b52d8b0b7589225c8699b",
+      "bytes": 228875,
+      "decoded_rgba_pixels_equal_approved_orb": true,
+      "compiled_bytes_equal_code5": true
+    },
+    {
+      "artifact": "release_aab",
+      "path": "base/res/mipmap-nodpi-v4/ic_launcher.png",
+      "sha256": "d75a952e0d6bf6b2a0e0911185886f95cd2a1b8ed82b52d8b0b7589225c8699b",
+      "bytes": 228875,
+      "decoded_rgba_pixels_equal_approved_orb": true,
+      "compiled_bytes_equal_code5": true
+    }
+  ],
+  "preserved_code5": {
+    "static_receipt": {
+      "path": "docs/android/evidence/parity-code5-security-release-validation.json",
+      "sha256": "502d2565c89e09bc15cbbc9cacea41fbfb714d368020b1c5ca70401776cbbbb9",
+      "bytes": 756832
+    },
+    "artifacts": {
+      "release_apk": {
+        "sha256": "20e7eb849105b81ab53bc9bbe8eb25e851781665443ef59b69b7a0a572c567ec",
+        "bytes": 47042112
+      },
+      "release_aab": {
+        "sha256": "0ec118b0d790e8b04faaaa8c77d3aa93ede6919e6f7f0491a96b314154cbc648",
+        "bytes": 50341132
+      }
+    },
+    "unchanged_during_validation": true
+  },
+  "code5_to_code6_package_deltas": [
+    {
+      "artifact": "release_apk",
+      "old_entries": 345,
+      "new_entries": 345,
+      "added": [],
+      "removed": [],
+      "changed_decompressed_entries": [
+        {
+          "path": "AndroidManifest.xml",
+          "code5_sha256": "01ded1b20bc714976bfc598354021cdd40dd3794ea1b129149f9e29e781daa77",
+          "code6_sha256": "aa1395878e2e6a0735b5ef902fe99accb7a6da79e8f87dc07b415b6c822ecb6d"
+        },
+        {
+          "path": "assets/dexopt/baseline.prof",
+          "code5_sha256": "f9e882c1e1f7dafecf4f6f9d53c7bc89bd72987b026ab03c24c8d475656e4b7f",
+          "code6_sha256": "b695afeb2095aa96fea80912df148fb04a7a9912a58929424956da223bd5619d"
+        },
+        {
+          "path": "assets/dexopt/baseline.profm",
+          "code5_sha256": "652bf7bf770ca2d09612384f0c3c3e61213b0331714964e854bedb2f2b5a1c94",
+          "code6_sha256": "8b34669de8508c365d705d4619cffeb07c7b6bf9209b420a5d6041e6a85a0280"
+        },
+        {
+          "path": "classes.dex",
+          "code5_sha256": "5f269eb3b7bed4c24be971bd51c0e1b35b8bad5e09cc6cdb287b44463c9d14c4",
+          "code6_sha256": "969c991f0da0e61f3a4a94c03fbe3bafe40550bfe1869b6e50a6984badb83c72"
+        }
+      ],
+      "identical_entries": 341,
+      "runtime_equivalence_inferred": false
+    },
+    {
+      "artifact": "release_aab",
+      "old_entries": 355,
+      "new_entries": 355,
+      "added": [],
+      "removed": [],
+      "changed_decompressed_entries": [
+        {
+          "path": "BUNDLE-METADATA/com.android.tools.build.obfuscation/proguard.map",
+          "code5_sha256": "a655f1781ab8ba01a68b3ed766cac8c69393855ae93327fe4cfa30361abe039b",
+          "code6_sha256": "97a27a8eb4aeb229cee811071a95d3f674efc03e340a495406f2b41da867ca06"
+        },
+        {
+          "path": "BUNDLE-METADATA/com.android.tools.build.profiles/baseline.prof",
+          "code5_sha256": "f9e882c1e1f7dafecf4f6f9d53c7bc89bd72987b026ab03c24c8d475656e4b7f",
+          "code6_sha256": "b695afeb2095aa96fea80912df148fb04a7a9912a58929424956da223bd5619d"
+        },
+        {
+          "path": "BUNDLE-METADATA/com.android.tools.build.profiles/baseline.profm",
+          "code5_sha256": "652bf7bf770ca2d09612384f0c3c3e61213b0331714964e854bedb2f2b5a1c94",
+          "code6_sha256": "8b34669de8508c365d705d4619cffeb07c7b6bf9209b420a5d6041e6a85a0280"
+        },
+        {
+          "path": "BUNDLE-METADATA/com.android.tools/r8.json",
+          "code5_sha256": "5d80da91ba124d5d56195aa3a07efae2cc69daf4dc2b9674f379855ad2d2d2d4",
+          "code6_sha256": "1bf9d0e115253d12c7151b0c7cf90d8628b085e3adf21ccd3a535c48f013c91b"
+        },
+        {
+          "path": "META-INF/BOBBY-UP.RSA",
+          "code5_sha256": "c2a9ee7a41651f442b84c0eeb79aa623eeb1f22657949860ecfc0ad49ce14a97",
+          "code6_sha256": "3dee983b203bb2e82f88489613fb4eccad786479d5ae0dc8ad886cd6a5bebe91"
+        },
+        {
+          "path": "META-INF/BOBBY-UP.SF",
+          "code5_sha256": "aec0528b9d432953754e9f05fc1fb69f0e4ee913c9429db6734a49582027fc63",
+          "code6_sha256": "b4d3fd2a6e3e42b02c221dce8cb6c28dee4f1f9846914c8ca1db08c24e539970"
+        },
+        {
+          "path": "META-INF/MANIFEST.MF",
+          "code5_sha256": "51c9183f391c1d7b56c2d7cedea50a7001f0e0e6c35db1132700c7ef2aad89b9",
+          "code6_sha256": "c2471daaeb6d1eb284f7073ac6bdfb6ac9ab7cf3e0546503f75bf933f89a13b0"
+        },
+        {
+          "path": "base/dex/classes.dex",
+          "code5_sha256": "5f269eb3b7bed4c24be971bd51c0e1b35b8bad5e09cc6cdb287b44463c9d14c4",
+          "code6_sha256": "969c991f0da0e61f3a4a94c03fbe3bafe40550bfe1869b6e50a6984badb83c72"
+        },
+        {
+          "path": "base/manifest/AndroidManifest.xml",
+          "code5_sha256": "c409cc8b6afa1542a660c3be76fd41734152c042cb89351887f996c2a6971a7f",
+          "code6_sha256": "6e43cf4c8ee122ef9a1b4234ca2b50a000685a668fe96dac0679e409b8fe31f3"
+        }
+      ],
+      "identical_entries": 346,
+      "runtime_equivalence_inferred": false
+    }
+  ],
+  "aab_signature_limit": "Local upload certificate, not Play App Signing. Self-signed certificate/chain, no timestamp, POSIX attributes not signed; verified with jarsigner JarFile, without streaming JarInputStream assurance.",
+  "fcm_enabled": false,
+  "fcm_delivery_verified": false,
+  "uploaded": false,
+  "physical_device_tested_by_this_validator": false,
+  "prior_runtime_evidence_rebound": false
+}

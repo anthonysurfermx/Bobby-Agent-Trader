@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.platform.DictationStateTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.409Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="automatic completion keeps logical hold and confirms only on release" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.001"/>
+  <testcase name="bounded final timeout confirms latest recognized partial only after release" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0"/>
+  <testcase name="missing final text uses recognized partial and an empty capture stays empty" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0"/>
+  <testcase name="background cancellation discards held and awaiting finals" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0"/>
+  <testcase name="release before final waits and delivers the actual final once" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0"/>
+  <testcase name="new capture never inherits text after cancellation or restart" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

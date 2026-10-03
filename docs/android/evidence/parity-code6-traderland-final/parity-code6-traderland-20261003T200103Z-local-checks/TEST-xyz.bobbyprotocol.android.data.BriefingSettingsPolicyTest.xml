@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.386Z" hostname="MacBook-Pro-F-Society.local" time="0.005">
+  <properties/>
+  <testcase name="changingTheReportLanguageDoesNotCarryAnotherLanguagesLocale" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.002"/>
+  <testcase name="unsupportedMalformedOrUnpairedReportLocalesFailBeforeTransport" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="missingStaleMalformedOptionsOrLocalConsentCannotEnableProcessing" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001"/>
+  <testcase name="assetsAndCompanionUseAuthoritativeOptionsAndActualSixAssetLimit" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="savedCrossClientReportLanguagesCanChangeAssetsAndVoiceWithoutChangingConsent" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="brazilianReportLocaleSurvivesAnAssetEditAndSupportsAnExplicitPortugalChoice" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001"/>
+  <testcase name="unsupportedFieldsLegacyVersionNamesAndWrongTypesFailBeforeTransport" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="disablingNeedsNeitherLocalAiConsentNorAServerVersion" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="reportLanguageIsExplicitAndRejectsUnsupportedOrRegionalLanguageCodes" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0"/>
+  <testcase name="enablingUsesTheRealCurrentVersionAndExactAcceptedField" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

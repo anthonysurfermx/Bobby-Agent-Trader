@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.423Z" hostname="MacBook-Pro-F-Society.local" time="0.016">
+  <properties/>
+  <testcase name="everyNativeRegionalLocaleSurvivesThePublicPageHandoff" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.013"/>
+  <testcase name="countryIsNormalizedOnlyWhenItNamesARealIsoCountry" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.0"/>
+  <testcase name="accountAndPaywallDestinationsPreserveAllSixInterfaceLanguages" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.001"/>
+  <testcase name="malformedContextCannotSteerTheOriginPageOrQueryKeys" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.001"/>
+  <testcase name="regionalLanguageInputsRemainCanonicalWithoutAddingPrivateContext" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.0"/>
+  <testcase name="mismatchedOrUnapprovedLocaleFallsBackWithinTheSelectedLanguage" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

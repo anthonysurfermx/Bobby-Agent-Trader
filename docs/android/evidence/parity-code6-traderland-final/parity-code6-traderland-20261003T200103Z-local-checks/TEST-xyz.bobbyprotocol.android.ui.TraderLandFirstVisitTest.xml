@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.499Z" hostname="MacBook-Pro-F-Society.local" time="0.005">
+  <properties/>
+  <testcase name="aFailedPersistenceWriteNeverConsumesTheVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001"/>
+  <testcase name="firstVisibleVisitIsDurableAcrossControllerRecreation" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0"/>
+  <testcase name="offscreenAndOverlappingDialogsLeaveTheVisitUnspent" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0"/>
+  <testcase name="guestAndEveryAccountKeepSeparateVisitsWithoutInheritingGuestState" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001"/>
+  <testcase name="anAccountSwitchOrSameAccountNewEpochRejectsTheStaleVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0"/>
+  <testcase name="accountPreferenceKeysAreBoundedAndCannotCollideWithTheGuestNamespace" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001"/>
+  <testcase name="simultaneousControllersOnlyPersistAndClaimOneVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.002"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
