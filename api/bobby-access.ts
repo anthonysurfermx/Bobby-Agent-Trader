@@ -114,9 +114,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
-      payments: { stripe: stripeReady(), apple: revenueCatReady() && Boolean(identity) && subscriptionAvailable && !(
+      // App Store sales close only for a known account that still has a card plan able to charge. A signed-out
+      // caller always sees them open (the shipped iPhone paywall reads this before sign-in; it cannot buy until then).
+      payments: { stripe: stripeReady(), apple: revenueCatReady() && (!identity || (subscriptionAvailable && !(
         subscription?.stripe_subscription_id && !STRIPE_TERMINAL.has(subscription.status)
-      ), revenuecat: revenueCatReady() },
+      ))), revenuecat: revenueCatReady() },
     });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });

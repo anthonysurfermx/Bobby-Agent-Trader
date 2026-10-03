@@ -33,7 +33,13 @@ export function track(event: TrackEvent, surface?: string | null) {
       await new Promise<void>((resolve) => {
         // A stalled auth lookup or network request must release the queue for later funnel steps.
         const timer = window.setTimeout(() => { controller.abort(); resolve(); }, 4000);
-        void accessHeaders().then((headers) => fetch('/api/track', { method: 'POST', body, keepalive: true,
+        // On the sign-in callback the session is still in the URL: asking for credentials would start the auth client,
+        // which consumes that URL before the callback page reads it (intermittent "invalid link"). Send that visit
+        // with the install only.
+        const authCallback = location.pathname.startsWith('/auth/') || /access_token=|refresh_token=|[?&#]code=/.test(location.hash + location.search);
+        const credentials: Promise<Record<string, string>> = authCallback
+          ? Promise.resolve({ 'x-bobby-device': deviceId(), 'x-bobby-platform': 'web' }) : accessHeaders();
+        void credentials.then((headers) => fetch('/api/track', { method: 'POST', body, keepalive: true,
           signal: controller.signal, headers: { 'Content-Type': 'text/plain', ...headers } }))
           .catch(() => {}).finally(() => { window.clearTimeout(timer); resolve(); });
       });
