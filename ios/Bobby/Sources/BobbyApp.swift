@@ -77,6 +77,9 @@ struct BobbyApp: App {
             ["agent.onboarded", "agent.riskNoticeVersion", "companion.id"].forEach { defaults.removeObject(forKey: $0) }
         }
 #endif
+        if args.contains("-qa-coupon") {
+            NucleoFixtures.activate(scenario: "default", liveVoice: false)
+        }
         if let scenario = nucleoOptions.fixtures {
             NucleoFixtures.activate(scenario: scenario, liveVoice: args.contains("-nucleo-fixtures-live-voice"))
         }
@@ -104,6 +107,8 @@ struct BobbyApp: App {
 #if DEBUG
                 if Self.isUnitTestHost {
                     Color.clear
+                } else if ProcessInfo.processInfo.arguments.contains("-qa-coupon") {
+                    CouponCelebrationQAFixture(alreadyRedeemed: ProcessInfo.processInfo.arguments.contains("-qa-coupon-already"))
                 } else if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") {
                     TraderLandGateHarnessView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-skin") {

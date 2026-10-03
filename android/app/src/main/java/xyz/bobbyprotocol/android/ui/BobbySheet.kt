@@ -33,6 +33,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -56,6 +57,8 @@ import xyz.bobbyprotocol.android.data.ApiException
 import xyz.bobbyprotocol.android.data.AccountDeletionPolicy
 import xyz.bobbyprotocol.android.data.AccountDeletionRequirements
 import xyz.bobbyprotocol.android.data.BobbyRepository
+import xyz.bobbyprotocol.android.data.BobbyQuotaOwner
+import xyz.bobbyprotocol.android.data.BobbyQuotaPolicy
 import xyz.bobbyprotocol.android.data.BriefingSettingsPolicy
 import xyz.bobbyprotocol.android.nucleo.NucleoSession
 import xyz.bobbyprotocol.android.platform.BriefingReminders
@@ -78,6 +81,11 @@ fun BobbySheet(
     val account by repository.session.collectAsStateWithLifecycle()
     val billingState by billing.state.collectAsStateWithLifecycle()
     val epoch by repository.epoch.collectAsStateWithLifecycle()
+    val quotaState by repository.quota.collectAsStateWithLifecycle()
+    val quota = quotaState.takeIf { it.owner?.userId == account?.userId && it.owner?.epoch == epoch }
+    val couponController = remember(repository, route, epoch) { repository.couponController() }
+    val couponState by couponController.state.collectAsStateWithLifecycle()
+    DisposableEffect(couponController) { onDispose { couponController.cancel() } }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
     var data by remember(route, epoch) { mutableStateOf<JSONObject?>(null) }
@@ -304,24 +312,30 @@ fun BobbySheet(
                 }
                 "isla" -> TraderLandSheet(session, repository, { error = it }, onExternal)
                 "coupon" -> if (account == null) SignedOut(t, onOpen) else {
-                    var code by remember(epoch) { mutableStateOf("") }
-                    var result by remember(epoch) { mutableStateOf<String?>(null) }
-                    Text(t("Redeem a Bobby code for the benefits confirmed by your account.", "Canjea un código Bobby por los beneficios confirmados en tu cuenta."))
-                    OutlinedTextField(code, { code = it.take(64).uppercase() }, label = { Text(t("Code", "Código")) }, singleLine = true, modifier = Modifier.fillMaxWidth())
-                    Action(t("Redeem", "Canjear"), !busy && code.isNotBlank()) { task {
-                        val response = repository.request("api/bobby-access", "POST", JSONObject().put("action", "redeem-coupon").put("code", code.trim()), authenticated = true)
-                        result = response.optString("result")
-                        data = repository.access()
-                    } }
-                    result?.let { Text(benefitResult(it, t), color = MaterialTheme.colorScheme.primary) }
+                    val visibleOwner = BobbyQuotaOwner(account?.userId, epoch)
+                    key(epoch, account?.userId) {
+                        CouponRedemptionContent(session, couponState,
+                            onRedeem = { code -> scope.launch { couponController.redeem(code, expectedOwner = visibleOwner) } },
+                            onCheckBalance = { scope.launch { couponController.checkBalance(expectedOwner = visibleOwner) } },
+                            onDismissOutcome = { couponController.dismissOutcome() },
+                            onRead = onClose)
+                    }
                 }
                 "levels" -> {
-                    val levels = data?.optJSONObject("levels")
+                    val quick = quota?.access
+                    val premium = quota?.levels
                     listOf("rapido" to t("Quick", "Rápido"), "profundo" to t("Deep", "Profundo"), "maximo" to t("Max", "Máximo")).forEach { (id, label) ->
-                        val access = levels?.optJSONObject(id)
+                        val meter = when (id) { "profundo" -> premium?.profundo; "maximo" -> premium?.maximo; else -> null }
+                        val remaining = if (id == "rapido") quick?.remaining else meter?.remaining
+                        val bonus = if (id == "rapido") quick?.bonus else meter?.bonus
+                        val unlimited = id == "rapido" && quick != null && quick.tier == "pro" && quick.used == null && quick.limit == null && quick.remaining == null
                         Text(label, style = MaterialTheme.typography.titleMedium)
-                        access?.optInt("remaining")?.let { Text("${t("Available reads", "Lecturas disponibles")}: $it") }
-                        Action(label, access?.optBoolean("allowed", id == "rapido") ?: (id == "rapido")) { session.selectAnalysisLevel(id); onClose() }
+                        Text(if (unlimited) CouponCopy.text("unlimited", language = session.language)
+                            else remaining?.let { CouponCopy.text("allowanceRow", it, session.language) }
+                                ?: (t("Available reads", "Lecturas disponibles") + ": —"))
+                        bonus?.takeIf { it > 0 }?.let { Text(CouponCopy.text("bonusRow", it, session.language), color = MaterialTheme.colorScheme.primary) }
+                        val selectable = id == "rapido" || BobbyQuotaPolicy.canSelectPremium(premium?.tier, meter)
+                        Action(label, !busy && selectable) { session.selectAnalysisLevel(id); onClose() }
                     }
                     Action("Bobby Pro") { onOpen("paywall") }
                 }

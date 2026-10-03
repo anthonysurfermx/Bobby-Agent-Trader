@@ -65,12 +65,15 @@ struct BobbyReadAccess: Equatable, Sendable {
     let remaining: Int?
     /// Gifted reads are separate from the plan balance and never confer Pro.
     let bonus: Int
+    /// Older unlimited-Pro consumption replies omit this field; absence is not a zero balance.
+    let bonusProvided: Bool
     /// ISO-8601; nil = no reset (anonymous reads do not reset).
     let resetsAt: String?
     let paywall: Bool
 
-    init(tier: String, used: Int, limit: Int?, remaining: Int?, resetsAt: String?, paywall: Bool, bonus: Int = 0) {
+    init(tier: String, used: Int, limit: Int?, remaining: Int?, resetsAt: String?, paywall: Bool, bonus: Int = 0, bonusProvided: Bool = true) {
         self.bonus = max(0, bonus)
+        self.bonusProvided = bonusProvided
         self.tier = tier; self.used = used; self.limit = limit; self.remaining = remaining; self.resetsAt = resetsAt; self.paywall = paywall
     }
 
@@ -81,7 +84,9 @@ struct BobbyReadAccess: Equatable, Sendable {
         used = Self.count(o["used"]) ?? 0
         limit = Self.count(o["limit"])
         remaining = Self.count(o["remaining"])
-        bonus = Self.count(o["bonus"]) ?? 0
+        let parsedBonus = Self.count(o["bonus"])
+        bonus = parsedBonus ?? 0
+        bonusProvided = parsedBonus != nil
         resetsAt = (o["resetsAt"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         paywall = (o["paywall"] as? NSNumber).map { CFGetTypeID($0) == CFBooleanGetTypeID() && $0.boolValue } ?? false
     }
@@ -169,13 +174,15 @@ enum BobbyAccessAPI {
     /// `extraHeaders` (briefings: If-Match, Idempotency-Key, installation proof) never replace the
     /// access headers: the bearer always comes from `auth`.
     static func send(_ path: String, method: String = "POST", body: [String: Any]? = nil,
-                     auth: BobbyMeterAuth, timeout: TimeInterval? = nil,
+                     auth: BobbyMeterAuth, expectedOwner: UUID? = nil, timeout: TimeInterval? = nil,
                      extraHeaders: [String: String] = [:],
                      onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
         func headers(bearer: String?) -> [String: String] {
             Self.headers(bearer: bearer).merging(extraHeaders.filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }) { access, _ in access }
         }
         let owner = await auth.owner()
+        // A mutating caller may have captured its account before this task began executing.
+        guard expectedOwner == nil || owner == expectedOwner else { throw CancellationError() }
         let bearer = await auth.bearer()
         try Task.checkCancellation()
         guard await auth.owner() == owner else { throw CancellationError() }
@@ -225,10 +232,17 @@ final class BobbyAccessCenter: ObservableObject {
     /// Whose snapshot this is (nil = signed out); a change of account clears it.
     private var owner: String?
     private var ownerGeneration: UUID?
+    private var requestGeneration = UUID()
     private var cancellables = Set<AnyCancellable>()
     var auth: BobbyMeterAuth = .account
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
+    /// Injectable GET loader, including suspended replies from before a confirmed coupon.
+    var load: (BobbyMeterAuth) async throws -> [String: Any]? = { auth in
+        let reply = try await BobbyAccessAPI.send(BobbyAccessAPI.accessPath, method: "GET", auth: auth)
+        guard (200..<300).contains(reply.status) else { return nil }
+        return reply.json as? [String: Any]
+    }
 
     init(observeAccount: Bool = true) {
         owner = currentUser()
@@ -242,6 +256,7 @@ final class BobbyAccessCenter: ObservableObject {
     }
 
     func clear() {
+        requestGeneration = UUID()
         owner = currentUser()
         ownerGeneration = currentGeneration()
         access = nil
@@ -257,7 +272,30 @@ final class BobbyAccessCenter: ObservableObject {
     func record(_ access: BobbyReadAccess?) {
         guard let access else { return }
         accountChanged()
+        if access.isPro, !access.bonusProvided, let previous = self.access, previous.isPro {
+            // Unlimited Quick consumption does not spend gifted reads. A legacy reply that omits
+            // their balance cannot erase a confirmed coupon balance for this same account epoch.
+            self.access = BobbyReadAccess(tier: access.tier, used: access.used, limit: access.limit,
+                                          remaining: access.remaining, resetsAt: access.resetsAt,
+                                          paywall: access.paywall, bonus: previous.bonus,
+                                          bonusProvided: previous.bonusProvided)
+        } else {
+            self.access = access
+        }
+    }
+
+    /// A coupon updates access directly, preserving subscription and store readiness. Older GET
+    /// replies cannot replace the confirmed balance; the caller must still own the same session.
+    @discardableResult
+    func recordCouponAccess(_ access: BobbyReadAccess?, userID: String, generation: UUID) -> Bool {
+        accountChanged()
+        guard currentUser() == userID, currentGeneration() == generation else { return false }
+        requestGeneration = UUID()
+        // A confirmed redemption still invalidates old GETs when the new quota read failed.
+        guard let access else { return true }
+        guard ["free", "pro"].contains(access.tier) else { return false }
         self.access = access
+        return true
     }
 
 #if DEBUG
@@ -277,10 +315,11 @@ final class BobbyAccessCenter: ObservableObject {
         defer { accountChanged() }
         let started = currentUser()
         let generation = currentGeneration()
-        guard let reply = try? await BobbyAccessAPI.send(BobbyAccessAPI.accessPath, method: "GET", auth: auth),
-              (200..<300).contains(reply.status), let body = reply.json as? [String: Any],
-              currentUser() == started, currentGeneration() == generation else {
-            applePayments = false
+        let revision = UUID()
+        requestGeneration = revision
+        guard let body = try? await load(auth), !Task.isCancelled,
+              currentUser() == started, currentGeneration() == generation, requestGeneration == revision else {
+            if currentUser() == started, currentGeneration() == generation, requestGeneration == revision { applePayments = false }
             return false
         }
         apply(body)

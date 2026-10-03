@@ -292,7 +292,8 @@
     "deploymentEnabled": {
       "codex/dashboard-live-review": false,
       "codex/dashboard-remediation-20261003": false,
-      "codex/bobby-android-parity-ios17": false
+      "codex/bobby-android-parity-ios17": false,
+      "codex/coupon-redemption-ux": false
     }
   }
 }

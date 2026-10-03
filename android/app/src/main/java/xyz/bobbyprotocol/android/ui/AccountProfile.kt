@@ -73,7 +73,9 @@ internal fun AccountProfile(
     val owner = account?.userId
     val t: (String) -> String = { session.text(it) }
     var snapshot by remember(epoch, owner) { mutableStateOf(session.snapshot()) }
-    var access by remember(epoch, owner) { mutableStateOf<JSONObject?>(null) }
+    val quotaState by repository.quota.collectAsStateWithLifecycle()
+    val quota = quotaState.takeIf { it.owner?.userId == owner && it.owner?.epoch == epoch }
+    val access = quota?.access
     var landMetrics by remember(epoch, owner) { mutableStateOf<ProfileLandMetrics?>(null) }
     val equipment = remember(context) { EquipmentStore(context) }
     val catalog = remember(context) { EquipmentStore.catalog(context) }
@@ -96,8 +98,7 @@ internal fun AccountProfile(
     LaunchedEffect(epoch, owner, snapshot.optBoolean("riskAccepted")) {
         if (!snapshot.optBoolean("riskAccepted") || !current()) return@LaunchedEffect
         try {
-            val result = repository.access()
-            if (current() && session.riskAccepted) access = result.optJSONObject("access")
+            repository.access()
         } catch (cancelled: CancellationException) { throw cancelled } catch (_: Exception) { /* Unknown counts stay unknown. */ }
     }
     LaunchedEffect(epoch, owner, snapshot.optBoolean("riskAccepted")) {
@@ -117,7 +118,7 @@ internal fun AccountProfile(
     val companions = roster.map { EquipmentCompanion(it.getString("id"), it.getString("label"), it.optInt("requiredLevel", 1)) }
     val owned = EquipmentLedger.ownedIds(catalog, companions, session.companionId, xp)
     val worn = if (equipmentReady) catalog.filter { it.companionId == companionId && EquipmentLedger.isEquipped(it.id, owned, disabled) } else emptyList()
-    val confirmedPro = access?.optString("tier") == "pro" || billingState.isPro
+    val confirmedPro = access?.tier?.let { it == "pro" } ?: billingState.isPro
     val aura = landMetrics?.aura ?: ProfileProgressPolicy.count(snapshot.opt("aura"))
     val privacy = { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.PRIVACY, session.language, session.locale, repository.country)) }
     val help = { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.SUPPORT, session.language, session.locale, repository.country)) }
@@ -180,13 +181,19 @@ internal fun AccountProfile(
         ProfileRow("Trader Land", t("Every read plants something"), ProfileSymbol.ISLAND, tag = "account-trader-land") { onOpen("isla") }
 
         ProfileSection(t("Account"))
-        val remaining = ProfileProgressPolicy.count(access?.opt("remaining"))
+        val remaining = access?.remaining
         ProfileRow(if (confirmedPro) "Bobby Pro" else t("Reads left this week"), if (confirmedPro) t("Your account confirms Pro access") else remaining?.toString() ?: "—", ProfileSymbol.READS,
             trailing = if (confirmedPro && billing.managementUri() != null) t("Manage") else null, tag = "account-reads") {
             billing.managementUri()?.takeIf { confirmedPro }?.let { onExternal(it.toString()) } ?: onOpen("levels")
         }
+        val gifts = listOfNotNull(
+            access?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("quickBalance", it, language) },
+            quota?.levels?.profundo?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("deepBalance", it, language) },
+            quota?.levels?.maximo?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("maxBalance", it, language) })
+        if (gifts.isNotEmpty()) ProfileRow(CouponCopy.text("balance", language = language), gifts.joinToString(" · "),
+            ProfileSymbol.GIFT, tag = "account-bonus") { onOpen("levels") }
         if (!confirmedPro) ProfileRow("Bobby Pro", t("Explore the plans available for your account"), ProfileSymbol.PRO, tag = "account-pro") { onOpen("paywall") }
-        ProfileRow(t("Restore purchases"), t("Recover access confirmed by Google Play"), ProfileSymbol.SYNC,
+        ProfileRow(t("Restore purchases"), CouponCopy.text("restoreDetail", language = language), ProfileSymbol.SYNC,
             enabled = !busy && (account == null || billingState.canRestore), tag = "account-restore") { if (account == null) onOpen("paywall") else onRestore() }
         ProfileRow(t("Invite friends"), t("Share Bobby with someone you know"), ProfileSymbol.INVITE, tag = "account-invite") { onOpen("invite") }
         ProfileRow(t("Redeem a code"), t("Use a benefit confirmed by your account"), ProfileSymbol.GIFT) { onOpen("coupon") }

@@ -1,0 +1,184 @@
+{
+  "status": "PASS",
+  "recorded_at": "2026-10-03T21:24:13.171186+00:00",
+  "started_at": "2026-10-03T21:14:39.994609+00:00",
+  "api": 35,
+  "page_size": 4096,
+  "source_sha256": "c1a619bda0a1b176365e063a21513250b71138a30b48b02b2694d7247815a166",
+  "version_name": "1.1.2",
+  "version_code": 7,
+  "fcm_enabled": false,
+  "source_unchanged_during_instrumentation": true,
+  "adb_exit_code": 0,
+  "expected_tests": 28,
+  "tests": 28,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "results": [
+    {
+      "class": "xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest",
+      "test": "reducedMotionDecorationExposesNoDuplicateGiftAnnouncement",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest",
+      "test": "alreadyRedeemedWithSpentGiftDoesNotPromiseAnotherGrant",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest",
+      "test": "confirmedGiftShowsActualCountsAndReturnAction",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest",
+      "test": "confirmedGiftWithUnknownBalanceKeepsConfirmationAndPendingCopy",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "approvedModelLoadsOrExplicitPortraitFallbackRemainsAvailable",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "viewerCannotFetchRemoteOrUnrelatedNativeAssets",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "realEarnedAttachmentsUpdateAndRapidCompanionChangesKeepLatestModel",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "profileVoiceChoicePersistsThroughTheNativeMenuWithoutExternalProcessing",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "unavailableOnDeviceDictationKeepsKeyboardAndCancelsUnicodeDraftLocally",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "unconfiguredPushBootstrapStaysDisabledWithoutFirebaseInitialization",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "accountAndBriefingPrivacyControlsRemainAccessibleBeforeAiConsent",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "consentGateAndLocalOnboardingReachTheRealGuestAppWithoutAnAnalysis",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "durableAwardKeepsLedgerAndPendingEventTogetherAcrossStoreRecreationAndAccountSwitch",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "sameOriginSubframeCannotDispatchEvenWhenItHasTheInjectedListener",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "outstandingReplyFromPreviousPageIsDroppedAfterReload",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "foreignOriginDoesNotReceiveNativeListener",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "guestSignInInheritsOnboardingConsentButDoesNotTransferGuestAwardsOrHistory",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "binaryMessageIsIgnoredAndNextNativeSessionStillCompletes",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "bundledEngineUsesNativeV1SessionWithoutFixturesOrAccountSecrets",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "malformedAndUnknownMethodsReturnProtocolFaultsAndOversizedMessagesNeverDispatch",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "nativeConsentGateRejectsQuestionsAndUnknownSavedReadsBeforeNetworking",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest",
+      "test": "equityEvidenceUsesTheBackendMonthlyKeyWithHourlyCandlesAndEncodedListing",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest",
+      "test": "cryptoEvidenceRetainsOneHundredHourlyCandlesWithoutEquityParameters",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest",
+      "test": "approvedArtworkExportsAsAReadablePngThroughOnlyTheNarrowProviderPath",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest",
+      "test": "invalidAssetPathsAndUnrelatedCacheFilesCannotBeShared",
+      "code": 0
+    }
+  ],
+  "scope": "Actual six-suite debug instrumentation, including four offline coupon-popup/celebration checks on disposable COW emulator clone, AOSP API35/4KB. Guest-only actual Activity/bridge and bundled 3D assets, isolated preferences/ledger checks, refused network, candle request contracts and local PNG provider. No account/provider purchase, generated remote analysis or audio, FCM registration, physical-device, Play or remote telemetry acceptance proof.",
+  "original_avd_changed": false,
+  "physical_device_changed": false,
+  "debug_apk": {
+    "path_in_worktree": "android/app/build/outputs/apk/debug/app-debug.apk",
+    "sha256": "209b52fedff5456b72bd18937d28f271a5b5024c4612c48038067b3cbeb22180",
+    "bytes": 60487023
+  },
+  "test_apk": {
+    "path_in_worktree": "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+    "sha256": "daa76005367b8b0a7c4cb9d4c9b75b0aea3afe6a4fbd42ce8ad8c43f6f7208b6",
+    "bytes": 1139497
+  },
+  "installed_apk_matches": {
+    "debug_apk": {
+      "sha256": "209b52fedff5456b72bd18937d28f271a5b5024c4612c48038067b3cbeb22180",
+      "bytes": 60487023
+    },
+    "test_apk": {
+      "sha256": "daa76005367b8b0a7c4cb9d4c9b75b0aea3afe6a4fbd42ce8ad8c43f6f7208b6",
+      "bytes": 1139497
+    }
+  },
+  "avd": "Bobby_Parity_API35 (disposable COW clone)"
+}

@@ -53,16 +53,20 @@ class BobbyRepository(context: Context) {
         .followRedirects(false)
         .followSslRedirects(false)
         .build()
+    private val couponClient by lazy { client.newBuilder().retryOnConnectionFailure(false).build() }
     private var storedSession: StoredSession? = null
     private val mutableSession = MutableStateFlow<AccountSession?>(null)
     val session: StateFlow<AccountSession?> = mutableSession.asStateFlow()
     private val mutableEpoch = MutableStateFlow(0L)
     val epoch: StateFlow<Long> = mutableEpoch.asStateFlow()
+    private val quotaStore = BobbyQuotaStore({ BobbyQuotaOwner(session.value?.userId, epoch.value) }, stateLock)
+    val quota: StateFlow<BobbyQuotaState> = quotaStore.state
     init {
         synchronized(stateLock) {
             storedSession = loadSession()
             mutableSession.value = storedSession?.identity
             mutableEpoch.value = store.read("epoch")?.toLongOrNull() ?: 0L
+            quotaStore.reset()
         }
     }
     private val mutableLastError = MutableStateFlow<String?>(null)
@@ -198,7 +202,43 @@ class BobbyRepository(context: Context) {
         else queryPath("api/okx-candles", mapOf("instId" to "$symbol-USDT", "bar" to "1H", "limit" to "100")),
     )
 
-    suspend fun access(): JSONObject = request("api/bobby-access")
+    /** A late GET cannot overwrite the replacement quota confirmed by a coupon POST. */
+    suspend fun access(): JSONObject = readAccessForOwner(null)
+
+    private suspend fun readAccessForOwner(expected: BobbyQuotaOwner?): JSONObject {
+        val ticket = synchronized(stateLock) {
+            if (expected != null && expected != BobbyQuotaOwner(session.value?.userId, epoch.value)) throw AccountChangedException()
+            checkOwner(epoch.value)
+            quotaStore.beginRead()
+        }
+        val reply = replyForOwner(ticket.owner, "api/bobby-access", authenticated = ticket.owner.userId != null)
+        requireSuccess(reply)
+        synchronized(stateLock) {
+            checkOwner(ticket.owner.epoch)
+            val applied = quotaStore.applyRead(ticket, BobbyQuotaPolicy.snapshot(reply.json, accountOnly = ticket.owner.userId != null))
+            // The explicit balance action must not return a GET superseded by another quota read.
+            if (expected != null && !applied) throw ApiException(409, "access_refresh_superseded")
+        }
+        return reply.json
+    }
+
+    fun couponController(): CouponRedemptionController = CouponRedemptionController(
+        currentOwner = { synchronized(stateLock) { BobbyQuotaOwner(session.value?.userId, epoch.value) } },
+        send = { owner, code ->
+            val reply = replyForOwner(owner, "api/bobby-access", "POST",
+                JSONObject().put("action", "redeem-coupon").put("code", code), authenticated = true, retryConnections = false)
+            CouponReply(reply.status, reply.json)
+        },
+        loadBalance = { owner -> BobbyQuotaPolicy.snapshot(readAccessForOwner(owner), accountOnly = true) },
+        applySnapshot = { owner, snapshot -> synchronized(stateLock) {
+            if (owner != BobbyQuotaOwner(session.value?.userId, epoch.value)) false
+            else {
+                checkOwner(owner.epoch)
+                quotaStore.applyCoupon(owner, snapshot)
+            }
+        } },
+        lock = stateLock,
+    )
     suspend fun refreshAccess(): JSONObject = request("api/bobby-access", "POST", JSONObject().put("action", "revenuecat-sync"), authenticated = true)
     suspend fun progress(): JSONObject = request("api/progress", authenticated = true)
     suspend fun syncProgress(events: JSONArray, profile: JSONObject): JSONObject {
@@ -336,6 +376,7 @@ class BobbyRepository(context: Context) {
         } finally {
             // Emit the epoch after identity assignment so observers always bind the new owner.
             mutableEpoch.value = next
+            quotaStore.reset()
         }
     }
 
@@ -368,21 +409,28 @@ class BobbyRepository(context: Context) {
     /** A delayed native operation cannot acquire or submit the next account's bearer. */
     suspend fun requestForAccount(ownerUserId: String, ownerEpoch: Long, path: String, method: String = "GET",
                                   body: JSONObject? = null, headers: Map<String, String> = emptyMap()): JSONObject {
-        fun currentOwner() = synchronized(stateLock) {
-            if (session.value?.userId != ownerUserId || epoch.value != ownerEpoch) throw AccountChangedException()
-            checkOwner(ownerEpoch)
-        }
-        currentOwner()
-        val token = tokenForRequest(true)
-        currentOwner()
-        val reply = authorizedRetry(ownerEpoch, token) { bearer ->
-            currentOwner()
-            network(apiRequest(path, method, body, bearer, headers)) { response -> decodeReply(response) }
-        }
-        currentOwner()
+        val reply = replyForOwner(BobbyQuotaOwner(ownerUserId, ownerEpoch), path, method, body, headers, authenticated = true)
         requireSuccess(reply)
-        requireProcessingConsent(path, body)
         return reply.json
+    }
+
+    private suspend fun replyForOwner(owner: BobbyQuotaOwner, path: String, method: String = "GET",
+                                      body: JSONObject? = null, headers: Map<String, String> = emptyMap(),
+                                      authenticated: Boolean, retryConnections: Boolean = true): JsonReply {
+        fun currentOwner() = synchronized(stateLock) {
+            if (session.value?.userId != owner.userId || epoch.value != owner.epoch) throw AccountChangedException()
+            checkOwner(owner.epoch)
+        }
+        currentOwner()
+        val token = tokenForRequest(authenticated)
+        currentOwner()
+        val reply = authorizedRetry(owner.epoch, token) { bearer ->
+            currentOwner()
+            network(apiRequest(path, method, body, bearer, headers), if (retryConnections) client else couponClient) { response -> decodeReply(response) }
+        }
+        currentOwner()
+        requireProcessingConsent(path, body)
+        return reply
     }
 
     private fun notifyOutgoingAccount(value: StoredSession) {
@@ -540,9 +588,9 @@ class BobbyRepository(context: Context) {
         return request.method(normalized, requestBody).build()
     }
 
-    private suspend fun <T> network(request: Request, consume: suspend (Response) -> T): T = coroutineScope {
+    private suspend fun <T> network(request: Request, transport: OkHttpClient = client, consume: suspend (Response) -> T): T = coroutineScope {
         suspendCancellableCoroutine { continuation ->
-            val call = client.newCall(request)
+            val call = transport.newCall(request)
             val responseRef = AtomicReference<Response?>()
             val jobRef = AtomicReference<Job?>()
             continuation.invokeOnCancellation { call.cancel(); responseRef.get()?.close(); jobRef.get()?.cancel() }
@@ -629,6 +677,7 @@ class BobbyRepository(context: Context) {
         mutableSession.value = value.identity
         mutableLastError.value = null
         mutableEpoch.value = next
+        quotaStore.reset()
     }
 
     private fun loadSession(): StoredSession? = store.read("session")?.let { raw -> try {
