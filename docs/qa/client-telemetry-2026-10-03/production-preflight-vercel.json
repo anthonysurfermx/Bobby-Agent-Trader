@@ -1,0 +1,163 @@
+{
+  "observedAt": "2026-10-03T00:26:54.308376+00:00",
+  "mode": "read_only_metadata",
+  "projectId": "prj_2mZTeXALvWwHIbfA6H4hYKWeS6iR",
+  "teamId": "team_W71FS3j3fxrXyWiigxkqgNYx",
+  "deployment": {
+    "id": "dpl_22w11hEfVMjvAcBijnsfTvgFGtRV",
+    "url": "bobby-agent-trader-aoutbv1yd-anthonysurfermxs-projects.vercel.app",
+    "target": "production",
+    "readyState": "READY",
+    "gitSha": "1d565e7250058f825a3514d6f7dbd91ffd4c2512",
+    "gitRef": "main",
+    "aliases": [
+      "bobbyprotocol.xyz",
+      "bobby-agent-trader.vercel.app",
+      "www.bobbyprotocol.xyz",
+      "bobby-agent-trader-anthonysurfermxs-projects.vercel.app",
+      "bobby-agent-trader-git-main-anthonysurfermxs-projects.vercel.app"
+    ]
+  },
+  "deploymentEvidence": "Vercel MCP list-deployments and get-deployment, refreshed 2026-10-03 00:21-00:23 UTC",
+  "productionEnvironment": [
+    {
+      "key": "RATE_LIMIT_SALT",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "REVENUECAT_PROJECT_ID",
+      "present": false,
+      "scopes": [],
+      "types": []
+    },
+    {
+      "key": "REVENUECAT_V2_SECRET_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "REVENUECAT_SECRET_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "REVENUECAT_WEBHOOK_AUTH",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "STRIPE_SECRET_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "STRIPE_PRICE_ID",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "STRIPE_WEBHOOK_SECRET",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "CRON_SECRET",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "encrypted"
+      ]
+    },
+    {
+      "key": "RESEND_API_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    },
+    {
+      "key": "BOBBY_SUPABASE_URL",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "encrypted"
+      ]
+    },
+    {
+      "key": "BOBBY_SUPABASE_ANON_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "encrypted"
+      ]
+    },
+    {
+      "key": "BOBBY_SUPABASE_SERVICE_ROLE_KEY",
+      "present": true,
+      "scopes": [
+        "production"
+      ],
+      "types": [
+        "sensitive"
+      ]
+    }
+  ],
+  "environmentEvidence": "Vercel CLI env ls production --format json; names, scopes and types only",
+  "requiredConfiguration": {
+    "key": "REVENUECAT_PROJECT_ID",
+    "value": "proj2d9c569b",
+    "state": "reviewed_proposal_not_applied",
+    "source": "production-preflight-revenuecat.json"
+  },
+  "limits": [
+    "Environment presence does not prove a value is valid or has provider permissions.",
+    "No environment value, token, secret or raw CLI output was printed or saved.",
+    "The reviewed dashboard/client telemetry changes are not yet deployed.",
+    "Production environment updates, migrations and publication still require the pending user authorization."
+  ]
+}

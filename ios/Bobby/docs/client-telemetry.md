@@ -35,3 +35,12 @@ Evidence:
 - Adjacent client-telemetry-evidence.json records source/log hashes and baseline provenance.
 
 Not verified: physical-device behavior, real signed receipt acceptance against production, production dashboard data from an installed build, background delivery under actual iOS suspension, App Store/TestFlight build installation, crash reporting or release/distribution. No deployment, archive, upload, transaction, real AI/TTS request or remote mutation was performed. Shipping the API alone cannot establish native emitter coverage in an already installed app.
+
+
+## Privacy declaration correction for the future instrumented release
+
+The source privacy manifest now includes Analytics alongside the existing purposes for linked UserID, DeviceID and ProductInteraction. These reports support aggregate feature/audience analysis as well as operational monitoring. A linked OtherDiagnosticData entry with AppFunctionality and Analytics covers only the implemented WebKit content-process termination report; it does not claim native crash logs, performance timings or a crash SDK. Tracking remains false, with no tracking domains.
+
+This classification follows Apple's [collection-purpose definitions](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatypepurposes) and [data-type definitions](https://developer.apple.com/documentation/bundleresources/app-privacy-configuration/nsprivacycollecteddatatypes/nsprivacycollecteddatatype). The bilingual first-party paragraph in PrivacyPage describes these purposes. Only the changed plist syntax is validated for this correction; Swift/runtime/native test results above are unchanged.
+
+This is a source declaration for a future instrumented release, not evidence that the public privacy policy or current App Store privacy answers have changed. Apple separately requires accurate [App Store privacy details](https://developer.apple.com/app-store/app-privacy-details/); the release owner must reconcile the actual installed/distributed artifact and App Store Connect answers before distribution. No App Store metadata, archive, upload or release was modified here.

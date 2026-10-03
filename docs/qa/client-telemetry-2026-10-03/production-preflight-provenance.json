@@ -1,0 +1,46 @@
+{
+  "observedAt": "2026-10-03T00:30:34.618760+00:00",
+  "implementationBaselineCommit": "93871936ce1902e327a192c625c22d34ee523d33",
+  "baselineEvidence": "provenance.json",
+  "followUpScope": [
+    "Read-only deployment/environment/database/RevenueCat preflight",
+    "Real-client acceptance procedure",
+    "Analytics and narrow WebKit-diagnostic source privacy declarations",
+    "Bilingual first-party purpose clarification"
+  ],
+  "supersededBaselineSourceSha256": {
+    "src/pages/PrivacyPage.tsx": "949f876bdde5eeb99e9ff6cba50d5cb30a21ab2ac3d25d8bd12c6991332d0909"
+  },
+  "unchangedBaselineRuntimeSourcesVerified": true,
+  "sha256": {
+    "ios/Bobby/Sources/PrivacyInfo.xcprivacy": "e7bc9597fd90b6c2b487f342a52844f96d740ad29e9215f11ef82362ec4cf13e",
+    "src/pages/PrivacyPage.tsx": "82db2e1dfd6e3bbd14e42fc8e94c97afd3596cb45dfefb82334c329102b423c7",
+    "ios/Bobby/docs/client-telemetry.md": "715f67f71aa0eab0f47a75fa09cdb1e60639d8a28c48ac816981b91f71c30c14",
+    "docs/qa/client-telemetry-2026-10-03/production-acceptance.md": "915012fae88bf1e09d678ea8bf88a45d38e8be849c12c25af9a1e32c80e1560e",
+    "docs/qa/client-telemetry-2026-10-03/production-preflight-db.json": "74d3489112d0bd95fc1e547bad5067320ed23f09dba7a6418c6d2122f3995d6c",
+    "docs/qa/client-telemetry-2026-10-03/production-preflight-revenuecat.json": "2d76ab17f3588a88548ae508b80de3f2fa0b744e0cd0ec6b3d0b40e53589cc26",
+    "docs/qa/client-telemetry-2026-10-03/production-preflight-vercel.json": "f190245b2b38552627d15565cd90e4847aa863b088e7c31277c69b1d1034bceb",
+    "docs/qa/client-telemetry-2026-10-03/preflight-build-console.txt": "ee3a43451189f5e64284590eaca46610151529ed88595712c5f68005fd611c79",
+    "docs/qa/client-telemetry-2026-10-03/production-preflight-db.md": "a67e2b65962e49ba16740ef36bc0d31a815cd12b79c8faab5d8a1b101414260a",
+    "docs/qa/client-telemetry-2026-10-03/README.md": "ea645ce1463752bd83110a0d92a54a3270b7d9ea0632076855064d655db95d45"
+  },
+  "validation": {
+    "npmRunBuild": "passed",
+    "changedPrivacyPageEslint": "passed",
+    "privacyPlistLint": "passed",
+    "baselineRuntimeTests": "unchanged_no_rerun",
+    "acceptanceSql": "six_local_read_only_explain_queries_passed_without_analyze",
+    "acceptanceSqlEvidence": "production-preflight-db.json/localAcceptanceQueryExplain"
+  },
+  "currentProductionSha": "1d565e7250058f825a3514d6f7dbd91ffd4c2512",
+  "productionPublished": false,
+  "productionClientEvidenceVerified": false,
+  "physicalDeviceVerified": false,
+  "nativeArchiveOrReleaseChanged": false,
+  "publicPrivacyAnswersVerified": false,
+  "limits": [
+    "Baseline simulator evidence predates this source-only privacy declaration correction; no newly distributed or installed native artifact is claimed.",
+    "Environment preflight saved metadata only; provider key permission/value validity remains unverified.",
+    "The new local build includes the bilingual privacy clarification but has not been deployed."
+  ]
+}

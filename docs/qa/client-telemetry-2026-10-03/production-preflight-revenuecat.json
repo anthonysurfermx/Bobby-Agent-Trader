@@ -1,0 +1,51 @@
+{
+  "observedAt": "2026-10-03T00:24:08Z",
+  "mode": "read_only",
+  "match": "exact_bundle_and_public_app_store_id",
+  "recommendedConfiguration": {
+    "name": "REVENUECAT_PROJECT_ID",
+    "value": "proj2d9c569b",
+    "target": "Vercel Production",
+    "state": "proposal_only_not_applied",
+    "deploymentRequiredAfterEnvironmentChange": true
+  },
+  "source": {
+    "bundleId": "xyz.bobbyprotocol.bobby",
+    "bundleEvidence": "ios/Bobby/project.yml:132",
+    "appStoreId": 6804460489,
+    "appStoreEvidence": "src/lib/app-store.ts:4"
+  },
+  "revenueCat": {
+    "projectId": "proj2d9c569b",
+    "projectName": "Bobby: Think Before You Trade",
+    "appId": "app25c54ce720",
+    "appName": "Bobby: Think Before You Trade (App Store)",
+    "appType": "app_store",
+    "bundleId": "xyz.bobbyprotocol.bobby",
+    "appStoreConnectApiKeyConfigured": false,
+    "subscriptionKeyConfigured": true,
+    "dashboardUrl": "https://app.revenuecat.com/projects/2d9c569b/apps/app25c54ce720",
+    "evidence": [
+      "RevenueCat MCP list-projects returned 1 accessible project with no next page",
+      "RevenueCat MCP list-apps returned the exact app_store bundle and a separate Test Store, with no next page",
+      "RevenueCat MCP get-app independently confirmed app25c54ce720 belongs to proj2d9c569b and has bundle xyz.bobbyprotocol.bobby"
+    ],
+    "excludedTestStoreAppId": "app4c0115aeb8"
+  },
+  "applePublicCatalog": {
+    "url": "https://itunes.apple.com/lookup?id=6804460489",
+    "resultCount": 1,
+    "trackId": 6804460489,
+    "bundleId": "xyz.bobbyprotocol.bobby",
+    "trackName": "Bobby: Think Before You Trade",
+    "publicVersionAtCheck": "1.5",
+    "trackViewUrl": "https://apps.apple.com/us/app/bobby-think-before-you-trade/id6804460489?uo=4"
+  },
+  "limits": [
+    "Project selection used exact store app identifiers, not first-project ordering or name alone",
+    "Connected RevenueCat access does not prove the separate Vercel V2 key has permission for this project",
+    "Presence of a subscription key does not prove purchase, restore, webhook lifecycle or dashboard metric accuracy",
+    "The App Store Connect API key is reported unconfigured for this RevenueCat app",
+    "No Vercel environment, RevenueCat data, paywalls or permissions were changed; no keys or secrets were read or saved"
+  ]
+}
