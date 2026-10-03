@@ -1,4 +1,4 @@
-import { REGIONAL_STOCKS, isListedStockSymbol } from './regional-stocks';
+import { REGIONAL_STOCKS, isListedStockSymbol } from './regional-stocks.js';
 // ============================================================
 // voice-assets — one asset universe for the whole voice desk.
 //

@@ -1,4 +1,4 @@
-import { appLocale, type AppLanguage } from './app-language';
+import { appLocale, type AppLanguage } from './app-language.js';
 import type { MarketAnalysis } from './market-indicators';
 
 export type DeskBriefLanguage = AppLanguage;

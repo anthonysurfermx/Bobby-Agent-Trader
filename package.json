@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && node scripts/build-client-telemetry.mjs && vite build",
     "build:dev": "node scripts/build-client-telemetry.mjs && vite build --mode development",
-    "check:api": "tsc -p tsconfig.api.json",
+    "check:api": "tsc -p tsconfig.api.json && node scripts/ci/check-api-esm-imports.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "test:playbooks": "tsx scripts/test-playbooks.mts",
