@@ -13,6 +13,8 @@
       'verdict.wait': 'Wait', 'verdict.review': 'Review',
       'ring.conviction': 'CONVICTION',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'The summary in one line', 'role.alpha': 'Looks for the evidence in favor',
+      'role.red': 'Questions the thesis, looks for what breaks it', 'role.cio': 'Weighs both sides and states the limits',
       'sat.rsi': 'RSI 14', 'sat.hot': 'hot', 'sat.cold': 'cold',
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
       'sat.trend': 'Trend', 'sat.ema': 'EMA 20 / 50',
@@ -50,6 +52,8 @@
       'verdict.wait': 'Espera', 'verdict.review': 'Revisa',
       'ring.conviction': 'CONVICCIÓN',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'El resumen en una línea', 'role.alpha': 'Busca la evidencia a favor',
+      'role.red': 'Cuestiona la tesis y busca qué la rompe', 'role.cio': 'Sopesa ambos lados y marca los límites',
       'sat.rsi': 'RSI 14', 'sat.hot': 'caliente', 'sat.cold': 'frío',
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
       'sat.trend': 'Tendencia', 'sat.ema': 'EMA 20 / 50',
@@ -91,6 +95,10 @@
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Le résumé en une ligne",
+    "role.alpha": "Cherche les éléments favorables",
+    "role.red": "Questionne la thèse et cherche ses failles",
+    "role.cio": "Pèse les deux côtés et précise les limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "surachat",
     "sat.cold": "survente",
@@ -160,6 +168,10 @@
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "O resumo numa linha",
+    "role.alpha": "Procura a evidência a favor",
+    "role.red": "Questiona a tese e procura o que a invalida",
+    "role.cio": "Pondera os dois lados e indica os limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "sobrecompra",
     "sat.cold": "sobrevenda",
@@ -230,6 +242,10 @@
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Il riassunto in una riga",
+    "role.alpha": "Cerca gli elementi a favore",
+    "role.red": "Contesta la tesi e cerca ciò che la invalida",
+    "role.cio": "Soppesa i due lati e indica i limiti",
     "sat.rsi": "RSI 14",
     "sat.hot": "ipercomprato",
     "sat.cold": "ipervenduto",
@@ -299,6 +315,10 @@
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Die Zusammenfassung in einer Zeile",
+    "role.alpha": "Sucht die Belege, die dafür sprechen",
+    "role.red": "Prüft die These auf Schwachstellen",
+    "role.cio": "Wägt beide Seiten ab, nennt die Grenzen",
     "sat.rsi": "RSI 14",
     "sat.hot": "überkauft",
     "sat.cold": "überverkauft",
@@ -555,7 +575,7 @@
     }
     if (fin(tech.support) && fin(tech.resistance)) {
       sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
-        delta: t(lang, 'sat.range30'), dot: 'neutral' });
+        delta: fin(tech.bars) ? '' : t(lang, 'sat.range30'), dot: 'neutral' });
     }
     return sats.slice(0, firstRead ? 3 : 4);
   }
@@ -678,7 +698,8 @@
       debate: {
         header: t(lang, 'debate.header'),
         title: t(lang, 'debate.title', { n: 3, s: fin(r.elapsedMs) ? Math.max(1, Math.round(r.elapsedMs / 1000)) : '—' }),
-        entries: ['alpha', 'red', 'cio'].map(function (k) { return { id: k, name: t(lang, 'agent.' + k), hue: HUES[k], text: r.agents[k] }; })
+        /* each voice carries `role`: one fixed line under its name saying what that voice does */
+        entries: ['alpha', 'red', 'cio'].map(function (k) { return { id: k, name: t(lang, 'agent.' + k), role: t(lang, 'role.' + k), hue: HUES[k], text: r.agents[k] }; })
       },
       meta: t(lang, 'meta'),
       aria: t(lang, 'aria.verdict', { word: word }) + (ring.pct != null ? t(lang, 'aria.conviction', { pct: ring.pct }) : '')

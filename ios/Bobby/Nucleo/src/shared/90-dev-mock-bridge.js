@@ -8,7 +8,7 @@
  *
  * URL params: scenario=default|slow|hang|quota|too_long|failed|unavailable|gateway_timeout|offline
  *                      |signin_required|subscription_required   (metered-read gates, ARCHITECTURE.md §8)
- *             lang=en|es  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
+ *             lang=en|es|fr|pt|it|de  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
  *             say=<text for the fake STT>  latency=<desk ms>  xp=<int>  streak=<int>  rm=1
  *             signin=ok (signIn succeeds)  purchase=ok (the Bobby Pro sheet ends `subscribed`)
  * Determinism: engines that own a sim clock call nucleoBridge.mock.useClock(fn) and then
@@ -24,7 +24,7 @@
   var riskNoticeVersion = FX.native.riskNotice.version;
   var q = new URLSearchParams(location.search);
   var scenario = q.get('scenario') || 'default';
-  var lang = q.get('lang') === 'es' ? 'es' : 'en';
+  var lang = window.NucleoLocale.language(q.get('lang'));
   function now() { return clock(); }
   var clock = function () { return performance.now(); };
   var timers = [];

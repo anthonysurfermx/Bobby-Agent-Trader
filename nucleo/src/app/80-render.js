@@ -178,7 +178,7 @@ function render(){
   op(uiEl, dimK); op(inGlass, dimK);
   var igr = Math.round(r * 100) / 100, igc = Math.round(cy * 100) / 100;
   if (inGlass._r !== igr || inGlass._cy !== igc){ inGlass._r = igr; inGlass._cy = igc; inGlass.style.clipPath = 'circle(' + igr + 'px at 195px ' + igc + 'px)'; }
-  renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render();
+  renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render(); swipeRoll.render();
   renderPill(); renderTranscript(cy, r); renderAgents(cy, r); renderSats(cy, r); renderChart(cy, r);
   renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderFaces(cy, r, th); renderPerm(cy, r);
   if (TB.shown || A.type.o.x > 0.002) placeTypeBox();
@@ -547,6 +547,9 @@ function renderCards(cy, r){
     }
   }
   tf(el.card0.inn, 0, -A.dscr.x, null);
+  /* the debate scroller fades only the edge it continues past */
+  var sk = (A.dscr.x > 1 ? 1 : 0) + (A.dscrMax - A.dscr.x > 1 ? 2 : 0), scr = el.card0.scr;
+  if (scr._sk !== sk){ scr._sk = sk; scr.classList.toggle('up', (sk & 1) > 0); scr.classList.toggle('dn', (sk & 2) > 0); }
   var vc = VC[A.saveC] || VC.wait;
   tf(el.save, 0, 0, A.savePress.x);
   var sv = A.saved.x; stc(el.save, 'background', mixCTo(X.save, C.ink, vc.saveBg, sv)); stc(el.save, 'color', mixCTo(X.saveInk, SAVE_INK, vc.c, sv));

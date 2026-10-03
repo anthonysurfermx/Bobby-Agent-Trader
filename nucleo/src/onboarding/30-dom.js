@@ -10,6 +10,7 @@ function st(el, t, o, f){
   if (t != null && t !== el._t){ el._t = t; el.style.transform = t; }
   if (o != null){ o = o < 0.003 ? 0 : (o > 0.997 ? 1 : Math.round(o * 1000) / 1000); if (o !== el._o){ el._o = o; el.style.opacity = o; } }
   if (f != null && f !== el._f){ el._f = f; el.style.filter = f; }
+  if (el === linesEl && o != null){ sa(el, 'aria-hidden', o > 0.5 ? 'false' : 'true'); if (rbodyEl) rbodyEl.tabIndex = o > 0.5 ? 0 : -1; }
 }
 function sa(el, k, v){ if (el['_a' + k] !== v){ el['_a' + k] = v; el.setAttribute(k, v); } }
 function sc(el, k, v){ if (el['_c' + k] !== v){ el['_c' + k] = v; el.style[k] = v; } }
@@ -65,16 +66,33 @@ function buildRisk(statements){
   (statements || []).slice(0, 4).forEach(function(s){
     var d = document.createElement('div'); d.className = 'ln'; linesEl.appendChild(d); lineEls.push(d); lineW.push(spans(d, s.title));
   });
-  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb'; rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
+  rbodyEl = document.createElement('div'); rbodyEl.className = 'rb';
+  rbodyEl.setAttribute('role', 'region'); rbodyEl.setAttribute('aria-label', statements && statements[0] ? statements[0].title : ''); rbodyEl.tabIndex = -1;
+  rbodyEl.textContent = statements && statements[0] ? statements[0].body : ''; linesEl.appendChild(rbodyEl);
   RISK_LAYOUT = null;
 }
 /* stack below the agree ring (ring bottom at cy + r + 14 = 436 for the risk sphere), 16 px clear */
 function layoutRisk(top){
   var y = top, tops = [];
   for (var i = 0; i < lineEls.length; i++){ tops.push(y); sc(lineEls[i], 'top', f1(y) + 'px'); y += (lineEls[i].offsetHeight || 26) + 4; }
-  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y; y += (rbodyEl.offsetHeight || 54) + 2;
-  RISK_LAYOUT = { tops:tops, body:by, notice:Math.min(y, 690) };
+  y += 8; sc(rbodyEl, 'top', f1(y) + 'px'); var by = y;
+  // Measure the complete copy before bounding its viewport above the full-notice button.
+  sc(rbodyEl, 'height', 'auto');
+  var naturalHeight = rbodyEl.scrollHeight || rbodyEl.offsetHeight || 54;
+  // The button's box starts 8 px under the copy and never below 690. Its text sits 14 px inside that box, so the
+  // copy's viewport may reach to 4 px above the box when that shows one more whole line.
+  var bodyHeight = Math.min(naturalHeight, Math.max(0, 690 - by - 4));
+  // Copy taller than its viewport scrolls: the viewport ends on a whole line (18 px), never through one.
+  if (bodyHeight < naturalHeight) bodyHeight = Math.max(18, Math.floor(bodyHeight / 18) * 18);
+  sc(rbodyEl, 'height', f1(bodyHeight) + 'px'); rbodyEl.scrollTop = 0;
+  RISK_LAYOUT = { top:top, tops:tops, body:by, bodyHeight:bodyHeight, notice:Math.min(by + bodyHeight + 8, 690) };
   return RISK_LAYOUT;
+}
+/* the edge the body's copy continues past fades (.up / .dn); true while there is more below its viewport */
+function riskCue(){
+  var y = rbodyEl ? rbodyEl.scrollTop : 0, more = riskScrollMax() - y > 1;
+  if (rbodyEl){ cls(rbodyEl, 'up', y > 1); cls(rbodyEl, 'dn', more); }
+  return more;
 }
 
 /* agent labels: names while the desk works; the first sentence of each real text after the reply */
@@ -258,7 +276,12 @@ var CARDS = [];      /* the live track: [debate, thesis, (isla)] */
 function buildCards(M, island, lang){
   txt($('dH'), M.debate.header); txt($('dT'), M.debate.title);
   var rows = '';
-  M.debate.entries.forEach(function(e){ rows += '<div class="row lbl" style="--c:' + e.hue + '"><i></i><div><b>' + esc(e.name) + '</b><p>' + esc(e.text) + '</p></div></div>'; });
+  M.debate.entries.forEach(function(e){
+    /* the voice's caption, its text, then its labeled lines (the synthesis and the scenarios carry `lines`) */
+    var body = (e.role ? '<span class="rl">' + esc(e.role) + '</span>' : '') + (e.text ? '<p>' + esc(e.text) + '</p>' : '');
+    (e.lines || []).forEach(function(l){ body += '<p><span class="lk">' + esc(l.label) + ':</span> ' + esc(l.text) + '</p>'; });
+    rows += '<div class="row lbl" style="--c:' + e.hue + '"><i></i><div><b>' + esc(e.name) + '</b>' + body + '</div></div>';
+  });
   $('dRows').innerHTML = rows; txt($('dFoot'), M.meta);
   txt($('tH'), M.thesis.header);
   var asof = M.chart && M.chart.source ? timeFmt(M.chart.source.asOf, lang) : '';
@@ -270,7 +293,9 @@ function buildCards(M, island, lang){
   txt($('hz'), M.thesis.line); txt($('saveA'), M.thesis.saveLabel); txt($('saveB'), M.thesis.savedLabel); txt($('tFoot'), M.meta);
   /* the line, XP chip and Save button sit under the rows (never over them) */
   var rowsBottom = 24 + 14 + 18 + 31 + 12 + 32 * M.thesis.rows.filter(function(r){ return r.value; }).length;
-  var lineTop = Math.max(271, rowsBottom + 12), btnTop = lineTop + 33;
+  /* the note is measured (two lines in most languages): it moves up into the free room, and the button comes after it */
+  var noteH = $('hz').offsetHeight || 18;
+  var lineTop = Math.max(271 - Math.max(0, noteH - 18), rowsBottom + 12), btnTop = lineTop + 15 + Math.max(18, noteH);
   sc($('hz'), 'top', (lineTop + 4) + 'px'); sc($('xp'), 'top', lineTop + 'px'); sc($('save'), 'top', btnTop + 'px');
   sc($('tFoot'), 'display', btnTop + 52 + 12 > 420 - 38 ? 'none' : '');
   cardT.style.setProperty('--vc', M.verdict.color);
@@ -281,7 +306,9 @@ function buildCards(M, island, lang){
     txt($('iBody'), Ls('isla.card.body', { pieces:island.pieces, seeds:island.seedsGrowing }));
     CARDS.push(cardI); sc(cardI, 'display', '');
   } else sc(cardI, 'display', 'none');
-  var sc2 = $('dScroll'); DSCROLL.max = Math.max(0, ($('dRows').offsetHeight || 0) - (sc2.offsetHeight || 324)); DSCROLL.y = 0; cls(sc2, 'more', DSCROLL.max > 2);
+  /* a header that wraps onto a second line pushes the scroller down; the fades follow the scroll (renderCards) */
+  var sc2 = $('dScroll'); sc(sc2, 'top', Math.max(50, 24 + ($('dH').parentNode.offsetHeight || 14) + 12) + 'px');
+  DSCROLL.max = Math.max(0, ($('dRows').offsetHeight || 0) - (sc2.offsetHeight || 324)); DSCROLL.y = 0;
   return CARDS;
 }
 var DSCROLL = { y:0, max:0 };

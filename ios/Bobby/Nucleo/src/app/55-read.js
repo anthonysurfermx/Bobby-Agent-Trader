@@ -275,12 +275,17 @@ function fillCards(m){
     var ar = mk('div', 'ar');
     ar.style.setProperty('--c', e.id === 'alpha' || e.id === 'red' || e.id === 'cio' ? 'var(--' + e.id + ')' : (e.hue || 'var(--cio)'));
     ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name));
+    if (e.role) d.appendChild(mk('span', 'rl', e.role));
     if (e.text) d.appendChild(mk('p', null, e.text));
     (e.lines || []).forEach(function(l){ var p = mk('p'), lb = mk('span', null, l.label + ': '); lb.style.fontWeight = '600'; lb.style.color = 'var(--ink)'; p.appendChild(lb); p.appendChild(D.createTextNode(l.text)); d.appendChild(p); });
     ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
-  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - 250 + 12);
+  /* a header or a footer that wraps onto a second line takes its room from the scroller; the scroll ends with the
+     last line clear above the lower edge, where no fade is left (.scr.dn in renderCards) */
+  var sTop = Math.max(62, 24 + (el.card0.ch.offsetHeight || 0) + 21), sH = Math.min(312, 328 - (el.card0.disc.offsetHeight || 16)) - sTop;
+  el.card0.scr.style.top = sTop + 'px'; el.card0.scr.style.height = sH + 'px';
+  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - sH);
   fillThesisCard(m.thesis, { verdict: m.verdict.key, readOnly: false, horizon: m.thesis.horizon });
   var isla = ISLAND && ISLAND.available;
   A.nCards = isla ? 3 : 2;
@@ -300,11 +305,15 @@ function fillThesisCard(th, o){
   var c = el.card1;
   c.lb.textContent = th.header; c.mt.textContent = o.readOnly && th.when ? th.when : ''; c.ct.textContent = th.title;
   var n = th.rows.length, showHz = !!(o.horizon && o.horizon.show) && !o.readOnly;
-  var avail = 284 - 8 - (showHz ? 40 : 34) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
-  fillRows(c.rows, th.rows, rh);
-  var yUnder = 91 + n * rh + 6;
-  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  /* the note under the rows is measured, not assumed (two lines in most languages): the rows leave it room, and the
+     button, with the card's lower edge, comes after it, never over it */
   c.ln.textContent = th.line || '';
+  var lnH = showHz ? 32 : (c.ln.offsetHeight || 32);
+  var avail = 284 - 8 - (showHz ? 40 : Math.max(34, lnH + 2)) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
+  fillRows(c.rows, th.rows, rh);
+  var yUnder = 91 + n * rh + 6, saveTop = Math.max(284, yUnder + lnH + 4);
+  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (saveTop + 76) + 'px';
   c.hz.textContent = '';
   HZ = o.horizon && o.horizon.defaultHours || 24;
   if (showHz){

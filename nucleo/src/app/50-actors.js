@@ -89,7 +89,8 @@ function greetIn(){ A.greet.x.set(0); A.greet.o.set(1); lineIn(A.greet); }
 function greetOut(){ lineOut(A.greet); }
 function noteIn(t, s){ lineSet(A.note, t || '', s || '', el.noteT, el.noteS); A.note.o.set(1); lineIn(A.note, 0.045); }
 function noteOut(){ lineOut(A.note); }
-function hint(t){ hintRoll.set(t || ''); }
+/* `t` is the line above the pill, `swipe` the line under the sphere (idle only): any other line, or none, takes it away */
+function hint(t, swipe){ hintRoll.set(t || ''); swipeRoll.set(swipe || ''); }
 
 /* haptics: the real one through the bridge (≤1/40 ms, native throttles too) + the visual tick of the prototype */
 var lastHaptic = -1;

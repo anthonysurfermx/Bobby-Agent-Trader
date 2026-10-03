@@ -97,6 +97,13 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #lines{left:20px;width:350px;top:0;opacity:1}
 #lines .ln{position:absolute;left:0;width:350px;text-align:center;font:300 19px/22px var(--serif);letter-spacing:-.035em;text-wrap:balance}
 #lines .rb{position:absolute;left:10px;width:330px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(163,156,145,.45) transparent;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
+/* copy taller than its viewport: the edge it continues past fades, and a chevron under it says there is more below.
+   The fades are capped at a share of the viewport, so a two-line viewport still shows one line at full strength. */
+#lines .rb.dn{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - min(28px,45%)),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - min(28px,45%)),transparent)}
+#lines .rb.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%));mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%))}
+#lines .rb.up.dn{-webkit-mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%),#000 calc(100% - min(28px,45%)),transparent);mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%),#000 calc(100% - min(28px,45%)),transparent)}
+#rmore{left:188px;width:14px;height:7px}
+#rmore svg{display:block}
 #notice.tap{pointer-events:auto}
 #notice{left:95px;width:200px;top:640px;height:44px;font:400 13px/16px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(163,156,145,.5)}
 .sat{min-width:100px;height:52px;border-radius:16px;padding:7px 12px;background:var(--glass);border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px -12px rgba(0,0,0,.7);white-space:nowrap}
@@ -154,15 +161,22 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   background:linear-gradient(180deg,rgba(34,30,27,.96),rgba(23,21,19,.96));border:1px solid var(--hair);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 26px 60px -22px rgba(0,0,0,.85)}
 .card::after{content:'';position:absolute;inset:0;border-radius:28px;background:linear-gradient(180deg,#221E1B,#171513);opacity:var(--veil,0);pointer-events:none}
-.ch{display:flex;justify-content:space-between;gap:12px;color:var(--ink2)}
-.ch span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch{display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:var(--ink2)}
+.ch span:last-child{flex:none;white-space:nowrap}   /* a long first label wraps onto a second line; nothing is cut with an ellipsis */
 .card h3{font:300 24px/27px var(--serif);letter-spacing:-.035em;margin-top:18px;color:var(--ink)}
 .dsc{position:absolute;left:24px;right:24px;top:50px;bottom:46px;overflow:hidden}
+#dRows{display:flow-root;padding-bottom:16px}   /* its height holds the first row's margin and leaves the last line clear of the lower edge */
+/* only an edge the debate continues past fades (.up / .more): scrolled to an end, its last line is clear of any mask */
 .dsc.more{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
+.dsc.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px);mask-image:linear-gradient(180deg,transparent,#000 20px)}
+.dsc.up.more{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent)}
 .row{display:flex;gap:12px;margin-top:14px}
 .row i{flex:0 0 5px;height:5px;border-radius:50%;background:var(--c);margin-top:5px}
 .row b{display:block;color:var(--c);font-weight:500}
 .row p{font:400 15px/21px var(--sans);margin-top:2px;color:var(--ink);text-transform:none;letter-spacing:0}
+.row p .lk{font-weight:600}
+.row .rl{display:block;margin-top:2px;font:400 12px/16px var(--sans);color:var(--ink2);text-transform:none;letter-spacing:0}   /* what this voice does */
+.row > div{min-width:0;overflow-wrap:anywhere}   /* a word wider than the column breaks: it never widens the column past the card */
 .card dl{margin-top:12px}
 .card dl div{display:flex;justify-content:space-between;align-items:center;height:32px;border-bottom:1px solid rgba(242,237,228,.06)}
 .card dt{color:var(--ink2)}
@@ -281,6 +295,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   <div id="agC" class="ag a" style="--c:#F6B94E;left:85px;top:528px"><div class="nm lbl"><i></i><span class="n"></span></div><div class="st"><span class="roll"><span></span><span></span></span></div></div>
 
   <div id="lines" class="a"></div>
+  <div id="rmore" class="a" aria-hidden="true"><svg width="14" height="7" viewBox="0 0 14 7"><path d="M1 1 L7 6 L13 1" fill="none" stroke="#F2EDE4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   <button id="notice" class="a" data-hit="notice" tabindex="0"></button>
   <div id="tx" class="a" aria-hidden="true"><div id="txIn"></div></div>
   <div id="tbead" class="a"></div>
@@ -504,6 +519,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'verdict.wait': 'Wait', 'verdict.review': 'Review',
       'ring.conviction': 'CONVICTION',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'The summary in one line', 'role.alpha': 'Looks for the evidence in favor',
+      'role.red': 'Questions the thesis, looks for what breaks it', 'role.cio': 'Weighs both sides and states the limits',
       'sat.rsi': 'RSI 14', 'sat.hot': 'hot', 'sat.cold': 'cold',
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
       'sat.trend': 'Trend', 'sat.ema': 'EMA 20 / 50',
@@ -554,6 +571,8 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       'verdict.wait': 'Espera', 'verdict.review': 'Revisa',
       'ring.conviction': 'CONVICCIÓN',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'El resumen en una línea', 'role.alpha': 'Busca la evidencia a favor',
+      'role.red': 'Cuestiona la tesis y busca qué la rompe', 'role.cio': 'Sopesa ambos lados y marca los límites',
       'sat.rsi': 'RSI 14', 'sat.hot': 'caliente', 'sat.cold': 'frío',
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
       'sat.trend': 'Tendencia', 'sat.ema': 'EMA 20 / 50',
@@ -608,6 +627,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Le résumé en une ligne",
+    "role.alpha": "Cherche les éléments favorables",
+    "role.red": "Questionne la thèse et cherche ses failles",
+    "role.cio": "Pèse les deux côtés et précise les limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "surachat",
     "sat.cold": "survente",
@@ -708,6 +731,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "O resumo numa linha",
+    "role.alpha": "Procura a evidência a favor",
+    "role.red": "Questiona a tese e procura o que a invalida",
+    "role.cio": "Pondera os dois lados e indica os limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "sobrecompra",
     "sat.cold": "sobrevenda",
@@ -809,6 +836,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Il riassunto in una riga",
+    "role.alpha": "Cerca gli elementi a favore",
+    "role.red": "Contesta la tesi e cerca ciò che la invalida",
+    "role.cio": "Soppesa i due lati e indica i limiti",
     "sat.rsi": "RSI 14",
     "sat.hot": "ipercomprato",
     "sat.cold": "ipervenduto",
@@ -909,6 +940,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Die Zusammenfassung in einer Zeile",
+    "role.alpha": "Sucht die Belege, die dafür sprechen",
+    "role.red": "Prüft die These auf Schwachstellen",
+    "role.cio": "Wägt beide Seiten ab, nennt die Grenzen",
     "sat.rsi": "RSI 14",
     "sat.hot": "überkauft",
     "sat.cold": "überverkauft",
@@ -1198,7 +1233,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     }
     if (fin(tech.support) && fin(tech.resistance)) {
       sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
-        delta: t(lang, 'sat.range30'), dot: 'neutral' });
+        delta: fin(tech.bars) ? '' : t(lang, 'sat.range30'), dot: 'neutral' });
     }
     return sats.slice(0, firstRead ? 3 : 4);
   }
@@ -1356,18 +1391,19 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   }
 
   /** The debate card: the synthesis on top (when there is one), then Alpha, Red Team, the second round, the CIO,
-   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text. */
+   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text.
+   *  The four voices carry `role`: one fixed line under the name saying what that voice does. */
   function debateEntries(r, lang) {
     var out = [], syn = synthesisOf(r), a = r.agents || {};
     if (syn) {
-      out.push({ id: 'syn', name: t(lang, 'syn.name'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
+      out.push({ id: 'syn', name: t(lang, 'syn.name'), role: t(lang, 'role.syn'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
         lines: [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].filter(function (x) { return x[1]; })
           .map(function (x) { return { label: t(lang, 'syn.' + x[0]), text: x[1] }; }) });
     }
-    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), hue: HUES.alpha, text: a.alpha });
-    out.push({ id: 'red', name: t(lang, 'agent.red'), hue: HUES.red, text: a.red });
+    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), role: t(lang, 'role.alpha'), hue: HUES.alpha, text: a.alpha });
+    out.push({ id: 'red', name: t(lang, 'agent.red'), role: t(lang, 'role.red'), hue: HUES.red, text: a.red });
     if (typeof a.rebuttal === 'string' && a.rebuttal) out.push({ id: 'rebuttal', name: t(lang, 'agent.rebuttal'), hue: HUES.alpha, text: a.rebuttal });
-    out.push({ id: 'cio', name: t(lang, 'agent.cio'), hue: HUES.cio, text: a.cio });
+    out.push({ id: 'cio', name: t(lang, 'agent.cio'), role: t(lang, 'role.cio'), hue: HUES.cio, text: a.cio });
     var sc = a.scenarios;
     if (sc && typeof sc.confirm === 'string' && typeof sc.invalidate === 'string') {
       out.push({ id: 'scenarios', name: t(lang, 'agent.scenarios'), hue: '#9A5CFF', text: '',
@@ -2182,10 +2218,20 @@ function layoutRisk(top){
   // Measure the complete copy before bounding its viewport above the full-notice button.
   sc(rbodyEl, 'height', 'auto');
   var naturalHeight = rbodyEl.scrollHeight || rbodyEl.offsetHeight || 54;
-  var bodyHeight = Math.min(naturalHeight, Math.max(0, 690 - by - 8));
+  // The button's box starts 8 px under the copy and never below 690. Its text sits 14 px inside that box, so the
+  // copy's viewport may reach to 4 px above the box when that shows one more whole line.
+  var bodyHeight = Math.min(naturalHeight, Math.max(0, 690 - by - 4));
+  // Copy taller than its viewport scrolls: the viewport ends on a whole line (18 px), never through one.
+  if (bodyHeight < naturalHeight) bodyHeight = Math.max(18, Math.floor(bodyHeight / 18) * 18);
   sc(rbodyEl, 'height', f1(bodyHeight) + 'px'); rbodyEl.scrollTop = 0;
-  RISK_LAYOUT = { tops:tops, body:by, bodyHeight:bodyHeight, notice:Math.min(by + bodyHeight + 8, 690) };
+  RISK_LAYOUT = { top:top, tops:tops, body:by, bodyHeight:bodyHeight, notice:Math.min(by + bodyHeight + 8, 690) };
   return RISK_LAYOUT;
+}
+/* the edge the body's copy continues past fades (.up / .dn); true while there is more below its viewport */
+function riskCue(){
+  var y = rbodyEl ? rbodyEl.scrollTop : 0, more = riskScrollMax() - y > 1;
+  if (rbodyEl){ cls(rbodyEl, 'up', y > 1); cls(rbodyEl, 'dn', more); }
+  return more;
 }
 
 /* agent labels: names while the desk works; the first sentence of each real text after the reply */
@@ -2369,7 +2415,12 @@ var CARDS = [];      /* the live track: [debate, thesis, (isla)] */
 function buildCards(M, island, lang){
   txt($('dH'), M.debate.header); txt($('dT'), M.debate.title);
   var rows = '';
-  M.debate.entries.forEach(function(e){ rows += '<div class="row lbl" style="--c:' + e.hue + '"><i></i><div><b>' + esc(e.name) + '</b><p>' + esc(e.text) + '</p></div></div>'; });
+  M.debate.entries.forEach(function(e){
+    /* the voice's caption, its text, then its labeled lines (the synthesis and the scenarios carry `lines`) */
+    var body = (e.role ? '<span class="rl">' + esc(e.role) + '</span>' : '') + (e.text ? '<p>' + esc(e.text) + '</p>' : '');
+    (e.lines || []).forEach(function(l){ body += '<p><span class="lk">' + esc(l.label) + ':</span> ' + esc(l.text) + '</p>'; });
+    rows += '<div class="row lbl" style="--c:' + e.hue + '"><i></i><div><b>' + esc(e.name) + '</b>' + body + '</div></div>';
+  });
   $('dRows').innerHTML = rows; txt($('dFoot'), M.meta);
   txt($('tH'), M.thesis.header);
   var asof = M.chart && M.chart.source ? timeFmt(M.chart.source.asOf, lang) : '';
@@ -2381,7 +2432,9 @@ function buildCards(M, island, lang){
   txt($('hz'), M.thesis.line); txt($('saveA'), M.thesis.saveLabel); txt($('saveB'), M.thesis.savedLabel); txt($('tFoot'), M.meta);
   /* the line, XP chip and Save button sit under the rows (never over them) */
   var rowsBottom = 24 + 14 + 18 + 31 + 12 + 32 * M.thesis.rows.filter(function(r){ return r.value; }).length;
-  var lineTop = Math.max(271, rowsBottom + 12), btnTop = lineTop + 33;
+  /* the note is measured (two lines in most languages): it moves up into the free room, and the button comes after it */
+  var noteH = $('hz').offsetHeight || 18;
+  var lineTop = Math.max(271 - Math.max(0, noteH - 18), rowsBottom + 12), btnTop = lineTop + 15 + Math.max(18, noteH);
   sc($('hz'), 'top', (lineTop + 4) + 'px'); sc($('xp'), 'top', lineTop + 'px'); sc($('save'), 'top', btnTop + 'px');
   sc($('tFoot'), 'display', btnTop + 52 + 12 > 420 - 38 ? 'none' : '');
   cardT.style.setProperty('--vc', M.verdict.color);
@@ -2392,7 +2445,9 @@ function buildCards(M, island, lang){
     txt($('iBody'), Ls('isla.card.body', { pieces:island.pieces, seeds:island.seedsGrowing }));
     CARDS.push(cardI); sc(cardI, 'display', '');
   } else sc(cardI, 'display', 'none');
-  var sc2 = $('dScroll'); DSCROLL.max = Math.max(0, ($('dRows').offsetHeight || 0) - (sc2.offsetHeight || 324)); DSCROLL.y = 0; cls(sc2, 'more', DSCROLL.max > 2);
+  /* a header that wraps onto a second line pushes the scroller down; the fades follow the scroll (renderCards) */
+  var sc2 = $('dScroll'); sc(sc2, 'top', Math.max(50, 24 + ($('dH').parentNode.offsetHeight || 14) + 12) + 'px');
+  DSCROLL.max = Math.max(0, ($('dRows').offsetHeight || 0) - (sc2.offsetHeight || 324)); DSCROLL.y = 0;
   return CARDS;
 }
 var DSCROLL = { y:0, max:0 };
@@ -3442,6 +3497,7 @@ ENTER.RISK = function(a){
 };
 function riskLinesIn(){
   buildRisk(RISK_NOTICE.statements); var L = layoutRisk(452);
+  sc(rmoreEl, 'top', f1(L.body + L.bodyHeight + 1) + 'px');
   tb('lines');
   at(0.30, function(){
     sc(noticeEl, 'top', f1(L.notice) + 'px'); tb('notice');
@@ -4475,7 +4531,7 @@ function dropWords(ws, born, gone, dir, stag){
 }
 var titleEl = $('title'), subEl = $('sub'), cap2El = $('cap2'), promptEl = $('prompt'), wmBig = $('wmBig'), metaEl = $('meta');
 var wmEl = $('wm'), dqEl = $('dq'), closeEl = $('close'), avatarEl = $('avatar'), xpArcEl = $('xpArc'), noticeEl = $('notice'), pnameEl = $('pname'), pcountEl = $('pcount');
-var riskProfileEl = $('riskProfile');
+var riskProfileEl = $('riskProfile'), rmoreEl = $('rmore');
 var titleW = [], subW = [], cap2W = [], cap2K = null, promptW = null;
 function renderTexts(){
   if (W.title && titleEl._k !== W.title[0] + '|' + W.title[1]){ titleEl._k = W.title[0] + '|' + W.title[1]; titleW = spans(titleEl, W.title[0]); subW = spans(subEl, W.title[1]); }
@@ -4508,6 +4564,9 @@ function renderTexts(){
   st(wmEl, tf(wx, wy, ws), wo);
   if (T >= dk && T < dg + 0.2){
     var qt = String(W.question || '').slice(0, 90), nch = Math.max(0, Math.min(qt.length, Math.floor((T - dk - 0.16) / 0.01))); txt(dqEl, qt.slice(0, nch));
+    /* consent step: the Profile button holds the right end of the header, so the docked question stops 8 px before
+       it, cut with its own ellipsis; it has its full line back the moment the button leaves */
+    sc(dqEl, 'paddingRight', W.state === 'RISK' && !W.agreeBusy ? Math.max(0, dqEl.offsetLeft + dqEl.offsetWidth - riskProfileEl.offsetLeft + 8) + 'px' : '');
     var dqo = T > dg ? 1 - c01((T - dg) / 0.16) : 1; st(dqEl, null, dqo); st(closeEl, null, c01((T - dk - 0.16) / 0.16) * dqo * c01(W.closeK.x));
   } else { st(dqEl, null, 0); st(closeEl, null, 0); }
   cls(closeEl, 'on', closeActive());
@@ -4558,7 +4617,7 @@ function renderRiskProfile(){
 function renderLines(){
   renderRiskProfile();
   var b = tmB('lines'), g = tmG('lines'), n = lineEls.length;
-  if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); }
+  if (T < b || T > g + 0.6 || !RISK_LAYOUT){ st(linesEl, null, 0); st(rmoreEl, null, 0); }
   else {
     st(linesEl, null, 1);
     for (var i = 0; i < n; i++){
@@ -4570,6 +4629,8 @@ function renderLines(){
     var rb = b + 0.18 * n + 0.1, rp = TR ? sp('soft', T - rb) : 1, ry = 6 * (1 - rp) * TR, ro = c01((T - rb) / 0.3);
     if (T > g){ var q2 = INH(c01((T - g) / 0.3)); ry = -14 * q2 * TR; ro *= 1 - sstep(0.5, 1, q2); }
     st(rbodyEl, tf(0, ry), ro);
+    /* more copy below the body's viewport: the chevron under it breathes until the end has been scrolled into view */
+    st(rmoreEl, tf(0, ry + (1 + Math.sin(T * 3.6)) * TR), riskCue() ? ro : 0);
   }
   var nb = tmB('notice'), ng = tmG('notice'), no = T >= nb ? c01((T - nb) / 0.24) * (T > ng ? 1 - c01((T - ng) / 0.2) : 1) : 0;
   st(noticeEl, no > 0 ? tf(0, 6 * (1 - FOC(c01((T - nb) / 0.3))) * TR) : null, no);
@@ -4706,6 +4767,7 @@ function renderCards(){
     st(el, tf(x, ty, s), o * (isOn('tpill') && j === ti ? 1 - 0.15 * c01((T - tmB('tpill')) / 0.3) : 1));
   }
   st(dRows, 'translateY(' + f1(-DSCROLL.y) + 'px)');
+  cls(dRows.parentNode, 'more', DSCROLL.max - DSCROLL.y > 1); cls(dRows.parentNode, 'up', DSCROLL.y > 1);   /* fade only the edge the debate continues past */
   /* thesis: Save → label roll → one conic sweep in the verdict hue → the only XP reward */
   var sv = tmB('saved'), sg = tmG('saved'), su = T - sv, saved = su >= 0 && T < sg;
   cls(saveBtn, 'tap', W.state === 'CARDS' && Math.round(track) === ti && p > 0.8);
@@ -4797,7 +4859,8 @@ function velocityOf(P){
 }
 function inDebate(x, y){ var ti = CARDS.indexOf(cardD); return ti >= 0 && Math.round(W.track.x) === ti && y > 286 && y < 610 && DSCROLL.max > 2; }
 function riskScrollMax(){ return rbodyEl ? Math.max(0, rbodyEl.scrollHeight - rbodyEl.clientHeight) : 0; }
-function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.body && y <= RISK_LAYOUT.body + RISK_LAYOUT.bodyHeight && riskScrollMax() > 0; }
+/* a drag that starts anywhere on the consent copy (the statements, the body, the gap above the full-notice button) scrolls the body */
+function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.top && y <= RISK_LAYOUT.notice && riskScrollMax() > 0; }
 function scrollRisk(y){ if (rbodyEl) rbodyEl.scrollTop = clamp(y, 0, riskScrollMax()); }
 function inDown(hit, idx, x, y){
   if (PTR) return;
