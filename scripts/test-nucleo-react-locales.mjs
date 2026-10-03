@@ -16,7 +16,7 @@ const clean=x=>JSON.parse(JSON.stringify(x));
 function browser(language='fr',preferred='fr-FR',navigatorPreferred=preferred){
  const saved=new Map([['bobby_lang',language],['bobby_locale',preferred]]), requests=[];
  const location={origin:'https://bobby.test',search:'',href:'https://bobby.test/desk',assign:(value)=>{location.assigned=value;}};
- const ctx=vm.createContext({console, Intl, URL, URLSearchParams, navigator:{language:navigatorPreferred},window:{location},document:{documentElement:{lang:'es'}},localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v))},fetch:async(url,init)=>{requests.push({url,init});return new Response(JSON.stringify({agents:{alpha:'A',red:'R',cio:'C',verdict:'wait',direction:'none'},level:'rapido'}),{headers:{'content-type':'application/json'}});},Response,AbortController,DOMException,TextDecoder,requestAnimationFrame:fn=>{fn();return 0;},setTimeout,clearTimeout});
+ const ctx=vm.createContext({console, Intl, URL, URLSearchParams, navigator:{language:navigatorPreferred},window:{location},document:{documentElement:{lang:'es'}},localStorage:{getItem:k=>saved.get(k)??null,setItem:(k,v)=>saved.set(k,String(v))},fetch:async(url,init)=>{if(url==='/api/geo')return new Response('{"country":null}');requests.push({url,init});return new Response(JSON.stringify({agents:{alpha:'A',red:'R',cio:'C',verdict:'wait',direction:'none'},level:'rapido'}),{headers:{'content-type':'application/json'}});},Response,AbortController,DOMException,TextDecoder,requestAnimationFrame:fn=>{fn();return 0;},setTimeout,clearTimeout});
  const loaded=new Map();let ack=[false,false,false,false];
  const stubs={
   react:{Component:class { constructor(props){this.props=props;this.state={};} },useState:init=>[Array.isArray(init)?ack:typeof init==='function'?init():init,()=>{}],useEffect:()=>{},useMemo:fn=>fn(),useCallback:fn=>fn,useId:()=> 'test-id',useRef:init=>({current:init}),useSyncExternalStore:(_sub,get)=>get()},
@@ -312,7 +312,7 @@ check('blocked storage and absent AI consent still declare German without mounti
 });
 check('the initial root locale resolver imports no translation catalogue or page dependencies',()=>{
  const b=browser('de','de-DE');assert.equal(b.load('src/lib/client-language.ts').clientLocale(),'de-DE');
- assert.deepEqual([...b.loaded.keys()].sort(),['src/lib/app-language.ts','src/lib/client-language.ts']);
+ assert.deepEqual([...b.loaded.keys()].sort(),['src/lib/app-language.ts','src/lib/client-language.ts','src/lib/geo-language.ts']);
  const app=ts.createSourceFile('App.tsx',read('src/App.tsx'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX);
  assert.ok(app.statements.some(item=>ts.isImportDeclaration(item)&&item.moduleSpecifier.text==='@/lib/client-language'));
  assert.ok(!app.statements.some(item=>ts.isImportDeclaration(item)&&item.moduleSpecifier.text==='@/lib/companions/i18n'));

@@ -2,9 +2,9 @@
 // companion, its level, gear and pet, the squad you unlock with discipline, your account,
 // wallet, Trader Land and the preferences all sit behind the avatar in the top-right corner,
 // the way the iPhone app keeps them behind its header face.
-import { useState, type ReactNode, type RefObject } from 'react';
+import { useState, useSyncExternalStore, type ReactNode, type RefObject } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeftRight, Brain, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X, Zap } from 'lucide-react';
+import { ArrowLeftRight, AudioLines, Brain, ChevronRight, Compass, Globe, Grid2x2, Lock, LogIn, LogOut, Map as MapIcon, Mic, RotateCcw, Share2, ShieldAlert, Sparkles, UserPlus, Volume2, VolumeX, X, Zap } from 'lucide-react';
 import BobbyMascot3D from '@/components/kinetic/BobbyMascot3D';
 import { DEFAULT_MASCOT } from '@/lib/mascot';
 import { COMPANIONS, nextLevelFor, type Companion, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
@@ -13,6 +13,7 @@ import { sfxTock } from '@/lib/companions/sfx';
 import { ToolBelt } from '@/components/companion/CompanionOverlays';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { useBobbyAccount } from '@/hooks/useBobbyAccount';
+import { voiceGenderStore, type VoiceGender } from '@/lib/voice-gender';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import { LangSegment } from './LangMenu';
 import MemoryDialog from './MemoryDialog';
@@ -67,6 +68,30 @@ function Row({ icon, label, detail, onClick, children }: { icon: ReactNode; labe
   return onClick
     ? <button type="button" className="n-row" onClick={() => { sfxTock(); onClick(); }}>{body}</button>
     : <div className="n-row">{body}</div>;
+}
+
+/** Bobby's voice: the companion's own (default), or one feminine / masculine voice for every companion.
+    Self-contained: it reads and writes the store, and the voice hook listens to the same store. The
+    segment takes its own line under the label so the three words fit a 360px drawer in every language. */
+function VoiceGenderRow() {
+  const gender = useSyncExternalStore(voiceGenderStore.subscribe, voiceGenderStore.get, voiceGenderStore.get);
+  const label = t("Bobby's voice", 'La voz de Bobby', 'A voz do Bobby');
+  const options: Array<[VoiceGender, string]> = [
+    ['companion', t('Companion', 'Compañero', 'Companheiro')],
+    ['female', t('Feminine', 'Femenina', 'Feminina')],
+    ['male', t('Masculine', 'Masculina', 'Masculina')],
+  ];
+  return (
+    <div className="n-row flex-wrap">
+      <span className="n-row-ico"><AudioLines size={16} /></span>
+      <span className="min-w-0 flex-1 text-left text-[15px]" style={{ color: '#F2EDE4' }}>{label}</span>
+      <div className="n-seg n-lang-seg w-full" role="group" aria-label={label}>
+        {options.map(([value, name]) => (
+          <button key={value} type="button" className="flex-auto" aria-pressed={value === gender} onClick={() => { sfxTock(); voiceGenderStore.set(value); }}>{name}</button>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function NucleoProfile(p: Props) {
@@ -176,6 +201,7 @@ export default function NucleoProfile(p: Props) {
           <Row icon={p.speakEnabled ? <Volume2 size={16} /> : <VolumeX size={16} />} label={t('Bobby speaks', 'Bobby habla', 'Bobby fala')} onClick={p.onToggleSpeak}>
             <span className="n-pill-sm">{p.speakEnabled ? t('On', 'Sí', 'Ligado') : t('Off', 'No', 'Desligado')}</span>
           </Row>
+          <VoiceGenderRow />
           <Row icon={p.muted ? <VolumeX size={16} /> : <Volume2 size={16} />} label={t('Sounds', 'Sonidos', 'Sons')} onClick={p.onToggleSounds}>
             <span className="n-pill-sm">{p.muted ? t('Off', 'No', 'Desligado') : t('On', 'Sí', 'Ligado')}</span>
           </Row>

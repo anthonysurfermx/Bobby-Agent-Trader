@@ -10792,5 +10792,23 @@
     "pt": "Análises Rápidas ilimitadas · uso razoável · 4,90 USD/mês",
     "it": "Analisi Rapide illimitate · uso corretto · 4,90 USD/mese",
     "de": "Unbegrenzte Schnellanalysen · angemessene Nutzung · 4,90 USD/Monat"
+  },
+  "Companion": {
+    "fr": "Compagnon",
+    "pt": "Companheiro",
+    "it": "Compagno",
+    "de": "Begleiter"
+  },
+  "Feminine": {
+    "fr": "Féminine",
+    "pt": "Feminina",
+    "it": "Femminile",
+    "de": "Weiblich"
+  },
+  "Masculine": {
+    "fr": "Masculine",
+    "pt": "Masculina",
+    "it": "Maschile",
+    "de": "Männlich"
   }
 }

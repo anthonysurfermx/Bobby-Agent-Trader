@@ -138,6 +138,23 @@ const BASE_INSTRUCTIONS_FEM_EN = 'You are a 22-year-old woman talking with your 
 
 const BASE_INSTRUCTIONS_MASC_EN = 'You are a 23-year-old guy talking with your best friend. Young, fresh, naturally energetic — but relaxed and confident, never cartoonish or forced. Native American English. Talk like real Gen Z: fluid, close, self-assured. Lower your tone a bit when mentioning risk, like you are looking out for him. Pronounce tickers and numbers naturally. Zero robot, zero announcer, no filler words.';
 
+// The Brazilian base is a masculine persona ("um jovem brasileiro… seu melhor
+// amigo"), so a feminine voice needs its own. French, Italian, German and
+// European Portuguese only describe the voice and stay shared.
+const BASE_INSTRUCTIONS_FEM_PT = 'Você é uma jovem brasileira de 22 anos conversando com sua melhor amiga. Voz jovem, fresca e com energia natural — mas relaxada e segura, nada de caricatura. Português brasileiro nativo autêntico. Fale como Gen Z de verdade: fluida, próxima, confiante. Abaixe um pouco o tom ao falar de risco. Zero robô, zero locutora.';
+
+// The same agreement for the vibe lines that describe the speaker in the
+// masculine ("nunca agresivo", "sin sonar frío", "sem soar frio").
+const VIBE_INSTRUCTIONS_FEM: Record<string, Record<string, string>> = {
+  direct: {
+    es: ' Energía un poco más viva y franca: di las cosas sin rodeos, pero siempre con calidez, nunca agresiva.',
+  },
+  analytical: {
+    es: ' Frases claras y concentradas, dicción precisa. Prioriza datos, riesgo y siguiente paso, sin sonar fría.',
+    pt: ' Frases claras e concentradas, dicção precisa. Priorize dados e risco, sem soar fria.',
+  },
+};
+
 // Every persona above reads as the same 22-year-old, which is right for the
 // squad but wrong for a character built on patience. A persona listed here
 // replaces the age/energy persona entirely — the accent rule is repeated
@@ -160,14 +177,18 @@ export function buildInstructions(lang: string, vibe?: string, resolvedVoice?: s
   // A masculine voice reading feminine self-references ("una chava…
   // extranjera") breaks the illusion instantly, and the reverse leaves the
   // feminine voices reading flat.
+  const feminine = !!resolvedVoice && FEM_VOICES.has(resolvedVoice);
   if (!process.env.TTS_INSTRUCTIONS && resolvedVoice) {
-    const feminine = FEM_VOICES.has(resolvedVoice);
     if (lang === 'es' && !feminine) base = BASE_INSTRUCTIONS_MASC_ES;
     else if (lang === 'en') base = feminine ? BASE_INSTRUCTIONS_FEM_EN : BASE_INSTRUCTIONS_MASC_EN;
+    else if (key === 'pt' && feminine) base = BASE_INSTRUCTIONS_FEM_PT;
   }
   const character = persona ? PERSONA_INSTRUCTIONS[persona] : undefined;
   if (!process.env.TTS_INSTRUCTIONS && character) base = character[key] || character.en;
-  const extra = vibe && VIBE_INSTRUCTIONS[vibe] ? (VIBE_INSTRUCTIONS[vibe][appLanguage(lang, 'es')] || VIBE_INSTRUCTIONS[vibe].en) : '';
+  const vibeLang = appLanguage(lang, 'es');
+  const extra = vibe && VIBE_INSTRUCTIONS[vibe]
+    ? ((feminine && VIBE_INSTRUCTIONS_FEM[vibe]?.[vibeLang]) || VIBE_INSTRUCTIONS[vibe][vibeLang] || VIBE_INSTRUCTIONS[vibe].en)
+    : '';
   return base + extra;
 }
 
@@ -200,19 +221,54 @@ const EDGE_VOICE_MENU = new Set([
   'de-DE-KatjaNeural', 'de-DE-ConradNeural',
 ]);
 
+// The "female" / "male" voice preference on the free path: one feminine and one
+// masculine neural voice per language, with a regional pair where one exists.
+type VoiceGender = 'female' | 'male';
+const EDGE_GENDER_VOICE: Record<string, Record<VoiceGender, string>> = {
+  es: { female: 'es-MX-DaliaNeural', male: 'es-MX-JorgeNeural' },
+  'es-ES': { female: 'es-ES-ElviraNeural', male: 'es-ES-AlvaroNeural' },
+  'es-US': { female: 'es-US-PalomaNeural', male: 'es-US-AlonsoNeural' },
+  en: { female: 'en-US-AriaNeural', male: 'en-US-GuyNeural' },
+  pt: { female: 'pt-BR-FranciscaNeural', male: 'pt-BR-AntonioNeural' },
+  'pt-PT': { female: 'pt-PT-RaquelNeural', male: 'pt-PT-DuarteNeural' },
+  fr: { female: 'fr-FR-DeniseNeural', male: 'fr-FR-HenriNeural' },
+  it: { female: 'it-IT-ElsaNeural', male: 'it-IT-DiegoNeural' },
+  de: { female: 'de-DE-KatjaNeural', male: 'de-DE-ConradNeural' },
+};
+
+function voiceGender(voice?: string): VoiceGender | undefined {
+  return voice === 'female' || voice === 'male' ? voice : undefined;
+}
+
+/**
+ * A client Edge voice is honored only from the strict menu, and never against
+ * an explicit voice gender: "male" with a feminine menu voice drops the voice.
+ */
+function menuEdgeVoice(edgeVoice?: string, voice?: string): string | undefined {
+  if (!edgeVoice || !EDGE_VOICE_MENU.has(edgeVoice)) return undefined;
+  const gender = voiceGender(voice);
+  return !gender || Object.values(EDGE_GENDER_VOICE).some((pair) => pair[gender] === edgeVoice) ? edgeVoice : undefined;
+}
+
 type TtsProvider = SpeechResult['provider'];
 
 /**
  * Resolve a client-selected Edge voice without ever passing arbitrary input to
  * the synthesizer. An invalid selection deliberately returns Bobby's default
  * identity instead of falling through to an unrelated paid provider voice.
- * All agents share one Edge identity per language, so `agent` is accepted for
- * API stability but doesn't change the fallback.
+ * All agents share one Edge identity per language, so `agent` doesn't change
+ * the fallback — except "female" / "male", which pick that gender's voice for
+ * the request's locale.
  */
-export function resolveEdgeVoice(lang: string, _agent = 'cio', edgeVoice?: string, locale?: string): string {
-  return (edgeVoice && EDGE_VOICE_MENU.has(edgeVoice))
-    ? edgeVoice
-    : EDGE_VOICE[lang === 'pt' && appLocale('pt', locale) === 'pt-PT' ? 'pt-PT' : lang] || EDGE_VOICE.es;
+export function resolveEdgeVoice(lang: string, agent = 'cio', edgeVoice?: string, locale?: string): string {
+  const selected = menuEdgeVoice(edgeVoice, agent);
+  if (selected) return selected;
+  const gender = voiceGender(agent);
+  if (gender) {
+    const pair = EDGE_GENDER_VOICE[appLocale(appLanguage(lang, 'es'), locale)] || EDGE_GENDER_VOICE[lang] || EDGE_GENDER_VOICE.es;
+    return pair[gender];
+  }
+  return EDGE_VOICE[lang === 'pt' && appLocale('pt', locale) === 'pt-PT' ? 'pt-PT' : lang] || EDGE_VOICE.es;
 }
 
 /**
@@ -304,8 +360,9 @@ export async function generateSpeech(
     format: opts.format || 'opus' as const,
     voice: opts.voice,
     vibe: opts.vibe,
-    // Only honored when it's on the strict menu — invalid names are dropped
-    edgeVoice: opts.edgeVoice && EDGE_VOICE_MENU.has(opts.edgeVoice) ? opts.edgeVoice : undefined,
+    // Only honored when it's on the strict menu — invalid names are dropped,
+    // and so is a menu voice that contradicts an explicit "female" / "male"
+    edgeVoice: menuEdgeVoice(opts.edgeVoice, opts.voice),
   };
 
   const provider = (opts.provider || process.env.TTS_PROVIDER || (process.env.OPENAI_API_KEY ? 'openai' : 'edge')).toLowerCase();

@@ -70,7 +70,7 @@ export function regionalMentions(text: string, language?: unknown, locale?: unkn
     let at = -1;
     // Longest name first, so "Intesa Sanpaolo" goes as one name before its parts.
     for (const term of [stock.symbol, stock.name, ...stock.aliases].map(normalize).sort((a, b) => b.length - a.length)) {
-      const letters = [...term].map(c => c === ' ' ? '\\s+' : c.replace(/[\\^$.*+?()[\]{}|]/, '\\$&') + '\\p{M}*').join('');
+      const letters = [...term].map(c => c === ' ' ? '\\s+' : c.replace(/[\\^$.*+?()[\]{}|]/g, '\\$&') + '\\p{M}*').join('');
       rest = rest.replace(new RegExp(`(?<![\\p{L}\\p{N}])${letters}(?![\\p{L}\\p{N}])`, 'giu'), (found: string, index: number) => {
         if (at < 0 || index < at) at = index;
         return ' '.repeat(found.length);

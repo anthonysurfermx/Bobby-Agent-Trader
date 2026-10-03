@@ -100,7 +100,7 @@ function Caption({ text, run }: { text: string; run: string | number }) {
 function Satellite({ k, v, q, dot, delay }: { k: string; v: string; q?: string | null; dot: string; delay: number }) {
   return (
     <motion.div initial={{ opacity: 0, scale: 0.85 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay, type: 'spring', stiffness: 260, damping: 22 }} className="n-sat">
-      <div className="flex items-center gap-1.5"><i style={{ background: dot }} /><span className="n-sat-k">{k}</span>{q && <span className="n-sat-q">{q}</span>}</div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1"><i style={{ background: dot }} /><span className="n-sat-k">{k}</span>{q && <span className="n-sat-q">{q}</span>}</div>
       <div className="n-sat-v">{v}</div>
     </motion.div>
   );
@@ -684,7 +684,9 @@ export default function NucleoDesk() {
     <ClientReadPresentation receipt={readReceipt} blocked={sheet !== 'none' || inviteOpen || signInPrompt || !!limit || !!inspected || !!evolution || !!drops[0]}>
       <div className="n-verdict-row">
         <div className="n-sats left">{sats.filter((_, i) => i % 2 === 0).map((s, i) => <Satellite key={s.k} {...s} delay={0.15 + i * 0.14} />)}</div>
-        <div className="grid place-items-center" style={{ padding: desktop ? 36 : 22 }}>
+        {/* a verdict longer than six letters ("Aucune opération") is fitted to the glass by .n-verdict-glass[data-long] */}
+        <div className="n-verdict-glass grid place-items-center" data-long={verdictWord && verdictWord.length > 6 ? '' : undefined}
+          style={{ padding: desktop ? 36 : 22, '--vs': `${desktop ? 200 : 128}px`, '--vn': Math.max(1, ...(verdictWord ?? '').split(/\s+/).map((w) => w.length)) } as CSSProperties}>
           <NucleoSphere size={desktop ? 200 : 128} mode="verdict" verdict={verdictKind} word={verdictWord} sub={verdictSub} />
         </div>
         <div className="n-sats right">{sats.filter((_, i) => i % 2 === 1).map((s, i) => <Satellite key={s.k} {...s} delay={0.22 + i * 0.14} />)}</div>
