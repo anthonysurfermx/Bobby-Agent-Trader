@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:05:29.487Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="chart accepts only numeric complete rows and orders evidence by timestamp" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.001"/>
+  <testcase name="missing conviction and prices stay null rather than invented values" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.0"/>
+  <testcase name="an incomplete provider reply is never rendered as Wait" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
