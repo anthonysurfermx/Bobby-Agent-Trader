@@ -277,7 +277,9 @@ async function dropProofOfRefundedCharge(charge: Record<string, unknown>): Promi
   const iid = stripeId(charge.invoice), pid = stripeId(charge.payment_intent);
   let linked = iid ? [iid] : [];
   if (!iid && pid) {
-    const payments = await stripeGet(`invoice_payments?payment[payment_intent]=${encodeURIComponent(pid)}&limit=10`);
+    // Stripe requires payment[type] with this filter ("Missing required param: payment[type]" otherwise, which made
+    // every full refund of a charge without `invoice` answer 500 for ever). Checked against Stripe 2026-10-03.
+    const payments = await stripeGet(`invoice_payments?payment[type]=payment_intent&payment[payment_intent]=${encodeURIComponent(pid)}&limit=10`);
     if (payments.has_more === true) throw new Error('Stripe invoice payment list is incomplete');
     linked = ((payments.data as Array<{ invoice?: string }> | undefined) ?? [])
       .map((payment) => payment.invoice).filter((id): id is string => !!stripeId(id));

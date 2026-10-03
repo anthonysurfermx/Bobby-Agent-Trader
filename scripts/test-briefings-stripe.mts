@@ -80,6 +80,9 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
   if (url.includes('api.stripe.com/v1/subscriptions/')) return json(liveSub);
   if (url.includes('api.stripe.com/v1/invoices/')) return json(liveInvoice);
+  // As Stripe does: the payment filter is refused without its type.
+  if (url.includes('api.stripe.com/v1/invoice_payments') && url.includes('payment[payment_intent]') && !url.includes('payment[type]=payment_intent'))
+    return json({ error: { message: 'Missing required param: payment[type].' } }, 400);
   if (url.includes('api.stripe.com/v1/invoice_payments')) return json({ has_more: false, data: livePayments });
   if (url.includes('api.stripe.com/v1/payment_intents/'))
     return json({ id: pid, status: 'succeeded', customer, livemode: true, latest_charge: cid });
