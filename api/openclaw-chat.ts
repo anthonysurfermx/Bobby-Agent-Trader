@@ -871,6 +871,8 @@ ${finalCallInstruction}`;
   } catch (err) {
     console.error('[Debate] Multi-call failed:', err);
     sendChunk('\n\n[Error: debate engine failed. Retrying as single-call...]');
+    // Machine-readable failure: a paid MCP call must not settle on this text (audit 2026-10-02).
+    res.write(`data: ${JSON.stringify({ bobby_error: 'debate_failed' })}\n\n`);
     res.write('data: [DONE]\n\n');
   } finally {
     res.end();

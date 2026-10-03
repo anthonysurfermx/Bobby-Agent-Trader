@@ -64,7 +64,7 @@ export async function startBilling(action: 'checkout' | 'portal'): Promise<strin
     const body = (await r.json().catch(() => ({}))) as { url?: string; error?: string; code?: string; provider?: string };
     if (r.ok && body.url) { window.location.assign(body.url); return null; }
     // Already paying by card (e.g. a past_due renewal): open the billing portal to fix it instead of a dead end.
-    if (action === 'checkout' && r.status === 409 && body.code === 'already_pro' && body.provider === 'stripe') return startBilling('portal');
+    if (action === 'checkout' && r.status === 409 && (body.code === 'already_pro' || body.code === 'payment_pending') && body.provider === 'stripe') return startBilling('portal');
     return body.error ?? 'Payments are temporarily unavailable.';
   } catch { return 'Payments are temporarily unavailable.'; }
 }

@@ -28,7 +28,7 @@ import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
 import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
-import { customerFor, stripeApi } from './_lib/stripe-api.js';
+import { customerFor, findCustomer, stripeApi } from './_lib/stripe-api.js';
 
 export const config = { maxDuration: 20 };
 
@@ -158,8 +158,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       try {
         customer = await customerFor(identity.id, existing?.stripe_customer_id);
         const subsAtStripe = await stripeApi<{ data?: Array<{ status: string }> }>('GET', `subscriptions?customer=${encodeURIComponent(customer)}&status=all&limit=20`);
-        if ((subsAtStripe.data ?? []).some((s) => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete'].includes(s.status))) {
+        const statuses = (subsAtStripe.data ?? []).map((s) => s.status);
+        if (statuses.some((st) => ['active', 'trialing', 'past_due'].includes(st))) {
           return res.status(409).json({ code: 'already_pro', provider: 'stripe', error: 'You already have Bobby Pro. Manage it from your account.' });
+        }
+        if (statuses.some((st) => ['unpaid', 'incomplete'].includes(st))) {
+          return res.status(409).json({ code: 'payment_pending', provider: 'stripe', error: 'Your card payment needs attention. Fix it from Manage subscription.' });
         }
         const open = await stripeApi<{ data?: Array<{ url?: string }> }>('GET', `checkout/sessions?customer=${encodeURIComponent(customer)}&status=open&limit=1`);
         if (open.data?.[0]?.url) return res.status(200).json({ url: open.data[0].url });
@@ -168,10 +172,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
       }
       const origin = siteOrigin(req);
+      // Two requests at the same moment (two tabs, a double click) both pass the open-session check above. An
+      // idempotency key per identity and 10-minute window makes Stripe return the same session to both; expires_at
+      // comes from the same window so the parameters match exactly (35-45 minutes ahead). Red team 2026-10-02.
+      const windowStart = Math.floor(Date.now() / 600_000) * 600;
       const form: Record<string, string> = {
         mode: 'subscription',
         customer,
-        expires_at: String(Math.floor(Date.now() / 1000) + 30 * 60),
+        expires_at: String(windowStart + 45 * 60),
         'line_items[0][price]': String(process.env.STRIPE_PRICE_ID),
         'line_items[0][quantity]': '1',
         success_url: `${origin}/desk?pro=welcome`,
@@ -181,15 +189,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'subscription_data[metadata][identity_id]': identity.id,
         allow_promotion_codes: 'true',
       };
-      const session = await stripe('checkout/sessions', form);
-      return res.status(200).json({ url: session.url });
+      try {
+        const session = await stripeApi<{ url?: string }>('POST', 'checkout/sessions', form, `bobby-checkout-${identity.id}-${windowStart}`);
+        return res.status(200).json({ url: session.url });
+      } catch (error) {
+        // Same window, different parameters (e.g. the other tab came from www.): hand back the session that exists.
+        const open = await stripeApi<{ data?: Array<{ url?: string }> }>('GET', `checkout/sessions?customer=${encodeURIComponent(customer)}&status=open&limit=1`).catch(() => null);
+        if (open?.data?.[0]?.url) return res.status(200).json({ url: open.data[0].url });
+        console.error('[bobby-access] checkout create', error instanceof Error ? error.message : error);
+        return res.status(503).json({ error: 'Payments are temporarily unavailable. Try again in a moment.' });
+      }
     }
 
     if (action === 'portal') {
       if (!stripeReady()) return res.status(503).json({ error: 'Card payments are not switched on yet.' });
       const existing = await getSubscription(identity.id);
-      if (!existing?.stripe_customer_id) return res.status(404).json({ error: 'No card subscription on this account.' });
-      const portal = await stripe('billing_portal/sessions', { customer: existing.stripe_customer_id, return_url: `${siteOrigin(req)}/desk` });
+      // The row may not carry the customer yet (webhook pending or retrying): Stripe is asked by metadata, never created.
+      const customer = await findCustomer(identity.id, existing?.stripe_customer_id).catch(() => null);
+      if (!customer) return res.status(404).json({ error: 'No card subscription on this account.' });
+      const portal = await stripe('billing_portal/sessions', { customer, return_url: `${siteOrigin(req)}/desk` });
       return res.status(200).json({ url: portal.url });
     }
 

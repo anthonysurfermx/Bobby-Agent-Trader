@@ -93,23 +93,25 @@ export async function syncRevenueCat(authUserId: string, identityId: string): Pr
   const sandbox = sub?.is_sandbox === true;
   const eligible = Boolean(ent && sub);
   const active = eligible && (expires === null || Date.parse(expires) > Date.now());
-  // A row that carries a Stripe subscription still able to charge belongs to the Stripe webhook: never rewrite it
-  // (relabelling it 'apple' would hide the card plan from account deletion, checkout and the portal). Pro is then
-  // whichever of the two is live. A row this sync owns has no Stripe subscription id.
-  if (current?.stripe_subscription_id && !['canceled', 'incomplete_expired'].includes(current.status)) {
-    const cardLive = ['active', 'trialing'].includes(current.status) && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
-    return Boolean(cardLive || (ent && sub && (expires === null || Date.parse(expires) > Date.now())));
-  }
-  const ownedRow = Boolean(current && !current.stripe_subscription_id);
+  // A card plan that is granting Pro right now belongs to the Stripe webhook: never rewrite it (relabelling it 'apple'
+  // would hide it from account deletion, checkout and the portal). Any other row is this sync's to write, including a
+  // card row that ended or cannot grant Pro (past_due, unpaid, canceled): the Stripe ids survive the merge, so
+  // deletion, checkout and the portal still find the customer, and the webhook ignores late states for that plan
+  // while the Apple one is live. Red team 2026-10-02 (R1-R3).
+  const cardLive = current?.provider === 'stripe' && Boolean(current.stripe_subscription_id) && ['active', 'trialing'].includes(current.status)
+    && (!current.current_period_end || Date.parse(current.current_period_end) > Date.now());
+  if (cardLive) return true;
+  const appleRow = Boolean(current && current.provider !== 'stripe');
   if (!eligible) {
     // Revoke what an earlier sync granted from an ineligible source (e.g. a Test Store row granted before this fix).
-    if (ownedRow && ['active', 'trialing'].includes(current!.status)) {
+    if (appleRow && ['active', 'trialing'].includes(current!.status)) {
       const refunded = Object.values(subscriber?.subscriptions ?? {}).some((s) => PRO_STORES.has(String(s?.store)) && s?.refunded_at);
       await upsertSubscription({ identity_id: identityId, provider: current!.provider, status: refunded ? 'refunded' : 'expired' });
     }
-    return Boolean(current && !ownedRow && ['active', 'trialing'].includes(current.status));
+    return false;
   }
-  if (current?.provider === 'stripe' && current.stripe_subscription_id && ['active', 'trialing'].includes(current.status) && !active) return true;
+  // Nothing Apple to record over a card row: an expired App Store record never replaces the card plan's own state.
+  if (current?.provider === 'stripe' && !active) return false;
   const periodType = ['normal', 'trial', 'intro', 'prepaid'].includes(String(sub?.period_type)) ? String(sub?.period_type) : null;
   await upsertSubscription({
     identity_id: identityId, provider: 'apple', status: sub?.refunded_at ? 'refunded' : !active ? 'expired' : periodType === 'trial' ? 'trialing' : 'active',

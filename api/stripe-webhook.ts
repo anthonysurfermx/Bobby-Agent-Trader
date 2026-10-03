@@ -7,6 +7,7 @@
 // The identity rides in metadata.identity_id (set by /api/bobby-access checkout).
 // ============================================================
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { notifyOwner } from './_lib/provider-alert.js';
 import { getSubscription, upsertSubscription } from './_lib/access.js';
 import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
 import { recordPurchaseEvent } from './_lib/purchases.js';
@@ -75,6 +76,11 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
         catch (c) { if (!(c instanceof StripeError && c.status === 404)) throw c; }
       }
       console.error('[stripe-webhook] subscription for a deleted account cancelled', sub.id);
+      // A charge may have gone through before the cancel (paid, then deleted before this event): refund by hand.
+      if (typeof sub.id === 'string' && !STRIPE_TERMINAL.has(status)) {
+        notifyOwner('Bobby: suscripción de tarjeta de una cuenta borrada — revisar reembolso',
+          `Stripe mandó ${sub.id} (cliente ${typeof sub.customer === 'string' ? sub.customer : '?'}) para una cuenta que ya no existe. La cancelé.\nSi la primera factura se cobró, reembólsala en Stripe → Pagos.`);
+      }
       return;
     }
     throw e;
