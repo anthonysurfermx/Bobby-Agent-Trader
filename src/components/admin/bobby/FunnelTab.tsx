@@ -15,8 +15,10 @@ import { SearchConsoleCard } from './LifecycleCards';
 import EconomicsSection from './EconomicsSection';
 import UtmBuilder from './UtmBuilder';
 import { growthWindows, windowDelta, type CompareSeries } from './deltas';
-import { fmtCompact, fmtDate, fmtDateTime, fmtInt, fmtMinutes, fmtPct, label, timeOf } from './format';
+import { DASH, fmtCompact, fmtDate, fmtDateTime, fmtDays, fmtInt, fmtMinutes, fmtPct, label, teamOut, timeOf } from './format';
 import { useLoad } from './useLoad';
+import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
+import SourceFreshness from './SourceFreshness';
 
 type Platform = 'web' | 'ios';
 type Notify = (text: string, ok?: boolean) => void;
@@ -31,41 +33,48 @@ const LEVEL_LABEL: Record<string, string> = { rapido: 'Rápido', profundo: 'Prof
 // desk_blocked reasons written by api/desk-debate.ts; anything else is shown as sent.
 const BLOCK_LABEL: Record<string, string> = {
   budget_paused: 'gasto de IA pausado', premium_paused: 'niveles premium pausados', unavailable: 'cupo no disponible', daily_limit: 'límite diario',
+  no_provider_keys: 'sin llaves de IA', no_address: 'sin dirección del cliente', level_unavailable: 'medidor de nivel no disponible',
 };
 const sourceLabel = (s: string) => (s === 'direct' || !s ? '(directo)' : s.startsWith('utm:') ? `${s.slice(4)} (UTM)` : s);
 
 // ---------------------------------------------------------------- the drawn funnel
 
-function webStages(c: GrowthCohort, sc: SearchConsoleData | null): FunnelStage[] {
+/** Google and Apple aggregates cannot leave the team out: their hints say so while the header does. */
+const SOURCE_TEAM = ' Incluye al equipo (la fuente no lo separa).';
+
+function webStages(c: GrowthCohort, sc: SearchConsoleData | null, teamOut: boolean): FunnelStage[] {
   const google = sc && sc.configured && !sc.error && sc.totals ? sc.totals : null;
   const gMissing = !sc ? 'Dato no disponible' : sc.configured ? 'Search Console con error' : 'Conecta Search Console';
+  const team = teamOut ? SOURCE_TEAM : '';
   return [
     { key: 'impressions', label: 'Impresiones en Google', value: google ? google.impressions : null, aggregate: true, missing: gMissing,
-      hint: 'Veces que bobbyprotocol.xyz salió en resultados de Google en el periodo. Son búsquedas, no personas: otra población que el embudo.' },
+      hint: `Veces que bobbyprotocol.xyz salió en resultados de Google en el periodo. Son búsquedas, no personas: otra población que el embudo.${team}` },
     { key: 'clicks', label: 'Clics desde Google', value: google ? google.clicks : null, aggregate: true, missing: gMissing,
-      hint: 'Clics desde la búsqueda de Google. Una persona puede dar varios; no se pueden seguir uno a uno dentro del embudo.' },
+      hint: `Clics desde la búsqueda de Google. Una persona puede dar varios; no se pueden seguir uno a uno dentro del embudo.${team}` },
     { key: 'arrived', label: 'Llegaron', value: c.arrived,
       hint: 'Navegadores vistos llegando en el periodo (su primera visita quedó registrada). Sin el histórico reconstruido.' },
     { key: 'deskOrRead', label: 'Abrieron el desk', value: c.deskOrRead, hint: 'De los que llegaron: abrieron /desk o pidieron una lectura.' },
-    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De los que abrieron el desk: recibieron al menos una lectura en ese navegador.' },
+    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De los que abrieron el desk: consumieron al menos una lectura del cupo. No prueba que el cliente la mostró.' },
     { key: 'accountAfterRead', label: 'Cuenta después de leer', value: c.accountAfterRead,
-      hint: 'De los que leyeron: ese navegador quedó ligado a una cuenta de Apple o Google (nueva o que ya existía).' },
-    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De los que leyeron y tienen cuenta: hoy tienen Bobby Pro.' },
+      hint: 'De los que registraron una lectura: ese navegador quedó ligado a una cuenta autenticada verificada (nueva o que ya existía).' },
+    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De los que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }
 
-function iosStages(c: GrowthCohort, store: AdminIntegrations['appStore'] | null): FunnelStage[] {
+function iosStages(c: GrowthCohort, store: AdminIntegrations['appStore'] | null, teamOut: boolean): FunnelStage[] {
   const ok = store && store.configured && !store.error && store.totals ? store.totals : null;
   const range = store?.coveredFrom ? ` Reportes de Apple del ${fmtDate(store.coveredFrom)} al ${fmtDate(store.coveredTo)}.` : '';
   const pending = store?.pendingDays?.length ? ` ${fmtInt(store.pendingDays.length)} ${store.pendingDays.length === 1 ? 'día reciente aún sin publicar' : 'días recientes aún sin publicar'} (no son ceros).` : '';
+  const missingDays = store?.missingDays ?? [];
+  const partial = store?.partial ? ` Carga parcial: faltan ${fmtInt(missingDays.length)} ${missingDays.length === 1 ? 'día' : 'días'}${missingDays.length ? ` (${fmtDays(missingDays)})` : ''}; el total cubre solo los días cargados.` : '';
   return [
-    { key: 'downloads', label: 'Descargas App Store', value: ok ? ok.downloads : null, aggregate: true,
+    { key: 'downloads', label: store?.partial ? 'Descargas App Store (parcial)' : 'Descargas App Store', value: ok ? ok.downloads : null, aggregate: true,
       missing: !store ? 'Dato no disponible' : store.configured ? 'App Store con error' : 'Conecta App Store',
-      hint: `Descargas nuevas según Apple: otra población que el embudo (incluye a quien nunca abrió la app).${range}${pending}` },
+      hint: `Descargas nuevas según Apple: otra población que el embudo (incluye a quien nunca abrió la app).${range}${pending}${partial}${teamOut ? SOURCE_TEAM : ''}` },
     { key: 'arrived', label: 'Abrieron la app', value: c.arrived, hint: 'Instalaciones de la app 1.5+ vistas abriendo por primera vez en el periodo.' },
-    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De las que abrieron la app: recibieron al menos una lectura.' },
-    { key: 'accountAfterRead', label: 'Cuenta', value: c.accountAfterRead, hint: 'De las que leyeron: quedaron ligadas a una cuenta de Apple o Google.' },
-    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De las que leyeron y tienen cuenta: hoy tienen Bobby Pro.' },
+    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De las que abrieron la app: consumieron al menos una lectura del cupo. No prueba que la app la mostró.' },
+    { key: 'accountAfterRead', label: 'Cuenta', value: c.accountAfterRead, hint: 'De las que registraron una lectura: quedaron ligadas a una cuenta autenticada verificada.' },
+    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De las que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }
 
@@ -181,9 +190,9 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
         </div>
       )}
 
-      <FunnelDrawing key={platform} idPrefix={`funnel-${platform}`} stages={platform === 'web' ? webStages(c, sc) : iosStages(c, store)} />
+      <FunnelDrawing key={platform} idPrefix={`funnel-${platform}`} stages={platform === 'web' ? webStages(c, sc, !g.includeInternal) : iosStages(c, store, !g.includeInternal)} />
       <p className="m-0 mt-5 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-        Cada paso es parte del anterior. Los pasos con borde (Google, App Store) son agregados de otra población y no se comparan uno a uno.
+        Cada paso es parte del anterior. Los pasos con borde (Google, App Store) son agregados de otra población y no se comparan uno a uno{g.includeInternal ? '' : '; incluyen al equipo (la fuente no lo separa)'}.
         Toca o pasa el cursor sobre una etapa para ver qué cuenta.
       </p>
 
@@ -191,7 +200,7 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
         <SubHead title="Después de la 1.ª lectura" sub={`${platform === 'web' ? 'web' : 'iOS'} · misma cohorte`} />
         <div className="mt-4 max-w-[760px]"><StatusBars max={1} labelWidth={210} wrapLabels stackMobile rows={afterReadRows(platform, c, outcomesSince != null)} /></div>
         <p className="m-0 mt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-          Base de cada fila: lecturas y muro, sobre los que leyeron · cuenta tras el muro, sobre los que chocaron · inicio de sesión y cuenta, sobre los que llegaron · Pro, sobre los que leyeron y tienen cuenta.
+          Base de cada fila: lecturas y muro, sobre los que leyeron · cuenta tras el muro, sobre los que chocaron · inicio de sesión y cuenta, sobre los que llegaron · Pro (con acceso hoy: pago, prueba o regalo), sobre los que leyeron y tienen cuenta.
           {partialOutcomes && ` El muro se registra desde ${fmtDateTime(outcomesSince)}: lo anterior en el periodo no aparece.`}
         </p>
         <div className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -253,16 +262,18 @@ function HistoryCard({ history }: { history: Growth['history'] }) {
 
 // ---------------------------------------------------------------- desk outcomes (server side)
 
-function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outcomes']; includeInternal: boolean; periodSince: string }) {
+function OutcomesCard({ out, includeInternal, periodSince, markFailed }: { out: Growth['outcomes']; includeInternal: boolean; periodSince: string; markFailed: boolean }) {
   const since = out.outcomesSince;
   const platforms = Object.entries(out.byPlatform).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const partial = since != null && (timeOf(since) ?? 0) > (timeOf(periodSince) ?? 0);
   const attempts = out.delivered + out.failed;
   const blocked = Object.entries(out.blocked).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
   const levels = Object.entries(out.byLevel).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]);
+  // Abandoned reads (the reader left first) are neither failures nor part of their base.
   const rows: StatusRow[] = [
-    { label: 'Entregadas', value: out.delivered, fill: 'orange' },
+    { label: 'Emitidas por servidor', value: out.delivered, fill: 'orange' },
     { label: 'Fallidas', value: out.failed, sub: attempts ? `${share(out.failed, attempts)} de ${fmtInt(attempts)} intentos` : undefined },
+    { label: 'Interrumpidas', value: out.abandoned ?? 0, sub: 'la conexión se cerró antes del final registrado', missing: out.abandoned == null ? 'Dato no disponible' : undefined },
     { label: 'Muro de registro', value: out.wallSignin, sub: `${fmtInt(out.wallSigninInstalls)} ${out.wallSigninInstalls === 1 ? 'instalación' : 'instalaciones'}` },
     { label: 'Muro de pago', value: out.wallPaywall },
     { label: 'Nivel rechazado', value: out.wallLevel, sub: 'pidió un nivel premium sin acceso' },
@@ -274,7 +285,7 @@ function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outc
       <BigNumber
         label="Resultados del desk"
         value={fmtInt(out.consumed)}
-        caption={`lecturas consumidas del cupo · ${includeInternal ? `incluye ${fmtInt(out.consumedInternal)} del equipo` : `${fmtInt(out.consumedInternal)} del equipo, fuera`}`}
+        caption={`lecturas consumidas del cupo · ${includeInternal ? `incluye ${fmtInt(out.consumedInternal)} del equipo` : teamOut(markFailed, `${fmtInt(out.consumedInternal)} del equipo, fuera`)}`}
         right={platforms.length ? (
           <div className="flex flex-wrap gap-x-3 gap-y-1 font-mono text-[11px] uppercase text-[#5C5C5C]">
             {platforms.map(([k, v]) => <span key={k}>{label(k)} <span className="text-[#8B8B8B]">{fmtInt(v)}</span></span>)}
@@ -283,7 +294,7 @@ function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outc
       />
       {!since ? (
         <Note tag="Sin datos aún">
-          Entregadas, fallidas, muros y bloqueos los registra el servidor en cada lectura del desk. Todavía no hay ninguno en este periodo.
+          Respuestas emitidas, fallidas, muros y bloqueos los registra el servidor en cada lectura del desk. Todavía no hay ninguno en este periodo.
         </Note>
       ) : (
         <>
@@ -293,14 +304,14 @@ function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outc
           <StatusBars rows={rows} labelWidth={190} wrapLabels stackMobile />
           {levels.length > 0 && (
             <div className="mt-4 flex flex-wrap items-center gap-2 font-mono text-[11px] text-[#8B8B8B]">
-              <span className="text-[#5C5C5C]">Entregadas por nivel:</span>
+              <span className="text-[#5C5C5C]">Emitidas por servidor, por nivel:</span>
               {levels.map(([k, v]) => <Tag key={k} tone={k === 'rapido' ? 'neutral' : 'orange'}>{LEVEL_LABEL[k] ?? k} {fmtInt(v)}</Tag>)}
             </div>
           )}
         </>
       )}
       <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-        Consumidas = lecturas cobradas al cupo (registro de lecturas). Entregadas y fallidas = lo que el servidor vio pasar en el desk, web e iOS.
+        Consumidas = lecturas cobradas al cupo. Emitidas, fallidas y abandonadas = registros del servidor en el desk, web e iOS. No se confirma que la respuesta se mostró en el cliente; una abandonada no es una falla.
       </p>
     </Card>
   );
@@ -308,7 +319,7 @@ function OutcomesCard({ out, includeInternal, periodSince }: { out: Growth['outc
 
 // ---------------------------------------------------------------- acquisition
 
-function AcquisitionSection({ g, days, cmp, period }: { g: Growth; days: string[]; cmp: CompareSeries | null; period: number }) {
+function AcquisitionSection({ g, days, cmp, period, markFailed }: { g: Growth; days: string[]; cmp: CompareSeries | null; period: number; markFailed: boolean }) {
   const a = g.acquisition;
   // Align the per-day series with the overview's days (both end today); never pad with invented zeros.
   const n = Math.min(days.length, a.visitorDays.length);
@@ -319,7 +330,7 @@ function AcquisitionSection({ g, days, cmp, period }: { g: Growth; days: string[
   const sameSeries = n > 0 && tail.length === n && tail.every((v, i) => v === barValues[i]);
   const delta = sameSeries ? windowDelta(cmp?.visits, period) : null;
   const chips = sameSeries ? growthWindows(cmp?.visits) : [];
-  const team = g.includeInternal ? 'incluye al equipo' : 'sin el equipo';
+  const team = g.includeInternal ? 'incluye al equipo' : teamOut(markFailed);
 
   return (
     <>
@@ -376,7 +387,7 @@ function AcquisitionSection({ g, days, cmp, period }: { g: Growth; days: string[
 
 // ---------------------------------------------------------------- the tab
 
-function CoverageNote({ g, o }: { g: Growth; o: OverviewResponse['overview'] }) {
+function CoverageNote({ g, o, markFailed }: { g: Growth; o: OverviewResponse['overview']; markFailed: boolean }) {
   const cv = g.coverage;
   const parts = [
     `Llegadas observadas desde ${cv.webObservedSince ? fmtDate(cv.webObservedSince) : 'sin datos'} (web)`,
@@ -385,28 +396,32 @@ function CoverageNote({ g, o }: { g: Growth; o: OverviewResponse['overview'] }) 
     `${fmtInt(cv.backfillInstalls)} instalaciones reconstruidas aparte`,
     g.includeInternal
       ? `incluye al equipo (${fmtInt(cv.internalAccounts)} cuentas, ${fmtInt(cv.internalInstalls)} instalaciones)`
-      : `sin el equipo: −${fmtInt(g.people.excluded.accounts)} cuentas, −${fmtInt(g.people.excluded.guests)} instalaciones sin cuenta, −${fmtInt(o.activity.readsInternal)} lecturas`,
+      : teamOut(markFailed, `sin el equipo: −${fmtInt(g.people.excluded.accounts)} cuentas, −${fmtInt(g.people.excluded.guests)} instalaciones sin cuenta, −${isMissing(o.missing, 'activity.readsInternal') ? DASH : fmtInt(o.activity.readsInternal)} lecturas`),
   ];
   return <Note tag="Cobertura">{parts.join(' · ')}</Note>;
 }
 
-export default function FunnelTab({ data, period, cmp, refreshKey, notify, internal }: {
+export default function FunnelTab({ data, period, cmp, refreshKey, notify, internal, markFailed: overviewMarkFailed = false }: {
   data: OverviewResponse; period: number; cmp: CompareSeries | null; refreshKey: number; notify: Notify; internal: boolean;
+  /** The overview's load could not mark this browser as the team's; the lifecycle view's own flag counts too. */
+  markFailed?: boolean;
 }) {
   const { overview: o, growth: g } = data;
   const mode = internal ? 'in' : 'out';
-  const lc = useLoad(() => fetchAdminLifecycle(period, internal), `${period}|${mode}|${refreshKey}`);
+  const lc = useLoad((signal) => fetchAdminLifecycle(period, internal, signal), `${period}|${mode}|${refreshKey}`, { intervalMs: CORE_REFRESH_MS });
   const costs = useLoad(fetchAdminCosts, `costs|${refreshKey}`);
   const reloadLc = lc.reload, reloadCosts = costs.reload;
   const onEconomicsChanged = useCallback(() => { void reloadLc(true); void reloadCosts(true); }, [reloadLc, reloadCosts]);
   // Economics from another period or mode is never shown under this one's label.
   const d = lc.data && lc.dataKey?.startsWith(`${period}|${mode}|`) ? lc.data : null;
-  const sc = data.searchConsole ?? d?.searchConsole ?? null;
-  const store = isMissing(o.missing, 'integrations') ? d?.appStore ?? null : data.integrations.appStore;
+  const sc = data.searchConsole;
+  const store = data.providersLoaded ? data.integrations.appStore : null;
+  const markFailed = !internal && (overviewMarkFailed || !!d?.internalMarkFailed);
 
   return (
     <div className="flex flex-col gap-4">
-      {g ? <CoverageNote g={g} o={o} /> : (
+      <SourceFreshness meta={sourceMetaForError(d?.meta, lc.error?.message)} maxAgeMs={CORE_STALE_MS} label="Economía · actualización cada 30 s" fallbackAt={lc.updatedAt} />
+      {g ? <CoverageNote g={g} o={o} markFailed={markFailed} /> : (
         <Note tag="Incompleto">Dato no disponible: el servidor no envió el crecimiento (personas, cohortes, resultados, adquisición).</Note>
       )}
       {d && <MissingNote missing={d.missing} />}
@@ -416,12 +431,12 @@ export default function FunnelTab({ data, period, cmp, refreshKey, notify, inter
         <>
           <FunnelCard g={g} period={period} sc={sc} store={store} />
           <HistoryCard history={g.history} />
-          <OutcomesCard out={g.outcomes} includeInternal={g.includeInternal} periodSince={g.since} />
-          <AcquisitionSection g={g} days={o.days} cmp={cmp} period={period} />
+          <OutcomesCard out={g.outcomes} includeInternal={g.includeInternal} periodSince={g.since} markFailed={markFailed} />
+          <AcquisitionSection g={g} days={o.days} cmp={cmp} period={period} markFailed={markFailed} />
         </>
       )}
       <UtmBuilder />
-      {sc && <SearchConsoleCard sc={sc} period={period} />}
+      {sc && <SearchConsoleCard sc={sc} period={period} teamOut={!internal} />}
 
       {d ? (
         <EconomicsSection

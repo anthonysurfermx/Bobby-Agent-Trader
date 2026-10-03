@@ -65,10 +65,11 @@ export function DeltaLine({ d, invert, suffix = 'vs periodo anterior', fallback 
 
 export interface KpiItem { label: string; value: ReactNode; delta?: Delta | null; invert?: boolean; caption?: ReactNode; tone?: 'red' }
 
-/** One card split in three columns with hairline dividers (stacks on phones). */
+/** One card split in three (or four) columns with hairline dividers (stacks on phones; four stack until lg). */
 export function KpiStrip({ items }: { items: KpiItem[] }) {
+  const four = items.length === 4;
   return (
-    <Card padded={false} className="grid grid-cols-1 divide-y divide-white/[0.06] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+    <Card padded={false} className={cx('grid grid-cols-1 divide-y divide-white/[0.06]', four ? 'lg:grid-cols-4 lg:divide-x lg:divide-y-0' : 'sm:grid-cols-3 sm:divide-x sm:divide-y-0')}>
       {items.map((k) => (
         <div key={k.label} className="flex min-w-0 flex-col justify-between gap-5 p-5">
           <div className="min-w-0">
@@ -118,11 +119,11 @@ export function Row({ label, value, hint }: { label: ReactNode; value: ReactNode
 // ---------------------------------------------------------------- controls
 
 type TagTone = 'neutral' | 'orange' | 'blue' | 'green' | 'red';
-export function Tag({ children, tone = 'neutral', title }: { children: ReactNode; tone?: TagTone; title?: string }) {
+export function Tag({ children, tone = 'neutral', title, wrap = false }: { children: ReactNode; tone?: TagTone; title?: string; wrap?: boolean }) {
   return (
     <span
       title={title}
-      className={cx('inline-flex items-center whitespace-nowrap rounded-md border px-1.5 py-[3px] font-mono text-[10px] font-medium uppercase leading-none tracking-[0.06em]',
+      className={cx('inline-flex max-w-full items-center rounded-md border px-1.5 py-[3px] font-mono text-[10px] font-medium uppercase tracking-[0.06em]', wrap ? 'whitespace-normal break-words leading-snug' : 'whitespace-nowrap leading-none',
         tone === 'neutral' && 'border-white/[0.08] text-[#8B8B8B]',
         tone === 'orange' && 'border-[#F28C38]/30 bg-[#F28C38]/10 text-[#F7A04B]',
         tone === 'blue' && 'border-[#4FB3FF]/30 bg-[#4FB3FF]/10 text-[#6CC4FF]',
@@ -279,7 +280,7 @@ export function Note({ children, tag, tone = 'neutral' }: { children: ReactNode;
       tone === 'red' && 'border-[#F06A6A]/30 bg-[#F06A6A]/[0.06] text-[#F3B0B0]')}
     >
       {tag && <Tag tone={tone === 'neutral' ? 'neutral' : tone}>{tag}</Tag>}
-      <span className="min-w-0 flex-1">{children}</span>
+      <span className="min-w-0 flex-1 basis-full sm:basis-0">{children}</span>
     </div>
   );
 }

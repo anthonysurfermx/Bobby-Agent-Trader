@@ -17,6 +17,8 @@ let status: SyncStatus = 'idle';
 let inflight: Promise<SyncStatus> | null = null;
 let timer: ReturnType<typeof setTimeout> | null = null;
 const listeners = new Set<() => void>();
+const credentialListeners = new Set<() => void>();
+export function onProgressCredentialChange(cb: () => void): () => void { credentialListeners.add(cb); return () => credentialListeners.delete(cb); }
 const emit = () => listeners.forEach((l) => l());
 
 // Trader Land grants (`results[].world`) keyed by the event that earned them,
@@ -44,6 +46,7 @@ function setStatus(next: SyncStatus) { if (status !== next) { status = next; emi
 export function configureProgressSync(fn: HeadersFn | null): void {
   generation++;
   headersFn = fn;
+  credentialListeners.forEach((cb) => cb());
   grants.clear();
   if (!fn) { setStatus('idle'); return; }
   void syncProgress();

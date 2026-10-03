@@ -60,6 +60,27 @@ function onStage(p){
   if (p.stage === 'accepted'){ r.accepted = true; r.asset = p.asset || null; dockAsset(); fsmEvent('accepted', r); }
   else if (p.stage === 'market'){ r.market = p.market || null; dockAsset(); }
 }
+/* Acknowledgment after two real animation frames with a settled, visible result card.
+   Native retains the signed receipt; this trusted page only names the current request UUID. */
+function observePresentedRead(){
+  var r = READ;
+  if (!r || !r.model || !r.reply || r.reply.status !== 'ok' || !r.requestId || r.presented || !canRun()) return;
+  var visible = false;
+  if (A.cardsOn){
+    for (var i = 0; i < el.cards.length; i++){
+      var c = el.cards[i];
+      if (!A.rev[i] || A.rev[i].x < 0.999 || !c.textContent.trim()) continue;
+      var box = c.getBoundingClientRect(), style = W.getComputedStyle(c);
+      if (style.visibility !== 'hidden' && style.display !== 'none' && Number(style.opacity) >= 0.5 &&
+          box.width > 0 && box.height > 0 && box.right > 0 && box.bottom > 0 && box.left < W.innerWidth && box.top < W.innerHeight){ visible = true; break; }
+    }
+  }
+  if (!visible){ r.visibleFrames = 0; return; }
+  r.visibleFrames = (r.visibleFrames || 0) + 1;
+  if (r.visibleFrames < 2) return;
+  r.presented = true;
+  bcall('read.rendered', { requestId: r.requestId }).catch(noop);
+}
 /* the header's second line: the real asset and price from ask.stage (never a JS guess) */
 function dockAsset(){
   var r = READ; if (!r || !r.asset) return;

@@ -192,6 +192,8 @@ final class NucleoSession: ObservableObject {
             return try await desk.ask(p)
         case "cancel":
             return desk.cancel()
+        case "read.rendered":
+            return try desk.readRendered(p)
         case "speech.permission":
             return speech.permission().json
         case "speech.requestPermission":

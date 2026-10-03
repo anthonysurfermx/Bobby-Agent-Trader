@@ -105,6 +105,13 @@
     "api/_lib/market-snapshot.ts",
     "api/briefings.ts",
     "api/briefing-worker.ts",
-    "api/bobby-intel.ts"
+    "api/bobby-intel.ts",
+    "api/admin.ts",
+    "api/revenuecat-webhook.ts",
+    "api/stripe-webhook.ts",
+    "api/_lib/admin-plan.ts",
+    "api/_lib/admin-digest.ts",
+    "api/client-telemetry.ts",
+    "api/_lib/client-telemetry.ts"
   ]
 }

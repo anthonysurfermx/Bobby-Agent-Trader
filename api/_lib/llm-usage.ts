@@ -6,14 +6,21 @@
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import type { LlmUsage } from './llm.js';
 
-export async function logLlmUsage(rows: LlmUsage[], context: { surface: string; level?: string | null }): Promise<void> {
+/** `abandoned`: the reader left before the answer reached them. One marker row (role 'left', provider 'none', $0)
+ *  is written with the run's batch, so the owner dashboard counts that run apart instead of as a failed analysis
+ *  (bobby_admin_overview → llm.deskRuns.abandoned); provider figures never read it. */
+export async function logLlmUsage(rows: LlmUsage[], context: { surface: string; level?: string | null; abandoned?: boolean }): Promise<void> {
   if (!rows.length) return;
   try {
-    const body = rows.map((u) => ({
+    const body: Array<Record<string, unknown>> = rows.map((u) => ({
       surface: context.surface, level: context.level ?? null, role: u.role, provider: u.provider, model: u.model,
       tokens_in: u.tokensIn, tokens_out: u.tokensOut, tokens_cached: u.tokensCached, tokens_reasoning: u.tokensReasoning,
       usd: Number(u.usd.toFixed(6)), latency_ms: u.latencyMs, stop: u.stop, ok: u.ok,
     }));
+    if (context.abandoned) {
+      body.push({ surface: context.surface, level: context.level ?? null, role: 'left', provider: 'none', model: 'none',
+        tokens_in: 0, tokens_out: 0, tokens_cached: 0, tokens_reasoning: 0, usd: 0, latency_ms: 0, stop: 'left', ok: false });
+    }
     const r = await fetch(bobbyRest('bobby_llm_usage'), {
       method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'return=minimal' }), body: JSON.stringify(body), signal: AbortSignal.timeout(1500),
     });

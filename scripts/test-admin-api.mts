@@ -10,6 +10,10 @@ process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.RATE_LIMIT_SALT = 'test-salt';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.OPENAI_API_KEY = 'test-openai';
+process.env.BOBBY_LLM_DAILY_CAP_USD = '8';
+process.env.BOBBY_LLM_MONTHLY_CAP_USD = '160';
+process.env.BOBBY_LLM_ALERT_USD = '40';
+process.env.BOBBY_PAYWALL = 'on';
 delete process.env.BOBBY_AUTH_URL;
 delete process.env.REVENUECAT_V2_SECRET_KEY;
 for (const k of ['ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER']) delete process.env[k];
@@ -61,6 +65,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   calls.push(c);
   const o = overrides(c);
   if (o) return o;
+  if (c.url.includes('/rpc/bobby_cache_claim')) return json(true);
   if (c.url.includes('/rest/v1/api_cache')) return c.method === 'POST' ? json(null, 201) : json([]);
   if (c.url.includes('/auth/v1/user')) {
     const t = TOKENS[c.headers.authorization ?? ''];
@@ -93,7 +98,8 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   }
   if (c.url.includes('agent_trades?user_id=eq.') || c.url.includes('bobby_identities?id=eq.')) return new Response(null, { status: 204 });
   if (c.url.includes('/auth/v1/admin/users/')) return json({});
-  if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events') || c.url.includes('bobby_costs') && c.method === 'POST') return new Response(null, { status: 201 });
+  if (c.url.includes('bobby_costs') && c.method === 'POST') return json([{ id: 1, ...c.body }], 201);
+  if (c.url.includes('bobby_llm_credit_marks') || c.url.includes('bobby_events')) return new Response(null, { status: 201 });
   if (c.url.includes('rpc/bobby_record_event')) return new Response(null, { status: 204 });
   if (c.url.includes('rpc/bobby_admin_geo')) return json({ since: new Date(Date.now() - 2 * 86_400_000).toISOString(), web: { devices: 3, located: 2 }, countries: [{ country: 'MX', visitors: 2 }], regions: [], purchases: [] });
   if (c.url.includes('rpc/bobby_admin_growth')) return json({ days: 30, people: { accounts: 3, active7d: 2 }, cohorts: { web: { arrived: 3 }, ios: { arrived: 1 } }, outcomes: {}, acquisition: { visits: 4, visitors: 3, visitsWithUtm: 0 }, attention: { neverRead: [] }, coverage: {} });
@@ -147,11 +153,16 @@ try {
   eq(over.statusCode, 200, 'overview');
   eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 365, p_internal: false }, 'the window is capped; the team is left out by default');
   ok(Array.isArray(over.body.insights) && over.body.growth?.people?.accounts === 3, 'the overview carries the growth view and its diagnosis');
+  eq(over.body.integrations, { llmCaps: { dayUsd: 8, monthUsd: 160, alertUsd: 40 }, paywall: true }, 'configured caps and paywall are available before provider reads');
+  eq(over.body.searchConsole, null, 'external provider data is deferred');
+  eq(calls.filter((c) => /appstoreconnect|revenuecat\.com|searchconsole\.googleapis|rpc\/bobby_llm_spend|bobby_purchase_events|bobby_reads\?|bobby_events\?|asc-sales-v2|cache_key=eq\.track-health/.test(c.url)).length, 0, 'core avoids delayed provider and health reads');
   eq((await call('GET', 'Bearer admin-token', { view: 'overview', internal: '1' })).statusCode, 200, 'internal traffic on request');
   eq(calls.find((c) => c.url.includes('rpc/bobby_admin_growth'))?.body, { p_days: 30, p_internal: true }, 'growth follows the same switch');
-  eq([over.body.integrations.revenuecat.configured, over.body.integrations.appStore.configured], [false, false], 'integrations report what is missing');
-  ok(over.body.integrations.missing.includes('REVENUECAT_V2_SECRET_KEY') && over.body.integrations.missing.includes('ASC_KEY_ID'), 'missing env names');
-  eq(typeof over.body.integrations.llmCaps.dayUsd, 'number', 'LLM caps');
+  eq(over.body.meta.sources.appStore.status, 'deferred', 'core names its pending providers');
+  const providers = await call('GET', 'Bearer admin-token', { view: 'integrations', days: '30' });
+  eq([providers.body.integrations.revenuecat.configured, providers.body.integrations.appStore.configured], [false, false], 'integrations report what is missing');
+  ok(providers.body.integrations.missing.includes('REVENUECAT_V2_SECRET_KEY') && providers.body.integrations.missing.includes('ASC_KEY_ID'), 'missing env names');
+  eq(typeof providers.body.integrations.llmCaps.dayUsd, 'number', 'LLM caps');
   const cmp = await call('GET', 'Bearer admin-token', { view: 'overview', days: '60', compare: '1' });
   eq([cmp.statusCode, cmp.body.integrations, cmp.body.overview.accounts.total], [200, null, 6], 'the comparison request only reads the series');
   await call('GET', 'Bearer admin-token', { view: 'users', q: 'ana', limit: '9999' });
@@ -296,12 +307,12 @@ try {
   // ---------- lifecycle and unit economics ----------
   const members = await call('GET', 'Bearer admin-token', { view: 'members' });
   eq([members.statusCode, members.body.subscriptions.length], [200, 1], 'members: every subscription, server side');
-  const over2 = await call('GET', 'Bearer admin-token', { view: 'overview', days: '7' });
+  const over2 = await call('GET', 'Bearer admin-token', { view: 'integrations', days: '7' });
   eq([over2.body.integrations.health.vercelAnalytics, over2.body.integrations.health.llmKeys], ['unverified', { anthropic: true, openai: true }], 'health is reported, not assumed');
   ok(over2.body.integrations.missing.includes('REVENUECAT_SECRET_KEY') && over2.body.integrations.missing.includes('REVENUECAT_WEBHOOK_AUTH'), 'webhook secrets are checked');
   eq(over2.body.integrations.health.revenuecatWebhook.configured, false, 'webhook not configured without its secrets');
   const life = await call('GET', 'Bearer admin-token', { view: 'lifecycle', days: '30' });
-  eq([life.statusCode, life.body.searchConsole.configured, life.body.appStore.configured], [200, false, false], 'lifecycle view: economics and the providers');
+  eq([life.statusCode, life.body.searchConsole, life.body.appStore], [200, null, null], 'lifecycle view: first-party economics while providers load separately');
   eq([life.body.instrumentation.iosPaywall, life.body.instrumentation.deskOutcomes], [false, true], 'what is measured');
   eq(calls.find((c) => c.url.includes('rpc/bobby_admin_economics'))?.body, { p_days: 30, p_internal: false }, 'economics leaves the team out');
   const ue = life.body.economics;
@@ -335,7 +346,7 @@ try {
   eq([countryCode('br'), countryCode('BRA'), countryCode(7)], ['BR', null, null], 'store country codes');
   const aud = await call('GET', 'Bearer admin-token', { view: 'audience', days: '30' });
   eq([aud.statusCode, aud.body.geo.web.located, aud.body.geo.countries[0].country], [200, 2, 'MX'], 'audience view: first-party location');
-  eq([aud.body.searchConsole.configured, aud.body.appStore.configured], [false, false], 'audience view: providers report whether they are connected');
+  eq([aud.body.searchConsole, aud.body.appStore], [null, null], 'audience view: delayed countries come from the provider view');
   eq((await call('GET', 'Bearer user-token', { view: 'audience' })).statusCode, 403, 'audience is admin only');
 
   // ---------- track ----------
@@ -414,6 +425,7 @@ try {
   await adminHandler({ method: 'GET', query: { cron: 'digest' }, headers: { 'x-forwarded-for': '10.7.7.2', authorization: 'Bearer cron-test-secret' } } as never, cronOk as never);
   eq([cronOk.statusCode, typeof cronOk.body?.sent], [200, 'boolean'], 'the cron builds the digest from the dashboard figures');
   eq(calls.find((c) => c.url.includes('rpc/bobby_admin_overview'))?.body, { p_days: 7, p_internal: false }, 'last 7 days, outside traffic');
+  ok(calls.some((c) => c.url.includes('rpc/bobby_cache_claim') && c.body.p_key === 'admin-digest:run-lock'), 'cron serializes before gathering an alert batch');
   const prev = await call('POST', 'Bearer admin-token', {}, { action: 'preview-digest' });
   ok(prev.statusCode === 200 && typeof prev.body.text === 'string' && prev.body.text.includes('bobbyprotocol.xyz/admin'), 'an admin can preview the email');
   delete process.env.CRON_SECRET;
@@ -429,8 +441,8 @@ try {
   const NOW = Date.parse('2026-10-02T09:00:00Z');
   const ins = buildInsights({ days: 30, now: NOW,
     overview: { llm: { providers: { openai: { lastCreditAlert: '2026-10-01T12:50:00Z', creditAlert: { code: 'insufficient_quota', endpoint: 'tts' }, lastOk: '2026-09-30T14:13:00Z', failures24h: 0, calls24h: 0 },
-      anthropic: { lastOk: '2026-10-01T17:30:00Z', calls24h: 4, failures24h: 0 } }, deskRuns: { runs: 24, finished: 15 } }, subscriptions: { paid: 0 }, revenue: { grossUsd: 0 } },
-    growth: { people: { accounts: 4, active7d: 6 }, cohorts: { web: { arrived: 3, deskOrRead: 1, read1: 1 }, ios: { arrived: 4 } }, history: { ios: { installs: 0 } },
+      anthropic: { lastOk: '2026-10-01T17:30:00Z', calls24h: 4, failures24h: 0 } }, deskRuns: { runs: 24, finished: 15 } }, subscriptions: { paid: 0, unverified: 0 }, revenue: { grossUsd: 0, unattributedEvents: 0, unconvertedEvents: 0 } },
+    growth: { people: { accounts: 4, active7d: 6 }, cohorts: { web: { arrived: 3, deskOrRead: 1, read1: 1 }, ios: { arrived: 4 } }, history: { ios: { installs: 0, installsInPeriod: 0 } },
       outcomes: { consumedTotal: 27, consumedInternal: 5, blocked: {} }, acquisition: { visits: 4, visitors: 3, visitsWithUtm: 0 },
       attention: { neverRead: [{ identityId: '868fbd4b-0000', provider: 'apple', createdAt: '2026-09-17T04:57:00Z' }], quiet: [] }, coverage: { webObservedSince: '2026-10-01T16:37:00Z' } },
     integrations: { paywall: false, appStore: { configured: true, totals: { downloads: 15 }, byCountry: [{ country: 'FR', downloads: 8 }, { country: 'MX', downloads: 3 }], coveredFrom: '2026-09-02', coveredTo: '2026-09-30' },
@@ -445,7 +457,7 @@ try {
   ok(!topped.some((i) => i.id === 'credit-openai'), 'a top-up after the alert clears it');
   const healedRun = buildInsights({ days: 30, now: NOW, overview: { llm: { deskRuns: { runs: 24, finished: 14, byDay: [{ day: '2026-09-30', runs: 1, finished: 0 }, { day: '2026-10-01', runs: 1, finished: 1 }] },
     providers: { openai: { lastFailure: { at: '2026-10-01T10:27:00Z', stop: 'http_429', surface: 'desk' } }, anthropic: { lastOk: '2026-10-01T17:30:00Z' } } } }, growth: {}, integrations: {}, searchConsole: {} });
-  eq(healedRun.find((i) => i.id === 'desk-failures')?.level, 'info', 'failures followed by a successful call are history, not urgent');
+  eq(healedRun.find((i) => i.id === 'desk-failures')?.level, 'critical', 'a successful provider probe does not prove a completed desk response');
 
   // ---------- dev dashboard fixture follows the same durable acknowledgement ----------
   const { mockAdminFetch } = await import('../src/components/admin/bobby/mock.ts');

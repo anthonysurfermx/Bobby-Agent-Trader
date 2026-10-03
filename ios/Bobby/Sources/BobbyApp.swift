@@ -8,6 +8,7 @@ struct BobbyApp: App {
     /// on the page's wordmark (`openClassic`) for the rest of this launch; the next launch
     /// returns here. Release always shows the Núcleo and never routes to ContentView.
     @State private var showNucleo = true
+    @Environment(\.scenePhase) private var scenePhase
     /// APNs token callbacks and the notification-tap delegate (briefings, build 53). Its launch hook does
     /// nothing in the unit-test host; it never asks for notification permission by itself.
     @UIApplicationDelegateAdaptor(BobbyAppDelegate.self) private var appDelegate
@@ -126,6 +127,17 @@ struct BobbyApp: App {
 #endif
             }
             .preferredColorScheme(.dark)
+            .onAppear { if scenePhase == .active { BobbyTelemetry.shared.becameActive() } }
+            .onChange(of: scenePhase) { _, phase in
+                switch phase {
+                case .active: BobbyTelemetry.shared.becameActive()
+                case .background: BobbyTelemetry.shared.wentBackground()
+                default: BobbyTelemetry.shared.becameInactive()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange)) { _ in
+                BobbyTelemetry.shared.accountChanged()
+            }
         }
     }
 }

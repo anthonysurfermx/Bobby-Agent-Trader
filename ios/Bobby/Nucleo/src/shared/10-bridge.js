@@ -16,7 +16,7 @@
   'use strict';
   var V = 1;
   var METHODS = [
-    'session', 'roster', 'suggestions', 'ask', 'cancel',
+    'session', 'roster', 'suggestions', 'ask', 'cancel', 'read.rendered',
     'speech.permission', 'speech.requestPermission', 'speech.start', 'speech.stop',
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',

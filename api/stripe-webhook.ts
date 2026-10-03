@@ -3,18 +3,33 @@
 // or ends; bobby_subscriptions follows. The signature (Stripe-Signature, HMAC-SHA256 over the raw
 // body with STRIPE_WEBHOOK_SECRET, 5-minute tolerance) is checked before anything is read.
 // Events: checkout.session.completed, customer.subscription.created|updated|deleted; invoice.paid and
-// charge.refunded and refund.created|updated become revenue rows (bobby_purchase_events) for the owner dashboard.
+// charge.refunded become revenue rows (bobby_purchase_events) for the owner dashboard.
 // The identity rides in metadata.identity_id (set by /api/bobby-access checkout).
 // ============================================================
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
-import { notifyOwner } from './_lib/provider-alert.js';
 import { getSubscription, upsertSubscription } from './_lib/access.js';
+import { notifyOwner } from './_lib/provider-alert.js';
 import { STRIPE_TERMINAL, StripeError, stripeApi } from './_lib/stripe-api.js';
-import { linkPurchaseIdentityIfMissing, recordPurchaseEvent } from './_lib/purchases.js';
+import { linkPurchaseIdentity, recordPurchaseEvent } from './_lib/purchases.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 
 export const config = { maxDuration: 60 };
 
+const stripeWork = new AsyncLocalStorage<{ deadline: number }>();
+const PAGE_LIMIT = 3;
+async function bounded<T>(load: () => Promise<T>, maximum = 5000): Promise<T> {
+  const ms = Math.min(maximum, (stripeWork.getStore()?.deadline ?? Date.now() + maximum) - Date.now());
+  if (ms <= 0) throw new Error('Stripe reconciliation budget exhausted');
+  let timer: ReturnType<typeof setTimeout>;
+  try { return await Promise.race([load(), new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('Stripe reconciliation budget exhausted')), ms); })]); }
+  finally { clearTimeout(timer!); }
+}
+const stripeFetch = (url: string, init: RequestInit = {}) => {
+  const ms = Math.max(1, Math.min(5000, (stripeWork.getStore()?.deadline ?? Date.now() + 5000) - Date.now()));
+  return bounded(() => fetch(url, { ...init, signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(ms)]) : AbortSignal.timeout(ms) }));
+};
+const purchaseTransport = { fetch: stripeFetch, body: bounded };
 const json = (status: number, body: unknown) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
 function validSignature(raw: string, header: string | null, secret: string): boolean {
@@ -30,9 +45,11 @@ function validSignature(raw: string, header: string | null, secret: string): boo
 }
 
 async function stripeGet(path: string): Promise<Record<string, unknown>> {
-  const r = await fetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }, signal: AbortSignal.timeout(5000) });
+  const r = await stripeFetch(`https://api.stripe.com/v1/${path}`, { headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }, signal: AbortSignal.timeout(5000) });
   if (!r.ok) throw new Error(`stripe GET ${path} ${r.status}`);
-  return (await r.json()) as Record<string, unknown>;
+  const result = await bounded(() => r.json()) as Record<string, unknown>;
+  if (!result || typeof result !== 'object' || Array.isArray(result)) throw new Error('Stripe response invalid');
+  return result;
 }
 
 /** Newer API versions carry the period end on the subscription item, older ones on the subscription. */
@@ -108,14 +125,14 @@ export function stripePaidPeriodFromInvoice(identity: string, sub: Record<string
 }
 
 async function stripeProof(identity: string): Promise<StripePaidPeriod | null> {
-  const r = await fetch(bobbyRest(`bobby_brief_paid_periods?identity_id=eq.${identity}&proof_source=eq.stripe&select=*`),
+  const r = await stripeFetch(bobbyRest(`bobby_brief_paid_periods?identity_id=eq.${identity}&proof_source=eq.stripe&select=*`),
     { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`Stripe paid proof read ${r.status}`);
-  return ((await r.json()) as StripePaidPeriod[])[0] ?? null;
+  return ((await bounded(() => r.json())) as StripePaidPeriod[])[0] ?? null;
 }
 
 async function deleteStripeProof(identity: string): Promise<void> {
-  const r = await fetch(bobbyRest(`bobby_brief_paid_periods?identity_id=eq.${identity}&proof_source=eq.stripe`),
+  const r = await stripeFetch(bobbyRest(`bobby_brief_paid_periods?identity_id=eq.${identity}&proof_source=eq.stripe`),
     { method: 'DELETE', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`Stripe paid proof delete ${r.status}`);
 }
@@ -131,7 +148,7 @@ async function reconcileStripeProof(identity: string, sub: Record<string, unknow
 }
 
 async function upsertStripeProof(proof: StripePaidPeriod): Promise<void> {
-  const r = await fetch(bobbyRest('bobby_brief_paid_periods?on_conflict=identity_id'), {
+  const r = await stripeFetch(bobbyRest('bobby_brief_paid_periods?on_conflict=identity_id'), {
     method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
     body: JSON.stringify({ ...proof, updated_at: new Date().toISOString() }), signal: AbortSignal.timeout(4000),
   });
@@ -189,12 +206,14 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   }
   const price = subPrice(sub);
   try {
-    await upsertSubscription({
+    await bounded(() => upsertSubscription({
       identity_id: identity, provider: 'stripe', status, product_id: price,
       current_period_end: periodEnd(sub), stripe_customer_id: typeof sub.customer === 'string' ? sub.customer : null,
       stripe_subscription_id: typeof sub.id === 'string' ? sub.id : null,
-      environment: sub.livemode === true ? 'production' : sub.livemode === false ? 'sandbox' : null,
-    });
+      environment: sub.livemode === true ? 'production' : sub.livemode === false ? 'sandbox' : 'unknown',
+      period_type: sub.status === 'trialing' ? 'trial' : periodEnd(sub) && periodStart(sub) ? 'normal' : 'unknown',
+      store_checked_at: new Date().toISOString(),
+    }));
   } catch (e) {
     // Foreign key: the account was deleted. Nobody can use this plan any more, so a subscription that can still
     // charge is cancelled at Stripe before acknowledging (otherwise it would bill a deleted account for ever).
@@ -215,149 +234,231 @@ async function saveSubscription(sub: Record<string, unknown>, fallbackIdentity?:
   return identity;
 }
 
-async function identityForSubscription(subscriptionId: unknown): Promise<string | null> {
-  if (typeof subscriptionId !== 'string' || !subscriptionId) return null;
-  const r = await fetch(bobbyRest(`bobby_subscriptions?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=identity_id`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
+async function subscriptionOwner(subscriptionId: unknown): Promise<{ identity: string | null; customer: string | null }> {
+  if (typeof subscriptionId !== 'string' || !subscriptionId) return { identity: null, customer: null };
+  const r = await stripeFetch(bobbyRest(`bobby_subscriptions?stripe_subscription_id=eq.${encodeURIComponent(subscriptionId)}&select=identity_id,stripe_customer_id`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
   if (!r.ok) throw new Error(`subscriptions ${r.status}`);
-  const stored = ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id;
-  if (stored) return stored;
-  const sub = await stripeApi<{ metadata?: { identity_id?: string } }>('GET', `subscriptions/${encodeURIComponent(subscriptionId)}`);
-  return existingIdentity(sub.metadata?.identity_id);
+  const rows = await bounded(() => r.json()) as Array<{ identity_id: string; stripe_customer_id?: string | null }>;
+  if (!Array.isArray(rows) || rows.length > 1) throw new Error('Stripe subscription owner ambiguous');
+  const row = rows[0];
+  return { identity: row && /^[0-9a-f-]{36}$/i.test(row.identity_id) ? row.identity_id : null, customer: invoiceId(row?.stripe_customer_id) };
+}
+async function identityForSubscription(subscriptionId: unknown): Promise<string | null> { return (await subscriptionOwner(subscriptionId)).identity; }
+
+/** Only USD scaling is explicitly supported here. Other currencies are retained without inventing major units. */
+const localAmount = (minor: number, currency: string) => currency === 'USD' ? minor / 100 : null;
+const mode = (value: unknown) => value === true ? 'PRODUCTION' : value === false ? 'SANDBOX' : null;
+const currencyOf = (value: unknown) => typeof value === 'string' && /^[a-zA-Z]{3}$/.test(value) ? value.toUpperCase() : null;
+const ledgerResourceId = (prefix: 'stripe-invoice' | 'stripe-refund', id: string) => {
+  const canonical = `${prefix}-${id}`;
+  return canonical.length <= 80 ? canonical : `${prefix}-${createHash('sha256').update(id).digest('hex')}`;
+};
+const ledgerInvoiceId = (id: string) => ledgerResourceId('stripe-invoice', id);
+const ledgerRefundId = (id: string) => ledgerResourceId('stripe-refund', id);
+
+async function recordInvoice(invoice: Record<string, unknown>, eventCreated: unknown): Promise<string | null> {
+  const amount = invoice.amount_paid, currency = currencyOf(invoice.currency), id = stripeId(invoice.id);
+  if (!Number.isSafeInteger(amount) || Number(amount) < 0 || !currency || !id) throw new Error('Stripe invoice money invalid');
+  if (amount === 0) return null;
+  const ledgerId = ledgerInvoiceId(id);
+  const paidAt = seconds((invoice.status_transitions as { paid_at?: unknown } | undefined)?.paid_at) ?? seconds(eventCreated);
+  await recordPurchaseEvent({ id: ledgerId, type: invoice.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL',
+    environment: mode(invoice.livemode), store: 'STRIPE', priceUsd: currency === 'USD' ? Number(amount) / 100 : null,
+    // A configured fee formula is not this charge's balance transaction. Keep the take-home unknown.
+    takehome: null, currency, priceLocal: localAmount(Number(amount), currency),
+    // Issuance can precede payment by days. The signed paid transition/event owns the revenue timestamp.
+    at: paidAt !== null ? paidAt * 1000 : Date.now(),
+    country: (invoice.customer_address as { country?: string } | null | undefined)?.country ?? null,
+  }, purchaseTransport);
+  return ledgerId;
 }
 
-async function existingIdentity(id: unknown): Promise<string | null> {
-  if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return null;
-  const r = await fetch(bobbyRest(`bobby_identities?id=eq.${encodeURIComponent(id)}&select=id&limit=1`),
-    { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
-  if (!r.ok) throw new Error(`identity ${r.status}`);
-  return ((await r.json()) as Array<{ id: string }>)[0]?.id ?? null;
+const REFUND_STATUSES = new Set(['pending', 'requires_action', 'succeeded', 'failed', 'canceled']);
+async function recordRefund(refund: Record<string, unknown>, charge: Record<string, unknown>, environment: unknown): Promise<string | null> {
+  const id = stripeId(refund.id), chargeId = stripeId(charge.id), refundedCharge = invoiceId(refund.charge);
+  const currency = currencyOf(refund.currency), chargeCurrency = currencyOf(charge.currency);
+  if (!id?.startsWith('re_') || !chargeId || refundedCharge !== chargeId || !currency ||
+      (chargeCurrency && currency !== chargeCurrency) || !Number.isSafeInteger(refund.amount) || Number(refund.amount) <= 0 ||
+      !REFUND_STATUSES.has(String(refund.status ?? ''))) throw new Error('Stripe refund evidence invalid');
+  if (refund.status !== 'succeeded') return null;
+  const ledgerId = ledgerRefundId(id);
+  await recordPurchaseEvent({ id: ledgerId, type: 'REFUND', environment: mode(environment), store: 'STRIPE',
+    priceUsd: currency === 'USD' ? -Number(refund.amount) / 100 : null, takehome: 1,
+    currency, priceLocal: localAmount(-Number(refund.amount), currency),
+    at: seconds(refund.created) ? Number(refund.created) * 1000 : null,
+    country: (charge.billing_details as { address?: { country?: string } } | null | undefined)?.address?.country ?? null,
+  }, purchaseTransport);
+  return ledgerId;
 }
 
-async function identityForCustomer(customerId: unknown): Promise<string | null> {
-  if (typeof customerId !== 'string' || !/^cus_[A-Za-z0-9_]+$/.test(customerId)) return null;
-  const r = await fetch(bobbyRest(`bobby_subscriptions?stripe_customer_id=eq.${encodeURIComponent(customerId)}&select=identity_id&limit=1`),
-    { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
-  if (!r.ok) throw new Error(`subscriptions ${r.status}`);
-  const stored = ((await r.json()) as Array<{ identity_id: string }>)[0]?.identity_id;
-  if (stored) return stored;
-  const customer = await stripeApi<{ metadata?: { identity_id?: string } }>('GET', `customers/${encodeURIComponent(customerId)}`);
-  return existingIdentity(customer.metadata?.identity_id);
-}
-
-async function recordStripeRefunds(charge: Record<string, unknown>): Promise<void> {
-  const chargeId = charge.id;
-  if (typeof chargeId !== 'string' || !/^ch_[A-Za-z0-9_]+$/.test(chargeId)) throw new Error('refund without charge');
-  const identityId = await identityForCustomer(charge.customer);
-  const country = (charge.billing_details as { address?: { country?: string } } | null | undefined)?.address?.country ?? null;
-  let after: string | null = null;
-  for (let page = 0; page < 100; page++) {
-    const path = `refunds?charge=${encodeURIComponent(chargeId)}&limit=100${after ? `&starting_after=${encodeURIComponent(after)}` : ''}`;
-    const list = await stripeApi<{ data?: Array<{ id: string; status?: string; amount?: number; currency?: string; created?: number; charge?: string }>; has_more?: boolean }>('GET', path);
-    const refunds = list.data ?? [];
-    for (const refund of refunds) {
-      if (refund.status !== 'succeeded' || !/^re_[A-Za-z0-9_]+$/.test(refund.id) || refund.charge !== chargeId || !Number.isSafeInteger(refund.amount) || (refund.amount ?? 0) <= 0) continue;
-      const currency = String(refund.currency ?? charge.currency ?? '').toLowerCase();
-      await recordPurchaseEvent({
-        id: `stripe-refund-${refund.id}`, type: 'REFUND', environment: charge.livemode === false ? 'SANDBOX' : 'PRODUCTION', store: 'STRIPE',
-        priceUsd: currency === 'usd' ? -refund.amount! / 100 : null, takehome: 1,
-        currency: currency.toUpperCase() || null, priceLocal: -refund.amount! / 100,
-        identityId, at: typeof refund.created === 'number' ? refund.created * 1000 : null, country,
-      });
+/** Persist every known individual refund before requesting another page or doing optional ownership/proof work. */
+async function refundRows(charge: Record<string, unknown>): Promise<string[]> {
+  const ids = new Set<string>();
+  let invalid = false;
+  const write = async (rows: unknown[]) => {
+    for (const row of rows) {
+      try {
+        if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('Stripe refund invalid');
+        const id = await recordRefund(row as Record<string, unknown>, charge, charge.livemode);
+        if (id) ids.add(id);
+      } catch { invalid = true; }
     }
-    if (!list.has_more) return;
-    if (!refunds.length) throw new Error('Stripe refund pagination stalled');
-    after = refunds[refunds.length - 1].id;
+  };
+  const embedded = charge.refunds as { data?: unknown[]; has_more?: unknown } | undefined;
+  if (embedded?.data && Array.isArray(embedded.data)) {
+    await write(embedded.data);
+    if (invalid) throw new Error('Stripe refund evidence/write incomplete');
+    if (embedded.has_more === false) {
+      if (!embedded.data.length && Number(charge.amount_refunded) > 0) throw new Error('Stripe refund detail missing');
+      return [...ids];
+    }
   }
-  throw new Error('Stripe refund pagination limit');
+  const chargeId = stripeId(charge.id);
+  if (!chargeId) throw new Error('Stripe charge id missing');
+  let cursor: string | null = null;
+  const seen = new Set<string>();
+  for (let page = 0; page < PAGE_LIMIT; page++) {
+    const list = await stripeGet(`refunds?charge=${encodeURIComponent(chargeId)}&limit=100${cursor ? `&starting_after=${encodeURIComponent(cursor)}` : ''}`);
+    if (!Array.isArray(list.data)) throw new Error('Stripe refund page invalid');
+    await write(list.data);
+    if (invalid) throw new Error('Stripe refund evidence/write incomplete');
+    if (list.has_more === false) {
+      if (!ids.size && !list.data.length && Number(charge.amount_refunded) > 0) throw new Error('Stripe refund detail missing');
+      return [...ids];
+    }
+    if (list.has_more !== true) throw new Error('Stripe refund pagination unknown');
+    const next = stripeId((list.data.at(-1) as { id?: unknown } | undefined)?.id);
+    if (!next || seen.has(next)) throw new Error('Stripe refund cursor invalid');
+    seen.add(next); cursor = next;
+  }
+  throw new Error('Stripe refund list exceeds budget');
 }
 
-/** A fully refunded charge no longer proves a paid period: drop the proof built from its invoice. */
-async function dropProofOfRefundedCharge(charge: Record<string, unknown>): Promise<void> {
-  if (charge.livemode !== true || typeof charge.amount !== 'number' || Number(charge.amount_refunded) < charge.amount) return;
-  const iid = stripeId(charge.invoice), pid = stripeId(charge.payment_intent);
-  let linked = iid ? [iid] : [];
-  if (!iid && pid) {
-    // Stripe requires payment[type] with this filter ("Missing required param: payment[type]" otherwise, which made
-    // every full refund of a charge without `invoice` answer 500 for ever). Checked against Stripe 2026-10-03.
-    const payments = await stripeGet(`invoice_payments?payment[type]=payment_intent&payment[payment_intent]=${encodeURIComponent(pid)}&limit=10`);
-    if (payments.has_more === true) throw new Error('Stripe invoice payment list is incomplete');
-    linked = ((payments.data as Array<{ invoice?: string }> | undefined) ?? [])
-      .map((payment) => payment.invoice).filter((id): id is string => !!stripeId(id));
+async function invoicesForCharge(charge: Record<string, unknown>): Promise<string[]> {
+  const direct = invoiceId(charge.invoice);
+  if (direct) return [direct];
+  const intent = invoiceId(charge.payment_intent);
+  if (!intent) return [];
+  const invoices = new Set<string>();
+  let cursor: string | null = null;
+  const seen = new Set<string>();
+  for (let page = 0; page < PAGE_LIMIT; page++) {
+    const list = await stripeGet(`invoice_payments?payment[type]=payment_intent&payment[payment_intent]=${encodeURIComponent(intent)}&limit=100${cursor ? `&starting_after=${encodeURIComponent(cursor)}` : ''}`);
+    if (!Array.isArray(list.data)) throw new Error('Stripe invoice payment page invalid');
+    for (const item of list.data) {
+      const row = item as Record<string, unknown>;
+      const payment = row?.payment as { type?: unknown; payment_intent?: unknown } | undefined;
+      const id = invoiceId(row?.invoice);
+      if (id && payment?.type === 'payment_intent' && invoiceId(payment.payment_intent) === intent && row.livemode === charge.livemode) invoices.add(id);
+      else throw new Error('Stripe invoice payment linkage unknown');
+    }
+    if (list.has_more === false) return [...invoices];
+    if (list.has_more !== true) throw new Error('Stripe invoice payment pagination unknown');
+    const next = stripeId((list.data.at(-1) as { id?: unknown } | undefined)?.id);
+    if (!next || seen.has(next)) throw new Error('Stripe invoice payment cursor invalid');
+    seen.add(next); cursor = next;
   }
-  for (const invoiceId of linked) {
-    const invoice = await stripeGet(`invoices/${invoiceId}`);
-    const identity = await identityForSubscription(subscriptionOfInvoice(invoice));
-    if (identity && (await stripeProof(identity))?.proof_id === invoiceId && await netStripePaid(invoice) <= 0)
-      await deleteStripeProof(identity);
-  }
+  throw new Error('Stripe invoice payment list exceeds budget');
 }
 
-/** Stripe's standard card fee (2.9% + $0.30) as the store share of a USD charge. */
-const stripeTakehome = (usd: number) => (usd > 0 ? Math.max(0, (usd - (usd * 0.029 + 0.3)) / usd) : null);
+async function attributeRefunds(charge: Record<string, unknown>, ledgerIds: string[]) {
+  const linked = await invoicesForCharge(charge);
+  const owners = new Set<string>();
+  const invoices: Array<{ invoice: Record<string, unknown>; identity: string | null }> = [];
+  const customer = invoiceId(charge.customer);
+  for (const iid of linked) {
+    const invoice = await stripeGet(`invoices/${iid}`);
+    if (invoice.id !== iid || !customer || invoiceId(invoice.customer) !== customer) throw new Error('Stripe refund invoice/customer mismatch');
+    const sid = subscriptionOfInvoice(invoice);
+    const mapping = await subscriptionOwner(sid);
+    if (mapping.customer && mapping.customer !== customer) throw new Error('Stripe subscription customer mismatch');
+    let identity = mapping.customer === customer ? mapping.identity : null;
+    if (mapping.identity && !mapping.customer && sid) {
+      const currentSub = await stripeGet(`subscriptions/${sid}`);
+      const metadataIdentity = (currentSub.metadata as Record<string, string> | undefined)?.identity_id;
+      if (currentSub.id !== sid || invoiceId(currentSub.customer) !== customer || (metadataIdentity && metadataIdentity !== mapping.identity)) throw new Error('Stripe refund subscription owner/customer mismatch');
+      identity = mapping.identity;
+    }
+    if (identity) owners.add(identity);
+    invoices.push({ invoice, identity });
+  }
+  if (owners.size > 1) throw new Error('Stripe refund owner ambiguous');
+  const owner = owners.values().next().value as string | undefined;
+  if (owner && invoices.every((i) => i.identity === owner)) for (const id of ledgerIds) await linkPurchaseIdentity(id, owner, purchaseTransport);
+  // Paid-period eligibility is still decided by fresh captured payments, never by the refund ledger alone.
+  if (charge.livemode === true && Number.isSafeInteger(charge.amount) && Number.isSafeInteger(charge.amount_refunded) &&
+      Number(charge.amount_refunded) >= Number(charge.amount)) {
+    for (const { invoice, identity } of invoices) {
+      if (identity && (await stripeProof(identity))?.proof_id === invoice.id && await netStripePaid(invoice) <= 0) await deleteStripeProof(identity);
+    }
+  }
+}
 
 export async function POST(request: Request): Promise<Response> {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   if (!secret || !process.env.STRIPE_SECRET_KEY) return json(503, { error: 'Stripe is not configured' });
   const raw = await request.text();
   if (!validSignature(raw, request.headers.get('stripe-signature'), secret)) return json(400, { error: 'bad signature' });
-  let event: { id?: string; type?: string; data?: { object?: Record<string, unknown> } };
+  let event: { id?: string; type?: string; livemode?: boolean; created?: number; data?: { object?: Record<string, unknown> } };
   try { event = JSON.parse(raw); } catch { return json(400, { error: 'bad payload' }); }
+  if (!event || typeof event !== 'object' || Array.isArray(event) || typeof event.type !== 'string') return json(400, { error: 'bad payload' });
   const obj = event.data?.object ?? {};
-  try {
-    if (event.type === 'checkout.session.completed' && obj.mode === 'subscription' && typeof obj.subscription === 'string') {
-      const sub = await stripeGet(`subscriptions/${obj.subscription}`);
-      await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
-    } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
-      // Stripe does not deliver events in order: save the subscription as it is now, never the event's snapshot,
-      // so a late or retried event cannot revive a cancelled plan or drop a paid one (audit 2026-10-02, STRIPE-01).
-      const sid = stripeId(obj.id);
-      const live = sid ? await stripeGet(`subscriptions/${sid}`) : obj;
-      await saveSubscription(live, await identityForSubscription(sid));
-    } else if (event.type === 'invoice.paid' && typeof obj.id === 'string' && /^in_[A-Za-z0-9_]+$/.test(obj.id)) {
-      const sid = subscriptionOfInvoice(obj);
-      let identity: string | null = null;
-      if (sid) {
-        const [sub, invoice] = await Promise.all([
-          stripeGet(`subscriptions/${sid}`), stripeGet(`invoices/${obj.id}`),
-        ]);
-        const mapped = await identityForSubscription(sid);
-        const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
-        if (mapped && metadataIdentity && mapped !== metadataIdentity) throw new Error('Stripe subscription owner mismatch');
-        identity = await saveSubscription(sub, mapped);
-        if (identity) {
-          const paid = stripePaidPeriodFromInvoice(identity, sub, invoice);
-          if (paid) {
-            const net = await netStripePaid(invoice);
-            if (net > 0) await upsertStripeProof({ ...paid, paid_amount: Math.min(paid.paid_amount, net) });
-            else if ((await stripeProof(identity))?.proof_id === paid.proof_id) await deleteStripeProof(identity);
+  return stripeWork.run({ deadline: Date.now() + 50_000 }, async () => {
+    try {
+      if (event.type === 'checkout.session.completed' && obj.mode === 'subscription' && typeof obj.subscription === 'string') {
+        const sub = await stripeGet(`subscriptions/${obj.subscription}`);
+        await saveSubscription(sub, (obj.client_reference_id as string | null) ?? (obj.metadata as Record<string, string> | undefined)?.identity_id);
+      } else if (event.type === 'customer.subscription.created' || event.type === 'customer.subscription.updated' || event.type === 'customer.subscription.deleted') {
+        const sid = stripeId(obj.id);
+        // Even a late deleted event must use the provider's current state.
+        const sub = sid ? await stripeGet(`subscriptions/${sid}`) : obj;
+        await saveSubscription(sub, await identityForSubscription(sid));
+      } else if (event.type === 'invoice.paid' && typeof event.id === 'string') {
+        // The signed event is already evidence that this amount was received; provider reads establish access separately.
+        const ledgerId = await recordInvoice(obj, event.created);
+        const sid = subscriptionOfInvoice(obj);
+        const mapping = await subscriptionOwner(sid), mapped = mapping.identity, customer = invoiceId(obj.customer);
+        if (mapping.customer && mapping.customer !== customer) throw new Error('Stripe subscription customer mismatch');
+        if (mapped && customer && mapping.customer === customer && ledgerId) await linkPurchaseIdentity(ledgerId, mapped, purchaseTransport);
+        if (sid && stripeId(obj.id)) {
+          const [sub, invoice] = await Promise.all([stripeGet(`subscriptions/${sid}`), stripeGet(`invoices/${obj.id}`)]);
+          if (sub.id !== sid || invoice.id !== obj.id || invoiceId(sub.customer) !== invoiceId(obj.customer) ||
+              invoiceId(invoice.customer) !== invoiceId(obj.customer) || subscriptionOfInvoice(invoice) !== sid) throw new Error('Stripe invoice subscription/customer mismatch');
+          const metadataIdentity = (sub.metadata as Record<string, string> | undefined)?.identity_id;
+          if (mapped && metadataIdentity && mapped !== metadataIdentity) throw new Error('Stripe subscription owner mismatch');
+          const identity = await saveSubscription(sub, mapped);
+          if (identity) {
+            if (ledgerId) await linkPurchaseIdentity(ledgerId, identity, purchaseTransport);
+            const paid = stripePaidPeriodFromInvoice(identity, sub, invoice);
+            if (paid) {
+              const net = await netStripePaid(invoice);
+              if (net > 0) await upsertStripeProof({ ...paid, paid_amount: Math.min(paid.paid_amount, net) });
+              else if ((await stripeProof(identity))?.proof_id === paid.proof_id) await deleteStripeProof(identity);
+            }
           }
         }
+      } else if (event.type === 'charge.refunded' && typeof event.id === 'string') {
+        const cid = stripeId(obj.id);
+        if (!cid) throw new Error('Stripe refunded charge missing');
+        const ids = await refundRows(obj);
+        const current = await stripeGet(`charges/${cid}`);
+        if (current.id !== cid || (obj.livemode != null && current.livemode !== obj.livemode)) throw new Error('Stripe refunded charge mismatch');
+        await attributeRefunds(current, ids);
+      } else if (['refund.created', 'refund.updated', 'charge.refund.updated'].includes(event.type ?? '') && typeof event.id === 'string') {
+        const cid = invoiceId(obj.charge);
+        if (!cid) throw new Error('Stripe refund charge missing');
+        const initialCharge = { id: cid, livemode: event.livemode };
+        const id = await recordRefund(obj, initialCharge, event.livemode);
+        if (id) {
+          const current = await stripeGet(`charges/${cid}`);
+          if (current.id !== cid || (event.livemode != null && current.livemode !== event.livemode)) throw new Error('Stripe refund charge mismatch');
+          await attributeRefunds(current, [id]);
+        }
       }
-      if (Number(obj.amount_paid) > 0) {
-        // Two Stripe Event objects may refer to the same invoice. Key the ledger
-        // to the invoice, then repair a missing identity on a later replay.
-        const purchaseId = `stripe-invoice-${obj.id}`;
-        const usd = String(obj.currency ?? '').toLowerCase() === 'usd' ? Number(obj.amount_paid) / 100 : null;
-        const identityId = identity ?? await identityForSubscription(sid);
-        await recordPurchaseEvent({
-          id: purchaseId, type: obj.billing_reason === 'subscription_create' ? 'INITIAL_PURCHASE' : 'RENEWAL', environment: obj.livemode === false ? 'SANDBOX' : 'PRODUCTION',
-          store: 'STRIPE', priceUsd: usd, takehome: usd !== null ? stripeTakehome(usd) : null, currency: String(obj.currency ?? '').toUpperCase() || null,
-          priceLocal: Number(obj.amount_paid) / 100, identityId, at: Number(obj.created) * 1000 || null,
-          country: (obj.customer_address as { country?: string } | null | undefined)?.country ?? null,
-        });
-        await linkPurchaseIdentityIfMissing(purchaseId, identityId);
-      }
-    } else if (event.type === 'charge.refunded' && typeof obj.id === 'string') {
-      await dropProofOfRefundedCharge(obj);
-      await recordStripeRefunds(obj);
-    } else if ((event.type === 'refund.created' || event.type === 'refund.updated') && typeof obj.charge === 'string') {
-      const charge = await stripeGet(`charges/${encodeURIComponent(obj.charge)}`);
-      await dropProofOfRefundedCharge(charge);
-      await recordStripeRefunds(charge);
+    } catch (e) {
+      console.error('[stripe-webhook]', event.type, e instanceof Error ? e.message : e);
+      return json(500, { error: 'retry' }); // Stripe retries with backoff
     }
-  } catch (e) {
-    console.error('[stripe-webhook]', event.type, e instanceof Error ? e.message : e);
-    return json(500, { error: 'retry' }); // Stripe retries with backoff
-  }
-  return json(200, { received: true });
+    return json(200, { received: true });
+  });
 }

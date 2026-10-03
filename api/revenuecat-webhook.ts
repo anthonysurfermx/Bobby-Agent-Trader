@@ -36,12 +36,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const ids = new Set([event.app_user_id, event.original_app_user_id, ...(event.aliases ?? []), ...(event.transferred_to ?? []), ...(event.transferred_from ?? [])]
     .filter((id): id is string => typeof id === 'string' && /^[0-9a-f-]{36}$/i.test(id)));
   try {
-    let firstIdentity: string | null = null;
+    const identities: Array<{ authUserId: string; identity: string }> = [];
     for (const authUserId of ids) {
       const identity = await identityForAuthUser(authUserId);
-      if (identity) { firstIdentity ??= identity; await syncRevenueCat(authUserId, identity, event); }
+      if (identity) identities.push({ authUserId, identity });
     }
-    // Revenue for the owner dashboard; a failed write is retried by RevenueCat like a failed sync.
+    const firstIdentity = identities[0]?.identity ?? null;
+    // Persist the authenticated store event before entitlement reconciliation. A rejected subscriber key must
+    // not hide a received charge from the dashboard. The event id makes retries idempotent.
     if (event.id && event.type) {
       await recordPurchaseEvent({
         id: event.id, type: event.type, environment: event.environment, store: event.store, productId: event.product_id,
@@ -50,6 +52,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         country: event.country_code,
       });
     }
+    for (const { authUserId, identity } of identities) await syncRevenueCat(authUserId, identity, event);
   } catch (e) {
     console.error('[revenuecat-webhook]', event.type, e instanceof Error ? e.message : e);
     return res.status(500).json({ error: 'retry' }); // RevenueCat retries failed deliveries
