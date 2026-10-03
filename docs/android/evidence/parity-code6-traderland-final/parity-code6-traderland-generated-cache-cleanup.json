@@ -1,0 +1,9 @@
+{
+  "recorded_at": "2026-10-03T20:03:29.033350+00:00",
+  "removed_task_generated_directories": [
+    "/private/tmp/bobby-android-toolchain/gradle-home/caches/8.13/transforms",
+    "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/intermediates"
+  ],
+  "preserved": "Signed APK/AAB, debug/test APKs, test XML/lint receipts, public source, private signing inputs and dependencies",
+  "free_gib": 3.15
+}

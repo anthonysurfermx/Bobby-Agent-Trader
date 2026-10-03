@@ -3,10 +3,11 @@ package xyz.bobbyprotocol.android.ui
 import android.graphics.BitmapFactory
 import android.util.LruCache
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,10 +38,27 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
+import kotlin.math.roundToInt
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -269,7 +287,7 @@ fun TraderLandSheet(
                         val next = growth.optInt("nextSize")
                         if (next > size) Text("${t("Growth", "Crecimiento")}: ${growth.optInt("occupied")} / ${growth.optInt("threshold")} · $next × $next")
                     }
-                    LandMap(land, pieces, draft, destination, rotation, writable, t) { x, y ->
+                    LandMap(land, pieces, draft, destination, rotation, writable, session.language, t) { x, y ->
                         if (draft != null) destination = x to y
                         else pieces.firstOrNull { it.contains(x, y) }?.let { piece ->
                             if (caps?.optBoolean("move") == true) { draft = LandDraft("move", piece.placementId, piece.itemId, piece.width, piece.height); rotation = piece.rotation; destination = piece.x to piece.y }
@@ -361,7 +379,7 @@ fun TraderLandSheet(
                 Text(if (isExample) t("Read-only app example. These pieces do not belong to your inventory.", "Ejemplo de la app para explorar. Estas piezas no pertenecen a tu inventario.")
                     else t("You are visiting a public island. Changes stay with its builder.", "Estás visitando una isla pública. Los cambios pertenecen a su creador."))
                 val land = JSONObject().put("size", visiting.getInt("size")).put("core", visiting.optJSONObject("core"))
-                LandMap(land, LandJson.pieces(visit!!, public = true), null, null, 0, false, t) { _, _ -> }
+                LandMap(land, LandJson.pieces(visit!!, public = true), null, null, 0, false, session.language, t) { _, _ -> }
                 visiting.optJSONObject("stats")?.let { Text("${it.optInt("pieces")} ${t("pieces", "piezas")}") }
                 if (!isExample) LandButton(t("Report or block creator", "Reportar o bloquear creador"), !busy) { helpOpen = false; communityOpen = true }
             } else {
@@ -449,26 +467,134 @@ fun TraderLandSheet(
     OutlinedButton(onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
 }
 
-@Composable private fun LandMap(land: JSONObject, pieces: List<LandPiece>, draft: LandDraft?, point: Pair<Int, Int>?, rotation: Int, editable: Boolean, t: (String, String) -> String, tap: (Int, Int) -> Unit) {
-    val size = land.getInt("size")
+private data class LandMapSprite(val asset: String, val frame: LandSpriteFrame)
+
+@Composable private fun LandMap(land: JSONObject, pieces: List<LandPiece>, draft: LandDraft?, point: Pair<Int, Int>?, rotation: Int, editable: Boolean, language: String, t: (String, String) -> String, tap: (Int, Int) -> Unit) {
+    val context = LocalContext.current
+    val gridSize = land.getInt("size")
+    val geometry = remember(gridSize) { TraderLandProjection(gridSize) }
     val core = LandJson.core(land)
-    val draftFootprint = draft?.let { LandJson.rotated(it.width, it.height, rotation) }
-    Column(Modifier.horizontalScroll(rememberScrollState()).testTag("land-map"), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        repeat(size) { y -> Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-            repeat(size) { x ->
-                val piece = pieces.firstOrNull { it.contains(x, y) }
-                val isCore = x in core.first until core.first + 2 && y in core.second until core.second + 2
-                val preview = point != null && draftFootprint != null && x in point.first until point.first + draftFootprint.first && y in point.second until point.second + draftFootprint.second
-                val color = when { preview -> Color(0xFF3A4266); isCore -> Color(0xFF36304C); piece != null -> Color(0xFF123C32); else -> Color(0xFF151A1D) }
-                Box(Modifier.size(48.dp).background(color, RoundedCornerShape(5.dp)).border(1.dp, Color(0xFF293239), RoundedCornerShape(5.dp))
-                    .semantics { contentDescription = "${t("Cell", "Celda")} ${x + 1}, ${y + 1}" + if (isCore) " · Aura Core" else piece?.let { " · ${it.itemId}" }.orEmpty() }
-                    .clickable(enabled = editable) { tap(x, y) }, contentAlignment = Alignment.Center) {
-                    if (isCore && x == core.first && y == core.second) LandArt("aura_core", null, Modifier.fillMaxSize(), land.optJSONObject("core")?.optInt("stage", 1) ?: 1)
-                    else if (piece != null && x == piece.x && y == piece.y) LandArt(piece.itemId, null, Modifier.fillMaxSize())
-                    else Text(if (isCore || piece != null) "·" else "${x + 1},${y + 1}", style = MaterialTheme.typography.labelSmall, color = Color(0xFF9DA7B2))
-                }
+    val stage = land.optJSONObject("core")?.optInt("stage", 1) ?: 1
+    val sprites = buildList {
+        fun addSprite(id: String, x: Int, y: Int, w: Int, h: Int, turn: Int, coreStage: Int = 1) {
+            val asset = TraderLandSpriteCatalog.asset(id, coreStage)
+            val art = TraderLandSpriteCatalog.art[asset] ?: return
+            add(LandMapSprite(asset, geometry.sprite(x, y, w, h, turn, art, id == "aura_core" && coreStage == 0)))
+        }
+        addSprite("aura_core", core.first, core.second, 2, 2, 0, stage)
+        pieces.forEach { addSprite(it.itemId, it.x, it.y, it.width, it.height, it.rotation) }
+    }.sortedBy { it.frame.depth }
+    val assets = sprites.map { it.asset }.distinct().sorted()
+    var images by remember(assets) { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
+    LaunchedEffect(context, assets) {
+        images = withContext(Dispatchers.IO) {
+            assets.mapNotNull { asset ->
+                val bitmap = landArtCache.get(asset) ?: runCatching {
+                    context.assets.open("traderland/$asset").use { BitmapFactory.decodeStream(it)?.asImageBitmap() }
+                }.getOrNull()?.also { landArtCache.put(asset, it) }
+                bitmap?.let { asset to it }
+            }.toMap()
+        }
+    }
+    var viewport by remember { mutableStateOf(IntSize.Zero) }
+    var zoom by remember(gridSize) { mutableStateOf(1f) }
+    var pan by remember(gridSize) { mutableStateOf(Offset.Zero) }
+    val camera = TraderLandCamera(viewport.width.toFloat(), viewport.height.toFloat(), zoom, pan.x, pan.y)
+    val currentTap by rememberUpdatedState(tap)
+    val maxZoom = 2.6f * gridSize / 8f
+    fun changeCamera(nextZoom: Float, nextPan: Offset = pan) {
+        zoom = nextZoom.coerceIn(.7f, maxZoom)
+        val bounds = TraderLandCamera(viewport.width.toFloat(), viewport.height.toFloat(), zoom)
+        val clamped = bounds.clampPan(nextPan.x, nextPan.y)
+        pan = Offset(clamped.x, clamped.y)
+    }
+    val mapDescription = when (language) {
+        "es" -> "Isla isométrica"; "fr" -> "Île isométrique"; "pt" -> "Ilha isométrica"
+        "it" -> "Isola isometrica"; "de" -> "Isometrische Insel"; else -> "Isometric island"
+    }
+    val zoomDescriptions = when (language) {
+        "es" -> "Alejar" to "Acercar"; "fr" -> "Zoom arrière" to "Zoom avant"; "pt" -> "Afastar" to "Aproximar"
+        "it" -> "Riduci zoom" to "Aumenta zoom"; "de" -> "Verkleinern" to "Vergrößern"; else -> "Zoom out" to "Zoom in"
+    }
+    val resetDescription = when (language) {
+        "es" -> "Encuadrar isla"; "fr" -> "Recentrer l’île"; "pt" -> "Enquadrar a ilha"
+        "it" -> "Inquadra l’isola"; "de" -> "Insel einpassen"; else -> "Fit island"
+    }
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Canvas(Modifier.fillMaxWidth().aspectRatio(860f / 720f)
+            .clip(RoundedCornerShape(16.dp)).clipToBounds().background(Color(0xFF07151C))
+            .testTag("land-map").onSizeChanged { viewport = it }
+            .semantics {
+                contentDescription = "$mapDescription · $gridSize × $gridSize · ${pieces.size}"
+                if (editable) customActions = (0 until gridSize).flatMap { y -> (0 until gridSize).map { x ->
+                    val occupant = if (x in core.first until core.first + 2 && y in core.second until core.second + 2) "Aura Core"
+                        else pieces.firstOrNull { it.contains(x, y) }?.itemId.orEmpty()
+                    CustomAccessibilityAction("${t("Cell", "Celda")} ${x + 1}, ${y + 1}" + if (occupant.isBlank()) "" else " · $occupant") { currentTap(x, y); true }
+                } }
             }
-        } }
+            .pointerInput(geometry, editable, camera) {
+                detectTapGestures(onTap = { screen ->
+                    if (editable && camera.scale > 0) {
+                        val world = camera.unproject(LandPoint(screen.x, screen.y))
+                        geometry.cellAt(world.x, world.y)?.let { currentTap(it.first, it.second) }
+                    }
+                })
+            }
+            .pointerInput(gridSize, viewport) {
+                detectTransformGestures { _, delta, factor, _ ->
+                    if (factor.isFinite() && factor > 0f) changeCamera(zoom * factor, pan + delta)
+                }
+            }) {
+            fun path(points: List<LandPoint>) = Path().apply {
+                moveTo(points.first().x, points.first().y)
+                points.drop(1).forEach { lineTo(it.x, it.y) }; close()
+            }
+            withTransform({ translate(camera.x, camera.y); scale(camera.scale, camera.scale, Offset.Zero) }) {
+                val slab = TraderLandProjection.slab
+                drawOval(Color(0xFF000A10), Offset(70f, 362f), Size(720f, 280f))
+                for (edge in listOf(1 to 2, 2 to 3)) {
+                    val a = slab[edge.first]; val b = slab[edge.second]
+                    drawPath(path(listOf(a, b, b.copy(y = b.y + 22f), a.copy(y = a.y + 22f))), if (edge.first == 1) Color(0xFF19202D) else Color(0xFF242238))
+                }
+                drawPath(path(slab), Brush.verticalGradient(listOf(Color(0xFF203B3A), Color(0xFF151D30)), 207f, 575f))
+                for (y in 0 until gridSize) for (x in 0 until gridSize) {
+                    drawPath(path(geometry.diamond(x, y)), Color(0xFF385057).copy(alpha = .48f), style = Stroke(.8f))
+                }
+                // Occupied footprints remain legible while local art loads, including future catalog items.
+                drawPath(path(geometry.diamond(core.first, core.second, 2, 2)), Color(0xFF745099).copy(alpha = .24f))
+                pieces.forEach { piece ->
+                    val footprint = LandJson.rotated(piece.width, piece.height, piece.rotation)
+                    drawPath(path(geometry.diamond(piece.x, piece.y, footprint.first, footprint.second)), Color(0xFF408377).copy(alpha = .24f))
+                }
+                val footprint = draft?.let { LandJson.rotated(it.width, it.height, rotation) }
+                if (point != null && draft != null && footprint != null) {
+                    val fits = LandJson.fits(land, pieces, draft, point.first, point.second, rotation)
+                    val highlight = if (fits) Color(0xFF76D9AA) else Color(0xFFE17883)
+                    val outline = path(geometry.diamond(point.first, point.second, footprint.first, footprint.second))
+                    drawPath(outline, highlight.copy(alpha = .28f)); drawPath(outline, highlight, style = Stroke(2f))
+                }
+                sprites.forEach { sprite ->
+                    val frame = sprite.frame
+                    val art = TraderLandSpriteCatalog.art.getValue(sprite.asset)
+                    val shadowWidth = frame.side * (art.right - art.left) * .75f
+                    drawOval(Color.Black.copy(alpha = .3f), Offset(frame.x + frame.side / 2 - shadowWidth / 2, frame.depth - shadowWidth / 7), Size(shadowWidth, shadowWidth / 5))
+                    images[sprite.asset]?.let { image ->
+                        val drawSprite = {
+                            drawImage(image, dstOffset = IntOffset(frame.x.roundToInt(), frame.y.roundToInt()), dstSize = IntSize(frame.side.roundToInt().coerceAtLeast(1), frame.side.roundToInt().coerceAtLeast(1)))
+                        }
+                        if (frame.flip) scale(-1f, 1f, Offset(frame.x + frame.side / 2, frame.y + frame.side / 2)) { drawSprite() } else drawSprite()
+                    }
+                }
+                drawPath(path(slab), Color(0xFF75A99B).copy(alpha = .5f), style = Stroke(1.5f))
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            TextButton(onClick = { changeCamera(zoom / 1.3f) }, modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = zoomDescriptions.first }) { Text("−") }
+            Text("${(zoom * 100).roundToInt()}%")
+            TextButton(onClick = { changeCamera(zoom * 1.3f) }, modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = zoomDescriptions.second }) { Text("+") }
+            TextButton(onClick = { zoom = 1f; pan = Offset.Zero }, modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = resetDescription }) { Text("↺") }
+        }
+        point?.let { Text("${t("Cell", "Celda")} ${it.first + 1}, ${it.second + 1}") }
     }
 }
 

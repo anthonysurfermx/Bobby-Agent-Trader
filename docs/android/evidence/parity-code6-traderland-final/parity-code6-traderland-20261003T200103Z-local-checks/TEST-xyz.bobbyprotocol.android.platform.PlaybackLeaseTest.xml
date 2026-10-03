@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.411Z" hostname="MacBook-Pro-F-Society.local" time="0.008">
+  <properties/>
+  <testcase name="localPreviewNeedsNoExternalConsentButStillHonorsMuteAndIdentity" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0"/>
+  <testcase name="generatedAudioDoesNotStartAfterMuteOrConsentWithdrawal" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0"/>
+  <testcase name="anUnpublishedFileIsDeletedWithoutDeletingANewerPublishedFile" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.003"/>
+  <testcase name="accountSwitchOrRefreshInvalidatesPreparedAndCompletionCallbacks" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0"/>
+  <testcase name="promptCancellationAtTheIOBoundaryCleansOnlyTheCancelledOperationsFile" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.004"/>
+  <testcase name="aPreparedCallbackFromAnOlderGenerationCannotStartTheNewAudio" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0"/>
+  <testcase name="rejectingAFileAfterOwnershipChangesRetainsItOnlyUntilTheFinallyCleanup" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
