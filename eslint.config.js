@@ -18,6 +18,11 @@ export default tseslint.config(
       'docs/**',
       'nucleo/**',
       'ios/**',
+      // Android concatenated engine and generated/vendor assets have their own contract/build checks.
+      'android/nucleo/src/**',
+      'android/app/src/main/assets/**',
+      'android/**/build/**',
+      'android/**/.gradle/**',
       'node_modules/**',
       'output/**',
       // Vendored third-party assets served as-is (e.g. the Draco decoder)

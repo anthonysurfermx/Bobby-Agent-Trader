@@ -1,0 +1,16 @@
+{
+  "status": "PASS",
+  "command": [
+    "npm",
+    "run",
+    "lint",
+    "--",
+    "--quiet"
+  ],
+  "cwd": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "started_at": "2026-10-03T18:10:23.973136+00:00",
+  "completed_at": "2026-10-03T18:10:33.028644+00:00",
+  "exit_code": 0,
+  "log_sha256": "0a5d6820db4a17f272f8b21607ea9ea0c2608a2785c0e24c48af294e927e6289",
+  "deployed": false
+}

@@ -1,132 +1,96 @@
-# Bobby on Android — Trusted Web Activity
+# Bobby for Android
 
-Android ships the web app, not a port. A Trusted Web Activity is a full-screen Chrome
-instance with no browser UI, wrapped in an Android package. It runs `bobbyprotocol.xyz`
-in the user's own Chrome, which means the Android app is never behind the web: the desk,
-the debate, the record, Trader Land, Google sign-in, EN/ES and Base swaps are whatever
-production is serving that minute.
+The Android candidate is **1.1.1 (version code 6)**, on `codex/bobby-android-parity-ios17`, with [draft Android PR #141](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/141), stacked on `claude/feedback-build61` and based on canonical iOS **1.7 (61)** source / [PR #140](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/140), commit `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. PR #140 is still open; this is a source reference, not proof of an iOS release. Kotlin owns accounts, consent, market data, billing, voice and persistence; the approved bundled HTML/WebGL Núcleo and native Compose sheets present the product. Authentication tokens never enter the web page. Application ID: `xyz.bobbyprotocol.bobby`.
 
-The decision and its trade-offs are written up in
-[`docs/play-store/2026-09-17-play-readiness.md`](../docs/play-store/2026-09-17-play-readiness.md).
+## Latest candidate: Trader Land correction, code 6
 
-## What is already in the repo
+A physical Seeker user reported that Trader Land in code 5 looked like coordinates and many dots, with the island dimension missing. The cause was native `LandMap`: a Cartesian table of 48 dp boxes, with each sprite drawn only in its first cell and `·` in the remaining footprint. Canonical iOS 1.7 (61) uses an isometric Canvas and sprites; this is a rendering defect, not a different 3D library.
 
-| Piece | Where | State |
-|---|---|---|
-| Web app manifest + service worker | `vite.config.ts`, `src/sw.ts` | in this branch, needs to be deployed |
-| Digital Asset Links | `public/.well-known/assetlinks.json` | **fingerprint is a placeholder** |
-| Bubblewrap config | `android/twa-manifest.json` | ready |
-| Store assets | `docs/play-store/final/` | ready |
-| Listing copy | `docs/play-store/listing-en.md`, `listing-es.md` | ready |
+Code 6 replaces that table with a responsive native Compose Canvas. `TraderLandProjection.kt` uses the canonical isometric geometry, constant slab extent for 8/10/12/16, exact anchors/content bounds for **28 bundled sprite states**, one sprite per placement and depth order. The existing PNGs, JSON/collision helpers, account fences and explicit actions are preserved. Painting and tap selection share the same inverse camera transform. Pan limits follow the rendered 860×720 extent at the current zoom, so all four slab corners remain reachable at maximum zoom; both zoom buttons clamp stale pan on zoom-out. Nonfinite hit coordinates return no cell. Editable cells retain custom accessibility actions; zoom/fit labels support all six languages. **All 10 new JVM regressions passed within the actual 173-test code-6 run.**
 
-## Package name
+The responsive camera uses canvas 860×720 and center 430/360, compared with iOS fit 830×640 and center 430/335. Core animation, detailed shadows/rim and archipelago flights remain aesthetic differences. Isometric art gives depth but does not establish a realtime 3D scene or full visual parity.
 
-`xyz.bobbyprotocol.app` — deliberately not `…twa`. A package name can never be changed
-once published, and if Android ever moves to a native build we want it to ship as an
-update to the same listing rather than a second app with the reviews starting at zero.
+| Code-6 check | Current status | Next evidence |
+| --- | --- | --- |
+| Source | 364 inputs; digest `4000f0aa35575b646c4c270728934ba61cdbc0b4e1e140106ba90efe0673f611`, unchanged during the build. | [Code-6 manifest](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-20261003T200103Z-source.json). |
+| Build/Node/JVM/lint/APK/AAB | PASS: 101 Node, 173 JVM; 0 failures/errors/skips; lint 0 errors/59 warnings, FCM false; debug/test/release compiled. | [Actual build](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-20261003T200103Z-build.json), current signed hashes below. |
+| Static release validation | PASS: 11 tools, 190 assets, 28 canonical art states/anchors, native ELF alignment, purple orb and full AAB payload signatures. | [Code-6 static receipt](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-20261003T200229043433Z-release-validation.json); runtime/Play remain separate. |
+| Debug instrumentation | Actual code6 PASS: 24/24, five classes, 0 failures/errors/skips; isolated AOSP API35/4096 guest/refused network. | [Current receipt](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-instrumentation-20261003T200427Z.json), exact installed debug/test hashes; general regression, not 24 map tests. |
+| Signed Seeker map QA | Exact code-6 installation/launch PASS, API36/4096; subsequent map QA is blocked by the phone lock screen. | [Install receipt](../docs/android/evidence/parity-code6-traderland-final/seeker-code6-signed-install-20261003T200309399230Z.json); next actual island/zoom/pan evidence. |
+| Remote CI | Pending the code-6 commit. | Check its exact head; final result will be recorded in PR description/handoff after checks, without a documentation commit loop. |
+| Claude CLI handoff | Code-5 text delivered and a real response received; new code-6 delivery after the commit is pending. | Final brief/handoff will state the actual CI and remaining QA limits. |
 
-## Build order (the order matters)
+Latest signed release APK: **47,058,496 bytes**, SHA-256 `94d731063348452a9558069b0e0888593ab2bfce2d8e16c8432be3cd416b39c1`. AAB: **50,360,495 bytes**, SHA-256 `6c5668280656eec0365759023b487b92d10dc2e85494a7eea9199a3c294743b6`. Both are code 6 / 1.1.1. Independent [static validation](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-20261003T200229043433Z-release-validation.json) is PASS, receipt SHA `a171a20a28e566f74a9bd6db70f38f96551e957799b69e5a393fc12c8644ee70`. The 11 actual tool logs were checked by hash. This does not prove Compose/GPU gestures, Play App Signing or 16 KB device runtime. [ESLint](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-eslint-security-final-20261003T195653Z.json) (`--quiet`) and [production web build](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-web-build-security-final-20261003T195653Z.json) passed locally without deployment. Compiling the test APK does not execute instrumentation: the first isolated emulator restart failed due to disk space; after scoped cache cleanup the new isolated emulator booted and the actual code-6 24-test suite passed; the old code-5 24/24 run is historical.
 
-1. **Merge and deploy this branch.** The TWA reads `https://bobbyprotocol.xyz/manifest.webmanifest`
-   at build time. Until the PWA layer is in production there is nothing to wrap.
-   Confirm with `curl -sI https://bobbyprotocol.xyz/manifest.webmanifest` (expect 200 and
-   `application/manifest+json`) and `curl -s https://bobbyprotocol.xyz/.well-known/assetlinks.json`
-   (expect the JSON below, not `<!doctype html>` — Vercel's SPA rewrite runs after the
-   filesystem check, so a real file wins, but verify rather than assume).
+Actual [code-6 debug instrumentation](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-instrumentation-20261003T200427Z.json), receipt SHA `edbf70e51c29a3d66259584f104ebcfd32ef53d53904999102f5e8cdf738f0d1`, finished **24/24 PASS**, five classes and 0 failures/errors/skips. [XML](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-instrumentation-20261003T200427Z.xml) was recounted and [log](../docs/android/evidence/parity-code6-traderland-final/parity-code6-traderland-instrumentation-20261003T200427Z.log) checked by hash. Exact installed debug APK SHA `0039c3ddb06317122a3a7cedb04f413269233253debc7d33f55ecc95c1827e28` and test APK `3ade491f3ec2cdfae97321000727189b0dd8b51f7dd37b084bae2a8a52436331`, unchanged source `4000f0aa…`, isolated AOSP API35/4096, guest/refused network. This covers general Activity/bridge/3D/languages/ledger/privacy/keyboard/candle/local-PNG regressions, **not 24 map tests**. Map geometry has the separate 10 JVM PASS; actual isometric appearance/gestures on the locked Seeker, accounts, audio/providers/payments, push, 16 KB hardware and Play remain unverified.
 
-2. **Install the toolchain.** This machine has neither, as of 2026-09-17:
-   ```bash
-   brew install --cask temurin@17
-   npm i -g @bubblewrap/cli
-   ```
-   `bubblewrap` offers to download the Android SDK itself on first run (~500 MB).
+The first code-6 build had **172/173 JVM PASS and one failed assertion**: Kotlin data-class equality distinguished positive/negative float zero. Only the test changed to numeric coordinate equality with delta 0; geometry/pan are unchanged, all ten tests remain and none are skipped. The failed receipt/XML remain historical; the fresh 20:01:03 UTC build passed all 173 JVM tests.
 
-3. **Generate the project and the upload key.**
-   ```bash
-   cd android && bubblewrap init --manifest https://bobbyprotocol.xyz/manifest.webmanifest
-   ```
-   Answer the prompts to match `twa-manifest.json` (or drop that file in place and run
-   `bubblewrap update`). Bubblewrap creates `android.keystore` — **that file and its
-   passwords are the upload key. Back them up outside the repo; they are gitignored.**
-   Losing the upload key is recoverable through Play support; losing it without Play App
-   Signing enrolled is not.
+The public capsule `docs/android/evidence/parity-code6-traderland-final/` has been copied: [index](../docs/android/evidence/parity-code6-traderland-final/INDEX.json), build/source/XML/logs, ESLint/web/static and phone-install receipts. Links now resolve. The index remains mutable until the single review commit; the actual final code-6 instrumentation JSON/XML/log have been added. Physical phone map QA and CI still need their own results. No APK/AAB binaries, private identifiers or signing material belong in that capsule.
 
-4. **Build the bundle.**
-   ```bash
-   bubblewrap build
-   ```
-   Produces `app-release-bundle.aab` (upload this) and `app-release-signed.apk`
-   (for sideloading onto a real phone to test).
+The Seeker first received signed code 5, then **1.1.1 (6)** was installed: [actual code-6 receipt](../docs/android/evidence/parity-code6-traderland-final/seeker-code6-signed-install-20261003T200309399230Z.json), SHA `ed6872e540c9568e06434def362cdb2fc183f40b434778e75fd1e733276e8865`. API36/4096, real installed APK `94d731…`/47,058,496 bytes and real version1.1.1/6 match; launch-wait/focus/resume passed. No wipe, permission grants, preferences or AI consent were injected. This proves installation/launch, with **map UI acceptance pending because the subsequent QA attempt found Keyguard showing (phone locked)**. The install receipt recorded focus/resume at installation time; no later map screenshot or gesture is claimed. The earlier human map report is **FAIL for code-5 Trader Land presentation**, preserved with its install receipt `seeker-code5-signed-install-20261003T194233057699Z.json`. Google Play's last verified inactive draft remains **1.0.2 (3)**.
 
-5. **Create the app in Play Console and upload the AAB.** Play App Signing is on by
-   default; Google re-signs the app with its own key.
+## Historical code-5 validation
 
-6. **Take the fingerprint back from Play.** Play Console → *Test and release* → *Setup* →
-   *App signing* → copy the **SHA-256 certificate fingerprint of the app signing key**
-   (not the upload key). Put it in `public/.well-known/assetlinks.json`, replacing
-   `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`, and deploy. Verify with:
-   ```bash
-   curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://bobbyprotocol.xyz&relation=delegate_permission/common.handle_all_urls"
-   ```
+The evidence below belongs to **1.1.0 (5)** only. Its build/static PASS, 24-test instrumentation and scoped profile QA do not validate the new code-6 map, artifacts or physical flows.
 
-   If this step is skipped or the fingerprint is wrong, the app still runs — but Chrome
-   shows a URL bar across the top and it looks like a browser, which is both ugly and the
-   shape of app Play rejects as a webview wrapper.
+The historical [local code-5 build receipt](../docs/android/evidence/parity-code5-final/parity-code5-20261003T184654Z-build.json) is **PASS**: 101 Node tests and 163 JVM tests, with no failures/errors/skips; lint has **0 errors and 59 warnings**. Debug and instrumentation APKs compiled, and the release APK/AAB were built and signed with the existing upload key. This is the default `BOBBY_FCM_ENABLED=false` build. The [362-input source manifest](../docs/android/evidence/parity-code5-final/parity-code5-20261003T184654Z-source.json) has digest `d37effbf75ac707415ced82ab01f8f69d1e4aa04c4d29aeecdfb51faf03a17ca`, unchanged during the build. Release APK SHA-256: `20e7eb849105b81ab53bc9bbe8eb25e851781665443ef59b69b7a0a572c567ec` (47,042,112 bytes); AAB: `0ec118b0d790e8b04faaaa8c77d3aa93ede6919e6f7f0491a96b314154cbc648` (50,341,132 bytes). The initial disk-space blocker is resolved.
 
-## Things to test on a real device before submitting
+Independent [security-candidate release validation](../docs/android/evidence/parity-code5-final/parity-code5-security-release-validation.json) is **PASS**: 11 actual tools, APK/AAB signature and identity, 190 source-bound packaged assets per artifact, 16 KB alignment/native ELF and the compiled purple-orb icon. Six assets deliberately changed from code 4; approved art/models and native libraries remain preserved. This is local static validation. [Historical code-5 debug instrumentation](../docs/android/evidence/parity-code5-final/parity-code5-instrumentation-20261003T184819Z.json) passed **24/24 tests in five classes**, with 0 failures/errors/skips, on an isolated API-35 emulator with 4096-byte pages. JSON/XML/log hashes were checked. The installed debug/test APKs match this source/build; [Ordinary signed release UI QA](../docs/android/evidence/parity-code5-final/parity-code5-security-signed-profile-qa.json) also passed on exact APK `20e7eb84…`; its scope and screenshots remain separate from debug instrumentation.
 
-Chrome Custom Tabs, not a WebView, so the web's own permission prompts apply and Chrome
-already holds the Android permissions. That is the theory; none of it is verified for
-this app yet:
+The historical code-5 signed QA used a **fresh guest with 0 XP and 0/72 equipment** on the isolated emulator. It checked Byte 3D, unknown Aura/Pieces as `—`, six-language menu, French informal copy/reselection and male preference persisted through force-stop/start. Companion was restored and observed; no extra restart followed that restoration. The real Android chooser opened with a new **1080×1440 PNG** and was dismissed without selecting a recipient/app or sending. The [new PNG](../docs/android/evidence/parity-code5-final/parity-code5-security-profile-screens/shared-avatar-card-fr-0xp.png) was inspected: BOBBY is fully visible after the baseline 108→70 fix. Risk remained unaccepted; no AI answer, microphone, audio, authentication or purchase was requested. Signed QA did not measure network traffic, so it makes no absolute no-network claim. Its initial decorative `ASK_TEACH` avatar leads to a possible profile-discovery improvement: the verified pre-consent path is BTC chip → RISK → Profile.
 
-- **Microphone.** The desk's dictation and Bobby Live both need `getUserMedia`. Confirm
-  the prompt appears inside the TWA and that audio actually reaches the model. If it does
-  not, this is the one feature that would force a native shell.
-- **Wallet handoff.** A swap opens the wallet app and must come back to Bobby, not to a
-  browser tab. Test with the wallet the audience actually uses.
-- **Google sign-in.** OAuth redirects leave the TWA's scope and return; confirm the
-  session lands on `/desk` and not in a stranded Custom Tab.
-- **Back button** at the start URL should exit the app, not leave a blank screen.
-- **No URL bar anywhere.** If one appears, Digital Asset Links did not verify.
+The [earlier signed profile QA](../docs/android/evidence/parity-code5-final/parity-code5-signed-profile-qa.json) belongs to APK `9652c638…` and its retained guest 40 XP. Those migration results stay historical; the code-5 fresh-guest run does not revalidate them. Code-5 installation/launch is now verified separately; the user reported its Trader Land map defect. Audio/providers/accounts/payments and Play distribution remain unverified.
 
-## Getting it onto your own phone
+[ESLint](../docs/android/evidence/parity-code5-final/parity-code5-eslint-security-final-20261003T184741Z.json) and the [web production build](../docs/android/evidence/parity-code5-final/parity-code5-web-build-security-final-20261003T184741Z.json) passed locally. The public review capsule contains receipts, XML/logs and approved evidence screenshots, not APK/AAB binaries or signing secrets. Its relative links are intended for review in GitHub.
 
-Three ways, cheapest first.
+See [the parity matrix](../docs/android/ANDROID-IOS17-PARITY.md) and [the fresh Claude review brief](../docs/android/CLAUDE-REVIEW-BRIEF.md) for the implementation, historical receipts and remaining checks. The physical Seeker installation last verified here is **1.1.1 (6)**; code-6 map UI QA is pending and the code-5 defect remains historical; the inactive Google Play draft is still **1.0.2 (3)**. The separate **1.0.3 (4)** build/static validation is historical evidence and does not validate this candidate.
 
-### 1. Install the web app (works the moment this branch is in production)
+## Product and parity boundaries
 
-On the Android phone, open `https://bobbyprotocol.xyz/desk` in Chrome → ⋮ → **Install app**
-(older Chrome says *Add to Home screen*). With the manifest live it installs standalone:
-own icon, own task in the recents switcher, no URL bar, starts on `/desk`. That is the
-same Chrome rendering the same web app the TWA will wrap — what you see there is what the
-Play build looks like, minus the Play plumbing.
+- iOS 1.7 reading/onboarding fixes, full synthesis/scenario text, separate sphere/input hints, regional company labels and six languages: English, Spanish, French, Portuguese, Italian and German. French and Portuguese use informal `tu`.
+- Native profile, actual equipment/progression, accessible account/privacy actions, mute and companion/female/male voice preference. Unknown account metrics remain unknown. Local previews depend on installed offline voices; an explicitly gendered voice is not guaranteed on every phone.
+- Authored risk notice **version 6** with Android on-device dictation disclosure. Exact-version acceptance requires the user to read and accept it again; earlier consent is not silently upgraded.
+- Island help can always be reopened. It opens after the first visible eligible visit, once for the guest and once per account; it does not award XP, unlock equipment or publish content.
+- `read.rendered` is a fenced, RAM-only presentation observation with an explicit negative server acknowledgment. Canonical backend source accepts telemetry only for iOS/web. Android server `read_done` transport is a remaining gap.
+- Avatar sharing produces a **1080 × 1440 PNG from approved 2D companion art and equipped item icons**, using a narrowly scoped FileProvider and the Android share chooser. The profile has the existing interactive 3D stage and pointer-up bounce; the exported card is not a snapshot of that 3D scene.
+- Real account, market, saved theses, reports, Google Play/RevenueCat access and restore, opt-in reminders and optional FCM retain their native guards. Runtime authentication, purchases, provider audio, notifications and server synchronization need their own acceptance evidence.
 
-If Chrome offers a plain bookmark instead of *Install app*, the manifest is not live yet.
+## Build and local configuration
 
-### 2. Sideload the signed APK (after `bubblewrap build`)
+Use JDK 17 or 21, Android SDK platform 36, build-tools 35.0.0 and platform-tools. The Gradle 8.13 wrapper checks its official distribution checksum; AGP 8.13.2 and Kotlin 2.2.21 are pinned. Minimum Android API is 26; target/compile API is 36. Check free disk space before generating artifacts.
 
-`bubblewrap build` writes `app-release-signed.apk` next to the bundle. Copy it to the
-phone, allow the file manager to install unknown apps, tap it.
+Copy `android/local.properties.example` to ignored `android/local.properties` and configure the SDK path and public client values. Keep service-role keys, RevenueCat secret keys, private signing files and passwords out of Git, chat, screenshots and logs. Without public account configuration, debug can show onboarding but cannot establish authentication or purchase acceptance.
 
-One catch: Digital Asset Links must list the key that signed *that* APK, which for a local
-build is your own upload key, not Play's. Print its fingerprint with
+From the repository root:
 
-```bash
-keytool -list -v -keystore android/android.keystore -alias android | grep SHA256
+```sh
+df -h .
+npm ci
+node android/nucleo/equipment-stage/build.mjs
+python3 android/nucleo/build.py --release
+node --test android/nucleo/tests/*.test.mjs
+npm run lint -- --quiet
+npm run build
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --no-daemon
+./gradlew :app:bundleRelease --no-daemon
 ```
 
-and add it to `public/.well-known/assetlinks.json` as a second entry in
-`sha256_cert_fingerprints` — the field is an array and Google accepts several, so the test
-build and the Play build can both verify from the same file. Without it the app runs with
-a URL bar across the top.
+These are fresh-checkout reproduction commands; the receipts above define what has actually passed. New changes need new receipts. The three public equipment-stage TypeScript inputs are included, and actual local regeneration produced byte-identical bundled assets. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`; bundle: `app/build/outputs/bundle/release/app-release.aab`. A release bundle built without signing configuration is unsigned; the signed code-5 build used the existing authorized local signer, recorded in its receipt. Preserve Bobby's existing upload-key identity; do not regenerate or rotate it. Signing does not establish Google Play distribution or backend readiness.
 
-### 3. Internal testing on Play (the real thing)
+The Android workflow defines default and optional FCM configurations (`BOBBY_FCM_ENABLED=false/true`), runs `npm ci` and regenerates both viewers. Its failed initial SDK step was corrected to discover executable `sdkmanager` in hosted command-line tools; it pins Ubuntu 24.04 and sets matrix `fail-fast: false`. The [remote code-commit CI receipt](../docs/android/evidence/parity-code5-final/parity-code5-source-commit-ci-20261003T185903Z.json) records **nine completed checks, all SUCCESS**, including native FCM `false` and `true`, contracts and both CodeQL checks, with no CodeQL annotations. It verifies all 362 source blobs against code commit `7dbd1470041d62b3137588043dd551bae2c46f79`; the full-SHA deployment query returned `[]`. This result applies to that code commit. Code-5 head `1b6c58ed4a108f0b6a4346367f487ab222e3fd1f` also completed nine SUCCESS checks (local historical head receipt), with zero CodeQL finding annotations and four retained infrastructure annotations in the workflow job; code 6 must finish its own checks; do not inherit PR #140 results. The workflow compiles instrumentation without running device tests or publishing artifacts. Default builds have no Firebase Messaging SDK; optional configuration and actual delivery require separate evidence.
 
-Once the AAB is uploaded, Play Console → *Testing* → *Internal testing* takes up to 100
-testers and goes live in minutes, not days, with no review queue. The testers install from
-the Play Store itself, so this is the only one of the three that exercises the actual
-delivery path: Play App Signing, the store listing, the install flow and the update flow.
+The 11 new CodeQL alerts from the initial Android review were addressed in source, rather than attributed to the iOS reference. The equipment generator narrowly replaces the pinned Three 0.182.0 UUID entropy block with Web Crypto and fails on an unreviewed source/version; visual randomness stays unchanged. The card-test selector helper now escapes every regular-expression metacharacter. Five meaningful new Node regressions are included in the 101-test PASS; the fresh code-commit remote CI, including both CodeQL checks, passed with zero annotations. Keep the subsequent PR-head check result separate.
 
-Internal testing is also not the same thing as the closed test that a personal developer
-account has to run for 14 days before it can apply for production — that one is a separate
-track with its own 12-tester requirement.
+## Device acceptance
+
+The historical code-5 24-test run exercised real Activity/WebView and bundled 3D assets, six language choices through actual popup/reload/typing, origin/bridge/account-ledger isolation, local PNG provider, privacy controls, and keyboard fallback when on-device recognition is unavailable. It used guest state and refused network; no real audio, authentication, purchase, push delivery or physical-device claim follows.
+
+Use a dedicated test emulator/device for debug and instrumentation, select its serial explicitly and record its API/page size. Do not replace the signed Seeker installation with a differently signed debug APK or clear its user data as a routine test step. On a selected test device, run `:app:connectedDebugAndroidTest` with `ANDROID_SERIAL` set to that device. Compiling `assembleDebugAndroidTest` alone does not execute those tests.
+
+Physical checks must cover consent, text input, on-device dictation, audio and cancellation, profile/account isolation, long text in all six languages, Island first visit, sharing, charts and authenticated flows. Request microphone and AI consent through the actual product controls. Dictation uses explicit on-device recognition on supported API 31+ devices; other devices keep keyboard input. A passed mock, local preference or rendered screen does not prove provider delivery, account synchronization, payment/restore or receipt telemetry.
+
+This branch covers Android, its CI/documentation and the necessary root lint/deployment-skip guard adjustments. Keep the stacked review/draft separate from deployment, Play uploads/publication, backend/database changes and legal declarations. Google Play production eligibility and account-specific testing requirements must be checked in the current Console before any later release.
+
+Public evidence note (code 6): `evidence/parity-code6-traderland-final/REDACTIONS.json` binds the public apksigner extract to its original coordinator log. Only its public-key SHA-256/SHA-1 digest values are omitted because Gitleaks misidentified them as API keys. The approved certificate fingerprint and signature results remain visible; all other tool logs are unmodified. The original validator log hashes apply to the retained originals, and INDEX records the public extract hash. No security rule is disabled.

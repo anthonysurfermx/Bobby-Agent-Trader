@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.399Z" hostname="MacBook-Pro-F-Society.local" time="0.004">
+  <properties/>
+  <testcase name="genuine offline discipline is capped and respects local dates" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.002"/>
+  <testcase name="resolved regional cash listings pass the same freshness guard as US stocks" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.001"/>
+  <testcase name="cash ticker support remains bounded and cannot accept URL steering or substitutes" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.001"/>
+  <testcase name="question length matches server code points rather than UTF16 units" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0"/>
+  <testcase name="booleans and nonfinite values never become market prices" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0"/>
+  <testcase name="invalid evidence is refused before metering" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

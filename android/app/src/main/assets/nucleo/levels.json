@@ -1,0 +1,55 @@
+{
+  "v": 1,
+  "levels": [
+    {
+      "number": 1,
+      "en": "SPAWNED",
+      "es": "EN ESCENA",
+      "fr": "APPARU",
+      "pt": "CRIADO",
+      "it": "APPARSO",
+      "de": "ERSCHIENEN",
+      "minXP": 0
+    },
+    {
+      "number": 2,
+      "en": "LOCKED IN",
+      "es": "EN LA ZONA",
+      "fr": "ENGAGÉ",
+      "pt": "FOCADO",
+      "it": "CONCENTRATO",
+      "de": "FOKUSSIERT",
+      "minXP": 50
+    },
+    {
+      "number": 3,
+      "en": "MARKET READER",
+      "es": "LEE EL MERCADO",
+      "fr": "LECTEUR DU MARCHÉ",
+      "pt": "LEITOR DO MERCADO",
+      "it": "LETTORE DEL MERCATO",
+      "de": "MARKTLESER",
+      "minXP": 150
+    },
+    {
+      "number": 4,
+      "en": "RISK GUARDIAN",
+      "es": "CUIDA EL RIESGO",
+      "fr": "GARDIEN DU RISQUE",
+      "pt": "GUARDIÃO DO RISCO",
+      "it": "GUARDIANO DEL RISCHIO",
+      "de": "RISIKOWÄCHTER",
+      "minXP": 400
+    },
+    {
+      "number": 5,
+      "en": "ON-CHAIN LEGEND",
+      "es": "LEYENDA ON-CHAIN",
+      "fr": "LÉGENDE DE LA BLOCKCHAIN",
+      "pt": "LENDA DA BLOCKCHAIN",
+      "it": "LEGGENDA DELLA BLOCKCHAIN",
+      "de": "BLOCKCHAIN-LEGENDE",
+      "minXP": 1000
+    }
+  ]
+}

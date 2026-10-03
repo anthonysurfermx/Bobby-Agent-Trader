@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" tests="32" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:05:29.297Z" hostname="MacBook-Pro-F-Society.local" time="0.147">
+  <properties/>
+  <testcase name="transportEpochFencePreventsMutatingNewOwnersLedger" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.085"/>
+  <testcase name="epochChangeDuringSalesOffRestoreDiscardsResultWithoutSyncingTheOldOwner" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.004"/>
+  <testcase name="expiredGoogleMirrorCannotConfirmPurchaseEvenWhenGrantStillGivesPro" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.004"/>
+  <testcase name="missingReservationVersionNeverLaunchesStore" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="tokenlessStartedPurchaseRestoresPendingEvenWithEmptyCustomerInfo" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003"/>
+  <testcase name="storeSheetAllowsOnlyOnePurchaseAtATime" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.005"/>
+  <testcase name="consentRevokedDuringRestorePreventsSubsequentServerSynchronization" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="constructionDoesNotConfigureOrReachTheNetwork" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="accountSwitchDuringSheetDiscardsPurchaseResult" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="activityRecreationCannotChangeGlobalSdkOwnerUntilOriginalSheetCompletes" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003"/>
+  <testcase name="sameUserWithNewSessionEpochAlsoRejectsStaleResult" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="noActiveSubscriptionRestoresNothingAndListenerCanExpireAccess" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="disablingNewSalesDoesNotDisableAnExistingPurchaseRestore" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="anotherAttemptConfirmationDoesNotCompleteOriginalPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="userCancellationIsSilentAndClearsBusy" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="activeCardSubscriptionPreventsLaunchingPlaySheet" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="callsBeforeConsentNeverConfigureSdkOrPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="lostStartResponseKeepsSameAttemptAndNeverLaunchesOrRetriesSdk" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="salesOffRestoreCannotConfirmProFromAnUnrelatedProvider" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="serverMustConfirmSdkEntitlement" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="failedSyncCanBeRetriedByRestoreWithoutBuyingAgain" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="accountDeletionRetiresOriginalReceiptAndLateSuccessCannotResurrectIt" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="salesOffRestoreDoesNotTrustAnOldGooglePeriodOrAProGrant" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="successfulTokenSurvivesSdkRefreshFailureAndConfirmsOriginalAttempt" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003"/>
+  <testcase name="proFromAnotherProviderDoesNotConfirmPlayPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="proGrantDoesNotClaimRestoredGoogleSubscription" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="existingGoogleOwnerCanRestoreWithSalesOffOnlyAfterFreshServerConfirmation" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="withdrawingConsentAfterSdkSuccessKeepsReceiptWithoutExternalSynchronization" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003"/>
+  <testcase name="activeOtherProvidersNeverConfigureOrRestoreTheGoogleSdk" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002"/>
+  <testcase name="restoreNeedsConfiguredServerAndPublicKey" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="lateSuccessfulTokenPersistsForOriginalOwnerWithoutSubmittingAsNewOwner" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <testcase name="cancellationNeverErasesTheDurableObligationOrAllowsAnotherCharge" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

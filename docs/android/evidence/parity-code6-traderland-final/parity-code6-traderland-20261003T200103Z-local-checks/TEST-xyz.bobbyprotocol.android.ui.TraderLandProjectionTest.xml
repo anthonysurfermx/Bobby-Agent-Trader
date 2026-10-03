@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-03T20:01:12.215Z" hostname="MacBook-Pro-F-Society.local" time="0.025">
+  <properties/>
+  <testcase name="allGrowthSizesKeepCanonicalSlabExtentInsteadOfAnOverflowingGrid" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.013"/>
+  <testcase name="rotationMirrorsArtAndMovesItsContactPointToTheSwappedFootprintBottom" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.002"/>
+  <testcase name="invalidTransformCoordinatesNeverSelectTheFirstCell" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0"/>
+  <testcase name="everyBundledStateHasMetadataAndTheHistoricalPathAliasUsesTheSameArt" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.002"/>
+  <testcase name="everyCellCanBeSelectedAtItsRenderedCenterOnPhoneAndTabletAfterZoomAndPan" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.002"/>
+  <testcase name="dormantCoreKeepsItsGroundContactWhileReducingArtToCanonicalScale" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0"/>
+  <testcase name="everySlabExtremityCanReturnToTheViewportAtMaximumZoomForEveryGrowthSize" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.004"/>
+  <testcase name="coreAndTallSpritesHaveCanonicalAnchorsAndDepthOrdersTheirGroundContact" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0"/>
+  <testcase name="outsideSlabNeverSelectsAnEdgeCellAndHalfCellTiesUseCanonicalFloor" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.001"/>
+  <testcase name="zoomingOutClampsAnOldPanAndFitCentersTheWholeCanvas" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
