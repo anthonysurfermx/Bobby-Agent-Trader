@@ -1,0 +1,61 @@
+# Brief para Claude: revisar y mejorar Bobby Android
+
+Revisa y mejora la app Android para alcanzar paridad comprobable con **iOS 1.7 (61)**, [PR #140](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/140), base `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. Trabaja en `/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader`, rama **`codex/bobby-android-parity-ios17`**, candidato **1.1.0 / código 5**, paquete `xyz.bobbyprotocol.bobby`. Conversación en español; código, comentarios y commits en inglés.
+
+Comienza con revisión independiente de solo lectura y reproduce los defectos antes de corregirlos. Preserva los cambios existentes y la referencia aprobada: icono/Núcleo de esfera morada, companions, catálogo/arte de equipo y composición. Después implementa las mejoras justificadas en esta rama y prepara una revisión/draft concreto. El alcance es **Android + su CI + documentación**. No despliegues, no hagas push a una rama que auto-despliegue, no subas/publiques en Play, no aceptes declaraciones legales, no cambies backend/base de datos/permisos/cuentas ni ejecutes compras. No inspecciones ni copies secretos, archivos privados de firma o contraseñas. Mantén la identidad del upload key existente.
+
+## Estado que debes respetar
+
+- **Build local código 5 PASS**, FCM desactivado: 96 Node y 163 JVM, 0 fallos/errores/skip; lint **0 errores y 59 warnings**; debug/test APK compilados y release APK/AAB construidos y firmados. Fuente inmutable durante build: 354 inputs, digest `6324e32de815884df1ba86d5cd209063af80b4c199cb1b9d8ab5aa2b61758948`. El espacio de disco se recuperó. No llamar “lint sin incidencias” a un resultado con 59 warnings.
+- Dos carreras de audio y una condición de OAuth detectadas durante revisión se corrigieron y revisaron estáticamente; las nuevas pruebas JVM están dentro del resultado código 5 aprobado. La validación estática independiente del release y el runtime del emulador están en curso, pendientes de recibos. No declares éxito de instrumentación, teléfono, CI, configuración FCM opcional ni Play por herencia de otra versión.
+- En el Seeker está instalado **1.0.2 (3)**. Google Play contiene únicamente un **borrador interno inactivo 1.0.2 (3)** en la evidencia disponible. Código 4 tiene build y validación firmada local histórica, sin aceptación física ni subida Play.
+- `read.rendered` no dispone de transporte Android autorizado por el backend canónico. Compartir avatar crea una tarjeta PNG 2D; no exporta la escena 3D. Son límites explícitos de paridad, no funciones terminadas mediante mocks.
+
+Lee el [recibo real de build código 5](/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/docs/android/evidence/parity-code5-20261003T174542Z-build.json) y su [manifiesto de fuente](/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/docs/android/evidence/parity-code5-20261003T174542Z-source.json). Los XML reales rederivan 96 Node PASS y 163 JVM PASS; lint rederiva 0 errores/59 warnings. APK firmado: 47 042 064 bytes, SHA-256 `d6aeb7c0f32bb66ec271ec0bda2e1e60f601f91f6bb5291eaa718fe44e504411`; AAB firmado: 50 340 579 bytes, SHA-256 `f6d562da878d49c3d4385327fbcc841c8b0fb2f828c6944893e16add884f9609`. Esos hashes y los de logs/manifiesto se comprobaron durante esta revisión documental.
+
+Consulta [la matriz de paridad](ANDROID-IOS17-PARITY.md) para límites e historial y [el README](../../android/README.md) para reproducir el build. Los recibos están fuera de esta rama en `/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/docs/android/evidence/`; los enlaces absolutos corresponden a archivos reales, no a un directorio de evidencia ficticio de esta rama. Los recibos código 3/4 son inmutables y no deben reemplazarse ni reutilizarse como prueba de código 5.
+
+## Fuente y puntos de comparación
+
+El renderer canónico se debe comparar contra el commit exacto, no contra una rama móvil. Si necesitas la referencia local, está en `/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/.claude/worktrees/lang-fix/ios/Bobby/`; verifica su SHA antes de usar el working tree. Las áreas iOS relevantes incluyen `Sources/AgentProfile.swift`, `Sources/AvatarVoiceToggle.swift`, `Sources/Nucleo/NucleoVoice.swift`, `Sources/Briefings/BriefingNarrator.swift`, `Sources/TraderLandGateHarness.swift` y `Sources/RiskNoticeView.swift`. Para archivos del commit usa `git show` del SHA, sin cambiar ni desplegar ese checkout.
+
+| Área Android | Fuente principal |
+| --- | --- |
+| Renderer/bridge/idiomas | `android/nucleo/PROVENANCE.md`, `android/nucleo/build.py`, `android/nucleo/src/shared/10-bridge.js`, `android/nucleo/src/app/55-read.js`, `android/nucleo/src/app/70-input.js`, `android/nucleo/src/app/99-boot.js`, chunks onboarding y `android/app/src/main/assets/nucleo/native-android-translations.json` |
+| Perfil y progreso real | `android/app/src/main/java/xyz/bobbyprotocol/android/ui/AccountProfile.kt`, `ui/ProfileLandMetrics.kt`, `nucleo/ProfileProgressPolicy.kt`, `ui/BobbySheet.kt` |
+| Voz y carreras | `data/VoicePreference.kt`, `platform/AndroidVoice.kt`, `platform/BriefingNarrator.kt`, `platform/PlaybackLease.kt`, `MainActivity.kt`, `nucleo/NucleoSession.kt` |
+| Consentimiento/presentación | `android/nucleo/risk-notice.json`, `nucleo/NucleoPolicy.kt`, `nucleo/NucleoStateStore.kt`, `nucleo/ReadPresentationPolicy.kt`, `nucleo/NucleoSession.kt` |
+| Ayuda de Isla | `ui/TraderLandSheet.kt`, `ui/TraderLandFirstVisit.kt`, `ui/TraderLandHelpCopy.kt`, `ui/TraderLandHelpDialog.kt` |
+| Tarjeta compartida | `platform/AvatarShareCard.kt`, `MainActivity.kt`, `AndroidManifest.xml`, `res/xml/avatar_share_paths.xml` |
+| Contratos existentes | `data/BobbyRepository.kt`, `data/BobbyLocales.kt`, `ui/BobbySupportLinks.kt`, billing, equipo y push |
+| Verificación | `android/nucleo/tests/`, `android/app/src/test/`, `android/app/src/androidTest/`, `.github/workflows/android.yml` |
+
+Los paths abreviados Kotlin de la tabla están dentro de `android/app/src/main/java/xyz/bobbyprotocol/android/`. Inspecciona source y assets generados: una corrección solo en HTML generado se pierde al regenerar. El builder release excluye mocks/fixtures/contract y conserva CSP sin red; el bridge no debe filtrar tokens ni dejar que transporte mock reemplace al nativo.
+
+## Revisión prioritaria y criterios de aceptación
+
+1. **Audio, cancelación y aislamiento.** Verifica que una respuesta o callback antiguo no reproduzca, cambie estado ni limpie archivo/player de una generación nueva. Cubrir fetch/preparación, progress/completion/error y TTS; cancelación durante IO; mute/tipo de voz/idioma, logout/login con otra cuenta, cambio de epoch, retirada de consentimiento, sheet/background y nueva reproducción. `PlaybackLease` une generación + owner + epoch + mute; el audio externo exige procesamiento permitido, la preview local no. `PendingAudioFile` mantiene propiedad por operación y se limpia aunque cancelación descarte el retorno de `withContext`. Conserva idioma/voz del reporte generado. Haz pruebas que fallen si se quita un fence; la presencia de guards no equivale a un flujo físico aprobado.
+2. **Perfil y datos verdaderos.** Usa nivel/XP/racha y equipo reales; métricas privadas desconocidas se muestran `—`. No fabriques progreso, badges, seed, Pro ni respuestas de API. Verifica invitado, cuenta A/B, respuestas privadas tardías y eliminación. Mantén accesibles cuenta/privacidad antes de aceptar IA y confirma reporting/publicación/eliminación por sus controles reales.
+3. **Riesgo v6 y seis idiomas.** `en/es/fr/pt/it/de`; copy completo, natural y sin mezclas, FR/PT informal `tu`. Revisar país/locale/language de mercado, reportes y enlaces, selección “sistema”, fuentes grandes, TalkBack, teclado, scroll y textos largos. Consentimiento previo no acepta v6 automáticamente. Retirada cancela el trabajo externo. Dictado exclusivamente on-device y permiso Android humano, con teclado cuando no está disponible. No prometer voz local femenina/masculina si el motor instalado no la proporciona.
+4. **Primera visita Isla.** La guía manual siempre abre; autoapertura solo después de vista real visible/resumida/consentida y sin diálogo de publicar/comunidad. Comprueba fence/epoch durante delay, commit fallido, rotación, reentrada, logout/login y limpieza de cuenta eliminada. La adaptación Android separa invitado y cada cuenta mediante hash de clave; iOS canónico es una vez por dispositivo. Documenta la diferencia sin llamar cifrado al hash. La guía no guarda una construcción, crea XP, desbloquea equipo, publica ni acepta términos; describe los controles nativos reales.
+5. **Presentación de lectura y límite backend.** Dos frames foreground y el request/read/owner/consent actual habilitan observación RAM. La respuesta debe seguir declarando `accepted:false`, `reason:telemetry_unavailable` mientras no exista contrato servidor. La fuente canónica `api/_lib/client-telemetry.ts` acepta `ios/web` y rechaza `android`; no falsifiques otra plataforma ni `read_done`. No equipares pantalla visible con lectura humana o acuse remoto. Una ampliación backend requiere trabajo/autorización aparte de este alcance.
+6. **Compartir y 3D.** El PNG 1080×1440 usa portrait aprobado **2D**, nivel/XP y hasta tres iconos reales de equipo; no contiene identidad de cuenta, correo, token, preguntas ni información de pago. Verifica MIME, dimensiones, límites de input, cleanup, owner/epoch al volver de IO, FileProvider no exportado con ruta cache limitada, grant de lectura y chooser. Abrir/compartir en dispositivo sigue pendiente. El perfil ya tiene escena 3D y rebote al soltar `pointerup`; metadata `snapshot()` no es una imagen. Si propones una captura 3D real, distingue el gap y entrega una mejora verificable sin afirmar que la tarjeta actual ya la implementa.
+7. **Flujos existentes y regresión.** Revisa velas de acciones `30d/1h`, errores/red, reportes/locales, soporte/privacidad, guards de OAuth, memoria/tesis, equipo, public visits, reporting, precios/provider duplicado y restore. Prueba mocks solo como contrato local; login, backend, pago y push reales deben tener evidencia separada. No enviar posts, reportes o transacciones reales durante una revisión de lectura.
+
+## Reproducción y evidencias
+
+Comprueba espacio y conserva artefactos firmados/recibos históricos y archivos del usuario. No borres indiscriminadamente assets, SDK o claves para liberar disco. Desde la raíz de esta rama:
+
+```sh
+df -h .
+python3 android/nucleo/build.py --release
+node --test android/nucleo/tests/*.test.mjs
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --no-daemon
+```
+
+Son comandos de reproducción. La ejecución de `assembleDebugAndroidTest` solo compila el APK de tests. Para instrumentación elige un emulador dedicado con `ANDROID_SERIAL` explícito y ejecuta `:app:connectedDebugAndroidTest`; registra cuál era, resultado por suite, API y page size. No sustituyas la app firmada del Seeker con un debug de otra firma ni borres datos del usuario. No otorgues permisos/consentimientos por shell para fingir la aceptación humana del flujo.
+
+Añade evidencia pública nueva y vinculada a la fuente exacta cuando realmente se ejecute; registra comandos/herramientas, exit codes, conteos y hashes sin secretos ni identificadores privados. El build/JVM/Node código 5 ya tiene un recibo aprobado; tus cambios futuros requieren otro. Build, tests locales, instrumentación, teléfono, firma, servidor, compras y Play son capas diferentes. Completar validación independiente de firma/package/assets/icono morado/ELF16KB/AAB sobre el release código 5 existente; un APK 4KB instalado no prueba ejecución en hardware 16KB. Ninguna prueba local cierra disponibilidad o requisitos actuales de producción en Play.
+
+Entrega hallazgos accionables con **prioridad, archivo:línea, escenario, evidencia, impacto y arreglo propuesto**; señala límites de lo revisado aunque no encuentres defectos. Después de mejoras, entrega diff revisable y matriz **verificado / no verificado / bloqueo / siguiente comprobación**, con la versión exacta por fila. Separa defectos corregidos de pruebas realmente ejecutadas. No uses “100 % funcionando” como conclusión de mocks, UI visible o recibos de una versión anterior.

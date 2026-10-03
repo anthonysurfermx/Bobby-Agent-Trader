@@ -1,132 +1,48 @@
-# Bobby on Android — Trusted Web Activity
+# Bobby for Android
 
-Android ships the web app, not a port. A Trusted Web Activity is a full-screen Chrome
-instance with no browser UI, wrapped in an Android package. It runs `bobbyprotocol.xyz`
-in the user's own Chrome, which means the Android app is never behind the web: the desk,
-the debate, the record, Trader Land, Google sign-in, EN/ES and Base swaps are whatever
-production is serving that minute.
+The Android candidate is **1.1.0 (version code 5)**, on `codex/bobby-android-parity-ios17`, based on iOS **1.7 (61)** / [PR #140](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/140), commit `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. Kotlin owns accounts, consent, market data, billing, voice and persistence; the approved bundled HTML/WebGL Núcleo and native Compose sheets present the product. Authentication tokens never enter the web page. Application ID: `xyz.bobbyprotocol.bobby`.
 
-The decision and its trade-offs are written up in
-[`docs/play-store/2026-09-17-play-readiness.md`](../docs/play-store/2026-09-17-play-readiness.md).
+The current [local code-5 build receipt](/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/docs/android/evidence/parity-code5-20261003T174542Z-build.json) is **PASS**: 96 Node tests and 163 JVM tests, with no failures/errors/skips; lint has **0 errors and 59 warnings**. Debug and instrumentation APKs compiled, and the release APK/AAB were built and signed with the existing upload key. This is the default `BOBBY_FCM_ENABLED=false` build. The [354-input source manifest](/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/docs/android/evidence/parity-code5-20261003T174542Z-source.json) has source digest `6324e32de815884df1ba86d5cd209063af80b4c199cb1b9d8ab5aa2b61758948`, unchanged during the build. The initial disk-space blocker is resolved.
 
-## What is already in the repo
+Independent release-artifact validation and emulator runtime checks are in progress; they are not marked passed without their receipts. Physical acceptance and Play distribution for code 5 remain unverified. CI configuration is present, but that is not evidence of a completed CI run. Lint warnings still need review.
 
-| Piece | Where | State |
-|---|---|---|
-| Web app manifest + service worker | `vite.config.ts`, `src/sw.ts` | in this branch, needs to be deployed |
-| Digital Asset Links | `public/.well-known/assetlinks.json` | **fingerprint is a placeholder** |
-| Bubblewrap config | `android/twa-manifest.json` | ready |
-| Store assets | `docs/play-store/final/` | ready |
-| Listing copy | `docs/play-store/listing-en.md`, `listing-es.md` | ready |
+See [the parity matrix](../docs/android/ANDROID-IOS17-PARITY.md) and [the fresh Claude review brief](../docs/android/CLAUDE-REVIEW-BRIEF.md) for the implementation, historical receipts and remaining checks. The physical Seeker installation and inactive Google Play draft are **1.0.2 (3)**. The separate **1.0.3 (4)** build/static validation is historical evidence and does not validate this candidate.
 
-## Package name
+## Product and parity boundaries
 
-`xyz.bobbyprotocol.app` — deliberately not `…twa`. A package name can never be changed
-once published, and if Android ever moves to a native build we want it to ship as an
-update to the same listing rather than a second app with the reviews starting at zero.
+- iOS 1.7 reading/onboarding fixes, full synthesis/scenario text, separate sphere/input hints, regional company labels and six languages: English, Spanish, French, Portuguese, Italian and German. French and Portuguese use informal `tu`.
+- Native profile, actual equipment/progression, accessible account/privacy actions, mute and companion/female/male voice preference. Unknown account metrics remain unknown. Local previews depend on installed offline voices; an explicitly gendered voice is not guaranteed on every phone.
+- Authored risk notice **version 6** with Android on-device dictation disclosure. Exact-version acceptance requires the user to read and accept it again; earlier consent is not silently upgraded.
+- Island help can always be reopened. It opens after the first visible eligible visit, once for the guest and once per account; it does not award XP, unlock equipment or publish content.
+- `read.rendered` is a fenced, RAM-only presentation observation with an explicit negative server acknowledgment. Canonical backend source accepts telemetry only for iOS/web. Android server `read_done` transport is a remaining gap.
+- Avatar sharing produces a **1080 × 1440 PNG from approved 2D companion art and equipped item icons**, using a narrowly scoped FileProvider and the Android share chooser. The profile has the existing interactive 3D stage and pointer-up bounce; the exported card is not a snapshot of that 3D scene.
+- Real account, market, saved theses, reports, Google Play/RevenueCat access and restore, opt-in reminders and optional FCM retain their native guards. Runtime authentication, purchases, provider audio, notifications and server synchronization need their own acceptance evidence.
 
-## Build order (the order matters)
+## Build and local configuration
 
-1. **Merge and deploy this branch.** The TWA reads `https://bobbyprotocol.xyz/manifest.webmanifest`
-   at build time. Until the PWA layer is in production there is nothing to wrap.
-   Confirm with `curl -sI https://bobbyprotocol.xyz/manifest.webmanifest` (expect 200 and
-   `application/manifest+json`) and `curl -s https://bobbyprotocol.xyz/.well-known/assetlinks.json`
-   (expect the JSON below, not `<!doctype html>` — Vercel's SPA rewrite runs after the
-   filesystem check, so a real file wins, but verify rather than assume).
+Use JDK 17 or 21, Android SDK platform 36, build-tools 35.0.0 and platform-tools. The Gradle 8.13 wrapper checks its official distribution checksum; AGP 8.13.2 and Kotlin 2.2.21 are pinned. Minimum Android API is 26; target/compile API is 36. Check free disk space before generating artifacts.
 
-2. **Install the toolchain.** This machine has neither, as of 2026-09-17:
-   ```bash
-   brew install --cask temurin@17
-   npm i -g @bubblewrap/cli
-   ```
-   `bubblewrap` offers to download the Android SDK itself on first run (~500 MB).
+Copy `android/local.properties.example` to ignored `android/local.properties` and configure the SDK path and public client values. Keep service-role keys, RevenueCat secret keys, private signing files and passwords out of Git, chat, screenshots and logs. Without public account configuration, debug can show onboarding but cannot establish authentication or purchase acceptance.
 
-3. **Generate the project and the upload key.**
-   ```bash
-   cd android && bubblewrap init --manifest https://bobbyprotocol.xyz/manifest.webmanifest
-   ```
-   Answer the prompts to match `twa-manifest.json` (or drop that file in place and run
-   `bubblewrap update`). Bubblewrap creates `android.keystore` — **that file and its
-   passwords are the upload key. Back them up outside the repo; they are gitignored.**
-   Losing the upload key is recoverable through Play support; losing it without Play App
-   Signing enrolled is not.
+From the repository root:
 
-4. **Build the bundle.**
-   ```bash
-   bubblewrap build
-   ```
-   Produces `app-release-bundle.aab` (upload this) and `app-release-signed.apk`
-   (for sideloading onto a real phone to test).
-
-5. **Create the app in Play Console and upload the AAB.** Play App Signing is on by
-   default; Google re-signs the app with its own key.
-
-6. **Take the fingerprint back from Play.** Play Console → *Test and release* → *Setup* →
-   *App signing* → copy the **SHA-256 certificate fingerprint of the app signing key**
-   (not the upload key). Put it in `public/.well-known/assetlinks.json`, replacing
-   `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`, and deploy. Verify with:
-   ```bash
-   curl -s "https://digitalassetlinks.googleapis.com/v1/statements:list?source.web.site=https://bobbyprotocol.xyz&relation=delegate_permission/common.handle_all_urls"
-   ```
-
-   If this step is skipped or the fingerprint is wrong, the app still runs — but Chrome
-   shows a URL bar across the top and it looks like a browser, which is both ugly and the
-   shape of app Play rejects as a webview wrapper.
-
-## Things to test on a real device before submitting
-
-Chrome Custom Tabs, not a WebView, so the web's own permission prompts apply and Chrome
-already holds the Android permissions. That is the theory; none of it is verified for
-this app yet:
-
-- **Microphone.** The desk's dictation and Bobby Live both need `getUserMedia`. Confirm
-  the prompt appears inside the TWA and that audio actually reaches the model. If it does
-  not, this is the one feature that would force a native shell.
-- **Wallet handoff.** A swap opens the wallet app and must come back to Bobby, not to a
-  browser tab. Test with the wallet the audience actually uses.
-- **Google sign-in.** OAuth redirects leave the TWA's scope and return; confirm the
-  session lands on `/desk` and not in a stranded Custom Tab.
-- **Back button** at the start URL should exit the app, not leave a blank screen.
-- **No URL bar anywhere.** If one appears, Digital Asset Links did not verify.
-
-## Getting it onto your own phone
-
-Three ways, cheapest first.
-
-### 1. Install the web app (works the moment this branch is in production)
-
-On the Android phone, open `https://bobbyprotocol.xyz/desk` in Chrome → ⋮ → **Install app**
-(older Chrome says *Add to Home screen*). With the manifest live it installs standalone:
-own icon, own task in the recents switcher, no URL bar, starts on `/desk`. That is the
-same Chrome rendering the same web app the TWA will wrap — what you see there is what the
-Play build looks like, minus the Play plumbing.
-
-If Chrome offers a plain bookmark instead of *Install app*, the manifest is not live yet.
-
-### 2. Sideload the signed APK (after `bubblewrap build`)
-
-`bubblewrap build` writes `app-release-signed.apk` next to the bundle. Copy it to the
-phone, allow the file manager to install unknown apps, tap it.
-
-One catch: Digital Asset Links must list the key that signed *that* APK, which for a local
-build is your own upload key, not Play's. Print its fingerprint with
-
-```bash
-keytool -list -v -keystore android/android.keystore -alias android | grep SHA256
+```sh
+df -h .
+python3 android/nucleo/build.py --release
+node --test android/nucleo/tests/*.test.mjs
+cd android
+./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --no-daemon
+./gradlew :app:bundleRelease --no-daemon
 ```
 
-and add it to `public/.well-known/assetlinks.json` as a second entry in
-`sha256_cert_fingerprints` — the field is an array and Google accepts several, so the test
-build and the Play build can both verify from the same file. Without it the app runs with
-a URL bar across the top.
+These reproduce the recorded default local checks; new changes need new receipts. Debug APK: `app/build/outputs/apk/debug/app-debug.apk`; bundle: `app/build/outputs/bundle/release/app-release.aab`. A release bundle built without signing configuration is unsigned; the signed code-5 build used the existing authorized local signer, recorded in its receipt. Preserve Bobby's existing upload-key identity; do not regenerate or rotate it. Signing does not establish Google Play distribution or backend readiness.
 
-### 3. Internal testing on Play (the real thing)
+The Android workflow defines default and optional FCM configurations (`BOBBY_FCM_ENABLED=false/true`). The code-5 receipt above covers only the default local build. The workflow compiles the instrumentation APK but does not run device instrumentation or publish artifacts. Default builds have no Firebase Messaging SDK; the optional build, real FCM configuration and delivery remain separate checks.
 
-Once the AAB is uploaded, Play Console → *Testing* → *Internal testing* takes up to 100
-testers and goes live in minutes, not days, with no review queue. The testers install from
-the Play Store itself, so this is the only one of the three that exercises the actual
-delivery path: Play App Signing, the store listing, the install flow and the update flow.
+## Device acceptance
 
-Internal testing is also not the same thing as the closed test that a personal developer
-account has to run for 14 days before it can apply for production — that one is a separate
-track with its own 12-tester requirement.
+Use a dedicated test emulator/device for debug and instrumentation, select its serial explicitly and record its API/page size. Do not replace the signed code-3 Seeker installation with a differently signed debug APK or clear its user data as a routine test step. On a selected test device, run `:app:connectedDebugAndroidTest` with `ANDROID_SERIAL` set to that device. Compiling `assembleDebugAndroidTest` alone does not execute those tests.
+
+Physical checks must cover consent, text input, on-device dictation, audio and cancellation, profile/account isolation, long text in all six languages, Island first visit, sharing, charts and authenticated flows. Request microphone and AI consent through the actual product controls. Dictation uses explicit on-device recognition on supported API 31+ devices; other devices keep keyboard input. A passed mock, local preference or rendered screen does not prove provider delivery, account synchronization, payment/restore or receipt telemetry.
+
+This branch is limited to Android, its CI and documentation. Keep the review/draft separate from deployment, Play uploads/publication, backend/database changes and legal declarations. Google Play production eligibility and account-specific testing requirements must be checked in the current Console before any later release.

@@ -1,0 +1,1412 @@
+{
+  "version": 1,
+  "provenance": "iOS Bobby release54 CompanionTools.swift and bundled approved art",
+  "items": [
+    {
+      "id": "orb-1",
+      "companionId": "orb",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Patience Chronometer",
+        "es": "Cronómetro de paciencia"
+      },
+      "lore": {
+        "en": "Counts the candles you did not chase.",
+        "es": "Cuenta las velas que no perseguiste."
+      },
+      "fallback": "clock",
+      "art": "tool_orb_1.png"
+    },
+    {
+      "id": "orb-2",
+      "companionId": "orb",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "4H Trend Compass",
+        "es": "Brújula de tendencia 4H"
+      },
+      "lore": {
+        "en": "Points where the structure goes, not where the noise does.",
+        "es": "Apunta hacia donde va la estructura, no el ruido."
+      },
+      "fallback": "safari",
+      "art": "tool_orb_2.png"
+    },
+    {
+      "id": "orb-3",
+      "companionId": "orb",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Omega Core",
+        "es": "Núcleo Omega"
+      },
+      "lore": {
+        "en": "Bobby's own heart. You earned it by waiting better.",
+        "es": "El corazón del propio Bobby. Te lo ganaste esperando mejor."
+      },
+      "fallback": "circle.hexagongrid.fill",
+      "art": "tool_orb_3.png"
+    },
+    {
+      "id": "byte-1",
+      "companionId": "byte",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hip",
+      "name": {
+        "en": "Market Translator",
+        "es": "Traductor de mercado"
+      },
+      "lore": {
+        "en": "Turns 'RSI divergence' into words you would say to a friend.",
+        "es": "Convierte 'divergencia de RSI' en palabras que le dirías a un amigo."
+      },
+      "fallback": "text.bubble",
+      "art": "tool_byte_1.png"
+    },
+    {
+      "id": "byte-2",
+      "companionId": "byte",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "face",
+      "name": {
+        "en": "Anti-Hype Goggles",
+        "es": "Gafas anti-humo"
+      },
+      "lore": {
+        "en": "Filters gurus, threads and 'trust me bro' out of the picture.",
+        "es": "Filtra gurús, hilos y 'confía en mí' de la escena."
+      },
+      "fallback": "eyeglasses",
+      "art": "tool_byte_2.png"
+    },
+    {
+      "id": "byte-3",
+      "companionId": "byte",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "hand",
+      "name": {
+        "en": "Golden Codex",
+        "es": "Códice dorado"
+      },
+      "lore": {
+        "en": "Every read you ever explained simply, bound in gold.",
+        "es": "Cada lectura que explicaste simple, encuadernada en oro."
+      },
+      "fallback": "book.closed.fill",
+      "art": "tool_byte_3.png"
+    },
+    {
+      "id": "kora-1",
+      "companionId": "kora",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "headset",
+      "name": {
+        "en": "Radar Headset",
+        "es": "Auriculares radar"
+      },
+      "lore": {
+        "en": "Hears the desk before the crowd does.",
+        "es": "Escucha la mesa antes que la multitud."
+      },
+      "fallback": "headphones",
+      "art": "tool_kora_1.png"
+    },
+    {
+      "id": "kora-2",
+      "companionId": "kora",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "shoulder",
+      "name": {
+        "en": "Gossip Antenna",
+        "es": "Antena de chisme"
+      },
+      "lore": {
+        "en": "Picks up what the market is whispering, with receipts.",
+        "es": "Capta lo que el mercado susurra, con pruebas."
+      },
+      "fallback": "antenna.radiowaves.left.and.right",
+      "art": "tool_kora_2.png"
+    },
+    {
+      "id": "kora-3",
+      "companionId": "kora",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "hand",
+      "name": {
+        "en": "Golden Mic",
+        "es": "Micrófono dorado"
+      },
+      "lore": {
+        "en": "When Kora speaks with this, the whole squad listens.",
+        "es": "Cuando Kora habla con esto, todo el equipo escucha."
+      },
+      "fallback": "mic.fill",
+      "art": "tool_kora_3.png"
+    },
+    {
+      "id": "zip-1",
+      "companionId": "zip",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "15M Stopwatch",
+        "es": "Cronómetro 15M"
+      },
+      "lore": {
+        "en": "Fifteen minutes. That is all Zip needs to notice.",
+        "es": "Quince minutos. Es todo lo que Zip necesita para notarlo."
+      },
+      "fallback": "stopwatch",
+      "art": "tool_zip_1.png"
+    },
+    {
+      "id": "zip-2",
+      "companionId": "zip",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "shoulder",
+      "name": {
+        "en": "Alert Beacon",
+        "es": "Baliza de alertas"
+      },
+      "lore": {
+        "en": "Lights up when something moves. Never for nothing.",
+        "es": "Se enciende cuando algo se mueve. Nunca en vano."
+      },
+      "fallback": "light.beacon.max",
+      "art": "tool_zip_2.png"
+    },
+    {
+      "id": "zip-3",
+      "companionId": "zip",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Bolt",
+        "es": "Rayo dorado"
+      },
+      "lore": {
+        "en": "Speed, forged. The stop is always within reach.",
+        "es": "Velocidad forjada. El stop siempre a la mano."
+      },
+      "fallback": "bolt.fill",
+      "art": "tool_zip_3.png"
+    },
+    {
+      "id": "glitch-1",
+      "companionId": "glitch",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Thesis Hammer",
+        "es": "Martillo de tesis"
+      },
+      "lore": {
+        "en": "Hits every idea once before the market does.",
+        "es": "Golpea cada idea una vez antes que el mercado."
+      },
+      "fallback": "hammer",
+      "art": "tool_glitch_1.png"
+    },
+    {
+      "id": "glitch-2",
+      "companionId": "glitch",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "hand",
+      "name": {
+        "en": "Refutation Blade",
+        "es": "Hoja de refutación"
+      },
+      "lore": {
+        "en": "Cuts the argument that would have cost you.",
+        "es": "Corta el argumento que te habría costado."
+      },
+      "fallback": "xmark.shield",
+      "art": "tool_glitch_2.png"
+    },
+    {
+      "id": "glitch-3",
+      "companionId": "glitch",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "chest",
+      "name": {
+        "en": "Golden Counter",
+        "es": "Contra dorada"
+      },
+      "lore": {
+        "en": "Survive Glitch, survive the candle.",
+        "es": "Sobrevive a Glitch, sobrevive a la vela."
+      },
+      "fallback": "shield.lefthalf.filled",
+      "art": "tool_glitch_3.png"
+    },
+    {
+      "id": "momo-1",
+      "companionId": "momo",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Explorer's Map",
+        "es": "Mapa de exploración"
+      },
+      "lore": {
+        "en": "Marks the corners nobody is watching yet.",
+        "es": "Marca los rincones que nadie mira todavía."
+      },
+      "fallback": "map",
+      "art": "tool_momo_1.png"
+    },
+    {
+      "id": "momo-2",
+      "companionId": "momo",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "face",
+      "name": {
+        "en": "Long-Range Binoculars",
+        "es": "Binoculares de largo alcance"
+      },
+      "lore": {
+        "en": "Sees tokenized stocks and new listings before the crowd.",
+        "es": "Ve acciones tokenizadas y listados nuevos antes que la multitud."
+      },
+      "fallback": "binoculars",
+      "art": "tool_momo_2.png"
+    },
+    {
+      "id": "momo-3",
+      "companionId": "momo",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Lens",
+        "es": "Lente dorado"
+      },
+      "lore": {
+        "en": "Finds signal in places that look like noise.",
+        "es": "Encuentra señal donde parece ruido."
+      },
+      "fallback": "sparkle.magnifyingglass",
+      "art": "tool_momo_3.png"
+    },
+    {
+      "id": "flux-1",
+      "companionId": "flux",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Tuning Fork",
+        "es": "Diapasón"
+      },
+      "lore": {
+        "en": "Rings when an indicator is off-key.",
+        "es": "Suena cuando un indicador desafina."
+      },
+      "fallback": "waveform",
+      "art": "tool_flux_1.png"
+    },
+    {
+      "id": "flux-2",
+      "companionId": "flux",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Signal Score",
+        "es": "Partitura de señales"
+      },
+      "lore": {
+        "en": "RSI, EMA and funding on one staff.",
+        "es": "RSI, EMA y financiamiento en un solo pentagrama."
+      },
+      "fallback": "chart.xyaxis.line",
+      "art": "tool_flux_2.png"
+    },
+    {
+      "id": "flux-3",
+      "companionId": "flux",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Note",
+        "es": "Nota dorada"
+      },
+      "lore": {
+        "en": "Perfect pitch for the market's rhythm.",
+        "es": "Oído absoluto para el ritmo del mercado."
+      },
+      "fallback": "music.note",
+      "art": "tool_flux_3.png"
+    },
+    {
+      "id": "rook-1",
+      "companionId": "rook",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "chest",
+      "name": {
+        "en": "Thesis Board",
+        "es": "Tablero de tesis"
+      },
+      "lore": {
+        "en": "Entry, stop, invalidation. Three squares, no roulette.",
+        "es": "Entrada, stop, invalidación. Tres casillas, nada de ruleta."
+      },
+      "fallback": "square.grid.3x3",
+      "art": "tool_rook_1.png"
+    },
+    {
+      "id": "rook-2",
+      "companionId": "rook",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "head",
+      "name": {
+        "en": "Rook's Crown",
+        "es": "Corona de torre"
+      },
+      "lore": {
+        "en": "Thinks three candles ahead.",
+        "es": "Piensa tres velas adelante."
+      },
+      "fallback": "crown",
+      "art": "tool_rook_2.png"
+    },
+    {
+      "id": "rook-3",
+      "companionId": "rook",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "hand",
+      "name": {
+        "en": "Golden Board",
+        "es": "Tablero dorado"
+      },
+      "lore": {
+        "en": "The whole game, seen at once.",
+        "es": "Todo el juego, visto de una vez."
+      },
+      "fallback": "checkerboard.rectangle",
+      "art": "tool_rook_3.png"
+    },
+    {
+      "id": "halo-1",
+      "companionId": "halo",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "chest",
+      "name": {
+        "en": "Capital Shield",
+        "es": "Escudo de capital"
+      },
+      "lore": {
+        "en": "Blocks the trade that was not there.",
+        "es": "Bloquea la operación que no estaba."
+      },
+      "fallback": "shield",
+      "art": "tool_halo_1.png"
+    },
+    {
+      "id": "halo-2",
+      "companionId": "halo",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "shoulder",
+      "name": {
+        "en": "Risk Gate",
+        "es": "Filtro de riesgo"
+      },
+      "lore": {
+        "en": "Only clean setups get through.",
+        "es": "Solo pasan las entradas limpias."
+      },
+      "fallback": "shield.checkered",
+      "art": "tool_halo_2.png"
+    },
+    {
+      "id": "halo-3",
+      "companionId": "halo",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Halo",
+        "es": "Halo dorado"
+      },
+      "lore": {
+        "en": "NO TRADE, made legendary.",
+        "es": "NO OPERAR, hecho leyenda."
+      },
+      "fallback": "shield.fill",
+      "art": "tool_halo_3.png"
+    },
+    {
+      "id": "axiom-1",
+      "companionId": "axiom",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Ledger",
+        "es": "Libro mayor"
+      },
+      "lore": {
+        "en": "Every call written down.",
+        "es": "Cada veredicto queda escrito."
+      },
+      "fallback": "doc.text",
+      "art": "tool_axiom_1.png"
+    },
+    {
+      "id": "axiom-2",
+      "companionId": "axiom",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Chain Link",
+        "es": "Eslabón"
+      },
+      "lore": {
+        "en": "Anchors the record where anyone can check it.",
+        "es": "Ancla el historial donde cualquiera puede revisarlo."
+      },
+      "fallback": "link",
+      "art": "tool_axiom_2.png"
+    },
+    {
+      "id": "axiom-3",
+      "companionId": "axiom",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Seal",
+        "es": "Sello dorado"
+      },
+      "lore": {
+        "en": "Verified, not promised.",
+        "es": "Comprobado, no prometido."
+      },
+      "fallback": "seal.fill",
+      "art": "tool_axiom_3.png"
+    },
+    {
+      "id": "iris-1",
+      "companionId": "iris",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Regime Dial",
+        "es": "Dial de régimen"
+      },
+      "lore": {
+        "en": "Says calm, caution or storm before you read a single candle.",
+        "es": "Dice calma, cuidado o tormenta antes de que leas una sola vela."
+      },
+      "fallback": "gauge.with.dots.needle.33percent",
+      "art": "tool_iris_1.png"
+    },
+    {
+      "id": "iris-2",
+      "companionId": "iris",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "face",
+      "name": {
+        "en": "Horizon Band",
+        "es": "Banda de horizonte"
+      },
+      "lore": {
+        "en": "One thin line for where the whole market is leaning.",
+        "es": "Una línea delgada para saber hacia dónde se inclina todo el mercado."
+      },
+      "fallback": "water.waves",
+      "art": "tool_iris_2.png"
+    },
+    {
+      "id": "iris-3",
+      "companionId": "iris",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Forecast",
+        "es": "Pronóstico dorado"
+      },
+      "lore": {
+        "en": "Every regime you respected instead of fighting, kept in gold.",
+        "es": "Cada régimen que respetaste en vez de pelear, guardado en oro."
+      },
+      "fallback": "sun.max.fill",
+      "art": "tool_iris_3.png"
+    },
+    {
+      "id": "sol-1",
+      "companionId": "sol",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Builder Tape",
+        "es": "Cinta de constructor"
+      },
+      "lore": {
+        "en": "Measures what you actually finished, never what you planned.",
+        "es": "Mide lo que sí terminaste, nunca lo que planeaste."
+      },
+      "fallback": "ruler",
+      "art": "tool_sol_1.png"
+    },
+    {
+      "id": "sol-2",
+      "companionId": "sol",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "head",
+      "name": {
+        "en": "Sprout Pin",
+        "es": "Prendedor de brote"
+      },
+      "lore": {
+        "en": "Grows one leaf per tier. Only discipline waters it.",
+        "es": "Le sale una hoja por nivel. Solo la disciplina la riega."
+      },
+      "fallback": "leaf",
+      "art": "tool_sol_2.png"
+    },
+    {
+      "id": "sol-3",
+      "companionId": "sol",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "hand",
+      "name": {
+        "en": "Golden Blueprint",
+        "es": "Plano dorado"
+      },
+      "lore": {
+        "en": "The plan of a world you built one earned piece at a time.",
+        "es": "El plano de un mundo que construiste pieza ganada por pieza ganada."
+      },
+      "fallback": "square.grid.3x3.fill",
+      "art": "tool_sol_3.png"
+    },
+    {
+      "id": "zuri-1",
+      "companionId": "zuri",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "headset",
+      "name": {
+        "en": "Trail Monocle",
+        "es": "Monóculo de rastreo"
+      },
+      "lore": {
+        "en": "Follows one wallet without losing it in the noise.",
+        "es": "Sigue una wallet sin perderla en el ruido."
+      },
+      "fallback": "scope",
+      "art": "tool_zuri_1.png"
+    },
+    {
+      "id": "zuri-2",
+      "companionId": "zuri",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "shoulder",
+      "name": {
+        "en": "Bead Ledger",
+        "es": "Cuentas de registro"
+      },
+      "lore": {
+        "en": "One bead per wallet worth watching. No bead is free.",
+        "es": "Una cuenta por cada wallet que vale la pena mirar. Ninguna es gratis."
+      },
+      "fallback": "circle.grid.2x1",
+      "art": "tool_zuri_2.png"
+    },
+    {
+      "id": "zuri-3",
+      "companionId": "zuri",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "hand",
+      "name": {
+        "en": "Golden Thread",
+        "es": "Hilo dorado"
+      },
+      "lore": {
+        "en": "Where the money went, drawn end to end.",
+        "es": "A dónde se fue el dinero, trazado de punta a punta."
+      },
+      "fallback": "point.topleft.down.to.point.bottomright.curvepath.fill",
+      "art": "tool_zuri_3.png"
+    },
+    {
+      "id": "mira-1",
+      "companionId": "mira",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Rehearsal Timer",
+        "es": "Cronómetro de ensayo"
+      },
+      "lore": {
+        "en": "Counts the reps, not the wins.",
+        "es": "Cuenta las repeticiones, no las victorias."
+      },
+      "fallback": "timer",
+      "art": "tool_mira_1.png"
+    },
+    {
+      "id": "mira-2",
+      "companionId": "mira",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Wireframe Half",
+        "es": "Mitad de malla"
+      },
+      "lore": {
+        "en": "The part of you still being drafted. Everyone has one.",
+        "es": "La parte de ti que todavía es borrador. Todos tenemos una."
+      },
+      "fallback": "square.split.diagonal",
+      "art": "tool_mira_2.png"
+    },
+    {
+      "id": "mira-3",
+      "companionId": "mira",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Replay",
+        "es": "Repetición dorada"
+      },
+      "lore": {
+        "en": "Every move you rewound until you understood it.",
+        "es": "Cada jugada que rebobinaste hasta entenderla."
+      },
+      "fallback": "star.fill",
+      "art": "tool_mira_3.png"
+    },
+    {
+      "id": "nalu-1",
+      "companionId": "nalu",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Flow Fin",
+        "es": "Quilla de flujo"
+      },
+      "lore": {
+        "en": "Feels the current before it shows on the chart.",
+        "es": "Siente la corriente antes de que se vea en la gráfica."
+      },
+      "fallback": "wind",
+      "art": "tool_nalu_1.png"
+    },
+    {
+      "id": "nalu-2",
+      "companionId": "nalu",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "hip",
+      "name": {
+        "en": "Tide Watch",
+        "es": "Reloj de marea"
+      },
+      "lore": {
+        "en": "Tells you the wave is not yours yet.",
+        "es": "Te dice que la ola todavía no es tuya."
+      },
+      "fallback": "clock.arrow.circlepath",
+      "art": "tool_nalu_2.png"
+    },
+    {
+      "id": "nalu-3",
+      "companionId": "nalu",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "shoulder",
+      "name": {
+        "en": "Golden Board",
+        "es": "Tabla dorada"
+      },
+      "lore": {
+        "en": "Earned by the waves you let pass.",
+        "es": "Se gana con las olas que dejaste pasar."
+      },
+      "fallback": "surfboard.fill",
+      "art": "tool_nalu_3.png"
+    },
+    {
+      "id": "vega-1",
+      "companionId": "vega",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Probability Cone",
+        "es": "Cono de probabilidad"
+      },
+      "lore": {
+        "en": "Shows the spread, not a single confident number.",
+        "es": "Muestra el rango, no un solo número seguro."
+      },
+      "fallback": "cone",
+      "art": "tool_vega_1.png"
+    },
+    {
+      "id": "vega-2",
+      "companionId": "vega",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Error Bar",
+        "es": "Barra de error"
+      },
+      "lore": {
+        "en": "The part of the forecast nobody likes to publish.",
+        "es": "La parte del pronóstico que nadie quiere publicar."
+      },
+      "fallback": "plusminus",
+      "art": "tool_vega_2.png"
+    },
+    {
+      "id": "vega-3",
+      "companionId": "vega",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Monocle",
+        "es": "Monóculo dorado"
+      },
+      "lore": {
+        "en": "Collapses the cone to one number, and shows its cost.",
+        "es": "Colapsa el cono a un número, y enseña lo que cuesta."
+      },
+      "fallback": "eyeglasses",
+      "art": "tool_vega_3.png"
+    },
+    {
+      "id": "noor-1",
+      "companionId": "noor",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "First Ring",
+        "es": "Primer anillo"
+      },
+      "lore": {
+        "en": "Given for showing up again, not for being right.",
+        "es": "Se da por volver, no por acertar."
+      },
+      "fallback": "circle",
+      "art": "tool_noor_1.png"
+    },
+    {
+      "id": "noor-2",
+      "companionId": "noor",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Review Ledger",
+        "es": "Libro de revisión"
+      },
+      "lore": {
+        "en": "The week read back to you, without flattery.",
+        "es": "La semana leída de vuelta, sin adulaciones."
+      },
+      "fallback": "book.closed",
+      "art": "tool_noor_2.png"
+    },
+    {
+      "id": "noor-3",
+      "companionId": "noor",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "head",
+      "name": {
+        "en": "Golden Crown",
+        "es": "Corona dorada"
+      },
+      "lore": {
+        "en": "The third ring. It is set above your head, never sold.",
+        "es": "El tercer anillo. Se pone sobre tu cabeza, no se vende."
+      },
+      "fallback": "crown.fill",
+      "art": "tool_noor_3.png"
+    },
+    {
+      "id": "keo-1",
+      "companionId": "keo",
+      "tier": 1,
+      "kind": "tool",
+      "unlockXP": 1,
+      "slot": "hand",
+      "name": {
+        "en": "Set Counter",
+        "es": "Contador de series"
+      },
+      "lore": {
+        "en": "Counts the waves you let go before the good one.",
+        "es": "Cuenta las olas que dejas ir antes de la buena."
+      },
+      "fallback": "number.circle",
+      "art": "tool_keo_1.png"
+    },
+    {
+      "id": "keo-2",
+      "companionId": "keo",
+      "tier": 2,
+      "kind": "tool",
+      "unlockXP": 100,
+      "slot": "chest",
+      "name": {
+        "en": "Reef Sense",
+        "es": "Sentido de arrecife"
+      },
+      "lore": {
+        "en": "Knows what is under the water before you drop in.",
+        "es": "Sabe qué hay bajo el agua antes de que entres."
+      },
+      "fallback": "fish",
+      "art": "tool_keo_2.png"
+    },
+    {
+      "id": "keo-3",
+      "companionId": "keo",
+      "tier": 3,
+      "kind": "tool",
+      "unlockXP": 200,
+      "slot": "shoulder",
+      "name": {
+        "en": "Golden Patience",
+        "es": "Paciencia dorada"
+      },
+      "lore": {
+        "en": "Thirty years of waiting, cast in gold.",
+        "es": "Treinta años de espera, fundidos en oro."
+      },
+      "fallback": "hourglass",
+      "art": "tool_keo_3.png"
+    },
+    {
+      "id": "pet-orb",
+      "companionId": "orb",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": true,
+      "name": {
+        "en": "Spin the panda",
+        "es": "Panda giratorio"
+      },
+      "lore": {
+        "en": "Spins next to you on the desk.",
+        "es": "Gira a tu lado en la mesa."
+      },
+      "fallback": "🐼",
+      "art": "pet_orb.png"
+    },
+    {
+      "id": "pet-byte",
+      "companionId": "byte",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Bit the dog",
+        "es": "Bit el perro"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐶",
+      "art": "pet_byte.png"
+    },
+    {
+      "id": "pet-kora",
+      "companionId": "kora",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Nova the cat",
+        "es": "Nova la gata"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐱",
+      "art": "pet_kora.png"
+    },
+    {
+      "id": "pet-zip",
+      "companionId": "zip",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Turbo the monkey",
+        "es": "Turbo el mono"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐵",
+      "art": "pet_zip.png"
+    },
+    {
+      "id": "pet-glitch",
+      "companionId": "glitch",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Bug the gecko",
+        "es": "Bicho el geco"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🦎",
+      "art": "pet_glitch.png"
+    },
+    {
+      "id": "pet-momo",
+      "companionId": "momo",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Ink the octopus",
+        "es": "Tinta el pulpo"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐙",
+      "art": "pet_momo.png"
+    },
+    {
+      "id": "pet-flux",
+      "companionId": "flux",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Echo the parrot",
+        "es": "Eco el loro"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🦜",
+      "art": "pet_flux.png"
+    },
+    {
+      "id": "pet-rook",
+      "companionId": "rook",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Sage the owl",
+        "es": "Sabio el búho"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🦉",
+      "art": "pet_rook.png"
+    },
+    {
+      "id": "pet-halo",
+      "companionId": "halo",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Peace the dove",
+        "es": "Paz la paloma"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🕊️",
+      "art": "pet_halo.png"
+    },
+    {
+      "id": "pet-axiom",
+      "companionId": "axiom",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Ledger the turtle",
+        "es": "Libreta la tortuga"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐢",
+      "art": "pet_axiom.png"
+    },
+    {
+      "id": "pet-iris",
+      "companionId": "iris",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Cirrus the crane",
+        "es": "Cirrus la grulla"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐦",
+      "art": "pet_iris.png"
+    },
+    {
+      "id": "pet-sol",
+      "companionId": "sol",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Root the hedgehog",
+        "es": "Root el erizo"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🦔",
+      "art": "pet_sol.png"
+    },
+    {
+      "id": "pet-zuri",
+      "companionId": "zuri",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Trace the fox",
+        "es": "Trace el zorro"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🦊",
+      "art": "pet_zuri.png"
+    },
+    {
+      "id": "pet-mira",
+      "companionId": "mira",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Pace the hare",
+        "es": "Pace la liebre"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐇",
+      "art": "pet_mira.png"
+    },
+    {
+      "id": "pet-nalu",
+      "companionId": "nalu",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Kai the dolphin",
+        "es": "Kai el delfín"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐬",
+      "art": "pet_nalu.png"
+    },
+    {
+      "id": "pet-vega",
+      "companionId": "vega",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Sigma the raven",
+        "es": "Sigma el cuervo"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐦‍⬛",
+      "art": "pet_vega.png"
+    },
+    {
+      "id": "pet-noor",
+      "companionId": "noor",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Elder the tortoise",
+        "es": "Elder la tortuga"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐢",
+      "art": "pet_noor.png"
+    },
+    {
+      "id": "pet-keo",
+      "companionId": "keo",
+      "tier": 0,
+      "kind": "pet",
+      "unlockXP": 500,
+      "slot": "pet",
+      "spins": false,
+      "name": {
+        "en": "Sombra the sea turtle",
+        "es": "Sombra la tortuga marina"
+      },
+      "lore": {
+        "en": "Lives at your companion's feet.",
+        "es": "Vive a los pies de tu amigo."
+      },
+      "fallback": "🐢",
+      "art": "pet_keo.png"
+    }
+  ],
+  "sha256": {
+    "tool_orb_1.png": "b3b1502425fc942808b4512a23f5af2086bb441091eba8813db114e577300886",
+    "tool_orb_2.png": "eec9b87b49cc299a697ad5fe10ca7dbd2185a64e484c558ded8ffe583dd3275b",
+    "tool_orb_3.png": "36209b1401dc56e37f0bc585d506095ef2adef6e7a60f6895f22642195530125",
+    "tool_byte_1.png": "86efb723d3a13055a701490402e96768b8c008b327c4a1a83d31413b8b20df51",
+    "tool_byte_2.png": "de9a8105b180129742ca2e3be0938e0a2cc42446b55d9acc524e8e04163e76ab",
+    "tool_byte_3.png": "078900e1c345ca3532c8310ac80eadec701f352536979bcc9642b2f2e6d5ff3c",
+    "tool_kora_1.png": "7bac0b4098bf5bfd6ee0084c7bf78898e8a8cfd7f49e6e1e1f72d9456d8ea171",
+    "tool_kora_2.png": "fabf34ae72ab90da0049c45c424b6bd12fff1070bb00a46c6135fa33a4e31673",
+    "tool_kora_3.png": "4c6615fb2ff498c62fff3ddce9105960064af30b637a7334fa10c24de6e3051c",
+    "tool_zip_1.png": "701e876ac2cccd2fad2a6c0c71e888f81ea22d365118b477d6425c47b7fbb75b",
+    "tool_zip_2.png": "d0f5ec1d6ec7af3105a449c932a6d23a65db5f954dc097ea2b9352b47546bdfc",
+    "tool_zip_3.png": "28c886278160875629e2cfe411a0773d4b7e94a5df2909785066cd23b77f428a",
+    "tool_glitch_1.png": "b2b610f03db02aa92bcdf464c63391f99b79b1ea85efdc2be3d46e5bf025bdd8",
+    "tool_glitch_2.png": "b4c2f2bedd415a65c3ea8d1498c7a7786e9219ba45477401e87e327b3e7d4475",
+    "tool_glitch_3.png": "cfa875b426ba1e1943bc1b6ecd6657826b9f9983f1f08db16da864c841e4ea70",
+    "tool_momo_1.png": "f10a33eac4448bd7294569d2829696c475163b15a91db95bcea5822955f03b6a",
+    "tool_momo_2.png": "302d1b9e095167f1a6eaae01af6b04443a8f7396ec2dbbbe13fcf5ce71e154b3",
+    "tool_momo_3.png": "d4dc3f81771c6a47efda4005ce9c7b438b1e5134e9ba8bbb1c73ae73f16a752a",
+    "tool_flux_1.png": "59208844c0b3f8d5ad146ce63df0b530b9f30cb638ce1586b640f1db4ef9ec8f",
+    "tool_flux_2.png": "4b6cd86286de7e2a415702c4847b1d327336a73e32ebb2b52a899d09bec56964",
+    "tool_flux_3.png": "600ef2cfdce642de753492d9cfc5c55e727544b22fea3eeb3eb16f7fa000e1dd",
+    "tool_rook_1.png": "52def010cdcfe318d86b0559f5aef70adc7b070fb43a02ddd3058ed0220ed6ba",
+    "tool_rook_2.png": "6aea6601d0f1a91cb300003030ee4873fefe3105991cda177c467522646ac2c6",
+    "tool_rook_3.png": "1afb3a8dde511662e10b06d4687d3b63c3d3b8dd0c03b62bd76675900ede4bda",
+    "tool_halo_1.png": "625a196f8075283f438de82e92a283c8aafc8acf706d77ede881cb961b19d62a",
+    "tool_halo_2.png": "0fa05456c3be6d86e4fa4f9aecb1cbb54e0066564e181b6a273b544cd3f671c1",
+    "tool_halo_3.png": "10da848fb11d57dfb03288d98f53d8cb5cac24953fb183c46f8188bca12cc743",
+    "tool_axiom_1.png": "3ee6582dbfbf37797fe1a32e2c7803b6c7e92b42f0459a4bd7e77282b2fa83b6",
+    "tool_axiom_2.png": "40889f9a5ceb854cce1aa106e0ebb069532e12a221c0bc5dac8dbbf0bfea4b77",
+    "tool_axiom_3.png": "b454771df3e09ed5e20bd904a64fe940e1a9a061c07c7da41fcae47d825f801b",
+    "tool_iris_1.png": "6e20df4b68763fdacd5edc79d49d7e879e3b48fee144549f6f5c488020ebb382",
+    "tool_iris_2.png": "f2a259d05f52832a2d0dc5efc9bf831ee611622636ccf62647348ae91ca18cda",
+    "tool_iris_3.png": "db87d9c098efccf3c7d8519db37e821d8c204f4e0d0c85af793c2c76876638df",
+    "tool_sol_1.png": "427b026b5b89d11cc9d519bc1003ecd65708b9635f62017e563bb413aaa9118c",
+    "tool_sol_2.png": "4f9f74e3c6870bc0cb41736cac1174c2b4e305a69456039d51e440b45c9969ac",
+    "tool_sol_3.png": "c9664e36104212fdb0afb96a9436b8d6540f3faef9bfc192b1e2a2d7434f27d0",
+    "tool_zuri_1.png": "194250f054500a5b7c94b3ae0d15989fabbfb9657c454d7738627dc147608b3f",
+    "tool_zuri_2.png": "496828581509febbb1995576fac9ec5606ce4ba5c74f36e02902fbc3e158750e",
+    "tool_zuri_3.png": "5a7c98320ea586d68f568e8adb59294ea81ec5496f71b1d7d35360b919b5215e",
+    "tool_mira_1.png": "75d2b8aea8333717dfa158292cf66e8de0f9f6737e0f1e497897e696b0eb4c0f",
+    "tool_mira_2.png": "70f9a483b3d729c0e8a086ae468d12a95b416613239020d30557ac679ed601c2",
+    "tool_mira_3.png": "2e5bdf32de042055c227c87a85d8766aa6852c8fe80a72fa4e44b628841e44b1",
+    "tool_nalu_1.png": "bcce6603073342a8fdc8391b6de0cb4f98c9268f747bce573c0ae643b8e0859c",
+    "tool_nalu_2.png": "e8d1b19263c14afcae07acf01c99481c3a8fcd006edd25910d5fd154126b671e",
+    "tool_nalu_3.png": "a3b08b6539d93196b56fe7199fb34773b86c7fbaf676fb36cd9cf663af3388bc",
+    "tool_vega_1.png": "855095e23d016dc3de0059092401cd62572270d2220c0698fb5244ca316d3326",
+    "tool_vega_2.png": "82b6d68d6f9021a97504c64ef0447f0effb020fb88e7ac0b9cd929afb854219e",
+    "tool_vega_3.png": "cb8baceb755978a41753dfa8232ed7c003f1ede5ab35561f7a7045ef8fbb6218",
+    "tool_noor_1.png": "ebf0fdbd88a6caa5a02d7f4a538968bfcf55dce4ad79376abd017c24d8513e71",
+    "tool_noor_2.png": "886f1fc98fce383bb9ee49b64e3a81313802c51b3ac92a98ae9fd076fd2c8f46",
+    "tool_noor_3.png": "4522fb98fbeb05b192319108172dd812c14c5304445e624b223b1d5cb0fd6ed8",
+    "tool_keo_1.png": "79be1145900632900b5415c4b6dc1df7b4505602e1e895c9faf51dcafa51230c",
+    "tool_keo_2.png": "a3fcd83c0d60e994b2c722b540a8654805312aeb7153a159113227b56dc4cd8f",
+    "tool_keo_3.png": "52b08b52bad11afc8ee0820e40ccd687e176d6126f0baf1c83a4c45addcea112",
+    "pet_orb.png": "18a531ce84cc195fd75a462c1d7abf9f091d5d9d385e1e0a36b552f64305e75f",
+    "pet_byte.png": "f31a8055b39afdf2c154683421bb8c3a31e780b9fbed56dd603114f0deacc47a",
+    "pet_kora.png": "1cf869333e78217c95c5e45b712ef85b7970f783d97289934af1c5e5357467e7",
+    "pet_zip.png": "5914071446a29a874f1496907a89b2ccafc64ace83f722bbf6309df70bf4ce1e",
+    "pet_glitch.png": "66973e7402898a7e7431a8bad06f287e0393ca3ae94015e9f1580a5ed161547a",
+    "pet_momo.png": "f1e60d98cb7a036c1b262ca161976633096a2bc831599104dae7b0fe9f6caed4",
+    "pet_flux.png": "516cedf65997bf2f07393209d465dc4540fa7f358f6a9bfb40a03c2eede91053",
+    "pet_rook.png": "b27862c86b6c1600e5ad594e943f6ab1a3e89d6f0e6741e848063514a144b86a",
+    "pet_halo.png": "d22829b62a661774243584508f1922ee90c322fb236706bda18cc5ab27f87433",
+    "pet_axiom.png": "4e1060ffec23d9063bd8f55fcf5fe8e9bea40c8a1440b0b177e74490c8591f82",
+    "pet_iris.png": "7ac18e63f9b4bffa8d780e42d21ed7a430b6d411ae416a4898d9e46125d2e4c1",
+    "pet_sol.png": "916fc3b234a46c9bd29eeb88566c4a549ddc77360d88f34a5484e7e8ca0c9ab3",
+    "pet_zuri.png": "c9f2e5293fce855f783803611f73222f18c1ca7a45e3e68b18a421408f0eefb4",
+    "pet_mira.png": "cdfa92dd87c94f9546b8a2b1d741f079307f442984752e48b05120273a18e473",
+    "pet_nalu.png": "9d011f24940282bdcd98f4ad72d7d3c6bd1eca7af34f66b7d12086b0552056ca",
+    "pet_vega.png": "97209be0929fc23d57220aea4eab65f901098b4ceeef353b4bd470f2234fac09",
+    "pet_noor.png": "a61ca861ed6768b162e621fe3e6ebbd22a8990b16809178151e86e47f8203e9b",
+    "pet_keo.png": "ad358e052e311a10757d837394fcfb549a2da616be12d0f587fd9d0bbaf76761",
+    "axiom_thumb.png": "45c04bcd54aa2b31e991a7feac140a833a0ba402fa250f82f5f5804f0bf8e63f",
+    "byte_thumb.png": "a8aab7a4b55208759cb83aa47eb22ea4c52d2cb31c0ad67283f501cec42f7241",
+    "flux_thumb.png": "3e686380faa1af27b72b18b7f5cef713eb91ddac0feb44e77598f25fec65defe",
+    "glitch_thumb.png": "b6e8854748d0e0685c412fa2d0f87986782efc3e0aa33c4356527c969a0ea228",
+    "halo_thumb.png": "aa7ae2615b63ddd8c1ed0ed3f02d89609ca79fcbc2e513c2b9aba14082aacb8c",
+    "iris_thumb.png": "ad4c0b2a751bd11c14ab105de5377650605405a6b786ec8fafb7842d02195240",
+    "keo_thumb.png": "0518ce8f0aad98938d67cdd41479f7a56560fb02db2fb3a7f115b9acd87135a5",
+    "kora_thumb.png": "9023464949440ef960654a510794e23a7a2c2265f7cffaf8cad8f502fff3f347",
+    "mira_thumb.png": "524faffa294d4e76e78ffcc22acb0d8e2ae2483828e864053016336c61630726",
+    "momo_thumb.png": "c4582cf34a9310104feccc62a7381a8049c757a7243cd99c1c911c981bfcc2ab",
+    "nalu_thumb.png": "2be6be51106320a1adf23ca982db937ef7fc83f7e43db309177e9beb94d34687",
+    "noor_thumb.png": "2ee6c9d1e40a2fa59ef07d9fb4cfa9e4944e621b5e4ba9209814e3e6b58a9356",
+    "orb_thumb.png": "09ea097af4e49293967e36ffdc73213d2ced270a334a0962f918fbb3034f26aa",
+    "rook_thumb.png": "d8f6b4ff038ab5ed06513ca135d3fe5ff2c8d6bf861e2328595fcbb4e0d31261",
+    "sol_thumb.png": "4d61157a5ed32b5b02718b75e2115b8831e44cfc49863897b85207e37cc3fd98",
+    "vega_thumb.png": "dccbae50993a16aa86f68a4e2ac2a7ec705814de4303ebcab7109c3f50ac95af",
+    "zip_thumb.png": "b93dd78bd17bfecbd632120bbb82d0fb19299177731f8a47764e2dd7efb07859",
+    "zuri_thumb.png": "7a04cfdb4944a2b1684a246b41276647a674430398a1a230ff1321c8c7bb3a9e"
+  }
+}

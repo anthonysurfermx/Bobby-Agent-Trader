@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "7385ec9c",
+  "models": 18,
+  "renderer": "Bobby web MascotScene.ts with per-avatar approved accessory profiles",
+  "sha256": {
+    "models/byte.glb": "8fc969e83dadcfdf9f1d9bffa2b552c9b780fb99ce3491704c1b1464a7374f50",
+    "models/vega.glb": "7997898e524844be643e7fd8103f8d38ff85742fe703775248d8ab6181ed7c1d",
+    "models/kora.glb": "f03d8388d4e77a885fad8cecc72d7188730bccf7d9c0c916f93704c4fbce0f95",
+    "models/nalu.glb": "eb5b9973abae2bc6cb1eccb95a53200f623dfd4c3cf4b064d1fdab199b8a9d6e",
+    "models/axiom.glb": "cae175ec4c560ec69ce3de9fe3b879ebdad8280f6e1120463545ed9032b86280",
+    "models/mira.glb": "f5705af9bd91b78ccc3cd18c17195d02a9c39b82d62fb0e1e1e51ee9bdaf9d7d",
+    "models/zuri.glb": "26c68558c6fdf8c40141357f1cf269dad4ffe6df25ed79e1c3aaf10fc2c695f5",
+    "models/flux.glb": "6a672ce95cbe00f26892ca8bd04571bc7578a3c07a6122e0c77b624132b41e2d",
+    "models/noor.glb": "159edc671e7f148822d0d37b6d12954b17731dc12555034ff10a7bec95ac5576",
+    "models/glitch.glb": "20dd7db4a9c46a356137170f75570c8043f9068ebf8eebabbb8a462f71f5146c",
+    "models/sol.glb": "b052e96ceb532d48b0bae0f61e5b10231c029ad7ab3c561db50f9aca252ae56a",
+    "models/zip.glb": "bc5d2cce42cc95d0995206dd2234ec967bcb94263a50a3e544c9707af9c4786d",
+    "models/orb.glb": "1b2e2d9f6fe5b3cb6d614e959f410b4c6a0a6bcca755f7ccfe52253d2b065226",
+    "models/keo.glb": "42cbfe68604835c965ba9933cc530adabc10f9898f61946bb0b88719ea720193",
+    "models/iris.glb": "96dd0932a1bbd8c8fc2a7216c90d56d8e71f18fe2a5b621b452ecb5a56d7a3a7",
+    "models/momo.glb": "5a4a4637f4af465850bfcb61e1beac634eb40ef93bdd6c1a6a047a33e4223a9c",
+    "models/halo.glb": "e2e1d4550e778bf63232206964f2ed16657756c80aec21b1f128e924fd789b3d",
+    "models/rook.glb": "d5698831e5fcf33ca1829fb910c992a23ec54afa89ad58f70389a222925928e3",
+    "draco/draco_decoder.wasm": "a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac",
+    "draco/draco_wasm_wrapper.js": "8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6"
+  },
+  "threeVersion": "0.182.0"
+}

@@ -1,0 +1,6 @@
+# Copy to local.properties (ignored). Only public client configuration belongs here.
+sdk.dir=/absolute/path/to/Android/sdk
+BOBBY_API_BASE_URL=https://bobbyprotocol.xyz
+BOBBY_SUPABASE_URL=
+BOBBY_SUPABASE_ANON_KEY=
+REVENUECAT_ANDROID_API_KEY=

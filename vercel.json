@@ -291,7 +291,8 @@
   "git": {
     "deploymentEnabled": {
       "codex/dashboard-live-review": false,
-      "codex/dashboard-remediation-20261003": false
+      "codex/dashboard-remediation-20261003": false,
+      "codex/bobby-android-parity-ios17": false
     }
   }
 }
