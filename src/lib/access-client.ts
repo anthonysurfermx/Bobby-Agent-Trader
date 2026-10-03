@@ -5,7 +5,7 @@ import { bobbySupabase } from '@/lib/bobby-db-client';
 import { progressHeaders } from '@/lib/companions/sync';
 
 export type Tier = 'anon' | 'free' | 'pro';
-/** `bonus`: reads gifted by coupons, spent after the weekly allowance (already included in `remaining`). */
+/** `bonus`: gifted Quick reads, separate from `remaining`; Pro keeps its balance while reads are unlimited. */
 export interface Access { tier: Tier; used: number | null; limit: number | null; remaining: number | null; resetsAt: string | null; paywall: boolean; bonus?: number }
 /** The analysis levels (api/_lib/desk-levels.ts). Rápido rides the read meter; Profundo and Máximo have their own. */
 export type DeskLevel = 'rapido' | 'profundo' | 'maximo';
@@ -13,7 +13,7 @@ export type PremiumLevel = Exclude<DeskLevel, 'rapido'>;
 export interface LevelMeter { used: number; limit: number; remaining: number; windowDays: number; resetsAt: string | null; bonus?: number }
 export interface LevelState { tier: Tier; levels: Record<PremiumLevel, LevelMeter> }
 /** Your invite link: each friend who creates an account through it adds `rewardDays` of Bobby Pro, up to `max`. */
-export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; friends: Array<{ joinedAt: string }> }
+export interface Referral { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; proSource?: 'admin' | 'referral' | null; friends: Array<{ joinedAt: string }> }
 export interface AccessState {
   access: Access; signedIn: boolean;
   subscription: { provider: 'stripe' | 'apple'; status: string; currentPeriodEnd: string | null } | null;
@@ -49,9 +49,9 @@ export async function accessHeaders(): Promise<Record<string, string>> {
   return h;
 }
 
-export async function fetchAccess(): Promise<AccessState | null> {
+export async function fetchAccess(headers?: Record<string, string>): Promise<AccessState | null> {
   try {
-    const r = await fetch('/api/bobby-access', { headers: await accessHeaders() });
+    const r = await fetch('/api/bobby-access', { headers: headers ?? await accessHeaders() });
     if (!r.ok) return null;
     return (await r.json()) as AccessState;
   } catch { return null; }

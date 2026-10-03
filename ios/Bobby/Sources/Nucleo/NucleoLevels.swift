@@ -78,6 +78,7 @@ struct NucleoLevelMeter: Equatable, Sendable {
     let used: Int
     let limit: Int?
     let remaining: Int?
+    let bonus: Int
     let windowDays: Int?
     let resetsAt: String?
 
@@ -86,6 +87,7 @@ struct NucleoLevelMeter: Equatable, Sendable {
         used = BobbyReadAccess.count(o["used"]) ?? 0
         limit = BobbyReadAccess.count(o["limit"])
         remaining = BobbyReadAccess.count(o["remaining"])
+        bonus = BobbyReadAccess.count(o["bonus"]) ?? 0
         windowDays = BobbyReadAccess.count(o["windowDays"])
         resetsAt = (o["resetsAt"] as? String).flatMap { $0.isEmpty ? nil : $0 }
     }
@@ -100,6 +102,7 @@ struct NucleoReferral: Equatable, Sendable {
     let max: Int
     let rewardDays: Int?
     let proUntil: String?
+    let proSource: String?
 
     init?(json: Any?) {
         guard let o = json as? [String: Any], let code = o["code"] as? String, let url = o["url"] as? String,
@@ -110,6 +113,7 @@ struct NucleoReferral: Equatable, Sendable {
         max = BobbyReadAccess.count(o["max"]) ?? 5
         rewardDays = BobbyReadAccess.count(o["rewardDays"])
         proUntil = o["proUntil"] as? String
+        proSource = o["proSource"] as? String
     }
 }
 
@@ -239,10 +243,11 @@ final class NucleoLevelCenter: ObservableObject {
                 return L.t("Available", "Disponible")
             }
             let left = access.remaining ?? max(0, limit - access.used)
+            let gift = access.bonus > 0 ? " + " + BobbyReadAccess.giftLabel(access.bonus) : ""
             if access.resetsAt != nil {
-                return "\(left)/\(limit) · " + window(7)
+                return "\(left)/\(limit) · " + window(7) + gift
             }
-            return L.t("\(left)/\(limit) left", "Quedan \(left)/\(limit)")
+            return L.t("\(left)/\(limit) left", "Quedan \(left)/\(limit)") + gift
         }
         guard let m = meters[level] else {
             return tier == "anon" && limit(tier: "anon", level) == 0
@@ -250,9 +255,12 @@ final class NucleoLevelCenter: ObservableObject {
                 : L.t("Available", "Disponible")
         }
         guard let limit = m.limit else { return L.t("Available", "Disponible") }
-        if limit == 0 { return L.t("With your free account", "Con tu cuenta gratis") }
+        if limit == 0 {
+            return m.bonus > 0 ? BobbyReadAccess.giftLabel(m.bonus) : L.t("With your free account", "Con tu cuenta gratis")
+        }
+        let gift = m.bonus > 0 ? " + " + BobbyReadAccess.giftLabel(m.bonus) : ""
         let left = m.remaining ?? max(0, limit - m.used)
-        return "\(left)/\(limit) · " + window(m.windowDays)
+        return "\(left)/\(limit) · " + window(m.windowDays) + gift
     }
 
     private func limit(tier: String, _ level: NucleoAnalysisLevel) -> Int? { planLimits[tier]?[level.rawValue]?.first }

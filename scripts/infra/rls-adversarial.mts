@@ -357,9 +357,20 @@ async function legitimatePath(): Promise<void> {
   line(debate.status === 403 && debate.transcript.length === 0, 'POST /api/openclaw-chat with a browser wallet session → 403 (internal callers only)', `HTTP ${debate.status}`);
   const guestDebate = await debateFor(base);
   line(guestDebate.status === 403 && guestDebate.transcript.length === 0, 'POST /api/openclaw-chat without a session → 403', `HTTP ${guestDebate.status}`);
-  const forgedReceipt = `v1.${randomBytes(12).toString('base64url')}.${randomBytes(32).toString('base64url')}`;
-  const forgedPublish = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript: `${MARK} forged`, receipt: forgedReceipt }) });
-  line([400, 403, 429].includes(forgedPublish.status), 'forum-publish with a forged receipt is refused', `HTTP ${forgedPublish.status}`);
+  // A well-formed receipt with a signature nobody holds the key for: long enough to pass the schema (transcript ≥ 40,
+  // receipt ≥ 40) and carrying the real prefix, so the refusal comes from the signature check itself.
+  const forgedPayload = Buffer.from(JSON.stringify({ id: '00000000-0000-4000-8000-0000000000c2', iat: Date.now(), wallet })).toString('base64url');
+  const forgedReceipt = `btr2.${forgedPayload}.${randomBytes(32).toString('base64url')}`;
+  const forgedPublish = await fetch(`${API}/api/forum-publish`, { method: 'POST', headers: authed, body: JSON.stringify({ language: 'en', transcript: `${MARK} forged transcript that is long enough to pass the schema`, receipt: forgedReceipt }) });
+  const forgedText = await forgedPublish.text().catch(() => '');
+  line(forgedPublish.status === 403 && /signature/i.test(forgedText), 'forum-publish refuses a receipt with a forged signature (403)', `HTTP ${forgedPublish.status} ${forgedText.slice(0, 80)}`);
+  // Conviction out of range: production never signs it, so prove the last line of defence directly at the RPC.
+  const badRpc = await fetch(`${URL_}/rest/v1/rpc/bobby_publish_debate`, { method: 'POST', headers: svcHeaders, body: JSON.stringify({ p_receipt_id: '00000000-0000-4000-8000-0000000000c1', p_wallet: wallet, p_thread: { topic: `${MARK} bad conviction`, conviction_score: 7, symbol: 'RLSTEST', scope: 'public', language: 'en' }, p_posts: [{ agent: 'alpha', content: MARK }, { agent: 'cio', content: MARK }] }) });
+  const badRpcText = await badRpc.text().catch(() => '');
+  line(badRpc.status >= 400 && /within 0\.\.1|22023/.test(badRpcText), 'RPC bobby_publish_debate refuses conviction 7 (must be within 0..1)', `HTTP ${badRpc.status} ${badRpcText.slice(0, 80)}`);
+  const badRpcResidue = await fetch(`${URL_}/rest/v1/forum_publish_receipts?receipt_id=eq.00000000-0000-4000-8000-0000000000c1&select=receipt_id`, { headers: svcHeaders });
+  const badRows = (await badRpcResidue.json().catch(() => [])) as unknown[];
+  line(Array.isArray(badRows) && badRows.length === 0, 'refused RPC call left no receipt row (transaction rolled back)', `rows=${Array.isArray(badRows) ? badRows.length : 'n/a'}`);
   const threads = await fetch(`${API}/api/my-threads?limit=1`, { headers: authed });
   line(threads.ok, 'GET /api/my-threads with session → 200', `HTTP ${threads.status}`);
   const del = await fetch(`${API}/api/agent-messages`, { method: 'DELETE', headers: authed, body: JSON.stringify({ wallet: CANARY_WALLET }) });

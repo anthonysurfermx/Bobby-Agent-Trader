@@ -33,7 +33,7 @@ export function storedLevel(): DeskLevel {
 }
 export function storeLevel(l: DeskLevel) { try { localStorage.setItem(LEVEL_KEY, l); } catch { /* private mode */ } }
 
-/** Coupon gifts (api/_lib/coupons.ts) are spent after the allowance: shown as "+N". */
+/** Gifts from coupons or the owner dashboard are spent after the regular allowance. */
 const gift = (n: number | undefined) => (n && n > 0 ? ` +${n}` : '');
 export interface Allowance { text: string; state: 'open' | 'locked' | 'empty'; resetsAt: string | null }
 /** What this level has left for this reader, from the server's meters. */
@@ -43,7 +43,12 @@ export function allowanceFor(level: DeskLevel, s: AccessState | null): Allowance
   const unit = (days: number) => (tier === 'anon' ? t('trial', 'prueba', 'teste') : days <= 7 ? t('week', 'semana', 'semana') : t('month', 'mes', 'mês'));
   if (level === 'rapido') {
     const a = s.access;
-    if (a.tier === 'pro' || !a.paywall || a.remaining === null || a.limit === null) return { text: t('Unlimited', 'Sin límite', 'Sem limite'), state: 'open', resetsAt: null };
+    if (a.tier === 'pro' || !a.paywall || a.remaining === null || a.limit === null) {
+      const gifted = a.bonus && a.bonus > 0
+        ? t(` · ${a.bonus} gifted`, ` · ${a.bonus} de regalo`, ` · ${a.bonus} de presente`)
+        : '';
+      return { text: t('Unlimited', 'Sin límite', 'Sem limite') + gifted, state: 'open', resetsAt: null };
+    }
     return { text: `${a.remaining}/${a.limit}${gift(a.bonus)} · ${a.tier === 'anon' ? unit(30) : unit(7)}`, state: a.remaining + (a.bonus ?? 0) > 0 ? 'open' : 'empty', resetsAt: a.resetsAt };
   }
   const m = s.levels?.levels[level];

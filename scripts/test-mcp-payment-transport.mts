@@ -25,7 +25,7 @@ const FEE = 1_000_000_000_000_000n;
 const emu = createEmu();
 emu.idType = 'uuid'; // the production column type, always
 const rpc = createRpcMock(BOBBY_AGENT_ECONOMY, FEE);
-let upstream: 'ok' | 'http500' | 'throw' = 'ok';
+let upstream: 'ok' | 'http500' | 'throw' | 'debate_failed' | 'empty' = 'ok';
 let executions = 0;
 // Lean pass 2026-09-29: openclaw-chat refuses callers with no allowed Origin and
 // no internal auth, so the paid tool must present the internal secret.
@@ -53,6 +53,9 @@ globalThis.fetch = (async (input: any, init?: any) => {
     chatHeaders = { ...(init?.headers || {}) };
     if (upstream === 'throw') throw new Error('ECONNRESET');
     if (upstream === 'http500') return json({ error: 'upstream down' }, 500);
+    // What openclaw-chat really sends when the debate engine fails: a header chunk, an error line and a failure frame, all with HTTP 200.
+    if (upstream === 'debate_failed') return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: '**ALPHA HUNTER:** ' } }] })}\n\ndata: ${JSON.stringify({ choices: [{ delta: { content: '\n\n[Error: debate engine failed. Retrying as single-call...]' } }] })}\n\ndata: ${JSON.stringify({ bobby_error: 'debate_failed' })}\n\ndata: [DONE]\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    if (upstream === 'empty') return new Response('data: [DONE]\n\n', { status: 200, headers: { 'content-type': 'text/event-stream' } });
     return new Response(`data: ${JSON.stringify({ choices: [{ delta: { content: ANALYSIS } }] })}\n\ndata: [DONE]\n\n`, { status: 200, headers: { 'content-type': 'text/event-stream' } });
   }
   if (init?.body && typeof init.body === 'string' && init.body.includes('"jsonrpc"') && init.body.includes('"eth_')) return rpc.handle(JSON.parse(init.body));
@@ -175,6 +178,11 @@ for (const [label, handler] of [['mcp-http', mcpHttp], ['mcp-bobby', mcpBobby]] 
     upstream = 'http500';
     const c = await call(handler, hdr); assert.ok(errOf(c), 'an upstream 500 surfaces as an error'); assert.equal(byId(iss.challengeId).status, 'retryable_failure');
     assert.ok(!JSON.stringify(byId(iss.challengeId).result_json ?? null).includes('upstream down'), 'the error body is not stored as the paid result');
+    for (const failure of ['debate_failed', 'empty'] as const) {
+      upstream = failure;
+      const d = await call(handler, hdr); assert.ok(errOf(d), `${failure}: surfaces as an error`); assert.equal(byId(iss.challengeId).status, 'retryable_failure', `${failure}: the payment stays redeemable`);
+      assert.ok(!JSON.stringify(byId(iss.challengeId).result_json ?? null).includes('debate engine failed'), 'the engine error text is never stored as the paid result');
+    }
     upstream = 'ok';
     const ok = await call(handler, hdr); assert.ok(ok.result); assert.equal(byId(iss.challengeId).status, 'completed');
   });

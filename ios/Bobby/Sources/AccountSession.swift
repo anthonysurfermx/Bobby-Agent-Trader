@@ -374,6 +374,8 @@ final class AccountSession: ObservableObject {
             store?.forgetAccount(deletingUserId)
             DeskMemory.forgetOwner(deletingUserId, defaults: defaults)
             NucleoLedger.forgetOwner(deletingUserId, defaults: defaults)
+            // The server cascade removed the device binding; forget its local proof (only if it was this account's).
+            PushRegistrar.forgetOwner(deletingUserId)
             guard generation == started else { return .deleted }
             AppleGivenName.forget(owner: session?.appleUserId, defaults: defaults)
             let answer = try? JSONSerialization.jsonObject(with: data) as? [String: Any]

@@ -24,6 +24,9 @@ let stripeDown = false;
 let stripeSubsList: Array<Record<string, unknown>> = [];
 let openSessions: Array<Record<string, unknown>> = [];
 let lastSessionForm: URLSearchParams | null = null;
+let lastSessionKey: string | null = null;
+let lastPortalCustomer: string | null = null;
+let foundCustomers: Array<Record<string, unknown>> = [];
 globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   const u = new URL(String(input));
   if (u.hostname === 'api.revenuecat.com') return Response.json({ subscriber });
@@ -31,11 +34,12 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const m = init?.method ?? 'GET';
     stripeCalls.push(`${m} ${u.pathname}`);
     if (stripeDown) return Response.json({ error: { message: 'down' } }, { status: 500 });
-    if (u.pathname === '/v1/customers/search') return Response.json({ data: [] });
+    if (u.pathname === '/v1/customers/search') return Response.json({ data: foundCustomers });
+    if (u.pathname === '/v1/billing_portal/sessions' && m === 'POST') { lastPortalCustomer = new URLSearchParams(String(init?.body)).get('customer'); return Response.json({ url: 'https://billing.stripe.test/p' }); }
     if (u.pathname === '/v1/customers' && m === 'POST') return Response.json({ id: 'cus_new' });
     if (u.pathname === '/v1/subscriptions' && m === 'GET') return Response.json({ data: stripeSubsList });
     if (u.pathname === '/v1/checkout/sessions' && m === 'GET') return Response.json({ data: openSessions });
-    if (u.pathname === '/v1/checkout/sessions' && m === 'POST') { lastSessionForm = new URLSearchParams(String(init?.body)); return Response.json({ url: 'https://checkout.stripe.test/s' }); }
+    if (u.pathname === '/v1/checkout/sessions' && m === 'POST') { lastSessionForm = new URLSearchParams(String(init?.body)); lastSessionKey = (init?.headers as Record<string, string> | undefined)?.['Idempotency-Key'] ?? null; return Response.json({ url: 'https://checkout.stripe.test/s' }); }
     if (u.pathname.startsWith('/v1/subscriptions/') && m === 'DELETE') return Response.json({ id: u.pathname.split('/').pop(), status: 'canceled' });
     if (u.pathname.startsWith('/v1/subscriptions/')) return Response.json(stripeSubscription);
     return Response.json({});
@@ -51,6 +55,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     const id = (u.searchParams.get('identity_id') ?? '').replace('eq.', '');
     return Response.json(subs.has(id) ? [subs.get(id)] : []);
   }
+  if (u.pathname === '/rest/v1/bobby_brief_paid_periods') return init?.method && init.method !== 'GET' ? new Response(null, { status: 204 }) : Response.json([]);
   return new Response(null, { status: 204 });
 }) as typeof fetch;
 
@@ -58,7 +63,7 @@ const { syncRevenueCat } = await import('../api/_lib/revenuecat.ts');
 const future = new Date(Date.now() + 30 * 86_400_000).toISOString();
 const later = new Date(Date.now() + 60 * 86_400_000).toISOString();
 const ent = (product = 'p') => ({ pro: { expires_date: future, product_identifier: product } });
-const reset = () => { subs.clear(); writes = []; stripeCalls = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
+const reset = () => { subs.clear(); writes = []; stripeCalls = []; subscriptionReadFails = false; upsertStatus = 204; stripeDown = false; stripeSubsList = []; openSessions = []; lastSessionForm = null; lastSessionKey = null; lastPortalCustomer = null; foundCustomers = []; delete process.env.BOBBY_SANDBOX_PRO_UIDS; };
 const UID = '00000000-0000-4000-8000-000000000001';
 
 // ---------------- RC-01 ----------------
@@ -121,6 +126,46 @@ subs.set('id-l', { identity_id: 'id-l', provider: 'stripe', status: 'past_due', 
 subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: new Date(Date.now() - 1000).toISOString() } } };
 eq(await syncRevenueCat(UID, 'id-l'), false, 'past_due card + expired Apple: no Pro');
 eq([writes.length, subs.get('id-l')?.provider], [0, 'stripe'], 'a past_due Stripe row stays Stripe');
+// Red team round 2: a card row only blocks RevenueCat while it is granting Pro.
+// R1: card plan ended, then an App Store purchase and its renewal are both recorded.
+reset();
+subs.set('id-r1', { identity_id: 'id-r1', provider: 'stripe', status: 'canceled', current_period_end: future, stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_r1' });
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
+eq(await syncRevenueCat(UID, 'id-r1'), true, 'R1: an App Store purchase after an ended card plan grants Pro');
+eq([subs.get('id-r1')?.provider, subs.get('id-r1')?.status, subs.get('id-r1')?.stripe_customer_id], ['apple', 'active', 'cus_r1'], 'R1: the row becomes the Apple plan and keeps the Stripe customer');
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later } } };
+eq(await syncRevenueCat(UID, 'id-r1'), true, 'R1: the renewal still syncs');
+eq(subs.get('id-r1')?.current_period_end, later, 'R1: the renewal extends the period (an old Stripe id on the row never freezes it)');
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later, refunded_at: new Date().toISOString() } } };
+eq(await syncRevenueCat(UID, 'id-r1'), false, 'R1: a later refund is recorded too');
+eq(subs.get('id-r1')?.status, 'refunded', 'R1: refunded');
+// R2: ended card plan + expired App Store record writes nothing; the next purchase is recorded.
+reset();
+subs.set('id-r2', { identity_id: 'id-r2', provider: 'stripe', status: 'canceled', current_period_end: future, stripe_subscription_id: 'sub_1' });
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: new Date(Date.now() - 1000).toISOString() } } };
+eq(await syncRevenueCat(UID, 'id-r2'), false, 'R2: expired Apple + ended card: no Pro');
+eq([writes.length, subs.get('id-r2')?.provider], [0, 'stripe'], 'R2: nothing is written over the card row');
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
+eq(await syncRevenueCat(UID, 'id-r2'), true, 'R2: the next App Store purchase grants Pro');
+eq([subs.get('id-r2')?.provider, subs.get('id-r2')?.status], ['apple', 'active'], 'R2: and is recorded');
+// R3: a card plan that cannot grant Pro (past_due) never blocks an App Store purchase.
+reset();
+subs.set('id-r3', { identity_id: 'id-r3', provider: 'stripe', status: 'past_due', current_period_end: future, stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_r3' });
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
+eq(await syncRevenueCat(UID, 'id-r3'), true, 'R3: past_due card + App Store purchase: Pro');
+eq([subs.get('id-r3')?.provider, subs.get('id-r3')?.status, subs.get('id-r3')?.stripe_subscription_id], ['apple', 'active', 'sub_1'], 'R3: recorded, and the Stripe ids stay for deletion, checkout and the portal');
+// An expired card row (status still "active", period over) no longer shields the row either.
+reset();
+subs.set('id-r4', { identity_id: 'id-r4', provider: 'stripe', status: 'active', current_period_end: new Date(Date.now() - 86_400_000).toISOString(), stripe_subscription_id: 'sub_1' });
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
+eq(await syncRevenueCat(UID, 'id-r4'), true, 'a card row whose period is over does not block the Apple plan');
+eq(subs.get('id-r4')?.provider, 'apple', 'the Apple plan is recorded');
+// Stores that never count.
+for (const store of ['promotional', 'play_store', 'rc_billing', 'stripe', 'amazon', undefined]) {
+  reset();
+  subscriber = { entitlements: ent(), subscriptions: { p: { store, expires_date: future } } };
+  eq(await syncRevenueCat(UID, 'id-s'), false, `store ${store}: no Pro from RevenueCat`);
+}
 // Apple billing grace period keeps Pro.
 reset();
 const grace = new Date(Date.now() + 10 * 86_400_000).toISOString();
@@ -166,6 +211,10 @@ eq([r.statusCode, stripeCalls.length], [503, 0], 'checkout fails closed when the
 reset();
 stripeSubsList = [{ id: 'sub_x', status: 'incomplete' }];
 r = await call();
+eq([r.statusCode, r.body?.code, stripeCalls.includes('POST /v1/checkout/sessions')], [409, 'payment_pending', false], 'an unfinished card payment at Stripe blocks a second checkout and is named as such');
+reset();
+stripeSubsList = [{ id: 'sub_x', status: 'past_due' }];
+r = await call();
 eq([r.statusCode, r.body?.code, stripeCalls.includes('POST /v1/checkout/sessions')], [409, 'already_pro', false], 'a subscription still able to charge at Stripe blocks a second checkout');
 reset();
 openSessions = [{ url: 'https://checkout.stripe.test/open' }];
@@ -182,6 +231,25 @@ eq([r.statusCode, r.body?.url, lastSessionForm?.get('customer'), Boolean(lastSes
 reset();
 r = await call();
 eq([lastSessionForm?.get('customer'), stripeCalls.includes('POST /v1/customers')], ['cus_new', true], 'a first buyer gets one Stripe customer, created idempotently');
+// Two tabs at the same moment: same idempotency key and same parameters, so Stripe hands both the same session.
+const firstKey = lastSessionKey, firstExpiry = lastSessionForm?.get('expires_at');
+r = await call();
+eq([/^bobby-checkout-id-buyer-\d+$/.test(String(firstKey)), lastSessionKey === firstKey, lastSessionForm?.get('expires_at') === firstExpiry], [true, true, true], 'concurrent checkouts share one idempotency key and identical parameters');
+const ahead = Number(firstExpiry) - Math.floor(Date.now() / 1000);
+eq(ahead >= 35 * 60 - 5 && ahead <= 45 * 60, true, 'the session expires 35-45 minutes ahead (Stripe needs at least 30)');
+// The portal finds the customer at Stripe when the row does not carry it yet (webhook pending).
+const portal = async () => {
+  const res: Res = { statusCode: 200, body: null, status(c) { this.statusCode = c; return this; }, json(b) { this.body = b; return this; }, setHeader() {} };
+  await access({ method: 'POST', body: { action: 'portal' }, query: {}, headers: { authorization: 'Bearer user-token', 'x-forwarded-for': `10.9.1.${++ip}`, host: 'bobbyprotocol.xyz' } } as never, res as never);
+  return res;
+};
+reset();
+r = await portal();
+eq([r.statusCode, stripeCalls.includes('POST /v1/customers')], [404, false], 'the portal never creates a customer');
+reset();
+foundCustomers = [{ id: 'cus_meta' }];
+r = await portal();
+eq([r.statusCode, r.body?.url, lastPortalCustomer], [200, 'https://billing.stripe.test/p', 'cus_meta'], 'the portal opens for a customer found by metadata');
 
 // ---------------- STRIPE-01 ----------------
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';

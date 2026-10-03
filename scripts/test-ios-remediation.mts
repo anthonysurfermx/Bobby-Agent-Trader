@@ -125,6 +125,51 @@ try {
     if(stripeStatus===200){eq(r.statusCode,200);eq(writes.length,3);}
     else{eq(r.statusCode,503);eq(writes.length,0);}
   }
+  // Red team round 2. One mock, driven by a scenario: the card row, how Stripe answers, and the account lookup.
+  let runs = 0;
+  type Scenario = { row: Record<string, unknown> | null; stripe: 'ok' | 'down'; lookup: number; open?: string[] };
+  const runDelete = async (sc: Scenario) => {
+    const writes: string[] = [], stripe: string[] = [];
+    globalThis.fetch = async (input, init) => {
+      const url = String(input), method = init?.method ?? 'GET';
+      if (url.startsWith('https://api.stripe.com/v1/')) {
+        const path = new URL(url).pathname; stripe.push(`${method} ${path}`);
+        if (sc.stripe === 'down') return json({ error: { message: 'down' } }, 500);
+        if (path === '/v1/subscriptions') return json({ data: sc.row?.stripe_subscription_id ? [{ id: sc.row.stripe_subscription_id, status: 'active' }] : [] });
+        if (path === '/v1/checkout/sessions') return json({ data: (sc.open ?? []).map((id) => ({ id })) });
+        return json({ data: [] });
+      }
+      if (url.includes('api_cache')) return json([]);
+      if (url.endsWith('/auth/v1/user')) return json({ id: ID, app_metadata: { provider: 'google' } });
+      if (url.includes('bobby_identities') && method === 'POST') return json([{ id: ID, auth_user_id: ID, wallet_address: null }]);
+      if (url.includes('bobby_subscriptions')) return json(sc.row ? [{ identity_id: ID, ...sc.row }] : []);
+      if (method === 'DELETE' || method === 'PATCH') { writes.push(`${method} ${url}`); return json({}); }
+      if (url.includes('/admin/users/')) return json({ identities: [{ provider: 'google' }] }, sc.lookup);
+      throw new Error(`Unexpected test request: ${url}`);
+    };
+    // A fresh address per run: the deletion endpoint allows five attempts an hour per network.
+    const r = response(); await accountHandler({ ...req, method: 'DELETE', headers: { ...req.headers, 'x-forwarded-for': `127.0.1.${++runs}` } } as never, r as never);
+    return { status: r.statusCode, body: r.body, writes: writes.length, stripe };
+  };
+  const liveCard = { provider: 'stripe', status: 'active', stripe_subscription_id: 'sub_live', stripe_customer_id: 'cus_1' };
+  const endedCard = { provider: 'stripe', status: 'canceled', stripe_subscription_id: 'sub_old', stripe_customer_id: 'cus_1' };
+  process.env.STRIPE_SECRET_KEY = 'sk_test_delete';
+  // The account lookup fails: nothing is cancelled, because the user is told nothing was deleted.
+  let d = await runDelete({ row: liveCard, stripe: 'ok', lookup: 500 });
+  eq([d.status, d.writes, d.stripe.some((c) => c.startsWith('DELETE'))], [503, 0, false]);
+  // A past card customer is never blocked by a Stripe outage (5.1.1(v)); a plan that may still charge is.
+  d = await runDelete({ row: endedCard, stripe: 'down', lookup: 200 });
+  eq([d.status, d.writes], [200, 3]);
+  d = await runDelete({ row: liveCard, stripe: 'down', lookup: 200 });
+  eq([d.status, d.writes], [503, 0]);
+  // The live plan is cancelled and a checkout left open in another tab is expired before the account goes.
+  d = await runDelete({ row: liveCard, stripe: 'ok', lookup: 200, open: ['cs_open'] });
+  eq([d.status, d.writes, d.stripe.includes('DELETE /v1/subscriptions/sub_live'), d.stripe.includes('POST /v1/checkout/sessions/cs_open/expire')], [200, 3, true, true]);
+  // Card payments switched off (no key): deletion still completes, for a past customer and for a live row alike.
   delete process.env.STRIPE_SECRET_KEY;
+  d = await runDelete({ row: endedCard, stripe: 'ok', lookup: 200 });
+  eq([d.status, d.writes, d.stripe.length], [200, 3, 0]);
+  d = await runDelete({ row: liveCard, stripe: 'ok', lookup: 200 });
+  eq([d.status, d.writes], [200, 3]);
   console.log(`ios-remediation: ${checks} checks passed`);
 } finally {globalThis.fetch=original;}

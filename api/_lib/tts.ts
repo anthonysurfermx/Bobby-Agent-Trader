@@ -70,7 +70,7 @@ const PERSONA_VOICE: Record<string, string> = {
 /** Feminine-voiced personas get feminine-gendered Spanish instructions. */
 const FEM_VOICES = new Set(['nova', 'shimmer', 'coral', 'sage', 'alloy', 'marin', 'fable']);
 
-function resolveOpenAIVoice(voice?: string): string {
+export function resolveOpenAIVoice(voice?: string): string {
   if (voice && PERSONA_VOICE[voice]) return PERSONA_VOICE[voice];
   if (voice && OPENAI_VOICES.includes(voice)) return voice;
   switch (voice) {
@@ -135,7 +135,7 @@ const PERSONA_INSTRUCTIONS: Record<string, Record<string, string>> = {
   },
 };
 
-function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string, persona?: string): string {
+export function buildInstructions(lang: string, vibe?: string, resolvedVoice?: string, persona?: string): string {
   let base = process.env.TTS_INSTRUCTIONS || BASE_INSTRUCTIONS[lang] || BASE_INSTRUCTIONS.es;
   // A masculine voice reading feminine self-references ("una chava…
   // extranjera") breaks the illusion instantly, and the reverse leaves the

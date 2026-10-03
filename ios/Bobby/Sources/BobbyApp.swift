@@ -8,6 +8,9 @@ struct BobbyApp: App {
     /// on the page's wordmark (`openClassic`) for the rest of this launch; the next launch
     /// returns here. Release always shows the Núcleo and never routes to ContentView.
     @State private var showNucleo = true
+    /// APNs token callbacks and the notification-tap delegate (briefings, build 53). Its launch hook does
+    /// nothing in the unit-test host; it never asks for notification permission by itself.
+    @UIApplicationDelegateAdaptor(BobbyAppDelegate.self) private var appDelegate
 
     init() {
 #if DEBUG
@@ -25,7 +28,7 @@ struct BobbyApp: App {
         BobbyStore.shared.start()
     }
 
-    private static var isUnitTestHost: Bool {
+    static var isUnitTestHost: Bool {
 #if DEBUG
         ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil
 #else

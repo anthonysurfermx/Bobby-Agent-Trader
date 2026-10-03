@@ -13,7 +13,7 @@ const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I, O, 0, 1
 export const isReferralCode = (v: unknown): v is string => typeof v === 'string' && /^[A-HJ-NP-Z2-9]{8}$/.test(v);
 const newCode = () => Array.from({ length: 8 }, () => ALPHABET[randomInt(ALPHABET.length)]).join('');
 
-export interface ReferralStatus { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; friends: Array<{ joinedAt: string }> }
+export interface ReferralStatus { code: string; url: string; accepted: number; max: number; rewardDays: number; proUntil: string | null; proSource: 'admin' | 'referral' | null; friends: Array<{ joinedAt: string }> }
 export type ClaimResult = 'claimed' | 'invalid_code' | 'self' | 'account_required' | 'not_new' | 'already_claimed' | 'inviter_full' | 'invalid_invitee';
 
 async function rows<T>(path: string): Promise<T[]> {
@@ -43,13 +43,15 @@ export async function referralStatus(identityId: string, origin: string): Promis
   const code = await referralCode(identityId);
   const [friends, grant] = await Promise.all([
     rows<{ created_at: string }>(`bobby_referrals?inviter_id=eq.${identityId}&select=created_at&order=created_at.asc&limit=${REFERRAL.maxFriends}`),
-    rows<{ pro_until: string }>(`bobby_pro_grants?identity_id=eq.${identityId}&select=pro_until`),
+    rows<{ pro_until: string; source: string }>(`bobby_pro_grants?identity_id=eq.${identityId}&select=pro_until,source`),
   ]);
   const until = grant[0]?.pro_until ? new Date(grant[0].pro_until) : null;
+  const active = !!until && until.getTime() > Date.now();
   return {
     // A new URL lets messaging apps fetch the refreshed share card for an existing code.
     code, url: `${origin}/desk?ref=${code}&v=2`, accepted: friends.length, max: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays,
-    proUntil: until && until.getTime() > Date.now() ? until.toISOString() : null,
+    proUntil: active ? until!.toISOString() : null,
+    proSource: active && (grant[0]?.source === 'admin' || grant[0]?.source === 'referral') ? grant[0].source : null,
     friends: friends.map((f) => ({ joinedAt: new Date(f.created_at).toISOString() })),
   };
 }

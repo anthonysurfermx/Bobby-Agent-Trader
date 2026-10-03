@@ -1,7 +1,7 @@
 // The Núcleo is the app (Nucleo/ARCHITECTURE.md §1.3). One session and one web view:
 // onboarding until a companion is chosen and the risk notice accepted, then the daily
-// app, cross-faded. Native sheets (squad, locker, island, account, risk notice, Bobby Pro)
-// open over the glass; the header avatar opens the account sheet (sign in, sign out, delete
+// app, cross-faded. Native sheets (squad, locker, island, account, risk notice, Bobby Pro, a tapped
+// market briefing) open over the glass; the header avatar opens the account sheet (sign in, sign out, delete
 // the account, privacy). DEBUG builds only: a long press on the page's wordmark
 // (`openClassic`) tears all of this down before the classic desk appears, for the rest
 // of this launch. Release has no way out of the Núcleo.
@@ -86,6 +86,7 @@ private struct NucleoStage: View {
         NucleoWebViewRepresentable(controller: controller)
             .ignoresSafeArea()
             .background(Color.black.ignoresSafeArea())
+            .overlay(alignment: .top) { NucleoNotchView(notch: session.notch) }
             // The pages keep their top free for the island; the status bar steps aside.
             .statusBarHidden(true)
             .persistentSystemOverlays(.hidden)
@@ -143,6 +144,18 @@ private struct NucleoStage: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)
+        case .briefing:
+            // A drained notification tap (build 53): the report re-authorizes owner + Pro on open, and
+            // its narration starts once loaded when the player's consent and mute allow it.
+            if let id = session.selectedBriefId {
+                BriefingReportView(briefId: id, autoplay: true,
+                                   onShowPro: { session.briefingChosePro() },
+                                   onClose: { session.sheet = nil })
+                    .id(id)
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(Theme.nucleoSurface)
+            }
         }
     }
 }

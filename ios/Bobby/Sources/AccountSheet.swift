@@ -32,6 +32,8 @@ struct AccountSheet: View {
     @ObservedObject private var reads = BobbyAccessCenter.shared
     @ObservedObject private var invites = NucleoLevelCenter.shared
     @ObservedObject private var purchases = BobbyStore.shared
+    /// The account's market briefing choices (the row detail); nil until read.
+    @ObservedObject private var briefings = BriefingsCenter.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
     @StateObject private var land = LandPulse()
     @State private var manageSubscription = false
@@ -85,13 +87,17 @@ struct AccountSheet: View {
             // R11: nothing reaches the network before the risk notice is accepted.
             guard profile.acceptedRiskNotice else { return }
             await reads.refresh()
+            await invites.refresh()
             if pieces == nil, account.isSignedIn { await land.refresh() }
+            if account.isSignedIn { await briefings.refresh() }
         }
         .sheet(item: $route, onDismiss: {
             // A thesis closed on the island or a piece planted: bring the pieces up to date.
             if pieces == nil, account.isSignedIn, profile.acceptedRiskNotice { Task { await land.refresh() } }
             // Back from Bobby Pro (a purchase, a restore or a sign in): the reads line and the levels follow.
             if profile.acceptedRiskNotice { Task { await reads.refresh(); await NucleoLevelCenter.shared.refresh() } }
+            // Back from the briefing settings (or Bobby Pro): the row detail follows the account's choices.
+            if profile.acceptedRiskNotice, account.isSignedIn { Task { await briefings.refresh() } }
         }) { destination in
             sheet(destination)
         }
@@ -335,8 +341,23 @@ struct AccountSheet: View {
     }
 
     @ViewBuilder private var accountRows: some View {
-        if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn) {
+        if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn,
+                                      grantUntil: invites.referral?.proUntil, grantSource: invites.referral?.proSource) {
             readsRow(row)
+        }
+        if let row = GiftedReadsRow.content(access: reads.access, meters: invites.meters) {
+            HStack(spacing: 12) {
+                ProfileIcon(symbol: "gift")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(row.title).font(.system(size: 15)).foregroundStyle(Theme.cream)
+                    Text(row.detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 8)
+            }
+            .profileRowFrame()
+            .accessibilityElement(children: .combine)
+            .accessibilityIdentifier("account-gifted-reads")
         }
         // Bobby Pro on the user's own initiative, not only after a refused read (signed out, the sheet asks to sign in).
         if reads.access?.isPro != true {
@@ -363,6 +384,11 @@ struct AccountSheet: View {
                        action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
                 .accessibilityIdentifier("account-invite")
         }
+        // Bobby Pro weekly briefing: the account's Monday schedule, its consents and its inbox.
+        ProfileRow(label: L.t("Weekly briefing", "Resumen semanal"),
+                   detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),
+                   action: { route = .briefings }) { ProfileIcon(symbol: "calendar") }
+            .accessibilityIdentifier("account-briefings")
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
         }
@@ -374,6 +400,11 @@ struct AccountSheet: View {
                        if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
                    }) { ProfileIcon(symbol: "globe") }
             .accessibilityIdentifier("account-language")
+        // What Bobby remembers about this account: see, correct, pause or delete it.
+        ProfileRow(label: L.t("Memory", "Memoria"),
+                   detail: L.t("What Bobby remembers about your assets and preferences", "Lo que Bobby recuerda de tus activos y preferencias"),
+                   action: { route = .memory }) { ProfileIcon(symbol: "brain") }
+            .accessibilityIdentifier("account-memory")
         ProfileRow(label: L.t("Risk notice", "Aviso de riesgo"),
                    detail: L.t("What Bobby is and is not", "Lo que Bobby es y lo que no"),
                    action: { route = .risk }) { ProfileIcon(symbol: "exclamationmark.shield") }
@@ -628,13 +659,28 @@ struct AccountSheet: View {
             PetDetailSheet(companion: companion, store: store)
                 .presentationDetents([.medium, .large])
                 .presentationBackground(Theme.nucleoSurface)
+        case .briefings:
+            BriefingsSettingsView(riskAccepted: profile.acceptedRiskNotice,
+                                  onShowPro: {
+                                      // Bobby Pro follows once this sheet is gone (as the invite sheet does).
+                                      route = nil
+                                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { route = .pro }
+                                  }) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memory:
+            MemoryView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         }
     }
 }
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet, pro
+    case avatar, invite, locker, land, risk, pet, pro, briefings, memory
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -647,6 +693,8 @@ enum ProfileRoute: Identifiable {
         case .risk: return "risk"
         case .pet: return "pet"
         case .pro: return "pro"
+        case .briefings: return "briefings"
+        case .memory: return "memory"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
         }
@@ -732,26 +780,67 @@ struct ReadsRow: Equatable {
     /// Manage subscription (Apple's sheet): only for an App Store subscription.
     let manage: Bool
 
-    static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool, spanish: Bool = L.isSpanish) -> ReadsRow? {
+    private static func giftDate(_ date: Date, spanish: Bool) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: spanish ? "es_ES" : "en_US")
+        formatter.dateFormat = spanish ? "d 'de' MMMM 'de' yyyy" : "MMMM d, yyyy"
+        return formatter.string(from: date)
+    }
+
+    static func content(access: BobbyReadAccess?, subscription: BobbySubscription?, signedIn: Bool,
+                        grantUntil: String? = nil, grantSource: String? = nil, spanish: Bool = L.isSpanish) -> ReadsRow? {
         guard let access else { return nil }
         if access.isPro {
-            let end = subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) }
+            let paid = ["active", "trialing"].contains(subscription?.status ?? "")
+                && (subscription?.periodEnd.map { $0 > .now } ?? true)
+            let grantEnd = grantUntil.flatMap(BobbyAccessAPI.date)
+            let activeGrant = ["admin", "referral"].contains(grantSource ?? "") && (grantEnd ?? .distantPast) > .now
+            let gifted = !paid && activeGrant
+            let end = paid ? subscription?.periodEnd.map { BobbyAccessAPI.day($0, spanish: spanish) } : nil
             let canceled = ["canceled", "cancelled", "expired"].contains(subscription?.status ?? "")
-            let detail = BobbyStore.Copy.benefits(spanish: spanish) + (end.map { canceled ? L.t(" · ends \($0)", " · termina el \($0)", spanish: spanish)
-                                                        : L.t(" · renews \($0)", " · se renueva el \($0)", spanish: spanish) } ?? "")
-            return ReadsRow(title: L.t("Bobby Pro · Active", "Bobby Pro · Activo", spanish: spanish), detail: detail, pro: true,
-                            manage: subscription?.managedByApple ?? false)
+            let paidDetail = end.map { canceled ? L.t(" · ends \($0)", " · termina el \($0)", spanish: spanish)
+                                                : L.t(" · renews \($0)", " · se renueva el \($0)", spanish: spanish) } ?? ""
+            let grantDetail = activeGrant ? grantEnd.map { L.t(" · gifted Pro until \(giftDate($0, spanish: spanish))", " · Pro regalado hasta el \(giftDate($0, spanish: spanish))", spanish: spanish) } ?? "" : ""
+            let detail = BobbyStore.Copy.benefits(spanish: spanish) + paidDetail + grantDetail
+            return ReadsRow(title: gifted ? L.t("Bobby Pro · Gifted", "Bobby Pro · Regalado", spanish: spanish)
+                                          : L.t("Bobby Pro · Active", "Bobby Pro · Activo", spanish: spanish), detail: detail, pro: true,
+                            manage: paid && (subscription?.managedByApple ?? false))
         }
         guard let limit = access.limit else { return nil }
         let left = access.remaining ?? max(0, limit - access.used)
+        let gift = access.bonus > 0 ? " + " + BobbyReadAccess.giftLabel(access.bonus, spanish: spanish) : ""
         if access.tier == "anon" {
-            return ReadsRow(title: L.t("\(left) of \(limit) free reads left", "Te quedan \(left) de \(limit) lecturas gratis", spanish: spanish),
+            return ReadsRow(title: L.t("\(left) of \(limit) free reads left", "Te quedan \(left) de \(limit) lecturas gratis", spanish: spanish) + gift,
                             detail: signedIn ? nil : L.t("Sign in to keep reading after that.", "Inicia sesión para seguir leyendo después.", spanish: spanish),
                             pro: false, manage: false)
         }
         let reset = access.resetsDate.map { L.t("Resets \(BobbyAccessAPI.day($0, spanish: spanish))", "Se renuevan el \(BobbyAccessAPI.day($0, spanish: spanish))", spanish: spanish) }
-        return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish),
+        return ReadsRow(title: L.t("\(left) of \(limit) free reads left this week", "Te quedan \(left) de \(limit) lecturas gratis esta semana", spanish: spanish) + gift,
                         detail: reset, pro: false, manage: false)
+    }
+}
+
+/// Gift balances are independent of the subscription. Free Quick gifts already appear in ReadsRow;
+/// Pro Quick gifts and either account's premium gifts need their own visible line.
+struct GiftedReadsRow: Equatable {
+    let title: String
+    let detail: String
+
+    static func content(access: BobbyReadAccess?, meters: [NucleoAnalysisLevel: NucleoLevelMeter],
+                        spanish: Bool = L.isSpanish) -> GiftedReadsRow? {
+        guard let access else { return nil }
+        var parts: [String] = []
+        if access.isPro, access.bonus > 0 {
+            parts.append(L.t("Quick: \(access.bonus)", "Rápido: \(access.bonus)", spanish: spanish))
+        }
+        for level in [NucleoAnalysisLevel.profundo, .maximo] {
+            guard let bonus = meters[level]?.bonus, bonus > 0 else { continue }
+            let label = level == .profundo ? L.t("Deep", "Profundo", spanish: spanish) : L.t("Max", "Máximo", spanish: spanish)
+            parts.append("\(label): \(bonus)")
+        }
+        guard !parts.isEmpty else { return nil }
+        return GiftedReadsRow(title: L.t("Gifted reads", "Lecturas de regalo", spanish: spanish),
+                              detail: parts.joined(separator: " · "))
     }
 }
 

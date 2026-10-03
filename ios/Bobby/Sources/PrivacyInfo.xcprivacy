@@ -22,15 +22,15 @@
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
-      <!-- Linked: the Trader Land island name is saved with the account token.
-           Typed desk questions stay unlinked in practice (sent without an account token),
-           but App Store Connect asks one "linked?" per data type. -->
+      <!-- Account-authenticated analyses and opted-in memory personalize the desk and briefings.
+           Memory stores asset/count/date/horizon for up to 90 days, not raw questions. -->
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
       <key>NSPrivacyCollectedDataTypeTracking</key>
       <false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
-      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key>
@@ -42,6 +42,7 @@
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
       </array>
     </dict>
     <dict>
@@ -54,6 +55,7 @@
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
       </array>
     </dict>
     <dict>
@@ -66,6 +68,7 @@
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array>
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
+        <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
       </array>
     </dict>
     <dict>
@@ -77,8 +80,6 @@
       <key>NSPrivacyCollectedDataTypePurposes</key>
       <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string></array>
     </dict>
-    <!-- Paid purchases are disabled in this release. Declare Purchase History again when
-         the production RevenueCat key and purchase paths are enabled. -->
     <dict>
       <!-- Existing authentication grants can include an email retained by the backend,
            even though the native Apple request does not request the email scope. -->

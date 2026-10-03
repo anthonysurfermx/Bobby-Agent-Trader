@@ -165,7 +165,102 @@ final class BobbyAccessTests: XCTestCase {
         XCTAssertTrue(proRow.detail?.contains("renews") == true)
         let web = BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: nil)
         XCTAssertEqual(ReadsRow.content(access: pro, subscription: web, signedIn: true, spanish: false)?.manage, false)
+        let giftedUntil = "2099-10-10T12:00:00Z"
+        let gifted = try XCTUnwrap(ReadsRow.content(access: pro, subscription: nil, signedIn: true,
+                                                   grantUntil: giftedUntil, grantSource: "admin", spanish: false))
+        XCTAssertEqual(gifted.title, "Bobby Pro · Gifted")
+        XCTAssertTrue(gifted.detail?.contains("gifted Pro until") == true)
+        XCTAssertTrue(gifted.detail?.contains("2099") == true, "gift expiry includes the year")
+        XCTAssertFalse(gifted.manage, "an admin gift has no App Store subscription to manage")
+        let expiredApple = BobbySubscription(provider: "apple", status: "expired", currentPeriodEnd: "2020-01-01T00:00:00Z")
+        XCTAssertEqual(ReadsRow.content(access: pro, subscription: expiredApple, signedIn: true,
+                                        grantUntil: giftedUntil, grantSource: "admin", spanish: true)?.title,
+                       "Bobby Pro · Regalado", "an expired paid row cannot hide the live grant")
+        XCTAssertEqual(ReadsRow.content(access: pro, subscription: apple, signedIn: true,
+                                        grantUntil: giftedUntil, grantSource: "admin", spanish: false)?.title,
+                       "Bobby Pro · Active", "a live paid period retains its subscription controls")
+        XCTAssertTrue(ReadsRow.content(access: pro, subscription: apple, signedIn: true,
+                                       grantUntil: giftedUntil, grantSource: "admin", spanish: false)?.detail?.contains("gifted Pro until") == true,
+                      "a gift scheduled after the paid period remains visible on the phone")
+        XCTAssertEqual(NucleoReferral(json: ["code": "ABCDEFGH", "url": "https://bobbyprotocol.xyz/desk?ref=ABCDEFGH",
+                                            "accepted": 0, "max": 5, "proUntil": giftedUntil, "proSource": "admin"])?.proSource, "admin")
         XCTAssertNil(ReadsRow.content(access: nil, subscription: nil, signedIn: true), "no server word, no line")
+    }
+
+    func testProProfileKeepsSubscriptionAndShowsAllGiftBalancesSeparately() throws {
+        let access = try XCTUnwrap(BobbyReadAccess(json: ["tier": "pro", "used": 40, "bonus": 20,
+                                                         "limit": NSNull(), "remaining": NSNull(), "paywall": false]))
+        let meters: [NucleoAnalysisLevel: NucleoLevelMeter] = [
+            .profundo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 60, "limit": 60, "remaining": 0, "bonus": 3])),
+            .maximo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 10, "limit": 10, "remaining": 0, "bonus": 1]))
+        ]
+        let subscription = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
+        let plan = try XCTUnwrap(ReadsRow.content(access: access, subscription: subscription, signedIn: true, spanish: true))
+        XCTAssertEqual(plan.title, "Bobby Pro · Activo")
+        XCTAssertTrue(plan.manage)
+        XCTAssertFalse(plan.title.contains("20"), "Gifts do not become part of the subscription or its allowance")
+        let gifts = try XCTUnwrap(GiftedReadsRow.content(access: access, meters: meters, spanish: true))
+        XCTAssertEqual(gifts.title, "Lecturas de regalo")
+        XCTAssertEqual(gifts.detail, "Rápido: 20 · Profundo: 3 · Máximo: 1")
+        XCTAssertEqual(GiftedReadsRow.content(access: access, meters: meters, spanish: false)?.detail,
+                       "Quick: 20 · Deep: 3 · Max: 1")
+    }
+
+    func testFreeProfileKeepsQuickGiftWithItsMeterAndShowsPremiumGiftsSeparately() throws {
+        let access = BobbyReadAccess(tier: "free", used: 10, limit: 10, remaining: 0, resetsAt: nil, paywall: true, bonus: 20)
+        let meters: [NucleoAnalysisLevel: NucleoLevelMeter] = [
+            .profundo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 3, "limit": 3, "bonus": 2])),
+            .maximo: try XCTUnwrap(NucleoLevelMeter(json: ["used": 1, "limit": 1, "bonus": 0]))
+        ]
+        let plan = try XCTUnwrap(ReadsRow.content(access: access, subscription: nil, signedIn: true, spanish: true))
+        XCTAssertTrue(plan.title.contains("0 de 10"))
+        XCTAssertTrue(plan.title.contains("20 lecturas de regalo"))
+        XCTAssertFalse(plan.pro, "A gift never confers paid Pro")
+        XCTAssertEqual(GiftedReadsRow.content(access: access, meters: meters, spanish: true)?.detail, "Profundo: 2")
+    }
+
+    func testProfileGiftLineTracksFreshServerBalancesAndHidesEmptyOrUnknownAccounts() throws {
+        let pro = BobbyReadAccess(tier: "pro", used: 0, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
+        let credited = try XCTUnwrap(NucleoLevelMeter(json: ["limit": 60, "remaining": 0, "bonus": 1]))
+        let spent = try XCTUnwrap(NucleoLevelMeter(json: ["limit": 60, "remaining": 0, "bonus": 0]))
+        XCTAssertEqual(GiftedReadsRow.content(access: pro, meters: [.profundo: credited], spanish: false)?.detail, "Deep: 1")
+        XCTAssertNil(GiftedReadsRow.content(access: pro, meters: [.profundo: spent]))
+        XCTAssertEqual(GiftedReadsRow.content(access: pro, meters: [.profundo: credited], spanish: false)?.detail,
+                       "Deep: 1", "A refunded balance is displayed after the next server refresh")
+        XCTAssertNil(GiftedReadsRow.content(access: nil, meters: [.profundo: credited]), "No gifts from a previous account")
+        XCTAssertNil(GiftedReadsRow.content(access: pro, meters: [:]))
+    }
+
+    @MainActor func testLatePremiumGiftRefreshCannotPopulateTheNextAccountsProfile() async throws {
+        let suite = "BobbyAccessTests.gifts.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = NucleoLevelCenter(defaults: defaults)
+        var user: String? = "account-a"
+        var epoch = UUID()
+        center.currentUser = { user }
+        center.currentGeneration = { epoch }
+        center.auth = .none
+        center.accountChanged(force: true)
+        let oldBody: [String: Any] = ["levels": ["tier": "pro", "levels": ["profundo": ["limit": 60, "bonus": 99]]]]
+        center.apply(oldBody)
+        let nextAccess = BobbyReadAccess(tier: "pro", used: 0, limit: nil, remaining: nil, resetsAt: nil, paywall: false)
+        XCTAssertEqual(GiftedReadsRow.content(access: nextAccess, meters: center.meters, spanish: false)?.detail, "Deep: 99")
+        var pending: CheckedContinuation<[String: Any]?, Never>?
+        let started = expectation(description: "Old account refresh suspended")
+        center.load = { _ in await withCheckedContinuation { pending = $0; started.fulfill() } }
+        let refresh = Task { await center.refresh() }
+        await fulfillment(of: [started], timeout: 1)
+        user = "account-b"; epoch = UUID()
+        center.accountChanged()
+        XCTAssertNil(GiftedReadsRow.content(access: nextAccess, meters: center.meters))
+        pending?.resume(returning: oldBody)
+        let applied = await refresh.value
+        XCTAssertFalse(applied)
+        XCTAssertNil(GiftedReadsRow.content(access: nextAccess, meters: center.meters), "A late A response cannot attach gifts to B")
+        user = nil; epoch = UUID()
+        center.accountChanged()
+        XCTAssertTrue(center.meters.isEmpty)
     }
 
     func testTheMeteredReadMapping() {

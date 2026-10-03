@@ -7,7 +7,7 @@
 //     (only `personalized: true`); a stored horizon never changes sufficiency (nor the verdict); the stored
 //     "risk" reaches the CIO only as explainRiskDepth, under a rule that forbids suitability and sizing; the ask is
 //     recorded only after a delivered answer, never on a refusal, an outage or a guard rejection; anonymous
-//     and wallet requests make no memory call at all, nor the iPhone app until it can show and delete memory;
+//     and wallet requests make no memory call at all; iPhone asks need a separate per-request opt-in;
 //   · kill switch: without BOBBY_MEMORY=on the desk makes no memory call at all, while /api/memory still works.
 import assert from 'node:assert/strict';
 
@@ -27,7 +27,7 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryPersonalizationOn, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -42,6 +42,8 @@ const hostOf = (url: string) => { try { return new URL(url).hostname; } catch { 
 const H = 3600_000;
 const IDENT = '0b8f0a52-0000-4000-8000-00000000c0de';
 const AUTH_USER = 'a11ce000-0000-4000-8000-000000000001';
+const IDENT_B = '0b8f0a52-0000-4000-8000-00000000b0bb';
+const AUTH_USER_B = 'a11ce000-0000-4000-8000-000000000002';
 
 interface Call { url: string; body: any; headers: Record<string, string>; method: string }
 let calls: Call[] = [];
@@ -62,11 +64,14 @@ const authCalls = () => calls.filter((c) => c.url.includes('/auth/v1/user'));
 
 const response = () => ({
   statusCode: 200, body: null as any, headers: {} as Record<string, string>, chunks: [] as string[], writableEnded: false, writableFinished: false,
+  closeListener: null as null | (() => void),
   setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; }, json(v: unknown) { this.body = v; this.writableEnded = true; this.writableFinished = true; return this; },
-  on() { return this; }, flushHeaders() {}, write(c: string) { this.chunks.push(c); return true; }, end() { this.writableEnded = true; this.writableFinished = true; return this; },
+  on(event: string, listener: () => void) { if (event === 'close') this.closeListener = listener; return this; },
+  close() { this.closeListener?.(); }, flushHeaders() {}, write(c: string) { this.chunks.push(c); return true; }, end() { this.writableEnded = true; this.writableFinished = true; return this; },
   lines() { return this.chunks.join('').split('\n').filter(Boolean).map((l) => JSON.parse(l)); },
 });
 const SIGNED_IN = { authorization: 'Bearer good-apple-token' };
+const SIGNED_IN_B = { authorization: 'Bearer good-google-token' };
 
 // ---- shared backend: identity, memory storage, rate limiter ----
 let summaryReply: unknown = null;
@@ -77,11 +82,14 @@ let storageDown = false;
 function backend(c: Call): Response | Promise<Response> | null {
   if (c.url.includes('/rest/v1/api_cache')) return c.method === 'POST' ? json(null, 201) : json([]);
   if (c.url.includes('/auth/v1/user')) {
-    return c.headers.authorization === SIGNED_IN.authorization
-      ? json({ id: AUTH_USER, email: 'reader@example.com', app_metadata: { provider: 'apple' } })
-      : json({ msg: 'bad token' }, 401);
+    if (c.headers.authorization === SIGNED_IN.authorization) return json({ id: AUTH_USER, email: 'reader@example.com', app_metadata: { provider: 'apple' } });
+    if (c.headers.authorization === SIGNED_IN_B.authorization) return json({ id: AUTH_USER_B, email: 'second@example.com', app_metadata: { provider: 'google' } });
+    return json({ msg: 'bad token' }, 401);
   }
-  if (c.url.includes('bobby_identities?on_conflict=auth_user_id')) return json([{ id: IDENT, auth_user_id: AUTH_USER, wallet_address: null }]);
+  if (c.url.includes('bobby_identities?on_conflict=auth_user_id')) {
+    const second = c.body?.auth_user_id === AUTH_USER_B;
+    return json([{ id: second ? IDENT_B : IDENT, auth_user_id: second ? AUTH_USER_B : AUTH_USER, wallet_address: null }]);
+  }
   if (c.url.includes('bobby_identities?on_conflict=wallet_address')) return json([{ id: 'wallet-ident', auth_user_id: null, wallet_address: '0xabc' }]);
   if (c.url.includes('rpc/bobby_memory_summary')) {
     if (storageDown) return json({ message: 'down' }, 500);
@@ -136,6 +144,11 @@ try {
 
   // ---------- kill switch ----------
   eq([memoryPersonalizationOn({ BOBBY_MEMORY: 'on' } as never), memoryPersonalizationOn({} as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'true' } as never), memoryPersonalizationOn({ BOBBY_MEMORY: 'ON' } as never)], [true, false, false, false], "memory personalization is on only for BOBBY_MEMORY === 'on'");
+  eq([memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': 'true' } } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: {} } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'ios', {} as never)],
+     [true, false, false, false], 'iOS needs exact affirmation and the global kill switch');
 
   // ---------- /api/memory ----------
   const memReq = (method: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
@@ -265,6 +278,8 @@ try {
   let cioReply: unknown = CIO;
   let levelGate: Record<string, unknown> = { allowed: true, code: null, useId: 91 };
   let spend = { day: 0, month: 0 };
+  let cancelAtCio = false;
+  let currentResponse: ReturnType<typeof response> | null = null;
   const deskMock = () => mock((c) => {
     const r = backend(c); if (r) return r;
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
@@ -279,6 +294,7 @@ try {
     if (c.url.includes('forum_threads')) return json([]);
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
       const role = byRole(c);
+      if (role === 'cio' && cancelAtCio) currentResponse?.close();
       const content = role === 'alpha' ? { analysis: ALPHA } : role === 'red' ? { analysis: RED } : cioReply;
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
@@ -289,6 +305,7 @@ try {
   const run = async (body: Record<string, unknown>, headers: Record<string, string> = {}) => {
     deskMock();
     const res = response();
+    currentResponse = res;
     await deskHandler(deskReq({ symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look?', ...body }, headers) as never, res as never);
     return res;
   };
@@ -360,11 +377,28 @@ try {
     ok(!models().some((c) => 'reader' in inputOf(c)), `${who}: no reader`);
   }
 
-  // The iPhone app sends its account token too, but cannot show or delete memory yet: nothing for it.
+  // A web memory preference never opts an iPhone in. Invalid header values also fail closed.
   const ios = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios' });
   await settle();
-  // One auth lookup remains: the desk meters the account's reads (consumeRead), not memory.
-  eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 1], 'an iPhone read: no memory call, no personalization (MEMORY_PLATFORMS); only the read meter resolves the account');
+  eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 1], 'iPhone default off: no memory call or personalization; only the read meter resolves the account');
+  const invalidIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': 'true' });
+  await settle();
+  eq([invalidIos.statusCode, memoryCalls().length, recorded().length], [200, 0, 0], 'non-exact iPhone affirmation records nothing');
+  const optedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([optedIos.body.personalized, recorded().length, authCalls().length], [true, 1, 1], 'opted-in iPhone: personalized and recorded for its verified account');
+  eq(recorded()[0].body.p_identity, IDENT, 'native record belongs to the bearer account');
+  const secondIos = await run({}, { ...SIGNED_IN_B, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([secondIos.body.personalized, recorded()[0].body.p_identity], [true, IDENT_B], 'another account cannot inherit the first account identity');
+  summaryReply = { ...REMEMBERED, enabled: false };
+  const pausedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([pausedIos.statusCode, 'personalized' in pausedIos.body, recorded().length], [200, false, 0], 'server-side pause blocks iPhone personalization and recording even with a header');
+  summaryReply = REMEMBERED;
+  const guestIos = await run({}, { 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([guestIos.statusCode, memoryCalls().length, recorded().length], [200, 0, 0], 'a guest cannot opt in by sending a header');
   const web = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
   await settle();
   eq([web.body.personalized, recorded().length], [true, 1], 'the same account on the web: personalized and recorded');
@@ -383,6 +417,12 @@ try {
   const backOn = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   await settle();
   eq([backOn.body.personalized, recorded().length], [true, 1], "BOBBY_MEMORY=on: personalized and recorded again");
+
+  cancelAtCio = true;
+  const cancelledIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
+  cancelAtCio = false;
+  await settle();
+  eq([cancelledIos.body, recorded().length], [null, 0], 'a native reader that closes before delivery records nothing');
 
   // Storage down or slow: the read runs without memory, in time.
   storageDown = true;

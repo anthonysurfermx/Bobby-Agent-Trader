@@ -1,7 +1,9 @@
 // Actual PostgreSQL regressions for 20261001180000_admin_dashboard.sql: reader stats kept by the bobby_reads
 // trigger (and never refusing a read when they fail), the dashboard aggregates (accounts, activation, funnel,
 // revenue production vs sandbox, LLM spend and estimated credit, coupons), the users table, cascades, and the
-// service-only privileges. Needs the schema prepared by scripts/test-trader-land-growth.sql.
+// service-only privileges, plus durable grants (20261002132827): lost responses, replay conflicts,
+// concurrency and atomic receipt/audit/benefit failures. Needs the schema prepared by
+// scripts/test-trader-land-growth.sql, or the identity migration with the same service-role grants.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -25,6 +27,8 @@ const MIGRATIONS = [
   '20261001200000_lifecycle_funnel.sql',
   '20261001210000_admin_audit_fixes.sql',
   '20261001220000_audience_geo.sql',
+  '20261002132827_admin_grant_idempotency.sql',
+  '20261002140326_pro_gift_balance_visibility.sql',
 ];
 const pool = new pg.Pool({ connectionString: url, max: 8 });
 let checks = 0;
@@ -57,14 +61,14 @@ try {
   await pool.query(readFileSync(`supabase/bobby-protocol/supabase/migrations/${MIGRATIONS.at(-1)}`, 'utf8')); // idempotent
   // A clean slate for the aggregates (earlier pg suites share this cluster).
   await pool.query(`truncate public.bobby_events, public.bobby_purchase_events, public.bobby_llm_credit_marks, public.bobby_llm_usage,
-    public.bobby_reader_stats, public.bobby_admin_actions, public.bobby_coupon_redemptions, public.bobby_usage_bonus, public.bobby_subscriptions,
+    public.bobby_reader_stats, public.bobby_admin_actions, public.bobby_admin_grant_operations, public.bobby_coupon_redemptions, public.bobby_usage_bonus, public.bobby_subscriptions,
     public.bobby_pro_grants, public.bobby_level_uses, public.bobby_reads restart identity cascade`);
   await pool.query('delete from public.bobby_coupons');
   await pool.query('truncate public.bobby_devices, public.bobby_costs restart identity');
   await pool.query('delete from public.bobby_identities');
 
   // ---------- privileges ----------
-  for (const table of ['bobby_admins', 'bobby_admin_actions', 'bobby_events', 'bobby_reader_stats', 'bobby_purchase_events', 'bobby_llm_credit_marks']) {
+  for (const table of ['bobby_admins', 'bobby_admin_actions', 'bobby_admin_grant_operations', 'bobby_events', 'bobby_reader_stats', 'bobby_purchase_events', 'bobby_llm_credit_marks']) {
     for (const role of ['anon', 'authenticated']) {
       for (const priv of ['select', 'insert', 'update', 'delete']) {
         eq((await pool.query('select has_table_privilege($1, $2, $3) as r', [role, `public.${table}`, priv])).rows[0].r, false, `${role} has no ${priv} on ${table}`);
@@ -188,22 +192,148 @@ try {
   eq((await users(bo)).users[0].bonus_reads, 7, 'search by id; gifted reads');
 
   // ---------- grants from the dashboard ----------
-  const grant = async (id: string, r: number, pf: number, mx: number, pd: number) =>
-    (await pool.query('select public.bobby_admin_grant($1, $2, $3, $4, $5) as r', [id, r, pf, mx, pd])).rows[0].r;
+  await pool.query('insert into public.bobby_admins(identity_id) values ($1)', [ana]);
+  const grant = async (id: string, r: number, pf: number, mx: number, pd: number, operation = randomUUID(), admin = ana) =>
+    (await pool.query('select public.bobby_admin_grant_once($1,$2,$3,$4,$5,$6,$7) as r', [operation, admin, id, r, pf, mx, pd])).rows[0].r;
   const g1 = await grant(bo, 5, 1, 0, 0);
   eq([g1.ok, g1.bonus], [true, { reads: 12, profundo: 1, maximo: 0 }], 'a gift stacks on the coupon balance');
+  const freeGiftAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [bo])).rows[0].r;
+  eq([freeGiftAccess.tier, freeGiftAccess.bonus], ['free', 12], 'free account sees the combined coupon and admin gift');
   const g2 = await grant(bo, 0, 0, 0, 7);
   ok(Math.round((new Date(g2.proUntil).getTime() - Date.now()) / 86_400_000) === 7, 'seven days of Pro');
   eq((await pool.query("select source from public.bobby_pro_grants where identity_id = $1", [bo])).rows[0].source, 'admin', 'an admin grant');
+  const proAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [bo])).rows[0].r;
+  eq([proAccess.tier, proAccess.limit, proAccess.bonus], ['pro', null, 12], 'Pro remains unlimited and sees its gifted Quick balance');
+  eq((await pool.query('select public.bobby_read_access($1,null,true) as r', [ana])).rows[0].r.bonus, 0, 'another Pro account sees no gifted Quick balance');
   const g3 = await grant(bo, 0, 0, 0, 3);
   ok(Math.round((new Date(g3.proUntil).getTime() - Date.now()) / 86_400_000) === 10, 'Pro days stack');
+  const payingReceiver = await account({ email: 'paid-gift@example.test' });
+  await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'apple', 'active', now() + interval '20 days')", [payingReceiver]);
+  const paidGift = await grant(payingReceiver, 0, 0, 0, 7);
+  ok(Math.round((new Date(paidGift.proUntil).getTime() - Date.now()) / 86_400_000) === 27,
+    'admin Pro starts after the paid period rather than expiring during it');
+  eq((await pool.query("select source from public.bobby_pro_grants where identity_id = $1", [payingReceiver])).rows[0].source,
+    'admin', 'paid user grant records its server-authoritative source');
+  const paidGiftAgain = await grant(payingReceiver, 0, 0, 0, 3);
+  ok(Math.round((new Date(paidGiftAgain.proUntil).getTime() - Date.now()) / 86_400_000) === 30,
+    'repeated admin Pro gifts stack after the paid period');
+  const unknownEnd = await account({ email: 'unknown-paid-end@example.test' });
+  await pool.query("insert into public.bobby_subscriptions(identity_id, provider, status, current_period_end) values ($1, 'apple', 'active', null)", [unknownEnd]);
+  const uncertainOperation = randomUUID();
+  eq((await grant(unknownEnd, 3, 1, 0, 7, uncertainOperation)).error, 'paid_period_end_unknown',
+    'a live paid subscription without a known end cannot silently consume gifted Pro days');
+  eq((await pool.query('select count(*)::int n from public.bobby_usage_bonus where identity_id=$1', [unknownEnd])).rows[0].n, 0,
+    'unknown paid end grants no partial reads or levels');
+  eq((await pool.query('select count(*)::int n from public.bobby_pro_grants where identity_id=$1', [unknownEnd])).rows[0].n, 0,
+    'unknown paid end grants no Pro time');
+  eq((await pool.query('select count(*)::int n from public.bobby_admin_grant_operations where operation_id=$1', [uncertainOperation])).rows[0].n, 0,
+    'a rejected intent leaves no durable receipt');
+  eq((await pool.query("select count(*)::int n from public.bobby_admin_actions where target=$1 and action='grant'", [unknownEnd])).rows[0].n, 0,
+    'a rejected intent leaves no success audit');
+  await pool.query("update public.bobby_subscriptions set current_period_end=now() + interval '20 days' where identity_id=$1", [unknownEnd]);
+  const resolvedGift = await grant(unknownEnd, 3, 1, 0, 7, uncertainOperation);
+  ok(Math.round((new Date(resolvedGift.proUntil).getTime() - Date.now()) / 86_400_000) === 27,
+    'the same operation succeeds once the paid end is known');
+  eq(resolvedGift.bonus, { reads: 3, profundo: 1, maximo: 0 }, 'retry grants the complete intent once');
   eq((await grant(randomUUID(), 1, 0, 0, 0)).error, 'not_found', 'an unknown account');
   await assert.rejects(grant(bo, 0, 0, 0, 0)); checks++;
   await assert.rejects(grant(bo, 5000, 0, 0, 0)); checks++;
   for (const role of ['anon', 'authenticated']) eq((await pool.query("select has_function_privilege($1, 'public.bobby_admin_grant(uuid,int,int,int,int)', 'execute') as r", [role])).rows[0].r, false, `${role} cannot grant`);
+  for (const role of ['anon', 'authenticated']) eq((await pool.query("select has_function_privilege($1, 'public.bobby_admin_grant_once(uuid,uuid,uuid,int,int,int,int)', 'execute') as r", [role])).rows[0].r, false, `${role} cannot execute the durable grant`);
+  eq((await pool.query("select has_function_privilege('service_role', 'public.bobby_admin_grant_once(uuid,uuid,uuid,int,int,int,int)', 'execute') as r")).rows[0].r, true, 'durable grant is service-only');
+  await assert.rejects(pool.query('select public.bobby_admin_grant($1,1,0,0,0)', [bo]), /grant operation id required/); checks++;
+  eq((await grant(bo, 1, 0, 0, 0, randomUUID(), bo)).error, 'not_admin', 'SQL refuses a non-admin even through the service caller');
+  const deniedCaller = await pool.connect();
+  try {
+    await deniedCaller.query('begin'); await deniedCaller.query('set local role authenticated');
+    await assert.rejects(deniedCaller.query('select public.bobby_admin_grant_once($1,$2,$3,1,0,0,0)', [randomUUID(), ana, bo]), /permission denied/); checks++;
+    await deniedCaller.query('rollback');
+  } finally { deniedCaller.release(); }
+  const serviceReceiver = await account();
+  const serviceCaller = await pool.connect();
+  try {
+    await serviceCaller.query('begin'); await serviceCaller.query('set local role service_role');
+    const serviceGift = (await serviceCaller.query('select public.bobby_admin_grant_once($1,$2,$3,1,0,0,0) r', [randomUUID(), ana, serviceReceiver])).rows[0].r;
+    eq(serviceGift.bonus.reads, 1, 'the production service role can persist its receipt, balance and audit');
+    await serviceCaller.query('commit');
+  } finally { serviceCaller.release(); }
+
+  // A dashboard gift is the same server-side balance spent by iOS requests; no AI/provider calls.
+  const receiver = await account({ email: 'grant-consumer@example.test' });
+  await grant(receiver, 1, 1, 1, 0);
+  const balance = async () => (await pool.query('select reads, profundo, maximo from public.bobby_usage_bonus where identity_id=$1', [receiver])).rows[0];
+  eq(await balance(), { reads: 1, profundo: 1, maximo: 1 }, 'persisted in the selected identity');
+  const freeAccess = (await pool.query('select public.bobby_read_access($1,null,true) as r', [receiver])).rows[0].r;
+  eq([freeAccess.tier, freeAccess.bonus], ['free', 1], 'free account still sees its own gifted Quick balance');
+  eq((await pool.query('select count(*)::int n from public.bobby_usage_bonus where identity_id=$1', [ana])).rows[0].n, 0, 'another identity receives no gift');
+  const consume = async (paywall = true) => (await pool.query("select public.bobby_consume_read($1,null,null,'ios','NVDA',$2) r", [receiver, paywall])).rows[0].r;
+  for (let i = 0; i < 10; i++) eq((await consume()).allowed, true, 'base allowance is consumed first');
+  eq((await balance()).reads, 1, 'base reads leave the gift intact');
+  const paidByGift = await consume();
+  eq([paidByGift.allowed, paidByGift.bonus], [true, 0], 'iOS at its cap spends one gifted read');
+  eq((await consume()).allowed, false, 'no reads after base and gift are exhausted');
+  await pool.query('delete from public.bobby_reads where id=$1', [paidByGift.readId]);
+  eq((await balance()).reads, 1, 'a failed gifted analysis is refunded');
+  eq((await consume(false)).allowed, true, 'paywall off permits another ordinary read');
+  eq((await balance()).reads, 1, 'paywall off does not spend gifted reads');
+  const zeroLimits = { anon: { profundo: [0, 7], maximo: [0, 7] }, free: { profundo: [0, 7], maximo: [0, 7] }, pro: { profundo: [0, 7], maximo: [0, 7] } };
+  for (const level of ['profundo', 'maximo']) {
+    const lv = (await pool.query("select public.bobby_consume_level($1,null,$2,'NVDA',$3::jsonb) r", [receiver, level, JSON.stringify(zeroLimits)])).rows[0].r;
+    eq([lv.allowed, lv.bonus], [true, 0], `gift permits ${level} even with zero base allowance`);
+    await pool.query('delete from public.bobby_level_uses where id=$1', [lv.useId]);
+    eq((await balance())[level], 1, `${level} failure returns the gift`);
+  }
+  const race = await Promise.all([consume(), consume()]);
+  eq(race.filter((r) => r.allowed).length, 1, 'two simultaneous iOS calls cannot spend one gift twice');
+  // The transaction commits but the caller loses its response; retry returns the stored outcome.
+  const retryOperation = randomUUID();
+  const committed = await grant(receiver, 5, 1, 1, 2, retryOperation);
+  const recovered = await grant(receiver, 5, 1, 1, 2, retryOperation);
+  eq(recovered, committed, 'lost response recovers the exact stored result, including Pro expiry');
+  eq((await balance()).reads, 5, 'replay does not add gifted reads twice');
+  eq((await pool.query('select count(*)::int n from public.bobby_admin_actions where detail->>\'operationId\'=$1', [retryOperation])).rows[0].n, 1, 'replay has one grant audit');
+  eq((await pool.query('select pro_until from public.bobby_pro_grants where identity_id=$1', [receiver])).rows[0].pro_until.getTime(), new Date(committed.proUntil).getTime(), 'replay does not extend Pro again');
+  const beforeConflicts = await balance();
+  for (const [id, reads] of [[receiver, 6], [ana, 5]] as const) {
+    eq((await grant(id, reads, 1, 1, 2, retryOperation)).error, 'operation_conflict', 'changed payload/recipient cannot reuse a receipt');
+  }
+  await pool.query('insert into public.bobby_admins(identity_id) values ($1)', [bo]);
+  eq((await grant(receiver, 5, 1, 1, 2, retryOperation, bo)).error, 'operation_conflict', 'different authorized admin cannot reuse the operation');
+  eq(await balance(), beforeConflicts, 'receipt conflicts add no benefits');
+  await pool.query('delete from public.bobby_admins where identity_id=$1', [ana]);
+  eq((await grant(receiver, 5, 1, 1, 2, retryOperation)).error, 'not_admin', 'role removal also blocks a replay');
+  await pool.query('insert into public.bobby_admins(identity_id) values ($1)', [ana]);
+
+  const raceOperation = randomUUID();
+  const concurrentGrants = await Promise.all(Array.from({ length: 6 }, () => grant(receiver, 3, 0, 0, 0, raceOperation)));
+  ok(concurrentGrants.every((r) => JSON.stringify(r) === JSON.stringify(concurrentGrants[0])), 'six concurrent retries return the same result');
+  eq((await balance()).reads, 8, 'six concurrent retries add three reads once');
+  eq((await pool.query('select count(*)::int n from public.bobby_admin_actions where detail->>\'operationId\'=$1', [raceOperation])).rows[0].n, 1, 'concurrent retries create one audit');
+  await grant(receiver, 3, 0, 0, 0);
+  eq((await balance()).reads, 11, 'a deliberately new operation creates a new gift');
+
+  // Audit or benefit failure cannot commit a receipt or partial addition.
+  for (const table of ['bobby_admin_actions', 'bobby_usage_bonus']) {
+    const failedOperation = randomUUID();
+    const fault = await pool.connect();
+    try {
+      await fault.query('begin');
+      await fault.query(`alter table public.${table} rename to ${table}_off`);
+      await assert.rejects(fault.query('select public.bobby_admin_grant_once($1,$2,$3,7,0,0,0)', [failedOperation, ana, receiver])); checks++;
+      await fault.query('rollback');
+    } finally { fault.release(); }
+    eq((await pool.query('select count(*)::int n from public.bobby_admin_grant_operations where operation_id=$1', [failedOperation])).rows[0].n, 0, `${table} failure rolls back the receipt`);
+    eq((await pool.query('select count(*)::int n from public.bobby_admin_actions where detail->>\'operationId\'=$1', [failedOperation])).rows[0].n, 0, `${table} failure rolls back the audit`);
+    eq((await balance()).reads, 11, `${table} failure leaves the benefit unchanged`);
+  }
+
+  const deleted = await account();
+  const deletedOperation = randomUUID();
+  await grant(deleted, 1, 0, 0, 0, deletedOperation);
+  await pool.query('delete from public.bobby_identities where id=$1', [deleted]);
+  eq((await pool.query('select count(*)::int n from public.bobby_admin_grant_operations where operation_id=$1', [deletedOperation])).rows[0].n, 1, 'account deletion preserves the operation receipt against key reuse');
 
   // ---------- cascades ----------
-  await pool.query("insert into public.bobby_admins(identity_id) values ($1)", [bo]);
   await pool.query("insert into public.bobby_events(event, platform, identity_id) values ('visit', 'web', $1)", [bo]);
   await pool.query('delete from public.bobby_identities where id = $1', [bo]);
   eq(await stats(`a:${bo}`), undefined, 'deleting an account removes its reader stats');

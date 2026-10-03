@@ -99,6 +99,9 @@ final class ReleaseAuditTests: XCTestCase {
         AuditAuthProtocol.handler = { request in
             XCTAssertEqual(request.request.url?.path, "/api/desk-debate")
             XCTAssertEqual(request.request.value(forHTTPHeaderField: "Origin"), "https://bobbyprotocol.xyz")
+            XCTAssertEqual(request.request.value(forHTTPHeaderField: "x-bobby-platform"), "ios")
+            XCTAssertNil(request.request.value(forHTTPHeaderField: MemoryCenter.nativeOptInHeader),
+                         "a guest or account without native consent never affirms memory")
             request.respond(status: 200, body: "{\"market\":{\"price\":100},\"agents\":{\"alpha\":\"A conditional opportunity\",\"red\":\"It needs confirmation\",\"cio\":\"Wait for further evidence\",\"verdict\":\"wait\"}}")
         }
         let answer = await BobbyAPI.debate("BTC", question: "What could invalidate this trend?")

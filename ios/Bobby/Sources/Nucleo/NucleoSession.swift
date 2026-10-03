@@ -40,12 +40,24 @@ enum NucleoPage: Equatable {
 }
 
 /// Native screens shown as sheets over the page. `openNative` opens every route but `paywall`,
-/// which only the awaited `paywall` method presents (§8.4).
+/// which only the awaited `paywall` method presents (§8.4), and `briefing`, which only a drained
+/// notification tap opens (build 53).
 enum NucleoRoute: String, Identifiable, CaseIterable {
-    case squad, locker, isla, account, riskNotice, paywall, levels, invite
+    case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
     var id: String { rawValue }
 
-    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall && $0 != .invite }.map(\.rawValue))
+    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall && $0 != .invite && $0 != .briefing }.map(\.rawValue))
+}
+
+/// What a briefing notification tap waits for before its report opens, read live at every drain.
+/// Defaults read the session's real state; tests replace single pieces.
+struct BriefingTapGate {
+    var appActive: () -> Bool
+    var signedIn: () -> Bool
+    var deskBusy: () -> Bool
+    var listening: () -> Bool
+    /// The page's voice line (or any Bobby narration) is speaking.
+    var narrating: () -> Bool
 }
 
 /// Native → page events (the web controller in the app, a recorder in tests).
@@ -78,6 +90,14 @@ final class NucleoSession: ObservableObject {
 
     @Published var sheet: NucleoRoute?
     @Published private(set) var classicRequested = false
+    let notch = NucleoNotch()
+    /// The briefing the `.briefing` sheet shows (set only when a tap is drained).
+    @Published private(set) var selectedBriefId: String?
+    /// Briefing notification taps (BobbyAppDelegate stores them; this session drains them once).
+    let briefingIntent: BriefingIntent
+    var briefingGate: BriefingTapGate!
+    /// Pause between a sheet going away and the next one presenting (SwiftUI dismissal animation).
+    var briefingSheetDelay: TimeInterval = 0.4
 
     private(set) var currentPage: String?
     private var cancellables = Set<AnyCancellable>()
@@ -95,8 +115,10 @@ final class NucleoSession: ObservableObject {
          companions: CompanionStore = CompanionStore(),
          voice: NeuralVoice? = nil,
          ledger: NucleoLedger = NucleoLedger(),
-         defaults: UserDefaults = .standard) {
+         defaults: UserDefaults = .standard,
+         briefingIntent: BriefingIntent? = nil) {
         self.fixtures = fixtures
+        self.briefingIntent = briefingIntent ?? .shared
         self.profile = profile
         self.companions = companions
         let voice = voice ?? NeuralVoice()
@@ -115,10 +137,28 @@ final class NucleoSession: ObservableObject {
         }
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
+        desk.debateStarted = { [weak self] level in self?.notch.debating(level) }
+        desk.askFinished = { [weak self] result in self?.notch.finished(result) }
+        desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
-        speech.emit = emit
+        speech.emit = { [weak self] name, payload in
+            self?.emit(name, payload)
+            // The mic closed: a waiting briefing tap may open now.
+            if name == "speech.state", payload["state"] as? String == "stopped" { self?.scheduleBriefingDrain() }
+        }
         speech.willStart = { [weak self] in self?.nucleoVoice.stop() }
         nucleoVoice.emit = emit
+        briefingGate = BriefingTapGate(
+            appActive: { UIApplication.shared.applicationState == .active },
+            signedIn: { [weak self] in self?.signedIn ?? false },
+            deskBusy: { [weak self] in self?.desk.isBusy ?? false },
+            listening: { [weak self] in self?.speech.isListening ?? false },
+            narrating: { [weak self] in (self?.nucleoVoice.isActive ?? false) || (self?.voice.speaking ?? false) })
+        // Report screens narrate through this session's voice (process-wide factory). Fixture mode is signed
+        // out, and the unit-test host keeps the silent default.
+        if !fixtures, !BobbyApp.isUnitTestHost {
+            BriefingPlaybackFactory.make = { [weak self] in self?.makeBriefingPlayback() ?? AnyBriefingPlayback(NoBriefingPlayback()) }
+        }
         observeStores()
         synchronizeAccountState()
     }
@@ -129,6 +169,7 @@ final class NucleoSession: ObservableObject {
 
     func emit(_ name: String, _ payload: [String: Any]) {
         guard !tornDown else { return }
+        if name == "ask.stage" { notch.stage(payload) }
         emitter?.emit(name, payload)
     }
 
@@ -137,6 +178,8 @@ final class NucleoSession: ObservableObject {
     func dispatch(_ method: String, _ p: NucleoParams) async throws -> Any {
         guard !tornDown else { throw NucleoFault.internalError("torn down") }
         synchronizeAccountState()
+        // Any page call may end what kept a briefing tap waiting (a read, the mic, a voice line).
+        defer { scheduleBriefingDrain() }
         switch method {
         case "session":
             let page = try p.string("page", required: false, oneOf: ["app", "onboarding", "contract"])
@@ -269,6 +312,8 @@ final class NucleoSession: ObservableObject {
         if let page { currentPage = page }
         emitter?.pageReady()
         bootOnce()
+        // After this reply reaches the page: a tap stored at cold launch opens now (emit drops before here).
+        scheduleBriefingDrain()
         return sessionJSON()
     }
 
@@ -335,6 +380,10 @@ final class NucleoSession: ObservableObject {
         companions.companionId = c.id
         profile.voiceId = c.voicePersona
         profile.auraText = AuraForge.keyword(nearest: c.hue)
+        // Future briefings speak with this companion's voice (account-bound, revisioned; R11 first).
+        if signedIn, profile.acceptedRiskNotice {
+            Task { await BriefingsCenter.shared.mirrorCompanion(c.id) }
+        }
         if signedIn, companions.profileNeedsSync {
             Task { [weak self] in
                 guard let self else { return }
@@ -410,6 +459,7 @@ final class NucleoSession: ObservableObject {
         profile.riskNoticeVersion = 0
         AccountSession.shared.cancelPendingSignIn()
         desk.invalidatePending()
+        notch.reset()
         speech.cancel()
         nucleoVoice.stop()
         vocabularyTask?.cancel()
@@ -582,11 +632,26 @@ final class NucleoSession: ObservableObject {
         openSheet = nil
         sheet = nil
         sheetClosed(route)
+        // A tap that arrived while this sheet was up opens once it is gone.
+        scheduleBriefingDrain(after: briefingSheetDelay)
     }
 
     private func sheetClosed(_ route: NucleoRoute) {
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
         if route == .paywall { finishPaywall() }
+        if route == .briefing {
+            selectedBriefId = nil
+            if briefingWantsPro {
+                // The report's Bobby Pro offer: the paywall follows once the report is gone (nothing awaits it).
+                briefingWantsPro = false
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
+                    guard let self, !self.tornDown, self.sheet == nil, self.openSheet == nil, self.profile.acceptedRiskNotice else { return }
+                    self.openSheet = .paywall
+                    self.sheet = .paywall
+                    self.emit("native.sheet", ["route": NucleoRoute.paywall.rawValue, "state": "open"])
+                }
+            }
+        }
         if route == .invite {
             if inviteWantsPro, paywallContinuation != nil {
                 inviteWantsPro = false
@@ -618,6 +683,77 @@ final class NucleoSession: ObservableObject {
         emit("app.state", ["state": "active"])
         if signedIn { Task { await AccountSession.shared.checkAppleCredential() } }
         sessionChanged()
+        scheduleBriefingDrain()
+    }
+
+    // MARK: - Briefing notification taps (build 53)
+
+    /// A tap that arrived signed out: kept here (BriefingIntent clears on account change) until a sign-in.
+    private var heldBriefId: String?
+    private var briefingWantsPro = false
+    private var briefingDrainScheduled = false
+
+    /// The report's Bobby Pro offer was tapped: close the report, then the paywall.
+    func briefingChosePro() {
+        briefingWantsPro = true
+        sheet = nil
+    }
+
+    /// Drains on the next main-queue turn (after the current bridge reply), or after `delay`.
+    func scheduleBriefingDrain(after delay: TimeInterval = 0) {
+        guard !tornDown else { return }
+        if delay > 0 {
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.drainBriefingIntent() }
+            return
+        }
+        guard !briefingDrainScheduled else { return }
+        briefingDrainScheduled = true
+        DispatchQueue.main.async { [weak self] in
+            self?.briefingDrainScheduled = false
+            self?.drainBriefingIntent()
+        }
+    }
+
+    /// A report's narrator: the page's line stops before it starts; the mic or a running read refuses it.
+    func makeBriefingPlayback() -> AnyBriefingPlayback {
+        guard !tornDown else { return AnyBriefingPlayback(NoBriefingPlayback()) }
+        return AnyBriefingPlayback(BriefingNarrator.live(
+            voice: voice,
+            stopPageVoice: { [weak self] in self?.nucleoVoice.stop() },
+            micActive: { [weak self] in self?.speech.isListening ?? false },
+            analysisBusy: { [weak self] in self?.desk.isBusy ?? false }))
+    }
+
+    /// Opens the tapped briefing when everything allows it; otherwise the tap keeps waiting. Consumed
+    /// once: a later foreground never replays it. True when the report sheet opened.
+    @discardableResult
+    func drainBriefingIntent() -> Bool {
+        guard !tornDown, let gate = briefingGate else { return false }
+        // Signed out: keep the tap past the sign-in (the intent itself clears on account changes). It
+        // never shows content: opening re-authorizes against whoever signs in.
+        if !gate.signedIn() {
+            if let id = briefingIntent.take() { heldBriefId = id }
+            return false
+        }
+        guard briefingIntent.pending != nil || heldBriefId != nil else { return false }
+        guard currentPage == NucleoPage.app.name,
+              gate.appActive(),
+              profile.acceptedRiskNotice, onboarded,
+              sheet == nil, openSheet == nil,
+              !gate.listening(), !gate.deskBusy(), !gate.narrating()
+        else { return false }
+        guard let id = briefingIntent.take() ?? heldBriefId else { return false }
+        heldBriefId = nil
+        // The same report is already on screen (a foreground push for it): nothing to open.
+        if id == briefingIntent.openBriefId { return false }
+        // The openNative pattern: the page's voice and the mic stop before a sheet covers the glass.
+        nucleoVoice.stop()
+        speech.cancel()
+        selectedBriefId = id
+        openSheet = .briefing
+        sheet = .briefing
+        emit("native.sheet", ["route": NucleoRoute.briefing.rawValue, "state": "open"])
+        return true
     }
 
     /// The mic closes and the voice stops; an in-flight read keeps going.
@@ -638,10 +774,12 @@ final class NucleoSession: ObservableObject {
     /// Before the classic app appears: nothing of this session may keep writing.
     func teardown() {
         guard !tornDown else { return }
+        heldBriefId = nil
         finishPaywall()
         speech.cancel()
         nucleoVoice.teardown()
         desk.teardown()
+        notch.reset()
         vocabularyTask?.cancel()
         cancellables.removeAll()
         tornDown = true
@@ -658,7 +796,22 @@ final class NucleoSession: ObservableObject {
                 self.sessionChanged()
                 // A new account has its own level allowance.
                 if self.profile.acceptedRiskNotice { Task { await NucleoLevelCenter.shared.refresh() } }
+                // Signed out: no tap of the previous account may open later. Signed in: a tap held while
+                // signed out opens now (re-authorized against this account).
+                if self.signedIn { self.scheduleBriefingDrain() } else { self.heldBriefId = nil; self.briefingIntent.clear() }
             }
+            .store(in: &cancellables)
+        // A briefing notification was tapped (cold launch, warm, or while busy): try now; it waits otherwise.
+        briefingIntent.$pending
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.scheduleBriefingDrain() }
+            .store(in: &cancellables)
+        // Bobby stopped speaking: a waiting tap may open.
+        voice.$speaking
+            .removeDuplicates()
+            .filter { !$0 }
+            .dropFirst()
+            .sink { [weak self] _ in self?.scheduleBriefingDrain(after: 0.05) }
             .store(in: &cancellables)
         // The level sheet changed the analysis level: the page's level pill follows.
         NucleoLevelCenter.shared.$level
@@ -684,6 +837,7 @@ final class NucleoSession: ObservableObject {
         accountGeneration = account.generation
         accountUserID = account.session?.userId
         desk.invalidatePending(preservingAnonymousSignInRetries: wasAnonymous && accountUserID != nil)
+        notch.reset()
         speech.cancel()
         nucleoVoice.stop()
         if let userId = accountUserID { companions.bind(to: userId) } else { companions.unbind() }

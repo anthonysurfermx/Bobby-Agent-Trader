@@ -320,6 +320,40 @@ final class NucleoRemediationTests: XCTestCase {
         catch { XCTAssertTrue(error is NucleoFault) }
     }
 
+    func testQueuedLiveEventCannotCrossCancellationNewReadAccountOrConsent() async throws {
+        let identity = Identity(), desk = makeDesk(identity)
+        B34Stub.install(Self.market)
+        let owner = identity.owner()
+        var oldID: String?
+        var received: [String] = []
+        var finished: [String] = []
+        desk.askFinished = { finished.append($0["status"] as? String ?? "") }
+        desk.debateEvent = { received.append($0["text"] as? String ?? "") }
+        desk.emit = { event, payload in
+            guard event == "ask.stage", payload["stage"] as? String == "accepted",
+                  let id = payload["requestId"] as? String else { return }
+            if oldID == nil {
+                oldID = id
+                _ = desk.cancel()
+            } else {
+                // Simulate an old network callback queued until a newer read became active.
+                desk.receiveLive(["text": "old read"], requestId: oldID!, generation: owner)
+                desk.receiveLive(["text": "current read"], requestId: id, generation: owner)
+                identity.replace()
+                desk.receiveLive(["text": "old account"], requestId: id, generation: owner)
+                desk.profile.riskNoticeVersion = 0
+                desk.receiveLive(["text": "without consent"], requestId: id, generation: identity.owner())
+                desk.invalidatePending()
+            }
+        }
+        let first = try await desk.ask(NucleoParams(["question": "Analyze NVDA"]))
+        XCTAssertEqual(first["status"] as? String, "cancelled")
+        let second = try await desk.ask(NucleoParams(["question": "Analyze NVDA again"]))
+        XCTAssertEqual(second["status"] as? String, "cancelled")
+        XCTAssertEqual(received, ["current read"])
+        XCTAssertEqual(finished, ["cancelled", "cancelled"], "Cancellation clears the HUD immediately")
+    }
+
     func testLateDeskResponseDoesNotUpdateTheNewAccountOrPendingRead() async throws {
         let identity = Identity(), desk = makeDesk(identity)
         var accessChanges = 0, remembered = 0

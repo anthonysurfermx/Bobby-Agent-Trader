@@ -1,7 +1,20 @@
 // One-way persona narration served by bobby-voice-free. Bundled previews and
 // generated answers use the same persona; failures never switch to Apple speech.
+// Build 53 adds prepared playback (authenticated briefing audio fetched by the caller): one completion per
+// request, keyed by the request's generation so an older completion can never end a newer request; stop()
+// stays the universal cancel and answers a pending request with `.stopped` exactly once.
 import Foundation
 @preconcurrency import AVFoundation
+
+/// How one prepared-audio request ended (playPrepared). Delivered exactly once per accepted request.
+enum NarrationEnd: Equatable, Sendable {
+    /// The audio played to its end.
+    case finished
+    /// stop() (or anything that calls it: mute, a new line, a new request) cancelled it.
+    case stopped
+    /// The audio could not be decoded or played on.
+    case failed
+}
 
 @MainActor
 final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSpeechSynthesizerDelegate {
@@ -15,6 +28,9 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     @Published private(set) var engine: Engine = .neural
     /// Position and length of the network voice's audio; nil for the device voice and when idle.
     @Published private(set) var playback: (time: TimeInterval, duration: TimeInterval)?
+    /// A prepared request is paused: `speaking` stays true (the line is not over, so nothing reads the pause
+    /// as an end), `level` drops to 0 and the position is kept.
+    @Published private(set) var isPaused = false
     /// Word boundaries of the device voice (`willSpeakRangeOfSpeechString`), in the spoken text.
     var onDeviceWord: ((NSRange) -> Void)?
     /// One device preference shared by onboarding, the desk and the gallery.
@@ -34,6 +50,8 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     private var generation = 0
     private var meterTimer: Timer?
     private let session: URLSession
+    /// The completion of the current prepared request, tagged with the generation it was accepted under.
+    private var preparedFinish: (generation: Int, onFinish: (NarrationEnd) -> Void)?
 
     /// Read the current consent at use time: gallery voices can outlive the consent sheet.
     /// Bundled clips remain available without sending any text to an external provider.
@@ -54,9 +72,7 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didFinish utterance: AVSpeechUtterance) {
         Task { @MainActor in
             guard self.fallbackUtterance === utterance else { return }
-            self.fallbackUtterance = nil
-            self.level = 0
-            self.speaking = false
+            self.endFallback(.finished)
         }
     }
 
@@ -70,9 +86,18 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     nonisolated func speechSynthesizer(_ synthesizer: AVSpeechSynthesizer, didCancel utterance: AVSpeechUtterance) {
         Task { @MainActor in
             guard self.fallbackUtterance === utterance else { return }
-            self.fallbackUtterance = nil
-            self.level = 0
-            self.speaking = false
+            self.endFallback(.stopped)
+        }
+    }
+
+    private func endFallback(_ end: NarrationEnd) {
+        fallbackUtterance = nil
+        isPaused = false
+        level = 0
+        speaking = false
+        if let pending = preparedFinish, pending.generation == generation {
+            preparedFinish = nil
+            pending.onFinish(end)
         }
     }
 
@@ -141,6 +166,66 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         }
     }
 
+    /// Plays audio the caller already fetched (briefing narration). Mute and the external-processing consent
+    /// are read now, at use time. Any current line or request is stopped first (its completion gets `.stopped`).
+    /// Returns false — and never calls `onFinish` — when nothing started; otherwise `onFinish` runs exactly
+    /// once: `.finished`, `.stopped` (stop(), mute, a newer line or request) or `.failed`.
+    @discardableResult
+    func playPrepared(_ data: Data, playbackRate: Float = 1.0, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
+        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech else { return false }
+        stop()
+        guard play(data, playbackRate: playbackRate) else { return false }
+        preparedFinish = (generation, onFinish)
+        return true
+    }
+
+    /// Speaks the locally stored Apple name on this device. No HTTP request or provider text is involved.
+    @discardableResult
+    func playLocalGreeting(_ text: String, language: String, onFinish: @escaping (NarrationEnd) -> Void) -> Bool {
+        guard Self.avatarNarrationEnabled, !isMuted, allowsExternalSpeech, !text.isEmpty,
+              language == "en" || language == "es" else { return false }
+        stop()
+        try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
+        try? AVAudioSession.sharedInstance().setActive(true)
+        let utterance = AVSpeechUtterance(string: text)
+        utterance.voice = AVSpeechSynthesisVoice(language: language == "es" ? "es-ES" : "en-US")
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
+        fallbackUtterance = utterance
+        engine = .device
+        speaking = true
+        preparedFinish = (generation, onFinish)
+        fallback.speak(utterance)
+        return true
+    }
+
+    /// Holds the current audio at its position. `speaking` is left true on purpose: page narration reads its
+    /// end from the falling edge of `speaking`, and a pause is not an end.
+    func pause() {
+        if fallbackUtterance != nil, !isPaused {
+            if fallback.pauseSpeaking(at: .immediate) { isPaused = true; level = 0 }
+            return
+        }
+        guard let player, player.isPlaying, !isPaused else { return }
+        player.pause()
+        isPaused = true
+        level = 0
+        playback = (player.currentTime, player.duration)
+    }
+
+    /// Continues a paused request from where it stopped. Muting or withdrawn consent while paused stops it.
+    func resume() {
+        if fallbackUtterance != nil, isPaused {
+            guard !isMuted, allowsExternalSpeech else { stop(); return }
+            if fallback.continueSpeaking() { isPaused = false }
+            return
+        }
+        guard let player, isPaused else { return }
+        guard !isMuted, allowsExternalSpeech else { stop(); return }
+        isPaused = false
+        guard player.play() else { endPlayer(.failed); return }
+        startMetering(player)
+    }
+
     @discardableResult
     private func play(_ data: Data, playbackRate: Float) -> Bool {
         try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .spokenAudio)
@@ -196,7 +281,10 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
     }
 
     func stop() {
+        let pending = preparedFinish
+        preparedFinish = nil
         generation += 1
+        isPaused = false
         narrationTask?.cancel()
         narrationTask = nil
         player?.stop()
@@ -208,17 +296,38 @@ final class NeuralVoice: NSObject, ObservableObject, AVAudioPlayerDelegate, AVSp
         playback = nil
         speaking = false
         level = 0
+        // Last, after the state is idle: the owner may start its next request from inside the callback.
+        pending?.onFinish(.stopped)
     }
 
     nonisolated func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
         Task { @MainActor in
             guard self.player === player else { return }
-            self.player = nil
-            self.meterTimer?.invalidate()
-            self.meterTimer = nil
-            self.level = 0
-            self.playback = nil
-            self.speaking = false
+            self.endPlayer(flag ? .finished : .failed)
+        }
+    }
+
+    nonisolated func audioPlayerDecodeErrorDidOccur(_ player: AVAudioPlayer, error: Error?) {
+        Task { @MainActor in
+            guard self.player === player else { return }
+            self.player?.stop()
+            self.endPlayer(.failed)
+        }
+    }
+
+    /// The current player is over on its own (not through stop()): idle, then answer its prepared request.
+    private func endPlayer(_ end: NarrationEnd) {
+        player = nil
+        meterTimer?.invalidate()
+        meterTimer = nil
+        isPaused = false
+        level = 0
+        playback = nil
+        speaking = false
+        // Only the request accepted under the current generation; stop() already answered any older one.
+        if let pending = preparedFinish, pending.generation == generation {
+            preparedFinish = nil
+            pending.onFinish(end)
         }
     }
 }
