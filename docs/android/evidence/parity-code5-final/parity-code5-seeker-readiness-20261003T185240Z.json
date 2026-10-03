@@ -1,0 +1,11 @@
+{
+  "status": "matching_authorized_seeker_not_detected",
+  "checked_at": "2026-10-03T18:52:40.370870+00:00",
+  "connected": false,
+  "authorized": false,
+  "physical_transport_count": 0,
+  "unauthorized_transport_count": 0,
+  "serials_saved": false,
+  "phone_modified": false,
+  "scope": "Read-only ADB transport inventory and model match; absence does not prove authorization was revoked."
+}

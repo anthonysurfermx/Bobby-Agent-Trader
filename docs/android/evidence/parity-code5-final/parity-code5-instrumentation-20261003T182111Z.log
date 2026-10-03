@@ -1,0 +1,386 @@
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest:
+INSTRUMENTATION_STATUS: test=approvedModelLoadsOrExplicitPortraitFallbackRemainsAvailable
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=approvedModelLoadsOrExplicitPortraitFallbackRemainsAvailable
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=viewerCannotFetchRemoteOrUnrelatedNativeAssets
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=viewerCannotFetchRemoteOrUnrelatedNativeAssets
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=realEarnedAttachmentsUpdateAndRapidCompanionChangesKeepLatestModel
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=realEarnedAttachmentsUpdateAndRapidCompanionChangesKeepLatestModel
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest:
+INSTRUMENTATION_STATUS: test=profileVoiceChoicePersistsThroughTheNativeMenuWithoutExternalProcessing
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=profileVoiceChoicePersistsThroughTheNativeMenuWithoutExternalProcessing
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=unavailableOnDeviceDictationKeepsKeyboardAndCancelsUnicodeDraftLocally
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=unavailableOnDeviceDictationKeepsKeyboardAndCancelsUnicodeDraftLocally
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=unconfiguredPushBootstrapStaysDisabledWithoutFirebaseInitialization
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=unconfiguredPushBootstrapStaysDisabledWithoutFirebaseInitialization
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=accountAndBriefingPrivacyControlsRemainAccessibleBeforeAiConsent
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=accountAndBriefingPrivacyControlsRemainAccessibleBeforeAiConsent
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=consentGateAndLocalOnboardingReachTheRealGuestAppWithoutAnAnalysis
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=consentGateAndLocalOnboardingReachTheRealGuestAppWithoutAnAnalysis
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Only refused read-only browsing is allowed: [(GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search)]
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.assertNoAnalysisOrMutation(MainActivityAcceptanceInstrumentedTest.kt:364)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack(MainActivityAcceptanceInstrumentedTest.kt:313)
+
+INSTRUMENTATION_STATUS: stream=
+Error in nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack(xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest):
+java.lang.AssertionError: Only refused read-only browsing is allowed: [(GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search)]
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.assertNoAnalysisOrMutation(MainActivityAcceptanceInstrumentedTest.kt:364)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack(MainActivityAcceptanceInstrumentedTest.kt:313)
+
+INSTRUMENTATION_STATUS: test=nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Acceptance condition did not complete; finishing=false, route=account, webFocus=false, windowFocus=false, ime=false, web=1080x2138; dom={"page":"/assets/nucleo/app.html","language":"en","state":"IDLE","active":"","pill":{"x":159.64907836914062,"y":716.5048828125,"w":92.70146179199219,"h":54.07584762573242,"visibility":"visible","opacity":"1","pointerEvents":"auto","hit":"pill"}}
+	at org.junit.Assert.fail(Assert.java:89)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.waitUntil(MainActivityAcceptanceInstrumentedTest.kt:441)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface(MainActivityAcceptanceInstrumentedTest.kt:261)
+
+INSTRUMENTATION_STATUS: stream=
+Error in sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface(xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest):
+java.lang.AssertionError: Acceptance condition did not complete; finishing=false, route=account, webFocus=false, windowFocus=false, ime=false, web=1080x2138; dom={"page":"/assets/nucleo/app.html","language":"en","state":"IDLE","active":"","pill":{"x":159.64907836914062,"y":716.5048828125,"w":92.70146179199219,"h":54.07584762573242,"visibility":"visible","opacity":"1","pointerEvents":"auto","hit":"pill"}}
+	at org.junit.Assert.fail(Assert.java:89)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.waitUntil(MainActivityAcceptanceInstrumentedTest.kt:441)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface(MainActivityAcceptanceInstrumentedTest.kt:261)
+
+INSTRUMENTATION_STATUS: test=sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest:
+INSTRUMENTATION_STATUS: test=durableAwardKeepsLedgerAndPendingEventTogetherAcrossStoreRecreationAndAccountSwitch
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=durableAwardKeepsLedgerAndPendingEventTogetherAcrossStoreRecreationAndAccountSwitch
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=sameOriginSubframeCannotDispatchEvenWhenItHasTheInjectedListener
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=sameOriginSubframeCannotDispatchEvenWhenItHasTheInjectedListener
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=outstandingReplyFromPreviousPageIsDroppedAfterReload
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=outstandingReplyFromPreviousPageIsDroppedAfterReload
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=foreignOriginDoesNotReceiveNativeListener
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=foreignOriginDoesNotReceiveNativeListener
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=guestSignInInheritsOnboardingConsentButDoesNotTransferGuestAwardsOrHistory
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=guestSignInInheritsOnboardingConsentButDoesNotTransferGuestAwardsOrHistory
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=17
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=binaryMessageIsIgnoredAndNextNativeSessionStillCompletes
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=17
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=binaryMessageIsIgnoredAndNextNativeSessionStillCompletes
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=18
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=bundledEngineUsesNativeV1SessionWithoutFixturesOrAccountSecrets
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=18
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=bundledEngineUsesNativeV1SessionWithoutFixturesOrAccountSecrets
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=19
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=malformedAndUnknownMethodsReturnProtocolFaultsAndOversizedMessagesNeverDispatch
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=19
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=malformedAndUnknownMethodsReturnProtocolFaultsAndOversizedMessagesNeverDispatch
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=20
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=nativeConsentGateRejectsQuestionsAndUnknownSavedReadsBeforeNetworking
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest
+INSTRUMENTATION_STATUS: current=20
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=nativeConsentGateRejectsQuestionsAndUnknownSavedReadsBeforeNetworking
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest
+INSTRUMENTATION_STATUS: current=21
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest:
+INSTRUMENTATION_STATUS: test=equityEvidenceUsesTheBackendMonthlyKeyWithHourlyCandlesAndEncodedListing
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest
+INSTRUMENTATION_STATUS: current=21
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=equityEvidenceUsesTheBackendMonthlyKeyWithHourlyCandlesAndEncodedListing
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest
+INSTRUMENTATION_STATUS: current=22
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=cryptoEvidenceRetainsOneHundredHourlyCandlesWithoutEquityParameters
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest
+INSTRUMENTATION_STATUS: current=22
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=cryptoEvidenceRetainsOneHundredHourlyCandlesWithoutEquityParameters
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest
+INSTRUMENTATION_STATUS: current=23
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest:
+INSTRUMENTATION_STATUS: test=approvedArtworkExportsAsAReadablePngThroughOnlyTheNarrowProviderPath
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest
+INSTRUMENTATION_STATUS: current=23
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=approvedArtworkExportsAsAReadablePngThroughOnlyTheNarrowProviderPath
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest
+INSTRUMENTATION_STATUS: current=24
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=invalidAssetPathsAndUnrelatedCacheFilesCannotBeShared
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest
+INSTRUMENTATION_STATUS: current=24
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=24
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=invalidAssetPathsAndUnrelatedCacheFilesCannotBeShared
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 353.11
+There were 2 failures:
+1) nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack(xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest)
+java.lang.AssertionError: Only refused read-only browsing is allowed: [(GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search), (GET, /api/bobby-access), (GET, /api/bobby-asset-search), (GET, /api/bobby-asset-search)]
+	at org.junit.Assert.fail(Assert.java:89)
+	at org.junit.Assert.assertTrue(Assert.java:42)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.assertNoAnalysisOrMutation(MainActivityAcceptanceInstrumentedTest.kt:364)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack(MainActivityAcceptanceInstrumentedTest.kt:313)
+2) sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface(xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest)
+java.lang.AssertionError: Acceptance condition did not complete; finishing=false, route=account, webFocus=false, windowFocus=false, ime=false, web=1080x2138; dom={"page":"/assets/nucleo/app.html","language":"en","state":"IDLE","active":"","pill":{"x":159.64907836914062,"y":716.5048828125,"w":92.70146179199219,"h":54.07584762573242,"visibility":"visible","opacity":"1","pointerEvents":"auto","hit":"pill"}}
+	at org.junit.Assert.fail(Assert.java:89)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.waitUntil(MainActivityAcceptanceInstrumentedTest.kt:441)
+	at xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest.sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface(MainActivityAcceptanceInstrumentedTest.kt:261)
+
+FAILURES!!!
+Tests run: 24,  Failures: 2
+
+
+INSTRUMENTATION_CODE: -1

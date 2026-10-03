@@ -1,0 +1,353 @@
+{
+  "status": "FAILED",
+  "recorded_at": "2026-10-03T18:40:02.579769+00:00",
+  "started_at": "2026-10-03T18:31:58.649321+00:00",
+  "target": "emulator-5556",
+  "hardware": "ranchu",
+  "api": 35,
+  "page_size": 4096,
+  "source_sha256": "f3637b6438154de63d92c8ab2d01b7691d80e4dd334ff744bb6c6d197f550b82",
+  "version_name": "1.1.0",
+  "version_code": 5,
+  "fcm_enabled": false,
+  "build_receipt": "docs/android/evidence/parity-code5-20261003T182924Z-build.json",
+  "debug_apk": {
+    "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/debug/app-debug.apk",
+    "sha256": "4653ee9f91061935e62c9adf8323a6c837e8c26d301291ded39793fe625ec2ea",
+    "bytes": 60844436
+  },
+  "test_apk": {
+    "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+    "sha256": "246aac95d8e45be93ff723d95f5087e37c4c7990914b1acb76a3bc489d362dcc",
+    "bytes": 1186756
+  },
+  "installed_apk_matches": {
+    "debug_apk": {
+      "sha256": "4653ee9f91061935e62c9adf8323a6c837e8c26d301291ded39793fe625ec2ea",
+      "bytes": 60844436
+    },
+    "test_apk": {
+      "sha256": "246aac95d8e45be93ff723d95f5087e37c4c7990914b1acb76a3bc489d362dcc",
+      "bytes": 1186756
+    }
+  },
+  "source_unchanged_during_instrumentation": true,
+  "steps": [
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "getprop",
+        "ro.hardware"
+      ],
+      "exit_code": 0,
+      "stdout": "ranchu",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "getprop",
+        "sys.boot_completed"
+      ],
+      "exit_code": 0,
+      "stdout": "1",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "getprop",
+        "ro.build.version.sdk"
+      ],
+      "exit_code": 0,
+      "stdout": "35",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "getconf",
+        "PAGE_SIZE"
+      ],
+      "exit_code": 0,
+      "stdout": "4096",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "settings",
+        "get",
+        "global",
+        "device_name"
+      ],
+      "exit_code": 0,
+      "stdout": "Android SDK built for arm64",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "uninstall",
+        "xyz.bobbyprotocol.bobby"
+      ],
+      "exit_code": 0,
+      "stdout": "Success",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm",
+        "list",
+        "packages"
+      ],
+      "exit_code": 0,
+      "stdout": "package:com.android.companiondevicemanager.auto_generated_characteristics_rro\npackage:xyz.bobbyprotocol.bobby.test\npackage:com.android.systemui.auto_generated_rro_vendor__\npackage:com.android.providers.media.module\npackage:com.android.modulemetadata\npackage:com.android.connectivity.resources\npackage:com.android.stk\npackage:com.android.server.deviceconfig.resources\npackage:com.android.music\npackage:com.android.calllogbackup\npackage:com.android.internal.display.cutout.emulation.hole\npackage:com.android.settings\npackage:com.android.bips\npackage:com.android.carrierconfig.auto_generated_rro_vendor__\npackage:com.android.internal.display.cutout.emulation.tall\npackage:com.android.systemui.emulation.pixel_7_pro\npackage:com.android.cameraextensions\npackage:com.android.systemui.emulation.pixel_8a\npackage:com.android.systemui.accessibility.accessibilitymenu\npackage:com.android.dreams.phototable\npackage:com.android.internal.emulation.pixel_3_xl\npackage:com.android.providers.contacts\npackage:com.android.carrierconfig\npackage:com.android.internal.emulation.pixel_4a\npackage:com.android.inputmethod.latin\npackage:com.android.federatedcompute.services\npackage:com.android.dreams.basic\npackage:com.android.companiondevicemanager\npackage:com.android.cts.priv.ctsshim\npackage:com.android.mms.service\npackage:com.android.providers.downloads\npackage:com.android.bluetoothmidiservice\npackage:com.android.credentialmanager\npackage:com.android.networkstack\npackage:com.android.wallpaper\npackage:android.ext.shared\npackage:com.android.networkstack.tethering\npackage:com.android.keychain\npackage:com.android.devicelockcontroller\npackage:com.android.internal.emulation.pixel_2_xl\npackage:com.android.musicfx\npackage:android.auto_generated_characteristics_rro\npackage:com.android.internal.emulation.pixel_7a\npackage:com.android.internal.systemui.navbar.transparent\npackage:com.android.documentsui\npackage:android.auto_generated_rro_vendor__\npackage:com.android.adservices.api\npackage:com.android.health.connect.backuprestore\npackage:com.android.connectivity.resources.goldfish.overlay\npackage:com.android.webview\npackage:com.android.virtualmachine.res\npackage:com.android.emulator.multidisplay\npackage:com.android.shell\npackage:com.android.inputdevices\npackage:com.android.providers.downloads.ui\npackage:com.android.ons\npackage:com.android.intentresolver\npackage:com.android.bookmarkprovider\npackage:com.android.dialer\npackage:com.android.phone.auto_generated_rro_vendor__\npackage:com.android.certinstaller\npackage:com.android.sdksetup\npackage:com.android.apps.tag\npackage:com.android.DeviceAsWebcam\npackage:android.ext.services\npackage:com.android.wifi.resources\npackage:com.android.wifi.dialog\npackage:com.android.internal.emulation.pixel_6a\npackage:com.android.sharedstoragebackup\npackage:com.android.captiveportallogin\npackage:com.android.imsserviceentitlement\npackage:com.android.providers.media\npackage:com.android.internal.emulation.pixel_7_pro\npackage:com.android.providers.calendar\npackage:com.android.providers.blockednumber\npackage:com.android.statementservice\npackage:com.android.simappdialog\npackage:com.android.providers.telephony\npackage:com.android.wallpaper.livepicker\npackage:com.android.printservice.recommendation\npackage:com.android.proxyhandler\npackage:com.android.internal.display.cutout.emulation.emu01\npackage:com.android.calendar\npackage:com.android.internal.ranchu.commonoverlay\npackage:com.android.systemui.emulation.pixel_3a\npackage:com.android.sdksandbox\npackage:com.android.safetycenter.resources\npackage:com.android.managedprovisioning\npackage:com.android.emergency\npackage:com.android.internal.display.cutout.emulation.waterfall\npackage:com.android.healthconnect.controller\npackage:com.android.providers.settings\npackage:com.android.systemui.emulation.pixel_3_xl\npackage:com.android.phone\npackage:com.android.internal.emulation.pixel_4_xl\npackage:com.android.cellbroadcastreceiver.module\npackage:com.android.carrierdefaultapp\npackage:com.android.traceur\npackage:com.android.backupconfirm\npackage:com.android.contacts\npackage:com.android.networkstack.tethering.emulator\npackage:com.android.systemui.emulation.pixel_6_pro\npackage:com.android.nfc\npackage:com.android.internal.emulation.pixel_3a_xl\npackage:com.android.cellbroadcastservice\npackage:com.android.mtp\npackage:com.android.systemui.emulation.pixel_4a\npackage:com.android.location.fused\npackage:com.android.vpndialogs\npackage:com.android.appsearch.apk\npackage:com.android.uwb.resources\npackage:com.android.cellbroadcastreceiver\npackage:com.android.phone.auto_generated_characteristics_rro\npackage:com.android.systemui.emulation.pixel_4_xl\npackage:com.android.internal.display.cutout.emulation.double\npackage:com.android.theme.font.notoserifsource\npackage:com.android.ondevicepersonalization.services\npackage:com.android.htmlviewer\npackage:com.android.internal.emulation.pixel_8a\npackage:com.android.systemui.emulation.pixel_8_pro\npackage:com.android.systemui.emulation.pixel_3\npackage:com.android.systemui\npackage:com.android.wallpapercropper\npackage:com.android.internal.emulation.pixel_4\npackage:com.android.systemui.emulation.pixel_7\npackage:com.android.internal.emulation.pixel_fold\npackage:com.android.internal.emulation.pixel_5\npackage:com.android.systemui.emulation.pixel_6\npackage:com.android.systemui.emulation.pixel_5\npackage:com.android.internal.emulation.pixel_3\npackage:com.android.systemui.emulation.pixel_4\npackage:com.android.internal.emulation.pixel_8\npackage:com.android.internal.emulation.pixel_6\npackage:com.android.internal.systemui.navbar.gestural\npackage:com.android.gallery3d\npackage:com.android.internal.emulation.pixel_7\npackage:com.android.systemui.emulation.pixel_8\npackage:com.android.providers.userdictionary\npackage:com.android.role.notes.enabled\npackage:com.android.launcher3\npackage:com.android.providers.contactkeys\npackage:com.android.cts.ctsshim\npackage:com.android.bluetooth\npackage:com.android.settings.intelligence\npackage:com.android.devicediagnostics\npackage:com.android.emulator.radio.config\npackage:com.android.internal.display.cutout.emulation.corner\npackage:com.android.storagemanager\npackage:com.android.quicksearchbox\npackage:com.android.avatarpicker\npackage:org.chromium.webview_shell\npackage:com.android.packageinstaller\npackage:com.android.internal.emulation.pixel_6_pro\npackage:com.android.printspooler\npackage:com.android.internal.emulation.pixel_3a\npackage:com.android.deskclock\npackage:com.android.wallpaperbackup\npackage:com.android.systemui.emulation.pixel_6a\npackage:com.android.internal.systemui.navbar.twobutton\npackage:com.android.internal.systemui.navbar.threebutton\npackage:com.android.egg\npackage:com.android.systemui.emulation.pixel_fold\npackage:com.android.localtransport\npackage:com.android.providers.partnerbookmarks\npackage:com.android.soundpicker\npackage:android\npackage:com.android.dynsystem\npackage:com.android.rkpdapp\npackage:com.android.permissioncontroller\npackage:com.android.camera2\npackage:com.android.providers.telephony.auto_generated_characteristics_rro\npackage:com.android.internal.emulation.pixel_8_pro\npackage:com.android.systemui.emulation.pixel_3a_xl\npackage:com.android.hotspot2.osulogin\npackage:com.android.externalstorage\npackage:com.android.server.telecom\npackage:com.android.se\npackage:com.android.systemui.emulation.pixel_7a\npackage:com.android.pacprocessor\npackage:com.android.messaging",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "uninstall",
+        "xyz.bobbyprotocol.bobby.test"
+      ],
+      "exit_code": 0,
+      "stdout": "Success",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "install",
+        "--no-streaming",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/debug/app-debug.apk"
+      ],
+      "exit_code": 0,
+      "stdout": "Performing Push Install\nSuccess",
+      "stderr": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/debug/app-debug.apk: 1 file pushed, 0 skipped. 286.1 MB/s (60844436 bytes in 0.203s)"
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm",
+        "path",
+        "xyz.bobbyprotocol.bobby"
+      ],
+      "exit_code": 0,
+      "stdout": "package:/data/app/~~e74YeVJhdxlnMTJbch6TAQ==/xyz.bobbyprotocol.bobby-2xXhCWJUCp2DI3IvTujqPw==/base.apk",
+      "stderr": ""
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "install",
+        "--no-streaming",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk"
+      ],
+      "exit_code": 0,
+      "stdout": "Performing Push Install\nSuccess",
+      "stderr": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk: 1 file pushed, 0 skipped. 665.9 MB/s (1186756 bytes in 0.002s)"
+    },
+    {
+      "command": [
+        "adb",
+        "-s",
+        "emulator-5556",
+        "shell",
+        "pm",
+        "path",
+        "xyz.bobbyprotocol.bobby.test"
+      ],
+      "exit_code": 0,
+      "stdout": "package:/data/app/~~vBw2Jbqe_uWdnZk_E3YyFA==/xyz.bobbyprotocol.bobby.test-toOYom2jVLETHz2DpdKTeA==/base.apk",
+      "stderr": ""
+    }
+  ],
+  "command": [
+    "adb",
+    "-s",
+    "emulator-5556",
+    "shell",
+    "am",
+    "instrument",
+    "-w",
+    "-r",
+    "-e",
+    "class",
+    "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest,xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest,xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest,xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest,xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest",
+    "xyz.bobbyprotocol.bobby.test/androidx.test.runner.AndroidJUnitRunner"
+  ],
+  "adb_exit_code": 0,
+  "expected_tests": 24,
+  "tests": 24,
+  "failures": 1,
+  "errors": 0,
+  "skipped": 0,
+  "results": [
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "approvedModelLoadsOrExplicitPortraitFallbackRemainsAvailable",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "viewerCannotFetchRemoteOrUnrelatedNativeAssets",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.EquipmentStageInstrumentedTest",
+      "test": "realEarnedAttachmentsUpdateAndRapidCompanionChangesKeepLatestModel",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "profileVoiceChoicePersistsThroughTheNativeMenuWithoutExternalProcessing",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "unavailableOnDeviceDictationKeepsKeyboardAndCancelsUnicodeDraftLocally",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "unconfiguredPushBootstrapStaysDisabledWithoutFirebaseInitialization",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "accountAndBriefingPrivacyControlsRemainAccessibleBeforeAiConsent",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "consentGateAndLocalOnboardingReachTheRealGuestAppWithoutAnAnalysis",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "nativeSheetsAndAwaitedSignInPaywallRequestsCancelOnSystemBack",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest",
+      "test": "sixLanguageChoicesRenderTheRealLocalizedGuestTypingSurface",
+      "code": -2,
+      "stack": "org.junit.ComparisonFailure: expected:<Pergunt[e] sobre uma a\u00e7\u00e3o ou c...> but was:<Pergunt[a] sobre uma a\u00e7\u00e3o ou c...>"
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "durableAwardKeepsLedgerAndPendingEventTogetherAcrossStoreRecreationAndAccountSwitch",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "sameOriginSubframeCannotDispatchEvenWhenItHasTheInjectedListener",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "outstandingReplyFromPreviousPageIsDroppedAfterReload",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "foreignOriginDoesNotReceiveNativeListener",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "guestSignInInheritsOnboardingConsentButDoesNotTransferGuestAwardsOrHistory",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "binaryMessageIsIgnoredAndNextNativeSessionStillCompletes",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "bundledEngineUsesNativeV1SessionWithoutFixturesOrAccountSecrets",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "malformedAndUnknownMethodsReturnProtocolFaultsAndOversizedMessagesNeverDispatch",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.NucleoBridgeInstrumentedTest",
+      "test": "nativeConsentGateRejectsQuestionsAndUnknownSavedReadsBeforeNetworking",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest",
+      "test": "equityEvidenceUsesTheBackendMonthlyKeyWithHourlyCandlesAndEncodedListing",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.data.BobbyRepositoryCandleContractInstrumentedTest",
+      "test": "cryptoEvidenceRetainsOneHundredHourlyCandlesWithoutEquityParameters",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest",
+      "test": "approvedArtworkExportsAsAReadablePngThroughOnlyTheNarrowProviderPath",
+      "code": 0
+    },
+    {
+      "class": "xyz.bobbyprotocol.android.platform.AvatarShareCardInstrumentedTest",
+      "test": "invalidAssetPathsAndUnrelatedCacheFilesCannotBeShared",
+      "code": 0
+    }
+  ],
+  "log": {
+    "path": "docs/android/evidence/parity-code5-instrumentation-20261003T183155Z.log",
+    "sha256": "37d7766d4661fec6a8dbbcb2da18644c3a2dacaed962f05cf5dd942c52f7a295"
+  },
+  "xml": {
+    "path": "docs/android/evidence/parity-code5-instrumentation-20261003T183155Z.xml",
+    "sha256": "ea159cae8ee971b3db19f90e833cdecf0e56ab05a8949ebdb1dc4075f9bce4a1"
+  },
+  "scope": "Actual five-suite debug instrumentation on disposable COW emulator clone, AOSP API35/4KB. Guest-only actual Activity/bridge and bundled 3D assets, isolated preferences/ledger checks, refused network, candle request contracts and local PNG provider. No account/provider purchase, generated remote analysis or audio, FCM registration, physical-device, Play or remote telemetry acceptance proof.",
+  "original_avd_changed": false,
+  "physical_device_changed": false,
+  "external_messages_sent": false,
+  "signed_gui_qa": "docs/android/evidence/parity-code5-signed-profile-qa.json",
+  "runner_sha256": "85f55c9d6d02d3cbcdff4eb658e0fe4ac8acbdef33a41235769b895394762da8"
+}
