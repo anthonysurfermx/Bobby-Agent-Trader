@@ -20,7 +20,7 @@ The dashboard preserves historical installs, separates provider read time from r
 | Check | Result |
 | --- | --- |
 | PostgreSQL R2, including #130 Apple mirror in users/members/metrics, predecessor NULL writes, privilege scope and JIT setting restoration | 366 checks passed |
-| Telemetry PostgreSQL suite, retention, concurrency, internal scope, cardinality and failure isolation | 196 checks passed |
+| Telemetry PostgreSQL suite, retention, concurrency, logical ordering, internal scope, cardinality and failure isolation | 199 checks passed |
 | Exact CI PostgreSQL progress/levels/payments/coupons/admin/lifecycle/memory/truth/R2/telemetry order | All passed |
 | Payment guards and schema-compatibility HTTP regressions | 75 + 26 checks passed |
 | Briefings calendar/content/core/macro/RevenueCat/Stripe and store guards | All passed |
@@ -38,6 +38,8 @@ The local scale case returned the full live snapshot in 65 ms or less with 110,0
 The first remote run passed the application, integration and Security workflows but failed the analytics performance assertion: growth + overview + economics took 11,624 ms against the unchanged 4,000 ms budget. The four bounded analytics/live RPCs now use function-local `jit=off`, preserving the caller's configuration, invoker security and grants. Tests report each RPC's timing and execution settings. The local rerun took 743 ms; Linux PostgreSQL 17.11 with JIT available passed at 1,263 ms on `d027f9d1`, with members/networks/geo at 1,339 ms and live at 34 ms. All original time budgets remain unchanged.
 
 The separate CodeQL pull-request alert check flagged three RevenueCat URL substring comparisons in offline test mocks. Those comparisons now parse the URL and check the exact API hostname; project cache assertions also check the exact endpoint path. The targeted offline API suite passes. The latest pull-request check rollup is the source of truth for remote security and CI completion.
+
+Logical heartbeat fixtures use timestamps anchored to the saved report. A 1.1-second database delay verifies that a stale capture still cannot update presence or clear an ingestion failure even when delivery takes longer. Production SQL ordering rules and age/performance limits remain unchanged.
 
 ## Production observation
 

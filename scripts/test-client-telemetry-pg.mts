@@ -93,23 +93,24 @@ try{
   const w=(await live()).client.platforms.ios.windows['15m'];eq([w.started,w.received,w.rendered],[1,1,1],'each receipt phase observed once');
  });
  await block('same-session ordering, background terminal state and heartbeat-only mutation',async()=>{
-  const first=randomUUID();await send({eventId:first,sequence:1,occurred:ago(20_000)});
-  await send({kind:'background',sequence:3,occurred:ago(10_000)});
-  eq((await send({eventId:first,sequence:1,occurred:ago(20_000)})).duplicate,true,'old foreground UUID retry ignored');
-  eq((await send({sequence:2,occurred:ago(15_000)})).presenceUpdated,false,'delayed lower sequence foreground cannot resurrect');
+  const base=Date.now(),first=randomUUID(),firstCapture=new Date(base-20_000).toISOString();
+  await send({eventId:first,sequence:1,occurred:firstCapture});
+  await send({kind:'background',sequence:3,occurred:new Date(base-10_000).toISOString()});
+  eq((await send({eventId:first,sequence:1,occurred:firstCapture})).duplicate,true,'old foreground UUID retry ignored');
+  eq((await send({sequence:2,occurred:new Date(base-15_000).toISOString()})).presenceUpdated,false,'delayed lower sequence foreground cannot resurrect');
   eq(await send({kind:'heartbeat',sequence:4,occurred:ago()}),{accepted:true,duplicate:false,presenceUpdated:false},'valid ignored heartbeat is safely accepted without storage error or background resurrection');
   eq((await presence()).foreground,false,'background remains terminal until actual newer foreground');
   await send({sequence:5,occurred:ago(400)});const stamp=await presence();
   const counts=await one('select (select count(*)::int from public.bobby_client_events) events,(select count(*)::int from public.bobby_client_coverage) coverage,(select count(*)::int from public.bobby_activity_days) activity,(select count(*)::int from public.bobby_reads) reads,(select count(*)::int from public.bobby_devices) devices');
-  const heartbeat=randomUUID();eq((await send({kind:'heartbeat',eventId:heartbeat,sequence:6,occurred:ago(200)})).presenceUpdated,true,'current foreground renewed');
+  const heartbeat=randomUUID(),heartbeatCapture=ago(200);eq((await send({kind:'heartbeat',eventId:heartbeat,sequence:6,occurred:heartbeatCapture})).presenceUpdated,true,'current foreground renewed');
   const renewed=await presence();ok(renewed.expires_at.getTime()>stamp.expires_at.getTime(),'new logical report advances expiry');
-  eq((await send({kind:'heartbeat',eventId:heartbeat,sequence:6,occurred:ago(200)})).duplicate,true,'heartbeat retry recognized');eq((await presence()).expires_at,renewed.expires_at,'heartbeat retry cannot extend TTL');
+  eq((await send({kind:'heartbeat',eventId:heartbeat,sequence:6,occurred:heartbeatCapture})).duplicate,true,'heartbeat retry recognized');eq((await presence()).expires_at,renewed.expires_at,'heartbeat retry cannot extend TTL');
   eq(await one('select (select count(*)::int from public.bobby_client_events) events,(select count(*)::int from public.bobby_client_coverage) coverage,(select count(*)::int from public.bobby_activity_days) activity,(select count(*)::int from public.bobby_reads) reads,(select count(*)::int from public.bobby_devices) devices'),counts,'heartbeat writes only presence; no retention or activity inflation');
  });
  await block('old sessions cannot revive after newer-session background',async()=>{
-  const next=hash();await send({sequence:100,occurred:ago(30_000)});
-  await send({kind:'background',session:next,sequence:1,occurred:ago(10_000)});
-  eq((await send({sequence:101,occurred:ago(20_000)})).presenceUpdated,false,'old-session delayed foreground rejected by logical epoch time');
+  const base=Date.now(),next=hash();await send({sequence:100,occurred:new Date(base-30_000).toISOString()});
+  await send({kind:'background',session:next,sequence:1,occurred:new Date(base-10_000).toISOString()});
+  eq((await send({sequence:101,occurred:new Date(base-20_000).toISOString()})).presenceUpdated,false,'old-session delayed foreground rejected by logical epoch time');
   eq((await send({kind:'heartbeat',sequence:102,occurred:ago()})).presenceUpdated,false,'old-session heartbeat cannot switch epoch with newer delivery');
   eq([(await presence()).session_hash,(await presence()).foreground],[next,false],'newer session background retained');
   eq((await send({kind:'foreground',session:next,sequence:2,occurred:ago(500)})).presenceUpdated,true,'same current session can genuinely return foreground');
@@ -188,10 +189,19 @@ try{
   await send({kind:'heartbeat',identity:id,sequence:3,occurred:ago(50)});eq((await health()).recovered,true,'fresh authenticated heartbeat is applicable recovery proof');
   await send({kind:'heartbeat',sequence:4,occurred:ago(10)});eq((await health()).recovered,true,'later anonymous heartbeat cannot erase previously observed authenticated recovery');
   await cache({lastErrorAt:new Date().toISOString(),error:'storage_unavailable',authenticated:true});
-  const before=(await presence()).received_at;
+  const before=await presence();
   eq((await send({kind:'heartbeat',identity:id,session:hash(),sequence:999,occurred:ago(10)})).accepted,true,'ineligible heartbeat safely acknowledged');
-  eq((await presence()).received_at,before,'ineligible heartbeat does not refresh report time');eq((await health()).recovered,false,'ineligible heartbeat cannot clear recorded failure');
-  await send({kind:'heartbeat',identity:id,sequence:5,occurred:ago(1000)});eq((await health()).recovered,false,'stale logical heartbeat cannot establish recovery');
+  eq((await presence()).received_at,before.received_at,'ineligible heartbeat does not refresh report time');eq((await health()).recovered,false,'ineligible heartbeat cannot clear recorded failure');
+  // Capture staleness relative to the stored report, not the advancing test clock. Slow CI
+  // queries can make now-minus-one-second NEWER than the preceding heartbeat's capture.
+  const staleCapture=new Date(before.occurred_at.getTime()-1000).toISOString();
+  await pool.query('select pg_sleep(1.1)');
+  ok(Date.parse(ago(1000))>before.occurred_at.getTime(),'elapsed SQL time reproduces why a moving now-minus-one-second is not necessarily stale');
+  eq((await send({kind:'heartbeat',identity:id,sequence:5,occurred:staleCapture})).presenceUpdated,false,'stale logical heartbeat cannot update presence after delayed delivery');
+  const afterStale=await presence();
+  eq([afterStale.sequence,afterStale.occurred_at,afterStale.received_at,afterStale.last_authenticated_received_at],
+    [before.sequence,before.occurred_at,before.received_at,before.last_authenticated_received_at],'stale capture preserves sequence, logical time and authenticated recovery evidence');
+  eq((await health()).recovered,false,'stale logical heartbeat cannot establish recovery');
   await cache({lastErrorAt:new Date().toISOString(),error:'storage_unavailable',authenticated:false});
   await send({install:hash(),session:hash()});eq((await health()).recovered,true,'anonymous accepted report can establish anonymous storage recovery');
  });
