@@ -16,13 +16,20 @@ import { callerHash, deviceHash, getSubscription, paywallOn } from './access.js'
 import { stopBillingFor } from './stripe-api.js';
 import { blockCheckoutForDeletion } from './checkout-attempt.js';
 import { countryCode, fromAlpha3 } from './geo.js';
+import { RevenueCatError, liveSubscription, revenueCatReady, syncRevenueCat } from './revenuecat.js';
+import { buildInsights } from './admin-insights.js';
+import { adminBounded, adminFetch, adminReadMeta, deferAdminSources, markAdminSource, observeAdminSource, remainingAdminMs, withAdminDeadline } from './admin-read.js';
 
 const TIMEOUT = 6000;
 
 async function rest<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const r = await fetch(bobbyRest(path), { ...init, headers: { ...bobbyServiceHeaders(), ...(init.headers ?? {}) }, signal: AbortSignal.timeout(TIMEOUT) });
+  const r = await adminFetch(bobbyRest(path), { ...init, headers: { ...bobbyServiceHeaders(), ...(init.headers ?? {}) } });
   if (!r.ok) throw new AdminError(r.status === 409 ? 409 : r.status === 400 ? 400 : 502, r.status === 400 ? 'Invalid request.' : `storage ${r.status}`);
-  return (r.status === 204 ? null : await r.json().catch(() => null)) as T;
+  const prefer = (init.headers as Record<string, string> | undefined)?.Prefer ?? '';
+  if (r.status === 204 || prefer.includes('return=minimal')) return null as T;
+  const value = await adminBounded(() => r.json());
+  if (value == null) throw new Error('storage_returned_no_data');
+  return value as T;
 }
 export async function rpc<T>(name: string, body: Record<string, unknown>): Promise<T> {
   return rest<T>(`rpc/${name}`, { method: 'POST', body: JSON.stringify(body) });
@@ -31,9 +38,11 @@ export async function rpc<T>(name: string, body: Record<string, unknown>): Promi
 /** Exact row count of a PostgREST query (Content-Range), without reading the rows. */
 async function countRows(path: string): Promise<number | null> {
   try {
-    const r = await fetch(bobbyRest(path), { headers: { ...bobbyServiceHeaders(), Prefer: 'count=exact', Range: '0-0' }, signal: AbortSignal.timeout(TIMEOUT) });
+    const r = await adminFetch(bobbyRest(path), { headers: { ...bobbyServiceHeaders(), Prefer: 'count=exact', Range: '0-0' } });
     if (!r.ok && r.status !== 206) return null;
-    const total = Number((r.headers.get('content-range') ?? '').split('/')[1]);
+    const range = r.headers.get('content-range');
+    if (!range || !/^(?:\d+-\d+|\*)\/\d+$/.test(range)) return null;
+    const total = Number(range.split('/')[1]);
     return Number.isFinite(total) ? total : null;
   } catch { return null; }
 }
@@ -42,9 +51,11 @@ export class AdminError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+export type AdminIdentity = Identity & { internalMarkFailed: boolean };
+
 /** The signed-in admin, or null after answering 401 / 403 / 503. */
-export async function requireAdmin(req: VercelRequest, res: VercelResponse): Promise<Identity | null> {
-  const identity = await requireIdentity(req, res);
+export async function requireAdmin(req: VercelRequest, res: VercelResponse): Promise<AdminIdentity | null> {
+  const identity = await withAdminDeadline(6500, () => requireIdentity(req, res, { fetch: adminFetch, body: adminBounded }));
   if (!identity) return null;
   if (identity.via !== 'supabase' || !identity.authUserId) { res.status(403).json({ error: 'not_admin' }); return null; }
   try {
@@ -53,8 +64,12 @@ export async function requireAdmin(req: VercelRequest, res: VercelResponse): Pro
     // The browser and the address used for /admin are the team's own traffic: the dashboard leaves them out.
     // Awaited, not deferred: the very first view from a new browser must already exclude that browser.
     const device = deviceHash(req), network = callerHash(req);
-    if (device || network) await rpc('bobby_mark_admin_session', { p_device: device, p_network: network }).catch(() => null);
-    return identity;
+    let internalMarkFailed = true;
+    for (let attempt = 0; attempt < 2 && internalMarkFailed && (device || network); attempt++) {
+      internalMarkFailed = await withAdminDeadline(1500, () => rpc('bobby_mark_admin_session', { p_device: device, p_network: network })).then(() => false, () => true);
+    }
+    markAdminSource('teamExclusion', { status: internalMarkFailed ? 'error' : 'ok', fetchedAt: internalMarkFailed ? null : new Date().toISOString(), ...(internalMarkFailed ? { error: 'admin_session_mark_failed' } : {}) });
+    return { ...identity, internalMarkFailed };
   } catch {
     res.status(503).json({ error: 'The admin check is unavailable. Try again.' });
     return null;
@@ -136,7 +151,7 @@ export async function couponsView() {
     rest<Array<Record<string, unknown> & { identity?: { email?: string | null } | null }>>(
       'bobby_coupon_redemptions?select=code,identity_id,reads,profundo,maximo,created_at,identity:bobby_identities(email)&order=created_at.desc&limit=100'),
   ]);
-  const [couponsTotal, redemptionsTotal] = await Promise.all([countRows('bobby_coupons?select=code'), countRows('bobby_coupon_redemptions?select=id')]);
+  const [couponsTotal, redemptionsTotal] = await Promise.all([observeAdminSource('couponsTotal', () => countRows('bobby_coupons?select=code')), observeAdminSource('redemptionsTotal', () => countRows('bobby_coupon_redemptions?select=id'))]);
   const now = Date.now();
   return {
     coupons: ((coupons ?? []) as Array<Record<string, unknown>>).map((c) => ({
@@ -153,11 +168,11 @@ export async function couponsView() {
 export async function actionsView() {
   const rows = await rest<Array<Record<string, unknown> & { admin?: { email?: string | null } | null }>>(
     'bobby_admin_actions?select=id,action,target,detail,created_at,admin:bobby_identities(email)&order=created_at.desc&limit=100');
-  return { actions: (rows ?? []).map(({ admin, ...a }) => ({ ...a, admin_email: admin?.email ?? null })), total: await countRows('bobby_admin_actions?select=id') };
+  return { actions: (rows ?? []).map(({ admin, ...a }) => ({ ...a, admin_email: admin?.email ?? null })), total: await observeAdminSource('actionsTotal', () => countRows('bobby_admin_actions?select=id')) };
 }
 
-export async function membersView() {
-  return rpc<{ subscriptions: unknown[]; grants: unknown[] }>('bobby_admin_members', {});
+export async function membersView(internal = false) {
+  return rpc<{ subscriptions: unknown[]; grants: unknown[] }>('bobby_admin_members', { p_internal: internal });
 }
 
 // ---------------- accounts ----------------
@@ -218,6 +233,34 @@ export async function deleteUser(admin: Identity, body: Record<string, unknown>)
   await rest(`agent_trades?user_id=eq.${row.id}`, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: null }) });
   await rest(`bobby_identities?id=eq.${row.id}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
   return { target: row.email || row.id, ...(billing.unverified ? { stripeUnverified: billing.unverified } : {}) };
+}
+
+/** Re-check one membership against RevenueCat. A successful store response reconciles access; an unavailable
+ *  provider leaves the existing row unchanged. No secret is handled by the admin. */
+export async function resyncMembership(body: Record<string, unknown>) {
+  const row = await identityRow(body.identityId);
+  if (!row.auth_user_id) throw new AdminError(400, 'Only Apple/Google accounts can be re-synced.');
+  if (!revenueCatReady()) throw new AdminError(503, 'RevenueCat is not configured.');
+  const before = await getSubscription(row.id).catch(() => null);
+  let revenuecatActive: boolean;
+  try {
+    revenuecatActive = await syncRevenueCat(row.auth_user_id, row.id, { keepAccess: true });
+  } catch (e) {
+    console.error('[admin] resync-membership', e instanceof Error ? e.message : e);
+    // A refused key and an unknown subscriber are answers, not silence: each one says what to fix.
+    if (e instanceof RevenueCatError && e.kind === 'key_rejected') throw new AdminError(502, 'RevenueCat rejected the secret key. Nothing was changed.');
+    if (e instanceof RevenueCatError && e.kind === 'not_found') throw new AdminError(404, 'RevenueCat does not know this account. Nothing was changed.');
+    if (e instanceof RevenueCatError && e.status) throw new AdminError(502, `RevenueCat answered with an error (${e.status}). Nothing was changed.`);
+    if (e instanceof RevenueCatError) throw new AdminError(504, 'RevenueCat did not answer. Nothing was changed.');
+    throw new AdminError(502, 'The membership could not be re-synced. Nothing was changed.');
+  }
+  // The sync is done: a failed read-back leaves the row unreported (null), not the action "failed".
+  const after = await getSubscription(row.id).catch(() => null);
+  const subscription = after ? {
+    status: after.status, environment: after.environment ?? 'unknown', periodType: after.period_type ?? 'unknown',
+    currentPeriodEnd: after.current_period_end, storeCheckedAt: after.store_checked_at ?? null,
+  } : null;
+  return { revenuecatActive, accessKept: liveSubscription(before) && liveSubscription(after) && !revenuecatActive, subscription };
 }
 
 export async function setAdmin(admin: Identity, body: Record<string, unknown>) {
@@ -301,6 +344,7 @@ export async function creditMark(body: Record<string, unknown>) {
   const kind = body.kind === 'balance' || body.kind === 'topup' ? body.kind : null;
   const amount = typeof body.amountUsd === 'number' ? body.amountUsd : Number(body.amountUsd);
   if (!provider || !kind || !Number.isFinite(amount) || amount < 0 || amount > 100000) throw new AdminError(400, 'Invalid amount.');
+  if (kind === 'topup' && Math.round(amount * 100) <= 0) throw new AdminError(400, 'A top-up must be more than $0.');
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 120) : null;
   await rest('bobby_llm_credit_marks', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ provider, kind, amount_usd: Math.round(amount * 100) / 100, note }) });
   return { provider, kind, amount };
@@ -348,27 +392,25 @@ export async function probeProvider(provider: unknown) {
 
 // ---------------- integrations ----------------
 type Metric = { id: string; name: string; value: number; unit?: string; period?: string; description?: string; updatedAt?: string };
-let rcCache: { at: number; value: { configured: boolean; error?: string; metrics?: Metric[]; fetchedAt?: string } } | null = null;
+let rcCache: { at: number; project: string; value: { configured: boolean; error?: string; metrics?: Metric[]; fetchedAt?: string } } | null = null;
 
 async function revenueCatMetrics() {
   const key = process.env.REVENUECAT_V2_SECRET_KEY?.trim();
   if (!key) return { configured: false };
-  if (rcCache && Date.now() - rcCache.at < (rcCache.value.error ? 60_000 : 5 * 60_000)) return rcCache.value;
+  const project = process.env.REVENUECAT_PROJECT_ID?.trim();
+  if (!project) return { configured: true, error: 'revenuecat_project_not_configured' };
+  if (rcCache && rcCache.project === project && Date.now() - rcCache.at < (rcCache.value.error ? 60_000 : 5 * 60_000)) return rcCache.value;
   const get = async (path: string) => {
-    const r = await fetch(`https://api.revenuecat.com/v2${path}`, { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(TIMEOUT) });
+    const r = await adminFetch(`https://api.revenuecat.com/v2${path}`, { headers: { Authorization: `Bearer ${key}` } });
     if (!r.ok) throw new Error(`revenuecat ${r.status}`);
-    return r.json() as Promise<Record<string, unknown>>;
+    return adminBounded(() => r.json()) as Promise<Record<string, unknown>>;
   };
   let value: { configured: boolean; error?: string; metrics?: Metric[]; fetchedAt?: string };
   try {
-    let project = process.env.REVENUECAT_PROJECT_ID?.trim();
-    if (!project) {
-      const list = await get('/projects');
-      project = ((list.items as Array<{ id?: string }> | undefined) ?? [])[0]?.id;
-      if (!project) throw new Error('revenuecat no project');
-    }
     const overview = await get(`/projects/${encodeURIComponent(project)}/metrics/overview`);
-    const metrics = ((overview.metrics as Array<Record<string, unknown>> | undefined) ?? []).map((m) => ({
+    if (!Array.isArray(overview.metrics)) throw new Error('revenuecat_metrics_invalid');
+    if (overview.metrics.some((m) => m == null || m.value == null || !Number.isFinite(Number(m.value)))) throw new Error('revenuecat_metrics_invalid');
+    const metrics = (overview.metrics as Array<Record<string, unknown>>).map((m) => ({
       id: String(m.id ?? ''), name: String(m.name ?? m.id ?? ''), value: Number(m.value ?? 0),
       unit: typeof m.unit === 'string' ? m.unit : undefined, period: typeof m.period === 'string' ? m.period : undefined,
       description: typeof m.description === 'string' ? m.description.slice(0, 80) : undefined,
@@ -378,7 +420,7 @@ async function revenueCatMetrics() {
   } catch (e) {
     value = { configured: true, error: e instanceof Error ? e.message : 'revenuecat unavailable' };
   }
-  rcCache = { at: Date.now(), value };
+  rcCache = { at: Date.now(), project, value };
   return value;
 }
 
@@ -408,11 +450,12 @@ export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string>
   const lines = tsv.split(/\r?\n/).filter(Boolean);
   const cols = (lines.shift() ?? '').split('\t');
   const at = (name: string) => cols.indexOf(name);
-  const [type, units, apple, parent, country] = [at('Product Type Identifier'), at('Units'), at('Apple Identifier'), at('Parent Identifier'), at('Country Code')];
+  const [type, units, apple, _parent, country] = [at('Product Type Identifier'), at('Units'), at('Apple Identifier'), at('Parent Identifier'), at('Country Code')];
   if (type < 0 || units < 0 || apple < 0) throw new Error('appstore report unreadable');
   for (const line of lines) {
     const f = line.split('\t');
-    const t = (f[type] ?? '').trim(); const n = Number(f[units]) || 0;
+    const t = (f[type] ?? '').trim(); const n = Number(f[units]);
+    if (f[units] == null || f[units].trim() === '' || !Number.isFinite(n)) throw new Error('appstore report unreadable');
     const ours = apple >= 0 && f[apple]?.trim() === appId;
     if (/^(IA|FI)/.test(t)) { if (iapIds.has(f[apple]?.trim() ?? '')) out.iap += n; continue; }
     if (!ours) continue;
@@ -427,99 +470,155 @@ export function parseSalesReport(tsv: string, appId: string, iapIds: Set<string>
   return out;
 }
 
-async function salesDay(date: string, token: string): Promise<SalesDay | null> {
-  const key = `asc-sales-v2:${date}`;   // v2 adds downloads by country
-  const cached = await rest<Array<{ payload: SalesDay }>>(`api_cache?cache_key=eq.${encodeURIComponent(key)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=payload`).catch(() => null);
-  if (cached?.[0]?.payload) return cached[0].payload;
-  const params = new URLSearchParams({
-    'filter[frequency]': 'DAILY', 'filter[reportDate]': date, 'filter[reportSubType]': 'SUMMARY',
-    'filter[reportType]': 'SALES', 'filter[vendorNumber]': ascVendor(), 'filter[version]': '1_1',
-  });
-  const r = await fetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, { headers: { Authorization: `Bearer ${token}`, Accept: 'application/a-gzip' }, signal: AbortSignal.timeout(10000) });
-  let day: SalesDay;
-  // 404: no sales that day — or, for the last days, a report Apple has not published yet (pending, never a zero).
-  const recent = Date.now() - new Date(`${date}T00:00:00Z`).getTime() <= 3 * 86_400_000;
-  if (r.status === 404) day = { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {}, ...(recent ? { pending: true } : {}) };
-  else if (!r.ok) throw new Error(`appstore ${r.status}`);
-  else day = parseSalesReport(gunzipSync(Buffer.from(await r.arrayBuffer())).toString('utf8'), APP_ID());
-  // Settled days keep a year; the last two days are re-read (Apple publishes with a delay).
-  const settled = Date.now() - new Date(`${date}T00:00:00Z`).getTime() > 3 * 86_400_000;
-  const expires = new Date(Date.now() + (settled ? 365 : r.status === 404 ? 0.25 : 1) * 86_400_000).toISOString();
-  await rest('api_cache?on_conflict=cache_key', {
-    method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
-    body: JSON.stringify({ cache_key: key, payload: day, expires_at: expires, updated_at: new Date().toISOString() }),
-  }).catch(() => null);
-  return day;
-}
+/** External reports run separately from live first-party figures. The budget includes cache reads/writes. */
+export const APPLE_BUDGET_MS = 10_000;
+export const APPLE_MAX_DAYS = 90;
+export interface AppleLoad { budgetMs?: number; cacheOnly?: boolean; coreOnly?: boolean }
 
-async function appStoreSales(days: string[]) {
+export async function appStoreSales(days: string[], budgetMs = APPLE_BUDGET_MS, opts: { cacheOnly?: boolean } = {}) {
   if (!ascConfigured()) return { configured: false };
-  try {
-    const token = ascToken();
-    // Apple's daily reports cover days that ended in its time zone: skip today.
+  return withAdminDeadline(budgetMs, async () => {
     const today = new Date().toISOString().slice(0, 10);
-    const wanted = days.filter((d) => d < today).slice(-90);
+    const past = [...new Set(days.filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d) && d < today))].sort();
+    const wanted = past.slice(-APPLE_MAX_DAYS).reverse();
     const results = new Map<string, SalesDay>();
-    for (let i = 0; i < wanted.length; i += 5) {
-      const batch = wanted.slice(i, i + 5);
-      const got = await Promise.all(batch.map((d) => salesDay(d, token)));
-      batch.forEach((d, j) => { if (got[j]) results.set(d, got[j]!); });
+    const stamps: string[] = [];
+    const errors = new Map<string, string>();
+    let cacheError: string | null = null;
+    // One cache read for the entire range; warm loads no longer make 90 serial cache round trips.
+    try {
+      if (wanted.length) {
+        const keys = wanted.map((d) => `asc-sales-v2:${d}`).join(',');
+        const rows = await rest<Array<{ cache_key: string; payload: SalesDay; updated_at: string }>>(
+          `api_cache?cache_key=in.(${encodeURIComponent(keys)})&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&select=cache_key,payload,updated_at`);
+        for (const row of rows) {
+          const date = row.cache_key.replace(/^asc-sales-v2:/, '');
+          if (wanted.includes(date) && row.payload && typeof row.payload.downloads === 'number') {
+            results.set(date, row.payload);
+            if (typeof row.updated_at === 'string') stamps.push(row.updated_at);
+          }
+        }
+      }
+    } catch { cacheError = 'cache_read_unavailable'; }
+    const writes: Array<Record<string, unknown>> = [];
+    if (!opts.cacheOnly) {
+      let token: string;
+      try { token = ascToken(); } catch { return { configured: true, error: 'appstore_credentials_invalid' }; }
+      const uncached = wanted.filter((d) => !results.has(d));
+      for (let i = 0; i < uncached.length; i += 5) {
+        try { remainingAdminMs(); } catch { break; }
+        await Promise.all(uncached.slice(i, i + 5).map(async (date) => {
+          try {
+            const params = new URLSearchParams({
+              'filter[frequency]': 'DAILY', 'filter[reportDate]': date, 'filter[reportSubType]': 'SUMMARY',
+              'filter[reportType]': 'SALES', 'filter[vendorNumber]': ascVendor(), 'filter[version]': '1_1',
+            });
+            const response = await adminFetch(`https://api.appstoreconnect.apple.com/v1/salesReports?${params}`, {
+              headers: { Authorization: `Bearer ${token}`, Accept: 'application/a-gzip' },
+            }, 10_000);
+            if (response.status !== 404 && !response.ok) throw new Error(`appstore_${response.status}`);
+            // A missing report is unpublished/unknown. It never supplies an observed zero day.
+            const day: SalesDay = response.status === 404
+              ? { downloads: 0, redownloads: 0, updates: 0, iap: 0, countries: {}, pending: true }
+              : parseSalesReport(gunzipSync(Buffer.from(await adminBounded(() => response.arrayBuffer()))).toString('utf8'), APP_ID());
+            results.set(date, day);
+            const at = new Date().toISOString();
+            stamps.push(at);
+            const settled = Date.now() - Date.parse(`${date}T00:00:00Z`) > 3 * 86_400_000;
+            writes.push({ cache_key: `asc-sales-v2:${date}`, payload: day, updated_at: at,
+              expires_at: new Date(Date.now() + (day.pending ? 0.25 : settled ? 365 : 1) * 86_400_000).toISOString() });
+          } catch (e) {
+            errors.set(date, e instanceof Error && /appstore_\d+/.test(e.message) ? e.message : 'report_unavailable');
+          }
+        }));
+        // A provider auth/rate error is shared by the following days: do not hammer all 90 reports.
+        if ([...errors.values()].some((e) => /appstore_(401|403|429)/.test(e))) break;
+      }
     }
+    // One bounded write, and only while time remains. Loaded reports remain useful if cache storage fails.
+    if (writes.length) {
+      try {
+        await rest('api_cache?on_conflict=cache_key', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify(writes) });
+      } catch { cacheError = 'cache_write_unavailable'; }
+    }
+    const missingDays = past.filter((d) => !results.has(d));
+    const pendingDays = [...results].filter(([, v]) => v.pending).map(([d]) => d).sort();
+    const reported = [...results].filter(([, v]) => !v.pending).map(([d]) => d).sort();
     const totals = { downloads: 0, redownloads: 0, updates: 0, iap: 0 };
     const countries = new Map<string, number>();
-    const pendingDays = [...results.entries()].filter(([, v]) => v.pending).map(([d]) => d);
-    const reported = [...results.entries()].filter(([, v]) => !v.pending).map(([d]) => d).sort();
-    for (const v of results.values()) {
-      totals.downloads += v.downloads; totals.redownloads += v.redownloads; totals.updates += v.updates; totals.iap += v.iap;
-      for (const [cc, n] of Object.entries(v.countries ?? {})) countries.set(cc, (countries.get(cc) ?? 0) + n);
+    for (const value of results.values()) {
+      if (value.pending) continue;
+      totals.downloads += value.downloads; totals.redownloads += value.redownloads; totals.updates += value.updates; totals.iap += value.iap;
+      for (const [country, downloads] of Object.entries(value.countries ?? {})) countries.set(country, (countries.get(country) ?? 0) + downloads);
     }
-    const byCountry = [...countries].map(([country, downloads]) => ({ country, downloads })).sort((a, b) => b.downloads - a.downloads || a.country.localeCompare(b.country)).slice(0, 40);
-    return { configured: true, days, downloads: days.map((d) => results.get(d)?.downloads ?? 0), totals, byCountry,
-      coveredFrom: reported[0] ?? null, coveredTo: reported.at(-1) ?? null, pendingDays, excludedToday: today };
-  } catch (e) {
-    return { configured: true, error: e instanceof Error ? e.message : 'appstore unavailable' };
-  }
+    const oldestReportAt = stamps.sort()[0] ?? null;
+    const fetchedAt = new Date().toISOString();
+    markAdminSource('appStoreCache', { status: cacheError ? 'error' : 'ok', fetchedAt: cacheError ? null : new Date().toISOString(), ...(cacheError ? { error: cacheError } : {}) });
+    return { configured: true, days, downloads: days.map((d) => results.has(d) && !results.get(d)!.pending ? results.get(d)!.downloads : null),
+      totals: reported.length ? totals : null,
+      byCountry: reported.length ? [...countries].map(([country, downloads]) => ({ country, downloads })).sort((a, b) => b.downloads - a.downloads).slice(0, 40) : null,
+      coveredFrom: reported[0] ?? null, coveredTo: reported.at(-1) ?? null, pendingDays, excludedToday: today,
+      partial: missingDays.length > 0 || pendingDays.length > 0, missingDays, fetchedAt, oldestReportAt,
+      ...(cacheError ? { cacheError } : {}),
+      ...(errors.size ? { reportErrors: Object.fromEntries(errors) } : {}) };
+  });
 }
 
 async function latest(path: string): Promise<string | null> {
-  const rows = await rest<Array<Record<string, unknown>>>(path).catch(() => null);
+  const rows = await rest<Array<Record<string, unknown>>>(path);
   const row = rows?.[0];
   const value = row ? Object.values(row)[0] : null;
   return typeof value === 'string' ? value : null;
 }
 
-export async function integrations(days: string[]) {
+async function observedLatest(name: string, path: string): Promise<string | null> {
+  const result = await observeAdminSource(name, async () => ({ at: await latest(path) }));
+  return result?.at ?? null;
+}
+
+export async function integrations(days: string[], apple: AppleLoad = {}) {
   // (Search Console is read by the lifecycle view, at the top of the web funnel.)
   const since30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const since24 = new Date(Date.now() - 86_400_000).toISOString();
   const [revenuecat, appStore, spend, webhookLast, webhook30d, stripeLast, trackLast, track24h, trackHealth, readsLast] = await Promise.all([
-    revenueCatMetrics(), appStoreSales(days), llmSpend(),
-    latest('bobby_purchase_events?select=created_at&store=neq.STRIPE&order=created_at.desc&limit=1'),
-    countRows(`bobby_purchase_events?select=id&store=neq.STRIPE&created_at=gte.${encodeURIComponent(since30)}`),
-    latest('bobby_purchase_events?select=created_at&store=eq.STRIPE&order=created_at.desc&limit=1'),
-    latest('bobby_events?select=created_at&event=eq.visit&order=created_at.desc&limit=1'),
-    countRows(`bobby_events?select=id&event=eq.visit&created_at=gte.${encodeURIComponent(since24)}`),
-    rest<Array<{ payload: { lastErrorAt?: string; error?: string } }>>('api_cache?cache_key=eq.track-health&select=payload').catch(() => null),
-    latest('bobby_reads?select=created_at&order=created_at.desc&limit=1'),
+    observeAdminSource('revenuecat', revenueCatMetrics), observeAdminSource('appStore', () => appStoreSales(days, apple.budgetMs ?? APPLE_BUDGET_MS, apple)),
+    observeAdminSource('llmGuard', llmSpend),
+    observedLatest('revenuecatWebhook', 'bobby_purchase_events?select=created_at&store=neq.STRIPE&order=created_at.desc&limit=1'),
+    observeAdminSource('revenuecatEvents', () => countRows(`bobby_purchase_events?select=id&store=neq.STRIPE&created_at=gte.${encodeURIComponent(since30)}`)),
+    observedLatest('stripeWebhook', 'bobby_purchase_events?select=created_at&store=eq.STRIPE&order=created_at.desc&limit=1'),
+    observedLatest('tracking', 'bobby_events?select=created_at&event=eq.visit&order=created_at.desc&limit=1'),
+    observeAdminSource('trackingEvents', () => countRows(`bobby_events?select=id&event=eq.visit&created_at=gte.${encodeURIComponent(since24)}`)),
+    observeAdminSource('trackingHealth', () => rest<Array<{ payload: { lastErrorAt?: string; error?: string } }>>('api_cache?cache_key=eq.track-health&select=payload')),
+    observedLatest('reads', 'bobby_reads?select=created_at&order=created_at.desc&limit=1'),
   ]);
   const missing = [
     ...(process.env.REVENUECAT_V2_SECRET_KEY?.trim() ? [] : ['REVENUECAT_V2_SECRET_KEY']),
+    ...(process.env.REVENUECAT_PROJECT_ID?.trim() ? [] : ['REVENUECAT_PROJECT_ID']),
     ...(ascKeyId() ? [] : ['ASC_KEY_ID']), ...(ascIssuer() ? [] : ['ASC_ISSUER_ID']),
     ...(process.env.ASC_PRIVATE_KEY?.trim() ? [] : ['ASC_PRIVATE_KEY']), ...(ascVendor() ? [] : ['ASC_VENDOR_NUMBER']),
     ...(process.env.GSC_SERVICE_ACCOUNT_JSON?.trim() ? [] : ['GSC_SERVICE_ACCOUNT_JSON']),
   ];
   const has = (k: string) => Boolean(process.env[k]?.trim());
   missing.push(...['REVENUECAT_SECRET_KEY', 'REVENUECAT_WEBHOOK_AUTH', 'ANTHROPIC_API_KEY', 'OPENAI_API_KEY'].filter((k) => !has(k)));
-  const stripe = { configured: has('STRIPE_SECRET_KEY') && has('STRIPE_PRICE_ID'), webhook: has('STRIPE_WEBHOOK_SECRET'), lastEventAt: stripeLast };
+  // A failed read is different from a successful read with no rows. Preserve that distinction per field.
+  const sourceError = (name: string) => {
+    const source = adminReadMeta().sources[name];
+    return source?.status === 'error' ? source.error ?? 'source_unavailable' : null;
+  };
+  const stripe = { configured: has('STRIPE_SECRET_KEY') && has('STRIPE_PRICE_ID'), webhook: has('STRIPE_WEBHOOK_SECRET'), lastEventAt: stripeLast,
+    lastEventError: sourceError('stripeWebhook') };
   return {
-    revenuecat, appStore, llmCaps: llmCaps(), paywall: paywallOn(), missing,
+    revenuecat: revenuecat ?? { configured: Boolean(process.env.REVENUECAT_V2_SECRET_KEY?.trim()), error: 'source_unavailable' },
+    appStore: appStore ?? { configured: ascConfigured(), error: 'source_unavailable' }, llmCaps: llmCaps(), paywall: paywallOn(), missing,
     // The spend guard's own figures: desk only, UTC calendar day and month (what the caps are compared to).
     llmGuard: spend ? { dayUsd: spend.day, monthUsd: spend.month } : null,
     health: {
       // Configured = the secrets exist; delivery is only proven by events arriving.
-      revenuecatWebhook: { configured: has('REVENUECAT_SECRET_KEY') && has('REVENUECAT_WEBHOOK_AUTH'), lastEventAt: webhookLast, events30d: webhook30d },
+      revenuecatWebhook: { configured: has('REVENUECAT_SECRET_KEY') && has('REVENUECAT_WEBHOOK_AUTH'), lastEventAt: webhookLast, events30d: webhook30d,
+        lastEventError: sourceError('revenuecatWebhook'), eventsError: sourceError('revenuecatEvents') },
       stripe,
-      tracking: { lastEventAt: trackLast, events24h: track24h, lastErrorAt: trackHealth?.[0]?.payload?.lastErrorAt ?? null, lastError: trackHealth?.[0]?.payload?.error ?? null, lastReadAt: readsLast },
+      tracking: { lastEventAt: trackLast, events24h: track24h, lastErrorAt: trackHealth?.[0]?.payload?.lastErrorAt ?? null, lastError: trackHealth?.[0]?.payload?.error ?? null, lastReadAt: readsLast,
+        lastEventError: sourceError('tracking'), eventsError: sourceError('trackingEvents'), lastReadError: sourceError('reads'), healthError: sourceError('trackingHealth') },
       llmKeys: { anthropic: has('ANTHROPIC_API_KEY'), openai: has('OPENAI_API_KEY') },
       // Vercel Web Analytics has no read API here: its state is not verified by the dashboard.
       vercelAnalytics: 'unverified' as const,
@@ -542,29 +641,36 @@ async function googleToken(): Promise<string> {
   const head = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
   const body = b64(JSON.stringify({ iss: creds.client_email, scope: 'https://www.googleapis.com/auth/webmasters.readonly', aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600 }));
   const sig = sign('RSA-SHA256', Buffer.from(`${head}.${body}`), createPrivateKey(creds.private_key.replace(/\\n/g, '\n')));
-  const r = await fetch('https://oauth2.googleapis.com/token', {
+  const r = await adminFetch('https://oauth2.googleapis.com/token', {
     method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, signal: AbortSignal.timeout(TIMEOUT),
     body: new URLSearchParams({ grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion: `${head}.${body}.${b64(sig)}` }),
   });
   if (!r.ok) throw new Error(`searchconsole token ${r.status}`);
-  const t = (await r.json()) as { access_token?: string; expires_in?: number };
+  const t = (await adminBounded(() => r.json())) as { access_token?: string; expires_in?: number };
   if (!t.access_token) throw new Error('searchconsole token missing');
   gscToken = { value: t.access_token, until: Date.now() + (t.expires_in ?? 3600) * 1000 };
   return t.access_token;
 }
 
 type GscRow = { keys?: string[]; clicks?: number; impressions?: number; ctr?: number; position?: number };
-async function gscQuery(token: string, body: Record<string, unknown>): Promise<GscRow[]> {
-  const r = await fetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE())}/searchAnalytics/query`, {
+interface GscResult { rows: GscRow[]; firstIncompleteDate: string | null }
+async function gscQuery(token: string, body: Record<string, unknown>): Promise<GscResult> {
+  const r = await adminFetch(`https://searchconsole.googleapis.com/webmasters/v3/sites/${encodeURIComponent(GSC_SITE())}/searchAnalytics/query`, {
     method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
   });
   if (!r.ok) {
     // Google's machine reason (SERVICE_DISABLED, forbidden…) tells setup problems apart; it carries no secrets.
-    const err = (await r.json().catch(() => null)) as { error?: { status?: string; errors?: Array<{ reason?: string }>; details?: Array<{ reason?: string }> } } | null;
+    const err = (await adminBounded(() => r.json()).catch(() => null)) as { error?: { status?: string; errors?: Array<{ reason?: string }>; details?: Array<{ reason?: string }> } } | null;
     const reason = err?.error?.details?.find((d) => d.reason)?.reason ?? err?.error?.errors?.[0]?.reason ?? err?.error?.status;
     throw new Error(`searchconsole ${r.status}${reason ? ` ${String(reason).slice(0, 40)}` : ''}`);
   }
-  return ((await r.json()) as { rows?: GscRow[] }).rows ?? [];
+  const data = await adminBounded(() => r.json()) as { rows?: GscRow[]; metadata?: { first_incomplete_date?: string } };
+  if (!data || (data.rows != null && !Array.isArray(data.rows))) throw new Error('searchconsole_response_invalid');
+  const rows = data.rows ?? [];
+  if (rows.some((row) => !row || !Array.isArray(row.keys) || row.clicks == null || row.impressions == null ||
+      !Number.isFinite(row.clicks) || !Number.isFinite(row.impressions))) throw new Error('searchconsole_response_invalid');
+  const incomplete = data.metadata?.first_incomplete_date;
+  return { rows, firstIncompleteDate: typeof incomplete === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(incomplete) ? incomplete : null };
 }
 
 export async function searchConsole(days: string[]) {
@@ -573,7 +679,10 @@ export async function searchConsole(days: string[]) {
   const key = `${days[0]}:${days.at(-1)}`;
   const hit = gscCache.get(key);
   // A failure is retried after a minute so a fixed setup (API enabled, user added) shows up quickly.
-  if (hit && Date.now() - hit.at < (hit.failed ? 60_000 : 30 * 60_000)) return hit.value;
+  if (hit && Date.now() - hit.at < (hit.failed ? 60_000 : 30 * 60_000)) {
+    if (hit.failed) return hit.value;
+    return { ...(hit.value as Record<string, unknown>), fetchedAt: new Date(Date.now()).toISOString(), oldestReportAt: new Date(hit.at).toISOString() };
+  }
   let value: unknown;
   let failed = false;
   try {
@@ -585,17 +694,24 @@ export async function searchConsole(days: string[]) {
       gscQuery(token, { ...range, dimensions: ['page'], rowLimit: 10 }),
       gscQuery(token, { ...range, dimensions: ['country'], rowLimit: 40 }),
     ]);
-    const byDay = new Map(byDate.map((r) => [r.keys?.[0] ?? '', r]));
-    const clicks = days.map((d) => byDay.get(d)?.clicks ?? 0);
-    const impressions = days.map((d) => byDay.get(d)?.impressions ?? 0);
-    const totalClicks = clicks.reduce((a, b) => a + b, 0), totalImpressions = impressions.reduce((a, b) => a + b, 0);
-    const weighted = byDate.reduce((a, r) => a + (r.position ?? 0) * (r.impressions ?? 0), 0);
+    const byDay = new Map(byDate.rows.map((r) => [r.keys?.[0] ?? '', r]));
+    // Google reports Pacific dates and omits dates with no available rows. Absence never proves a zero.
+    const firstIncompleteDate = byDate.firstIncompleteDate;
+    const missingDays = days.filter((d) => !byDay.has(d));
+    const incompleteDays = firstIncompleteDate ? days.filter((d) => d >= firstIncompleteDate) : [];
+    const clicks = days.map((d) => byDay.get(d)?.clicks ?? null);
+    const impressions = days.map((d) => byDay.get(d)?.impressions ?? null);
+    const totalClicks = byDate.rows.reduce((a, r) => a + r.clicks!, 0), totalImpressions = byDate.rows.reduce((a, r) => a + r.impressions!, 0);
+    const weighted = byDate.rows.reduce((a, r) => a + (r.position ?? 0) * r.impressions!, 0);
+    const covered = days.filter((d) => byDay.has(d));
     value = {
-      configured: true, site: GSC_SITE(), days, clicks, impressions,
-      totals: { clicks: totalClicks, impressions: totalImpressions, ctr: totalImpressions ? totalClicks / totalImpressions : 0, position: totalImpressions ? weighted / totalImpressions : null },
-      topQueries: queries.map((r) => ({ query: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0, ctr: r.ctr ?? 0, position: r.position ?? null })),
-      topPages: pages.map((r) => ({ page: r.keys?.[0] ?? '', clicks: r.clicks ?? 0, impressions: r.impressions ?? 0 })),
-      byCountry: countries.flatMap((r) => { const country = fromAlpha3(r.keys?.[0]); return country ? [{ country, clicks: r.clicks ?? 0, impressions: r.impressions ?? 0 }] : []; }),
+      configured: true, site: GSC_SITE(), days, clicks, impressions, fetchedAt: new Date().toISOString(),
+      timeZone: 'America/Los_Angeles', firstIncompleteDate, incompleteDays, missingDays,
+      partial: missingDays.length > 0 || incompleteDays.length > 0, coveredFrom: covered[0] ?? null, coveredTo: covered.at(-1) ?? null,
+      totals: byDate.rows.length ? { clicks: totalClicks, impressions: totalImpressions, ctr: totalImpressions ? totalClicks / totalImpressions : 0, position: totalImpressions ? weighted / totalImpressions : null } : null,
+      topQueries: queries.rows.map((r) => ({ query: r.keys?.[0] ?? '', clicks: r.clicks!, impressions: r.impressions!, ctr: r.ctr ?? 0, position: r.position ?? null })),
+      topPages: pages.rows.map((r) => ({ page: r.keys?.[0] ?? '', clicks: r.clicks!, impressions: r.impressions! })),
+      byCountry: countries.rows.flatMap((r) => { const country = fromAlpha3(r.keys?.[0]); return country ? [{ country, clicks: r.clicks!, impressions: r.impressions! }] : []; }),
     };
   } catch (e) {
     value = { configured: true, error: e instanceof Error ? e.message : 'searchconsole unavailable' };
@@ -608,98 +724,155 @@ export async function searchConsole(days: string[]) {
 // ---------------- unit economics ----------------
 interface EconomicsRaw {
   days: number; since: string;
-  revenue: { grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; payersEver?: number; initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null };
+  revenue: {
+    grossUsd: number; netUsd: number; refundsUsd: number; newPaying: number; payersEver?: number; payingInPeriod?: number; purchasesSince?: string | null;
+    unverifiedGrossUsd?: number;
+    unattributedGrossUsd?: number | null; unattributedRefundsUsd?: number | null; unattributedNetUsd?: number | null;
+    unattributedEvents?: number | null; unconvertedEvents?: number | null; revenueScope?: string | null;
+    initialPurchases30d: number; expirations30d: number; lastPriceUsd: number | null; takehome: number | null;
+  };
   costs: { marketingUsd: number; infraUsd: number; otherUsd: number; entries?: number; byChannel: Array<{ channel: string; usd: number }> };
-  subscriptions: { active: number; trialing?: number }; newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
+  // `paidVerified`: live subscriptions with a verified production charge (the only ones in MRR); `active` carries the
+  // same count since the r2 migration and is the fallback for an older server.
+  subscriptions: { active?: number; paidVerified?: number; unverified?: number; test?: number; sandbox?: number; live?: number; trialing?: number };
+  newAccounts: number; activeReaders30d: number; activeReaders30dAll?: number; llmUsd: number; llm30dUsd: number;
   assumptions: { monthlyChurn?: number; priceUsd?: number; storeFee?: number; maxLifetimeMonths?: number };
 }
 const n = (v: unknown) => { const x = Number(v); return Number.isFinite(x) ? x : 0; };
+/** Absent and malformed are unknown (null); 0 is a value. Never `||` on a number: it turns a real 0 into the default. */
+const numOrNull = (v: unknown) => (v == null || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null);
 const round = (v: number | null, digits = 2) => (v === null || !Number.isFinite(v) ? null : Math.round(v * 10 ** digits) / 10 ** digits);
 
 /** CAC, LTV and ROI from the raw sums. Every input is returned so the dashboard can show the formula. */
 export function unitEconomics(raw: EconomicsRaw) {
   const a = raw.assumptions ?? {};
-  const priceUsd = n(raw.revenue.lastPriceUsd) || n(a.priceUsd) || 4.99;
+  const subs = raw.subscriptions ?? {};
+  const lastPrice = numOrNull(raw.revenue.lastPriceUsd), assumedPrice = numOrNull(a.priceUsd);
+  const priceSource = lastPrice !== null && lastPrice > 0 ? 'observed' : assumedPrice !== null && assumedPrice > 0 ? 'assumed' : 'default';
+  const priceUsd = priceSource === 'observed' ? lastPrice! : priceSource === 'assumed' ? assumedPrice! : 4.99;
   // A saved 0% fee is a real choice (a web sale with no store): only an absent value falls back to 15%.
-  const fee = typeof a.storeFee === 'number' && Number.isFinite(a.storeFee) ? a.storeFee : 0.15;
-  const takehome = n(raw.revenue.takehome) || 1 - fee;
+  const storeFee = numOrNull(a.storeFee);
+  const fee = storeFee !== null && storeFee >= 0 && storeFee <= 1 ? storeFee : 0.15;
+  // An observed take-home of 0 is respected too (F12): only absent or out of range falls back to 1 - fee.
+  const observedTakehome = numOrNull(raw.revenue.takehome);
+  const takehome = observedTakehome !== null && observedTakehome >= 0 && observedTakehome <= 1 ? observedTakehome : 1 - fee;
   const payersEver = n(raw.revenue.payersEver);
-  const activeSubs = n(raw.subscriptions.active);
+  // MRR counts verified payers only: "Pro sin verificar" and "Pro de prueba" keep access but are not revenue.
+  const paidSent = numOrNull(subs.paidVerified) ?? numOrNull(subs.active);
+  const paidVerified = paidSent ?? 0;
   // Monthly churn: expirations in the last 30 days over the subscriptions alive at its start, once there are
   // enough of them to mean something; until then the owner's assumption (default 10%).
-  const base = activeSubs + n(raw.revenue.expirations30d) - n(raw.revenue.initialPurchases30d);
+  const base = paidVerified + n(raw.revenue.expirations30d) - n(raw.revenue.initialPurchases30d);
   const observed = base >= 5 ? n(raw.revenue.expirations30d) / base : null;
-  const monthlyChurn = observed ?? (n(a.monthlyChurn) > 0 ? n(a.monthlyChurn) : 0.1);
-  const churnSource = observed !== null ? 'observed' : n(a.monthlyChurn) > 0 ? 'assumed' : 'default';
+  const assumedChurn = numOrNull(a.monthlyChurn);
+  const monthlyChurn = observed ?? (assumedChurn !== null && assumedChurn > 0 ? assumedChurn : 0.1);
+  const churnSource = observed !== null ? 'observed' : assumedChurn !== null && assumedChurn > 0 ? 'assumed' : 'default';
   // The ledger carries no account (the team's reads are in it): divide by every active reader, the team included.
-  const readers30 = n(raw.activeReaders30dAll) || n(raw.activeReaders30d);
+  const readers30 = numOrNull(raw.activeReaders30dAll) ?? numOrNull(raw.activeReaders30d) ?? 0;
   const llmPerActiveReader = readers30 > 0 ? n(raw.llm30dUsd) / readers30 : 0;
   const monthlyContribution = priceUsd * takehome - llmPerActiveReader;
-  const lifetimeMonths = Math.min(1 / Math.max(monthlyChurn, 0.0001), n(a.maxLifetimeMonths) || 36);
+  const cap = numOrNull(a.maxLifetimeMonths);
+  const lifetimeMonths = Math.min(1 / Math.max(monthlyChurn, 0.0001), cap !== null && cap > 0 ? cap : 36);
   const ltv = monthlyContribution * lifetimeMonths;
   const marketing = n(raw.costs.marketingUsd);
-  const cacPerPaying = n(raw.revenue.newPaying) > 0 ? marketing / n(raw.revenue.newPaying) : null;
+  const newPaying = n(raw.revenue.newPaying);
+  const cacPerPaying = newPaying > 0 ? marketing / newPaying : null;
   const cacPerAccount = n(raw.newAccounts) > 0 ? marketing / n(raw.newAccounts) : null;
   const totalCosts = marketing + n(raw.costs.infraUsd) + n(raw.costs.otherUsd) + n(raw.llmUsd);
   const profit = n(raw.revenue.netUsd) - totalCosts;
+  const purchasesSince = typeof raw.revenue.purchasesSince === 'string' ? raw.revenue.purchasesSince : null;
   return {
     days: raw.days, since: raw.since,
     revenue: {
       grossUsd: round(n(raw.revenue.grossUsd)), netUsd: round(n(raw.revenue.netUsd)), refundsUsd: round(n(raw.revenue.refundsUsd)),
-      mrrGrossUsd: round(activeSubs * priceUsd), mrrNetUsd: round(activeSubs * priceUsd * takehome),
-      activeSubscriptions: activeSubs, trialing: n(raw.subscriptions.trialing), newPaying: n(raw.revenue.newPaying), payersEver, priceUsd, takehome,
-      priceSource: n(raw.revenue.lastPriceUsd) ? 'observed' : n(a.priceUsd) ? 'assumed' : 'default',
+      // Store money of accounts that are not verified payers (inside grossUsd); unknown on an older server.
+      unverifiedGrossUsd: round(numOrNull(raw.revenue.unverifiedGrossUsd)),
+      unattributedGrossUsd: round(numOrNull(raw.revenue.unattributedGrossUsd)),
+      unattributedRefundsUsd: round(numOrNull(raw.revenue.unattributedRefundsUsd)), unattributedNetUsd: round(numOrNull(raw.revenue.unattributedNetUsd)),
+      unattributedEvents: numOrNull(raw.revenue.unattributedEvents), unconvertedEvents: numOrNull(raw.revenue.unconvertedEvents),
+      revenueScope: typeof raw.revenue.revenueScope === 'string' ? raw.revenue.revenueScope : null,
+      mrrGrossUsd: paidSent === null ? null : round(paidVerified * priceUsd), mrrNetUsd: paidSent === null ? null : round(paidVerified * priceUsd * takehome),
+      activeSubscriptions: paidVerified, paidVerified,
+      // Counts an older server does not send stay null (unknown), never 0.
+      unverifiedSubscriptions: numOrNull(subs.unverified), testSubscriptions: numOrNull(subs.test ?? subs.sandbox), liveSubscriptions: numOrNull(subs.live),
+      trialing: n(subs.trialing), newPaying, payingInPeriod: numOrNull(raw.revenue.payingInPeriod), payersEver, priceUsd, takehome, priceSource,
+      // When the first purchase event of any environment arrived: before it, revenue is not measured (not $0).
+      purchasesSince, measured: purchasesSince !== null,
     },
     costs: {
       marketingUsd: round(marketing), infraUsd: round(n(raw.costs.infraUsd)), otherUsd: round(n(raw.costs.otherUsd)),
       llmUsd: round(n(raw.llmUsd), 4), totalUsd: round(totalCosts), byChannel: (raw.costs.byChannel ?? []).map((c) => ({ channel: c.channel, usd: round(n(c.usd)) })),
       // Only the AI ledger is recorded automatically; the rest exists once the owner enters it.
-      manualEntries: n(raw.costs.entries),
+      manualEntries: n(raw.costs.entries), coverage: 'recorded_only' as const, complete: false,
     },
-    acquisition: { newAccounts: n(raw.newAccounts), newPaying: n(raw.revenue.newPaying), cacPerAccount: round(cacPerAccount), cacPerPaying: round(cacPerPaying) },
+    acquisition: { newAccounts: n(raw.newAccounts), newPaying, cacPerAccount: round(cacPerAccount), cacPerPaying: round(cacPerPaying) },
     ltv: {
       monthlyNetPerSubUsd: round(priceUsd * takehome), monthlyLlmPerUserUsd: round(llmPerActiveReader, 4), monthlyContributionUsd: round(monthlyContribution),
       monthlyChurn: round(monthlyChurn, 4), churnSource, lifetimeMonths: round(lifetimeMonths, 1), ltvUsd: round(ltv),
-      // No account has ever paid: the LTV is a scenario built from the price and churn above, not an observation.
+      // No account has ever paid (verified): the LTV is a scenario built from the price and churn above, not an observation.
       scenario: payersEver === 0,
       ltvToCac: cacPerPaying ? round(ltv / cacPerPaying) : null,
       paybackMonths: cacPerPaying && monthlyContribution > 0 ? round(cacPerPaying / monthlyContribution, 1) : null,
     },
-    roi: { profitUsd: round(profit), roi: totalCosts > 0 ? round(profit / totalCosts, 4) : null },
-    assumptions: { monthlyChurn: n(a.monthlyChurn) || null, priceUsd: n(a.priceUsd) || null, storeFee: typeof a.storeFee === 'number' ? a.storeFee : null, maxLifetimeMonths: n(a.maxLifetimeMonths) || null },
+    roi: { profitUsd: round(profit), roi: totalCosts > 0 ? round(profit / totalCosts, 4) : null, coverage: 'recorded_only' as const },
+    assumptions: { monthlyChurn: numOrNull(a.monthlyChurn), priceUsd: numOrNull(a.priceUsd), storeFee: numOrNull(a.storeFee), maxLifetimeMonths: numOrNull(a.maxLifetimeMonths) },
   };
 }
-
-const daysFrom = (since: string) => {
-  const out: string[] = [];
-  const start = new Date(since); start.setUTCHours(0, 0, 0, 0);
-  for (let t = start.getTime(); t <= Date.now(); t += 86_400_000) out.push(new Date(t).toISOString().slice(0, 10));
-  return out;
-};
 
 // Where the audience is: web devices by country/region (first-party), iOS downloads by storefront (App Store),
 // Google search by country (Search Console) and purchases by store country. Age and gender have no source yet.
 export async function audienceView(days: number, internal = false) {
-  const geo = await rpc<{ since: string }>('bobby_admin_geo', { p_days: days, p_internal: internal });
-  const list = daysFrom(geo.since);
-  const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
-  const pick = (v: unknown, key: string) => {
-    const o = (v ?? {}) as Record<string, unknown>;
-    return { configured: Boolean(o.configured), error: typeof o.error === 'string' ? o.error : null, [key]: Array.isArray(o.byCountry) ? o.byCountry : null };
-  };
-  return { geo, searchConsole: pick(search, 'countries'), appStore: pick(appStore, 'countries') };
+  const geo = await observeAdminSource('audience', () => rpc<{ since: string }>('bobby_admin_geo', { p_days: days, p_internal: internal }), true);
+  deferAdminSources('appStore', 'searchConsole');
+  return { geo, searchConsole: null, appStore: null };
 }
 
-/** What the shipped clients report: a zero on an uninstrumented step means "not measured", not "nobody". The desk
- *  outcomes (delivered, walls, blocks) come from the server for every client since the 20261001230000 deploy. */
+/** Unmeasured client steps remain explicitly unavailable, including native paywall/render/crash telemetry. */
 export const INSTRUMENTATION = { webVisits: true, webPaywall: true, iosVisits: false, iosOpens: true, iosPaywall: false, purchaseStart: false, deskOutcomes: true };
 
-/** The funnel tab's unit economics (the cohort itself travels with the overview, in `growth`). */
 export async function lifecycleView(days: number, internal = false) {
-  const raw = await rpc<EconomicsRaw & { since: string }>('bobby_admin_economics', { p_days: days, p_internal: internal });
-  const list = daysFrom(raw.since);
-  const [search, appStore] = await Promise.all([searchConsole(list), appStoreSales(list)]);
-  return { economics: unitEconomics(raw), searchConsole: search, appStore, instrumentation: INSTRUMENTATION };
+  const raw = await observeAdminSource('lifecycle', () => rpc<EconomicsRaw>('bobby_admin_economics', { p_days: days, p_internal: internal }), true);
+  deferAdminSources('appStore', 'searchConsole');
+  return { economics: unitEconomics(raw!), searchConsole: null, appStore: null, instrumentation: INSTRUMENTATION };
+}
+
+export function adminDays(days: number): string[] {
+  const end = new Date(); end.setUTCHours(0, 0, 0, 0);
+  return Array.from({ length: days }, (_, i) => new Date(end.getTime() - (days - i - 1) * 86_400_000).toISOString().slice(0, 10));
+}
+
+/** Shared diagnosis inputs for the panel, digest and plan. GET coreOnly avoids delayed external providers. */
+export async function overviewBundle(days: number, internal: boolean, apple: AppleLoad = {}) {
+  const [overview, growth, networks] = await Promise.all([
+    observeAdminSource('overview', () => rpc<{ days: string[] } & Record<string, unknown>>('bobby_admin_overview', { p_days: days, p_internal: internal }), true),
+    observeAdminSource('growth', () => rpc<Record<string, unknown>>('bobby_admin_growth', { p_days: days, p_internal: internal })),
+    observeAdminSource('networks', () => rpc<unknown[]>('bobby_admin_internal_networks', {})),
+  ]);
+  let integ: Awaited<ReturnType<typeof integrations>> | null = null;
+  let search: unknown = null;
+  if (apple.coreOnly) deferAdminSources('appStore', 'revenuecat', 'searchConsole', 'health');
+  else {
+    [integ, search] = await Promise.all([
+      integrations(overview!.days ?? adminDays(days), apple),
+      observeAdminSource('searchConsole', () => searchConsole(overview!.days ?? adminDays(days))),
+    ]);
+  }
+  const missing = [...(growth == null ? ['growth'] : []), ...(networks == null ? ['networks'] : [])];
+  // Operational evidence remains useful when cohorts fail; the bundle identifies the incomplete diagnosis.
+  const diagnosis = buildInsights({ days, overview, growth, integrations: integ, searchConsole: search, networks, includeInternal: internal });
+  const insights = growth == null ? diagnosis.filter((finding) => finding.area === 'operacion') : diagnosis;
+  return { overview, integrations: integ ?? { llmCaps: llmCaps(), paywall: paywallOn() }, growth, searchConsole: search, networks, insights, missing };
+}
+
+export async function providerBundle(days: number) {
+  const range = adminDays(days);
+  const [integ, search] = await Promise.all([
+    integrations(range),
+    observeAdminSource('searchConsole', () => searchConsole(range)),
+  ]);
+  const meta = adminReadMeta();
+  markAdminSource('health', { status: Object.entries(meta.sources).some(([name, source]) => !['appStore', 'revenuecat', 'searchConsole', 'teamExclusion'].includes(name) && source.status === 'error') ? 'partial' : 'ok', fetchedAt: new Date().toISOString() });
+  return { integrations: integ, searchConsole: search ?? { configured: Boolean(process.env.GSC_SERVICE_ACCOUNT_JSON?.trim()), error: 'source_unavailable' } };
 }
 
 // ---------------- costs and assumptions ----------------
@@ -713,7 +886,7 @@ export async function addCost(body: Record<string, unknown>) {
   const channel = typeof body.channel === 'string' && body.channel.trim() ? body.channel.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 32) : null;
   const spentOn = typeof body.spentOn === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.spentOn) ? body.spentOn : new Date().toISOString().slice(0, 10);
   if (!kind || !Number.isFinite(amount) || amount <= 0 || amount > 1_000_000) throw new AdminError(400, 'Invalid cost.');
-  if (spentOn > new Date().toISOString().slice(0, 10)) throw new AdminError(400, 'The date cannot be in the future.');
+  if (spentOn > new Date().toISOString().slice(0, 10)) throw new AdminError(400, 'The date cannot be in the future (UTC).');
   const note = typeof body.note === 'string' && body.note.trim() ? body.note.trim().slice(0, 160) : null;
   const rows = await rest<unknown[]>('bobby_costs', { method: 'POST', headers: { Prefer: 'return=representation' },
     body: JSON.stringify({ kind, channel, amount_usd: Math.round(amount * 100) / 100, spent_on: spentOn, note }) });

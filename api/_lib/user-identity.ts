@@ -34,6 +34,13 @@ interface IdentityRow { id: string; auth_user_id: string | null; wallet_address:
 
 export class IdentityUnavailableError extends Error {}
 
+/** Optional request transport: admin reads include authentication and body decoding in their global deadline. */
+export interface IdentityTransport {
+  fetch: (url: string, init?: RequestInit) => Promise<Response>;
+  body: <T>(load: () => Promise<T>) => Promise<T>;
+}
+const defaultTransport: IdentityTransport = { fetch: (url, init) => fetch(url, init), body: (load) => load() };
+
 function authBase(): { url: string; anon: string } | null {
   try {
     const url = (process.env.BOBBY_AUTH_URL || bobbyDbUrl()).replace(/\/+$/, '');
@@ -44,14 +51,14 @@ function authBase(): { url: string; anon: string } | null {
   }
 }
 
-async function verifySupabaseToken(token: string): Promise<{ id: string; email: string | null; provider: string | null; firstName: string | null } | null> {
+async function verifySupabaseToken(token: string, transport: IdentityTransport): Promise<{ id: string; email: string | null; provider: string | null; firstName: string | null } | null> {
   const base = authBase();
   if (!base) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
   try {
-    const r = await fetch(`${base.url}/auth/v1/user`, { headers: { apikey: base.anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
+    const r = await transport.fetch(`${base.url}/auth/v1/user`, { headers: { apikey: base.anon, Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(5000) });
     if ([400, 401, 403].includes(r.status)) return null;
     if (!r.ok) throw new IdentityUnavailableError('Authentication is temporarily unavailable');
-    const user = (await r.json()) as { id?: string; email?: string; app_metadata?: { provider?: string }; user_metadata?: Record<string, unknown> };
+    const user = (await transport.body(() => r.json())) as { id?: string; email?: string; app_metadata?: { provider?: string }; user_metadata?: Record<string, unknown> };
     if (!user?.id || !/^[0-9a-f-]{36}$/i.test(user.id)) return null;
     return { id: user.id, email: user.email || null, provider: user.app_metadata?.provider ?? null, firstName: firstNameOf(user.user_metadata) };
   } catch {
@@ -60,17 +67,17 @@ async function verifySupabaseToken(token: string): Promise<{ id: string; email: 
   }
 }
 
-async function upsertIdentity(conflict: 'wallet_address' | 'auth_user_id', row: Record<string, unknown>): Promise<IdentityRow | null> {
-  const r = await fetch(bobbyRest(`bobby_identities?on_conflict=${conflict}&select=id,auth_user_id,wallet_address`), {
+async function upsertIdentity(conflict: 'wallet_address' | 'auth_user_id', row: Record<string, unknown>, transport: IdentityTransport): Promise<IdentityRow | null> {
+  const r = await transport.fetch(bobbyRest(`bobby_identities?on_conflict=${conflict}&select=id,auth_user_id,wallet_address`), {
     method: 'POST',
     headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=representation' }),
     body: JSON.stringify({ ...row, last_seen_at: new Date().toISOString() }),
   });
   if (!r.ok) {
-    console.error('[user-identity] upsert', r.status, await r.text().catch(() => ''));
+    console.error('[user-identity] upsert', r.status, await transport.body(() => r.text()).catch(() => ''));
     throw new IdentityUnavailableError('Account data is temporarily unavailable');
   }
-  const rows = (await r.json()) as IdentityRow[];
+  const rows = (await transport.body(() => r.json())) as IdentityRow[];
   return rows[0] ?? null;
 }
 
@@ -81,24 +88,24 @@ function bearer(req: VercelRequest): string {
 }
 
 /** Resolve the caller. Returns null when no valid credential is present. */
-export async function resolveIdentity(req: VercelRequest): Promise<Identity | null> {
+export async function resolveIdentity(req: VercelRequest, transport: IdentityTransport = defaultTransport): Promise<Identity | null> {
   const sessionToken = sessionTokenFromRequest(req);
   const session = sessionToken ? verifyWalletSession(sessionToken) : null;
   if (session) {
-    const row = await upsertIdentity('wallet_address', { wallet_address: session.wallet });
+    const row = await upsertIdentity('wallet_address', { wallet_address: session.wallet }, transport);
     return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'wallet' } : null;
   }
   const token = bearer(req);
   if (!token || token.startsWith('bws.')) return null;
-  const user = await verifySupabaseToken(token);
+  const user = await verifySupabaseToken(token, transport);
   if (!user) return null;
-  const row = await upsertIdentity('auth_user_id', { auth_user_id: user.id, email: user.email, provider: user.provider });
+  const row = await upsertIdentity('auth_user_id', { auth_user_id: user.id, email: user.email, provider: user.provider }, transport);
   return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'supabase', firstName: user.firstName } : null;
 }
 
-export async function requireIdentity(req: VercelRequest, res: VercelResponse): Promise<Identity | null> {
+export async function requireIdentity(req: VercelRequest, res: VercelResponse, transport: IdentityTransport = defaultTransport): Promise<Identity | null> {
   let identity: Identity | null;
-  try { identity = await resolveIdentity(req); }
+  try { identity = await resolveIdentity(req, transport); }
   catch {
     res.setHeader('Retry-After', '5');
     res.status(503).json({ error: 'Sign-in service is temporarily unavailable. Try again.' });

@@ -13,12 +13,12 @@ const STAGES: Array<{ key: PeopleStage; label: string; color: string; def: strin
   { key: 'new', label: 'Sin activar', color: '#6CC4FF', def: 'activos en 7 días, nunca han leído' },
   { key: 'active', label: 'Activos', color: '#2E9BFF', def: 'ya leyeron y estuvieron activos en 7 días' },
   { key: 'recurring', label: 'Recurrentes', color: '#4ADE80', def: 'leyeron en 2+ días distintos de los últimos 14' },
-  { key: 'pro', label: 'Pro', color: '#F28C38', def: 'tienen Bobby Pro hoy' },
+  { key: 'pro', label: 'Pro', color: '#F28C38', def: 'tienen acceso Pro hoy (pago, prueba o regalo)' },
   { key: 'atRisk', label: 'En riesgo', color: '#F06A6A', def: 'última actividad hace 7 a 29 días' },
   { key: 'lost', label: 'Perdidos', color: '#3A3A3C', def: 'última actividad hace 30+ días' },
 ];
 
-export function PeopleCard({ people, includeInternal }: { people: Growth['people']; includeInternal: boolean }) {
+export function PeopleCard({ people, includeInternal, markFailed = false }: { people: Growth['people']; includeInternal: boolean; markFailed?: boolean }) {
   const p = people;
   const classified = STAGES.reduce((s, x) => s + p.stages[x.key], 0);
   const base = Math.max(p.total, classified);
@@ -29,7 +29,7 @@ export function PeopleCard({ people, includeInternal }: { people: Growth['people
   return (
     <Card>
       <BigNumber
-        label="Personas"
+        label="Cuentas y dispositivos observados"
         value={fmtInt(p.total)}
         caption={`${fmtInt(p.accounts)} cuentas + ${fmtInt(p.guests)} instalaciones sin cuenta`}
         right={platforms.length ? (
@@ -41,8 +41,9 @@ export function PeopleCard({ people, includeInternal }: { people: Growth['people
       <div className="-mt-3 mb-5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11px] text-[#5C5C5C]">
         <span>una cuenta y sus instalaciones cuentan una vez; no son humanos únicos (una persona con dos navegadores sin cuenta cuenta dos)</span>
         {!includeInternal && excluded > 0 && (
-          <span className="text-[#8B8B8B]">sin el equipo: −{fmtInt(p.excluded.accounts)} cuentas, −{fmtInt(p.excluded.guests)} instalaciones</span>
+          <span className="text-[#8B8B8B]">sin el equipo: −{fmtInt(p.excluded.accounts)} cuentas, −{fmtInt(p.excluded.guests)} instalaciones{markFailed ? ' · sin verificar' : ''}</span>
         )}
+        {!includeInternal && excluded === 0 && markFailed && <span className="text-[#F7A04B]">sin el equipo · sin verificar</span>}
         {includeInternal && <span className="text-[#F7A04B]">incluye al equipo</span>}
         {p.wallets > 0 && <span>{fmtInt(p.wallets)} identidades wallet, fuera</span>}
       </div>
@@ -65,24 +66,32 @@ export function PeopleCard({ people, includeInternal }: { people: Growth['people
                 <div className="mt-1 font-mono text-[15px] text-[#EDEDED]">
                   {fmtInt(p.stages[x.key])} {base >= MIN_BASE && <span className="text-[11px] text-[#5C5C5C]">{fmtPct(p.stages[x.key], base)}</span>}
                 </div>
+                {/* Access is not payment: of the Pro stage, only these have a verified charge. */}
+                {x.key === 'pro' && p.proPaidVerified != null && (
+                  <div className="mt-0.5 font-mono text-[10.5px] text-[#5C5C5C]">{fmtInt(p.proPaidVerified)} de pago verificado</div>
+                )}
               </li>
             ))}
           </ul>
-          {base < MIN_BASE && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">Muestra pequeña: con {fmtInt(base)} personas se muestran conteos, no porcentajes.</p>}
+          {base < MIN_BASE && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">Muestra pequeña: con {fmtInt(base)} sujetos observados se muestran conteos, no porcentajes.</p>}
           {rest > 0 && <p className="m-0 mt-3 font-mono text-[11px] text-[#5C5C5C]">{fmtInt(rest)} sin clasificar</p>}
         </>
-      ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay personas registradas.</p>}
+      ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay cuentas o dispositivos registrados.</p>}
 
       {(p.proInactive > 0 || p.accountsNeverRead > 0) && (
         <div className="mt-4 flex flex-wrap gap-2">
-          {p.proInactive > 0 && <Tag tone="red">{fmtInt(p.proInactive)} Pro sin usar Bobby en 14+ días</Tag>}
+          {p.proInactive > 0 && (
+            <Tag tone="red" wrap>
+              {fmtInt(p.proInactive)} Pro sin usar Bobby en 14+ días{p.proInactivePaid != null ? ` · ${fmtInt(p.proInactivePaid)} de pago verificado` : ''}
+            </Tag>
+          )}
           {p.accountsNeverRead > 0 && <Tag tone="orange">{fmtInt(p.accountsNeverRead)} {p.accountsNeverRead === 1 ? 'cuenta nunca ha leído' : 'cuentas nunca han leído'}</Tag>}
         </div>
       )}
 
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {[
-          ['Activas en 7 días', p.active7d, 'abrieron Bobby o leyeron'],
+          ['Activas en 7 días', p.active7d, 'registraron actividad o lectura'],
           ['Leyeron en 7 días', p.readers7d, `de ${fmtInt(p.readers)} que han leído alguna vez`],
           ['Activas en 30 días', p.active30d, `de ${fmtInt(p.total)}`],
           ['Nuevas en el periodo', p.newInPeriod, 'vistas por primera vez'],
@@ -104,7 +113,8 @@ export function PeopleCard({ people, includeInternal }: { people: Growth['people
 
 const path = (url: string) => { try { const u = new URL(url); return u.pathname === '/' ? u.host : u.pathname; } catch { return url; } };
 
-export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; period: number }) {
+/** `teamOut`: the header leaves the team out; Google's figures cannot, and the card says so. */
+export function SearchConsoleCard({ sc, period, teamOut = false }: { sc: SearchConsoleData; period: number; teamOut?: boolean }) {
   const [metric, setMetric] = useState<'clicks' | 'impressions'>('clicks');
   if (!sc.configured) {
     return (
@@ -140,7 +150,7 @@ export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; perio
             <Segmented<'clicks' | 'impressions'> label="Métrica" value={metric} onChange={setMetric} options={[{ value: 'clicks', label: 'Clics' }, { value: 'impressions', label: 'Impresiones' }]} />
           </div>
           <div className="mt-2 font-mono text-[30px] font-medium leading-none tracking-[-0.02em] text-[#EDEDED]">{fmtCompact(metric === 'clicks' ? t.clicks : t.impressions)}</div>
-          <div className="mt-2 font-mono text-[12px] text-[#8B8B8B]">{metric === 'clicks' ? 'clics' : 'impresiones'} · {period}d{sc.site ? ` · ${path(sc.site)}` : ''}</div>
+          <div className="mt-2 font-mono text-[12px] text-[#8B8B8B]">{metric === 'clicks' ? 'clics' : 'impresiones'} · {period}d{sc.site ? ` · ${path(sc.site)}` : ''}{sc.partial ? ' · parcial' : ''}{teamOut ? ' · incluye al equipo (la fuente no lo separa)' : ''}</div>
         </div>
         <div className="flex flex-wrap gap-2">
           {[
@@ -158,8 +168,9 @@ export function SearchConsoleCard({ sc, period }: { sc: SearchConsoleData; perio
         </div>
       </div>
       <BarsChart days={days} values={(metric === 'clicks' ? sc.clicks : sc.impressions) ?? []} height={180} emptyLabel="Sin datos de Google en el periodo" />
+      {sc.partial && <div className="mt-3"><Note tag="Parcial">Solo se suman los días que Google reportó. {sc.missingDays?.length ?? 0} días sin fila publicada; {sc.incompleteDays?.length ?? 0} días con cifras provisionales. Los huecos son datos ausentes. Calendario de Google: {sc.timeZone ?? 'sin zona confirmada'}.</Note></div>}
       <p className="m-0 mt-3 font-mono text-[11px] leading-relaxed text-[#5C5C5C]">
-        Datos de Google: población distinta al embudo (búsquedas y clics, no personas ni instalaciones){days.length ? `; último día publicado: ${days[days.length - 1]}` : ''}.
+        Datos de Google: población distinta al embudo (búsquedas y clics, no personas ni instalaciones){sc.coveredTo ? `; último día con reporte: ${sc.coveredTo}` : ''}.
       </p>
 
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">

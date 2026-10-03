@@ -1,4 +1,5 @@
-import type { AdminUser, Coverage } from '@/lib/admin-client';
+import type { AdminUser, Coverage, MemberCommercial, MemberCommercialReason, TeamSeed } from '@/lib/admin-client';
+import { MIN_BASE } from './deltas';
 
 // Formatting for the owner dashboard (/admin). One language (Spanish, es-MX) and one set of rules:
 // integers with thousands separators, USD with 2 decimals (LLM cents keep 3–4), short es-MX dates.
@@ -9,6 +10,8 @@ const PCT = new Intl.NumberFormat('es-MX', { style: 'percent', maximumFractionDi
 const USD2 = new Intl.NumberFormat('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const DATE = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: '2-digit' });
 const DATE_TIME = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', year: '2-digit', hour: '2-digit', minute: '2-digit' });
+const LIVE_TIME = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' });
+export const fmtTimestamp = (value: string | null | undefined) => value && Number.isFinite(Date.parse(value)) ? LIVE_TIME.format(new Date(value)) : '—';
 const DAY = new Intl.DateTimeFormat('es-MX', { day: 'numeric', month: 'short' });
 const DAY_LONG = new Intl.DateTimeFormat('es-MX', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 const REL = new Intl.RelativeTimeFormat('es-MX', { numeric: 'auto' });
@@ -69,6 +72,9 @@ export function fmtCompact(v: number | null | undefined): string {
 }
 export const fmtDayLong = (day: string): string => DAY_LONG.format(parseDay(day));
 
+/** Today's UTC calendar day ('YYYY-MM-DD'): the server dates costs in UTC, so the form does too. */
+export const todayUtc = (now: Date = new Date()): string => now.toISOString().slice(0, 10);
+
 function toDate(v: string | null | undefined): Date | null {
   if (!v) return null;
   const d = /^\d{4}-\d{2}-\d{2}$/.test(v) ? parseDay(v) : new Date(v);
@@ -76,6 +82,11 @@ function toDate(v: string | null | undefined): Date | null {
 }
 export const fmtDate = (v: string | null | undefined): string => { const d = toDate(v); return d ? DATE.format(d) : DASH; };
 export const fmtDateTime = (v: string | null | undefined): string => { const d = toDate(v); return d ? DATE_TIME.format(d) : DASH; };
+/** A list of days ('YYYY-MM-DD', ascending) short enough for a caption: up to three by name, else the range. */
+export function fmtDays(days: readonly string[]): string {
+  if (!days.length) return DASH;
+  return days.length <= 3 ? days.map(fmtDate).join(', ') : `del ${fmtDate(days[0])} al ${fmtDate(days[days.length - 1])}`;
+}
 
 /** "hace 3 horas", "ayer", "en 5 días". */
 export function fmtRelative(v: string | null | undefined, now = Date.now()): string {
@@ -113,7 +124,7 @@ export function fmtGift(reads?: number | null, profundo?: number | null, maximo?
 }
 
 export const PROVIDER_LABEL: Record<string, string> = {
-  apple: 'Apple', google: 'Google', wallet: 'Wallet', email: 'Email', stripe: 'Stripe', revenuecat: 'RevenueCat',
+  apple: 'Apple', google: 'Google', twitter: 'Twitter / X', other: 'Otro proveedor', wallet: 'Wallet', email: 'Email', stripe: 'Stripe', revenuecat: 'RevenueCat',
   anthropic: 'Anthropic', openai: 'OpenAI', web: 'Web', ios: 'iOS', android: 'Android', unknown: 'Sin dato',
 };
 export const label = (k: string | null | undefined): string => (k ? PROVIDER_LABEL[k] ?? k : DASH);
@@ -125,8 +136,67 @@ export const STATUS_LABEL: Record<string, string> = {
 };
 export const statusLabel = (k: string | null | undefined): string => (k ? STATUS_LABEL[k] ?? k : DASH);
 
-/** Subscription states that count as a paying membership. */
+/** Subscription states that give Pro access (paying or not: the commercial class says which). */
 export const ACTIVE_SUB = new Set(['active', 'trialing']);
+
+const COMMERCIAL_LABEL: Record<MemberCommercial, string> = { paid: 'Pagando (verificado)', unverified: 'Sin verificar', test: 'De prueba', inactive: 'Inactiva' };
+const COMMERCIAL_REASON_LABEL: Record<MemberCommercialReason, string> = {
+  unknown_environment: 'entorno desconocido', no_charge: 'sin cobro registrado', unknown_period: 'periodo sin verificar', sandbox: 'sandbox', trial: 'periodo de prueba',
+};
+/** A membership's commercial class in words: "Sin verificar · entorno desconocido". Access is a separate fact. */
+export function commercialLabel(commercial: MemberCommercial | null | undefined, reason?: MemberCommercialReason | null): string {
+  if (!commercial) return DASH;
+  const why = (commercial === 'unverified' || commercial === 'test') && reason ? COMMERCIAL_REASON_LABEL[reason] : null;
+  return why ? `${COMMERCIAL_LABEL[commercial]} · ${why}` : COMMERCIAL_LABEL[commercial];
+}
+
+/** "sin el equipo", or "… · sin verificar" when this load could not mark the owner's browser (internalMarkFailed):
+ *  then no caption claims a verified exclusion. */
+export const teamOut = (markFailed = false, text = 'sin el equipo'): string => (markFailed ? `${text} · sin verificar` : text);
+
+/** The reads caption follows the team switch, not whether the team happened to read in the period. An unknown count
+ *  (null) is "—", and a failed /admin mark never prints "(0 en el periodo)" as if the exclusion were verified. */
+export function teamReadsCaption(includeInternal: boolean, readsInternal: number | null, markFailed = false): string {
+  if (includeInternal) return 'incluye las del equipo';
+  if (markFailed) return teamOut(true, readsInternal != null && readsInternal > 0 ? `sin ${fmtInt(readsInternal)} del equipo` : 'sin las del equipo');
+  if (readsInternal == null) return `sin las del equipo (${DASH} en el periodo)`;
+  return readsInternal > 0 ? `sin ${fmtInt(readsInternal)} del equipo` : 'sin las del equipo (0 en el periodo)';
+}
+
+/** a of b as text: a percentage only with a base of MIN_BASE or more, else the raw counts. */
+export function shareText(a: number, b: number): string {
+  if (!b) return DASH;
+  return b < MIN_BASE ? `${fmtInt(a)}/${fmtInt(b)} (muestra pequeña)` : `${fmtPct(a, b)} (n=${fmtInt(b)})`;
+}
+
+/** The audience tab's web location captions and countries count (F17): a value the server did not send is "—" or
+ *  "dato no disponible", never a zero. `miss` = isMissing over the response; `since` = when location started. */
+export function geoText(g: { web: { devices: number; measurable: number; located: number }; countries: Array<{ visitors: number }> },
+  miss: (path: string) => boolean, period: number, since: string | null) {
+  const located = g.countries.reduce((a, c) => a + c.visitors, 0);
+  return {
+    located: miss('geo.web.located') || miss('geo.web.measurable') ? 'dato no disponible'
+      : g.web.measurable ? `${shareText(g.web.located, g.web.measurable)} de los que llegaron${since ? ` desde el ${since}` : ''} · ${period}d`
+      : since ? `nadie llegó desde el ${since} · ${period}d` : 'la ubicación aún no se registra',
+    noLocation: miss('geo.web.devices') ? 'dato no disponible'
+      : since ? `llegaron antes del ${since}, cuando aún no se registraba · de ${fmtInt(g.web.devices)} nuevos` : `de ${fmtInt(g.web.devices)} instalaciones web nuevas · ${period}d`,
+    countriesCount: miss('geo.countries') ? DASH : `${fmtInt(g.countries.length)} países · n=${fmtInt(located)}`,
+  };
+}
+
+const TEAM_SEED_LABEL: Record<TeamSeed, string> = {
+  email: 'cuenta de la lista de emails del equipo', install_mark: 'instalación marcada', admin_session: 'instalación que abrió /admin',
+  network: 'red del equipo', admin: 'cuenta admin', mark: 'cuenta marcada',
+};
+/** Why the D2 rule makes this account the team's, in words ("por estar ligada a una instalación marcada (ab12cd34ef…)"),
+ *  or null when the server sent no reason (an admin or a hand mark needs none). */
+export function teamReason(u: Pick<AdminUser, 'id' | 'team_seed' | 'team_seed_ref'>): string | null {
+  if (!u.team_seed) return null;
+  const ref = u.team_seed_ref ?? '';
+  if (u.team_seed === 'email' && ref === u.id) return 'por su email (lista de emails del equipo)';
+  const short = u.team_seed === 'install_mark' || u.team_seed === 'admin_session' || u.team_seed === 'network' ? ref : ref.slice(0, 8);
+  return `por estar ligada a una ${TEAM_SEED_LABEL[u.team_seed]} (${short}…)`;
+}
 
 /** The status to show: an "active" subscription whose period already ended is shown as expired. */
 export function effectiveSubStatus(status: string | null | undefined, periodEnd: string | null | undefined, now = Date.now()): string | null {

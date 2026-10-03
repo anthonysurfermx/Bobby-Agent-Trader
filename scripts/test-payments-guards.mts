@@ -19,6 +19,7 @@ let writes: Array<Record<string, unknown>> = [];
 let stripeCalls: string[] = [];
 let stripeQueries: string[] = [];
 let stripeSubscription: Record<string, unknown> = {};
+let stripeInvoice: Record<string, unknown> = {};
 let subscriptionReadFails = false;
 let upsertStatus = 204;
 let stripeDown = false;
@@ -62,6 +63,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
       return Response.json({ id: 'cs_test_session', url: 'https://checkout.stripe.com/s' });
     }
     if (u.pathname === '/v1/refunds' && m === 'GET') return Response.json({ data: refunds, has_more: false });
+    if (u.pathname.startsWith('/v1/invoices/')) return Response.json(stripeInvoice);
     if (u.pathname.startsWith('/v1/charges/')) return Response.json(charge);
     if (u.pathname.startsWith('/v1/customers/') && m === 'GET') return Response.json({ metadata: { identity_id: '22222222-2222-4222-8222-222222222222' } });
     if (u.pathname.startsWith('/v1/subscriptions/') && m === 'DELETE') return Response.json({ id: u.pathname.split('/').pop(), status: 'canceled' });
@@ -75,10 +77,14 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (u.pathname === '/rest/v1/bobby_purchase_events' && init?.method === 'POST') {
     const b = JSON.parse(String(init.body)); if (!purchases.has(b.id)) purchases.set(b.id, b); return new Response(null, { status: 204 });
   }
-  if (u.pathname === '/rest/v1/bobby_purchase_events' && init?.method === 'PATCH') {
+  if (u.pathname === '/rest/v1/bobby_purchase_events') {
     const id = (u.searchParams.get('id') ?? '').replace('eq.', ''); const row = purchases.get(id);
-    if (row && row.identity_id === null) purchases.set(id, { ...row, ...JSON.parse(String(init.body)) });
-    return new Response(null, { status: 204 });
+    if (init?.method === 'PATCH') {
+      if (!row || row.identity_id !== null) return Response.json([]);
+      const updated = { ...row, ...JSON.parse(String(init.body)) }; purchases.set(id, updated);
+      return Response.json([{identity_id:updated.identity_id}]);
+    }
+    return Response.json(row ? [{identity_id:row.identity_id}] : []);
   }
   if (u.pathname === '/rest/v1/rpc/bobby_checkout_claim') {
     const b = JSON.parse(String(init?.body));
@@ -124,6 +130,10 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     if (u.searchParams.has('stripe_customer_id')) {
       const customerId = (u.searchParams.get('stripe_customer_id') ?? '').replace('eq.', '');
       return Response.json([...subs.values()].filter((s) => s.stripe_customer_id === customerId).map((s) => ({ identity_id: s.identity_id })));
+    }
+    if (u.searchParams.has('stripe_subscription_id')) {
+      const sid=(u.searchParams.get('stripe_subscription_id') ?? '').replace('eq.','');
+      return Response.json([...subs.values()].filter((row)=>row.stripe_subscription_id===sid).map((row)=>({identity_id:row.identity_id,stripe_customer_id:row.stripe_customer_id})));
     }
     const id = (u.searchParams.get('identity_id') ?? '').replace('eq.', '');
     return Response.json(subs.has(id) ? [subs.get(id)] : []);
@@ -172,18 +182,18 @@ eq(await syncRevenueCat(UID, 'id-d'), true, 'a real card subscription keeps Pro'
 eq([writes.length, subs.get('id-d')?.provider, subs.get('id-d')?.apple_status], [1, 'stripe', 'expired'], 'RevenueCat records no Apple access without changing the card owner');
 
 reset();
-subscriber = { entitlements: ent('t'), subscriptions: { t: { store: 'test_store', expires_date: later }, a: { store: 'app_store', expires_date: future } } };
+subscriber = { entitlements: ent('t'), subscriptions: { t: { store: 'test_store', expires_date: later }, a: { store: 'app_store', is_sandbox: false, expires_date: future } } };
 eq(await syncRevenueCat(UID, 'id-e'), true, 'a real App Store subscription beside a Test Store one grants Pro');
 eq([subs.get('id-e')?.provider, subs.get('id-e')?.status, subs.get('id-e')?.product_id, subs.get('id-e')?.environment], ['apple', 'active', 'a', 'production'], 'row comes from the App Store record');
 
 reset();
-subscriber = { entitlements: ent(), subscriptions: { p: { store: 'app_store', expires_date: future, refunded_at: new Date().toISOString() } } };
+subscriber = { entitlements: ent(), subscriptions: { p: { store: 'app_store', is_sandbox: false, expires_date: future, refunded_at: new Date().toISOString() } } };
 subs.set('id-f', { identity_id: 'id-f', provider: 'apple', status: 'active', current_period_end: future });
 eq(await syncRevenueCat(UID, 'id-f'), false, 'a refunded App Store subscription is not Pro');
 eq(subs.get('id-f')?.status, 'refunded', 'refund is recorded as refunded');
 
 reset();
-subscriber = { subscriptions: { p: { store: 'app_store', expires_date: future } } };
+subscriber = { subscriptions: { p: { store: 'app_store', is_sandbox: false, expires_date: future } } };
 subs.set('id-g', { identity_id: 'id-g', provider: 'apple', status: 'active', current_period_end: future });
 eq(await syncRevenueCat(UID, 'id-g'), false, 'no entitlement means no Pro');
 eq(subs.get('id-g')?.status, 'expired', 'Apple row expires when the entitlement is gone');
@@ -191,29 +201,29 @@ eq(subs.get('id-g')?.status, 'expired', 'Apple row expires when the entitlement 
 // Red team (2026-10-02): a live card plan is never relabelled 'apple' by a RevenueCat sync.
 reset();
 subs.set('id-k', { identity_id: 'id-k', provider: 'stripe', status: 'active', current_period_end: future, stripe_subscription_id: 'sub_live', stripe_customer_id: 'cus_k' });
-subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: later } } };
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', is_sandbox: false, expires_date: later } } };
 eq(await syncRevenueCat(UID, 'id-k'), true, 'card plan + Apple plan: Pro');
 eq([writes.length, subs.get('id-k')?.provider, subs.get('id-k')?.apple_status], [1, 'stripe', 'active'], 'Apple is mirrored without rewriting a live Stripe plan');
 reset();
 subs.set('id-coexist', { identity_id: 'id-coexist', provider: 'stripe', status: 'past_due', current_period_end: future, stripe_subscription_id: 'sub_due', stripe_customer_id: 'cus_due' });
-subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future } } };
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', is_sandbox: false, expires_date: future } } };
 eq(await syncRevenueCat(UID, 'id-coexist'), true, 'past_due card + paid Apple stays Pro');
 const { publicSubscription } = await import('../api/_lib/access.ts');
 eq([subs.get('id-coexist')?.status, subs.get('id-coexist')?.stripe_subscription_id, subs.get('id-coexist')?.apple_status,
   publicSubscription(subs.get('id-coexist') as never)?.provider, publicSubscription(subs.get('id-coexist') as never)?.cardPlan],
   ['past_due', 'sub_due', 'active', 'apple', true], 'Apple access is persisted while the card remains manageable');
-subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: future, refunded_at: new Date().toISOString() } } };
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', is_sandbox: false, expires_date: future, refunded_at: new Date().toISOString() } } };
 eq(await syncRevenueCat(UID, 'id-coexist'), false, 'a refund removes Apple access when the card is past due');
 eq([subs.get('id-coexist')?.apple_status, publicSubscription(subs.get('id-coexist') as never)?.appleActive], ['refunded', false], 'refund revokes the Apple mirror');
 reset();
 subs.set('id-l', { identity_id: 'id-l', provider: 'stripe', status: 'past_due', current_period_end: future, stripe_subscription_id: 'sub_live' });
-subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: new Date(Date.now() - 1000).toISOString() } } };
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', is_sandbox: false, expires_date: new Date(Date.now() - 1000).toISOString() } } };
 eq(await syncRevenueCat(UID, 'id-l'), false, 'past_due card + expired Apple: no Pro');
 eq([writes.length, subs.get('id-l')?.provider, subs.get('id-l')?.apple_status], [1, 'stripe', 'expired'], 'a past_due Stripe row stays Stripe and expired Apple is recorded');
 // Apple billing grace period keeps Pro.
 reset();
 const grace = new Date(Date.now() + 10 * 86_400_000).toISOString();
-subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', expires_date: new Date(Date.now() - 3600_000).toISOString(), grace_period_expires_date: grace } } };
+subscriber = { entitlements: ent('a'), subscriptions: { a: { store: 'app_store', is_sandbox: false, expires_date: new Date(Date.now() - 3600_000).toISOString(), grace_period_expires_date: grace } } };
 eq(await syncRevenueCat(UID, 'id-m'), true, 'billing grace period keeps Pro');
 eq(subs.get('id-m')?.current_period_end, grace, 'grace end stored as the period end');
 
@@ -354,7 +364,7 @@ process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test';
 const { POST: webhook } = await import('../api/stripe-webhook.ts');
 const IDN = '22222222-2222-4222-8222-222222222222';
 const deliver = async (event: Record<string, unknown>) => {
-  const raw = JSON.stringify(event); const t = Math.floor(Date.now() / 1000);
+  const raw = JSON.stringify({livemode:true,...event}); const t = Math.floor(Date.now() / 1000);
   const sig = createHmac('sha256', 'whsec_test').update(`${t}.${raw}`).digest('hex');
   return webhook(new Request('https://bobbyprotocol.xyz/api/stripe-webhook', { method: 'POST', body: raw, headers: { 'stripe-signature': `t=${t},v1=${sig}` } }));
 };
@@ -399,12 +409,13 @@ eq([w.status, subs.has(IDN)], [200, false], 'a test-mode subscription never gran
 delete process.env.VERCEL_ENV;
 
 reset();
-stripeSubscription = { id: 'sub_invoice', metadata: {} };
-w = await deliver({ id: 'evt_invoice_early', type: 'invoice.paid', data: { object: { id: 'in_early', amount_paid: 490, currency: 'usd',
+stripeSubscription = { id: 'sub_invoice', customer:'cus_9', metadata: {} };
+stripeInvoice = { id:'in_early', customer:'cus_9', subscription:'sub_invoice', amount_paid:490, currency:'usd', billing_reason:'subscription_create', created:1000, livemode:true };
+w = await deliver({ id: 'evt_invoice_early', type: 'invoice.paid', data: { object: { id: 'in_early', customer:'cus_9', amount_paid: 490, currency: 'usd',
   subscription: 'sub_invoice', billing_reason: 'subscription_create', created: 1000, livemode: true } } });
 eq([w.status, purchases.get('stripe-invoice-in_early')?.identity_id], [200, null], 'out-of-order invoice is recorded before ownership is known');
-stripeSubscription = { id: 'sub_invoice', metadata: { identity_id: IDN } };
-w = await deliver({ id: 'evt_invoice_distinct', type: 'invoice.paid', data: { object: { id: 'in_early', amount_paid: 490, currency: 'usd',
+stripeSubscription = { id: 'sub_invoice', customer:'cus_9', metadata: { identity_id: IDN } };
+w = await deliver({ id: 'evt_invoice_distinct', type: 'invoice.paid', data: { object: { id: 'in_early', customer:'cus_9', amount_paid: 490, currency: 'usd',
   subscription: 'sub_invoice', billing_reason: 'subscription_create', created: 1000, livemode: true } } });
 eq([w.status, purchases.size, purchases.get('stripe-invoice-in_early')?.identity_id, purchases.get('stripe-invoice-in_early')?.price_usd], [200, 1, IDN, 4.9],
   'a distinct Stripe Event for one invoice dedupes and repairs identity without changing amount');
@@ -413,7 +424,8 @@ eq([w.status, purchases.size, purchases.get('stripe-invoice-in_early')?.identity
 // charge.refunded events are repeated or arrive after a later partial refund.
 reset();
 subs.set(IDN, { identity_id: IDN, provider: 'stripe', status: 'active', stripe_subscription_id: 'sub_1', stripe_customer_id: 'cus_9' });
-charge = { id: 'ch_1', customer: 'cus_9', currency: 'usd', livemode: true, billing_details: { address: { country: 'US' } } };
+stripeInvoice = {id:'in_refund',customer:'cus_9',subscription:'sub_1'};
+charge = { id: 'ch_1', invoice:'in_refund', customer: 'cus_9', currency: 'usd', livemode: true, billing_details: { address: { country: 'US' } } };
 refunds = [
   { id: 're_first', charge: 'ch_1', status: 'succeeded', amount: 100, currency: 'usd', created: 1000 },
   { id: 're_second', charge: 'ch_1', status: 'succeeded', amount: 150, currency: 'usd', created: 2000 },
@@ -428,7 +440,7 @@ eq([purchases.get('stripe-refund-re_first')?.identity_id, purchases.get('stripe-
 w = await deliver(refundEvent);
 eq([w.status, purchases.size], [200, 2], 'repeated charge.refunded events dedupe by refund id');
 refunds[2].status = 'succeeded';
-w = await deliver({ id: 'evt_refund_update', type: 'refund.updated', data: { object: { id: 're_pending', charge: 'ch_1' } } });
+w = await deliver({ id: 'evt_refund_update', type: 'refund.updated', data: { object: refunds[2] } });
 eq([w.status, purchases.size, purchases.get('stripe-refund-re_pending')?.price_usd], [200, 3, -0.5], 'a later successful async refund is added once');
 
 // The portal finds the customer at Stripe when the row does not carry it yet (webhook pending), and never creates one.

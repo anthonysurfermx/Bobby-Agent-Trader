@@ -64,7 +64,7 @@ newShape.lines.data[0].parent.subscription_item_details.proration = true;
 no(proof(sub(), newShape), 'proration alone is not a paid full subscription period');
 
 let liveSub: any = sub(), liveInvoice: any = invoice();
-let liveCharge: any = { id: cid, payment_intent: pid, customer, livemode: true,
+let liveCharge: any = { id: cid, payment_intent: pid, customer, currency: 'usd', invoice: iid, livemode: true,
                         paid: true, captured: true, disputed: false, amount: 499, amount_refunded: 0 };
 let livePayments: any[] = [{
   invoice: iid, status: 'paid', livemode: true, currency: 'usd', amount_paid: 499,
@@ -93,7 +93,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   if (url.includes('/bobby_subscriptions?stripe_customer_id'))
     return json(mirrored?.stripe_customer_id === customer ? [{ identity_id: mirrored.identity_id }] : []);
   if (url.includes('/bobby_subscriptions?stripe_subscription_id'))
-    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id }] : []);
+    return json(mirrored?.stripe_subscription_id === sid ? [{ identity_id: mirrored.identity_id, stripe_customer_id: mirrored.stripe_customer_id }] : []);
   // The webhook reads the account's current row before writing (a late state never overwrites another live plan).
   if (url.includes('/bobby_subscriptions?identity_id=eq.')) return json(mirrored ? [mirrored] : []);
   if (url.includes('/bobby_subscriptions?on_conflict')) {
@@ -107,8 +107,16 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
   // The ledger falls back to the subscription's metadata owner while the row is not written yet.
   if (url.includes('/bobby_identities?id=eq.')) return json([{ id: new URL(url).searchParams.get('id')!.replace('eq.', '') }]);
   if (url.includes('/bobby_purchase_events')) {
-    if (method === 'PATCH') return new Response(null, { status: 204 });
-    purchaseRows.push(JSON.parse(String(init?.body))); return json(null, 201);
+    const id = new URL(url).searchParams.get('id')?.replace(/^eq\./, '');
+    const row = purchaseRows.find((r) => r.id === id);
+    if (method === 'PATCH') {
+      if (!row || row.identity_id) return json([]);
+      row.identity_id = JSON.parse(String(init?.body)).identity_id; return json([{ identity_id: row.identity_id }]);
+    }
+    if (method === 'GET') return json(row ? [{ identity_id: row.identity_id }] : []);
+    const body = JSON.parse(String(init?.body));
+    if (!purchaseRows.some((r) => r.id === body.id)) purchaseRows.push(body);
+    return json(null, 201);
   }
   throw new Error(`unexpected ${method} ${url}`);
 }) as typeof fetch;

@@ -4,6 +4,8 @@
 // everything the iPhone cannot: the Base swap on a LONG, the wallet, and the rest of the desk
 // (sign-in, XP, gear, Trader Land) now living behind the avatar, in the profile.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import ClientReadPresentation from './ClientReadPresentation';
+import type { TelemetryReceipt } from '@/lib/client-telemetry';
 import { AnimatePresence, motion } from 'framer-motion';
 import * as Dialog from '@radix-ui/react-dialog';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
@@ -140,6 +142,7 @@ export default function NucleoDesk() {
   const [input, setInput] = useState(() => returned?.transcript?.at(-1)?.role === 'user' ? returned.transcript.at(-1)!.text : '');
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
+  const [readReceipt, setReadReceipt] = useState<TelemetryReceipt | null>(null);
   const [series, setSeries] = useState<Candle[]>([]);
   const [pending, setPending] = useState<Resolution | null>(null);
   const [award, setAward] = useState<{ xp: number; noTrade: boolean } | null>(null);
@@ -238,6 +241,7 @@ export default function NucleoDesk() {
     setDeskRetry(null);
     setSnapshot(snap);
     setAnswer(null);
+    setReadReceipt(null);
     setAgents(null);
     setAgentsFailed(null);
     setLive({});
@@ -329,6 +333,7 @@ export default function NucleoDesk() {
     const g = run.agents;
     setAgents(g);
     setAnswer(a);
+    setReadReceipt(g ? run.telemetry ?? null : null);
     setReadSeq((n) => n + 1);
     if (!g) {
       // The agents did not finish: the market read stays, clearly marked; no verdict, no XP. A premium
@@ -673,7 +678,7 @@ export default function NucleoDesk() {
   }, [answer, snapshot, change]);
 
   const resultStage = done && debate && answer && snapshot ? (
-    <div className="flex w-full flex-col items-center">
+    <ClientReadPresentation receipt={readReceipt} blocked={sheet !== 'none' || inviteOpen || signInPrompt || !!limit || !!inspected || !!evolution || !!drops[0]}>
       <div className="n-verdict-row">
         <div className="n-sats left">{sats.filter((_, i) => i % 2 === 0).map((s, i) => <Satellite key={s.k} {...s} delay={0.15 + i * 0.14} />)}</div>
         <div className="grid place-items-center" style={{ padding: desktop ? 36 : 22 }}>
@@ -703,7 +708,7 @@ export default function NucleoDesk() {
       <div className="mt-8 w-full">
         <NucleoChart series={series} answer={answer} debate={agentsFailed ? null : debate} watch={agentsFailed ? null : agents?.synthesis?.watchLevel ?? null} symbol={snapshot.symbol} isEquity={snapshot.isEquity} drawKey={readSeq} height={desktop ? 280 : 220} />
       </div>
-    </div>
+    </ClientReadPresentation>
   ) : null;
 
   const thesisCard = done && debate && answer && snapshot ? (() => {

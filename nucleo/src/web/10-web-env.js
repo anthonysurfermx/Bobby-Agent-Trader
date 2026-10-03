@@ -130,6 +130,8 @@
     if (o.timeoutMs) timer = setTimeout(function () { timedOut = true; if (ctl) ctl.abort(); }, o.timeoutMs);
     function done() { clearTimeout(timer); if (o.signal) o.signal.removeEventListener('abort', onAbort); }
     var init = { method: o.method || 'GET', credentials: 'same-origin', cache: 'no-store', headers: {}, signal: ctl ? ctl.signal : undefined };
+    if (window.BobbyClientTelemetry && path.charAt(0) === '/' && path.charAt(1) !== '/') init.headers = window.BobbyClientTelemetry.headers();
+    if (o.headers) Object.keys(o.headers).forEach(function (key) { init.headers[key] = o.headers[key]; });
     if (o.body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(o.body); }
     if (cancelled) { done(); var e0 = new Error('cancelled'); e0.kind = 'cancelled'; return Promise.reject(e0); }
     return fetch(path, init).then(function (res) {

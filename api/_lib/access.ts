@@ -77,14 +77,14 @@ async function rpc(name: string, body: Record<string, unknown>): Promise<Record<
   }
 }
 
-/** Who is asking; an expired or bad token counts as anonymous, an auth outage too (served, never blocked). */
-async function who(req: VercelRequest): Promise<Identity | null> {
+/** Who is asking; an expired or bad token counts as anonymous, an auth outage too (served, never blocked). Never throws. */
+export async function resolveCaller(req: VercelRequest): Promise<Identity | null> {
   try { return await resolveIdentity(req); } catch { return null; }
 }
 
 /** Check and record one read. */
 export async function consumeRead(req: VercelRequest, symbol: string, options: { strict?: boolean; identity?: Identity | null } = {}): Promise<ReadGate> {
-  const identity = options.identity === undefined ? await who(req) : options.identity;
+  const identity = options.identity === undefined ? await resolveCaller(req) : options.identity;
   // A signed-in read keeps its install too (the owner's funnel pairs install and account); the meter still counts
   // accounts by account and guests by install (bobby_consume_read, 20261001230000).
   const device = deviceHash(req);
@@ -116,7 +116,8 @@ export async function touchDevice(req: VercelRequest, identity: Identity | null)
   });
 }
 
-export type DeskOutcome = 'read_done' | 'read_failed' | 'wall_signin' | 'wall_paywall' | 'wall_level' | 'desk_blocked';
+/** `read_abandoned`: the reader closed the request before the answer reached them (not a failure of the desk). */
+export type DeskOutcome = 'read_done' | 'read_failed' | 'read_abandoned' | 'wall_signin' | 'wall_paywall' | 'wall_level' | 'desk_blocked';
 
 /** What the server saw happen at the desk, for the owner's funnel (bobby_events). Never throws, never delays. */
 export async function recordOutcome(req: VercelRequest, event: DeskOutcome, identity: Identity | null | undefined, detail: string | null = null): Promise<void> {
@@ -147,12 +148,23 @@ export async function refundRead(readId: number | null): Promise<boolean> {
 
 /** The access state without consuming a read. */
 export async function readAccess(req: VercelRequest, identity?: Identity | null): Promise<Access> {
-  const id = identity === undefined ? await who(req) : identity;
+  const id = identity === undefined ? await resolveCaller(req) : identity;
   const row = await rpc('bobby_read_access', { p_identity: id?.id ?? null, p_device: id ? null : deviceHash(req), p_paywall: paywallOn() });
   return row ? shape(row) : OPEN;
 }
 
-export interface SubscriptionRow { identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null; current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null; apple_original_transaction_id: string | null; environment?: 'production' | 'sandbox' | null; period_type?: string | null; apple_status?: string | null; apple_current_period_end?: string | null; apple_product_id?: string | null; apple_environment?: 'production' | 'sandbox' | null; apple_period_type?: string | null }
+export type SubscriptionEnvironment = 'production' | 'sandbox' | 'unknown';
+export type SubscriptionPeriodType = 'normal' | 'trial' | 'intro' | 'prepaid' | 'unknown';
+/** Commercial evidence is optional on older schemas and does not determine Pro access. */
+export interface SubscriptionRow {
+  identity_id: string; provider: 'stripe' | 'apple'; status: string; product_id: string | null;
+  current_period_end: string | null; stripe_customer_id: string | null; stripe_subscription_id: string | null;
+  apple_original_transaction_id: string | null; environment?: SubscriptionEnvironment | null;
+  period_type?: string | null; store_checked_at?: string | null; apple_status?: string | null;
+  apple_current_period_end?: string | null; apple_product_id?: string | null;
+  apple_environment?: 'production' | 'sandbox' | null; apple_period_type?: string | null;
+}
+
 
 export async function getSubscription(identityId: string): Promise<SubscriptionRow | null> {
   const r = await fetch(bobbyRest(`bobby_subscriptions?identity_id=eq.${identityId}&select=*`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
@@ -162,12 +174,29 @@ export async function getSubscription(identityId: string): Promise<SubscriptionR
 }
 
 export async function upsertSubscription(row: Partial<SubscriptionRow> & { identity_id: string; provider: 'stripe' | 'apple'; status: string }): Promise<void> {
-  const r = await fetch(bobbyRest('bobby_subscriptions?on_conflict=identity_id'), {
-    method: 'POST',
-    headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
-    body: JSON.stringify({ ...row, updated_at: new Date().toISOString() }),
+  const payload = { ...row, updated_at: new Date().toISOString() };
+  // New evidence columns must never make an otherwise valid store sync depend on deployment order.
+  for (const key of ['environment', 'period_type'] as const) if (key in payload && payload[key] == null) payload[key] = 'unknown';
+  const write = (body: typeof payload) => fetch(bobbyRest('bobby_subscriptions?on_conflict=identity_id'), {
+    method: 'POST', headers: bobbyServiceHeaders({ Prefer: 'resolution=merge-duplicates,return=minimal' }),
+    body: JSON.stringify(body), signal: AbortSignal.timeout(4000),
   });
-  if (!r.ok) throw new Error(`subscription upsert ${r.status} ${await r.text().catch(() => '')}`);
+  let response = await write(payload);
+  if (response.ok) return;
+  let detail = await response.text().catch(() => '');
+  const missingEvidenceColumn = /"code"\s*:\s*"PGRST204"/.test(detail) && /store_checked_at/.test(detail);
+  const oldEvidenceConstraint = /"code"\s*:\s*"23514"/.test(detail) && /bobby_subscriptions_(environment|period_type)_check/.test(detail);
+  if (missingEvidenceColumn || oldEvidenceConstraint) {
+    const compatible = { ...payload };
+    delete compatible.store_checked_at;
+    // Omission gets NULL on the old schema and the unknown default on the migrated schema.
+    if (compatible.environment === 'unknown') delete compatible.environment;
+    if (compatible.period_type === 'unknown') delete compatible.period_type;
+    response = await write(compatible);
+    if (response.ok) return;
+    detail = await response.text().catch(() => '');
+  }
+  throw new Error(`subscription upsert ${response.status} ${detail}`);
 }
 
 export const publicSubscription = (s: SubscriptionRow | null) => {
@@ -202,9 +231,10 @@ function meter(raw: unknown): LevelMeter {
 }
 const tierOf = (v: unknown): Tier => (v === 'pro' || v === 'free' ? v : 'anon');
 
-/** Check and record one premium read. Null when storage is unreachable (the caller refuses the read). */
-export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symbol: string): Promise<(LevelGate & { identity: Identity | null }) | null> {
-  const identity = await who(req);
+/** Check and record one premium read. Null when storage is unreachable (the caller refuses the read).
+ *  `identity`: the caller already resolved by the endpoint (undefined: resolve it here). */
+export async function consumeLevel(req: VercelRequest, level: PremiumLevel, symbol: string, opts: { identity?: Identity | null } = {}): Promise<(LevelGate & { identity: Identity | null }) | null> {
+  const identity = opts.identity === undefined ? await resolveCaller(req) : opts.identity;
   const row = await rpc('bobby_consume_level', {
     p_identity: identity?.id ?? null, p_device: identity ? null : deviceHash(req), p_level: level,
     p_symbol: symbol.slice(0, 24) || null, p_limits: LEVEL_LIMITS,
@@ -233,7 +263,7 @@ export async function refundLevel(useId: number | null): Promise<boolean> {
 
 /** The premium meters without consuming anything. */
 export async function readLevels(req: VercelRequest, identity?: Identity | null): Promise<LevelState | null> {
-  const id = identity === undefined ? await who(req) : identity;
+  const id = identity === undefined ? await resolveCaller(req) : identity;
   const row = await rpc('bobby_level_state', { p_identity: id?.id ?? null, p_device: id ? null : deviceHash(req), p_limits: LEVEL_LIMITS });
   if (!row) return null;
   const levels = (row.levels ?? {}) as Record<string, unknown>;

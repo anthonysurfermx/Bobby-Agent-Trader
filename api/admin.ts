@@ -3,7 +3,8 @@
 // bobby_admins only (api/_lib/admin.ts). Every change is written to bobby_admin_actions.
 //   GET ?view=me | overview&days=N | lifecycle&days=N | audience&days=N | users&q=&limit=&offset= | coupons | costs
 //       | actions | members | internal          (&internal=1 includes the team's own traffic; default: left out)
-//       overview also carries `growth` (bobby_admin_growth), Search Console and `insights` (api/_lib/admin-insights.ts).
+//       overview carries first-party growth/insights; view=integrations loads delayed providers separately.
+//       view=live reads the 15-minute/hour/day server outcomes; every read exposes source metadata.
 //   POST { action: 'create-coupon' | 'set-coupon-active' | 'grant' | 'delete-user' | 'set-admin'
 //          | 'credit-mark' | 'probe-llm' | 'add-cost' | 'delete-cost' | 'set-assumptions'
 //          | 'set-internal' | 'set-device-internal' | 'remove-internal-network' | 'set-internal-emails'
@@ -14,39 +15,31 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 import {
-  AdminError, actionsView, addCost, auditStart, costsView, couponsView, createCoupon, creditMark, deleteCost, deleteUser, grant, integrations,
-  audienceView, internalView, lifecycleView, membersView, probeProvider, removeInternalNetwork, requireAdmin, rpc, searchConsole, setAdmin,
-  setAssumptions, setCouponActive, setDeviceInternal, setInternal, setInternalEmails,
+  AdminError, actionsView, addCost, auditStart, costsView, couponsView, createCoupon, creditMark, deleteCost, deleteUser, grant,
+  audienceView, internalView, lifecycleView, membersView, probeProvider, removeInternalNetwork, requireAdmin, rpc, setAdmin,
+  setAssumptions, setCouponActive, setDeviceInternal, setInternal, setInternalEmails, overviewBundle, providerBundle, resyncMembership,
 } from './_lib/admin.js';
-import { buildInsights } from './_lib/admin-insights.js';
-import { buildDigest, runDigest } from './_lib/admin-digest.js';
+import { buildDigest, runDigest, sendDigestNow } from './_lib/admin-digest.js';
 import { runAmplitude } from './_lib/amplitude.js';
-import { notifyOwner } from './_lib/provider-alert.js';
 import { growthPlan } from './_lib/admin-plan.js';
 
-/** The overview view in full: figures, integrations, growth, Search Console and the diagnosis built from them. */
-async function overviewBundle(days: number, internal: boolean) {
-  const overview = await rpc<{ days: string[] } & Record<string, unknown>>('bobby_admin_overview', { p_days: days, p_internal: internal });
-  const [integ, growth, search, networks] = await Promise.all([
-    integrations(overview.days ?? []),
-    rpc<Record<string, unknown>>('bobby_admin_growth', { p_days: days, p_internal: internal }),
-    searchConsole(overview.days ?? []),
-    rpc<unknown[]>('bobby_admin_internal_networks', {}).catch(() => []),
-  ]);
-  const insights = buildInsights({ days, overview, growth, integrations: integ, searchConsole: search, networks });
-  return { overview, integrations: integ, growth, searchConsole: search, insights };
-}
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
+import { adminBounded, adminFetch, adminInteger, adminReadMeta, observeAdminSource, withAdminDeadline, withAdminRead } from './_lib/admin-read.js';
 
 export const config = { maxDuration: 60 };
 
 const one = (v: unknown) => (Array.isArray(v) ? v[0] : v) as string | undefined;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  const cron = one(req.query.cron);
+  return withAdminRead(() => dispatch(req, res), { budgetMs: req.method === 'GET' && !cron ? 15_000 : 50_000 });
+}
+
+async function dispatch(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'private, no-store');
   res.setHeader('X-Robots-Tag', 'noindex');
   if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-  if (!await enforcePublicRateLimit(req, res, 'admin', 120, 60)) return;
+  if (!await withAdminDeadline(1200, () => enforcePublicRateLimit(req, res, 'admin', 120, 60, { transport: { fetch: adminFetch, body: adminBounded } }))) return;
   if (req.method === 'GET' && one(req.query.cron) === 'digest') {
     if (!isInternalRequest(req)) return res.status(401).json({ error: 'unauthorized' });
     try { return res.status(200).json(await runDigest()); } catch (e) {
@@ -68,40 +61,52 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'GET') {
       const view = one(req.query.view) ?? 'overview';
       const internal = one(req.query.internal) === '1';
-      const days = Math.min(Math.max(Number(one(req.query.days)) || 30, 1), 365);
+      const days = adminInteger(one(req.query.days), 30, 1, 365);
+      const reply = (body: unknown) => res.status(200).json({ ...(body as Record<string, unknown>), internalMarkFailed: admin.internalMarkFailed, meta: adminReadMeta() });
       if (view === 'me') {
-        const r = await fetch(bobbyRest(`bobby_identities?id=eq.${admin.id}&select=email`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
-        const rows = r.ok ? ((await r.json()) as Array<{ email: string | null }>) : [];
-        return res.status(200).json({ admin: true, email: rows[0]?.email ?? null, identityId: admin.id });
+        const me = await observeAdminSource('me', async () => {
+          const response = await fetch(bobbyRest(`bobby_identities?id=eq.${admin.id}&select=email`), { headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(4000) });
+          if (!response.ok) throw new Error('identity_read_unavailable');
+          return await response.json() as Array<{ email: string | null }>;
+        });
+        // The identity was authenticated above. An absent optional email is not a failed admin check.
+        return reply({ admin: true, email: me?.[0]?.email ?? null, identityId: admin.id });
       }
       if (view === 'overview') {
-        // compare=1: the dashboard's "vs previous period" request only needs the series.
         if (one(req.query.compare) === '1') {
-          return res.status(200).json({ overview: await rpc('bobby_admin_overview', { p_days: days, p_internal: internal }), integrations: null });
+          return reply({ overview: await observeAdminSource('overview', () => rpc('bobby_admin_overview', { p_days: days, p_internal: internal }), true), integrations: null });
         }
-        return res.status(200).json(await overviewBundle(days, internal));
+        return reply(await overviewBundle(days, internal, { coreOnly: true }));
+      }
+      if (view === 'integrations') return reply(await providerBundle(days));
+      if (view === 'live') {
+        const [server, client] = await Promise.all([
+          withAdminDeadline(7000, () => observeAdminSource('live', () => rpc<Record<string, unknown>>('bobby_admin_server_live', { p_internal: internal }), true)),
+          withAdminDeadline(4000, () => observeAdminSource('clientLive', () => rpc<Record<string, unknown>>('bobby_admin_client_live', { p_internal: internal }))),
+        ]);
+        return reply({ live: { ...server, client }, missing: client == null ? ['clientLive'] : [] });
       }
       if (view === 'users') {
         const q = (one(req.query.q) ?? '').trim().slice(0, 120);
-        const limit = Math.min(Math.max(Number(one(req.query.limit)) || 50, 1), 200);
-        const offset = Math.max(Number(one(req.query.offset)) || 0, 0);
-        return res.status(200).json(await rpc('bobby_admin_users', { p_query: q || null, p_limit: limit, p_offset: offset }));
+        const limit = adminInteger(one(req.query.limit), 50, 1, 200);
+        const offset = adminInteger(one(req.query.offset), 0, 0, 1_000_000);
+        return reply(await observeAdminSource('users', () => rpc('bobby_admin_users', { p_query: q || null, p_limit: limit, p_offset: offset }), true));
       }
-      if (view === 'lifecycle') return res.status(200).json(await lifecycleView(days, internal));
-      if (view === 'audience') return res.status(200).json(await audienceView(days, internal));
-      if (view === 'internal') return res.status(200).json(await internalView());
-      if (view === 'costs') return res.status(200).json(await costsView());
-      if (view === 'members') return res.status(200).json(await membersView());
-      if (view === 'coupons') return res.status(200).json(await couponsView());
-      if (view === 'actions') return res.status(200).json(await actionsView());
-      return res.status(400).json({ error: 'Unknown view' });
+      if (view === 'lifecycle') return reply(await lifecycleView(days, internal));
+      if (view === 'audience') return reply(await audienceView(days, internal));
+      if (view === 'internal') return reply(await observeAdminSource('internal', internalView, true));
+      if (view === 'costs') return reply(await observeAdminSource('costs', costsView, true));
+      if (view === 'members') return reply(await observeAdminSource('members', () => membersView(internal), true));
+      if (view === 'coupons') return reply(await observeAdminSource('coupons', couponsView, true));
+      if (view === 'actions') return reply(await observeAdminSource('actions', actionsView, true));
+      return res.status(400).json({ error: 'Unknown view', meta: adminReadMeta() });
     }
 
     let body: Record<string, unknown>;
     try { body = (typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body ?? {}) as Record<string, unknown>; }
     catch { return res.status(400).json({ error: 'Invalid JSON' }); }
     const ACTIONS = ['create-coupon', 'set-coupon-active', 'grant', 'delete-user', 'set-admin', 'credit-mark', 'probe-llm', 'add-cost', 'delete-cost', 'set-assumptions',
-      'set-internal', 'set-device-internal', 'remove-internal-network', 'set-internal-emails', 'preview-digest', 'send-digest', 'growth-plan'];
+      'set-internal', 'set-device-internal', 'remove-internal-network', 'set-internal-emails', 'preview-digest', 'send-digest', 'growth-plan', 'resync-membership'];
     const action = typeof body.action === 'string' && ACTIONS.includes(body.action) ? body.action : null;
     if (!action) return res.status(400).json({ error: 'Unknown action' });
     // Grant receipt, balance and audit must commit together. A lost HTTP/DB response is retried with
@@ -125,9 +130,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw e;
     }
   } catch (e) {
-    if (e instanceof AdminError) return res.status(e.status).json({ error: e.message });
+    if (e instanceof AdminError) return res.status(e.status).json({ error: e.message, ...(req.method === 'GET' ? { meta: adminReadMeta() } : {}) });
     console.error('[admin]', e instanceof Error ? e.message : e);
-    return res.status(502).json({ error: 'The dashboard data is temporarily unavailable. Try again.' });
+    return res.status(502).json({ error: 'The dashboard data is temporarily unavailable. Try again.', ...(req.method === 'GET' ? { meta: adminReadMeta() } : {}) });
   }
 
   async function runAction(action: string, body: Record<string, unknown>): Promise<{ body: Record<string, unknown>; audit?: Record<string, unknown> }> {
@@ -160,21 +165,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       case 'set-device-internal': await setDeviceInternal(body); return { body: {} };
       case 'remove-internal-network': await removeInternalNetwork(body); return { body: {} };
       case 'growth-plan': {
-        const days = Math.min(Math.max(Number(body.days) || 30, 1), 365);
-        const b = await overviewBundle(days, body.internal === true);
+        const days = adminInteger(body.days, 30, 1, 365);
+        const b = await overviewBundle(days, body.internal === true, { cacheOnly: true, budgetMs: 4000 });
+        if (b.growth == null) throw new AdminError(503, 'The growth facts are unavailable. Try again.');
         const g = b.growth as Record<string, Record<string, unknown>>;
         const metrics = { days, people: g.people, cohorts: g.cohorts, outcomes: g.outcomes, acquisition: { visits: g.acquisition?.visits, visitors: g.acquisition?.visitors, visitsWithUtm: g.acquisition?.visitsWithUtm, sources: g.acquisition?.sources } };
-        const plan = await growthPlan(b.insights, metrics, body.force === true);
-        return { body: { plan }, audit: { cached: plan.cached, usd: plan.usd } };
+        const plan = await growthPlan(b.insights, metrics, body.force === true, { deadline: Date.now() + 30_000, team: body.internal === true ? 'included' : admin!.internalMarkFailed ? 'unverified' : 'excluded' });
+        return { body: { plan, internalMarkFailed: admin!.internalMarkFailed }, audit: { cached: plan.cached, usd: plan.usd } };
       }
       case 'preview-digest': {
         const d = await buildDigest();
         return { body: { subject: d.subject, text: d.text, fresh: d.fresh.length, urgent: d.urgent.length, weekly: d.weekly } };
       }
       case 'send-digest': {
-        const d = await buildDigest();
-        notifyOwner(d.subject, d.text);
-        return { body: { subject: d.subject }, audit: { subject: d.subject } };
+        const d = await sendDigestNow();
+        return { body: { subject: d.subject, accepted: d.accepted, emailId: d.emailId, emailError: d.error }, audit: { subject: d.subject, accepted: d.accepted } };
+      }
+      case 'resync-membership': {
+        const { revenuecatActive, accessKept, subscription } = await resyncMembership(body);
+        return { body: { revenuecatActive, accessKept, subscription }, audit: { revenuecatActive, environment: subscription?.environment ?? null, periodType: subscription?.periodType ?? null } };
       }
       case 'set-internal-emails': {
         const { emails } = await setInternalEmails(body);
