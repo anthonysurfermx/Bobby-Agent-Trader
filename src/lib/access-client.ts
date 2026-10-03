@@ -3,6 +3,7 @@
 // account credential (Apple/Google session first, the wallet session second).
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { progressHeaders } from '@/lib/companions/sync';
+import { browserDeviceId } from './device-id';
 
 export type Tier = 'anon' | 'free' | 'pro';
 /** `bonus`: gifted Quick reads, separate from `remaining`; Pro keeps its balance while reads are unlimited. */
@@ -23,18 +24,8 @@ export interface AccessState {
   plans?: { limits: Record<Tier, Record<PremiumLevel, [number, number]>>; referral: { maxFriends: number; rewardDays: number }; freeReadsPerWeek: number | null };
 }
 
-const DEVICE_KEY = 'bobby:device:v1';
-
 export function deviceId(): string {
-  try {
-    const have = localStorage.getItem(DEVICE_KEY);
-    if (have && /^[A-Za-z0-9-]{16,64}$/.test(have)) return have;
-    const id = crypto.randomUUID();
-    localStorage.setItem(DEVICE_KEY, id);
-    return id;
-  } catch {
-    return crypto.randomUUID();
-  }
+  return browserDeviceId();
 }
 
 export async function accessHeaders(): Promise<Record<string, string>> {

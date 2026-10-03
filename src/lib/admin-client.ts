@@ -1,5 +1,5 @@
 // The owner dashboard's view of /api/admin. Every call carries the same Bobby credential as the rest of
-// the web (accessHeaders: the Apple/Google session, the install id and the platform); the server decides
+// the web (accessHeaders: the verified account session, the install id and the platform); the server decides
 // who is an admin. Postgres numerics may arrive as numbers or numeric strings, so every response is
 // normalized here. A field the server did not send is never turned into a silent zero: its path goes into
 // `missing`, and the components show "—" and "dato no disponible" for it.
@@ -33,6 +33,21 @@ export interface AdminLive {
     callLatencyP50Ms: number | null; callLatencyP95Ms: number | null; lastCallAt: string | null; lastFailureAt: string | null }>;
   coverage: { readStarted: boolean; clientRendered: boolean; crashes: boolean; buildVersion: boolean; onlinePresence: boolean;
     eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null; llmLedgerCoverageSince: string | null };
+  client: ClientLive | null;
+}
+export interface ClientWindow { minutes: number; since: string | null; foreground: number; background: number; started: number; received: number; rendered: number; webviewTerminations: number; reportedInstalls: number; reportedAccounts: number }
+export interface ClientLivePlatform {
+  presence: { reportedForegroundInstalls: number; reportedForegroundAccounts: number; reportedForegroundSessions: number; latestReportAt: string | null };
+  windows: Record<LiveWindowId, ClientWindow>;
+  latest: { eventAt: string | null; receivedAt: string | null; renderedAt: string | null; webviewTerminationAt: string | null };
+  coverage: { rolloutSince: string | null; readStartedSince: string | null; readReceivedSince: string | null; readRenderedSince: string | null; webviewTerminationSince: string | null };
+  builds: Array<{ appVersion: string | null; appBuild: string | null; reportedInstalls24h: number | null; foregroundInstalls: number | null; latestReportAt: string | null;
+    coverageSince: string | null; readStartedSince: string | null; readReceivedSince: string | null; readRenderedSince: string | null }>;
+}
+export interface ClientLive {
+  presenceTtlSeconds: number | null; platforms: Record<'ios' | 'web', ClientLivePlatform>;
+  health: { status: 'unknown' | 'failure_observed' | 'recovered'; lastErrorAt: string | null; error: string | null;
+    authenticated: boolean | null; lastReportAt: string | null; recovered: boolean | null } | null;
 }
 export interface AdminLiveResponse { live: AdminLive | null; internalMarkFailed: boolean; missing: string[]; meta: AdminMeta | null }
 
@@ -1050,7 +1065,28 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
     latestEventAt: strOrNull(t.latestEventAt), latestOutcomeAt: strOrNull(t.latestOutcomeAt),
     latestCompletedAt: strOrNull(t.latestCompletedAt), latestReadConsumptionAt: strOrNull(t.latestReadConsumptionAt) }; };
   const since = (key: string) => { if (!(key in coverage)) r.mark(`coverage.${key}`); return strOrNull(coverage[key]); };
+  let client: ClientLive | null = null;
+  if (isObj(live.client) && num(obj(live.client.coverage).protocolVersion) === 1) {
+    const c = live.client, cp = r.sec(c, 'platforms', 'client.platforms');
+    const clientPlatform = (pf: 'ios' | 'web'): ClientLivePlatform => {
+      const path = `client.platforms.${pf}`, p = r.sec(cp, pf, path), presence = r.sec(p, 'presence', `${path}.presence`), cov = r.sec(p, 'coverage', `${path}.coverage`), latest = obj(p.latest), cw = r.sec(p, 'windows', `${path}.windows`);
+      return {
+        presence: { reportedForegroundInstalls: r.n(presence, 'reportedForegroundInstalls', `${path}.presence.reportedForegroundInstalls`), reportedForegroundAccounts: r.n(presence, 'reportedForegroundAccounts', `${path}.presence.reportedForegroundAccounts`), reportedForegroundSessions: r.n(presence, 'reportedForegroundSessions', `${path}.presence.reportedForegroundSessions`), latestReportAt: strOrNull(presence.latestReportAt) },
+        windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(cw, id, `${path}.windows.${id}`); return [id, { minutes: num(w.minutes), since: strOrNull(w.since), ...Object.fromEntries(['foreground', 'background', 'started', 'received', 'rendered', 'webviewTerminations', 'reportedInstalls', 'reportedAccounts'].map((key) => [key, r.n(w, key, `${path}.windows.${id}.${key}`)])) }]; })) as ClientLivePlatform['windows'],
+        latest: { eventAt: strOrNull(latest.eventAt), receivedAt: strOrNull(latest.receivedAt), renderedAt: strOrNull(latest.renderedAt), webviewTerminationAt: strOrNull(latest.webviewTerminationAt) },
+        coverage: { rolloutSince: strOrNull(cov.rolloutSince), readStartedSince: strOrNull(cov.readStartedSince), readReceivedSince: strOrNull(cov.readReceivedSince), readRenderedSince: strOrNull(cov.readRenderedSince), webviewTerminationSince: strOrNull(cov.webviewTerminationSince) },
+        builds: (Array.isArray(p.builds) ? p.builds : []).map((raw) => { const b = obj(raw); return { appVersion: strOrNull(b.appVersion), appBuild: strOrNull(b.appBuild), reportedInstalls24h: numOrNull(b.reportedInstalls24h), foregroundInstalls: numOrNull(b.foregroundInstalls), latestReportAt: strOrNull(b.latestReportAt), coverageSince: strOrNull(b.coverageSince), readStartedSince: strOrNull(b.readStartedSince), readReceivedSince: strOrNull(b.readReceivedSince), readRenderedSince: strOrNull(b.readRenderedSince) }; }),
+      };
+    };
+    const health = isObj(c.health) ? c.health : null;
+    client = { presenceTtlSeconds: numOrNull(c.presenceTtlSeconds), platforms: { ios: clientPlatform('ios'), web: clientPlatform('web') }, health: health ? {
+      status: health.status === 'failure_observed' || health.status === 'recovered' ? health.status : 'unknown',
+      lastErrorAt: strOrNull(health.lastErrorAt), error: strOrNull(health.error), lastReportAt: strOrNull(health.lastReportAt),
+      authenticated: typeof health.authenticated === 'boolean' ? health.authenticated : null, recovered: typeof health.recovered === 'boolean' ? health.recovered : null,
+    } : null };
+  }
   return { live: { snapshotAt: strOrNull(live.snapshotAt), includeInternal: live.includeInternal === true,
+    client,
     windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(windows, id, `windows.${id}`); return [id, {
       minutes: num(w.minutes), since: strOrNull(w.since), ios: window(w.ios, `windows.${id}.ios`), web: window(w.web, `windows.${id}.web`) }]; })) as AdminLive['windows'],
     platforms: { ios: timestamps('ios'), web: timestamps('web') },

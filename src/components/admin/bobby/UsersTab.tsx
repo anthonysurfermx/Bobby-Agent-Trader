@@ -415,7 +415,7 @@ function DeleteDialog({ user, onClose, onDone }: { user: AdminUser | null; onClo
       <form onSubmit={submit} className="flex flex-col gap-3">
         <Field
           label={user?.email ? 'Escribe el email de la cuenta para confirmar' : 'Escribe el id completo de la cuenta para confirmar'}
-          hint={user && !user.email ? (user.wallet_only ? 'Las cuentas de wallet no tienen email.' : 'Esta cuenta no tiene email (Apple lo oculta).') : undefined}
+          hint={user && !user.email ? (user.wallet_only ? 'Esta identidad wallet no tiene email.' : user.provider === 'apple' ? 'Esta cuenta no tiene email; Apple permite ocultarlo.' : 'Esta cuenta no tiene email confirmado.') : undefined}
         >
           <TextInput mono value={typed} onChange={(e) => setTyped(e.target.value)} placeholder={expected} autoComplete="off" autoCapitalize="none" spellCheck={false} />
         </Field>

@@ -4,6 +4,7 @@ import { Card, CardHead, ErrorState, Loading, Note, Row, Segmented, StaleBanner,
 import { DASH, fmtInt, fmtTimestamp, fmtUsd } from './format';
 import { CORE_STALE_MS, sourceMetaForError } from './live';
 import SourceFreshness from './SourceFreshness';
+import ClientOperationalPanel from './ClientOperationalPanel';
 
 export default function OperationalPanel({ data, error, loading, updatedAt, onRetry }: {
   data: AdminLiveResponse | null; error: AdminError | null; loading: boolean; updatedAt: string | null; onRetry: () => void;
@@ -38,6 +39,7 @@ export default function OperationalPanel({ data, error, loading, updatedAt, onRe
               {loading && <span>Actualizando…</span>}
               {partial && <Tag tone="orange">Ventana con cobertura parcial</Tag>}
             </div>
+            <ClientOperationalPanel client={live.client} windowId={windowId} missing={data.missing} />
             <div className="grid gap-3 lg:grid-cols-2">
               {(['ios', 'web'] as const).map((pf) => {
                 const t = live.platforms[pf];
@@ -68,7 +70,7 @@ export default function OperationalPanel({ data, error, loading, updatedAt, onRe
             </div>}
             <div className="mt-4"><Note tag="Cobertura">
               Respuestas emitidas y fallos son registros del servidor; no se confirma que se mostraron en el teléfono o navegador.
-              No se mide inicio de cada lectura, crashes, versión instalada ni presencia online. Cero registros no demuestra que toda la app funciona.
+              Los reportes del cliente se muestran aparte para las versiones que los envían. No se mide crash nativo ni presencia de todos los usuarios. Cero registros no demuestra que toda la app funciona.
               {coverage.outcomeCoverageSince ? ` Resultados observados desde ${fmtTimestamp(coverage.outcomeCoverageSince)}.` : ''}
             </Note></div>
           </>

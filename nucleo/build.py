@@ -54,13 +54,16 @@ WEB_BASE = "/nucleo/"
 # desk (openClassic), Trader Land (openNative isla) and the privacy policy (the account sheet).
 WEB_ROUTES = {"app": WEB_BASE, "onboarding": WEB_BASE + "onboarding.html", "classic": "/desk",
               "isla": "/trader-land", "privacy": "/privacy"}
-WEB_CSP = ("default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
+WEB_CSP = ("default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; "
            "font-src https://fonts.gstatic.com data:; img-src 'self' data: blob:; media-src 'self' blob: data:; "
            "connect-src 'self'; base-uri 'none'; form-action 'none'")
 # Web-only differences from the canonical engine sources, applied at build time so src/ stays
 # byte-identical to the iOS branch. Each (file, old, new) must match EXACTLY once or the build stops.
 # They are CONTRACT CHANGE REQUESTS for the iOS branch (README.md); none changes native behaviour.
 WEB_PATCHES = [
+    ("app/55-read.js", "  fsmEvent('reply', r);", "  r.telemetry = res.telemetry || null;\n  fsmEvent('reply', r);"),
+    ("app/80-render.js", "function render(){", "function render(){\n  if (window.BobbyClientTelemetry && READ && READ.model && READ.telemetry && ['VERDICT','HANDBACK','CARDS','PULLING','SAVING','FOLLOWUPS'].indexOf(ST.name) >= 0){ var reportedRead = READ; window.BobbyClientTelemetry.reportVisible(reportedRead.telemetry, ST.name === 'CARDS' ? '#card1' : '#vWord', function(){ return READ === reportedRead && !!reportedRead.model; }, function(){ return !SHEET; }); }"),
+    ("onboarding/99-boot.js", "  renderGhost(); renderTyping();", "  renderGhost(); renderTyping();\n  if (window.BobbyClientTelemetry && W.reply && M && W.reply.telemetry && ['VERDICT','HANDBACK','CARDS','PULLING','SAVING'].indexOf(W.state) >= 0){ var reportedReply = W.reply; window.BobbyClientTelemetry.reportVisible(reportedReply.telemetry, W.state === 'CARDS' ? '#card1' : '#vword', function(){ return W.reply === reportedReply && !!M; }, function(){ return !W.sheetOpen; }); }"),
     # The pre-permission card must not promise an iOS prompt, nor on-device speech, in a browser.
     ("app/40-strings.js",
      "'perm.body': 'iOS will ask for the microphone and speech recognition once.',",
@@ -256,7 +259,7 @@ def build_web_page(page, companions_payload, catalog_payload):
     page_js = web_parts(page)
     out = (tpl.replace("<!--NUCLEO:CSP-->", f'<meta http-equiv="Content-Security-Policy" content="{WEB_CSP}">')
               .replace("<!--NUCLEO:FIXTURES-->", f"<script>window.NUCLEO_WEB={catalog_payload};</script>")
-              .replace("<!--NUCLEO:SHARED-->", "<script>\n" + shared_js + "\n</script>")
+              .replace("<!--NUCLEO:SHARED-->", '<script src="/client-telemetry.js"></script><script>\n' + shared_js + "\n</script>")
               .replace("<!--NUCLEO:JS-->", "<script>\n" + page_js + "\n</script>"))
     n = out.count("__COMPANIONS_JSON__")
     if n != 1:

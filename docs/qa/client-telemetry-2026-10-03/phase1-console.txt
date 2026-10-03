@@ -1,0 +1,26 @@
+  ✓ privileges and shape
+  ✓ F01 memberships classified; payers and money need production evidence
+  ✓ F01 prod state: an unknown environment with a production charge is no payer anywhere
+  ✓ F01 known production environment with unknown period is not current paid membership proof
+  ✓ unowned production charges and refunds are reconciliation evidence, not customer revenue
+  ✓ production billing without converted USD stays explicit pending evidence
+  ✓ F13 new payer = first-ever verified charge in the period
+  ✓ F02 last finished vs last unfinished desk analysis
+  ✓ F04 the first account inherits only the guest days of a shared install
+  ✓ guest activity writers and backfill
+  ✓ F05 a team network reaches the accounts signed in on its installs
+  ✓ F05 the closure chains through pairings; a link can be set aside
+  ✓ F07 lastTopup = the latest positive top-up
+  ✓ F08 members leave the team out unless asked
+  ✓ F09 activeReaders30d needs a read in the window
+  ✓ F11 read_abandoned is an outcome of its own
+  ✓ bobby_record_event keeps a visit with a bad slug
+  ✓ bobby_cache_claim is atomic
+  ✓ live empty means no observed recent events and unavailable coverage
+  ✓ live windows separate consumption, completion, refusal, failure and abandonment
+  ✓ live provider call percentiles are scoped and never user latency
+    growth + overview + economics 646 ms; members + networks + geo 61 ms; live 20 ms
+  ✓ 2,000 installs and 2,000 paired accounts
+    growth + overview + economics 527 ms (1 seed) → 551 ms (153 seeds); members + networks + geo 35 ms; users 174 ms
+  ✓ one component of 4,000 nodes with 150 install seeds costs what one seed costs
+admin-r2-pg: 339 checks passed

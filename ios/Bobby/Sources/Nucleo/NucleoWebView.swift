@@ -157,8 +157,9 @@ final class NucleoWebController: NSObject, WKNavigationDelegate, WKUIDelegate, N
         return .allow
     }
 
-    /// The web content process died (memory pressure): reload the same page; it restores from `session().pendingRead`.
+    /// WebKit content-process termination is not an app crash. Preserve the existing page restoration.
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        BobbyTelemetry.shared.webviewTerminated()
         load(page)
     }
 

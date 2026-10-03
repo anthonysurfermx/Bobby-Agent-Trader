@@ -1,0 +1,19 @@
+
+> vite_react_shadcn_ts@0.0.0 test:client-telemetry
+> node --import tsx scripts/test-client-telemetry-api.mts && node --import tsx scripts/test-client-telemetry-ui.mts && node --test ios/Bobby/Nucleo/tests/presentation-telemetry.test.mjs
+
+[user-identity] auth service unavailable
+client-telemetry-api: 97 checks passed (offline; no production writes)
+test-client-telemetry-ui: 59 checks passed
+✔ valid parsed response alone does not claim presentation (1.031291ms)
+✔ two visible settled frames acknowledge current request once without receipt/content (0.768833ms)
+✔ hidden/background/sheet and unsettled cards do not acknowledge (1.374458ms)
+✔ network failure and replaced read cannot acknowledge old request (0.613084ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 71.751459

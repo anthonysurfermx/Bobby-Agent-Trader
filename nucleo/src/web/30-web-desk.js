@@ -167,9 +167,10 @@
   }
   /** BobbyAPI.debate: POST /api/desk-debate, 100 s. The browser sends this origin's Origin header itself. */
   function debate(symbol, question, isEquity, signal) {
+    var telemetry = window.BobbyClientTelemetry, request = telemetry ? telemetry.beginRead() : null;
     return NW.http('/api/desk-debate', { method: 'POST', timeoutMs: DESK_TIMEOUT, signal: signal,
-      body: { symbol: symbol, question: question, language: NW.lang, assetType: isEquity ? 'equity' : 'crypto' } })
-      .then(function (r) { return parseDebate(r.status, r.json, r.headers); },
+      body: { symbol: symbol, question: question, language: NW.lang, assetType: isEquity ? 'equity' : 'crypto', requestId: request ? request.requestId : undefined } })
+      .then(function (r) { var result = parseDebate(r.status, r.json, r.headers); if (result.kind === 'ok' && request && !(signal && signal.aborted)) result.telemetry = telemetry.received(request, r.json && r.json.telemetry); return result; },
         function (e) { return { kind: e.kind === 'timeout' ? 'timeout' : e.kind === 'cancelled' ? 'cancelled' : 'network' }; });
   }
 
@@ -321,7 +322,7 @@
     var result = {
       v: 1, status: 'ok', requestId: job.requestId, question: job.question, language: NW.lang,
       asset: assetJSON(a), market: mk, technicals: desk.technicals, pulse: pl, agents: desk.agents,
-      provenance: desk.provenance, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false
+      provenance: desk.provenance, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false, telemetry: desk.telemetry || null
     };
     // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
     S.recordQuery(a.symbol, a.isEquity);

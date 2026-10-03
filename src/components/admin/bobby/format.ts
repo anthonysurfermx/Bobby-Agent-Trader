@@ -124,7 +124,7 @@ export function fmtGift(reads?: number | null, profundo?: number | null, maximo?
 }
 
 export const PROVIDER_LABEL: Record<string, string> = {
-  apple: 'Apple', google: 'Google', wallet: 'Wallet', email: 'Email', stripe: 'Stripe', revenuecat: 'RevenueCat',
+  apple: 'Apple', google: 'Google', twitter: 'Twitter / X', other: 'Otro proveedor', wallet: 'Wallet', email: 'Email', stripe: 'Stripe', revenuecat: 'RevenueCat',
   anthropic: 'Anthropic', openai: 'OpenAI', web: 'Web', ios: 'iOS', android: 'Android', unknown: 'Sin dato',
 };
 export const label = (k: string | null | undefined): string => (k ? PROVIDER_LABEL[k] ?? k : DASH);

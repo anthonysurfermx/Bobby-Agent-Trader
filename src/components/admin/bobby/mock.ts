@@ -832,12 +832,32 @@ function liveFixture(bare: boolean, internal: boolean, partial: boolean) {
     blocked: bare ? {} : { daily_limit: Math.round(scale) } });
   const times = { latestEventAt: bare ? null : iso(at - 2 * MIN), latestOutcomeAt: bare ? null : iso(at - MIN),
     latestCompletedAt: bare ? null : iso(at - MIN), latestReadConsumptionAt: bare ? null : iso(at - MIN) };
+  const clientPlatform = (ios: boolean) => {
+    const measuredAt = bare ? null : iso(at - 2 * HOUR), renderedAt = bare || (partial && ios) ? null : measuredAt;
+    const signalAt = bare ? null : iso(at - 20_000);
+    return { presence: { reportedForegroundInstalls: bare ? 0 : ios ? 2 : 4, reportedForegroundAccounts: bare ? 0 : 1,
+      reportedForegroundSessions: bare ? 0 : ios ? 2 : 4, latestReportAt: signalAt },
+      windows: Object.fromEntries([['15m', 15, 1], ['1h', 60, 3], ['24h', 1440, 8]].map(([id, minutes, scale]) => [id, {
+        minutes, since: iso(at - Number(minutes) * MIN), foreground: bare ? 0 : 2 * Number(scale), background: bare ? 0 : Number(scale),
+        started: bare ? 0 : 3 * Number(scale), received: bare ? 0 : 2 * Number(scale), rendered: renderedAt ? 2 * Number(scale) : 0,
+        webviewTerminations: 0, reportedInstalls: bare ? 0 : 3 * Number(scale), reportedAccounts: bare ? 0 : Number(scale),
+      }])), latest: { eventAt: signalAt, receivedAt: bare ? null : iso(at - MIN), renderedAt: renderedAt ? iso(at - MIN) : null, webviewTerminationAt: null },
+      coverage: { rolloutSince: measuredAt, readStartedSince: measuredAt, readReceivedSince: measuredAt, readRenderedSince: renderedAt, webviewTerminationSince: null },
+      builds: bare ? [] : [{ appVersion: 'fixture-version', appBuild: ios ? 'fixture-ios-build' : 'fixture-web-build', reportedInstalls24h: 6,
+        foregroundInstalls: ios ? 2 : 4, latestReportAt: signalAt, coverageSince: measuredAt, readStartedSince: measuredAt,
+        readReceivedSince: measuredAt, readRenderedSince: renderedAt }],
+    };
+  };
   return { live: { snapshotAt: iso(at), includeInternal: internal,
     windows: Object.fromEntries([['15m', 15, 1], ['1h', 60, 3], ['24h', 1440, 12]].map(([id, minutes, scale]) => [id,
       { minutes, since: iso(at - Number(minutes) * MIN), ios: platform(Number(scale), true), web: platform(Number(scale), false) }])),
     platforms: { ios: times, web: times },
     providers: bare ? [] : [{ provider: 'anthropic', model: 'fixture-model', calls24h: 120, failures24h: 1, usd24h: 0.41,
       callLatencyP50Ms: 1450, callLatencyP95Ms: 3400, lastCallAt: iso(at - MIN), lastFailureAt: iso(at - HOUR) }],
+    client: { presenceTtlSeconds: 90, coverage: { protocolVersion: 1, scope: 'instrumented_clients_only', legacyClients: 'unmeasured', crashes: false, successRate: null },
+      platforms: { ios: clientPlatform(true), web: clientPlatform(false) },
+      health: { status: bare ? 'unknown' : partial ? 'failure_observed' : 'recovered', lastErrorAt: bare ? null : iso(at - 10 * MIN),
+        error: bare ? null : 'storage_unavailable', authenticated: bare ? null : true, lastReportAt: bare ? null : iso(at - (partial ? 15 * MIN : 20_000)), recovered: bare ? null : !partial } },
     coverage: { readStarted: false, clientRendered: false, crashes: false, buildVersion: false, onlinePresence: false,
       eventCoverageSince: bare ? null : COVERAGE.eventsSince, outcomeCoverageSince: bare ? null : COVERAGE.outcomesSince,
       readConsumptionCoverageSince: bare ? null : COVERAGE.readsSince, llmLedgerCoverageSince: bare ? null : COVERAGE.ledgerSince } },

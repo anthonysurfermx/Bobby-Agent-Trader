@@ -1,0 +1,489 @@
+
+> vite_react_shadcn_ts@0.0.0 build
+> node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && node scripts/build-client-telemetry.mjs && vite build
+
+[prod-source-guard] ok (local)
+
+> vite_react_shadcn_ts@0.0.0 check:api
+> tsc -p tsconfig.api.json
+
+
+> vite_react_shadcn_ts@0.0.0 check:admin
+> tsc -p tsconfig.admin.json
+
+vite v6.4.3 building for production...
+transforming...
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/utils/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/utils/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/Base64.js (6:27): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/Base64.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@coinbase/wallet-sdk/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@base-org/account/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/ethereum-provider/node_modules/ox/_esm/core/Address.js (6:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/ethereum-provider/node_modules/ox/_esm/core/Address.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/ethereum-provider/node_modules/ox/_esm/core/internal/cursor.js (2:21): A comment
+
+"/*#__PURE__*/"
+
+in "../../bobby-dashboard-live/Bobby-Agent-Trader/node_modules/@walletconnect/ethereum-provider/node_modules/ox/_esm/core/internal/cursor.js" contains an annotation that Rollup cannot interpret due to the position of the comment. The comment will be removed to avoid issues.
+✓ 8781 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/registerSW.js                                         0.13 kB
+dist/manifest.webmanifest                                  0.67 kB
+dist/index.html                                            6.41 kB │ gzip:   2.06 kB
+dist/assets/brotli_wasm_bg-NfWIZley.wasm               1,056.86 kB │ gzip: 497.75 kB
+dist/assets/BobbyAppLandingWorld-CuUSBPVr.css              2.98 kB │ gzip:   0.95 kB
+dist/assets/useNucleoPages-BMUwSyuQ.css                   15.15 kB │ gzip:   3.39 kB
+dist/assets/TraderLandGatePage-TjD6kTNS.css               27.96 kB │ gzip:   6.37 kB
+dist/assets/CompanionDeskPage-Hc_Uni-Y.css                35.31 kB │ gzip:   7.92 kB
+dist/assets/index-aSMjeyOa.css                           323.47 kB │ gzip:  47.49 kB
+dist/assets/connectors-BkiAkXrA.js                         0.03 kB │ gzip:   0.05 kB
+dist/assets/connectors-mXb62Iam.js                         0.03 kB │ gzip:   0.05 kB
+dist/assets/connectors-DAWtxdNk.js                         0.03 kB │ gzip:   0.05 kB
+dist/assets/unit-BrLjPYbF.js                               0.04 kB │ gzip:   0.06 kB
+dist/assets/index-BdQq_4o_.js                              0.06 kB │ gzip:   0.08 kB
+dist/assets/app-store-Dwu6fp8n.js                          0.10 kB │ gzip:   0.11 kB
+dist/assets/skeleton-BelEKjSN.js                           0.21 kB │ gzip:   0.18 kB
+dist/assets/createPublicClient-BjXx_R7N.js                 0.22 kB │ gzip:   0.18 kB
+dist/assets/index-cuU-ZuVu.js                              0.23 kB │ gzip:   0.17 kB
+dist/assets/AreaChart-dxB9_bXu.js                          0.28 kB │ gzip:   0.21 kB
+dist/assets/LineChart-CH81UymE.js                          0.28 kB │ gzip:   0.21 kB
+dist/assets/useLandManifest-DZnQ4Gfb.js                    0.28 kB │ gzip:   0.23 kB
+dist/assets/maxBy-Cyj9-HuF.js                              0.28 kB │ gzip:   0.23 kB
+dist/assets/chevron-down-T3rQ-LA2.js                       0.30 kB │ gzip:   0.25 kB
+dist/assets/chevron-up-Cwhd8llV.js                         0.30 kB │ gzip:   0.25 kB
+dist/assets/chevron-left-Bx4b1GC9.js                       0.30 kB │ gzip:   0.25 kB
+dist/assets/play-CAzWJF_7.js                               0.30 kB │ gzip:   0.25 kB
+dist/assets/square-Dx3bsU9w.js                             0.32 kB │ gzip:   0.26 kB
+dist/assets/BarChart-Dnkn2CHg.js                           0.32 kB │ gzip:   0.23 kB
+dist/assets/plus-BPWlkiTN.js                               0.32 kB │ gzip:   0.26 kB
+dist/assets/filter-BMhZXUsV.js                             0.33 kB │ gzip:   0.26 kB
+dist/assets/arrow-up-Bq2Hhrr8.js                           0.33 kB │ gzip:   0.27 kB
+dist/assets/arrow-down-DuM_Gl_M.js                         0.33 kB │ gzip:   0.27 kB
+dist/assets/arrow-right-B1MruzKQ.js                        0.33 kB │ gzip:   0.27 kB
+dist/assets/arrow-up-right-CXgsShOJ.js                     0.34 kB │ gzip:   0.26 kB
+dist/assets/circle-check-CwEDy3oa.js                       0.35 kB │ gzip:   0.27 kB
+dist/assets/message-square-xpC-UwaU.js                     0.35 kB │ gzip:   0.27 kB
+dist/assets/decodeFunctionData-CFoYjik-.js                 0.35 kB │ gzip:   0.27 kB
+dist/assets/clock-CWyPcDVS.js                              0.35 kB │ gzip:   0.27 kB
+dist/assets/circle-check-big-B6Nj6HRr.js                   0.36 kB │ gzip:   0.29 kB
+dist/assets/loading-spinner-wqLEbdPV.js                    0.37 kB │ gzip:   0.26 kB
+dist/assets/user-CZYlPOWl.js                               0.37 kB │ gzip:   0.29 kB
+dist/assets/rotate-ccw-CLkCUADz.js                         0.37 kB │ gzip:   0.29 kB
+dist/assets/rotate-cw-Dj8Z1VzT.js                          0.37 kB │ gzip:   0.29 kB
+dist/assets/trending-up-DVE21PBS.js                        0.37 kB │ gzip:   0.29 kB
+dist/assets/info-DqGfIMew.js                               0.37 kB │ gzip:   0.28 kB
+dist/assets/cursor-CJGVqvSS.js                             0.37 kB │ gzip:   0.28 kB
+dist/assets/lock-DkSqIr7m.js                               0.38 kB │ gzip:   0.29 kB
+dist/assets/circle-x-BJ7n-Znh.js                           0.38 kB │ gzip:   0.28 kB
+dist/assets/trending-down-Ds12Ol7Q.js                      0.38 kB │ gzip:   0.28 kB
+dist/assets/mail-DZlIKRyw.js                               0.39 kB │ gzip:   0.30 kB
+dist/assets/dollar-sign-DDd9-lHJ.js                        0.39 kB │ gzip:   0.29 kB
+dist/assets/grid-2x2-CJnxD33s.js                           0.39 kB │ gzip:   0.29 kB
+dist/assets/target-BJSQU7U7.js                             0.40 kB │ gzip:   0.27 kB
+dist/assets/activity-DOr_yrNx.js                           0.40 kB │ gzip:   0.30 kB
+dist/assets/copy-tDwNhROt.js                               0.41 kB │ gzip:   0.31 kB
+dist/assets/link-2-tCdvxkCi.js                             0.41 kB │ gzip:   0.31 kB
+dist/assets/heart-BBOqKRl6.js                              0.42 kB │ gzip:   0.31 kB
+dist/assets/twitter-KF8u-7E5.js                            0.42 kB │ gzip:   0.32 kB
+dist/assets/arrow-left-right-DQsfaVwE.js                   0.42 kB │ gzip:   0.30 kB
+dist/assets/circle-alert-D54kKKKl.js                       0.42 kB │ gzip:   0.29 kB
+dist/assets/external-link-YixBpMl5.js                      0.42 kB │ gzip:   0.30 kB
+dist/assets/chart-column-DkSDp00t.js                       0.42 kB │ gzip:   0.30 kB
+dist/assets/eye-Ce-K63Uk.js                                0.43 kB │ gzip:   0.31 kB
+dist/assets/map-pin-DQtpcYf9.js                            0.43 kB │ gzip:   0.33 kB
+dist/assets/log-in-CNwXqNKt.js                             0.43 kB │ gzip:   0.32 kB
+dist/assets/zap-CfJDMn0Z.js                                0.43 kB │ gzip:   0.31 kB
+dist/assets/triangle-alert-B9lEG1A1.js                     0.43 kB │ gzip:   0.31 kB
+dist/assets/mic-X2VmPJBN.js                                0.44 kB │ gzip:   0.31 kB
+dist/assets/shield-CVOkCEgG.js                             0.44 kB │ gzip:   0.33 kB
+dist/assets/book-open-Cm5T6eDv.js                          0.45 kB │ gzip:   0.31 kB
+dist/assets/flame-BlLX0l5K.js                              0.45 kB │ gzip:   0.33 kB
+dist/assets/wallet-DEjzNkTT.js                             0.46 kB │ gzip:   0.31 kB
+dist/assets/send-CgRfexC9.js                               0.46 kB │ gzip:   0.33 kB
+dist/assets/badge-check-C5WcZUSR.js                        0.49 kB │ gzip:   0.31 kB
+dist/assets/shield-check-DdWSPzCc.js                       0.49 kB │ gzip:   0.35 kB
+dist/assets/refresh-cw-CNvROHAZ.js                         0.49 kB │ gzip:   0.32 kB
+dist/assets/apple-CTB3Xdl9.js                              0.49 kB │ gzip:   0.35 kB
+dist/assets/tag--lNYxEr9.js                                0.50 kB │ gzip:   0.35 kB
+dist/assets/youtube-BHbuchLA.js                            0.50 kB │ gzip:   0.32 kB
+dist/assets/bot-BuWQ-DPm.js                                0.50 kB │ gzip:   0.33 kB
+dist/assets/chevron-left-DX9T6mxb.js                       0.51 kB │ gzip:   0.34 kB
+dist/assets/chevron-top-eqmk5GpU.js                        0.51 kB │ gzip:   0.33 kB
+dist/assets/external-link-DquJIUd4.js                      0.51 kB │ gzip:   0.34 kB
+dist/assets/chevron-bottom-BtGVN3jD.js                     0.52 kB │ gzip:   0.34 kB
+dist/assets/chevron-right-DavwwXas.js                      0.52 kB │ gzip:   0.33 kB
+dist/assets/key-round-BhdMk599.js                          0.52 kB │ gzip:   0.36 kB
+dist/assets/share-2-6YIEDZVB.js                            0.53 kB │ gzip:   0.34 kB
+dist/assets/gift-DthmexrJ.js                               0.53 kB │ gzip:   0.35 kB
+dist/assets/trash-2-D3Anj2r6.js                            0.53 kB │ gzip:   0.35 kB
+dist/assets/arrow-top-C4FhBV-W.js                          0.53 kB │ gzip:   0.34 kB
+dist/assets/arrow-bottom-CHpKG3uG.js                       0.53 kB │ gzip:   0.35 kB
+dist/assets/arrow-left-E3WO38rb.js                         0.53 kB │ gzip:   0.34 kB
+dist/assets/arrow-right-CbG6IJMS.js                        0.53 kB │ gzip:   0.35 kB
+dist/assets/layers-CEd4tNOm.js                             0.53 kB │ gzip:   0.34 kB
+dist/assets/radio-EcjfLnan.js                              0.54 kB │ gzip:   0.35 kB
+dist/assets/hammer-BXwsaOFJ.js                             0.54 kB │ gzip:   0.38 kB
+dist/assets/off-Bci8-6aF.js                                0.55 kB │ gzip:   0.35 kB
+dist/assets/textarea-DD8L0D4Y.js                           0.55 kB │ gzip:   0.35 kB
+dist/assets/search-TWytIf_f.js                             0.55 kB │ gzip:   0.36 kB
+dist/assets/close-BkzVD5u9.js                              0.56 kB │ gzip:   0.35 kB
+dist/assets/all-wallets-BrnjTvUC.js                        0.56 kB │ gzip:   0.32 kB
+dist/assets/filters-B1BopKeZ.js                            0.57 kB │ gzip:   0.33 kB
+dist/assets/sprout-Cjpae-gr.js                             0.57 kB │ gzip:   0.39 kB
+dist/assets/github-BdX1D1QA.js                             0.58 kB │ gzip:   0.40 kB
+dist/assets/useSignMessage-DxxqNDSN.js                     0.59 kB │ gzip:   0.36 kB
+dist/assets/info-circle-CXxSvUqs.js                        0.59 kB │ gzip:   0.35 kB
+dist/assets/eye-off-Bxd7mkgr.js                            0.60 kB │ gzip:   0.38 kB
+dist/assets/more-DckYx_wZ.js                               0.61 kB │ gzip:   0.36 kB
+dist/assets/refresh-CKJyvMM5.js                            0.61 kB │ gzip:   0.38 kB
+dist/assets/warning-circle-DTlGCHC4.js                     0.61 kB │ gzip:   0.37 kB
+dist/assets/coinPlaceholder-CIitZ9f8.js                    0.62 kB │ gzip:   0.41 kB
+dist/assets/trophy-CCC5QIfo.js                             0.64 kB │ gzip:   0.39 kB
+dist/assets/compass-C7PdcZ7c.js                            0.64 kB │ gzip:   0.40 kB
+dist/assets/star-JUUFf915.js                               0.64 kB │ gzip:   0.40 kB
+dist/assets/minus-Oc62f7yB.js                              0.65 kB │ gzip:   0.34 kB
+dist/assets/ScrambleText-DeOrtow-.js                       0.65 kB │ gzip:   0.44 kB
+dist/assets/useBobbySession-CcK0TqlP.js                    0.66 kB │ gzip:   0.42 kB
+dist/assets/input-zxbgGlYh.js                              0.66 kB │ gzip:   0.40 kB
+dist/assets/swapVertical-BXlELCb8.js                       0.66 kB │ gzip:   0.39 kB
+dist/assets/swapHorizontal-BFtc42E5.js                     0.67 kB │ gzip:   0.39 kB
+dist/assets/sparkles-hKm41H8R.js                           0.68 kB │ gzip:   0.40 kB
+dist/assets/useVisiblePoll-CRyRUgW3.js                     0.68 kB │ gzip:   0.41 kB
+dist/assets/x-BEFfyrW2.js                                  0.68 kB │ gzip:   0.45 kB
+dist/assets/cursor-transparent-CW5o4n4r.js                 0.70 kB │ gzip:   0.42 kB
+dist/assets/twitterIcon-C-nV8dKJ.js                        0.70 kB │ gzip:   0.44 kB
+dist/assets/mobile-D4d79zIo.js                             0.71 kB │ gzip:   0.38 kB
+dist/assets/swords-DCH5wLI7.js                             0.72 kB │ gzip:   0.39 kB
+dist/assets/checkmark-bold-Dyx1lFMy.js                     0.76 kB │ gzip:   0.49 kB
+dist/assets/chains-B552XXHY.js                             0.81 kB │ gzip:   0.54 kB
+dist/assets/undo-2-CSRfCXix.js                             0.82 kB │ gzip:   0.38 kB
+dist/assets/etherscan-DzxPYUpB.js                          0.82 kB │ gzip:   0.51 kB
+dist/assets/checkmark-ChP5xNDA.js                          0.82 kB │ gzip:   0.54 kB
+dist/assets/help-circle-DlwbLGbF.js                        0.83 kB │ gzip:   0.48 kB
+dist/assets/wallet-Qta-eRjO.js                             0.84 kB │ gzip:   0.48 kB
+dist/assets/bug-V69j9PgB.js                                0.84 kB │ gzip:   0.47 kB
+dist/assets/lightbulb-Br-EmsOe.js                          0.88 kB │ gzip:   0.43 kB
+dist/assets/plus-BaDKn-kj.js                               0.88 kB │ gzip:   0.48 kB
+dist/assets/verify-filled-BaU13oVL.js                      0.88 kB │ gzip:   0.53 kB
+dist/assets/add-CDiSNyvx.js                                0.88 kB │ gzip:   0.49 kB
+dist/assets/brain-DpmHkQXJ.js                              0.90 kB │ gzip:   0.47 kB
+dist/assets/google-DYy4g5tO.js                             0.93 kB │ gzip:   0.52 kB
+dist/assets/three-dots-DtdcOf8S.js                         0.95 kB │ gzip:   0.47 kB
+dist/assets/clock-Dpde3dyH.js                              0.96 kB │ gzip:   0.54 kB
+dist/assets/alert-CbSYqlKN.js                              0.98 kB │ gzip:   0.50 kB
+dist/assets/disconnect-DlnQgvKk.js                         1.00 kB │ gzip:   0.57 kB
+dist/assets/label-BETYv1nN.js                              1.01 kB │ gzip:   0.61 kB
+dist/assets/twitch-nq1HfjxQ.js                             1.01 kB │ gzip:   0.56 kB
+dist/assets/bank-Cakk3eeh.js                               1.06 kB │ gzip:   0.58 kB
+dist/assets/paw-print-BhcgY8CE.js                          1.06 kB │ gzip:   0.51 kB
+dist/assets/volume-x-CIIHWfay.js                           1.07 kB │ gzip:   0.44 kB
+dist/assets/card-Bp7LWF43.js                               1.07 kB │ gzip:   0.42 kB
+dist/assets/apple-B_pihPzy.js                              1.07 kB │ gzip:   0.59 kB
+dist/assets/transactions-BOqHyHZH.js                       1.08 kB │ gzip:   0.64 kB
+dist/assets/separator-Cx1-_TYC.js                          1.12 kB │ gzip:   0.63 kB
+dist/assets/play-store-BaafTKxu.js                         1.12 kB │ gzip:   0.59 kB
+dist/assets/farcaster-C485LKRw.js                          1.13 kB │ gzip:   0.60 kB
+dist/assets/tabs-D-lBtB8m.js                               1.17 kB │ gzip:   0.50 kB
+dist/assets/arrow-bottom-circle-DG45OtKG.js                1.24 kB │ gzip:   0.59 kB
+dist/assets/github-CbuzPl89.js                             1.25 kB │ gzip:   0.66 kB
+dist/assets/useNucleoPages-BSgiN8xw.js                     1.26 kB │ gzip:   0.70 kB
+dist/assets/swapHorizontalBold-BMb4Dvpu.js                 1.28 kB │ gzip:   0.68 kB
+dist/assets/useSwitchChain-3DLeVICx.js                     1.28 kB │ gzip:   0.69 kB
+dist/assets/app-store-B_7Hyctv.js                          1.31 kB │ gzip:   0.73 kB
+dist/assets/mail-BYYnsgYi.js                               1.32 kB │ gzip:   0.72 kB
+dist/assets/facebook-BMF85uWr.js                           1.35 kB │ gzip:   0.70 kB
+dist/assets/wallet-placeholder-BRhmGV1I.js                 1.38 kB │ gzip:   0.66 kB
+dist/assets/desktop-BuAgV2T6.js                            1.39 kB │ gzip:   0.70 kB
+dist/assets/useChainId-DDLMW7x0.js                         1.41 kB │ gzip:   0.79 kB
+dist/assets/discord-D1DtMioR.js                            1.42 kB │ gzip:   0.72 kB
+dist/assets/swapHorizontalMedium-BfnDdnzQ.js               1.42 kB │ gzip:   0.74 kB
+dist/assets/recycle-horizontal-DBSkPovm.js                 1.46 kB │ gzip:   0.77 kB
+dist/assets/localBatchGatewayRequest-BYH4Lf3F.js           1.54 kB │ gzip:   0.74 kB
+dist/assets/extension-BG-sBMKt.js                          1.55 kB │ gzip:   0.76 kB
+dist/assets/telegram-DCvPzuea.js                           1.57 kB │ gzip:   0.90 kB
+dist/assets/swapHorizontalRoundedBold-9DjYN-YX.js          1.57 kB │ gzip:   0.83 kB
+dist/assets/ShortRedirect-BWJCxJfc.js                      1.58 kB │ gzip:   0.77 kB
+dist/assets/verify-1CPzGeJ8.js                             1.59 kB │ gzip:   0.78 kB
+dist/assets/qr-code-BtCOkorB.js                            1.63 kB │ gzip:   0.59 kB
+dist/assets/browser-BBASeP8o.js                            1.69 kB │ gzip:   0.86 kB
+dist/assets/network-placeholder-C_HLJIaK.js                1.77 kB │ gzip:   0.80 kB
+dist/assets/id-CDDXo9r8.js                                 1.86 kB │ gzip:   0.88 kB
+dist/assets/nftPlaceholder-CO14RIbx.js                     1.87 kB │ gzip:   0.94 kB
+dist/assets/PhCaretLeft-_aiyH7n1.js                        1.88 kB │ gzip:   0.92 kB
+dist/assets/PhCaretDown-78IuKU3V.js                        1.94 kB │ gzip:   0.95 kB
+dist/assets/PhCaretRight-8zJQEuDX.js                       1.96 kB │ gzip:   0.94 kB
+dist/assets/useFollowedWallets-Fc3L4eSn.js                 2.01 kB │ gzip:   0.83 kB
+dist/assets/PhCaretUp-CiCxKWwN.js                          2.02 kB │ gzip:   0.93 kB
+dist/assets/PhArrowUpRight-BpJjRRRh.js                     2.06 kB │ gzip:   1.01 kB
+dist/assets/PhArrowDown-C4hT9BVu.js                        2.10 kB │ gzip:   1.01 kB
+dist/assets/PhArrowRight-Cp5ZME0F.js                       2.11 kB │ gzip:   1.00 kB
+dist/assets/PhPlus-BMjcHjsT.js                             2.11 kB │ gzip:   0.96 kB
+dist/assets/PhCheck-CcADx8br.js                            2.11 kB │ gzip:   0.97 kB
+dist/assets/PhArrowLeft-Way4Cu-r.js                        2.12 kB │ gzip:   1.00 kB
+dist/assets/NotFound-CCsLYhPb.js                           2.13 kB │ gzip:   1.08 kB
+dist/assets/PhArrowUp-Dph6j8rm.js                          2.17 kB │ gzip:   1.00 kB
+dist/assets/PhMagnifyingGlass-Mygfryvz.js                  2.21 kB │ gzip:   1.07 kB
+dist/assets/PhBrowser-dUu2TrC1.js                          2.22 kB │ gzip:   0.97 kB
+dist/assets/CheckEmailPage-FSl_lzQk.js                     2.24 kB │ gzip:   1.13 kB
+dist/assets/PhDotsThree-BMXCQl-0.js                        2.25 kB │ gzip:   0.94 kB
+dist/assets/PhFunnelSimple-Ba7BbWTp.js                     2.36 kB │ gzip:   1.00 kB
+dist/assets/PhCopy-C-PDgSlZ.js                             2.36 kB │ gzip:   1.00 kB
+dist/assets/PhClock-UItiXeJq.js                            2.37 kB │ gzip:   1.02 kB
+dist/assets/info-DL_zZqG3.js                               2.38 kB │ gzip:   1.24 kB
+dist/assets/PhWarningCircle-BqjT745H.js                    2.43 kB │ gzip:   1.04 kB
+dist/assets/PhX-s-SmVExa.js                                2.50 kB │ gzip:   1.06 kB
+dist/assets/exclamation-triangle-DU2zgNKB.js               2.54 kB │ gzip:   1.23 kB
+dist/assets/send-BqKTHsZL.js                               2.54 kB │ gzip:   1.37 kB
+dist/assets/PhDeviceMobile-BdsPaATg.js                     2.57 kB │ gzip:   1.06 kB
+dist/assets/PhArrowClockwise-CJPxQhr_.js                   2.59 kB │ gzip:   1.19 kB
+dist/assets/PhUser-CAgZSpGe.js                             2.68 kB │ gzip:   1.26 kB
+dist/assets/PhEnvelope-yUsis6yU.js                         2.68 kB │ gzip:   1.17 kB
+dist/assets/card-Bo--yCLa.js                               2.71 kB │ gzip:   1.24 kB
+dist/assets/chrome-store-oExmU35A.js                       2.71 kB │ gzip:   1.08 kB
+dist/assets/PhCircleHalf-BYzSzd2h.js                       2.71 kB │ gzip:   1.20 kB
+dist/assets/reown-logo-CwxN7Jux.js                         2.72 kB │ gzip:   1.16 kB
+dist/assets/PhSignOut-C5YOWlPT.js                          2.77 kB │ gzip:   1.15 kB
+dist/assets/PhInfo-Cr4DhVUE.js                             2.78 kB │ gzip:   1.21 kB
+dist/assets/PhPower-CGffGmdb.js                            2.78 kB │ gzip:   1.27 kB
+dist/assets/PhDesktop-BBIPrYLl.js                          2.79 kB │ gzip:   1.11 kB
+dist/assets/PhArrowsLeftRight-CuLpbKRk.js                  2.80 kB │ gzip:   1.17 kB
+dist/assets/PhArrowCircleDown-B305t-Sh.js                  2.81 kB │ gzip:   1.17 kB
+dist/assets/PhWallet-w25D16It.js                           2.83 kB │ gzip:   1.17 kB
+dist/assets/lightbulb-vgS2vw0m.js                          2.83 kB │ gzip:   1.30 kB
+dist/assets/PhQuestionMark-BP9EMB6h.js                     2.84 kB │ gzip:   1.30 kB
+dist/assets/UnauthorizedPage-DmVzpRIW.js                   2.86 kB │ gzip:   1.16 kB
+dist/assets/PhArrowSquareOut-NnrK69c5.js                   2.93 kB │ gzip:   1.24 kB
+dist/assets/PhArrowsDownUp-BjBI4ckC.js                     2.93 kB │ gzip:   1.17 kB
+dist/assets/public-C5RlxkTi.js                             2.93 kB │ gzip:   1.52 kB
+dist/assets/PhCreditCard-CWRaUT6F.js                       2.93 kB │ gzip:   1.14 kB
+dist/assets/PhBank-Dchr4XQJ.js                             2.94 kB │ gzip:   1.24 kB
+dist/assets/PhVault-l2PHF38a.js                            2.97 kB │ gzip:   1.19 kB
+dist/assets/defillama.service-DP-oozP1.js                  2.98 kB │ gzip:   1.42 kB
+dist/assets/PhCompass-CUy3uA7t.js                          2.98 kB │ gzip:   1.27 kB
+dist/assets/PhPaperPlaneRight-BeuCA660.js                  3.10 kB │ gzip:   1.42 kB
+dist/assets/PhTrash-Biq6rmmL.js                            3.12 kB │ gzip:   1.18 kB
+dist/assets/NucleoSphere-GuUKePNM.js                       3.19 kB │ gzip:   1.48 kB
+dist/assets/jobs.service-Qo4Sj6LK.js                       3.23 kB │ gzip:   0.92 kB
+dist/assets/PhCurrencyDollar-Cqla3AXT.js                   3.24 kB │ gzip:   1.32 kB
+dist/assets/PhQuestion-M09j2U0T.js                         3.32 kB │ gzip:   1.45 kB
+dist/assets/ccip-B-rZgPhS.js                               3.32 kB │ gzip:   1.53 kB
+dist/assets/calldata-guard-VHlHtvrS.js                     3.33 kB │ gzip:   1.25 kB
+dist/assets/progress-FgkPxtkn.js                           3.42 kB │ gzip:   1.60 kB
+dist/assets/PhImage-BAJ_erz6.js                            3.44 kB │ gzip:   1.44 kB
+dist/assets/BobbySignInPage-BgnEvNpv.js                    3.50 kB │ gzip:   1.59 kB
+dist/assets/startups.service-BdCiPqAI.js                   3.53 kB │ gzip:   1.03 kB
+dist/assets/image-CLvyxWH5.js                              3.61 kB │ gzip:   1.61 kB
+dist/assets/MascotShowcasePage-BNCV2fS5.js                 3.64 kB │ gzip:   1.65 kB
+dist/assets/index-vVb7EcSR.js                              3.68 kB │ gzip:   1.52 kB
+dist/assets/index-C-X8TNcq.js                              3.85 kB │ gzip:   1.79 kB
+dist/assets/PhArrowsClockwise-CFUT8X7R.js                  3.87 kB │ gzip:   1.60 kB
+dist/assets/tokens-DBR3Tu6i.js                             3.88 kB │ gzip:   1.40 kB
+dist/assets/PhWarning-DPEydIPw.js                          3.91 kB │ gzip:   1.49 kB
+dist/assets/copy-CBMd0aY2.js                               3.93 kB │ gzip:   1.55 kB
+dist/assets/checkbox-Dm5E2bWD.js                           3.96 kB │ gzip:   1.75 kB
+dist/assets/index-1p4IZVQB.js                              4.03 kB │ gzip:   1.52 kB
+dist/assets/hashTypedData-81Et0Ow1.js                      4.14 kB │ gzip:   1.70 kB
+dist/assets/walletconnect-CTy6iuE5.js                      4.18 kB │ gzip:   1.75 kB
+dist/assets/PhIdentificationCard-Czjmq9Z3.js               4.22 kB │ gzip:   1.65 kB
+dist/assets/ResourcesPage-CTfpA2rQ.js                      4.24 kB │ gzip:   1.75 kB
+dist/assets/PhSpinner-BXooDYzU.js                          4.45 kB │ gzip:   1.64 kB
+dist/assets/index-w1iPMKYf.js                              4.62 kB │ gzip:   1.42 kB
+dist/assets/parseSignature-C6ZI0K3v.js                     4.88 kB │ gzip:   2.24 kB
+dist/assets/PhLightbulb-BX_7duTr.js                        4.92 kB │ gzip:   1.88 kB
+dist/assets/PhQrCode-DRwRzXCH.js                           4.92 kB │ gzip:   1.46 kB
+dist/assets/UserSettings-CiyfH7c-.js                       5.04 kB │ gzip:   1.48 kB
+dist/assets/PhPuzzlePiece-wm_GpVSi.js                      5.37 kB │ gzip:   1.98 kB
+dist/assets/PhGlobe-DgLxBk5U.js                            5.72 kB │ gzip:   1.93 kB
+dist/assets/ChainTVLChart-CcH0GNa0.js                      5.81 kB │ gzip:   2.42 kB
+dist/assets/features-DXZuPoP3.js                           6.09 kB │ gzip:   2.44 kB
+dist/assets/StartupsPage-D2a3aZu4.js                       6.20 kB │ gzip:   2.35 kB
+dist/assets/events.service-DaKAEk7q.js                     6.29 kB │ gzip:   1.29 kB
+dist/assets/index.web-Bqyr3zbv.js                          6.35 kB │ gzip:   2.20 kB
+dist/assets/BobbyBountyPage-CdH4TEr9.js                    6.59 kB │ gzip:   2.60 kB
+dist/assets/CartesianGrid-UEVodAey.js                      6.78 kB │ gzip:   2.36 kB
+dist/assets/receive-DMwdLw2f.js                            6.80 kB │ gzip:   2.45 kB
+dist/assets/BobbyRiskPage-FAw7Uqo5.js                      6.93 kB │ gzip:   2.81 kB
+dist/assets/AuthCallback-hanG7bhG.js                       7.04 kB │ gzip:   2.73 kB
+dist/assets/ForgotPasswordPage-P1Vz06Cs.js                 7.22 kB │ gzip:   2.76 kB
+dist/assets/AIInsightsTerminal-CCYk2S3g.js                 7.44 kB │ gzip:   2.83 kB
+dist/assets/BobbyPortfolioPage-P-rqTcdB.js                 7.49 kB │ gzip:   2.53 kB
+dist/assets/BobbyRedeemPage-CRn648TQ.js                    7.64 kB │ gzip:   3.12 kB
+dist/assets/HackathonProjectsPage-C5DGEkOX.js              8.09 kB │ gzip:   2.60 kB
+dist/assets/index-Ciz7nBDb.js                              8.09 kB │ gzip:   3.35 kB
+dist/assets/ProposeCommunity-C7Cs2HG8.js                   8.11 kB │ gzip:   2.40 kB
+dist/assets/SignalPanel-COS19Y3A.js                        8.12 kB │ gzip:   2.31 kB
+dist/assets/ProposeReferent-C_DXt93r.js                    8.18 kB │ gzip:   2.58 kB
+dist/assets/communities.service-f14jd1tx.js                8.19 kB │ gzip:   1.58 kB
+dist/assets/RegisterPage-CbGo5wtE.js                       8.68 kB │ gzip:   3.07 kB
+dist/assets/BobbyAgentsPage-VkHDjSNs.js                    8.71 kB │ gzip:   3.08 kB
+dist/assets/EventDetailPage-DxkPF035.js                    8.78 kB │ gzip:   3.10 kB
+dist/assets/BobbyAgentConsolePage-BlJZRha6.js              8.95 kB │ gzip:   3.03 kB
+dist/assets/TikTokFeedPage-B9libh93.js                     9.25 kB │ gzip:   2.92 kB
+dist/assets/BlogComments-ksQX46kf.js                       9.37 kB │ gzip:   2.96 kB
+dist/assets/ProposeStartup-DprQnJa_.js                     9.45 kB │ gzip:   2.70 kB
+dist/assets/KineticShell-Cfd3ywS_.js                       9.47 kB │ gzip:   3.65 kB
+dist/assets/ProposeJob-C9hltXEf.js                         9.65 kB │ gzip:   2.87 kB
+dist/assets/index-FGHPnIN9.js                              9.76 kB │ gzip:   3.27 kB
+dist/assets/index-C9E-B_Dc.js                              9.77 kB │ gzip:   3.66 kB
+dist/assets/index-aabTe7OH.js                              9.77 kB │ gzip:   3.17 kB
+dist/assets/blog.service-tAoQV8Nm.js                       9.79 kB │ gzip:   3.01 kB
+dist/assets/useAccount-f-auhPw4.js                         9.82 kB │ gzip:   3.47 kB
+dist/assets/UserDashboard-COb7Yb46.js                      9.87 kB │ gzip:   3.48 kB
+dist/assets/BobbyHistoryPage-Dx-OO3to.js                  10.14 kB │ gzip:   3.36 kB
+dist/assets/BlogPage-D-D0LGLw.js                          10.30 kB │ gzip:   3.96 kB
+dist/assets/ResetPasswordPage-DJ7mq7oo.js                 10.36 kB │ gzip:   3.21 kB
+dist/assets/polymarket.service-CYgaGH_K.js                10.61 kB │ gzip:   3.45 kB
+dist/assets/email-DBSEx9Iw.js                             10.65 kB │ gzip:   2.85 kB
+dist/assets/Area-CJAxTUiI.js                              10.83 kB │ gzip:   3.99 kB
+dist/assets/ProposeEvent-CoWZX3t1.js                      10.83 kB │ gzip:   2.98 kB
+dist/assets/Line-Bhus5sSy.js                              10.98 kB │ gzip:   4.22 kB
+dist/assets/Web3JobsPage-BUmIKZ9X.js                      11.43 kB │ gzip:   3.52 kB
+dist/assets/LoginPage-DBohXARy.js                         11.47 kB │ gzip:   4.05 kB
+dist/assets/useProposals-CIPMDJvQ.js                      11.53 kB │ gzip:   3.54 kB
+dist/assets/BobbyTelegramPage-DevG6Hj_.js                 11.68 kB │ gzip:   3.68 kB
+dist/assets/PhSealCheck-BfG80yKn.js                       12.10 kB │ gzip:   4.04 kB
+dist/assets/BobbyAnalyticsPage-BiVR67Ah.js                12.16 kB │ gzip:   3.96 kB
+dist/assets/ComposedChart-B22642AO.js                     12.18 kB │ gzip:   3.94 kB
+dist/assets/CommunityDetailPage-xvI8vStG.js               12.22 kB │ gzip:   3.56 kB
+dist/assets/BobbySupportPage-BhfCID8r.js                  12.28 kB │ gzip:   5.25 kB
+dist/assets/EventosPage-STPkp58_.js                       12.31 kB │ gzip:   3.58 kB
+dist/assets/StartupDetailPage-B6LdUf1I.js                 12.33 kB │ gzip:   3.33 kB
+dist/assets/DigitalArtDeFiPage-lbOv5SRK.js                13.02 kB │ gzip:   3.44 kB
+dist/assets/data-capture-BKc90cP9.js                      13.11 kB │ gzip:   3.83 kB
+dist/assets/AdvisorSetup-D4rHnlHA.js                      13.48 kB │ gzip:   3.97 kB
+dist/assets/ComunidadesPage-DjqD90KH.js                   13.50 kB │ gzip:   4.30 kB
+dist/assets/DigitalArtGalleryPage-E4zuoMFh.js             14.52 kB │ gzip:   4.02 kB
+dist/assets/playbooks--pDUAllb.js                         14.85 kB │ gzip:   5.56 kB
+dist/assets/BobbyPlaybooksPage-BRAHf3qk.js                15.26 kB │ gzip:   4.28 kB
+dist/assets/SwapController-BbD3kDe8.js                    15.44 kB │ gzip:   4.40 kB
+dist/assets/pay-with-exchange-MvyFzPMW.js                 15.63 kB │ gzip:   4.09 kB
+dist/assets/useScanLimit-B3sRl4y1.js                      15.69 kB │ gzip:   6.31 kB
+dist/assets/BobbyHarnessConsolePage-BggjxUsD.js           15.71 kB │ gzip:   4.56 kB
+dist/assets/BobbyAppLandingA-B8hcD1Eb.js                  15.79 kB │ gzip:   5.60 kB
+dist/assets/VideoTutorialsPage-DPIoeD9S.js                15.90 kB │ gzip:   5.04 kB
+dist/assets/AgenticWorldPage-C44NW_b8.js                  16.25 kB │ gzip:   5.48 kB
+dist/assets/TraderLandWorldsPage-CVyXDFoc.js              16.65 kB │ gzip:   6.04 kB
+dist/assets/index-kzlEvkEN.js                             17.28 kB │ gzip:   4.71 kB
+dist/assets/property-C9JG5tag.js                          17.92 kB │ gzip:   6.52 kB
+dist/assets/BobbyAppLandingB-4K2mCpFz.js                  17.99 kB │ gzip:   5.83 kB
+dist/assets/socials-DpaSK4Np.js                           18.12 kB │ gzip:   4.78 kB
+dist/assets/BobbyMetacognitionPage-BihZoJ0u.js            18.31 kB │ gzip:   5.66 kB
+dist/assets/BobbyHeartbeatPage-CT6hu5T4.js                18.98 kB │ gzip:   5.01 kB
+dist/assets/ClawTraderChatPage-nAZ6oZVT.js                19.20 kB │ gzip:   6.25 kB
+dist/assets/BobbyCallsPage-C5jTDBXc.js                    19.36 kB │ gzip:   6.55 kB
+dist/assets/MetricsPage-CDrwPu-X.js                       19.62 kB │ gzip:   5.33 kB
+dist/assets/BobbyB2BPage-CZMyyHuZ.js                      20.70 kB │ gzip:   5.94 kB
+dist/assets/AdminStartupForm-nPxt16K6.js                  20.79 kB │ gzip:   6.59 kB
+dist/assets/BobbyLandingPage-9zp0Y3TB.js                  20.88 kB │ gzip:   4.94 kB
+dist/assets/NFTGalleryPage-Cu59G04Y.js                    20.93 kB │ gzip:   5.58 kB
+dist/assets/select-DRbBeTOy.js                            22.61 kB │ gzip:   7.90 kB
+dist/assets/embedded-wallet-v7ExUljg.js                   23.66 kB │ gzip:   6.05 kB
+dist/assets/onramp-DoXCkCi6.js                            23.79 kB │ gzip:   5.61 kB
+dist/assets/AgentForumPage-DC3xzWio.js                    25.44 kB │ gzip:   7.51 kB
+dist/assets/DigitalArtStudioPage-CphqXXUW.js              26.42 kB │ gzip:   6.48 kB
+dist/assets/BobbyDocsPage-DesKQqvV.js                     26.56 kB │ gzip:   8.35 kB
+dist/assets/desk-price-BfNDXDXP.js                        27.57 kB │ gzip:  10.18 kB
+dist/assets/LatamExchangesTab-BlkGFkb0.js                 27.85 kB │ gzip:   7.51 kB
+dist/assets/secp256k1-C5Quw1JY.js                         28.01 kB │ gzip:  10.81 kB
+dist/assets/DeployAgentPage-DSozCW09.js                   28.27 kB │ gzip:   9.16 kB
+dist/assets/ConsensusPage-f2RToo7q.js                     29.74 kB │ gzip:   8.63 kB
+dist/assets/BobbySandboxPage-nGmonadd.js                  29.81 kB │ gzip:   7.85 kB
+dist/assets/secp256k1-CeFqFWMO.js                         31.58 kB │ gzip:  12.47 kB
+dist/assets/ClawTraderPage-BSeOgkhc.js                    32.59 kB │ gzip:   8.65 kB
+dist/assets/index-DoFqRRZg.js                             33.40 kB │ gzip:   9.65 kB
+dist/assets/send-DYQ-UOFL.js                              33.53 kB │ gzip:   7.66 kB
+dist/assets/HomePage-DBKGjY8Z.js                          34.43 kB │ gzip:   6.76 kB
+dist/assets/index-Bv3Gdmwm.js                             35.36 kB │ gzip:   8.10 kB
+dist/assets/BobbyAppLandingExperience-Cub2zRZx.js         38.85 kB │ gzip:  11.26 kB
+dist/assets/w3m-modal-el4QRSE2.js                         40.24 kB │ gzip:   9.47 kB
+dist/assets/query-C-fJnC64.js                             42.11 kB │ gzip:  12.77 kB
+dist/assets/w3m-modal-Dp9Wbu_K.js                         48.10 kB │ gzip:  10.89 kB
+dist/assets/TraderLandGatePage-B8-mmfd7.js                55.73 kB │ gzip:  19.19 kB
+dist/assets/swaps-CVFFRmWX.js                             56.31 kB │ gzip:  10.34 kB
+dist/assets/BobbyAppLandingWorld-C1JTnkbk.js              57.36 kB │ gzip:  17.88 kB
+dist/assets/i18n-CSfZxkbL.js                              58.49 kB │ gzip:  19.05 kB
+dist/assets/AgenticLeaderboardPage-Cym_LvcJ.js            63.26 kB │ gzip:  19.14 kB
+dist/assets/PrivacyPage-CMMkUTTj.js                       65.66 kB │ gzip:  22.10 kB
+dist/assets/index-Y5tdHxQb.js                             75.45 kB │ gzip:  15.90 kB
+dist/assets/BobbyMascot3D-LtdDvrXq.js                     79.16 kB │ gzip:  24.37 kB
+dist/assets/zod-CM49zHY7.js                               79.99 kB │ gzip:  21.91 kB
+dist/assets/BobbyProtocolLanding-M0Z1Q5nU.js              89.69 kB │ gzip:  26.34 kB
+dist/assets/public-BgfhzDf0.js                            99.94 kB │ gzip:  32.24 kB
+dist/assets/p256-Bq56z2RT.js                             101.56 kB │ gzip:  32.36 kB
+dist/assets/ui-DgrdkGdb.js                               103.44 kB │ gzip:  31.72 kB
+dist/assets/basic-UaTNHKql.js                            117.49 kB │ gzip:  22.06 kB
+dist/assets/animation-co_0Ytul.js                        138.21 kB │ gzip:  45.59 kB
+dist/assets/BlogPostPage-DaX9BX02.js                     138.39 kB │ gzip:  39.59 kB
+dist/assets/lightweight-charts.production-CtRk52B3.js    168.67 kB │ gzip:  53.81 kB
+dist/assets/CompanionDeskPage-BkWxVcNq.js                171.24 kB │ gzip:  57.57 kB
+dist/assets/BobbyAgentTraderPage-BgPeqDpN.js             193.07 kB │ gzip:  63.64 kB
+dist/assets/PolymarketTrackerPage-CjB-Gnhi.js            203.35 kB │ gzip:  50.19 kB
+dist/assets/supabase-BuRTrmrQ.js                         220.35 kB │ gzip:  57.53 kB
+dist/assets/vendor-BiQY7cYQ.js                           238.97 kB │ gzip:  78.27 kB
+dist/assets/index-Ck7LeVIP.js                            259.51 kB │ gzip:  80.14 kB
+dist/assets/MercadoLPGamePage-D9MLVMMW.js                270.99 kB │ gzip:  72.20 kB
+dist/assets/BobbyAdminPage-Dk3UQ5nN.js                   312.16 kB │ gzip:  93.84 kB
+dist/assets/index.es-CmDOUgvh.js                         322.66 kB │ gzip:  86.93 kB
+dist/assets/generateCategoricalChart-D2R1g1AX.js         378.21 kB │ gzip: 104.43 kB
+dist/assets/core-BEsEGDpz.js                             466.56 kB │ gzip: 124.20 kB
+dist/assets/three-BNPLiEGw.js                            553.48 kB │ gzip: 140.50 kB
+dist/assets/index-BnJ6xrcm.js                            699.09 kB │ gzip: 198.01 kB
+dist/assets/index-CRyopUsF.js                            701.09 kB │ gzip: 193.21 kB
+dist/assets/index-KOBbhsBh.js                          2,060.62 kB │ gzip: 571.87 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 9.63s
+
+PWA v1.3.0
+Building src/sw.ts service worker ("es" format)...
+vite v6.4.3 building for production...
+transforming...
+✓ 92 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/sw.mjs  26.20 kB │ gzip: 8.53 kB
+✓ built in 73ms
+
+PWA v1.3.0
+mode      injectManifest
+format:   es
+precache  5 entries (3.24 KiB)
+files generated
+  dist/sw.js

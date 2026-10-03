@@ -70,7 +70,7 @@ function CreateCoupon({ onCreated }: { onCreated: (c: AdminCoupon) => void }) {
 
   return (
     <Card>
-      <CardHead title="Crear cupón" sub="Cada cuenta de Apple o Google lo canjea una vez. Los usos regalados se gastan cuando se acaban los gratis." />
+      <CardHead title="Crear cupón" sub="Cada cuenta autenticada verificada lo canjea una vez. Los usos regalados se gastan cuando se acaban los gratis." />
       <form onSubmit={submit} className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <Field label="Código (opcional)" hint="vacío: se genera uno como BOBBY-7K2QX" className="col-span-2">
           <TextInput mono value={code} onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s+/g, '-').replace(/[^A-Z0-9-]/g, '').slice(0, 32))} placeholder="AMIGOS20" autoCapitalize="characters" spellCheck={false} />

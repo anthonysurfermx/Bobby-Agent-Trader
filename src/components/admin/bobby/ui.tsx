@@ -280,7 +280,7 @@ export function Note({ children, tag, tone = 'neutral' }: { children: ReactNode;
       tone === 'red' && 'border-[#F06A6A]/30 bg-[#F06A6A]/[0.06] text-[#F3B0B0]')}
     >
       {tag && <Tag tone={tone === 'neutral' ? 'neutral' : tone}>{tag}</Tag>}
-      <span className="min-w-0 flex-1">{children}</span>
+      <span className="min-w-0 flex-1 basis-full sm:basis-0">{children}</span>
     </div>
   );
 }

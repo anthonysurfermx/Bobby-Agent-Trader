@@ -1,0 +1,17 @@
+  ✓ service-only security, RLS and idempotent additive RPC
+  ✓ invalid IDs, timestamps, metadata and unsigned read reports rejected
+  ✓ concurrent UUID retries and alternate UUID read retries count once
+  ✓ same-session ordering, background terminal state and heartbeat-only mutation
+  ✓ old sessions cannot revive after newer-session background
+  ✓ 90-second expiry uses logical report time, not delayed delivery
+  ✓ platform/build rollout remains observed cohort; legacy clients unmeasured
+  ✓ server receipt event windows, termination separation and no PII in snapshot
+  ✓ team exclusion uses exact existing install graph and selected scope
+  ✓ ingestion health validates cache evidence and authenticates recovery cohort
+  ✓ verified wallet recovery never invents account identity and guests cannot clear auth failure
+  ✓ bounded future capture order survives inverted cross-session delivery
+  ✓ concurrent reordered lifecycle reports retain the newest state
+  ✓ historical-only event kinds and builds retain latest facts outside recent windows
+    full live 41 ms: 110,000 retained events, 2,000 installs, six platform/build cohorts
+  ✓ aggregate latency with retained history and two thousand reported installs
+client-telemetry-pg: 170 checks passed

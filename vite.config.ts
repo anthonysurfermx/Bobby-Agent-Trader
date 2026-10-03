@@ -54,6 +54,7 @@ export default defineConfig({
   base: '/',
   define: {
     global: 'globalThis',
+    'import.meta.env.VITE_APP_BUILD': JSON.stringify(process.env.VITE_APP_BUILD || process.env.VERCEL_GIT_COMMIT_SHA || ''),
     'process.env': {},
   },
   resolve: {

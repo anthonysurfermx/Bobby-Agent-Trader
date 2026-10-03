@@ -56,7 +56,7 @@ function webStages(c: GrowthCohort, sc: SearchConsoleData | null, teamOut: boole
     { key: 'deskOrRead', label: 'Abrieron el desk', value: c.deskOrRead, hint: 'De los que llegaron: abrieron /desk o pidieron una lectura.' },
     { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De los que abrieron el desk: consumieron al menos una lectura del cupo. No prueba que el cliente la mostró.' },
     { key: 'accountAfterRead', label: 'Cuenta después de leer', value: c.accountAfterRead,
-      hint: 'De los que leyeron: ese navegador quedó ligado a una cuenta de Apple o Google (nueva o que ya existía).' },
+      hint: 'De los que registraron una lectura: ese navegador quedó ligado a una cuenta autenticada verificada (nueva o que ya existía).' },
     { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De los que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }
@@ -73,7 +73,7 @@ function iosStages(c: GrowthCohort, store: AdminIntegrations['appStore'] | null,
       hint: `Descargas nuevas según Apple: otra población que el embudo (incluye a quien nunca abrió la app).${range}${pending}${partial}${teamOut ? SOURCE_TEAM : ''}` },
     { key: 'arrived', label: 'Abrieron la app', value: c.arrived, hint: 'Instalaciones de la app 1.5+ vistas abriendo por primera vez en el periodo.' },
     { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De las que abrieron la app: consumieron al menos una lectura del cupo. No prueba que la app la mostró.' },
-    { key: 'accountAfterRead', label: 'Cuenta', value: c.accountAfterRead, hint: 'De las que leyeron: quedaron ligadas a una cuenta de Apple o Google.' },
+    { key: 'accountAfterRead', label: 'Cuenta', value: c.accountAfterRead, hint: 'De las que registraron una lectura: quedaron ligadas a una cuenta autenticada verificada.' },
     { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De las que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }

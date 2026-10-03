@@ -1,0 +1,35 @@
+{
+  "baselineCommit": "321f46047a50cc19eb894c9e859706c160417a83",
+  "configuration": "Debug",
+  "version": "1.6",
+  "build": "54",
+  "simulator": "iPhone17Pro / iOS26.1",
+  "xctest": {
+    "passed": 64,
+    "failed": 0
+  },
+  "nodeTests": 48,
+  "readModelAssertions": 38,
+  "sourceSha256": {
+    "ios/Bobby/Sources/BobbyTelemetry.swift": "b03bffd8dbe8ff0b0250630330c5f8e29d2cad6a3580f0b42c082dfeb64a3cd8",
+    "ios/Bobby/Sources/BobbyApp.swift": "6dd2c894923a9df79128a06378dd0b4567b1bfabe22e53db1c9e14717e7e8fac",
+    "ios/Bobby/Sources/BobbyAPI.swift": "0445670f1126d5e1b2bcd5ad3c23a8b96220321d6997b91a1db69c2e6f65ab63",
+    "ios/Bobby/Sources/Nucleo/NucleoDesk.swift": "21068c9265f150c757c25b1b2b7fff7fa90c6fe0b1f6e43e0a054f412c995445",
+    "ios/Bobby/Sources/Nucleo/NucleoBridge.swift": "9db7dfc758d151c2550df28e13be270132928c1498869ef3c5d6a4074fe717e8",
+    "ios/Bobby/Sources/Nucleo/NucleoSession.swift": "e415cc723220e778b0d261169941b5b91c01a8291a1931b44aa5ddb49faa01f2",
+    "ios/Bobby/Sources/Nucleo/NucleoWebView.swift": "dc3c292b71b89080364fae700dd281673b9ad5ff97730eb76f1b41d62ea73b43",
+    "ios/Bobby/Nucleo/src/app/55-read.js": "c3622d7e5aa921ce0f450ca7da7804064f6bc4d2c9d525205ad22112a9415bbc",
+    "ios/Bobby/Nucleo/src/app/90-loop.js": "b62a8572abe7ac8ea2e07cddb348739be964dc42afbbfb4c54301ca0799a84ab",
+    "ios/Bobby/Nucleo/src/shared/10-bridge.js": "cc7518f8e1773d36c23987e0ac9adcaa4957f58aeed88f404f3b85257cb881af",
+    "ios/Bobby/Resources/Nucleo/app.html": "0ffe72baf4874b74c2c5765c1bd696c1cdc1955c44a75ce7131f6f20cc814eb8",
+    "ios/Bobby/Resources/Nucleo/onboarding.html": "546b7535f43031ff8cce3bd1650bc7b748d0a6d6b70fdbc058ed4ff9be0b9892",
+    "ios/Bobby/Tests/BobbyTelemetryTests.swift": "e0222ca1c3738ac9b8f2c435579ea46fa27095437c7ac9700ed07a0445cc4c89",
+    "ios/Bobby/Tests/NucleoPresentationTelemetryTests.swift": "8ad9f1d67eed04fe6365c11996de1037c3bff5f6e6662d3a840fe0d510f8801a"
+  },
+  "log": "/private/tmp/bobby-live-native/xcode-test-final.log",
+  "logSha256": "2842895f243bac45d1a61ab324896ec2a83c462a18c9ef5720c4d7edac97565f",
+  "xcresult": "/private/tmp/bobby-live-native/DerivedData/Logs/Test/Test-Bobby-2026.10.03_00-59-19-+0100.xcresult",
+  "physicalDeviceVerified": false,
+  "productionReceiptVerified": false,
+  "releaseDistributed": false
+}

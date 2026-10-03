@@ -68,3 +68,6 @@ android/*.aab
 android/*.apk
 android/*.idsig
 android/store_icon.png
+
+# Deployment-specific first-party telemetry bundle, rebuilt before Vite copies public assets.
+/public/client-telemetry.js

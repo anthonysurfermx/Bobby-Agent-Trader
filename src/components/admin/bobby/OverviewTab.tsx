@@ -156,7 +156,7 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify, mark
           </div>
         </Card>
         <Card>
-          <BigNumber label={o.includeInternal ? 'Cuentas (con el equipo)' : 'Cuentas externas'} value={show('accounts.total', fmtInt(o.accounts.total))} caption="Apple / Google" />
+          <BigNumber label={o.includeInternal ? 'Cuentas (con el equipo)' : 'Cuentas externas'} value={show('accounts.total', fmtInt(o.accounts.total))} caption="Cuentas con identidad autenticada verificada" />
           {miss('accounts.byProvider') ? <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Dato no disponible</p> : providers.length ? (
             <StatusBars rows={providers.map(([k, v], idx) => ({ label: label(k), value: v, fill: (idx % 2 ? 'orange' : 'blue') as 'orange' | 'blue', sub: share(v, o.accounts.total) }))} />
           ) : <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Todavía no hay cuentas {who}.</p>}

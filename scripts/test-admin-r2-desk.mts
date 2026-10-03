@@ -342,6 +342,39 @@ try {
     ok(ledger.length === 1 && !ledger[0].some((x) => x.role === 'left'), 'delivered: no abandoned marker in the ledger');
   }
 
+  // Client receipts are issued only for completed requests from the new instrumented client.
+  {
+    const salt = process.env.RATE_LIMIT_SALT;
+    process.env.RATE_LIMIT_SALT = 'offline-desk-client-receipt-salt-32';
+    const { clientBinding, verifyClientReadReceipt } = await import('../api/_lib/client-telemetry.ts');
+    const requestId = '00000000-0000-4000-8000-00000000cccc';
+    const telemetryHeaders = { 'x-bobby-platform': 'web' };
+    const binding = clientBinding(request('POST', ASK, telemetryHeaders) as never, null)!
+    try {
+      const old = await drive('POST', ASK);
+      eq(old.res.body.telemetry, undefined, 'legacy desk response shape unchanged');
+      const unstamped = await drive('POST', { ...ASK, requestId });
+      eq(unstamped.res.body.telemetry, undefined, 'missing platform cannot mint an invented web receipt');
+      const jsonResult = await drive('POST', { ...ASK, requestId }, telemetryHeaders);
+      eq(jsonResult.res.statusCode, 200, 'instrumented JSON completes');
+      eq(verifyClientReadReceipt(jsonResult.res.body.telemetry.receipt, binding)?.requestId, requestId,
+        'real successful desk endpoint signs matching client request');
+      ok(!jsonResult.logs.some(l => l.includes(jsonResult.res.body.telemetry.receipt)), 'read receipt is not logged');
+      const streamed = await drive('POST', { ...ASK, requestId }, { ...telemetryHeaders, accept: 'application/x-ndjson' });
+      const final = streamed.res.lines().find(l => l.type === 'final')!;
+      eq(verifyClientReadReceipt(final.data.telemetry.receipt, binding)?.requestId, requestId, 'streamed final contains same binding protocol');
+      for (const scenario of [{ quota: false }, { model: 'http' }, { model: 'rejected' }] as const) {
+        const r = await drive('POST', { ...ASK, requestId }, telemetryHeaders, scenario);
+        eq(r.res.body?.telemetry, undefined, 'refusal/failure cannot mint response receipt');
+      }
+      let res: Res | null = null;
+      const abandoned = await drive('POST', { ...ASK, requestId }, telemetryHeaders,
+        { during: { role: 'cio', run: () => res!.leave() } }, x => { res = x; });
+      eq(abandoned.res.body?.telemetry, undefined, 'interrupted reading cannot mint receipt');
+      eq(abandoned.outcomes[0].p_event, 'read_abandoned', 'receipt instrumentation preserves interruption outcome');
+    } finally { process.env.RATE_LIMIT_SALT = salt; }
+  }
+
   console.log(`admin-r2-desk: ${checks} checks passed`);
 } finally {
   globalThis.fetch = original;

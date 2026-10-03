@@ -10,6 +10,7 @@ import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, rec
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
+import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
 import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
@@ -22,7 +23,7 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido') });
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(['en','es','pt']).default('en'), level: z.enum(['rapido','profundo','maximo']).default('rapido'), requestId: z.string().uuid().optional() });
 
 type Lang = 'en' | 'es' | 'pt';
 const copy = (lang: Lang, en: string, es: string) => lang === 'es' ? es : en;
@@ -90,7 +91,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!parsed.success) {
     return refuse(res, 400, 'invalid_request', copy(lang, 'Choose an asset and type a question.', 'Elige un activo y escribe una pregunta.'));
   }
-  const { symbol, question, language, assetType, level } = parsed.data;
+  const { symbol, question, language, assetType, level, requestId } = parsed.data;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
     return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
@@ -210,7 +211,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const result = await runDeskDebate(question, evidence, language, { level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
-    const body = { ...result, access, ...(reader ? { personalized: true } : {}) };
+    const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);
+    const body = { ...result, access, ...(reader ? { personalized: true } : {}), ...(telemetry ? { telemetry } : {}) };
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
     const remember = () => {
