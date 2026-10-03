@@ -257,15 +257,15 @@ override = () => null;
 res = await get({ view: 'integrations' });
 eq(res.body.meta.sources.revenuecat.status, 'error', 'missing RevenueCat project is not green');
 eq(res.body.integrations.revenuecat.error, 'revenuecat_project_not_configured', 'RevenueCat project setup gap is explicit');
-eq(calls.filter((c) => c.url.includes('revenuecat.com')).length, 0, 'missing project never lists arbitrary RevenueCat projects');
+eq(calls.filter((c) => new URL(c.url).hostname === 'api.revenuecat.com').length, 0, 'missing project never lists arbitrary RevenueCat projects');
 process.env.REVENUECAT_PROJECT_ID = 'proj-bobby-offline';
-override = (c) => c.url.includes('revenuecat.com') ? json({ metrics: [{ id: 'active_subscribers', name: 'Active', value: 0 }] }) : null;
+override = (c) => new URL(c.url).hostname === 'api.revenuecat.com' ? json({ metrics: [{ id: 'active_subscribers', name: 'Active', value: 0 }] }) : null;
 res = await get({ view: 'integrations' });
 eq(res.body.integrations.revenuecat.metrics[0].value, 0, 'explicit project retains observed zero');
-eq(calls.filter((c) => c.url.includes('revenuecat.com')).map((c) => new URL(c.url).pathname), ['/v2/projects/proj-bobby-offline/metrics/overview'], 'only configured RevenueCat project queried');
+eq(calls.filter((c) => new URL(c.url).hostname === 'api.revenuecat.com').map((c) => new URL(c.url).pathname), ['/v2/projects/proj-bobby-offline/metrics/overview'], 'only configured RevenueCat project queried');
 process.env.REVENUECAT_PROJECT_ID = 'proj-second-offline';
 res = await get({ view: 'integrations' });
-ok(calls.some((c) => c.url.includes('/projects/proj-second-offline/metrics/overview')), 'RevenueCat cached metrics do not leak between projects');
+ok(calls.some((c) => new URL(c.url).hostname === 'api.revenuecat.com' && new URL(c.url).pathname === '/v2/projects/proj-second-offline/metrics/overview'), 'RevenueCat cached metrics do not leak between projects');
 override = () => null;
 
 // ADM-4: failed latest-event reads carry per-field errors instead of claiming no row ever arrived.

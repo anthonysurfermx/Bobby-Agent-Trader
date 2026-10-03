@@ -7,7 +7,7 @@ Branch: `codex/dashboard-remediation-20261003`. Draft branch deployments are dis
 
 The dashboard package is rebased on the deployed payment implementation. The integration preserves checkout reservations, Stripe ownership and Apple mirrors, store/sandbox eligibility, refund lookup, and canonical invoice/refund ledger keys.
 
-Payment writes tolerate the predecessor schema. The migration's INSERT/UPDATE trigger also accepts the explicit NULL evidence written by the currently deployed code, normalizing primary evidence to `unknown` and mirror evidence to NULL. Real PostgreSQL cases cover both release orders and Apple-to-card transitions.
+Payment writes tolerate the predecessor schema. The migration's INSERT/UPDATE trigger also accepts the explicit NULL evidence written by the currently deployed code, normalizing primary evidence to `unknown` and mirror evidence to NULL. Real PostgreSQL cases cover both release orders and Apple-to-card transitions. Users, members and commercial metrics use the same effective membership, so an active Apple mirror supplies the correct provider, status and renewal date without rewriting the primary card snapshot.
 
 Telemetry has serialized admission of at most 100 build cohorts per platform, an unknown overflow bucket, grouped queries and at most 20 recent builds in the response. Web reports whose build does not match the serving deployment are unknown. Coverage and build lists use the same internal-traffic exclusion as counts. Crawlers are dropped. Retention cleanup targets 35-day events and 7-day presence/coverage, with bounded hourly/daily batches.
 
@@ -19,7 +19,7 @@ The dashboard preserves historical installs, separates provider read time from r
 
 | Check | Result |
 | --- | --- |
-| PostgreSQL R2, including #130 Apple mirror, predecessor NULL writes, privilege scope and JIT setting restoration | 355 checks passed |
+| PostgreSQL R2, including #130 Apple mirror in users/members/metrics, predecessor NULL writes, privilege scope and JIT setting restoration | 366 checks passed |
 | Telemetry PostgreSQL suite, retention, concurrency, internal scope, cardinality and failure isolation | 196 checks passed |
 | Exact CI PostgreSQL progress/levels/payments/coupons/admin/lifecycle/memory/truth/R2/telemetry order | All passed |
 | Payment guards and schema-compatibility HTTP regressions | 75 + 26 checks passed |
@@ -35,7 +35,9 @@ The dashboard preserves historical installs, separates provider read time from r
 
 The local scale case returned the full live snapshot in 65 ms or less with 110,000 events and 2,000 installations; 6,000 legacy build labels returned at most 20 build entries. These are local measurements, not production latency guarantees.
 
-The first remote run passed application, integration and Security checks but failed the analytics performance assertion: growth + overview + economics took 11,624 ms against the unchanged 4,000 ms budget. The four bounded analytics/live RPCs now use function-local `jit=off`, preserving the caller's configuration, invoker security and grants. Tests report each RPC's timing and execution settings. The local rerun took 743 ms for the three analytics RPCs; Homebrew PostgreSQL reports JIT unavailable, so remote CI must verify the Linux performance result. The time budgets remain unchanged.
+The first remote run passed the application, integration and Security workflows but failed the analytics performance assertion: growth + overview + economics took 11,624 ms against the unchanged 4,000 ms budget. The four bounded analytics/live RPCs now use function-local `jit=off`, preserving the caller's configuration, invoker security and grants. Tests report each RPC's timing and execution settings. The local rerun took 743 ms; Linux PostgreSQL 17.11 with JIT available passed at 1,263 ms on `d027f9d1`, with members/networks/geo at 1,339 ms and live at 34 ms. All original time budgets remain unchanged.
+
+The separate CodeQL pull-request alert check flagged three RevenueCat URL substring comparisons in offline test mocks. Those comparisons now parse the URL and check the exact API hostname; project cache assertions also check the exact endpoint path. The targeted offline API suite passes. The latest pull-request check rollup is the source of truth for remote security and CI completion.
 
 ## Production observation
 

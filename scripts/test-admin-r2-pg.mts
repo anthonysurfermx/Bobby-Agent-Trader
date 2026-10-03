@@ -804,6 +804,42 @@ try {
       {provider:'stripe',live:true,commercial:'test'}, 'refunded mirror cannot classify trial primary as paid');
   });
 
+  await block('payments #130: users display the effective plan without changing card ownership', async () => {
+    const mirror = await account(), card = await account(), noPlan = await account();
+    await pool.query(`insert into public.bobby_subscriptions(identity_id,provider,status,current_period_end,environment,period_type,
+      stripe_subscription_id,apple_status,apple_current_period_end,apple_environment,apple_period_type)
+      values($1,'stripe','canceled',now()-interval '1 day','production','normal','sub_users_mirror',
+        'active',now()+interval '40 days',null,null),
+        ($2,'stripe','active',now()+interval '25 days','production','normal','sub_users_card',null,null,null,null)`,[mirror,card]);
+    const users = async () => (await one('select public.bobby_admin_users(null,50,0) as r')).r;
+    const row = (list: { users: { id: string; sub_provider: string | null; sub_status: string | null; current_period_end: string | null; pro: boolean }[] }, id: string) => list.users.find(u => u.id === id)!;
+    const plan = (u: ReturnType<typeof row>) => [u.sub_provider,u.sub_status,u.pro];
+    const raw = () => one('select provider,status,current_period_end,apple_current_period_end from public.bobby_subscriptions where identity_id=$1',[mirror]);
+    let list = await users();
+    eq([list.total,list.accounts,list.users.length,new Set(list.users.map((u: { id: string }) => u.id)).size],[3,3,3,3],'users retain exactly one row per account across dual plans');
+    eq(plan(row(list,mirror)),['apple','active',true],'unknown but live Apple mirror supplies the displayed plan after card cancellation');
+    eq(Date.parse(row(list,mirror).current_period_end!), (await raw()).apple_current_period_end.getTime(),'users show the Apple renewal date, not the expired card period');
+    eq(plan(row(list,card)),['stripe','active',true],'a primary card plan retains its original users fields');
+    eq([row(list,noPlan).sub_provider,row(list,noPlan).sub_status,row(list,noPlan).current_period_end,row(list,noPlan).pro],[null,null,null,false],'accounts without a membership retain nullable plan fields');
+
+    await pool.query("update public.bobby_subscriptions set apple_environment='production',apple_period_type='normal' where identity_id=$1",[mirror]);
+    await purchase(mirror,'PRODUCTION');
+    list = await users();
+    const member = (await members()).subscriptions.find((s: { identityId: string }) => s.identityId === mirror);
+    eq([row(list,mirror).sub_provider,row(list,mirror).sub_status,row(list,mirror).current_period_end],[member.provider,member.status,member.currentPeriodEnd],'users and members agree on the paid Apple mirror and renewal date');
+    await pool.query("update public.bobby_subscriptions set status='trialing',environment='sandbox',period_type='trial',current_period_end=now()+interval '20 days' where identity_id=$1",[mirror]);
+    list = await users();
+    eq(plan(row(list,mirror)),['apple','active',true],'verified paid Apple mirror wins over a live test card primary in users too');
+    eq([(await raw()).provider,(await raw()).status],['stripe','trialing'],'displaying the mirror never rewrites the primary card snapshot');
+
+    await pool.query("update public.bobby_subscriptions set apple_status='refunded' where identity_id=$1",[mirror]);
+    list = await users();
+    eq(plan(row(list,mirror)),['stripe','trialing',true],'a refunded mirror falls back to the live primary trial');
+    eq(Date.parse(row(list,mirror).current_period_end!), (await raw()).current_period_end.getTime(),'fallback displays the primary renewal date');
+    await pool.query("update public.bobby_subscriptions set status='canceled',current_period_end=now()-interval '1 day' where identity_id=$1",[mirror]);
+    eq(plan(row(await users(),mirror)),['stripe','canceled',false],'both inactive plans preserve the primary history without showing paid Apple access');
+  });
+
   console.log(`admin-r2-pg: ${checks} checks passed`);
 } finally {
   await pool.end();

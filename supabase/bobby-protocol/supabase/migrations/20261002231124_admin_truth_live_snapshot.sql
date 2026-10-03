@@ -588,6 +588,7 @@ $$;
 -- The users list (20261001233000) plus, for a team account that is neither an admin nor marked by hand, why the D2 rule
 -- makes it the team's: team_seed (email, install_mark, admin_session, network, admin, mark) and team_seed_ref (the
 -- account id, or the 10-character prefix of the install or network). Its own email first, then the nearest kind.
+-- The displayed plan uses the same effective membership as members/metrics, including an active Apple mirror.
 create or replace function public.bobby_admin_users(p_query text, p_limit int, p_offset int)
 returns jsonb language sql stable security invoker set search_path = public, pg_temp as $$
   with q as (select nullif(trim(coalesce(p_query, '')), '') as q),
@@ -617,7 +618,7 @@ returns jsonb language sql stable security invoker set search_path = public, pg_
     from bobby_identities b
     left join bobby_reader_stats s on s.reader = 'a:' || b.id::text
     left join pf on pf.identity_id = b.id
-    left join bobby_subscriptions sub on sub.identity_id = b.id
+    left join bobby_subscription_facts() sub on sub.identity_id = b.id
     left join bobby_pro_grants g on g.identity_id = b.id
     left join bobby_usage_bonus bonus on bonus.identity_id = b.id, esc
     where esc.q is null or b.email ilike '%' || esc.e || '%' or b.id::text ilike esc.e || '%' or b.wallet_address ilike '%' || esc.e || '%'
