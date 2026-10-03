@@ -10,8 +10,9 @@ permissions:
 
 jobs:
   native:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
+      fail-fast: false
       matrix:
         fcm: ['false', 'true']
     env:
@@ -34,7 +35,15 @@ jobs:
       - name: Check the Android bridge
         run: node --test android/nucleo/tests/*.test.mjs
       - name: Install the compile SDK
-        run: sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+        run: |
+          for android_sdk_manager in "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager; do
+            if [ -x "$android_sdk_manager" ]; then
+              "$android_sdk_manager" 'platforms;android-36' 'build-tools;35.0.0'
+              exit 0
+            fi
+          done
+          echo 'Android command-line tools are missing from the hosted SDK.' >&2
+          exit 1
       - name: Build, test and lint Android
         working-directory: android
         run: ./gradlew :app:assembleDebug :app:testDebugUnitTest :app:assembleDebugAndroidTest :app:lintDebug --no-daemon

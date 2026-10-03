@@ -51,9 +51,27 @@ function cards(tree, model, { note = 18, header = 14, rows = 900 } = {}) {
   return { nodes, context };
 }
 
+// CSS selectors remain literal strings when matched against the source stylesheet.
+function cssRule(template, selector) {
+  const literalSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('^' + literalSelector + '\\{([^}]*)\\}', 'm').exec(template)?.[1];
+}
+
+test('CSS card rules match literal backslashes, attributes and adjacent-sibling selectors', () => {
+  for (const [selector, decoy] of [
+    [String.raw`.token\+name`, '.token+name'],
+    ['.card[data-state="open"]', '.carda'],
+    ['.row + .row', '.row  .row'],
+  ]) {
+    const template = `${decoy}{color:red}\n${selector}{height:52px}`;
+    assert.equal(cssRule(template, selector), 'height:52px', selector);
+    assert.equal(cssRule(`${decoy}{color:red}`, selector), undefined, 'no regex interpretation: ' + selector);
+  }
+});
+
 for (const tree of Object.keys(TREES)) {
   const RM = readModel(tree), template = read(tree, 'onboarding/template.html');
-  const rule = (selector) => new RegExp('^' + selector.replace(/[.#]/g, '\\$&') + '\\{([^}]*)\\}', 'm').exec(template)?.[1];
+  const rule = (selector) => cssRule(template, selector);
 
   test(`${tree}: the thesis note is measured; the button comes after it and stays inside the card`, () => {
     for (const lang of LANGS) {

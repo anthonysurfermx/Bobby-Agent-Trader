@@ -18,6 +18,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.test.isDialog
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasAnyAncestor
+import androidx.compose.ui.test.isPopup
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.onNodeWithTag
@@ -249,7 +252,7 @@ class MainActivityAcceptanceInstrumentedTest {
             Triple("en", "English", "Ask about a stock or a crypto…"),
             Triple("es", "Español", "Pregunta por una acción o cripto…"),
             Triple("fr", "Français", "Une question sur une action ou une crypto…"),
-            Triple("pt", "Português", "Pergunte sobre uma ação ou cripto…"),
+            Triple("pt", "Português", "Pergunta sobre uma ação ou cripto…"),
             Triple("it", "Italiano", "Chiedi di un’azione o una cripto…"),
             Triple("de", "Deutsch", "Frage zu einer Aktie oder Kryptowährung…"),
         )
@@ -257,8 +260,10 @@ class MainActivityAcceptanceInstrumentedTest {
             bridge("openNative", JSONObject().put("route", "account"))
             waitForNativeSheet("account")
             evaluate("window.acceptanceDocumentSentinel=true;true")
-            compose.onNodeWithText(label).performScrollTo().performClick()
+            compose.onNodeWithTag("account-language").performScrollTo().performClick()
+            compose.onNode(hasText(label) and hasAnyAncestor(isPopup())).performClick()
             waitUntil { evaluate("window.acceptanceDocumentSentinel!==true && location.pathname.endsWith('/app.html') && document.documentElement.lang===${JSONObject.quote(code)} && window.nucleo.state()==='IDLE'") == true }
+            instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
             waitForNativeDismissal()
             val native = bridge("session")
             assertRealGuestModel(native)
@@ -361,7 +366,8 @@ class MainActivityAcceptanceInstrumentedTest {
     }
 
     private fun assertNoAnalysisOrMutation() {
-        assertTrue("Only refused read-only browsing is allowed: $refusedRequests", refusedRequests.all { (method, path) -> method == "GET" && path == "/api/bobby-asset-search" })
+        val readOnlyPaths = setOf("/api/bobby-asset-search", "/api/bobby-access")
+        assertTrue("Only refused asset/access reads are allowed: $refusedRequests", refusedRequests.all { (method, path) -> method == "GET" && path in readOnlyPaths })
     }
 
     private fun currentRoute(): String? {

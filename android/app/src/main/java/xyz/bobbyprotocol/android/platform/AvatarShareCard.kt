@@ -52,7 +52,7 @@ object AvatarShareCard {
                 if (shown != clean && shown.isNotEmpty()) shown = shown.dropLast(1) + "…"
                 canvas.drawText(shown, 540f, y, paint)
             }
-            text("BOBBY", 108f, 36f, violet, true)
+            text("BOBBY", 70f, 36f, violet, true)
             val portrait = context.assets.open("equipment/" + spec.companionId + "_thumb.png").use(BitmapFactory::decodeStream)
                 ?: error("Companion artwork is unavailable")
             try {
