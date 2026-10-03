@@ -584,7 +584,7 @@ export default function NucleoDesk() {
   const verdictWord = !debate ? null : agentsFailed ? t('No verdict', 'Sin veredicto', 'Sem veredito') : debate.direction === 'long' ? 'Long' : debate.direction === 'short' ? 'Short' : t('No trade', 'No trade', 'No trade');
   const verdictSub = !debate ? null : agentsFailed ? t('The agents did not finish', 'Los agentes no terminaron', 'Os agentes não terminaram') : debate.direction !== 'none' && answer?.convictionPct != null
     ? t(`${Math.round(answer.convictionPct)}% conviction`, `${Math.round(answer.convictionPct)}% convicción`, `${Math.round(answer.convictionPct)}% convicção`)
-    : t('Capital protected', 'Capital protegido', 'Capital protegido');
+    : t('No exposure', 'Sin exposición', 'Sem exposição');
   const lastYou = [...messages].reverse().find((m) => m.from === 'you')?.text ?? '';
   const lastBobby = [...messages].reverse().find((m) => m.from === 'bobby')?.text ?? '';
   const change = useMemo(() => {

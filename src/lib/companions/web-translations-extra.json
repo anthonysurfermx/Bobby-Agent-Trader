@@ -299,11 +299,11 @@
     "it": "Può dire che non c'è un'operazione",
     "de": "Darf sagen, dass es keinen Trade gibt"
   },
-  "Alpha Hunter finds no clean setup{0}. Red Team: {1} CIO: NO TRADE, capital protected. {2}": {
-    "fr": "Alpha Hunter ne trouve aucune configuration claire{0}. Red Team : {1} CIO : NE PAS INTERVENIR, capital préservé. {2}",
-    "pt": "Alpha Hunter não encontra configuração clara{0}. Red Team: {1} CIO: NÃO OPERAR, capital preservado. {2}",
-    "it": "Alpha Hunter non trova una configurazione chiara{0}. Red Team: {1} CIO: NON OPERARE, capitale preservato. {2}",
-    "de": "Alpha Hunter findet keine klare Konstellation{0}. Red Team: {1} CIO: NICHT HANDELN, Kapital geschützt. {2}"
+  "Alpha Hunter finds no clean setup{0}. Red Team: {1} CIO: NO TRADE, no exposure. {2}": {
+    "fr": "Alpha Hunter ne trouve aucune configuration claire{0}. Red Team : {1} CIO : NE PAS INTERVENIR, aucune exposition. {2}",
+    "pt": "Alpha Hunter não encontra configuração clara{0}. Red Team: {1} CIO: NÃO OPERAR, sem exposição. {2}",
+    "it": "Alpha Hunter non trova una configurazione chiara{0}. Red Team: {1} CIO: NON OPERARE, nessuna esposizione. {2}",
+    "de": "Alpha Hunter findet keine klare Konstellation{0}. Red Team: {1} CIO: NICHT HANDELN, keine Position. {2}"
   },
   "Alpha Hunter looks for the case": {
     "fr": "Alpha Hunter cherche les arguments",
@@ -1157,11 +1157,11 @@
     "it": "Torre delle Candele",
     "de": "Kerzenturm"
   },
-  "Capital protected": {
-    "fr": "Capital protégé",
-    "pt": "Capital protegido",
-    "it": "Capitale protetto",
-    "de": "Kapital geschützt"
+  "No exposure": {
+    "fr": "Aucune exposition",
+    "pt": "Sem exposição",
+    "it": "Nessuna esposizione",
+    "de": "Keine Position"
   },
   "Center island": {
     "fr": "Centrer l’île",
@@ -3119,11 +3119,11 @@
     "it": "Ancora nessuna operazione pubblicamente attribuibile al protocollo",
     "de": "Noch keine öffentlich zuordenbaren Protokoll-Trades"
   },
-  "No setup yet. Capital protected.": {
-    "fr": "Aucune configuration encore. Capital protégé.",
-    "pt": "Ainda sem cenário. Capital protegido.",
-    "it": "Nessuna configurazione ancora. Capitale protetto.",
-    "de": "Noch kein Setup. Kapital geschützt."
+  "No setup yet. No exposure.": {
+    "fr": "Aucune configuration encore. Aucune exposition.",
+    "pt": "Ainda sem cenário. Sem exposição.",
+    "it": "Nessuna configurazione ancora. Nessuna esposizione.",
+    "de": "Noch kein Setup. Keine Position."
   },
   "No shared islands in this district yet. Try another district.": {
     "fr": "Aucune île partagée dans ce quartier. Essayez un autre.",
