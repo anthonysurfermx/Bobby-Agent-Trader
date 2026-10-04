@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "recorded_at": "2026-10-04T07:55:03.110575+00:00",
+  "status": "LOCAL_VERSION_FROZEN_PHYSICAL_ACCEPTANCE_PENDING",
+  "audited_base_head": "6bdf35737b71979d44e950527059a9564ab8545a",
+  "code_commit": "2f191491eaa5282a149c103d2889082be3f1c10e",
+  "android_version": "1.1.4",
+  "android_code": 9,
+  "ios_version": "1.7",
+  "ios_build": 63,
+  "original_brief_delivered_to_claude": true,
+  "additional_closure_delivery": "AUTO_REVIEW_REJECTED_BEFORE_EXECUTION",
+  "full_goal_or_physical_acceptance_complete": false,
+  "files": [
+    {
+      "path": "VERSION-CLOSURE.md",
+      "bytes": 3537,
+      "sha256": "e0c398c3bb5031aed47efc73f1e3030f4e06b4ba783c058bb577f90fe38b2b2e"
+    },
+    {
+      "path": "claude-closure-block.json",
+      "bytes": 601,
+      "sha256": "74bb211edac1fcdca20f19e58cb92753651878622a189ce757776531eaca5483"
+    },
+    {
+      "path": "independent-review.json",
+      "bytes": 557,
+      "sha256": "929bb29d295b88e9ba0f38ab82633b6837c83b870cd7e91afeb795a2712298ea"
+    },
+    {
+      "path": "secret-scan.json",
+      "bytes": 240,
+      "sha256": "747c5237915908d238182b64369b6472ecdfb0fd1604b6e29e437b006394812e"
+    },
+    {
+      "path": "seeker-code9-final-revalidation-20261004T075247Z.json",
+      "bytes": 2647,
+      "sha256": "4e87e45027d3a292ee5af948c9a6396cf0ade7fc1b7eae6c96c8886fddb981f6"
+    },
+    {
+      "path": "validation.json",
+      "bytes": 2162,
+      "sha256": "57d47116e09ca423a8ee02254b854263629424d98ce1bc47d12bf5dc00a86052"
+    }
+  ]
+}
