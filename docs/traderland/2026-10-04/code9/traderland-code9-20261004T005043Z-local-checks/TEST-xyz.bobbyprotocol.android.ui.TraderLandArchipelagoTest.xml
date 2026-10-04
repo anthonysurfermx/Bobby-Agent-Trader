@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" tests="17" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.400Z" hostname="MacBook-Pro-F-Society.local" time="0.011">
+  <properties/>
+  <testcase name="seaPanBoundsKeepEveryVisibleIslandReachable" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.001"/>
+  <testcase name="zeroLiftPanBoundsRemainDensityInvariantForSeaAndFocusedVisits" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.001"/>
+  <testcase name="hitTestingFindsActualNeighborsAndLeavesOpenSeaUntargeted" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="emptyPublicArchipelagoHasCanonicalSeaBoundsForAllSixFreeLots" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="canvasChipsUseTheCanonicalSlabMarginAndNeverSplitSurrogatePairs" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.002"/>
+  <testcase name="firstRingMatchesCanonicalClockwiseOffsetsFromTheTop" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="sceneBoundsAndAnchoredTransformScaleTogetherAtDensityOneAndThree" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="canvasWithoutFooterOverlayCentersAndFitsTheRingAtEveryDensity" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="neighborFlightsCenterTheActualSlabAboveTheCardOnPhoneAndTablet" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="allFourRingsHaveDistinctNonoverlappingIslands" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.004"/>
+  <testcase name="overviewAndVisitedCenterKeepTheSameLogicalFrameAtDensityOneAndThree" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.001"/>
+  <testcase name="invalidDragCoordinatesDoNotEscapeSceneBounds" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.001"/>
+  <testcase name="refocusingPreservesHomeAndFindsEachNeighborAcrossZoomLevels" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="closePanBoundsFollowVisitedIslandAndGrowthSlack" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="overviewUsesRoomAboveTheCardAndSafeZoomLimits" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="successfulPublicReadsFillOnlyTheUnoccupiedFirstRingSlots" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <testcase name="freeLotsNeverBecomeVisitedOrClickableIslands" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.267Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="olderPartialServersKeepKnownAuraAndInvalidNewAuraBecomesUnknown" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0"/>
+  <testcase name="missingAuraIsUnknownAndAConfirmedZeroIsRealZero" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0"/>
+  <testcase name="anOwnerSwitchRejectsTheOldRequestEvenAtTheSameEpoch" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0"/>
+  <testcase name="aLaterEpochRejectsOldRepliesFromTheSameAccountOrGuest" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.001"/>
+  <testcase name="applyingServerMetricsKeepsUnrelatedThesisAndAwardState" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0"/>
+  <testcase name="malformedMetricsNeverBecomeZeroOrOverflow" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

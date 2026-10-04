@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.LandPracticeTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.310Z" hostname="MacBook-Pro-F-Society.local" time="0.014">
+  <properties/>
+  <testcase name="rotationSwapsBoundsAndInvalidTurnsCannotPlace" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.002"/>
+  <testcase name="undoHistoryRemainsBoundedAtTenAndNoopMoveDoesNotSpendHistory" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="repeatedBlueprintsDoNotAcquireAccountOrInventoryMeaning" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="initialFocusRejectsFogUntilExplicitRevealAndUndoRestoresIt" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0"/>
+  <testcase name="savedFocusClampsAndValidEmptyPracticeDoesNotBecomeTheSample" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="invalidItemCoreMissingAndDuplicateIdentifiersFailClosed" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="malformedTopLevelAndIncorrectTypesRestoreTheApprovedFixture" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.002"/>
+  <testcase name="invalidCallerStateCannotBypassOccupancyOrHistoryIntegrity" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="collisionsIncludeCoreAndEveryRotatedFootprint" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0"/>
+  <testcase name="persistedStateRoundTripsButLocalHistoryDoesNotPersist" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="storeUndoAndResetPreserveTheExactPreviousLocalLayout" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="sanitizedSavedEntriesDropUnknownCoreDuplicatesCollisionsAndBadNumbers" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0"/>
+  <testcase name="corruptBundledFixtureCannotManufacturePractice" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <testcase name="movingReusesOwnCellsWithoutCoveringAnotherPiece" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0"/>
+  <testcase name="canonicalFixtureHasSevenPiecesAndFixedAwakeCore" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

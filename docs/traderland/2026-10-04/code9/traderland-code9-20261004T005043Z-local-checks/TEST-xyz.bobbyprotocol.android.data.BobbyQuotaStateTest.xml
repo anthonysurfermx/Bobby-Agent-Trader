@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.225Z" hostname="MacBook-Pro-F-Society.local" time="0.004">
+  <properties/>
+  <testcase name="confirmedCouponWithMissingQuotaStillInvalidatesEarlierGet" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001"/>
+  <testcase name="resetDatesRequireAnIsoInstantWhileNullAndAbsentStayUnknown" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="actualGuestDeepAllowanceAndGiftedFreeUsesCanBeSelectedWithoutGrantingMax" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="onlyTheLatestGetMayApplyEvenIfAnOlderGetReturnsLast" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001"/>
+  <testcase name="resetInvalidatesARequestEvenWhenTheAccountIdentityIsUnchanged" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="couponIsTheServerBalanceAndInvalidatesAnEarlierGetWithoutAddingGifts" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="generalReadPermitsOpenAnonButCouponDoesNotApplyItForAnAccount" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="unavailableLatestGetCannotAllowAnOlderSuccessfulGetToReappear" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="partialTierChangeRetiresTheOtherFieldsOldPlanAllowance" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001"/>
+  <testcase name="realProUnlimitedTripleNullKeepsGiftBalanceWithoutInventingUsed" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="partialSnapshotsMergeSameTierAndPreserveUnchangedMeters" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="accountSwitchAbAAndSameUserNewEpochNeverReviveOldQuotas" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="explicitZeroIsAValidBalanceAndNeverTreatedAsMissing" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001"/>
+  <testcase name="realNestedShapePreservesQuickAndBothPremiumGiftBalances" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="malformedOneFieldStillKeepsTheOtherValidatedPartialField" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="detectedOwnerChangeClearsStateBeforeStartingOrApplyingAnotherRequest" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="nullableQuotaFieldsRequirePresenceAndMalformedCountsNeverRound" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="flatOrIncompletePremiumShapeNeverFabricatesAZeroMeter" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <testcase name="strictCountsRejectBooleansStringsFractionsNegativeAndOverflow" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
