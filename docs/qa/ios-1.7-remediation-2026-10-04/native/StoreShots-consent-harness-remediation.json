@@ -1,0 +1,24 @@
+{
+  "at": "2026-10-04T12:48:42.920624+00:00",
+  "productEdited": false,
+  "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/ios/Bobby/UITests/StoreShots.swift",
+  "changes": 3,
+  "sourceHEAD": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "beforeSHA256": "e631a5cbda5875ed5bd38db1461b463ab3ec6ab72abadc0bc703f23fb76224e4",
+  "afterSHA256": "2e9837c8a6bbce1ccc0c61f8ac50744f06d6b49c9ecab31742fa639ece733971",
+  "originalOfficialResult": {
+    "total": 5,
+    "passed": 2,
+    "failed": 3,
+    "skipped": 0
+  },
+  "failureReason": "Prior privacy withdrawal persisted riskNoticeVersion=0; StoreShots01 launch override6 is not persistent;02/03/04 omitted it. Recorded AX shows four unacknowledged disclosure buttons and disabled ACKNOWLEDGE ALL FOUR.",
+  "readOnlyPreferences": {
+    "agent.riskNoticeVersion": 0,
+    "agent.onboarded": true
+  },
+  "assertionsChanged": false,
+  "liveAPIChanged": false,
+  "currentFreeGiB": 5.431,
+  "testOnlyCommit": "a44b98b5eed6ce5445dec3d57d3cf4030f967902"
+}

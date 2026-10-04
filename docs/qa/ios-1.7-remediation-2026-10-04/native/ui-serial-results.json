@@ -226,10 +226,552 @@
         }
       ],
       "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:32:06.491425+00:00",
+      "stage": "ReleaseReadinessTests",
+      "class": "ReleaseReadinessTests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testAIConsentIsRequiredBeforeEnteringDesk",
+        "testAvatarVoiceStyleReturnsToOnboarding",
+        "testSpanishAvatarVoiceStyleReturnsToOnboarding",
+        "testDeskCanMuteAndRestoreAvatarNarration",
+        "testSpanishDeskCanMuteAndRestoreAvatarNarration",
+        "testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice",
+        "testMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+        "testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+        "testOrdinaryPracticeIslandCanZoomOutToTheArchipelago",
+        "testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto",
+        "testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+        "testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+        "testAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+        "testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate"
+      ],
+      "expectedCount": 14,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "12ec860fedbb71de304700a34227a728881265f75896edb0b0f2d09615665a4f",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "5d1d9473871bf820266ab0eee78bd92401e0a1feb5985eda6824f6fa0d265345",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 14,
+        "passedTests": 14,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "ReleaseReadinessTests/testAccountIslandCanSaveNamePublishShareAndBecomePrivate()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testAIConsentIsRequiredBeforeEnteringDesk()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAIConsentIsRequiredBeforeEnteringDesk",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testAvatarVoiceStyleReturnsToOnboarding()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAvatarVoiceStyleReturnsToOnboarding",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testDeskCanMuteAndRestoreAvatarNarration()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testDeskCanMuteAndRestoreAvatarNarration",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testMuteChoiceSurvivesOnboardingGalleryAndRelaunch()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testOrdinaryPracticeIslandCanZoomOutToTheArchipelago()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testOrdinaryPracticeIslandCanZoomOutToTheArchipelago",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishAvatarVoiceStyleReturnsToOnboarding()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishAvatarVoiceStyleReturnsToOnboarding",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishDeskCanMuteAndRestoreAvatarNarration()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishDeskCanMuteAndRestoreAvatarNarration",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ReleaseReadinessTests/testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:34:14.461071+00:00",
+      "stage": "NucleoPrivacyUITests",
+      "class": "NucleoPrivacyUITests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement",
+        "testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "7e6241fda9f3dae4f5b46ba97e38e3fd17533cc8cb69329c67832ea0a7aeebc5",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "ab36650ec01a44d8fe3c421c2fdd3f1225a6a8cf2b1f340216fe9eeee13bcf9a",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "NucleoPrivacyUITests/testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoPrivacyUITests/testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement",
+          "result": "Passed"
+        },
+        {
+          "identifier": "NucleoPrivacyUITests/testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoPrivacyUITests/testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:34:42.135496+00:00",
+      "stage": "CouponRedemptionUITests",
+      "class": "CouponRedemptionUITests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testConfirmedGiftShowsActualCountsAndReturnAction",
+        "testAlreadyRedeemedDoesNotPromiseAnotherGift"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "07f6107613b667000f077b11cf866c6b36895acaeecaa80d2d38866b2ac418c4",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "f1eec268c532f90ab2974f5b41ab280239e5bda75202c88ab5888abea9e9ef84",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "CouponRedemptionUITests/testAlreadyRedeemedDoesNotPromiseAnotherGift()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/CouponRedemptionUITests/testAlreadyRedeemedDoesNotPromiseAnotherGift",
+          "result": "Passed"
+        },
+        {
+          "identifier": "CouponRedemptionUITests/testConfirmedGiftShowsActualCountsAndReturnAction()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/CouponRedemptionUITests/testConfirmedGiftShowsActualCountsAndReturnAction",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:36:08.945773+00:00",
+      "stage": "DeskHarvestCardTests",
+      "class": "DeskHarvestCardTests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testSignedOutCardKeepsItsButtonIdentifiers",
+        "testBloomedCardOffersBuildIt",
+        "testCappedCardOpensTheIsland",
+        "testPickerAsksBeforeGrowingTheSeed",
+        "testConfirmedHorizonBecomesTheSeeds",
+        "testGrownSeedsNameTheirHorizon",
+        "testNoTradeAndOlderServersShowNoPicker",
+        "testAReviewThatOpenedLocksTheChoice",
+        "testTheChoiceLocksWhenTheReviewOpensOnScreen",
+        "testChipCarriesItsBadge"
+      ],
+      "expectedCount": 10,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "5d2c8f95785d6faa9abf34288d39a6d358871cdb30b19b090f485c914305e794",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "32a55381aae127e27f89cf0a0686de635d92d4fab8c4527fc44fc6cc3ff1dc29",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 10,
+        "passedTests": 10,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "DeskHarvestCardTests/testAReviewThatOpenedLocksTheChoice()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testAReviewThatOpenedLocksTheChoice",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testBloomedCardOffersBuildIt()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testBloomedCardOffersBuildIt",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testCappedCardOpensTheIsland()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testCappedCardOpensTheIsland",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testChipCarriesItsBadge()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testChipCarriesItsBadge",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testConfirmedHorizonBecomesTheSeeds()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testConfirmedHorizonBecomesTheSeeds",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testGrownSeedsNameTheirHorizon()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testGrownSeedsNameTheirHorizon",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testNoTradeAndOlderServersShowNoPicker()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testNoTradeAndOlderServersShowNoPicker",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testPickerAsksBeforeGrowingTheSeed()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testPickerAsksBeforeGrowingTheSeed",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testSignedOutCardKeepsItsButtonIdentifiers()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testSignedOutCardKeepsItsButtonIdentifiers",
+          "result": "Passed"
+        },
+        {
+          "identifier": "DeskHarvestCardTests/testTheChoiceLocksWhenTheReviewOpensOnScreen()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testTheChoiceLocksWhenTheReviewOpensOnScreen",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:36:49.544039+00:00",
+      "stage": "CommunitySafetyUITests",
+      "class": "CommunitySafetyUITests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testEnglishVisitorCanBlockAndUnblockCreator",
+        "testSpanishVisitorCanBlockAndUnblockCreator"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "919a3719527e837ed848206c4231721b7b85ab53d8604b44c1f270f758cf341f",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "862fcb9df75287cc3dd745b41077582ebeeb41a38883615d885564b201917cfb",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "CommunitySafetyUITests/testEnglishVisitorCanBlockAndUnblockCreator()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/CommunitySafetyUITests/testEnglishVisitorCanBlockAndUnblockCreator",
+          "result": "Passed"
+        },
+        {
+          "identifier": "CommunitySafetyUITests/testSpanishVisitorCanBlockAndUnblockCreator()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/CommunitySafetyUITests/testSpanishVisitorCanBlockAndUnblockCreator",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:37:58.332904+00:00",
+      "stage": "TraderLandGateTests",
+      "class": "TraderLandGateTests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testPreviewMoveCancelCollisionUndoAndPersistence",
+        "testAccountFixtureMovesTheCoreAndExtendsASeed",
+        "testArchipelagoArrowsVisitNeighboursAndReturnHome"
+      ],
+      "expectedCount": 3,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "df0e48867096f403bfdc57c2c8a2767aef049c23da7bcca0f6405b481c404e78",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "84249cff9d09d5ba7e4aa73a928d0c1251894daa429b32501630e5c094db18c1",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 3,
+        "passedTests": 3,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "TraderLandGateTests/testAccountFixtureMovesTheCoreAndExtendsASeed()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testAccountFixtureMovesTheCoreAndExtendsASeed",
+          "result": "Passed"
+        },
+        {
+          "identifier": "TraderLandGateTests/testArchipelagoArrowsVisitNeighboursAndReturnHome()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testArchipelagoArrowsVisitNeighboursAndReturnHome",
+          "result": "Passed"
+        },
+        {
+          "identifier": "TraderLandGateTests/testPreviewMoveCancelCollisionUndoAndPersistence()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testPreviewMoveCancelCollisionUndoAndPersistence",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:39:44.206575+00:00",
+      "stage": "NucleoStoreScreenshots",
+      "class": "NucleoStoreScreenshots",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testEnglishScreenshots",
+        "testSpanishScreenshots"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "40c9f96f1538f4c3ec6269542579b3c6696f6260429ff408acedbcd27e548f76",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "ee09dbc1eeb25db1b786f37376ba2b8f370f19e7e4084183b17524123cb7fff5",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "NucleoStoreScreenshots/testEnglishScreenshots()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoStoreScreenshots/testEnglishScreenshots",
+          "result": "Passed"
+        },
+        {
+          "identifier": "NucleoStoreScreenshots/testSpanishScreenshots()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoStoreScreenshots/testSpanishScreenshots",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:40:53.187812+00:00",
+      "stage": "CompanionLoadTests",
+      "class": "CompanionLoadTests",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "testEveryCompanionModelLoads"
+      ],
+      "expectedCount": 1,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "01b59bae17723c897adf9ca892eca8ad3b12f78e4e552cafa0c40bcf16eb4eb8",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "056279f501932c8a26620c798db732d55cf3cf20eb267b4aee4591fa0e868cf6",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "CompanionLoadTests/testEveryCompanionModelLoads()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/CompanionLoadTests/testEveryCompanionModelLoads",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:46:58.592745+00:00",
+      "stage": "StoreShots",
+      "class": "StoreShots",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "test01_OnboardingAndCompanion",
+        "test03_BoardAndSuggestions",
+        "test04_ShareSkin",
+        "test05_GearAttachmentMatrix",
+        "test02_VerdictAndEvolution"
+      ],
+      "expectedCount": 5,
+      "executionExitCode": 65,
+      "issues": [
+        "execution did not complete successfully",
+        "unexpected summary result: Failed",
+        "unexpected summary passedTests: 2",
+        "unexpected summary failedTests: 3",
+        "one or more actual case nodes did not pass"
+      ],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "9e2a0b72a4a7d5be0d5645074bef931f3b1aacbb4c9c2b00115f908d1c26f8ba",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "80ccd1b2500d5978b9e98c10ba882d6c0c8fa53eb0e6f318aa8d77ed2bc848b9",
+      "officialSummary": {
+        "result": "Failed",
+        "totalTestCount": 5,
+        "passedTests": 2,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "StoreShots/test01_OnboardingAndCompanion()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test01_OnboardingAndCompanion",
+          "result": "Passed"
+        },
+        {
+          "identifier": "StoreShots/test02_VerdictAndEvolution()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test02_VerdictAndEvolution",
+          "result": "Failed"
+        },
+        {
+          "identifier": "StoreShots/test03_BoardAndSuggestions()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test03_BoardAndSuggestions",
+          "result": "Failed"
+        },
+        {
+          "identifier": "StoreShots/test04_ShareSkin()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test04_ShareSkin",
+          "result": "Failed"
+        },
+        {
+          "identifier": "StoreShots/test05_GearAttachmentMatrix()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test05_GearAttachmentMatrix",
+          "result": "Passed"
+        }
+      ],
+      "accepted": false
+    },
+    {
+      "at": "2026-10-04T12:57:16.525162+00:00",
+      "stage": "StoreShots-consent-corrected",
+      "class": "StoreShots",
+      "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+      "expectedMethods": [
+        "test01_OnboardingAndCompanion",
+        "test03_BoardAndSuggestions",
+        "test04_ShareSkin",
+        "test05_GearAttachmentMatrix",
+        "test02_VerdictAndEvolution"
+      ],
+      "expectedCount": 5,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "17f0a2b8e89a399fba75e871ca6f1ba38b5040b198591b2ed59acc9552ac8cba",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "277deb73dab042995d958b1c96d9cde11efb5c37335775b51b899d2cee4f5377",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 5,
+        "passedTests": 5,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "StoreShots/test01_OnboardingAndCompanion()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test01_OnboardingAndCompanion",
+          "result": "Passed"
+        },
+        {
+          "identifier": "StoreShots/test02_VerdictAndEvolution()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test02_VerdictAndEvolution",
+          "result": "Passed"
+        },
+        {
+          "identifier": "StoreShots/test03_BoardAndSuggestions()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test03_BoardAndSuggestions",
+          "result": "Passed"
+        },
+        {
+          "identifier": "StoreShots/test04_ShareSkin()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test04_ShareSkin",
+          "result": "Passed"
+        },
+        {
+          "identifier": "StoreShots/test05_GearAttachmentMatrix()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test05_GearAttachmentMatrix",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
     }
   ],
-  "acceptedClasses": 5,
-  "acceptedMethods": 16,
-  "updatedAt": "2026-10-04T12:09:32.092589+00:00",
-  "complete": false
+  "acceptedClasses": 14,
+  "acceptedMethods": 57,
+  "updatedAt": "2026-10-04T12:57:16.525162+00:00",
+  "complete": true
 }

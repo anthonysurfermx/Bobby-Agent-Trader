@@ -1,0 +1,98 @@
+{
+  "at": "2026-10-04T13:08:53.289898+00:00",
+  "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/claude-review",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 6479,
+      "sha256": "cb2af2dc689540653ab9537fd1cf35f500aedf98b43ee5c01b88bf44d9ecc250",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/README.md"
+    },
+    {
+      "path": "primary-Claude-report.md",
+      "bytes": 22440,
+      "sha256": "63da77c7b4cac0c3df3fa8ab239a8f0b54fe5e86d645f7747b55dabbd1b395ee",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/review-report.md"
+    },
+    {
+      "path": "reviewer-A-result.json",
+      "bytes": 39510,
+      "sha256": "07ed5ef5e59f0e8a3442784ea81eef1cec046756c6e13b970bc109de79bdf01a",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/reviewer-A-result.json"
+    },
+    {
+      "path": "reviewer-B-result.json",
+      "bytes": 45320,
+      "sha256": "dbbd612bc3495fde289536b7ce844bf7b7963e5ca41cf1dbc96cf7f08541cab9",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/reviewer-B-result.json"
+    },
+    {
+      "path": "review-execution.json",
+      "bytes": 3080,
+      "sha256": "6e8b161a3bc33fd84359c66256e265d8cb26b2053409eea88ba9b3af9237452d",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/review-execution.json"
+    },
+    {
+      "path": "actual-review-audit.json",
+      "bytes": 1805,
+      "sha256": "3539b365a38b05897ec4dd189e625101d051d2793230e5877e3f877aa88665d2",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/actual-review-audit.json"
+    },
+    {
+      "path": "capabilities.md",
+      "bytes": 2519,
+      "sha256": "5b0c56834f42a689e693db1d0476d09c3f9ed04cac0abf2858ef4ff427c40b85",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/capabilities.md"
+    },
+    {
+      "path": "authentication-environment-repair.json",
+      "bytes": 664,
+      "sha256": "593a655a79e7d281866c993bd1525a531bc33dc1517e7e85abd8c712fb907b47",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/authentication-environment-repair.json"
+    },
+    {
+      "path": "review-execution-first-auth-failure.json",
+      "bytes": 3019,
+      "sha256": "6ce43bc2b6ddac3c9d8b5f85f9d193acd4de72a51ad4d16487af7d4b369ae279",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/review-execution-first-auth-failure.json"
+    },
+    {
+      "path": "chart-support-binding-review.json",
+      "bytes": 7606,
+      "sha256": "3418b204e9059cda62f75b976c1d6825f21a1a5cb2134fed759382b94a9c3ad4",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/chart-support-binding-review.json"
+    },
+    {
+      "path": "late-evidence-receipt.json",
+      "bytes": 3918,
+      "sha256": "37dfd98f3287d1430d4501cc5635587784597597e9cc7f9ea774cf1235399188",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/late-evidence-receipt.json"
+    },
+    {
+      "path": "actual-workflow-script.js",
+      "bytes": 17141,
+      "sha256": "c8d70429ca43d369dc6fd88df4dbda17869972a18aec78651cad6d2e1ffa9795",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/actual-workflow-script.js"
+    },
+    {
+      "path": "brief.md",
+      "bytes": 10286,
+      "sha256": "e7aae7bcffaf979d5d353d1ca2c461d64a7d6ec08a3476049a0111cb665dc879",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/brief.md"
+    },
+    {
+      "path": "review-settings.json",
+      "bytes": 538,
+      "sha256": "6d8e0f72edcc9492e754c5a1b392d40fbcf2d9d7f63c21903a268e1a7252475d",
+      "sourcePath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/review-settings.json"
+    }
+  ],
+  "fileCount": 14,
+  "totalLogicalBytes": 164325,
+  "sourceCommitReviewed": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "shippingSourceBinding": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "rawEventLogAndSourceSnapshotCopied": false,
+  "credentialsCopied": false,
+  "canonicalParentReadmeEdited": false,
+  "commitOrPushPerformed": false
+}

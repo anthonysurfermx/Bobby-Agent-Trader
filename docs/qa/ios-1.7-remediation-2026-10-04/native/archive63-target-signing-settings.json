@@ -1,0 +1,17 @@
+{
+  "checkedAtUTC": "2026-10-04T12:34:06.775192+00:00",
+  "rows": [
+    {
+      "target": "Bobby",
+      "configuration": "Release",
+      "profileSpecifier": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+      "signingStyle": "Manual",
+      "identity": "Apple Distribution",
+      "team": "QZRTV6CMTT",
+      "aps": "production"
+    }
+  ],
+  "exitCode": 0,
+  "unredactedBuildSettingsPersisted": false,
+  "scope": "Read-only resolved signing settings. No build/archive/upload action."
+}

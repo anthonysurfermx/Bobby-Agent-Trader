@@ -1,0 +1,96 @@
+{
+  "consolidatedAtUTC": "2026-10-04T13:10:32.531653+00:00",
+  "attribution": "Remote actions executed by root; raw receipts copied without alteration.",
+  "version": "1.7",
+  "plannedBuild": "63",
+  "screenshots": {
+    "observedAtUTC": "2026-10-04T12:45:25.624Z",
+    "verifiedImageCount": 30,
+    "verifiedLocaleCount": 6,
+    "filesPerLocale": [
+      "01.png",
+      "02.png",
+      "03.png",
+      "04.png",
+      "06.png"
+    ],
+    "persistedAfterReload": true,
+    "editableOwnLocaleSets": true,
+    "newUploads": [
+      "de-DE",
+      "fr-FR",
+      "it"
+    ],
+    "inheritedSetUpdated": [
+      "pt-PT",
+      "es-MX",
+      "en-US"
+    ],
+    "historicalArtworkNotFresh63Capture": true,
+    "receipt": "app-store-screenshots-saved.json"
+  },
+  "versionMetadata": {
+    "observedAtUTC": "2026-10-04T12:53:57.944Z",
+    "verifiedFieldCount": 30,
+    "verifiedLocaleCount": 6,
+    "fields": [
+      "promotionalText",
+      "description",
+      "whatsNew",
+      "keywords",
+      "supportURL"
+    ],
+    "fullCopyMatchesAppliedMetadataAfterReload": true,
+    "appliedCopy": "metadata-final-applied.json",
+    "appliedCopySHA256": "23e04ee02fe661886ae5188f8d12755854c725a26d9a491fb746e43b35c12172",
+    "changesFromPreparedCopy": [
+      {
+        "locale": "es-MX",
+        "field": "description",
+        "preparedCharacters": 3102,
+        "appliedCharacters": 3125
+      }
+    ],
+    "receipt": "app-store-metadata-full-readback.json"
+  },
+  "appInfo": {
+    "observedAtUTC": "2026-10-04T12:55:28.493Z",
+    "verifiedFieldCount": 12,
+    "verifiedLocaleCount": 6,
+    "fields": [
+      "name",
+      "subtitle"
+    ],
+    "matchesPreparedCopyAfterReload": true,
+    "receipt": "app-store-appinfo-full-readback.json"
+  },
+  "privacyPolicyURLs": {
+    "status": "all six locale URL fields saved and matched after reload",
+    "verifiedRemoteFields": 6,
+    "observedAtUTC": "2026-10-04T13:02:48.647Z",
+    "receipt": "app-store-privacyurls-full-readback.json",
+    "privacyDataDisclosuresModified": false
+  },
+  "localArchive": {
+    "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+    "result": "signed Release archive verified, including exact non-shipping QA delta"
+  },
+  "remainingUITarget": {
+    "acceptedClasses": 14,
+    "acceptedMethods": 57,
+    "failedAcceptedCases": 0,
+    "skippedAcceptedCases": 0,
+    "correctedStoreShotsReceipt": "../native/StoreShots-consent-corrected-inspection.json"
+  },
+  "binaryUpload": "Apple accepted1.7(63) with explicit Upload succeeded. status and xcodebuild exit0",
+  "buildAttachedToDraft": false,
+  "submittedForReview": false,
+  "testFlightProcessing": "pending independent root remote verification",
+  "physicalAcceptance": "not verified; current blocker receipt retained",
+  "historicalPreparationFlagPolicy": "Original preparation and applied-copy envelope flags are preserved. Later explicit remote readbacks govern current saved status.",
+  "totalVerifiedLocalizedMetadataFields": 48,
+  "finalSavedCopy": "metadata-final-saved.json",
+  "finalSavedCopySHA256": "9bd095811bcc43a002b90655ca7e87cb0663bae5356f48edc2d54ec85fe681d8",
+  "releaseCoordination": "Root reports completed Claude review with no source product P0-P2. Physical acceptance remains separate and does not block the authorized candidate TestFlight upload needed for installation. App Review submission remains under root coordination.",
+  "binaryUploadReceipt": "../release-archive/retry/candidate-upload-receipt.json"
+}

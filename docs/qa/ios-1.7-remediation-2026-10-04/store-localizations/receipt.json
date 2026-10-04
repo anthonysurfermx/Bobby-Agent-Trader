@@ -1,0 +1,316 @@
+{
+  "createdAtUTC": "2026-10-04T12:29:33.012666+00:00",
+  "version": "1.7",
+  "targetBuild": "63",
+  "candidateDocumentedHEAD": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "shippingCodeMatchesA135d6e1": true,
+  "shippingCodeDiffPaths": [],
+  "locales": [
+    "en-US",
+    "es-MX",
+    "pt-PT",
+    "de-DE",
+    "fr-FR",
+    "it"
+  ],
+  "allMetadataLimitsPass": true,
+  "artworkOriginalCount": 42,
+  "selectedArtworkCount": 30,
+  "selectedPerLocale": 5,
+  "excludedArtworkCount": 12,
+  "excludedPositions": [
+    "05",
+    "07"
+  ],
+  "exclusion": "Existing artwork names OKX in chart footer, while current build63 footer removes that provider name. No interval mislabel or support clipping found in these images.",
+  "allOriginalHashesMatchApproved56And57Manifest": true,
+  "allOriginalImages1320x2868RGBNoAlpha": true,
+  "inventoryImages": 456,
+  "icloudPlaceholdersInTargetedInventory": 0,
+  "bulkICloudDownloadRequested": false,
+  "newCurrentBuild63CaptureCount": 0,
+  "originalsEditedOrCopied": 0,
+  "safeUploadPathsAreSymlinks": true,
+  "publicSupportPrivacyURLHTTP200Count": 12,
+  "publicURLCount": 12,
+  "renderedPublicTranslationsChecked": false,
+  "appleSaveUploadOrSubmitPerformedByThisTask": false,
+  "sourceFiles": {
+    "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/ios/Bobby/Sources/Nucleo/NucleoSpeech.swift": {
+      "sha256": "83ca6ccb9889303b0badfea6ffb8c0dbbd70d8de5e01535c998af0611c28da0e",
+      "bytes": 24090
+    },
+    "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/ios/Bobby/Nucleo/src/app/55-read.js": {
+      "sha256": "2231d5b64f72d18adf7d52395a4cb2ca4e548e5dd486ecbe4613037202e4d612",
+      "bytes": 28649
+    },
+    "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/api/_lib/desk-levels.ts": {
+      "sha256": "e2989058325c0e16e10e68b19c456d9dca9e1ff433bfc121b813b836bf57643c",
+      "bytes": 5457
+    },
+    "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/api/_lib/briefings/http.ts": {
+      "sha256": "24ee8f48a86349923e276e385dee36fc9f82c8cfd4288ce04d159def196c2677",
+      "bytes": 12780
+    }
+  },
+  "evidenceFiles": {
+    "README.md": {
+      "sha256": "3f983178b1d4fad26b76b02137da09d23ab4f2ce89a9d945dda48186fbbc9662",
+      "bytes": 10717
+    },
+    "assets-inventory.json": {
+      "sha256": "ba1a644a704bcb8c883af7024a5db89cc41516d54a7469b5c337a36bd0a91ff9",
+      "bytes": 312288
+    },
+    "contact-sheet-de.jpg": {
+      "sha256": "f4f3555de782a679e1c31eb7e3a3dafeeeae00581df5090d0501745de92b6627",
+      "bytes": 128694
+    },
+    "contact-sheet-en.jpg": {
+      "sha256": "ce8ca3fec362cc70a36308f267fbe892ebb508f6c474b50346bacb921279a723",
+      "bytes": 122435
+    },
+    "contact-sheet-es.jpg": {
+      "sha256": "9710525701d70c282bd3f99ecfb125e13106831f7cad52e8f07ed627be9bb282",
+      "bytes": 123205
+    },
+    "contact-sheet-fr.jpg": {
+      "sha256": "c40a75df0bdc8243ef94faad8bd6967cfa2d98a9c76f19274e2997ea0245cb34",
+      "bytes": 129609
+    },
+    "contact-sheet-it.jpg": {
+      "sha256": "7dbf0cceddb3b925ee4bab5a79e3b78171d72c85330b8ad6025bcb2d3e075a19",
+      "bytes": 127489
+    },
+    "contact-sheet-pt.jpg": {
+      "sha256": "9de39c789a1ecf21af32a2499a3a63257546609ba3f65d887cda2fee68b45452",
+      "bytes": 123822
+    },
+    "de-DE/description.txt": {
+      "sha256": "fa6e1f238f65bb1f8929de2db56a1c40af9a59e62b6b25387e612fca4d67419f",
+      "bytes": 3331
+    },
+    "de-DE/keywords.txt": {
+      "sha256": "7c6d617e1f593a747c6a5df37781d5f1291df9a7edae445553d05ca4115eb275",
+      "bytes": 69
+    },
+    "de-DE/name.txt": {
+      "sha256": "7ab877f5e48fd2f03d40cb3f84c9d607af3f006211509246b84b9a52eb404756",
+      "bytes": 25
+    },
+    "de-DE/privacyPolicyURL.txt": {
+      "sha256": "29cc0e0867ba1f93a539ac864505b5eb8d1b3474bb8f61445296ece420a492d7",
+      "bytes": 42
+    },
+    "de-DE/promotionalText.txt": {
+      "sha256": "d3a4936ef36d40776396f708961c548aab3a62a326824198ab6b5880d434b0a6",
+      "bytes": 154
+    },
+    "de-DE/subtitle.txt": {
+      "sha256": "3b3563e51ba6316c44600fa57bcfcfb804c214f24a43f09a480dbe8097639259",
+      "bytes": 27
+    },
+    "de-DE/supportURL.txt": {
+      "sha256": "f327d575cc95e617caac0188c1285bb47ef3e7ed9bed725014f69ceaca41b948",
+      "bytes": 42
+    },
+    "de-DE/whatsNew.txt": {
+      "sha256": "c07f5d01e7e3c79dfd2d6db1f99b82ffbf303f021590c367b56d9c031e96473b",
+      "bytes": 516
+    },
+    "en-US/description.txt": {
+      "sha256": "fdafec040624baf51445534361e880190a7cd3b6aa9f8e37017e074955db215a",
+      "bytes": 2872
+    },
+    "en-US/keywords.txt": {
+      "sha256": "efdcdb7faa5a59cfd9c8722ff1a0879207103e47e38422c7125da74a0a069ce0",
+      "bytes": 79
+    },
+    "en-US/name.txt": {
+      "sha256": "65a7477d3f64c430758e74eb5f83cbe5fbe22331d097978cfe577a3d5a30698c",
+      "bytes": 30
+    },
+    "en-US/privacyPolicyURL.txt": {
+      "sha256": "0c0b13d9282565de5da222c6c9d6f03d90af2b318be11e9a771cf2ba25d38be3",
+      "bytes": 42
+    },
+    "en-US/promotionalText.txt": {
+      "sha256": "cee94086a917e7c0ececce8bbd587bf650c25241314a6e400bead28149c6ef90",
+      "bytes": 156
+    },
+    "en-US/subtitle.txt": {
+      "sha256": "f39e36508ac8bb75a913256662aa11d84d64a70bccd56ff17c8490dd63f07917",
+      "bytes": 26
+    },
+    "en-US/supportURL.txt": {
+      "sha256": "894ef52956f0fdf123fd7f8b6fec0e0c6971dcf4a7bf20d640f20760d665a4be",
+      "bytes": 42
+    },
+    "en-US/whatsNew.txt": {
+      "sha256": "d909e75becd611cc3adbcfb3f8337f6cc6a1db474e975c72190a761696b6ecae",
+      "bytes": 436
+    },
+    "es-MX/description.txt": {
+      "sha256": "f22d7e0407a1cdcb197d91d483d777519f8a1cb2ef016f29c66401e6be66ad59",
+      "bytes": 3154
+    },
+    "es-MX/keywords.txt": {
+      "sha256": "ab13fb558eaced5544532aa27ef4522928f3b64f3e36e7558484785d3d4a7c70",
+      "bytes": 89
+    },
+    "es-MX/name.txt": {
+      "sha256": "d319d0c4ceb7b2301a8f03e887435c1c6b5f12f4370a511189ca58c402d22870",
+      "bytes": 30
+    },
+    "es-MX/privacyPolicyURL.txt": {
+      "sha256": "701329ea38d94ac1eb4c97329049a3fe310d82490cb63940d1ca380f981ef91c",
+      "bytes": 42
+    },
+    "es-MX/promotionalText.txt": {
+      "sha256": "94f45258a61b4e55cfb09f626a04a437df889c5459e864c040e3ecee9752aa62",
+      "bytes": 158
+    },
+    "es-MX/subtitle.txt": {
+      "sha256": "e279dd793fc91508c18c7aecc53994b0a2a4b8150fb27a88a57cf626896f2c93",
+      "bytes": 25
+    },
+    "es-MX/supportURL.txt": {
+      "sha256": "c0a8a29fa43f575fdf8519eb48cde849bd29f864cd027fa50923237aa3eba10c",
+      "bytes": 42
+    },
+    "es-MX/whatsNew.txt": {
+      "sha256": "b38e234c92f1c8d726737dcb3f0c0dcb1ec2342300c1149e537dd350c662feee",
+      "bytes": 483
+    },
+    "final-artwork-manifest.json": {
+      "sha256": "c80e365e1d1ac2d8dce9302aa60f2344a714ac9cdecd338142a4d9c47f77bbe1",
+      "bytes": 79430
+    },
+    "fr-FR/description.txt": {
+      "sha256": "2fc05bbb79dfdeed25c924df3bb24682d35792c8f5211825d328587686a63dd3",
+      "bytes": 3429
+    },
+    "fr-FR/keywords.txt": {
+      "sha256": "3965f506a1d276dc6d2594e7f03b273733848931bd70e5f61166ae57f87e5131",
+      "bytes": 75
+    },
+    "fr-FR/name.txt": {
+      "sha256": "5bf825fb2ec908fa9f5fa146f8579d307e809868b09e2909a1691d74f2d2d287",
+      "bytes": 27
+    },
+    "fr-FR/privacyPolicyURL.txt": {
+      "sha256": "6d27690b2141175668b86c761f2e96ad286482bc3ce84cf08a1073f92e822cf8",
+      "bytes": 42
+    },
+    "fr-FR/promotionalText.txt": {
+      "sha256": "ac0d760b5642a965e809a734644f6c91ea0f73c1bdc43a18558c60270de935d7",
+      "bytes": 158
+    },
+    "fr-FR/subtitle.txt": {
+      "sha256": "17d283ebab165bb0325912abb19bd2cf3a853b7b3449218cec703b0abc96056c",
+      "bytes": 29
+    },
+    "fr-FR/supportURL.txt": {
+      "sha256": "176dff83c1ac3c6530f5381852282a2c59c78b41f0b6d4445cda655d4953cd01",
+      "bytes": 42
+    },
+    "fr-FR/whatsNew.txt": {
+      "sha256": "aa714df0aa9156a1a12530d78679749f54b38d1988fc4f7b90bfd7536aa4ad7c",
+      "bytes": 538
+    },
+    "it/description.txt": {
+      "sha256": "3fa0fe9cf729580a41e8f0d68ec8c92fb8fd33e3db74177f61d1c6ab57684702",
+      "bytes": 3223
+    },
+    "it/keywords.txt": {
+      "sha256": "8debcdd6a695dcc59fdb35e1f5490f885cc4f1b8b00e5a0e454160d87ce69bad",
+      "bytes": 69
+    },
+    "it/name.txt": {
+      "sha256": "9722c187cf236b00f6470f6d6242e9504b13f0e898f8e6932b1ab8cd391b6ac8",
+      "bytes": 30
+    },
+    "it/privacyPolicyURL.txt": {
+      "sha256": "e47c485119569e4da3049e61b2ca29d898676be91fbdac89bf1dd589a44d9206",
+      "bytes": 42
+    },
+    "it/promotionalText.txt": {
+      "sha256": "ce4bba7315c49d66482862db76a7ad468951698826bc052b0006401f71690d49",
+      "bytes": 147
+    },
+    "it/subtitle.txt": {
+      "sha256": "dbfda7913b0074e278a1d5f2fe33796c2cd33c60e84a9efa345038a087af1f11",
+      "bytes": 28
+    },
+    "it/supportURL.txt": {
+      "sha256": "183bd1cc24c36b748922479b5cda50123c1c5122df38df81aece6f7b18ea33df",
+      "bytes": 42
+    },
+    "it/whatsNew.txt": {
+      "sha256": "2fc86eaecd054869cf8b4a6dafa16700cbad28e6509c6593d8c73e29f465be04",
+      "bytes": 481
+    },
+    "metadata-1.7-63-four-new-locales.json": {
+      "sha256": "7aa55c11f83288933073661fa3b131bc5e518afa1b3c35f2baf8569f9ee583f8",
+      "bytes": 21323
+    },
+    "metadata-1.7-63.json": {
+      "sha256": "7f2b12f204da2935e610fb9e1bf7bd24699703d88b197101120b7fc34f27bbe9",
+      "bytes": 29561
+    },
+    "metadata-validation.json": {
+      "sha256": "8f9d31b7872bcf7da9d720484224b0675727616e6d58347265d52557ad91ebad",
+      "bytes": 5761
+    },
+    "prepare-metadata.py": {
+      "sha256": "8b3ebe7fe426e6470c74790aaefcf4c7a4a6c8f141efa1ae90f67a6812fad0ca",
+      "bytes": 14465
+    },
+    "pt-PT/description.txt": {
+      "sha256": "63802c0490325e353a6b2f52d0b9ad787ef822f5a08c33f5e701e883837bba6e",
+      "bytes": 3279
+    },
+    "pt-PT/keywords.txt": {
+      "sha256": "83fd1ca97020e8fbf520e5825d133d4e9cb10fda6942c436dc30277db7fd009e",
+      "bytes": 81
+    },
+    "pt-PT/name.txt": {
+      "sha256": "cbcbe7101e4a75c44da0f5bd3b21da305a311a1525f4971b154a2e4245fa1fa6",
+      "bytes": 31
+    },
+    "pt-PT/privacyPolicyURL.txt": {
+      "sha256": "03fb98e3687d1340f55aaf1b73980a1ee61b57c46012e6a4f46c980d669f64d0",
+      "bytes": 42
+    },
+    "pt-PT/promotionalText.txt": {
+      "sha256": "11340db403af97499fe9691f64fef6d27f2d65a5754360541819c0ab8874f65f",
+      "bytes": 147
+    },
+    "pt-PT/subtitle.txt": {
+      "sha256": "c3b0cb26fade1e5773c90183945cfea1295e369a165d9f62c93859c38980e2a9",
+      "bytes": 30
+    },
+    "pt-PT/supportURL.txt": {
+      "sha256": "4552889f947245c9dcc6d927480579add2a093a9c8ebddda885b1ca6d8da74c1",
+      "bytes": 42
+    },
+    "pt-PT/whatsNew.txt": {
+      "sha256": "4de0b5b01b124fadd09653ddc8176b3182121c8a18c5e658b5ce76bb4585f5d3",
+      "bytes": 492
+    },
+    "review-notes-en.txt": {
+      "sha256": "b2914d3e1e5adfabbe3a9f71809e50cc6621246506d7e9ec3a514db24e298349",
+      "bytes": 2385
+    },
+    "url-checks.json": {
+      "sha256": "bc674ab13143df9fdf3ca8b029725b122aaa07329362bb2916928287d8b86489",
+      "bytes": 4495
+    },
+    "validate-assets.py": {
+      "sha256": "63e6e0baf0c41fc9d9acf3221cb0ce6d01068bf0007ebe008163dca3466f2c63",
+      "bytes": 5723
+    }
+  },
+  "reportLocalLinksChecked": 7,
+  "brokenReportLocalLinks": []
+}

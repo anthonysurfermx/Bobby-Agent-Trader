@@ -1,0 +1,17 @@
+{
+  "method": "StoreShots/test02_VerdictAndEvolution()",
+  "attachments": [
+    {
+      "name": "09-verdict",
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-corrected-09-verdict.png",
+      "bytes": 1763619
+    }
+  ],
+  "evolutionCaptured": false,
+  "recordedResultInspection": "Visible HALO // RISK GATE, NO TRADE, No clear setup. Waiting is an option. English CIO analysis for 1H BTC-USDT at2026-10-04 12:00UTC, DAILY XP COMPLETE and SAVED ON THIS DEVICE. This is a valid waiting verdict from the actual classic DEBUG backend call, not a fixture/quota error.",
+  "inspectedAt": "2026-10-04T12:59:44.143828+00:00",
+  "actualLiveVerdictVisible": true,
+  "verdict": "NO TRADE",
+  "evolutionVerified": false,
+  "evolutionBoundary": "No10-evolution attachment recorded; existing evolution branch is optional and daily XP is complete. No XP was silently seeded to manufacture evolution."
+}

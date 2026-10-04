@@ -1,0 +1,357 @@
+{
+  "type": "result",
+  "key": "v2:98a527aada38442e18ec4b3004637c47be049d1809c63f06fee4a79fc98c2aee",
+  "agentId": "a010249fcfa06df5e",
+  "result": {
+    "findings": [
+      {
+        "title": "StoreShots UI class failed 3 of 5 methods; driver halted; rerun pending against an uncommitted test edit",
+        "severity": "P2",
+        "category": "operational_blocker",
+        "location": "evidence/ui-serial-results.json",
+        "trigger": "Serial UI run, class StoreShots, 2026-10-04T12:40:53Z-12:46:58Z, test-without-building on the Debug simulator products, after NucleoPrivacyUITests had persisted a withdrawn consent in the same simulator.",
+        "evidence": "PROVEN RUNTIME RESULT. evidence/ui-serial-results.json:667-685 `\"executionExitCode\": 65`, `\"result\": \"Failed\", \"totalTestCount\": 5, \"passedTests\": 2, \"failedTests\": 3`; failed cases are test02_VerdictAndEvolution, test03_BoardAndSuggestions, test04_ShareSkin (lines 694-706); `\"acceptedClasses\": 13, \"acceptedMethods\": 52, \"complete\": false` (717-720). evidence/ui-serial-driver-status.json:4 `\"phase\": \"halted-needs-diagnosis\"`. evidence/StoreShots-summary.json shows three `XCTAssertTrue failed`. The cause in evidence/native/StoreShots-consent-harness-remediation.json:15 (\"Prior privacy withdrawal persisted riskNoticeVersion=0 ... 02/03/04 omitted it\") is a diagnosis, not a proven fix: no passing rerun receipt exists in the snapshot. evidence/native/StoreShots-failure-extraction.json covers only test02 and exported no attachments.",
+        "fix": "Commit the StoreShots.swift harness change, rebuild the UI test bundle, re-record the source/binary binding, rerun StoreShots (5 methods) on a known simulator state and keep the failed receipt as history. Until then report UI as 13/14 classes, 52/57 methods accepted, 3 methods failed.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "Snapshot contains a dirty working-tree test file, so the 'product/test paths identical to a135d6e1' claim does not hold for tests",
+        "severity": "P2",
+        "category": "evidence_coverage_gap",
+        "location": "ios/Bobby/UITests/StoreShots.swift:41",
+        "trigger": "Compare snapshot-manifest.json file kinds and hashes with the hashes bound to the executed UI run.",
+        "evidence": "snapshot-manifest.json:5 `\"codeMatchesNativeAcceptanceCommit\": true`, but snapshot-manifest.json:4132-4136 lists `\"kind\": \"working-tree-test-only-override\"` for ios/Bobby/UITests/StoreShots.swift with sha256 2e9837c8... The executed UI binding (evidence/native/ui-serial-source-binding.json:18) records StoreShots.swift as e631a5cb..., and evidence/native/StoreShots-consent-harness-remediation.json:7-8 records beforeSHA256 e631a5cb... / afterSHA256 2e9837c8... edited at 12:48:42Z, after the failed run. The snapshot file (lines 41, 98, 128, 176 carry `-agent.riskNoticeVersion 6`) is therefore not the file any receipt executed, and it is not in commit be3e8b13 or a135d6e1. Every UI class ran `test-without-building` (evidence/NucleoPrivacyUITests-execution.json:31), so the frozen BobbyUITests binary (sha 083fe7dd...) cannot contain the edit. Only this one override entry was found; product paths are all `committed-source` in the lines I checked.",
+        "fix": "State the binding as 'product paths identical; one uncommitted UITests override'. Commit the test change, rebuild, and issue a new source/binary binding before any StoreShots rerun is accepted.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "No evidence that the live privacy policy carries the 1.7 dictation text that the store listing links to",
+        "severity": "P2",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/store-localizations/receipt.json",
+        "trigger": "User follows the Privacy link in any of the six store descriptions after 1.7 ships while the deployed site still serves the 1.6 policy.",
+        "evidence": "SOURCE INFERENCE: src/pages/PrivacyPage.tsx:201 has the corrected text (\"From iPhone version 1.7 ... otherwise ... the audio goes to Apple's speech service ... In versions 1.5 and 1.6, dictation ran only on the iPhone\"). RECEIPT: evidence/store-localizations/receipt.json:36 `\"renderedPublicTranslationsChecked\": false`; url-checks.json records only HTTP 200 for 12 URLs at 12:25:44Z; README.md:24 says \"This is URL reachability, not rendered localization\". No deployment receipt for the web build exists (evidence/lock-build/report.md:9 \"No deploy\"). Whether the public page still says on-device-only is unknown.",
+        "fix": "Deploy the web build containing PrivacyPage.tsx before or with the 1.7 release and capture a rendered-content readback of the dictation paragraph per language.",
+        "status": "unverified"
+      },
+      {
+        "title": "Store metadata: version fields saved and read back, but AppInfo name/subtitle/privacy URL not updated, no build attached, and readback is boolean-only",
+        "severity": "P2",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/store-localizations/app-store-metadata-saved.json",
+        "trigger": "Treating the six-locale store listing as fully saved and verified.",
+        "evidence": "SAVED-STORE RECEIPTS: app-store-metadata-saved.json (12:50:31Z) lines 4-10 saved fields are promotionalText, description, whatsNew, keywords, supportURL; line 19-22 fresh-reload readback complete only for en-US, others \"pending due active user Safari navigation\"; line 25 `\"appInfoNameSubtitlePrivacyURL\": \"prepared; not yet updated in remote AppInfo\"`; line 26 `\"draft; no build attached; not sent to App Review\"`. app-store-metadata-full-readback.json (12:53:57Z) lines 5-70 then report `match: true` on those five fields for en-US, de-DE, fr-FR, it, pt-PT, es-MX. That later receipt holds only booleans: no read-back text, no hash, no named reference file (I read lines 1-70 only). Review notes are `globalReviewNotesSaved: true` with no readback. Both receipts are timestamped after snapshot-manifest.json:2 (12:48:57Z). LOCAL DRAFT FILES: receipt.json:37 `\"appleSaveUploadOrSubmitPerformedByThisTask\": false`.",
+        "fix": "Update name/subtitle/privacy URL in AppInfo for all six locales, attach build 63, and store a readback containing the text or its SHA-256 per locale and field, plus a review-notes readback.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "es-MX text saved to the store differs from the es-MX draft files, the metadata JSON and the length validation",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/store-localizations/es-MX/description.txt",
+        "trigger": "Re-applying metadata from es-MX/description.txt or metadata-1.7-63.json, or relying on metadata-validation.json for the applied text.",
+        "evidence": "es-MX/description.txt:20 and metadata-1.7-63.json:22 read \"La app para iPhone no conecta wallets, ejecuta operaciones ni mueve fondos\" and \"60 an\u00e1lisis Profundo y 10 M\u00e1ximo\" (txt:26). metadata-final-applied.json:22 reads \"no conecta wallets, no ejecuta operaciones y no mueve fondos\" and \"60 an\u00e1lisis de nivel Profundo y 10 de nivel M\u00e1ximo\". app-store-metadata-saved.json:27-28 `\"spanishGrammarPolishApplied\": true, \"spanishDescriptionCharacters\": 3125`, while metadata-validation.json:63-64 validated 3102 characters and receipt.json hashes the draft. The draft wording can be read as 'executes trades', which reverses a compliance statement; the applied wording is correct. 3125 is under the 4000 limit. The privacy sentence (line 18) is identical in both.",
+        "fix": "Regenerate es-MX/description.txt, metadata-1.7-63.json, metadata-validation.json and receipt.json from metadata-final-applied.json so one source of truth exists.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "Apple speech-service agreement has no revocation control of its own; it is cleared only by withdrawing AI consent",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Sources/Nucleo/NucleoSession.swift:507",
+        "trigger": "User allows Apple's speech service, later wants to revoke only that; or grants it while AI consent is not accepted (withdraw button is hidden in that state); or signs out / deletes the account.",
+        "evidence": "SOURCE INFERENCE. The only production call site of `revokeAppleServiceConsent()` is NucleoSession.swift:507 inside `revokeRiskNoticeConsent()` (grep over source/ found no other non-test caller). ios/Bobby/Sources/Nucleo/NucleoRootView.swift:141 passes `onWithdraw: session.profile.acceptedRiskNotice ? { ... } : nil`, so the withdraw action is absent when AI consent is not currently accepted. The key lives in UserDefaults (`speech.appleServiceConsent.v1`, NucleoSpeech.swift:89) and is not tied to the account. evidence/store-localizations/review-notes-en.txt:5 states \"This consent is separate from the analysis AI permission\"; granting is separate, revoking is not. Whether dictation is reachable before the risk notice is accepted was not verified. The iOS Settings speech-recognition switch remains a fallback.",
+        "fix": "Add a Profile row to revoke the Apple speech agreement independently, and clear the key on account deletion; or document that revocation is via AI-consent withdrawal or iOS Settings.",
+        "status": "inferred"
+      },
+      {
+        "title": "Privacy policy describes the Apple-service gate differently from the app and the store listing",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "src/pages/PrivacyPage.tsx:201",
+        "trigger": "Reading the policy next to the store description or review notes.",
+        "evidence": "PrivacyPage.tsx:201: \"otherwise, and only after you have allowed speech recognition, the audio goes to Apple's speech service\". The gate named is the iOS permission. The app requires an additional stored in-app agreement (NucleoSpeech.swift:183, 295; alert at NucleoSession.swift:457-463) and the store text says \"only with your separate consent\" (evidence/store-localizations/en-US/description.txt:18). PrivacyPage.tsx:202 says withdrawal \"stops future AI analysis and generated-speech requests\" and does not mention that it also removes the Apple speech agreement (NucleoSession.swift:507). The policy understates the protection; it does not overstate privacy. The page's tr() calls carry English and Spanish only in the lines read.",
+        "fix": "Add one sentence: Apple's speech service is used only after a separate in-app agreement, which is removed when AI consent is withdrawn.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "API TypeScript target omits api/bobby-access.ts, the Stripe checkout handler that iOS also calls; no TS2339 receipt in the snapshot",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "tsconfig.api.json:21",
+        "trigger": "`npm run check:api` (package.json:10 `tsc -p tsconfig.api.json`) passes while type errors exist in files outside the allowlist.",
+        "evidence": "tsconfig.api.json:21-117 is an explicit `include` allowlist with no `exclude`. It lists `api/stripe-webhook.ts` (line 111) and `api/account.ts` (line 73), so api/_lib/stripe-api.ts is reached through their imports (api/stripe-webhook.ts:13, api/account.ts:38). A grep of tsconfig.api.json for bobby-access, _lib/access, checkout-attempt, _lib/revenuecat, _lib/stripe-api returned 0 matches: api/bobby-access.ts (imports stripe-api at line 32, 40 Stripe references) is not a root and nothing imports an endpoint file. api/tsconfig.json:19 `\"include\": [\"**/*.ts\"]` would cover it, but no package.json script uses it (only lines 10 and 79 reference a tsconfig). The same endpoint serves iOS: ios/Bobby/Sources/BobbyAccess.swift:163 `static let accessPath = \"api/bobby-access\"`, and bobby-access.ts:293 handles Apple verification. The TS2339 errors are cited only in prose (brief.md:31, evidence/README.md:61); no tsc output exists in the snapshot, so their count and location are not verifiable. Impact on the iOS 1.7 (63) binary: none directly, as this is server code deployed separately; the risk is an unchecked server handler on the iOS access/levels/RevenueCat-sync path.",
+        "fix": "Add api/bobby-access.ts and its _lib dependencies to tsconfig.api.json (or run tsc with api/tsconfig.json in CI), capture the tsc output, and fix or annotate the TS2339 errors.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "Runtime UI evidence proves AI-consent withdrawal persistence, not the clearing of the Apple speech agreement",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "ios/Bobby/UITests/NucleoPrivacyUITests.swift:200",
+        "trigger": "Citing NucleoPrivacyUITests as end-to-end proof that withdrawal clears speech consent.",
+        "evidence": "PROVEN RUNTIME RESULT (Debug simulator, offline fixtures, English): evidence/NucleoPrivacyUITests-summary.json `passedTests: 2, failedTests: 0`; evidence/ui-serial-results.json:341-376. The test (lines 200-256) asserts the confirmation dialog, cancel without withdrawal, Profile and name preserved, and the risk gate returning after relaunch. It never reads `speech.appleServiceConsent.v1`, never exercises dictation, and does not assert that AI requests stop. Independent corroboration of persistence: evidence/native/StoreShots-consent-harness-remediation.json:16-18 `\"agent.riskNoticeVersion\": 0`. Speech-key clearing is covered only by mocked unit tests in source (ios/Bobby/Tests/NativeSpeechPipelineTests.swift:184-218, NucleoSpeechButtonTests.swift:143-144); I did not confirm those method names inside the 536-case test tree. No real SFSpeechRecognizer or physical-device run exists.",
+        "fix": "Add a UI or unit assertion that the defaults key is absent after `revokeRiskNoticeConsent()` through the Profile path, and run dictation once on a physical device with and without a local model.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "Archive verifier was narrowed to three patterns, the script is not in the snapshot, and the Mach-O is not inspected for DEBUG code",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/native/archive63-wrapper-fixture-verifier-repair.json",
+        "trigger": "Relying on the archive receipt as proof that no DEBUG fixture or mock bridge ships.",
+        "evidence": "archive63-wrapper-fixture-verifier-repair.json:4 \"Literal NUCLEO_FIXTURES test incorrectly rejected inert release guards\"; lines 8-14 list the replacement checks (no window/W.NUCLEO_FIXTURES assignment, no shared/90-dev-mock-bridge.js section, no B.mock install, build-info release true with pages app/onboarding, byte equality and no fixture folder/contract retained). The change was made at 12:39:38Z, after the archive finished (12:37:49Z) and after a first verification failure (evidence/archive63-r2/completion-receipt.json:38). archive63-wrapper.py is referenced by hash only, so the patterns cannot be reviewed; a payload under another identifier would pass the three rules. Mitigations in receipts: archive Nucleo/app.html sha 4bf4221c... (archive-verification.json:41) equals the source resource hash in evidence/final-bundle-summary.json:31 and the Debug product hash in evidence/native/ui-serial-source-binding.json:32; `get-task-allow: false`. For Swift, exclusion is SOURCE INFERENCE only (ios/Bobby/Sources/Nucleo/NucleoFixtures.swift:6 `#if DEBUG` ... :327 `#endif`); archive-verification.json records only executableSHA256, with no symbol or strings check. Also completion-receipt.json:39: codesign \"returned1; no full stderr captured\" in the default sandbox and passed outside it. The privacy manifest is recorded as a hash, not as checked content.",
+        "fix": "Include the verifier script in the evidence bundle, add a strings/symbol check of the Release executable for NucleoFixtures and -nucleo-fixtures handling, and capture codesign stderr for the sandbox failure.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "PostgreSQL directory in this snapshot proves 7 suites and 132 counted checks, not 21 suites or 2,575",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/pg-remaining/results.json",
+        "trigger": "Quoting '21 distinct suites PASS, 2,575 Node counters' from this snapshot.",
+        "evidence": "PROVEN RUNTIME RESULT for 7 suites at a135d6e1: results.json:3 candidateHEAD a135d6e1; lines 498-506 list 7 regressionRuns; line 512 \"7 distinct regression suites; 132 explicit Node checks in three suites ... Earlier 14 suites were not repeated\"; reportedChecks 53 + 15 + 64 = 132 (lines 234, 373, 418); registry, RLS, swap and cells have `reportedChecks: null`. The 14 earlier suites and 2,443 counters appear only in prose (evidence/evidence-consolidation-review.md:11-12), and line 15 of that file says \"The old PG receipt is from 393776c3\", a different commit bound by 72 file hashes. I did not locate or read that historical receipt.",
+        "fix": "Include the historical 14-suite receipt with its hash comparison in the bundle, or state the PG claim as '7 suites re-run at a135d6e1; 14 from 393776c3 with matching script/migration hashes'.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "UI receipts carry two commit labels; one binary binding was recorded once; simulator state leaks between classes",
+        "severity": "INFO",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/native/ui-serial-run-report.md",
+        "trigger": "Reading 'runtime acceptance bound to a135d6e1' as a uniform binding for all 13 accepted classes.",
+        "evidence": "evidence/ui-serial-results.json: ProReviewShots, Store35Shots, EquipmentUITests, LockerTests, SquadGalleryTests have sourceCommit a135d6e1 (lines 8, 46, 84, 122, 184); the other 8 accepted classes and StoreShots have be3e8b13 (234, 344, 382, 420, 506, 544, 588, 626, 658). All ran test-without-building; product hashes were frozen once at 11:53:46Z (evidence/native/ui-serial-source-binding.json:2) and not re-hashed after the two disk-guard stops (ui-serial-run-report.md:27, gaps 11:56:59-12:06:27 and 12:09:32-12:28:01) or the simulator shutdown/boot. The StoreShots failure shows classes share persisted app defaults, so results are order-dependent. The Release archive (12:34:26-12:37:49Z) ran concurrently with four UI classes using separate DerivedData (ui-serial-run-report.md:29).",
+        "fix": "Re-hash the app and test binaries at each resume and reset the relevant defaults at the start of every UI class.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "Lock build ran from 507616c9 on Node 25.9.0; Anvil Hardness result was completed after the wrapper crashed",
+        "severity": "INFO",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/lock-build/result.json",
+        "trigger": "Treating lock-build and Anvil receipts as direct a135d6e1 / CI-equivalent runs.",
+        "evidence": "Lock build: result.json:3 sourceCommit 507616c9, :6 node v25.9.0, :211-212 currentCandidateCommit a135d6e1 with `currentCandidateSourceMatches: true`; installed vite 6.4.3, @swc/core 1.15.24, typescript 5.9.3 (:49-53), 1292 packages with zero mismatches (:62-63), dist count 896 (:206). CI uses Node 22 (.github/workflows/ci.yml:29, 90, 124). The shared candidate node_modules, used by other suites, holds vite 5.4.21 (result.json:217), not the locked 6.4.3. Anvil: result.json:89, 125, 162 give 10 + 51 = 61 assertion calls, 0 failed; first-run-wrapper-receipt.json:79-83 `\"error\": \"[Errno 48] Address already in use\"`, `\"passed\": false` with a Hardness entry lacking exitCode and assertion counts; the final result.json fills those in with the same endedAtUTC and `\"hardnessRerun\": false` (:147), so the Hardness pass is reconstructed from the log and audit file. Test scripts ran as modified copies (sourceSHA256 differs from runtimeSHA256, :9-17); artifacts came from another checkout's contracts/out (:21). Chain 31337 is stated in report.md:12-14, not in result.json. lock-build/preflight.json was not read.",
+        "fix": "Keep the Node 25 vs 22 boundary in the release notes; attach the port-allocation diff of the two Anvil scripts.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "1.6 on-device-only statement replaced by the consent-gated Apple-service fallback in code, usage string, risk notice and six store descriptions",
+        "severity": "INFO",
+        "category": "corrected_regression",
+        "location": "ios/Bobby/Sources/Nucleo/NucleoSpeech.swift:295",
+        "trigger": "Hold-to-ask on a phone without a local model for the app language.",
+        "evidence": "SOURCE INFERENCE. NucleoSpeech.swift:294-298 `let onDevice = recognizer.supportsOnDeviceRecognition`, `guard onDevice || appleServiceConsent else { return .unavailable }`, request built with `onDevice: onDevice`; :261 `request.requiresOnDeviceRecognition = onDevice`; :148 consent read from UserDefaults on every call; :92 default prompt handler returns false; :213 stored only on Allow. ios/Bobby/Sources/Info.plist:56 and ios/Bobby/project.yml:116 name Apple's speech service; ios/Bobby/Sources/RiskNoticeView.swift:17 does too. Line 18 of each of the six evidence/store-localizations/<locale>/description.txt states the separate-consent fallback; a grep for 'never leaves / not uploaded / on-device only' equivalents across that directory returned no matches. Stale comment remains at nucleo/src/web/40-web-speech.js:4 (\"Unlike iOS (R8, on-device only)\"). de-DE and fr-FR line 18 use an imperative (\"widerrufe deine Zustimmung im Profil\", \"retire ton autorisation\") where English says \"You can ... withdraw\"; privacy meaning is unchanged.",
+        "fix": "Update the stale web comment; soften the de/fr imperative to 'you can'.",
+        "status": "verified_in_source"
+      }
+    ],
+    "rejectedFalsePositives": [
+      {
+        "claim": "The Apple-service consent alert exists only in English and Spanish, so fr/pt/it/de users consent in a language they did not choose.",
+        "counterEvidence": "ios/Bobby/Sources/Localization.swift:121-126 routes non-Spanish languages through NativeTranslations.rows; ios/Bobby/Sources/NativeTranslations.swift:659 holds fr, pt, it and de for the alert title, and :800 holds the message (fr and the start of pt seen; the rest of that long line was not displayed)."
+      },
+      {
+        "claim": "The app is on-device-only (requiresOnDeviceRecognition always true).",
+        "counterEvidence": "ios/Bobby/Sources/Nucleo/NucleoSpeech.swift:259-261 takes an `onDevice` parameter and :294-298 passes the recognizer's `supportsOnDeviceRecognition`; ios/Bobby/Tests/NativeSpeechPipelineTests.swift:121 asserts `requiresOnDeviceRecognition == false` on the consented server path."
+      },
+      {
+        "claim": "Audio can reach Apple's servers without stored consent through a default flag, a race between the availability check and start, a nil recognizer, or a locale fallback.",
+        "counterEvidence": "NucleoSpeech.swift:148 `defaults.bool` is false when the key is absent; :289 a nil or unavailable recognizer returns `.unavailable`; :294-295 re-read capability and consent at the enforcement point before any request or microphone tap exists (:298, :304); when the recognizer is on-device the request is forced on-device (:261); :234-236 reject unsupported or substituted locales. Unit coverage in source: NativeSpeechPipelineTests.swift:147-163 and :165-181."
+      },
+      {
+        "claim": "Consent stays cached in memory after withdrawal.",
+        "counterEvidence": "`appleServiceConsent` is a computed property reading UserDefaults (NucleoSpeech.swift:148); withdrawal calls `speech.cancel()` then `removeObject` (NucleoSession.swift:506-507; NucleoSpeech.swift:151); NativeSpeechPipelineTests.swift:126-127 expects `.consent` on the next start."
+      },
+      {
+        "claim": "Some locale's 1.7 description still says audio is on-device only or never uploaded.",
+        "counterEvidence": "Line 18 of en-US, es-MX, de-DE, fr-FR, it and pt-PT description.txt each states the Apple speech service is used only with separate consent when no on-device model is available; the consent phrase appears 6 times in metadata-1.7-63.json and 6 times in metadata-final-applied.json; a case-insensitive grep for on-device-only / never-leaves phrasing in six languages returned no matches."
+      },
+      {
+        "claim": "The Release archive was built from a different commit than the snapshot.",
+        "counterEvidence": "evidence/archive63-r2/completion-receipt.json:3, archive-verification.json:5 and preflight.json:4 all give sourceHead be3e8b1389294e7d477a77b87e107f044ea3f55e, equal to snapshot-manifest.json:3. The only dirty file is a UITests source, which is not an app-target input."
+      },
+      {
+        "claim": "The 536 native count is inflated by parent suite or bundle nodes.",
+        "counterEvidence": "evidence/native-unit-contract-a135d6e1-tests.json has exactly 536 `\"nodeType\" : \"Test Case\"` nodes out of 575 result-bearing nodes; no Failed, Skipped or Expected Failure result; two cases under NucleoContractUITests (lines 5124, 5133), leaving 534 unit cases. The summary reports passedTests 536 and totalTestCount 536."
+      },
+      {
+        "claim": "The Stripe webhook is excluded from the API TypeScript target.",
+        "counterEvidence": "tsconfig.api.json:111 lists `api/stripe-webhook.ts`, which imports api/_lib/stripe-api.ts (api/stripe-webhook.ts:13). The file left out is api/bobby-access.ts."
+      },
+      {
+        "claim": "The relaxed archive verifier let DEBUG fixtures into the Release app.",
+        "counterEvidence": "No receipt shows fixture content: archive-verification.json:57-58 report fixture resources absent and build-info `release: true` (:59-66); archive app.html and onboarding.html hashes equal the audited source resources (final-bundle-summary.json:31, 36); NucleoFixtures.swift is wholly inside `#if DEBUG` (lines 6-327). This rejects the positive claim only; the residual verification gap is listed as a finding."
+      }
+    ],
+    "claimChecks": [
+      {
+        "claim": "B1: NucleoSpeech prefers on-device recognition and allows Apple's speech service only with stored Apple-service consent; it is not universally on-device-only.",
+        "verdict": "confirmed",
+        "evidence": "SOURCE INFERENCE from a full read of ios/Bobby/Sources/Nucleo/NucleoSpeech.swift: consent key :89, default-deny prompt :92, consent read :148, revoke :151, `consent` state :183, storage only on Allow :213, on-device candidate preferred :237-243, server candidate only if reachable :245, enforcement :294-298. No source path creates a request or opens the microphone on a server recognizer without the stored key. Runtime proof is limited to mocked unit tests inside the 536/536 Debug simulator run; no physical-device or real-recognizer receipt exists."
+      },
+      {
+        "claim": "B1: Disclosures (usage strings, risk notice, consent alert, privacy policy, web path) match the behaviour.",
+        "verdict": "partially_confirmed",
+        "evidence": "Info.plist:56 and project.yml:116 disclose Apple's speech service; RiskNoticeView.swift:17 does too; the alert at NucleoSession.swift:457-463 is separate from AI consent and translated. PrivacyPage.tsx:201 discloses the fallback and the web browser speech path but names the iOS permission as the gate rather than the separate in-app agreement. Web path: nucleo/src/web/40-web-speech.js:42-46 always reports onDevice false. Deployment of the policy text is unverified."
+      },
+      {
+        "claim": "B2: 1.7 metadata discloses the separate-consent speech fallback in all six locale descriptions and in review-notes-en.txt.",
+        "verdict": "confirmed",
+        "evidence": "LOCAL DRAFT FILES: line 18 of all six description.txt files; review-notes-en.txt:5 \"Apple's speech service requires a separate native consent before microphone capture\". Translations preserve the privacy meaning in es, de, fr, it, pt. I read en/de promotional text and en/de whatsNew in txt, and en/es/fr promo and whatsNew inside metadata-final-applied.json; it and pt promo/whatsNew were covered only by the negative grep."
+      },
+      {
+        "claim": "B2: Per-locale .txt files match the metadata JSON and limits pass.",
+        "verdict": "partially_confirmed",
+        "evidence": "txt and metadata-1.7-63.json agree with each other, and metadata-validation.json shows allPass with every field under its limit (pt-PT name at 30/30). The text applied to the store for es-MX (metadata-final-applied.json:22, 3125 characters per app-store-metadata-saved.json:28) differs from the es-MX txt and from metadata-1.7-63.json (3102 validated). de, it and pt entries of metadata-final-applied.json were not compared."
+      },
+      {
+        "claim": "B2: Final store metadata readback is still in progress.",
+        "verdict": "partially_confirmed",
+        "evidence": "app-store-metadata-saved.json (12:50:31Z) shows only en-US read back and others pending. A later receipt, app-store-metadata-full-readback.json (12:53:57Z), reports match true for promotionalText, description, whatsNew, keywords and supportURL in all six locales, as booleans without text or hashes. Name, subtitle and privacy URL are not yet updated in AppInfo; no build attached; not submitted. Screenshot save is recorded separately in app-store-screenshots-saved.json with `buildAttached: false`."
+      },
+      {
+        "claim": "B3: Withdrawal clears speech consent and AI consent (riskNoticeVersion) and is proven at runtime by NucleoPrivacyUITests.",
+        "verdict": "partially_confirmed",
+        "evidence": "SOURCE: NucleoSession.swift:499-523 sets `profile.riskNoticeVersion = 0` (:502), cancels speech (:506), removes the Apple speech key (:507), stops voice, clears caches, closes paywall and sheets, emits consent.withdrawn; it does not sign out or delete. AI consent and riskNoticeVersion are the same value (no separate aiConsent key found). Both Profile entry points call it (NucleoRootView.swift:136, 141). RUNTIME: NucleoPrivacyUITests 2/2 passed proves persistence of the withdrawn notice and Profile availability only; speech-key clearing is not asserted in any UI test."
+      },
+      {
+        "claim": "B4: Web Stripe is excluded from the API TypeScript target with reported TS2339 errors.",
+        "verdict": "partially_confirmed",
+        "evidence": "tsconfig.api.json:21-117 is an allowlist that omits api/bobby-access.ts (Stripe checkout and iOS access endpoint); api/stripe-webhook.ts is included (:111). The TS2339 errors exist only as prose in brief.md:31 and evidence/README.md:61; no compiler output is in the snapshot."
+      },
+      {
+        "claim": "B5 native: 536/536 passed = 534 unit + 2 Nucleo contract UI, zero failed/skipped/expected failures, Debug iOS Simulator, one QoS runtime warning.",
+        "verdict": "confirmed",
+        "evidence": "PROVEN RUNTIME RESULT. Summary: passedTests 536, failedTests 0, skippedTests 0, expectedFailures 0, totalTestCount 536, iPhone 17 Pro simulator iOS 26.1. tests.json: 536 Test Case nodes, 2 under NucleoContractUITests, no non-passing result, one Runtime Warning node at :318-319. execution.json: `-configuration Debug`, sourceCommit a135d6e1, exitCode 0, 11:46:55-11:49:31Z."
+      },
+      {
+        "claim": "B5 UI: 14 classes / 57 methods; 13 classes / 52 methods passed; StoreShots (5) incomplete with observed failures, rerun pending.",
+        "verdict": "confirmed",
+        "evidence": "Recount from evidence/ui-serial-results.json: 2+2+2+6+4+14+2+2+10+2+3+2+1 = 52 passed across 13 classes with 0 failed/skipped/expected failures each; StoreShots 2 passed, 3 failed; 52 + 5 = 57. ui-test-matrix.json method counts sum to 57 over 14 classes; ui-test-method-inventory.json sums to 59 over 15 classes including the 2 contract methods run in the native phase. 'Incomplete' understates it: the StoreShots run completed with 3 failures and exit 65. Five classes are labelled a135d6e1 and nine be3e8b13; the run was halted and resumed twice."
+      },
+      {
+        "claim": "B5 lock build: 1,292 package paths, Vite 6.4.3 / SWC 1.15.24 / TS 5.9.3, 896 artifacts, Node 25.9.0 vs CI Node 22.",
+        "verdict": "confirmed",
+        "evidence": "evidence/lock-build/result.json:6, 49-53, 62-63, 206; npm ci and build exit 0; ci.yml:29, 90, 124 `node-version: 22`. Source snapshot commit is 507616c9, declared byte-identical to a135d6e1 for 1,484 files. preflight.json not read."
+      },
+      {
+        "claim": "B5 PostgreSQL: 21 distinct suites PASS; 2,575 Node counters with repeated portions 187 and 103; registry/RLS/swap/cells have no aggregate counter.",
+        "verdict": "partially_confirmed",
+        "evidence": "This snapshot's pg-remaining receipts prove 7 suites passed at a135d6e1 with 132 counted checks (53 + 15 + 64) and no counter for registry, RLS, swap and cells. The other 14 suites, the 2,443 counters and the 187/103 overlap are stated only in evidence-consolidation-review.md:11-12 and come from a receipt bound to commit 393776c3 that I did not read."
+      },
+      {
+        "claim": "B5 Anvil: 2 suites, 61 assertions (Hardness 10 + Bounties 51), chain 31337, no fresh Forge compile, TIME_WAIT wrapper correction without rerunning Hardness.",
+        "verdict": "confirmed",
+        "evidence": "evidence/anvil/result.json: assertionCalls 10 and 51, totals 61 with 0 failed, `hardnessRerun: false`, artifacts copied from another checkout with sourceKeccakMatches true; first-run-wrapper-receipt.json preserves the Errno 48 failure. Chain 31337 and 'no Forge compilation' are stated in report.md:12-18, not in result.json. The Hardness pass in the final result was reconstructed after the wrapper error."
+      },
+      {
+        "claim": "B5 archive: signed Release 1.7 (63), xcodebuild exit 0, verification/codesign PASS at 12:41:55Z, binds 750 source inputs to be3/a135 source, excludes DEBUG fixtures/mock bridge assignments, checks App Store entitlements/privacy manifest.",
+        "verdict": "partially_confirmed",
+        "evidence": "Confirmed by receipt: Release configuration and exit 0 (archive-phase/phase-receipt.json:11, 43), version 1.7 build 63, Apple Distribution identity, aps production, get-task-allow false, verification at 12:41:13Z and completion at 12:41:55Z, sourceHead be3e8b13, `sourceInputsVerified: 750`. Not confirmable: the 750 count against the preflight manifest (not counted), the verifier logic (script absent), binary-level DEBUG exclusion (no symbol check), and privacy-manifest content (hash only). Upload, TestFlight processing and physical installation are recorded as not run or unverified."
+      },
+      {
+        "claim": "Context: snapshot HEAD be3e8b13 has product/test paths identical to a135d6e1; later commits are docs only.",
+        "verdict": "partially_confirmed",
+        "evidence": "snapshot-manifest.json:3-5 gives sourceCommit be3e8b13, nativeAcceptanceCommit a135d6e1, codeMatchesNativeAcceptanceCommit true. One test path is a `working-tree-test-only-override` (manifest :4132-4136, StoreShots.swift). NucleoSpeech.swift hash in the manifest (:3723) equals the hash in store-localizations/receipt.json:40. I could not diff the two commits, so 'docs only' rests on the manifest flag and the UI run report."
+      }
+    ],
+    "filesInspected": [
+      "snapshot-manifest.json (lines 1-200, 4124-4141, greps)",
+      "source/ios/Bobby/Sources/Nucleo/NucleoSpeech.swift (full)",
+      "source/ios/Bobby/Sources/Nucleo/NucleoSession.swift (lines 448-534, greps)",
+      "source/ios/Bobby/Sources/Nucleo/NucleoRootView.swift (grep context 134-143)",
+      "source/ios/Bobby/Sources/Nucleo/NucleoFixtures.swift (grep)",
+      "source/ios/Bobby/Sources/BobbyApp.swift (grep)",
+      "source/ios/Bobby/Sources/Localization.swift (lines 95-134)",
+      "source/ios/Bobby/Sources/NativeTranslations.swift (grep lines 120, 659, 800)",
+      "source/ios/Bobby/Sources/RiskNoticeView.swift (grep lines 17, 180-184)",
+      "source/ios/Bobby/Sources/Info.plist (lines 48-59)",
+      "source/ios/Bobby/project.yml (grep)",
+      "source/ios/Bobby/Sources/BobbyAccess.swift (grep)",
+      "source/ios/Bobby/UITests/NucleoPrivacyUITests.swift (full)",
+      "source/ios/Bobby/UITests/StoreShots.swift (grep)",
+      "source/ios/Bobby/Tests/NativeSpeechPipelineTests.swift (lines 98-218)",
+      "source/ios/Bobby/Tests/NucleoSpeechButtonTests.swift (grep)",
+      "source/src/pages/PrivacyPage.tsx (lines 198-205, grep)",
+      "source/nucleo/src/web/40-web-speech.js (lines 1-60)",
+      "source/tsconfig.api.json (full)",
+      "source/api/tsconfig.json (full)",
+      "source/package.json (grep)",
+      "source/api/bobby-access.ts, api/stripe-webhook.ts, api/account.ts, api/_lib/admin.ts (grep)",
+      "source/.github/workflows/ci.yml (grep)",
+      "evidence/native-unit-contract-a135d6e1-summary.json",
+      "evidence/native-unit-contract-a135d6e1-execution.json",
+      "evidence/native-unit-contract-a135d6e1-tests.json (greps and counts)",
+      "evidence/ui-serial-results.json",
+      "evidence/ui-serial-driver-status.json",
+      "evidence/NucleoPrivacyUITests-summary.json",
+      "evidence/NucleoPrivacyUITests-execution.json",
+      "evidence/StoreShots-summary.json",
+      "evidence/*-execution.json (grep of commit, timestamps, exit codes for all 15)",
+      "evidence/native/ui-serial-source-binding.json",
+      "evidence/native/ui-serial-run-report.md",
+      "evidence/native/ui-test-matrix.json (grep)",
+      "evidence/native/ui-test-method-inventory.json (grep)",
+      "evidence/native/StoreShots-failure-extraction.json",
+      "evidence/native/StoreShots-consent-harness-remediation.json",
+      "evidence/native/archive63-wrapper-fixture-verifier-repair.json",
+      "evidence/native/archive63-wrapper-signing-repair.json",
+      "evidence/native/archive63-final-evidence-receipt.json",
+      "evidence/native/archive63-run-report.md (grep line 19)",
+      "evidence/archive63-r2/completion-receipt.json",
+      "evidence/archive63-r2/archive-verification.json",
+      "evidence/archive63-r2/preflight.json (lines 1-70)",
+      "evidence/archive63-r2/archive-phase/phase-receipt.json",
+      "evidence/lock-build/result.json",
+      "evidence/lock-build/report.md",
+      "evidence/pg-remaining/results.json",
+      "evidence/pg-remaining/report.md",
+      "evidence/anvil/result.json",
+      "evidence/anvil/report.md",
+      "evidence/anvil/first-run-wrapper-receipt.json",
+      "evidence/final-bundle-summary.json",
+      "evidence/final-bundle-audit-report.md",
+      "evidence/evidence-consolidation-review.md",
+      "evidence/README.md (grep line 61)",
+      "evidence/store-localizations/README.md",
+      "evidence/store-localizations/receipt.json",
+      "evidence/store-localizations/metadata-validation.json",
+      "evidence/store-localizations/review-notes-en.txt",
+      "evidence/store-localizations/{en-US,es-MX,de-DE,fr-FR,it,pt-PT}/description.txt",
+      "evidence/store-localizations/metadata-final-applied.json (lines 1-40)",
+      "evidence/store-localizations/metadata-1.7-63.json (grep)",
+      "evidence/store-localizations/metadata-1.7-63-four-new-locales.json (grep count)",
+      "evidence/store-localizations/app-store-metadata-saved.json",
+      "evidence/store-localizations/app-store-metadata-full-readback.json (lines 1-70)",
+      "evidence/store-localizations/app-store-screenshots-saved.json (lines 1-60)",
+      "evidence/store-localizations/url-checks.json (grep)",
+      "evidence/store-localizations/*/promotionalText.txt and whatsNew.txt (grep only)"
+    ],
+    "notVerified": [
+      "brief.md was not read beyond one grep hit.",
+      "Physical-device dictation with a real SFSpeechRecognizer, with and without a local model: no receipt exists.",
+      "Whether the specific speech unit tests (NativeSpeechPipelineTests, NucleoSpeechButtonTests) appear by name in the 536-case test tree.",
+      "Whether dictation is reachable before the risk notice is accepted (needed to confirm the no-revocation-path scenario).",
+      "Full text of NativeTranslations.swift:800 (consent alert message) for pt, it and de; only fr and the start of pt were displayed.",
+      "Any Profile disclosure text beyond the risk notice sentence at RiskNoticeView.swift:17.",
+      "source/src/components/adams/AdamsChat.tsx and source/src/components/nucleo/NucleoDesk.tsx web SpeechRecognition paths (located by grep, not read).",
+      "it and pt promotionalText.txt and whatsNew.txt full text; de, it, pt entries of metadata-final-applied.json; per-field comparison of txt files against metadata-1.7-63.json beyond es-MX; metadata-1.7-63-four-new-locales.json content.",
+      "app-store-metadata-full-readback.json after line 70 and what reference text it compared against.",
+      "Whether the two post-12:48:57Z store receipts and metadata-final-applied.json are listed in snapshot-manifest.json; SHA-256 values of any file (no hashing tool available).",
+      "Deployed content of bobbyprotocol.xyz/privacy and /support in any language.",
+      "The TS2339 errors: count, files and lines (no compiler output in the snapshot); the full set of API files outside tsconfig.api.json; tsconfig.admin.json and tsconfig.app.json.",
+      "The historical 14-suite PostgreSQL receipt from 393776c3, the 2,443 counter and the 187/103 overlap.",
+      "evidence/lock-build/preflight.json, dist-manifest.json, installed-package-versions.json, npm logs.",
+      "Anvil logs and network audit files; the diff between original and runtime test scripts.",
+      "archive63-wrapper.py (absent), verification-history.json (absent), archive63-run-report.md beyond one line, the count of entries in preflight.json sourceManifest, privacy manifest content, xcodebuild archive log.",
+      "Whether generated Nucleo resources (builtAt 09:40:14Z, audited 09:45:15Z with no commit recorded) are fresh relative to JS sources at be3e8b13.",
+      "Per-class summary and tests JSON for the 12 accepted classes other than NucleoPrivacyUITests (counts taken from ui-serial-results.json); evidence/native/retry-log-receipt.json and prior-* files, so earlier retries are not ruled out.",
+      "Whether BobbyApp.swift launch-argument handling (lines 56-92) is DEBUG-gated.",
+      "A diff between commits a135d6e1 and be3e8b13.",
+      "evidence/README.md, evidence/native/current-native-verification.md, native-run-evidence.md and other reports outside the listed reads.",
+      "Chart, subtitle, localization/SEO, stock-board and store artwork items (other reviewer's scope)."
+    ],
+    "localCodeVerdict": "GO for the speech/privacy code in scope (no source path sends audio to Apple's speech service without the stored agreement, and withdrawal clears it), but this is not a release GO: StoreShots failed 3 of 5 with the rerun pending against an uncommitted test edit, the live privacy page and AppInfo fields are unverified, and no build is attached.",
+    "notes": "Method: read-only, Read/Grep/Glob inside the snapshot only; nothing was run. About 8 tool rounds were used; items not reached are listed under notVerified.\n\nStatus of each area:\n- PROVEN RUNTIME (receipts read): native 536/536 Debug simulator at a135d6e1; 13 UI classes / 52 methods passed; StoreShots 2 passed, 3 failed; lock build pass at 507616c9 on Node 25.9.0; 7 PostgreSQL suites / 132 counted checks at a135d6e1; Anvil 2 suites / 61 assertion calls; signed Release archive 1.7 (63) from be3e8b13 with local verification.\n- SOURCE INFERENCE: speech consent enforcement, withdrawal behaviour, DEBUG gating of fixtures, tsconfig coverage.\n- STALE/HISTORICAL: final-bundle audit (09:45Z, no commit recorded), 14-suite PostgreSQL receipt (393776c3), release55/56/57 artwork provenance.\n- PENDING: StoreShots rerun, AppInfo name/subtitle/privacy URL, build attachment, upload, TestFlight, physical-device acceptance, web deployment of the privacy page.\n\nCounts were not summed across overlapping sources: 536 native cases, 57 remaining UI methods, 132 PostgreSQL checks and 61 Anvil assertion calls are separate counters.\n\nLine-number note: the store README cites NucleoSpeech.swift 87-92, 217-261, 285-295 and the task text cites 88-92, 217-261, 293-305. In the snapshot the consent key is at 87-92, recognizer resolution at 217-251, request shape at 257-266 and the enforcement point at 289-298.\n\nTimeline note: the Release archive ran 12:34:26-12:37:49Z, overlapping four UI classes; the verifier was changed at 12:39:38Z and passed at 12:41:13Z; StoreShots failed at 12:46:58Z; StoreShots.swift was edited at 12:48:42Z; the manifest is stamped 12:48:57Z; store save and readback receipts are stamped 12:50:31Z and 12:53:57Z."
+  }
+}

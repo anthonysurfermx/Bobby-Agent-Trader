@@ -1,0 +1,80 @@
+{
+  "at": "2026-10-04T13:00:46.481589+00:00",
+  "kind": "append-only late store evidence",
+  "files": [
+    {
+      "path": "evidence/store-localizations/app-store-metadata-saved.json",
+      "sha256": "b4451437457bb93eb76198b6c173633a69ee1b94c2086f9c31dd5da1f98b114d",
+      "bytes": 742,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-metadata-saved.json"
+    },
+    {
+      "path": "evidence/store-localizations/metadata-final-applied.json",
+      "sha256": "23e04ee02fe661886ae5188f8d12755854c725a26d9a491fb746e43b35c12172",
+      "bytes": 29797,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-final-applied.json"
+    },
+    {
+      "path": "evidence/store-localizations/app-store-metadata-full-readback.json",
+      "sha256": "54fca45edf795d9a02441ee646730c6857b475715f7b944723fcac74ff9f08d1",
+      "bytes": 1831,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-metadata-full-readback.json"
+    },
+    {
+      "path": "evidence/store-localizations/app-store-appinfo-full-readback.json",
+      "sha256": "0872e3773fdafc49ab514166f911c46f7c5a2817fd890154e3384a2061c04d82",
+      "bytes": 907,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-appinfo-full-readback.json"
+    },
+    {
+      "path": "evidence/StoreShots-consent-corrected-summary.json",
+      "sha256": "17f0a2b8e89a399fba75e871ca6f1ba38b5040b198591b2ed59acc9552ac8cba",
+      "bytes": 709,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-summary.json"
+    },
+    {
+      "path": "evidence/StoreShots-consent-corrected-tests.json",
+      "sha256": "277deb73dab042995d958b1c96d9cde11efb5c37335775b51b899d2cee4f5377",
+      "bytes": 2713,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-tests.json"
+    },
+    {
+      "path": "evidence/StoreShots-consent-corrected-test02-activities.json",
+      "sha256": "c3c01a8a357e00d0b3d5b3f6e72ffae2aefcc92fca2d79dcf14217de6b048e17",
+      "bytes": 40090,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-test02-activities.json"
+    },
+    {
+      "path": "evidence/StoreShots-consent-corrected-execution.json",
+      "sha256": "21347caec4a317f5383e3d10b4e65cce4fc31428e3f194030b66b2aa3c3b2908",
+      "bytes": 2267,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-execution.json"
+    },
+    {
+      "path": "evidence/StoreShots-consent-corrected-inspection.json",
+      "sha256": "45e221c8cf0aa97e85e7e47f9945f2da14a78a876b9acf05ec95739c7455fbb1",
+      "bytes": 1856,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-inspection.json"
+    },
+    {
+      "path": "evidence/chart-timeframe-results.json",
+      "sha256": "be19036e71cda3ce8eeec8a96d0aefcd2d669a495eea3f1f361868ed81ab5ea9",
+      "bytes": 3129,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-results.json"
+    },
+    {
+      "path": "evidence/support-source-manifest.json",
+      "sha256": "020d24db9fd2ef9a7f7079ac90cbc21f222bd072cb262f909194392ba5e72248",
+      "bytes": 539,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/support-source-manifest.json"
+    },
+    {
+      "path": "evidence/chart-support-binding-review.json",
+      "sha256": "34a847b11706960cc175d8d8e88d7e3c8d7c77933df6777576cb3b125337ca8c",
+      "bytes": 7299,
+      "originalPath": "/private/tmp/bobby-ios17-remediation-20261004/claude-review/chart-support-binding-review.json"
+    }
+  ],
+  "sourceSnapshotChanged": false,
+  "rootReportedStoreShots": "official corrected whole-classPASS5/5zero fail/skip12:57:13; totalremainingUI14classes57; native536separate"
+}

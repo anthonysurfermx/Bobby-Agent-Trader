@@ -1,0 +1,11 @@
+{
+  "recordedAtUTC": "2026-10-04T12:34:43.445959+00:00",
+  "expectedSourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "concurrentUI": "Root-authorized UItest-without-building in progress; separate Release DerivedData, jobs2; no simulator action.",
+  "uploadBlocked": true,
+  "releaseGO": false,
+  "firstAttempt": "/private/tmp/bobby-ios17-remediation-20261004/archive63/archive-phase/phase-receipt.json",
+  "wrapperRepair": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper-signing-repair.json",
+  "minimumStartGiB": 4,
+  "stopBelowGiB": 2
+}

@@ -1,0 +1,24 @@
+{
+  "preparedAtUTC": "2026-10-04T12:50:47.667309+00:00",
+  "archiveSourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "archivePreflightSHA256": "87c581293b2fb84124714a87dfdae03d4384985851dfa1e8e81f3f24252df571",
+  "approvedPath": "ios/Bobby/UITests/StoreShots.swift",
+  "archivedSHA256": "e631a5cbda5875ed5bd38db1461b463ab3ec6ab72abadc0bc703f23fb76224e4",
+  "currentTestOnlySHA256": "2e9837c8a6bbce1ccc0c61f8ac50744f06d6b49c9ecab31742fa639ece733971",
+  "deltaSHA256": "32db1b176555c6584de0fbb8261656f825a3fa4d25e60620afd0563941779a44",
+  "sourceProjectSHA256": "b633d5897c704ff95a40a896f5a3905701a56f08a932491e46897f7fd1775525",
+  "sourceSchemeSHA256": "8bf829f84f2a800e74ac0b1534904af1419d5992d910ab91a6a0412a2051fc4b",
+  "membership": [
+    {
+      "name": "BobbyUITests",
+      "productType": "com.apple.product-type.bundle.ui-testing"
+    }
+  ],
+  "archiveTargets": [
+    "Bobby"
+  ],
+  "archiveConfiguration": "Release",
+  "delta": "Only three launch argument arrays add -agent.riskNoticeVersion6. No test assertions or product code changes.",
+  "runtimeAcceptance": "Root/QA worker rebuild and rerun pending; this source receipt does not claim corrected tests pass.",
+  "uploadAuthority": "User authorized release; uploader still requires explicit root trigger after runtime/review coordination."
+}

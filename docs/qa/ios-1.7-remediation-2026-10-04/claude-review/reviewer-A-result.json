@@ -1,0 +1,294 @@
+{
+  "type": "result",
+  "key": "v2:4f72f210107191d876489f5e4eb82fe1553acd19422dfef569ad3bfa3280e946",
+  "agentId": "a9f626dc0bf4a860b",
+  "result": {
+    "findings": [
+      {
+        "title": "StoreShots UI class is NOT accepted: 2 passed / 3 failed, and the test-only repair is applied in the working tree but has no rerun receipt",
+        "severity": "P2",
+        "category": "operational_blocker",
+        "location": "evidence/StoreShots-tests.json",
+        "trigger": "Serial UI run at be3e8b13 on simulator 0025C304 (iPhone 17 Pro, iOS 26.1), -only-testing:BobbyUITests/StoreShots, after NucleoPrivacyUITests had persisted agent.riskNoticeVersion=0.",
+        "evidence": "PROVEN RUNTIME RESULT: evidence/StoreShots-summary.json: \"failedTests\":3,\"passedTests\":2,\"result\":\"Failed\",\"totalTestCount\":5. evidence/StoreShots-tests.json per method: test01_OnboardingAndCompanion Passed (55 s); test02_VerdictAndEvolution Failed (\"StoreShots.swift:177: XCTAssertTrue failed\"); test03_BoardAndSuggestions Failed (\":101\"); test04_ShareSkin Failed (\":130\"); test05_GearAttachmentMatrix Passed (3 min 39 s). All five executed; none skipped. evidence/StoreShots-execution.json: \"exitCode\": 65, \"processPassed\": false, \"officialSummaryAcceptance\": \"not accepted\". evidence/ui-serial-results.json:714-720: \"accepted\": false, \"acceptedClasses\": 13, \"acceptedMethods\": 52, \"complete\": false. evidence/ui-serial-driver-status.json: \"phase\": \"halted-needs-diagnosis\". PENDING: evidence/native/StoreShots-consent-harness-remediation.json records \"changes\": 3, \"productEdited\": false at 12:48:42, 15 s before the snapshot; no post-repair execution receipt exists in evidence/.",
+        "fix": "Rerun the full StoreShots class with the repaired file and record a fresh xcresult summary. Until then report StoreShots as 2/5 passed, 3/5 failed, and the UI serial as incomplete (13 classes / 52 methods accepted). Commit the test-only change so the candidate is reproducible from a commit.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "Snapshot is not purely the committed tree: StoreShots.swift is an uncommitted working-tree override, and the failure receipts cite line numbers of the pre-repair file that is not in the snapshot",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "ios/Bobby/UITests/StoreShots.swift:98",
+        "trigger": "Compare snapshot-manifest.json entry for StoreShots.swift against the failure receipts and the snapshot source.",
+        "evidence": "snapshot-manifest.json:4132-4136: \"kind\": \"working-tree-test-only-override\", sha256 2e9837c8..., which equals \"afterSHA256\" in evidence/native/StoreShots-consent-harness-remediation.json (before: e631a5cb...). In the snapshot source ALL four methods pass the override: lines 41, 98, 128, 176 each contain \"-agent.riskNoticeVersion\", \"6\". The asserts are now at lines 102, 132 and 180, while the receipt cites 101, 130 and 177: a shift of +1/+2/+3, consistent with one added line per method in file order (03, 04, 02). So the statement '02/03/04 do not override' describes the pre-repair file, which I could not read; it is supported only by the line shift and the receipt text.",
+        "fix": "Include the pre-repair file or a diff in the evidence, or commit the repair and rebind the snapshot. State explicitly in the release summary that product paths equal a135d6e1 but one UITest file is uncommitted.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "StoreShots root-cause diagnosis is only directly extracted for test02; the AX evidence it relies on is not in the snapshot",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/native/StoreShots-failure-extraction.json",
+        "trigger": "Trying to confirm that tests 03 and 04 failed for the same consent-gate reason as test02.",
+        "evidence": "The extraction receipt covers one test only: \"test\": \"StoreShots/test02_VerdictAndEvolution()\", and its attachments step says \"Skipped export ... no matching attachments\". The remediation receipt asserts \"Recorded AX shows four unacknowledged disclosure buttons and disabled ACKNOWLEDGE ALL FOUR\" and \"readOnlyPreferences\": {\"agent.riskNoticeVersion\": 0, \"agent.onboarded\": true}, but the referenced StoreShots-test02-activities.json is not in evidence/. Tests 03 and 04 are inferred to share the cause from identical ~18.8 s durations (15 s waitForExistence timeout) and the same first-assert failure. SOURCE INFERENCE supports it: ContentView.swift:519 `if !vm.profile.acceptedRiskNotice {` renders RiskNoticeView instead of mainScreen, so `ask-field` and `More` never exist.",
+        "fix": "Export activities for test03 and test04 as well and include the AX extracts, or rely on the post-repair rerun as the confirming experiment.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "closedVolumeRatio still hard-codes a 1-hour candle duration; it is not derived from candlesTimeframe or from candle spacing",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Nucleo/src/shared/20-read-model.js:678",
+        "trigger": "Any future change of the candle interval constant, or an equity session whose last bar is shorter than 60 minutes (for example a 15:30-16:00 closing bar).",
+        "evidence": "SOURCE: iOS copy line 678 and web copy nucleo/src/shared/20-read-model.js:526 are identical: `return c.v > 0 && (!fin(receivedAt) || c.t + 3600e3 <= receivedAt);`. The generated ios/Bobby/Resources/Nucleo/app.html:1240 carries the same literal. This is correct today only because the transport constant is 1H (NucleoDesk.swift:196 `static let candlesTimeframe = MarketTimeframe.oneHour`; nucleo/src/web/30-web-desk.js:83 `var CANDLES_TIMEFRAME = '1H'`). The claim that closed-volume logic 'uses actual candle duration' is not what the code does, and evidence/chart-timeframe-report.md does not make that claim either. No NaN or zero-division path exists: line 532/684 guards `if (!(avg > 0)) return null`, and fewer than 21 closed bars returns null.",
+        "fix": "Derive the duration from r.candlesTimeframe via a map (1H -> 3600e3) passed into closedVolumeRatio, or drop the claim from the release notes. No release impact while the constant stays 1H.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "Overlay gate fails open and the footer shows the analysis timeframe when candlesTimeframe is absent or empty (legacy path)",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Nucleo/src/shared/20-read-model.js:743",
+        "trigger": "A reply or re-rendered stored read that lacks candlesTimeframe (or carries an empty string) while provenance.timeframe is 4H/1D/1W.",
+        "evidence": "SOURCE: line 741 `var timeframe = r.candlesTimeframe || r.provenance.timeframe;` and line 743 `var aligned = !r.candlesTimeframe || String(r.candlesTimeframe).toUpperCase() === String(r.provenance.timeframe).toUpperCase();` (web copy 589/591 identical). With the field missing, aligned is true and the footer is labelled with the analysis horizon, which is the original P2-a behaviour. This is deliberate and tested (ios/Bobby/Nucleo/tests/chart-timeframe.test.mjs:107-113), and the report admits 'The legacy fallback cannot reconstruct a candle interval omitted by an older response'. Current transports always send the field (NucleoDesk.swift:932; nucleo/src/web/30-web-desk.js:326), so fresh reads are not affected. Whether reads saved by build 62 or earlier are re-rendered through buildChart was not checked.",
+        "fix": "If every historical transport fetched hourly candles, default a missing value to '1H' and gate on that; otherwise hide overlays when the field is missing and provenance.timeframe is not 1H. Confirm how saved reads are replayed.",
+        "status": "inferred"
+      },
+      {
+        "title": "Chart and subtitle test receipts are bound to a modified worktree at 393776c3, not to a135d6e1 / be3e8b13",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/chart-timeframe-report.md",
+        "trigger": "Using the 165/0, 280/0 and 126/126 results as acceptance for the frozen candidate.",
+        "evidence": "evidence/chart-timeframe-report.md line 5: 'Source at verification: modified worktree ... HEAD `393776c332b2c3f6e21d6cad457869431dd28a62`'. evidence/support-subtitle-report.md line 3: 'Source base: Bobby 1.7 (63), `393776c3...`... binds to the modified source hashes in `support-source-manifest.json`, not an existing uploaded binary.' snapshot-manifest.json:3-5 binds sourceCommit be3e8b13 and nativeAcceptanceCommit a135d6e1. These receipts are therefore HISTORICAL relative to the snapshot unless their recorded file hashes equal the snapshot hashes (iOS 55-read.js 2231d5b6..., web 55-read.js 749ae1df..., iOS 20-read-model.js ebad05ca..., web 51f76137...). I did not perform that comparison. Both reports also state they are offline/mocked: 'They do not establish live provider behavior, physical-device acceptance'.",
+        "fix": "Compare the hashes in chart-timeframe-results.json and support-source-manifest.json with the snapshot manifest, or rerun both suites at a135d6e1 and attach the logs.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "Subtitle wrap is measured once with whatever font is active; no re-measure after fonts load, and two languages sit within 5 px of the 90 px threshold",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Nucleo/src/app/55-read.js:198",
+        "trigger": "Italian or Spanish 'above support' read rendered with a face wider than the measured system-ui (Geist on web if it loads after buildChart, or iPhone WebKit metrics differing from desktop Chrome).",
+        "evidence": "SOURCE: line 198 `if (!text || node.getComputedTextLength() <= width) return;` with `width = 90` (line 196); web copy nucleo/src/app/55-read.js:175-177 identical. The only fonts.ready hook in the app page refits other elements: ios/Bobby/Nucleo/src/app/30-dom.js:71 `document.fonts.ready.then(function(){ FIT_LINES.forEach(fitLine); })`; chartSubtitle is not re-run. template.html:338 declares `font-family=\"Geist, system-ui, sans-serif\"` for cBrS, and a grep for @font-face in the native app template found nothing, consistent with the report's 'No local Geist face is installed or embedded in the native page'. RECEIPT: evidence/support-subtitle-report.md table shows it/above 88.83 px (right edge 384.83 of 390), it/below 86.27, es/above 85.58, all left on one line. Geist and physical WebKit are explicitly 'not verified'. Other limits by inspection: exactly two lines maximum (text wider than ~180 px still overflows, not reachable with the six current strings), and the character fallback at line 210 splits mid-word without a hyphen.",
+        "fix": "Re-run chartSubtitle from the fonts.ready callback when a bracket is shown, and consider a lower threshold (for example 84 px) to give margin. Close the pending physical iPhone gate for it/es/de/fr/pt.",
+        "status": "inferred"
+      },
+      {
+        "title": "Chart footer 'as of' uses the open time of the last (possibly still-forming) candle",
+        "severity": "INFO",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Nucleo/src/shared/20-read-model.js:763",
+        "trigger": "Any read taken mid-hour: the footer says 'as of 2:00 PM' while the plotted last close is the in-progress price at, say, 2:47 PM.",
+        "evidence": "SOURCE: lines 761-763 `var now = pts[pts.length - 1]; var lastTime = new Date(now.t); var asOf = fin(now.t) && !isNaN(lastTime.getTime()) ? lastTime.toISOString() : null;` (web 609-611 identical). `now.c` (line 776) is the last bar's close whether or not the bar is closed; closedVolumeRatio excludes the unclosed bar but the chart does not. The label is formatted in device-local time and the UI locale by whenLabel (ios/Bobby/Nucleo/src/app/40-strings.js:358-365), with the date added when the day differs from receivedAt, so weekend equity reads show the Friday date. The Spanish template 'a las {when}' (40-strings.js:59) reads awkwardly when a date is prepended. The test encodes this behaviour (chart-timeframe.test.mjs:43). The claim 'labels data with its actual last-candle timestamp' is literally true.",
+        "fix": "Optional: label as bar open, or use min(t + interval, receivedAt). Cosmetic; no release impact.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "Retained P3 (i): onboarding island card heading is static 'Isla' in the template for every language",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "ios/Bobby/Nucleo/src/onboarding/template.html:327",
+        "trigger": "A non-Spanish user (en/fr/pt/it/de) whose onboarding shows the island card.",
+        "evidence": "SOURCE: iOS template line 327 and web nucleo/src/onboarding/template.html:322 both contain `<div class=\"ch lbl\"><span id=\"iH\">Isla</span><span id=\"iT\"></span></div>`. A grep for the identifier iH across ios/Bobby/Nucleo/src/onboarding returned only this template line, so no script replaces the text. Localized strings exist for the adjacent title (40-strings.js:57 'Island \u00b7 size {size}', :120 'Isla \u00b7 tama\u00f1o {size}', :184 '\u00cele \u00b7 taille {size}'), which makes the fixed heading inconsistent. I did not find a Swift-side fixed Spanish island heading: every Swift match uses L.t(English, Spanish), e.g. TraderLandGateHarness.swift:976. evidence/README.md:61 retains this as open.",
+        "fix": "Add an 'isla.card.header' key to the six string tables and set iH in buildCards. Cosmetic; not a release blocker.",
+        "status": "verified_in_source"
+      },
+      {
+        "title": "Retained P3 (ii): Trader Land share page sets og:url / twitter:url / canonical by replace-only, so they are silently absent if the app shell lacks those tags; og:locale covers only two languages",
+        "severity": "P3",
+        "category": "open_product_defect",
+        "location": "api/_lib/trader-land-card.ts:94",
+        "trigger": "A crawler fetches a shared island URL whose runtime shell HTML has no og:url, twitter:url or canonical tag.",
+        "evidence": "SOURCE: lines 88-91 define `tag` as `out = out.replace(re, ...)` on an existing `<meta ... content=\"...\">` pattern; line 94 `tag('property', 'og:url', meta.url);`, line 100 `tag('name', 'twitter:url', meta.url);`, line 105 `out = out.replace(/<link rel=\"canonical\" href=\"[^\"]*\"\\s*\\/?>/, ...)`. None of these insert a tag when it is missing. The shell is fetched at runtime (api/trader-land-share.ts:98 `shell = await appShell(originOf(req));`), and no index.html exists in the snapshot (Glob for source/index.html, public/index.html, dist/index.html returned nothing), so I could not confirm which tags the shell contains. evidence/README.md:61 states the shared pages lack them, which matches the no-op path. Separately, trader-land-share.ts:119 sets `locale: lang === 'es' ? 'es_MX' : 'en_US'`, so fr/pt/it/de shares are labelled en_US.",
+        "fix": "Insert the tag before </head> when the replace does not match, and add a unit test with a shell lacking the tags. Web/SEO only; no iOS binary impact.",
+        "status": "inferred"
+      },
+      {
+        "title": "Retained P3 (iii): Ferrari / Santander resolver and regional board findings cannot be located in this snapshot",
+        "severity": "INFO",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/README.md",
+        "trigger": "Attempt to scope the retained regional stock board and Ferrari/Santander resolver findings to file:line.",
+        "evidence": "Grep for Ferrari|Santander|\\bRACE\\b across source/ (excluding docs, html, md) returned no matches; grep for Ferrari|RACE|Santander|SAN in source/api/_lib returned no matches. The only mention is the retained-findings sentence at evidence/README.md:61 (mirrored at docs/qa/ios-1.7-remediation-2026-10-04/README.md:61). There is therefore no explicit alias or override for these names in the snapshot; resolution must go through a generic search path that I did not trace. No reproduction, scenario or receipt for the regional board ordering/quote issue is present in the evidence I searched.",
+        "fix": "Attach the original reproduction (query, locale/country, expected vs returned symbol/exchange/currency) and trace it through the asset search handler. Treat as open and unscoped, not as fixed.",
+        "status": "unverified"
+      },
+      {
+        "title": "Store artwork: saved-store receipt carries filenames only (no hashes), no build is attached, and selected panels are historical or image-generated rather than build 63 captures",
+        "severity": "P2",
+        "category": "evidence_coverage_gap",
+        "location": "evidence/store-localizations/app-store-screenshots-saved.json",
+        "trigger": "Using the saved-store receipt as proof that the store shows the manifest's 30 approved files, or as evidence of current UI behaviour.",
+        "evidence": "RECEIPT: app-store-screenshots-saved.json lists six locales (de-DE, fr-FR, it, pt-PT, es-MX, en-US), each with files 01.png, 02.png, 03.png, 04.png, 06.png and \"orderConfirmed\": true, plus \"buildAttached\": false, \"historicalArtworkNotFresh63Capture\": true, \"notSubmittedForReview\": true. It has no sha256 or byte fields, so byte identity with final-artwork-manifest.json cannot be checked; only locale names and ordinals match \"selectedOrder\": [\"01\",\"02\",\"03\",\"04\",\"06\"]. Manifest header: \"totalOriginalImages\": 42, \"selectedImages\": 30, \"excludedImages\": 12; my grep of the entries shows 42 records in six groups of seven with five true and two false selectedForCurrentUpload each, and no \"currentCaptureBuild63\": true anywhere. Provenance is more layered than 'build57 captures': the first entry records \"packageBuild\": \"57\", \"identicalApprovedSourceBuild\": \"56\", and historicalProvenance \"originalGenerationMethod\": \"image_gen\" with a resample from 851x1849. README.md line 56: 'DE/FR/IT internal UI text was localized historically with imagegen' and 'ES/PT headlines are translated but the internal app UI remains English'; the manifest's innerUILocale values are de x7, en x21, fr x7, it x7, so es-MX and pt-PT panels carry English inner UI. README.md line 52 confirms the 12 excluded chart panels (05, 07) show a stale OKX footer. README line 50 quotes German artwork text '\u00fcber Unterst\u00fctzung' whereas the current string is '\u00fcber der Unterst\u00fctzung' (20-read-model.js:458), further showing the artwork predates current copy. Pixels are not in the snapshot; I did not inspect any image.",
+        "fix": "Add per-file hashes or sizes to the saved-store receipt. Disclose in the release review that selected panel 03 is not a real localized capture for five of six locales, and replace with fresh build 63 captures when native QA completes. Do not cite this artwork as evidence of the 4H/1D/1W gate.",
+        "status": "verified_in_receipt"
+      },
+      {
+        "title": "StoreShots test02 has no assertion on the verdict and tests 02/03/04 depend on state persisted by test01",
+        "severity": "P3",
+        "category": "evidence_coverage_gap",
+        "location": "ios/Bobby/UITests/StoreShots.swift:186",
+        "trigger": "Post-repair rerun where the live desk fails, is rate limited, or returns nothing.",
+        "evidence": "SOURCE: after `ask.typeText(\"bitcoin\\n\")` (line 183) the method only does `if evolved.waitForExistence(timeout: 90) { ... }` (187-192) and `shot(\"09-verdict\")` (193); there is no XCTAssert on a verdict, so a pass proves only that ask-field existed. Tests 02/03/04 do not pass -agent.onboarded (lines 97-98, 127-128, 175-176) and rely on the onboarded flag persisted by test01 (comment line 92: 'needs onboarded state'); the run order in evidence/ui-serial-results.json:659-665 is 01, 03, 04, 05, 02. The file header (line 1) says the rig 'Drives the real app on a real backend'. The stale comment at lines 38-39 still says 'four-acknowledgement risk/AI notice (v3)' while RiskNoticeView.swift:9 has `static let currentVersion = 6`, and the override hard-codes \"6\".",
+        "fix": "When rerunning, do not describe a test02 pass as a verified live verdict. Optionally assert a verdict element and document the ordering dependency.",
+        "status": "verified_in_source"
+      }
+    ],
+    "rejectedFalsePositives": [
+      {
+        "claim": "The overlay gate fails open for lowercase or mixed-case timeframes ('4h' vs '4H').",
+        "counterEvidence": "Both sides are upper-cased before comparison: ios/Bobby/Nucleo/src/shared/20-read-model.js:743 and nucleo/src/shared/20-read-model.js:591 `String(r.candlesTimeframe).toUpperCase() === String(r.provenance.timeframe).toUpperCase()`. A null or undefined provenance.timeframe becomes 'NULL'/'UNDEFINED', which does not equal '1H', so the gate closes (overlays hidden). chart-timeframe.test.mjs:115-120 covers '1h'. Unknown spellings such as '60m' also fail closed. The only fail-open path is a missing candlesTimeframe, reported separately."
+      },
+      {
+        "claim": "Mismatched-horizon levels still distort the chart domain or leave a band/bracket.",
+        "counterEvidence": "On mismatch `tech = {}` (line 744/592), so no support/resistance lines are pushed (746-747), plan lines require `plan && aligned` (748), band and bracket stay null because `fin(tech.support)` is false (765), and `vals` at 753 contains closes only. The test sets support=1 and resistance=1e9 and asserts the domain excludes both (chart-timeframe.test.mjs:79-92)."
+      },
+      {
+        "claim": "Stale tspans or stale subtitle text survive a re-render or a long-to-short transition.",
+        "counterEvidence": "chartSubtitle starts with `node.textContent = text || ''` (ios 55-read.js:197, web :176), which removes all child tspans before measuring; the no-bracket branch clears both nodes: `el.cBrT.textContent = ''; el.cBrS.textContent = '';` (ios :274, web :253). Right-hand lines are rebuilt from scratch via `el.cLines.textContent = ''` (ios :220)."
+      },
+      {
+        "claim": "getComputedTextLength returns 0 because the chart is hidden when buildChart runs, so wrapping never triggers.",
+        "counterEvidence": "The chart SVG is not display:none: ios/Bobby/Nucleo/src/app/template.html:58 `#vec,#chart{position:absolute;left:0;top:0;overflow:visible;pointer-events:none}` and :304 `<svg id=\"chart\" width=\"390\" height=\"844\" ...>`; the bracket group is only `opacity=\"0\"` (:333), which does not suppress SVG text layout. I did not check every ancestor for display:none at call time, so this is a source inference, but the 126/126 Chrome run exercising the shipping template is consistent with it."
+      },
+      {
+        "claim": "The native and web copies of the chart logic have diverged in the fixed regions.",
+        "counterEvidence": "buildChart in the read model is textually identical in the lines I read (iOS 735-780 vs web 583-628), as are closedVolumeRatio (676-686 vs 524-534) and chartSubtitle (iOS 55-read.js:195-218 vs web 174-197). The files are not byte-equal overall (manifest sizes 61551 vs 45312 and 28649 vs 26636). The one divergence in the renderer is intentional provider masking on iOS (55-read.js:276-278) versus the plain provider on web (:255)."
+      },
+      {
+        "claim": "The riskNoticeVersion launch override leaks into shipping/Release code.",
+        "counterEvidence": "There is no product code for it: `-agent.riskNoticeVersion 6` is the standard UserDefaults argument domain read by AgentProfile.swift:162 `riskNoticeVersion = d.integer(forKey: \"agent.riskNoticeVersion\")`. The remediation receipt records \"productEdited\": false. The only launch-flag code touching that key is the reset in BobbyApp.swift:74-79, inside `#if targetEnvironment(simulator)` within the DEBUG block opened at line 48 and invoked only from `#if DEBUG` at lines 17-19. App Store users cannot pass launch arguments."
+      },
+      {
+        "claim": "ContentView.swift:519 could wrongly block a real user who withdrew consent.",
+        "counterEvidence": "Release never shows ContentView: BobbyApp.swift:129-131 `#else // No hidden exit in Release (App Review 2.3.1) ... NucleoRootView(options: Self.nucleoLaunchOptions) {}`; ContentView is reachable only in the DEBUG branch at line 127 (StoreShots forces it via `-store-shots`, line 92). In the shipping Nucleo, withdrawal intentionally sets `profile.riskNoticeVersion = 0` (NucleoSession.swift:502) with the doc comment 'account management and deletion remain available', and NucleoPrivacyUITests.swift:229-255 asserts Profile remains reachable and the notice gates the next question. Requiring the notice after withdrawal is the designed behaviour, not a defect. I did not read the receipt line proving that privacy class passed."
+      },
+      {
+        "claim": "Division by zero or NaN in the bracket percentage or volume ratio.",
+        "counterEvidence": "Bracket pct is guarded: `pct: fin(d / tech.support) ? ... : null` (iOS 20-read-model.js:771). Volume ratio returns null when `!(avg > 0)` (:684) or when fewer than 21 closed bars exist (:680). Chart domain padding falls back through `|| Math.abs(hi) * 0.004 || 1` (:755) and the renderer uses `span = (hi - lo) || 1` (55-read.js:222)."
+      },
+      {
+        "claim": "Manifest counts 42 / 30 / 12 are inconsistent with the entries or with the store receipt.",
+        "counterEvidence": "Header fields at final-artwork-manifest.json:10-12 read 42, 30, 12; the entries show six groups of seven with the pattern true,true,true,true,false,true,false, giving 30 selected and 12 excluded (positions 05 and 07). The saved-store receipt lists exactly five files (01, 02, 03, 04, 06) for each of the same six locales. No locale or ordinal mismatch found; hashes are not comparable because the store receipt has none."
+      }
+    ],
+    "claimChecks": [
+      {
+        "claim": "Binding: runtime acceptance bound to a135d6e1; snapshot HEAD be3e8b13 with product/test paths identical to a135d6e1; code fixes 507616c9; spy repair ecc4ff49.",
+        "verdict": "partially_confirmed",
+        "evidence": "snapshot-manifest.json:3-5: sourceCommit be3e8b1389..., nativeAcceptanceCommit a135d6e107..., codeMatchesNativeAcceptanceCommit true. Exception: ios/Bobby/UITests/StoreShots.swift is \"working-tree-test-only-override\" (manifest 4132-4136), so test paths are not identical to any commit. Commits 507616c9 and ecc4ff49 cannot be checked (no git metadata). The chart and subtitle test reports are bound to worktree HEAD 393776c3, not a135d6e1."
+      },
+      {
+        "claim": "A1: transport distinguishes hourly candles from 4H/1D/1W analysis; chart labelled with actual last-candle timestamp; overlays gated on incompatible timeframe; analysis semantics preserved.",
+        "verdict": "confirmed",
+        "evidence": "SOURCE INFERENCE: NucleoDesk.swift:196 constant, :198-203 both provider URLs built from it, :932 result field; web 30-web-desk.js:83-87, :326. Read model iOS 741-778 / web 589-626: timeframe label from candlesTimeframe, asOf from last candle t, tech emptied and plan lines skipped when not aligned. Contract enforces `candlesTimeframe: eq('1H')` (ios contract/10-contract.js:75). Generated app.html contains the gate (line 1305). Tests load the real source files from both trees through vm (chart-timeframe.test.mjs:12-22), not a duplicated copy. RUNTIME: 165/0 and 280/0 per evidence/chart-timeframe-report.md, offline/mocked, at HEAD 393776c3 (historical relative to snapshot). Physical/live 4H/1D/1W gates are PENDING per docs/qa/.../iphone-live-chart-support-gates.md:15-20."
+      },
+      {
+        "claim": "A1 sub-claim: closed-volume logic uses actual candle duration.",
+        "verdict": "contradicted",
+        "evidence": "iOS 20-read-model.js:678 and web :526 hard-code `c.t + 3600e3 <= receivedAt`. It matches the 1H constant by coincidence of value, not by derivation; the chart report does not claim otherwise."
+      },
+      {
+        "claim": "A2: both 55-read.js copies measure rendered SVG width and wrap to two tspans at x=296 above ~90 px, preserving all text; no stale spans; 126 checks / 30 scenarios; Geist and physical WebKit unverified.",
+        "verdict": "partially_confirmed",
+        "evidence": "SOURCE: identical chartSubtitle in iOS 55-read.js:195-218 and web :174-197: threshold `width = 90`, measured word-boundary split, character fallback, tspans with `x='296'` and y + index*14, full text preserved by slice/trim, cleanup on re-render. text-anchor is default start at x=296 for both cBrT and cBrS (template.html:337-338). RECEIPT: evidence/support-subtitle-report.md: 126/126 fixed, 106/126 baseline, Chrome 154 at 390x844, system-ui, at HEAD 393776c3; Geist 'not verified'. Residual: no re-measure on fonts.ready, it/es within 5 px of threshold, two-line maximum. Delta/label collision checks are asserted by the report only; I did not read the runner's assertions in full."
+      },
+      {
+        "claim": "A3(i): fixed-Spanish onboarding island heading.",
+        "verdict": "confirmed",
+        "evidence": "ios/Bobby/Nucleo/src/onboarding/template.html:327 and nucleo/src/onboarding/template.html:322: `<span id=\"iH\">Isla</span>`; no script reference to iH in the onboarding sources. No fixed-Spanish Swift heading found. Cosmetic P3, open."
+      },
+      {
+        "claim": "A3(ii): shared Trader Land pages missing canonical / og:url / twitter:url.",
+        "verdict": "partially_confirmed",
+        "evidence": "api/_lib/trader-land-card.ts:88-105 only replaces existing tags; api/trader-land-share.ts:98 fetches the shell at runtime. The shell HTML is not in the snapshot, so absence of the tags in served pages is inferred, not observed. Web-only impact."
+      },
+      {
+        "claim": "A3(iii): regional stock board ordering/quote accuracy and Ferrari/Santander resolver issues.",
+        "verdict": "not_verifiable",
+        "evidence": "No occurrence of Ferrari, Santander or RACE in source outside docs; only evidence/README.md:61 retains the finding. No reproduction or receipt found. Open and unscoped."
+      },
+      {
+        "claim": "A4: 42 historical originals (7 x 6), 30 selected (5 x 6), 12 excluded; provenance stated as historical, not fresh build 63, not evidence of the overlay gate; no locale/ordinal/hash mismatch with the saved-store receipt.",
+        "verdict": "partially_confirmed",
+        "evidence": "Counts confirmed from final-artwork-manifest.json:10-12 and entry flags; selected order 01,02,03,04,06 matches app-store-screenshots-saved.json for all six locales. Provenance is stated as historical (manifest scope line 27, \"currentCaptureBuild63\": false, receipt \"historicalArtworkNotFresh63Capture\": true), and the chart panels 05/07 are excluded, so no artwork is offered as overlay-gate evidence. Not confirmed: hash match with the store (receipt has no hashes); 'build57 captures' is imprecise (build 57 package = build 56 bytes, derived from build 55 image_gen edits and build 40 captures per README:56). assets-inventory.json was not opened. No pixels inspected."
+      },
+      {
+        "claim": "A5: NucleoPrivacyUITests leaves riskNoticeVersion 0; StoreShots01 overrides to 6 but 02/03/04 do not; ContentView.swift:519 blocks ask-field/More; test-only launch-override repair authorized/pending.",
+        "verdict": "partially_confirmed",
+        "evidence": "ContentView.swift:519 `if !vm.profile.acceptedRiskNotice {` confirmed. NucleoPrivacyUITests.swift:200-226 withdraws consent in the app domain and relaunches without override (:244). Receipts: 01 and 05 Passed; 02, 03, 04 Failed; none not-executed; class not accepted. However the snapshot's StoreShots.swift already contains the override in all four methods (lines 41, 98, 128, 176) as an uncommitted working-tree file, so 'do not' is true only of the pre-repair file (supported by the +1/+2/+3 line shift and the remediation receipt, changes: 3). The repair is applied but unrun: PENDING, not a pass. It is a harness precondition, not a product defect: ContentView is DEBUG-only (BobbyApp.swift:107-131). 'Authorized' cannot be verified from the snapshot."
+      }
+    ],
+    "filesInspected": [
+      "snapshot-manifest.json",
+      "brief.md",
+      "evidence/chart-timeframe-report.md",
+      "evidence/support-subtitle-report.md",
+      "evidence/StoreShots-summary.json",
+      "evidence/StoreShots-tests.json",
+      "evidence/StoreShots-execution.json",
+      "evidence/native/StoreShots-failure-extraction.json",
+      "evidence/native/StoreShots-consent-harness-remediation.json",
+      "evidence/ui-serial-driver-status.json",
+      "evidence/ui-serial-results.json",
+      "evidence/README.md",
+      "evidence/store-localizations/README.md",
+      "evidence/store-localizations/final-artwork-manifest.json",
+      "evidence/store-localizations/app-store-screenshots-saved.json",
+      "source/nucleo/src/shared/20-read-model.js",
+      "source/ios/Bobby/Nucleo/src/shared/20-read-model.js",
+      "source/nucleo/src/app/55-read.js",
+      "source/ios/Bobby/Nucleo/src/app/55-read.js",
+      "source/ios/Bobby/Nucleo/src/app/40-strings.js",
+      "source/ios/Bobby/Nucleo/src/app/template.html",
+      "source/ios/Bobby/Nucleo/src/app/30-dom.js",
+      "source/ios/Bobby/Nucleo/src/contract/10-contract.js",
+      "source/ios/Bobby/Nucleo/src/onboarding/template.html",
+      "source/ios/Bobby/Nucleo/src/onboarding/40-strings.js",
+      "source/nucleo/src/onboarding/template.html",
+      "source/nucleo/src/web/30-web-desk.js",
+      "source/ios/Bobby/Nucleo/tests/chart-timeframe.test.mjs",
+      "source/ios/Bobby/Nucleo/fixtures/ask/btc.json",
+      "source/ios/Bobby/Nucleo/fixtures/ask/nvda.json",
+      "source/ios/Bobby/Resources/Nucleo/app.html",
+      "source/scripts/qa/test-ios17-support-subtitle.mjs",
+      "source/ios/Bobby/Sources/Nucleo/NucleoDesk.swift",
+      "source/ios/Bobby/Sources/Nucleo/NucleoSession.swift",
+      "source/ios/Bobby/Sources/ContentView.swift",
+      "source/ios/Bobby/Sources/BobbyApp.swift",
+      "source/ios/Bobby/Sources/BobbyAPI.swift",
+      "source/ios/Bobby/Sources/AgentProfile.swift",
+      "source/ios/Bobby/Sources/RiskNoticeView.swift",
+      "source/ios/Bobby/Sources/TraderLandGateHarness.swift",
+      "source/ios/Bobby/UITests/StoreShots.swift",
+      "source/ios/Bobby/UITests/NucleoPrivacyUITests.swift",
+      "source/api/_lib/trader-land-card.ts",
+      "source/api/trader-land-share.ts",
+      "source/docs/qa/ios-1.7-remediation-2026-10-04/iphone-live-chart-support-gates.md"
+    ],
+    "notVerified": [
+      "Any post-repair StoreShots run: no receipt exists; tests 02/03/04 remain failed in the only recorded run.",
+      "The pre-repair StoreShots.swift (sha e631a5cb...) is not in the snapshot; its lack of the override in 02/03/04 is inferred from line-number shifts and the remediation receipt.",
+      "AX activities for the StoreShots failures (StoreShots-test02-activities.json) are referenced but not present; tests 03 and 04 have no extraction at all.",
+      "Which 13 classes / 52 methods are accepted in ui-serial-results.json, including whether NucleoPrivacyUITests itself passed; I read only the StoreShots stage and the totals.",
+      "Whether the hashes recorded in chart-timeframe-results.json and support-source-manifest.json equal the snapshot manifest hashes (tests were run at worktree HEAD 393776c3).",
+      "Commits 507616c9 and ecc4ff49 and the claim that later commits are docs-only: no git metadata in the snapshot.",
+      "Full body of scripts/qa/test-ios17-support-subtitle.mjs and its collision/delta assertions; only its header and loading lines were read.",
+      "Web transport test (nucleo/tests/web-transport.test.mjs) and the Swift test NucleoBridgeTests.testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon were not opened; the DEBUG request-spy repair was not reviewed.",
+      "Whether saved/stored reads from earlier builds are re-rendered through buildChart without candlesTimeframe (legacy fail-open reachability).",
+      "Stale overlays after a timeframe switch in the live UI: only the per-render rebuild in buildChart was read, not the state machine that calls it.",
+      "Weekend-gap and irregular-bar behaviour for equities beyond reading closedVolumeRatio; the x-axis spaces points by index, not time, and I did not assess whether that is disclosed.",
+      "Geist font rendering, iPhone WebKit text metrics, physical-device chart behaviour and live provider 4H/1D/1W reads: all marked pending in the evidence.",
+      "Whether the web app page loads Geist via CSS (only the native app template was grepped for @font-face).",
+      "The runtime app shell HTML used by trader-land-share (not in snapshot), so the actual presence of canonical/og:url/twitter:url in served pages.",
+      "Ferrari/Santander resolver and regional stock board ordering/quote issues: no code or reproduction located; assets.ts, stock-signals.ts, public-price.ts and path-resolution.ts were grepped for those names only, not read.",
+      "evidence/store-localizations/assets-inventory.json, metadata-validation.json, receipt.json and url-checks.json were not opened.",
+      "Artwork pixels: not in the snapshot; README's visual-review statements are unverified by me.",
+      "All 42 manifest entries individually (hash equality with build 56, per-entry provenance); only the header, first entry and grep-level flags were read.",
+      "web Stripe TS2339 retained finding (outside the stated A3 scope items)."
+    ],
+    "localCodeVerdict": "GO for local product code in the chart/localization/UI-contract scope (no P0/P1 found in source; only P3 residuals), but NO-GO on claiming StoreShots UI acceptance: the only receipt is 2 passed / 3 failed and the repair has not been rerun.",
+    "notes": "Stopped at the time budget after 8 tool rounds. Classification used throughout: PROVEN RUNTIME = StoreShots 2 passed (test01, test05) / 3 failed (test02, test03, test04), exit 65, class not accepted, serial run incomplete at 13 classes / 52 methods; store receipt shows 6 locales x 5 files with no build attached and not submitted. HISTORICAL = chart 165/0 and 280/0 and subtitle 126/126 results, produced offline at worktree HEAD 393776c3, not at the bound commit. SOURCE INFERENCE = all chart-gate, subtitle-wrap, DEBUG-gating and Trader Land meta analysis. PENDING = StoreShots rerun, physical iPhone gates for six languages, Geist measurement, fresh build 63 artwork. On A5 the decisive point is that ContentView is unreachable in Release (BobbyApp.swift:129-131), so the :519 gate that failed the tests is a DEBUG classic-desk path and the failure is a cross-class harness precondition rather than a masked product defect; the override is a plain UserDefaults argument-domain value with no product code. The most actionable discrepancy against the brief is that the snapshot already contains the repaired, uncommitted StoreShots.swift, so the candidate is not reproducible from be3e8b13 alone."
+  }
+}

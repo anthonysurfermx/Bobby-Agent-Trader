@@ -1,0 +1,18 @@
+{
+  "changedAtUTC": "2026-10-04T12:33:42.082682+00:00",
+  "scope": "Archive wrapper CLI target-specific macro only; source project and product code unchanged.",
+  "firstAttemptExitCode": 65,
+  "firstFailure": "Global provisioning profile propagated to RevenueCat_RevenueCat resource bundle. Configuration failure before product compilation.",
+  "wrapperBeforeSHA256": "97cb718b0221434570c2dc16a28e1a75e2c85190f080b6f83772b55aa8feba97",
+  "wrapperAfterSHA256": "104e799f17735be4e7cd49e58b6e337b6ee4081fede056cb1bdd349f643d9c48",
+  "preservedOldWrapper": "/private/tmp/bobby-ios17-remediation-20261004/archive63/first-attempt-wrapper.py",
+  "oldArgument": "PROVISIONING_PROFILE_SPECIFIER=d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+  "newArguments": [
+    "BOBBY_ARCHIVE_PROFILE_Bobby=d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+    "PROVISIONING_PROFILE_SPECIFIER=$(BOBBY_ARCHIVE_PROFILE_$(TARGET_NAME))"
+  ],
+  "rationale": "Xcode resolves the profile through target-name indirection. Bobby resolves its explicit UUID; resource bundle targets resolve an undefined variable to the empty profile.",
+  "automaticProvisioningUpdates": false,
+  "profilesOrGlobalSigningModified": false,
+  "canonicalProductChanges": false
+}

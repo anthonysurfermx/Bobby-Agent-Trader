@@ -1,0 +1,62 @@
+{
+  "at": "2026-10-04T12:46:58.592745+00:00",
+  "stage": "StoreShots",
+  "class": "StoreShots",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "test01_OnboardingAndCompanion",
+    "test03_BoardAndSuggestions",
+    "test04_ShareSkin",
+    "test05_GearAttachmentMatrix",
+    "test02_VerdictAndEvolution"
+  ],
+  "expectedCount": 5,
+  "executionExitCode": 65,
+  "issues": [
+    "execution did not complete successfully",
+    "unexpected summary result: Failed",
+    "unexpected summary passedTests: 2",
+    "unexpected summary failedTests: 3",
+    "one or more actual case nodes did not pass"
+  ],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "9e2a0b72a4a7d5be0d5645074bef931f3b1aacbb4c9c2b00115f908d1c26f8ba",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "80ccd1b2500d5978b9e98c10ba882d6c0c8fa53eb0e6f318aa8d77ed2bc848b9",
+  "officialSummary": {
+    "result": "Failed",
+    "totalTestCount": 5,
+    "passedTests": 2,
+    "failedTests": 3,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "StoreShots/test01_OnboardingAndCompanion()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test01_OnboardingAndCompanion",
+      "result": "Passed"
+    },
+    {
+      "identifier": "StoreShots/test02_VerdictAndEvolution()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test02_VerdictAndEvolution",
+      "result": "Failed"
+    },
+    {
+      "identifier": "StoreShots/test03_BoardAndSuggestions()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test03_BoardAndSuggestions",
+      "result": "Failed"
+    },
+    {
+      "identifier": "StoreShots/test04_ShareSkin()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test04_ShareSkin",
+      "result": "Failed"
+    },
+    {
+      "identifier": "StoreShots/test05_GearAttachmentMatrix()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test05_GearAttachmentMatrix",
+      "result": "Passed"
+    }
+  ],
+  "accepted": false
+}

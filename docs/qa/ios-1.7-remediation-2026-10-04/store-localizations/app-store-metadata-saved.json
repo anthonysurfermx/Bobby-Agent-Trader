@@ -1,0 +1,29 @@
+{
+  "recordedAtUTC": "2026-10-04T12:50:31.728314+00:00",
+  "version": "1.7",
+  "savedVersionFields": [
+    "promotionalText",
+    "description",
+    "whatsNew",
+    "keywords",
+    "supportURL"
+  ],
+  "saveObservedDisabledAfterEachLocale": [
+    "en-US",
+    "de-DE",
+    "fr-FR",
+    "it",
+    "pt-PT",
+    "es-MX"
+  ],
+  "freshReloadReadbackComplete": [
+    "en-US"
+  ],
+  "otherLocaleReadbacks": "pending due active user Safari navigation",
+  "globalReviewNotesSaved": true,
+  "reviewNotesTargetBuild": "63",
+  "appInfoNameSubtitlePrivacyURL": "prepared; not yet updated in remote AppInfo",
+  "submission": "draft; no build attached; not sent to App Review",
+  "spanishGrammarPolishApplied": true,
+  "spanishDescriptionCharacters": 3125
+}

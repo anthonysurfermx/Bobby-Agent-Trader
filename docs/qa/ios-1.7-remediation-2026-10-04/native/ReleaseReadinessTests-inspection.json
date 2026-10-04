@@ -1,0 +1,110 @@
+{
+  "at": "2026-10-04T12:32:06.491425+00:00",
+  "stage": "ReleaseReadinessTests",
+  "class": "ReleaseReadinessTests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testAIConsentIsRequiredBeforeEnteringDesk",
+    "testAvatarVoiceStyleReturnsToOnboarding",
+    "testSpanishAvatarVoiceStyleReturnsToOnboarding",
+    "testDeskCanMuteAndRestoreAvatarNarration",
+    "testSpanishDeskCanMuteAndRestoreAvatarNarration",
+    "testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice",
+    "testMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+    "testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+    "testOrdinaryPracticeIslandCanZoomOutToTheArchipelago",
+    "testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto",
+    "testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+    "testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+    "testAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+    "testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate"
+  ],
+  "expectedCount": 14,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "12ec860fedbb71de304700a34227a728881265f75896edb0b0f2d09615665a4f",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "5d1d9473871bf820266ab0eee78bd92401e0a1feb5985eda6824f6fa0d265345",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 14,
+    "passedTests": 14,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "ReleaseReadinessTests/testAccountIslandCanSaveNamePublishShareAndBecomePrivate()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testAIConsentIsRequiredBeforeEnteringDesk()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAIConsentIsRequiredBeforeEnteringDesk",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testAvatarVoiceStyleReturnsToOnboarding()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testAvatarVoiceStyleReturnsToOnboarding",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testDeskCanMuteAndRestoreAvatarNarration()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testDeskCanMuteAndRestoreAvatarNarration",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testMuteChoiceSurvivesOnboardingGalleryAndRelaunch()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testOrdinaryPracticeIslandCanZoomOutToTheArchipelago()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testOrdinaryPracticeIslandCanZoomOutToTheArchipelago",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishAvatarVoiceStyleReturnsToOnboarding()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishAvatarVoiceStyleReturnsToOnboarding",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishDeskCanMuteAndRestoreAvatarNarration()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishDeskCanMuteAndRestoreAvatarNarration",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ReleaseReadinessTests/testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ReleaseReadinessTests/testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

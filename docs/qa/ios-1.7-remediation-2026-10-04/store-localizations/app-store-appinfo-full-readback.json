@@ -1,0 +1,40 @@
+{
+  "observedAtUTC": "2026-10-04T12:55:28.493Z",
+  "surface": "App Store Connect AppInfo distribution/info",
+  "method": "Saved native Safari UI then fresh reload and six locale readbacks",
+  "all12NameSubtitleFieldsMatchPreparedMetadata": true,
+  "locales": [
+    {
+      "locale": "en-US",
+      "nameMatch": true,
+      "subtitleMatch": true
+    },
+    {
+      "locale": "es-MX",
+      "nameMatch": true,
+      "subtitleMatch": true
+    },
+    {
+      "locale": "de-DE",
+      "nameMatch": true,
+      "subtitleMatch": true
+    },
+    {
+      "locale": "fr-FR",
+      "nameMatch": true,
+      "subtitleMatch": true
+    },
+    {
+      "locale": "it",
+      "nameMatch": true,
+      "subtitleMatch": true
+    },
+    {
+      "locale": "pt-PT",
+      "nameMatch": true,
+      "subtitleMatch": true
+    }
+  ],
+  "privacyPolicyURL": "prepared, remote update not yet verified",
+  "appReviewSubmission": false
+}

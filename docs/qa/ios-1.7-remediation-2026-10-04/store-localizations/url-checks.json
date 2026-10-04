@@ -1,0 +1,114 @@
+{
+  "checkedAtUTC": "2026-10-04T12:25:44.756854+00:00",
+  "execution": "authorized read-only public-page network request outside network-restricted sandbox",
+  "rows": [
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=en",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=en",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=es",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=es",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=de",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=de",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=fr",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=fr",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=it",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=it",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=pt",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/support?lang=pt",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=en",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=en",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=es",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=es",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=de",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=de",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=fr",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=fr",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=it",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=it",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=pt",
+      "status": 200,
+      "finalURL": "https://bobbyprotocol.xyz/privacy?lang=pt",
+      "contentType": "text/html; charset=utf-8",
+      "sampleBytes": 4096,
+      "sampleContainsHTML": true,
+      "scope": "HTTP URL reachability only; not full localized page content or legal adequacy"
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+Application, 0x10b9045f0, pid: 65922, label: 'Bobby' <App element pid: 65922>
+  Window (Main), 0x10b905a70, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4393561680.4>
+    Other, 0x10b904ef0, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4384144512.5>
+      Other, 0x10b905010, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4384146592.6>
+        Other, 0x10b9055b0, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4392554816.7>
+          Other, 0x10b905b90, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4381475392.8>
+            Other, 0x10b905cb0, {{0.0, 0.0}, {402.0, 874.0}} <AX element pid: 65922, elementOrHash.elementID: 4381419664.9>
+            StaticText, 0x10b905dd0, {{33.0, 76.0}, {209.0, 13.3}}, label: 'BOBBY // BEFORE WE START' <AX element pid: 65922, elementOrHash.elementID: 4381439968.10>
+            ScrollView, 0x10b905130, {{0.0, 89.3}, {402.0, 680.7}} <AX element pid: 65922, elementOrHash.elementID: 4421383168.11>
+              Other, 0x10b905250, {{0.0, 89.3}, {402.0, 692.7}} <AX element pid: 65922, elementOrHash.elementID: 4388311248.13>
+                StaticText, 0x10b905370, {{18.0, 107.3}, {300.3, 33.7}}, label: 'Read this once. It matters.' <AX element pid: 65922, elementOrHash.elementID: 4381446320.17>
+                StaticText, 0x10b905490, {{18.0, 159.0}, {357.3, 36.0}}, label: 'Bobby is here to make you think, not to tell you what to do with your money.' <AX element pid: 65922, elementOrHash.elementID: 4381446752.18>
+                Button, 0x10b9061c0, {{17.5, 212.5}, {367.0, 190.7}}, label: 'Allow AI processing of my questions.', value: not acknowledged <AX element pid: 65922, elementOrHash.elementID: 4381450496.19>
+                  Image, 0x10b9062e0, {{34.0, 230.0}, {22.7, 22.7}}, identifier: 'circle', label: 'circle' <AX element pid: 65922, elementOrHash.elementID: 4381447184.26>
+                  StaticText, 0x10b906400, {{70.7, 227.0}, {265.7, 18.0}}, label: 'Allow AI processing of my questions.' <AX element pid: 65922, elementOrHash.elementID: 4381447616.27>
+                  StaticText, 0x10b906520, {{70.7, 249.0}, {284.0, 139.7}}, label: 'Bobby sends your question and market data to OpenAI or Anthropic, depending on the analysis level. With voice on, reply text goes to OpenAI or Microsoft for speech. Dictation is transcribed on your iPhone when the language is installed; otherwise Apple's speech service transcribes it. Bobby does not store the audio. Avoid personal or account details. You can withdraw AI consent here at any time.' <AX element pid: 65922, elementOrHash.elementID: 4381448048.28>
+                Button, 0x10b9067f0, {{17.5, 420.2}, {367.0, 97.7}}, label: 'Not investment advice.', value: not acknowledged <AX element pid: 65922, elementOrHash.elementID: 4381457808.20>
+                  Image, 0x10b906910, {{34.0, 437.7}, {22.7, 22.7}}, identifier: 'circle', label: 'circle' <AX element pid: 65922, elementOrHash.elementID: 4381454496.29>
+                  StaticText, 0x10b906c40, {{70.7, 434.7}, {166.3, 18.0}}, label: 'Not investment advice.' <AX element pid: 65922, elementOrHash.elementID: 4381454928.30>
+                  StaticText, 0x10b906d60, {{70.7, 456.7}, {253.7, 46.7}}, label: 'Verdicts, levels and stops are educational analysis made by software, not recommendations for you.' <AX element pid: 65922, elementOrHash.elementID: 4381455360.31>
+                Button, 0x10b906e80, {{17.5, 534.8}, {367.0, 82.3}}, label: 'Bobby never touches your money.', value: not acknowledged <AX element pid: 65922, elementOrHash.elementID: 4381462848.21>
+                  Image, 0x10b906fa0, {{34.0, 552.3}, {22.7, 22.7}}, identifier: 'circle', label: 'circle' <AX element pid: 65922, elementOrHash.elementID: 4381459536.32>
+                  StaticText, 0x10b9070c0, {{70.7, 549.3}, {243.7, 18.0}}, label: 'Bobby never touches your money.' <AX element pid: 65922, elementOrHash.elementID: 4381459968.33>
+                  StaticText, 0x10b9071e0, {{70.7, 571.3}, {287.3, 31.3}}, label: 'It doesn't connect wallets, move funds, execute trades or hold your keys.' <AX element pid: 65922, elementOrHash.elementID: 4381460400.34>
+                Button, 0x107704b80, {{17.5, 634.2}, {367.0, 82.3}}, label: 'You can lose money. You decide.', value: not acknowledged <AX element pid: 65922, elementOrHash.elementID: 4381467888.22>
+                  Image, 0x107705b50, {{34.0, 651.7}, {22.7, 22.7}}, identifier: 'circle', label: 'circle' <AX element pid: 65922, elementOrHash.elementID: 4381464576.35>
+                  StaticText, 0x107705c70, {{70.7, 648.7}, {232.3, 18.0}}, label: 'You can lose money. You decide.' <AX element pid: 65922, elementOrHash.elementID: 4381465008.36>
+                  StaticText, 0x107705d90, {{70.7, 670.7}, {277.0, 31.3}}, label: 'Data can be late or wrong. If you need advice, talk to a licensed professional.' <AX element pid: 65922, elementOrHash.elementID: 4381465440.37>
+                StaticText, 0x107705eb0, {{18.0, 734.0}, {235.0, 12.0}}, label: 'Bobby does not publish your questions.' <AX element pid: 65922, elementOrHash.elementID: 4381469616.23>
+                Button, 0x107705fd0, {{18.0, 752.0}, {86.7, 12.0}}, label: 'Privacy Policy' <AX element pid: 65922, elementOrHash.elementID: 4381360832.24>
+              Other, 0x1077060f0, {{369.0, 89.3}, {30.0, 680.7}}, label: 'Vertical scroll bar, 2 pages', value: 0% <AX element pid: 65922, elementOrHash.elementID: 4388847744.14>
+                Other, 0x107706210, {{396.0, 760.0}, {3.0, 7.0}} <AX element pid: 65922, elementOrHash.elementID: 4388867616.25>
+              Other, 0x107706330, {{369.0, 89.3}, {30.0, 680.7}}, label: 'Vertical scroll bar, 2 pages', value: 0% <AX element pid: 65922, elementOrHash.elementID: 4388847744.14>
+                Other, 0x107706450, {{396.0, 760.0}, {3.0, 7.0}} <AX element pid: 65922, elementOrHash.elementID: 4388867616.25>
+            Button, 0x107706570, {{18.0, 778.0}, {366.0, 52.0}}, label: 'ACKNOWLEDGE ALL FOUR', Disabled <AX element pid: 65922, elementOrHash.elementID: 4381474336.12>
+              StaticText, 0x107706690, {{36.0, 796.8}, {182.7, 14.3}}, label: 'ACKNOWLEDGE ALL FOUR', Disabled <AX element pid: 65922, elementOrHash.elementID: 4381472128.15>
+              Image, 0x1077067b0, {{353.0, 796.7}, {11.0, 14.7}}, identifier: 'hand.raised.fill', label: 'Block', Disabled <AX element pid: 65922, elementOrHash.elementID: 4381472560.16>

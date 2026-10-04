@@ -1,0 +1,80 @@
+{
+  "completedAtUTC": "2026-10-04T12:41:55.190185+00:00",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "version": "1.7",
+  "build": "63",
+  "archive": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive",
+  "app": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive/Products/Applications/Bobby.app",
+  "archiveBytes": 175162800,
+  "applicationBytes": 104991141,
+  "releaseDerivedDataBytes": 472773066,
+  "archiveXcodebuildExitCode": 0,
+  "archiveElapsedSeconds": 202.75,
+  "archiveStartedUTC": "2026-10-04T12:34:26.547877+00:00",
+  "archiveEndedUTC": "2026-10-04T12:37:49.294276+00:00",
+  "verificationResult": "passed",
+  "codesignVerification": "passed",
+  "profileUUID": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+  "productionAPS": "production",
+  "getTaskAllow": false,
+  "appleSignIn": [
+    "Default"
+  ],
+  "appGroups": [
+    "group.xyz.bobbyprotocol.bobby"
+  ],
+  "executableSHA256": "f69898e5004a9f8742984295c48835ebf189d3808a2c00dd246e79866067983c",
+  "nucleoResourcesVerified": 4,
+  "sourceInputsVerified": 750,
+  "debugFixtureResources": "absent",
+  "devMockBridgeAndFixtureAssignments": "absent; inert reads of undefined fixtures may remain",
+  "privacyManifestSHA256": "e7bc9597fd90b6c2b487f342a52844f96d740ad29e9215f11ef82362ec4cf13e",
+  "releaseRevenueCatKeyType": "App Store public SDK key; value omitted",
+  "minimumObservedFreeGiB": 5.825,
+  "freeAfterArchiveGiB": 5.825,
+  "freeNowGiB": 5.63,
+  "firstArchiveAttemptExitCode": 65,
+  "firstArchiveFailureScope": "wrapper CLI global-profile configuration propagated to RevenueCat resource bundle; source/product unchanged",
+  "initialRetryVerificationFailure": "overbroad fixture-name substring rule; repaired verifier checks actual injected assignment, dev mock implementation, generated release flag and absent fixture resources",
+  "defaultSandboxVerifyFailure": "codesign returned1; no full stderr captured. Same unmodified archive verified successfully outside that sandbox. No archive defect inferred.",
+  "uiAcceptance": "Root UI test-without-building remains in progress; this archive does not establish all-flow GO",
+  "upload": "not run; blocked pending UI completion, Claude review and root coordination",
+  "testFlightProcessing": "unverified",
+  "physicalInstallationAcceptance": "unverified",
+  "receiptHashes": {
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/preflight.json": {
+      "sha256": "87c581293b2fb84124714a87dfdae03d4384985851dfa1e8e81f3f24252df571",
+      "bytes": 144428
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-phase/phase-receipt.json": {
+      "sha256": "291f9ae62c96ec1f956e19fb341d77218151dcd919868b0974130cdfd08fefe7",
+      "bytes": 1640
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-phase/xcodebuild.log": {
+      "sha256": "6de5ba39a148e9293b662fc26117231c1553037fd9b3d8ae6c014f46b5fed1d4",
+      "bytes": 546050
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-verification.json": {
+      "sha256": "5e7a9463fce2244bec88d45346b10fc19763ea224f9d79bbf084519df3202cdd",
+      "bytes": 2627
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper.py": {
+      "sha256": "609befc08b23475b1b7a7587f3b0e40127e68041b9e56f48f7e48ff27bb0b552",
+      "bytes": 16900
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper-signing-repair.json": {
+      "sha256": "0868a5f20e28ac559dbe879c5f7f99a4ed9a6eb079adae572e8ab46df926039d",
+      "bytes": 1209
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper-fixture-verifier-repair.json": {
+      "sha256": "8e216215921f984c8a9c1ea067c56eb2695446491e9b6f006c2797a9b45ff598",
+      "bytes": 1060
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-target-signing-settings.json": {
+      "sha256": "a64451069ec4517e2c44f4ae51d847ea3cf7c2301f20829d3193f1a520460c16",
+      "bytes": 482
+    }
+  },
+  "minimumMonitoredWhileRunningFreeGiB": 5.836,
+  "minimumIncludingRecordedFinalFreeGiB": 5.825
+}

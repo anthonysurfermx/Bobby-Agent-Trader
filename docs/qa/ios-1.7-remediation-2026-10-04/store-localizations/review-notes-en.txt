@@ -1,0 +1,15 @@
+Bobby 1.7 (63) is an educational market-analysis app. Alpha Hunter, Red Team and CIO provide three perspectives on a supported stock or crypto asset. The iPhone app does not connect wallets, execute trades or move funds. Market data may be delayed; source timestamps and the actual chart data interval are shown.
+
+Review the app with typed input. A guest can explore the app and use the available guest allowance. Some analysis levels and account features require Sign in with Apple; availability and remaining allowances are shown in the app. Analysis processing by external AI requires the user's permission. The notice can be reviewed and permission withdrawn in Profile.
+
+Optional dictation asks for microphone and Apple Speech permissions. An on-device recognition model is preferred when available. If it is unavailable for the selected app language, Apple's speech service requires a separate native consent before microphone capture. Declining it leaves typed input available. This consent is separate from the analysis AI permission. Optional narration can be muted.
+
+The app supports English, Spanish, French, Portuguese, Italian and German. Language is selected in Profile. Portuguese recognition and narration choose compatible Portugal or Brazil variants from the device's language/region settings; availability depends on Apple speech support on the device.
+
+Bobby Pro is an optional auto-renewing monthly App Store subscription. Pricing is loaded from the current store offering and shown before confirmation; no fixed test price is advertised. Pro includes unlimited Quick readings subject to fair use, 60 Deep analyses and 10 Max analyses every 30 days. Restore Purchases and account/subscription controls are in Profile. Deleting a Bobby account does not itself cancel an Apple subscription.
+
+The optional weekly briefing requires an eligible active paid Pro account and separate permissions. Guest, gifted or trial access does not by itself grant this eligibility. Availability and scheduling are shown in Profile; a report is not represented as delivered until it exists. Public Trader Land content offers reporting and creator blocking; islands are private until published.
+
+Support: https://bobbyprotocol.xyz/support?lang=en
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en
+Standard Apple EULA: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/

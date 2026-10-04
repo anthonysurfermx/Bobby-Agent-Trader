@@ -1,0 +1,93 @@
+{
+  "observedAtUTC": "2026-10-04T12:45:25.624Z",
+  "version": "1.7",
+  "buildAttached": false,
+  "surface": "Safari native AX App Store Connect media-manager iPhone 6.9 after reload",
+  "locales": [
+    {
+      "locale": "de-DE",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    },
+    {
+      "locale": "fr-FR",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    },
+    {
+      "locale": "it",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    },
+    {
+      "locale": "pt-PT",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    },
+    {
+      "locale": "es-MX",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    },
+    {
+      "locale": "en-US",
+      "files": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "editableOwnLocaleScreenshots": true,
+      "orderConfirmed": true
+    }
+  ],
+  "newUploads": [
+    "de-DE",
+    "fr-FR",
+    "it"
+  ],
+  "inheritedSetUpdated": [
+    "pt-PT",
+    "es-MX",
+    "en-US"
+  ],
+  "historicalArtworkNotFresh63Capture": true,
+  "selectedManifest": "final-artwork-manifest.json",
+  "notSubmittedForReview": true
+}

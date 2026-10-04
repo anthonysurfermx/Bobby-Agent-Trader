@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-04T12:37:58.332904+00:00",
+  "stage": "TraderLandGateTests",
+  "class": "TraderLandGateTests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testPreviewMoveCancelCollisionUndoAndPersistence",
+    "testAccountFixtureMovesTheCoreAndExtendsASeed",
+    "testArchipelagoArrowsVisitNeighboursAndReturnHome"
+  ],
+  "expectedCount": 3,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "df0e48867096f403bfdc57c2c8a2767aef049c23da7bcca0f6405b481c404e78",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "84249cff9d09d5ba7e4aa73a928d0c1251894daa429b32501630e5c094db18c1",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 3,
+    "passedTests": 3,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "TraderLandGateTests/testAccountFixtureMovesTheCoreAndExtendsASeed()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testAccountFixtureMovesTheCoreAndExtendsASeed",
+      "result": "Passed"
+    },
+    {
+      "identifier": "TraderLandGateTests/testArchipelagoArrowsVisitNeighboursAndReturnHome()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testArchipelagoArrowsVisitNeighboursAndReturnHome",
+      "result": "Passed"
+    },
+    {
+      "identifier": "TraderLandGateTests/testPreviewMoveCancelCollisionUndoAndPersistence()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/TraderLandGateTests/testPreviewMoveCancelCollisionUndoAndPersistence",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

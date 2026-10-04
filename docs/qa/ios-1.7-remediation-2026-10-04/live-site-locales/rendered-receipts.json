@@ -1,0 +1,159 @@
+{
+  "at": "2026-10-04T13:06:46.041825+00:00",
+  "scope": "Eight requested privacy/support pages DE FR IT PT plus priority EN privacy; actual rendered production website text only",
+  "pages": [
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=en",
+      "page": "privacy",
+      "requestedLanguage": "en",
+      "renderedHeading": "Privacy Policy",
+      "renderedHTMLLang": "en-US",
+      "selectedDropdown": "English",
+      "bodyExcerpt": "Effective October 3, 2026",
+      "speechExcerpt": "From iPhone version 1.7, your speech is transcribed on the iPhone when Apple’s recognition for the app language is installed on it; otherwise, and only after you have allowed speech recognition, the audio goes to Apple’s speech service, which transcribes it in the same language and handles it under its own terms. Bobby does not store the audio and does not receive it on its servers.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=de",
+      "page": "privacy",
+      "requestedLanguage": "de",
+      "renderedHeading": "Datenschutzerklärung",
+      "renderedHTMLLang": "de-DE",
+      "selectedDropdown": "Deutsch",
+      "bodyExcerpt": "Gültig ab 3. Oktober 2026",
+      "speechExcerpt": "Ab iPhone-Version 1.7 wird das Gesprochene auf dem iPhone transkribiert, wenn Apples Spracherkennung für die Sprache der App dort installiert ist; andernfalls, und nur nachdem du die Spracherkennung erlaubt hast, gehen die Audiodaten an Apples Spracherkennungsdienst, der sie in derselben Sprache transkribiert und nach seinen eigenen Bedingungen verarbeitet. Bobby speichert die Audiodaten nicht und erhält sie nicht auf seinen Servern.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=fr",
+      "page": "privacy",
+      "requestedLanguage": "fr",
+      "renderedHeading": "Politique de confidentialité",
+      "renderedHTMLLang": "fr-FR",
+      "selectedDropdown": "Français",
+      "bodyExcerpt": "En vigueur le 3 octobre 2026",
+      "speechExcerpt": "À partir de la version 1.7 pour iPhone, ta voix est transcrite sur l’iPhone si la reconnaissance d’Apple pour la langue de l’app y est installée ; sinon, et seulement après que tu as autorisé la reconnaissance vocale, l’audio est envoyé au service de reconnaissance vocale d’Apple, qui le transcrit dans la même langue et le traite selon ses propres conditions. Bobby ne conserve pas l’audio et ne le reçoit pas sur ses serveurs.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=it",
+      "page": "privacy",
+      "requestedLanguage": "it",
+      "renderedHeading": "Informativa sulla privacy",
+      "renderedHTMLLang": "it-IT",
+      "selectedDropdown": "Italiano",
+      "bodyExcerpt": "In vigore dal 3 ottobre 2026",
+      "speechExcerpt": "Dalla versione 1.7 per iPhone, la tua voce viene trascritta sull’iPhone se il riconoscimento Apple per la lingua dell’app vi è installato; altrimenti, e solo dopo che hai autorizzato il riconoscimento vocale, l’audio viene inviato al servizio di riconoscimento vocale di Apple, che lo trascrive nella stessa lingua e lo tratta secondo i propri termini. Bobby non conserva l’audio e non lo riceve sui propri server.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/privacy?lang=pt",
+      "page": "privacy",
+      "requestedLanguage": "pt",
+      "renderedHeading": "Política de privacidade",
+      "renderedHTMLLang": "pt-PT",
+      "selectedDropdown": "Português",
+      "bodyExcerpt": "Em vigor desde 3 de outubro de 2026",
+      "speechExcerpt": "A partir da versão 1.7 para iPhone, a tua voz é transcrita no iPhone se o reconhecimento da Apple para o idioma da app estiver instalado nele; caso contrário, e só depois de teres autorizado o reconhecimento de voz, o áudio é enviado para o serviço de reconhecimento de voz da Apple, que o transcreve no mesmo idioma e o trata segundo os seus próprios termos. O Bobby não guarda o áudio nem o recebe nos seus servidores.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=de",
+      "page": "support",
+      "requestedLanguage": "de",
+      "renderedHeading": "Wie können wir dir helfen?",
+      "renderedHTMLLang": "de-DE",
+      "selectedDropdown": "Deutsch",
+      "bodyExcerpt": "Verwende dieses Formular für App-Support, Datenschutzanfragen oder Sicherheitsprobleme in der Community.",
+      "speechExcerpt": "Ab Version 1.7 wird das Diktat auf diesem iPhone transkribiert, wenn die Sprache installiert ist; andernfalls transkribiert es Apples Spracherkennungsdienst. Bobby speichert die Audiodaten nicht.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=fr",
+      "page": "support",
+      "requestedLanguage": "fr",
+      "renderedHeading": "Comment pouvons-nous t'aider ?",
+      "renderedHTMLLang": "fr-FR",
+      "selectedDropdown": "Français",
+      "bodyExcerpt": "Utilise ce formulaire pour l'assistance de l'app, les demandes de confidentialité ou les problèmes de sécurité de la communauté.",
+      "speechExcerpt": "À partir de la version 1.7, la dictée est transcrite sur cet iPhone si la langue est installée ; sinon, le service de reconnaissance vocale d’Apple la transcrit. Bobby ne conserve pas l’audio.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=it",
+      "page": "support",
+      "requestedLanguage": "it",
+      "renderedHeading": "Come possiamo aiutarti?",
+      "renderedHTMLLang": "it-IT",
+      "selectedDropdown": "Italiano",
+      "bodyExcerpt": "Usa questo modulo per assistenza sull'app, richieste sulla privacy o problemi di sicurezza della community.",
+      "speechExcerpt": "Dalla versione 1.7, la dettatura viene trascritta su questo iPhone se la lingua è installata; altrimenti la trascrive il servizio di riconoscimento vocale di Apple. Bobby non conserva l’audio.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=pt",
+      "page": "support",
+      "requestedLanguage": "pt",
+      "renderedHeading": "Como podemos ajudar?",
+      "renderedHTMLLang": "pt-PT",
+      "selectedDropdown": "Português",
+      "bodyExcerpt": "Usa este formulário para suporte da app, pedidos de privacidade ou questões de segurança da comunidade.",
+      "speechExcerpt": "A partir da versão 1.7, o ditado é transcrito neste iPhone se o idioma estiver instalado; caso contrário, é transcrito pelo serviço de reconhecimento de voz da Apple. O Bobby não guarda o áudio.",
+      "translationRendered": true,
+      "fallbackDisclosureRendered": true,
+      "evidence": "Actual live CUA Chrome DOM heading/p.innerText and selected option; excerpts copied from rendered DOM, not local source"
+    }
+  ],
+  "pagesVerified": 9,
+  "privacySpecificGate": {
+    "version17ConditionalOnDeviceWhenLanguageInstalled": true,
+    "otherwiseAppleSpeechServiceAfterSpeechRecognitionPermission": true,
+    "noAudioStoredOrReceivedByBobbyServers": true,
+    "separatesOnDeviceOnlyVersion15And16": true,
+    "typingFallback": true,
+    "AIConsentSeparateFromMicrophoneAndSpeechPermission": true
+  },
+  "minorEditorialFindings": [
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=de",
+      "severity": "P3",
+      "observed": "Bei Fehlern ohne sensible Daten kannst du auch ein öffentliches GitHub-Issue.",
+      "issue": "Sentence lacks closing verb after linked noun; translated content otherwise present."
+    },
+    {
+      "url": "https://bobbyprotocol.xyz/support?lang=it",
+      "severity": "P3",
+      "observed": "una ticket pubblico su GitHub",
+      "issue": "Article should be un ticket; translated content otherwise present."
+    }
+  ],
+  "initialAccessFallback": {
+    "webTool": "Requested pages inaccessible through web extraction tool",
+    "hiddenIAB": "Unavailable",
+    "finalSuccessfulSurface": "Documented CUA Chrome agent-created scoped tab; Safari/simulator/phone untouched"
+  },
+  "notEstablished": [
+    "No served SHA inferred from local source or earlier health",
+    "No microphone/audio/provider runtime acceptance from text",
+    "No support form submission or delivery test",
+    "No legal-compliance conclusion"
+  ],
+  "readOnly": true,
+  "noFormsLoginMicTransactionsDeploys": true
+}

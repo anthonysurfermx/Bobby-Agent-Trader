@@ -1,0 +1,11 @@
+{
+  "recordedAtUTC": "2026-10-04T13:09:04.730547+00:00",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "version": "1.7",
+  "build": "63",
+  "xcodebuildExitCode": 0,
+  "explicitUploadSuccessMarker": false,
+  "result": "export exit0; explicit upload confirmation requires log review",
+  "testFlightProcessing": "not verified; requires separate remote build63 receipt",
+  "installationAndPhysicalAcceptance": "not verified"
+}

@@ -1,0 +1,86 @@
+{
+  "at": "2026-10-04T12:36:08.945773+00:00",
+  "stage": "DeskHarvestCardTests",
+  "class": "DeskHarvestCardTests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testSignedOutCardKeepsItsButtonIdentifiers",
+    "testBloomedCardOffersBuildIt",
+    "testCappedCardOpensTheIsland",
+    "testPickerAsksBeforeGrowingTheSeed",
+    "testConfirmedHorizonBecomesTheSeeds",
+    "testGrownSeedsNameTheirHorizon",
+    "testNoTradeAndOlderServersShowNoPicker",
+    "testAReviewThatOpenedLocksTheChoice",
+    "testTheChoiceLocksWhenTheReviewOpensOnScreen",
+    "testChipCarriesItsBadge"
+  ],
+  "expectedCount": 10,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "5d2c8f95785d6faa9abf34288d39a6d358871cdb30b19b090f485c914305e794",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "32a55381aae127e27f89cf0a0686de635d92d4fab8c4527fc44fc6cc3ff1dc29",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 10,
+    "passedTests": 10,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "DeskHarvestCardTests/testAReviewThatOpenedLocksTheChoice()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testAReviewThatOpenedLocksTheChoice",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testBloomedCardOffersBuildIt()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testBloomedCardOffersBuildIt",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testCappedCardOpensTheIsland()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testCappedCardOpensTheIsland",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testChipCarriesItsBadge()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testChipCarriesItsBadge",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testConfirmedHorizonBecomesTheSeeds()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testConfirmedHorizonBecomesTheSeeds",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testGrownSeedsNameTheirHorizon()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testGrownSeedsNameTheirHorizon",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testNoTradeAndOlderServersShowNoPicker()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testNoTradeAndOlderServersShowNoPicker",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testPickerAsksBeforeGrowingTheSeed()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testPickerAsksBeforeGrowingTheSeed",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testSignedOutCardKeepsItsButtonIdentifiers()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testSignedOutCardKeepsItsButtonIdentifiers",
+      "result": "Passed"
+    },
+    {
+      "identifier": "DeskHarvestCardTests/testTheChoiceLocksWhenTheReviewOpensOnScreen()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/DeskHarvestCardTests/testTheChoiceLocksWhenTheReviewOpensOnScreen",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

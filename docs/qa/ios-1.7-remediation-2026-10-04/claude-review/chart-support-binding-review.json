@@ -1,0 +1,162 @@
+{
+  "at": "2026-10-04T13:00:11.769460+00:00",
+  "checks": [
+    {
+      "path": "ios/Bobby/Sources/Nucleo/NucleoDesk.swift",
+      "expected": "7f50141eef732931de491da3c96622947b82b0acd00c1233b3992e6928819164",
+      "snapshot": "7f50141eef732931de491da3c96622947b82b0acd00c1233b3992e6928819164",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "7f50141eef732931de491da3c96622947b82b0acd00c1233b3992e6928819164",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/src/shared/20-read-model.js",
+      "expected": "ebad05ca359f0978b2fd9e5cebb8c4b5c1f8479d51c3854f4da99f00be06adac",
+      "snapshot": "ebad05ca359f0978b2fd9e5cebb8c4b5c1f8479d51c3854f4da99f00be06adac",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "ebad05ca359f0978b2fd9e5cebb8c4b5c1f8479d51c3854f4da99f00be06adac",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "nucleo/src/shared/20-read-model.js",
+      "expected": "51f7613770358559f79594693c9d3206849125fb3561c57a773f6392145cae4b",
+      "snapshot": "51f7613770358559f79594693c9d3206849125fb3561c57a773f6392145cae4b",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "51f7613770358559f79594693c9d3206849125fb3561c57a773f6392145cae4b",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/src/contract/10-contract.js",
+      "expected": "07bc69c0d68461afd7aade3d395f9c29a8324cc5b23a77140272e215efde7a63",
+      "snapshot": "07bc69c0d68461afd7aade3d395f9c29a8324cc5b23a77140272e215efde7a63",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "07bc69c0d68461afd7aade3d395f9c29a8324cc5b23a77140272e215efde7a63",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "nucleo/src/contract/10-contract.js",
+      "expected": "5aaffc592798a4850c777ea4b8b0410374993d489d56af298a40f67aa5d3d1d6",
+      "snapshot": "5aaffc592798a4850c777ea4b8b0410374993d489d56af298a40f67aa5d3d1d6",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "5aaffc592798a4850c777ea4b8b0410374993d489d56af298a40f67aa5d3d1d6",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/fixtures/ask/btc.json",
+      "expected": "b6c453dc5baa6371c703e7ea36087883062d3c811836ba9ca9f712e9d0e1ea68",
+      "snapshot": "b6c453dc5baa6371c703e7ea36087883062d3c811836ba9ca9f712e9d0e1ea68",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "b6c453dc5baa6371c703e7ea36087883062d3c811836ba9ca9f712e9d0e1ea68",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/fixtures/ask/nvda.json",
+      "expected": "35b72b080dec5d027527d34fd144dfdd4d5705db5248b92e24735255de1d8fc0",
+      "snapshot": "35b72b080dec5d027527d34fd144dfdd4d5705db5248b92e24735255de1d8fc0",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "35b72b080dec5d027527d34fd144dfdd4d5705db5248b92e24735255de1d8fc0",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/fixtures/normalize.py",
+      "expected": "14c9d848f93144fab3748a1a23e170329e76cf4b0863f6420c697b2b7300d2ba",
+      "snapshot": null,
+      "matches": false,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "14c9d848f93144fab3748a1a23e170329e76cf4b0863f6420c697b2b7300d2ba",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Tests/NucleoBridgeTests.swift",
+      "expected": "2486a077b18031b45ccde579af5c99823365c266de63e4ac5ccd9d15787e3129",
+      "snapshot": "e63ab3a3cfe85661fb72611849f811e9d76e8c073f48fb0d9df1504f2fa3767c",
+      "matches": false,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "e63ab3a3cfe85661fb72611849f811e9d76e8c073f48fb0d9df1504f2fa3767c",
+      "candidateMatchesExpected": false
+    },
+    {
+      "path": "ios/Bobby/Nucleo/ARCHITECTURE.md",
+      "expected": "252f0ab799a61b87117a65adc4e2848aebc9b358ce464333a06ac8340d052ceb",
+      "snapshot": "252f0ab799a61b87117a65adc4e2848aebc9b358ce464333a06ac8340d052ceb",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "252f0ab799a61b87117a65adc4e2848aebc9b358ce464333a06ac8340d052ceb",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/tests/chart-timeframe.test.mjs",
+      "expected": "faf536a181ae5dfd92d3735bfdb484648d0b4e209a9cee1feb119680e10b63ea",
+      "snapshot": "faf536a181ae5dfd92d3735bfdb484648d0b4e209a9cee1feb119680e10b63ea",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "faf536a181ae5dfd92d3735bfdb484648d0b4e209a9cee1feb119680e10b63ea",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "nucleo/src/web/30-web-desk.js",
+      "expected": "07650a6d0c9db77966a143bfccbb6217db1a447dd58f7b2ba4a3f6f864fc92ad",
+      "snapshot": "07650a6d0c9db77966a143bfccbb6217db1a447dd58f7b2ba4a3f6f864fc92ad",
+      "matches": true,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "07650a6d0c9db77966a143bfccbb6217db1a447dd58f7b2ba4a3f6f864fc92ad",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "nucleo/tests/web-transport.test.mjs",
+      "expected": "1890cfdc50425d78cb75b875c2d6b3cccde9a94d5cc5f9badcf32e64ad0913ce",
+      "snapshot": null,
+      "matches": false,
+      "receiptKind": "sourceFiles",
+      "candidateCurrent": "1890cfdc50425d78cb75b875c2d6b3cccde9a94d5cc5f9badcf32e64ad0913ce",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "ios/Bobby/Nucleo/src/app/55-read.js",
+      "expected": "2231d5b64f72d18adf7d52395a4cb2ca4e548e5dd486ecbe4613037202e4d612",
+      "snapshot": "2231d5b64f72d18adf7d52395a4cb2ca4e548e5dd486ecbe4613037202e4d612",
+      "matches": true,
+      "receiptKind": "files",
+      "candidateCurrent": "2231d5b64f72d18adf7d52395a4cb2ca4e548e5dd486ecbe4613037202e4d612",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "nucleo/src/app/55-read.js",
+      "expected": "749ae1df22ee8ddc8e916659f2045ba0ebe5d32831ee91ac1e569a0771235b40",
+      "snapshot": "749ae1df22ee8ddc8e916659f2045ba0ebe5d32831ee91ac1e569a0771235b40",
+      "matches": true,
+      "receiptKind": "files",
+      "candidateCurrent": "749ae1df22ee8ddc8e916659f2045ba0ebe5d32831ee91ac1e569a0771235b40",
+      "candidateMatchesExpected": true
+    },
+    {
+      "path": "scripts/qa/test-ios17-support-subtitle.mjs",
+      "expected": "de94507855d397ebf81d2c44c6166f4e9b3524559a45e9cf33049f31d5bf78f4",
+      "snapshot": "de94507855d397ebf81d2c44c6166f4e9b3524559a45e9cf33049f31d5bf78f4",
+      "matches": true,
+      "receiptKind": "files",
+      "candidateCurrent": "de94507855d397ebf81d2c44c6166f4e9b3524559a45e9cf33049f31d5bf78f4",
+      "candidateMatchesExpected": true
+    }
+  ],
+  "matched": 13,
+  "total": 16,
+  "scope": "SHA comparisons only, no suite rerun",
+  "candidateMatched": 15,
+  "boundary": "Two receipt inputs excluded by snapshot text/prefix selection still match candidate: normalize.py and web-transport.test.mjs. NucleoBridgeTests.swift changed afterward for the ecc4ff49 request-spy repair and is covered by the current536-case native pass; renderer, transport, contract, chart regression and subtitle inputs match.",
+  "currentNativeSpyCase": [
+    {
+      "name": "testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon()",
+      "nodeType": "Test Case",
+      "result": "Passed",
+      "nodeIdentifier": "NucleoBridgeTests/testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon()"
+    }
+  ]
+}

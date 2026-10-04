@@ -2,7 +2,6 @@
 """Run one coordinated Release phase, preserving receipts and partial outputs."""
 import argparse
 import datetime
-import xml.etree.ElementTree as ET
 import hashlib
 import json
 import os
@@ -45,14 +44,6 @@ def command(argv, cwd=None):
 
 def write_json(path, value):
     path.write_text(json.dumps(value, indent=2) + '\n')
-
-
-def upload_success_lines(log):
-    """Recognize explicit Apple upload acceptance, not export/progress alone."""
-    return [line.strip() for line in log.splitlines()
-            if line.strip() == '** UPLOAD SUCCEEDED **'
-            or re.search(r'\bSuccessfully uploaded\b', line)
-            or re.search(r'\bProgress\s+100%:\s*Upload succeeded\.\s*$', line)]
 
 
 def decode_profile(path):
@@ -127,72 +118,14 @@ def preflight(expected_head):
             'remoteState': 'not checked by this local preflight'}
 
 
-def approved_test_only_input(receipt, path):
-    """Allow exactly the reviewed consent-precondition change in a UI-test-only target."""
-    approved = json.loads(path.read_text())
-    rel = 'ios/Bobby/UITests/StoreShots.swift'
-    assert approved.get('approvedPath') == rel, 'only the explicitly reviewed StoreShots test delta is eligible'
-    assert approved.get('archiveSourceHead') == receipt['sourceHead'], 'QA receipt source differs from archive'
-    expected = next(item for item in receipt['sourceManifest'] if item['path'] == rel)
-    assert approved.get('archivedSHA256') == expected['sha256'], 'QA receipt archived test hash mismatch'
-    old = command(['git', 'show', receipt['sourceHead'] + ':' + rel], SOURCE).stdout
-    assert hashlib.sha256(old).hexdigest() == expected['sha256'], 'archived test blob mismatch'
-    before = 'app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]'
-    after = 'app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",\n                               "-agent.riskNoticeVersion", "6"]'
-    original = old.decode()
-    assert original.count(before) == 3, 'unexpected archived launch-precondition count'
-    current = (SOURCE / rel).read_bytes()
-    assert current.decode() == original.replace(before, after), 'UI test delta exceeds the three reviewed launch preconditions'
-    current_hash = hashlib.sha256(current).hexdigest()
-    assert current_hash == approved.get('currentTestOnlySHA256'), 'current test hash differs from the reviewed receipt'
-    project = SOURCE / 'ios/Bobby/Bobby.xcodeproj/project.pbxproj'
-    scheme = SOURCE / 'ios/Bobby/Bobby.xcodeproj/xcshareddata/xcschemes/Bobby.xcscheme'
-    for file, key in [(project, 'sourceProjectSHA256'), (scheme, 'sourceSchemeSHA256')]:
-        archived = next(item for item in receipt['sourceManifest'] if item['path'] == str(file.relative_to(SOURCE)))
-        assert sha(file) == archived['sha256'] == approved.get(key), 'target membership/settings changed since archive'
-    objects = json.loads(command(['/usr/bin/plutil', '-convert', 'json', '-o', '-', str(project)]).stdout)['objects']
-    refs = [key for key, value in objects.items() if value.get('isa') == 'PBXFileReference' and value.get('path') == 'StoreShots.swift']
-    assert len(refs) == 1, 'StoreShots file reference is ambiguous'
-    build_files = [key for key, value in objects.items() if value.get('isa') == 'PBXBuildFile' and value.get('fileRef') == refs[0]]
-    owners = []
-    for target in objects.values():
-        if target.get('isa') != 'PBXNativeTarget':
-            continue
-        for phase_id in target.get('buildPhases', []):
-            phase = objects[phase_id]
-            if phase.get('isa') == 'PBXSourcesBuildPhase' and set(build_files).intersection(phase.get('files', [])):
-                owners.append((target['name'], target['productType']))
-    assert owners == [('BobbyUITests', 'com.apple.product-type.bundle.ui-testing')], 'test file participates in a shipping target'
-    root = ET.parse(scheme).getroot()
-    archive_targets = [entry.find('BuildableReference').get('BlueprintName')
-                       for entry in root.find('BuildAction/BuildActionEntries')
-                       if entry.get('buildForArchiving') == 'YES']
-    assert archive_targets == ['Bobby'] and root.find('ArchiveAction').get('buildConfiguration') == 'Release', 'archive target/configuration changed'
-    return {'path': rel, 'archivedSHA256': expected['sha256'], 'currentTestOnlySHA256': current_hash,
-            'receipt': str(path), 'receiptSHA256': sha(path),
-            'membership': 'BobbyUITests only; excluded from Release archive target',
-            'delta': 'Three riskNoticeVersion6 launch preconditions; all assertions preserved'}
-
-
-def verify_source(receipt, qa_input_receipt=None):
-    approved = approved_test_only_input(receipt, qa_input_receipt) if qa_input_receipt else None
-    deltas = []
+def verify_source(receipt):
     for item in receipt['sourceManifest']:
-        actual = sha(SOURCE / item['path'])
-        if actual != item['sha256']:
-            assert approved and item['path'] == approved['path'] and actual == approved['currentTestOnlySHA256'], 'build-input drift: ' + item['path']
-            deltas.append(approved)
+        assert sha(SOURCE / item['path']) == item['sha256'], 'build-input drift: ' + item['path']
     assert sha(CACHE / 'workspace-state.json') == receipt['sourcePackages']['workspaceStateSHA256'], 'package-cache state drift'
     assert sha(UPLOAD_OPTIONS) == receipt['uploadOptions']['sha256'], 'upload-options drift'
-    # Binding remains the archived product input hashes. A docs/test-only commit may advance HEAD.
-    return {'archiveSourceHead': receipt['sourceHead'],
-            'observedCurrentHead': command(['git', 'rev-parse', 'HEAD'], SOURCE).stdout.decode().strip(),
-            'strictInputHashCount': len(receipt['sourceManifest']) - len(deltas),
-            'approvedNonShippingDeltas': deltas,
-            'productResourceProjectCacheHashes': 'all unchanged; no product exception permitted'}
 
 
-def verify_archive(archive, receipt, qa_input_receipt=None):
+def verify_archive(archive, receipt):
     app = archive / 'Products/Applications/Bobby.app'
     info = plistlib.loads((app / 'Info.plist').read_bytes())
     assert info['CFBundleIdentifier'] == BUNDLE
@@ -214,22 +147,14 @@ def verify_archive(archive, receipt, qa_input_receipt=None):
             packaged = app / 'Nucleo' / relative
             assert packaged.is_file() and sha(packaged) == sha(original), 'packaged Nucleo resource drift: ' + str(relative)
             if original.suffix == '.html':
-                page = packaged.read_text()
-                # Release retains inert guards that read the absent fixtures; reject actual injection.
-                assert not re.search(r'(?:\bwindow|\bW)\s*\.\s*NUCLEO_FIXTURES\s*=(?!=)', page), 'mock fixture data assignment packaged'
-                assert 'shared/90-dev-mock-bridge.js' not in page, 'dev mock bridge implementation packaged'
-                assert 'B.mock = {' not in page, 'dev mock bridge install packaged'
+                assert 'NUCLEO_FIXTURES' not in packaged.read_text(), 'mock fixture code packaged'
             resources.append({'path': str(Path('Nucleo') / relative), 'sha256': sha(packaged)})
-    release_build_info = json.loads((app / 'Nucleo/build-info.json').read_text())
-    assert release_build_info.get('release') is True, 'Nucleo bundle was not generated in Release mode'
-    assert set(release_build_info.get('pages', [])) == {'app', 'onboarding'}, 'unexpected Release Nucleo page list'
     privacy = app / 'PrivacyInfo.xcprivacy'
     assert privacy.is_file() and sha(privacy) == sha(SOURCE / 'ios/Bobby/Sources/PrivacyInfo.xcprivacy')
-    source_verification = verify_source(receipt, qa_input_receipt)
+    verify_source(receipt)
     archive_info = plistlib.loads((archive / 'Info.plist').read_bytes())
     return {'verifiedAtUTC': utc(), 'archive': str(archive), 'application': str(app),
             'sourceHead': receipt['sourceHead'], 'version': '1.7', 'build': '63',
-            'sourceVerification': source_verification,
             'archiveInfoSHA256': sha(archive / 'Info.plist'), 'appInfoSHA256': sha(app / 'Info.plist'),
             'executableSHA256': sha(app / info['CFBundleExecutable']),
             'archiveApplicationProperties': archive_info.get('ApplicationProperties', {}),
@@ -237,8 +162,6 @@ def verify_archive(archive, receipt, qa_input_receipt=None):
             'releaseRevenueCatKeyType': 'App Store public SDK key; value omitted',
             'privacyManifestSHA256': sha(privacy), 'nucleoResources': resources,
             'codesignVerification': 'passed', 'debugFixtureResources': 'absent',
-            'devMockBridgeAndFixtureAssignments': 'absent; inert reads of undefined fixtures may remain',
-            'nucleoReleaseBuildInfo': release_build_info,
             'result': 'local signed Release archive verified; remote processing unverified'}
 
 
@@ -297,7 +220,6 @@ def main():
     parser.add_argument('--expected-head', default='a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2')
     parser.add_argument('--out', type=Path, default=BASE / 'archive63')
     parser.add_argument('--derived-data', type=Path, default=BASE / 'archive63-derived')
-    parser.add_argument('--qa-input-receipt', type=Path, help='Exact reviewed StoreShots test-only launch-precondition receipt; product input hashes stay strict')
     args = parser.parse_args()
     args.out.mkdir(parents=True, exist_ok=True)
     archive = args.out / 'Bobby-1.7-63.xcarchive'
@@ -330,22 +252,15 @@ def main():
         monitored_run(archive_command, args.out / 'archive-phase', 4 * GIB, 2 * GIB, 3600)
     else:
         receipt = json.loads(preflight_path.read_text())
-        assert receipt['sourceHead'] == args.expected_head, 'expected archive source does not match preserved preflight'
-    if args.qa_input_receipt:
-        approval = json.loads(args.qa_input_receipt.read_text())
-        assert approval.get('archivePreflightSHA256') == sha(preflight_path), 'QA approval not bound to this archive preflight'
-    verified = verify_archive(archive, receipt, args.qa_input_receipt)
-    verification_name = 'archive-verification-with-qa-input-delta.json' if args.qa_input_receipt else 'archive-verification.json'
-    write_json(args.out / verification_name, verified)
+    verified = verify_archive(archive, receipt)
+    write_json(args.out / 'archive-verification.json', verified)
     if args.phase == 'upload':
         monitored_run(upload_command, args.out / 'upload-phase', 3 * GIB, 2 * GIB, 1800)
         log = (args.out / 'upload-phase/xcodebuild.log').read_text(errors='replace')
-        success_lines = upload_success_lines(log)
-        uploaded = bool(success_lines)
+        uploaded = 'UPLOAD SUCCEEDED' in log or 'Successfully uploaded' in log
         write_json(args.out / 'upload-acceptance.json', {
             'recordedAtUTC': utc(), 'sourceHead': receipt['sourceHead'], 'version': '1.7', 'build': '63',
             'xcodebuildExitCode': 0, 'explicitUploadSuccessMarker': uploaded,
-            'explicitUploadSuccessLines': success_lines,
             'result': 'upload accepted by xcodebuild' if uploaded else 'export exit0; explicit upload confirmation requires log review',
             'testFlightProcessing': 'not verified; requires separate remote build63 receipt',
             'installationAndPhysicalAcceptance': 'not verified'})

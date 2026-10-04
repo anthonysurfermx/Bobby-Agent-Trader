@@ -1,0 +1,25 @@
+{
+  "at": "2026-10-04T12:48:39.562811+00:00",
+  "originalFailure": "authentication_failed; synthetic local message, no alternative model",
+  "normalEnvironment": {
+    "loggedIn": true,
+    "authMethod": "claude.ai",
+    "subscriptionType": "max"
+  },
+  "reducedEnvironment": {
+    "loggedIn": false
+  },
+  "identityVariablesAdded": [
+    "USER",
+    "LOGNAME",
+    "SHELL"
+  ],
+  "identityVariant": {
+    "loggedIn": true,
+    "authMethod": "claude.ai",
+    "subscriptionType": "max"
+  },
+  "macSessionAndXdgVariants": "did not resolve authentication",
+  "credentialValuesReadOrPrinted": false,
+  "scope": "status metadata only; reviewer permissions unchanged"
+}

@@ -1,0 +1,30 @@
+Scopri Bobby, il tuo compagno per ragionare sui mercati.
+
+Fai una domanda su un asset supportato, come un’azione o una criptovaluta, scrivendo oppure usando la dettatura facoltativa sui dispositivi compatibili. Bobby riunisce tre prospettive: le opportunità, una verifica dei rischi e una sintesi delle evidenze.
+
+SEI LINGUE E CONTESTO LOCALE
+Usa Bobby in italiano, inglese, spagnolo, francese, portoghese o tedesco. Cambia lingua nel Profilo. La voce e la dettatura in portoghese seguono la variante del Portogallo o del Brasile impostata sul dispositivo. Cerca le azioni locali supportate per nome o simbolo; i simboli di borsa originali e la valuta delle quotazioni vengono mantenuti.
+
+UN’ANALISI DA RILEGGERE
+Consulta il contesto del mercato, un grafico, gli orari delle fonti e una conclusione condizionata. Salva un’analisi sul dispositivo e torna al suo ragionamento in seguito. Attendere è una risposta utile quando le evidenze non bastano.
+
+SCEGLI LA PROFONDITÀ
+Rapida, Approfondita e Massima offrono diverse profondità di analisi. Le analisi senza account e i livelli con account hanno limiti di utilizzo; disponibilità e quote residue sono indicate nell’app. Alcuni livelli richiedono Accedi con Apple.
+
+IL TUO COMPAGNO E I TUOI PROGRESSI
+Scegli un compagno, personalizza il profilo ed esplora Trader Land. Un account Apple facoltativo sincronizza i progressi. La tua isola rimane privata finché non scegli di pubblicarla. Le isole pubbliche consentono di segnalare contenuti e bloccare i creatori.
+
+SEI TU A DECIDERE SULL’IA
+L’elaborazione esterna della tua analisi con IA richiede il tuo consenso. Puoi leggere l’avviso e revocare il consenso dal Profilo. La dettatura facoltativa usa il riconoscimento vocale Apple. Se sul dispositivo non è disponibile un modello locale, il servizio vocale Apple viene usato solo con il tuo consenso separato. Puoi sempre scrivere. La narrazione facoltativa può essere disattivata.
+
+Bobby è uno strumento educativo di analisi di mercato. L’app per iPhone non collega wallet, non esegue operazioni e non trasferisce fondi. Le analisi possono essere incomplete o errate e i dati di mercato possono essere ritardati. Bobby non promette rendimenti e non offre consulenza di investimento personalizzata. Decidi tu cosa fare.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=it
+Assistenza: https://bobbyprotocol.xyz/support?lang=it
+
+BOBBY PRO (FACOLTATIVO)
+Bobby Pro è un abbonamento mensile facoltativo a rinnovo automatico: analisi Rapide illimitate (uso corretto), più 60 analisi Approfondite e 10 Massime ogni 30 giorni. Il prezzo viene mostrato nella tua valuta prima dell’acquisto. Il pagamento viene addebitato all’account Apple alla conferma. L’abbonamento si rinnova automaticamente salvo disdetta almeno 24 ore prima della fine del periodo attuale; gestiscilo o annullalo in Impostazioni › Account Apple › Abbonamenti. Ripristina acquisti si trova nel Profilo.
+
+Il riepilogo settimanale facoltativo è riservato agli account Pro a pagamento attivi e idonei e richiede autorizzazioni separate. Disponibilità e calendario sono nel Profilo.
+
+Termini di utilizzo (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
