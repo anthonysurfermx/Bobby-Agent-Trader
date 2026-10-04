@@ -21,6 +21,7 @@ import UserLayout from '@/pages/user/UserLayout';
 const BobbyLandingPage = lazy(() => import('@/pages/BobbyLandingPage'));
 const BobbyProtocolLanding = lazyWithRetry(() => import('@/pages/BobbyProtocolLanding'), 'protocol-landing');
 const BobbySignInPage = lazyWithRetry(() => import('@/pages/BobbySignInPage'), 'bobby-signin');
+const BobbyChatGPTPage = lazyWithRetry(() => import('@/pages/BobbyChatGPTPage'), 'bobby-chatgpt');
 
 // A direct visit to "/" is served by middleware. Reload client-side navigation to reach that page.
 const SPA_BOOT_PATH = typeof window !== 'undefined' ? window.location.pathname : '/';
@@ -356,6 +357,14 @@ const router = createBrowserRouter(
         {
           path: 'redeem',
           element: (<Suspense fallback={<PageLoader />}><BobbyRedeemPage /></Suspense>),
+        },
+        {
+          path: 'chatgpt',
+          element: (<Suspense fallback={<PageLoader />}><BobbyChatGPTPage /></Suspense>),
+        },
+        {
+          path: 'chatgpt/connect',
+          element: (<Suspense fallback={<PageLoader />}><BobbyChatGPTPage /></Suspense>),
         },
         {
           path: 'privacy',

@@ -14,6 +14,7 @@ import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
 import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
+import { recordRecommendation } from './_lib/financial-context.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -228,7 +229,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
     const remember = () => {
       if (summary && !summary.enabled) return;
-      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked, evidence.technicals.price) : false)).catch(() => false));
+      waitUntil(memoryOwner.then(async (id) => {
+        if (!id) return;
+        await Promise.all([
+          recordAsk(id.id, symbol, asked, evidence.technicals.price),
+          recordRecommendation(id.id, { ...result, symbol }),
+        ]);
+      }).catch(() => false));
     };
     if (!live) { res.status(200).json(body); remember(); outcome('read_done', level); return; }
     send({ type: 'final', data: body });

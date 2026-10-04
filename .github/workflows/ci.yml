@@ -43,6 +43,7 @@ jobs:
       - run: npm run test:desk-audit
       - run: npm run test:desk-levels
       - run: npm run test:user-memory
+      - run: npm run test:financial-context
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2
       - run: npm run test:rpc-redaction
@@ -132,6 +133,8 @@ jobs:
       - run: npm run test:admin-pg
       - run: npm run test:lifecycle-pg
       - run: npm run test:user-memory-pg
+      - run: npm run test:financial-context-pg
+      - run: npm run test:financial-context
       - run: npm run test:admin-truth-pg
       - run: npm run test:admin-live-pg
       - run: npm run test:client-telemetry-pg

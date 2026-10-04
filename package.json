@@ -66,6 +66,8 @@
     "test:lifecycle-pg": "tsx scripts/test-lifecycle-pg.mts",
     "test:llm-ledger": "tsx scripts/test-llm-ledger.mts",
     "test:user-memory": "tsx scripts/test-user-memory.mts",
+    "test:financial-context": "node --import tsx scripts/test-financial-context.mts && node --import tsx scripts/test-chatgpt-auth.mts",
+    "test:financial-context-pg": "node --import tsx scripts/test-financial-context-pg.mts",
     "test:user-memory-pg": "tsx scripts/test-user-memory-pg.mts",
     "test:account-delete": "tsx scripts/test-account-delete.mts",
     "test:progress-atomic-pg": "tsx scripts/test-progress-atomic-pg.mts",

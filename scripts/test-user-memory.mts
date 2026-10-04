@@ -96,6 +96,7 @@ function backend(c: Call): Response | Promise<Response> | null {
     return summaryDelayMs ? new Promise((resolve) => setTimeout(() => resolve(json(summaryReply)), summaryDelayMs)) : json(summaryReply);
   }
   if (c.url.includes('rpc/bobby_memory_record')) return json(true);
+  if (c.url.includes('rpc/bobby_financial_record_recommendation')) return json(true);
   if (c.url.includes('rpc/bobby_memory_forget')) return storageDown ? json({ message: 'down' }, 500) : json(3);
   if (c.url.includes('bobby_user_prefs?on_conflict=identity_id')) return storageDown ? json({ message: 'down' }, 500) : new Response('', { status: 201 });
   if (c.url.includes('bobby_user_prefs?identity_id=eq.')) return storageDown ? json({ message: 'down' }, 500) : json(prefsRows);
@@ -149,6 +150,10 @@ try {
       memoryDeskAllowed({ headers: {} } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
       memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'ios', {} as never)],
      [true, false, false, false], 'iOS needs exact affirmation and the global kill switch');
+  eq([memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: {} } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': ['1'] } } as never, 'android', { BOBBY_MEMORY: 'on' } as never)],
+     [true, false, false], 'Android also needs explicit per-request native consent');
 
   // ---------- /api/memory ----------
   const memReq = (method: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
@@ -343,6 +348,15 @@ try {
   const rec = recorded();
   eq(rec.length, 1, 'the delivered answer is recorded once');
   eq(rec[0].body, { p_identity: IDENT, p_symbol: 'NVDA', p_horizon: 'unspecified', p_price: 200 }, 'with the horizon the question named (none), not the preference, and the evidence price');
+  const snapshot = calls.find(c => c.url.includes('rpc/bobby_financial_record_recommendation'));
+  eq(snapshot?.body.p_identity, IDENT, 'a recommendation snapshot belongs to the delivered account');
+  eq(snapshot?.body.p_snapshot, {
+    symbol: 'NVDA', asOf: served.body.provenance.asOf,
+    headline: served.body.agents.synthesis.headline, why: served.body.agents.synthesis.why,
+    risk: served.body.agents.synthesis.risk, watch: served.body.agents.synthesis.watch,
+    verdict: served.body.agents.verdict, direction: served.body.agents.direction,
+  }, 'only the published, dated synthesis is saved; not the original question');
+  eq(calls.some(c => c.url.includes('rpc/bobby_financial_list')), false, 'imported financial facts never enter a market-verdict call');
   ok(calls.indexOf(rec[0]) > calls.indexOf(models().at(-1)!), 'after the last model call, never before');
   eq(authCalls().length, 1, 'the account is verified once');
 
@@ -402,6 +416,12 @@ try {
   const web = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
   await settle();
   eq([web.body.personalized, recorded().length], [true, 1], 'the same account on the web: personalized and recorded');
+  const androidOff = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android' });
+  await settle();
+  eq([androidOff.statusCode, recorded().length, calls.filter(c => c.url.includes('rpc/bobby_financial_record_recommendation')).length], [200, 0, 0], 'Android default off saves no snapshot');
+  const androidOn = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([androidOn.statusCode, recorded().length, calls.find(c => c.url.includes('rpc/bobby_financial_record_recommendation'))?.body.p_identity], [200, 1, IDENT], 'opted-in Android saves the same account snapshot');
 
   // Kill switch off (unset or not exactly 'on'): a signed-in web reader gets no memory call at all.
   for (const value of [undefined, 'true']) {
@@ -423,6 +443,7 @@ try {
   cancelAtCio = false;
   await settle();
   eq([cancelledIos.body, recorded().length], [null, 0], 'a native reader that closes before delivery records nothing');
+  eq(calls.some(c => c.url.includes('rpc/bobby_financial_record_recommendation')), false, 'cancelled reads save no recommendation');
 
   // Storage down or slow: the read runs without memory, in time.
   storageDown = true;
@@ -459,6 +480,7 @@ try {
   await settle();
   console.error = errorLog;
   eq([rejected.statusCode, rejected.body.code, recorded().length], [503, 'analysis_failed', 0], 'a guard rejection: analysis_failed and nothing recorded');
+  eq(calls.some(c => c.url.includes('rpc/bobby_financial_record_recommendation')), false, 'guard rejection saves no recommendation');
   cioReply = CIO;
 
   // Premium: the meter already resolved the account; memory reuses it, and the Sonnet CIO gets the reader.

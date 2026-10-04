@@ -530,7 +530,7 @@ class NucleoSession(
     companion object {
         val SUPPORTED_LANGUAGES = setOf("en", "es", "fr", "pt", "it", "de")
         val ANALYSIS_LEVELS = setOf("rapido", "profundo", "maximo")
-        val NATIVE_ROUTES = setOf("squad", "locker", "isla", "account", "riskNotice", "levels", "paywall", "memory", "briefings", "briefingSettings", "invite", "coupon", "reportContent")
+        val NATIVE_ROUTES = setOf("squad", "locker", "isla", "account", "riskNotice", "levels", "paywall", "memory", "financialContext", "briefings", "briefingSettings", "invite", "coupon", "reportContent")
     }
 }
 

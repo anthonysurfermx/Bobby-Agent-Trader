@@ -125,7 +125,7 @@ export default function MemoryDialog({ open, onOpenChange, onSignIn }: Props) {
                 </ul>
               )}
               <button type="button" className="n-mem-btn danger mt-5" disabled={busy}
-                onClick={() => { if (window.confirm(t('Erase every remembered asset and your preferences?', '¿Borrar todos los activos recordados y tus preferencias?', 'Apagar todos os ativos lembrados e suas preferências?'))) void run(forgetAllMemory); }}>
+                onClick={() => { if (window.confirm(t('Erase all remembered assets, preferences, financial context and saved recommendations?', '¿Borrar todos los activos recordados, preferencias, contexto financiero y recomendaciones guardadas?', 'Apagar todos os ativos lembrados, preferências, contexto financeiro e recomendações guardadas?'))) void run(forgetAllMemory); }}>
                 {t('Erase all', 'Borrar todo', 'Apagar tudo')}
               </button>
               {failed && <p role="alert" className="n-mem-note" style={{ color: '#FFB3B5' }}>{t('That did not save. Try again.', 'No se guardó. Inténtalo de nuevo.', 'Não foi salvo. Tente de novo.')}</p>}

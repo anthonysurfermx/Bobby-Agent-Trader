@@ -34,14 +34,14 @@ struct MemoryView: View {
             guard riskAccepted, account.isSignedIn else { return }
             await center.refresh()
         }
-        .confirmationDialog(L.t("Erase every remembered asset and your preferences?", "¿Borrar todos los activos recordados y tus preferencias?"),
+        .confirmationDialog(L.t("Erase all account memory, financial context and recommendations?", "¿Borrar toda la memoria, el contexto financiero y las recomendaciones?"),
                             isPresented: Binding(get: { center.confirmingForgetAll }, set: { if !$0 { center.cancelForgetAll() } }),
                             titleVisibility: .visible) {
             Button(L.t("Delete everything", "Borrar todo"), role: .destructive) { Task { await center.confirmForgetAll() } }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) { center.cancelForgetAll() }
         } message: {
-            Text(L.t("Memory-based briefings already delivered are removed too. A paused memory stays paused.",
-                     "También se eliminan los resúmenes basados en memoria ya entregados. Si la memoria está en pausa, sigue en pausa."))
+            Text(L.t("Remembered assets, preferences, approved financial facts, pending ChatGPT drafts, saved recommendations and delivered memory-based briefings are erased. A paused memory stays paused.",
+                     "Se eliminan los activos recordados, preferencias, datos financieros aprobados, borradores pendientes de ChatGPT, recomendaciones guardadas y resúmenes basados en memoria. Si la memoria está en pausa, sigue en pausa."))
         }
     }
 

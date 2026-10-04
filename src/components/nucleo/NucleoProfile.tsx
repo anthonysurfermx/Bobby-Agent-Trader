@@ -17,6 +17,7 @@ import { voiceGenderStore, type VoiceGender } from '@/lib/voice-gender';
 import { WalletBalancePill } from '@/components/companion/DeskWallet';
 import { LangSegment } from './LangMenu';
 import MemoryDialog from './MemoryDialog';
+import FinancialContextDialog from './FinancialContextDialog';
 
 interface Props {
   companion: Companion;
@@ -97,6 +98,7 @@ function VoiceGenderRow() {
 export default function NucleoProfile(p: Props) {
   const [locked, setLocked] = useState<Companion | null>(null);
   const [memoryOpen, setMemoryOpen] = useState(false);
+  const [financialContextOpen, setFinancialContextOpen] = useState(false);
   const { account, signOut } = useBobbyAccount();
   const next = nextLevelFor(p.xp);
   const progress = next ? Math.max(0, Math.min(1, (p.xp - p.level.minXP) / (next.minXP - p.level.minXP))) : 1;
@@ -195,6 +197,8 @@ export default function NucleoProfile(p: Props) {
 
         <div className="mt-6 space-y-1">
           <div className="n-label mb-2">{t('Preferences', 'Preferencias', 'Preferências')}</div>
+          <Row icon={<ArrowLeftRight size={16} />} label={t('Bring context from ChatGPT', 'Traer contexto de ChatGPT', 'Trazer contexto do ChatGPT', 'Importer du contexte depuis ChatGPT', 'Importa contesto da ChatGPT', 'Kontext aus ChatGPT importieren')}
+            detail={t('Review, save and share with your permission', 'Revisar, guardar y compartir con tu permiso', 'Rever, guardar e partilhar com a tua autorização', 'Vérifier, enregistrer et partager avec ton accord', 'Controlla, salva e condividi con il tuo consenso', 'Mit deiner Zustimmung prüfen, speichern und teilen')} onClick={() => setFinancialContextOpen(true)} />
           <Row icon={<Mic size={16} />} label={t('Voice', 'Voz', 'Voz')} detail={p.freeVoice ? t('Free: dictation in the browser', 'Gratis: dictado en el navegador', 'Grátis: ditado no navegador') : t('Live voice room', 'Sala de voz en vivo', 'Sala de voz ao vivo')} onClick={p.onToggleVoiceMode}>
             <span className="n-pill-sm">{p.freeVoice ? t('Free', 'Gratis', 'Grátis') : t('Live', 'En vivo', 'Em direto')}</span>
           </Row>
@@ -212,6 +216,7 @@ export default function NucleoProfile(p: Props) {
         </div>
         {/* Inside the drawer, so clicks in the dialog (a portal) bubble to the drawer, not the backdrop that closes it. */}
         <MemoryDialog open={memoryOpen} onOpenChange={setMemoryOpen} onSignIn={() => { setMemoryOpen(false); p.onSignIn(); }} />
+        <FinancialContextDialog open={financialContextOpen} onOpenChange={setFinancialContextOpen} onSignIn={() => { setFinancialContextOpen(false); p.onSignIn(); }} />
       </motion.aside>
     </motion.div>
   );

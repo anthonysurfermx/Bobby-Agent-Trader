@@ -387,6 +387,10 @@ struct AccountSheet: View {
                        action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
                 .accessibilityIdentifier("account-invite")
         }
+        ProfileRow(label: L.t("ChatGPT context", "Contexto de ChatGPT"),
+                   detail: L.t("Bring chosen financial facts and share Bobby recommendations", "Trae datos financieros elegidos y comparte recomendaciones de Bobby"),
+                   detailLineLimit: nil, action: { route = .financialContext }) { ProfileIcon(symbol: "arrow.left.arrow.right") }
+            .accessibilityIdentifier("account-financial-context")
         // Bobby Pro weekly briefing: the account's Monday schedule, its consents and its inbox.
         ProfileRow(label: L.t("Weekly briefing", "Resumen semanal"),
                    detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),
@@ -691,6 +695,12 @@ struct AccountSheet: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .financialContext:
+            FinancialContextView { route = nil }
+                .id(account.generation)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .memory:
             MemoryView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
                 .presentationDetents([.large])
@@ -702,7 +712,7 @@ struct AccountSheet: View {
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet, pro, briefings, memory, coupon
+    case avatar, invite, locker, land, risk, pet, pro, briefings, memory, coupon, financialContext
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -716,6 +726,7 @@ enum ProfileRoute: Identifiable {
         case .pet: return "pet"
         case .pro: return "pro"
         case .briefings: return "briefings"
+        case .financialContext: return "financialContext"
         case .memory: return "memory"
         case .coupon: return "coupon"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"

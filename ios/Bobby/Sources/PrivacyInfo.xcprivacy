@@ -23,7 +23,9 @@
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherUserContent</string>
       <!-- Account-authenticated analyses and opted-in memory personalize the desk and briefings.
-           Memory stores asset/count/date/horizon for up to 90 days, not raw questions. -->
+           Memory stores asset/count/date/horizon for up to 90 days, not raw questions.
+           Optional ChatGPT context stores only selected facts after explicit review and approval;
+           facts stay until deletion, unapproved drafts expire in 24 hours, recommendations in 90 days. -->
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
       <key>NSPrivacyCollectedDataTypeTracking</key>
@@ -63,6 +65,8 @@
     <dict>
       <key>NSPrivacyCollectedDataType</key>
       <string>NSPrivacyCollectedDataTypeOtherFinancialInfo</string>
+      <!-- Optional, account-linked user-reported goals, income, expenses, assets, debts and transactions.
+           No account/card identifiers or credentials; never verified bank movements or full chat history. -->
       <key>NSPrivacyCollectedDataTypeLinked</key>
       <true/>
       <key>NSPrivacyCollectedDataTypeTracking</key>

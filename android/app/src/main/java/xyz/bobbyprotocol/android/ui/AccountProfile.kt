@@ -226,6 +226,7 @@ internal fun AccountProfile(
                 }) }
             }
         }
+        ProfileRow(session.text("ChatGPT context", "Contexto de ChatGPT"), session.text("Bring chosen financial facts and share Bobby recommendations", "Trae datos financieros elegidos y comparte recomendaciones de Bobby"), ProfileSymbol.MEMORY, tag = "account-financial-context") { onOpen("financialContext") }
         ProfileRow(t("Memory"), t("What Bobby remembers about your assets and preferences"), ProfileSymbol.MEMORY, tag = "account-memory") { onOpen("memory") }
         ProfileRow(t("Risk notice"), t("Review your AI and voice consent"), ProfileSymbol.RISK, tag = "account-risk") { onOpen("riskNotice") }
         ProfileRow(reportContentTitle(language), t("Tell us about an unsafe response"), ProfileSymbol.RISK) { onOpen("reportContent") }

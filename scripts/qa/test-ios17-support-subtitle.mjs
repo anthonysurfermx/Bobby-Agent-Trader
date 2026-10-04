@@ -66,7 +66,7 @@ try {
       await page.locator('#cBrT').evaluate((node, face) => node.setAttribute('font-family', face), face);
       for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de']) {
         for (const direction of ['above', 'below']) {
-          const subtitle = await page.evaluate(({language, direction}) => NucleoReadModel.t(language, 'chart.' + direction + 'Support'), { language, direction });
+          const subtitle = await page.evaluate(({language, direction}) => window.NucleoReadModel.t(language, 'chart.' + direction + 'Support'), { language, direction });
           const beforeWidth = await page.locator('#cBrS').evaluate((node, text) => { node.textContent = text; return node.getComputedTextLength(); }, subtitle);
           const measured = await page.evaluate(({subtitle, direction}) => window.drawSupport(subtitle, direction), { subtitle, direction });
           const out = { tree, face, language, direction, subtitle, beforeWidth, measured, checks: [] }; result.cases.push(out);

@@ -1,0 +1,146 @@
+import assert from 'node:assert/strict';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+// Run against a local Vite fixture: VITE_BOBBY_SUPABASE_URL=http://localhost VITE_BOBBY_SUPABASE_ANON_KEY=anon npm run dev -- --port 5187.
+// Set PLAYWRIGHT_MODULE and BROWSER_EXECUTABLE when using a bundled browser runtime.
+// All remote requests and API writes are intercepted; this never connects to real accounts or financial data.
+const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const origin = process.env.BOBBY_WEB_ORIGIN || 'http://127.0.0.1:5187';
+const storageKey = process.env.BOBBY_AUTH_STORAGE_KEY || 'sb-localhost-auth-token';
+const evidenceDirectory = process.env.BOBBY_UI_EVIDENCE_DIR || tmpdir();
+const browser = await chromium.launch({headless:true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {})});
+const context = await browser.newContext({viewport:{width:390,height:844}});
+const page = await context.newPage();
+let state={enabled:false,financialMemoryEnabled:false,accountMemoryEnabled:true,items:[],drafts:[],recommendations:[{id:'fixture-rec',symbol:'BTC',asOf:'2026-10-04T10:00:00Z',createdAt:'2026-10-04T10:00:00Z',headline:'Wait for confirmation',why:'Test thesis',risk:'Test risk',watch:'Test trigger',verdict:'wait',direction:'none'}]};
+let validateOAuth=true;
+let holdImport=false, heldImport=false, releaseImport;
+const oauthQuery={client_id:'fixture-client',redirect_uri:'https://chatgpt.com/connector_platform_oauth_redirect',response_type:'code',code_challenge:'a'.repeat(43),code_challenge_method:'S256',state:'fixture-state-1234567890',scope:'bobby.context.read bobby.context.write',resource:'https://bobbyprotocol.xyz/api/chatgpt'};
+const writes=[];
+await context.route('**/*',async route=>{
+ const request=route.request(),url=new URL(request.url());
+ if(url.pathname==='/auth/v1/user')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({id:'00000000-0000-4000-8000-000000000002',email:'fixture-b@example.invalid',aud:'authenticated',app_metadata:{provider:'google'},user_metadata:{name:'Fixture B'}})});
+ if(url.host !== new URL(origin).host) return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+ if(url.pathname==='/api/financial-context'){
+  const method=request.method(),data=method==='POST'||method==='PATCH'?request.postDataJSON():null;
+  if(method==='POST'&&holdImport){heldImport=true;const oldResponse={...structuredClone(state),items:[{...data.items[0],id:'00000000-0000-4000-8000-000000000098',source:'chatgpt',verification:'user_reported',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}]};await new Promise(resolve=>{releaseImport=resolve;});return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(oldResponse)}).catch(()=>{});}
+  if(method!=='GET') writes.push({method,url:url.search,data});
+  if(method==='PATCH'&&typeof data.enabled==='boolean'){state.financialMemoryEnabled=data.enabled;state.enabled=data.enabled&&state.accountMemoryEnabled;}
+  if(method==='POST'&&data.draftId)state.drafts=state.drafts.filter(draft=>draft.id!==data.draftId);
+  if(method==='POST') state.items.push(...data.items.map((item,i)=>({...item,id:`00000000-0000-4000-8000-${String(writes.length*10+i).padStart(12,'0')}`,source:'chatgpt',verification:'user_reported',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})));
+  if(method==='PATCH'&&data.id)state.items=state.items.map(item=>item.id===data.id?{...item,...data.item}:item);
+  if(method==='DELETE'){
+   if(url.searchParams.has('draftId'))state.drafts=state.drafts.filter(draft=>draft.id!==url.searchParams.get('draftId'));
+   if(url.searchParams.has('id'))state.items=state.items.filter(item=>item.id!==url.searchParams.get('id'));
+   if(url.searchParams.get('scope')==='all')state={enabled:false,financialMemoryEnabled:false,accountMemoryEnabled:true,items:[],drafts:[],recommendations:[]};
+  }
+  return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(state)});
+ }
+ if(url.pathname==='/api/chatgpt'){ if(url.searchParams.has('client_id')){assert(!url.searchParams.has('lang')&&!url.searchParams.has('locale'),'OAuth server sees only OAuth params');return route.fulfill({status:validateOAuth?200:400,contentType:'application/json',body:JSON.stringify(validateOAuth?{client:{id:'fixture-client',name:'ChatGPT fixture'},requestedScopes:['bobby.context.read','bobby.context.write'],resource:'https://bobbyprotocol.xyz/api/chatgpt',connected:false,scopes:[],available:true}:{error:'invalid_request'})});} if(url.searchParams.get('op')==='authorize'){writes.push({method:'AUTHORIZE',data:request.postDataJSON()});return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({redirectUrl:'https://chatgpt.com/connector_platform_oauth_redirect?code=fixture-code&state=fixture-state-1234567890&iss=https%3A%2F%2Fbobbyprotocol.xyz'})});} return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({connected:false,scopes:[],available:true})}); }
+ if(url.pathname.startsWith('/api/'))return route.fulfill({status:200,contentType:'application/json',body:'{}'});
+ return route.continue();
+});
+await page.addInitScript(storageKey=>{
+ localStorage.setItem(storageKey,JSON.stringify({access_token:'fixture-token',refresh_token:'fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,expires_in:3600,token_type:'bearer',user:{id:'00000000-0000-4000-8000-000000000001',email:'fixture@example.invalid',app_metadata:{provider:'google'},user_metadata:{name:'Fixture'},aud:'authenticated'}}));
+}, storageKey);
+const pageErrors=[];
+page.on('pageerror',error=>pageErrors.push(error.message));
+await page.goto(origin + '/chatgpt?lang=en');
+await page.getByRole('button',{name:'Enable context',exact:true}).waitFor();
+assert(await page.getByLabel('Paste selected facts as JSON').isDisabled());
+await page.getByRole('button',{name:'Enable context',exact:true}).click();
+await page.getByRole('button',{name:'Pause',exact:true}).waitFor();
+const beforeImport=writes.length;
+const facts={format:'bobby-context-v1',items:[{category:'goal',summary:'Build an emergency fund',amount:3000,currency:'EUR'},{category:'preference',summary:'Prefer conservative risk'}]};
+await page.getByLabel('Paste selected facts as JSON').fill(JSON.stringify(facts));
+await page.getByRole('button',{name:'Review facts',exact:true}).click();
+await page.getByRole('heading',{name:'Review and choose what Bobby saves'}).waitFor();
+assert.equal(writes.length,beforeImport,'review sends no network write');
+assert(await page.getByRole('button',{name:/Save selected facts/}).isDisabled(),'save blocked before consent');
+await page.getByLabel('Include 2',{exact:true}).uncheck();
+await page.getByLabel('Financial fact · up to 240 characters').first().fill('Build a six-month emergency fund');
+await page.getByLabel('I reviewed these facts and allow Bobby').check();
+await page.getByRole('button',{name:/Save selected facts/}).click();
+await page.getByText('Build a six-month emergency fund',{exact:true}).waitFor();
+const imported=writes.find(write=>write.method==='POST').data;
+assert.equal(imported.items.length,1);assert.equal(imported.items[0].summary,'Build a six-month emergency fund');assert.equal(imported.consent,true);assert.match(imported.requestId,/^[0-9a-f-]{36}$/);
+assert(!('source' in imported),'raw pasted source is never uploaded');
+await page.getByRole('button',{name:'Correct',exact:true}).click();
+await page.getByLabel('Financial fact · up to 240 characters').fill('Build a twelve-month emergency fund');
+await page.getByRole('button',{name:'Approve correction',exact:true}).click();
+await page.getByText('Build a twelve-month emergency fund',{exact:true}).waitFor();
+await page.getByRole('button',{name:'Review export',exact:true}).click();
+assert.match(await page.getByLabel('Recommendations to share').inputValue(),/Wait for confirmation/);
+await page.getByRole('button',{name:'Pause',exact:true}).click();
+await page.getByRole('button',{name:'Enable context',exact:true}).waitFor();
+assert(await page.getByLabel('Paste selected facts as JSON').isDisabled());
+assert(await page.getByText('Build a twelve-month emergency fund',{exact:true}).isVisible());
+await page.getByRole('button',{name:'Delete',exact:true}).click();
+await page.getByText('No facts saved yet.',{exact:true}).waitFor();
+assert.equal(await page.evaluate(()=>Object.values(localStorage).some(value=>value.includes('emergency fund')||value.includes('Wait for confirmation'))),false,'financial content never persisted in localStorage');
+await page.screenshot({path:join(evidenceDirectory,'bobby-chatgpt-ui-reviewed.png'),fullPage:true});
+for(const language of ['es','pt','fr','it','de']){
+ await page.goto(origin + '/chatgpt?lang='+language);
+ await page.getByRole('heading',{name:'Bobby + ChatGPT',exact:true}).waitFor();
+ await page.waitForTimeout(150);
+ const body=await page.locator('main').innerText();
+ assert(!body.includes('Bring context from ChatGPT'),language+' import UI translated');
+ assert(!body.includes('Your context. Your choice.'),language+' lead translated');
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false,language+' no horizontal overflow at 390px');
+}
+await page.goto(origin + '/chatgpt/connect?lang=en&locale=en-GB&'+new URLSearchParams(oauthQuery));
+await page.getByText('ChatGPT fixture',{exact:true}).waitFor();
+assert(await page.getByRole('button',{name:'Approve connection',exact:true}).isDisabled());
+await page.getByLabel('I approve these permissions for my Bobby account.').check();
+await page.getByRole('button',{name:'Approve connection',exact:true}).click();
+await page.waitForURL('https://chatgpt.com/**');
+const authorized=writes.find(write=>write.method==='AUTHORIZE').data;
+assert.equal(authorized.approved,true);assert.equal(authorized.scope,oauthQuery.scope);assert(!('lang' in authorized));
+await page.goto(origin + '/chatgpt/connect?lang=en&locale=en-GB&'+new URLSearchParams(oauthQuery)+'&state=duplicate-state');
+await page.getByText('This connection could not be verified. Start again from ChatGPT.').waitFor();
+assert.equal(await page.getByRole('button',{name:'Approve connection',exact:true}).count(),0,'duplicate OAuth params blocked before request');
+validateOAuth=false;
+await page.goto(origin + '/chatgpt/connect?lang=en&locale=en-GB&'+new URLSearchParams(oauthQuery));
+await page.getByText('This connection could not be verified. Start again from ChatGPT.').waitFor();
+assert.equal(await page.getByRole('button',{name:'Approve connection',exact:true}).count(),0,'invalid OAuth request cannot be approved');
+state.accountMemoryEnabled=false;state.financialMemoryEnabled=true;state.enabled=false;
+await page.goto(origin + '/chatgpt?lang=en');
+await page.getByText(/Your account memory is paused/).waitFor();
+assert(await page.getByLabel('Paste selected facts as JSON').isDisabled());
+await page.getByRole('button',{name:'Pause',exact:true}).click();
+await page.getByRole('button',{name:'Enable context',exact:true}).waitFor();
+assert.equal(state.financialMemoryEnabled,false,'financial preference can be paused while global memory paused');
+state.accountMemoryEnabled=true;
+state.drafts=[{id:'00000000-0000-4000-8000-000000000099',items:[{category:'goal',summary:'A private connector draft'}],expiresAt:new Date(Date.now()+86400000).toISOString()}];
+state.enabled=true;state.financialMemoryEnabled=true;
+await page.goto(origin + '/chatgpt?lang=en&draft=00000000-0000-4000-8000-000000000099');
+await page.getByRole('heading',{name:'Review and choose what Bobby saves'}).waitFor();
+assert.equal(await page.getByLabel('Financial fact · up to 240 characters').inputValue(),'A private connector draft');
+const draftWrites=writes.length;
+await page.getByLabel('I reviewed these facts and allow Bobby').check();
+await page.getByRole('button',{name:/Save selected facts/}).click();
+await page.getByRole('heading',{name:'Review and choose what Bobby saves'}).waitFor({state:'detached'});
+await page.getByText('A private connector draft',{exact:true}).waitFor();
+assert.equal(writes[draftWrites].data.draftId,'00000000-0000-4000-8000-000000000099');
+assert.equal(state.drafts.length,0,'approved draft consumed');
+await page.getByLabel('Paste selected facts as JSON').fill(JSON.stringify({format:'bobby-context-v1',items:[{category:'goal',summary:'Account A private unsaved fact'}]}));
+await page.getByRole('button',{name:'Review facts',exact:true}).click();
+await page.getByRole('heading',{name:'Review and choose what Bobby saves'}).waitFor();
+holdImport=true;
+await page.getByLabel('I reviewed these facts and allow Bobby').check();
+await page.getByRole('button',{name:/Save selected facts/}).click();
+for(let i=0;i<100&&!heldImport;i++)await new Promise(resolve=>setTimeout(resolve,10));
+assert(heldImport,'old-account write in flight before signout');
+await page.evaluate(async()=>{const {bobbySupabase}=await import('/src/lib/bobby-db-client.ts');await bobbySupabase().auth.signOut();});
+await page.getByRole('button',{name:'Sign in to Bobby',exact:true}).waitFor();
+assert.equal(await page.locator('textarea').count(),0,'signout clears all finance view state');
+state={enabled:false,financialMemoryEnabled:false,accountMemoryEnabled:true,items:[],drafts:[],recommendations:[]};
+await page.evaluate(async()=>{const {bobbySupabase}=await import('/src/lib/bobby-db-client.ts');const encode=value=>btoa(JSON.stringify(value)).replace(/=/g,'').replace(/\+/g,'-').replace(/\//g,'_');const token=encode({alg:'HS256',typ:'JWT'})+'.'+encode({sub:'00000000-0000-4000-8000-000000000002',exp:Math.floor(Date.now()/1000)+3600,aud:'authenticated'})+'.fixture';const result=await bobbySupabase().auth.setSession({access_token:token,refresh_token:'fixture-b-refresh'});if(result.error)throw result.error;});
+await page.getByText('No facts saved yet.',{exact:true}).waitFor();
+releaseImport();
+await page.waitForTimeout(150);
+assert(!((await page.locator('body').innerText()).includes('Account A')),'account B does not see account A review');
+assert.equal(await page.getByLabel('Paste selected facts as JSON').inputValue(),'','account B source reset');
+assert.equal(await page.locator('textarea').count(),2,'account B has only own empty source and prompt');
+assert.deepEqual(pageErrors,[],'no unhandled browser errors');
+console.log('PASS: local browser review performs no write; enable; select/edit/consent/import; correction; pause; delete; recommendation export; no finance localStorage; 6-language mobile UI; OAuth explicit consent and validated callback; invalid OAuth refusal; independent financial pause while global memory paused; connector draft review/consume; sign-out and account B draft/source isolation including delayed account A reply. Mocked local endpoints only.');
+await browser.close();

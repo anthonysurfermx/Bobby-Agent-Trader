@@ -130,8 +130,24 @@ export async function redeemCoupon(code: string): Promise<{ result: RedeemResult
 
 // After an Apple/Google sign-in started from /redeem or /admin, /auth/callback returns there instead of the desk.
 const RETURN_KEY = 'bobby:return:v1';
+function isChatGPTReturnPath(value: string): boolean {
+  if (value.length > 8192 || [...value].some(char => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127 || char === '\\')) return false;
+  try {
+    const url = new URL(value, 'https://bobby-return.invalid');
+    if (url.origin !== 'https://bobby-return.invalid' || url.hash || !['/chatgpt', '/chatgpt/connect'].includes(url.pathname)) return false;
+    const keys = [...url.searchParams.keys()];
+    if (new Set(keys).size !== keys.length) return false;
+    const languageKeys = ['lang', 'locale', 'country'];
+    const allowed = url.pathname === '/chatgpt' ? [...languageKeys, 'draft'] : [...languageKeys,
+      'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource'];
+    if (keys.some(key => !allowed.includes(key))) return false;
+    const draft = url.searchParams.get('draft');
+    if (draft && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(draft)) return false;
+    return [...url.searchParams.values()].every(part => part.length <= 4096 && ![...part].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127));
+  } catch { return false; }
+}
 const isReturnPath = (v: unknown): v is string =>
-  typeof v === 'string' && (v === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt|fr|it|de))?$/.test(v));
+  typeof v === 'string' && (v === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt|fr|it|de))?$/.test(v) || (v.startsWith('/chatgpt') && isChatGPTReturnPath(v)));
 export function rememberReturn(path: string) { try { if (isReturnPath(path)) sessionStorage.setItem(RETURN_KEY, path); } catch { /* private mode */ } }
 export function takeReturn(): string | null {
   try {

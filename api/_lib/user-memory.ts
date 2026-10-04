@@ -31,7 +31,7 @@ export const MEMORY_MAX_ASSETS = 50;
  * affirmation on each desk request; a web preference alone never opts the phone in. /api/memory remains
  * available on every platform so an account can always inspect, correct and erase what is stored.
  */
-export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web', 'ios']);
+export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web', 'ios', 'android']);
 export const NATIVE_MEMORY_OPT_IN_HEADER = 'x-bobby-memory-opt-in';
 /**
  * Kill switch: the desk personalizes with memory and records asks only when BOBBY_MEMORY is exactly 'on'.
@@ -42,10 +42,10 @@ export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): b
   return env.BOBBY_MEMORY === 'on';
 }
 
-/** Fail closed for every iOS desk path unless this request explicitly affirms native consent. */
+/** Fail closed for every native desk path unless this request explicitly affirms native consent. */
 export function memoryDeskAllowed(req: VercelRequest, platform: string, env: NodeJS.ProcessEnv = process.env): boolean {
   if (!memoryPersonalizationOn(env) || !MEMORY_PLATFORMS.has(platform)) return false;
-  if (platform !== 'ios') return true;
+  if (platform === 'web') return true;
   const raw = req.headers[NATIVE_MEMORY_OPT_IN_HEADER];
   return !Array.isArray(raw) && raw === '1';
 }
