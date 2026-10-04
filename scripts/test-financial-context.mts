@@ -7,7 +7,7 @@ process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY='offline-service';
 process.env.BOBBY_SUPABASE_ANON_KEY='offline-anon';
 process.env.RATE_LIMIT_SALT='offline-salt';
 const {default:handler}=await import('../api/financial-context.ts');
-const {recordRecommendation}=await import('../api/_lib/financial-context.ts');
+const {recordRecommendation,listRecommendations}=await import('../api/_lib/financial-context.ts');
 let checks=0;
 const eq=(value:unknown,expected:unknown)=>{assert.deepEqual(value,expected);checks++;};
 const fact={category:'goal',summary:'Build my emergency fund',amount:3000,currency:'EUR'};
@@ -27,6 +27,7 @@ globalThis.fetch=(async (input,init)=>{
   if(url.includes('bobby_identities?')) return json([{id:identity,auth_user_id:account,wallet_address:null}]);
   if(url.includes('api_cache')) return json([]);
   if(url.includes('bobby_financial_list')) return down?json({},500):json(state);
+  if(url.includes('bobby_financial_recommendations')) return conflict?json({error:conflict}):json({recommendations:[{symbol:'NVDA',headline:'An older retained analysis'}]});
   if(url.includes('bobby_financial_record_recommendation')) return json(true);
   if(url.includes('bobby_financial_')) return conflict?json({error:conflict}):json({ok:true});
   throw new Error(`Unexpected offline call ${url}`);
@@ -59,5 +60,10 @@ try {
   const payload=calls[0].body.p_snapshot;
   eq(Object.keys(payload).sort(),['asOf','direction','headline','risk','symbol','verdict','watch','why']);
   eq(JSON.stringify(payload).includes('private'),false);
+  calls=[];eq((await listRecommendations(identity,'nvda',10))[0].symbol,'NVDA');
+  eq(calls[0].body,{p_identity:identity,p_symbol:'NVDA',p_limit:10});
+  eq(calls.some(c=>c.url.includes('bobby_financial_list')),false); // never search an already truncated profile list
+  for(const limit of [0,21,1.5,NaN]) { calls=[];await assert.rejects(()=>listRecommendations(identity,'NVDA',limit),(error:any)=>error.code==='invalid_context');checks++;eq(calls.length,0); }
+  conflict='context_paused';await assert.rejects(()=>listRecommendations(identity,'NVDA'),(error:any)=>error.code==='context_paused');checks++;conflict='';
   console.log(`financial-context: ${checks} PASS (local parsing, validation, authenticated review, pause, minimal recommendations)`);
 } finally {globalThis.fetch=original;}

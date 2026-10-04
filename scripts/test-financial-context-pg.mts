@@ -15,6 +15,7 @@ const fact = { category: 'goal', summary: 'Build an emergency fund', amount: 300
 const state = (id: string) => rpc('bobby_financial_list',[id]);
 const enable = (id: string, on: boolean) => rpc('bobby_financial_set_enabled',[id,on]);
 const save = (id: string, items = [fact], requestId = randomUUID(), draftId: string | null = null) => rpc('bobby_financial_import',[id,JSON.stringify(items),requestId,draftId]);
+const recommendations = (id: string, symbol: string | null = null, limit: number | null = 10) => rpc('bobby_financial_recommendations',[id,symbol,limit]);
 let a: string; let b: string; let wallet: string;
 try {
   const migration = readFileSync('supabase/bobby-protocol/supabase/migrations/20261004160000_financial_context.sql','utf8');
@@ -67,8 +68,27 @@ try {
   eq(await rpc('bobby_financial_record_recommendation',[a,JSON.stringify(snapshot)]),true);
   eq((await state(a)).recommendations[0].headline,snapshot.headline); eq((await state(b)).recommendations.length,0);
   eq(await rpc('bobby_financial_record_recommendation',[a,JSON.stringify({...snapshot,question:'raw private question'})]),false);
+  eq(await rpc('bobby_financial_record_recommendation',[a,JSON.stringify({...snapshot,symbol:'NVDA',headline:'Older NVDA analysis'})]),true);
+  await q("update bobby_saved_recommendations set created_at=now()-interval '2 hours' where identity_id=$1 and snapshot->>'symbol'='NVDA'",[a]);
+  eq(await rpc('bobby_financial_record_recommendation',[b,JSON.stringify({...snapshot,symbol:'NVDA',headline:'Other account NVDA analysis'})]),true);
+  for(let i=0;i<20;i++) await rpc('bobby_financial_record_recommendation',[a,JSON.stringify({...snapshot,headline:`Newer BTC analysis ${i}`})]);
+  eq((await state(a)).recommendations.length,20);
+  eq((await state(a)).recommendations.some((r:any)=>r.symbol==='NVDA'),false); // intentionally outside the app's newest-20 view
+  eq((await recommendations(a,'NVDA')).recommendations.map((r:any)=>r.headline),['Older NVDA analysis']);
+  eq((await recommendations(b,'NVDA')).recommendations.map((r:any)=>r.headline),['Other account NVDA analysis']);
+  eq((await recommendations(a,'BTC',5)).recommendations.length,5);
+  eq((await recommendations(a,null,20)).recommendations.length,20);
+  eq((await recommendations(a,'AMZN')).recommendations,[]);
+  for(const limit of [0,21,null]) eq(await recommendations(a,'NVDA',limit),{error:'invalid_context'});
+  eq(await recommendations(a,''),{error:'invalid_context'});
+  eq(await recommendations(wallet,'NVDA'),{error:'signin_required'});
+  await enable(a,false); eq(await recommendations(a,'NVDA'),{error:'context_paused'}); await enable(a,true);
+  await q('update bobby_user_prefs set memory_enabled=false where identity_id=$1',[a]);
+  eq(await recommendations(a,'NVDA'),{error:'context_paused'});
+  await q('update bobby_user_prefs set memory_enabled=true where identity_id=$1',[a]);
   await enable(a,false); eq(await rpc('bobby_financial_record_recommendation',[a,JSON.stringify(snapshot)]),false); await enable(a,true);
   await q("update bobby_saved_recommendations set created_at=now()-interval '91 days' where identity_id=$1",[a]); eq((await state(a)).recommendations.length,0);
+  eq((await recommendations(a,'NVDA')).recommendations,[]);
   await rpc('bobby_financial_purge',[]);
   eq(Number((await q('select count(*) from bobby_saved_recommendations where identity_id=$1',[a]))[0].count),0);
   eq(Number((await q('select count(*) from bobby_financial_drafts where id=$1',[expired.id]))[0].count),0);

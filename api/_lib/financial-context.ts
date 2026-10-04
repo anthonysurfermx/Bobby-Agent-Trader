@@ -52,10 +52,13 @@ export async function createContextDraft(identityId: string, items: FinancialIte
   return { ...draft, reviewUrl: `https://bobbyprotocol.xyz/chatgpt?draft=${encodeURIComponent(draft.id)}` };
 }
 export async function listRecommendations(identityId: string, symbol?: string, limit = 10): Promise<BobbyRecommendation[]> {
-  const state = await listFinancialContext(identityId);
-  if (!state.enabled) throw new FinancialContextConflictError('context_paused');
-  const filter = symbol?.toUpperCase();
-  return state.recommendations.filter(item => !filter || item.symbol === filter).slice(0, Math.max(1, Math.min(20, limit)));
+  const parsed = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/).optional(), limit: z.number().int().min(1).max(20) })
+    .safeParse({ symbol: symbol?.toUpperCase(), limit });
+  if (!parsed.success) throw new FinancialContextConflictError('invalid_context');
+  // The database filters the retained account history before applying the result limit.
+  const result = await rpc('bobby_financial_recommendations', { p_identity: identityOf(identityId), p_symbol: parsed.data.symbol ?? null, p_limit: parsed.data.limit }) as { recommendations?: unknown };
+  if (!result || !Array.isArray(result.recommendations)) throw new FinancialContextUnavailableError();
+  return result.recommendations as BobbyRecommendation[];
 }
 
 /** Called only after a delivered, validated read, under the existing memory consent gates. No original question. */

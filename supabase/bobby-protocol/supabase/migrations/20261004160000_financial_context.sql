@@ -91,6 +91,22 @@ begin
     'items',items,'drafts',drafts,'recommendations',recs);
 end;
 $$;
+-- Connector lookups filter the full retained account history before the result cap.
+-- The profile listing above deliberately remains capped at the newest 20 snapshots.
+create or replace function public.bobby_financial_recommendations(p_identity uuid,p_symbol text default null,p_limit int default 10)
+returns jsonb language plpgsql stable security invoker set search_path = public, pg_temp as $$
+declare recs jsonb;
+begin
+  if not exists(select 1 from bobby_identities where id=p_identity and auth_user_id is not null) then return jsonb_build_object('error','signin_required'); end if;
+  if p_limit is null or p_limit<1 or p_limit>20 or (p_symbol is not null and p_symbol !~ '^[A-Z0-9.^=-]{1,20}$') then return jsonb_build_object('error','invalid_context'); end if;
+  if not bobby_financial_enabled(p_identity) then return jsonb_build_object('error','context_paused'); end if;
+  select coalesce(jsonb_agg(snapshot || jsonb_build_object('id',id,'createdAt',created_at) order by created_at desc,id),'[]') into recs
+    from (select * from bobby_saved_recommendations where identity_id=p_identity
+      and created_at>=now()-interval '90 days' and (p_symbol is null or snapshot->>'symbol'=p_symbol)
+      order by created_at desc,id limit p_limit) r;
+  return jsonb_build_object('recommendations',recs);
+end;
+$$;
 create or replace function public.bobby_financial_prepare(p_identity uuid,p_items jsonb)
 returns jsonb language plpgsql volatile security invoker set search_path = public, pg_temp as $$
 declare draft bobby_financial_drafts;

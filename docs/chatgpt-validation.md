@@ -22,9 +22,9 @@ Bobby does not obtain the user's complete ChatGPT history. Reported facts are no
 
 | Area | Result | Evidence and limits |
 | --- | --- | --- |
-| Financial API and local schema | 33 checks passed | Authentication, explicit review, validation, pause, protected purge and minimal recommendation output. |
-| Financial storage | 122 checks passed with real local PostgreSQL | Migration replay, permissions, account isolation, concurrent imports, duplicate requests, expiry, pause and account cascade. |
-| OAuth/MCP | 111 checks passed | 78 offline HTTP/MCP checks and 33 real PostgreSQL checks, including PKCE, one-use exchange, replay, consent versions, expiry and revocation. |
+| Financial API and local schema | 45 checks passed | Authentication, explicit review, validation, pause, protected purge, minimal recommendation output and filtered account lookup. |
+| Financial storage | 141 checks passed with real local PostgreSQL | Migration replay, permissions, account isolation, concurrent imports, duplicate requests, expiry, pause, account cascade and filtering before the result limit. |
+| OAuth/MCP | 114 checks passed | 81 offline HTTP/MCP checks and 33 real PostgreSQL checks, including PKCE, one-use exchange, replay, consent versions, expiry, revocation and filtered recommendation ID stripping. |
 | Existing memory | 128 checks passed | Includes native per-account opt-in and validated recommendation capture. |
 | Desk analysis | 353 checks passed | Existing analysis regression suite. |
 | Web | Production build, API/admin TypeScript and ESLint passed | Browser fixture exercises review, editing, selection, consent, drafts, delete, pause, export, OAuth and delayed replies on account changes. Six languages checked at 390 px. All remote requests mocked. |
@@ -34,6 +34,12 @@ Bobby does not obtain the user's complete ChatGPT history. Reported facts are no
 Full frontend TypeScript separately reports existing errors in MascotScene and useBobbySession; the feature files have no reported errors. The standard production build and full ESLint pass. The existing iOS chart browser test had an undeclared browser-global lint reference; it now explicitly uses `window.NucleoReadModel`, and its 126 browser assertions pass.
 
 Tests are wired into the repository CI. [Connector details and activation](chatgpt-connector.md) describes endpoints, scopes, retention and deployment checks.
+
+## Review correction
+
+An independent Codex review reproduced a recommendation lookup defect: an older retained NVDA recommendation disappeared from a symbol-specific query when twenty newer BTC recommendations preceded it. The connector now filters the full retained history by account and symbol in a service-only database function before applying the requested limit. The profile's newest-twenty listing stays unchanged.
+
+The regression passes against real local PostgreSQL, including a second account with its own NVDA recommendation, both memory pause settings, expired entries, invalid limits, an invalid symbol and a wallet-only identity. Offline API and MCP checks also confirm the filtered query and removal of internal identifiers from tool output. This correction and these test results are from Codex; external reviewers evaluated the original implementation snapshot separately.
 
 ## Preserving and activating the change
 

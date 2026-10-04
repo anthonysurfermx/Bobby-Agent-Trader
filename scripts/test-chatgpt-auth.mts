@@ -44,6 +44,7 @@ function mock() {
     else if(url.includes('rpc/bobby_chatgpt_token_identity')) result=grant;
     else if(url.includes('rpc/bobby_financial_prepare')) result=enabled?{id:randomUUID(),items:body.p_items,expiresAt:'2026-10-05T00:00:00Z'}:{error:'context_paused'};
     else if(url.includes('rpc/bobby_financial_list')) result={enabled,items:[{id:randomUUID(),category:'goal',summary:'Emergency fund',source:'chatgpt',verification:'user_reported'}],drafts:[{id:randomUUID(),items:[{category:'expense',summary:'Pending private fact'}]}],recommendations:[{id:randomUUID(),symbol:'BTC',asOf:'2026-10-01T00:00:00Z',headline:'Wait for more evidence'}]};
+    else if(url.includes('rpc/bobby_financial_recommendations')) result=enabled?{recommendations:[{id:randomUUID(),symbol:body.p_symbol ?? 'BTC',asOf:'2026-10-01T00:00:00Z',headline:'Wait for more evidence'}]}:{error:'context_paused'};
     return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}});
   }) as typeof fetch;
 }
@@ -122,6 +123,11 @@ try {
   const recommendations=(await handleChatgptMcp(rpc('bobby_get_recommendations'),read)).body as any;
   eq('id' in recommendations.result.structuredContent.recommendations[0],false,'dated analyses omit internal snapshot IDs');
   eq(recommendations.result.structuredContent.recommendations[0].asOf,'2026-10-01T00:00:00Z','preserve actual dated evidence');
+  mock();
+  const filtered=(await handleChatgptMcp(rpc('bobby_get_recommendations',{symbol:'NVDA',limit:5}),read)).body as any;
+  eq(filtered.result.structuredContent.recommendations[0].symbol,'NVDA','connector receives account-scoped database-filtered recommendations');
+  eq(calls.find(c=>c.url.includes('rpc/bobby_financial_recommendations'))?.body,{p_identity:ID,p_symbol:'NVDA',p_limit:5},'apply symbol filter before database result cap');
+  eq('id' in filtered.result.structuredContent.recommendations[0],false,'filtered recommendations still omit internal IDs');
   enabled=false; mock();
   const paused=(await handleChatgptMcp(rpc('bobby_get_financial_context'),read)).body as any;
   eq([paused.result.isError,paused.result.structuredContent.error],[true,'context_paused'],'pause blocks sharing approved facts');
