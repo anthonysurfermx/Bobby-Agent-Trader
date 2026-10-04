@@ -38,7 +38,7 @@ function SectionLabel({ children }: { children: ReactNode }) {
 
 export default function Sidebar({ tab, onSelect, onSearch, collapsed, onToggleCollapse, email, onSignOut, platforms }: {
   tab: TabId; onSelect: (id: TabId) => void; onSearch: () => void; collapsed: boolean; onToggleCollapse?: () => void;
-  email: string; onSignOut: () => void; platforms: { web: number; ios: number; days: number } | null;
+  email: string; onSignOut: () => void; platforms: { web: number | null; ios: number | null; android: number | null; days: number } | null;
 }) {
   return (
     <div className="flex h-full min-h-0 flex-col font-sans">
@@ -106,7 +106,7 @@ export default function Sidebar({ tab, onSelect, onSearch, collapsed, onToggleCo
 
             <SectionLabel>{platforms ? `Lecturas · ${platforms.days}D` : 'Plataformas'}</SectionLabel>
             <ul className="m-0 flex list-none flex-col gap-0.5 p-0">
-              {([['Web', '#4FB3FF', platforms?.web], ['iOS', '#F28C38', platforms?.ios]] as const).map(([name, color, reads]) => (
+              {([['Web', '#4FB3FF', platforms?.web], ['iOS', '#F28C38', platforms?.ios], ['Android', '#4ADE80', platforms?.android]] as const).map(([name, color, reads]) => (
                 <li key={name}>
                   <button
                     type="button" onClick={() => onSelect('funnel')}
@@ -114,7 +114,7 @@ export default function Sidebar({ tab, onSelect, onSearch, collapsed, onToggleCo
                   >
                     <span className="h-3 w-3 shrink-0 rounded-[3px]" style={{ background: color }} aria-hidden />
                     <span className="min-w-0 flex-1 truncate">{name}</span>
-                    {reads != null && <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-[#5C5C5C]">{fmtCompact(reads)} lect</span>}
+                    {platforms && <span className="font-mono text-[9.5px] uppercase tracking-[0.06em] text-[#5C5C5C]" title={reads == null ? 'Dato no disponible' : 'Lecturas consumidas registradas'}>{reads == null ? '—' : fmtCompact(reads)} lect</span>}
                   </button>
                 </li>
               ))}

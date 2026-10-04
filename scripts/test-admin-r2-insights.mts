@@ -160,7 +160,7 @@ const at = (hhmm: string) => `2026-10-02T${hhmm}:00Z`;
   });
   const byId = new Map(small.map((i) => [i.id, i]));
   ok(byId.get('failing-openai')?.title.includes('2 de 3') && !byId.get('failing-openai')!.title.includes('%'), 'F14: 2 failures of 3 calls ⇒ "2 de 3", not 67%');
-  ok(byId.get('ios-gap')?.detail.includes('faltan 3 de 3') && !/100%/.test(textOf(byId.get('ios-gap')!)), 'F14: 0 installs of 3 downloads ⇒ "3 de 3", not 100%');
+  ok(byId.get('ios-gap')?.detail.includes('No hay una unión entre ambas fuentes') && !/\d+%|De esas descargas faltan/.test(textOf(byId.get('ios-gap')!)), 'Apple downloads and observed installs never supply a loss rate');
   ok(byId.get('wall-conversion')?.title.includes('convierte 0 de 3') && !/0%/.test(byId.get('wall-conversion')!.title), 'F14: 0 accounts after 3 walls ⇒ "0 de 3", not 0%');
   ok(!byId.has('best-source'), 'F14: no best source from sources with 3 installs (3 of 3 is not "100%")');
   const percentages = small.filter((i) => /\d\s?%/.test(textOf(i))).map((i) => i.id);
@@ -217,7 +217,7 @@ const at = (hhmm: string) => `2026-10-02T${hhmm}:00Z`;
     overview: {}, growth: { acquisition: { visitors: 2 }, cohorts: { ios: { arrived: 1 } }, history: { ios: { installsInPeriod: 0 } } }, integrations: { appStore: { configured: true, ...appStore } }, searchConsole: {} });
   const partial = apple({ totals: { downloads: 6 }, byCountry: [{ country: 'MX', downloads: 5 }], partial: true, missingDays: Array.from({ length: 23 }, (_, k) => `2026-09-${String(k + 1).padStart(2, '0')}`), coveredFrom: '2026-09-24', coveredTo: '2026-10-01' });
   const byId = new Map(partial.map((i) => [i.id, i]));
-  ok(byId.get('ios-gap')!.title.includes('Apple reporta 6 descargas (parcial: faltan 23 días); Bobby solo vio 1 instalación iOS') && byId.get('ios-gap')!.evidence.some((e) => e.endsWith(': 6 (parcial)')), 'F16: ios-gap says the Apple count is partial');
+  ok(byId.get('ios-gap')!.title.includes('Apple: 6 descargas (parcial: faltan 23 días); Bobby: 1 instalación iOS observada') && byId.get('ios-gap')!.evidence.some((e) => e.endsWith(': 6 (parcial)')), 'F16: ios-gap says the Apple count is partial');
   ok(byId.get('low-traffic')!.detail.includes('Apple reporta 6 descargas (parcial: faltan 23 días) en el mismo periodo'), 'F16: low-traffic too');
   ok(byId.get('appstore-country')!.title.endsWith('(parcial: faltan 23 días)'), 'F16: appstore-country too');
   ok(byId.get('ios-gap')!.detail.includes('Apple cuenta también las descargas del propio equipo') && byId.get('low-traffic')!.detail.includes('incluidas las del equipo')
@@ -225,6 +225,36 @@ const at = (hhmm: string) => `2026-10-02T${hhmm}:00Z`;
   const full = new Map(apple({ totals: { downloads: 6 }, byCountry: [{ country: 'MX', downloads: 5 }] }, true).map((i) => [i.id, i]));
   ok(!textOf(full.get('ios-gap')!).includes('parcial') && !full.get('ios-gap')!.detail.includes('propio equipo') && !full.get('low-traffic')!.detail.includes('incluidas las del equipo'),
     'F16/F08: a complete load with the team included says neither');
+}
+
+// Reader-return windows start after a complete later day, not after a mature week.
+// A recent cohort with no return cannot justify a weekly-retention warning.
+{
+  const returns = buildInsights({ days: 30, now: NOW, overview: {},
+    growth: { cohorts: { ios: { oldestDays: 2, retention: { readersBack: { eligible: 5, returned: 1, read: 0 } } } } },
+    integrations: {}, searchConsole: {} }).find((i) => i.id === 'readers-back');
+  ok(returns?.level === 'info' && returns.title.includes('0 de 5') && !returns.title.includes('%'), 'five immature readers remain a provisional count');
+  ok(returns?.detail.includes('no mide retención semanal madura') && returns.action.includes('siete días completos'), 'provisional reader returns state the incomplete observation window');
+  const incomplete = buildInsights({ days: 30, now: NOW, overview: {},
+    growth: { cohorts: { web: { retention: { readersBack: { eligible: 100 } } }, android: { retention: { readersBack: { eligible: 5, returned: 2, read: 1 } } } } },
+    integrations: {}, searchConsole: {} }).find((i) => i.id === 'readers-back');
+  ok(incomplete?.title.startsWith('1 de 5') && incomplete.sample === 5, 'missing return counts are excluded, while observed Android readers remain included');
+
+  const truncated = buildInsights({ days: 30, now: NOW, overview: {},
+    growth: { people: { accounts: 40, accountsNeverRead: 28 }, attention: { neverRead: Array.from({ length: 20 }, (_, i) => ({ identityId: `example-${i}` })) } },
+    integrations: {}, searchConsole: {} }).find((i) => i.id === 'accounts-never-read');
+  ok(truncated?.title.startsWith('28 de 40') && truncated.evidence.includes('sin lectura registrada: 28'), 'account attention uses the total, not the bounded example slice');
+  ok(truncated?.detail.includes('no prueba que nunca hayan leído como invitadas'), 'missing account reads cannot prove no prior guest use');
+
+  const pending = buildInsights({ days: 30, now: NOW, overview: {},
+    growth: { cohorts: { ios: { arrived: 1 } }, history: { ios: { installsInPeriod: 0 } } },
+    integrations: { appStore: { configured: true, totals: { downloads: 6 }, partial: true,
+      missingDays: ['2026-09-01'], pendingDays: ['2026-09-02', '2026-09-03'] } }, searchConsole: {} }).find((i) => i.id === 'ios-gap');
+  ok(pending?.title.includes('faltan 3 días'), 'Apple unpublished days count alongside unloaded days');
+
+  const included = buildInsights({ days: 30, now: NOW, includeInternal: true, overview: {},
+    growth: { outcomes: { consumedTotal: 10, consumedInternal: 8 } }, integrations: {}, searchConsole: {} }).find((i) => i.id === 'internal-share');
+  ok(included?.detail.includes('Esta vista las incluye.') && !included.detail.includes('Ya están fuera'), 'internal traffic is interpreted according to the selected scope');
 }
 
 // ---------------------------------------------------------------- network rule reports accounts too

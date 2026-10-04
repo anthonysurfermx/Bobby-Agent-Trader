@@ -17,6 +17,8 @@ export type AdminSourceStatus = 'ok' | 'error' | 'partial' | 'not_configured' | 
 export interface AdminSourceMeta {
   status: AdminSourceStatus; fetchedAt: string | null; error?: string;
   coveredFrom?: string | null; coveredTo?: string | null; missingDays?: string[]; cacheAgeMs?: number;
+  cacheTtlMs?: number;
+  oldestReportAt?: string | null;
 }
 export interface AdminMeta { generatedAt: string | null; durationMs: number | null; partial: boolean; sources: Record<string, AdminSourceMeta>; receivedAt?: number }
 export interface AdminIntegrationsResponse { integrations: AdminIntegrations; searchConsole: SearchConsoleData | null; meta: AdminMeta | null }
@@ -25,14 +27,22 @@ export interface LivePlatformWindow {
   observedDevices: number; observedAccounts: number; events: number; consumed: number; completed: number;
   failed: number; abandoned: number; wallSignin: number; wallPaywall: number; wallLevel: number; blocked: Record<string, number>;
 }
+export interface LiveServerCoverage {
+  eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null;
+}
 export interface AdminLive {
   snapshotAt: string | null; includeInternal: boolean;
-  windows: Record<LiveWindowId, { minutes: number; since: string | null; ios: LivePlatformWindow; web: LivePlatformWindow }>;
-  platforms: Record<'ios' | 'web', { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null }>;
-  providers: Array<{ provider: string; model: string; calls24h: number; failures24h: number; usd24h: number;
+  windows: Record<LiveWindowId, { minutes: number; since: string | null; ios: LivePlatformWindow; web: LivePlatformWindow; android: LivePlatformWindow | null }>;
+  platforms: Record<'ios' | 'web', { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null }> & {
+    android: { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null;
+      /** Server source observation across all traffic, independently of the selected account/team population. */
+      coverage: LiveServerCoverage | null } | null;
+  };
+  providers: Array<{ provider: string; model: string; calls24h: number | null; failures24h: number | null; usd24h: number | null;
     callLatencyP50Ms: number | null; callLatencyP95Ms: number | null; lastCallAt: string | null; lastFailureAt: string | null }>;
   coverage: { readStarted: boolean; clientRendered: boolean; crashes: boolean; buildVersion: boolean; onlinePresence: boolean;
-    eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null; llmLedgerCoverageSince: string | null };
+    eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null; llmLedgerCoverageSince: string | null;
+    clientIngestionEnabled: boolean | null };
   client: ClientLive | null;
 }
 export interface ClientWindow { minutes: number; since: string | null; foreground: number; background: number; started: number; received: number; rendered: number; webviewTerminations: number; reportedInstalls: number; reportedAccounts: number }
@@ -201,8 +211,8 @@ export interface Growth {
     /** Of the people with Pro access (stages.pro: paid, test, unverified or gifted), those with a verified payment; null = not sent. */
     proPaidVerified: number | null; proInactivePaid: number | null;
   };
-  cohorts: { web: GrowthCohort; ios: GrowthCohort };
-  history: { web: GrowthHistory; ios: GrowthHistory };
+  cohorts: { web: GrowthCohort; ios: GrowthCohort; android: GrowthCohort | null };
+  history: { web: GrowthHistory; ios: GrowthHistory; android: GrowthHistory | null };
   outcomes: {
     consumed: number; consumedInternal: number; consumedTotal: number; byPlatform: Record<string, number>;
     delivered: number; failed: number; wallSignin: number; wallSigninInstalls: number; wallPaywall: number; wallLevel: number;
@@ -217,7 +227,7 @@ export interface Growth {
   };
   attention: { neverRead: AttentionAccount[]; quiet: AttentionAccount[] };
   coverage: {
-    webObservedSince: string | null; iosObservedSince: string | null; activitySince: string | null; outcomesSince: string | null;
+    webObservedSince: string | null; iosObservedSince: string | null; androidObservedSince: string | null; activitySince: string | null; outcomesSince: string | null;
     observedInstalls: number; backfillInstalls: number; internalInstalls: number; internalAccounts: number;
   };
 }
@@ -530,6 +540,18 @@ function errorMessage(status: number, code: string | null): string {
   return `La solicitud falló (HTTP ${status}).`;
 }
 
+function abortableAdminRead<T>(load: () => Promise<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted();
+  return new Promise<T>((resolve, reject) => {
+    const cancel = () => { signal.removeEventListener('abort', cancel); reject(signal.reason); };
+    signal.addEventListener('abort', cancel, { once: true });
+    Promise.resolve().then(load).then(
+      (value) => { signal.removeEventListener('abort', cancel); resolve(value); },
+      (error) => { signal.removeEventListener('abort', cancel); reject(error); },
+    );
+  });
+}
+
 async function request(method: 'GET' | 'POST', query: URLSearchParams | null, body?: AdminPostBody, signal?: AbortSignal): Promise<unknown> {
   const abort = method === 'GET' ? new AbortController() : null;
   const cancel = () => abort?.abort(signal?.reason);
@@ -538,30 +560,36 @@ async function request(method: 'GET' | 'POST', query: URLSearchParams | null, bo
   let timedOut = false;
   const timer = abort ? setTimeout(() => { timedOut = true; abort.abort(); }, query?.get('view') === 'integrations' ? 55_000 : 25_000) : null;
   try {
-    let r: Response;
-    const mock = adminMockMode();
-    if (import.meta.env?.DEV && mock) {
-      // Dev fixtures answer with a real Response, so errors and numeric strings take the same path as prod.
-      const { mockAdminFetch } = await import('@/components/admin/bobby/mock');
-      r = await mockAdminFetch(mock, method, query, body);
-    } else {
-      const { accessHeaders } = await import('@/lib/access-client');
-      const headers: Record<string, string> = { ...(await accessHeaders()) };
+    const load = async () => {
       abort?.signal.throwIfAborted();
-      if (body) headers['Content-Type'] = 'application/json';
-      r = await fetch(`/api/admin${query ? `?${query.toString()}` : ''}`, {
-        method, headers, cache: 'no-store', body: body ? JSON.stringify(body) : undefined,
-        signal: abort?.signal,
-      });
-    }
-    const data = (await r.json().catch((e) => { if (abort?.signal.aborted) throw e; return null; })) as { error?: unknown } | null;
-    abort?.signal.throwIfAborted();
-    if (!r.ok) {
-      const code = typeof data?.error === 'string' ? data.error : null;
-      throw new AdminError(r.status, code, errorMessage(r.status, code));
-    }
-    if (data == null) throw new AdminError(r.status, 'bad_response', 'El servidor respondió algo que no es JSON.');
-    return data;
+      let r: Response;
+      const mock = adminMockMode();
+      if (import.meta.env?.DEV && mock) {
+        // Dev fixtures answer with a real Response, so errors and numeric strings take the same path as prod.
+        const { mockAdminFetch } = await import('@/components/admin/bobby/mock');
+        r = await mockAdminFetch(mock, method, query, body);
+      } else {
+        const { accessHeaders } = await import('@/lib/access-client');
+        const headers: Record<string, string> = { ...(await accessHeaders()) };
+        abort?.signal.throwIfAborted();
+        if (body) headers['Content-Type'] = 'application/json';
+        r = await fetch(`/api/admin${query ? `?${query.toString()}` : ''}`, {
+          method, headers, cache: 'no-store', body: body ? JSON.stringify(body) : undefined,
+          signal: abort?.signal,
+        });
+      }
+      const data = (await r.json().catch((e) => { if (abort?.signal.aborted) throw e; return null; })) as { error?: unknown } | null;
+      abort?.signal.throwIfAborted();
+      if (!r.ok) {
+        const code = typeof data?.error === 'string' ? data.error : null;
+        throw new AdminError(r.status, code, errorMessage(r.status, code));
+      }
+      if (data == null) throw new AdminError(r.status, 'bad_response', 'El servidor respondió algo que no es JSON.');
+      return data;
+    };
+    // Credential acquisition and JSON parsing also obey the GET deadline, even if they ignore signals.
+    // Mutations retain their existing behavior and are never raced against cancellation.
+    return abort ? await abortableAdminRead(load, abort.signal) : await load();
   } catch (e) {
     if (e instanceof AdminError) throw e;
     if (timedOut) throw new AdminError(0, 'timeout', 'La fuente tardó demasiado. Se conservan los datos anteriores con su hora de consulta.');
@@ -598,14 +626,20 @@ const counts = (v: unknown): Record<string, number> => Object.fromEntries(Object
 export function normalizeAdminMeta(v: unknown): AdminMeta | null {
   if (!isObj(v)) return null;
   const statuses: AdminSourceStatus[] = ['ok', 'error', 'partial', 'not_configured', 'deferred'];
-  return { generatedAt: strOrNull(v.generatedAt), durationMs: numOrNull(v.durationMs), partial: v.partial === true, receivedAt: Date.now(),
-    sources: Object.fromEntries(Object.entries(obj(v.sources)).map(([name, source]) => {
+  const timestamp = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
+  const nonnegative = (value: unknown) => { const n = numOrNull(value); return n != null && n >= 0 ? n : null; };
+  const sources: Record<string, AdminSourceMeta> = Object.fromEntries(Object.entries(obj(v.sources)).map(([name, source]) => {
       const s = obj(source);
-      return [name, { status: statuses.includes(s.status as AdminSourceStatus) ? s.status as AdminSourceStatus : 'error',
-        fetchedAt: strOrNull(s.fetchedAt), error: strOrNull(s.error) ?? undefined,
+      const status = statuses.includes(s.status as AdminSourceStatus) ? s.status as AdminSourceStatus : 'error';
+      return [name, { status,
+        fetchedAt: status === 'not_configured' || status === 'deferred' ? null : timestamp(s.fetchedAt), error: strOrNull(s.error) ?? undefined,
         coveredFrom: strOrNull(s.coveredFrom), coveredTo: strOrNull(s.coveredTo),
-        missingDays: Array.isArray(s.missingDays) ? s.missingDays.map(str) : undefined, cacheAgeMs: numOrNull(s.cacheAgeMs) ?? undefined }];
-    })) };
+        missingDays: Array.isArray(s.missingDays) ? s.missingDays.filter((x): x is string => typeof x === 'string') : undefined,
+        cacheAgeMs: nonnegative(s.cacheAgeMs) ?? undefined, cacheTtlMs: nonnegative(s.cacheTtlMs) ?? undefined,
+        oldestReportAt: timestamp(s.oldestReportAt) }];
+    }));
+  return { generatedAt: timestamp(v.generatedAt), durationMs: nonnegative(v.durationMs), receivedAt: Date.now(), sources,
+    partial: v.partial === true || !Object.keys(sources).length || Object.values(sources).some((s) => s.status !== 'ok' || !s.fetchedAt) };
 }
 
 export function normalizeAdminIntegrations(raw: unknown): AdminIntegrationsResponse {
@@ -906,8 +940,8 @@ export function normalizeGrowth(v: unknown): Growth | null {
       byPlatform: counts(p.byPlatform), proInactive: num(p.proInactive), accountsNeverRead: num(p.accountsNeverRead),
       proPaidVerified: numOrNull(p.proPaidVerified), proInactivePaid: numOrNull(p.proInactivePaid),
     },
-    cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios) },
-    history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios) },
+    cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios), android: isObj(co.android) ? normalizeCohortV2(co.android) : null },
+    history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios), android: isObj(hi.android) ? normalizeHistory(hi.android) : null },
     outcomes: {
       consumed: num(out.consumed), consumedInternal: num(out.consumedInternal), consumedTotal: num(out.consumedTotal), byPlatform: counts(out.byPlatform),
       delivered: num(out.delivered), failed: num(out.failed), wallSignin: num(out.wallSignin), wallSigninInstalls: num(out.wallSigninInstalls),
@@ -922,7 +956,7 @@ export function normalizeGrowth(v: unknown): Growth | null {
     },
     attention: { neverRead: normalizeAttention(att.neverRead), quiet: normalizeAttention(att.quiet) },
     coverage: {
-      webObservedSince: strOrNull(cov.webObservedSince), iosObservedSince: strOrNull(cov.iosObservedSince), activitySince: strOrNull(cov.activitySince),
+      webObservedSince: strOrNull(cov.webObservedSince), iosObservedSince: strOrNull(cov.iosObservedSince), androidObservedSince: strOrNull(cov.androidObservedSince), activitySince: strOrNull(cov.activitySince),
       outcomesSince: strOrNull(cov.outcomesSince), observedInstalls: num(cov.observedInstalls), backfillInstalls: num(cov.backfillInstalls),
       internalInstalls: num(cov.internalInstalls), internalAccounts: num(cov.internalAccounts),
     },
@@ -1061,6 +1095,14 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
   if (!isObj(root.live)) return { live: null, internalMarkFailed: root.internalMarkFailed === true, missing: ['live'], meta: normalizeAdminMeta(root.meta) };
   const live = root.live, windows = r.sec(live, 'windows', 'windows'), platforms = r.sec(live, 'platforms', 'platforms');
   const coverage = r.sec(live, 'coverage', 'coverage');
+  // Null is an explicit absence of observation; omitted or malformed clocks are missing evidence.
+  const date = (o: Obj, key: string, path: string): string | null => {
+    const value = o[key];
+    if (value === null) return null;
+    if (typeof value === 'string' && Number.isFinite(Date.parse(value))) return value;
+    r.mark(path);
+    return null;
+  };
   const window = (value: unknown, path: string): LivePlatformWindow => {
     const w = obj(value);
     return { observedDevices: r.n(w, 'observedDevices', `${path}.observedDevices`), observedAccounts: r.n(w, 'observedAccounts', `${path}.observedAccounts`),
@@ -1068,10 +1110,17 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
       failed: r.n(w, 'failed', `${path}.failed`), abandoned: r.n(w, 'abandoned', `${path}.abandoned`), wallSignin: r.n(w, 'wallSignin', `${path}.wallSignin`),
       wallPaywall: r.n(w, 'wallPaywall', `${path}.wallPaywall`), wallLevel: r.n(w, 'wallLevel', `${path}.wallLevel`), blocked: r.cnt(w, 'blocked', `${path}.blocked`) };
   };
-  const timestamps = (pf: 'ios' | 'web') => { const t = r.sec(platforms, pf, `platforms.${pf}`); return {
+  const timestamps = (pf: 'ios' | 'web' | 'android') => { const t = r.sec(platforms, pf, `platforms.${pf}`); return {
     latestEventAt: strOrNull(t.latestEventAt), latestOutcomeAt: strOrNull(t.latestOutcomeAt),
     latestCompletedAt: strOrNull(t.latestCompletedAt), latestReadConsumptionAt: strOrNull(t.latestReadConsumptionAt) }; };
-  const since = (key: string) => { if (!(key in coverage)) r.mark(`coverage.${key}`); return strOrNull(coverage[key]); };
+  const androidCoverage = (): LiveServerCoverage | null => {
+    const path = 'platforms.android.coverage', t = obj(platforms.android);
+    if (!isObj(t.coverage)) { r.mark(path); return null; }
+    const cov = t.coverage;
+    return { eventCoverageSince: date(cov, 'eventCoverageSince', `${path}.eventCoverageSince`), outcomeCoverageSince: date(cov, 'outcomeCoverageSince', `${path}.outcomeCoverageSince`),
+      readConsumptionCoverageSince: date(cov, 'readConsumptionCoverageSince', `${path}.readConsumptionCoverageSince`) };
+  };
+  const since = (key: string) => date(coverage, key, `coverage.${key}`);
   let client: ClientLive | null = null;
   if (meta?.sources.clientLive?.status === 'error') r.mark('client');
   else if (isObj(live.client) && num(obj(live.client.coverage).protocolVersion) === 1) {
@@ -1079,11 +1128,11 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
     const clientPlatform = (pf: 'ios' | 'web'): ClientLivePlatform => {
       const path = `client.platforms.${pf}`, p = r.sec(cp, pf, path), presence = r.sec(p, 'presence', `${path}.presence`), cov = r.sec(p, 'coverage', `${path}.coverage`), latest = obj(p.latest), cw = r.sec(p, 'windows', `${path}.windows`);
       return {
-        presence: { reportedForegroundInstalls: r.n(presence, 'reportedForegroundInstalls', `${path}.presence.reportedForegroundInstalls`), reportedForegroundAccounts: r.n(presence, 'reportedForegroundAccounts', `${path}.presence.reportedForegroundAccounts`), reportedForegroundSessions: r.n(presence, 'reportedForegroundSessions', `${path}.presence.reportedForegroundSessions`), latestReportAt: strOrNull(presence.latestReportAt) },
-        windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(cw, id, `${path}.windows.${id}`); return [id, { minutes: num(w.minutes), since: strOrNull(w.since), ...Object.fromEntries(['foreground', 'background', 'started', 'received', 'rendered', 'webviewTerminations', 'reportedInstalls', 'reportedAccounts'].map((key) => [key, r.n(w, key, `${path}.windows.${id}.${key}`)])) }]; })) as ClientLivePlatform['windows'],
+        presence: { reportedForegroundInstalls: r.n(presence, 'reportedForegroundInstalls', `${path}.presence.reportedForegroundInstalls`), reportedForegroundAccounts: r.n(presence, 'reportedForegroundAccounts', `${path}.presence.reportedForegroundAccounts`), reportedForegroundSessions: r.n(presence, 'reportedForegroundSessions', `${path}.presence.reportedForegroundSessions`), latestReportAt: date(presence, 'latestReportAt', `${path}.presence.latestReportAt`) },
+        windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(cw, id, `${path}.windows.${id}`); return [id, { minutes: num(w.minutes), since: date(w, 'since', `${path}.windows.${id}.since`), ...Object.fromEntries(['foreground', 'background', 'started', 'received', 'rendered', 'webviewTerminations', 'reportedInstalls', 'reportedAccounts'].map((key) => [key, r.n(w, key, `${path}.windows.${id}.${key}`)])) }]; })) as ClientLivePlatform['windows'],
         latest: { eventAt: strOrNull(latest.eventAt), receivedAt: strOrNull(latest.receivedAt), renderedAt: strOrNull(latest.renderedAt), webviewTerminationAt: strOrNull(latest.webviewTerminationAt) },
-        coverage: { rolloutSince: strOrNull(cov.rolloutSince), readStartedSince: strOrNull(cov.readStartedSince), readReceivedSince: strOrNull(cov.readReceivedSince), readRenderedSince: strOrNull(cov.readRenderedSince), webviewTerminationSince: strOrNull(cov.webviewTerminationSince) },
-        builds: (Array.isArray(p.builds) ? p.builds : []).map((raw) => { const b = obj(raw); return { appVersion: strOrNull(b.appVersion), appBuild: strOrNull(b.appBuild), reportedInstalls24h: numOrNull(b.reportedInstalls24h), foregroundInstalls: numOrNull(b.foregroundInstalls), latestReportAt: strOrNull(b.latestReportAt), coverageSince: strOrNull(b.coverageSince), readStartedSince: strOrNull(b.readStartedSince), readReceivedSince: strOrNull(b.readReceivedSince), readRenderedSince: strOrNull(b.readRenderedSince) }; }),
+        coverage: { rolloutSince: date(cov, 'rolloutSince', `${path}.coverage.rolloutSince`), readStartedSince: date(cov, 'readStartedSince', `${path}.coverage.readStartedSince`), readReceivedSince: date(cov, 'readReceivedSince', `${path}.coverage.readReceivedSince`), readRenderedSince: date(cov, 'readRenderedSince', `${path}.coverage.readRenderedSince`), webviewTerminationSince: date(cov, 'webviewTerminationSince', `${path}.coverage.webviewTerminationSince`) },
+        builds: (Array.isArray(p.builds) ? p.builds : []).map((raw, index) => { const b = obj(raw), buildPath = `${path}.builds.${index}`; return { appVersion: strOrNull(b.appVersion), appBuild: strOrNull(b.appBuild), reportedInstalls24h: numOrNull(b.reportedInstalls24h), foregroundInstalls: numOrNull(b.foregroundInstalls), latestReportAt: strOrNull(b.latestReportAt), coverageSince: date(b, 'coverageSince', `${buildPath}.coverageSince`), readStartedSince: date(b, 'readStartedSince', `${buildPath}.readStartedSince`), readReceivedSince: date(b, 'readReceivedSince', `${buildPath}.readReceivedSince`), readRenderedSince: date(b, 'readRenderedSince', `${buildPath}.readRenderedSince`) }; }),
       };
     };
     const health = isObj(c.health) ? c.health : null;
@@ -1096,15 +1145,24 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
   return { live: { snapshotAt: strOrNull(live.snapshotAt), includeInternal: live.includeInternal === true,
     client,
     windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(windows, id, `windows.${id}`); return [id, {
-      minutes: num(w.minutes), since: strOrNull(w.since), ios: window(w.ios, `windows.${id}.ios`), web: window(w.web, `windows.${id}.web`) }]; })) as AdminLive['windows'],
-    platforms: { ios: timestamps('ios'), web: timestamps('web') },
-    providers: (Array.isArray(live.providers) ? live.providers : (r.mark('providers'), [])).map((p) => { const x = obj(p); return {
-      provider: str(x.provider), model: str(x.model), calls24h: num(x.calls24h), failures24h: num(x.failures24h), usd24h: num(x.usd24h),
+      minutes: num(w.minutes), since: date(w, 'since', `windows.${id}.since`), ios: window(w.ios, `windows.${id}.ios`), web: window(w.web, `windows.${id}.web`),
+      android: isObj(w.android) ? window(w.android, `windows.${id}.android`) : (r.mark(`windows.${id}.android`), null) }]; })) as AdminLive['windows'],
+    platforms: { ios: timestamps('ios'), web: timestamps('web'), android: isObj(platforms.android) ? { ...timestamps('android'), coverage: androidCoverage() } : (r.mark('platforms.android'), null) },
+    providers: (Array.isArray(live.providers) ? live.providers : (r.mark('providers'), [])).map((p, index) => { const x = obj(p);
+      const observed = (key: 'calls24h' | 'failures24h' | 'usd24h') => {
+        const raw = x[key];
+        const value = typeof raw === 'number' || (typeof raw === 'string' && raw.trim()) ? numOrNull(raw) : null;
+        if (value === null) r.mark(`providers.${index}.${key}`);
+        return value;
+      };
+      return {
+      provider: str(x.provider), model: str(x.model), calls24h: observed('calls24h'), failures24h: observed('failures24h'), usd24h: observed('usd24h'),
       callLatencyP50Ms: numOrNull(x.callLatencyP50Ms), callLatencyP95Ms: numOrNull(x.callLatencyP95Ms), lastCallAt: strOrNull(x.lastCallAt), lastFailureAt: strOrNull(x.lastFailureAt) }; }),
     coverage: { readStarted: coverage.readStarted === true, clientRendered: coverage.clientRendered === true, crashes: coverage.crashes === true,
       buildVersion: coverage.buildVersion === true, onlinePresence: coverage.onlinePresence === true,
       eventCoverageSince: since('eventCoverageSince'), outcomeCoverageSince: since('outcomeCoverageSince'),
-      readConsumptionCoverageSince: since('readConsumptionCoverageSince'), llmLedgerCoverageSince: since('llmLedgerCoverageSince') } },
+      readConsumptionCoverageSince: since('readConsumptionCoverageSince'), llmLedgerCoverageSince: since('llmLedgerCoverageSince'),
+      clientIngestionEnabled: typeof coverage.clientIngestionEnabled === 'boolean' ? coverage.clientIngestionEnabled : null } },
     internalMarkFailed: root.internalMarkFailed === true, missing, meta };
 }
 

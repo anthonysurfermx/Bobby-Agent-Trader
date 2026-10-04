@@ -681,7 +681,7 @@ export async function searchConsole(days: string[]) {
   // A failure is retried after a minute so a fixed setup (API enabled, user added) shows up quickly.
   if (hit && Date.now() - hit.at < (hit.failed ? 60_000 : 30 * 60_000)) {
     if (hit.failed) return hit.value;
-    return { ...(hit.value as Record<string, unknown>), fetchedAt: new Date(Date.now()).toISOString(), oldestReportAt: new Date(hit.at).toISOString() };
+    return { ...(hit.value as Record<string, unknown>), oldestReportAt: new Date(hit.at).toISOString(), cacheTtlMs: 30 * 60_000 };
   }
   let value: unknown;
   let failed = false;
@@ -705,7 +705,7 @@ export async function searchConsole(days: string[]) {
     const weighted = byDate.rows.reduce((a, r) => a + (r.position ?? 0) * r.impressions!, 0);
     const covered = days.filter((d) => byDay.has(d));
     value = {
-      configured: true, site: GSC_SITE(), days, clicks, impressions, fetchedAt: new Date().toISOString(),
+      configured: true, site: GSC_SITE(), days, clicks, impressions, fetchedAt: new Date().toISOString(), cacheTtlMs: 30 * 60_000,
       timeZone: 'America/Los_Angeles', firstIncompleteDate, incompleteDays, missingDays,
       partial: missingDays.length > 0 || incompleteDays.length > 0, coveredFrom: covered[0] ?? null, coveredTo: covered.at(-1) ?? null,
       totals: byDate.rows.length ? { clicks: totalClicks, impressions: totalImpressions, ctr: totalImpressions ? totalClicks / totalImpressions : 0, position: totalImpressions ? weighted / totalImpressions : null } : null,

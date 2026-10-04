@@ -66,20 +66,22 @@ export function DeltaLine({ d, invert, suffix = 'vs periodo anterior', fallback 
 export interface KpiItem { label: string; value: ReactNode; delta?: Delta | null; invert?: boolean; caption?: ReactNode; tone?: 'red' }
 
 /** One card split in three (or four) columns with hairline dividers (stacks on phones; four stack until lg). */
-export function KpiStrip({ items }: { items: KpiItem[] }) {
+export function KpiStrip({ items, compact = false }: { items: KpiItem[]; compact?: boolean }) {
   const four = items.length === 4;
   return (
-    <Card padded={false} className={cx('grid grid-cols-1 divide-y divide-white/[0.06]', four ? 'lg:grid-cols-4 lg:divide-x lg:divide-y-0' : 'sm:grid-cols-3 sm:divide-x sm:divide-y-0')}>
+    <Card padded={false} className={cx('grid divide-white/[0.06]', compact
+      ? 'grid-cols-2 [&>div:nth-child(odd)]:border-r [&>div:nth-child(n+3)]:border-t [&>div]:border-white/[0.06] lg:grid-cols-4 lg:[&>div:nth-child(n+3)]:border-t-0 lg:[&>div:not(:last-child)]:border-r'
+      : cx('grid-cols-1 divide-y', four ? 'lg:grid-cols-4 lg:divide-x lg:divide-y-0' : 'sm:grid-cols-3 sm:divide-x sm:divide-y-0'))}>
       {items.map((k) => (
-        <div key={k.label} className="flex min-w-0 flex-col justify-between gap-5 p-5">
+        <div key={k.label} className={cx('flex min-w-0 flex-col justify-between', compact ? 'gap-3 p-4' : 'gap-5 p-5')}>
           <div className="min-w-0">
-            <div className="text-[13px] text-[#EDEDED]/90">{k.label}</div>
+            <div className={cx('text-[#EDEDED]/90', compact ? 'text-[12px]' : 'text-[13px]')}>{k.label}</div>
             <div className={cx('mt-2 truncate font-mono text-[28px] font-medium leading-none tracking-[-0.02em]', k.tone === 'red' ? 'text-[#F06A6A]' : 'text-[#EDEDED]')}>{k.value}</div>
           </div>
           {k.delta !== undefined || k.caption ? (
             <div className="flex min-w-0 flex-col gap-1">
               {k.delta !== undefined && <DeltaLine d={k.delta} invert={k.invert} fallback={!k.caption ? 'sin comparación' : undefined} />}
-              {k.caption && <div className="font-mono text-[12px] leading-snug text-[#8B8B8B]">{k.caption}</div>}
+              {k.caption && <div className={cx('font-mono leading-snug text-[#8B8B8B]', compact ? 'text-[10.5px]' : 'text-[12px]')}>{k.caption}</div>}
             </div>
           ) : null}
         </div>

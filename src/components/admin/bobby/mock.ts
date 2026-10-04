@@ -393,13 +393,13 @@ function growth(n: number, bare: boolean) {
       total: r(4120), accounts: r(128), guests: r(3992), wallets: 3, excluded: { accounts: 2, guests: 3 },
       newInPeriod: r(3400), active7d: r(1210), active30d: r(2900), readers7d: r(640), readers: r(1700),
       stages: { new: r(430), active: r(975), recurring: r(318), pro: r(24), atRisk: r(905), lost: r(1402) },
-      byPlatform: { web: r(3310), ios: r(790) }, proInactive: bare ? 0 : 2, accountsNeverRead: r(14),
+      byPlatform: { web: r(3310), ios: r(790), android: r(20) }, proInactive: bare ? 0 : 2, accountsNeverRead: r(14),
       proPaidVerified: subscriptionsSummary(bare).paidVerified, proInactivePaid: bare ? 0 : 1,
     },
-    cohorts: { web: cohort(3400, 1690, 690), ios: cohort(640, 512, 512) },
-    history: { web: { installs: 8, readers: 8, reads: 13, read2: 4, linked: 0, since: iso(NOW - 40 * DAY), until: iso(NOW - 36 * DAY) }, ios: { installs: 4, readers: 4, reads: 6, read2: 2, linked: 0, since: iso(NOW - 39 * DAY), until: iso(NOW - 36 * DAY) } },
+    cohorts: { web: cohort(3400, 1690, 690), ios: cohort(640, 512, 512), android: { ...cohort(20, 15, 10), signinStart: 0 } },
+    history: { web: { installs: 8, readers: 8, reads: 13, read2: 4, linked: 0, since: iso(NOW - 40 * DAY), until: iso(NOW - 36 * DAY) }, ios: { installs: 4, readers: 4, reads: 6, read2: 2, linked: 0, since: iso(NOW - 39 * DAY), until: iso(NOW - 36 * DAY) }, android: { installs: 0, readers: 0, reads: 0, read2: 0, linked: 0, since: null, until: null } },
     outcomes: {
-      consumed: r(2700), consumedInternal: r(110), consumedTotal: r(2810), byPlatform: { web: r(1500), ios: r(1200) }, delivered: r(2600), failed: r(40),
+      consumed: r(2770), consumedInternal: r(110), consumedTotal: r(2880), byPlatform: { web: r(1500), ios: r(1200), android: r(70) }, delivered: r(2660), failed: r(42),
       wallSignin: r(210), wallSigninInstalls: r(170), wallPaywall: r(12), wallLevel: r(66), abandoned: r(25),
       blocked: bare ? {} : { daily_limit: r(4), no_address: r(1) }, byLevel: { rapido: r(2300), profundo: r(220), maximo: r(80) },
       outcomesSince: bare ? null : iso(NOW - 5 * HOUR),
@@ -416,7 +416,7 @@ function growth(n: number, bare: boolean) {
       neverRead: bare ? [] : USERS.filter((u) => !u.reads && !u.wallet_only).slice(0, 6).map((u) => ({ identityId: u.id, email: u.email, provider: u.provider, createdAt: u.created_at, lastDay: localDay(NOW - 3 * DAY) })),
       quiet: bare ? [] : USERS.filter((u) => (u.reads ?? 0) > 2).slice(0, 4).map((u) => ({ identityId: u.id, email: u.email, provider: u.provider, reads: u.reads, lastDay: localDay(NOW - 12 * DAY) })),
     },
-    coverage: { webObservedSince: iso(NOW - 6 * HOUR), iosObservedSince: iso(NOW - 4 * HOUR), activitySince: localDay(NOW - 40 * DAY), outcomesSince: bare ? null : iso(NOW - 5 * HOUR), observedInstalls: r(4040), backfillInstalls: 12, internalInstalls: 3, internalAccounts: 2 },
+    coverage: { webObservedSince: iso(NOW - 6 * HOUR), iosObservedSince: iso(NOW - 4 * HOUR), androidObservedSince: bare ? null : iso(NOW - 3 * HOUR), activitySince: localDay(NOW - 40 * DAY), outcomesSince: bare ? null : iso(NOW - 5 * HOUR), observedInstalls: r(4060), backfillInstalls: 12, internalInstalls: 3, internalAccounts: 2 },
   };
 }
 
@@ -850,15 +850,18 @@ function liveFixture(bare: boolean, internal: boolean, partial: boolean) {
   };
   return { live: { snapshotAt: iso(at), includeInternal: internal,
     windows: Object.fromEntries([['15m', 15, 1], ['1h', 60, 3], ['24h', 1440, 12]].map(([id, minutes, scale]) => [id,
-      { minutes, since: iso(at - Number(minutes) * MIN), ios: platform(Number(scale), true), web: platform(Number(scale), false) }])),
-    platforms: { ios: times, web: times },
+      { minutes, since: iso(at - Number(minutes) * MIN), ios: platform(Number(scale), true), web: platform(Number(scale), false),
+        android: platform(bare ? 0 : Number(scale) / 2, true) }])),
+    platforms: { ios: times, web: times, android: { ...times, coverage: {
+      eventCoverageSince: bare ? null : COVERAGE.eventsSince, outcomeCoverageSince: bare ? null : COVERAGE.outcomesSince,
+      readConsumptionCoverageSince: bare ? null : COVERAGE.readsSince } } },
     providers: bare ? [] : [{ provider: 'anthropic', model: 'fixture-model', calls24h: 120, failures24h: 1, usd24h: 0.41,
       callLatencyP50Ms: 1450, callLatencyP95Ms: 3400, lastCallAt: iso(at - MIN), lastFailureAt: iso(at - HOUR) }],
     client: { presenceTtlSeconds: 90, coverage: { protocolVersion: 1, scope: 'instrumented_clients_only', legacyClients: 'unmeasured', crashes: false, successRate: null },
       platforms: { ios: clientPlatform(true), web: clientPlatform(false) },
       health: { status: bare ? 'unknown' : partial ? 'failure_observed' : 'recovered', lastErrorAt: bare ? null : iso(at - 10 * MIN),
         error: bare ? null : 'storage_unavailable', authenticated: bare ? null : true, lastReportAt: bare ? null : iso(at - (partial ? 15 * MIN : 20_000)), recovered: bare ? null : !partial } },
-    coverage: { readStarted: false, clientRendered: false, crashes: false, buildVersion: false, onlinePresence: false,
+    coverage: { readStarted: false, clientRendered: false, crashes: false, buildVersion: false, onlinePresence: false, clientIngestionEnabled: true,
       eventCoverageSince: bare ? null : COVERAGE.eventsSince, outcomeCoverageSince: bare ? null : COVERAGE.outcomesSince,
       readConsumptionCoverageSince: bare ? null : COVERAGE.readsSince, llmLedgerCoverageSince: bare ? null : COVERAGE.ledgerSince } },
     internalMarkFailed: partial, meta: fixtureMeta(['live'], partial) };

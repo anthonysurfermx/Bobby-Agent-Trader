@@ -187,6 +187,15 @@ export default function IntegrationsTab({ data, period, refreshKey }: { data: Ov
         </div>
       </div>
 
+      <Card>
+        <CardHead title="Cobertura pendiente" sub="Estas fuentes no se pueden inferir de una integración configurada o de una respuesta correcta del servidor" />
+        <ul className="m-0 list-none space-y-2 p-0 text-[12px] leading-relaxed text-[#8B8B8B]">
+          <li><span className="text-[#EDEDED]">Google Play:</span> los webhooks recibidos se guardan, pero las membresías Pro y su clasificación comercial siguen sin reconciliarse para esta tienda. Las descargas de Play Console no están conectadas.</li>
+          <li><span className="text-[#EDEDED]">Clientes:</span> no hay una fuente de crashes nativos. Android aún no envía confirmaciones de recepción o presentación.</li>
+          <li><span className="text-[#EDEDED]">Finanzas:</span> los eventos de compra y el uso de IA registrados no sustituyen una conciliación con facturas, saldos y comisiones del proveedor.</li>
+        </ul>
+      </Card>
+
       {actions.data && actions.error && <StaleBanner error={actions.error} onRetry={() => void actions.reload()} />}
       <SourceFreshness meta={sourceMetaForError(actions.data?.meta, actions.error?.message)} maxAgeMs={CORE_STALE_MS} label="Historial del admin · cada 30 s" fallbackAt={actions.updatedAt} />
       <Card>

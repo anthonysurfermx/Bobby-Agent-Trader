@@ -72,7 +72,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   const now = input.now ?? Date.now();
   const ov = o(input.overview), gr = o(input.growth), ig = o(input.integrations), sc = o(input.searchConsole);
   const health = o(ig.health), people = o(gr.people), outcomes = o(gr.outcomes), acq = o(gr.acquisition), cov = o(gr.coverage);
-  const web = o(o(gr.cohorts).web), ios = o(o(gr.cohorts).ios);
+  const web = o(o(gr.cohorts).web), ios = o(o(gr.cohorts).ios), android = o(o(gr.cohorts).android);
   const llm = o(ov.llm), providers = o(llm.providers);
   const out: Insight[] = [];
   const add = (i: Insight) => out.push(i);
@@ -185,7 +185,7 @@ export function buildInsights(input: InsightInput): Insight[] {
   const downloads = n(o(store.totals).downloads);
   // Apple's load can be partial (its time budget, the 90-day read window, the plan's cache-only read): its figures
   // cover the loaded days only and say so. Apple never separates the team's own downloads.
-  const appleMissing = store.partial === true ? Math.max(1, a(store.missingDays).length) : 0;
+  const appleMissing = store.partial === true ? Math.max(1, new Set([...a(store.missingDays), ...a(store.pendingDays)]).size) : 0;
   const applePartial = appleMissing ? ` (parcial: faltan ${count(appleMissing, 'día', 'días')})` : '';
   const appleTeam = input.includeInternal ? '' : ' Apple cuenta también las descargas del propio equipo (no las separa); las instalaciones de Bobby ya las dejan fuera.';
   // Installs of the same window: observed arrivals plus rebuilt installs first seen in the period.
@@ -193,10 +193,10 @@ export function buildInsights(input: InsightInput): Insight[] {
   const iosInstalls = n(ios.arrived) + n(historicalIos);
   if (measured(ios.arrived) && measured(historicalIos) && store.configured && !store.error && downloads >= 3 && downloads > iosInstalls) {
     add({
-      id: 'ios-gap', level: 'warn', area: 'medicion', tab: 'funnel', impact: 72, sample: downloads,
-      title: `Apple reporta ${count(downloads, 'descarga', 'descargas')}${applePartial}; Bobby solo vio ${count(iosInstalls, 'instalación iOS', 'instalaciones iOS')}`,
-      detail: `De esas descargas faltan ${share(downloads - iosInstalls, downloads)}: Apple y Bobby miden pasos y poblaciones diferentes; la diferencia puede incluir descargas sin apertura o versiones sin instrumentación. No demuestra una pérdida de usuarios.${appleTeam}${applePartial ? ' Las descargas cubren solo los días que Apple alcanzó a cargar.' : ''}${small(downloads)}`,
-      action: 'Libera iOS 1.5 (envía id de instalación y vincula la cuenta) y revisa qué ve alguien en su primera apertura.',
+      id: 'ios-gap', level: 'info', area: 'medicion', tab: 'funnel', impact: 72, sample: downloads,
+      title: `Apple: ${count(downloads, 'descarga', 'descargas')}${applePartial}; Bobby: ${count(iosInstalls, 'instalación iOS', 'instalaciones iOS')} observada${iosInstalls === 1 ? '' : 's'}`,
+      detail: `Las descargas de Apple y las instalaciones que contactaron el servidor miden pasos y poblaciones diferentes. No hay una unión entre ambas fuentes que permita calcular conversión ni usuarios perdidos. La diferencia puede incluir descargas sin apertura o versiones sin instrumentación.${appleTeam}${applePartial ? ' Las descargas cubren solo los días que Apple alcanzó a cargar.' : ''}${small(downloads)}`,
+      action: 'Comprueba la cobertura de la versión distribuida y su primera apertura antes de interpretar la diferencia.',
       evidence: [`descargas Apple ${dateOnly(s(store.coveredFrom))}–${dateOnly(s(store.coveredTo))}: ${int(downloads)}${appleMissing ? ' (parcial)' : ''}`, `instalaciones iOS vistas: ${int(iosInstalls)}`],
     });
   }
@@ -206,7 +206,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'internal-share', level: 'info', area: 'medicion', tab: 'usuarios', impact: 40, sample: consumedTotal,
       title: `${share(consumedInternal, consumedTotal)} de las lecturas del periodo fueron del equipo`,
-      detail: `${int(consumedInternal)} de ${int(consumedTotal)} lecturas vienen de cuentas, instalaciones o redes internas. Ya están fuera de todas las cifras; sin ellas quedan ${int(consumedTotal - consumedInternal)}.`,
+      detail: `${int(consumedInternal)} de ${int(consumedTotal)} lecturas vienen de cuentas, instalaciones o redes internas. ${input.includeInternal ? 'Esta vista las incluye.' : 'Esta vista las excluye.'} Sin ellas quedan ${int(consumedTotal - consumedInternal)} lecturas externas.`,
       action: 'Si alguna cuenta Apple de prueba aún cuenta como externa, márcala en Usuarios → Interno.',
       evidence: [`internas: ${int(consumedInternal)}`, `externas: ${int(consumedTotal - consumedInternal)}`],
     });
@@ -326,14 +326,15 @@ export function buildInsights(input: InsightInput): Insight[] {
     });
   }
   const neverRead = a(o(gr.attention).neverRead).map(o);
-  if (neverRead.length) {
+  const neverReadTotal = measured(people.accountsNeverRead) ? n(people.accountsNeverRead) : neverRead.length;
+  if (neverReadTotal > 0) {
     add({
       id: 'accounts-never-read', level: 'warn', area: 'activacion', tab: 'usuarios', impact: 78, sample: n(people.accounts),
-      title: `${int(neverRead.length)} de ${int(n(people.accounts))} cuentas externas se registraron y nunca leyeron`,
+      title: `${int(neverReadTotal)} de ${int(n(people.accounts))} cuentas${input.includeInternal ? '' : ' externas'} se registraron y no tienen lecturas registradas`,
       // Ids and providers only: this text also goes to the digest email and the plan model, never user emails.
-      detail: `Crearon cuenta y no recibieron ni una lectura: ${neverRead.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)} (${dateOnly(s(u.createdAt))})`).join(', ')}${neverRead.length > 5 ? '…' : ''}.${neverRead.every((u) => !s(u.email)) ? ' Ninguna tiene email visible (Apple lo oculta): no se les puede escribir.' : ' Los emails están en Usuarios.'}`,
+      detail: `No hay consumo de lecturas registrado en esas cuentas; no prueba que nunca hayan leído como invitadas o en clientes sin cobertura.${neverRead.length ? ` Ejemplos: ${neverRead.slice(0, 5).map((u) => `${String(u.provider ?? 'cuenta')} ${String(u.identityId).slice(0, 8)} (${dateOnly(s(u.createdAt))})`).join(', ')}${neverReadTotal > Math.min(5, neverRead.length) ? '…' : ''}.` : ''} Los datos de contacto disponibles están en Usuarios.`,
       action: 'Revisa qué ve alguien justo después de iniciar sesión, y regálales 1 Profundo desde Usuarios (se gasta aunque el cobro esté apagado).',
-      evidence: [`cuentas externas: ${int(n(people.accounts))}`, `sin lectura: ${int(neverRead.length)}`],
+      evidence: [`cuentas${input.includeInternal ? '' : ' externas'}: ${int(n(people.accounts))}`, `sin lectura registrada: ${int(neverReadTotal)}`],
     });
   }
   const medFirst = web.medianMinutesToFirstRead == null ? null : n(web.medianMinutesToFirstRead);
@@ -348,8 +349,8 @@ export function buildInsights(input: InsightInput): Insight[] {
   }
 
   // ---------------------------------------------------------------- conversión
-  const wall = n(web.wall) + n(ios.wall), afterWall = n(web.accountAfterWall) + n(ios.accountAfterWall);
-  const read3 = n(web.read3) + n(ios.read3), readers = n(web.read1) + n(ios.read1);
+  const wall = n(web.wall) + n(ios.wall) + n(android.wall), afterWall = n(web.accountAfterWall) + n(ios.accountAfterWall) + n(android.accountAfterWall);
+  const read3 = n(web.read3) + n(ios.read3) + n(android.read3), readers = n(web.read1) + n(ios.read1) + n(android.read1);
   if (wall >= 3) {
     if (afterWall / wall < 0.3) {
       add({
@@ -381,14 +382,17 @@ export function buildInsights(input: InsightInput): Insight[] {
   }
 
   // ---------------------------------------------------------------- retención
-  const back = o(o(web.retention).readersBack), backIos = o(o(ios.retention).readersBack);
-  const backEligible = n(back.eligible) + n(backIos.eligible), backReturned = n(back.returned) + n(backIos.returned), backRead = n(back.read) + n(backIos.read);
+  const returnCells = [web, ios, android].map((cohort) => o(o(cohort.retention).readersBack))
+    .filter((cell) => measured(cell.eligible) && measured(cell.returned) && measured(cell.read));
+  const backEligible = returnCells.reduce((total, cell) => total + n(cell.eligible), 0);
+  const backReturned = returnCells.reduce((total, cell) => total + n(cell.returned), 0);
+  const backRead = returnCells.reduce((total, cell) => total + n(cell.read), 0);
   if (backEligible >= MIN_RATE_SAMPLE) {
     add({
-      id: 'readers-back', level: backRead / backEligible < 0.2 ? 'warn' : 'info', area: 'retencion', tab: 'funnel', impact: 72, sample: backEligible,
-      title: `${share(backRead, backEligible)} de quienes leyeron volvió a leer otro día`,
-      detail: `${int(backRead)} de ${int(backEligible)} lectores nuevos leyeron de nuevo en su primera semana; ${int(backReturned)} registraron actividad de nuevo.${small(backEligible)}`,
-      action: 'Dale una razón para volver: recordatorio del activo que preguntó, "¿se cumplió?" al día siguiente.',
+      id: 'readers-back', level: 'info', area: 'retencion', tab: 'funnel', impact: 42, sample: backEligible,
+      title: `${backEligible < SMALL_SAMPLE ? `${int(backRead)} de ${int(backEligible)}` : share(backRead, backEligible)} instalaciones lectoras volvieron a leer otro día hasta ahora`,
+      detail: `Se observó otra lectura en ${int(backRead)} de ${int(backEligible)} instalaciones lectoras nuevas y actividad posterior en ${int(backReturned)}. Cada instalación tiene al menos un día posterior completo, pero algunas aún no completan su primera semana. Este acumulado provisional no mide retención semanal madura ni personas distintas.${small(backEligible)}`,
+      action: 'Espera cohortes con siete días completos y revisa W1 antes de concluir que los lectores no vuelven.',
       evidence: [`elegibles: ${int(backEligible)}`, `volvieron a leer: ${int(backRead)}`, `volvieron a registrar actividad: ${int(backReturned)}`],
     });
   }
@@ -429,7 +433,7 @@ export function buildInsights(input: InsightInput): Insight[] {
       id: 'paywall-off', level: 'info', area: 'monetizacion', tab: 'membresias', impact: 45, sample: null,
       title: 'El cobro está apagado: las cuentas gratis leen Rápido sin límite',
       detail: 'Los invitados siguen limitados a 3 lecturas y Profundo/Máximo se miden siempre; pero ninguna cuenta gratis llega al muro de pago de lecturas.',
-      action: 'Enciende BOBBY_PAYWALL cuando iOS 1.5 (con compra in-app) esté publicado.',
+      action: 'Activa BOBBY_PAYWALL cuando el flujo de compra de la versión distribuida esté verificado.',
       evidence: ['BOBBY_PAYWALL: apagado'],
     });
   }

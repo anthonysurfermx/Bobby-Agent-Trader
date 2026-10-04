@@ -170,7 +170,9 @@ function rawOverview(extra: { subscriptions?: Record<string, unknown>; revenue?:
   documentMock.visibilityState = 'hidden'; for (const tick of timers) tick(); await flush();
   eq(requests.length, 2, 'hook: hidden document skips scheduled refresh');
   documentMock.visibilityState = 'visible'; for (const tick of listeners) tick(); await flush();
-  eq(requests.length, 3, 'hook: visibility return refreshes once');
+  eq(requests.length, 2, 'hook: brief visibility return does not repeat a recent request');
+  for (const tick of timers) tick(); await flush();
+  eq(requests.length, 3, 'hook: scheduled cadence still refreshes once');
   key = '7|all'; state = RenderHarness(); await flush();
   eq(requests[2].signal.aborted, true, 'hook: range/team switch aborts previous request');
   eq(state.stale, true, 'hook: previous range cannot masquerade as selected range');

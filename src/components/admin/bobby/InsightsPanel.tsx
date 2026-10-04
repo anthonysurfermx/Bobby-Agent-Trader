@@ -178,29 +178,21 @@ export default function InsightsPanel({ insights, missing, onOpenTab, notify, pe
 }) {
   const urgent = insights.filter((i) => i.level === 'critical' || i.level === 'warn').length;
   const [showAll, setShowAll] = useState(false);
-  // The urgent ones start open: they are what the owner should read first.
-  const [open, setOpen] = useState<Set<string>>(() => new Set(insights.filter((i) => i.level === 'critical').slice(0, 2).map((i) => i.id)));
-  const visible = showAll ? insights : insights.slice(0, 6);
+  const [open, setOpen] = useState<Set<string>>(() => new Set());
+  const priority = ['critical', 'warn', 'opportunity', 'info'];
+  const ordered = [...insights].sort((a, b) => priority.indexOf(a.level) - priority.indexOf(b.level));
+  const visible = showAll ? ordered : ordered.slice(0, 3);
   const counts = (['critical', 'warn', 'opportunity', 'info'] as InsightLevel[]).map((l) => [l, insights.filter((i) => i.level === l).length] as const).filter(([, n]) => n > 0);
   const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
     <Card>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="text-[13px] text-[#EDEDED]/90">Dónde mejorar</div>
-          <div className="mt-2 font-mono text-[26px] font-medium leading-none tracking-[-0.02em] text-[#EDEDED]">
-            {missing ? '—' : urgent ? `${fmtInt(urgent)} por atender` : insights.length ? 'Nada urgente' : 'Sin hallazgos'}
-          </div>
-          <p className="m-0 mt-2 max-w-[640px] text-[12px] leading-snug text-[#8B8B8B]">
-            Calculado con las mismas cifras de este panel, {internal ? 'incluyendo al equipo' : markFailed ? 'sin el tráfico del equipo · sin verificar (este navegador no se pudo marcar: puede incluir tu propio tráfico)' : 'sin el tráfico del equipo'}; cada hallazgo muestra sus números y su muestra (n).
-          </p>
+          <h2 className="m-0 text-[13px] font-medium text-[#EDEDED]">Prioridades</h2>
+          <p className="m-0 mt-1 text-[11px] text-[#8B8B8B]">{missing ? 'Diagnóstico no disponible' : urgent ? `${fmtInt(urgent)} hallazgos por atender · primero los de mayor urgencia` : insights.length ? 'Sin hallazgos urgentes en la cobertura observada' : 'Sin hallazgos en la cobertura observada'}</p>
         </div>
-        {counts.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {counts.map(([l, n]) => <Tag key={l} tone={LEVEL[l].tone}>{LEVEL[l].label} {n}</Tag>)}
-          </div>
-        )}
+        {counts.length > 0 && <div className="flex gap-1.5">{counts.filter(([l]) => l === 'critical' || l === 'warn').map(([l, n]) => <Tag key={l} tone={LEVEL[l].tone}>{LEVEL[l].label} {n}</Tag>)}</div>}
       </div>
       {missing ? (
         <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">El diagnóstico no está disponible (el servidor no envió los datos de crecimiento).</p>
@@ -209,17 +201,22 @@ export default function InsightsPanel({ insights, missing, onOpenTab, notify, pe
           <ul className="m-0 flex list-none flex-col gap-2 p-0">
             {visible.map((i) => <InsightCard key={i.id} i={i} open={open.has(i.id)} onToggle={() => toggle(i.id)} onOpenTab={onOpenTab} />)}
           </ul>
-          {insights.length > 6 && (
+          {insights.length > 3 && (
             <button type="button" onClick={() => setShowAll((v) => !v)} className="mt-3 font-mono text-[11px] uppercase tracking-[0.06em] text-[#8B8B8B] hover:text-[#EDEDED]">
-              {showAll ? 'Ver menos' : `Ver los ${insights.length} hallazgos`}
+              {showAll ? 'Mostrar 3 prioridades' : `Ver los ${insights.length} hallazgos`}
             </button>
           )}
+          {!showAll && insights.length > 3 && <span className="ml-2 text-[10.5px] text-[#8B8B8B]">Incluye oportunidades e información</span>}
         </>
       ) : (
         <p className="m-0 font-mono text-[12px] text-[#5C5C5C]">Ninguna regla encontró algo que atender con los datos de este periodo.</p>
       )}
-      {notify && !missing && insights.length > 0 && period != null && <WeeklyPlan insights={insights} period={period} internal={!!internal} notify={notify} />}
-      {notify && !missing && <DigestControls notify={notify} />}
+      {!missing && <details className="mt-3 border-t border-white/[0.06] pt-3 text-[11px] text-[#8B8B8B]">
+        <summary className="cursor-pointer">Cómo se calcula y herramientas del diagnóstico</summary>
+        <p className="m-0 mt-3 leading-relaxed">Reglas basadas en las cifras del periodo, {internal ? 'incluyendo al equipo' : markFailed ? 'con exclusión del equipo sin verificar para esta carga' : 'sin el tráfico del equipo'}. Cada hallazgo conserva su muestra y evidencia; una cobertura incompleta limita el diagnóstico.</p>
+        {notify && insights.length > 0 && period != null && <WeeklyPlan insights={insights} period={period} internal={!!internal} notify={notify} />}
+        {notify && <DigestControls notify={notify} />}
+      </details>}
     </Card>
   );
 }
