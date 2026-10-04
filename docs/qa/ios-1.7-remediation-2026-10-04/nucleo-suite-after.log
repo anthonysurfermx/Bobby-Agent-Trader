@@ -1,0 +1,1039 @@
+TAP version 13
+# Subtest: A→B immediately removes visible account collections and current read
+ok 1 - A→B immediately removes visible account collections and current read
+  ---
+  duration_ms: 3.124
+  type: 'test'
+  ...
+# Subtest: late collection replies from A cannot restore cards, island or suggestions under B
+ok 2 - late collection replies from A cannot restore cards, island or suggestions under B
+  ---
+  duration_ms: 3.900583
+  type: 'test'
+  ...
+# Subtest: an old logged-in signin gate is cleared on A→B
+ok 3 - an old logged-in signin gate is cleared on A→B
+  ---
+  duration_ms: 0.41625
+  type: 'test'
+  ...
+# Subtest: explicit anonymous→login preserves the signin gate and its question for the native retry
+ok 4 - explicit anonymous→login preserves the signin gate and its question for the native retry
+  ---
+  duration_ms: 0.358833
+  type: 'test'
+  ...
+# Subtest: logout drops a gate and prevents pre-logout collection replies appearing to the guest
+ok 5 - logout drops a gate and prevents pre-logout collection replies appearing to the guest
+  ---
+  duration_ms: 0.340833
+  type: 'test'
+  ...
+# Subtest: consent withdrawal cancels current read/gate while preserving accessible saved account data
+ok 6 - consent withdrawal cancels current read/gate while preserving accessible saved account data
+  ---
+  duration_ms: 2.70175
+  type: 'test'
+  ...
+# Subtest: account change during boot preserves BOOT and still discards its old pending read
+ok 7 - account change during boot preserves BOOT and still discards its old pending read
+  ---
+  duration_ms: 0.368125
+  type: 'test'
+  ...
+# Subtest: hold past the ring: the read started (RESOLVING) and the release does not cancel it
+ok 8 - hold past the ring: the read started (RESOLVING) and the release does not cancel it
+  ---
+  duration_ms: 1.710875
+  type: 'test'
+  ...
+# Subtest: the same through THINK_WAIT and a cancelled pointer
+ok 9 - the same through THINK_WAIT and a cancelled pointer
+  ---
+  duration_ms: 0.506917
+  type: 'test'
+  ...
+# Subtest: a tap that begins during the read still cancels it
+ok 10 - a tap that begins during the read still cancels it
+  ---
+  duration_ms: 0.28
+  type: 'test'
+  ...
+# Subtest: previous event allowlist reproduces the black BOOT screen before the session request
+ok 11 - previous event allowlist reproduces the black BOOT screen before the session request
+  ---
+  duration_ms: 13.775708
+  type: 'test'
+  ...
+# Subtest: every literal event registered by either shipping page is allowed by the real bridge
+ok 12 - every literal event registered by either shipping page is allowed by the real bridge
+  ---
+  duration_ms: 5.457458
+  type: 'test'
+  ...
+# Subtest: en: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 13 - en: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 13.531042
+  type: 'test'
+  ...
+# Subtest: es: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 14 - es: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 16.9555
+  type: 'test'
+  ...
+# Subtest: fr: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 15 - fr: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 12.245667
+  type: 'test'
+  ...
+# Subtest: pt: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 16 - pt: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 9.307417
+  type: 'test'
+  ...
+# Subtest: it: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 17 - it: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 7.377292
+  type: 'test'
+  ...
+# Subtest: de: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+ok 18 - de: native Momo/risk v6 session wakes, labels Profile, and opens the native account
+  ---
+  duration_ms: 6.492042
+  type: 'test'
+  ...
+# Subtest: offline collection failures still reach IDLE via the real scheduler
+ok 19 - offline collection failures still reach IDLE via the real scheduler
+  ---
+  duration_ms: 9.959
+  type: 'test'
+  ...
+# Subtest: new native account and consent events register and dispatch through the shipping client
+ok 20 - new native account and consent events register and dispatch through the shipping client
+  ---
+  duration_ms: 0.86425
+  type: 'test'
+  ...
+# Subtest: actual consent handler runs and a closed native sheet resumes the app with Profile accessible
+ok 21 - actual consent handler runs and a closed native sheet resumes the app with Profile accessible
+  ---
+  duration_ms: 9.862708
+  type: 'test'
+  ...
+# Subtest: actual account handler receives native changes and refreshes collections
+ok 22 - actual account handler receives native changes and refreshes collections
+  ---
+  duration_ms: 6.281333
+  type: 'test'
+  ...
+# Subtest: ios: current bridge contract rejects missing or incorrect candle intervals
+ok 23 - ios: current bridge contract rejects missing or incorrect candle intervals
+  ---
+  duration_ms: 7.038917
+  type: 'test'
+  ...
+# Subtest: ios/btc: aligned 1H keeps support and resistance in every locale
+ok 24 - ios/btc: aligned 1H keeps support and resistance in every locale
+  ---
+  duration_ms: 20.328958
+  type: 'test'
+  ...
+# Subtest: ios/btc/wait: 4H analysis never overlays its levels on 1H candles
+ok 25 - ios/btc/wait: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 2.109417
+  type: 'test'
+  ...
+# Subtest: ios/btc/review: 4H analysis never overlays its levels on 1H candles
+ok 26 - ios/btc/review: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.96775
+  type: 'test'
+  ...
+# Subtest: ios/btc/wait: 1D analysis never overlays its levels on 1H candles
+ok 27 - ios/btc/wait: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.852083
+  type: 'test'
+  ...
+# Subtest: ios/btc/review: 1D analysis never overlays its levels on 1H candles
+ok 28 - ios/btc/review: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 2.144458
+  type: 'test'
+  ...
+# Subtest: ios/btc/wait: 1W analysis never overlays its levels on 1H candles
+ok 29 - ios/btc/wait: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.506875
+  type: 'test'
+  ...
+# Subtest: ios/btc/review: 1W analysis never overlays its levels on 1H candles
+ok 30 - ios/btc/review: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.704833
+  type: 'test'
+  ...
+# Subtest: ios/btc: legacy replies without candle metadata retain the declared 1H fallback
+ok 31 - ios/btc: legacy replies without candle metadata retain the declared 1H fallback
+  ---
+  duration_ms: 0.4085
+  type: 'test'
+  ...
+# Subtest: ios/btc: matching timeframe comparison accepts enum casing
+ok 32 - ios/btc: matching timeframe comparison accepts enum casing
+  ---
+  duration_ms: 0.409125
+  type: 'test'
+  ...
+# Subtest: ios/btc: an invalid final candle timestamp never borrows the debate timestamp
+ok 33 - ios/btc: an invalid final candle timestamp never borrows the debate timestamp
+  ---
+  duration_ms: 0.440333
+  type: 'test'
+  ...
+# Subtest: ios/nvda: aligned 1H keeps support and resistance in every locale
+ok 34 - ios/nvda: aligned 1H keeps support and resistance in every locale
+  ---
+  duration_ms: 1.662416
+  type: 'test'
+  ...
+# Subtest: ios/nvda/wait: 4H analysis never overlays its levels on 1H candles
+ok 35 - ios/nvda/wait: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.508834
+  type: 'test'
+  ...
+# Subtest: ios/nvda/review: 4H analysis never overlays its levels on 1H candles
+ok 36 - ios/nvda/review: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 7.158333
+  type: 'test'
+  ...
+# Subtest: ios/nvda/wait: 1D analysis never overlays its levels on 1H candles
+ok 37 - ios/nvda/wait: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.630125
+  type: 'test'
+  ...
+# Subtest: ios/nvda/review: 1D analysis never overlays its levels on 1H candles
+ok 38 - ios/nvda/review: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.722709
+  type: 'test'
+  ...
+# Subtest: ios/nvda/wait: 1W analysis never overlays its levels on 1H candles
+ok 39 - ios/nvda/wait: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.398375
+  type: 'test'
+  ...
+# Subtest: ios/nvda/review: 1W analysis never overlays its levels on 1H candles
+ok 40 - ios/nvda/review: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.373917
+  type: 'test'
+  ...
+# Subtest: ios/nvda: legacy replies without candle metadata retain the declared 1H fallback
+ok 41 - ios/nvda: legacy replies without candle metadata retain the declared 1H fallback
+  ---
+  duration_ms: 0.313417
+  type: 'test'
+  ...
+# Subtest: ios/nvda: matching timeframe comparison accepts enum casing
+ok 42 - ios/nvda: matching timeframe comparison accepts enum casing
+  ---
+  duration_ms: 0.295041
+  type: 'test'
+  ...
+# Subtest: ios/nvda: an invalid final candle timestamp never borrows the debate timestamp
+ok 43 - ios/nvda: an invalid final candle timestamp never borrows the debate timestamp
+  ---
+  duration_ms: 0.2995
+  type: 'test'
+  ...
+# Subtest: web: current bridge contract rejects missing or incorrect candle intervals
+ok 44 - web: current bridge contract rejects missing or incorrect candle intervals
+  ---
+  duration_ms: 4.226875
+  type: 'test'
+  ...
+# Subtest: web/btc: aligned 1H keeps support and resistance in every locale
+ok 45 - web/btc: aligned 1H keeps support and resistance in every locale
+  ---
+  duration_ms: 5.288917
+  type: 'test'
+  ...
+# Subtest: web/btc/wait: 4H analysis never overlays its levels on 1H candles
+ok 46 - web/btc/wait: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.892583
+  type: 'test'
+  ...
+# Subtest: web/btc/review: 4H analysis never overlays its levels on 1H candles
+ok 47 - web/btc/review: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.89125
+  type: 'test'
+  ...
+# Subtest: web/btc/wait: 1D analysis never overlays its levels on 1H candles
+ok 48 - web/btc/wait: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 3.092083
+  type: 'test'
+  ...
+# Subtest: web/btc/review: 1D analysis never overlays its levels on 1H candles
+ok 49 - web/btc/review: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 3.582916
+  type: 'test'
+  ...
+# Subtest: web/btc/wait: 1W analysis never overlays its levels on 1H candles
+ok 50 - web/btc/wait: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.656
+  type: 'test'
+  ...
+# Subtest: web/btc/review: 1W analysis never overlays its levels on 1H candles
+ok 51 - web/btc/review: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.857042
+  type: 'test'
+  ...
+# Subtest: web/btc: legacy replies without candle metadata retain the declared 1H fallback
+ok 52 - web/btc: legacy replies without candle metadata retain the declared 1H fallback
+  ---
+  duration_ms: 0.354334
+  type: 'test'
+  ...
+# Subtest: web/btc: matching timeframe comparison accepts enum casing
+ok 53 - web/btc: matching timeframe comparison accepts enum casing
+  ---
+  duration_ms: 0.322917
+  type: 'test'
+  ...
+# Subtest: web/btc: an invalid final candle timestamp never borrows the debate timestamp
+ok 54 - web/btc: an invalid final candle timestamp never borrows the debate timestamp
+  ---
+  duration_ms: 0.319833
+  type: 'test'
+  ...
+# Subtest: web/nvda: aligned 1H keeps support and resistance in every locale
+ok 55 - web/nvda: aligned 1H keeps support and resistance in every locale
+  ---
+  duration_ms: 2.246958
+  type: 'test'
+  ...
+# Subtest: web/nvda/wait: 4H analysis never overlays its levels on 1H candles
+ok 56 - web/nvda/wait: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.409
+  type: 'test'
+  ...
+# Subtest: web/nvda/review: 4H analysis never overlays its levels on 1H candles
+ok 57 - web/nvda/review: 4H analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.377583
+  type: 'test'
+  ...
+# Subtest: web/nvda/wait: 1D analysis never overlays its levels on 1H candles
+ok 58 - web/nvda/wait: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.393125
+  type: 'test'
+  ...
+# Subtest: web/nvda/review: 1D analysis never overlays its levels on 1H candles
+ok 59 - web/nvda/review: 1D analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.394625
+  type: 'test'
+  ...
+# Subtest: web/nvda/wait: 1W analysis never overlays its levels on 1H candles
+ok 60 - web/nvda/wait: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.394417
+  type: 'test'
+  ...
+# Subtest: web/nvda/review: 1W analysis never overlays its levels on 1H candles
+ok 61 - web/nvda/review: 1W analysis never overlays its levels on 1H candles
+  ---
+  duration_ms: 1.377083
+  type: 'test'
+  ...
+# Subtest: web/nvda: legacy replies without candle metadata retain the declared 1H fallback
+ok 62 - web/nvda: legacy replies without candle metadata retain the declared 1H fallback
+  ---
+  duration_ms: 0.515833
+  type: 'test'
+  ...
+# Subtest: web/nvda: matching timeframe comparison accepts enum casing
+ok 63 - web/nvda: matching timeframe comparison accepts enum casing
+  ---
+  duration_ms: 0.295541
+  type: 'test'
+  ...
+# Subtest: web/nvda: an invalid final candle timestamp never borrows the debate timestamp
+ok 64 - web/nvda: an invalid final candle timestamp never borrows the debate timestamp
+  ---
+  duration_ms: 0.288416
+  type: 'test'
+  ...
+# Subtest: ios: the thesis note is measured; the button comes after it and stays inside the card
+ok 65 - ios: the thesis note is measured; the button comes after it and stays inside the card
+  ---
+  duration_ms: 87.6135
+  type: 'test'
+  ...
+# Subtest: ios: the debate header wraps instead of being cut, and the scroller starts under it
+ok 66 - ios: the debate header wraps instead of being cut, and the scroller starts under it
+  ---
+  duration_ms: 4.049375
+  type: 'test'
+  ...
+# Subtest: ios: each voice shows its caption under its name, and labeled lines are kept, in six languages
+ok 67 - ios: each voice shows its caption under its name, and labeled lines are kept, in six languages
+  ---
+  duration_ms: 6.524041
+  type: 'test'
+  ...
+# Subtest: web: the thesis note is measured; the button comes after it and stays inside the card
+ok 68 - web: the thesis note is measured; the button comes after it and stays inside the card
+  ---
+  duration_ms: 39.782834
+  type: 'test'
+  ...
+# Subtest: web: the debate header wraps instead of being cut, and the scroller starts under it
+ok 69 - web: the debate header wraps instead of being cut, and the scroller starts under it
+  ---
+  duration_ms: 1.817458
+  type: 'test'
+  ...
+# Subtest: web: each voice shows its caption under its name, and labeled lines are kept, in six languages
+ok 70 - web: each voice shows its caption under its name, and labeled lines are kept, in six languages
+  ---
+  duration_ms: 6.404125
+  type: 'test'
+  ...
+# Subtest: both trees build the first-read cards with the same code and the same card rules
+ok 71 - both trees build the first-read cards with the same code and the same card rules
+  ---
+  duration_ms: 0.586041
+  type: 'test'
+  ...
+# Subtest: iOS consent step: the docked question stops 8 px before the Profile button and has its line back afterwards
+ok 72 - iOS consent step: the docked question stops 8 px before the Profile button and has its line back afterwards
+  ---
+  duration_ms: 4.847959
+  type: 'test'
+  ...
+# Subtest: the dev mock speaks the six languages in both trees, and never ships
+ok 73 - the dev mock speaks the six languages in both trees, and never ships
+  ---
+  duration_ms: 1.162417
+  type: 'test'
+  ...
+# Subtest: unconfigured microphone: short tap opens typing without permission
+ok 74 - unconfigured microphone: short tap opens typing without permission
+  ---
+  duration_ms: 1.814458
+  type: 'test'
+  ...
+# Subtest: short tap on a result preserves the follow-up context
+ok 75 - short tap on a result preserves the follow-up context
+  ---
+  duration_ms: 0.314625
+  type: 'test'
+  ...
+# Subtest: a deliberate hold opens the voice explanation
+ok 76 - a deliberate hold opens the voice explanation
+  ---
+  duration_ms: 0.269875
+  type: 'test'
+  ...
+# Subtest: cancelled gesture neither requests permission nor types
+ok 77 - cancelled gesture neither requests permission nor types
+  ---
+  duration_ms: 0.276625
+  type: 'test'
+  ...
+# Subtest: valid parsed response alone does not claim presentation
+ok 78 - valid parsed response alone does not claim presentation
+  ---
+  duration_ms: 1.120041
+  type: 'test'
+  ...
+# Subtest: two visible settled frames acknowledge current request once without receipt/content
+ok 79 - two visible settled frames acknowledge current request once without receipt/content
+  ---
+  duration_ms: 0.862125
+  type: 'test'
+  ...
+# Subtest: hidden/background/sheet and unsettled cards do not acknowledge
+ok 80 - hidden/background/sheet and unsettled cards do not acknowledge
+  ---
+  duration_ms: 11.838041
+  type: 'test'
+  ...
+# Subtest: network failure and replaced read cannot acknowledge old request
+ok 81 - network failure and replaced read cannot acknowledge old request
+  ---
+  duration_ms: 0.296541
+  type: 'test'
+  ...
+# Subtest: ios: the thesis note is measured; the save button and the card's lower edge come after it
+ok 82 - ios: the thesis note is measured; the save button and the card's lower edge come after it
+  ---
+  duration_ms: 10.5255
+  type: 'test'
+  ...
+# Subtest: ios: the debate header may wrap, the scroller starts under it and scrolls until its last line is clear
+ok 83 - ios: the debate header may wrap, the scroller starts under it and scrolls until its last line is clear
+  ---
+  duration_ms: 16.723083
+  type: 'test'
+  ...
+# Subtest: ios: each voice of the debate carries one short line saying what it does, in six languages
+ok 84 - ios: each voice of the debate carries one short line saying what it does, in six languages
+  ---
+  duration_ms: 3.887167
+  type: 'test'
+  ...
+# Subtest: ios: the idle hints are split, each next to what it is about, and stop after three sessions
+ok 85 - ios: the idle hints are split, each next to what it is about, and stop after three sessions
+  ---
+  duration_ms: 1.851708
+  type: 'test'
+  ...
+# Subtest: web: the thesis note is measured; the save button and the card's lower edge come after it
+ok 86 - web: the thesis note is measured; the save button and the card's lower edge come after it
+  ---
+  duration_ms: 7.524417
+  type: 'test'
+  ...
+# Subtest: web: the debate header may wrap, the scroller starts under it and scrolls until its last line is clear
+ok 87 - web: the debate header may wrap, the scroller starts under it and scrolls until its last line is clear
+  ---
+  duration_ms: 5.926584
+  type: 'test'
+  ...
+# Subtest: web: each voice of the debate carries one short line saying what it does, in six languages
+ok 88 - web: each voice of the debate carries one short line saying what it does, in six languages
+  ---
+  duration_ms: 11.09175
+  type: 'test'
+  ...
+# Subtest: web: the idle hints are split, each next to what it is about, and stop after three sessions
+ok 89 - web: the idle hints are split, each next to what it is about, and stop after three sessions
+  ---
+  duration_ms: 3.17975
+  type: 'test'
+  ...
+# Subtest: both trees carry the same captions and the same hint lines
+ok 90 - both trees carry the same captions and the same hint lines
+  ---
+  duration_ms: 2.508167
+  type: 'test'
+  ...
+# ok - nvda/en: wait verdict owns amber, no conviction number
+# ok - nvda/en: spoken text fits TTS and ends on the verdict word
+# ok - nvda/en: chart domain holds every close and line
+# ok - nvda/es: wait verdict owns amber, no conviction number
+# ok - nvda/es: spoken text fits TTS and ends on the verdict word
+# ok - nvda/es: chart domain holds every close and line
+# ok - nvda: first read shows at most 3 satellites
+# ok - btc/en: wait verdict owns amber, no conviction number
+# ok - btc/en: spoken text fits TTS and ends on the verdict word
+# ok - btc/en: chart domain holds every close and line
+# ok - btc/es: wait verdict owns amber, no conviction number
+# ok - btc/es: spoken text fits TTS and ends on the verdict word
+# ok - btc/es: chart domain holds every close and line
+# ok - btc: first read shows at most 3 satellites
+# ok - review + agreeing intel pulse -> real conviction ring + engine plan rows
+# ok - review but pulse disagrees on direction -> no number, no plan
+# ok - pulse from a different instrument (tokenized swap vs Yahoo stock) is never shown
+# ok - an inverted plan (stop above entry on a long) is dropped
+# ok - missing candles -> no chart, no volume satellite, trend fallback
+# ok - missing market price falls back to the technicals price
+# ok - every non-ok golden maps to a caption and never to a verdict
+# ok - a transient failure with a native retry token offers Try again (same question) and Not now; without one, no chips
+# ok - missing data names the horizon in words, never the raw enum; unspecified takes the plain line
+# ok - a read refused for consent routes to the risk beat, never the generic failure copy
+# ok - signin_required -> the sign-in beat: the exact line, the Apple chip holding the retry token, never a verdict
+# ok - subscription_required -> the Bobby Pro beat: reset day from access.resetsAt, the Pro chip holding the retry token
+# ok - gate goldens: a retry token, the access shape, and no read in them
+# ok - bridge methods: the page and native list the same ones (paywall included)
+# ok - xp chip shows real points and the cap honestly
+# ok - no advice or outcome language in the string tables
+# ok - sentence split survives decimals and tickers
+# ok - follow-ups: a follow-up of THIS read first, then up to 2 real symbols, never the current one
+# ok - follow-ups: no suggestions -> only the follow-up of this read; junk symbols are dropped
+# ok - thesis view: a saved Wait shows price, support and resistance; never plan rows it does not have
+# ok - thesis view: a Review with engine levels shows them, in mint; missing values are dropped
+# ok - app strings: en and es carry exactly the same keys
+# ok - app strings: no advice or outcome language (en, es)
+# ok - app strings: no prototype copy or invented market values
+# 38 passed
+# Subtest: ios/Bobby/Nucleo/tests/read-model.test.mjs
+ok 9 - ios/Bobby/Nucleo/tests/read-model.test.mjs
+  ---
+  duration_ms: 161.342084
+  type: 'test'
+  ...
+# Subtest: ios en: the complete consent copy fits in a scroll region above the full-notice button
+ok 92 - ios en: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 1.945667
+  type: 'test'
+  ...
+# Subtest: ios en: even four wrapped headings and a much longer body retain the final sentence
+ok 93 - ios en: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.535833
+  type: 'test'
+  ...
+# Subtest: ios es: the complete consent copy fits in a scroll region above the full-notice button
+ok 94 - ios es: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.369041
+  type: 'test'
+  ...
+# Subtest: ios es: even four wrapped headings and a much longer body retain the final sentence
+ok 95 - ios es: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.336583
+  type: 'test'
+  ...
+# Subtest: ios fr: the complete consent copy fits in a scroll region above the full-notice button
+ok 96 - ios fr: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.384208
+  type: 'test'
+  ...
+# Subtest: ios fr: even four wrapped headings and a much longer body retain the final sentence
+ok 97 - ios fr: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 1.170875
+  type: 'test'
+  ...
+# Subtest: ios pt: the complete consent copy fits in a scroll region above the full-notice button
+ok 98 - ios pt: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.881458
+  type: 'test'
+  ...
+# Subtest: ios pt: even four wrapped headings and a much longer body retain the final sentence
+ok 99 - ios pt: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.750875
+  type: 'test'
+  ...
+# Subtest: ios it: the complete consent copy fits in a scroll region above the full-notice button
+ok 100 - ios it: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 4.421834
+  type: 'test'
+  ...
+# Subtest: ios it: even four wrapped headings and a much longer body retain the final sentence
+ok 101 - ios it: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.518042
+  type: 'test'
+  ...
+# Subtest: ios de: the complete consent copy fits in a scroll region above the full-notice button
+ok 102 - ios de: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.338667
+  type: 'test'
+  ...
+# Subtest: ios de: even four wrapped headings and a much longer body retain the final sentence
+ok 103 - ios de: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.314583
+  type: 'test'
+  ...
+# Subtest: ios: short copy uses its measured height without introducing overlap or an unnecessary scroll gesture
+ok 104 - ios: short copy uses its measured height without introducing overlap or an unnecessary scroll gesture
+  ---
+  duration_ms: 0.337083
+  type: 'test'
+  ...
+# Subtest: ios: copy that fits is shown whole, at its own height, with no fade and no cue
+ok 105 - ios: copy that fits is shown whole, at its own height, with no fade and no cue
+  ---
+  duration_ms: 1.664416
+  type: 'test'
+  ...
+# Subtest: ios: copy taller than its viewport ends on a whole line and fades where it continues until the end is in view
+ok 106 - ios: copy taller than its viewport ends on a whole line and fades where it continues until the end is in view
+  ---
+  duration_ms: 2.761292
+  type: 'test'
+  ...
+# Subtest: ios: a viewport cut at the cap takes one more whole line when 4 px above the button are enough for it
+ok 107 - ios: a viewport cut at the cap takes one more whole line when 4 px above the button are enough for it
+  ---
+  duration_ms: 2.005
+  type: 'test'
+  ...
+# Subtest: ios: dragging the body to and across the agree button scrolls without accepting or opening a notice
+ok 108 - ios: dragging the body to and across the agree button scrolls without accepting or opening a notice
+  ---
+  duration_ms: 0.79425
+  type: 'test'
+  ...
+# Subtest: ios: a drag that starts on a statement or just under the body scrolls the body too
+ok 109 - ios: a drag that starts on a statement or just under the body scrolls the body too
+  ---
+  duration_ms: 0.460125
+  type: 'test'
+  ...
+# Subtest: ios: hold to agree and read-full-notice keep their own handlers
+ok 110 - ios: hold to agree and read-full-notice keep their own handlers
+  ---
+  duration_ms: 1.014375
+  type: 'test'
+  ...
+# Subtest: ios: keyboard and trackpad can reach all copy without activating agreement
+ok 111 - ios: keyboard and trackpad can reach all copy without activating agreement
+  ---
+  duration_ms: 4.93625
+  type: 'test'
+  ...
+# Subtest: ios: full accessible copy is hidden from focus outside its visible risk step
+ok 112 - ios: full accessible copy is hidden from focus outside its visible risk step
+  ---
+  duration_ms: 0.590459
+  type: 'test'
+  ...
+# Subtest: ios: the page carries the fades and the more-below chevron, placed under the viewport and driven by the scroll position
+ok 113 - ios: the page carries the fades and the more-below chevron, placed under the viewport and driven by the scroll position
+  ---
+  duration_ms: 0.191875
+  type: 'test'
+  ...
+# Subtest: web en: the complete consent copy fits in a scroll region above the full-notice button
+ok 114 - web en: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.537583
+  type: 'test'
+  ...
+# Subtest: web en: even four wrapped headings and a much longer body retain the final sentence
+ok 115 - web en: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.360292
+  type: 'test'
+  ...
+# Subtest: web es: the complete consent copy fits in a scroll region above the full-notice button
+ok 116 - web es: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.303291
+  type: 'test'
+  ...
+# Subtest: web es: even four wrapped headings and a much longer body retain the final sentence
+ok 117 - web es: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.29475
+  type: 'test'
+  ...
+# Subtest: web fr: the complete consent copy fits in a scroll region above the full-notice button
+ok 118 - web fr: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.286458
+  type: 'test'
+  ...
+# Subtest: web fr: even four wrapped headings and a much longer body retain the final sentence
+ok 119 - web fr: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.284541
+  type: 'test'
+  ...
+# Subtest: web pt: the complete consent copy fits in a scroll region above the full-notice button
+ok 120 - web pt: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.335208
+  type: 'test'
+  ...
+# Subtest: web pt: even four wrapped headings and a much longer body retain the final sentence
+ok 121 - web pt: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.279917
+  type: 'test'
+  ...
+# Subtest: web it: the complete consent copy fits in a scroll region above the full-notice button
+ok 122 - web it: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.282833
+  type: 'test'
+  ...
+# Subtest: web it: even four wrapped headings and a much longer body retain the final sentence
+ok 123 - web it: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.27425
+  type: 'test'
+  ...
+# Subtest: web de: the complete consent copy fits in a scroll region above the full-notice button
+ok 124 - web de: the complete consent copy fits in a scroll region above the full-notice button
+  ---
+  duration_ms: 0.284417
+  type: 'test'
+  ...
+# Subtest: web de: even four wrapped headings and a much longer body retain the final sentence
+ok 125 - web de: even four wrapped headings and a much longer body retain the final sentence
+  ---
+  duration_ms: 0.768458
+  type: 'test'
+  ...
+# Subtest: web: short copy uses its measured height without introducing overlap or an unnecessary scroll gesture
+ok 126 - web: short copy uses its measured height without introducing overlap or an unnecessary scroll gesture
+  ---
+  duration_ms: 0.461416
+  type: 'test'
+  ...
+# Subtest: web: copy that fits is shown whole, at its own height, with no fade and no cue
+ok 127 - web: copy that fits is shown whole, at its own height, with no fade and no cue
+  ---
+  duration_ms: 0.926042
+  type: 'test'
+  ...
+# Subtest: web: copy taller than its viewport ends on a whole line and fades where it continues until the end is in view
+ok 128 - web: copy taller than its viewport ends on a whole line and fades where it continues until the end is in view
+  ---
+  duration_ms: 1.176625
+  type: 'test'
+  ...
+# Subtest: web: a viewport cut at the cap takes one more whole line when 4 px above the button are enough for it
+ok 129 - web: a viewport cut at the cap takes one more whole line when 4 px above the button are enough for it
+  ---
+  duration_ms: 1.864542
+  type: 'test'
+  ...
+# Subtest: web: dragging the body to and across the agree button scrolls without accepting or opening a notice
+ok 130 - web: dragging the body to and across the agree button scrolls without accepting or opening a notice
+  ---
+  duration_ms: 0.656
+  type: 'test'
+  ...
+# Subtest: web: a drag that starts on a statement or just under the body scrolls the body too
+ok 131 - web: a drag that starts on a statement or just under the body scrolls the body too
+  ---
+  duration_ms: 0.395083
+  type: 'test'
+  ...
+# Subtest: web: hold to agree and read-full-notice keep their own handlers
+ok 132 - web: hold to agree and read-full-notice keep their own handlers
+  ---
+  duration_ms: 0.400417
+  type: 'test'
+  ...
+# Subtest: web: keyboard and trackpad can reach all copy without activating agreement
+ok 133 - web: keyboard and trackpad can reach all copy without activating agreement
+  ---
+  duration_ms: 0.37025
+  type: 'test'
+  ...
+# Subtest: web: full accessible copy is hidden from focus outside its visible risk step
+ok 134 - web: full accessible copy is hidden from focus outside its visible risk step
+  ---
+  duration_ms: 0.355
+  type: 'test'
+  ...
+# Subtest: web: the page carries the fades and the more-below chevron, placed under the viewport and driven by the scroll position
+ok 135 - web: the page carries the fades and the more-below chevron, placed under the viewport and driven by the scroll position
+  ---
+  duration_ms: 0.064292
+  type: 'test'
+  ...
+# Subtest: the web twin lays the consent copy out with the same code as the iOS page
+ok 136 - the web twin lays the consent copy out with the same code as the iOS page
+  ---
+  duration_ms: 2.962042
+  type: 'test'
+  ...
+# Subtest: en: withdrawal and relaunch keeps Profile accessible without renewed AI consent
+ok 137 - en: withdrawal and relaunch keeps Profile accessible without renewed AI consent
+  ---
+  duration_ms: 6.8905
+  type: 'test'
+  ...
+# Subtest: en: build 60 consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent
+ok 138 - en: build 60 consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent
+  ---
+  duration_ms: 0.57775
+  type: 'test'
+  ...
+# Subtest: es: withdrawal and relaunch keeps Profile accessible without renewed AI consent
+ok 139 - es: withdrawal and relaunch keeps Profile accessible without renewed AI consent
+  ---
+  duration_ms: 0.484292
+  type: 'test'
+  ...
+# Subtest: es: build 60 consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent
+ok 140 - es: build 60 consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent
+  ---
+  duration_ms: 0.384833
+  type: 'test'
+  ...
+# Subtest: a new guest at the risk step can open Profile without accepting AI processing
+ok 141 - a new guest at the risk step can open Profile without accepting AI processing
+  ---
+  duration_ms: 0.373875
+  type: 'test'
+  ...
+# Subtest: opening Profile releases a pending hold so it cannot accept while the native sheet is open
+ok 142 - opening Profile releases a pending hold so it cannot accept while the native sheet is open
+  ---
+  duration_ms: 0.360917
+  type: 'test'
+  ...
+# Subtest: cancelled profile pointer does not open an account sheet or accept risk
+ok 143 - cancelled profile pointer does not open an account sheet or accept risk
+  ---
+  duration_ms: 0.916125
+  type: 'test'
+  ...
+# Subtest: VoiceOver or keyboard activates the same Profile action without invoking hold-to-agree
+ok 144 - VoiceOver or keyboard activates the same Profile action without invoking hold-to-agree
+  ---
+  duration_ms: 0.397958
+  type: 'test'
+  ...
+# Subtest: Profile leaves focus and pointer access outside RISK or while acceptance is being committed
+ok 145 - Profile leaves focus and pointer access outside RISK or while acceptance is being committed
+  ---
+  duration_ms: 2.497834
+  type: 'test'
+  ...
+# Subtest: the release template contains a 44-point profile button hidden until the risk state renders it
+ok 146 - the release template contains a 44-point profile button hidden until the risk state renders it
+  ---
+  duration_ms: 0.202125
+  type: 'test'
+  ...
+# Subtest: accessible consent activation is explicit and readiness guarded: false
+ok 147 - accessible consent activation is explicit and readiness guarded: false
+  ---
+  duration_ms: 0.371709
+  type: 'test'
+  ...
+# Subtest: accessible consent activation is explicit and readiness guarded: true
+ok 148 - accessible consent activation is explicit and readiness guarded: true
+  ---
+  duration_ms: 0.336666
+  type: 'test'
+  ...
+# Subtest: ios: German ordinals and abbreviations do not end a sentence
+ok 149 - ios: German ordinals and abbreviations do not end a sentence
+  ---
+  duration_ms: 1.932125
+  type: 'test'
+  ...
+# Subtest: ios: a number that closes a sentence still ends it
+ok 150 - ios: a number that closes a sentence still ends it
+  ---
+  duration_ms: 0.703792
+  type: 'test'
+  ...
+# Subtest: ios: the German rules do not merge sentences in the other languages
+ok 151 - ios: the German rules do not merge sentences in the other languages
+  ---
+  duration_ms: 0.290416
+  type: 'test'
+  ...
+# Subtest: ios: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains
+ok 152 - ios: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains
+  ---
+  duration_ms: 4.670583
+  type: 'test'
+  ...
+# Subtest: ios: the consent state keeps the mic pill, and both pages ask native before deciding a hold
+ok 153 - ios: the consent state keeps the mic pill, and both pages ask native before deciding a hold
+  ---
+  duration_ms: 2.026292
+  type: 'test'
+  ...
+# Subtest: ios: the unavailable-voice line offers typing and no longer blames the microphone
+ok 154 - ios: the unavailable-voice line offers typing and no longer blames the microphone
+  ---
+  duration_ms: 1.375042
+  type: 'test'
+  ...
+# Subtest: ios: French greets with Bonjour in the afternoon and addresses the user as tu; Portuguese as tu
+ok 155 - ios: French greets with Bonjour in the afternoon and addresses the user as tu; Portuguese as tu
+  ---
+  duration_ms: 1.540667
+  type: 'test'
+  ...
+# Subtest: ios: the evening greeting starts at 20:00 in Spanish and Portuguese, 18:00 elsewhere
+ok 156 - ios: the evening greeting starts at 20:00 in Spanish and Portuguese, 18:00 elsewhere
+  ---
+  duration_ms: 3.793959
+  type: 'test'
+  ...
+# Subtest: web: German ordinals and abbreviations do not end a sentence
+ok 157 - web: German ordinals and abbreviations do not end a sentence
+  ---
+  duration_ms: 0.164
+  type: 'test'
+  ...
+# Subtest: web: a number that closes a sentence still ends it
+ok 158 - web: a number that closes a sentence still ends it
+  ---
+  duration_ms: 0.10025
+  type: 'test'
+  ...
+# Subtest: web: the German rules do not merge sentences in the other languages
+ok 159 - web: the German rules do not merge sentences in the other languages
+  ---
+  duration_ms: 0.08875
+  type: 'test'
+  ...
+# Subtest: web: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains
+ok 160 - web: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains
+  ---
+  duration_ms: 4.131625
+  type: 'test'
+  ...
+# Subtest: web: the consent state keeps the mic pill, and both pages ask native before deciding a hold
+ok 161 - web: the consent state keeps the mic pill, and both pages ask native before deciding a hold
+  ---
+  duration_ms: 1.816292
+  type: 'test'
+  ...
+# Subtest: web: the unavailable-voice line offers typing and no longer blames the microphone
+ok 162 - web: the unavailable-voice line offers typing and no longer blames the microphone
+  ---
+  duration_ms: 1.99
+  type: 'test'
+  ...
+# Subtest: web: French greets with Bonjour in the afternoon and addresses the user as tu; Portuguese as tu
+ok 163 - web: French greets with Bonjour in the afternoon and addresses the user as tu; Portuguese as tu
+  ---
+  duration_ms: 0.932917
+  type: 'test'
+  ...
+# Subtest: web: the evening greeting starts at 20:00 in Spanish and Portuguese, 18:00 elsewhere
+ok 164 - web: the evening greeting starts at 20:00 in Spanish and Portuguese, 18:00 elsewhere
+  ---
+  duration_ms: 3.385375
+  type: 'test'
+  ...
+# Subtest: iOS onboarding: the consent button label names what is agreed to in all six languages
+ok 165 - iOS onboarding: the consent button label names what is agreed to in all six languages
+  ---
+  duration_ms: 0.383167
+  type: 'test'
+  ...
+1..165
+# tests 165
+# suites 0
+# pass 165
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 261.681334
