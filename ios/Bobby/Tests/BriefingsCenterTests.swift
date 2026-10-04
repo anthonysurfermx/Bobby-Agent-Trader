@@ -487,8 +487,33 @@ final class BriefingsCenterTests: XCTestCase {
         XCTAssertNil(BriefingReport(json: ["id": "3f2504e0-4f89-41d3-9a0c-0305e82c3301", "cadence": "hourly", "contentVersion": 1]))
     }
 
+    func testSettingsParsingPreservesAllSixLanguagesAndTheirRegionalLocales() throws {
+        let cases: [(String, String, String)] = [
+            ("en-GB", "en", "en-GB"), ("es-ES", "es", "es-ES"),
+            ("fr-CA", "fr", "fr-FR"), ("pt-BR", "pt", "pt-BR"),
+            ("it-IT", "it", "it-IT"), ("de-AT", "de", "de-DE"),
+        ]
+        for (rawLanguage, expectedLanguage, expectedLocale) in cases {
+            let snapshot = try XCTUnwrap(BriefingSettingsSnapshot(json: ["revision": 0, "language": rawLanguage]))
+            XCTAssertEqual(snapshot.settings.language, expectedLanguage, rawLanguage)
+            XCTAssertEqual(snapshot.settings.locale, expectedLocale, rawLanguage)
+            XCTAssertNil(snapshot.eligiblePro, "A supported language never implies subscription access")
+        }
+    }
+
+    func testSettingsParsingUnsupportedAndMissingLanguagesFallBackToEnglish() throws {
+        for rawLanguage in ["ja", "unknown", ""] {
+            let snapshot = try XCTUnwrap(BriefingSettingsSnapshot(json: ["revision": 0, "language": rawLanguage]))
+            XCTAssertEqual(snapshot.settings.language, "en", rawLanguage)
+            XCTAssertNil(snapshot.eligiblePro)
+        }
+        let missing = try XCTUnwrap(BriefingSettingsSnapshot(json: ["revision": 0]))
+        XCTAssertEqual(missing.settings.language, "en")
+        XCTAssertNil(missing.eligiblePro)
+    }
+
     func testSettingsParsingNeverReadsAMissingFieldAsPro() throws {
-        let bare = try XCTUnwrap(BriefingSettingsSnapshot(json: ["revision": 0, "openingEnabled": 1, "language": "fr"]))
+        let bare = try XCTUnwrap(BriefingSettingsSnapshot(json: ["revision": 0, "openingEnabled": 1, "language": "ja"]))
         XCTAssertNil(bare.eligiblePro)
         XCTAssertFalse(bare.settings.openingEnabled, "a number is not a boolean")
         XCTAssertEqual(bare.settings.language, "en")

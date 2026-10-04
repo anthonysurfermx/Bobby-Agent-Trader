@@ -2,8 +2,9 @@ import XCTest
 
 /// App Review captures for the Bobby Pro subscription (Debug build; nothing is ever bought):
 ///   · the profile's Bobby Pro and Restore Purchases rows, in the real Núcleo (live server, signed out);
-///   · the Bobby Pro sheet in its purchasable state: price and period from the App Store through
-///     RevenueCat's Test Store, the renewal terms, Subscribe, Restore Purchases and the legal links.
+///   · the Bobby Pro sheet with a live RevenueCat Test Store offering: its price and period,
+///     renewal terms, enabled Subscribe, Restore Purchases and legal links. This is Test Store
+///     evidence; it does not verify Apple sandbox purchases or an App Store product price.
 ///     The QA profile (`-qa-profile signed-in`, an in-memory session) plus `-qa-sales-open` (DEBUG only:
 ///     App Store sales taken as open without asking the server) give the signed-in look.
 /// `TEST_RUNNER_BOBBY_SHOTS_DIR=/path xcodebuild test … -only-testing:BobbyUITests/ProReviewShots`
@@ -42,14 +43,18 @@ final class ProReviewShots: XCTestCase {
         app.launch()
         let pro = app.buttons["account-pro"]
         scrollTo(pro)
+        XCTAssertTrue(app.buttons["account-sign-out"].exists, "The isolated QA profile must remain signed in")
         pro.tap()
-        XCTAssertTrue(app.staticTexts["paywall-price"].waitForExistence(timeout: 30), "The App Store price never loaded")
+        XCTAssertTrue(app.staticTexts["paywall-price"].waitForExistence(timeout: 30), "The RevenueCat Test Store price never loaded")
         let subscribe = app.buttons["paywall-subscribe"]
         XCTAssertTrue(subscribe.waitForExistence(timeout: 10))
         let enabled = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: subscribe)
         XCTAssertEqual(XCTWaiter.wait(for: [enabled], timeout: 15), .completed, "Subscribe stayed disabled")
         XCTAssertFalse(app.descendants(matching: .any)["paywall-unavailable"].exists, "no unavailable line")
         XCTAssertTrue(app.buttons["paywall-restore"].exists)
+        XCTAssertTrue(app.staticTexts["paywall-renews"].exists)
+        XCTAssertTrue(app.buttons["paywall-terms"].exists)
+        XCTAssertTrue(app.buttons["paywall-privacy"].exists)
         Thread.sleep(forTimeInterval: 2)
         save("bobby-paywall-review")
     }

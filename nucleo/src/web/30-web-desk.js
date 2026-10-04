@@ -79,11 +79,12 @@
     });
   }
 
-  /* ---- 1H candles, exactly the desk's request (MarketTimeframe.oneHour) ---- */
+  /* ---- Chart candles (fixed 1H, independent of the analysis horizon) ---- */
+  var CANDLES_TIMEFRAME = '1H'; // Shared by both provider URLs and the successful reply metadata.
   function candlePath(symbol, isEquity) {
     var s = encodeURIComponent(symbol);
-    return isEquity ? '/api/stock-candles?symbol=' + s + '&range=7d&interval=1h'
-                    : '/api/okx-candles?instId=' + s + '-USDT&bar=1H&limit=100';
+    return isEquity ? '/api/stock-candles?symbol=' + s + '&range=7d&interval=' + CANDLES_TIMEFRAME.toLowerCase()
+                    : '/api/okx-candles?instId=' + s + '-USDT&bar=' + CANDLES_TIMEFRAME + '&limit=100';
   }
   function decodeCandles(body) {
     var candles = Array.isArray(body.candles) ? body.candles : [];
@@ -322,7 +323,7 @@
     var result = {
       v: 1, status: 'ok', requestId: job.requestId, question: job.question, language: NW.lang,
       asset: assetJSON(a), market: mk, technicals: desk.technicals, pulse: pl, agents: desk.agents,
-      provenance: desk.provenance, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false, telemetry: desk.telemetry || null
+      provenance: desk.provenance, candlesTimeframe: CANDLES_TIMEFRAME, candles: bars, receivedAt: Date.now(), elapsedMs: Date.now() - job.startedAt, fixture: false, telemetry: desk.telemetry || null
     };
     // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
     S.recordQuery(a.symbol, a.isEquity);

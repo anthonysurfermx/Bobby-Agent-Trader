@@ -177,6 +177,11 @@ enum BobbyAccessAPI {
                      auth: BobbyMeterAuth, expectedOwner: UUID? = nil, timeout: TimeInterval? = nil,
                      extraHeaders: [String: String] = [:],
                      onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async throws -> (json: Any?, status: Int, headers: [String: String]) {
+#if DEBUG
+        // Profile captures retain their in-memory identity without issuing Bobby requests, even
+        // with accepted consent. RevenueCat offerings use their own transport and remain live.
+        guard await !AccountSession.shared.isQAFixture else { throw URLError(.cancelled) }
+#endif
         func headers(bearer: String?) -> [String: String] {
             Self.headers(bearer: bearer).merging(extraHeaders.filter { $0.key.caseInsensitiveCompare("Authorization") != .orderedSame }) { access, _ in access }
         }

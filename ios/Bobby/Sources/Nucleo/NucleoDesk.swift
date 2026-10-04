@@ -190,10 +190,13 @@ enum NucleoDeskIO {
                          proxyNote: resolution["proxyNote"] as? String)
     }
 
-    // MARK: Candles (1H, exactly the desk's request)
+    // MARK: Chart candles (fixed 1H, independent of the analysis horizon)
+
+    // The chart metadata and both provider URLs must describe the same candle interval.
+    static let candlesTimeframe = MarketTimeframe.oneHour
 
     static func candlePath(symbol: String, isEquity: Bool) -> String {
-        let tf = MarketTimeframe.oneHour
+        let tf = candlesTimeframe
         return isEquity
             ? "api/stock-candles?symbol=\(symbol)&range=\(tf.equityQuery.range)&interval=\(tf.equityQuery.interval)"
             : "api/okx-candles?instId=\(symbol)-USDT&bar=\(tf.cryptoBar)&limit=100"
@@ -926,6 +929,7 @@ final class NucleoDesk {
                 "pulse": pulse.map { $0.json as Any } ?? NSNull(),
                 "agents": debate.agentsJSON,
                 "provenance": debate.provenance.json,
+                "candlesTimeframe": NucleoDeskIO.candlesTimeframe.rawValue,
                 "candles": candles,
                 "receivedAt": Int((receivedAt.timeIntervalSince1970 * 1000).rounded()),
                 "elapsedMs": Int((Date().timeIntervalSince(job.startedAt) * 1000).rounded()),

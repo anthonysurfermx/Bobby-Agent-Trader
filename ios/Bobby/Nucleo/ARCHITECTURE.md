@@ -276,7 +276,7 @@ Order is normative. The mock follows it too.
                   "plan":null | {"direction":S,"entry":N?,"stop":N?,"target":N?,"rewardRisk":N?,"invalidation":S?}},
   "agents":{"alpha":S,"red":S,"cio":S,"verdict":"wait|review","direction":"long|short|none"},
   "provenance":{"provider":"Yahoo Finance","instrument":"NVDA","assetType":"equity","timeframe":"1H","asOf":"2026-09-25T20:00:00.000Z"},
-  "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
+  "candlesTimeframe":"1H", "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
   "receivedAt":1790422570000, "elapsedMs":5378, "fixture":false,
   "access": Access }            // only when the server sent one (§8.2); a legacy server: no key at all
 { "v":1, "status":"confirm", "token":S, "asset":{"symbol":"XAUT","name":"Xau","isEquity":false,"assetClass":"commodity"}, "matchKind":"proxy|fuzzy|…", "proxyNote":S? }
@@ -295,6 +295,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 - trend: `alcista`→`up`, `bajista`→`down`, `lateral`→`sideways`.
 - momentum: `sobrecompra`→`overbought`, `sobreventa`→`oversold`, `neutral`→`neutral`.
 - Candles decode like `BobbyAPI.candles`: `ts` becomes an Int `t`; string numbers are parsed; volume defaults to 0; sorted ascending.
+- `candlesTimeframe` comes from the same native constant used by both candle request URLs. `provenance.timeframe` remains the debate/evidence horizon. The chart uses the candle interval and final plotted candle timestamp; explicit horizon mismatches suppress support, resistance, band, bracket, and plan overlays while the separate analysis cards retain them. Older replies without `candlesTimeframe` fall back to `provenance.timeframe`.
 - `plan` is null unless at least one of entry, stop or target is a number.
 - `asset.name` = `prettyName(first alias ≠ symbol)`.
 - `receivedAt` is ms at receipt. **In fixture mode it is the raw capture's `recordedAt`**, which keeps the golden replies deterministic.

@@ -134,6 +134,17 @@ final class NucleoBridgeTests: XCTestCase {
     private func assertGolden(_ actual: [String: Any], _ name: String, ignoring: [String] = [],
                               file: StaticString = #filePath, line: UInt = #line) throws {
         var a = actual, b = try golden(name)
+        // Successful recorded replies predate regional context and equity quote currency.
+        // Keep those fields in the strict comparison: a missing or wrong value must fail.
+        if name == "nvda" || name == "btc" {
+            b["locale"] = L.localeIdentifier
+            b["country"] = L.country ?? NSNull() as Any
+            if name == "nvda" {
+                var market = try XCTUnwrap(b["market"] as? [String: Any], file: file, line: line)
+                market["currency"] = "USD"
+                b["market"] = market
+            }
+        }
         // The goldens were recorded in English; the reply's language is the device's (L.ttsLang).
         if let language = a["language"] { XCTAssertEqual(language as? String, L.ttsLang, file: file, line: line) }
         for key in ["requestId", "elapsedMs", "fixture", "language"] + ignoring { a.removeValue(forKey: key); b.removeValue(forKey: key) }
@@ -170,6 +181,27 @@ final class NucleoBridgeTests: XCTestCase {
         try assertGolden(btc, "btc")
         XCTAssertFalse(NucleoFixtures.log.isEmpty)
         XCTAssertTrue(NucleoFixtures.log.allSatisfy { $0.contains("bobbyprotocol.xyz") }, "only fixture hosts: \(NucleoFixtures.log)")
+    }
+
+    func testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon() async throws {
+        XCTAssertEqual(NucleoDeskIO.candlesTimeframe.rawValue, "1H")
+        XCTAssertEqual(NucleoDeskIO.candlePath(symbol: "BTC", isEquity: false),
+                       "api/okx-candles?instId=BTC-USDT&bar=1H&limit=100")
+        XCTAssertEqual(NucleoDeskIO.candlePath(symbol: "NVDA", isEquity: true),
+                       "api/stock-candles?symbol=NVDA&range=7d&interval=1h")
+        for (name, isEquity) in [("Bitcoin", false), ("NVIDIA", true)] {
+            for horizon in ["1H", "4H", "1D", "1W"] {
+                NucleoFixtures.clearLog()
+                let (session, bridge, _) = make()
+                defer { session.teardown() }
+                let r = await result(bridge, "ask", ["question": "Should I buy \(name) on the \(horizon) timeframe?"])
+                XCTAssertEqual(r["candlesTimeframe"] as? String, "1H", "\(name)/\(horizon)")
+                let bars = try XCTUnwrap(r["candles"] as? [[String: Any]])
+                XCTAssertGreaterThanOrEqual(bars.count, 10)
+                let path = NucleoDeskIO.candlePath(symbol: isEquity ? "NVDA" : "BTC", isEquity: isEquity)
+                XCTAssertTrue(NucleoFixtures.log.contains { $0.contains(path) }, "the metadata must match the actual candle URL")
+            }
+        }
     }
 
     func testDeskRefusalsMapToTheGoldenReplies() async throws {

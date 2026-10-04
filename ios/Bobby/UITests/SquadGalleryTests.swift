@@ -17,10 +17,10 @@ final class SquadGalleryTests: XCTestCase {
 
     private func launch(select id: String, xp: Int) -> XCUIApplication {
         let app = XCUIApplication()
-        // companion.id is pinned too: a pick saved on this simulator would make
+        // Pin the owner-scoped selection too: a pick saved on this simulator would make
         // the selected companion "yours" and hide its lock.
         app.launchArguments = ["-qa-squad", "-qa-select", id, "-companion.disciplineXP", "\(xp)",
-                               "-companion.id", "qa-none",
+                               "-companion.id", "qa-none", "-companion.selected.v2.local", "qa-none",
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         return app
@@ -65,7 +65,7 @@ final class SquadGalleryTests: XCTestCase {
     func testActiveCompanionIsNeverShownLocked() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-qa-squad", "-qa-select", "vega", "-companion.disciplineXP", "0",
-                               "-companion.id", "vega",
+                               "-companion.id", "vega", "-companion.selected.v2.local", "vega",
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
         app.launch()
         XCTAssertTrue(waitForStage(app).ready, "vega: never loaded")

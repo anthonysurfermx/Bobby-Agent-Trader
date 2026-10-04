@@ -170,6 +170,31 @@ function fillSats(model){
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
 function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
+/* Keep the full localized subtitle in the 90 px beside the support bracket. */
+function chartSubtitle(text, y){
+  var node = el.cBrS, width = 90;
+  node.textContent = text || ''; att(node, 'y', f2(y));
+  if (!text || node.getComputedTextLength() <= width) return;
+  var best = null, bestWidth = Infinity;
+  function splitAt(i){
+    var a = text.slice(0, i).trim(), b = text.slice(i).trim();
+    if (!a || !b) return;
+    node.textContent = a; var wa = node.getComputedTextLength();
+    node.textContent = b; var wb = node.getComputedTextLength();
+    var w = Math.max(wa, wb);
+    if (w < bestWidth){ best = [a, b]; bestWidth = w; }
+  }
+  for (var i = 1; i < text.length; i++) if (/\s/.test(text.charAt(i))) splitAt(i);
+  /* A single long word can still use both lines without dropping characters. */
+  if (bestWidth > width) for (i = 1; i < text.length; i++) splitAt(i);
+  if (!best){ node.textContent = text; return; }
+  node.textContent = '';
+  best.forEach(function(line, index){
+    var span = D.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    span.setAttribute('x', '296'); span.setAttribute('y', f2(y + index * 14));
+    span.textContent = line; node.appendChild(span);
+  });
+}
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }
@@ -223,8 +248,8 @@ function buildChart(ch, prov, receivedAt){
   if (br && fin(br.to)){
     var ya = nowY, yb = Y(br.to), mid = (ya + yb) / 2;
     att(el.cBrL, 'y1', f2(ya)); att(el.cBrL, 'y2', f2(yb)); att(el.cBrA, 'y1', f2(ya)); att(el.cBrA, 'y2', f2(ya)); att(el.cBrB, 'y1', f2(yb)); att(el.cBrB, 'y2', f2(yb));
-    el.cBrT.textContent = br.label; el.cBrS.textContent = br.sub;
-    att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
+    el.cBrT.textContent = br.label; att(el.cBrT, 'y', f2(mid - 2));
+    chartSubtitle(br.sub, mid + 12);
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
   el.cX.textContent = tt('chart.x', { tf: src.timeframe || '', provider: src.provider || '', inst: src.instrument || '', when: whenLabel(src.asOf, receivedAt) }).toUpperCase();

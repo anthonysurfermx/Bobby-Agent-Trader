@@ -967,8 +967,9 @@ enum AccountDeletionCopy {
 /// Backend-free profile for QA screenshots: `-qa-profile signed-out|signed-in`, progress via
 /// `-companion.disciplineXP <n> -companion.disciplineStreak <n> -companion.aura <n> -companion.id <id>`,
 /// `-qa-pieces <n>` for the island count, `-qa-given-name <name>` for the greeting. The signed-in
-/// session lives in memory only (never the Keychain) and the risk notice stays unaccepted, so
-/// nothing reaches the network.
+/// session lives in memory only (never the Keychain). AccountSession and BobbyAccessAPI refuse
+/// its authenticated transport even with accepted consent; RevenueCat Test Store offerings stay
+/// available for the separate paywall capture, which never purchases or restores.
 struct ProfileQAFixtureView: View {
     @StateObject private var store = CompanionStore()
     @StateObject private var profile = AgentProfile()

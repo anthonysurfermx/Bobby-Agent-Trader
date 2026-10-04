@@ -94,6 +94,10 @@ final class AccountSession: ObservableObject {
     /// Invalidates every pending request when the account changes or signs out.
     private(set) var generation = UUID()
     private var refreshTask: Task<StoredSession, Error>?
+#if DEBUG
+    /// The screenshot session has no bearer and must never be refreshed or sent to a server.
+    private(set) var isQAFixture = false
+#endif
     private var revocationObserver: NSObjectProtocol?
     private static let keychainService = "xyz.bobbyprotocol.bobby.session"
     private let storage: AccountSessionStorage
@@ -130,6 +134,9 @@ final class AccountSession: ObservableObject {
     /// Signs out when Apple says this Apple ID no longer authorizes Bobby. Runs at launch and on
     /// every return to the foreground; a session saved before build 33 first learns its Apple ID.
     func checkAppleCredential() async {
+#if DEBUG
+        guard !isQAFixture else { return }
+#endif
         guard let s = session, s.provider != "twitter" else { return }
         let started = generation
         if s.appleUserId == nil { await backfillIdentity() }
@@ -178,6 +185,9 @@ final class AccountSession: ObservableObject {
     /// `replacing` a token the server just refused (401) forces the refresh whatever its
     /// clock says, unless another request already replaced it.
     func accessToken(replacing stale: String? = nil) async -> String? {
+#if DEBUG
+        guard !isQAFixture else { return nil }
+#endif
         guard let s = session else { return nil }
         let refused = stale != nil && s.accessToken == stale
         if !refused, s.expiresAt.timeIntervalSinceNow > 60 { return s.accessToken }
@@ -241,6 +251,9 @@ final class AccountSession: ObservableObject {
     }
 
     func signOut(store: CompanionStore? = nil) {
+#if DEBUG
+        isQAFixture = false
+#endif
         generation = UUID()
         cancelPendingSignIn()
         refreshTask?.cancel(); refreshTask = nil
@@ -252,6 +265,9 @@ final class AccountSession: ObservableObject {
     }
 
     func accept(_ newSession: StoredSession) {
+#if DEBUG
+        isQAFixture = false
+#endif
         generation = UUID()
         cancelPendingSignIn()
         refreshTask?.cancel(); refreshTask = nil
@@ -480,6 +496,7 @@ final class AccountSession: ObservableObject {
     /// `-qa-profile signed-in`: an in-memory Apple session (never the Keychain, never a real token)
     /// so the profile sheet can be captured signed in. Nothing it holds can reach the server.
     func acceptQAFixture(userId: String, appleUserId: String) {
+        isQAFixture = true
         generation = UUID()
         cancelPendingSignIn()
         session = StoredSession(accessToken: "qa-fixture", refreshToken: "qa-fixture", expiresAt: Date().addingTimeInterval(3600),

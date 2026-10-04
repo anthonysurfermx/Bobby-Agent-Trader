@@ -1,5 +1,5 @@
 // The desk's "+" locker (SquadLockerSheet) through its DEBUG fixture:
-// `-qa-locker -qa-locker-fresh -companion.id <id> -companion.disciplineXP <n>`.
+// `-qa-locker -qa-locker-fresh -companion.selected.v2.local <id> -companion.disciplineXP <n>`.
 // Screenshots are kept as attachments for review.
 import XCTest
 
@@ -11,7 +11,7 @@ final class LockerTests: XCTestCase {
     private func launch(xp: Int, own: String = "kora", fresh: Bool = true, extra: [String] = []) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-qa-locker"] + (fresh ? ["-qa-locker-fresh"] : []) +
-            ["-companion.id", own, "-companion.disciplineXP", "\(xp)",
+            ["-companion.id", own, "-companion.selected.v2.local", own, "-companion.disciplineXP", "\(xp)",
              "-AppleLanguages", "(en)", "-AppleLocale", "en_US"] + extra
         app.launch()
         return app

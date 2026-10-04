@@ -586,11 +586,14 @@
     if (c.length < 10) return null;
     var pts = c.slice(-48);
     var closes = pts.map(function (x) { return x.c; });
-    var tech = r.technicals || {};
+    var timeframe = r.candlesTimeframe || r.provenance.timeframe;
+    // Legacy replies lack candle metadata. Explicit mismatched horizons cannot share overlays.
+    var aligned = !r.candlesTimeframe || String(r.candlesTimeframe).toUpperCase() === String(r.provenance.timeframe).toUpperCase();
+    var tech = aligned ? (r.technicals || {}) : {};
     var lines = [];
     if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) });
     if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency, locale) }) });
-    if (plan) {
+    if (plan && aligned) {
       ['entry', 'stop', 'target'].forEach(function (k) {
         lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency, locale) }) });
       });
@@ -604,6 +607,8 @@
     var grid = [];
     for (var g = lo + step; g < hi - step * 0.5 && grid.length < 2; g += step) grid.push(+g.toFixed(10));
     var now = pts[pts.length - 1];
+    var lastTime = new Date(now.t);
+    var asOf = fin(now.t) && !isNaN(lastTime.getTime()) ? lastTime.toISOString() : null;
     var band = null, bracket = null;
     if (fin(tech.support)) {
       var atr = fin(tech.atrPct) && fin(now.c) ? now.c * tech.atrPct / 100 : 0;
@@ -618,7 +623,7 @@
       domain: [lo, hi], gridlines: grid,
       now: { price: now.c, t: now.t, label: money(now.c, lang, currency, locale) },
       band: band, lines: lines, bracket: bracket,
-      source: { timeframe: r.provenance.timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: r.provenance.asOf }
+      source: { timeframe: timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: asOf }
     };
   }
 

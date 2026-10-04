@@ -60,7 +60,7 @@
     pulse: T.any,
     agents: { alpha: T.str, red: T.str, cio: T.str, verdict: oneOf('wait', 'review'), direction: oneOf('long', 'short', 'none') },
     provenance: { provider: T.str, instrument: T.str, assetType: oneOf('equity', 'crypto'), timeframe: T.str, asOf: T.str },
-    candles: arrayOf(CANDLE), receivedAt: T.int, elapsedMs: T.int, fixture: T.bool
+    candlesTimeframe: eq('1H'), candles: arrayOf(CANDLE), receivedAt: T.int, elapsedMs: T.int, fixture: T.bool
   };
   var SAVE = {
     status: eq('saved'), awardedXP: T.int, capped: T.bool, kind: oneOf('read_complete', 'no_trade_respected'),
