@@ -1,0 +1,356 @@
+[
+  {
+    "name": "bobby_read_access",
+    "matches": true,
+    "expected": "p_identity uuid, p_device text, p_paywall boolean",
+    "actual": "p_identity uuid, p_device text, p_paywall boolean"
+  },
+  {
+    "name": "bobby_consume_read",
+    "matches": true,
+    "expected": "p_identity uuid, p_device text, p_network text, p_platform text, p_symbol text, p_paywall boolean",
+    "actual": "p_identity uuid, p_device text, p_network text, p_platform text, p_symbol text, p_paywall boolean"
+  },
+  {
+    "name": "bobby_level_state",
+    "matches": true,
+    "expected": "p_identity uuid, p_device text, p_limits jsonb",
+    "actual": "p_identity uuid, p_device text, p_limits jsonb"
+  },
+  {
+    "name": "bobby_consume_level",
+    "matches": true,
+    "expected": "p_identity uuid, p_device text, p_level text, p_symbol text, p_limits jsonb",
+    "actual": "p_identity uuid, p_device text, p_level text, p_symbol text, p_limits jsonb"
+  },
+  {
+    "name": "bobby_memory_record",
+    "matches": true,
+    "expected": "p_identity uuid, p_symbol text, p_horizon text, p_price numeric",
+    "actual": "p_identity uuid, p_symbol text, p_horizon text, p_price numeric"
+  },
+  {
+    "name": "bobby_memory_summary",
+    "matches": true,
+    "expected": "p_identity uuid, p_symbol text",
+    "actual": "p_identity uuid, p_symbol text"
+  },
+  {
+    "name": "bobby_memory_forget",
+    "matches": true,
+    "expected": "p_identity uuid, p_symbol text",
+    "actual": "p_identity uuid, p_symbol text"
+  },
+  {
+    "name": "bobby_return_bonus_read",
+    "matches": true,
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "name": "bobby_return_bonus_level",
+    "matches": true,
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "name": "bobby_admin_grant",
+    "matches": true,
+    "expected": "p_identity uuid, p_reads integer, p_profundo integer, p_maximo integer, p_pro_days integer",
+    "actual": "p_identity uuid, p_reads integer, p_profundo integer, p_maximo integer, p_pro_days integer"
+  },
+  {
+    "name": "bobby_admin_grant_once",
+    "matches": true,
+    "expected": "p_operation uuid, p_admin uuid, p_identity uuid, p_reads integer, p_profundo integer, p_maximo integer, p_pro_days integer",
+    "actual": "p_operation uuid, p_admin uuid, p_identity uuid, p_reads integer, p_profundo integer, p_maximo integer, p_pro_days integer"
+  },
+  {
+    "name": "bobby_brief_is_paid_pro",
+    "matches": true,
+    "expected": "p_identity uuid",
+    "actual": "p_identity uuid"
+  },
+  {
+    "name": "bobby_brief_bad",
+    "matches": true,
+    "expected": "p_what text",
+    "actual": "p_what text"
+  },
+  {
+    "name": "bobby_brief_cadence_on",
+    "matches": true,
+    "expected": "s bobby_brief_settings, p_cadence text",
+    "actual": "s bobby_brief_settings, p_cadence text"
+  },
+  {
+    "name": "bobby_brief_analysis_ok",
+    "matches": true,
+    "expected": "s bobby_brief_settings",
+    "actual": "s bobby_brief_settings"
+  },
+  {
+    "name": "bobby_brief_settings_json",
+    "matches": true,
+    "expected": "p_identity uuid",
+    "actual": "p_identity uuid"
+  },
+  {
+    "name": "bobby_brief_jbool",
+    "matches": true,
+    "expected": "p jsonb, k text",
+    "actual": "p jsonb, k text"
+  },
+  {
+    "name": "bobby_brief_jversion",
+    "matches": true,
+    "expected": "p jsonb, k text",
+    "actual": "p jsonb, k text"
+  },
+  {
+    "name": "bobby_brief_settings_get",
+    "matches": true,
+    "expected": "p_identity uuid",
+    "actual": "p_identity uuid"
+  },
+  {
+    "name": "bobby_brief_settings_patch",
+    "matches": true,
+    "expected": "p_identity uuid, p_expected_revision integer, p_patch jsonb",
+    "actual": "p_identity uuid, p_expected_revision integer, p_patch jsonb"
+  },
+  {
+    "name": "bobby_brief_privacy_bump",
+    "matches": true,
+    "expected": "p_identity uuid, p_reason text, p_purge_memory_content boolean",
+    "actual": "p_identity uuid, p_reason text, p_purge_memory_content boolean"
+  },
+  {
+    "name": "bobby_brief_memory_forgotten",
+    "matches": true,
+    "expected": "p_identity uuid, p_symbol text",
+    "actual": "p_identity uuid, p_symbol text"
+  },
+  {
+    "name": "bobby_brief_prefs_hook",
+    "matches": true,
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "name": "bobby_brief_assets_hook",
+    "matches": true,
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "name": "bobby_brief_device_args",
+    "matches": true,
+    "expected": "p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer",
+    "actual": "p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer"
+  },
+  {
+    "name": "bobby_push_device_register",
+    "matches": true,
+    "expected": "p_identity uuid, p_installation uuid, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_credential_verifier text, p_max_active integer",
+    "actual": "p_identity uuid, p_installation uuid, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_credential_verifier text, p_max_active integer"
+  },
+  {
+    "name": "bobby_push_device_rebind",
+    "matches": true,
+    "expected": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer",
+    "actual": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer"
+  },
+  {
+    "name": "bobby_push_device_revoke",
+    "matches": true,
+    "expected": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text",
+    "actual": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text"
+  },
+  {
+    "name": "bobby_push_device_invalidate",
+    "matches": true,
+    "expected": "p_registration uuid, p_binding_revision bigint, p_reason text",
+    "actual": "p_registration uuid, p_binding_revision bigint, p_reason text"
+  },
+  {
+    "name": "bobby_brief_idem_begin",
+    "matches": true,
+    "expected": "p_identity uuid, p_scope text, p_key text, p_digest text, p_ttl_seconds integer",
+    "actual": "p_identity uuid, p_scope text, p_key text, p_digest text, p_ttl_seconds integer"
+  },
+  {
+    "name": "bobby_brief_idem_finish",
+    "matches": true,
+    "expected": "p_identity uuid, p_scope text, p_key text, p_status integer, p_response text",
+    "actual": "p_identity uuid, p_scope text, p_key text, p_status integer, p_response text"
+  },
+  {
+    "name": "bobby_brief_seed",
+    "matches": true,
+    "expected": "p_cadence text, p_period_key text, p_period_start timestamp with time zone, p_period_end timestamp with time zone, p_scheduled_at timestamp with time zone, p_push_expires_at timestamp with time zone, p_calendar_version text, p_policy_version text",
+    "actual": "p_cadence text, p_period_key text, p_period_start timestamp with time zone, p_period_end timestamp with time zone, p_scheduled_at timestamp with time zone, p_push_expires_at timestamp with time zone, p_calendar_version text, p_policy_version text"
+  },
+  {
+    "name": "bobby_brief_shared_claim",
+    "matches": true,
+    "expected": "p_cadence text, p_period_key text, p_language text, p_worker text, p_lease_seconds integer, p_max_attempts integer",
+    "actual": "p_cadence text, p_period_key text, p_language text, p_worker text, p_lease_seconds integer, p_max_attempts integer"
+  },
+  {
+    "name": "bobby_brief_shared_commit",
+    "matches": true,
+    "expected": "p_id uuid, p_fence bigint, p_state text, p_evidence jsonb, p_narrative jsonb, p_data_as_of timestamp with time zone, p_error text",
+    "actual": "p_id uuid, p_fence bigint, p_state text, p_evidence jsonb, p_narrative jsonb, p_data_as_of timestamp with time zone, p_error text"
+  },
+  {
+    "name": "bobby_brief_frequent_assets",
+    "matches": true,
+    "expected": "p_identity uuid",
+    "actual": "p_identity uuid"
+  },
+  {
+    "name": "bobby_brief_memory_for",
+    "matches": true,
+    "expected": "s bobby_brief_settings",
+    "actual": "s bobby_brief_settings"
+  },
+  {
+    "name": "bobby_brief_needed_assets",
+    "matches": true,
+    "expected": "p_cadence text, p_period_key text, p_language text",
+    "actual": "p_cadence text, p_period_key text, p_language text"
+  },
+  {
+    "name": "bobby_brief_open_languages",
+    "matches": true,
+    "expected": "p_cadence text, p_period_key text",
+    "actual": "p_cadence text, p_period_key text"
+  },
+  {
+    "name": "bobby_brief_claim",
+    "matches": true,
+    "expected": "p_cadence text, p_period_key text, p_worker text, p_lease_seconds integer, p_limit integer, p_voices jsonb, p_default_voice text",
+    "actual": "p_cadence text, p_period_key text, p_worker text, p_lease_seconds integer, p_limit integer, p_voices jsonb, p_default_voice text"
+  },
+  {
+    "name": "bobby_brief_publish",
+    "matches": true,
+    "expected": "p_id uuid, p_fence bigint, p_shared_id uuid, p_content jsonb, p_quality text, p_data_as_of timestamp with time zone, p_uses_memory boolean, p_memory_assets text[], p_settings_revision integer, p_privacy_epoch integer",
+    "actual": "p_id uuid, p_fence bigint, p_shared_id uuid, p_content jsonb, p_quality text, p_data_as_of timestamp with time zone, p_uses_memory boolean, p_memory_assets text[], p_settings_revision integer, p_privacy_epoch integer"
+  },
+  {
+    "name": "bobby_brief_fail",
+    "matches": true,
+    "expected": "p_id uuid, p_fence bigint, p_error text, p_final boolean",
+    "actual": "p_id uuid, p_fence bigint, p_error text, p_final boolean"
+  },
+  {
+    "name": "bobby_brief_outbox_fill",
+    "matches": true,
+    "expected": "p_limit integer",
+    "actual": "p_limit integer"
+  },
+  {
+    "name": "bobby_brief_outbox_claim",
+    "matches": true,
+    "expected": "p_worker text, p_lease_seconds integer, p_limit integer",
+    "actual": "p_worker text, p_lease_seconds integer, p_limit integer"
+  },
+  {
+    "name": "bobby_brief_outbox_result",
+    "matches": true,
+    "expected": "p_id uuid, p_fence bigint, p_outcome text, p_apns_status integer, p_reason text, p_retry_after_seconds integer",
+    "actual": "p_id uuid, p_fence bigint, p_outcome text, p_apns_status integer, p_reason text, p_retry_after_seconds integer"
+  },
+  {
+    "name": "bobby_brief_budget_reserve",
+    "matches": true,
+    "expected": "p_kind text, p_work_ref text, p_provider text, p_model text, p_reserve_usd numeric, p_day_cap numeric, p_month_cap numeric, p_max_slots integer, p_max_attempts_per_work integer, p_worker text",
+    "actual": "p_kind text, p_work_ref text, p_provider text, p_model text, p_reserve_usd numeric, p_day_cap numeric, p_month_cap numeric, p_max_slots integer, p_max_attempts_per_work integer, p_worker text"
+  },
+  {
+    "name": "bobby_brief_attempt_cost",
+    "matches": true,
+    "expected": "a bobby_brief_provider_attempts",
+    "actual": "a bobby_brief_provider_attempts"
+  },
+  {
+    "name": "bobby_brief_budget_dispatch",
+    "matches": true,
+    "expected": "p_attempt uuid",
+    "actual": "p_attempt uuid"
+  },
+  {
+    "name": "bobby_brief_budget_settle",
+    "matches": true,
+    "expected": "p_attempt uuid, p_outcome text, p_actual_usd numeric, p_tokens_in integer, p_tokens_out integer, p_chars integer, p_latency_ms integer, p_estimated boolean",
+    "actual": "p_attempt uuid, p_outcome text, p_actual_usd numeric, p_tokens_in integer, p_tokens_out integer, p_chars integer, p_latency_ms integer, p_estimated boolean"
+  },
+  {
+    "name": "bobby_brief_budget_status",
+    "matches": true,
+    "expected": "",
+    "actual": ""
+  },
+  {
+    "name": "bobby_brief_audio_request",
+    "matches": true,
+    "expected": "p_identity uuid, p_brief uuid, p_content_version integer, p_segment integer, p_cache_key text, p_voice text, p_language text",
+    "actual": "p_identity uuid, p_brief uuid, p_content_version integer, p_segment integer, p_cache_key text, p_voice text, p_language text"
+  },
+  {
+    "name": "bobby_brief_audio_claim",
+    "matches": true,
+    "expected": "p_audio uuid, p_worker text, p_lease_seconds integer",
+    "actual": "p_audio uuid, p_worker text, p_lease_seconds integer"
+  },
+  {
+    "name": "bobby_brief_audio_commit",
+    "matches": true,
+    "expected": "p_audio uuid, p_fence bigint, p_state text, p_storage_path text, p_bytes integer, p_error text",
+    "actual": "p_audio uuid, p_fence bigint, p_state text, p_storage_path text, p_bytes integer, p_error text"
+  },
+  {
+    "name": "bobby_brief_audio_authorize",
+    "matches": true,
+    "expected": "p_identity uuid, p_audio uuid",
+    "actual": "p_identity uuid, p_audio uuid"
+  },
+  {
+    "name": "bobby_brief_inbox",
+    "matches": true,
+    "expected": "p_identity uuid, p_cadence text, p_before_scheduled timestamp with time zone, p_before_id uuid, p_limit integer",
+    "actual": "p_identity uuid, p_cadence text, p_before_scheduled timestamp with time zone, p_before_id uuid, p_limit integer"
+  },
+  {
+    "name": "bobby_brief_get",
+    "matches": true,
+    "expected": "p_identity uuid, p_id uuid",
+    "actual": "p_identity uuid, p_id uuid"
+  },
+  {
+    "name": "bobby_brief_reconcile",
+    "matches": true,
+    "expected": "p_settle_seconds integer",
+    "actual": "p_settle_seconds integer"
+  },
+  {
+    "name": "bobby_brief_purge",
+    "matches": true,
+    "expected": "p_report_days integer, p_audio_days integer, p_outbox_days integer, p_attempt_days integer, p_device_days integer, p_idem_hours integer, p_shared_days integer, p_limit integer",
+    "actual": "p_report_days integer, p_audio_days integer, p_outbox_days integer, p_attempt_days integer, p_device_days integer, p_idem_hours integer, p_shared_days integer, p_limit integer"
+  },
+  {
+    "name": "bobby_push_device_write_once",
+    "matches": true,
+    "expected": "p_identity uuid, p_key text, p_digest text, p_action text, p_installation uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer, p_sealed_credential text",
+    "actual": "p_identity uuid, p_key text, p_digest text, p_action text, p_installation uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build integer, p_max_active integer, p_sealed_credential text"
+  },
+  {
+    "name": "bobby_redeem_coupon",
+    "matches": true,
+    "expected": "p_identity uuid, p_code text",
+    "actual": "p_identity uuid, p_code text"
+  }
+]

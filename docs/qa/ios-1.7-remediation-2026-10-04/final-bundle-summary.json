@@ -1,0 +1,50 @@
+{
+  "at": "2026-10-04T09:45:15.282939+00:00",
+  "scope": "Generated resources in current worktree; no archive/TestFlight/device identity asserted",
+  "byteComparison": {
+    "matchedFiles": 42,
+    "pages": 4,
+    "voiceClips": 36,
+    "iosMetadataFiles": 2,
+    "timestampSeededFromDeliveredMetadata": {
+      "ios": "2026-10-04T09:40:14Z",
+      "web": "2026-10-04T09:40Z",
+      "note": "Builder timestamp inputs are seeded from delivered build metadata for an exact byte comparison; no product source is modified."
+    },
+    "temporaryBytesRemoved": 4846903
+  },
+  "shippingHtmlRenderer": {
+    "input": "actual generated shipping HTML sections; all requests blocked",
+    "scenarios": 30,
+    "assertions": 126,
+    "passed": 126,
+    "failed": 0,
+    "font": "system-ui",
+    "geist": "not verified",
+    "platform": "headless Chrome; not iPhone WebKit",
+    "network": "blocked"
+  },
+  "pages": [
+    {
+      "path": "ios/Bobby/Resources/Nucleo/app.html",
+      "bytes": 581350,
+      "sha256": "4bf4221c4899b0fb5c50b47cc5294f07d5b499d799c593c18eb4946d90291b76"
+    },
+    {
+      "path": "ios/Bobby/Resources/Nucleo/onboarding.html",
+      "bytes": 569363,
+      "sha256": "571ad78f4dd55126ef4fa43b829a893834a00db159d5e506606fa91a353dc83f"
+    },
+    {
+      "path": "public/nucleo/index.html",
+      "bytes": 677558,
+      "sha256": "1f1c677d74903aef46953b5ca4665b788b9da563b190db5d2c8601970e5da114"
+    },
+    {
+      "path": "public/nucleo/onboarding.html",
+      "bytes": 674485,
+      "sha256": "494faa25bb80926a1abcbbde2f9734721f2c8329d0cfcf700307b7fe273fc11d"
+    }
+  ],
+  "productSourceChangesByAudit": false
+}

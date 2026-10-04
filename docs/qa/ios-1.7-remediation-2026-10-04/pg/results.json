@@ -1,0 +1,568 @@
+{
+  "startedAt": "2026-10-04T09:42:23.689236+00:00",
+  "candidateHEAD": "393776c332b2c3f6e21d6cad457869431dd28a62",
+  "ownedDirectory": "/private/tmp/bobby-ios17-remediation-20261004/pg/pg-55497-gc54ex32",
+  "databaseHost": "127.0.0.1",
+  "port": 55497,
+  "minimumFreeMiB": 200,
+  "maximumOwnTemporaryMiB": 150,
+  "freeBeforeBytes": 885215232,
+  "postgresVersion": "pg_ctl (PostgreSQL) 17.11 (Homebrew)",
+  "providerEnvironment": "credential variables excluded; synthetic provider transports in tests",
+  "runs": [
+    {
+      "name": "00-initdb",
+      "command": [
+        "/opt/homebrew/bin/initdb",
+        "-D",
+        "/private/tmp/bobby-ios17-remediation-20261004/pg/pg-55497-gc54ex32/data",
+        "-U",
+        "postgres",
+        "-A",
+        "trust",
+        "--locale=C",
+        "--encoding=UTF8"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:23.772489+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/00-initdb.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:24.544571+00:00",
+      "elapsedSeconds": 0.769,
+      "exitCode": 0,
+      "logSHA256": "e7949dbd6ed7f7869eeaeaf7d756163f7af1145df0d8712264aba4cfb77acb3f",
+      "tail": [
+        "running bootstrap script ... ok",
+        "performing post-bootstrap initialization ... ok",
+        "syncing data to disk ... ok",
+        "",
+        "Success. You can now start the database server using:",
+        "",
+        "    /opt/homebrew/bin/pg_ctl -D /private/tmp/bobby-ios17-remediation-20261004/pg/pg-55497-gc54ex32/data -l logfile start",
+        ""
+      ]
+    },
+    {
+      "name": "01-start",
+      "command": [
+        "/opt/homebrew/bin/pg_ctl",
+        "-D",
+        "/private/tmp/bobby-ios17-remediation-20261004/pg/pg-55497-gc54ex32/data",
+        "-l",
+        "/private/tmp/bobby-ios17-remediation-20261004/pg/pg-55497-gc54ex32/server.log",
+        "-o",
+        "-p 55497 -c listen_addresses=127.0.0.1 -c unix_socket_directories='' -c shared_buffers=16MB -c max_connections=40 -c max_wal_size=64MB -c min_wal_size=32MB -c checkpoint_timeout=30s -c temp_file_limit=16MB -c timezone=UTC -c log_min_messages=warning",
+        "-w",
+        "start"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:24.551499+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/01-start.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:24.816041+00:00",
+      "elapsedSeconds": 0.263,
+      "exitCode": 0,
+      "logSHA256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad",
+      "tail": [
+        "waiting for server to start.... done",
+        "server started"
+      ]
+    },
+    {
+      "name": "02-growth",
+      "command": [
+        "/opt/homebrew/bin/psql",
+        "postgres://postgres@127.0.0.1:55497/postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-f",
+        "scripts/test-trader-land-growth.sql"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:24.823005+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/02-growth.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:25.343427+00:00",
+      "elapsedSeconds": 0.518,
+      "exitCode": 0,
+      "logSHA256": "b46d2c44813cc268b5b8337cf432626f5fb37851af70df2de80bf0b0cf0bfb8e",
+      "tail": [
+        "RESET",
+        "SELECT 1",
+        "GRANT",
+        "SET",
+        "psql:scripts/test-trader-land-growth.sql:599: NOTICE:  PASS service_role path under RLS",
+        "DO",
+        "RESET",
+        "PASS: trader land growth \u2014 schema, grants, extend, core, placement writes, growth, races, checks, backfill, link, privileges"
+      ],
+      "reportedChecks": null
+    },
+    {
+      "name": "03-progress-atomic-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-progress-atomic-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:25.350073+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/03-progress-atomic-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:25.870568+00:00",
+      "elapsedSeconds": 0.518,
+      "exitCode": 0,
+      "logSHA256": "ffea935d948d2d91d041b59bae7033831d2f7467a9bbd501dcdd989e2463d1aa",
+      "tail": [
+        "progress-atomic-pg: 74 checks passed"
+      ],
+      "reportedChecks": 74
+    },
+    {
+      "name": "04-levels-referrals-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-levels-referrals-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:25.877865+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/04-levels-referrals-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:26.141328+00:00",
+      "elapsedSeconds": 0.262,
+      "exitCode": 0,
+      "logSHA256": "2d1ff1615350744ac309d573dc339cb85f80a21d6b419dbb0979cb8781864ed9",
+      "tail": [
+        "levels-referrals-pg: 116 checks passed"
+      ],
+      "reportedChecks": 116
+    },
+    {
+      "name": "05-payments-guards-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-payments-guards-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:26.147627+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/05-payments-guards-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:26.409544+00:00",
+      "elapsedSeconds": 0.26,
+      "exitCode": 0,
+      "logSHA256": "6964e46068fc1ebd17afe47e75b459c0800f7998f9763d8080440a2fd1a9b429",
+      "tail": [
+        "payments-guards-pg: 23 checks passed"
+      ],
+      "reportedChecks": 23
+    },
+    {
+      "name": "06-coupons-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-coupons-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:26.416376+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/06-coupons-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:26.684909+00:00",
+      "elapsedSeconds": 0.266,
+      "exitCode": 0,
+      "logSHA256": "a2222779452508a60e6bea9e873744e882a0c1c0a828d8e84693a0a8d5e4926f",
+      "tail": [
+        "coupons-pg: 91 checks passed"
+      ],
+      "reportedChecks": 91
+    },
+    {
+      "name": "07-admin-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-admin-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:26.691649+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/07-admin-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:27.209356+00:00",
+      "elapsedSeconds": 0.516,
+      "exitCode": 0,
+      "logSHA256": "44c8a18980d47d484570381af8bc2c4f051c2dfad636f2bbe96cacba5ed808de",
+      "tail": [
+        "admin-pg: 203 checks passed"
+      ],
+      "reportedChecks": 203
+    },
+    {
+      "name": "08-lifecycle-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-lifecycle-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:27.217729+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/08-lifecycle-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:27.477984+00:00",
+      "elapsedSeconds": 0.258,
+      "exitCode": 0,
+      "logSHA256": "10dd838c1d564a40266ee56c0474b927a16385425a70263b7c6d7d3af8e4ea2a",
+      "tail": [
+        "lifecycle-pg: 61 checks passed"
+      ],
+      "reportedChecks": 61
+    },
+    {
+      "name": "09-user-memory-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-user-memory-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:27.487014+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/09-user-memory-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:27.747667+00:00",
+      "elapsedSeconds": 0.259,
+      "exitCode": 0,
+      "logSHA256": "bd201bb7668353853060cabc857232da2c145e4b413e772e05c9c029db55c449",
+      "tail": [
+        "user-memory-pg: 91 checks passed"
+      ],
+      "reportedChecks": 91
+    },
+    {
+      "name": "10-admin-truth-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-admin-truth-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:27.756026+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/10-admin-truth-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:29.851823+00:00",
+      "elapsedSeconds": 2.094,
+      "exitCode": 0,
+      "logSHA256": "68084e93c64251e1df5bea9fda4cc67bb06540b7b40051921fe57cfd8d71997e",
+      "tail": [
+        "admin-truth-pg: 167 checks passed"
+      ],
+      "reportedChecks": 167
+    },
+    {
+      "name": "11-admin-r2-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-admin-r2-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:29.860989+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/11-admin-r2-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:38.204409+00:00",
+      "elapsedSeconds": 8.341,
+      "exitCode": 0,
+      "logSHA256": "02557d1ff89ac643f52043accc2d43c9bdc3f4cf790ebfcb950afc3e643655c5",
+      "tail": [
+        "  \u2713 2,000 installs and 2,000 paired accounts",
+        "    growth + overview + economics 618 ms (1 seed) \u2192 617 ms (153 seeds); members + networks + geo 42 ms; users 195 ms",
+        "  \u2713 one component of 4,000 nodes with 150 install seeds costs what one seed costs",
+        "  \u2713 migration-first rollout: serving #130 explicit NULL writes remain compatible",
+        "  \u2713 payments #130: unknown Apple evidence survives card checkout and the mirror counts as live",
+        "  \u2713 payments #130: paid Apple mirror wins over a sandbox or trial primary",
+        "  \u2713 payments #130: users display the effective plan without changing card ownership",
+        "admin-r2-pg: 370 checks passed"
+      ],
+      "reportedChecks": 370
+    },
+    {
+      "name": "12-client-telemetry-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-client-telemetry-pg.mts"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:38.217189+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/12-client-telemetry-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:47.306595+00:00",
+      "elapsedSeconds": 9.087,
+      "exitCode": 0,
+      "logSHA256": "297b1aead29227298aee94c6c8c082c84ad83b108f230ef6ff8dcb344535ce2d",
+      "tail": [
+        "  \u2713 bounded cohort admission under sequential and concurrent invented builds",
+        "  \u2713 indexed retention removes old events, presence and coverage but preserves current evidence",
+        "  \u2713 client aggregate failure never erases immutable server facts",
+        "    full live 57 ms: 110,000 retained events, 2,000 installs, six platform/build cohorts",
+        "  \u2713 aggregate latency with retained history and two thousand reported installs",
+        "    high-cardinality live 43 ms: 6,000 legacy cohorts, twenty returned",
+        "  \u2713 grouped capped builds remain fast with thousands of legacy invented labels",
+        "client-telemetry-pg: 199 checks passed"
+      ],
+      "reportedChecks": 199
+    },
+    {
+      "name": "13-create-qa_briefings_pg",
+      "command": [
+        "/opt/homebrew/bin/psql",
+        "postgres://postgres@127.0.0.1:55497/postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "create database qa_briefings_pg"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:47.316190+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/13-create-qa_briefings_pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:47.582118+00:00",
+      "elapsedSeconds": 0.264,
+      "exitCode": 0,
+      "logSHA256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+      "tail": [
+        "CREATE DATABASE"
+      ]
+    },
+    {
+      "name": "13-briefings-pg",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-briefings-pg.mts"
+      ],
+      "database": "qa_briefings_pg",
+      "startedAt": "2026-10-04T09:42:47.593053+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/13-briefings-pg.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:48.387383+00:00",
+      "elapsedSeconds": 0.793,
+      "exitCode": 0,
+      "logSHA256": "ef4398ba3368da24bc8e2f2c555dcd30240f491664c24abaaeeb603a291898cc",
+      "tail": [
+        "briefings-pg: 644 checks passed"
+      ],
+      "reportedChecks": 644
+    },
+    {
+      "name": "14-create-qa_briefings_api",
+      "command": [
+        "/opt/homebrew/bin/psql",
+        "postgres://postgres@127.0.0.1:55497/postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "create database qa_briefings_api"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:48.399832+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/14-create-qa_briefings_api.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:48.669705+00:00",
+      "elapsedSeconds": 0.268,
+      "exitCode": 0,
+      "logSHA256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+      "tail": [
+        "CREATE DATABASE"
+      ]
+    },
+    {
+      "name": "14-briefings-api",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-briefings-api.mts"
+      ],
+      "database": "qa_briefings_api",
+      "startedAt": "2026-10-04T09:42:48.681797+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/14-briefings-api.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:50.274995+00:00",
+      "elapsedSeconds": 1.592,
+      "exitCode": 0,
+      "logSHA256": "786df3efc8826231c1faa492dcf5cffc5ee89726d2ac0499fa53b83be72e82f6",
+      "tail": [
+        "briefings-api: 257 checks passed"
+      ],
+      "reportedChecks": 257
+    },
+    {
+      "name": "15-create-qa_briefings_worker",
+      "command": [
+        "/opt/homebrew/bin/psql",
+        "postgres://postgres@127.0.0.1:55497/postgres",
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-c",
+        "create database qa_briefings_worker"
+      ],
+      "database": "postgres",
+      "startedAt": "2026-10-04T09:42:50.290832+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/15-create-qa_briefings_worker.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:50.563481+00:00",
+      "elapsedSeconds": 0.271,
+      "exitCode": 0,
+      "logSHA256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7",
+      "tail": [
+        "CREATE DATABASE"
+      ]
+    },
+    {
+      "name": "15-briefings-worker",
+      "command": [
+        "node",
+        "--import",
+        "tsx",
+        "scripts/test-briefings-worker.mts"
+      ],
+      "database": "qa_briefings_worker",
+      "startedAt": "2026-10-04T09:42:50.581260+00:00",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/pg/15-briefings-worker.log",
+      "status": "passed",
+      "endedAt": "2026-10-04T09:42:51.388261+00:00",
+      "elapsedSeconds": 0.805,
+      "exitCode": 0,
+      "logSHA256": "a640c41d3f50341d4ca1832d3a240d4c6d55aa62b5255d79b0025f7384029a9b",
+      "tail": [
+        "[briefing-worker] cron {\"enabled\":true,\"claimed\":0,\"seeded\":0,\"published\":0,\"failed\":0,\"sharedReady\":0,\"audioReady\":0,\"dispatched\":0,\"accepted\":0,\"expired\":0,\"purged\":0,\"budget\":null,\"stoppedEarly\":false}",
+        "[briefing-worker] ops {\"enabled\":true,\"claimed\":0,\"seeded\":0,\"published\":0,\"failed\":0,\"sharedReady\":0,\"audioReady\":0,\"dispatched\":0,\"accepted\":0,\"expired\":0,\"purged\":0,\"budget\":null,\"stoppedEarly\":false}",
+        "[briefing-worker] ops {\"enabled\":true,\"claimed\":0,\"seeded\":0,\"published\":0,\"failed\":0,\"sharedReady\":0,\"audioReady\":0,\"dispatched\":0,\"accepted\":0,\"expired\":0,\"purged\":0,\"budget\":null,\"stoppedEarly\":false}",
+        "[briefing-worker] ops {\"enabled\":true,\"claimed\":0,\"seeded\":0,\"published\":0,\"failed\":0,\"sharedReady\":0,\"audioReady\":0,\"dispatched\":0,\"accepted\":0,\"expired\":0,\"purged\":0,\"budget\":null,\"stoppedEarly\":false}",
+        "[briefing-worker] ops {\"enabled\":true,\"claimed\":0,\"seeded\":0,\"published\":0,\"failed\":0,\"sharedReady\":0,\"audioReady\":0,\"dispatched\":0,\"accepted\":0,\"expired\":0,\"purged\":0,\"budget\":null,\"stoppedEarly\":false}",
+        "[briefing-worker] storage_unavailable",
+        "briefings-worker: PG part 44 checks",
+        "briefings-worker: 147 checks passed"
+      ],
+      "reportedChecks": 147
+    }
+  ],
+  "stopped": true,
+  "sourceHashes": {
+    "supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql": "1d6ad7af39dd6b5166eb29ac3a076e953b9a9e160b61122710c6a7e35f9c7d09",
+    "supabase/bobby-protocol/supabase/migrations/20260903000002_reset_baseline_for_exact_schema.sql": "8b0bd5a9e03d77a111d045b4c5e6cb46f36b6820d1e71a7e6962e849f293c7bd",
+    "supabase/bobby-protocol/supabase/migrations/20261002132106_amplitude_billing_export.sql": "775248644dcd9ba1d5edea2d1f7ee495be3419401d1f881bbabf0f0ffb892097",
+    "supabase/bobby-protocol/supabase/migrations/20261002140000_subscription_environment.sql": "0a7f579f142127fe02109277feb72aad96c55d97d98668623de43a46fb2905d8",
+    "supabase/bobby-protocol/supabase/migrations/20260929170000_referral_rules_llm_spend.sql": "80b98fa32817cfc9142ac6d8717055447a9f2727c5d18f5f3124cb85ac12673e",
+    "supabase/bobby-protocol/supabase/migrations/20261002140326_pro_gift_balance_visibility.sql": "46d1a2cf1e0003a2d2e0b834335ba0c5ba92c2de5369e7525036f263f29fa71e",
+    "supabase/bobby-protocol/supabase/migrations/20260930121932_serialize_guest_network_quota.sql": "c3b78d5360c6876170a252e575290eb7410d9b6627fb4f0fd27a86ad313f51c0",
+    "supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql": "6f0005993863ed65f8d4a629ef6b22f8ef0ada4b71fc4ecf16eca40265130187",
+    "supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql": "21e0d5421f913fb6a08e2a5821eeac559c729e59f81230c34801634354a5e418",
+    "supabase/bobby-protocol/supabase/migrations/20261001220000_audience_geo.sql": "7c99756e48133f1eac9c01d92cd33d1465bbc8f7739a3ebc31f1676cd29d3381",
+    "supabase/bobby-protocol/supabase/migrations/20260903000005_bobby_progress.sql": "7c43be7750f4d08a57cb86aec8b97f588088c5d370f45261400c7d2c7584c104",
+    "supabase/bobby-protocol/supabase/migrations/20260903000007_identity_link.sql": "4417f1ede7df034a75c45e58e812c3d8875657e6312fdfcc7ba2170434de5b96",
+    "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql": "c42c18777d512dc65ba8bf72406c865d605335e943ab1199a2db3d3183c7d69b",
+    "supabase/bobby-protocol/supabase/migrations/20261002132827_admin_grant_idempotency.sql": "9071cfb7c4660b0b190d5fbfbad689342a3bf12cfdff6c56a194e967415d137b",
+    "supabase/bobby-protocol/supabase/migrations/20260922120000_trader_land_moderation.sql": "436758e348e8908e9e2196d13a1fb0ff31a5a999e055233417e6c74a0210b1e6",
+    "supabase/bobby-protocol/supabase/migrations/20260927120000_access_reads_subscriptions.sql": "96a8337382fa42dff81a77831239ee4e2be1c9a999c5f681e2174fc783bb68ff",
+    "supabase/bobby-protocol/supabase/migrations/20260928210000_public_views_select_only.sql": "856cf1609913e96e20c24c70daef3cf9f993f95baccf71674772fc2554104121",
+    "supabase/bobby-protocol/supabase/migrations/20261002185656_brief_languages_build55.sql": "977842c914d576893c11fce509c933abf7511c1b7909b02ddb0c4340ee094895",
+    "supabase/bobby-protocol/supabase/migrations/DRAFT_bobby_schema_from_legacy.sql": "9f71eefcae78f281cb0d47231f0b83d6b421d2d836d543b17f0a52531a476ffe",
+    "supabase/bobby-protocol/supabase/migrations/20261002104708_20261002130000_admin_device_facts_join.sql": "20543774837217aa7399749b8db1434214a78a0c16ff47212b42a8c03823a1a1",
+    "supabase/bobby-protocol/supabase/migrations/20260919183000_atomic_progress.sql": "59642668cd38838aadacebeae955565daf05f0db66c013d5a7df64805b74608c",
+    "supabase/bobby-protocol/supabase/migrations/20260919190000_desk_quota.sql": "e5af32eef3416f414b5e47633bbb2884f7e26e1a17008c1bb9bc7fa91c3ad2cc",
+    "supabase/bobby-protocol/supabase/migrations/20260903000009_swap_receipts.sql": "28f235a1ff9ee8beb82135be70feea95e200abc6a0de33f0b963930475c9bfa6",
+    "supabase/bobby-protocol/supabase/migrations/20261002183000_brief_device_atomic.sql": "c3b08536088f64e9f5845101d7c4779fd94eedfe1325757ecf86067ad7f2dbf6",
+    "supabase/bobby-protocol/supabase/migrations/20260903000006_trader_land.sql": "d603aaebb162187234dcca4c5c2a36d93953b4b13f2f4a6e36e2b71479eff324",
+    "supabase/bobby-protocol/supabase/migrations/20261002235202_first_party_client_telemetry.sql": "4750a3de1c68d0ddccb57b979c23e3ac883928ae5a01977a0b9d1b1c6c429481",
+    "supabase/bobby-protocol/supabase/migrations/20260903000012_hardness_agent_cas.sql": "93a10d9e9d63f20affdfdbbf6ef00cb890a26783813c803eb4fc611433ad46e3",
+    "supabase/bobby-protocol/supabase/migrations/20260823000001_bobby_baseline.sql": "db6b8e2055e2f367369875b481e71b393bb42cc6a20cabe65c9a6cd0e3a6f6f7",
+    "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql": "3030cfdf646ad3a84c99de56eb9d52d11a7caf0eee0cfa62067035527a5b7a72",
+    "supabase/bobby-protocol/supabase/migrations/20260929150000_levels_referrals_usage.sql": "1c39652018ecfb97d0ba2ed45af79025d8e514c892348716c836f21186a30182",
+    "supabase/bobby-protocol/supabase/migrations/20261002160000_web_conversion_funnel.sql": "cd359074dffb666c05e3e5675aea398818160fc82721bec863b6bccc4f7c6dab",
+    "supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql": "a7cead5f538d6f9f7ad41555452222d2423ed6e0604f62fd7d74edcb85b3e098",
+    "supabase/bobby-protocol/supabase/migrations/20261001180000_admin_dashboard.sql": "6649ce792723705e79c2d0f03e2239e3ad2d20ef095c2c5e9a42e6b5642aaf39",
+    "supabase/bobby-protocol/supabase/migrations/20261002103557_20261002124500_internal_subjects_indexed.sql": "229a133abc1f31cb3fdee55dbf00b311ef538ff267ad159b481916f4c63a8991",
+    "supabase/bobby-protocol/supabase/migrations/20261001210000_admin_audit_fixes.sql": "86c014760f19ab38e2c5f0b8d9520760b79b66a468d7f56a7f609ece5f5374c6",
+    "supabase/bobby-protocol/supabase/migrations/20260904230244_trader_land_public_worlds.sql": "84977dad7b6c1ac7a77c325f19281b5eb719b856872b07c012a48f4d0f72b169",
+    "supabase/bobby-protocol/supabase/migrations/20261002184500_brief_paid_source_guard.sql": "c231aa30b98c45c7421a649f455de5f15ac09e48f8ac0a7572c21fbdd9493b93",
+    "supabase/bobby-protocol/supabase/migrations/20260908000014_revoke_anon_security_definer_rpcs.sql": "325ed6bc586b65b716528fdc978c1194a1a56e10afca413b0c12ec17f7f4e921",
+    "supabase/bobby-protocol/supabase/migrations/20261002150000_checkout_reservation_apple_mirror.sql": "9f3817a3db2b0c07eb3d50dea24ea678ad776e32ddbaa5ea8ed2c2e608503170",
+    "supabase/bobby-protocol/supabase/migrations/20261001200000_lifecycle_funnel.sql": "b3eb612d5a59a2fbdd2a245008cbf5ddf3db76c1650722a63b682916c9e92dc2",
+    "supabase/bobby-protocol/supabase/migrations/20260903000008_telegram_tables.sql": "d07f066f88dabbb36f5dbaf57770796c73162953420deab13c94b541f3f37b34",
+    "supabase/bobby-protocol/supabase/migrations/20260903000003_migration_outbox.sql": "7369b74f24cbb036b9979830d1c9be28e82ac14d9800cc8decb833debcc34881",
+    "supabase/bobby-protocol/supabase/migrations/20260919200000_desk_quota_networks.sql": "32203c281005a1de80c1cbd6b6ea0f3dc67f23c2bdbc1e7efa3cc770b2e134f9",
+    "supabase/bobby-protocol/supabase/migrations/20260903000013_mcp_challenge_binding.sql": "e41ad44990f805211821bc97345977a9786ce5dc3df371871bd2a90869259981",
+    "supabase/bobby-protocol/supabase/migrations/20260903000011_cycle_provenance.sql": "ac59a7afa69df815a1d88900dd272e6afe55c161eb8a933e48dd6dde0bc27fb7",
+    "supabase/bobby-protocol/supabase/migrations/20261002102846_20261002120000_admin_codex_review.sql": "fc119e83b0f23dd6b941f2e4f2acff02729d82b7f6612d50859fdd5797e5843e",
+    "supabase/bobby-protocol/supabase/migrations/20261001233000_admin_truth_review.sql": "12938a65b5d26ea9294283bef0698bff32eed356c502f3b8da1988236ce2eb7b",
+    "supabase/bobby-protocol/supabase/migrations/20261002090000_amplitude_forward.sql": "f768b2ef74ab2e479f1115ca9c9990729d9e24467c7aaab532356a3ec3eecf92",
+    "supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql": "832f3cbf07e86448e763557018dea8a1c005aa4f3e4ab0194a077c1f4966ebe7",
+    "supabase/bobby-protocol/supabase/migrations/20260903000010_lock_down_public_reads.sql": "f81a519346047ad5fb637e644a2bf443444411e6e57345285c454aae391fcfa0",
+    "supabase/bobby-protocol/supabase/migrations/20261002231124_admin_truth_live_snapshot.sql": "24490ee3e768e2a3459664db51b870376a491d68467f048f93e43db6a829971c",
+    "supabase/bobby-protocol/supabase/migrations/20260903000004_bobby_schema_exact.sql": "91d4184b704dd4a07819fc276c6545adbe8cca281e453a6ae1951ee8456556d2",
+    "scripts/test-briefings-pg.mts": "b1e6ecd8af941d40defcc204bce55ae6558a3c4937f67bbfa822080dcca0eba9",
+    "scripts/test-swap-ledger-pg.mts": "bde5b236ac31c0284f9aac84f1e3b9642b297d800b78784d0e611cfd84611906",
+    "scripts/test-progress-atomic-pg.mts": "0293ee4cdc200f356db7b02b474c35d3740af9efc3c6f403d36bba58a68fe566",
+    "scripts/test-lifecycle-pg.mts": "e242995ae61c9d64856ef9eba594c4376225af633b9739bc929be7204d2e51f9",
+    "scripts/test-admin-truth-pg.mts": "4336c3816d654002d3699c5bd8e692362fff93e46b8f035c7867fbee52ba3929",
+    "scripts/test-client-telemetry-pg.mts": "a71202309d0ad0429078f0682f29f96a4978ae1845f63549a98eecf09d336e51",
+    "scripts/test-admin-r2-pg.mts": "9731796119e19df9d80e0f6f1631c7d84447da4a3274d8e73453b7202236fb1f",
+    "scripts/test-coupons-pg.mts": "6954fb14f312bcb1661b0bfd673f63b970bddd63ad94ef88052875f6844e9ad3",
+    "scripts/test-admin-pg.mts": "164e30d4abe38b1527936086c420e3196c4294c504e2809df41b64c84b9c93bc",
+    "scripts/test-web-funnel-pg.mts": "ef47cf95190b9d10ab4e96148cae89db10578be7f18c89c0c3be2ddc475d3935",
+    "scripts/test-rls-lockdown-pg.mts": "897347a7315c839d6429b59950a437e37936cbc6b193948b9427c263158095a5",
+    "scripts/test-trader-land-moderation-pg.mts": "7c6b262d67397f955736631b203bc14294f66aad59cf31b0e398db0e85d99a63",
+    "scripts/test-amplitude-billing-pg.mts": "932030a0901750c67c6b92470935343d8942864bc39a16ccdc2dd0c346f160e3",
+    "scripts/test-user-memory-pg.mts": "90f4ee6aa101ca83a80fb95361428089f8ed0148644bd9321a076a26a10000c4",
+    "scripts/test-agent-registry-pg.mts": "8223629d6ac77906799a27029aebe68035239858b8402199cfb00b0255b87612",
+    "scripts/test-payments-guards-pg.mts": "af3c26136e7617788163f10937e86fa23ee5678065143de644d7b2e7469da75c",
+    "scripts/test-levels-referrals-pg.mts": "c139b1ef2fc4514faf9d814b37abf113df9f0a333b0c228e2f6d73ca585d2562",
+    "scripts/briefings-pg-harness.mts": "723269cf0124d4ed5e5c5248a9f263d1f87197b1937b30c97f79caddfa9b1263",
+    "scripts/test-trader-land-growth.sql": "f436ff5c81a5348c8789a21fa38a60f1d67f2859bd66f7319d897c26f99b20e9",
+    ".github/workflows/ci.yml": "8ece137ed6db13c4887e6fa920482d5f20210f720535dfc00746e0dc90af16c2"
+  },
+  "maximumObservedOwnBytes": 146965932,
+  "minimumObservedFreeBytes": 725708800,
+  "endedAt": "2026-10-04T09:42:51.643061+00:00",
+  "ownFinalBytes": 130494718,
+  "freeAfterBytes": 737030144,
+  "sourceUnchanged": true,
+  "portClosedAfterStop": true,
+  "suiteSummary": {
+    "executed": 14,
+    "passed": 14,
+    "failed": 0,
+    "skipped": 0,
+    "reportedNodeChecks": 2443,
+    "briefingsApiUnitChecksAlreadyCovered": 187,
+    "briefingsApiAdditionalPgChecks": 70,
+    "briefingsWorkerUnitChecksAlreadyCovered": 103,
+    "briefingsWorkerAdditionalPgChecks": 44
+  },
+  "ownDataRemovedAt": "2026-10-04T09:44:46.207326+00:00",
+  "ownDataRemoved": true,
+  "nodeVersion": "v25.9.0",
+  "remainingPgScriptsNotExecuted": [
+    "scripts/test-agent-registry-pg.mts",
+    "scripts/test-amplitude-billing-pg.mts",
+    "scripts/test-rls-lockdown-pg.mts",
+    "scripts/test-swap-ledger-pg.mts",
+    "scripts/test-trader-land-moderation-pg.mts",
+    "scripts/test-web-funnel-pg.mts"
+  ],
+  "releaseCommitAfterRun": "507616c99eb143e466084c85bbb177d11315bf68",
+  "snapshotHashesMatchReleaseCommitWorkingTree": true
+}

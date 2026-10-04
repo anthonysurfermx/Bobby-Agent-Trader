@@ -1,0 +1,65 @@
+{
+  "files": {
+    "README.md": {
+      "bytes": 5911,
+      "sha256": "f6fdccc045c70033732af6a08713b3d13b05337bec269ec233d24e64be71d72f"
+    },
+    "bobby-health.json": {
+      "bytes": 890,
+      "sha256": "3544114d7419436433613ad8de26f4b2d08f59617448b9d603520f7cbfb81b32"
+    },
+    "catalog-evidence.json": {
+      "bytes": 125908,
+      "sha256": "f887399c4dce71483c8b51e2435d2d8e5d1b54fd48108fa414ec0c01878fa669"
+    },
+    "column-privilege-evidence.json": {
+      "bytes": 861,
+      "sha256": "21a10bd849251b4330fcdf2782c8008bf13bf676e679b2e8053f5097e0e26260"
+    },
+    "expected-source.json": {
+      "bytes": 24235,
+      "sha256": "cd1ea948c7527dfd72f06c7e011e494c06ebed46d37de9633a4a5647878dd4db"
+    },
+    "index-evidence.json": {
+      "bytes": 15824,
+      "sha256": "39a078a0a64f71ee7844a416ba6a945d2a891bb293b7631a88ef4ea9e3281b37"
+    },
+    "memory-record-body.diff": {
+      "bytes": 966,
+      "sha256": "3695703f988b2d4b5a2d1283cbaa614d3e28b6af07d92b5acfd481a82167517b"
+    },
+    "memory-record-catalog.json": {
+      "bytes": 2066,
+      "sha256": "79d237752d2c3dd47a7a36942da2f49f987b2bf2db8d619503f73d85bea7a9b7"
+    },
+    "memory-record-drift.json": {
+      "bytes": 261,
+      "sha256": "0f69ed2c6812ed8c471482bb1bc0edb2cd219d51171cc7d68d90db6c991d6275"
+    },
+    "migration-comparison.json": {
+      "bytes": 4140,
+      "sha256": "f43b7ea6bd7645329731f8d1c97a3e445e9562e86b394f5711123768ca79723e"
+    },
+    "project-evidence.json": {
+      "bytes": 473,
+      "sha256": "26da97b869f9fc6f773088bd87b99ac51a98826aef4e5be249658f886be3532a"
+    },
+    "signature-comparison.json": {
+      "bytes": 15009,
+      "sha256": "1eede7bab0d0cec531d83d75f299e17dfc3604c5c6caed75e7362cc9c437d900"
+    },
+    "structural-comparison.json": {
+      "bytes": 5800,
+      "sha256": "349564c78216795bbf3a422ed958cad225ce310b9648dcc4f4f89d606c696efb"
+    },
+    "summary.json": {
+      "bytes": 2042,
+      "sha256": "bcd00791cd936c75c52c3ea06fe0ff69b11096190cb9da4750da371279a42cc6"
+    },
+    "supabase-changelog.md": {
+      "bytes": 98178,
+      "sha256": "8a9b9cc29618b6988edcec0de74725028c031fce4f5638c93efd90a75ce88f0d"
+    }
+  },
+  "totalBytes": 302564
+}

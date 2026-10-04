@@ -1,0 +1,176 @@
+{
+  "verifiedAtUTC": "2026-10-04T10:05:04.707562+00:00",
+  "scope": "Read existing source/logs/receipts only; no build, simulator action or xcresult export",
+  "status": "Native remediation remains pending complete accepted runtime; no full-green claim",
+  "firstAttempt": {
+    "log": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract.log",
+    "sha256": "eeec4f33dc9719e5a72a0a9558d039258f2965f9d8fd8615ae7a96ec555a07e8",
+    "bytes": 158075,
+    "methodCountsFromLog": {
+      "BobbyTests": {
+        "started": 0,
+        "passed": 0,
+        "failed": 0
+      },
+      "BobbyUITests": {
+        "started": 0,
+        "passed": 0,
+        "failed": 0
+      }
+    },
+    "debugBuild": "compiled successfully before runner infrastructure failure",
+    "officialSummary": "/private/tmp/bobby-ios17-remediation-20261004/native/infra-xcresult-summary.json",
+    "officialSyntheticInfrastructureFailures": 2,
+    "diagnosis": "/private/tmp/bobby-ios17-remediation-20261004/native/infra-runner-diagnosis.md",
+    "cause": "testmanagerd/runner connection loss with simulator Shutdown then Booting; shutdown cause unverified",
+    "appCrashProven": false
+  },
+  "retry": {
+    "log": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-retry.log",
+    "sha256": "68ee188f6afced41aef8c950f647aeb792e163ab192c8bf1b6cefe0925a93e6d",
+    "bytes": 310789,
+    "sourceCommitFromRootRunReceipt": "507616c99eb143e466084c85bbb177d11315bf68",
+    "methodCountsFromLog": {
+      "BobbyTests": {
+        "started": 534,
+        "passed": 533,
+        "failed": 1
+      },
+      "BobbyUITests": {
+        "started": 2,
+        "passed": 2,
+        "failed": 0
+      }
+    },
+    "failedMethods": [
+      {
+        "line": 1573,
+        "target": "BobbyTests",
+        "class": "NucleoBridgeTests",
+        "method": "testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon",
+        "status": "failed"
+      }
+    ],
+    "assertionFailures": 8,
+    "assertionFailureLines": [
+      1530,
+      1536,
+      1542,
+      1548,
+      1554,
+      1560,
+      1566,
+      1572
+    ],
+    "contractPasses": [
+      {
+        "line": 2426,
+        "target": "BobbyUITests",
+        "class": "NucleoContractUITests",
+        "method": "testContractPassesAfterAnOnboardingReset",
+        "status": "passed"
+      },
+      {
+        "line": 2478,
+        "target": "BobbyUITests",
+        "class": "NucleoContractUITests",
+        "method": "testContractPassesOnTheNativeBridge",
+        "status": "passed"
+      }
+    ],
+    "newIsolationAndParserRegressionsPassed": [
+      {
+        "line": 1025,
+        "target": "BobbyTests",
+        "class": "Build34Tests",
+        "method": "testDebateAcceptsRequiredTextBesideNestedSynthesisAndScenarios",
+        "status": "passed"
+      },
+      {
+        "line": 1029,
+        "target": "BobbyTests",
+        "class": "Build34Tests",
+        "method": "testDebateRejectsEveryMissingEmptyOrMalformedRequiredAgentText",
+        "status": "passed"
+      },
+      {
+        "line": 1043,
+        "target": "BobbyTests",
+        "class": "Build34Tests",
+        "method": "testProfileFixtureBlocksMeteredRequestsBeforeNetworkWithoutSigningOut",
+        "status": "passed"
+      },
+      {
+        "line": 1045,
+        "target": "BobbyTests",
+        "class": "Build34Tests",
+        "method": "testProfileFixtureNeverRefreshesOrSendsItsFakeBearer",
+        "status": "passed"
+      }
+    ],
+    "summaryLines": [
+      {
+        "line": 2367,
+        "text": "Executed 534 tests, with 8 failures (0 unexpected) in 89.927 (90.069) seconds"
+      },
+      {
+        "line": 2369,
+        "text": "Executed 534 tests, with 8 failures (0 unexpected) in 89.927 (90.069) seconds"
+      },
+      {
+        "line": 2480,
+        "text": "Executed 2 tests, with 0 failures (0 unexpected) in 34.065 (34.067) seconds"
+      },
+      {
+        "line": 2482,
+        "text": "Executed 2 tests, with 0 failures (0 unexpected) in 34.065 (34.068) seconds"
+      },
+      {
+        "line": 2484,
+        "text": "Executed 2 tests, with 0 failures (0 unexpected) in 34.065 (34.069) seconds"
+      }
+    ],
+    "resultBundleFailure": [
+      {
+        "line": 2485,
+        "text": "2026-10-04 10:56:01.587 xcodebuild[3468:5359653] [MT] IDETesting: Failed to construct test run summaries and write them to the result bundle: fileSystemFailure(reason: \"mkstemp: No space left on device\")"
+      }
+    ],
+    "xcresultAcceptance": "incomplete: ENOSPC; passes are plaintext log evidence only",
+    "exitCodeFromRootRunReceipt": 65
+  },
+  "candleSpyRepair": {
+    "manifest": "/private/tmp/bobby-ios17-remediation-20261004/candle-request-spy-repair-manifest.json",
+    "manifestSourceHead": "507616c99eb143e466084c85bbb177d11315bf68",
+    "currentSourceHead": "ecc4ff49baf48634374750d8e4bdbdd34d9d8329",
+    "files": {
+      "ios/Bobby/Sources/Nucleo/NucleoFixtures.swift": {
+        "manifestSha256": "547556c498ecdf7de6142744dad8f739a6597d4da3fff1d610983d4b86c586ed",
+        "currentSha256": "547556c498ecdf7de6142744dad8f739a6597d4da3fff1d610983d4b86c586ed",
+        "matchesManifest": true
+      },
+      "ios/Bobby/Tests/NucleoBridgeTests.swift": {
+        "manifestSha256": "e63ab3a3cfe85661fb72611849f811e9d76e8c073f48fb0d9df1504f2fa3767c",
+        "currentSha256": "e63ab3a3cfe85661fb72611849f811e9d76e8c073f48fb0d9df1504f2fa3767c",
+        "matchesManifest": true
+      }
+    },
+    "causeVerifiedFromRunSource": "Original NucleoFixtures label used method/host/url.path only, while new test looked for a path with query. All eight horizon/asset iterations therefore fail that spy assertion.",
+    "newAssertions": "One real recorded candle request; GET/HTTPS/host/path; exact query count and values; returned timeframe equals actual request interval. No headers or bodies retained.",
+    "runtimeAfterRepair": "not executed in the reviewed evidence"
+  },
+  "storageSnapshot": {
+    "freeBytes": 462020608,
+    "freeMiB": 440.6,
+    "userPromisedSpace": "8 GB; not confirmed freed by this snapshot"
+  },
+  "physicalSnapshot": {
+    "receipt": "/private/tmp/bobby-ios17-remediation-20261004/device-before.json",
+    "sha256": "8e45149b6ba5703938dcb360643fa4634bfe48dc38671d2306c25de108c09288",
+    "commandOutcome": "success",
+    "bobbyBundle": "xyz.bobbyprotocol.bobby",
+    "matchingApps": 0,
+    "acceptance": "No current Bobby installation in this snapshot. Earlier development build60 inventory is historical. TestFlight63 and dev-build hardware acceptance remain separate and pending."
+  },
+  "remaining": "After measured storage recovery, run repaired unit suite and Contract UI with a complete result bundle, then the 14 remaining UI classes. Archive/export/upload/TestFlight/physical acceptance require separate evidence."
+}

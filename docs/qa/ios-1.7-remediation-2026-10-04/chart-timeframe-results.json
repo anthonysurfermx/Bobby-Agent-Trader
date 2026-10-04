@@ -1,0 +1,57 @@
+{
+  "at": "2026-10-04T09:39:56.237669+00:00",
+  "worktree": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "sourceHEAD": "393776c332b2c3f6e21d6cad457869431dd28a62",
+  "sourceVersion": "1.7",
+  "sourceBuild": "63",
+  "workingTree": "modified; no commits by this agent",
+  "sourceFiles": {
+    "ios/Bobby/Sources/Nucleo/NucleoDesk.swift": "7f50141eef732931de491da3c96622947b82b0acd00c1233b3992e6928819164",
+    "ios/Bobby/Nucleo/src/shared/20-read-model.js": "ebad05ca359f0978b2fd9e5cebb8c4b5c1f8479d51c3854f4da99f00be06adac",
+    "nucleo/src/shared/20-read-model.js": "51f7613770358559f79594693c9d3206849125fb3561c57a773f6392145cae4b",
+    "ios/Bobby/Nucleo/src/contract/10-contract.js": "07bc69c0d68461afd7aade3d395f9c29a8324cc5b23a77140272e215efde7a63",
+    "nucleo/src/contract/10-contract.js": "5aaffc592798a4850c777ea4b8b0410374993d489d56af298a40f67aa5d3d1d6",
+    "ios/Bobby/Nucleo/fixtures/ask/btc.json": "b6c453dc5baa6371c703e7ea36087883062d3c811836ba9ca9f712e9d0e1ea68",
+    "ios/Bobby/Nucleo/fixtures/ask/nvda.json": "35b72b080dec5d027527d34fd144dfdd4d5705db5248b92e24735255de1d8fc0",
+    "ios/Bobby/Nucleo/fixtures/normalize.py": "14c9d848f93144fab3748a1a23e170329e76cf4b0863f6420c697b2b7300d2ba",
+    "ios/Bobby/Tests/NucleoBridgeTests.swift": "2486a077b18031b45ccde579af5c99823365c266de63e4ac5ccd9d15787e3129",
+    "ios/Bobby/Nucleo/ARCHITECTURE.md": "252f0ab799a61b87117a65adc4e2848aebc9b358ce464333a06ac8340d052ceb",
+    "ios/Bobby/Nucleo/tests/chart-timeframe.test.mjs": "faf536a181ae5dfd92d3735bfdb484648d0b4e209a9cee1feb119680e10b63ea",
+    "nucleo/src/web/30-web-desk.js": "07650a6d0c9db77966a143bfccbb6217db1a447dd58f7b2ba4a3f6f864fc92ad",
+    "nucleo/tests/web-transport.test.mjs": "1890cfdc50425d78cb75b875c2d6b3cccde9a94d5cc5f9badcf32e64ad0913ce"
+  },
+  "verification": {
+    "nucleoNodeRunner": {
+      "passed": 165,
+      "failed": 0,
+      "newCandleCases": 42,
+      "originalCandleBaseline": {
+        "passed": 0,
+        "failed": 40,
+        "note": "Before the two strict schema cases were added; same 40 behavioral cases fail on unfixed source."
+      }
+    },
+    "scriptedWebTransport": {
+      "passedAssertions": 280,
+      "failedAssertions": 0,
+      "beforeTransportFix": {
+        "passedAssertions": 254,
+        "failedAssertions": 26
+      },
+      "mocked": true
+    },
+    "goldenNormalizer": {
+      "successfulGoldensExact": 2,
+      "missingIntervalRejected": true
+    },
+    "negativeMutationControls": 20,
+    "gitDiffCheck": "passed",
+    "nativeBridge": "one new fixture test added; execution delegated to root",
+    "resourceBuild": "delegated to root; this agent did not regenerate bundles"
+  },
+  "limits": [
+    "Offline replay and scripted HTTP only; no live provider, transaction, payment, physical device, archive, TestFlight, or remote deployment evidence.",
+    "Legacy responses without candlesTimeframe retain their declared provenance.timeframe fallback; the actual candle interval is unknown from that legacy payload alone.",
+    "Preserved pre-existing QA expectation changes and other agents\u2019 concurrent changes."
+  ]
+}

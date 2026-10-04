@@ -1,0 +1,16 @@
+--- source
++++ production
+@@ -12,13 +12,11 @@
+       set asks = least(a.asks + 1, 1000000), last_asked_at = now(), last_horizon = excluded.last_horizon,
+           recent_asks = (array[now()] || a.recent_asks)[1:20], last_price = coalesce(excluded.last_price, a.last_price);
+ 
+-  -- Retention: this account's stale rows, plus a bounded sweep of everyone's.
+   delete from bobby_user_assets where identity_id = p_identity and last_asked_at < now() - interval '90 days';
+   delete from bobby_user_assets where (identity_id, symbol) in (
+     select identity_id, symbol from bobby_user_assets where last_asked_at < now() - interval '90 days'
+     limit 500 for update skip locked);
+ 
+-  -- Cap: the asset just asked about always stays; of the rest, the 49 with the highest decayed score.
+   delete from bobby_user_assets where identity_id = p_identity and symbol in (
+     select symbol from bobby_user_assets
+     where identity_id = p_identity and symbol <> p_symbol
