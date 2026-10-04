@@ -65,14 +65,19 @@ export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, key: strin
     return () => { generation.current.invalidate(); controller.current?.abort(); pending.current = null; };
   }, [key, reload]);
   useEffect(() => {
-    if (!options.intervalMs) return;
+    const intervalMs = options.intervalMs;
+    if (!intervalMs) return;
     const tick = () => { if (document.visibilityState === 'visible') void reload(true); };
     // Returning to a briefly hidden tab should not refetch slow providers that were just consulted.
-    // The interval still refreshes on schedule; the manual refresh always starts immediately.
+    // A visibility refresh starts a new interval, avoiding a second read at the old scheduled tick.
+    let timer = window.setInterval(tick, intervalMs);
     const onVisible = () => {
-      if (document.visibilityState === 'visible' && (lastStartedAt.current == null || Date.now() - lastStartedAt.current >= options.intervalMs!)) void reload(true);
+      if (document.visibilityState === 'visible' && !pending.current && (lastStartedAt.current == null || Date.now() - lastStartedAt.current >= intervalMs)) {
+        void reload(true);
+        window.clearInterval(timer);
+        timer = window.setInterval(tick, intervalMs);
+      }
     };
-    const timer = window.setInterval(tick, options.intervalMs);
     document.addEventListener('visibilitychange', onVisible);
     return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [options.intervalMs, reload]);

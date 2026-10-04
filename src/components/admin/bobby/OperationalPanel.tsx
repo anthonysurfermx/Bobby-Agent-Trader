@@ -26,7 +26,7 @@ export default function OperationalPanel({ data, error, loading, updatedAt, onRe
   const coverage = live?.coverage;
   const metric = (pf: OperationalPlatform, field: 'observedDevices' | 'observedAccounts' | 'abandoned' | 'wallSignin' | 'wallPaywall' | 'wallLevel' | 'blocked', measured: boolean) => {
     const platformWindow = snapshot?.[pf];
-    if (!platformWindow || !measured || isMissing(data?.missing, `windows.${windowId}.${pf}.${field}`)) return DASH;
+    if (!platformWindow || !snapshot?.since || !measured || isMissing(data?.missing, `windows.${windowId}.${pf}.${field}`)) return DASH;
     const value = platformWindow[field];
     return typeof value === 'number' ? fmtInt(value) : fmtInt(Object.values(value).reduce((sum, n) => sum + n, 0));
   };
@@ -108,7 +108,7 @@ export default function OperationalPanel({ data, error, loading, updatedAt, onRe
                     <Row label="Interrumpidas" value={metric(pf, 'abandoned', outcomesMeasured)} hint="conexión cerrada antes del final registrado" />
                     <Row label="Muros de registro / pago / nivel" value={`${metric(pf, 'wallSignin', outcomesMeasured)} / ${metric(pf, 'wallPaywall', outcomesMeasured)} / ${metric(pf, 'wallLevel', outcomesMeasured)}`} />
                     <Row label="Solicitudes bloqueadas" value={metric(pf, 'blocked', outcomesMeasured)} />
-                    {outcomesMeasured && Object.entries(snapshot?.[pf]?.blocked ?? {}).filter(([, n]) => n > 0).map(([reason, n]) => <Row key={reason} label={reason} value={fmtInt(n)} />)}
+                    {snapshot?.since && outcomesMeasured && Object.entries(snapshot?.[pf]?.blocked ?? {}).filter(([, n]) => n > 0).map(([reason, n]) => <Row key={reason} label={reason} value={fmtInt(n)} />)}
                     <p className="m-0 mt-3 text-[11px]">Último evento {fmtTimestamp(t?.latestEventAt)} · última emisión {fmtTimestamp(t?.latestCompletedAt)}</p>
                     <p className="m-0 mt-2 text-[11px]">Cobertura de resultados desde {fmtTimestamp(serverCoverage?.outcomeCoverageSince)}</p>
                   </div>;
@@ -118,7 +118,7 @@ export default function OperationalPanel({ data, error, loading, updatedAt, onRe
               {live.providers.length > 0 && <div className="mt-4 border-t border-white/[0.06] pt-3">
                 <div className="mb-2 text-[12px] text-[#EDEDED]">IA · últimas 24 h · ledger registrado, incluye al equipo</div>
                 {live.providers.map((p) => <Row key={`${p.provider}|${p.model}`} label={`${p.provider} · ${p.model}`}
-                  value={`${fmtInt(p.calls24h)} llamadas · ${fmtInt(p.failures24h)} fallos · ${fmtUsd(p.usd24h, true)}`}
+                  value={`${p.calls24h == null ? DASH : fmtInt(p.calls24h)} llamadas · ${p.failures24h == null ? DASH : fmtInt(p.failures24h)} fallos · ${p.usd24h == null ? DASH : fmtUsd(p.usd24h, true)}`}
                   hint={`Latencia proveedor p50 / p95: ${p.callLatencyP50Ms == null ? DASH : `${(p.callLatencyP50Ms / 1000).toFixed(1)} s`} / ${p.callLatencyP95Ms == null ? DASH : `${(p.callLatencyP95Ms / 1000).toFixed(1)} s`}; no es tiempo hasta renderizar. Última llamada ${fmtTimestamp(p.lastCallAt)}.`} />)}
               </div>}
               <p className="m-0 mt-4 text-[11px] leading-relaxed">Resultados observados desde {fmtTimestamp(coverage?.outcomeCoverageSince)}. Los reportes del cliente solo cubren versiones que los envían; la presentación no prueba lectura humana. No se mide crash nativo ni presencia de todos los usuarios.</p>

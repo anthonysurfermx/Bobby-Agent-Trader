@@ -15,7 +15,7 @@ export default function ClientOperationalPanel({ client, windowId, missing }: { 
     <div className="grid gap-3 lg:grid-cols-2">
       {(['ios', 'web'] as const).map((pf) => {
         const p = client.platforms[pf], cov = p.coverage, w = p.windows[windowId], path = `client.platforms.${pf}`;
-        const value = (key: keyof typeof w, measured: boolean) => measured && !isMissing(missing, `${path}.windows.${windowId}.${key}`) ? fmtInt(w[key] as number) : DASH;
+        const value = (key: keyof typeof w, measured: boolean) => w.since && measured && !isMissing(missing, `${path}.windows.${windowId}.${key}`) ? fmtInt(w[key] as number) : DASH;
         const presence = (key: keyof typeof p.presence) => cov.rolloutSince && p.presence.latestReportAt && !isMissing(missing, `${path}.presence.${key}`) ? fmtInt(p.presence[key] as number) : DASH;
         const partial = !!w.since && [cov.rolloutSince, cov.readStartedSince, cov.readReceivedSince, cov.readRenderedSince].some((s) => s && Date.parse(s) > Date.parse(w.since!));
         return <div key={pf} className="min-w-0 rounded-xl border border-white/[0.06] p-4">

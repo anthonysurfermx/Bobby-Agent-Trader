@@ -17,6 +17,8 @@ The overview opens with one selected operational window, one platform comparison
 
 `—` means the source or observed coverage is unavailable. `0` means no records in the available observed coverage. Neither claims universal instrumentation. Server and client totals may cover different requests; they must not be divided into a success rate.
 
+Invalid or omitted coverage/window dates cannot establish a measured count. Missing provider call, failure, or cost fields remain unknown, including inside the collapsed diagnostics.
+
 ## Refresh behavior
 
 - Live server/client aggregate: every 15 seconds while the tab is visible.
@@ -24,6 +26,7 @@ The overview opens with one selected operational window, one platform comparison
 - External providers and period comparison: every five minutes while visible.
 - Search Console's successful cache retains its original fetch date and a declared 30-minute TTL. Apple retains per-report dates and its oldest cached-report date. Provider publication lag remains separate from polling cadence.
 - Returning to a hidden tab consults sources that are due. Manual refresh forces a new request. Requests for the same key do not overlap; changing scope/range invalidates late responses.
+- A due refresh on returning to the tab restarts its polling interval. GET deadlines also cover credential acquisition and response parsing, so a stalled session cannot permanently block later refreshes.
 - Failure retains the last observed values with an explicit stale/error state; cached data is not relabeled as newly fetched.
 
 ## Publication order

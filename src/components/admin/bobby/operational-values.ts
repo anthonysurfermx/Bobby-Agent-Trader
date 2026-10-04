@@ -18,12 +18,12 @@ export function operationalValue(data: AdminLiveResponse, windowId: LiveWindowId
     if (platform === 'android') return null;
     const client = live.client?.platforms[platform];
     const since = key === 'received' ? client?.coverage.readReceivedSince : client?.coverage.readRenderedSince;
-    return client && since && !isMissing(data.missing, `client.platforms.${platform}.windows.${windowId}.${key}`)
+    return client && since && client.windows[windowId].since && !isMissing(data.missing, `client.platforms.${platform}.windows.${windowId}.${key}`)
       ? client.windows[windowId][key] : null;
   }
   const snapshot = live.windows[windowId][platform];
   const timestamps = live.platforms[platform];
-  if (!snapshot || !timestamps) return null;
+  if (!snapshot || !timestamps || !live.windows[windowId].since) return null;
   const coverage = operationalServerCoverage(data, platform);
   const since = key === 'consumed' ? coverage?.readConsumptionCoverageSince : coverage?.outcomeCoverageSince;
   return since && !isMissing(data.missing, `windows.${windowId}.${platform}.${key}`)
