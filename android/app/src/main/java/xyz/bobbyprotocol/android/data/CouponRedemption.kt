@@ -83,7 +83,8 @@ object CouponRedemptionPolicy {
             return ParsedCouponReply(CouponRedemptionOutcome.Failed(CouponRedemptionFailure.INVALID_RESPONSE), null)
         }
         val snapshot = BobbyQuotaPolicy.snapshot(body, accountOnly = true)
-        val receipt = CouponRedemptionReceipt(granted, explicitBonus ?: balance(snapshot))
+        // These quota reads follow the redemption RPC; a complete balance is the latest observation.
+        val receipt = CouponRedemptionReceipt(granted, balance(snapshot) ?: explicitBonus)
         return ParsedCouponReply(if (result == "redeemed") CouponRedemptionOutcome.Redeemed(receipt)
             else CouponRedemptionOutcome.AlreadyRedeemed(receipt), snapshot)
     }

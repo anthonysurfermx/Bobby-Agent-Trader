@@ -1,5 +1,7 @@
 package xyz.bobbyprotocol.android.ui
 
+import java.text.BreakIterator
+import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -13,6 +15,8 @@ internal data class LandArchipelagoBounds(val x: Float, val y: Float, val width:
 /** The canonical iOS axial island lattice and camera geometry, without network or account state. */
 internal object LandArchipelago {
     const val slotCount = 60
+    const val firstRingCount = 6
+    const val labelWorldY = 607f // 391 slab center + 184 half-height + 22 depth + 10 margin.
     const val ownIndex = -1
     const val minZoom = .22f
     const val seaZoom = .75f
@@ -48,24 +52,48 @@ internal object LandArchipelago {
         return LandPoint((q + r) * 92f / 2f * spacing, (q - r) * 46f / 2f * spacing)
     }
 
+    /** Only unoccupied ring-one slots become free lots, after the public read succeeded. */
+    fun freeLots(islandCount: Int, showLots: Boolean): List<LandPoint> {
+        require(islandCount >= 0)
+        return if (showLots && islandCount < firstRingCount) (islandCount until firstRingCount).map(::offset) else emptyList()
+    }
+
+    /** Camera bounds include lots; visiting and hit testing continue to use only real islands. */
+    fun sceneOffsets(islandOffsets: List<LandPoint>, showLots: Boolean): List<LandPoint> =
+        islandOffsets + freeLots(islandOffsets.size, showLots)
+
+    /** The native Canvas chip has the same 24-character budget as the canonical iOS label. */
+    fun shortTitle(title: String): String {
+        val characters = BreakIterator.getCharacterInstance(Locale.ROOT).apply { setText(title) }
+        var count = 0
+        var prefixEnd = 0
+        var end = characters.first()
+        while (end != BreakIterator.DONE) {
+            if (count == 23) prefixEnd = end
+            if (count > 24) return title.substring(0, prefixEnd) + "…"
+            end = characters.next(); count++
+        }
+        return title
+    }
+
     // Tall art above, the fixed slab below and the bottom label must fit together.
     val ringOneBounds = LandArchipelagoBounds(-1012f, -988f, 2024f, 1876f)
 
-    /** Put the neighbor's slab center above the card; own home remains pan (0, 0). */
-    fun targetPan(offset: LandPoint, camera: TraderLandCamera, lift: Float = cardLift): LandPoint = LandPoint(
+    /** Screen-space lift/margins are canonical points (dp), converted to Canvas pixels once. */
+    fun targetPan(offset: LandPoint, camera: TraderLandCamera, lift: Float = cardLift, screenUnit: Float = 1f): LandPoint = LandPoint(
         -offset.x * camera.scale,
-        -(offset.y + 391f - 335f) * camera.scale - lift,
+        -(offset.y + 391f - 335f) * camera.scale - lift * screenUnit,
     )
 
-    fun overviewZoom(width: Float, height: Float, cameraFit: Float): Float {
-        if (!width.isFinite() || !height.isFinite() || !cameraFit.isFinite() || cameraFit <= 0f) return minZoom
-        val wide = (width - 16f) / (ringOneBounds.width * cameraFit)
-        val tall = (height - 2f * cardLift - 24f) / (ringOneBounds.height * cameraFit)
+    fun overviewZoom(width: Float, height: Float, cameraFit: Float, screenUnit: Float = 1f, lift: Float = cardLift): Float {
+        if (!width.isFinite() || !height.isFinite() || !cameraFit.isFinite() || cameraFit <= 0f || !screenUnit.isFinite() || screenUnit <= 0f || !lift.isFinite() || lift < 0f) return minZoom
+        val wide = (width - 16f * screenUnit) / (ringOneBounds.width * cameraFit)
+        val tall = (height - (2f * lift + 24f) * screenUnit) / (ringOneBounds.height * cameraFit)
         return min(.5f, max(minZoom, min(wide, tall)))
     }
 
     /** Null means the own island wins. Call while zoom > seaZoom to refocus a pinch. */
-    fun nearestIsland(pan: LandPoint, camera: TraderLandCamera, offsets: List<LandPoint>): Int? {
+    fun nearestIsland(pan: LandPoint, camera: TraderLandCamera, offsets: List<LandPoint>, screenUnit: Float = 1f, lift: Float = cardLift): Int? {
         if (camera.scale <= 0f || !pan.x.isFinite() || !pan.y.isFinite()) return null
         fun distance(target: LandPoint): Float = abs(pan.x - target.x) / (736f * camera.scale) +
             abs(pan.y - target.y) / (368f * camera.scale)
@@ -73,7 +101,7 @@ internal object LandArchipelago {
         var closest = distance(LandPoint(0f, 0f))
         offsets.forEachIndexed { index, offset ->
             if (offset.x.isFinite() && offset.y.isFinite()) {
-                val candidate = distance(targetPan(offset, camera))
+                val candidate = distance(targetPan(offset, camera, screenUnit = screenUnit, lift = lift))
                 if (candidate < closest) { best = index; closest = candidate }
             }
         }
@@ -99,6 +127,8 @@ internal object LandArchipelago {
         offsets: List<LandPoint>,
         size: Int = camera.islandSize,
         focused: Int? = null,
+        screenUnit: Float = 1f,
+        lift: Float = cardLift,
     ): LandPoint {
         require(size in setOf(8, 10, 12, 16))
         val finiteOffsets = offsets.filter { it.x.isFinite() && it.y.isFinite() }
@@ -109,7 +139,7 @@ internal object LandArchipelago {
         var lowY = -slackY
         var highY = slackY
         if (camera.zoom <= seaZoom && finiteOffsets.isNotEmpty()) {
-            val targets = listOf(LandPoint(0f, 0f)) + finiteOffsets.map { targetPan(it, camera) }
+            val targets = listOf(LandPoint(0f, 0f)) + finiteOffsets.map { targetPan(it, camera, screenUnit = screenUnit, lift = lift) }
             lowX = targets.minOf { it.x } - camera.width * .5f
             highX = targets.maxOf { it.x } + camera.width * .5f
             lowY = targets.minOf { it.y } - camera.height * .5f
@@ -117,7 +147,7 @@ internal object LandArchipelago {
         } else if (focused != null && focused in offsets.indices) {
             val offset = offsets[focused]
             if (offset.x.isFinite() && offset.y.isFinite()) {
-                val center = targetPan(offset, camera)
+                val center = targetPan(offset, camera, screenUnit = screenUnit, lift = lift)
                 lowX = center.x - slackX
                 highX = center.x + slackX
                 lowY = center.y - slackY

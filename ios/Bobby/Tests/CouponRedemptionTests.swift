@@ -5,20 +5,34 @@ import XCTest
 /// Every transport is injected and local. No coupon, account, purchase or device is consumed.
 @MainActor
 final class CouponRedemptionTests: XCTestCase {
+    func testReducedMotionCompletesReceiptBeforeMotionIsReenabled() {
+        var progress: CGFloat = 0
+        XCTAssertEqual(CouponCelebration.progressAfterMotionPreference(progress, reduceMotion: false), 0)
+        progress = CouponCelebration.progressAfterMotionPreference(progress, reduceMotion: true)
+        XCTAssertEqual(progress, 1)
+        progress = CouponCelebration.progressAfterMotionPreference(progress, reduceMotion: false)
+        XCTAssertEqual(progress, 1, "Reenabling motion must not replay a receipt already shown statically")
+        XCTAssertEqual(CouponCelebration.progressAfterMotionPreference(0.3, reduceMotion: true), 1,
+                       "Removing motion during a celebration must settle the same receipt")
+    }
+
     private final class Identity {
         var user: String? = "account-a"
         var generation = UUID()
         func switchTo(_ user: String?) { self.user = user; generation = UUID() }
     }
 
-    private final class Deferred<Value> {
+    @MainActor private final class Deferred<Value> {
         private var reply: CheckedContinuation<Value, Error>?
         private var started: CheckedContinuation<Void, Never>?
         private var isStarted = false
         func wait() async throws -> Value {
-            isStarted = true
-            started?.resume(); started = nil
-            return try await withCheckedThrowingContinuation { reply = $0 }
+            return try await withCheckedThrowingContinuation {
+                reply = $0
+                // Report readiness only after a completion can be delivered, on the same actor.
+                isStarted = true
+                started?.resume(); started = nil
+            }
         }
         func waitForStart() async {
             if isStarted { return }
@@ -78,7 +92,7 @@ final class CouponRedemptionTests: XCTestCase {
         let result = await center.redeem(code: " gifts - 99\n")
         guard case .redeemed(let receipt) = result else { return XCTFail("Expected confirmed redemption") }
         XCTAssertEqual(receipt.granted?.reads, 10, "The code's 99 is not the grant")
-        XCTAssertEqual(receipt.bonus?.reads, 40, "The RPC balance is not grant + a cached allowance")
+        XCTAssertEqual(receipt.bonus?.reads, 10, "The later complete quota snapshot supersedes the RPC balance")
         XCTAssertTrue(receipt.balanceVerified)
         XCTAssertEqual((applied?["access"] as? [String: Any])?["bonus"] as? Int, 10)
         XCTAssertEqual(calls, 1)
@@ -88,7 +102,9 @@ final class CouponRedemptionTests: XCTestCase {
     func testMultiLevelCouponKeepsEachGrantAndBonusSeparate() async {
         var applied: [String: Any]?
         let center = center(send: { _, _, _, _, _ in
-            .init(json: self.redemption(grant: self.credits(10, 3, 1), bonus: self.credits(20, 8, 2)), status: 200)
+            var body = self.redemption(grant: self.credits(10, 3, 1), bonus: self.credits(20, 8, 2))
+            body["access"] = self.access(bonus: 20); body["levels"] = self.levels(deep: 8, max: 2)
+            return .init(json: body, status: 200)
         }, apply: { body, _, _ in applied = body })
         let result = await center.redeem(code: "MULTI")
         guard case .redeemed(let receipt) = result else { return XCTFail("Expected multi-level grant") }
@@ -712,6 +728,143 @@ final class CouponRedemptionTests: XCTestCase {
         pending.complete(.init(json: ["access": access(), "levels": levels()], status: 200))
         _ = await first.value
         XCTAssertFalse(center.isCheckingBalance)
+    }
+
+
+    func testGiftAnnouncementIncludesEachPositiveLevelInAllSixLanguages() throws {
+        let gift = try XCTUnwrap(CouponCredits(json: credits(1, 2, 3)))
+        let receipt = CouponRedemptionReceipt(granted: gift, bonus: gift)
+        for language in ["en", "es", "fr", "pt", "it", "de"] {
+            let message = CouponCopy.announcement(receipt: receipt, isNewGift: true, language: language)
+            for (key, count) in [("oneRead", 1), ("profundoAdded", 2), ("maximoAdded", 3)] {
+                XCTAssertTrue(message.contains(CouponCopy.text(key, count: count, language: language)), language + ": " + key)
+            }
+            XCTAssertTrue(message.contains(CouponCopy.text("next", language: language)))
+        }
+    }
+    func testPremiumOnlyAnnouncementDoesNotInventQuickGift() throws {
+        let gift = try XCTUnwrap(CouponCredits(json: credits(0, 4, 1)))
+        let receipt = CouponRedemptionReceipt(granted: gift, bonus: gift)
+        let message = CouponCopy.announcement(receipt: receipt, isNewGift: true, language: "es")
+        XCTAssertTrue(message.contains("Lecturas Profundo: +4"))
+        XCTAssertTrue(message.contains("Lecturas Máximo: +1"))
+        XCTAssertFalse(message.contains("lectura Rápido"))
+    }
+    func testAlreadyRedeemedAnnouncementNeverPromisesAnotherGrant() throws {
+        let gift = try XCTUnwrap(CouponCredits(json: credits(10, 2, 1)))
+        // Defensive even if a future caller passes a grant for an old redemption.
+        let message = CouponCopy.announcement(receipt: .init(granted: gift, bonus: gift), isNewGift: false, language: "es")
+        XCTAssertTrue(message.contains(CouponCopy.text("already", language: "es")))
+        XCTAssertTrue(message.contains(CouponCopy.text("alreadyNext", language: "es")))
+        XCTAssertFalse(message.contains("+2"))
+        XCTAssertFalse(message.contains("+1"))
+        XCTAssertFalse(message.contains("Tienes 10"))
+    }
+    func testPartialCouponAccessPlanChangeRetiresOldPremiumMeters() throws {
+        let identity = Identity()
+        let suite = "bobby.coupon.partial-plan.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = NucleoLevelCenter(defaults: defaults)
+        center.currentUser = { identity.user }; center.currentGeneration = { identity.generation }
+        center.accountChanged(force: true)
+        var proLevels = levels(deep: 9, max: 3); proLevels["tier"] = "pro"
+        center.apply(["access": access(tier: "pro", bonus: 7), "levels": proLevels,
+                      "plans": ["limits": ["pro": ["profundo": [60, 7]]]]])
+        XCTAssertEqual(center.tier, "pro")
+        XCTAssertTrue(center.applyCouponSnapshot(["access": access(tier: "free", bonus: 10)],
+            userID: "account-a", generation: identity.generation))
+        XCTAssertEqual(center.quickAccess?.tier, "free")
+        XCTAssertEqual(center.quickAccess?.bonus, 10)
+        XCTAssertNil(center.tier)
+        XCTAssertTrue(center.meters.isEmpty)
+        XCTAssertEqual(center.planLimits["pro"]?["profundo"], [60, 7], "Non-quota plans are preserved")
+    }
+    func testPartialCouponLevelsPlanChangeRetiresOldQuickMeter() throws {
+        let identity = Identity()
+        let suite = "bobby.coupon.partial-levels.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = NucleoLevelCenter(defaults: defaults)
+        center.currentUser = { identity.user }; center.currentGeneration = { identity.generation }
+        center.accountChanged(force: true)
+        center.apply(["access": access(tier: "pro", bonus: 7)])
+        XCTAssertTrue(center.applyCouponSnapshot(["levels": levels(deep: 2, max: 1)],
+            userID: "account-a", generation: identity.generation))
+        XCTAssertNil(center.quickAccess)
+        XCTAssertEqual(center.tier, "free")
+        XCTAssertEqual(center.meters[.profundo]?.bonus, 2)
+        XCTAssertEqual(center.meters[.maximo]?.bonus, 1)
+    }
+    func testPartialCouponLevelTierChangeRetiresOmittedOldMeter() throws {
+        let identity = Identity()
+        let suite = "bobby.coupon.partial-one-level.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = NucleoLevelCenter(defaults: defaults)
+        center.currentUser = { identity.user }; center.currentGeneration = { identity.generation }
+        center.accountChanged(force: true)
+        var proLevels = levels(deep: 9, max: 3); proLevels["tier"] = "pro"
+        center.apply(["access": access(tier: "pro", bonus: 7), "levels": proLevels])
+        XCTAssertTrue(center.applyCouponSnapshot(["levels": ["tier": "free", "levels": [
+            "profundo": ["used": 0, "limit": 3, "remaining": 3, "bonus": 2, "windowDays": 7, "resetsAt": NSNull()]]]],
+            userID: "account-a", generation: identity.generation))
+        XCTAssertNil(center.quickAccess)
+        XCTAssertEqual(center.tier, "free")
+        XCTAssertEqual(center.meters[.profundo]?.bonus, 2)
+        XCTAssertNil(center.meters[.maximo], "The omitted field cannot keep the old plan's quota")
+    }
+    func testPartialCouponSamePlanPreservesUnavailableOtherMeters() throws {
+        let identity = Identity()
+        let suite = "bobby.coupon.same-plan.\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let center = NucleoLevelCenter(defaults: defaults)
+        center.currentUser = { identity.user }; center.currentGeneration = { identity.generation }
+        center.accountChanged(force: true)
+        center.apply(["access": access(bonus: 7), "levels": levels(deep: 2, max: 1)])
+        XCTAssertTrue(center.applyCouponSnapshot(["access": access(bonus: 10)],
+            userID: "account-a", generation: identity.generation))
+        XCTAssertEqual(center.quickAccess?.bonus, 10)
+        XCTAssertEqual(center.tier, "free")
+        XCTAssertEqual(center.meters[.profundo]?.bonus, 2)
+        XCTAssertEqual(center.meters[.maximo]?.bonus, 1)
+    }
+
+
+    func testCompletePostRpcQuotaBalanceWinsWhileGrantStaysUnchanged() async {
+        for amount in [0, 8] {
+            let center = center(send: { _, _, _, _, _ in
+                var body = self.redemption(grant: self.credits(10, 3, 1), bonus: self.credits(20, 8, 4))
+                body["access"] = self.access(bonus: amount)
+                body["levels"] = self.levels(deep: amount == 0 ? 0 : 2, max: amount == 0 ? 0 : 1)
+                return .init(json: body, status: 200)
+            })
+            let result = await center.redeem(code: "LATEST")
+            guard case .redeemed(let receipt) = result else { return XCTFail("The new redemption is confirmed") }
+            XCTAssertEqual(receipt.granted?.reads, 10)
+            XCTAssertEqual(receipt.granted?.profundo, 3)
+            XCTAssertEqual(receipt.granted?.maximo, 1)
+            XCTAssertEqual(receipt.bonus?.reads, amount, "Available balance follows the later complete quota reads, including zero")
+            XCTAssertEqual(receipt.bonus?.profundo, amount == 0 ? 0 : 2)
+            XCTAssertEqual(receipt.bonus?.maximo, amount == 0 ? 0 : 1)
+        }
+    }
+    func testIncompletePostRpcQuotaKeepsConfirmedRpcBalanceWithoutInventingMeters() async {
+        var applied: [String: Any]?
+        let center = center(send: { _, _, _, _, _ in
+            var body = self.redemption(grant: self.credits(10, 3, 1), bonus: self.credits(20, 8, 4))
+            body["access"] = self.access(bonus: 8)
+            body["levels"] = NSNull()
+            return .init(json: body, status: 200)
+        }, apply: { body, _, _ in applied = body })
+        let result = await center.redeem(code: "PARTIAL")
+        guard case .redeemed(let receipt) = result else { return XCTFail("The RPC balance remains confirmed") }
+        XCTAssertEqual(receipt.bonus?.reads, 20)
+        XCTAssertEqual(receipt.bonus?.profundo, 8)
+        XCTAssertEqual(receipt.bonus?.maximo, 4)
+        XCTAssertNotNil(applied?["access"])
+        XCTAssertNil(applied?["levels"])
     }
 
 }

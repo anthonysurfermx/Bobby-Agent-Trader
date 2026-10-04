@@ -8,11 +8,20 @@ private func seg(_ p: CGFloat, _ a: CGFloat, _ b: CGFloat) -> CGFloat {
 struct CouponCelebration: View {
     let reduceMotion: Bool
     @State private var progress: CGFloat = 0
+    // A receipt shown statically is already complete when motion becomes available again.
+    static func progressAfterMotionPreference(_ progress: CGFloat, reduceMotion: Bool) -> CGFloat {
+        reduceMotion ? 1 : progress
+    }
     var body: some View {
         CelebrationFrame(progress: reduceMotion ? 1 : progress, still: reduceMotion)
             .frame(width: 120, height: 120)
             .accessibilityHidden(true)
             .task(id: reduceMotion) {
+                let settled = Self.progressAfterMotionPreference(progress, reduceMotion: reduceMotion)
+                if settled != progress {
+                    var t = Transaction(); t.disablesAnimations = true
+                    withTransaction(t) { progress = settled }
+                }
                 guard !reduceMotion, progress == 0 else { return } // One shot per receipt
                 withAnimation(.linear(duration: 1.2)) { progress = 1 }
             }

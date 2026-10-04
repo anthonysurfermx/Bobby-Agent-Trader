@@ -282,9 +282,27 @@ class MainActivityAcceptanceInstrumentedTest {
     @Test fun starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails() {
         enterGuestApp()
         waitUntil { evaluate("getComputedStyle(document.querySelector('#greet .t span')).opacity > 0.9") == true }
-        assertEquals(true, evaluate("(function(){var e=document.querySelector('#chipRow [data-hit=chip]');if(!e)return false;e.id='acceptanceStarter';return true;})()"))
+        // The chip is born from the pill before it reaches its final hit rectangle. A screen tap
+        // must use settled geometry, rather than a coordinate sampled from that flight.
+        var previousRect: List<Double>? = null
+        var stableFrames = 0
+        waitUntil {
+            val raw = evaluate("JSON.stringify((function(){var e=document.querySelector('#chipRow [data-hit=chip]');if(!e||window.nucleo.state()!=='IDLE'||Number(getComputedStyle(e).opacity)<0.99)return null;e.id='acceptanceStarter';var r=e.getBoundingClientRect();return [r.left,r.top,r.width,r.height];})())") as? String
+            val rect = raw?.takeUnless { it == "null" }?.let { value ->
+                val array = JSONArray(value)
+                (0 until array.length()).map { array.getDouble(it) }
+            }
+            val old = previousRect
+            stableFrames = if (rect != null && old != null && rect.size == 4 &&
+                rect.indices.all { kotlin.math.abs(rect[it] - old[it]) < 0.25 }) stableFrames + 1 else 0
+            previousRect = rect
+            stableFrames >= 3
+        }
+        val logBeforeTap = (evaluate("window.nucleo.log().length") as Number).toInt()
         tapDom("acceptanceStarter")
-        waitUntil { refusedRequests.any { it.second == "/api/bobby-asset-search" } }
+        // The bootstrap GET is unrelated to this action. Require actual question resolution.
+        waitUntil { refusedRequests.any { it.first == "POST" && it.second == "/api/bobby-asset-search" } }
+        assertEquals(true, evaluate("window.nucleo.log().slice($logBeforeTap).some(function(row){return row[1]==='SENDING';})"))
         waitUntil { evaluate("window.nucleo.state()!=='IDLE' && Array.from(document.querySelectorAll('#greet .t span,#greet .s')).every(function(e){return Number(getComputedStyle(e).opacity)<0.01;}) && Array.from(document.querySelectorAll('#meri i')).every(function(e){return Number(getComputedStyle(e).opacity)<0.01;})") == true }
         assertTrue("The pure-glass fallback companion image must remain invisible",
             evaluate("Number(getComputedStyle(document.getElementById('fbImg')).opacity)===0") == true)
@@ -458,7 +476,7 @@ class MainActivityAcceptanceInstrumentedTest {
             "finishing=${activity.isFinishing}, route=$nativeRoute, webFocus=${web.hasFocus()}, windowFocus=${web.hasWindowFocus()}, " +
                 "ime=${ViewCompat.getRootWindowInsets(web)?.isVisible(WindowInsetsCompat.Type.ime())}, web=${web.width}x${web.height}"
         }
-        val dom = runCatching { evaluate("JSON.stringify((function(){var e=document.getElementById('pill'),r=e&&e.getBoundingClientRect(),s=e&&getComputedStyle(e),h=r&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {page:location.pathname,language:document.documentElement.lang,state:window.nucleo&&window.nucleo.state(),active:document.activeElement&&document.activeElement.id,pill:r&&{x:r.x,y:r.y,w:r.width,h:r.height,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,hit:h&&h.id}};})())") }.getOrNull()
+        val dom = runCatching { evaluate("JSON.stringify((function(){var e=document.getElementById('pill'),r=e&&e.getBoundingClientRect(),s=e&&getComputedStyle(e),h=r&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {page:location.pathname,language:document.documentElement.lang,state:window.nucleo&&window.nucleo.state(),log:window.nucleo&&window.nucleo.log(),active:document.activeElement&&document.activeElement.id,pill:r&&{x:r.x,y:r.y,w:r.width,h:r.height,visibility:s.visibility,opacity:s.opacity,pointerEvents:s.pointerEvents,hit:h&&h.id}};})())") }.getOrNull()
         return "$native; dom=$dom"
     }
     private fun findWeb(view: View): WebView? = when (view) {

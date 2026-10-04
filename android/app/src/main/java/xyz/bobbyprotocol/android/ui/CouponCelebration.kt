@@ -29,13 +29,11 @@ private fun seg(p: Float, a: Float, b: Float): Float {
 
 @Composable
 fun CouponCelebration(reduceMotion: Boolean = false, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val still = reduceMotion || remember(context) {
-        Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
-    }
+    val still = reduceMotion || rememberCouponSystemReducedMotion()
     val progress = remember { Animatable(0f) }
     LaunchedEffect(still) { // Cancels automatically when leaving composition
-        if (!still && progress.value < 1f) progress.animateTo(1f, tween(1200, easing = LinearEasing))
+        if (still) progress.snapTo(1f) // Respect changes immediately and never replay this receipt.
+        else if (progress.value < 1f) progress.animateTo(1f, tween(1200, easing = LinearEasing))
     }
     Box(modifier.size(120.dp).clearAndSetSemantics { }, contentAlignment = Alignment.Center) {
         Canvas(Modifier.matchParentSize()) {
@@ -74,4 +72,25 @@ fun CouponCelebration(reduceMotion: Boolean = false, modifier: Modifier = Modifi
         }
 
     }
+}
+
+/** Observe the real system policy, including changes while a receipt remains visible. */
+@Composable
+internal fun rememberCouponSystemReducedMotion(): Boolean {
+    val context = LocalContext.current
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    fun systemReducedMotion() = Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
+    var systemStill by remember(context) { mutableStateOf(systemReducedMotion()) }
+    DisposableEffect(context, lifecycleOwner) {
+        val observer = object : android.database.ContentObserver(android.os.Handler(android.os.Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) { systemStill = systemReducedMotion() }
+        }
+        val listener = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) systemStill = systemReducedMotion()
+        }
+        context.contentResolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
+        lifecycleOwner.lifecycle.addObserver(listener)
+        onDispose { context.contentResolver.unregisterContentObserver(observer); lifecycleOwner.lifecycle.removeObserver(listener) }
+    }
+    return systemStill
 }

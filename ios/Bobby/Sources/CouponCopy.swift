@@ -6,6 +6,17 @@ enum CouponCopy {
         let value = rows[key]?[language] ?? rows[key]?["en"] ?? key
         return count.map { value.replacingOccurrences(of: "{n}", with: String($0)) } ?? value
     }
+    /// The same confirmed benefit is visible and announced in every language.
+    static func announcement(receipt: CouponRedemptionReceipt, isNewGift: Bool, language: String = L.language) -> String {
+        var parts = [text(isNewGift ? "applied" : "already", language: language)]
+        if isNewGift, let gift = receipt.granted {
+            if gift.reads > 0 { parts.append(text(gift.reads == 1 ? "oneRead" : "manyReads", count: gift.reads, language: language)) }
+            if gift.profundo > 0 { parts.append(text("profundoAdded", count: gift.profundo, language: language)) }
+            if gift.maximo > 0 { parts.append(text("maximoAdded", count: gift.maximo, language: language)) }
+        }
+        parts.append(text(isNewGift ? "next" : "alreadyNext", language: language))
+        return parts.joined(separator: ". ")
+    }
     static let rows: [String: [String: String]] = [
         "title": ["en": "Redeem a code", "es": "Canjear un código", "fr": "Utiliser un code", "pt": "Resgatar um código", "it": "Riscatta un codice", "de": "Code einlösen"],
         "intro": ["en": "Your reads are added directly to your account.", "es": "Las lecturas se añaden directamente a tu cuenta.", "fr": "Tes analyses sont ajoutées directement à ton compte.", "pt": "As leituras são adicionadas diretamente à tua conta.", "it": "Le analisi vengono aggiunte direttamente al tuo account.", "de": "Deine Analysen werden direkt deinem Konto gutgeschrieben."],

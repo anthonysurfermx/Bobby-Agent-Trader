@@ -281,6 +281,26 @@ class CouponRedemptionTest {
         assertEquals(1, fixture.applied)
     }
 
+
+    @Test fun completePostRpcQuotaBalanceWinsWhileGrantStaysUnchanged() {
+        for (latest in listOf(CouponCredits(8, 2, 1), CouponCredits(0, 0, 0))) {
+            val body = snapshot(latest.reads, latest.profundo, latest.maximo).put("result", "redeemed")
+                .put("granted", credits(10, 3, 1)).put("bonus", credits(20, 8, 4))
+            val receipt = (CouponRedemptionPolicy.parse(CouponReply(200, body)).outcome as CouponRedemptionOutcome.Redeemed).receipt
+            assertEquals(CouponCredits(10, 3, 1), receipt.granted)
+            assertEquals("Available balance follows the later complete quota reads, including zero", latest, receipt.bonus)
+        }
+    }
+    @Test fun incompletePostRpcQuotaKeepsConfirmedRpcBalanceWithoutInventingMeters() {
+        val body = snapshot(8, 2, 1).put("result", "redeemed")
+            .put("granted", credits(10, 3, 1)).put("bonus", credits(20, 8, 4)).apply { remove("levels") }
+        val parsed = CouponRedemptionPolicy.parse(CouponReply(200, body))
+        val receipt = (parsed.outcome as CouponRedemptionOutcome.Redeemed).receipt
+        assertEquals(CouponCredits(20, 8, 4), receipt.bonus)
+        assertNotNull(parsed.snapshot?.access)
+        assertNull(parsed.snapshot?.levels)
+    }
+
     private class Fixture(
         send: suspend (BobbyQuotaOwner, String) -> CouponReply,
         get: suspend (BobbyQuotaOwner) -> BobbyQuotaSnapshot? = { null },

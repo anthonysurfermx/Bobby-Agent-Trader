@@ -50,7 +50,16 @@ fun CouponRedemptionContent(
     onRedeem: (String) -> Unit, onCheckBalance: () -> Unit,
     onDismissOutcome: () -> Unit, onRead: () -> Unit,
 ) {
-    val language = session.language
+    CouponRedemptionContent(session.language, state, onRedeem, onCheckBalance, onDismissOutcome, onRead)
+}
+
+/** Production form with explicit copy context; tests use the same UI without an account repository. */
+@Composable
+internal fun CouponRedemptionContent(
+    language: String, state: CouponRedemptionState,
+    onRedeem: (String) -> Unit, onCheckBalance: () -> Unit,
+    onDismissOutcome: () -> Unit, onRead: () -> Unit,
+) {
     val text: (String) -> String = { CouponCopy.text(it, language = language) }
     var code by remember { mutableStateOf("") }
     val busy = state.isRedeeming || state.isCheckingBalance

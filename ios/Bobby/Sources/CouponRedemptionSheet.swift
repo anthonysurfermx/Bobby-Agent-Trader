@@ -182,11 +182,8 @@ struct CouponSuccessPopup: View {
                     .onAppear {
                         if isNewGift { UINotificationFeedbackGenerator().notificationOccurred(.success) }
                         if UIAccessibility.isVoiceOverRunning {
-                            let gift = receipt.granted?.reads ?? 0
-                            let message = CouponCopy.text(isNewGift ? "applied" : "already") + ". "
-                                + (gift > 0 ? CouponCopy.text(gift == 1 ? "oneRead" : "manyReads", count: gift) + ". " : "")
-                                + CouponCopy.text(isNewGift ? "next" : "alreadyNext")
-                            UIAccessibility.post(notification: .announcement, argument: message)
+                            UIAccessibility.post(notification: .announcement,
+                                                 argument: CouponCopy.announcement(receipt: receipt, isNewGift: isNewGift))
                         }
                     }
         }.foregroundStyle(Theme.cream)

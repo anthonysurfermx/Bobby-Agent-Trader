@@ -31,7 +31,7 @@ struct CouponCredits: Equatable, Sendable {
 struct CouponRedemptionReceipt: Equatable, Sendable {
     /// Present only when this request confirmed a new redemption; never added to a cached balance.
     let granted: CouponCredits?
-    /// The RPC balance, or all three validated quota gift balances; separate from plan `remaining`.
+    /// The later complete quota gift balance, or confirmed RPC balance; separate from plan `remaining`.
     let bonus: CouponCredits?
     var balanceVerified: Bool { bonus != nil }
 }
@@ -257,7 +257,8 @@ final class CouponRedemptionCenter: ObservableObject {
         let bonus = CouponCredits(json: rawBonus)
         guard rawBonus == nil || rawBonus is NSNull || bonus != nil else { return (.failed(.invalidResponse), nil) }
         let snapshot = validatedSnapshot(body)
-        let receipt = CouponRedemptionReceipt(granted: granted, bonus: bonus ?? giftBalance(snapshot))
+        // These quota reads follow the redemption RPC; a complete balance is the latest observation.
+        let receipt = CouponRedemptionReceipt(granted: granted, bonus: giftBalance(snapshot) ?? bonus)
         let outcome: CouponRedemptionOutcome = result == "redeemed" ? .redeemed(receipt) : .alreadyRedeemed(receipt)
         return (outcome, snapshot)
     }

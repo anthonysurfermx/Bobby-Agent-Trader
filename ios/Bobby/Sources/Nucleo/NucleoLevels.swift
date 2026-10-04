@@ -240,11 +240,19 @@ final class NucleoLevelCenter: ObservableObject {
         requestGeneration = UUID()
         var recorded = false
         if let access = BobbyReadAccess(json: body["access"]), ["free", "pro"].contains(access.tier) {
+            // A partial response for a different plan cannot retain that plan's old premium quota.
+            if let tier, tier != access.tier {
+                self.tier = nil
+                meters = [:]
+            }
             quickAccess = access
             recorded = true
         }
         if let levels = body["levels"] as? [String: Any], let incomingTier = levels["tier"] as? String,
            ["free", "pro"].contains(incomingTier), let per = levels["levels"] as? [String: Any] {
+            // Levels can also be the only valid field in a partial coupon response.
+            if let tier, tier != incomingTier { meters = [:] }
+            if let quickAccess, quickAccess.tier != incomingTier { self.quickAccess = nil }
             tier = incomingTier
             for level in NucleoAnalysisLevel.allCases where level.isPremium {
                 if let meter = NucleoLevelMeter(json: per[level.rawValue]) { meters[level] = meter }

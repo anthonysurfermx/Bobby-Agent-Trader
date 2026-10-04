@@ -11,6 +11,11 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.SemanticsPropertyKey
 import androidx.compose.ui.semantics.stateDescription
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.isActive
@@ -57,8 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.withTransform
 import androidx.compose.ui.geometry.Offset
@@ -178,6 +181,7 @@ fun TraderLandSheet(
     }
     var world by remember(epoch, owner) { mutableStateOf<JSONObject?>(null) }
     var neighbors by remember(epoch, owner) { mutableStateOf<JSONObject?>(null) }
+    var neighborsFailed by remember(epoch, owner) { mutableStateOf(false) }
     var showcase by remember { mutableStateOf<JSONObject?>(null) }
     var visit by remember(epoch, owner) { mutableStateOf<JSONObject?>(null) }
     var tab by remember(epoch, owner) { mutableStateOf("mine") }
@@ -185,6 +189,7 @@ fun TraderLandSheet(
     var mustReload by remember(epoch, owner) { mutableStateOf(false) }
     var error by remember(epoch, owner) { mutableStateOf<String?>(null) }
     var notice by remember(epoch, owner) { mutableStateOf<String?>(null) }
+    var selectedPlacementId by remember(epoch, owner) { mutableStateOf<String?>(null) }
     var draft by remember(epoch, owner) { mutableStateOf<LandDraft?>(null) }
     var destination by remember(epoch, owner) { mutableStateOf<Pair<Int, Int>?>(null) }
     var rotation by remember(epoch, owner) { mutableIntStateOf(0) }
@@ -232,13 +237,16 @@ fun TraderLandSheet(
         val answer = repository.request("api/trader-land", authenticated = true, headers = headers)
         current(true); LandJson.requireWorld(answer)
         world = answer; title = LandJson.string(answer.optJSONObject("share"), "title").orEmpty()
-        draft = null; destination = null; mustReload = false
+        draft = null; destination = null; selectedPlacementId = null; mustReload = false
     }
     suspend fun loadNeighbors() {
         current()
-        val answer = repository.request("api/trader-land-public", headers = headers)
-        current(); check(answer.optBoolean("ok") && answer.optJSONArray("worlds") != null) { t("Islands are unavailable.", "Las islas no están disponibles.") }
-        neighbors = answer
+        try {
+            val answer = repository.request("api/trader-land-public", headers = headers)
+            current(); check(answer.optBoolean("ok") && answer.optJSONArray("worlds") != null) { t("Islands are unavailable.", "Las islas no están disponibles.") }
+            neighbors = answer; neighborsFailed = false
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failed: Exception) { neighborsFailed = true; throw failed }
     }
     fun task(requireAccount: Boolean = false, action: suspend () -> Unit) {
         if (busy) return
@@ -257,7 +265,7 @@ fun TraderLandSheet(
             mustReload = true
             val answer = repository.request("api/trader-land", "POST", body, true, headers)
             current(true); LandJson.requireWorld(answer)
-            world = answer; mustReload = false; draft = null; destination = null
+            world = answer; mustReload = false; draft = null; destination = null; selectedPlacementId = null
             title = LandJson.string(answer.optJSONObject("share"), "title").orEmpty()
             val closed = answer.optJSONObject("closed")
             val grew = answer.optJSONObject("grew")
@@ -283,7 +291,7 @@ fun TraderLandSheet(
             val island = answer.optJSONObject("world")
             check(answer.optBoolean("ok") && island != null && LandJson.shareCode(island.optString("code")) == code) { t("This island is unavailable.", "Esta isla no está disponible.") }
             LandJson.requirePublicWorld(island!!)
-            visit = answer; tab = "neighbors"; reason = "offensive"; details = ""; requestCamera(code)
+            selectedPlacementId = null; draft = null; destination = null; visit = answer; tab = "neighbors"; reason = "offensive"; details = ""; requestCamera(code)
         }
     }
     fun saveBlocked(values: Map<String, String>) {
@@ -358,35 +366,55 @@ fun TraderLandSheet(
                 tap = { x, y ->
                     if (tab == "mine" && ((writable && world != null) || practiceWritable)) {
                         if (draft != null) destination = x to y
-                        else primaryPieces.firstOrNull { it.contains(x, y) }?.let { piece ->
-                            if (practiceWritable || world?.optJSONObject("capabilities")?.optBoolean("move") == true) {
-                                draft = LandDraft("move", piece.placementId, piece.itemId, piece.width, piece.height)
-                                rotation = piece.rotation; destination = piece.x to piece.y
-                            }
-                        }
+                        else selectedPlacementId = landSelectionAt(land, primaryPieces, x, y,
+                            canSelectCore = world?.optJSONObject("capabilities")?.optBoolean("moveCore") == true)?.id
                     }
                 }, islands = sceneIslands, mapIdentity = "island-$epoch-${owner ?: "guest"}",
                 onFocus = { island ->
                     if (island == null) { visit = null; tab = "mine" }
-                    else { draft = null; destination = null; visit = island.snapshot; tab = "neighbors"; reason = "offensive"; details = "" }
-                }, onExplore = { draft = null; destination = null; visit = null; tab = "neighbors"; if (neighbors == null && !busy && session.riskAccepted) task { loadNeighbors() } },
+                    else { draft = null; destination = null; selectedPlacementId = null; visit = island.snapshot; tab = "neighbors"; reason = "offensive"; details = "" }
+                }, onExplore = { draft = null; destination = null; selectedPlacementId = null; visit = null; tab = "neighbors"; if (neighbors == null && !busy && session.riskAccepted) task { loadNeighbors() } },
                 navigationCode = navigationCode?.takeUnless { it == LandJson.string(world?.optJSONObject("share"), "code") }, navigationId = navigationId,
                 revealRadius = if (practicing) practiceState?.let(LandPractice::revealRadius) else null,
                 draftValid = if (practicing && draft != null && destination != null) LandPractice.canPlace(practiceState!!, draft!!.itemId, destination!!.first, destination!!.second, rotation,
-                    if (draft!!.action == "move") draft!!.id else null, practiceCatalog) == null else null)
+                    if (draft!!.action == "move") draft!!.id else null, practiceCatalog) == null else null,
+                showLots = neighbors != null && !neighborsFailed,
+                selectedID = landSelectionById(land, primaryPieces, selectedPlacementId, world?.optJSONObject("capabilities")?.optBoolean("moveCore") == true)?.id.takeIf { tab == "mine" },
+                ownTitle = if (practicing) LandPracticeCopy.text("practice_title", session.language) else title.takeIf(String::isNotBlank) ?: t("My island", "Mi isla"),
+                onArchipelagoModeChanged = { active ->
+                    if (active) {
+                        draft = null; destination = null; selectedPlacementId = null; tab = "neighbors"
+                        if (neighbors == null && !busy && session.riskAccepted) task { loadNeighbors() }
+                    } else { visit = null; tab = "mine" }
+                })
         }
         if (tab == "mine") {
+            val selected = primaryLand?.let { landSelectionById(it, primaryPieces, selectedPlacementId,
+                canSelectCore = world?.optJSONObject("capabilities")?.optBoolean("moveCore") == true) }
+            if (selected != null && draft == null) {
+                val item = if (practicing) LandJson.objects(practiceCatalogJson).firstOrNull { it.optString("id") == selected.itemId }
+                    else world?.let { LandJson.catalogItem(it, selected.itemId) }
+                LandSelectionBar(LandJson.name(item, session.language).ifBlank { if (selected.core) LandSelectionCopy.text("core", session.language) else selected.itemId.replace('_', ' ') }, selected.core,
+                    enabled = if (selected.core) writable && world?.optJSONObject("capabilities")?.optBoolean("moveCore") == true
+                        else practiceWritable || (writable && world?.optJSONObject("capabilities")?.optBoolean("move") == true),
+                    t = t, language = session.language, dormant = primaryLand?.optJSONObject("core")?.optInt("stage", 1) == 0, onMove = {
+                        if (repository.epoch.value == epoch && repository.session.value?.userId == owner && session.riskAccepted &&
+                            (practiceWritable || (writable && world?.optJSONObject("capabilities")?.optBoolean(if (selected.core) "moveCore" else "move") == true))) {
+                            draft = selected.moveDraft(); destination = selected.x to selected.y; rotation = selected.rotation
+                        }
+                    })
+            }
             if (owner == null) {
                 val localState = practiceState; val fixture = practiceFixture
                 if (localState != null && fixture != null) LandPracticePanel(localState, fixture, practiceCatalog, draft, destination, rotation,
                     enabled = practiceWritable, language = session.language,
                     onItemName = { id -> LandJson.name(LandJson.objects(practiceCatalogJson).firstOrNull { it.optString("id") == id }, session.language) },
-                    onDraftChosen = { chosen -> if (practiceWritable) { draft = chosen; destination = null; rotation = 0 } },
+                    onDraftChosen = { chosen -> if (practiceWritable) { selectedPlacementId = null; draft = chosen; destination = null; rotation = 0 } },
                     onRotation = { turn -> if (practiceWritable) rotation = turn },
                     onCancel = { draft = null; destination = null },
                     onUpdate = { next ->
                         when (val result = practicePersistence.commit(AccountVersion(owner, epoch), localState, next, practiceCatalog, onCommitted = { practiceState = it })) {
-                            is PracticePersistenceResult.Committed -> true
+                            is PracticePersistenceResult.Committed -> { selectedPlacementId = null; true }
                             else -> false
                         }
                     })
@@ -406,7 +434,7 @@ fun TraderLandSheet(
                         val next = growth.optInt("nextSize")
                         if (next > size) Text("${t("Growth", "Crecimiento")}: ${growth.optInt("occupied")} / ${growth.optInt("threshold")} · $next × $next")
                     }
-                    if (caps?.optBoolean("moveCore") == true) LandButton(t("Move Aura Core", "Mover Núcleo de Aura"), writable) { draft = LandDraft("move_core", "", "aura_core", 2, 2); rotation = 0; destination = null }
+                    if (caps?.optBoolean("moveCore") == true) LandButton(t("Move Aura Core", "Mover Núcleo de Aura"), writable) { selectedPlacementId = LAND_CORE_SELECTION_ID; draft = LandDraft("move_core", "", "aura_core", 2, 2); rotation = 0; destination = LandJson.core(land) }
                     draft?.let { chosen ->
                         Text(t("Choose a destination on the grid, then confirm.", "Elige el destino en la cuadrícula y confirma."))
                         if (chosen.action != "move_core") LandButton("${t("Rotate", "Girar")} · $rotation°", writable) { rotation = (rotation + 90) % 360 }
@@ -419,7 +447,7 @@ fun TraderLandSheet(
                                 if (chosen.action != "move_core") body.put("rotation", rotation).put(if (chosen.action == "place") "inventoryId" else "placementId", chosen.id)
                                 mutate(body)
                             }
-                            LandButton(t("Cancel", "Cancelar"), !busy) { draft = null; destination = null }
+                            LandDraftCancelButton(!busy, t, language = session.language) { draft = null; destination = null }
                         }
                     }
                     LandJson.objects(actual.optJSONArray("tiers")).forEach { tier ->
@@ -462,10 +490,10 @@ fun TraderLandSheet(
                                 val placement = pieces.firstOrNull { it.inventoryId == id }
                                 if (placement == null && !entry.optBoolean("placed")) LandButton(t("Build with this piece", "Construir con esta pieza"), writable) {
                                     val footprint = LandJson.footprint(item)
-                                    draft = LandDraft("place", id, entry.optString("item_id"), footprint.first, footprint.second); rotation = 0; destination = null
+                                    selectedPlacementId = null; draft = LandDraft("place", id, entry.optString("item_id"), footprint.first, footprint.second); rotation = 0; destination = null
                                 } else if (placement != null) {
                                     Text("${t("Placed", "Colocada")} · ${placement.x + 1}, ${placement.y + 1} · ${placement.rotation}°")
-                                    if (caps?.optBoolean("move") == true) LandButton(t("Move piece", "Mover pieza"), writable) { draft = LandDraft("move", placement.placementId, placement.itemId, placement.width, placement.height); destination = placement.x to placement.y; rotation = placement.rotation }
+                                    if (caps?.optBoolean("move") == true) LandButton(t("Move piece", "Mover pieza"), writable) { selectedPlacementId = placement.placementId; draft = LandDraft("move", placement.placementId, placement.itemId, placement.width, placement.height); destination = placement.x to placement.y; rotation = placement.rotation }
                                     LandButton(t("Return to collection", "Volver a la colección"), writable) { mutate(JSONObject().put("action", "remove").put("placementId", placement.placementId)) }
                                 }
                             }
@@ -478,7 +506,7 @@ fun TraderLandSheet(
                     if (caps?.optBoolean("grow") == true) LandButton(t("Save name privately", "Guardar nombre en privado"), writable) { mutate(JSONObject().put("action", "rename_private").put("title", title)) }
                     if (share?.optBoolean("public") == true) {
                         val code = LandJson.shareCode(share.optString("code"))
-                        code?.let { Text(it); LandButton(t("Open public link", "Abrir enlace público"), !busy) { onExternalUrl("https://bobbyprotocol.xyz/trader-land?code=$it") } }
+                        code?.let { Text(it); LandButton(t("Open public link", "Abrir enlace público"), !busy) { onExternalUrl("https://bobbyprotocol.xyz/agentic-world/bobby/trader-land/w/$it") } }
                         LandButton(t("Make private", "Hacer privada"), writable) { mutate(JSONObject().put("action", "unpublish")) }
                     } else LandButton(t("Publish island", "Publicar isla"), writable) { helpOpen = false; publishRulesAccepted = false; publishConfirm = true }
                     Text(t("Publishing shares your island name and layout. Your account identity is not included in the public island.", "Publicar comparte el nombre y la distribución de tu isla. La isla pública no incluye la identidad de tu cuenta."), style = MaterialTheme.typography.bodySmall)
@@ -578,6 +606,65 @@ fun TraderLandSheet(
     OutlinedButton(onClick, enabled = enabled, modifier = Modifier.heightIn(min = 48.dp)) { Text(label) }
 }
 
+internal const val LAND_CORE_SELECTION_ID = "aura-core"
+
+internal data class LandMapSelection(val id: String, val itemId: String, val x: Int, val y: Int,
+    val width: Int, val height: Int, val rotation: Int, val core: Boolean = false) {
+    fun moveDraft() = LandDraft(if (core) "move_core" else "move", if (core) "" else id, itemId, width, height)
+}
+
+internal fun landSelectionById(land: JSONObject, pieces: List<LandPiece>, id: String?, canSelectCore: Boolean): LandMapSelection? {
+    if (id == null) return null
+    if (id == LAND_CORE_SELECTION_ID && canSelectCore) {
+        val core = LandJson.core(land)
+        return LandMapSelection(id, "aura_core", core.first, core.second, 2, 2, 0, core = true)
+    }
+    return pieces.firstOrNull { it.placementId == id }?.let {
+        LandMapSelection(it.placementId, it.itemId, it.x, it.y, it.width, it.height, it.rotation)
+    }
+}
+
+internal fun landSelectionAt(land: JSONObject, pieces: List<LandPiece>, x: Int, y: Int, canSelectCore: Boolean): LandMapSelection? {
+    if (x !in 0 until land.getInt("size") || y !in 0 until land.getInt("size")) return null
+    val piece = pieces.firstOrNull { it.contains(x, y) }
+    if (piece != null) return landSelectionById(land, pieces, piece.placementId, canSelectCore)
+    val core = LandJson.core(land)
+    return if (canSelectCore && x in core.first until core.first + 2 && y in core.second until core.second + 2)
+        landSelectionById(land, pieces, LAND_CORE_SELECTION_ID, true) else null
+}
+
+internal object LandSelectionCopy {
+    fun text(key: String, language: String): String {
+        val index = listOf("en", "es", "fr", "pt", "it", "de").indexOf(language.lowercase(Locale.ROOT).substringBefore('-').substringBefore('_')).coerceAtLeast(0)
+        return when (key) {
+            "move" -> listOf("Move", "Mover", "Déplacer", "Mover", "Sposta", "Verschieben")
+            "cancel" -> listOf("Cancel", "Cancelar", "Annuler", "Cancelar", "Annulla", "Abbrechen")
+            "core" -> listOf("Aura Core", "Núcleo de Aura", "Noyau d’Aura", "Núcleo de Aura", "Nucleo di Aura", "Aura-Kern")
+            "dormant" -> listOf("Dormant · wakes when 5 pieces stand", "Dormido · despierta con 5 piezas", "En sommeil · s’éveille avec 5 pièces", "Adormecido · desperta com 5 peças", "Dormiente · si risveglia con 5 pezzi", "Ruhend · erwacht mit 5 Teilen")
+            "awake" -> listOf("Awake · the heart of your island", "Despierto · el corazón de tu isla", "Éveillé · le cœur de ton île", "Desperto · o coração da tua ilha", "Sveglio · il cuore della tua isola", "Wach · das Herz deiner Insel")
+            else -> listOf("On your island", "En tu isla", "Sur ton île", "Na tua ilha", "Sulla tua isola", "Auf deiner Insel")
+        }[index]
+    }
+}
+
+@Composable internal fun LandSelectionBar(name: String, core: Boolean, enabled: Boolean,
+    t: (String, String) -> String, onMove: () -> Unit, language: String = "en", dormant: Boolean = false) {
+    Card(Modifier.fillMaxWidth().testTag("land-selection")) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(name, style = MaterialTheme.typography.titleMedium)
+            Text(LandSelectionCopy.text(if (core) { if (dormant) "dormant" else "awake" } else "placed", language),
+                style = MaterialTheme.typography.bodySmall, modifier = Modifier.testTag("land-selection-detail"))
+            OutlinedButton(onClick = onMove, enabled = enabled,
+                modifier = Modifier.heightIn(min = 48.dp).testTag("land-build-or-move")) { Text(if (language in setOf("en", "es")) t("Move", "Mover") else LandSelectionCopy.text("move", language)) }
+        }
+    }
+}
+
+@Composable internal fun LandDraftCancelButton(enabled: Boolean, t: (String, String) -> String, language: String = "en", onCancel: () -> Unit) {
+    OutlinedButton(onClick = onCancel, enabled = enabled,
+        modifier = Modifier.heightIn(min = 48.dp).testTag("land-draft-cancel")) { Text(if (language in setOf("en", "es")) t("Cancel", "Cancelar") else LandSelectionCopy.text("cancel", language)) }
+}
+
 internal data class LandMapIsland(
     val code: String,
     val title: String,
@@ -586,27 +673,33 @@ internal data class LandMapIsland(
     val snapshot: JSONObject,
 )
 
-private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: LandDraft? = null, point: Pair<Int, Int>? = null, rotation: Int = 0): List<LandSceneSprite> {
+private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: LandDraft? = null, point: Pair<Int, Int>? = null, rotation: Int = 0, selectedID: String? = null): List<LandSceneSprite> {
     val geometry = TraderLandProjection(land.getInt("size"))
     val core = LandJson.core(land)
     val stage = if (land.optJSONObject("core")?.optInt("stage", 1) == 0) 0 else 1
-    fun sprite(id: String, col: Int, row: Int, width: Int, height: Int, turn: Int, coreStage: Int? = null, lifted: Boolean = false): LandSceneSprite? {
+    fun sprite(id: String, col: Int, row: Int, width: Int, height: Int, turn: Int, coreStage: Int? = null, lifted: Boolean = false, uid: String? = null): LandSceneSprite? {
         val area = LandJson.rotated(width, height, turn)
         if (!lifted && (turn !in setOf(0, 90, 180, 270) || col < 0 || row < 0 || col + area.first > geometry.size || row + area.second > geometry.size)) return null
         val asset = TraderLandSpriteCatalog.asset(id, coreStage ?: 1)
         val art = TraderLandSpriteCatalog.art[asset] ?: return null
         return LandSceneSprite(asset, geometry.sprite(col, row, width, height, turn, art, id == "aura_core" && coreStage == 0, path = traderLandPathAsset(asset)),
-            art, LandSceneFootprint(col, row, area.first, area.second), coreStage, lifted)
+            art, LandSceneFootprint(col, row, area.first, area.second), coreStage, lifted, selected = selectedID != null && uid == selectedID)
     }
     return buildList {
-        if (draft?.action != "move_core" || point == null) sprite("aura_core", core.first, core.second, 2, 2, 0, stage)?.let(::add)
+        if (draft?.action != "move_core" || point == null) sprite("aura_core", core.first, core.second, 2, 2, 0, stage, uid = LAND_CORE_SELECTION_ID)?.let(::add)
         pieces.filterNot { draft?.action == "move" && point != null && it.placementId == draft.id }.forEach {
-            sprite(it.itemId, it.x, it.y, it.width, it.height, it.rotation)?.let(::add)
+            sprite(it.itemId, it.x, it.y, it.width, it.height, it.rotation, uid = it.placementId)?.let(::add)
         }
         if (draft != null && point != null) sprite(draft.itemId, point.first, point.second, draft.width, draft.height, rotation,
-            if (draft.action == "move_core") stage else null, lifted = true)?.let(::add)
+            if (draft.action == "move_core") stage else null, lifted = true, uid = if (draft.action == "move_core") LAND_CORE_SELECTION_ID else draft.id)?.let(::add)
     }.sortedBy { if (it.lifted) Float.MAX_VALUE else it.frame.depth }
 }
+
+// These describe actual Canvas content and camera mode without adding interactive overlays.
+internal val LandMapIslandLabels = SemanticsPropertyKey<List<String>>("LandMapIslandLabels")
+internal val LandMapFreeLots = SemanticsPropertyKey<Int>("LandMapFreeLots")
+internal val LandMapSelectedPlacement = SemanticsPropertyKey<String>("LandMapSelectedPlacement")
+internal val LandMapArchipelagoMode = SemanticsPropertyKey<Boolean>("LandMapArchipelagoMode")
 
 /** Shared production map; offline instrumentation supplies only public, bundled layouts. */
 @Composable internal fun TraderLandMap(
@@ -629,20 +722,36 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
     revealRadius: Float? = null,
     onCameraChanged: (TraderLandCamera) -> Unit = {},
     draftValid: Boolean? = null,
+    showLots: Boolean = false,
+    ownTitle: String = t("My island", "Mi isla"),
+    onArchipelagoModeChanged: (Boolean) -> Unit = {},
+    selectedID: String? = null,
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val gridSize = land.getInt("size")
     val geometry = remember(gridSize) { TraderLandProjection(gridSize) }
-    val sprites = remember(land, pieces, draft, point, rotation) { landSceneSprites(land, pieces, draft, point, rotation) }
+    val sprites = remember(land, pieces, draft, point, rotation, selectedID) { landSceneSprites(land, pieces, draft, point, rotation, selectedID) }
     val publicSprites = remember(islands) { islands.map { landSceneSprites(it.land, it.pieces) } }
     val offsets = remember(islands) { islands.indices.map(LandArchipelago::offset) }
+    val lots = remember(islands.size, showLots) { LandArchipelago.freeLots(islands.size, showLots) }
+    val sceneOffsets = remember(offsets, showLots) { LandArchipelago.sceneOffsets(offsets, showLots) }
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val pixelUnit = density.density
+    // Android editing controls sit below this Canvas; no iOS footer overlay consumes map height.
+    val mapCardLift = 0f
+    val labelSize = 11f * density.density * density.fontScale
+    val freeLotLabel = when (language) {
+        "es" -> "Lote libre"; "fr" -> "Terrain libre"; "pt" -> "Lote livre"
+        "it" -> "Lotto libero"; "de" -> "Freies Grundstück"; else -> "Free lot"
+    }
     val assets = remember(sprites, publicSprites) {
         (sprites.map { it.asset } + publicSprites.flatten().map { it.asset } + (sprites + publicSprites.flatten()).mapNotNull { TraderLandSpriteCatalog.glow(it.asset) } + listOf("core-body.png", "core-ring-back.png", "core-sphere.png", "core-ring-front.png", "core-glow.png", "core-dormant-glow.png")).distinct().sorted()
     }
     var images by remember(context) { mutableStateOf<Map<String, ImageBitmap>>(emptyMap()) }
     LaunchedEffect(context, assets) {
         images = withContext(Dispatchers.IO) {
+            warmTraderLandShadows()
             assets.mapNotNull { asset ->
                 val bitmap = landArtCache.get(asset) ?: runCatching {
                     context.assets.open("traderland/$asset").use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = if (asset in TraderLandSpriteCatalog.art || asset.endsWith("_bloom_glow.png")) 2 else 1 })?.asImageBitmap() }
@@ -674,11 +783,28 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
         }
     }
     var viewport by remember { mutableStateOf(IntSize.Zero) }
-    var zoom by remember(mapIdentity, gridSize) { mutableStateOf(geometry.homeZoom) }
-    var pan by remember(mapIdentity, gridSize) { mutableStateOf(Offset.Zero) }
-    var focusedCode by remember(mapIdentity, gridSize) { mutableStateOf<String?>(null) }
+    var zoom by remember(mapIdentity) { mutableStateOf(geometry.homeZoom) }
+    var pan by remember(mapIdentity) { mutableStateOf(Offset.Zero) }
+    var focusedCode by remember(mapIdentity) { mutableStateOf<String?>(null) }
     val focused = islands.indexOfFirst { it.code == focusedCode }.takeIf { it >= 0 }
     val camera = TraderLandCamera(viewport.width.toFloat(), viewport.height.toFloat(), zoom, pan.x, pan.y, gridSize)
+    val archipelagoMode = zoom < LandArchipelago.overviewThreshold || focused != null
+    val currentModeChanged by rememberUpdatedState(onArchipelagoModeChanged)
+    var previousArchipelagoMode by remember(mapIdentity) { mutableStateOf(archipelagoMode) }
+    LaunchedEffect(archipelagoMode, mapIdentity) {
+        // Initial home is not a return: the host may already have resolved a shared-link island.
+        if (previousArchipelagoMode != archipelagoMode) {
+            previousArchipelagoMode = archipelagoMode
+            currentModeChanged(archipelagoMode)
+        }
+    }
+    val visibleTitles = if (zoom < LandArchipelago.overviewThreshold) {
+        (listOf(ownTitle to LandPoint(0f, 0f)) + islands.mapIndexed { index, island -> island.title to offsets[index] }).filter { (_, offset) ->
+            val point = camera.project(LandPoint(offset.x + 430f, offset.y + LandArchipelago.labelWorldY))
+            point.x >= -24 * pixelUnit && point.x <= camera.width + 24 * pixelUnit &&
+                point.y >= -24 * pixelUnit && point.y <= camera.height + 24 * pixelUnit
+        }.map { (title, _) -> LandArchipelago.shortTitle(title) }
+    } else emptyList()
     androidx.compose.runtime.SideEffect { onCameraChanged(camera) }
     val currentCamera by rememberUpdatedState(camera)
     val currentTap by rememberUpdatedState(tap)
@@ -688,17 +814,25 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
     val currentRotation by rememberUpdatedState(rotation)
     val currentIslands by rememberUpdatedState(islands)
     val currentOffsets by rememberUpdatedState(offsets)
+    val currentSceneOffsets by rememberUpdatedState(sceneOffsets)
     val currentFocus by rememberUpdatedState(onFocus)
     val scope = rememberCoroutineScope()
     var flight by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
+    var previousHomeZoom by remember(mapIdentity) { mutableStateOf(geometry.homeZoom) }
+    LaunchedEffect(mapIdentity, gridSize) {
+        // Canonical adoptLand: growth follows Home only while the own camera is resting there.
+        val atHome = zoom == previousHomeZoom && pan == Offset.Zero && focusedCode == null
+        previousHomeZoom = geometry.homeZoom
+        if (atHome && zoom != geometry.homeZoom) { flight?.cancel(); zoom = geometry.homeZoom }
+    }
     fun focus(index: Int?, force: Boolean = false) {
         val code = index?.let { currentIslands.getOrNull(it)?.code }
         if (focusedCode != code || force) { focusedCode = code; currentFocus(index?.let { currentIslands.getOrNull(it) }) }
     }
     fun applyCamera(next: TraderLandCamera) {
-        val nextFocus = if (next.zoom > .75f) LandArchipelago.nearestIsland(LandPoint(next.panX, next.panY), next, currentOffsets) else null
+        val nextFocus = if (next.zoom > .75f) LandArchipelago.nearestIsland(LandPoint(next.panX, next.panY), next, currentOffsets, screenUnit = pixelUnit, lift = mapCardLift) else null
         if (next.zoom > .75f) focus(nextFocus)
-        val bounded = LandArchipelago.clampPan(LandPoint(next.panX, next.panY), next, currentOffsets, gridSize, if (next.zoom > .75f) nextFocus else null)
+        val bounded = LandArchipelago.clampPan(LandPoint(next.panX, next.panY), next, currentSceneOffsets, gridSize, if (next.zoom > .75f) nextFocus else null, screenUnit = pixelUnit, lift = mapCardLift)
         zoom = next.zoom; pan = Offset(bounded.x, bounded.y)
     }
     fun fly(targetZoom: Float, targetPan: LandPoint, index: Int?, forceFocus: Boolean = false) {
@@ -716,13 +850,13 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
     fun goHome() = fly(geometry.homeZoom, LandPoint(0f, 0f), null, forceFocus = true)
     fun visit(index: Int) {
         val target = currentCamera.copy(zoom = .9f)
-        fly(.9f, LandArchipelago.targetPan(currentOffsets[index], target), index)
+        fly(.9f, LandArchipelago.targetPan(currentOffsets[index], target, screenUnit = pixelUnit, lift = mapCardLift), index)
     }
     fun overview() {
         val current = currentCamera
-        val targetZoom = LandArchipelago.overviewZoom(viewport.width.toFloat(), viewport.height.toFloat(), current.fit)
+        val targetZoom = LandArchipelago.overviewZoom(viewport.width.toFloat(), viewport.height.toFloat(), current.fit, screenUnit = pixelUnit, lift = mapCardLift)
         val target = current.copy(zoom = targetZoom)
-        fly(targetZoom, LandArchipelago.targetPan(LandPoint(0f, LandArchipelago.ringOneBounds.centerY), target), null)
+        fly(targetZoom, LandArchipelago.targetPan(LandPoint(0f, LandArchipelago.ringOneBounds.centerY), target, screenUnit = pixelUnit, lift = mapCardLift), null)
         onExplore()
     }
     androidx.compose.runtime.DisposableEffect(mapIdentity, gridSize) { onDispose { flight?.cancel() } }
@@ -754,7 +888,11 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
             Canvas(Modifier.fillMaxSize().clipToBounds().testTag("land-map").onSizeChanged { viewport = it }
                 .semantics {
                     contentDescription = "${labels[0]} · $gridSize × $gridSize · ${pieces.size}"
-                    stateDescription = if (images.size == assets.size) "art-ready" else "art-loading"
+                    stateDescription = if (assets.all { it in images }) "art-ready" else "art-loading"
+                    this[LandMapIslandLabels] = visibleTitles
+                    this[LandMapFreeLots] = if (zoom <= LandArchipelago.seaZoom || focused != null) lots.size else 0
+                    this[LandMapArchipelagoMode] = archipelagoMode
+                    this[LandMapSelectedPlacement] = if (focused == null && sprites.any { it.selected }) selectedID.orEmpty() else ""
                     if (editable && focused == null && zoom >= .6f) customActions = (0 until gridSize).flatMap { y -> (0 until gridSize).map { x ->
                         CustomAccessibilityAction("${t("Cell", "Celda")} ${x + 1}, ${y + 1}") { currentTap(x, y); true }
                     } }
@@ -770,7 +908,7 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
                         val startCell = geometry.cellAt(startWorld.x, startWorld.y)
                         val chosen = currentDraft; val origin = currentPoint
                         val area = chosen?.let { LandJson.rotated(it.width, it.height, currentRotation) }
-                        val moving = currentEditable && chosen != null && origin != null && area != null && startCell != null &&
+                        val moving = currentEditable && focusedCode == null && start.zoom >= LandArchipelago.overviewThreshold && chosen != null && origin != null && area != null && startCell != null &&
                             startCell.first in origin.first until origin.first + area.first && startCell.second in origin.second until origin.second + area.second
                         var total = Offset.Zero; var totalZoom = 1f; var active = false
                         var hadMultipleFingers = false; var canceled = false; var tapPoint = first.position
@@ -813,7 +951,7 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
                 val coreLayers = if (layers.all { it != null }) LandCoreImages(layers[0]!!, layers[1]!!, layers[2]!!, layers[3]!!, layers[4]!!) else null
                 withTransform({ translate(camera.x, camera.y); scale(camera.scale, camera.scale, Offset.Zero) }) {
                     val seaAlpha = if (focused != null) 1f else ((.75f - zoom) / .05f).coerceIn(0f, 1f)
-                    fun paintIsland(islandLand: JSONObject, scene: List<LandSceneSprite>, offset: LandPoint, alpha: Float, own: Boolean) {
+                    fun paintIsland(islandLand: JSONObject, scene: List<LandSceneSprite>, offset: LandPoint, alpha: Float, own: Boolean, visiting: Boolean = false) {
                         if (alpha <= 0f) return
                         val center = camera.project(LandPoint(offset.x + 430f, offset.y + 335f))
                         if (center.x + 460f * camera.scale < 0 || center.x - 460f * camera.scale > size.width || center.y + 440f * camera.scale < 0 || center.y - 440f * camera.scale > size.height) return
@@ -821,7 +959,8 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
                         withTransform({ translate(offset.x, offset.y) }) {
                             if (alpha < 1f) drawIntoCanvas { it.saveLayer(Rect(-400f, -400f, 1260f, 1100f), Paint().apply { this.alpha = alpha }) }
                             val occupied = scene.filterNot { it.lifted }.map { it.footprint }
-                            drawTraderLandGround(projection, occupied, revealRadius = if (own) revealRadius else null, placing = own && draft != null)
+                            drawTraderLandGround(projection, occupied, revealRadius = if (own) revealRadius else null, placing = own && draft != null,
+                                visited = visiting, ambient = own, publicIsland = !own, selected = scene.firstOrNull { it.selected && !it.lifted }?.footprint)
                             if (own && draft != null && point != null) {
                                 val area = LandJson.rotated(draft.width, draft.height, rotation)
                                 drawTraderLandDraft(projection, LandSceneFootprint(point.first, point.second, area.first, area.second), draftValid ?: LandJson.fits(land, pieces, draft, point.first, point.second, rotation))
@@ -837,8 +976,58 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
                             if (alpha < 1f) drawIntoCanvas { it.restore() }
                         }
                     }
-                    islands.forEachIndexed { index, island -> paintIsland(island.land, publicSprites[index], offsets[index], seaAlpha, false) }
+                    islands.forEachIndexed { index, island -> paintIsland(island.land, publicSprites[index], offsets[index], seaAlpha, false, visiting = focused == index) }
                     paintIsland(land, sprites, LandPoint(0f, 0f), 1f, true)
+                }
+                val seaAlpha = if (focused != null) 1f else ((.75f - zoom) / .05f).coerceIn(0f, 1f)
+                if (seaAlpha > .01f) {
+                    // Lot outlines and type stay at screen size while the real island camera scales.
+                    lots.forEach { offset ->
+                        val path = Path().apply {
+                            TraderLandProjection.slab.forEachIndexed { index, point ->
+                                val screen = camera.project(LandPoint(point.x + offset.x, point.y + offset.y))
+                                if (index == 0) moveTo(screen.x, screen.y) else lineTo(screen.x, screen.y)
+                            }
+                            close()
+                        }
+                        drawPath(path, Color.White.copy(alpha = .012f * seaAlpha))
+                        drawPath(path, Color.White.copy(alpha = .16f * seaAlpha), style = Stroke(pixelUnit,
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(5f * pixelUnit, 5f * pixelUnit))))
+                        val center = camera.project(LandPoint(offset.x + 430f, offset.y + 391f))
+                        drawIntoCanvas { canvas ->
+                            val ink = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                color = android.graphics.Color.rgb(163, 156, 145); alpha = (255 * seaAlpha).roundToInt()
+                                textSize = labelSize; typeface = android.graphics.Typeface.MONOSPACE; textAlign = android.graphics.Paint.Align.CENTER
+                            }
+                            canvas.nativeCanvas.drawText(freeLotLabel, center.x, center.y - (ink.ascent() + ink.descent()) / 2f, ink)
+                        }
+                    }
+                    if (zoom < LandArchipelago.overviewThreshold) {
+                        fun title(text: String, offset: LandPoint, own: Boolean, visiting: Boolean = false) {
+                            val point = camera.project(LandPoint(offset.x + 430f, offset.y + LandArchipelago.labelWorldY))
+                            if (point.x < -24 * pixelUnit || point.x > size.width + 24 * pixelUnit || point.y < -24 * pixelUnit || point.y > size.height + 24 * pixelUnit) return
+                            val short = LandArchipelago.shortTitle(text)
+                            drawIntoCanvas { canvas ->
+                                val ink = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                    color = if (visiting) android.graphics.Color.rgb(250, 199, 46) else if (own) android.graphics.Color.rgb(242, 237, 228) else android.graphics.Color.rgb(163, 156, 145)
+                                    alpha = (255 * seaAlpha).roundToInt(); textSize = labelSize
+                                    typeface = if (own) android.graphics.Typeface.DEFAULT_BOLD else android.graphics.Typeface.DEFAULT
+                                    textAlign = android.graphics.Paint.Align.CENTER
+                                }
+                                val height = ink.descent() - ink.ascent()
+                                val width = ink.measureText(short)
+                                val plate = android.graphics.RectF(point.x - width / 2f - 8 * pixelUnit, point.y,
+                                    point.x + width / 2f + 8 * pixelUnit, point.y + height + 6 * pixelUnit)
+                                val background = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                                    color = android.graphics.Color.rgb(4, 3, 6); alpha = (255 * .78f * seaAlpha).roundToInt()
+                                }
+                                canvas.nativeCanvas.drawRoundRect(plate, plate.height() / 2f, plate.height() / 2f, background)
+                                canvas.nativeCanvas.drawText(short, point.x, point.y + 3 * pixelUnit - ink.ascent(), ink)
+                            }
+                        }
+                        title(ownTitle, LandPoint(0f, 0f), own = true)
+                        islands.forEachIndexed { index, island -> title(island.title, offsets[index], own = false, visiting = focused == index) }
+                    }
                 }
             }
             if (draft != null && point != null && editable && focused == null && zoom >= .6f) {
@@ -867,7 +1056,7 @@ private fun landSceneSprites(land: JSONObject, pieces: List<LandPiece>, draft: L
             Text("${(zoom * 100).roundToInt()}%", modifier = Modifier.testTag("land-zoom"))
             TextButton(onClick = { flight?.cancel(); applyCamera(camera.anchoredTransform(LandPoint(viewport.width / 2f, viewport.height / 2f), LandPoint(0f, 0f), 1.3f, if (draft == null) .22f else .7f, geometry.maxZoom, false)) }, modifier = Modifier.heightIn(min = 48.dp).semantics { contentDescription = labels[2] }) { Text("+") }
             TextButton(onClick = { goHome() }, modifier = Modifier.heightIn(min = 48.dp).testTag("land-home").semantics { contentDescription = labels[3] }) { Text("⌂") }
-            TextButton(onClick = { overview() }, modifier = Modifier.heightIn(min = 48.dp).testTag("land-archipelago").semantics { contentDescription = labels[4] }) { Text("◈") }
+            TextButton(onClick = { if (archipelagoMode) goHome() else overview() }, modifier = Modifier.heightIn(min = 48.dp).testTag("land-archipelago").semantics { contentDescription = labels[4] }) { Text("◈") }
         }
         if (islands.isNotEmpty() && (zoom < .6f || focused != null)) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             TextButton(onClick = { visit(((focused ?: 0) - 1 + islands.size) % islands.size) }, modifier = Modifier.heightIn(min = 48.dp).testTag("land-previous")) { Text(labels[5]) }
