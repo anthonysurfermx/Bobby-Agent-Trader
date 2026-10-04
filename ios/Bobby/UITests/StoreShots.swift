@@ -94,7 +94,8 @@ final class StoreShots: XCTestCase {
         let app = XCUIApplication()
         // Force English so the App Store captures are deterministic instead of
         // inheriting whatever language the simulator happens to be set to.
-        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-agent.riskNoticeVersion", "6"]
         app.launch()
 
         let ask = app.textFields["ask-field"]
@@ -123,7 +124,8 @@ final class StoreShots: XCTestCase {
     /// Instagram, WhatsApp and X destinations, and it closes cleanly.
     func test04_ShareSkin() throws {
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-agent.riskNoticeVersion", "6"]
         app.launch()
 
         let more = app.buttons["More"]
@@ -170,7 +172,8 @@ final class StoreShots: XCTestCase {
         let app = XCUIApplication()
         // Force English so the App Store captures are deterministic instead of
         // inheriting whatever language the simulator happens to be set to.
-        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["-store-shots", "-AppleLanguages", "(en)", "-AppleLocale", "en_US",
+                               "-agent.riskNoticeVersion", "6"]
         app.launch()
 
         let ask = app.textFields["ask-field"]
