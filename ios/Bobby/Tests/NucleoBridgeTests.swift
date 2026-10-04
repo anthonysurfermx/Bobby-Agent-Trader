@@ -198,8 +198,24 @@ final class NucleoBridgeTests: XCTestCase {
                 XCTAssertEqual(r["candlesTimeframe"] as? String, "1H", "\(name)/\(horizon)")
                 let bars = try XCTUnwrap(r["candles"] as? [[String: Any]])
                 XCTAssertGreaterThanOrEqual(bars.count, 10)
-                let path = NucleoDeskIO.candlePath(symbol: isEquity ? "NVDA" : "BTC", isEquity: isEquity)
-                XCTAssertTrue(NucleoFixtures.log.contains { $0.contains(path) }, "the metadata must match the actual candle URL")
+                let requests = NucleoFixtures.candleRequests
+                XCTAssertEqual(requests.count, 1, "one candle request for \(name)/\(horizon)")
+                let request = try XCTUnwrap(requests.first)
+                XCTAssertEqual(request.method, "GET")
+                XCTAssertEqual(request.url.scheme, "https")
+                XCTAssertEqual(request.url.host, "bobbyprotocol.xyz")
+                XCTAssertEqual(request.url.path, isEquity ? "/api/stock-candles" : "/api/okx-candles")
+                let components = try XCTUnwrap(URLComponents(url: request.url, resolvingAgainstBaseURL: false))
+                let queryItems = components.queryItems ?? []
+                let expectedQuery = isEquity
+                    ? ["symbol": "NVDA", "range": "7d", "interval": "1h"]
+                    : ["instId": "BTC-USDT", "bar": "1H", "limit": "100"]
+                XCTAssertEqual(queryItems.count, expectedQuery.count, "no missing, duplicate or additional query parameters")
+                let query = Dictionary(queryItems.map { ($0.name, $0.value ?? "") }, uniquingKeysWith: { first, _ in first })
+                XCTAssertEqual(query, expectedQuery, "actual candle request for \(name)/\(horizon)")
+                let interval = try XCTUnwrap(query[isEquity ? "interval" : "bar"])
+                XCTAssertEqual(r["candlesTimeframe"] as? String, interval.uppercased(),
+                               "the chart metadata must match the actual provider request")
             }
         }
     }
