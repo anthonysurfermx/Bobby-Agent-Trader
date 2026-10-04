@@ -8,7 +8,7 @@ import { rememberReturn } from '@/lib/access-client';
 import { clientLanguagePath } from '@/lib/client-language';
 import { locale, t } from '@/lib/companions/i18n';
 import { useBobbyAccount } from '@/hooks/useBobbyAccount';
-import { authorizeChatGPT, useFinancialAccount, validateChatGPTAuthorization, type ChatGPTAuthorizationRequest } from '@/lib/financial-context-client';
+import { authorizeChatGPT, denyChatGPTAuthorization, useFinancialAccount, validateChatGPTAuthorization, type ChatGPTAuthorizationRequest } from '@/lib/financial-context-client';
 
 const button = 'inline-flex min-h-12 items-center justify-center rounded-xl border border-white/15 px-5 py-3 text-sm disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/5';
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -43,24 +43,34 @@ function ChatGPTConsent() {
     const query = new URLSearchParams(location.search), signalController = new AbortController();
     void validateChatGPTAuthorization(query, signalController.signal).then(result => {
       if (active.current && !signalController.signal.aborted) {
-        if (!result?.client?.id || !Array.isArray(result.requestedScopes) || !result.available) {
+        if (!result?.client?.id || !Array.isArray(result.requestedScopes)) {
           setValidationError(t('This connection is unavailable or its request is invalid. Start again from ChatGPT.', 'Esta conexión no está disponible o la solicitud no es válida. Empieza de nuevo desde ChatGPT.', 'Esta ligação não está disponível ou o pedido é inválido. Começa novamente no ChatGPT.', 'Cette connexion est indisponible ou la demande est invalide. Recommence depuis ChatGPT.', 'Questa connessione non è disponibile o la richiesta non è valida. Ricomincia da ChatGPT.', 'Diese Verbindung ist nicht verfügbar oder die Anfrage ist ungültig. Starte erneut aus ChatGPT.'));
-        } else setRequest(result);
+        } else {
+          setRequest(result);
+          if (!result.available) setValidationError(t('This connection is unavailable. You can cancel this request and return to ChatGPT.', 'Esta conexión no está disponible. Puedes cancelar la solicitud y volver a ChatGPT.', 'Esta ligação não está disponível. Podes cancelar o pedido e voltar ao ChatGPT.', 'Cette connexion est indisponible. Tu peux annuler cette demande et retourner dans ChatGPT.', 'Questa connessione non è disponibile. Puoi annullare la richiesta e tornare a ChatGPT.', 'Diese Verbindung ist nicht verfügbar. Du kannst die Anfrage abbrechen und zu ChatGPT zurückkehren.'));
+        }
       }
     }).catch(() => { if (active.current && !signalController.signal.aborted) setValidationError(t('This connection could not be verified. Start again from ChatGPT.', 'No se pudo verificar esta conexión. Empieza de nuevo desde ChatGPT.', 'Não foi possível verificar esta ligação. Começa novamente no ChatGPT.', 'Cette connexion n’a pas pu être vérifiée. Recommence depuis ChatGPT.', 'Impossibile verificare la connessione. Ricomincia da ChatGPT.', 'Diese Verbindung konnte nicht geprüft werden. Starte erneut aus ChatGPT.')); });
     return () => { active.current = false; signalController.abort(); controller.current?.abort(); };
   }, [location.search]);
 
-  const approve = async () => {
-    if (!account.id || !request || !approved || lock.current) return;
+  const decide = async (allow: boolean) => {
+    if (!request || !account.ready || lock.current || (allow && (!account.id || !approved || !request.available))) return;
     lock.current = true; setBusy(true); setError('');
     const owner = identity.current, signalController = new AbortController(); controller.current = signalController;
     try {
-      const redirectUrl = await authorizeChatGPT(account.id, new URLSearchParams(location.search), signalController.signal);
+      const query = new URLSearchParams(location.search);
+      const redirectUrl = allow
+        ? await authorizeChatGPT(account.id!, query, signalController.signal)
+        : await denyChatGPTAuthorization(account.id, query, signalController.signal);
       if (active.current && !signalController.signal.aborted && identity.current === owner) window.location.assign(redirectUrl);
+      // Keep the decision locked until navigation unloads this page. A delayed or blocked
+      // callback must not permit a second approval to rotate the authorization code.
     } catch (caught) {
-      if (active.current && !signalController.signal.aborted && identity.current === owner) setError(financialContextErrorMessage(caught));
-    } finally { if (active.current && identity.current === owner) { setBusy(false); lock.current = false; } }
+      if (active.current && !signalController.signal.aborted && identity.current === owner) {
+        setError(financialContextErrorMessage(caught)); setBusy(false); lock.current = false;
+      }
+    }
   };
   const scopeLabel = (scope: string) => {
     if (scope === 'bobby.context.read') return t('Read the financial facts you approved in Bobby and your saved recommendations with their dates.', 'Leer los datos financieros que aprobaste en Bobby y tus recomendaciones guardadas con sus fechas.', 'Ler os dados financeiros que aprovaste no Bobby e as recomendações guardadas com as respetivas datas.', 'Lire les faits financiers approuvés dans Bobby et tes recommandations enregistrées avec leurs dates.', 'Leggere i dati finanziari approvati in Bobby e le raccomandazioni salvate con le date.', 'Die freigegebenen Finanzangaben in Bobby und deine gespeicherten Empfehlungen mit Datum lesen.');
@@ -79,11 +89,13 @@ function ChatGPTConsent() {
       <ul className="mt-4 list-disc space-y-3 pl-5 text-sm leading-6 text-[#F2EDE4]">{request.requestedScopes.map(scope => <li key={scope}>{scopeLabel(scope)}</li>)}</ul>
       {account.ready && account.id ? <>
         {displayAccount?.email && <p className="mt-4 break-all text-sm text-[#A39C91]">{displayAccount.email}</p>}
-        <label className="mt-6 flex gap-3 text-sm leading-6"><input type="checkbox" checked={approved} className="mt-1.5" disabled={busy} onChange={event => setApproved(event.target.checked)} />{t('I approve these permissions for my Bobby account.', 'Apruebo estos permisos para mi cuenta de Bobby.', 'Aprovo estas permissões para a minha conta Bobby.', 'J’approuve ces autorisations pour mon compte Bobby.', 'Approvo queste autorizzazioni per il mio account Bobby.', 'Ich bestätige diese Berechtigungen für mein Bobby-Konto.')}</label>
-        <button className={`${button} mt-5 bg-[#F2EDE4] !text-[#0B0A09]`} disabled={busy || !approved} onClick={() => void approve()}>{t('Approve connection', 'Aprobar conexión', 'Aprovar ligação', 'Approuver la connexion', 'Approva connessione', 'Verbindung bestätigen')}</button>
-      </> : <button className={`${button} mt-5 bg-[#F2EDE4] !text-[#0B0A09]`} disabled={!account.ready} onClick={signIn}>{t('Sign in to review permissions', 'Inicia sesión para revisar permisos', 'Inicia sessão para rever permissões', 'Connecte-toi pour vérifier les autorisations', 'Accedi per controllare le autorizzazioni', 'Anmelden und Berechtigungen prüfen')}</button>}
+        <label className="mt-6 flex gap-3 text-sm leading-6"><input type="checkbox" checked={approved} className="mt-1.5" disabled={busy || !request.available} onChange={event => setApproved(event.target.checked)} />{t('I approve these permissions for my Bobby account.', 'Apruebo estos permisos para mi cuenta de Bobby.', 'Aprovo estas permissões para a minha conta Bobby.', 'J’approuve ces autorisations pour mon compte Bobby.', 'Approvo queste autorizzazioni per il mio account Bobby.', 'Ich bestätige diese Berechtigungen für mein Bobby-Konto.')}</label>
+        <button className={`${button} mt-5 bg-[#F2EDE4] !text-[#0B0A09]`} disabled={busy || !approved || !request.available} onClick={() => void decide(true)}>{t('Approve connection', 'Aprobar conexión', 'Aprovar ligação', 'Approuver la connexion', 'Approva connessione', 'Verbindung bestätigen')}</button>
+      </> : <button className={`${button} mt-5 bg-[#F2EDE4] !text-[#0B0A09]`} disabled={!account.ready || busy || !request.available} onClick={signIn}>{t('Sign in to review permissions', 'Inicia sesión para revisar permisos', 'Inicia sessão para rever permissões', 'Connecte-toi pour vérifier les autorisations', 'Accedi per controllare le autorizzazioni', 'Anmelden und Berechtigungen prüfen')}</button>}
     </>}
-    <Link className={`${button} ml-0 mt-3 sm:ml-3`} to={clientLanguagePath('/chatgpt')}>{t('Cancel', 'Cancelar', 'Cancelar', 'Annuler', 'Annulla', 'Abbrechen')}</Link>
+    {request
+      ? <button className={`${button} ml-0 mt-3 sm:ml-3`} disabled={busy || !account.ready} onClick={() => void decide(false)}>{t('Cancel', 'Cancelar', 'Cancelar', 'Annuler', 'Annulla', 'Abbrechen')}</button>
+      : <Link className={`${button} ml-0 mt-3 sm:ml-3`} to={clientLanguagePath('/chatgpt')}>{t('Cancel', 'Cancelar', 'Cancelar', 'Annuler', 'Annulla', 'Abbrechen')}</Link>}
   </section>;
 }
 

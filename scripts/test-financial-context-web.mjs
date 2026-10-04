@@ -9,11 +9,13 @@ const origin = process.env.BOBBY_WEB_ORIGIN || 'http://127.0.0.1:5187';
 const storageKey = process.env.BOBBY_AUTH_STORAGE_KEY || 'sb-localhost-auth-token';
 const evidenceDirectory = process.env.BOBBY_UI_EVIDENCE_DIR || tmpdir();
 const browser = await chromium.launch({headless:true, ...(process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {})});
+try {
 const context = await browser.newContext({viewport:{width:390,height:844}});
 const page = await context.newPage();
-let state={enabled:false,financialMemoryEnabled:false,accountMemoryEnabled:true,items:[],drafts:[],recommendations:[{id:'fixture-rec',symbol:'BTC',asOf:'2026-10-04T10:00:00Z',createdAt:'2026-10-04T10:00:00Z',headline:'Wait for confirmation',why:'Test thesis',risk:'Test risk',watch:'Test trigger',verdict:'wait',direction:'none'}]};
+let state={enabled:false,financialMemoryEnabled:false,accountMemoryEnabled:true,items:[],drafts:[],recommendations:[{id:'fixture-rec',symbol:'BTC',asOf:'2026-10-04T10:00:00Z',createdAt:'2026-10-04T10:01:00Z',headline:'Wait for confirmation',why:'Test thesis',risk:'Test risk',watch:'Test trigger',verdict:'wait',direction:'none'},{id:'fixture-rec-eth',symbol:'ETH',asOf:'2026-10-04T11:00:00Z',createdAt:'2026-10-04T11:02:00Z',headline:'Review support before acting',why:'ETH test thesis',risk:'ETH test risk',watch:'ETH test trigger',verdict:'review',direction:'long'}]};
 let validateOAuth=true;
 let holdImport=false, heldImport=false, releaseImport;
+let conflictNextImport=false;
 const oauthQuery={client_id:'fixture-client',redirect_uri:'https://chatgpt.com/connector_platform_oauth_redirect',response_type:'code',code_challenge:'a'.repeat(43),code_challenge_method:'S256',state:'fixture-state-1234567890',scope:'bobby.context.read bobby.context.write',resource:'https://bobbyprotocol.xyz/api/chatgpt'};
 const writes=[];
 await context.route('**/*',async route=>{
@@ -24,6 +26,7 @@ await context.route('**/*',async route=>{
   const method=request.method(),data=method==='POST'||method==='PATCH'?request.postDataJSON():null;
   if(method==='POST'&&holdImport){heldImport=true;const oldResponse={...structuredClone(state),items:[{...data.items[0],id:'00000000-0000-4000-8000-000000000098',source:'chatgpt',verification:'user_reported',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()}]};await new Promise(resolve=>{releaseImport=resolve;});return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(oldResponse)}).catch(()=>{});}
   if(method!=='GET') writes.push({method,url:url.search,data});
+  if(method==='POST'&&conflictNextImport){conflictNextImport=false;return route.fulfill({status:409,contentType:'application/json',body:JSON.stringify({code:'request_conflict',error:'request_conflict'})});}
   if(method==='PATCH'&&typeof data.enabled==='boolean'){state.financialMemoryEnabled=data.enabled;state.enabled=data.enabled&&state.accountMemoryEnabled;}
   if(method==='POST'&&data.draftId)state.drafts=state.drafts.filter(draft=>draft.id!==data.draftId);
   if(method==='POST') state.items.push(...data.items.map((item,i)=>({...item,id:`00000000-0000-4000-8000-${String(writes.length*10+i).padStart(12,'0')}`,source:'chatgpt',verification:'user_reported',createdAt:new Date().toISOString(),updatedAt:new Date().toISOString()})));
@@ -40,6 +43,7 @@ await context.route('**/*',async route=>{
  return route.continue();
 });
 await page.addInitScript(storageKey=>{
+ Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async text=>{globalThis.__fixtureClipboard=text;}}});
  localStorage.setItem(storageKey,JSON.stringify({access_token:'fixture-token',refresh_token:'fixture-refresh',expires_at:Math.floor(Date.now()/1000)+3600,expires_in:3600,token_type:'bearer',user:{id:'00000000-0000-4000-8000-000000000001',email:'fixture@example.invalid',app_metadata:{provider:'google'},user_metadata:{name:'Fixture'},aud:'authenticated'}}));
 }, storageKey);
 const pageErrors=[];
@@ -66,16 +70,87 @@ assert.equal(imported.items.length,1);assert.equal(imported.items[0].summary,'Bu
 assert(!('source' in imported),'raw pasted source is never uploaded');
 await page.getByRole('button',{name:'Correct',exact:true}).click();
 await page.getByLabel('Financial fact · up to 240 characters').fill('Build a twelve-month emergency fund');
+await page.getByText('Approving saves this correction to your Bobby account. It is available to authorized queries when context is enabled.',{exact:true}).waitFor();
 await page.getByRole('button',{name:'Approve correction',exact:true}).click();
 await page.getByText('Build a twelve-month emergency fund',{exact:true}).waitFor();
-await page.getByRole('button',{name:'Review export',exact:true}).click();
-assert.match(await page.getByLabel('Recommendations to share').inputValue(),/Wait for confirmation/);
+const reviewRecommendations=page.getByRole('button',{name:/^Review selected recommendations/});
+assert(await reviewRecommendations.isDisabled(),'no recommendation is selected by default');
+const btcSelection=page.getByLabel('Select recommendation · BTC · Wait for confirmation',{exact:true});
+const ethSelection=page.getByLabel('Select recommendation · ETH · Review support before acting',{exact:true});
+assert.equal(await btcSelection.isChecked(),false);assert.equal(await ethSelection.isChecked(),false);
+await btcSelection.check();
+await reviewRecommendations.click();
+let exported=JSON.parse(await page.getByLabel('Recommendations to share').inputValue());
+assert.deepEqual(exported.recommendations.map(item=>item.id),['fixture-rec'],'one selected recommendation excludes other account recommendations');
+assert.equal(exported.recommendations[0].asOf,'2026-10-04T10:00:00Z');assert.equal(exported.recommendations[0].createdAt,'2026-10-04T10:01:00Z');
+await page.getByRole('button',{name:'Copy for ChatGPT',exact:true}).click();
+assert.deepEqual(JSON.parse(await page.evaluate(()=>globalThis.__fixtureClipboard)).recommendations.map(item=>item.id),['fixture-rec'],'copy contains only chosen recommendation');
+await ethSelection.check();
+assert.equal(await page.getByLabel('Recommendations to share').count(),0,'changing selection closes old export');
+await reviewRecommendations.click();
+exported=JSON.parse(await page.getByLabel('Recommendations to share').inputValue());
+assert.deepEqual(exported.recommendations.map(item=>item.id),['fixture-rec','fixture-rec-eth'],'sharing two recommendations requires selecting both');
+await btcSelection.uncheck();
+await reviewRecommendations.click();
+exported=JSON.parse(await page.getByLabel('Recommendations to share').inputValue());
+assert.deepEqual(exported.recommendations.map(item=>item.id),['fixture-rec-eth']);
+assert.equal(exported.recommendations[0].asOf,'2026-10-04T11:00:00Z');assert.equal(exported.recommendations[0].createdAt,'2026-10-04T11:02:00Z');
+await page.getByRole('button',{name:'Copy for ChatGPT',exact:true}).click();
+assert.deepEqual(JSON.parse(await page.evaluate(()=>globalThis.__fixtureClipboard)).recommendations.map(item=>item.id),['fixture-rec-eth']);
+await page.screenshot({path:join(evidenceDirectory,'bobby-context-web-selected.png'),fullPage:true});
 await page.getByRole('button',{name:'Pause',exact:true}).click();
 await page.getByRole('button',{name:'Enable context',exact:true}).waitFor();
 assert(await page.getByLabel('Paste selected facts as JSON').isDisabled());
 assert(await page.getByText('Build a twelve-month emergency fund',{exact:true}).isVisible());
+assert.equal(await page.getByLabel('Recommendations to share').count(),0,'pause closes the open export');
+assert.equal(await page.getByRole('button',{name:'Copy for ChatGPT',exact:true}).count(),0,'paused export cannot copy');
+assert.equal(await page.getByRole('button',{name:'Download JSON',exact:true}).count(),0,'paused export cannot download');
+assert(await reviewRecommendations.isDisabled(),'paused sharing cannot reopen export');
+assert(await btcSelection.isDisabled());assert(await ethSelection.isDisabled());
+await page.getByRole('button',{name:'Correct',exact:true}).click();
+await page.getByLabel('Financial fact · up to 240 characters').fill('Build a nine-month emergency fund');
+await page.getByRole('button',{name:'Approve correction',exact:true}).click();
+await page.getByText('Build a nine-month emergency fund',{exact:true}).waitFor();
+assert.equal(state.enabled,false,'private correction does not resume sharing');
 await page.getByRole('button',{name:'Delete',exact:true}).click();
 await page.getByText('No facts saved yet.',{exact:true}).waitFor();
+await page.getByRole('button',{name:'Enable context',exact:true}).click();
+await page.getByRole('button',{name:'Pause',exact:true}).waitFor();
+assert.equal(await btcSelection.isChecked(),false,'resume does not restore paused recommendation selection');
+assert.equal(await ethSelection.isChecked(),false);
+assert.equal(await page.getByLabel('Recommendations to share').count(),0,'resume does not restore old export');
+conflictNextImport=true;
+await page.getByLabel('Paste selected facts as JSON').fill(JSON.stringify({format:'bobby-context-v1',items:[{category:'goal',summary:'Review a conflicted savings goal'}]}));
+await page.getByRole('button',{name:'Review facts',exact:true}).click();
+await page.getByLabel('I reviewed these facts and allow Bobby').check();
+const conflictIndex=writes.length;
+await page.getByRole('button',{name:/Save selected facts/}).click();
+await page.getByText('This save request conflicts with an earlier attempt. Start a new review, check the selected facts, and approve them again before retrying.',{exact:true}).waitFor();
+assert(await page.getByRole('button',{name:/Save selected facts/}).isDisabled(),'conflicted request cannot be retried without new review');
+await page.getByRole('button',{name:'Start a new review',exact:true}).click();
+assert.equal(await page.getByLabel('I reviewed these facts and allow Bobby').isChecked(),false,'new review needs fresh approval');
+assert(await page.getByRole('button',{name:/Save selected facts/}).isDisabled());
+assert.equal(await page.getByLabel('Financial fact · up to 240 characters').inputValue(),'Review a conflicted savings goal','new review retains reviewed item');
+await page.getByLabel('I reviewed these facts and allow Bobby').check();
+await page.getByRole('button',{name:/Save selected facts/}).click();
+await page.getByRole('heading',{name:'Review and choose what Bobby saves'}).waitFor({state:'detached'});
+await page.getByText('Review a conflicted savings goal',{exact:true}).waitFor();
+assert.notEqual(writes[conflictIndex].data.requestId,writes[conflictIndex+1].data.requestId,'explicit new review uses a fresh idempotency key');
+assert.equal(state.items.filter(item=>item.summary==='Review a conflicted savings goal').length,1,'only confirmed retry creates a saved fact');
+await btcSelection.check();
+await reviewRecommendations.click();
+const unreviewedSource=JSON.stringify({format:'bobby-context-v1',items:[{category:'debt',summary:'Unreviewed private debt',amount:4000,currency:'EUR'}]});
+await page.getByLabel('Paste selected facts as JSON').fill(unreviewedSource);
+page.once('dialog',dialog=>dialog.accept());
+await page.getByRole('button',{name:'Delete all financial context',exact:true}).click();
+await page.getByText('No saved recommendations yet. Your next signed-in Bobby analysis can appear here.',{exact:true}).waitFor();
+assert.equal(await page.getByLabel('Paste selected facts as JSON').inputValue(),'','successful erase all clears unsaved pasted JSON');
+assert.equal(await page.getByLabel('Recommendations to share').count(),0,'successful erase all closes export');
+assert.equal(await page.getByLabel('Financial fact · up to 240 characters').count(),0,'successful erase all clears review and correction');
+assert.deepEqual(state.items,[]);assert.deepEqual(state.drafts,[]);assert.deepEqual(state.recommendations,[]);
+await page.getByRole('button',{name:'Enable context',exact:true}).click();
+await page.getByRole('button',{name:'Pause',exact:true}).waitFor();
+assert.equal(await page.getByLabel('Paste selected facts as JSON').inputValue(),'','erase does not retain source after re-enabling');
 assert.equal(await page.evaluate(()=>Object.values(localStorage).some(value=>value.includes('emergency fund')||value.includes('Wait for confirmation'))),false,'financial content never persisted in localStorage');
 await page.screenshot({path:join(evidenceDirectory,'bobby-chatgpt-ui-reviewed.png'),fullPage:true});
 for(const language of ['es','pt','fr','it','de']){
@@ -83,6 +158,8 @@ for(const language of ['es','pt','fr','it','de']){
  await page.getByRole('heading',{name:'Bobby + ChatGPT',exact:true}).waitFor();
  await page.waitForTimeout(150);
  const body=await page.locator('main').innerText();
+ const conflictMessage=await page.evaluate(async()=>{const {financialContextErrorMessage}=await import('/src/components/nucleo/FinancialContextDialog.tsx');const {FinancialContextError}=await import('/src/lib/financial-context-client.ts');return financialContextErrorMessage(new FinancialContextError('request_conflict'));});
+ assert(conflictMessage.length>40&&!conflictMessage.includes('This save request conflicts'),language+' request_conflict uses the app language');
  assert(!body.includes('Bring context from ChatGPT'),language+' import UI translated');
  assert(!body.includes('Your context. Your choice.'),language+' lead translated');
  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth),false,language+' no horizontal overflow at 390px');
@@ -142,5 +219,5 @@ assert(!((await page.locator('body').innerText()).includes('Account A')),'accoun
 assert.equal(await page.getByLabel('Paste selected facts as JSON').inputValue(),'','account B source reset');
 assert.equal(await page.locator('textarea').count(),2,'account B has only own empty source and prompt');
 assert.deepEqual(pageErrors,[],'no unhandled browser errors');
-console.log('PASS: local browser review performs no write; enable; select/edit/consent/import; correction; pause; delete; recommendation export; no finance localStorage; 6-language mobile UI; OAuth explicit consent and validated callback; invalid OAuth refusal; independent financial pause while global memory paused; connector draft review/consume; sign-out and account B draft/source isolation including delayed account A reply. Mocked local endpoints only.');
-await browser.close();
+console.log('PASS: local browser review performs no write; enable; select/edit/consent/import; correction; pause; delete; selected recommendation copy/export with distinct dates; pause clears and blocks export; private correction/deletion while paused; erase clears unsaved JSON; explicit request_conflict review/retry; no finance localStorage; 6-language mobile UI; OAuth explicit consent and validated callback; invalid OAuth refusal; independent financial pause while global memory paused; connector draft review/consume; sign-out and account B draft/source isolation including delayed account A reply. Mocked local endpoints only.');
+} finally { await browser.close(); }

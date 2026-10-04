@@ -8,6 +8,7 @@ import { accountConnection, authorizeAccount, chatgptEnabled, CHATGPT_ISSUER, CH
 import { handleChatgptMcp } from './_lib/chatgpt-mcp.js';
 
 export const config = { maxDuration: 20 };
+const OPERATIONS = new Set(['mcp', 'metadata', 'oauth-metadata', 'register', 'authorize', 'token', 'revoke', 'connection']);
 
 /** Consent and account revocation require an explicit first-party Origin, never an inferred Referer. */
 export function isChatgptFirstPartyOrigin(req: VercelRequest): boolean {
@@ -23,7 +24,10 @@ export function isChatgptFirstPartyOrigin(req: VercelRequest): boolean {
 
 function bodyOf(req: VercelRequest): unknown {
   const raw = req.body;
-  if (typeof raw !== 'string') return raw;
+  if (typeof raw !== 'string') {
+    if (Buffer.byteLength(JSON.stringify(raw ?? {}), 'utf8') > 16384) throw new ChatgptAuthError('invalid_request', 413);
+    return raw;
+  }
   if (Buffer.byteLength(raw, 'utf8') > 16384) throw new ChatgptAuthError('invalid_request', 413);
   const contentType = req.headers['content-type'];
   if (typeof contentType === 'string' && contentType.startsWith('application/x-www-form-urlencoded')) {
@@ -61,7 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  const op = typeof req.query?.op === 'string' ? req.query.op : 'mcp';
+  const rawOp = req.query?.op;
+  // Reject unknown operations before allocating a limiter or writing any persistent counters.
+  if (rawOp !== undefined && (typeof rawOp !== 'string' || !OPERATIONS.has(rawOp))) return res.status(400).json({ error: 'invalid_request' });
+  const op = typeof rawOp === 'string' ? rawOp : 'mcp';
   const method = req.method || 'GET';
   const origin = req.headers.origin;
   const clientOrigin = origin === 'https://chatgpt.com' || isChatgptFirstPartyOrigin(req);
@@ -81,7 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (method === 'GET' && op === 'oauth-metadata') return res.status(200).json(oauthMetadata());
 
   try {
-    if (!await enforcePublicRateLimit(req, res, `chatgpt-${op}`, op === 'register' ? 10 : 60, 60)) return;
+    // Shared ChatGPT egress gets a coarse authentication ceiling; each verified account keeps its own 60/min bucket.
+    if (!await enforcePublicRateLimit(req, res, op === 'mcp' ? 'chatgpt-mcp-authentication' : `chatgpt-${op}`, op === 'mcp' ? 600 : op === 'register' ? 10 : 60, 60)) return;
     if (op === 'connection') {
       if (method === 'GET') {
         if (typeof req.query?.client_id === 'string') {
@@ -97,9 +105,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       throw new ChatgptAuthError('method_not_allowed', 405);
     }
-    if (op === 'revoke' && method === 'POST' && carriesAccountToken(req) && isChatgptFirstPartyOrigin(req)) {
-      await revokeAccountConnection(await requireAccount(req));
-      return res.status(200).json({ connected: false, scopes: [], available: chatgptEnabled() });
+    if (op === 'revoke') {
+      if (method !== 'POST') throw new ChatgptAuthError('method_not_allowed', 405);
+      const body = bodyOf(req);
+      const tokenRequest = typeof body === 'object' && body !== null && Object.hasOwn(body, 'token');
+      if (!tokenRequest && carriesAccountToken(req) && isChatgptFirstPartyOrigin(req)) {
+        await revokeAccountConnection(await requireAccount(req));
+        return res.status(200).json({ connected: false, scopes: [], available: chatgptEnabled() });
+      }
+      await revokeToken(body);
+      return res.status(200).json({});
+    }
+    if (op === 'authorize' && method === 'POST') {
+      if (!isChatgptFirstPartyOrigin(req)) throw new ChatgptAuthError('origin_not_allowed', 403);
+      const body = bodyOf(req);
+      const denied = typeof body === 'object' && body !== null && (body as { approved?: unknown }).approved === false;
+      if (!denied && !chatgptEnabled()) throw new ChatgptAuthError('temporarily_unavailable', 503);
+      return res.status(200).json(await authorizeAccount(denied ? null : await requireAccount(req), body));
     }
     if (!chatgptEnabled()) throw new ChatgptAuthError('temporarily_unavailable', 503);
     if (op === 'authorize') {
@@ -109,23 +131,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
         return res.redirect(302, url.href);
       }
-      if (method !== 'POST') throw new ChatgptAuthError('method_not_allowed', 405);
-      if (!isChatgptFirstPartyOrigin(req)) throw new ChatgptAuthError('origin_not_allowed', 403);
-      return res.status(200).json(await authorizeAccount(await requireAccount(req), bodyOf(req)));
+      throw new ChatgptAuthError('method_not_allowed', 405);
     }
-    if (op === 'register' || op === 'token' || op === 'revoke') {
+    if (op === 'register' || op === 'token') {
       if (method !== 'POST') throw new ChatgptAuthError('method_not_allowed', 405);
       const body = bodyOf(req);
       if (op === 'register') return res.status(201).json(await registerClient(body));
-      if (op === 'token') return res.status(200).json(await exchangeCode(body));
-      await revokeToken(body);
-      return res.status(200).json({});
+      return res.status(200).json(await exchangeCode(body));
     }
     if (op !== 'mcp') throw new ChatgptAuthError('invalid_request');
     if (method === 'DELETE') return res.status(405).json({ error: 'Stateless MCP has no sessions to delete.' });
     if (method === 'GET') {
       const grant = await resolveChatgptGrant(req);
       if (!grant) return mcpAuthentication(res, 'invalid_token', 401);
+      if (!await enforcePublicRateLimit(req, res, 'chatgpt-mcp-account', 60, 60, { trustedIdentityId: grant.identityId })) return;
       res.setHeader('Allow', 'POST');
       return res.status(405).json({ error: 'Use POST for stateless MCP JSON requests.' });
     }
@@ -134,6 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (protocol !== undefined && (typeof protocol !== 'string' || !['2025-06-18', '2025-03-26', '2024-11-05'].includes(protocol))) throw new ChatgptAuthError('unsupported_protocol_version');
     const grant = await resolveChatgptGrant(req);
     if (!grant) return mcpAuthentication(res, 'invalid_token', 401);
+    if (!await enforcePublicRateLimit(req, res, 'chatgpt-mcp-account', 60, 60, { trustedIdentityId: grant.identityId })) return;
     const reply = await handleChatgptMcp(bodyOf(req), grant);
     return reply.body === undefined ? res.status(reply.status).end() : res.status(reply.status).json(reply.body);
   } catch (error) {

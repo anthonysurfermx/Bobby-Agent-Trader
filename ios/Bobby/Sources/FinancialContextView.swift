@@ -26,6 +26,7 @@ struct FinancialContextView: View {
                 if !account.isSignedIn {
                     Text(FinancialContextError.signedOut.message).foregroundStyle(Theme.warmMuted)
                 } else {
+                    connectionSection
                     if let snapshot = center.snapshot { loaded(snapshot) }
                     else if !center.busy {
                         Button(L.t("Load context", "Cargar contexto")) { Task { await center.request() } }
@@ -37,11 +38,11 @@ struct FinancialContextView: View {
         }
         .background(Theme.nucleoSurface.ignoresSafeArea())
         .environment(\.colorScheme, .dark)
-        .task { if account.isSignedIn { await center.request() } }
+        .task { if account.isSignedIn { await center.request(); await center.loadConnection() } }
         .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)) { _ in
             input = ""; review = []; consent = false; draftId = nil; editingId = nil; copied = false; deleteAll = false
             requestId = UUID().uuidString; center.reset()
-            Task { if account.isSignedIn { await center.request() } }
+            Task { if account.isSignedIn { await center.request(); await center.loadConnection() } }
         }
         .onChange(of: review) { _, _ in consent = false; requestId = UUID().uuidString }
         .confirmationDialog(L.t("Delete all financial context and saved recommendations?", "¿Borrar todo el contexto financiero y las recomendaciones guardadas?"), isPresented: $deleteAll, titleVisibility: .visible) {
@@ -51,6 +52,33 @@ struct FinancialContextView: View {
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
         }
         .accessibilityIdentifier("financial-context")
+    }
+
+    @ViewBuilder private var connectionSection: some View {
+        Text(L.t("ChatGPT connection", "Conexión con ChatGPT")).font(.headline)
+        if let connection = center.connection {
+            Text(connection.connected ? L.t("ChatGPT connected", "ChatGPT conectado") : L.t("ChatGPT is not connected", "ChatGPT no está conectado"))
+                .font(.subheadline).accessibilityIdentifier("financial-context-connection-status")
+            if !connection.available {
+                Text(L.t("The connector is currently unavailable. Existing connections can still be disconnected.", "El conector no está disponible por ahora. Puedes desconectar las conexiones existentes."))
+                    .font(.footnote).foregroundStyle(Theme.warmMuted)
+            }
+            if connection.connected {
+                if connection.scopes.contains("bobby.context.read") {
+                    Text(L.t("Permission to read your approved facts and saved recommendations.", "Permiso para leer tus datos aprobados y recomendaciones guardadas.")).font(.footnote)
+                }
+                if connection.scopes.contains("bobby.context.write") {
+                    Text(L.t("Permission to prepare drafts for your review.", "Permiso para preparar borradores para que los revises.")).font(.footnote)
+                }
+                Button(L.t("Disconnect ChatGPT", "Desconectar ChatGPT"), role: .destructive) { Task { await center.revokeConnection() } }
+                    .disabled(center.busy).accessibilityIdentifier("financial-context-disconnect")
+                Text(L.t("Disconnecting removes ChatGPT's access. Your saved facts remain until you delete them in Bobby.", "Al desconectar se elimina el acceso de ChatGPT. Tus datos guardados permanecen hasta que los borres en Bobby."))
+                    .font(.footnote).foregroundStyle(Theme.warmMuted)
+            }
+        }
+        Button(L.t("Refresh connection", "Actualizar conexión")) { Task { await center.loadConnection() } }
+            .disabled(center.busy).accessibilityIdentifier("financial-context-refresh-connection")
+        if let error = center.connectionError { Text(error).foregroundStyle(Theme.down).font(.footnote) }
     }
 
     @ViewBuilder private func loaded(_ state: FinancialContextSnapshot) -> some View {
@@ -140,7 +168,7 @@ struct FinancialContextView: View {
     }
 
     private func startReview(_ items: [FinancialContextItem], draft: String? = nil, edit: String? = nil) {
-        review = items.map(FinancialContextEditor.init); draftId = draft; editingId = edit; consent = false; requestId = UUID().uuidString
+        review = items.map { FinancialContextEditor($0) }; draftId = draft; editingId = edit; consent = false; requestId = UUID().uuidString
     }
     @ViewBuilder private func reviewSection(enabled: Bool) -> some View {
         Text(L.t("Review each fact", "Revisa cada dato")).font(.headline)
@@ -174,15 +202,16 @@ struct FinancialContextEditor: Identifiable, Equatable {
     var amount: String
     var currency: String
     var observedAt: String
-    init(_ item: FinancialContextItem) {
-        category = item.category; summary = item.summary; amount = item.amount.map { String($0) } ?? ""
+    let amountLocale: Locale
+    init(_ item: FinancialContextItem, locale: Locale = L.locale) {
+        amountLocale = locale
+        category = item.category; summary = item.summary; amount = item.amount.map { FinancialContextItem.amountText($0, locale: locale) } ?? ""
         currency = item.currency ?? ""; observedAt = item.observedAt ?? ""
     }
     func item() throws -> FinancialContextItem {
         var json: [String: Any] = ["category": category, "summary": summary.trimmingCharacters(in: .whitespacesAndNewlines)]
         if !amount.isEmpty {
-            guard let number = Double(amount) else { throw FinancialContextError.invalidImport }
-            json["amount"] = number
+            json["amount"] = try FinancialContextItem.enteredAmount(amount, locale: amountLocale)
         }
         if !currency.isEmpty { json["currency"] = currency }
         if !observedAt.isEmpty { json["observedAt"] = observedAt }
@@ -199,6 +228,8 @@ private struct FinancialContextEditorRow: View {
             }
             TextField(L.t("Summary", "Resumen"), text: $row.summary, axis: .vertical)
             TextField(L.t("Amount (optional)", "Importe (opcional)"), text: $row.amount).keyboardType(.decimalPad)
+            Text(L.t("Use \(row.amountLocale.decimalSeparator ?? ".") for decimals; no grouping separators.", "Usa \(row.amountLocale.decimalSeparator ?? ".") para los decimales; sin separadores de miles."))
+                .font(.caption).foregroundStyle(Theme.warmMuted)
             TextField(L.t("Currency (EUR, USD…)", "Moneda (EUR, USD…)"), text: $row.currency).textInputAutocapitalization(.characters).autocorrectionDisabled()
             TextField(L.t("Date YYYY-MM-DD (optional)", "Fecha AAAA-MM-DD (opcional)"), text: $row.observedAt).autocorrectionDisabled()
         }.textFieldStyle(.roundedBorder).padding(12).background(Theme.warmMuted.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
@@ -206,5 +237,5 @@ private struct FinancialContextEditorRow: View {
 }
 
 enum FinancialContextCopy {
-    static let exportPrompt = "Prepare only the financial facts I explicitly choose to share with Bobby from this conversation. Ask me which facts if I have not selected them. Do not access or reconstruct my full chat history. Do not include raw messages, names, account/card numbers, passwords, credentials, or anything unrelated to my chosen financial task. Do not infer facts or describe reported transactions as verified. Return only JSON, without markdown, in this format: {\"format\":\"bobby-context-v1\",\"items\":[{\"category\":\"goal\",\"summary\":\"Build an emergency fund\",\"amount\":3000,\"currency\":\"EUR\"}]}. Replace the example with my chosen facts and their real dates; omit unknown amounts, currencies and dates. Allowed categories: goal, income, expense, debt, asset, preference, transaction. Each summary is one line, at most 240 characters; at most 20 items. Amounts are nonnegative numbers and require a three-letter uppercase currency. I will review and approve them in Bobby before saving."
+    static let exportPrompt = "Prepare only the financial facts I explicitly choose to share with Bobby from this conversation. Ask me which facts if I have not selected them. Do not access or reconstruct my full chat history. Do not include raw messages, names, account/card numbers, passwords, credentials, or anything unrelated to my chosen financial task. Do not infer facts or describe reported transactions as verified. Return only JSON, without markdown, in this format: {\"format\":\"bobby-context-v1\",\"items\":[{\"category\":\"goal\",\"summary\":\"Build an emergency fund\",\"amount\":3000,\"currency\":\"EUR\"}]}. Replace the example with my chosen facts. Include observedAt as YYYY-MM-DD only if I supplied the real date; never invent a date, and omit unknown amounts, currencies and dates. Allowed categories: goal, income, expense, debt, asset, preference, transaction. Each summary is one line, at most 240 characters; at most 20 items. Amounts are nonnegative numbers and require a three-letter uppercase currency. I will review and approve them in Bobby before saving."
 }

@@ -51,7 +51,7 @@ async function request<T>(path: string, method: string, accountId: string | null
     const data = await response.json().catch(() => null);
     if (accountId) await accountHeaders(accountId);
     if (signal?.aborted) throw new FinancialContextError('cancelled');
-    if (!response.ok) throw new FinancialContextError(response.status === 401 ? 'signin_required' :
+    if (!response.ok) throw new FinancialContextError(response.status === 401 ? 'signin_required' : response.status === 429 ? 'rate_limited' :
       typeof data?.code === 'string' ? data.code : typeof data?.error === 'string' ? data.error : 'context_unavailable');
     return data as T;
   } catch (error) {
@@ -97,16 +97,25 @@ export async function validateChatGPTAuthorization(query: URLSearchParams, signa
     'GET', null, undefined, signal);
 }
 export async function authorizeChatGPT(accountId: string, query: URLSearchParams, signal?: AbortSignal): Promise<string> {
+  return decideChatGPTAuthorization(accountId, query, true, signal);
+}
+export async function denyChatGPTAuthorization(accountId: string | null, query: URLSearchParams, signal?: AbortSignal): Promise<string> {
+  return decideChatGPTAuthorization(accountId, query, false, signal);
+}
+async function decideChatGPTAuthorization(accountId: string | null, query: URLSearchParams, approved: boolean, signal?: AbortSignal): Promise<string> {
   const body = oauthParameters(query);
   const response = await request<{ redirectUrl: string }>('/api/chatgpt?op=authorize', 'POST', accountId,
-    { ...body, approved: true }, signal);
+    { ...body, approved }, signal);
   try {
     const expected = new URL(query.get('redirect_uri') ?? ''), redirect = new URL(response.redirectUrl);
+    const keys = [...redirect.searchParams.keys()];
+    const allowedKeys = approved ? ['code', 'state', 'iss'] : ['error', 'state', 'iss'];
     if (redirect.protocol !== 'https:' || redirect.username || redirect.password || redirect.hash ||
       redirect.origin !== expected.origin || redirect.pathname !== expected.pathname ||
-      redirect.searchParams.get('state') !== query.get('state') || !redirect.searchParams.get('code') ||
+      redirect.searchParams.get('state') !== query.get('state') ||
+      (approved ? !redirect.searchParams.get('code') : redirect.searchParams.get('error') !== 'access_denied') ||
       redirect.searchParams.get('iss') !== 'https://bobbyprotocol.xyz' ||
-      [...redirect.searchParams.keys()].some(key => !['code', 'state', 'iss'].includes(key))) throw new Error('redirect');
+      new Set(keys).size !== keys.length || keys.some(key => !allowedKeys.includes(key))) throw new Error('redirect');
     return redirect.href;
   } catch { throw new FinancialContextError('invalid_authorization'); }
 }

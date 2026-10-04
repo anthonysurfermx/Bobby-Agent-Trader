@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import pg from 'pg';
+import { FinancialItemSchema } from '../shared/financial-context.ts';
 
 const url = process.env.DATABASE_URL;
 if (!url) { if (process.env.CI) throw new Error('DATABASE_URL required'); console.log('financial-context-pg: SKIP (local scratch database required)'); process.exit(0); }
@@ -45,8 +46,20 @@ try {
   eq(await rpc('bobby_financial_update',[a,id,JSON.stringify({...fact,amount:4000})]),{ok:true}); eq((await state(a)).items[0].amount,4000);
   eq((await state(a)).items[0].verification,'user_reported');
   for (const bad of [{...fact,transcript:'all chats'}, {...fact,amount:-1}, {...fact,summary:'Card 4242 4242 4242 4242'}, {...fact,observedAt:'2026-02-31'}]) eq(await rpc('bobby_financial_import',[a,JSON.stringify([bad]),randomUUID(),null]),{error:'invalid_context'});
+  for (const summary of ['I earn USD1000 every month','Rent is EUR1200 per month','Covid19 reduced my income']) {
+    const item={...fact,summary};
+    eq(FinancialItemSchema.safeParse(item).success,true);
+    eq(await rpc('bobby_financial_item_valid',[JSON.stringify(item)]),true);
+    eq(await save(a,[item]),{ok:true});
+  }
+  for (const summary of ['IBAN GB82WEST12345698765432','IBAN PT50 0000 0000 0000 0000 0000 0','IBAN MT84MALT011000012345MTLCAST001S','éMT84MALT011000012345MTLCAST001S']) {
+    const item={...fact,summary};
+    eq(FinancialItemSchema.safeParse(item).success,false);
+    eq(await rpc('bobby_financial_item_valid',[JSON.stringify(item)]),false);
+    eq(await save(a,[item]),{error:'invalid_context'});
+  }
   const draft = await rpc('bobby_financial_prepare',[a,JSON.stringify([fact])]);
-  eq((await state(a)).drafts.length,1); eq((await state(a)).items.length,1);
+  eq((await state(a)).drafts.length,1); eq((await state(a)).items.length,4);
   eq(await save(b,[fact],randomUUID(),draft.id),{error:'draft_unavailable'});
   const confirm = randomUUID(); eq(await save(a,[fact],confirm,draft.id),{ok:true}); eq(await save(a,[fact],confirm,draft.id),{ok:true});
   eq((await state(a)).drafts.length,0);
@@ -54,6 +67,12 @@ try {
   const expired = await rpc('bobby_financial_prepare',[a,JSON.stringify([fact])]);
   await q("update bobby_financial_drafts set expires_at=now()-interval '1 second' where id=$1",[expired.id]);
   eq((await state(a)).drafts.length,0); eq(await save(a,[fact],randomUUID(),expired.id),{error:'draft_unavailable'});
+  const cappedDrafts=[];
+  for(let i=0;i<5;i++) cappedDrafts.push(await rpc('bobby_financial_prepare',[a,JSON.stringify([fact])]));
+  eq((await state(a)).drafts.length,5);
+  eq(await rpc('bobby_financial_prepare',[a,JSON.stringify([fact])]),{error:'draft_limit'});
+  for(const pending of cappedDrafts) await rpc('bobby_financial_dismiss',[a,pending.id]);
+  eq((await state(a)).drafts.length,0);
   await enable(a,false); eq(await save(a),{error:'context_paused'}); eq(await rpc('bobby_financial_prepare',[a,JSON.stringify([fact])]),{error:'context_paused'});
   await enable(a,true);
   await q('insert into bobby_user_prefs(identity_id,memory_enabled) values($1,false)',[a]);
@@ -87,6 +106,18 @@ try {
   eq(await recommendations(a,'NVDA'),{error:'context_paused'});
   await q('update bobby_user_prefs set memory_enabled=true where identity_id=$1',[a]);
   await enable(a,false); eq(await rpc('bobby_financial_record_recommendation',[a,JSON.stringify(snapshot)]),false); await enable(a,true);
+  // Forgetting one asset removes its saved snapshots, while preserving all other facts/accounts/assets.
+  await q('insert into bobby_user_assets(identity_id,symbol) values($1,\'BTC\'),($2,\'BTC\')',[a,b]);
+  eq(await rpc('bobby_financial_record_recommendation',[b,JSON.stringify({...snapshot,headline:'Other account BTC analysis'})]),true);
+  const financialFacts=(await state(a)).items;
+  eq(await rpc('bobby_memory_forget',[a,'BTC']),1);
+  eq((await recommendations(a,'BTC')).recommendations,[]);
+  eq((await recommendations(a,'NVDA')).recommendations.map((r:any)=>r.headline),['Older NVDA analysis']);
+  eq((await recommendations(b,'BTC')).recommendations.map((r:any)=>r.headline),['Other account BTC analysis']);
+  eq((await recommendations(b,'NVDA')).recommendations.map((r:any)=>r.headline),['Other account NVDA analysis']);
+  eq((await state(a)).items,financialFacts);
+  eq(Number((await q('select count(*) from bobby_user_assets where identity_id=$1',[a]))[0].count),0);
+  eq(Number((await q('select count(*) from bobby_user_assets where identity_id=$1',[b]))[0].count),1);
   await q("update bobby_saved_recommendations set created_at=now()-interval '91 days' where identity_id=$1",[a]); eq((await state(a)).recommendations.length,0);
   eq((await recommendations(a,'NVDA')).recommendations,[]);
   await rpc('bobby_financial_purge',[]);

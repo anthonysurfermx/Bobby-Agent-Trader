@@ -1,4 +1,4 @@
--- Reviewed financial facts and delivered educational recommendations, shared by account across clients.
+-- Reviewed financial facts and saved validated analyses, shared by account across clients.
 -- Service-only: identity comes from verified authentication, never a model argument. No raw conversations.
 create table if not exists public.bobby_financial_settings (
   identity_id uuid primary key references public.bobby_identities(id) on delete cascade,
@@ -49,7 +49,8 @@ begin
   if coalesce(p_item->>'category','') not in ('goal','income','expense','debt','asset','preference','transaction') then return false; end if;
   v := p_item->>'summary';
   if jsonb_typeof(p_item->'summary') <> 'string' or v is null or length(btrim(v)) < 3 or length(v) > 240 or v ~ '[[:cntrl:]]' then return false; end if;
-  if v ~ '[0-9]([ -]?[0-9]){12,18}' or v ~* '[A-Z]{2}[0-9]{2}[A-Z0-9 ]{11,30}' or v ~ 'sk-[A-Za-z0-9_-]{12,}' or v like '%PRIVATE KEY%' then return false; end if;
+  -- ASCII word boundaries match JavaScript's \b, including identifiers beside non-ASCII text.
+  if v ~ '[0-9]([ -]?[0-9]){12,18}' or v ~* '(^|[^A-Za-z0-9_])[A-Z]{2}[0-9]{2}[A-Z0-9 ]{11,30}($|[^A-Za-z0-9_])' or v ~ 'sk-[A-Za-z0-9_-]{12,}' or v like '%PRIVATE KEY%' then return false; end if;
   if p_item ? 'currency' and (jsonb_typeof(p_item->'currency') <> 'string' or p_item->>'currency' !~ '^[A-Z]{3}$') then return false; end if;
   if p_item ? 'amount' then
     if jsonb_typeof(p_item->'amount') <> 'number' or not p_item ? 'currency' then return false; end if;
@@ -210,6 +211,8 @@ begin
   delete from bobby_financial_drafts where id in (select id from bobby_financial_drafts where expires_at<=now() limit 5000 for update skip locked);
   delete from bobby_saved_recommendations where id in (select id from bobby_saved_recommendations where created_at<now()-interval '90 days' limit 5000 for update skip locked);
   delete from bobby_financial_imports where (identity_id,request_id) in (select identity_id,request_id from bobby_financial_imports where created_at<now()-interval '90 days' limit 5000 for update skip locked);
+  -- The following OAuth migration adds this helper. The existing protected daily cron covers both.
+  if to_regprocedure('public.bobby_chatgpt_purge()') is not null then perform public.bobby_chatgpt_purge(); end if;
   return jsonb_build_object('ok',true);
 end;
 $$;
@@ -226,8 +229,10 @@ begin
     delete from bobby_user_prefs where identity_id=p_identity and memory_enabled;
     update bobby_user_prefs set horizon=null,experience=null,risk=null,updated_at=now() where identity_id=p_identity;
   else
+    perform pg_advisory_xact_lock(hashtextextended(p_identity::text, 61004));
     delete from bobby_user_assets where identity_id=p_identity and symbol=p_symbol;
     get diagnostics n=row_count;
+    delete from bobby_saved_recommendations where identity_id=p_identity and snapshot->>'symbol'=p_symbol;
   end if;
   return n;
 end;

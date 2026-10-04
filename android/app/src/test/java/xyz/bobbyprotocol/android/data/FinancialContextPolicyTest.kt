@@ -46,4 +46,30 @@ class FinancialContextPolicyTest {
         val text = FinancialContextPolicy.recommendationText(rec)
         assertTrue(text.contains("2026-10-04T10:00:00Z")); assertFalse(text.contains("secret")); assertFalse(text.contains("accessToken"))
     }
+    @Test fun actualApiConflictCodesGiveSpecificRecoveryMessagesInBothLanguages() {
+        fun message(code: String, spanish: Boolean): String {
+            val body = JSONObject().put("code", code)
+            return FinancialContextPolicy.errorMessage(ApiException(409, BobbyParsers.machineCode(body), body)) { en, es -> if (spanish) es else en }
+        }
+        assertTrue(message("draft_unavailable", false).contains("draft expired"))
+        assertTrue(message("draft_unavailable", true).contains("borrador caducó"))
+        assertTrue(message("context_limit", false).contains("50 financial facts"))
+        assertTrue(message("context_limit", true).contains("50 datos financieros"))
+        assertTrue(message("duplicate_context", false).contains("another saved fact"))
+        assertTrue(message("duplicate_context", true).contains("otro dato guardado"))
+        assertTrue(message("request_conflict", false).contains("different facts"))
+        assertTrue(message("request_conflict", true).contains("otros datos"))
+        assertFalse(message("unknown_conflict", false).contains("draft"))
+    }
+    @Test fun connectionContractRemainsAvailableForRevokeWhenConnectorIsOffAndContainsNoBearer() {
+        val json = JSONObject().put("connected", true).put("available", false)
+            .put("scopes", org.json.JSONArray().put("bobby.context.read")).put("accessToken", "must-not-enter-controls")
+        val state = FinancialContextPolicy.connection(json)
+        assertTrue(state.connected); assertFalse(state.available); assertEquals(listOf("bobby.context.read"), state.scopes)
+        assertFalse(state.toString().contains("must-not-enter-controls"))
+        val revoked = FinancialContextPolicy.connection(JSONObject().put("connected", false).put("available", false).put("scopes", org.json.JSONArray()))
+        assertFalse(revoked.connected); assertTrue(revoked.scopes.isEmpty())
+        rejected { FinancialContextPolicy.connection(JSONObject().put("connected", "false").put("available", true).put("scopes", org.json.JSONArray())) }
+        rejected { FinancialContextPolicy.connection(JSONObject().put("connected", true).put("available", true).put("scopes", org.json.JSONArray().put("arbitrary"))) }
+    }
 }

@@ -24,6 +24,8 @@ internal fun FinancialContextContent(repository: BobbyRepository, owner: String,
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     var state by remember(owner, epoch) { mutableStateOf<JSONObject?>(null) }
+    var connection by remember(owner, epoch) { mutableStateOf<FinancialChatGPTConnection?>(null) }
+    var connectionError by remember(owner, epoch) { mutableStateOf<String?>(null) }
     var busy by remember(owner, epoch) { mutableStateOf(false) }
     var error by remember(owner, epoch) { mutableStateOf<String?>(null) }
     var input by remember(owner, epoch) { mutableStateOf("") }
@@ -49,12 +51,21 @@ internal fun FinancialContextContent(repository: BobbyRepository, owner: String,
             return true
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (failure: Exception) {
-            if (current()) error = when ((failure as? ApiException)?.code) {
-                "context_paused" -> t("Context is paused. Resume it before saving.", "El contexto está en pausa. Reanúdalo antes de guardar.")
-                "draft_missing", "draft_not_found" -> t("The draft expired or was deleted. Refresh and review again.", "El borrador caducó o se eliminó. Actualiza y revisa de nuevo.")
-                "signin_required" -> t("Sign in to your Bobby account first.", "Primero inicia sesión en tu cuenta de Bobby.")
-                else -> t("Context could not be loaded or saved. Try again.", "No se pudo cargar o guardar el contexto. Intenta de nuevo.")
-            }
+            if (current()) error = FinancialContextPolicy.errorMessage(failure, t)
+            return false
+        } finally { if (current()) busy = false }
+    }
+    suspend fun loadConnection(revoke: Boolean = false): Boolean {
+        if (busy || !current()) return false
+        busy = true; connectionError = null
+        try {
+            val result = repository.financialChatGPTConnection(owner, epoch, revoke)
+            if (!current()) return false
+            connection = result
+            return true
+        } catch (cancelled: CancellationException) { throw cancelled }
+        catch (failure: Exception) {
+            if (current()) connectionError = FinancialContextPolicy.errorMessage(failure, t)
             return false
         } finally { if (current()) busy = false }
     }
@@ -64,11 +75,26 @@ internal fun FinancialContextContent(repository: BobbyRepository, owner: String,
     }
     fun cancelReview() { review = emptyList(); consent = false; draftId = null; editingId = null }
     val invalid = t("Use Bobby JSON with 1–20 facts, one-line summaries up to 240 characters, and valid amounts, currencies and dates. Remove credentials and account/card numbers.", "Usa JSON de Bobby con 1–20 datos, resúmenes de una línea de hasta 240 caracteres e importes, monedas y fechas válidos. Elimina credenciales y números de cuentas o tarjetas.")
-    LaunchedEffect(owner, epoch) { call() }
+    LaunchedEffect(owner, epoch) { call(); loadConnection() }
     Column(Modifier.fillMaxWidth().testTag("financial-context"), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text(t("Share only the financial facts you choose. Bobby cannot read your full ChatGPT history. Reported facts are dated and unverified; they are not verified bank movements or a suitability assessment.", "Comparte solo los datos financieros que elijas. Bobby no puede leer todo tu historial de ChatGPT. Los datos son declarados, fechados y no verificados; no son movimientos bancarios verificados ni una evaluación de idoneidad."))
         if (busy) CircularProgressIndicator(Modifier.size(24.dp))
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+        Text(t("ChatGPT connection", "Conexión con ChatGPT"), style = MaterialTheme.typography.titleMedium)
+        connection?.let { connected ->
+            Text(if (connected.connected) t("ChatGPT connected", "ChatGPT conectado") else t("ChatGPT is not connected", "ChatGPT no está conectado"), modifier = Modifier.testTag("financial-context-connection-status"))
+            if (!connected.available) Text(t("The connector is currently unavailable. Existing connections can still be disconnected.", "El conector no está disponible por ahora. Puedes desconectar las conexiones existentes."), style = MaterialTheme.typography.bodySmall)
+            if (connected.connected) {
+                if ("bobby.context.read" in connected.scopes) Text(t("Permission to read your approved facts and saved recommendations.", "Permiso para leer tus datos aprobados y recomendaciones guardadas."), style = MaterialTheme.typography.bodySmall)
+                if ("bobby.context.write" in connected.scopes) Text(t("Permission to prepare drafts for your review.", "Permiso para preparar borradores para que los revises."), style = MaterialTheme.typography.bodySmall)
+                TextButton(onClick = { scope.launch { loadConnection(revoke = true) } }, enabled = !busy, modifier = Modifier.testTag("financial-context-disconnect")) {
+                    Text(t("Disconnect ChatGPT", "Desconectar ChatGPT"), color = MaterialTheme.colorScheme.error)
+                }
+                Text(t("Disconnecting removes ChatGPT's access. Your saved facts remain until you delete them in Bobby.", "Al desconectar se elimina el acceso de ChatGPT. Tus datos guardados permanecen hasta que los borres en Bobby."), style = MaterialTheme.typography.bodySmall)
+            }
+        }
+        TextButton(onClick = { scope.launch { loadConnection() } }, enabled = !busy, modifier = Modifier.testTag("financial-context-refresh-connection")) { Text(t("Refresh connection", "Actualizar conexión")) }
+        connectionError?.let { Text(it, color = MaterialTheme.colorScheme.error) }
         if (state == null) OutlinedButton(onClick = { scope.launch { call() } }, enabled = !busy) { Text(t("Retry", "Reintentar")) }
         state?.let { snapshot ->
             val enabled = snapshot.getBoolean("enabled")

@@ -30,6 +30,7 @@ type Call = { url: string; body: any; init?: RequestInit };
 let calls: Call[] = [];
 let grant: unknown = { identity_id:ID,client_id:CLIENT,scopes:[...CHATGPT_SCOPES] };
 let enabled = true;
+let preparationError = '';
 let exchangeReply: unknown = {scopes:[...CHATGPT_SCOPES]};
 function mock() {
   calls=[];
@@ -42,9 +43,9 @@ function mock() {
     else if(url.includes('rpc/bobby_chatgpt_authorize')) result=true;
     else if(url.includes('rpc/bobby_chatgpt_exchange_code')) result=exchangeReply;
     else if(url.includes('rpc/bobby_chatgpt_token_identity')) result=grant;
-    else if(url.includes('rpc/bobby_financial_prepare')) result=enabled?{id:randomUUID(),items:body.p_items,expiresAt:'2026-10-05T00:00:00Z'}:{error:'context_paused'};
+    else if(url.includes('rpc/bobby_financial_prepare')) result=preparationError?{error:preparationError}:enabled?{id:randomUUID(),items:body.p_items,expiresAt:'2026-10-05T00:00:00Z'}:{error:'context_paused'};
     else if(url.includes('rpc/bobby_financial_list')) result={enabled,items:[{id:randomUUID(),category:'goal',summary:'Emergency fund',source:'chatgpt',verification:'user_reported'}],drafts:[{id:randomUUID(),items:[{category:'expense',summary:'Pending private fact'}]}],recommendations:[{id:randomUUID(),symbol:'BTC',asOf:'2026-10-01T00:00:00Z',headline:'Wait for more evidence'}]};
-    else if(url.includes('rpc/bobby_financial_recommendations')) result=enabled?{recommendations:[{id:randomUUID(),symbol:body.p_symbol ?? 'BTC',asOf:'2026-10-01T00:00:00Z',headline:'Wait for more evidence'}]}:{error:'context_paused'};
+    else if(url.includes('rpc/bobby_financial_recommendations')) result=enabled?{recommendations:[{id:randomUUID(),symbol:body.p_symbol ?? 'BTC',asOf:'2026-10-01T00:00:00Z',createdAt:'2026-10-01T00:01:00Z',headline:'Wait for more evidence'}]}:{error:'context_paused'};
     return new Response(JSON.stringify(result),{status:200,headers:{'content-type':'application/json'}});
   }) as typeof fetch;
 }
@@ -68,6 +69,13 @@ try {
   await rejects(()=>registerClient({redirect_uris:['https://evil.example/callback']}),'invalid_client_metadata');
   await rejects(()=>registerClient({redirect_uris:[CALLBACK],token_endpoint_auth_method:'client_secret_post'}),'invalid_client_metadata');
   mock();
+  const extensionRegistration=await registerClient({redirect_uris:[CALLBACK],client_uri:'https://metadata.example',logo_uri:'https://metadata.example/logo',contacts:['owner@example.test'],software_id:'test-standard-extension'});
+  eq(extensionRegistration.redirect_uris,[CALLBACK],'RFC7591 ignored metadata does not change approved callback');
+  eq(calls.length,1,'registration never fetches extension URLs');
+  eq(Object.keys(calls[0].body).sort(),['id','name','redirect_uris','scopes'],'ignored metadata is not persisted');
+  await rejects(()=>registerClient({redirect_uris:[CALLBACK],grant_types:['authorization_code','refresh_token'],client_uri:'https://metadata.example'}),'invalid_client_metadata');
+  await rejects(()=>registerClient({redirect_uris:[CALLBACK],scope:'bobby.context.admin',software_id:'test-extension'}),'invalid_scope');
+  mock();
   const authorized=await authorizeAccount(ID,{...authorization,approved:true});
   const redirected=new URL(authorized.redirectUrl);
   eq([redirected.origin,redirected.pathname,redirected.searchParams.get('state'),redirected.searchParams.get('iss')],['https://chatgpt.com','/connector_platform_oauth_redirect',authorization.state,CHATGPT_ISSUER],'redirect binds state and issuer');
@@ -76,8 +84,14 @@ try {
   eq(write.body.p_code_hash,digest(code),'store only code hash');
   eq(write.body.p_identity,ID,'authorize server verified account');
   ok(!JSON.stringify(write.body).includes(code),'raw code not persisted');
-  await rejects(()=>authorizeAccount(ID,{...authorization,approved:false}),'invalid_request');
-  await rejects(()=>authorizeAccount(ID,{...authorization,approved:true,user_id:randomUUID()}),'invalid_request');
+  mock();
+  const denied=await authorizeAccount(null,{...authorization,approved:false,prompt:'consent'});
+  const denial=new URL(denied.redirectUrl);
+  eq([denial.searchParams.get('error'),denial.searchParams.get('state'),denial.searchParams.get('iss'),denial.searchParams.has('code')],['access_denied',authorization.state,CHATGPT_ISSUER,false],'signed-out denial binds exact callback/state/issuer without a code');
+  eq(calls.some(c=>c.init?.method==='POST'),false,'denial writes no authorization or grant');
+  await rejects(()=>authorizeAccount(null,{...authorization,approved:true}),'signin_required');
+  await authorizeAccount(ID,{...authorization,approved:true,user_id:randomUUID(),prompt:'consent'});
+  eq(calls.find(c=>c.url.endsWith('rpc/bobby_chatgpt_authorize'))?.body.p_identity,ID,'ignored OAuth extensions cannot choose the authorized account');
   await rejects(()=>authorizeAccount(ID,{...authorization,approved:true,code_challenge_method:'plain'}),'invalid_request');
   await rejects(()=>authorizeAccount(ID,{...authorization,approved:true,resource:'https://evil.example/api'}),'invalid_request');
   await rejects(()=>authorizeAccount(ID,{...authorization,approved:true,redirect_uri:'https://evil.example'}),'invalid_request');
@@ -87,6 +101,8 @@ try {
   eq([exchange.body.p_code_hash,exchange.body.p_challenge,exchange.body.p_token_hash],[digest(code),pkceChallenge(verifier),digest(token.access_token)],'code, PKCE and token hash bindings');
   ok(!JSON.stringify(exchange.body).includes(token.access_token),'raw token not stored');
   eq(token.expires_in,3600,'bounded token lifetime');
+  const extendedToken=await exchangeCode({grant_type:'authorization_code',client_id:CLIENT,code,redirect_uri:CALLBACK,code_verifier:verifier,resource:CHATGPT_RESOURCE,extension_parameter:'ignored'});
+  eq(extendedToken.token_type,'Bearer','RFC6749 token endpoint ignores unknown extensions');
   await rejects(()=>exchangeCode({grant_type:'refresh_token',client_id:CLIENT,refresh_token:'x'}),'invalid_request');
   await rejects(()=>exchangeCode({grant_type:'authorization_code',client_id:CLIENT,code,redirect_uri:CALLBACK,code_verifier:verifier,resource:'https://evil.example'}),'invalid_request');
   exchangeReply=null; await rejects(()=>exchangeCode({grant_type:'authorization_code',client_id:CLIENT,code,redirect_uri:CALLBACK,code_verifier:verifier,resource:CHATGPT_RESOURCE}),'invalid_grant'); exchangeReply={scopes:[...CHATGPT_SCOPES]};
@@ -101,11 +117,19 @@ try {
   mock();
   const listed=await handleChatgptMcp({jsonrpc:'2.0',id:1,method:'tools/list'},read);
   eq((listed.body as any).result.tools.map((t:any)=>t.name),['bobby_get_financial_context','bobby_get_recommendations'],'scope filters exposed tools');
+  for(const id of [null,1.5]) eq((await handleChatgptMcp({jsonrpc:'2.0',id,method:'ping'},read)).status,400,'MCP request IDs are non-null strings or integers');
+  const initialize=(version:string)=>({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:version,capabilities:{},clientInfo:{name:'Test client',version:'1.0.0'}}});
+  for(const version of ['2025-06-18','2025-03-26','2024-11-05']) eq(((await handleChatgptMcp(initialize(version),read)).body as any).result.protocolVersion,version,'negotiate each supported protocol version');
+  eq(((await handleChatgptMcp(initialize('future-version'),read)).body as any).result.protocolVersion,'2025-06-18','unsupported initialize version falls back to latest supported');
+  eq((await handleChatgptMcp({jsonrpc:'2.0',id:1,method:'initialize',params:{protocolVersion:'2025-06-18'}},read)).status,400,'initialize requires capabilities and client information');
+  eq((await handleChatgptMcp({jsonrpc:'2.0',method:'notifications/initialized'},read)).status,202,'initialized notification has no response body');
   await rejects(()=>handleChatgptMcp(rpc('bobby_prepare_financial_context',{items:[{category:'goal',summary:'Emergency fund'}]}),read),'insufficient_scope');
   await rejects(()=>handleChatgptMcp(rpc('bobby_get_financial_context'),writeGrant),'insufficient_scope');
   for(const args of [{history:['raw']},{items:[{category:'goal',summary:'Emergency fund',user_id:ID}]},{items:[{category:'goal',summary:'Emergency fund',amount:50}]},{items:[{category:'goal',summary:'Account GB82WEST12345698765432'}]},{items:Array.from({length:21},()=>({category:'goal',summary:'Emergency fund'}))}]) {
     mock(); const result=await handleChatgptMcp(rpc('bobby_prepare_financial_context',args),writeGrant);
     eq((result.body as any).result.isError,true,'reject broad history, IDs, invalid facts and batch overflow');
+    eq((result.body as any).result.structuredContent.error,'invalid_financial_facts','invalid selected facts retain their actionable validation error');
+    eq((result.body as any).result.structuredContent.message.includes('Try again'),false,'invalid tool data requires correction rather than automatic retry');
     eq(calls.length,0,'invalid tool input makes no storage call');
   }
   mock();
@@ -123,11 +147,23 @@ try {
   const recommendations=(await handleChatgptMcp(rpc('bobby_get_recommendations'),read)).body as any;
   eq('id' in recommendations.result.structuredContent.recommendations[0],false,'dated analyses omit internal snapshot IDs');
   eq(recommendations.result.structuredContent.recommendations[0].asOf,'2026-10-01T00:00:00Z','preserve actual dated evidence');
+  eq(recommendations.result.structuredContent.recommendations[0].storedAt,'2026-10-01T00:01:00Z','storage timestamp is explicit and separate from market date');
+  eq('deliveredAt' in recommendations.result.structuredContent.recommendations[0],false,'snapshot storage does not prove device delivery');
   mock();
   const filtered=(await handleChatgptMcp(rpc('bobby_get_recommendations',{symbol:'NVDA',limit:5}),read)).body as any;
   eq(filtered.result.structuredContent.recommendations[0].symbol,'NVDA','connector receives account-scoped database-filtered recommendations');
   eq(calls.find(c=>c.url.includes('rpc/bobby_financial_recommendations'))?.body,{p_identity:ID,p_symbol:'NVDA',p_limit:5},'apply symbol filter before database result cap');
   eq('id' in filtered.result.structuredContent.recommendations[0],false,'filtered recommendations still omit internal IDs');
+  mock();
+  const lower=(await handleChatgptMcp(rpc('bobby_get_recommendations',{symbol:'btc'}),read)).body as any;
+  eq(lower.result.structuredContent.recommendations[0].symbol,'BTC','lowercase ticker normalizes before account-scoped retrieval');
+  for(const code of ['draft_limit','invalid_context']) {
+    preparationError=code; mock();
+    const blocked=(await handleChatgptMcp(rpc('bobby_prepare_financial_context',{items:[{category:'goal',summary:'Emergency fund'}]}),writeGrant)).body as any;
+    eq(blocked.result.structuredContent.error,code,'preserve known actionable draft conflict');
+    eq(blocked.result.structuredContent.message.includes('Try again'),false,'draft conflicts require user action, not automatic retry');
+  }
+  preparationError='';
   enabled=false; mock();
   const paused=(await handleChatgptMcp(rpc('bobby_get_financial_context'),read)).body as any;
   eq([paused.result.isError,paused.result.structuredContent.error],[true,'context_paused'],'pause blocks sharing approved facts');
@@ -138,10 +174,39 @@ try {
   eq(noAuth.statusCode,401,'MCP no token returns 401'); ok(noAuth.headers['www-authenticate'].includes('oauth-protected-resource/api/chatgpt'),'401 advertises protected resource discovery');
   const badOrigin=response(); await handler(req('POST','authorize',{...authorization,approved:true},{origin:'https://evil.example',authorization:'Bearer account-token'}),badOrigin as any); eq(badOrigin.statusCode,403,'foreign browser cannot approve');
   const anonymous=response(); await handler(req('POST','authorize',{...authorization,approved:true},{origin:CHATGPT_ISSUER}),anonymous as any); eq(anonymous.statusCode,401,'consent requires signed account');
+  mock();
+  for(const op of ['arbitrary-attacker-scope',Array.from({length:2},()=> 'mcp')]) {
+    const unknown=response(); await handler({...req('POST','mcp',{}),query:{op}},unknown as any);
+    eq(unknown.statusCode,400,'unknown or repeated operation rejected before rate-limit allocation');
+    eq(calls.length,0,'invalid operation writes no persistent rate-limit key or other storage');
+  }
+  const signedOutCancel=response(); await handler(req('POST','authorize',{...authorization,approved:false},{origin:CHATGPT_ISSUER}),signedOutCancel as any);
+  eq(signedOutCancel.statusCode,200,'signed-out user can cancel a validated authorization');
+  eq(new URL(signedOutCancel.body.redirectUrl).searchParams.get('error'),'access_denied','cancel returns trusted error callback');
+  eq(calls.some(c=>c.url.includes('rpc/bobby_chatgpt_authorize')),false,'cancel endpoint never emits a grant');
+  const foreignCancel=response(); await handler(req('POST','authorize',{...authorization,approved:false},{origin:'https://evil.example'}),foreignCancel as any); eq(foreignCancel.statusCode,403,'foreign origin cannot submit consent or denial');
   process.env.BOBBY_CHATGPT='off';
   const disabled=response(); await handler(req('POST','mcp',{jsonrpc:'2.0',id:1,method:'tools/list'},{authorization:`Bearer ${token.access_token}`}),disabled as any); eq(disabled.statusCode,503,'feature switch fails closed');
   const metadata=response(); await handler(req('GET','metadata'),metadata as any); eq(metadata.body.resource,CHATGPT_RESOURCE,'discovery works while disabled');
-  const revoke=response(); await handler(req('POST','revoke',{}, {origin:CHATGPT_ISSUER,authorization:'Bearer account-token'}),revoke as any); eq([revoke.statusCode,revoke.body.connected],[200,false],'account can revoke even while feature disabled'); process.env.BOBBY_CHATGPT='on';
+  const revoke=response(); await handler(req('POST','revoke',{}, {origin:CHATGPT_ISSUER,authorization:'Bearer account-token'}),revoke as any); eq([revoke.statusCode,revoke.body.connected],[200,false],'account can revoke even while feature disabled');
+  mock();
+  const tokenRevoke=response(); await handler(req('POST','revoke',{token:token.access_token,client_id:CLIENT}),tokenRevoke as any);
+  eq(tokenRevoke.statusCode,200,'OAuth token revocation remains available while disabled');
+  eq(calls.find(c=>c.url.includes('rpc/bobby_chatgpt_revoke_token'))?.body,{p_token_hash:digest(token.access_token),p_client:CLIENT},'disabled revocation applies only the supplied hashed token/client binding');
+  const disabledCancel=response(); await handler(req('POST','authorize',{...authorization,approved:false},{origin:CHATGPT_ISSUER}),disabledCancel as any);eq(disabledCancel.statusCode,200,'denial remains available while disabled');
+  process.env.BOBBY_CHATGPT='on';
+  const accountA=randomUUID(),accountB=randomUUID();
+  grant={identity_id:accountA,client_id:CLIENT,scopes:[...CHATGPT_SCOPES]};
+  for(let n=0;n<60;n++) {
+    mock(); const result=response();await handler(req('POST','mcp',{jsonrpc:'2.0',id:n,method:'ping'},{authorization:`Bearer ${token.access_token}`}),result as any);
+    eq(result.statusCode,200,'verified account has its own MCP rate budget');
+  }
+  const exhausted=response();await handler(req('POST','mcp',{jsonrpc:'2.0',id:61,method:'ping'},{authorization:`Bearer ${token.access_token}`}),exhausted as any);eq(exhausted.statusCode,429,'one verified account cannot exceed its own MCP limit');
+  grant={identity_id:accountB,client_id:CLIENT,scopes:[...CHATGPT_SCOPES]};mock();
+  const otherAccount=response();await handler(req('POST','mcp',{jsonrpc:'2.0',id:1,method:'ping'},{authorization:`Bearer ${token.access_token}`,'x-user-id':accountA}),otherAccount as any);eq(otherAccount.statusCode,200,'another verified account on the same proxy IP keeps its independent budget');
+  const counters=calls.filter(c=>c.url.includes('api_cache') && c.body);
+  eq(counters.some(c=>JSON.stringify(c.body).includes(accountA)||JSON.stringify(c.body).includes(accountB)),false,'persistent counters never contain raw account IDs');
+  grant={identity_id:ID,client_id:CLIENT,scopes:[...CHATGPT_SCOPES]};
 } finally { globalThis.fetch=originalFetch; }
 
 // Optional real PostgreSQL regression. It is explicitly restricted to a local scratch database.
@@ -151,7 +216,7 @@ if(databaseUrl) {
   const pool=new pg.Pool({connectionString:databaseUrl,max:4});
   const q=async(sql:string,args:unknown[]=[]) => (await pool.query(sql,args)).rows;
   const migration=readFileSync('supabase/bobby-protocol/supabase/migrations/20261004161000_chatgpt_oauth.sql','utf8');
-  const identity=randomUUID(),client=randomUUID();
+  const identity=randomUUID(),client=randomUUID(),orphanClient=randomUUID(),recentClient=randomUUID(),retiredClient=randomUUID();
   try {
     await q(migration); await q(migration);
     await q('insert into bobby_identities(id,auth_user_id) values($1,$2)',[identity,randomUUID()]);
@@ -187,14 +252,33 @@ if(databaseUrl) {
     for(const table of ['bobby_chatgpt_clients','bobby_chatgpt_connections','bobby_chatgpt_codes','bobby_chatgpt_tokens']) for(const role of ['anon','authenticated']) {
       eq((await q('select has_table_privilege($1,$2,\'select\') r',[role,`public.${table}`]))[0].r,false,'PG service-only tables');
     }
-    for(const signature of ['bobby_chatgpt_token_identity(text,text,text)','bobby_chatgpt_revoke_account(uuid)','bobby_chatgpt_exchange_code(text,uuid,text,text,text,text,text,timestamptz)']) for(const role of ['anon','authenticated']) {
+    for(const signature of ['bobby_chatgpt_token_identity(text,text,text)','bobby_chatgpt_revoke_account(uuid)','bobby_chatgpt_exchange_code(text,uuid,text,text,text,text,text,timestamptz)','bobby_chatgpt_purge()']) for(const role of ['anon','authenticated']) {
       eq((await q('select has_function_privilege($1,$2,\'execute\') r',[role,`public.${signature}`]))[0].r,false,'PG service-only RPCs');
     }
+    // Existing protected daily financial retention also sweeps bounded OAuth metadata without a fresh consent.
+    await q('insert into bobby_chatgpt_clients(id,name,redirect_uris,scopes,created_at) values($1,$4,$5,$6,now()-interval \'31 days\'),($2,$4,$5,$6,now()),($3,$4,$5,$6,now()-interval \'31 days\')',[orphanClient,recentClient,retiredClient,'ChatGPT',[CALLBACK],[...CHATGPT_SCOPES]]);
+    await q('insert into bobby_chatgpt_connections(identity_id,client_id,scopes,revoked_at) values($1,$2,$3,now()-interval \'31 days\')',[identity,retiredClient,[...CHATGPT_SCOPES]]);
+    await q('update bobby_chatgpt_codes set expires_at=now()-interval \'31 days\' where client_id=$1',[client]);
+    await q('update bobby_chatgpt_clients set created_at=now()-interval \'31 days\' where id=$1',[client]);
+    // Current consent is retained even when all of its old transient credentials can be swept.
+    await q('update bobby_chatgpt_connections set revoked_at=null where identity_id=$1 and client_id=$2',[identity,client]);
+    await q('select bobby_financial_purge()');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_codes where client_id=$1',[client]))[0].n),0,'PG daily cleanup removes expired old codes');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_tokens where client_id=$1',[client]))[0].n),0,'PG old tokens cascade with their codes');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_clients where id=$1',[orphanClient]))[0].n),0,'PG old unused registration cleaned without user activity');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_clients where id=$1',[recentClient]))[0].n),1,'PG recent pending registration survives cleanup');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_clients where id=$1',[retiredClient]))[0].n),0,'PG old revoked empty consent and its client cleaned');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_connections where client_id=$1',[retiredClient]))[0].n),0,'PG old revoked empty consent removed');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_clients where id=$1',[client]))[0].n),1,'PG current consent retains its old registered client');
+    eq(Number((await q('select count(*) n from bobby_chatgpt_connections where identity_id=$1 and revoked_at is null',[identity]))[0].n),1,'PG current consent retained');
+    await issue('cascade-code');await exchange('cascade-code','cascade-token');
+    ok(await resolve('cascade-token'),'PG live credential exists before account cascade');
     await q('delete from bobby_identities where id=$1',[identity]);
     eq(Number((await q('select count(*) n from bobby_chatgpt_connections where identity_id=$1',[identity]))[0].n),0,'PG account deletion cascades OAuth credentials');
+    for(const table of ['bobby_chatgpt_codes','bobby_chatgpt_tokens']) eq(Number((await q(`select count(*) n from ${table} where client_id=$1`,[client]))[0].n),0,'PG account cascade deletes transient credentials as well as consent');
   } finally {
     await q('delete from bobby_identities where id=$1',[identity]).catch(()=>{});
-    await q('delete from bobby_chatgpt_clients where id=$1',[client]).catch(()=>{});
+    for(const clientId of [client,orphanClient,recentClient,retiredClient]) await q('delete from bobby_chatgpt_clients where id=$1',[clientId]).catch(()=>{});
     await pool.end();
   }
 } else console.log('chatgpt-auth: PostgreSQL checks skipped (no local DATABASE_URL)');

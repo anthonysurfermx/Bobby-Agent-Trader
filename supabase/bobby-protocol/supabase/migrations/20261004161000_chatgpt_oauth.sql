@@ -66,7 +66,7 @@ begin
      or p_code_hash !~ '^[0-9a-f]{64}$' or p_challenge !~ '^[A-Za-z0-9_-]{43}$'
      or cardinality(p_scopes) not between 1 and 2 or not p_scopes <@ array['bobby.context.read','bobby.context.write'] then return false; end if;
   if not exists(select 1 from bobby_identities where id = p_identity and auth_user_id is not null) then return false; end if;
-  select * into cli from bobby_chatgpt_clients where id = p_client;
+  select * into cli from bobby_chatgpt_clients where id = p_client for key share;
   if not found or not p_redirect_uri = any(cli.redirect_uris) or not p_scopes <@ cli.scopes then return false; end if;
   insert into bobby_chatgpt_connections (identity_id,client_id,scopes)
     values(p_identity,p_client,p_scopes)
@@ -127,13 +127,35 @@ returns void language sql volatile security invoker set search_path = public, pg
   update bobby_chatgpt_tokens set revoked_at=now() where token_hash=p_token_hash and client_id=p_client and revoked_at is null;
 $$;
 
+-- Service-only, bounded daily housekeeping; expired metadata is unusable before deletion.
+-- Keep current consent records and registered clients referenced by them.
+create or replace function public.bobby_chatgpt_purge()
+returns jsonb language plpgsql volatile security invoker set search_path = public, pg_temp as $$
+begin
+  delete from bobby_chatgpt_codes where code_hash in
+    (select code_hash from bobby_chatgpt_codes where expires_at<now()-interval '30 days' limit 5000 for update skip locked);
+  -- Tokens cascade with their code; preserve unexpired/recent records for replay checks.
+  delete from bobby_chatgpt_connections where id in
+    (select c.id from bobby_chatgpt_connections c where c.revoked_at<now()-interval '30 days'
+      and not exists(select 1 from bobby_chatgpt_codes k where k.connection_id=c.id)
+      and not exists(select 1 from bobby_chatgpt_tokens t where t.connection_id=c.id)
+      limit 5000 for update skip locked);
+  delete from bobby_chatgpt_clients where id in
+    (select c.id from bobby_chatgpt_clients c where c.created_at<now()-interval '30 days'
+      and not exists(select 1 from bobby_chatgpt_connections g where g.client_id=c.id)
+      limit 5000 for update skip locked);
+  return jsonb_build_object('ok',true);
+end; $$;
+
 revoke all on function public.bobby_chatgpt_authorize(uuid,uuid,text[],text,text,text,text,text,timestamptz) from public,anon,authenticated;
 revoke all on function public.bobby_chatgpt_exchange_code(text,uuid,text,text,text,text,text,timestamptz) from public,anon,authenticated;
 revoke all on function public.bobby_chatgpt_token_identity(text,text,text) from public,anon,authenticated;
 revoke all on function public.bobby_chatgpt_revoke_account(uuid) from public,anon,authenticated;
 revoke all on function public.bobby_chatgpt_revoke_token(text,uuid) from public,anon,authenticated;
+revoke all on function public.bobby_chatgpt_purge() from public,anon,authenticated;
 grant execute on function public.bobby_chatgpt_authorize(uuid,uuid,text[],text,text,text,text,text,timestamptz) to service_role;
 grant execute on function public.bobby_chatgpt_exchange_code(text,uuid,text,text,text,text,text,timestamptz) to service_role;
 grant execute on function public.bobby_chatgpt_token_identity(text,text,text) to service_role;
 grant execute on function public.bobby_chatgpt_revoke_account(uuid) to service_role;
 grant execute on function public.bobby_chatgpt_revoke_token(text,uuid) to service_role;
+grant execute on function public.bobby_chatgpt_purge() to service_role;

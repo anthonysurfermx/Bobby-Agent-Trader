@@ -59,7 +59,7 @@ const Registration = z.object({
   grant_types: z.array(z.literal('authorization_code')).length(1).default(['authorization_code']),
   response_types: z.array(z.literal('code')).length(1).default(['code']),
   scope: z.string().optional(),
-}).strict();
+}).strip(); // RFC 7591: ignore unsupported metadata; never store or fetch its values.
 
 export async function registerClient(input: unknown) {
   const result = Registration.safeParse(input);
@@ -84,7 +84,7 @@ export const AuthorizationRequest = z.object({
   response_type: z.literal('code'), client_id: UUID, redirect_uri: z.string().max(2048),
   code_challenge: z.string().regex(/^[A-Za-z0-9_-]{43}$/), code_challenge_method: z.literal('S256'),
   state: z.string().min(16).max(512), scope: z.string().max(200), resource: z.literal(CHATGPT_RESOURCE),
-}).strict();
+}).strip(); // RFC 6749 sections 3.1/3.2 require ignoring unrecognized OAuth parameters.
 export type AuthorizationParams = z.infer<typeof AuthorizationRequest>;
 
 export async function validateAuthorization(input: unknown) {
@@ -99,26 +99,30 @@ export async function validateAuthorization(input: unknown) {
   return { params, client, scopes };
 }
 
-export async function authorizeAccount(identityId: string, input: unknown): Promise<{ redirectUrl: string }> {
-  const parsed = AuthorizationRequest.extend({ approved: z.literal(true) }).safeParse(input);
+export async function authorizeAccount(identityId: string | null, input: unknown): Promise<{ redirectUrl: string }> {
+  const parsed = AuthorizationRequest.extend({ approved: z.boolean() }).safeParse(input);
   if (!parsed.success) throw new ChatgptAuthError('invalid_request');
-  const { approved: _approved, ...request } = parsed.data;
+  const { approved, ...request } = parsed.data;
   const { params, scopes } = await validateAuthorization(request);
+  const redirect = new URL(params.redirect_uri);
+  redirect.searchParams.set('state', params.state); redirect.searchParams.set('iss', CHATGPT_ISSUER);
+  // RFC 6749 section 4.1.2.1. A denial issues no code or grant, including before sign-in.
+  if (!approved) { redirect.searchParams.set('error', 'access_denied'); return { redirectUrl: redirect.href }; }
+  if (!UUID.safeParse(identityId).success) throw new ChatgptAuthError('signin_required', 401);
   const code = opaque();
   const expiresAt = new Date(Date.now() + AUTHORIZATION_CODE_SECONDS * 1000).toISOString();
   const issued = await rpc('bobby_chatgpt_authorize', { p_identity: identityId, p_client: params.client_id, p_scopes: scopes,
     p_code_hash: digest(code), p_challenge: params.code_challenge, p_redirect_uri: params.redirect_uri,
     p_resource: CHATGPT_RESOURCE, p_issuer: CHATGPT_ISSUER, p_expires_at: expiresAt });
   if (issued !== true) throw new ChatgptAuthError('access_denied', 403);
-  const redirect = new URL(params.redirect_uri);
-  redirect.searchParams.set('code', code); redirect.searchParams.set('state', params.state); redirect.searchParams.set('iss', CHATGPT_ISSUER);
+  redirect.searchParams.set('code', code);
   return { redirectUrl: redirect.href };
 }
 
 const TokenRequest = z.object({
   grant_type: z.literal('authorization_code'), client_id: UUID, code: z.string().regex(OPAQUE),
   redirect_uri: z.string().max(2048), code_verifier: z.string().regex(/^[A-Za-z0-9._~-]{43,128}$/), resource: z.literal(CHATGPT_RESOURCE),
-}).strict();
+}).strip();
 
 export async function exchangeCode(input: unknown) {
   const result = TokenRequest.safeParse(input);
@@ -155,7 +159,7 @@ export async function revokeAccountConnection(identityId: string): Promise<void>
   await rpc('bobby_chatgpt_revoke_account', { p_identity: identityId });
 }
 
-const Revocation = z.object({ token: z.string().max(200), client_id: UUID, token_type_hint: z.literal('access_token').optional() }).strict();
+const Revocation = z.object({ token: z.string().max(200), client_id: UUID, token_type_hint: z.literal('access_token').optional() }).strip();
 export async function revokeToken(input: unknown): Promise<void> {
   const parsed = Revocation.safeParse(input);
   if (!parsed.success) throw new ChatgptAuthError('invalid_request');

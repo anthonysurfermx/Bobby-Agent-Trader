@@ -130,29 +130,35 @@ export async function redeemCoupon(code: string): Promise<{ result: RedeemResult
 
 // After an Apple/Google sign-in started from /redeem or /admin, /auth/callback returns there instead of the desk.
 const RETURN_KEY = 'bobby:return:v1';
-function isChatGPTReturnPath(value: string): boolean {
-  if (value.length > 8192 || [...value].some(char => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127 || char === '\\')) return false;
+function sanitizeChatGPTReturnPath(value: string): string | null {
+  if (value.length > 8192 || [...value].some(char => char.charCodeAt(0) <= 32 || char.charCodeAt(0) === 127 || char === '\\')) return null;
   try {
     const url = new URL(value, 'https://bobby-return.invalid');
-    if (url.origin !== 'https://bobby-return.invalid' || url.hash || !['/chatgpt', '/chatgpt/connect'].includes(url.pathname)) return false;
+    if (url.origin !== 'https://bobby-return.invalid' || url.hash || !['/chatgpt', '/chatgpt/connect'].includes(url.pathname)) return null;
     const keys = [...url.searchParams.keys()];
-    if (new Set(keys).size !== keys.length) return false;
+    if (new Set(keys).size !== keys.length) return null;
     const languageKeys = ['lang', 'locale', 'country'];
     const allowed = url.pathname === '/chatgpt' ? [...languageKeys, 'draft'] : [...languageKeys,
       'client_id', 'redirect_uri', 'response_type', 'code_challenge', 'code_challenge_method', 'state', 'scope', 'resource'];
-    if (keys.some(key => !allowed.includes(key))) return false;
+    // OAuth extensions do not change permissions and do not need to survive first-party sign-in.
+    if (url.pathname === '/chatgpt/connect') keys.filter(key => !allowed.includes(key)).forEach(key => url.searchParams.delete(key));
+    else if (keys.some(key => !allowed.includes(key))) return null;
     const draft = url.searchParams.get('draft');
-    if (draft && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(draft)) return false;
-    return [...url.searchParams.values()].every(part => part.length <= 4096 && ![...part].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127));
-  } catch { return false; }
+    if (draft && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(draft)) return null;
+    if (![...url.searchParams.values()].every(part => part.length <= 4096 && ![...part].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127))) return null;
+    return url.pathname + url.search;
+  } catch { return null; }
 }
-const isReturnPath = (v: unknown): v is string =>
-  typeof v === 'string' && (v === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt|fr|it|de))?$/.test(v) || (v.startsWith('/chatgpt') && isChatGPTReturnPath(v)));
-export function rememberReturn(path: string) { try { if (isReturnPath(path)) sessionStorage.setItem(RETURN_KEY, path); } catch { /* private mode */ } }
+function safeReturnPath(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  if (value === '/admin' || /^\/redeem(\?(code=[A-Z0-9-]{4,32}&)?lang=(en|es|pt|fr|it|de))?$/.test(value)) return value;
+  return value.startsWith('/chatgpt') ? sanitizeChatGPTReturnPath(value) : null;
+}
+export function rememberReturn(path: string) { try { const safe = safeReturnPath(path); if (safe) sessionStorage.setItem(RETURN_KEY, safe); else sessionStorage.removeItem(RETURN_KEY); } catch { /* private mode */ } }
 export function takeReturn(): string | null {
   try {
     const v = sessionStorage.getItem(RETURN_KEY);
     sessionStorage.removeItem(RETURN_KEY);
-    return isReturnPath(v) ? v : null;
+    return safeReturnPath(v);
   } catch { return null; }
 }

@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import type { IdentityTransport } from './user-identity.js';
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { checkPersistentLimit } from './rate-limit-persistent.js';
-import { createLimiter, getClientIpKey, type Limiter } from './rate-limit.js';
+import { createLimiter, getClientIpKey, saltedKey, type Limiter } from './rate-limit.js';
 
 const localLimiters = new Map<string, Limiter>();
 
@@ -128,7 +128,7 @@ export async function enforcePublicRateLimit(
   scope: string,
   limit: number,
   windowSec: number,
-  options: { transport?: IdentityTransport } = {},
+  options: { transport?: IdentityTransport; trustedIdentityId?: string } = {},
 ): Promise<boolean> {
   let limiter = localLimiters.get(scope);
   if (!limiter) {
@@ -136,10 +136,11 @@ export async function enforcePublicRateLimit(
     localLimiters.set(scope, limiter);
   }
 
-  // Hashed identity — persisted rate-limit rows never hold a raw IP
-  const ip = getClientIpKey(req);
-  const local = limiter.check(ip);
-  const persistent = await checkPersistentLimit(scope, ip, limit, windowSec, options);
+  // Only a server-resolved identity may select an account bucket. Never use request/model IDs.
+  if (options.trustedIdentityId !== undefined && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(options.trustedIdentityId)) throw new Error('Invalid trusted rate-limit identity');
+  const key = options.trustedIdentityId ? saltedKey(`account:${options.trustedIdentityId}`) : getClientIpKey(req);
+  const local = limiter.check(key);
+  const persistent = await checkPersistentLimit(scope, key, limit, windowSec, options);
   const limited = local.limited || persistent.limited;
   const remaining = Math.min(local.remaining, persistent.remaining);
   const resetAt = Math.max(local.resetAt, persistent.resetAt);
