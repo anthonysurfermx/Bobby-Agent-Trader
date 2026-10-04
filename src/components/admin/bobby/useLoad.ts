@@ -23,6 +23,7 @@ export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, key: strin
   const generation = useRef(new LoadGeneration());
   const controller = useRef<AbortController | null>(null);
   const pending = useRef<Promise<void> | null>(null);
+  const lastStartedAt = useRef<number | null>(null);
   const mergeRef = useRef(options.merge);
   mergeRef.current = options.merge;
   // Invalidate during render: a response can resolve before the new key's effect runs.
@@ -34,6 +35,7 @@ export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, key: strin
     const forKey = keyRef.current;
     const abort = new AbortController();
     controller.current = abort;
+    lastStartedAt.current = Date.now();
     setState((s) => ({ ...s, loading: true, error: quiet ? s.error : null }));
     const work = Promise.resolve().then(async () => {
       try {
@@ -65,9 +67,14 @@ export function useLoad<T>(load: (signal: AbortSignal) => Promise<T>, key: strin
   useEffect(() => {
     if (!options.intervalMs) return;
     const tick = () => { if (document.visibilityState === 'visible') void reload(true); };
+    // Returning to a briefly hidden tab should not refetch slow providers that were just consulted.
+    // The interval still refreshes on schedule; the manual refresh always starts immediately.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && (lastStartedAt.current == null || Date.now() - lastStartedAt.current >= options.intervalMs!)) void reload(true);
+    };
     const timer = window.setInterval(tick, options.intervalMs);
-    document.addEventListener('visibilitychange', tick);
-    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', tick); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [options.intervalMs, reload]);
   return { ...state, stale: state.dataKey !== key, reload };
 }

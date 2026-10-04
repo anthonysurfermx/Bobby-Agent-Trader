@@ -2,6 +2,7 @@ import type { AdminIntegrationsResponse, AdminMeta, AdminSourceMeta, AudienceRes
 import { buildInsights } from '../../../../shared/admin-insights';
 
 export const CORE_REFRESH_MS = 30_000;
+export const LIVE_REFRESH_MS = 15_000;
 export const PROVIDER_REFRESH_MS = 300_000;
 export const CORE_STALE_MS = 90_000;
 
@@ -17,11 +18,12 @@ export class LoadGeneration {
 
 export function sourceState(source: AdminSourceMeta | undefined, maxAgeMs: number, now = Date.now()) {
   if (!source) return 'unknown';
-  if (source.status !== 'ok') return source.status;
+  if (source.status !== 'ok' && source.status !== 'partial') return source.status;
   const fetched = source.fetchedAt ? Date.parse(source.fetchedAt) : NaN;
   if (!Number.isFinite(fetched)) return 'unknown';
   if (fetched > now + 60_000) return 'unknown';
-  return now - fetched > maxAgeMs ? 'stale' : 'fresh';
+  if (now - fetched > Math.max(maxAgeMs, source.cacheTtlMs ?? 0)) return 'stale';
+  return source.status === 'partial' ? 'partial' : 'fresh';
 }
 
 /** Advance the server's response clock locally so a workstation clock offset cannot invalidate a fresh source. */
@@ -68,7 +70,7 @@ export function composeOverview(core: OverviewResponse, providers: AdminIntegrat
     const source = providers?.meta?.sources[key];
     if (source?.status === 'not_configured') return true;
     const age = source?.fetchedAt ? providerNow - Date.parse(source.fetchedAt) : NaN;
-    return !!source && ['ok', 'partial'].includes(source.status) && age >= -60_000 && age <= PROVIDER_REFRESH_MS * 2;
+    return !!source && ['ok', 'partial'].includes(source.status) && age >= -60_000 && age <= Math.max(PROVIDER_REFRESH_MS * 2, source.cacheTtlMs ?? 0);
   };
   const integrations = { llmCaps, paywall,
     llmGuard: core.overview.llm.guard ? { dayUsd: core.overview.llm.guard.day, monthUsd: core.overview.llm.guard.month } : providers?.integrations.llmGuard,

@@ -17,6 +17,8 @@ export type AdminSourceStatus = 'ok' | 'error' | 'partial' | 'not_configured' | 
 export interface AdminSourceMeta {
   status: AdminSourceStatus; fetchedAt: string | null; error?: string;
   coveredFrom?: string | null; coveredTo?: string | null; missingDays?: string[]; cacheAgeMs?: number;
+  cacheTtlMs?: number;
+  oldestReportAt?: string | null;
 }
 export interface AdminMeta { generatedAt: string | null; durationMs: number | null; partial: boolean; sources: Record<string, AdminSourceMeta>; receivedAt?: number }
 export interface AdminIntegrationsResponse { integrations: AdminIntegrations; searchConsole: SearchConsoleData | null; meta: AdminMeta | null }
@@ -25,14 +27,22 @@ export interface LivePlatformWindow {
   observedDevices: number; observedAccounts: number; events: number; consumed: number; completed: number;
   failed: number; abandoned: number; wallSignin: number; wallPaywall: number; wallLevel: number; blocked: Record<string, number>;
 }
+export interface LiveServerCoverage {
+  eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null;
+}
 export interface AdminLive {
   snapshotAt: string | null; includeInternal: boolean;
-  windows: Record<LiveWindowId, { minutes: number; since: string | null; ios: LivePlatformWindow; web: LivePlatformWindow }>;
-  platforms: Record<'ios' | 'web', { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null }>;
+  windows: Record<LiveWindowId, { minutes: number; since: string | null; ios: LivePlatformWindow; web: LivePlatformWindow; android: LivePlatformWindow | null }>;
+  platforms: Record<'ios' | 'web', { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null }> & {
+    android: { latestEventAt: string | null; latestOutcomeAt: string | null; latestCompletedAt: string | null; latestReadConsumptionAt: string | null;
+      /** Server source observation across all traffic, independently of the selected account/team population. */
+      coverage: LiveServerCoverage | null } | null;
+  };
   providers: Array<{ provider: string; model: string; calls24h: number; failures24h: number; usd24h: number;
     callLatencyP50Ms: number | null; callLatencyP95Ms: number | null; lastCallAt: string | null; lastFailureAt: string | null }>;
   coverage: { readStarted: boolean; clientRendered: boolean; crashes: boolean; buildVersion: boolean; onlinePresence: boolean;
-    eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null; llmLedgerCoverageSince: string | null };
+    eventCoverageSince: string | null; outcomeCoverageSince: string | null; readConsumptionCoverageSince: string | null; llmLedgerCoverageSince: string | null;
+    clientIngestionEnabled: boolean | null };
   client: ClientLive | null;
 }
 export interface ClientWindow { minutes: number; since: string | null; foreground: number; background: number; started: number; received: number; rendered: number; webviewTerminations: number; reportedInstalls: number; reportedAccounts: number }
@@ -201,8 +211,8 @@ export interface Growth {
     /** Of the people with Pro access (stages.pro: paid, test, unverified or gifted), those with a verified payment; null = not sent. */
     proPaidVerified: number | null; proInactivePaid: number | null;
   };
-  cohorts: { web: GrowthCohort; ios: GrowthCohort };
-  history: { web: GrowthHistory; ios: GrowthHistory };
+  cohorts: { web: GrowthCohort; ios: GrowthCohort; android: GrowthCohort | null };
+  history: { web: GrowthHistory; ios: GrowthHistory; android: GrowthHistory | null };
   outcomes: {
     consumed: number; consumedInternal: number; consumedTotal: number; byPlatform: Record<string, number>;
     delivered: number; failed: number; wallSignin: number; wallSigninInstalls: number; wallPaywall: number; wallLevel: number;
@@ -217,7 +227,7 @@ export interface Growth {
   };
   attention: { neverRead: AttentionAccount[]; quiet: AttentionAccount[] };
   coverage: {
-    webObservedSince: string | null; iosObservedSince: string | null; activitySince: string | null; outcomesSince: string | null;
+    webObservedSince: string | null; iosObservedSince: string | null; androidObservedSince: string | null; activitySince: string | null; outcomesSince: string | null;
     observedInstalls: number; backfillInstalls: number; internalInstalls: number; internalAccounts: number;
   };
 }
@@ -598,14 +608,20 @@ const counts = (v: unknown): Record<string, number> => Object.fromEntries(Object
 export function normalizeAdminMeta(v: unknown): AdminMeta | null {
   if (!isObj(v)) return null;
   const statuses: AdminSourceStatus[] = ['ok', 'error', 'partial', 'not_configured', 'deferred'];
-  return { generatedAt: strOrNull(v.generatedAt), durationMs: numOrNull(v.durationMs), partial: v.partial === true, receivedAt: Date.now(),
-    sources: Object.fromEntries(Object.entries(obj(v.sources)).map(([name, source]) => {
+  const timestamp = (value: unknown) => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
+  const nonnegative = (value: unknown) => { const n = numOrNull(value); return n != null && n >= 0 ? n : null; };
+  const sources: Record<string, AdminSourceMeta> = Object.fromEntries(Object.entries(obj(v.sources)).map(([name, source]) => {
       const s = obj(source);
-      return [name, { status: statuses.includes(s.status as AdminSourceStatus) ? s.status as AdminSourceStatus : 'error',
-        fetchedAt: strOrNull(s.fetchedAt), error: strOrNull(s.error) ?? undefined,
+      const status = statuses.includes(s.status as AdminSourceStatus) ? s.status as AdminSourceStatus : 'error';
+      return [name, { status,
+        fetchedAt: status === 'not_configured' || status === 'deferred' ? null : timestamp(s.fetchedAt), error: strOrNull(s.error) ?? undefined,
         coveredFrom: strOrNull(s.coveredFrom), coveredTo: strOrNull(s.coveredTo),
-        missingDays: Array.isArray(s.missingDays) ? s.missingDays.map(str) : undefined, cacheAgeMs: numOrNull(s.cacheAgeMs) ?? undefined }];
-    })) };
+        missingDays: Array.isArray(s.missingDays) ? s.missingDays.filter((x): x is string => typeof x === 'string') : undefined,
+        cacheAgeMs: nonnegative(s.cacheAgeMs) ?? undefined, cacheTtlMs: nonnegative(s.cacheTtlMs) ?? undefined,
+        oldestReportAt: timestamp(s.oldestReportAt) }];
+    }));
+  return { generatedAt: timestamp(v.generatedAt), durationMs: nonnegative(v.durationMs), receivedAt: Date.now(), sources,
+    partial: v.partial === true || !Object.keys(sources).length || Object.values(sources).some((s) => s.status !== 'ok' || !s.fetchedAt) };
 }
 
 export function normalizeAdminIntegrations(raw: unknown): AdminIntegrationsResponse {
@@ -906,8 +922,8 @@ export function normalizeGrowth(v: unknown): Growth | null {
       byPlatform: counts(p.byPlatform), proInactive: num(p.proInactive), accountsNeverRead: num(p.accountsNeverRead),
       proPaidVerified: numOrNull(p.proPaidVerified), proInactivePaid: numOrNull(p.proInactivePaid),
     },
-    cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios) },
-    history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios) },
+    cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios), android: isObj(co.android) ? normalizeCohortV2(co.android) : null },
+    history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios), android: isObj(hi.android) ? normalizeHistory(hi.android) : null },
     outcomes: {
       consumed: num(out.consumed), consumedInternal: num(out.consumedInternal), consumedTotal: num(out.consumedTotal), byPlatform: counts(out.byPlatform),
       delivered: num(out.delivered), failed: num(out.failed), wallSignin: num(out.wallSignin), wallSigninInstalls: num(out.wallSigninInstalls),
@@ -922,7 +938,7 @@ export function normalizeGrowth(v: unknown): Growth | null {
     },
     attention: { neverRead: normalizeAttention(att.neverRead), quiet: normalizeAttention(att.quiet) },
     coverage: {
-      webObservedSince: strOrNull(cov.webObservedSince), iosObservedSince: strOrNull(cov.iosObservedSince), activitySince: strOrNull(cov.activitySince),
+      webObservedSince: strOrNull(cov.webObservedSince), iosObservedSince: strOrNull(cov.iosObservedSince), androidObservedSince: strOrNull(cov.androidObservedSince), activitySince: strOrNull(cov.activitySince),
       outcomesSince: strOrNull(cov.outcomesSince), observedInstalls: num(cov.observedInstalls), backfillInstalls: num(cov.backfillInstalls),
       internalInstalls: num(cov.internalInstalls), internalAccounts: num(cov.internalAccounts),
     },
@@ -1068,9 +1084,24 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
       failed: r.n(w, 'failed', `${path}.failed`), abandoned: r.n(w, 'abandoned', `${path}.abandoned`), wallSignin: r.n(w, 'wallSignin', `${path}.wallSignin`),
       wallPaywall: r.n(w, 'wallPaywall', `${path}.wallPaywall`), wallLevel: r.n(w, 'wallLevel', `${path}.wallLevel`), blocked: r.cnt(w, 'blocked', `${path}.blocked`) };
   };
-  const timestamps = (pf: 'ios' | 'web') => { const t = r.sec(platforms, pf, `platforms.${pf}`); return {
+  const timestamps = (pf: 'ios' | 'web' | 'android') => { const t = r.sec(platforms, pf, `platforms.${pf}`); return {
     latestEventAt: strOrNull(t.latestEventAt), latestOutcomeAt: strOrNull(t.latestOutcomeAt),
     latestCompletedAt: strOrNull(t.latestCompletedAt), latestReadConsumptionAt: strOrNull(t.latestReadConsumptionAt) }; };
+  const androidCoverage = (): LiveServerCoverage | null => {
+    const path = 'platforms.android.coverage', t = obj(platforms.android);
+    if (!isObj(t.coverage)) { r.mark(path); return null; }
+    const cov = t.coverage;
+    const observedSince = (key: keyof LiveServerCoverage) => {
+      const value = cov[key];
+      if (!(key in cov)) r.mark(`${path}.${key}`);
+      if (value === null) return null;
+      if (typeof value === 'string' && Number.isFinite(Date.parse(value))) return value;
+      r.mark(`${path}.${key}`);
+      return null;
+    };
+    return { eventCoverageSince: observedSince('eventCoverageSince'), outcomeCoverageSince: observedSince('outcomeCoverageSince'),
+      readConsumptionCoverageSince: observedSince('readConsumptionCoverageSince') };
+  };
   const since = (key: string) => { if (!(key in coverage)) r.mark(`coverage.${key}`); return strOrNull(coverage[key]); };
   let client: ClientLive | null = null;
   if (meta?.sources.clientLive?.status === 'error') r.mark('client');
@@ -1096,15 +1127,17 @@ export function normalizeAdminLive(raw: unknown): AdminLiveResponse {
   return { live: { snapshotAt: strOrNull(live.snapshotAt), includeInternal: live.includeInternal === true,
     client,
     windows: Object.fromEntries((['15m', '1h', '24h'] as const).map((id) => { const w = r.sec(windows, id, `windows.${id}`); return [id, {
-      minutes: num(w.minutes), since: strOrNull(w.since), ios: window(w.ios, `windows.${id}.ios`), web: window(w.web, `windows.${id}.web`) }]; })) as AdminLive['windows'],
-    platforms: { ios: timestamps('ios'), web: timestamps('web') },
+      minutes: num(w.minutes), since: strOrNull(w.since), ios: window(w.ios, `windows.${id}.ios`), web: window(w.web, `windows.${id}.web`),
+      android: isObj(w.android) ? window(w.android, `windows.${id}.android`) : (r.mark(`windows.${id}.android`), null) }]; })) as AdminLive['windows'],
+    platforms: { ios: timestamps('ios'), web: timestamps('web'), android: isObj(platforms.android) ? { ...timestamps('android'), coverage: androidCoverage() } : (r.mark('platforms.android'), null) },
     providers: (Array.isArray(live.providers) ? live.providers : (r.mark('providers'), [])).map((p) => { const x = obj(p); return {
       provider: str(x.provider), model: str(x.model), calls24h: num(x.calls24h), failures24h: num(x.failures24h), usd24h: num(x.usd24h),
       callLatencyP50Ms: numOrNull(x.callLatencyP50Ms), callLatencyP95Ms: numOrNull(x.callLatencyP95Ms), lastCallAt: strOrNull(x.lastCallAt), lastFailureAt: strOrNull(x.lastFailureAt) }; }),
     coverage: { readStarted: coverage.readStarted === true, clientRendered: coverage.clientRendered === true, crashes: coverage.crashes === true,
       buildVersion: coverage.buildVersion === true, onlinePresence: coverage.onlinePresence === true,
       eventCoverageSince: since('eventCoverageSince'), outcomeCoverageSince: since('outcomeCoverageSince'),
-      readConsumptionCoverageSince: since('readConsumptionCoverageSince'), llmLedgerCoverageSince: since('llmLedgerCoverageSince') } },
+      readConsumptionCoverageSince: since('readConsumptionCoverageSince'), llmLedgerCoverageSince: since('llmLedgerCoverageSince'),
+      clientIngestionEnabled: typeof coverage.clientIngestionEnabled === 'boolean' ? coverage.clientIngestionEnabled : null } },
     internalMarkFailed: root.internalMarkFailed === true, missing, meta };
 }
 

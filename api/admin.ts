@@ -22,6 +22,7 @@ import {
 import { buildDigest, runDigest, sendDigestNow } from './_lib/admin-digest.js';
 import { runAmplitude } from './_lib/amplitude.js';
 import { growthPlan } from './_lib/admin-plan.js';
+import { clientTelemetryOn } from './_lib/client-telemetry.js';
 
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { adminBounded, adminFetch, adminInteger, adminReadMeta, observeAdminSource, withAdminDeadline, withAdminRead } from './_lib/admin-read.js';
@@ -84,7 +85,8 @@ async function dispatch(req: VercelRequest, res: VercelResponse) {
           withAdminDeadline(7000, () => observeAdminSource('live', () => rpc<Record<string, unknown>>('bobby_admin_server_live', { p_internal: internal }), true)),
           withAdminDeadline(4000, () => observeAdminSource('clientLive', () => rpc<Record<string, unknown>>('bobby_admin_client_live', { p_internal: internal }))),
         ]);
-        return reply({ live: { ...server, client }, missing: client == null ? ['clientLive'] : [] });
+        return reply({ live: { ...server, client, coverage: { ...(server?.coverage as Record<string, unknown> ?? {}),
+          clientIngestionEnabled: clientTelemetryOn() } }, missing: client == null ? ['clientLive'] : [] });
       }
       if (view === 'users') {
         const q = (one(req.query.q) ?? '').trim().slice(0, 120);

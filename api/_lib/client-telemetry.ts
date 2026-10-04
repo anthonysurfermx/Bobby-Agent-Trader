@@ -9,6 +9,8 @@ import type { Identity } from './user-identity.js';
 export const CLIENT_RECEIPT_TTL_MS = 15 * 60_000;
 export const CLIENT_EVENT_MAX_BYTES = 4096;
 export const CLIENT_RECEIPT_MAX_BYTES = 1024;
+/** Shared by ingestion and the authenticated admin read; false never means a healthy client. */
+export const clientTelemetryOn = () => (process.env.BOBBY_CLIENT_TELEMETRY || '').trim().toLowerCase() === 'on';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const HASH = /^[0-9a-f]{24}$/;
 const PREFIX = 'bcr1';

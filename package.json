@@ -74,12 +74,13 @@
     "test:briefings-api": "tsx scripts/test-briefings-api.mts",
     "test:briefings-worker": "tsx scripts/test-briefings-worker.mts",
     "test:briefings-pg": "tsx scripts/test-briefings-pg.mts",
-    "test:admin-live": "node --import tsx scripts/test-admin-live-api.mts && node --import tsx scripts/test-admin-live-ui.mts && node --import tsx scripts/test-admin-r2-desk.mts && node --import tsx scripts/test-admin-r2-insights.mts && node --import tsx scripts/test-admin-stripe-truth.mts",
+    "test:admin-live": "node --import tsx scripts/test-admin-live-api.mts && node --import tsx scripts/test-admin-live-ui.mts && node --import tsx scripts/test-admin-r2-desk.mts && node --import tsx scripts/test-admin-r2-insights.mts && node --import tsx scripts/test-admin-stripe-truth.mts && node --import tsx scripts/test-admin-compass-refresh.mts && node --import tsx scripts/test-admin-compass-ui.mts",
     "test:admin-live-pg": "node --import tsx scripts/test-admin-r2-pg.mts",
     "check:admin": "tsc -p tsconfig.admin.json",
     "test:client-telemetry": "node scripts/build-client-telemetry.mjs && node --import tsx scripts/test-client-telemetry-api.mts && node --import tsx scripts/test-client-telemetry-ui.mts && node --test ios/Bobby/Nucleo/tests/presentation-telemetry.test.mjs",
     "test:client-telemetry-pg": "node --import tsx scripts/test-client-telemetry-pg.mts",
-    "test:dashboard-payments": "tsx scripts/test-dashboard-payments.mts"
+    "test:dashboard-payments": "tsx scripts/test-dashboard-payments.mts",
+    "test:admin-compass-pg": "node --import tsx scripts/test-admin-compass-pg.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",

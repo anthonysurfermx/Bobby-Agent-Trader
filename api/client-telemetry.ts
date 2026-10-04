@@ -9,13 +9,13 @@ import { resolveIdentity } from './_lib/user-identity.js';
 import { isBotUserAgent } from './track.js';
 import { saltedKey } from './_lib/rate-limit.js';
 import { adminBounded, adminFetch, withAdminDeadline, withAdminRead } from './_lib/admin-read.js';
-import { CLIENT_EVENT_MAX_BYTES, clientBinding, normalizeClientEvent, clientBuildLabels, admitClientInstallation, verifyClientReadReceipt } from './_lib/client-telemetry.js';
+import { CLIENT_EVENT_MAX_BYTES, clientBinding, normalizeClientEvent, clientBuildLabels, admitClientInstallation, verifyClientReadReceipt, clientTelemetryOn } from './_lib/client-telemetry.js';
 
 export const config = { maxDuration: 10 };
 const transport = { fetch: adminFetch, body: adminBounded };
 /** Ingestion is public and unauthenticated: it stays off until the owner sets BOBBY_CLIENT_TELEMETRY=on (the same
  *  convention as BOBBY_MEMORY). Off answers 204 before any origin, auth, limiter or storage work. */
-export const clientTelemetryOn = () => (process.env.BOBBY_CLIENT_TELEMETRY || '').trim().toLowerCase() === 'on';
+export { clientTelemetryOn } from './_lib/client-telemetry.js';
 
 async function recordFailure(error: string, authenticated: boolean) {
   try {

@@ -1,7 +1,7 @@
 // The drawn funnel: stacked trapezoid bands whose width follows the count (with a floor so small stages stay
 // visible). The top band is the brightest orange and each later one fades toward grey; the hovered or tapped
 // band lights up and shows its detail. Aggregate bands (Google, App Store) are outlined: same funnel, not the
-// same cohort. Mono numbers on the sides: count, share of the top, step conversion and who left. Under 5 at the
+// same cohort. Mono numbers on the sides: count, share of the top, step conversion and unrecorded next steps. Under 5 at the
 // base a percentage is noise, so the step reads "2/3" instead.
 import { useState, type KeyboardEvent } from 'react';
 import { fmtInt, fmtPct } from './format';
@@ -55,7 +55,7 @@ export default function FunnelDrawing({ stages, idPrefix }: { stages: FunnelStag
     const s = stages[i], p = stages[i - 1];
     if (!!p.aggregate !== !!s.aggregate) return { conv: null, left: null, note: 'otra población' };
     if (s.value == null || p.value == null || !p.value) return { conv: null, left: null };
-    return { conv: share(s.value, p.value), left: p.value - s.value };
+    return { conv: share(s.value, p.value), left: s.aggregate ? null : p.value - s.value };
   };
   const shareOfTop = (s: FunnelStage, i: number) => {
     if (s.value == null) return '—';
@@ -82,14 +82,14 @@ export default function FunnelDrawing({ stages, idPrefix }: { stages: FunnelStag
         const fade = on ? 0 : Math.min(1, t * 1.05);
         const fillTop = mix(ORANGE_TOP, GREY, fade);
         const fillBottom = mix(ORANGE_BOTTOM, GREY, on ? 0 : Math.min(1, fade + 0.08));
-        const summary = `${s.label}: ${missing ? 'sin conectar' : fmtInt(s.value!)}${conv ? `, ${conv} del paso anterior` : ''}`;
+        const summary = `${s.label}: ${missing ? 'dato no disponible' : fmtInt(s.value!)}${conv ? `, ${conv} del paso anterior` : ''}`;
 
         return (
           <div key={s.key}>
             {i > 0 && (
               <div className="grid h-[22px] grid-cols-[minmax(0,1fr)_88px] items-center gap-x-4 sm:grid-cols-[minmax(0,190px)_minmax(0,1fr)_minmax(0,150px)]" aria-hidden>
                 <span className="hidden sm:block" />
-                <span className="text-center font-mono text-[10.5px] text-[#F06A6A]/70">{left != null && left > 0 ? `−${fmtInt(left)} se fueron` : ''}</span>
+                <span className="text-center font-mono text-[10.5px] text-[#8B8B8B]">{left != null && left > 0 ? `${fmtInt(left)} sin siguiente paso registrado` : ''}</span>
                 <span />
               </div>
             )}

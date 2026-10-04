@@ -7,7 +7,7 @@ process.env.BOBBY_SUPABASE_URL = 'https://db.test';
 process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'test-service';
 process.env.RATE_LIMIT_SALT = 'dashboard-offline-test-salt';
-for (const key of ['BOBBY_AUTH_URL', 'REVENUECAT_V2_SECRET_KEY', 'REVENUECAT_SECRET_KEY', 'GSC_SERVICE_ACCOUNT_JSON', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER']) delete process.env[key];
+for (const key of ['BOBBY_AUTH_URL', 'BOBBY_CLIENT_TELEMETRY', 'REVENUECAT_V2_SECRET_KEY', 'REVENUECAT_SECRET_KEY', 'GSC_SERVICE_ACCOUNT_JSON', 'ASC_KEY_ID', 'ASC_ISSUER_ID', 'ASC_PRIVATE_KEY', 'ASC_VENDOR_NUMBER']) delete process.env[key];
 
 const { default: handler } = await import('../api/admin.ts');
 const { appStoreSales, unitEconomics, adminDays, requireAdmin, searchConsole, INSTRUMENTATION } = await import('../api/_lib/admin.ts');
@@ -80,6 +80,11 @@ eq(calls.filter((c) => c.url.includes('bobby_mark_admin_session')).length, 2, 't
 eq(res.body.live.includeInternal, true, 'live honors include team');
 eq(res.body.live.coverage.onlinePresence, false, 'server observation never claims online presence');
 eq(res.body.meta.sources.live.status, 'ok', 'live RPC source');
+eq(res.body.live.coverage.clientIngestionEnabled, false, 'admin exposes disabled ingestion despite successful client RPC');
+process.env.BOBBY_CLIENT_TELEMETRY = 'on';
+res = await get({ view: 'live' });
+eq(res.body.live.coverage.clientIngestionEnabled, true, 'admin exposes the actual ingestion flag without inferring it from HTTP success');
+delete process.env.BOBBY_CLIENT_TELEMETRY;
 
 override = (c) => c.url.includes('rpc/bobby_admin_client_live') ? json({ error: 'statement timeout' }, 503) : null;
 res = await get({ view: 'live' });
@@ -240,7 +245,8 @@ const realNow = Date.now, later = realNow() + 15 * 60_000;
 Date.now = () => later;
 try {
   const cached = await searchConsole(googleDays) as any;
-  ok(Date.parse(cached.fetchedAt) >= later, 'ADM-1: a warm Google cache is freshly read after 15 minutes');
+  eq(cached.fetchedAt, google.fetchedAt, 'ADM-1: a warm Google cache retains the original provider fetch time');
+  eq(cached.cacheTtlMs, 30 * 60_000, 'ADM-1: provider cache policy is explicit beside its original fetch time');
   ok(Date.parse(cached.oldestReportAt) < later, 'ADM-1: Google preserves the earlier provider read separately');
 } finally { Date.now = realNow; }
 override = (c) => c.url.includes('searchconsole.googleapis') ? json({ rows: [] }) : null;

@@ -9,6 +9,8 @@ export interface AdminSource {
   coveredTo?: string | null;
   missingDays?: string[];
   cacheAgeMs?: number;
+  cacheTtlMs?: number;
+  oldestReportAt?: string | null;
 }
 export interface AdminReadMeta {
   generatedAt: string;
@@ -61,20 +63,28 @@ export function deferAdminSources(...names: string[]): void {
 
 /** Optional sources return null with explicit failure evidence. They never become empty tables or zero counts. */
 export async function observeAdminSource<T>(name: string, load: () => Promise<T>, required = false): Promise<T | null> {
+  const startedAt = Date.now();
   try {
     const value = await adminBounded(load, remainingAdminMs(ADMIN_READ_BUDGET_MS));
     if (value == null) throw new Error('source_returned_no_data');
     const o = (typeof value === 'object' && value ? value : {}) as Record<string, unknown>;
     const error = typeof o.error === 'string' ? o.error : undefined;
+    // SQL snapshots describe when the rows were observed; receiving them later cannot make them newer.
+    // For sources without their own clock, use the beginning of the read rather than its completion.
+    const timestamp = 'fetchedAt' in o ? o.fetchedAt : 'snapshotAt' in o ? o.snapshotAt : new Date(startedAt).toISOString();
+    const fetchedAt = typeof timestamp === 'string' && Number.isFinite(Date.parse(timestamp)) ? timestamp : null;
     const source: AdminSource = {
       status: error ? 'error' : o.configured === false ? 'not_configured' : o.partial === true ? 'partial' : 'ok',
-      fetchedAt: o.configured === false || o.fetchedAt === null || error ? null : typeof o.fetchedAt === 'string' ? o.fetchedAt : new Date().toISOString(),
+      fetchedAt: o.configured === false || error ? null : fetchedAt,
       ...(error ? { error } : {}),
       ...(typeof o.coveredFrom === 'string' || o.coveredFrom === null ? { coveredFrom: o.coveredFrom as string | null } : {}),
       ...(typeof o.coveredTo === 'string' || o.coveredTo === null ? { coveredTo: o.coveredTo as string | null } : {}),
       ...(Array.isArray(o.missingDays) ? { missingDays: o.missingDays.filter((x): x is string => typeof x === 'string') } : {}),
+      ...(typeof o.cacheTtlMs === 'number' && Number.isFinite(o.cacheTtlMs) && o.cacheTtlMs > 0 ? { cacheTtlMs: o.cacheTtlMs } : {}),
+      ...(typeof o.oldestReportAt === 'string' && Number.isFinite(Date.parse(o.oldestReportAt)) ? { oldestReportAt: o.oldestReportAt } : {}),
     };
-    if (source.fetchedAt && Number.isFinite(Date.parse(source.fetchedAt))) source.cacheAgeMs = Math.max(0, Date.now() - Date.parse(source.fetchedAt));
+    const cachedAt = source.oldestReportAt ?? source.fetchedAt;
+    if (cachedAt && Number.isFinite(Date.parse(cachedAt))) source.cacheAgeMs = Math.max(0, Date.now() - Date.parse(cachedAt));
     markAdminSource(name, source);
     return value;
   } catch (e) {
@@ -87,9 +97,14 @@ export async function observeAdminSource<T>(name: string, load: () => Promise<T>
 
 export function adminReadMeta(): AdminReadMeta {
   const c = reads.getStore();
-  const sources = { ...(c?.sources ?? {}) };
-  return { generatedAt: new Date().toISOString(), durationMs: Math.max(0, Date.now() - (c?.started ?? Date.now())),
-    partial: Object.values(sources).some((s) => s.status === 'error' || s.status === 'partial' || s.status === 'deferred'), sources };
+  const now = Date.now();
+  const sources = Object.fromEntries(Object.entries(c?.sources ?? {}).map(([name, source]) => {
+    const cachedAt = source.oldestReportAt ?? source.fetchedAt;
+    const fetched = cachedAt ? Date.parse(cachedAt) : NaN;
+    return [name, { ...source, ...(Number.isFinite(fetched) ? { cacheAgeMs: Math.max(0, now - fetched) } : {}) }];
+  }));
+  return { generatedAt: new Date(now).toISOString(), durationMs: Math.max(0, now - (c?.started ?? now)),
+    partial: Object.values(sources).some((s) => s.status !== 'ok' || !s.fetchedAt), sources };
 }
 
 /** SQL integer arguments are finite and bounded even for Infinity, decimals and enormous offsets. */

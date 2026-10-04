@@ -20,7 +20,7 @@ import { useLoad } from './useLoad';
 import { CORE_REFRESH_MS, CORE_STALE_MS, sourceMetaForError } from './live';
 import SourceFreshness from './SourceFreshness';
 
-type Platform = 'web' | 'ios';
+type Platform = 'web' | 'ios' | 'android';
 type Notify = (text: string, ok?: boolean) => void;
 
 const MIN_BASE = 5;
@@ -55,26 +55,27 @@ function webStages(c: GrowthCohort, sc: SearchConsoleData | null, teamOut: boole
       hint: 'Navegadores vistos llegando en el periodo (su primera visita quedó registrada). Sin el histórico reconstruido.' },
     { key: 'deskOrRead', label: 'Abrieron el desk', value: c.deskOrRead, hint: 'De los que llegaron: abrieron /desk o pidieron una lectura.' },
     { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De los que abrieron el desk: consumieron al menos una lectura del cupo. No prueba que el cliente la mostró.' },
-    { key: 'accountAfterRead', label: 'Cuenta después de leer', value: c.accountAfterRead,
+    { key: 'accountAfterRead', label: 'Lectura + cuenta', value: c.accountAfterRead,
       hint: 'De los que registraron una lectura: ese navegador quedó ligado a una cuenta autenticada verificada (nueva o que ya existía).' },
-    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De los que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
+    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De los navegadores con consumo registrado y cuenta: acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }
 
-function iosStages(c: GrowthCohort, store: AdminIntegrations['appStore'] | null, teamOut: boolean): FunnelStage[] {
+function nativeStages(c: GrowthCohort, store: AdminIntegrations['appStore'] | null, teamOut: boolean, platform: 'ios' | 'android'): FunnelStage[] {
   const ok = store && store.configured && !store.error && store.totals ? store.totals : null;
   const range = store?.coveredFrom ? ` Reportes de Apple del ${fmtDate(store.coveredFrom)} al ${fmtDate(store.coveredTo)}.` : '';
   const pending = store?.pendingDays?.length ? ` ${fmtInt(store.pendingDays.length)} ${store.pendingDays.length === 1 ? 'día reciente aún sin publicar' : 'días recientes aún sin publicar'} (no son ceros).` : '';
   const missingDays = store?.missingDays ?? [];
   const partial = store?.partial ? ` Carga parcial: faltan ${fmtInt(missingDays.length)} ${missingDays.length === 1 ? 'día' : 'días'}${missingDays.length ? ` (${fmtDays(missingDays)})` : ''}; el total cubre solo los días cargados.` : '';
   return [
-    { key: 'downloads', label: store?.partial ? 'Descargas App Store (parcial)' : 'Descargas App Store', value: ok ? ok.downloads : null, aggregate: true,
+    ...(platform === 'android' ? [{ key: 'downloads', label: 'Descargas Google Play', value: null, aggregate: true,
+      missing: 'Sin fuente conectada', hint: 'El dashboard no consulta los reportes de Play Console; las lecturas de Android no prueban descargas ni distribución.' }] : [{ key: 'downloads', label: store?.partial ? 'Descargas App Store (parcial)' : 'Descargas App Store', value: ok ? ok.downloads : null, aggregate: true,
       missing: !store ? 'Dato no disponible' : store.configured ? 'App Store con error' : 'Conecta App Store',
-      hint: `Descargas nuevas según Apple: otra población que el embudo (incluye a quien nunca abrió la app).${range}${pending}${partial}${teamOut ? SOURCE_TEAM : ''}` },
-    { key: 'arrived', label: 'Abrieron la app', value: c.arrived, hint: 'Instalaciones de la app 1.5+ vistas abriendo por primera vez en el periodo.' },
-    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De las que abrieron la app: consumieron al menos una lectura del cupo. No prueba que la app la mostró.' },
+      hint: `Descargas nuevas según Apple: otra población que el embudo (incluye a quien nunca abrió la app).${range}${pending}${partial}${teamOut ? SOURCE_TEAM : ''}` }]),
+    { key: 'arrived', label: 'Instalaciones observadas', value: c.arrived, hint: 'Instalaciones con primer contacto registrado en el periodo. No equivale a todas las aperturas de la app.' },
+    { key: 'read1', label: '1.ª lectura', value: c.read1, hint: 'De las instalaciones observadas: consumieron al menos una lectura del cupo. No prueba que la app la mostró.' },
     { key: 'accountAfterRead', label: 'Cuenta', value: c.accountAfterRead, hint: 'De las que registraron una lectura: quedaron ligadas a una cuenta autenticada verificada.' },
-    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De las que leyeron y tienen cuenta: con acceso Pro hoy (pago, prueba o regalo).' },
+    { key: 'proAfterRead', label: 'Pro', value: c.proAfterRead, hint: 'De las instalaciones con consumo registrado y cuenta: acceso Pro hoy (pago, prueba o regalo).' },
   ];
 }
 
@@ -96,7 +97,7 @@ function afterReadRows(platform: Platform, c: GrowthCohort, outcomes: boolean): 
     ofRow('Chocaron con el muro de registro', c.wall, c.read1, wallMissing),
     ofRow('Cuenta tras el muro', c.accountAfterWall, c.wall, wallMissing),
     // The iOS app does not report the start of a sign-in (only the web does).
-    ofRow('Empezaron a iniciar sesión', c.signinStart, c.arrived, platform === 'ios' ? `${NOT_MEASURED}: la app no lo reporta` : undefined),
+    ofRow('Empezaron a iniciar sesión', c.signinStart, c.arrived, platform !== 'web' ? `${NOT_MEASURED}: la app no lo reporta` : undefined),
     ofRow('Cuenta (nueva o existente)', c.account, c.arrived),
     ofRow('Pro', c.proAfterRead, c.accountAfterRead),
   ];
@@ -163,8 +164,10 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
   const [platform, setPlatform] = useState<Platform>('web');
   const c = g.cohorts[platform];
   const outcomesSince = g.coverage.outcomesSince;
-  const observedSince = platform === 'web' ? g.coverage.webObservedSince : g.coverage.iosObservedSince;
+  const observedSince = platform === 'web' ? g.coverage.webObservedSince : platform === 'ios' ? g.coverage.iosObservedSince : g.coverage.androidObservedSince;
   const partialOutcomes = outcomesSince != null && (timeOf(outcomesSince) ?? 0) > (timeOf(g.since) ?? 0);
+  if (!c) return <Card><CardHead title="Embudo Android" /><Note tag="Fuente pendiente">El servidor aún no envía esta cohorte. No se interpreta como cero instalaciones.</Note>
+    <button type="button" className="mt-3 text-[#EDEDED]" onClick={() => setPlatform('web')}>Volver a Web</button></Card>;
   const existing = Math.max(0, c.account - c.accountNew);
 
   return (
@@ -179,7 +182,7 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
             </span>
           </div>
         </div>
-        <Segmented<Platform> label="Plataforma" value={platform} onChange={setPlatform} options={[{ value: 'web', label: 'Web' }, { value: 'ios', label: 'iOS' }]} />
+        <Segmented<Platform> label="Plataforma" value={platform} onChange={setPlatform} options={[{ value: 'web', label: 'Web' }, { value: 'ios', label: 'iOS' }, { value: 'android', label: 'Android' }]} />
       </div>
 
       {c.arrived < MIN_BASE && (
@@ -190,14 +193,14 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
         </div>
       )}
 
-      <FunnelDrawing key={platform} idPrefix={`funnel-${platform}`} stages={platform === 'web' ? webStages(c, sc, !g.includeInternal) : iosStages(c, store, !g.includeInternal)} />
+      <FunnelDrawing key={platform} idPrefix={`funnel-${platform}`} stages={platform === 'web' ? webStages(c, sc, !g.includeInternal) : nativeStages(c, platform === 'ios' ? store : null, !g.includeInternal, platform)} />
       <p className="m-0 mt-5 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-        Cada paso es parte del anterior. Los pasos con borde (Google, App Store) son agregados de otra población y no se comparan uno a uno{g.includeInternal ? '' : '; incluyen al equipo (la fuente no lo separa)'}.
+        En la cohorte, cada paso es parte del anterior. Los pasos con borde (Google, App Store) son agregados de otra población y no se comparan uno a uno{g.includeInternal ? '' : '; incluyen al equipo (la fuente no lo separa)'}.
         Toca o pasa el cursor sobre una etapa para ver qué cuenta.
       </p>
 
       <div className="mt-6 border-t border-white/[0.06] pt-5">
-        <SubHead title="Después de la 1.ª lectura" sub={`${platform === 'web' ? 'web' : 'iOS'} · misma cohorte`} />
+        <SubHead title="Después de la 1.ª lectura" sub={`${label(platform)} · misma cohorte`} />
         <div className="mt-4 max-w-[760px]"><StatusBars max={1} labelWidth={210} wrapLabels stackMobile rows={afterReadRows(platform, c, outcomesSince != null)} /></div>
         <p className="m-0 mt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
           Base de cada fila: lecturas y muro, sobre los que leyeron · cuenta tras el muro, sobre los que chocaron · inicio de sesión y cuenta, sobre los que llegaron · Pro (con acceso hoy: pago, prueba o regalo), sobre los que leyeron y tienen cuenta.
@@ -225,7 +228,7 @@ function FunnelCard({ g, period, sc, store }: { g: Growth; period: number; sc: S
 // ---------------------------------------------------------------- history (never mixed with the funnel)
 
 function HistoryCard({ history }: { history: Growth['history'] }) {
-  const rows: Array<[string, GrowthHistory]> = [['Web', history.web], ['iOS', history.ios]];
+  const rows: Array<[string, GrowthHistory]> = [['Web', history.web], ['iOS', history.ios], ...(history.android ? [['Android', history.android] as [string, GrowthHistory]] : [])];
   const any = rows.some(([, h]) => h.installs > 0);
   return (
     <Card>
@@ -294,7 +297,7 @@ function OutcomesCard({ out, includeInternal, periodSince, markFailed }: { out: 
       />
       {!since ? (
         <Note tag="Sin datos aún">
-          Respuestas emitidas, fallidas, muros y bloqueos los registra el servidor en cada lectura del desk. Todavía no hay ninguno en este periodo.
+          Sin cobertura observada de respuestas, fallos, muros o bloqueos en este periodo. La ausencia de registros no demuestra cero actividad.
         </Note>
       ) : (
         <>
@@ -311,7 +314,7 @@ function OutcomesCard({ out, includeInternal, periodSince, markFailed }: { out: 
         </>
       )}
       <p className="m-0 mt-4 border-t border-white/[0.06] pt-3 font-mono text-[10.5px] leading-relaxed text-[#5C5C5C]">
-        Consumidas = lecturas cobradas al cupo. Emitidas, fallidas y abandonadas = registros del servidor en el desk, web e iOS. No se confirma que la respuesta se mostró en el cliente; una abandonada no es una falla.
+        Consumidas = lecturas cobradas al cupo. Emitidas, fallidas y abandonadas = registros del servidor en web, iOS y Android. No se confirma que la respuesta se mostró en el cliente; una abandonada no es una falla.
       </p>
     </Card>
   );
@@ -391,7 +394,8 @@ function CoverageNote({ g, o, markFailed }: { g: Growth; o: OverviewResponse['ov
   const cv = g.coverage;
   const parts = [
     `Llegadas observadas desde ${cv.webObservedSince ? fmtDate(cv.webObservedSince) : 'sin datos'} (web)`,
-    `iOS desde ${cv.iosObservedSince ? fmtDate(cv.iosObservedSince) : 'sin datos'} (instalaciones 1.5+)`,
+    `iOS desde ${cv.iosObservedSince ? fmtDate(cv.iosObservedSince) : 'sin datos'}`,
+    `Android desde ${cv.androidObservedSince ? fmtDate(cv.androidObservedSince) : 'sin datos'}`,
     `resultados del desk ${cv.outcomesSince ? `desde ${fmtDate(cv.outcomesSince)}` : 'aún sin registros'}`,
     `${fmtInt(cv.backfillInstalls)} instalaciones reconstruidas aparte`,
     g.includeInternal

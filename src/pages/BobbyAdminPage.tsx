@@ -22,7 +22,7 @@ import LlmTab from '@/components/admin/bobby/LlmTab';
 import IntegrationsTab from '@/components/admin/bobby/IntegrationsTab';
 import OperationalPanel from '@/components/admin/bobby/OperationalPanel';
 import SourceFreshness from '@/components/admin/bobby/SourceFreshness';
-import { composeOverview, CORE_REFRESH_MS, CORE_STALE_MS, mergeProviderSnapshots, PROVIDER_REFRESH_MS, sourceMetaForError } from '@/components/admin/bobby/live';
+import { composeOverview, CORE_REFRESH_MS, LIVE_REFRESH_MS, CORE_STALE_MS, mergeProviderSnapshots, PROVIDER_REFRESH_MS, sourceMetaForError } from '@/components/admin/bobby/live';
 
 /**
  * /admin — Bobby's owner dashboard: accounts, reads, funnel, memberships, coupons, LLM spend and
@@ -127,11 +127,10 @@ function headerCount(tab: TabId, d: OverviewResponse | null, period: number): st
   const o = d.overview;
   switch (tab) {
     case 'resumen': {
-      const urgent = d.insights.filter((x) => x.level === 'critical' || x.level === 'warn').length;
-      return d.growth ? `${fmtInt(d.growth.people.active7d)} cuentas/dispositivos activos 7d${urgent ? ` · ${urgent} por atender` : ''}` : null;
+      return 'Actividad, prioridades y tendencia';
     }
     case 'usuarios': return `${fmtInt(o.accounts.total)} cuentas ${o.includeInternal ? '(con el equipo)' : 'externas'}`;
-    case 'funnel': return d.growth ? `${fmtInt(d.growth.cohorts.web.arrived + d.growth.cohorts.ios.arrived)} llegadas observadas · ${period}d` : null;
+    case 'funnel': return d.growth ? `${fmtInt(d.growth.cohorts.web.arrived + d.growth.cohorts.ios.arrived + (d.growth.cohorts.android?.arrived ?? 0))} llegadas ${d.growth.cohorts.android ? 'observadas' : 'iOS/web'} · ${period}d` : null;
     case 'audiencia': return null;
     case 'membresias': return `${isMissing(o.missing, 'subscriptions.paidVerified') ? DASH : fmtInt(o.subscriptions.paidVerified)} pagando (verificado)`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
@@ -151,7 +150,7 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const [flash, setFlash] = useState<{ id: number; text: string; ok: boolean } | null>(null);
   const flashId = useRef(0);
   const overview = useLoad((signal) => fetchAdminOverview(period, { internal, signal }), `${period}|${internal ? 'all' : 'ext'}`, { intervalMs: CORE_REFRESH_MS });
-  const live = useLoad((signal) => fetchAdminLive(internal, signal), `live|${internal ? 'all' : 'ext'}`, { intervalMs: CORE_REFRESH_MS });
+  const live = useLoad((signal) => fetchAdminLive(internal, signal), `live|${internal ? 'all' : 'ext'}`, { intervalMs: LIVE_REFRESH_MS });
   const providers = useLoad((signal) => fetchAdminIntegrations(period, signal), `providers|${period}`, { intervalMs: PROVIDER_REFRESH_MS, merge: mergeProviderSnapshots });
   // Twice the window, for "vs periodo anterior". Optional: if it fails the deltas just do not show.
   const compare = useLoad((signal) => fetchAdminOverview(Math.min(period * 2, 365), { compare: true, internal, signal }), `cmp|${period}|${internal ? 'all' : 'ext'}`, { intervalMs: PROVIDER_REFRESH_MS });
@@ -217,7 +216,9 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const count = headerCount(tab, o, period);
   const reads = o?.overview.activity.readsDaily;
   // Outside reads in the selected period (the header switch decides whether the team's are in).
-  const platforms = reads ? { web: reads.web.reduce((a, b) => a + b, 0), ios: reads.ios.reduce((a, b) => a + b, 0), days: period } : null;
+  const readTotal = (platform: 'web' | 'ios' | 'android') => !reads || isMissing(o?.overview.missing, `activity.readsDaily.${platform}`)
+    ? null : reads[platform].reduce((a, b) => a + b, 0);
+  const platforms = reads ? { web: readTotal('web'), ios: readTotal('ios'), android: readTotal('android'), days: period } : null;
   const email = me.email ?? me.identityId;
   // The server could not mark this browser as the team's: "sin equipo" is not verified for this load.
   const markFailed = !internal && !!o?.internalMarkFailed;
@@ -247,10 +248,10 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
       <div className={collapsed ? 'md:pl-16' : 'md:pl-[240px]'}>
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-white/[0.06] bg-[#0B0B0C]/85 px-4 backdrop-blur-md md:px-6">
           <IconBtn label="Abrir menú" className="-ml-1.5 md:hidden" onClick={() => setDrawer(true)}><MenuIcon className="h-4 w-4" strokeWidth={1.6} /></IconBtn>
-          <div className="flex min-w-0 flex-1 items-baseline gap-2.5">
+          <div className="flex min-w-0 flex-1 items-baseline gap-1.5 max-sm:flex-wrap max-sm:gap-y-0 sm:gap-2.5">
             <h1 className="m-0 shrink-0 text-[14px] font-medium">{current.label}</h1>
             {count && <span className="hidden truncate font-mono text-[10.5px] uppercase tracking-[0.06em] text-[#5C5C5C] sm:inline">{count}</span>}
-            {adminMockMode() && <span className="font-mono text-[8px] uppercase leading-tight tracking-[0.04em] text-[#F7A04B] sm:text-[10px]">Datos ficticios</span>}
+            {adminMockMode() && <span aria-label="Datos ficticios" title="Datos ficticios" className="font-mono text-[8px] uppercase leading-tight tracking-[0.04em] text-[#F7A04B] sm:text-[10px]"><span className="sm:hidden">Demo</span><span className="hidden sm:inline">Datos ficticios</span></span>}
           </div>
           <button
             type="button" onClick={toggleInternal} aria-pressed={internal}
@@ -272,9 +273,10 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
 
         <main className="mx-auto w-full max-w-[1240px] px-4 py-5 md:px-6 md:py-6" aria-label={current.label}>
           {tab === 'resumen' && <OperationalPanel data={liveData} error={live.error} loading={live.loading} updatedAt={live.updatedAt} onRetry={() => void live.reload(true)} />}
-          <div className="mb-4 flex flex-col gap-2">
-            <SourceFreshness meta={sourceMetaForError(o?.meta, overview.error?.message)} maxAgeMs={CORE_STALE_MS} label="Bobby · cada 30 s · pausa al ocultar pestaña" fallbackAt={overview.updatedAt} />
-            <SourceFreshness meta={sourceMetaForError(providerData?.meta, providers.error?.message)} maxAgeMs={PROVIDER_REFRESH_MS * 2} label="Apple / Google / RevenueCat · cada 5 min · publicación diferida" fallbackAt={providers.updatedAt} />
+          <div className={`mb-4 grid gap-2 ${tab === 'resumen' ? 'lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
+            {tab === 'resumen' && <SourceFreshness meta={sourceMetaForError(liveData?.meta, live.error?.message)} maxAgeMs={CORE_STALE_MS} label="Operación" fallbackAt={live.updatedAt} />}
+            <SourceFreshness meta={sourceMetaForError(o?.meta, overview.error?.message)} maxAgeMs={CORE_STALE_MS} label="Métricas Bobby" fallbackAt={overview.updatedAt} />
+            <SourceFreshness meta={sourceMetaForError(providerData?.meta, providers.error?.message)} maxAgeMs={PROVIDER_REFRESH_MS * 2} label="Apple / Google / RevenueCat" fallbackAt={providers.updatedAt} />
             {providers.error && <StaleBanner error={providers.error} onRetry={() => void providers.reload(true)} />}
           </div>
           {needsOverview && !o ? (
