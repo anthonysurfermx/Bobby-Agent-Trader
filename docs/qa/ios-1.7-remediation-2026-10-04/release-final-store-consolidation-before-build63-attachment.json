@@ -1,11 +1,11 @@
 {
-  "consolidatedAtUTC": "2026-10-04T13:28:17.309999+00:00",
+  "consolidatedAtUTC": "2026-10-04T13:10:32.531653+00:00",
   "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04",
   "archiveSourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
-  "observedCurrentHead": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
+  "observedCurrentHead": "a44b98b5eed6ce5445dec3d57d3cf4030f967902",
   "sourceChangesByThisWorker": "docs only; temporary verifier copy updated, no product edits",
-  "copiedFileCount": 102,
-  "copiedBytes": 2784558,
+  "copiedFileCount": 98,
+  "copiedBytes": 2776856,
   "files": [
     {
       "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-screenshots-saved.json",
@@ -526,14 +526,14 @@
     {
       "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/current-store-state.json",
       "destination": "store-localizations/current-store-state.json",
-      "bytes": 4422,
-      "sha256": "c08b63979dd5fd6ae95431b4de9a8fcf107e14775167e2e318b0ea382d32977a"
+      "bytes": 3464,
+      "sha256": "a2c1c165c9d8e819aa37ba6e19e57edcfbab9e1ba895acff185fe8746230259a"
     },
     {
       "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/current-store-state.md",
       "destination": "store-localizations/current-store-state.md",
-      "bytes": 4425,
-      "sha256": "683a8182cdde036109819c5da7a6a2b5027fadac70d47ac8507586976f0e2bd4"
+      "bytes": 3625,
+      "sha256": "51ffab77dedc06688e0b16e2c4a4666f03463d30161416a7157208aa4d9429cf"
     },
     {
       "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-privacyurls-full-readback.json",
@@ -594,30 +594,6 @@
       "destination": "native/archive63-upload-marker-repair.json",
       "bytes": 1502,
       "sha256": "8e9c1b940c9376589f8963f26b3fa3b4b9683cc0717279e7ed2cd64f5a8ee807"
-    },
-    {
-      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/app-store-build63-attached.json",
-      "destination": "store-localizations/app-store-build63-attached.json",
-      "bytes": 1166,
-      "sha256": "a9a5d582bdd096f1236bd3de729075544781bd4b0e3b203687fb9cf88b9f94bb"
-    },
-    {
-      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/testflight63-processed.json",
-      "destination": "store-localizations/testflight63-processed.json",
-      "bytes": 1581,
-      "sha256": "148bd636595ea63a18b49515b7e2b27906b1076720ba873ee994839886427600"
-    },
-    {
-      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/post-attachment-six-locales.json",
-      "destination": "store-localizations/post-attachment-six-locales.json",
-      "bytes": 2218,
-      "sha256": "5ec74659d495e89e342d6fd2f48ba57ce9e9cf3a0010d307991a2d14173f8118"
-    },
-    {
-      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/physical-current-blocker-latest.json",
-      "destination": "native/physical-current-blocker-latest.json",
-      "bytes": 979,
-      "sha256": "ccc86501fb61d1c61316ccd8c1e38d4962e5f7a0289b81d2264a32394b1b2164"
     }
   ],
   "screenshotsVerified": 30,
@@ -629,17 +605,12 @@
   "uploadExecuted": true,
   "fullArchiveOrArtworkCopied": false,
   "commitOrStageExecuted": false,
-  "mainReportSHA256": "40acfcaee86b1c5a6f799086d7d4613f4ca9532622a96ca5c32113c4ade57a8a",
+  "mainReportSHA256": "407ea8524cd9fd989ad81d35f8039c44f8d709d6b53fbdf032af166491f51a95",
   "preparedUploadCommandSHA256": "e837cc40a17d3aa6a7a773a18d63d6e1891b31494151e6ee5252b708825d2412",
   "totalVerifiedLocalizedMetadataFields": 48,
   "uploadStatus": "accepted by Apple with explicit success marker and exit0",
   "appReviewSubmissionExecuted": false,
   "publicationExecuted": false,
   "uploadAcceptedAtUTC": "2026-10-04T13:09:04.728985+00:00",
-  "testFlightProcessing": "verified processed/listed, Validado binary; remote receipt13:24UTC",
-  "buildAttachedToDraft": true,
-  "buildAttachmentObservedAtUTC": "2026-10-04T13:23:45.870Z",
-  "postAttachmentSixLocalesVerified": true,
-  "remoteImageByteIdentityVerified": false,
-  "currentPhysicalInstallation": "unverified; no fresh device inventory query"
+  "testFlightProcessing": "pending root remote receipt"
 }

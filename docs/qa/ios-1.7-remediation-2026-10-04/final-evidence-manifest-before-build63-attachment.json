@@ -1,17 +1,12 @@
 {
-  "createdAtUTC": "2026-10-04T13:31:20.661122+00:00",
-  "candidateHEAD": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
-  "scope": "Curated QA, archive/upload, processed TestFlight63, persisted ASC1.7/build63 attachment, localized copy/artwork and independent review evidence. Historical attempts/manifests retained. Physical/commercial acceptance, App Review submission and publication remain unverified or not performed. This manifest excludes itself.",
-  "archiveSourceHEAD": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
-  "lastTestOnlyCodeHEAD": "a44b98b5eed6ce5445dec3d57d3cf4030f967902",
-  "documentationHEADBeforeThisUpdate": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
-  "fileCount": 309,
-  "totalBytes": 7602538,
+  "createdAtUTC": "2026-10-04T13:12:06.254558+00:00",
+  "candidateHEAD": "a44b98b5eed6ce5445dec3d57d3cf4030f967902",
+  "scope": "Current curated QA, archive upload, App Store localizations and independent review evidence. Previous attempt receipts and historical manifests preserved. This manifest excludes itself. Remote processing/attachment and physical acceptance require later receipts.",
   "files": [
     {
       "path": "README.md",
-      "bytes": 15995,
-      "sha256": "d868f15d0afbbf695ae89eb74c1f7926b79d0a08adf4a0fe0092255c0593a5ec"
+      "bytes": 14928,
+      "sha256": "407ea8524cd9fd989ad81d35f8039c44f8d709d6b53fbdf032af166491f51a95"
     },
     {
       "path": "anvil/bounties-network.jsonl",
@@ -197,11 +192,6 @@
       "path": "final-bundle-summary.json",
       "bytes": 1628,
       "sha256": "f0f3ed80723eac685ae714ca6f4e21ed6f0415dbfef7dfa0f8b6a2a720acc1c5"
-    },
-    {
-      "path": "final-evidence-manifest-before-build63-attachment.json",
-      "bytes": 52808,
-      "sha256": "1a1119eeb35ca8f392cefc2387e422ac569878b3488bc0024d28d40d4cb6445b"
     },
     {
       "path": "iphone-live-chart-support-gates.md",
@@ -714,11 +704,6 @@
       "sha256": "8b5a063eb1d985742c7eced73f526eed220ccc3e79056af3363d76586b3cd95f"
     },
     {
-      "path": "native/physical-current-blocker-latest.json",
-      "bytes": 983,
-      "sha256": "40b9c1edf76bb44cb02c0e3a9ba455b3b131f39dd9b1f12c84a68e3367d6c4e2"
-    },
-    {
       "path": "native/physical-current-blocker.json",
       "bytes": 412,
       "sha256": "0c6dd6e5a79f304c230e4b595e88c26620392fc57328a8ee27e5c97d2b6079c1"
@@ -1114,14 +1099,9 @@
       "sha256": "e837cc40a17d3aa6a7a773a18d63d6e1891b31494151e6ee5252b708825d2412"
     },
     {
-      "path": "release-final-store-consolidation-before-build63-attachment.json",
+      "path": "release-final-store-consolidation-receipt.json",
       "bytes": 29371,
       "sha256": "200fcafccb7a9c4cc89f90d68927b3c66220869df4640e68e940219e483d1f56"
-    },
-    {
-      "path": "release-final-store-consolidation-receipt.json",
-      "bytes": 31174,
-      "sha256": "b154ad17db5d23cbf5504b6fd40a2254e2511b2b79755c48a1ae81d557680ff7"
     },
     {
       "path": "release-preparation-consolidation-receipt.json",
@@ -1137,11 +1117,6 @@
       "path": "store-localizations/app-store-appinfo-full-readback.json",
       "bytes": 907,
       "sha256": "0872e3773fdafc49ab514166f911c46f7c5a2817fd890154e3384a2061c04d82"
-    },
-    {
-      "path": "store-localizations/app-store-build63-attached.json",
-      "bytes": 1166,
-      "sha256": "a9a5d582bdd096f1236bd3de729075544781bd4b0e3b203687fb9cf88b9f94bb"
     },
     {
       "path": "store-localizations/app-store-metadata-full-readback.json",
@@ -1200,13 +1175,13 @@
     },
     {
       "path": "store-localizations/current-store-state.json",
-      "bytes": 4422,
-      "sha256": "d64eaecd1cb526e0c2c843c2f5c581af66589878a3b313605223a2ae280e2b9c"
+      "bytes": 3464,
+      "sha256": "a2c1c165c9d8e819aa37ba6e19e57edcfbab9e1ba895acff185fe8746230259a"
     },
     {
       "path": "store-localizations/current-store-state.md",
-      "bytes": 4425,
-      "sha256": "2634f59bc1e029ac259bbe136b9c9bfef43bd22b7923995fbe682e5b427abbcd"
+      "bytes": 3625,
+      "sha256": "51ffab77dedc06688e0b16e2c4a4666f03463d30161416a7157208aa4d9429cf"
     },
     {
       "path": "store-localizations/de-DE/description.txt",
@@ -1444,11 +1419,6 @@
       "sha256": "8f9d31b7872bcf7da9d720484224b0675727616e6d58347265d52557ad91ebad"
     },
     {
-      "path": "store-localizations/post-attachment-six-locales.json",
-      "bytes": 2218,
-      "sha256": "5ec74659d495e89e342d6fd2f48ba57ce9e9cf3a0010d307991a2d14173f8118"
-    },
-    {
       "path": "store-localizations/prepare-metadata.py",
       "bytes": 14465,
       "sha256": "8b3ebe7fe426e6470c74790aaefcf4c7a4a6c8f141efa1ae90f67a6812fad0ca"
@@ -1504,11 +1474,6 @@
       "sha256": "b2914d3e1e5adfabbe3a9f71809e50cc6621246506d7e9ec3a514db24e298349"
     },
     {
-      "path": "store-localizations/testflight63-processed.json",
-      "bytes": 1581,
-      "sha256": "148bd636595ea63a18b49515b7e2b27906b1076720ba873ee994839886427600"
-    },
-    {
       "path": "store-localizations/url-checks.json",
       "bytes": 4495,
       "sha256": "bc674ab13143df9fdf3ca8b029725b122aaa07329362bb2916928287d8b86489"
@@ -1553,5 +1518,7 @@
       "bytes": 28,
       "sha256": "829e9a2fc8482fe9f0da2ab1a7e68f81cff6f48e4c28d5ac1ab770c0b8891520"
     }
-  ]
+  ],
+  "fileCount": 303,
+  "totalBytes": 7509783
 }
