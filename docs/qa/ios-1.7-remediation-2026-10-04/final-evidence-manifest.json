@@ -1,17 +1,17 @@
 {
-  "createdAtUTC": "2026-10-04T13:31:20.661122+00:00",
-  "candidateHEAD": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
-  "scope": "Curated QA, archive/upload, processed TestFlight63, persisted ASC1.7/build63 attachment, localized copy/artwork and independent review evidence. Historical attempts/manifests retained. Physical/commercial acceptance, App Review submission and publication remain unverified or not performed. This manifest excludes itself.",
+  "createdAtUTC": "2026-10-04T13:43:01.370298+00:00",
+  "candidateHEAD": "7bf96e23efbaf809659aebfd30e4e3fdb4c32e71",
+  "scope": "Curated QA, archive/upload, processed TestFlight63, persisted ASC1.7/build63 attachment, localized copy/artwork and independent review evidence. Historical attempts/manifests retained. Physical/commercial acceptance, App Review submission and publication remain unverified or not performed. This manifest excludes itself. User-requested generated artifact cleanup is recorded; compact evidence persists while binary xcresults and two disposable QA devices were removed.",
   "archiveSourceHEAD": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
   "lastTestOnlyCodeHEAD": "a44b98b5eed6ce5445dec3d57d3cf4030f967902",
-  "documentationHEADBeforeThisUpdate": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
-  "fileCount": 309,
-  "totalBytes": 7602538,
+  "documentationHEADBeforeThisUpdate": "7bf96e23efbaf809659aebfd30e4e3fdb4c32e71",
+  "fileCount": 311,
+  "totalBytes": 7635068,
   "files": [
     {
       "path": "README.md",
-      "bytes": 15995,
-      "sha256": "d868f15d0afbbf695ae89eb74c1f7926b79d0a08adf4a0fe0092255c0593a5ec"
+      "bytes": 16519,
+      "sha256": "acd88d884a65e3a67e7a22ff66a30d7ffbf21368f068134ca89015b7cb0bbb6c"
     },
     {
       "path": "anvil/bounties-network.jsonl",
@@ -1127,6 +1127,16 @@
       "path": "release-preparation-consolidation-receipt.json",
       "bytes": 30661,
       "sha256": "5faf6f099cc24917bfd44d559bac7597fa6d7a723805e992dff0235edf6dfb3d"
+    },
+    {
+      "path": "storage-cleanup.json",
+      "bytes": 30220,
+      "sha256": "38b631d231fed89cf514b82d31d00d6f0a5dacf68e3937eaa02ad99d9822cf2a"
+    },
+    {
+      "path": "storage-cleanup.md",
+      "bytes": 1786,
+      "sha256": "61f6dc72a6835c084c17a0d70fe3ac0c43447d304b108893ce70a34881ea4812"
     },
     {
       "path": "store-localizations/README.md",

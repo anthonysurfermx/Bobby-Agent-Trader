@@ -76,3 +76,8 @@ See [archive report](native/archive63-run-report.md), [signed archive verificati
 See [Apple candidate upload](release-archive/retry/candidate-upload-receipt.json) and [live localized site rendering](live-site-locales/report.md). Apple upload acceptance, processing and persisted build attachment are confirmed. App Review submission/publication, installation and physical acceptance remain separate pending gates.
 
 See [processed TestFlight 63](store-localizations/testflight63-processed.json), [persisted draft attachment](store-localizations/app-store-build63-attached.json), [all six locale checks after attachment](store-localizations/post-attachment-six-locales.json), and [latest physical blocker](native/physical-current-blocker-latest.json). At 13:26:03–13:26:21 UTC, all six locale selections retained screenshots 01/02/03/04/06, build 63 and disabled Save. This confirms names/order/persistence, not remote image byte identity or new build 63 captures. The version remains in preparation for submission with manual release; Add for Review was not clicked.
+
+
+## Storage cleanup after local QA
+
+At the user's request, generated QA binaries, temporary copies and two stopped Bobby QA simulators were deleted after small evidence records were verified. Source tests and the signed uploaded63 archive remain. Raw xcresults are no longer locally available; earlier retention statements are historical. See [cleanup scope and verification](storage-cleanup.md) and [machine-readable cleanup receipt](storage-cleanup.json). Physical acceptance and App Review submission are still pending.
