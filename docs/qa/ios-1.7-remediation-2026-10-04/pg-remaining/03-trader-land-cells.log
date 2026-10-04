@@ -1,0 +1,90 @@
+CREATE ROLE
+CREATE ROLE
+CREATE ROLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 2
+INSERT 0 2
+INSERT 0 2
+INSERT 0 3
+BEGIN
+CREATE TABLE
+CREATE INDEX
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql:16: NOTICE:  policy "tl_placement_cells_service_all" for relation "public.tl_placement_cells" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+psql:supabase/bobby-protocol/supabase/migrations/20260904222250_trader_land_occupied_cells.sql:57: NOTICE:  trigger "tl_placement_cells_reserve" for relation "public.tl_placements" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+UPDATE 0
+COMMIT
+BEGIN
+SET
+LOCK TABLE
+ALTER TABLE
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:38: NOTICE:  constraint "tl_items_tier_check" of relation "tl_items" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:40: NOTICE:  constraint "tl_items_tier_key" of relation "tl_items" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:76: NOTICE:  constraint "tl_inventory_horizon_hours_check" of relation "tl_inventory" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:83: NOTICE:  constraint "tl_lands_core_stage_check" of relation "tl_lands" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:85: NOTICE:  constraint "tl_lands_size_check" of relation "tl_lands" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:87: NOTICE:  constraint "tl_lands_core_inside" of relation "tl_lands" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+UPDATE 0
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+psql:supabase/bobby-protocol/supabase/migrations/20260919120516_trader_land_growth.sql:255: NOTICE:  function public.tl_move_core(uuid,pg_catalog.int4,pg_catalog.int4) does not exist, skipping
+DROP FUNCTION
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+CREATE FUNCTION
+REVOKE
+GRANT
+COMMIT
+psql:scripts/test-trader-land-cells.sql:62: NOTICE:  PASS: full footprint, collision, rotation, core, bounds, seed, ownership, rollback, moved core, removal
+DO

@@ -1,0 +1,84 @@
+{
+  "startedAtUTC": "2026-10-04T11:50:03.980682+00:00",
+  "candidate": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "sourceHead": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "workspace": "/private/tmp/bobby-ios17-remediation-20261004/anvil",
+  "files": [
+    {
+      "path": "scripts/test-hardness-abi-anvil.mts",
+      "sourceSHA256": "6b12d4fb518a458f63111f711ab30031af3fa5bf572e3707ea04f1528d6d27ee",
+      "runtimeSHA256": "e5e3c90ed5d5218ef40bc9654e8beeaf3f069f898d46322df12f9df4f0f4a44c",
+      "runtimeChange": "Only port allocation; test assertions and backend imports unchanged"
+    },
+    {
+      "path": "scripts/test-bounties-abi-anvil.mts",
+      "sourceSHA256": "6befd656bf52a316cae0eb9ee5058d2b8fa3507579ceda03da91c021894b6d8e",
+      "runtimeSHA256": "a3373351f12711d4dddbf8916c87946bf440f38e4ac316daf472a4345637d1e9",
+      "runtimeChange": "Only port allocation; test assertions and backend imports unchanged"
+    },
+    {
+      "path": "contracts/out/HardnessRegistry.sol/HardnessRegistry.json",
+      "artifactOrigin": "/Users/mrrobot/Documents/Documentos - MacBook Pro F Society/GitHub/Bobby-Agent-Trader/contracts/out/HardnessRegistry.sol/HardnessRegistry.json",
+      "sha256": "8c5a5218ee0ff943344f59c3b6a603c43dc44ee3e591944857d270c93115a92c",
+      "sourceContractSHA256": "2853ca08fe15422ab5545d8fb1f7a720122a9635d196998aa9c69eca89cee9de"
+    },
+    {
+      "path": "contracts/out/BobbyAdversarialBounties.sol/BobbyAdversarialBounties.json",
+      "artifactOrigin": "/Users/mrrobot/Documents/Documentos - MacBook Pro F Society/GitHub/Bobby-Agent-Trader/contracts/out/BobbyAdversarialBounties.sol/BobbyAdversarialBounties.json",
+      "sha256": "5d4c6a6a953262927b849dcb039dd54e9b0407aa8deff3b9589e7d943b71f421",
+      "sourceContractSHA256": "0c1d98fac13e6d81fe9247111acb75736c1641f23ad67c65628550e3d5b8d72a"
+    }
+  ],
+  "artifactProvenance": [
+    {
+      "contract": "HardnessRegistry",
+      "sourceKeccakMatches": true,
+      "generatedABIEqualsArtifact": true,
+      "compiler": "0.8.24+commit.e11b9ed9",
+      "optimizer": {
+        "enabled": true,
+        "runs": 1
+      },
+      "viaIR": true
+    },
+    {
+      "contract": "BobbyAdversarialBounties",
+      "sourceKeccakMatches": true,
+      "generatedABIEqualsArtifact": true,
+      "compiler": "0.8.24+commit.e11b9ed9",
+      "optimizer": {
+        "enabled": true,
+        "runs": 1
+      },
+      "viaIR": true
+    }
+  ],
+  "anvilExecutable": "/Users/mrrobot/.foundry/bin/anvil",
+  "toolVersion": "1.5.1-stable",
+  "environment": "OnlyHOME plus explicit local PATH/TMPDIR/QA guard variables; no provider credentials",
+  "minimumStartBytes": 2684354560,
+  "stopBelowFreeBytes": 2147483648,
+  "maximumPrivateFootprintBytes": 262144000,
+  "suites": [
+    {
+      "suite": "hardness",
+      "startedAtUTC": "2026-10-04T11:50:03.995853+00:00",
+      "argv": [
+        "/opt/homebrew/bin/node",
+        "/private/tmp/bobby-ios17-remediation-20261004/anvil/node_modules/tsx/dist/cli.mjs",
+        "/private/tmp/bobby-ios17-remediation-20261004/anvil/scripts/test-hardness-abi-anvil.mts"
+      ],
+      "cwd": "/private/tmp/bobby-ios17-remediation-20261004/anvil",
+      "port": 63649,
+      "portPreflight": "bound successfully on127.0.0.1 before launch",
+      "log": "/private/tmp/bobby-ios17-remediation-20261004/anvil/hardness.log",
+      "freeBeforeBytes": 5726269440,
+      "minimumObservedFreeBytes": 5669781504
+    }
+  ],
+  "error": "[Errno 48] Address already in use",
+  "endedAtUTC": "2026-10-04T11:50:05.517292+00:00",
+  "privateFootprintBytes": 637124,
+  "freeAfterBytes": 5659324416,
+  "passed": false
+}

@@ -1,0 +1,5170 @@
+{
+  "node_modules/@adraffy/ens-normalize": {
+    "installed": "1.11.1",
+    "locked": "1.11.1"
+  },
+  "node_modules/@alloc/quick-lru": {
+    "installed": "5.2.0",
+    "locked": "5.2.0"
+  },
+  "node_modules/@anthropic-ai/sdk": {
+    "installed": "0.75.0",
+    "locked": "0.75.0"
+  },
+  "node_modules/@apideck/better-ajv-errors": {
+    "installed": "0.3.7",
+    "locked": "0.3.7"
+  },
+  "node_modules/@babel/code-frame": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/compat-data": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/core": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/core/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/@babel/generator": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/helper-annotate-as-pure": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-compilation-targets": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-compilation-targets/node_modules/lru-cache": {
+    "installed": "5.1.1",
+    "locked": "5.1.1"
+  },
+  "node_modules/@babel/helper-compilation-targets/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/@babel/helper-compilation-targets/node_modules/yallist": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/@babel/helper-create-class-features-plugin": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-create-class-features-plugin/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/@babel/helper-create-regexp-features-plugin": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-create-regexp-features-plugin/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/@babel/helper-define-polyfill-provider": {
+    "installed": "0.6.8",
+    "locked": "0.6.8"
+  },
+  "node_modules/@babel/helper-globals": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-member-expression-to-functions": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-module-imports": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-module-transforms": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-optimise-call-expression": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-plugin-utils": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-remap-async-to-generator": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-replace-supers": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-skip-transparent-expression-wrappers": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-string-parser": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-validator-identifier": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-validator-option": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helper-wrap-function": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/helpers": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/parser": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/plugin-bugfix-firefox-class-in-computed-class-key": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-bugfix-safari-class-field-initializer-scope": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-bugfix-safari-id-destructuring-collision-in-function-expression": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-bugfix-safari-rest-destructuring-rhs-array": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-bugfix-v8-spread-parameters-in-optional-chaining": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-bugfix-v8-static-class-fields-redefine-readonly": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-proposal-private-property-in-object": {
+    "installed": "7.21.0-placeholder-for-preset-env.2",
+    "locked": "7.21.0-placeholder-for-preset-env.2"
+  },
+  "node_modules/@babel/plugin-syntax-import-assertions": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-syntax-import-attributes": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-syntax-unicode-sets-regex": {
+    "installed": "7.18.6",
+    "locked": "7.18.6"
+  },
+  "node_modules/@babel/plugin-transform-arrow-functions": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-async-generator-functions": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-async-to-generator": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-block-scoped-functions": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-block-scoping": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-class-properties": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-class-static-block": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-classes": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-computed-properties": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-destructuring": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-dotall-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-duplicate-keys": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-duplicate-named-capturing-groups-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-dynamic-import": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-explicit-resource-management": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-exponentiation-operator": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-export-namespace-from": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-for-of": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-function-name": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-json-strings": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-literals": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-logical-assignment-operators": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-member-expression-literals": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-modules-amd": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-modules-commonjs": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-modules-systemjs": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/plugin-transform-modules-umd": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-named-capturing-groups-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-new-target": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-nullish-coalescing-operator": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-numeric-separator": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-object-rest-spread": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-object-super": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-optional-catch-binding": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-optional-chaining": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-parameters": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-private-methods": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-private-property-in-object": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-property-literals": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-regenerator": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/plugin-transform-regexp-modifiers": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-reserved-words": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-shorthand-properties": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-spread": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/plugin-transform-sticky-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-template-literals": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-typeof-symbol": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-unicode-escapes": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-unicode-property-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-unicode-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/plugin-transform-unicode-sets-regex": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/preset-env": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/preset-env/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/@babel/preset-modules": {
+    "installed": "0.1.6-no-external-plugins",
+    "locked": "0.1.6-no-external-plugins"
+  },
+  "node_modules/@babel/runtime": {
+    "installed": "7.29.2",
+    "locked": "7.29.2"
+  },
+  "node_modules/@babel/template": {
+    "installed": "7.29.7",
+    "locked": "7.29.7"
+  },
+  "node_modules/@babel/traverse": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@babel/types": {
+    "installed": "7.29.8",
+    "locked": "7.29.8"
+  },
+  "node_modules/@base-org/account": {
+    "installed": "2.5.1",
+    "locked": "2.5.1"
+  },
+  "node_modules/@base-org/account/node_modules/clsx": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/@base-org/account/node_modules/ox": {
+    "installed": "0.6.9",
+    "locked": "0.6.9"
+  },
+  "node_modules/@base-org/account/node_modules/ox/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@coinbase/cdp-sdk": {
+    "installed": "1.57.1",
+    "locked": "1.57.1"
+  },
+  "node_modules/@coinbase/cdp-sdk/node_modules/base-x": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/@coinbase/cdp-sdk/node_modules/bs58": {
+    "installed": "6.0.0",
+    "locked": "6.0.0"
+  },
+  "node_modules/@coinbase/wallet-sdk": {
+    "installed": "4.3.6",
+    "locked": "4.3.6"
+  },
+  "node_modules/@coinbase/wallet-sdk/node_modules/clsx": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/@coinbase/wallet-sdk/node_modules/ox": {
+    "installed": "0.6.9",
+    "locked": "0.6.9"
+  },
+  "node_modules/@coinbase/wallet-sdk/node_modules/ox/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@dimforge/rapier3d-compat": {
+    "installed": "0.12.0",
+    "locked": "0.12.0"
+  },
+  "node_modules/@ecies/ciphers": {
+    "installed": "0.2.6",
+    "locked": "0.2.6"
+  },
+  "node_modules/@edge-runtime/format": {
+    "installed": "2.2.1",
+    "locked": "2.2.1"
+  },
+  "node_modules/@edge-runtime/node-utils": {
+    "installed": "2.3.0",
+    "locked": "2.3.0"
+  },
+  "node_modules/@edge-runtime/ponyfill": {
+    "installed": "2.4.2",
+    "locked": "2.4.2"
+  },
+  "node_modules/@edge-runtime/primitives": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/@edge-runtime/vm": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/@emnapi/runtime": {
+    "installed": "1.11.3",
+    "locked": "1.11.3"
+  },
+  "node_modules/@esbuild/darwin-arm64": {
+    "installed": "0.27.0",
+    "locked": "0.27.0"
+  },
+  "node_modules/@eslint-community/eslint-utils": {
+    "installed": "4.9.1",
+    "locked": "4.9.1"
+  },
+  "node_modules/@eslint-community/eslint-utils/node_modules/eslint-visitor-keys": {
+    "installed": "3.4.3",
+    "locked": "3.4.3"
+  },
+  "node_modules/@eslint-community/regexpp": {
+    "installed": "4.12.2",
+    "locked": "4.12.2"
+  },
+  "node_modules/@eslint/config-array": {
+    "installed": "0.21.2",
+    "locked": "0.21.2"
+  },
+  "node_modules/@eslint/config-array/node_modules/minimatch": {
+    "installed": "3.1.5",
+    "locked": "3.1.5"
+  },
+  "node_modules/@eslint/config-helpers": {
+    "installed": "0.4.2",
+    "locked": "0.4.2"
+  },
+  "node_modules/@eslint/core": {
+    "installed": "0.17.0",
+    "locked": "0.17.0"
+  },
+  "node_modules/@eslint/eslintrc": {
+    "installed": "3.3.5",
+    "locked": "3.3.5"
+  },
+  "node_modules/@eslint/eslintrc/node_modules/ajv": {
+    "installed": "6.14.0",
+    "locked": "6.14.0"
+  },
+  "node_modules/@eslint/eslintrc/node_modules/globals": {
+    "installed": "14.0.0",
+    "locked": "14.0.0"
+  },
+  "node_modules/@eslint/eslintrc/node_modules/json-schema-traverse": {
+    "installed": "0.4.1",
+    "locked": "0.4.1"
+  },
+  "node_modules/@eslint/eslintrc/node_modules/minimatch": {
+    "installed": "3.1.5",
+    "locked": "3.1.5"
+  },
+  "node_modules/@eslint/js": {
+    "installed": "9.39.4",
+    "locked": "9.39.4"
+  },
+  "node_modules/@eslint/object-schema": {
+    "installed": "2.1.7",
+    "locked": "2.1.7"
+  },
+  "node_modules/@eslint/plugin-kit": {
+    "installed": "0.4.1",
+    "locked": "0.4.1"
+  },
+  "node_modules/@ethereumjs/common": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/@ethereumjs/rlp": {
+    "installed": "4.0.1",
+    "locked": "4.0.1"
+  },
+  "node_modules/@ethereumjs/tx": {
+    "installed": "4.2.0",
+    "locked": "4.2.0"
+  },
+  "node_modules/@ethereumjs/util": {
+    "installed": "8.1.0",
+    "locked": "8.1.0"
+  },
+  "node_modules/@floating-ui/core": {
+    "installed": "1.7.5",
+    "locked": "1.7.5"
+  },
+  "node_modules/@floating-ui/dom": {
+    "installed": "1.7.6",
+    "locked": "1.7.6"
+  },
+  "node_modules/@floating-ui/react-dom": {
+    "installed": "2.1.8",
+    "locked": "2.1.8"
+  },
+  "node_modules/@floating-ui/utils": {
+    "installed": "0.2.11",
+    "locked": "0.2.11"
+  },
+  "node_modules/@gemini-wallet/core": {
+    "installed": "0.3.2",
+    "locked": "0.3.2"
+  },
+  "node_modules/@hookform/resolvers": {
+    "installed": "3.10.0",
+    "locked": "3.10.0"
+  },
+  "node_modules/@humanfs/core": {
+    "installed": "0.19.2",
+    "locked": "0.19.2"
+  },
+  "node_modules/@humanfs/node": {
+    "installed": "0.16.8",
+    "locked": "0.16.8"
+  },
+  "node_modules/@humanfs/types": {
+    "installed": "0.15.0",
+    "locked": "0.15.0"
+  },
+  "node_modules/@humanwhocodes/module-importer": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@humanwhocodes/retry": {
+    "installed": "0.4.3",
+    "locked": "0.4.3"
+  },
+  "node_modules/@img/colour": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/@img/sharp-darwin-arm64": {
+    "installed": "0.35.4",
+    "locked": "0.35.4"
+  },
+  "node_modules/@img/sharp-libvips-darwin-arm64": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/@img/sharp-wasm32": {
+    "installed": "0.35.4",
+    "locked": "0.35.4"
+  },
+  "node_modules/@isaacs/cliui": {
+    "installed": "9.0.0",
+    "locked": "9.0.0"
+  },
+  "node_modules/@isaacs/fs-minipass": {
+    "installed": "4.0.1",
+    "locked": "4.0.1"
+  },
+  "node_modules/@jridgewell/gen-mapping": {
+    "installed": "0.3.13",
+    "locked": "0.3.13"
+  },
+  "node_modules/@jridgewell/remapping": {
+    "installed": "2.3.5",
+    "locked": "2.3.5"
+  },
+  "node_modules/@jridgewell/resolve-uri": {
+    "installed": "3.1.2",
+    "locked": "3.1.2"
+  },
+  "node_modules/@jridgewell/source-map": {
+    "installed": "0.3.11",
+    "locked": "0.3.11"
+  },
+  "node_modules/@jridgewell/sourcemap-codec": {
+    "installed": "1.5.5",
+    "locked": "1.5.5"
+  },
+  "node_modules/@jridgewell/trace-mapping": {
+    "installed": "0.3.31",
+    "locked": "0.3.31"
+  },
+  "node_modules/@lit-labs/ssr-dom-shim": {
+    "installed": "1.5.1",
+    "locked": "1.5.1"
+  },
+  "node_modules/@lit/react": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/@lit/reactive-element": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/@mapbox/node-pre-gyp": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/json-rpc-engine": {
+    "installed": "7.3.3",
+    "locked": "7.3.3"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/json-rpc-engine/node_modules/@metamask/utils": {
+    "installed": "8.5.0",
+    "locked": "8.5.0"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/rpc-errors": {
+    "installed": "6.4.0",
+    "locked": "6.4.0"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils": {
+    "installed": "9.3.0",
+    "locked": "9.3.0"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/@metamask/utils": {
+    "installed": "5.0.2",
+    "locked": "5.0.2"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/superstruct": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/@metamask/eth-json-rpc-provider/node_modules/uuid": {
+    "installed": "9.0.1",
+    "locked": "9.0.1"
+  },
+  "node_modules/@metamask/json-rpc-engine": {
+    "installed": "8.0.2",
+    "locked": "8.0.2"
+  },
+  "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/rpc-errors": {
+    "installed": "6.4.0",
+    "locked": "6.4.0"
+  },
+  "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils": {
+    "installed": "9.3.0",
+    "locked": "9.3.0"
+  },
+  "node_modules/@metamask/json-rpc-engine/node_modules/@metamask/utils": {
+    "installed": "8.5.0",
+    "locked": "8.5.0"
+  },
+  "node_modules/@metamask/json-rpc-engine/node_modules/uuid": {
+    "installed": "9.0.1",
+    "locked": "9.0.1"
+  },
+  "node_modules/@metamask/json-rpc-middleware-stream": {
+    "installed": "7.0.2",
+    "locked": "7.0.2"
+  },
+  "node_modules/@metamask/json-rpc-middleware-stream/node_modules/@metamask/utils": {
+    "installed": "8.5.0",
+    "locked": "8.5.0"
+  },
+  "node_modules/@metamask/json-rpc-middleware-stream/node_modules/uuid": {
+    "installed": "9.0.1",
+    "locked": "9.0.1"
+  },
+  "node_modules/@metamask/object-multiplex": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/@metamask/onboarding": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@metamask/providers": {
+    "installed": "16.1.0",
+    "locked": "16.1.0"
+  },
+  "node_modules/@metamask/providers/node_modules/@metamask/rpc-errors": {
+    "installed": "6.4.0",
+    "locked": "6.4.0"
+  },
+  "node_modules/@metamask/providers/node_modules/@metamask/rpc-errors/node_modules/@metamask/utils": {
+    "installed": "9.3.0",
+    "locked": "9.3.0"
+  },
+  "node_modules/@metamask/providers/node_modules/@metamask/utils": {
+    "installed": "8.5.0",
+    "locked": "8.5.0"
+  },
+  "node_modules/@metamask/providers/node_modules/uuid": {
+    "installed": "9.0.1",
+    "locked": "9.0.1"
+  },
+  "node_modules/@metamask/rpc-errors": {
+    "installed": "7.0.2",
+    "locked": "7.0.2"
+  },
+  "node_modules/@metamask/safe-event-emitter": {
+    "installed": "3.1.2",
+    "locked": "3.1.2"
+  },
+  "node_modules/@metamask/scure-bip39": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/@metamask/scure-bip39/node_modules/@noble/hashes": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/@metamask/scure-bip39/node_modules/@scure/base": {
+    "installed": "1.1.9",
+    "locked": "1.1.9"
+  },
+  "node_modules/@metamask/sdk": {
+    "installed": "0.33.1",
+    "locked": "0.33.1"
+  },
+  "node_modules/@metamask/sdk-analytics": {
+    "installed": "0.0.5",
+    "locked": "0.0.5"
+  },
+  "node_modules/@metamask/sdk-install-modal-web": {
+    "installed": "0.32.1",
+    "locked": "0.32.1"
+  },
+  "node_modules/@metamask/sdk/node_modules/@metamask/sdk-communication-layer": {
+    "installed": "0.33.1",
+    "locked": "0.33.1"
+  },
+  "node_modules/@metamask/sdk/node_modules/cross-fetch": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/@metamask/sdk/node_modules/date-fns": {
+    "installed": "2.30.0",
+    "locked": "2.30.0"
+  },
+  "node_modules/@metamask/sdk/node_modules/debug": {
+    "installed": "4.3.4",
+    "locked": "4.3.4"
+  },
+  "node_modules/@metamask/sdk/node_modules/ms": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/@metamask/sdk/node_modules/utf-8-validate": {
+    "installed": "5.0.10",
+    "locked": "5.0.10"
+  },
+  "node_modules/@metamask/superstruct": {
+    "installed": "3.2.1",
+    "locked": "3.2.1"
+  },
+  "node_modules/@metamask/utils": {
+    "installed": "11.12.1",
+    "locked": "11.12.1"
+  },
+  "node_modules/@metamask/utils/node_modules/uuid": {
+    "installed": "9.0.1",
+    "locked": "9.0.1"
+  },
+  "node_modules/@msgpack/msgpack": {
+    "installed": "3.1.3",
+    "locked": "3.1.3"
+  },
+  "node_modules/@noble/ciphers": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/@noble/curves": {
+    "installed": "1.9.7",
+    "locked": "1.9.7"
+  },
+  "node_modules/@noble/curves/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@noble/hashes": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/@nodelib/fs.scandir": {
+    "installed": "2.1.5",
+    "locked": "2.1.5"
+  },
+  "node_modules/@nodelib/fs.stat": {
+    "installed": "2.0.5",
+    "locked": "2.0.5"
+  },
+  "node_modules/@nodelib/fs.walk": {
+    "installed": "1.2.8",
+    "locked": "1.2.8"
+  },
+  "node_modules/@paralleldrive/cuid2": {
+    "installed": "2.3.1",
+    "locked": "2.3.1"
+  },
+  "node_modules/@paulmillr/qr": {
+    "installed": "0.2.1",
+    "locked": "0.2.1"
+  },
+  "node_modules/@phosphor-icons/webcomponents": {
+    "installed": "2.1.5",
+    "locked": "2.1.5"
+  },
+  "node_modules/@radix-ui/number": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/primitive": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/@radix-ui/react-accordion": {
+    "installed": "1.2.12",
+    "locked": "1.2.12"
+  },
+  "node_modules/@radix-ui/react-alert-dialog": {
+    "installed": "1.1.15",
+    "locked": "1.1.15"
+  },
+  "node_modules/@radix-ui/react-alert-dialog/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-arrow": {
+    "installed": "1.1.7",
+    "locked": "1.1.7"
+  },
+  "node_modules/@radix-ui/react-aspect-ratio": {
+    "installed": "1.1.8",
+    "locked": "1.1.8"
+  },
+  "node_modules/@radix-ui/react-aspect-ratio/node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.4",
+    "locked": "2.1.4"
+  },
+  "node_modules/@radix-ui/react-avatar": {
+    "installed": "1.1.11",
+    "locked": "1.1.11"
+  },
+  "node_modules/@radix-ui/react-avatar/node_modules/@radix-ui/react-context": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/@radix-ui/react-avatar/node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.4",
+    "locked": "2.1.4"
+  },
+  "node_modules/@radix-ui/react-checkbox": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/@radix-ui/react-collapsible": {
+    "installed": "1.1.12",
+    "locked": "1.1.12"
+  },
+  "node_modules/@radix-ui/react-collection": {
+    "installed": "1.1.7",
+    "locked": "1.1.7"
+  },
+  "node_modules/@radix-ui/react-collection/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-compose-refs": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/@radix-ui/react-context": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/@radix-ui/react-context-menu": {
+    "installed": "2.2.16",
+    "locked": "2.2.16"
+  },
+  "node_modules/@radix-ui/react-dialog": {
+    "installed": "1.1.15",
+    "locked": "1.1.15"
+  },
+  "node_modules/@radix-ui/react-dialog/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-direction": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-dismissable-layer": {
+    "installed": "1.1.11",
+    "locked": "1.1.11"
+  },
+  "node_modules/@radix-ui/react-dropdown-menu": {
+    "installed": "2.1.16",
+    "locked": "2.1.16"
+  },
+  "node_modules/@radix-ui/react-focus-guards": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/@radix-ui/react-focus-scope": {
+    "installed": "1.1.7",
+    "locked": "1.1.7"
+  },
+  "node_modules/@radix-ui/react-hover-card": {
+    "installed": "1.1.15",
+    "locked": "1.1.15"
+  },
+  "node_modules/@radix-ui/react-id": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-label": {
+    "installed": "2.1.8",
+    "locked": "2.1.8"
+  },
+  "node_modules/@radix-ui/react-label/node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.4",
+    "locked": "2.1.4"
+  },
+  "node_modules/@radix-ui/react-menu": {
+    "installed": "2.1.16",
+    "locked": "2.1.16"
+  },
+  "node_modules/@radix-ui/react-menu/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-menubar": {
+    "installed": "1.1.16",
+    "locked": "1.1.16"
+  },
+  "node_modules/@radix-ui/react-navigation-menu": {
+    "installed": "1.2.14",
+    "locked": "1.2.14"
+  },
+  "node_modules/@radix-ui/react-popover": {
+    "installed": "1.1.15",
+    "locked": "1.1.15"
+  },
+  "node_modules/@radix-ui/react-popover/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-popper": {
+    "installed": "1.2.8",
+    "locked": "1.2.8"
+  },
+  "node_modules/@radix-ui/react-portal": {
+    "installed": "1.1.9",
+    "locked": "1.1.9"
+  },
+  "node_modules/@radix-ui/react-presence": {
+    "installed": "1.1.5",
+    "locked": "1.1.5"
+  },
+  "node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.3",
+    "locked": "2.1.3"
+  },
+  "node_modules/@radix-ui/react-primitive/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-progress": {
+    "installed": "1.1.8",
+    "locked": "1.1.8"
+  },
+  "node_modules/@radix-ui/react-progress/node_modules/@radix-ui/react-context": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/@radix-ui/react-progress/node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.4",
+    "locked": "2.1.4"
+  },
+  "node_modules/@radix-ui/react-radio-group": {
+    "installed": "1.3.8",
+    "locked": "1.3.8"
+  },
+  "node_modules/@radix-ui/react-roving-focus": {
+    "installed": "1.1.11",
+    "locked": "1.1.11"
+  },
+  "node_modules/@radix-ui/react-scroll-area": {
+    "installed": "1.2.10",
+    "locked": "1.2.10"
+  },
+  "node_modules/@radix-ui/react-select": {
+    "installed": "2.2.6",
+    "locked": "2.2.6"
+  },
+  "node_modules/@radix-ui/react-select/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-separator": {
+    "installed": "1.1.8",
+    "locked": "1.1.8"
+  },
+  "node_modules/@radix-ui/react-separator/node_modules/@radix-ui/react-primitive": {
+    "installed": "2.1.4",
+    "locked": "2.1.4"
+  },
+  "node_modules/@radix-ui/react-slider": {
+    "installed": "1.3.6",
+    "locked": "1.3.6"
+  },
+  "node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.4",
+    "locked": "1.2.4"
+  },
+  "node_modules/@radix-ui/react-switch": {
+    "installed": "1.2.6",
+    "locked": "1.2.6"
+  },
+  "node_modules/@radix-ui/react-tabs": {
+    "installed": "1.1.13",
+    "locked": "1.1.13"
+  },
+  "node_modules/@radix-ui/react-toast": {
+    "installed": "1.2.15",
+    "locked": "1.2.15"
+  },
+  "node_modules/@radix-ui/react-toggle": {
+    "installed": "1.1.10",
+    "locked": "1.1.10"
+  },
+  "node_modules/@radix-ui/react-toggle-group": {
+    "installed": "1.1.11",
+    "locked": "1.1.11"
+  },
+  "node_modules/@radix-ui/react-tooltip": {
+    "installed": "1.2.8",
+    "locked": "1.2.8"
+  },
+  "node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-slot": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/react-use-callback-ref": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-use-controllable-state": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/@radix-ui/react-use-effect-event": {
+    "installed": "0.0.2",
+    "locked": "0.0.2"
+  },
+  "node_modules/@radix-ui/react-use-escape-keydown": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-use-is-hydrated": {
+    "installed": "0.1.0",
+    "locked": "0.1.0"
+  },
+  "node_modules/@radix-ui/react-use-layout-effect": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-use-previous": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-use-rect": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-use-size": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@radix-ui/react-visually-hidden": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@radix-ui/rect": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@reown/appkit": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-adapter-wagmi": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-adapter-wagmi/node_modules/@wagmi/connectors": {
+    "installed": "8.0.1",
+    "locked": "8.0.1"
+  },
+  "node_modules/@reown/appkit-common": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-controllers": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-pay": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-polyfills": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-scaffold-ui": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-ui": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-utils": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-wallet": {
+    "installed": "1.8.23",
+    "locked": "1.8.23"
+  },
+  "node_modules/@reown/appkit-wallet/node_modules/zod": {
+    "installed": "3.22.4",
+    "locked": "3.22.4"
+  },
+  "node_modules/@reown/appkit/node_modules/base-x": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/@reown/appkit/node_modules/bs58": {
+    "installed": "6.0.0",
+    "locked": "6.0.0"
+  },
+  "node_modules/@resvg/resvg-wasm": {
+    "installed": "2.4.1",
+    "locked": "2.4.1"
+  },
+  "node_modules/@rolldown/pluginutils": {
+    "installed": "1.0.0-beta.27",
+    "locked": "1.0.0-beta.27"
+  },
+  "node_modules/@rollup/plugin-babel": {
+    "installed": "6.1.0",
+    "locked": "6.1.0"
+  },
+  "node_modules/@rollup/plugin-node-resolve": {
+    "installed": "16.0.3",
+    "locked": "16.0.3"
+  },
+  "node_modules/@rollup/plugin-replace": {
+    "installed": "6.0.3",
+    "locked": "6.0.3"
+  },
+  "node_modules/@rollup/plugin-terser": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/@rollup/pluginutils": {
+    "installed": "5.4.0",
+    "locked": "5.4.0"
+  },
+  "node_modules/@rollup/rollup-darwin-arm64": {
+    "installed": "4.60.1",
+    "locked": "4.60.1"
+  },
+  "node_modules/@safe-global/safe-apps-provider": {
+    "installed": "0.18.6",
+    "locked": "0.18.6"
+  },
+  "node_modules/@safe-global/safe-apps-sdk": {
+    "installed": "9.1.0",
+    "locked": "9.1.0"
+  },
+  "node_modules/@safe-global/safe-gateway-typescript-sdk": {
+    "installed": "3.23.1",
+    "locked": "3.23.1"
+  },
+  "node_modules/@scure/base": {
+    "installed": "1.2.6",
+    "locked": "1.2.6"
+  },
+  "node_modules/@scure/bip32": {
+    "installed": "1.7.0",
+    "locked": "1.7.0"
+  },
+  "node_modules/@scure/bip32/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@scure/bip39": {
+    "installed": "1.6.0",
+    "locked": "1.6.0"
+  },
+  "node_modules/@scure/bip39/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@shuding/opentype.js": {
+    "installed": "1.4.0-beta.0",
+    "locked": "1.4.0-beta.0"
+  },
+  "node_modules/@shuding/opentype.js/node_modules/fflate": {
+    "installed": "0.7.5",
+    "locked": "0.7.5"
+  },
+  "node_modules/@socket.io/component-emitter": {
+    "installed": "3.1.2",
+    "locked": "3.1.2"
+  },
+  "node_modules/@solana-program/system": {
+    "installed": "0.10.0",
+    "locked": "0.10.0"
+  },
+  "node_modules/@solana-program/token": {
+    "installed": "0.9.0",
+    "locked": "0.9.0"
+  },
+  "node_modules/@solana/accounts": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/addresses": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/assertions": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/codecs": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/codecs-core": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/codecs-data-structures": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/codecs-numbers": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/codecs-strings": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/errors": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/fast-stable-stringify": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/functional": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/instruction-plans": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/instructions": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/keys": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/kit": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/nominal-types": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/offchain-messages": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/options": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/plugin-core": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/programs": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/promises": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-api": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-parsed-types": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-spec": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-spec-types": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-subscriptions": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-subscriptions-api": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-subscriptions-channel-websocket": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-subscriptions-spec": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-transformers": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-transport-http": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/rpc-types": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/signers": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/subscribable": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/sysvars": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/transaction-confirmation": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/transaction-messages": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@solana/transactions": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/@stitches/core": {
+    "installed": "1.2.8",
+    "locked": "1.2.8"
+  },
+  "node_modules/@supabase/auth-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@supabase/auth-ui-react": {
+    "installed": "0.4.7",
+    "locked": "0.4.7"
+  },
+  "node_modules/@supabase/auth-ui-shared": {
+    "installed": "0.1.8",
+    "locked": "0.1.8"
+  },
+  "node_modules/@supabase/functions-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@supabase/phoenix": {
+    "installed": "0.4.5",
+    "locked": "0.4.5"
+  },
+  "node_modules/@supabase/postgrest-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@supabase/realtime-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@supabase/storage-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@supabase/supabase-js": {
+    "installed": "2.112.3",
+    "locked": "2.112.3"
+  },
+  "node_modules/@swc/core": {
+    "installed": "1.15.24",
+    "locked": "1.15.24"
+  },
+  "node_modules/@swc/core-darwin-arm64": {
+    "installed": "1.15.24",
+    "locked": "1.15.24"
+  },
+  "node_modules/@swc/counter": {
+    "installed": "0.1.3",
+    "locked": "0.1.3"
+  },
+  "node_modules/@swc/types": {
+    "installed": "0.1.26",
+    "locked": "0.1.26"
+  },
+  "node_modules/@tailwindcss/typography": {
+    "installed": "0.5.19",
+    "locked": "0.5.19"
+  },
+  "node_modules/@tanstack/query-core": {
+    "installed": "5.96.2",
+    "locked": "5.96.2"
+  },
+  "node_modules/@tanstack/react-query": {
+    "installed": "5.96.2",
+    "locked": "5.96.2"
+  },
+  "node_modules/@trickfilm400/rollup-plugin-off-main-thread": {
+    "installed": "3.0.0-pre1",
+    "locked": "3.0.0-pre1"
+  },
+  "node_modules/@ts-morph/common": {
+    "installed": "0.11.1",
+    "locked": "0.11.1"
+  },
+  "node_modules/@ts-morph/common/node_modules/minimatch": {
+    "installed": "3.1.5",
+    "locked": "3.1.5"
+  },
+  "node_modules/@tweenjs/tween.js": {
+    "installed": "23.1.3",
+    "locked": "23.1.3"
+  },
+  "node_modules/@types/d3-array": {
+    "installed": "3.2.2",
+    "locked": "3.2.2"
+  },
+  "node_modules/@types/d3-color": {
+    "installed": "3.1.3",
+    "locked": "3.1.3"
+  },
+  "node_modules/@types/d3-ease": {
+    "installed": "3.0.2",
+    "locked": "3.0.2"
+  },
+  "node_modules/@types/d3-interpolate": {
+    "installed": "3.0.4",
+    "locked": "3.0.4"
+  },
+  "node_modules/@types/d3-path": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/@types/d3-scale": {
+    "installed": "4.0.9",
+    "locked": "4.0.9"
+  },
+  "node_modules/@types/d3-shape": {
+    "installed": "3.1.8",
+    "locked": "3.1.8"
+  },
+  "node_modules/@types/d3-time": {
+    "installed": "3.0.4",
+    "locked": "3.0.4"
+  },
+  "node_modules/@types/d3-timer": {
+    "installed": "3.0.2",
+    "locked": "3.0.2"
+  },
+  "node_modules/@types/debug": {
+    "installed": "4.1.13",
+    "locked": "4.1.13"
+  },
+  "node_modules/@types/dompurify": {
+    "installed": "3.0.5",
+    "locked": "3.0.5"
+  },
+  "node_modules/@types/estree": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/@types/formidable": {
+    "installed": "3.5.0",
+    "locked": "3.5.0"
+  },
+  "node_modules/@types/json-schema": {
+    "installed": "7.0.15",
+    "locked": "7.0.15"
+  },
+  "node_modules/@types/lodash": {
+    "installed": "4.17.24",
+    "locked": "4.17.24"
+  },
+  "node_modules/@types/ms": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/@types/node": {
+    "installed": "22.19.17",
+    "locked": "22.19.17"
+  },
+  "node_modules/@types/node/node_modules/undici-types": {
+    "installed": "6.21.0",
+    "locked": "6.21.0"
+  },
+  "node_modules/@types/pg": {
+    "installed": "8.23.1",
+    "locked": "8.23.1"
+  },
+  "node_modules/@types/prop-types": {
+    "installed": "15.7.15",
+    "locked": "15.7.15"
+  },
+  "node_modules/@types/react": {
+    "installed": "18.3.28",
+    "locked": "18.3.28"
+  },
+  "node_modules/@types/react-dom": {
+    "installed": "18.3.7",
+    "locked": "18.3.7"
+  },
+  "node_modules/@types/resolve": {
+    "installed": "1.20.2",
+    "locked": "1.20.2"
+  },
+  "node_modules/@types/stats.js": {
+    "installed": "0.17.4",
+    "locked": "0.17.4"
+  },
+  "node_modules/@types/three": {
+    "installed": "0.182.0",
+    "locked": "0.182.0"
+  },
+  "node_modules/@types/trusted-types": {
+    "installed": "2.0.7",
+    "locked": "2.0.7"
+  },
+  "node_modules/@types/webxr": {
+    "installed": "0.5.24",
+    "locked": "0.5.24"
+  },
+  "node_modules/@typescript-eslint/eslint-plugin": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/eslint-plugin/node_modules/ignore": {
+    "installed": "7.0.5",
+    "locked": "7.0.5"
+  },
+  "node_modules/@typescript-eslint/parser": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/project-service": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/scope-manager": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/tsconfig-utils": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/type-utils": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/types": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/typescript-estree": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/typescript-estree/node_modules/balanced-match": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion": {
+    "installed": "5.0.12",
+    "locked": "5.0.12"
+  },
+  "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch": {
+    "installed": "10.2.5",
+    "locked": "10.2.5"
+  },
+  "node_modules/@typescript-eslint/typescript-estree/node_modules/semver": {
+    "installed": "7.7.4",
+    "locked": "7.7.4"
+  },
+  "node_modules/@typescript-eslint/utils": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/visitor-keys": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/@typescript-eslint/visitor-keys/node_modules/eslint-visitor-keys": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/@vercel/analytics": {
+    "installed": "1.6.1",
+    "locked": "1.6.1"
+  },
+  "node_modules/@vercel/build-utils": {
+    "installed": "14.2.0",
+    "locked": "14.2.0"
+  },
+  "node_modules/@vercel/build-utils/node_modules/es-module-lexer": {
+    "installed": "1.5.0",
+    "locked": "1.5.0"
+  },
+  "node_modules/@vercel/cli-config": {
+    "installed": "0.2.3",
+    "locked": "0.2.3"
+  },
+  "node_modules/@vercel/cli-config/node_modules/zod": {
+    "installed": "4.1.11",
+    "locked": "4.1.11"
+  },
+  "node_modules/@vercel/cli-exec": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@vercel/error-utils": {
+    "installed": "2.2.1",
+    "locked": "2.2.1"
+  },
+  "node_modules/@vercel/functions": {
+    "installed": "3.9.3",
+    "locked": "3.9.3"
+  },
+  "node_modules/@vercel/nft": {
+    "installed": "1.10.0",
+    "locked": "1.10.0"
+  },
+  "node_modules/@vercel/node": {
+    "installed": "5.10.2",
+    "locked": "5.10.2"
+  },
+  "node_modules/@vercel/node/node_modules/@types/node": {
+    "installed": "20.11.0",
+    "locked": "20.11.0"
+  },
+  "node_modules/@vercel/node/node_modules/node-fetch": {
+    "installed": "2.6.9",
+    "locked": "2.6.9"
+  },
+  "node_modules/@vercel/node/node_modules/undici-types": {
+    "installed": "5.26.5",
+    "locked": "5.26.5"
+  },
+  "node_modules/@vercel/og": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@vercel/oidc": {
+    "installed": "3.8.4",
+    "locked": "3.8.4"
+  },
+  "node_modules/@vercel/oidc/node_modules/jose": {
+    "installed": "5.10.0",
+    "locked": "5.10.0"
+  },
+  "node_modules/@vercel/speed-insights": {
+    "installed": "1.3.1",
+    "locked": "1.3.1"
+  },
+  "node_modules/@vercel/static-config": {
+    "installed": "3.4.1",
+    "locked": "3.4.1"
+  },
+  "node_modules/@vercel/static-config/node_modules/json-schema-to-ts": {
+    "installed": "1.6.4",
+    "locked": "1.6.4"
+  },
+  "node_modules/@vitejs/plugin-react-swc": {
+    "installed": "3.11.0",
+    "locked": "3.11.0"
+  },
+  "node_modules/@wagmi/core": {
+    "installed": "3.4.2",
+    "locked": "3.4.2"
+  },
+  "node_modules/@wagmi/core/node_modules/zustand": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@wallet-standard/base": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@wallet-standard/wallet": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/@walletconnect/core": {
+    "installed": "2.23.7",
+    "locked": "2.23.7"
+  },
+  "node_modules/@walletconnect/core/node_modules/@walletconnect/keyvaluestorage": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@walletconnect/core/node_modules/chokidar": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/core/node_modules/readdirp": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/core/node_modules/unstorage": {
+    "installed": "1.17.5",
+    "locked": "1.17.5"
+  },
+  "node_modules/@walletconnect/environment": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@walletconnect/environment/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@noble/ciphers": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@noble/curves": {
+    "installed": "1.8.1",
+    "locked": "1.8.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@noble/hashes": {
+    "installed": "1.7.1",
+    "locked": "1.7.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-common": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/core": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/sign-client": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/types": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/universal-provider": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/utils": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-controllers/node_modules/@walletconnect/utils/node_modules/viem": {
+    "installed": "2.23.2",
+    "locked": "2.23.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-pay": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-polyfills": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-scaffold-ui": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-ui": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/core": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/sign-client": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/types": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/universal-provider": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/utils": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-utils/node_modules/@walletconnect/utils/node_modules/viem": {
+    "installed": "2.23.2",
+    "locked": "2.23.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit-wallet": {
+    "installed": "1.7.8",
+    "locked": "1.7.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/core": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/sign-client": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/types": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/universal-provider": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/utils": {
+    "installed": "2.21.0",
+    "locked": "2.21.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@reown/appkit/node_modules/@walletconnect/utils/node_modules/viem": {
+    "installed": "2.23.2",
+    "locked": "2.23.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@scure/bip32": {
+    "installed": "1.6.2",
+    "locked": "1.6.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@scure/bip39": {
+    "installed": "1.5.4",
+    "locked": "1.5.4"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/core": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/keyvaluestorage": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/logger": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/sign-client": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/types": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/universal-provider": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/utils": {
+    "installed": "2.21.1",
+    "locked": "2.21.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/@walletconnect/utils/node_modules/viem": {
+    "installed": "2.23.2",
+    "locked": "2.23.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/abitype": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/base-x": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/bs58": {
+    "installed": "6.0.0",
+    "locked": "6.0.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/chokidar": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/es-toolkit": {
+    "installed": "1.33.0",
+    "locked": "1.33.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/isows": {
+    "installed": "1.0.6",
+    "locked": "1.0.6"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/on-exit-leak-free": {
+    "installed": "0.2.0",
+    "locked": "0.2.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/ox": {
+    "installed": "0.6.7",
+    "locked": "0.6.7"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/pino": {
+    "installed": "7.11.0",
+    "locked": "7.11.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/pino-abstract-transport": {
+    "installed": "0.5.0",
+    "locked": "0.5.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/pino-std-serializers": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/process-warning": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/proxy-compare": {
+    "installed": "2.6.0",
+    "locked": "2.6.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/readdirp": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/real-require": {
+    "installed": "0.1.0",
+    "locked": "0.1.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/sonic-boom": {
+    "installed": "2.8.0",
+    "locked": "2.8.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/thread-stream": {
+    "installed": "0.15.2",
+    "locked": "0.15.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/uint8arrays": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/unstorage": {
+    "installed": "1.17.5",
+    "locked": "1.17.5"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/use-sync-external-store": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/valtio": {
+    "installed": "1.13.2",
+    "locked": "1.13.2"
+  },
+  "node_modules/@walletconnect/ethereum-provider/node_modules/zod": {
+    "installed": "3.22.4",
+    "locked": "3.22.4"
+  },
+  "node_modules/@walletconnect/events": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@walletconnect/events/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/heartbeat": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/@walletconnect/jsonrpc-http-connection": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/@walletconnect/jsonrpc-provider": {
+    "installed": "1.0.14",
+    "locked": "1.0.14"
+  },
+  "node_modules/@walletconnect/jsonrpc-types": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/@walletconnect/jsonrpc-utils": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/@walletconnect/jsonrpc-utils/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/jsonrpc-ws-connection": {
+    "installed": "1.0.16",
+    "locked": "1.0.16"
+  },
+  "node_modules/@walletconnect/jsonrpc-ws-connection/node_modules/ws": {
+    "installed": "7.5.13",
+    "locked": "7.5.13"
+  },
+  "node_modules/@walletconnect/logger": {
+    "installed": "3.0.2",
+    "locked": "3.0.2"
+  },
+  "node_modules/@walletconnect/relay-api": {
+    "installed": "1.0.11",
+    "locked": "1.0.11"
+  },
+  "node_modules/@walletconnect/relay-auth": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/@walletconnect/relay-auth/node_modules/@noble/curves": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@walletconnect/relay-auth/node_modules/@noble/hashes": {
+    "installed": "1.7.0",
+    "locked": "1.7.0"
+  },
+  "node_modules/@walletconnect/safe-json": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/@walletconnect/safe-json/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/sign-client": {
+    "installed": "2.23.7",
+    "locked": "2.23.7"
+  },
+  "node_modules/@walletconnect/time": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/@walletconnect/time/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/types": {
+    "installed": "2.23.7",
+    "locked": "2.23.7"
+  },
+  "node_modules/@walletconnect/types/node_modules/@walletconnect/keyvaluestorage": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@walletconnect/types/node_modules/chokidar": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/types/node_modules/readdirp": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/types/node_modules/unstorage": {
+    "installed": "1.17.5",
+    "locked": "1.17.5"
+  },
+  "node_modules/@walletconnect/universal-provider": {
+    "installed": "2.23.7",
+    "locked": "2.23.7"
+  },
+  "node_modules/@walletconnect/universal-provider/node_modules/@walletconnect/keyvaluestorage": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@walletconnect/universal-provider/node_modules/chokidar": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/universal-provider/node_modules/readdirp": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/universal-provider/node_modules/unstorage": {
+    "installed": "1.17.5",
+    "locked": "1.17.5"
+  },
+  "node_modules/@walletconnect/utils": {
+    "installed": "2.23.7",
+    "locked": "2.23.7"
+  },
+  "node_modules/@walletconnect/utils/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/@walletconnect/utils/node_modules/@walletconnect/keyvaluestorage": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/@walletconnect/utils/node_modules/abitype": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/@walletconnect/utils/node_modules/chokidar": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/utils/node_modules/ox": {
+    "installed": "0.9.3",
+    "locked": "0.9.3"
+  },
+  "node_modules/@walletconnect/utils/node_modules/ox/node_modules/@noble/curves": {
+    "installed": "1.9.1",
+    "locked": "1.9.1"
+  },
+  "node_modules/@walletconnect/utils/node_modules/readdirp": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/@walletconnect/utils/node_modules/unstorage": {
+    "installed": "1.17.5",
+    "locked": "1.17.5"
+  },
+  "node_modules/@walletconnect/window-getters": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@walletconnect/window-getters/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@walletconnect/window-metadata": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/@walletconnect/window-metadata/node_modules/tslib": {
+    "installed": "1.14.1",
+    "locked": "1.14.1"
+  },
+  "node_modules/@webgpu/types": {
+    "installed": "0.1.69",
+    "locked": "0.1.69"
+  },
+  "node_modules/abbrev": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/abitype": {
+    "installed": "1.0.6",
+    "locked": "1.0.6"
+  },
+  "node_modules/acorn": {
+    "installed": "8.16.0",
+    "locked": "8.16.0"
+  },
+  "node_modules/acorn-import-attributes": {
+    "installed": "1.9.5",
+    "locked": "1.9.5"
+  },
+  "node_modules/acorn-jsx": {
+    "installed": "5.3.2",
+    "locked": "5.3.2"
+  },
+  "node_modules/aes-js": {
+    "installed": "4.0.0-beta.5",
+    "locked": "4.0.0-beta.5"
+  },
+  "node_modules/agent-base": {
+    "installed": "7.1.4",
+    "locked": "7.1.4"
+  },
+  "node_modules/ajv": {
+    "installed": "8.6.3",
+    "locked": "8.6.3"
+  },
+  "node_modules/ansi-regex": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/ansi-styles": {
+    "installed": "4.3.0",
+    "locked": "4.3.0"
+  },
+  "node_modules/any-promise": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/anymatch": {
+    "installed": "3.1.3",
+    "locked": "3.1.3"
+  },
+  "node_modules/anymatch/node_modules/picomatch": {
+    "installed": "2.3.2",
+    "locked": "2.3.2"
+  },
+  "node_modules/arg": {
+    "installed": "5.0.2",
+    "locked": "5.0.2"
+  },
+  "node_modules/argparse": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/aria-hidden": {
+    "installed": "1.2.6",
+    "locked": "1.2.6"
+  },
+  "node_modules/array-buffer-byte-length": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/arraybuffer.prototype.slice": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/asap": {
+    "installed": "2.0.6",
+    "locked": "2.0.6"
+  },
+  "node_modules/async": {
+    "installed": "3.2.6",
+    "locked": "3.2.6"
+  },
+  "node_modules/async-function": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/async-listen": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/async-mutex": {
+    "installed": "0.2.6",
+    "locked": "0.2.6"
+  },
+  "node_modules/async-sema": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/asynckit": {
+    "installed": "0.4.0",
+    "locked": "0.4.0"
+  },
+  "node_modules/at-least-node": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/atomic-sleep": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/autoprefixer": {
+    "installed": "10.4.27",
+    "locked": "10.4.27"
+  },
+  "node_modules/available-typed-arrays": {
+    "installed": "1.0.7",
+    "locked": "1.0.7"
+  },
+  "node_modules/axios": {
+    "installed": "1.20.0",
+    "locked": "1.20.0"
+  },
+  "node_modules/axios-retry": {
+    "installed": "4.5.0",
+    "locked": "4.5.0"
+  },
+  "node_modules/axios/node_modules/agent-base": {
+    "installed": "6.0.2",
+    "locked": "6.0.2"
+  },
+  "node_modules/axios/node_modules/https-proxy-agent": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/babel-plugin-polyfill-corejs2": {
+    "installed": "0.4.17",
+    "locked": "0.4.17"
+  },
+  "node_modules/babel-plugin-polyfill-corejs2/node_modules/semver": {
+    "installed": "6.3.1",
+    "locked": "6.3.1"
+  },
+  "node_modules/babel-plugin-polyfill-corejs3": {
+    "installed": "0.14.2",
+    "locked": "0.14.2"
+  },
+  "node_modules/babel-plugin-polyfill-regenerator": {
+    "installed": "0.6.8",
+    "locked": "0.6.8"
+  },
+  "node_modules/balanced-match": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/base64-js": {
+    "installed": "1.5.1",
+    "locked": "1.5.1"
+  },
+  "node_modules/baseline-browser-mapping": {
+    "installed": "2.11.20",
+    "locked": "2.11.20"
+  },
+  "node_modules/big.js": {
+    "installed": "6.2.2",
+    "locked": "6.2.2"
+  },
+  "node_modules/binary-extensions": {
+    "installed": "2.3.0",
+    "locked": "2.3.0"
+  },
+  "node_modules/bindings": {
+    "installed": "1.5.0",
+    "locked": "1.5.0"
+  },
+  "node_modules/blakejs": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/bn.js": {
+    "installed": "5.2.3",
+    "locked": "5.2.3"
+  },
+  "node_modules/bowser": {
+    "installed": "2.14.1",
+    "locked": "2.14.1"
+  },
+  "node_modules/brace-expansion": {
+    "installed": "1.1.21",
+    "locked": "1.1.21"
+  },
+  "node_modules/braces": {
+    "installed": "3.0.3",
+    "locked": "3.0.3"
+  },
+  "node_modules/brotli-wasm": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/browserslist": {
+    "installed": "4.28.8",
+    "locked": "4.28.8"
+  },
+  "node_modules/buffer": {
+    "installed": "6.0.3",
+    "locked": "6.0.3"
+  },
+  "node_modules/buffer-from": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/bufferutil": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/call-bind": {
+    "installed": "1.0.9",
+    "locked": "1.0.9"
+  },
+  "node_modules/call-bind-apply-helpers": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/call-bound": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/callsites": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/camelcase": {
+    "installed": "5.3.1",
+    "locked": "5.3.1"
+  },
+  "node_modules/camelcase-css": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/camelize": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/caniuse-lite": {
+    "installed": "1.0.30001810",
+    "locked": "1.0.30001810"
+  },
+  "node_modules/cbw-sdk": {
+    "installed": "3.9.3",
+    "locked": "3.9.3"
+  },
+  "node_modules/cbw-sdk/node_modules/clsx": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/chalk": {
+    "installed": "5.6.2",
+    "locked": "5.6.2"
+  },
+  "node_modules/charenc": {
+    "installed": "0.0.2",
+    "locked": "0.0.2"
+  },
+  "node_modules/chokidar": {
+    "installed": "3.6.0",
+    "locked": "3.6.0"
+  },
+  "node_modules/chokidar/node_modules/glob-parent": {
+    "installed": "5.1.2",
+    "locked": "5.1.2"
+  },
+  "node_modules/chownr": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/cjs-module-lexer": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/class-variance-authority": {
+    "installed": "0.7.1",
+    "locked": "0.7.1"
+  },
+  "node_modules/cliui": {
+    "installed": "6.0.0",
+    "locked": "6.0.0"
+  },
+  "node_modules/clsx": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/cmdk": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/code-block-writer": {
+    "installed": "10.1.1",
+    "locked": "10.1.1"
+  },
+  "node_modules/color-convert": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/color-name": {
+    "installed": "1.1.4",
+    "locked": "1.1.4"
+  },
+  "node_modules/combined-stream": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/commander": {
+    "installed": "14.0.2",
+    "locked": "14.0.2"
+  },
+  "node_modules/common-tags": {
+    "installed": "1.8.2",
+    "locked": "1.8.2"
+  },
+  "node_modules/concat-map": {
+    "installed": "0.0.1",
+    "locked": "0.0.1"
+  },
+  "node_modules/consola": {
+    "installed": "3.4.2",
+    "locked": "3.4.2"
+  },
+  "node_modules/convert-hrtime": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/convert-source-map": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/cookie": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/cookie-es": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/core-js-compat": {
+    "installed": "3.50.0",
+    "locked": "3.50.0"
+  },
+  "node_modules/core-util-is": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/crc-32": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/cross-fetch": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/cross-spawn": {
+    "installed": "7.0.6",
+    "locked": "7.0.6"
+  },
+  "node_modules/crossws": {
+    "installed": "0.3.5",
+    "locked": "0.3.5"
+  },
+  "node_modules/crypt": {
+    "installed": "0.0.2",
+    "locked": "0.0.2"
+  },
+  "node_modules/crypto-random-string": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/css-background-parser": {
+    "installed": "0.1.0",
+    "locked": "0.1.0"
+  },
+  "node_modules/css-box-shadow": {
+    "installed": "1.0.0-3",
+    "locked": "1.0.0-3"
+  },
+  "node_modules/css-color-keywords": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/css-gradient-parser": {
+    "installed": "0.0.17",
+    "locked": "0.0.17"
+  },
+  "node_modules/css-to-react-native": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/cssesc": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/csstype": {
+    "installed": "3.2.3",
+    "locked": "3.2.3"
+  },
+  "node_modules/d3-array": {
+    "installed": "3.2.4",
+    "locked": "3.2.4"
+  },
+  "node_modules/d3-color": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/d3-ease": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/d3-format": {
+    "installed": "3.1.2",
+    "locked": "3.1.2"
+  },
+  "node_modules/d3-interpolate": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/d3-path": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/d3-scale": {
+    "installed": "4.0.2",
+    "locked": "4.0.2"
+  },
+  "node_modules/d3-shape": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/d3-time": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/d3-time-format": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/d3-timer": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/data-view-buffer": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/data-view-byte-length": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/data-view-byte-offset": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/date-fns": {
+    "installed": "3.6.0",
+    "locked": "3.6.0"
+  },
+  "node_modules/dayjs": {
+    "installed": "1.11.13",
+    "locked": "1.11.13"
+  },
+  "node_modules/debug": {
+    "installed": "4.4.3",
+    "locked": "4.4.3"
+  },
+  "node_modules/decamelize": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/decimal.js-light": {
+    "installed": "2.5.1",
+    "locked": "2.5.1"
+  },
+  "node_modules/decode-uri-component": {
+    "installed": "0.2.2",
+    "locked": "0.2.2"
+  },
+  "node_modules/deep-is": {
+    "installed": "0.1.4",
+    "locked": "0.1.4"
+  },
+  "node_modules/deepmerge": {
+    "installed": "4.3.1",
+    "locked": "4.3.1"
+  },
+  "node_modules/define-data-property": {
+    "installed": "1.1.4",
+    "locked": "1.1.4"
+  },
+  "node_modules/define-properties": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/defu": {
+    "installed": "6.1.7",
+    "locked": "6.1.7"
+  },
+  "node_modules/delayed-stream": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/derive-valtio": {
+    "installed": "0.1.0",
+    "locked": "0.1.0"
+  },
+  "node_modules/destr": {
+    "installed": "2.0.5",
+    "locked": "2.0.5"
+  },
+  "node_modules/detect-browser": {
+    "installed": "5.3.0",
+    "locked": "5.3.0"
+  },
+  "node_modules/detect-libc": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/detect-node-es": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/dezalgo": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/didyoumean": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/dijkstrajs": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/dlv": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/dom-helpers": {
+    "installed": "5.2.1",
+    "locked": "5.2.1"
+  },
+  "node_modules/dompurify": {
+    "installed": "3.4.16",
+    "locked": "3.4.16"
+  },
+  "node_modules/dotenv": {
+    "installed": "17.4.1",
+    "locked": "17.4.1"
+  },
+  "node_modules/dunder-proto": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/duplexify": {
+    "installed": "4.1.3",
+    "locked": "4.1.3"
+  },
+  "node_modules/eciesjs": {
+    "installed": "0.4.18",
+    "locked": "0.4.18"
+  },
+  "node_modules/eciesjs/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/edge-runtime": {
+    "installed": "2.5.9",
+    "locked": "2.5.9"
+  },
+  "node_modules/edge-runtime/node_modules/async-listen": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/edge-runtime/node_modules/picocolors": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/edge-tts-universal": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/edge-tts-universal/node_modules/cross-fetch": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/edge-tts-universal/node_modules/isomorphic-ws": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/edge-tts-universal/node_modules/uuid": {
+    "installed": "11.1.1",
+    "locked": "11.1.1"
+  },
+  "node_modules/ejs": {
+    "installed": "3.1.10",
+    "locked": "3.1.10"
+  },
+  "node_modules/electron-to-chromium": {
+    "installed": "1.5.420",
+    "locked": "1.5.420"
+  },
+  "node_modules/embla-carousel": {
+    "installed": "8.6.0",
+    "locked": "8.6.0"
+  },
+  "node_modules/embla-carousel-react": {
+    "installed": "8.6.0",
+    "locked": "8.6.0"
+  },
+  "node_modules/embla-carousel-reactive-utils": {
+    "installed": "8.6.0",
+    "locked": "8.6.0"
+  },
+  "node_modules/emoji-regex": {
+    "installed": "8.0.0",
+    "locked": "8.0.0"
+  },
+  "node_modules/emoji-regex-xs": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/encode-utf8": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/end-of-stream": {
+    "installed": "1.4.5",
+    "locked": "1.4.5"
+  },
+  "node_modules/engine.io-client": {
+    "installed": "6.6.6",
+    "locked": "6.6.6"
+  },
+  "node_modules/engine.io-parser": {
+    "installed": "5.2.3",
+    "locked": "5.2.3"
+  },
+  "node_modules/es-abstract": {
+    "installed": "1.24.2",
+    "locked": "1.24.2"
+  },
+  "node_modules/es-abstract-get": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/es-abstract-get/node_modules/es-object-atoms": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/es-define-property": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/es-errors": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/es-module-lexer": {
+    "installed": "1.4.1",
+    "locked": "1.4.1"
+  },
+  "node_modules/es-object-atoms": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/es-set-tostringtag": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/es-to-primitive": {
+    "installed": "1.3.4",
+    "locked": "1.3.4"
+  },
+  "node_modules/es-toolkit": {
+    "installed": "1.44.0",
+    "locked": "1.44.0"
+  },
+  "node_modules/esbuild": {
+    "installed": "0.27.0",
+    "locked": "0.27.0"
+  },
+  "node_modules/escalade": {
+    "installed": "3.2.0",
+    "locked": "3.2.0"
+  },
+  "node_modules/escape-html": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/escape-string-regexp": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/eslint": {
+    "installed": "9.39.4",
+    "locked": "9.39.4"
+  },
+  "node_modules/eslint-plugin-react-hooks": {
+    "installed": "5.2.0",
+    "locked": "5.2.0"
+  },
+  "node_modules/eslint-plugin-react-refresh": {
+    "installed": "0.4.26",
+    "locked": "0.4.26"
+  },
+  "node_modules/eslint-scope": {
+    "installed": "8.4.0",
+    "locked": "8.4.0"
+  },
+  "node_modules/eslint-visitor-keys": {
+    "installed": "4.2.1",
+    "locked": "4.2.1"
+  },
+  "node_modules/eslint/node_modules/ajv": {
+    "installed": "6.14.0",
+    "locked": "6.14.0"
+  },
+  "node_modules/eslint/node_modules/chalk": {
+    "installed": "4.1.2",
+    "locked": "4.1.2"
+  },
+  "node_modules/eslint/node_modules/json-schema-traverse": {
+    "installed": "0.4.1",
+    "locked": "0.4.1"
+  },
+  "node_modules/eslint/node_modules/minimatch": {
+    "installed": "3.1.5",
+    "locked": "3.1.5"
+  },
+  "node_modules/espree": {
+    "installed": "10.4.0",
+    "locked": "10.4.0"
+  },
+  "node_modules/esquery": {
+    "installed": "1.7.0",
+    "locked": "1.7.0"
+  },
+  "node_modules/esrecurse": {
+    "installed": "4.3.0",
+    "locked": "4.3.0"
+  },
+  "node_modules/estraverse": {
+    "installed": "5.3.0",
+    "locked": "5.3.0"
+  },
+  "node_modules/estree-walker": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/esutils": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/eta": {
+    "installed": "4.6.0",
+    "locked": "4.6.0"
+  },
+  "node_modules/etag": {
+    "installed": "1.8.1",
+    "locked": "1.8.1"
+  },
+  "node_modules/eth-block-tracker": {
+    "installed": "7.1.0",
+    "locked": "7.1.0"
+  },
+  "node_modules/eth-block-tracker/node_modules/@metamask/utils": {
+    "installed": "5.0.2",
+    "locked": "5.0.2"
+  },
+  "node_modules/eth-block-tracker/node_modules/pify": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/eth-block-tracker/node_modules/superstruct": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/eth-json-rpc-filters": {
+    "installed": "6.0.1",
+    "locked": "6.0.1"
+  },
+  "node_modules/eth-json-rpc-filters/node_modules/pify": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/eth-query": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/eth-rpc-errors": {
+    "installed": "4.0.3",
+    "locked": "4.0.3"
+  },
+  "node_modules/ethereum-cryptography": {
+    "installed": "2.2.1",
+    "locked": "2.2.1"
+  },
+  "node_modules/ethereum-cryptography/node_modules/@noble/curves": {
+    "installed": "1.4.2",
+    "locked": "1.4.2"
+  },
+  "node_modules/ethereum-cryptography/node_modules/@scure/base": {
+    "installed": "1.1.9",
+    "locked": "1.1.9"
+  },
+  "node_modules/ethereum-cryptography/node_modules/@scure/bip32": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/ethereum-cryptography/node_modules/@scure/bip39": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/ethers": {
+    "installed": "6.17.0",
+    "locked": "6.17.0"
+  },
+  "node_modules/ethers/node_modules/@noble/curves": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/ethers/node_modules/@noble/hashes": {
+    "installed": "1.3.2",
+    "locked": "1.3.2"
+  },
+  "node_modules/ethers/node_modules/@types/node": {
+    "installed": "22.7.5",
+    "locked": "22.7.5"
+  },
+  "node_modules/ethers/node_modules/tslib": {
+    "installed": "2.7.0",
+    "locked": "2.7.0"
+  },
+  "node_modules/ethers/node_modules/undici-types": {
+    "installed": "6.19.8",
+    "locked": "6.19.8"
+  },
+  "node_modules/eventemitter2": {
+    "installed": "6.4.9",
+    "locked": "6.4.9"
+  },
+  "node_modules/eventemitter3": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/events": {
+    "installed": "3.3.0",
+    "locked": "3.3.0"
+  },
+  "node_modules/execa": {
+    "installed": "5.1.1",
+    "locked": "5.1.1"
+  },
+  "node_modules/execa/node_modules/signal-exit": {
+    "installed": "3.0.7",
+    "locked": "3.0.7"
+  },
+  "node_modules/extension-port-stream": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/fancy-canvas": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/fast-deep-equal": {
+    "installed": "3.1.3",
+    "locked": "3.1.3"
+  },
+  "node_modules/fast-equals": {
+    "installed": "5.4.0",
+    "locked": "5.4.0"
+  },
+  "node_modules/fast-glob": {
+    "installed": "3.3.3",
+    "locked": "3.3.3"
+  },
+  "node_modules/fast-glob/node_modules/glob-parent": {
+    "installed": "5.1.2",
+    "locked": "5.1.2"
+  },
+  "node_modules/fast-json-stable-stringify": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/fast-levenshtein": {
+    "installed": "2.0.6",
+    "locked": "2.0.6"
+  },
+  "node_modules/fast-redact": {
+    "installed": "3.5.0",
+    "locked": "3.5.0"
+  },
+  "node_modules/fast-safe-stringify": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/fastq": {
+    "installed": "1.20.1",
+    "locked": "1.20.1"
+  },
+  "node_modules/fdir": {
+    "installed": "6.5.0",
+    "locked": "6.5.0"
+  },
+  "node_modules/fflate": {
+    "installed": "0.8.3",
+    "locked": "0.8.3"
+  },
+  "node_modules/file-entry-cache": {
+    "installed": "8.0.0",
+    "locked": "8.0.0"
+  },
+  "node_modules/file-uri-to-path": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/filelist": {
+    "installed": "1.0.6",
+    "locked": "1.0.6"
+  },
+  "node_modules/fill-range": {
+    "installed": "7.1.1",
+    "locked": "7.1.1"
+  },
+  "node_modules/filter-obj": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/find-up": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/flat-cache": {
+    "installed": "4.0.1",
+    "locked": "4.0.1"
+  },
+  "node_modules/flatted": {
+    "installed": "3.4.2",
+    "locked": "3.4.2"
+  },
+  "node_modules/follow-redirects": {
+    "installed": "1.16.0",
+    "locked": "1.16.0"
+  },
+  "node_modules/for-each": {
+    "installed": "0.3.5",
+    "locked": "0.3.5"
+  },
+  "node_modules/foreground-child": {
+    "installed": "3.3.1",
+    "locked": "3.3.1"
+  },
+  "node_modules/form-data": {
+    "installed": "4.0.6",
+    "locked": "4.0.6"
+  },
+  "node_modules/formidable": {
+    "installed": "3.5.4",
+    "locked": "3.5.4"
+  },
+  "node_modules/fraction.js": {
+    "installed": "5.3.4",
+    "locked": "5.3.4"
+  },
+  "node_modules/framer-motion": {
+    "installed": "12.38.0",
+    "locked": "12.38.0"
+  },
+  "node_modules/fs-extra": {
+    "installed": "9.1.0",
+    "locked": "9.1.0"
+  },
+  "node_modules/fsevents": {
+    "installed": "2.3.3",
+    "locked": "2.3.3"
+  },
+  "node_modules/function-bind": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/function.prototype.name": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/functions-have-names": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/generator-function": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/gensync": {
+    "installed": "1.0.0-beta.2",
+    "locked": "1.0.0-beta.2"
+  },
+  "node_modules/get-caller-file": {
+    "installed": "2.0.5",
+    "locked": "2.0.5"
+  },
+  "node_modules/get-intrinsic": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/get-nonce": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/get-own-enumerable-property-symbols": {
+    "installed": "3.0.2",
+    "locked": "3.0.2"
+  },
+  "node_modules/get-proto": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/get-stream": {
+    "installed": "6.0.1",
+    "locked": "6.0.1"
+  },
+  "node_modules/get-symbol-description": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/get-tsconfig": {
+    "installed": "4.13.7",
+    "locked": "4.13.7"
+  },
+  "node_modules/glob": {
+    "installed": "13.0.6",
+    "locked": "13.0.6"
+  },
+  "node_modules/glob-parent": {
+    "installed": "6.0.2",
+    "locked": "6.0.2"
+  },
+  "node_modules/glob/node_modules/balanced-match": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/glob/node_modules/brace-expansion": {
+    "installed": "5.0.12",
+    "locked": "5.0.12"
+  },
+  "node_modules/glob/node_modules/minimatch": {
+    "installed": "10.2.6",
+    "locked": "10.2.6"
+  },
+  "node_modules/globals": {
+    "installed": "15.15.0",
+    "locked": "15.15.0"
+  },
+  "node_modules/globalthis": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/gopd": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/graceful-fs": {
+    "installed": "4.2.11",
+    "locked": "4.2.11"
+  },
+  "node_modules/h3": {
+    "installed": "1.15.11",
+    "locked": "1.15.11"
+  },
+  "node_modules/has-bigints": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/has-flag": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/has-property-descriptors": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/has-proto": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/has-symbols": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/has-tostringtag": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/hasown": {
+    "installed": "2.0.4",
+    "locked": "2.0.4"
+  },
+  "node_modules/hex-rgb": {
+    "installed": "4.3.0",
+    "locked": "4.3.0"
+  },
+  "node_modules/hono": {
+    "installed": "4.13.12",
+    "locked": "4.13.12"
+  },
+  "node_modules/html-parse-stringify": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/https-proxy-agent": {
+    "installed": "7.0.6",
+    "locked": "7.0.6"
+  },
+  "node_modules/human-signals": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/i18next": {
+    "installed": "25.10.10",
+    "locked": "25.10.10"
+  },
+  "node_modules/i18next-browser-languagedetector": {
+    "installed": "8.2.1",
+    "locked": "8.2.1"
+  },
+  "node_modules/iceberg-js": {
+    "installed": "0.8.1",
+    "locked": "0.8.1"
+  },
+  "node_modules/idb": {
+    "installed": "7.1.1",
+    "locked": "7.1.1"
+  },
+  "node_modules/idb-keyval": {
+    "installed": "6.2.1",
+    "locked": "6.2.1"
+  },
+  "node_modules/ieee754": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/ignore": {
+    "installed": "5.3.2",
+    "locked": "5.3.2"
+  },
+  "node_modules/import-fresh": {
+    "installed": "3.3.1",
+    "locked": "3.3.1"
+  },
+  "node_modules/import-fresh/node_modules/resolve-from": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/imurmurhash": {
+    "installed": "0.1.4",
+    "locked": "0.1.4"
+  },
+  "node_modules/inherits": {
+    "installed": "2.0.4",
+    "locked": "2.0.4"
+  },
+  "node_modules/input-otp": {
+    "installed": "1.4.2",
+    "locked": "1.4.2"
+  },
+  "node_modules/internal-slot": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/internmap": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/invariant": {
+    "installed": "2.2.4",
+    "locked": "2.2.4"
+  },
+  "node_modules/iron-webcrypto": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/is-arguments": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/is-array-buffer": {
+    "installed": "3.0.5",
+    "locked": "3.0.5"
+  },
+  "node_modules/is-async-function": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/is-bigint": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/is-binary-path": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/is-boolean-object": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/is-buffer": {
+    "installed": "1.1.6",
+    "locked": "1.1.6"
+  },
+  "node_modules/is-callable": {
+    "installed": "1.2.7",
+    "locked": "1.2.7"
+  },
+  "node_modules/is-core-module": {
+    "installed": "2.16.1",
+    "locked": "2.16.1"
+  },
+  "node_modules/is-data-view": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/is-date-object": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/is-document.all": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/is-extglob": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/is-finalizationregistry": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/is-fullwidth-code-point": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/is-generator-function": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/is-glob": {
+    "installed": "4.0.3",
+    "locked": "4.0.3"
+  },
+  "node_modules/is-map": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/is-module": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/is-negative-zero": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/is-number": {
+    "installed": "7.0.0",
+    "locked": "7.0.0"
+  },
+  "node_modules/is-number-object": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/is-obj": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/is-regex": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/is-regexp": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/is-retry-allowed": {
+    "installed": "2.2.0",
+    "locked": "2.2.0"
+  },
+  "node_modules/is-set": {
+    "installed": "2.0.3",
+    "locked": "2.0.3"
+  },
+  "node_modules/is-shared-array-buffer": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/is-stream": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/is-string": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/is-symbol": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/is-typed-array": {
+    "installed": "1.1.15",
+    "locked": "1.1.15"
+  },
+  "node_modules/is-weakmap": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/is-weakref": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/is-weakset": {
+    "installed": "2.0.4",
+    "locked": "2.0.4"
+  },
+  "node_modules/isarray": {
+    "installed": "2.0.5",
+    "locked": "2.0.5"
+  },
+  "node_modules/isexe": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/isows": {
+    "installed": "1.0.7",
+    "locked": "1.0.7"
+  },
+  "node_modules/jackspeak": {
+    "installed": "4.2.3",
+    "locked": "4.2.3"
+  },
+  "node_modules/jake": {
+    "installed": "10.9.4",
+    "locked": "10.9.4"
+  },
+  "node_modules/jiti": {
+    "installed": "1.21.7",
+    "locked": "1.21.7"
+  },
+  "node_modules/jose": {
+    "installed": "6.2.2",
+    "locked": "6.2.2"
+  },
+  "node_modules/js-tokens": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/js-yaml": {
+    "installed": "4.3.2",
+    "locked": "4.3.2"
+  },
+  "node_modules/jsesc": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/json-buffer": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/json-rpc-engine": {
+    "installed": "6.1.0",
+    "locked": "6.1.0"
+  },
+  "node_modules/json-rpc-engine/node_modules/@metamask/safe-event-emitter": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/json-rpc-random-id": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/json-schema-to-ts": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/json-schema-traverse": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/json-stable-stringify-without-jsonify": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/json5": {
+    "installed": "2.2.3",
+    "locked": "2.2.3"
+  },
+  "node_modules/jsonfile": {
+    "installed": "6.2.1",
+    "locked": "6.2.1"
+  },
+  "node_modules/jsonpointer": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/keccak": {
+    "installed": "3.0.4",
+    "locked": "3.0.4"
+  },
+  "node_modules/keyv": {
+    "installed": "4.5.4",
+    "locked": "4.5.4"
+  },
+  "node_modules/keyvaluestorage-interface": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/leven": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/levn": {
+    "installed": "0.4.1",
+    "locked": "0.4.1"
+  },
+  "node_modules/lightweight-charts": {
+    "installed": "5.1.0",
+    "locked": "5.1.0"
+  },
+  "node_modules/lilconfig": {
+    "installed": "3.1.3",
+    "locked": "3.1.3"
+  },
+  "node_modules/linebreak": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/linebreak/node_modules/base64-js": {
+    "installed": "0.0.8",
+    "locked": "0.0.8"
+  },
+  "node_modules/lines-and-columns": {
+    "installed": "1.2.4",
+    "locked": "1.2.4"
+  },
+  "node_modules/lit": {
+    "installed": "3.3.0",
+    "locked": "3.3.0"
+  },
+  "node_modules/lit-element": {
+    "installed": "4.2.2",
+    "locked": "4.2.2"
+  },
+  "node_modules/lit-html": {
+    "installed": "3.3.2",
+    "locked": "3.3.2"
+  },
+  "node_modules/locate-path": {
+    "installed": "6.0.0",
+    "locked": "6.0.0"
+  },
+  "node_modules/lodash": {
+    "installed": "4.18.1",
+    "locked": "4.18.1"
+  },
+  "node_modules/lodash.debounce": {
+    "installed": "4.0.8",
+    "locked": "4.0.8"
+  },
+  "node_modules/lodash.merge": {
+    "installed": "4.6.2",
+    "locked": "4.6.2"
+  },
+  "node_modules/loose-envify": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/lovable-tagger": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/lovable-tagger/node_modules/@esbuild/darwin-arm64": {
+    "installed": "0.25.12",
+    "locked": "0.25.12"
+  },
+  "node_modules/lovable-tagger/node_modules/esbuild": {
+    "installed": "0.25.12",
+    "locked": "0.25.12"
+  },
+  "node_modules/lru-cache": {
+    "installed": "11.3.2",
+    "locked": "11.3.2"
+  },
+  "node_modules/lucide-react": {
+    "installed": "0.462.0",
+    "locked": "0.462.0"
+  },
+  "node_modules/magic-string": {
+    "installed": "0.30.21",
+    "locked": "0.30.21"
+  },
+  "node_modules/math-intrinsics": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/md5": {
+    "installed": "2.3.0",
+    "locked": "2.3.0"
+  },
+  "node_modules/merge-stream": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/merge2": {
+    "installed": "1.4.1",
+    "locked": "1.4.1"
+  },
+  "node_modules/meshoptimizer": {
+    "installed": "0.22.0",
+    "locked": "0.22.0"
+  },
+  "node_modules/micro-ftch": {
+    "installed": "0.3.1",
+    "locked": "0.3.1"
+  },
+  "node_modules/micromatch": {
+    "installed": "4.0.8",
+    "locked": "4.0.8"
+  },
+  "node_modules/micromatch/node_modules/picomatch": {
+    "installed": "2.3.2",
+    "locked": "2.3.2"
+  },
+  "node_modules/mime-db": {
+    "installed": "1.52.0",
+    "locked": "1.52.0"
+  },
+  "node_modules/mime-types": {
+    "installed": "2.1.35",
+    "locked": "2.1.35"
+  },
+  "node_modules/mimic-fn": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/minimatch": {
+    "installed": "5.1.9",
+    "locked": "5.1.9"
+  },
+  "node_modules/minimatch/node_modules/brace-expansion": {
+    "installed": "2.1.7",
+    "locked": "2.1.7"
+  },
+  "node_modules/minipass": {
+    "installed": "7.1.3",
+    "locked": "7.1.3"
+  },
+  "node_modules/minizlib": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/mipd": {
+    "installed": "0.0.7",
+    "locked": "0.0.7"
+  },
+  "node_modules/mkdirp": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/motion-dom": {
+    "installed": "12.38.0",
+    "locked": "12.38.0"
+  },
+  "node_modules/motion-utils": {
+    "installed": "12.36.0",
+    "locked": "12.36.0"
+  },
+  "node_modules/mri": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/ms": {
+    "installed": "2.1.3",
+    "locked": "2.1.3"
+  },
+  "node_modules/multiformats": {
+    "installed": "9.9.0",
+    "locked": "9.9.0"
+  },
+  "node_modules/mz": {
+    "installed": "2.7.0",
+    "locked": "2.7.0"
+  },
+  "node_modules/nanoid": {
+    "installed": "3.3.18",
+    "locked": "3.3.18"
+  },
+  "node_modules/natural-compare": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/next-themes": {
+    "installed": "0.3.0",
+    "locked": "0.3.0"
+  },
+  "node_modules/node-addon-api": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/node-fetch": {
+    "installed": "2.7.0",
+    "locked": "2.7.0"
+  },
+  "node_modules/node-fetch-native": {
+    "installed": "1.6.7",
+    "locked": "1.6.7"
+  },
+  "node_modules/node-gyp-build": {
+    "installed": "4.8.4",
+    "locked": "4.8.4"
+  },
+  "node_modules/node-mock-http": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/node-releases": {
+    "installed": "2.0.54",
+    "locked": "2.0.54"
+  },
+  "node_modules/nopt": {
+    "installed": "8.1.0",
+    "locked": "8.1.0"
+  },
+  "node_modules/normalize-path": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/npm-run-path": {
+    "installed": "4.0.1",
+    "locked": "4.0.1"
+  },
+  "node_modules/obj-multiplex": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/obj-multiplex/node_modules/isarray": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/obj-multiplex/node_modules/readable-stream": {
+    "installed": "2.3.8",
+    "locked": "2.3.8"
+  },
+  "node_modules/obj-multiplex/node_modules/safe-buffer": {
+    "installed": "5.1.2",
+    "locked": "5.1.2"
+  },
+  "node_modules/obj-multiplex/node_modules/string_decoder": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/object-assign": {
+    "installed": "4.1.1",
+    "locked": "4.1.1"
+  },
+  "node_modules/object-hash": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/object-inspect": {
+    "installed": "1.13.4",
+    "locked": "1.13.4"
+  },
+  "node_modules/object-keys": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/object.assign": {
+    "installed": "4.1.7",
+    "locked": "4.1.7"
+  },
+  "node_modules/ofetch": {
+    "installed": "1.5.1",
+    "locked": "1.5.1"
+  },
+  "node_modules/on-exit-leak-free": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/once": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/onetime": {
+    "installed": "5.1.2",
+    "locked": "5.1.2"
+  },
+  "node_modules/openai": {
+    "installed": "6.33.0",
+    "locked": "6.33.0"
+  },
+  "node_modules/openapi-fetch": {
+    "installed": "0.13.8",
+    "locked": "0.13.8"
+  },
+  "node_modules/openapi-typescript-helpers": {
+    "installed": "0.0.15",
+    "locked": "0.0.15"
+  },
+  "node_modules/optionator": {
+    "installed": "0.9.4",
+    "locked": "0.9.4"
+  },
+  "node_modules/os-paths": {
+    "installed": "4.4.0",
+    "locked": "4.4.0"
+  },
+  "node_modules/own-keys": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/ox": {
+    "installed": "0.14.33",
+    "locked": "0.14.33"
+  },
+  "node_modules/ox/node_modules/@noble/curves": {
+    "installed": "1.9.1",
+    "locked": "1.9.1"
+  },
+  "node_modules/ox/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/ox/node_modules/abitype": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/p-limit": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/p-locate": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/p-try": {
+    "installed": "2.2.0",
+    "locked": "2.2.0"
+  },
+  "node_modules/package-json-from-dist": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/pako": {
+    "installed": "0.2.9",
+    "locked": "0.2.9"
+  },
+  "node_modules/parent-module": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/parse-css-color": {
+    "installed": "0.2.1",
+    "locked": "0.2.1"
+  },
+  "node_modules/parse-ms": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/path-browserify": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/path-exists": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/path-key": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/path-parse": {
+    "installed": "1.0.7",
+    "locked": "1.0.7"
+  },
+  "node_modules/path-scurry": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/path-to-regexp": {
+    "installed": "6.3.0",
+    "locked": "6.3.0"
+  },
+  "node_modules/path-to-regexp-updated": {
+    "installed": "6.3.0",
+    "locked": "6.3.0"
+  },
+  "node_modules/pg": {
+    "installed": "8.23.0",
+    "locked": "8.23.0"
+  },
+  "node_modules/pg-cloudflare": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/pg-connection-string": {
+    "installed": "2.14.0",
+    "locked": "2.14.0"
+  },
+  "node_modules/pg-int8": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/pg-pool": {
+    "installed": "3.14.0",
+    "locked": "3.14.0"
+  },
+  "node_modules/pg-protocol": {
+    "installed": "1.16.0",
+    "locked": "1.16.0"
+  },
+  "node_modules/pg-types": {
+    "installed": "2.2.0",
+    "locked": "2.2.0"
+  },
+  "node_modules/pgpass": {
+    "installed": "1.0.5",
+    "locked": "1.0.5"
+  },
+  "node_modules/picocolors": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/picomatch": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/pify": {
+    "installed": "2.3.0",
+    "locked": "2.3.0"
+  },
+  "node_modules/pino": {
+    "installed": "10.0.0",
+    "locked": "10.0.0"
+  },
+  "node_modules/pino-abstract-transport": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/pino-std-serializers": {
+    "installed": "7.1.0",
+    "locked": "7.1.0"
+  },
+  "node_modules/pirates": {
+    "installed": "4.0.7",
+    "locked": "4.0.7"
+  },
+  "node_modules/pngjs": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/pony-cause": {
+    "installed": "2.1.11",
+    "locked": "2.1.11"
+  },
+  "node_modules/possible-typed-array-names": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/postcss": {
+    "installed": "8.5.26",
+    "locked": "8.5.26"
+  },
+  "node_modules/postcss-import": {
+    "installed": "15.1.0",
+    "locked": "15.1.0"
+  },
+  "node_modules/postcss-js": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/postcss-load-config": {
+    "installed": "6.0.1",
+    "locked": "6.0.1"
+  },
+  "node_modules/postcss-nested": {
+    "installed": "6.2.0",
+    "locked": "6.2.0"
+  },
+  "node_modules/postcss-nested/node_modules/postcss-selector-parser": {
+    "installed": "6.1.4",
+    "locked": "6.1.4"
+  },
+  "node_modules/postcss-selector-parser": {
+    "installed": "6.0.10",
+    "locked": "6.0.10"
+  },
+  "node_modules/postcss-value-parser": {
+    "installed": "4.2.0",
+    "locked": "4.2.0"
+  },
+  "node_modules/postgres-array": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/postgres-bytea": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/postgres-date": {
+    "installed": "1.0.7",
+    "locked": "1.0.7"
+  },
+  "node_modules/postgres-interval": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/preact": {
+    "installed": "10.24.2",
+    "locked": "10.24.2"
+  },
+  "node_modules/prelude-ls": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/pretty-bytes": {
+    "installed": "6.1.1",
+    "locked": "6.1.1"
+  },
+  "node_modules/pretty-ms": {
+    "installed": "7.0.1",
+    "locked": "7.0.1"
+  },
+  "node_modules/process-nextick-args": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/process-warning": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/prop-types": {
+    "installed": "15.8.1",
+    "locked": "15.8.1"
+  },
+  "node_modules/proxy-compare": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/proxy-from-env": {
+    "installed": "2.1.0",
+    "locked": "2.1.0"
+  },
+  "node_modules/pump": {
+    "installed": "3.0.4",
+    "locked": "3.0.4"
+  },
+  "node_modules/punycode": {
+    "installed": "2.3.1",
+    "locked": "2.3.1"
+  },
+  "node_modules/qrcode": {
+    "installed": "1.5.3",
+    "locked": "1.5.3"
+  },
+  "node_modules/query-string": {
+    "installed": "7.1.3",
+    "locked": "7.1.3"
+  },
+  "node_modules/queue-microtask": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/quick-format-unescaped": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/radix3": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/react": {
+    "installed": "18.3.1",
+    "locked": "18.3.1"
+  },
+  "node_modules/react-day-picker": {
+    "installed": "8.10.1",
+    "locked": "8.10.1"
+  },
+  "node_modules/react-dom": {
+    "installed": "18.3.1",
+    "locked": "18.3.1"
+  },
+  "node_modules/react-fast-compare": {
+    "installed": "3.2.2",
+    "locked": "3.2.2"
+  },
+  "node_modules/react-helmet-async": {
+    "installed": "2.0.5",
+    "locked": "2.0.5"
+  },
+  "node_modules/react-hook-form": {
+    "installed": "7.72.1",
+    "locked": "7.72.1"
+  },
+  "node_modules/react-i18next": {
+    "installed": "16.6.6",
+    "locked": "16.6.6"
+  },
+  "node_modules/react-icons": {
+    "installed": "5.6.0",
+    "locked": "5.6.0"
+  },
+  "node_modules/react-is": {
+    "installed": "16.13.1",
+    "locked": "16.13.1"
+  },
+  "node_modules/react-remove-scroll": {
+    "installed": "2.7.2",
+    "locked": "2.7.2"
+  },
+  "node_modules/react-remove-scroll-bar": {
+    "installed": "2.3.8",
+    "locked": "2.3.8"
+  },
+  "node_modules/react-resizable-panels": {
+    "installed": "2.1.9",
+    "locked": "2.1.9"
+  },
+  "node_modules/react-router": {
+    "installed": "7.18.2",
+    "locked": "7.18.2"
+  },
+  "node_modules/react-router-dom": {
+    "installed": "7.18.2",
+    "locked": "7.18.2"
+  },
+  "node_modules/react-smooth": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/react-style-singleton": {
+    "installed": "2.2.3",
+    "locked": "2.2.3"
+  },
+  "node_modules/react-transition-group": {
+    "installed": "4.4.5",
+    "locked": "4.4.5"
+  },
+  "node_modules/read-cache": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/readable-stream": {
+    "installed": "3.6.2",
+    "locked": "3.6.2"
+  },
+  "node_modules/readdirp": {
+    "installed": "3.6.0",
+    "locked": "3.6.0"
+  },
+  "node_modules/readdirp/node_modules/picomatch": {
+    "installed": "2.3.2",
+    "locked": "2.3.2"
+  },
+  "node_modules/real-require": {
+    "installed": "0.2.0",
+    "locked": "0.2.0"
+  },
+  "node_modules/recharts": {
+    "installed": "2.15.4",
+    "locked": "2.15.4"
+  },
+  "node_modules/recharts-scale": {
+    "installed": "0.4.5",
+    "locked": "0.4.5"
+  },
+  "node_modules/recharts/node_modules/eventemitter3": {
+    "installed": "4.0.7",
+    "locked": "4.0.7"
+  },
+  "node_modules/recharts/node_modules/react-is": {
+    "installed": "18.3.1",
+    "locked": "18.3.1"
+  },
+  "node_modules/reflect.getprototypeof": {
+    "installed": "1.0.10",
+    "locked": "1.0.10"
+  },
+  "node_modules/regenerate": {
+    "installed": "1.4.2",
+    "locked": "1.4.2"
+  },
+  "node_modules/regenerate-unicode-properties": {
+    "installed": "10.2.2",
+    "locked": "10.2.2"
+  },
+  "node_modules/regexp.prototype.flags": {
+    "installed": "1.5.4",
+    "locked": "1.5.4"
+  },
+  "node_modules/regexpu-core": {
+    "installed": "6.4.0",
+    "locked": "6.4.0"
+  },
+  "node_modules/regjsgen": {
+    "installed": "0.8.0",
+    "locked": "0.8.0"
+  },
+  "node_modules/regjsparser": {
+    "installed": "0.13.2",
+    "locked": "0.13.2"
+  },
+  "node_modules/require-directory": {
+    "installed": "2.1.1",
+    "locked": "2.1.1"
+  },
+  "node_modules/require-from-string": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/require-main-filename": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/resolve": {
+    "installed": "1.22.11",
+    "locked": "1.22.11"
+  },
+  "node_modules/resolve-from": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/resolve-pkg-maps": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/reusify": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/rollup": {
+    "installed": "4.60.1",
+    "locked": "4.60.1"
+  },
+  "node_modules/run-parallel": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/safe-array-concat": {
+    "installed": "1.1.4",
+    "locked": "1.1.4"
+  },
+  "node_modules/safe-buffer": {
+    "installed": "5.2.1",
+    "locked": "5.2.1"
+  },
+  "node_modules/safe-push-apply": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/safe-regex-test": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/safe-stable-stringify": {
+    "installed": "2.5.0",
+    "locked": "2.5.0"
+  },
+  "node_modules/satori": {
+    "installed": "0.29.0",
+    "locked": "0.29.0"
+  },
+  "node_modules/scheduler": {
+    "installed": "0.23.2",
+    "locked": "0.23.2"
+  },
+  "node_modules/semver": {
+    "installed": "7.7.2",
+    "locked": "7.7.2"
+  },
+  "node_modules/serialize-javascript": {
+    "installed": "7.1.2",
+    "locked": "7.1.2"
+  },
+  "node_modules/set-blocking": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/set-cookie-parser": {
+    "installed": "2.7.2",
+    "locked": "2.7.2"
+  },
+  "node_modules/set-function-length": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/set-function-name": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/set-proto": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/sha.js": {
+    "installed": "2.4.12",
+    "locked": "2.4.12"
+  },
+  "node_modules/shallowequal": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/sharp": {
+    "installed": "0.35.4",
+    "locked": "0.35.4"
+  },
+  "node_modules/sharp/node_modules/semver": {
+    "installed": "7.8.5",
+    "locked": "7.8.5"
+  },
+  "node_modules/shebang-command": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/shebang-regex": {
+    "installed": "3.0.0",
+    "locked": "3.0.0"
+  },
+  "node_modules/side-channel": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/side-channel-list": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/side-channel-map": {
+    "installed": "1.0.1",
+    "locked": "1.0.1"
+  },
+  "node_modules/side-channel-weakmap": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/signal-exit": {
+    "installed": "4.0.2",
+    "locked": "4.0.2"
+  },
+  "node_modules/slow-redact": {
+    "installed": "0.3.2",
+    "locked": "0.3.2"
+  },
+  "node_modules/smob": {
+    "installed": "1.6.2",
+    "locked": "1.6.2"
+  },
+  "node_modules/socket.io-client": {
+    "installed": "4.8.3",
+    "locked": "4.8.3"
+  },
+  "node_modules/socket.io-parser": {
+    "installed": "4.2.7",
+    "locked": "4.2.7"
+  },
+  "node_modules/sonic-boom": {
+    "installed": "4.2.1",
+    "locked": "4.2.1"
+  },
+  "node_modules/sonner": {
+    "installed": "1.7.4",
+    "locked": "1.7.4"
+  },
+  "node_modules/source-map": {
+    "installed": "0.8.0",
+    "locked": "0.8.0"
+  },
+  "node_modules/source-map-js": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/source-map-support": {
+    "installed": "0.5.21",
+    "locked": "0.5.21"
+  },
+  "node_modules/source-map-support/node_modules/source-map": {
+    "installed": "0.6.1",
+    "locked": "0.6.1"
+  },
+  "node_modules/split-on-first": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/split2": {
+    "installed": "4.2.0",
+    "locked": "4.2.0"
+  },
+  "node_modules/stop-iteration-iterator": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/stream-shift": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/strict-uri-encode": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/string_decoder": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/string-width": {
+    "installed": "4.2.3",
+    "locked": "4.2.3"
+  },
+  "node_modules/string.prototype.codepointat": {
+    "installed": "0.2.1",
+    "locked": "0.2.1"
+  },
+  "node_modules/string.prototype.matchall": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/string.prototype.matchall/node_modules/es-object-atoms": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/string.prototype.trim": {
+    "installed": "1.2.11",
+    "locked": "1.2.11"
+  },
+  "node_modules/string.prototype.trim/node_modules/es-object-atoms": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/string.prototype.trimend": {
+    "installed": "1.0.10",
+    "locked": "1.0.10"
+  },
+  "node_modules/string.prototype.trimend/node_modules/es-object-atoms": {
+    "installed": "1.1.2",
+    "locked": "1.1.2"
+  },
+  "node_modules/string.prototype.trimstart": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/stringify-object": {
+    "installed": "3.3.0",
+    "locked": "3.3.0"
+  },
+  "node_modules/strip-ansi": {
+    "installed": "6.0.1",
+    "locked": "6.0.1"
+  },
+  "node_modules/strip-comments": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/strip-final-newline": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/strip-json-comments": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/sucrase": {
+    "installed": "3.35.1",
+    "locked": "3.35.1"
+  },
+  "node_modules/sucrase/node_modules/commander": {
+    "installed": "4.1.1",
+    "locked": "4.1.1"
+  },
+  "node_modules/supports-color": {
+    "installed": "7.2.0",
+    "locked": "7.2.0"
+  },
+  "node_modules/supports-preserve-symlinks-flag": {
+    "installed": "1.0.0",
+    "locked": "1.0.0"
+  },
+  "node_modules/tailwind-merge": {
+    "installed": "2.6.1",
+    "locked": "2.6.1"
+  },
+  "node_modules/tailwindcss": {
+    "installed": "3.4.19",
+    "locked": "3.4.19"
+  },
+  "node_modules/tailwindcss-animate": {
+    "installed": "1.0.7",
+    "locked": "1.0.7"
+  },
+  "node_modules/tailwindcss/node_modules/postcss-selector-parser": {
+    "installed": "6.1.4",
+    "locked": "6.1.4"
+  },
+  "node_modules/tar": {
+    "installed": "7.5.22",
+    "locked": "7.5.22"
+  },
+  "node_modules/temp-dir": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/tempy": {
+    "installed": "0.6.0",
+    "locked": "0.6.0"
+  },
+  "node_modules/terser": {
+    "installed": "5.51.2",
+    "locked": "5.51.2"
+  },
+  "node_modules/terser/node_modules/commander": {
+    "installed": "2.20.3",
+    "locked": "2.20.3"
+  },
+  "node_modules/thenify": {
+    "installed": "3.3.1",
+    "locked": "3.3.1"
+  },
+  "node_modules/thenify-all": {
+    "installed": "1.6.0",
+    "locked": "1.6.0"
+  },
+  "node_modules/thread-stream": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/three": {
+    "installed": "0.182.0",
+    "locked": "0.182.0"
+  },
+  "node_modules/time-span": {
+    "installed": "4.0.0",
+    "locked": "4.0.0"
+  },
+  "node_modules/tiny-inflate": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/tiny-invariant": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/tinyglobby": {
+    "installed": "0.2.15",
+    "locked": "0.2.15"
+  },
+  "node_modules/to-buffer": {
+    "installed": "1.2.2",
+    "locked": "1.2.2"
+  },
+  "node_modules/to-regex-range": {
+    "installed": "5.0.1",
+    "locked": "5.0.1"
+  },
+  "node_modules/tr46": {
+    "installed": "0.0.3",
+    "locked": "0.0.3"
+  },
+  "node_modules/ts-algebra": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/ts-api-utils": {
+    "installed": "2.5.0",
+    "locked": "2.5.0"
+  },
+  "node_modules/ts-interface-checker": {
+    "installed": "0.1.13",
+    "locked": "0.1.13"
+  },
+  "node_modules/ts-morph": {
+    "installed": "12.0.0",
+    "locked": "12.0.0"
+  },
+  "node_modules/ts-toolbelt": {
+    "installed": "6.15.5",
+    "locked": "6.15.5"
+  },
+  "node_modules/tslib": {
+    "installed": "2.8.1",
+    "locked": "2.8.1"
+  },
+  "node_modules/tsx": {
+    "installed": "4.21.0",
+    "locked": "4.21.0"
+  },
+  "node_modules/type-check": {
+    "installed": "0.4.0",
+    "locked": "0.4.0"
+  },
+  "node_modules/type-fest": {
+    "installed": "0.16.0",
+    "locked": "0.16.0"
+  },
+  "node_modules/typed-array-buffer": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/typed-array-byte-length": {
+    "installed": "1.0.3",
+    "locked": "1.0.3"
+  },
+  "node_modules/typed-array-byte-offset": {
+    "installed": "1.0.4",
+    "locked": "1.0.4"
+  },
+  "node_modules/typed-array-length": {
+    "installed": "1.0.8",
+    "locked": "1.0.8"
+  },
+  "node_modules/typescript": {
+    "installed": "5.9.3",
+    "locked": "5.9.3"
+  },
+  "node_modules/typescript-eslint": {
+    "installed": "8.58.0",
+    "locked": "8.58.0"
+  },
+  "node_modules/ufo": {
+    "installed": "1.6.3",
+    "locked": "1.6.3"
+  },
+  "node_modules/uint8arrays": {
+    "installed": "3.1.1",
+    "locked": "3.1.1"
+  },
+  "node_modules/unbox-primitive": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/uncrypto": {
+    "installed": "0.1.3",
+    "locked": "0.1.3"
+  },
+  "node_modules/undici": {
+    "installed": "6.28.1",
+    "locked": "6.28.1"
+  },
+  "node_modules/undici-types": {
+    "installed": "7.24.7",
+    "locked": "7.24.7"
+  },
+  "node_modules/unicode-canonical-property-names-ecmascript": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/unicode-match-property-ecmascript": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/unicode-match-property-value-ecmascript": {
+    "installed": "2.2.1",
+    "locked": "2.2.1"
+  },
+  "node_modules/unicode-property-aliases-ecmascript": {
+    "installed": "2.2.0",
+    "locked": "2.2.0"
+  },
+  "node_modules/unicode-trie": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/unique-string": {
+    "installed": "2.0.0",
+    "locked": "2.0.0"
+  },
+  "node_modules/universalify": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/upath": {
+    "installed": "1.2.0",
+    "locked": "1.2.0"
+  },
+  "node_modules/update-browserslist-db": {
+    "installed": "1.3.2",
+    "locked": "1.3.2"
+  },
+  "node_modules/uri-js": {
+    "installed": "4.4.1",
+    "locked": "4.4.1"
+  },
+  "node_modules/use-callback-ref": {
+    "installed": "1.3.3",
+    "locked": "1.3.3"
+  },
+  "node_modules/use-sidecar": {
+    "installed": "1.1.3",
+    "locked": "1.1.3"
+  },
+  "node_modules/use-sync-external-store": {
+    "installed": "1.6.0",
+    "locked": "1.6.0"
+  },
+  "node_modules/util": {
+    "installed": "0.12.5",
+    "locked": "0.12.5"
+  },
+  "node_modules/util-deprecate": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/uuid": {
+    "installed": "8.3.2",
+    "locked": "8.3.2"
+  },
+  "node_modules/valtio": {
+    "installed": "2.1.7",
+    "locked": "2.1.7"
+  },
+  "node_modules/vaul": {
+    "installed": "0.9.9",
+    "locked": "0.9.9"
+  },
+  "node_modules/victory-vendor": {
+    "installed": "36.9.2",
+    "locked": "36.9.2"
+  },
+  "node_modules/viem": {
+    "installed": "2.55.13",
+    "locked": "2.55.13"
+  },
+  "node_modules/viem/node_modules/@noble/curves": {
+    "installed": "1.9.1",
+    "locked": "1.9.1"
+  },
+  "node_modules/viem/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/viem/node_modules/abitype": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/vite": {
+    "installed": "6.4.3",
+    "locked": "6.4.3"
+  },
+  "node_modules/vite-plugin-pwa": {
+    "installed": "1.3.0",
+    "locked": "1.3.0"
+  },
+  "node_modules/vite/node_modules/@esbuild/darwin-arm64": {
+    "installed": "0.25.12",
+    "locked": "0.25.12"
+  },
+  "node_modules/vite/node_modules/esbuild": {
+    "installed": "0.25.12",
+    "locked": "0.25.12"
+  },
+  "node_modules/void-elements": {
+    "installed": "3.1.0",
+    "locked": "3.1.0"
+  },
+  "node_modules/wagmi": {
+    "installed": "2.19.5",
+    "locked": "2.19.5"
+  },
+  "node_modules/wagmi/node_modules/@noble/curves": {
+    "installed": "1.9.1",
+    "locked": "1.9.1"
+  },
+  "node_modules/wagmi/node_modules/@noble/hashes": {
+    "installed": "1.8.0",
+    "locked": "1.8.0"
+  },
+  "node_modules/wagmi/node_modules/@wagmi/connectors": {
+    "installed": "6.2.0",
+    "locked": "6.2.0"
+  },
+  "node_modules/wagmi/node_modules/@wagmi/connectors/node_modules/porto": {
+    "installed": "0.2.35",
+    "locked": "0.2.35"
+  },
+  "node_modules/wagmi/node_modules/@wagmi/core": {
+    "installed": "2.22.1",
+    "locked": "2.22.1"
+  },
+  "node_modules/wagmi/node_modules/@wagmi/core/node_modules/zustand": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/wagmi/node_modules/abitype": {
+    "installed": "1.2.3",
+    "locked": "1.2.3"
+  },
+  "node_modules/wagmi/node_modules/ox": {
+    "installed": "0.9.17",
+    "locked": "0.9.17"
+  },
+  "node_modules/wagmi/node_modules/use-sync-external-store": {
+    "installed": "1.4.0",
+    "locked": "1.4.0"
+  },
+  "node_modules/wagmi/node_modules/zod": {
+    "installed": "4.3.6",
+    "locked": "4.3.6"
+  },
+  "node_modules/webextension-polyfill": {
+    "installed": "0.10.0",
+    "locked": "0.10.0"
+  },
+  "node_modules/webidl-conversions": {
+    "installed": "3.0.1",
+    "locked": "3.0.1"
+  },
+  "node_modules/whatwg-url": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/which": {
+    "installed": "2.0.2",
+    "locked": "2.0.2"
+  },
+  "node_modules/which-boxed-primitive": {
+    "installed": "1.1.1",
+    "locked": "1.1.1"
+  },
+  "node_modules/which-builtin-type": {
+    "installed": "1.2.1",
+    "locked": "1.2.1"
+  },
+  "node_modules/which-collection": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/which-module": {
+    "installed": "2.0.1",
+    "locked": "2.0.1"
+  },
+  "node_modules/which-typed-array": {
+    "installed": "1.1.20",
+    "locked": "1.1.20"
+  },
+  "node_modules/word-wrap": {
+    "installed": "1.2.5",
+    "locked": "1.2.5"
+  },
+  "node_modules/workbox-background-sync": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-broadcast-update": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-build": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-build/node_modules/balanced-match": {
+    "installed": "4.0.4",
+    "locked": "4.0.4"
+  },
+  "node_modules/workbox-build/node_modules/brace-expansion": {
+    "installed": "5.0.12",
+    "locked": "5.0.12"
+  },
+  "node_modules/workbox-build/node_modules/glob": {
+    "installed": "11.1.0",
+    "locked": "11.1.0"
+  },
+  "node_modules/workbox-build/node_modules/minimatch": {
+    "installed": "10.2.6",
+    "locked": "10.2.6"
+  },
+  "node_modules/workbox-build/node_modules/pretty-bytes": {
+    "installed": "5.6.0",
+    "locked": "5.6.0"
+  },
+  "node_modules/workbox-cacheable-response": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-core": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-expiration": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-google-analytics": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-navigation-preload": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-precaching": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-range-requests": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-recipes": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-routing": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-strategies": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-streams": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-sw": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/workbox-window": {
+    "installed": "7.4.1",
+    "locked": "7.4.1"
+  },
+  "node_modules/wrap-ansi": {
+    "installed": "6.2.0",
+    "locked": "6.2.0"
+  },
+  "node_modules/wrappy": {
+    "installed": "1.0.2",
+    "locked": "1.0.2"
+  },
+  "node_modules/ws": {
+    "installed": "8.21.3",
+    "locked": "8.21.3"
+  },
+  "node_modules/xdg-app-paths": {
+    "installed": "5.5.1",
+    "locked": "5.5.1"
+  },
+  "node_modules/xdg-portable": {
+    "installed": "7.3.0",
+    "locked": "7.3.0"
+  },
+  "node_modules/xml-escape": {
+    "installed": "1.1.0",
+    "locked": "1.1.0"
+  },
+  "node_modules/xmlhttprequest-ssl": {
+    "installed": "2.1.2",
+    "locked": "2.1.2"
+  },
+  "node_modules/xtend": {
+    "installed": "4.0.2",
+    "locked": "4.0.2"
+  },
+  "node_modules/y18n": {
+    "installed": "4.0.3",
+    "locked": "4.0.3"
+  },
+  "node_modules/yallist": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/yargs": {
+    "installed": "15.4.1",
+    "locked": "15.4.1"
+  },
+  "node_modules/yargs-parser": {
+    "installed": "18.1.3",
+    "locked": "18.1.3"
+  },
+  "node_modules/yargs/node_modules/find-up": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/yargs/node_modules/locate-path": {
+    "installed": "5.0.0",
+    "locked": "5.0.0"
+  },
+  "node_modules/yargs/node_modules/p-limit": {
+    "installed": "2.3.0",
+    "locked": "2.3.0"
+  },
+  "node_modules/yargs/node_modules/p-locate": {
+    "installed": "4.1.0",
+    "locked": "4.1.0"
+  },
+  "node_modules/yocto-queue": {
+    "installed": "0.1.0",
+    "locked": "0.1.0"
+  },
+  "node_modules/yoga-layout": {
+    "installed": "3.2.1",
+    "locked": "3.2.1"
+  },
+  "node_modules/zod": {
+    "installed": "3.25.76",
+    "locked": "3.25.76"
+  },
+  "node_modules/zustand": {
+    "installed": "5.0.3",
+    "locked": "5.0.3"
+  }
+}

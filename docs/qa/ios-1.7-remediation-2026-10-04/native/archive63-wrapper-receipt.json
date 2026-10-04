@@ -1,0 +1,65 @@
+{
+  "checkedAtUTC": "2026-10-04T11:42:06.653941+00:00",
+  "sourceHead": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "workingTree": "clean tracked source",
+  "version": "1.7",
+  "build": "63",
+  "configuration": "Release",
+  "profileUUID": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+  "distributionIdentitySHA1": "A485BF8AE5E66C9127F54E508C426C916B518C26",
+  "profileExpiresUTC": "2027-09-22T12:35:26Z",
+  "sourcePackages": {
+    "path": "/private/tmp/claude-501/-Users-mrrobot-Documents-GitHub-Bobby-Agent-Trader/e040cdf9-5bb4-4dd1-aeee-3d346213d559/scratchpad/lang-derived/SourcePackages",
+    "workspaceStateSHA256": "328954b77c02f28abd3dc75e4fd4a436f4c62af790543c97e338a68bec7fd42b",
+    "dependencies": [
+      {
+        "identity": "gltfkit2",
+        "version": "0.5.15",
+        "revision": "e69e354c4f31ea07b7816b8cbe2ddb28e897d073"
+      },
+      {
+        "identity": "purchases-ios-spm",
+        "version": "5.92.0",
+        "revision": "e45bb84b726885492ce4e7ee94ddb252d171a205"
+      }
+    ]
+  },
+  "uploadOptions": {
+    "path": "/private/tmp/bobby-ios17-remediation-20261004/ExportOptions-63-Upload.plist",
+    "sha256": "9776625e6dd2ba80e72e4e8b9024b525d15793c66e53815b1742d206659af955",
+    "values": {
+      "method": "app-store-connect",
+      "destination": "upload",
+      "teamID": "QZRTV6CMTT",
+      "signingStyle": "manual",
+      "signingCertificate": "Apple Distribution",
+      "provisioningProfiles": {
+        "xyz.bobbyprotocol.bobby": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef"
+      },
+      "manageAppVersionAndBuildNumber": false,
+      "uploadSymbols": true
+    }
+  },
+  "freeAtPreflightGiB": 6.07,
+  "dryRunPreflight": "/private/tmp/bobby-ios17-remediation-20261004/archive63/dry-run-preflight.json",
+  "dryRunPreflightSHA256": "7f657225358d7b090e434b6034c28903742f527c6fd064f2bfdb513e1b75367c",
+  "wrapper": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper.py",
+  "wrapperSHA256": "97cb718b0221434570c2dc16a28e1a75e2c85190f080b6f83772b55aa8feba97",
+  "checks": {
+    "pythonAST": "passed",
+    "cliHelp": "passed",
+    "dryRun": "passed",
+    "archiveExecuted": false,
+    "exportUploadExecuted": false,
+    "deviceActions": false
+  },
+  "diskGuard": {
+    "archiveMinimumStartGiB": 4,
+    "uploadMinimumStartGiB": 3,
+    "stopBelowGiB": 2,
+    "sampleIntervalSeconds": 1,
+    "scope": "Only wrapper-owned xcodebuild process group is stopped; partial archive/logs are preserved."
+  },
+  "distributionAuthorization": "Parent says the user brief explicitly authorizes Archive and TestFlight; root coordinates serial execution.",
+  "claims": "Local signing/profile/cache preflight only. No archive63, upload, TestFlight processing or physical acceptance claim."
+}

@@ -1,0 +1,74 @@
+{
+  "observedAt": "2026-10-04T12:13:43.684311+00:00",
+  "method": "native Safari accessibility UI, read-only navigation; relevant rows transcribed",
+  "app": "Bobby: Think Before You Trade",
+  "appId": "6804460489",
+  "distributionListObserved": "iOS 1.6 Listo para distribuci\u00f3n",
+  "testflightUrl": "https://appstoreconnect.apple.com/teams/bccd998d-3e28-47e6-8e08-bf1894bc6070/apps/6804460489/testflight/ios",
+  "visibleVersion17Builds": [
+    {
+      "build": 60,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    },
+    {
+      "build": 59,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    },
+    {
+      "build": 58,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    },
+    {
+      "build": 57,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    },
+    {
+      "build": 56,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    },
+    {
+      "build": 55,
+      "status": "Lista para enviar",
+      "group": "Founder"
+    }
+  ],
+  "visibleUploadRows": [
+    {
+      "version": "1.7",
+      "build": 60,
+      "status": "Finalizado",
+      "created": "Oct 3, 2026 1:16 PM"
+    },
+    {
+      "version": "1.7",
+      "build": 59,
+      "status": "Finalizado",
+      "created": "Oct 3, 2026 12:47 AM"
+    },
+    {
+      "version": "1.7",
+      "build": 58,
+      "status": "Finalizado",
+      "created": "Oct 2, 2026 11:57 PM"
+    },
+    {
+      "version": "1.7",
+      "build": 57,
+      "status": "Finalizado",
+      "created": "Oct 2, 2026 11:17 PM"
+    },
+    {
+      "version": "1.7",
+      "build": 56,
+      "status": "Finalizado",
+      "created": "Oct 2, 2026 9:22 PM"
+    }
+  ],
+  "build63Visible": false,
+  "boundary": "Latest visible version1.7 and descending upload rows; no claim about installation, physical behavior, unseen history or a future upload. No build upload/group/metadata mutation performed."
+}

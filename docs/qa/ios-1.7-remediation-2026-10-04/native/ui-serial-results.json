@@ -1,0 +1,235 @@
+{
+  "scope": "14 remaining UI classes / 57 methods",
+  "classes": [
+    {
+      "at": "2026-10-04T11:52:51.964545+00:00",
+      "stage": "ProReviewShots",
+      "class": "ProReviewShots",
+      "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+      "expectedMethods": [
+        "testProfileProRows",
+        "testPaywallPurchasable"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "d6fe2634a86c691585498d1f64053fa530c259de0d5d6d5d067b2609a966cc92",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "6ce196ef1334073fd9006a7d4ae63b0452b56a127a2875fdb534a397b7b0cffe",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "ProReviewShots/testPaywallPurchasable()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ProReviewShots/testPaywallPurchasable",
+          "result": "Passed"
+        },
+        {
+          "identifier": "ProReviewShots/testProfileProRows()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/ProReviewShots/testProfileProRows",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T11:55:30.098665+00:00",
+      "stage": "Store35Shots",
+      "class": "Store35Shots",
+      "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+      "expectedMethods": [
+        "testEnglishScreenshots",
+        "testSpanishScreenshots"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "edd23c525d1c81389ed7c70e8d89ad3a69e38961a5f12bbe503928edf71672aa",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "49075e3a22d38e9cce7ec622bb690c71452ef2fac2dc49a5a50722b3e1fdcf17",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "Store35Shots/testEnglishScreenshots()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/Store35Shots/testEnglishScreenshots",
+          "result": "Passed"
+        },
+        {
+          "identifier": "Store35Shots/testSpanishScreenshots()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/Store35Shots/testSpanishScreenshots",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T11:56:59.400478+00:00",
+      "stage": "EquipmentUITests",
+      "class": "EquipmentUITests",
+      "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+      "expectedMethods": [
+        "testEnglishEquipmentChoices",
+        "testSpanishEquipmentChoices"
+      ],
+      "expectedCount": 2,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "cba351210441e2bb775a53d4a81f31c4f58372628a1831a7f76c53ce6e9b20d5",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "63b1cb8acddbf720dfddb01e68acbe73610af668d33a72bc4d7c501310bc747b",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "EquipmentUITests/testEnglishEquipmentChoices()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/EquipmentUITests/testEnglishEquipmentChoices",
+          "result": "Passed"
+        },
+        {
+          "identifier": "EquipmentUITests/testSpanishEquipmentChoices()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/EquipmentUITests/testSpanishEquipmentChoices",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:07:50.816241+00:00",
+      "stage": "LockerTests",
+      "class": "LockerTests",
+      "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+      "expectedMethods": [
+        "testOpensOnYourCompanionWithTheRealCount",
+        "testCounterAcrossTheLadder",
+        "testLockedCompanionShowsSilverAndItsPrice",
+        "testTappingABoxShowsThePiece",
+        "testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost",
+        "testANewDropIsFlagged"
+      ],
+      "expectedCount": 6,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "f5446f9663da91d6caa9c082f2e01b9338e9331b1111de24d40fe04062905eaa",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "10374d68ba6313ed7c7e437e4c0c93f986c7f9f4d8ea625f0875cfa92e6316a5",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "LockerTests/testANewDropIsFlagged()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testANewDropIsFlagged",
+          "result": "Passed"
+        },
+        {
+          "identifier": "LockerTests/testCounterAcrossTheLadder()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testCounterAcrossTheLadder",
+          "result": "Passed"
+        },
+        {
+          "identifier": "LockerTests/testLockedCompanionShowsSilverAndItsPrice()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testLockedCompanionShowsSilverAndItsPrice",
+          "result": "Passed"
+        },
+        {
+          "identifier": "LockerTests/testOpensOnYourCompanionWithTheRealCount()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testOpensOnYourCompanionWithTheRealCount",
+          "result": "Passed"
+        },
+        {
+          "identifier": "LockerTests/testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost",
+          "result": "Passed"
+        },
+        {
+          "identifier": "LockerTests/testTappingABoxShowsThePiece()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testTappingABoxShowsThePiece",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    },
+    {
+      "at": "2026-10-04T12:09:32.092589+00:00",
+      "stage": "SquadGalleryTests",
+      "class": "SquadGalleryTests",
+      "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+      "expectedMethods": [
+        "testEveryCompanionLoadsInTheSquad",
+        "testLockedCompanionShowsItsUnlockTarget",
+        "testActiveCompanionIsNeverShownLocked",
+        "testUnlockedCompanionHasNoLock"
+      ],
+      "expectedCount": 4,
+      "executionExitCode": 0,
+      "issues": [],
+      "summaryExtractionExitCode": 0,
+      "summarySHA256": "4e9596db1bedcf576ccd107d7e80fbb5e7ac807b8d3d5e9a186e0764ad367eab",
+      "testsExtractionExitCode": 0,
+      "testsSHA256": "e5e120e278747b682070d28c4471e5f93040f628d7b1f00cea2a7bb3b967c24b",
+      "officialSummary": {
+        "result": "Passed",
+        "totalTestCount": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "expectedFailures": 0
+      },
+      "actualCases": [
+        {
+          "identifier": "SquadGalleryTests/testActiveCompanionIsNeverShownLocked()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/SquadGalleryTests/testActiveCompanionIsNeverShownLocked",
+          "result": "Passed"
+        },
+        {
+          "identifier": "SquadGalleryTests/testEveryCompanionLoadsInTheSquad()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/SquadGalleryTests/testEveryCompanionLoadsInTheSquad",
+          "result": "Passed"
+        },
+        {
+          "identifier": "SquadGalleryTests/testLockedCompanionShowsItsUnlockTarget()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/SquadGalleryTests/testLockedCompanionShowsItsUnlockTarget",
+          "result": "Passed"
+        },
+        {
+          "identifier": "SquadGalleryTests/testUnlockedCompanionHasNoLock()",
+          "url": "test://com.apple.xcode/Bobby/BobbyUITests/SquadGalleryTests/testUnlockedCompanionHasNoLock",
+          "result": "Passed"
+        }
+      ],
+      "accepted": true
+    }
+  ],
+  "acceptedClasses": 5,
+  "acceptedMethods": 16,
+  "updatedAt": "2026-10-04T12:09:32.092589+00:00",
+  "complete": false
+}

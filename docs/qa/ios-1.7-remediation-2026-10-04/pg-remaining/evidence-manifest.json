@@ -1,0 +1,101 @@
+{
+  "scope": "pg-remaining",
+  "files": {
+    "09-trader-land-moderation-pg.log": {
+      "bytes": 45,
+      "sha256": "96d122d88a12f5a62b43ccd818dd2ad27269233b5e38d3d230930468db438484"
+    },
+    "08-swap-ledger-pg.log": {
+      "bytes": 251,
+      "sha256": "7272c1b7c47cd38e8fbd0ac5b9183e695e003ec2ce204116f94bf896e073c8a8"
+    },
+    "03-trader-land-cells.log": {
+      "bytes": 2719,
+      "sha256": "9f5decf323e36c15237090a4bce3decbe02f6901e12dc44a94568ee3fa0f83f1"
+    },
+    "09-create-bobby_store35_moderation_test.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "receipt-server.log": {
+      "bytes": 6993,
+      "sha256": "5ece73c6c8eb82c090cacfe5e98d61f3987a2eb0c8566d156b854cfd456d5547"
+    },
+    "06-amplitude-billing-pg.log": {
+      "bytes": 94,
+      "sha256": "a12d9db3fbc8e0bafca7fc73fe021b414357b61336bd8649d6ed51453276a705"
+    },
+    "report.md": {
+      "bytes": 4710,
+      "sha256": "e70bf5a2307e47909e262cd9f1bc7487c7c154ab47ac96502e19b5a914f25bb7"
+    },
+    "04-roles.log": {
+      "bytes": 36,
+      "sha256": "bef3f39503a2121fccf5096de53ad9fdc591494e541d7017e1944613fdd0e3a1"
+    },
+    "02-create-qa_cells.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "results.json": {
+      "bytes": 27256,
+      "sha256": "49745b2090ddf3bfb66bf22b43814863848befc5a2ded060de7c17affa4f57ec"
+    },
+    "07-create-qa_rls_lockdown.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "10-web-funnel-pg.log": {
+      "bytes": 125,
+      "sha256": "4e52cc0508b7aabf9ef50142611207a92ced680c38c9ea22d7e329c6ecb57feb"
+    },
+    "01-start.log": {
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+    },
+    "08-create-qa_swap_ledger.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "99-stop.log": {
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+    },
+    "07-rls-lockdown-pg.log": {
+      "bytes": 769,
+      "sha256": "32b5bef1b080037f423bdfeb70937f6399b5e7b3d1420fb61cd651e3cf50aab4"
+    },
+    "06-create-qa_amplitude_billing.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "receipt-PG_VERSION": {
+      "bytes": 3,
+      "sha256": "54183f4323f377b737433a1e98229ead0fdc686f93bab057ecb612daa94002b5"
+    },
+    "00-initdb.log": {
+      "bytes": 943,
+      "sha256": "1e325c4dccb094303cc7afa231769108674f9fe85d1a20b8ff12535a0afcee51"
+    },
+    "10-create-qa_web_funnel.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "receipt-postmaster.opts": {
+      "bytes": 435,
+      "sha256": "18636f90ced00327491f4b32ffa35c40fa1d4f97c17a27bb8d0753bbdfb05df2"
+    },
+    "05-agent-registry-pg.log": {
+      "bytes": 170,
+      "sha256": "a6c7f523aaa7167c22172f8e6abececb67d265bcea726eb4d456a0735867537a"
+    },
+    "05-create-qa_agent_registry.log": {
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    "pg-55497-d10wd748/server.log": {
+      "bytes": 6993,
+      "sha256": "5ece73c6c8eb82c090cacfe5e98d61f3987a2eb0c8566d156b854cfd456d5547"
+    }
+  }
+}

@@ -1,0 +1,455 @@
+{
+  "reviewedAt": "2026-10-04T12:12:50.086341+00:00",
+  "testedCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04",
+  "scope": "Copy plan only; no copy/commit/deletion/product edit performed",
+  "coreFiles": [
+    {
+      "group": "native-current",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/native-unit-contract-a135d6e1-summary.json",
+      "bytes": 1169,
+      "sha256": "40e5a90746f1597109b34b13a6dcc53c6102e872944da6877ed8991f597f2063"
+    },
+    {
+      "group": "native-current",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/native-unit-contract-a135d6e1-tests.json",
+      "bytes": 319688,
+      "sha256": "97dbfcb719f288ae2de0672628ff6859d8feeb638e519d2cb38da8f95f62c1ee"
+    },
+    {
+      "group": "native-current",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/native-unit-contract-a135d6e1-execution.json",
+      "bytes": 2937,
+      "sha256": "3125066a273cabb375a702def634285598ad02735d8cb45d4a78cfb00e422755"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/report.md",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/report.md",
+      "bytes": 3698,
+      "sha256": "8a90046fbd53d22a20d5ad44b5f637f75a028cf26dc819d7d65049235886a93b"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/result.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/result.json",
+      "bytes": 11832,
+      "sha256": "32e30019be419ec3ef2dd7ec1e4bbc2cfece6c087eda77335315b65764ada8e5"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/preflight.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/preflight.json",
+      "bytes": 262556,
+      "sha256": "31537e8792ddb8dcd332a694166e3ce26f2a2bfbc04252893370a65f6a4f586f"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/installed-package-versions.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/installed-package-versions.json",
+      "bytes": 127611,
+      "sha256": "f4e93ca6782a1c8ebe5bf673cbabeb82653c2e7476c0c999f5248cb53d273578"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/dist-manifest.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/dist-manifest.json",
+      "bytes": 151822,
+      "sha256": "3be993da832991a3543106eab51567c5ec7078bef133944eed027a06f53c68a1"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/npm-ci.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/npm-ci.log",
+      "bytes": 2448,
+      "sha256": "61415925d79d1cb520a84ea38c002346b3adcc9f82d7d28251c4e3637570df62"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/npm-build.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/npm-build.log",
+      "bytes": 64026,
+      "sha256": "0a423fad21c95042f5999405c43a9ca172b978a3f9e882b4fbec38edd4ca222d"
+    },
+    {
+      "group": "lock-build",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/lock-build/evidence-manifest.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/lock-build/evidence-manifest.json",
+      "bytes": 1276,
+      "sha256": "d9af1d516d72a8ab2cea0ad66c1425e0ad7469ef5cb819daabc2ae10fe63540f"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/00-initdb.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/00-initdb.log",
+      "bytes": 943,
+      "sha256": "1e325c4dccb094303cc7afa231769108674f9fe85d1a20b8ff12535a0afcee51"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/01-start.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/01-start.log",
+      "bytes": 52,
+      "sha256": "66afd0411ccc09366e99fdd99b85f21899c8d2d064f5835126859618802153ad"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/02-create-qa_cells.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/02-create-qa_cells.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/03-trader-land-cells.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/03-trader-land-cells.log",
+      "bytes": 2719,
+      "sha256": "9f5decf323e36c15237090a4bce3decbe02f6901e12dc44a94568ee3fa0f83f1"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/04-roles.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/04-roles.log",
+      "bytes": 36,
+      "sha256": "bef3f39503a2121fccf5096de53ad9fdc591494e541d7017e1944613fdd0e3a1"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/05-agent-registry-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/05-agent-registry-pg.log",
+      "bytes": 170,
+      "sha256": "a6c7f523aaa7167c22172f8e6abececb67d265bcea726eb4d456a0735867537a"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/05-create-qa_agent_registry.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/05-create-qa_agent_registry.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/06-amplitude-billing-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/06-amplitude-billing-pg.log",
+      "bytes": 94,
+      "sha256": "a12d9db3fbc8e0bafca7fc73fe021b414357b61336bd8649d6ed51453276a705"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/06-create-qa_amplitude_billing.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/06-create-qa_amplitude_billing.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/07-create-qa_rls_lockdown.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/07-create-qa_rls_lockdown.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/07-rls-lockdown-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/07-rls-lockdown-pg.log",
+      "bytes": 769,
+      "sha256": "32b5bef1b080037f423bdfeb70937f6399b5e7b3d1420fb61cd651e3cf50aab4"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/08-create-qa_swap_ledger.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/08-create-qa_swap_ledger.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/08-swap-ledger-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/08-swap-ledger-pg.log",
+      "bytes": 251,
+      "sha256": "7272c1b7c47cd38e8fbd0ac5b9183e695e003ec2ce204116f94bf896e073c8a8"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/09-create-bobby_store35_moderation_test.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/09-create-bobby_store35_moderation_test.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/09-trader-land-moderation-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/09-trader-land-moderation-pg.log",
+      "bytes": 45,
+      "sha256": "96d122d88a12f5a62b43ccd818dd2ad27269233b5e38d3d230930468db438484"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/10-create-qa_web_funnel.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/10-create-qa_web_funnel.log",
+      "bytes": 16,
+      "sha256": "691e4b64d448c6cffd680247056c2f445e4fbf2dcbc9be821934064e906d1ce7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/10-web-funnel-pg.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/10-web-funnel-pg.log",
+      "bytes": 125,
+      "sha256": "4e52cc0508b7aabf9ef50142611207a92ced680c38c9ea22d7e329c6ecb57feb"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/99-stop.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/99-stop.log",
+      "bytes": 56,
+      "sha256": "ca19178a35ab4153b75b494963b66ce8243e1b94c173107c87b44d09db23652d"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/evidence-manifest.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/evidence-manifest.json",
+      "bytes": 3459,
+      "sha256": "3b079b5cef0e7f67d8f5957f42b95660a949299afd856119f8652c47fd14b2df"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/receipt-PG_VERSION",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/receipt-PG_VERSION",
+      "bytes": 3,
+      "sha256": "54183f4323f377b737433a1e98229ead0fdc686f93bab057ecb612daa94002b5"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/receipt-postmaster.opts",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/receipt-postmaster.opts",
+      "bytes": 435,
+      "sha256": "18636f90ced00327491f4b32ffa35c40fa1d4f97c17a27bb8d0753bbdfb05df2"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/receipt-server.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/receipt-server.log",
+      "bytes": 6993,
+      "sha256": "5ece73c6c8eb82c090cacfe5e98d61f3987a2eb0c8566d156b854cfd456d5547"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/report.md",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/report.md",
+      "bytes": 4710,
+      "sha256": "e70bf5a2307e47909e262cd9f1bc7487c7c154ab47ac96502e19b5a914f25bb7"
+    },
+    {
+      "group": "pg-remaining",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining/results.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/pg-remaining/results.json",
+      "bytes": 27256,
+      "sha256": "49745b2090ddf3bfb66bf22b43814863848befc5a2ded060de7c17affa4f57ec"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/report.md",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/report.md",
+      "bytes": 4407,
+      "sha256": "8ce64b642e947dce73cc9a5dfc97d2ee71785c9620d967177faf6a49c1c8ffac"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/result.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/result.json",
+      "bytes": 7204,
+      "sha256": "2289ba4212b2222e4bcf0036a5be9bc7bf8ea371be06d9f52d2fd2903b3e1a94"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/hardness.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/hardness.log",
+      "bytes": 283,
+      "sha256": "49fce945936c0d788aad8fb42ec12ef1f69595b554d5867aab6e4c7258fc36c9"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/bounties.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/bounties.log",
+      "bytes": 774,
+      "sha256": "c72c04a8480d6b061441330ee2f0a0479c3baaebf445c8a45592151527414e3a"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/hardness-network.jsonl",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/hardness-network.jsonl",
+      "bytes": 568,
+      "sha256": "ba4ff1933242761d973fb28d26c6c9b21dab059f9135090fc64ee8b111e4e6fa"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/bounties-network.jsonl",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/bounties-network.jsonl",
+      "bytes": 1076,
+      "sha256": "e757a7eab0a9853106e3e12b9a1321789782f2644a2d6db6ee4b3c28d47d7898"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/first-run-wrapper-receipt.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/first-run-wrapper-receipt.json",
+      "bytes": 3643,
+      "sha256": "e00b16a619a98dd5b8686ff03615d32cdeaa30158e075c1c3457f76ad0bd953a"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/network-guard.cjs",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/network-guard.cjs",
+      "bytes": 3173,
+      "sha256": "076a1891f614116fe27c07813d469553b7a0670b016e356ab8281a75099fa354"
+    },
+    {
+      "group": "anvil",
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/anvil/run-suites.py",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/anvil/run-suites.py",
+      "bytes": 10248,
+      "sha256": "e89acfd5f35647193da12e42ee8499e550dfaa6668764e0cc09db8dd1bf24f88"
+    }
+  ],
+  "coreBytes": 1028667,
+  "optionalFiles": [
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1.log",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/native-unit-contract-a135d6e1.log",
+      "bytes": 415544,
+      "sha256": "8b5a063eb1d985742c7eced73f526eed220ccc3e79056af3363d76586b3cd95f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-run-report.md",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ui-serial-run-report.md",
+      "bytes": 3315,
+      "sha256": "080eec1ea4ae82aae5a0defe6640394416c402db10b1dc39f2697ef4eea170be"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-source-binding.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ui-serial-source-binding.json",
+      "bytes": 2660,
+      "sha256": "d437b959c8d214eea4fa88b16434c96c55c3ac2ff96560450b07dc8c04bbada5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-results.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ui-serial-results.json",
+      "bytes": 8661,
+      "sha256": "53e9ab5b8a2d877656d96a704aeeb0c8fb99778d5be144028d78a1a316fbb82f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-driver-status.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ui-serial-driver-status.json",
+      "bytes": 138,
+      "sha256": "77deaeab05c2692e70088599c8b88783abb983fe65a2ccacdcd6399b6b988606"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ProReviewShots-summary.json",
+      "bytes": 708,
+      "sha256": "d6fe2634a86c691585498d1f64053fa530c259de0d5d6d5d067b2609a966cc92"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ProReviewShots-tests.json",
+      "bytes": 1444,
+      "sha256": "6ce196ef1334073fd9006a7d4ae63b0452b56a127a2875fdb534a397b7b0cffe"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/ProReviewShots-execution.json",
+      "bytes": 2109,
+      "sha256": "8988d74540abbd2fb12accd231848a8e775e9dd0d9f8b5adfc2fb05acfd2b6f0"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/Store35Shots-summary.json",
+      "bytes": 709,
+      "sha256": "edd23c525d1c81389ed7c70e8d89ad3a69e38961a5f12bbe503928edf71672aa"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/Store35Shots-tests.json",
+      "bytes": 1446,
+      "sha256": "49075e3a22d38e9cce7ec622bb690c71452ef2fac2dc49a5a50722b3e1fdcf17"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/Store35Shots-execution.json",
+      "bytes": 2098,
+      "sha256": "307a43216bcdd0531f1dd613824efb2ba53d782fcce9ae1829442c7887eda17c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/EquipmentUITests-summary.json",
+      "bytes": 709,
+      "sha256": "cba351210441e2bb775a53d4a81f31c4f58372628a1831a7f76c53ce6e9b20d5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/EquipmentUITests-tests.json",
+      "bytes": 1831,
+      "sha256": "63b1cb8acddbf720dfddb01e68acbe73610af668d33a72bc4d7c501310bc747b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/EquipmentUITests-execution.json",
+      "bytes": 2121,
+      "sha256": "a041bfe9b19e9674e99875423eb96a72ba74578cb80b1986e96b6c29cadae05f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/LockerTests-summary.json",
+      "bytes": 709,
+      "sha256": "f5446f9663da91d6caa9c082f2e01b9338e9331b1111de24d40fe04062905eaa"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/LockerTests-tests.json",
+      "bytes": 3145,
+      "sha256": "10374d68ba6313ed7c7e437e4c0c93f986c7f9f4d8ea625f0875cfa92e6316a5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/LockerTests-execution.json",
+      "bytes": 2091,
+      "sha256": "db7cc104d868b899f880634093bf87aa1f2596f416f9f3788004032a9b511051"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-summary.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/SquadGalleryTests-summary.json",
+      "bytes": 708,
+      "sha256": "4e9596db1bedcf576ccd107d7e80fbb5e7ac807b8d3d5e9a186e0764ad367eab"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-tests.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/SquadGalleryTests-tests.json",
+      "bytes": 2389,
+      "sha256": "e5e120e278747b682070d28c4471e5f93040f628d7b1f00cea2a7bb3b967c24b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-execution.json",
+      "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/SquadGalleryTests-execution.json",
+      "bytes": 2127,
+      "sha256": "d3dd616a76508533b5e4253e08b0991a253791884238e6e9d3b11e9acf09ff8b"
+    }
+  ],
+  "optionalBytes": 454662,
+  "exclude": [
+    "*.xcresult",
+    "DerivedData",
+    "SourcePackages",
+    "archives/IPA",
+    "node_modules",
+    "npm caches",
+    "dist",
+    "PG data directories",
+    "Anvil cache/compiled artifacts/api and node_modules symlinks"
+  ],
+  "historicalAlreadyTracked": [
+    "pg/report.md",
+    "pg/results.json"
+  ]
+}

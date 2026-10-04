@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T11:52:51.964545+00:00",
+  "stage": "ProReviewShots",
+  "class": "ProReviewShots",
+  "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "expectedMethods": [
+    "testProfileProRows",
+    "testPaywallPurchasable"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "d6fe2634a86c691585498d1f64053fa530c259de0d5d6d5d067b2609a966cc92",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "6ce196ef1334073fd9006a7d4ae63b0452b56a127a2875fdb534a397b7b0cffe",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "ProReviewShots/testPaywallPurchasable()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ProReviewShots/testPaywallPurchasable",
+      "result": "Passed"
+    },
+    {
+      "identifier": "ProReviewShots/testProfileProRows()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/ProReviewShots/testProfileProRows",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

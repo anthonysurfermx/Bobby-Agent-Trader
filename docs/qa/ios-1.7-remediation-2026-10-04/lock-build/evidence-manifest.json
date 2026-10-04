@@ -1,0 +1,41 @@
+{
+  "scope": "lock-build",
+  "files": {
+    "result.json": {
+      "bytes": 11832,
+      "sha256": "32e30019be419ec3ef2dd7ec1e4bbc2cfece6c087eda77335315b65764ada8e5"
+    },
+    "npm-ci.log": {
+      "bytes": 2448,
+      "sha256": "61415925d79d1cb520a84ea38c002346b3adcc9f82d7d28251c4e3637570df62"
+    },
+    "empty-user.npmrc": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "report.md": {
+      "bytes": 3698,
+      "sha256": "8a90046fbd53d22a20d5ad44b5f637f75a028cf26dc819d7d65049235886a93b"
+    },
+    "npm-build.log": {
+      "bytes": 64026,
+      "sha256": "0a423fad21c95042f5999405c43a9ca172b978a3f9e882b4fbec38edd4ca222d"
+    },
+    "installed-package-versions.json": {
+      "bytes": 127611,
+      "sha256": "f4e93ca6782a1c8ebe5bf673cbabeb82653c2e7476c0c999f5248cb53d273578"
+    },
+    "empty-global.npmrc": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "preflight.json": {
+      "bytes": 262556,
+      "sha256": "31537e8792ddb8dcd332a694166e3ce26f2a2bfbc04252893370a65f6a4f586f"
+    },
+    "dist-manifest.json": {
+      "bytes": 151822,
+      "sha256": "3be993da832991a3543106eab51567c5ec7078bef133944eed027a06f53c68a1"
+    }
+  }
+}

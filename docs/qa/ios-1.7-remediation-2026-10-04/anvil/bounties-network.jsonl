@@ -1,0 +1,12 @@
+{"pid":46490,"type":"anvil-spawn","childPid":46494,"executable":"anvil","args":["--port","64365","--quiet","--host","127.0.0.1","--chain-id","31337"]}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"tcp","host":"127.0.0.1","port":64365,"allowed":true}
+{"pid":46490,"type":"anvil-exit","childPid":46494,"code":0,"signal":null}
+{"pid":46490,"type":"node-exit","code":0,"assertions":{"calls":51,"failures":0,"byOperation":{"equal":38,"rejects":4,"ok":5,"match":1,"deepEqual":2,"throws":1}}}
+{"pid":46489,"type":"node-exit","code":0,"assertions":{"calls":0,"failures":0,"byOperation":{}}}
