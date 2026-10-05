@@ -1,6 +1,14 @@
 {
   "rewrites": [
     {
+      "source": "/protocol",
+      "destination": "/_seo/protocol/index.html"
+    },
+    {
+      "source": "/protocol/",
+      "destination": "/_seo/protocol/index.html"
+    },
+    {
       "source": "/app",
       "has": [
         {

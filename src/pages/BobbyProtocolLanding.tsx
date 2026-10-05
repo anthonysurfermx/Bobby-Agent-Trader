@@ -309,6 +309,7 @@ export default function BobbyProtocolLanding() {
     : null;
 
   const explorerAddressUrl = `${stats?.chain?.explorerUrl || 'https://basescan.org'}/address`;
+  const contractUrl = (address: string | undefined) => address ? `${explorerAddressUrl}/${address}` : undefined;
   const c = stats?.contracts;
   const proofPoints = [
     {
@@ -318,7 +319,7 @@ export default function BobbyProtocolLanding() {
         ? `${formatNumber(onchainRecord.decisionsResolved, '0')} resolved · ${formatNumber(onchainRecord.pending, '0')} pending · ${formatNumber(onchainRecord.commitmentsCreated, '0')} commitments`
         : onchainRecord ? 'TrackRecord unavailable right now.' : 'Waiting for the TrackRecord contract.',
       proof: 'TrackRecord contract',
-      href: `${explorerAddressUrl}/${c?.trackRecord?.address ?? ''}`,
+      href: contractUrl(c?.trackRecord?.address),
     },
     {
       label: 'Public debate ledger',
@@ -332,16 +333,18 @@ export default function BobbyProtocolLanding() {
     {
       label: 'Adversarial bounties',
       value: formatNumber(c?.adversarialBounties?.totalPosted),
-      detail: 'Escrowed rewards for proving a verdict wrong. The contract is live and verified; no bounty has been posted yet.',
+      detail: c?.adversarialBounties?.verified && c.adversarialBounties.totalPosted === 0
+        ? 'Escrowed rewards for proving a verdict wrong. The contract is live and verified; no bounty has been posted yet.'
+        : 'Escrowed rewards for proving a verdict wrong.',
       proof: 'AdversarialBounties contract',
-      href: `${explorerAddressUrl}/${c?.adversarialBounties?.address ?? ''}`,
+      href: contractUrl(c?.adversarialBounties?.address),
     },
     {
       label: 'Contracts live',
-      value: String(Object.keys(BOBBY_BASE_MAINNET.contracts).length),
+      value: stats ? String(Object.keys(BOBBY_BASE_MAINNET.contracts).length) : '—',
       detail: 'Track record, oracle, economy, bounties, hardness, identity and intent escrow — all deployed on Base and owned by the 2-of-3 Safe.',
       proof: 'AgentEconomy V2 contract',
-      href: `${explorerAddressUrl}/${c?.agentEconomy?.address ?? ''}`,
+      href: contractUrl(c?.agentEconomy?.address),
     },
   ];
 
@@ -367,16 +370,24 @@ export default function BobbyProtocolLanding() {
 
   return (
     <div className="min-h-screen overflow-x-hidden bg-[#050505] text-white selection:bg-[#0052ff] selection:text-white">
-      <Helmet>
+      <Helmet htmlAttributes={{ lang: 'en' }}>
         <title>Bobby Protocol — Refuted before execution</title>
         <meta name="description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and eligible public theses are committed before the outcome." />
+        <meta name="language" content="English" />
+        <link rel="canonical" href="https://bobbyprotocol.xyz/protocol" />
+        <meta property="og:title" content="Bobby Protocol — Refuted before execution" />
+        <meta property="og:description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and eligible public theses are committed before the outcome." />
+        <meta property="og:url" content="https://bobbyprotocol.xyz/protocol" />
+        <meta property="og:locale" content="en_US" />
+        <meta name="twitter:title" content="Bobby Protocol — Refuted before execution" />
+        <meta name="twitter:description" content="The rules behind every answer Bobby gives about a market. One agent builds the case, a second attacks it, a third rules and can veto it, and eligible public theses are committed before the outcome." />
       </Helmet>
 
       <div className="pointer-events-none fixed inset-0 opacity-[0.05] [background-image:linear-gradient(rgba(255,255,255,.6)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.6)_1px,transparent_1px)] [background-size:52px_52px]" />
 
       <NucleoTopBar links={navItems} />
 
-      <main className="relative">
+      <main className="relative" lang="en">
         <section className="relative isolate min-h-[calc(100vh-72px)] overflow-hidden bg-[#050505] text-white">
           <SectionMedia name="hero" className="opacity-55 grayscale contrast-125" />
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.7)_42%,rgba(5,5,5,.3)_100%)]" />
@@ -527,7 +538,13 @@ export default function BobbyProtocolLanding() {
               </div>
               <p className="max-w-sm text-sm leading-6 text-white/45">Follow one question through the protocol, stage by stage. Then the whole map: a desk read, the daily public debate, another agent over MCP and a swap you sign on Base.</p>
             </div>
-            <ProtocolJourney debate={publicRecord?.latestDebate} />
+            {publicRecord?.latestDebate ? <ProtocolJourney debate={publicRecord.latestDebate} /> : (
+              <div className="flex min-h-[430px] items-center rounded-2xl border border-white/10 bg-[#0B0A09] p-7">
+                <p className="text-sm leading-6 text-white/45">{stats
+                  ? 'The most recent debates were published before the public output guard existed, so none is featured here. The next debate runs at 12:00 UTC.'
+                  : 'Loading the latest debate from the public ledger…'}</p>
+              </div>
+            )}
             <div className="mb-6 mt-20 font-mono text-xs font-bold uppercase tracking-[0.22em] text-[#7da6ff]">The whole map</div>
             <ArchitectureFlow />
           </div>
@@ -656,7 +673,7 @@ export default function BobbyProtocolLanding() {
                 {
                   title: 'Proof',
                   description: 'The daily public debate stores every call with entry, stop, target and a 48-hour expiry before the outcome, and grades it on the real 1H price path. Eligible calls the cycle commits live also go to TrackRecordV2 on Base; price-verified and attested outcomes are kept apart.',
-                  telemetry: [`cycle  ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`, `resolver  ${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}`, 'grading  first touch · stop wins a tie', `chain  base · 8453 · ${formatNumber(onchainRecord?.commitmentsCreated, '0')} on-chain`],
+                  telemetry: [`cycle  ${stats?.pipeline?.cycle?.schedule ?? 'daily 12:00 UTC'}`, `resolver  ${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}`, 'grading  first touch · stop wins a tie', `chain  base · 8453 · ${formatNumber(onchainRecord?.commitmentsCreated)} on-chain`],
                 },
               ]} />
           </div>
@@ -691,10 +708,10 @@ export default function BobbyProtocolLanding() {
                     title: 'The daily cycle',
                     rows: [
                       ['Endpoint', stats?.pipeline?.cycle?.endpoint ?? '/api/bobby-cycle'],
-                      ['Agents', `Alpha ${stats?.pipeline?.cycle?.models?.alpha ?? 'gpt-4o-mini'} → Red Team ${stats?.pipeline?.cycle?.models?.redTeam ?? 'gpt-4o-mini'} → CIO ${stats?.pipeline?.cycle?.models?.cio ?? 'gpt-4o'} with a forced structured verdict: action, direction, entry, stop, target, invalidation, conviction 1–10.`],
+                      ['Agents', `Alpha ${stats?.pipeline?.cycle?.models?.alpha ?? '—'} → Red Team ${stats?.pipeline?.cycle?.models?.redTeam ?? '—'} → CIO ${stats?.pipeline?.cycle?.models?.cio ?? '—'} with a forced structured verdict: action, direction, entry, stop, target, invalidation, conviction 1–10.`],
                       ['Evidence', 'Public market prices, funding, open interest and top-trader positioning, a technical pulse across indicators, Fear & Greed, Polymarket and the dollar index.'],
-                      ['Gate', `Conviction = 70% backend model + 30% CIO. A call is committed only when the CIO asks to act with complete levels and conviction ≥ ${stats?.pipeline?.cycle?.commitConvictionFloor ?? 0.35}.`],
-                      ['Grading', `${stats?.pipeline?.cycle?.horizonHours ?? 48} h expiry. ${stats?.pipeline?.resolver?.method ?? '1H candle path, first touch, stop wins a same-bar tie'} (${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}).`],
+                      ['Gate', `Conviction = 70% backend model + 30% CIO. A call is committed only when the CIO asks to act with complete levels and conviction ≥ ${stats?.pipeline?.cycle?.commitConvictionFloor ?? '—'}.`],
+                      ['Grading', `${stats?.pipeline?.cycle?.horizonHours ?? '—'} h expiry. ${stats?.pipeline?.resolver?.method ?? '1H candle path, first touch, stop wins a same-bar tie'} (${stats?.pipeline?.resolver?.schedule ?? 'daily 12:30 UTC'}).`],
                       ['Record', 'Public, with the full debate. Live commits also go to TrackRecordV2 on Base.'],
                     ],
                   },
@@ -742,7 +759,7 @@ export default function BobbyProtocolLanding() {
                   <div className="text-[#C9C2B6]">bobby_debate · bobby_analyze · bobby_judge <span className="text-[#F6B94E]">premium</span></div>
                   <div className="text-[#C9C2B6]">bobby_brief · bobby_ta · bobby_intel · bobby_uniswap_quote <span className="text-[#3FE0B5]">free</span></div>
                   <div className="mt-2 text-[#8A8378]">→ premium call</div>
-                  <div className="text-[#9AB4FF]">x402 · {mcp?.pricing?.premium?.price ?? '0.000025 ETH'} · paid on Base (8453)</div>
+                  <div className="text-[#9AB4FF]">x402 · {mcp?.pricing?.premium?.price ?? '—'} · paid on Base (8453)</div>
                 </div>
                 <p className="relative mt-6 max-w-lg text-[15px] leading-7 text-[#A39C91]">Request a debate, a judge score or a brief from any MCP client. Premium calls settle in AgentEconomy on Base before the answer is returned.</p>
                 <div className="relative mt-auto pt-6 font-mono text-[11px] uppercase tracking-[0.16em] text-[#F2EDE4]">Read the docs →</div>
@@ -800,8 +817,8 @@ export default function BobbyProtocolLanding() {
 
             <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 font-mono text-[11px] text-white/35">
               <span>Base · 8453</span>
-              <a href={`${explorerAddressUrl}/${stats?.contracts?.trackRecord?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on Basescan ↗</a>
-              <a href={`${explorerAddressUrl}/${stats?.contracts?.agentEconomy?.address ?? ''}`} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on Basescan ↗</a>
+              <a href={contractUrl(c?.trackRecord?.address)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">TrackRecord on Basescan ↗</a>
+              <a href={contractUrl(c?.agentEconomy?.address)} target="_blank" rel="noreferrer" className="transition hover:text-[#7da6ff]">AgentEconomy on Basescan ↗</a>
               <a href="/protocol/heartbeat" className="transition hover:text-[#7da6ff]">Full contract heartbeat →</a>
             </div>
           </div>

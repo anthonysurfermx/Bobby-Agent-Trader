@@ -19,7 +19,8 @@ export default function NucleoTopBar({ links = PROTOCOL_LINKS }: { links?: Reado
   const spanishLabels: Record<string, string> = { Protocol: 'Protocolo', Calls: 'Consultas', Record: 'Historial', Docs: 'Documentación', Heartbeat: 'Actividad', App: 'App' };
   const localizedHref = (href: string) => {
     if (!href.startsWith('/') || href.startsWith('//')) return href;
-    const url = new URL(href, window.location.origin);
+    const origin = typeof window === 'undefined' ? 'https://bobbyprotocol.xyz' : window.location.origin;
+    const url = new URL(href, origin);
     url.searchParams.set('lang', language);
     url.searchParams.set('locale', locale());
     return url.pathname + url.search + url.hash;

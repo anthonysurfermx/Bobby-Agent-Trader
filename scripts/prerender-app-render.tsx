@@ -1,13 +1,24 @@
 import { renderToStaticMarkup } from 'react-dom/server';
 import { HelmetProvider, type FilledContext } from 'react-helmet-async';
 import { AnimatePresence } from 'framer-motion';
+import type { ReactNode } from 'react';
+import { StaticRouter } from 'react-router-dom';
 import BobbyAppLandingWorld from '../src/pages/BobbyAppLandingWorld';
+import BobbyProtocolLanding from '../src/pages/BobbyProtocolLanding';
 import { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale } from '../src/lib/app-language';
 
 export { APP_LANGUAGES, APP_LOCALES, appLanguage, appLocale };
 
 /** Render the public marketing component only. Effects never run on the server. */
 export function renderApp(language: string, locale: string) {
+  return renderPublicPage(<BobbyAppLandingWorld />, language, locale);
+}
+
+export function renderProtocol() {
+  return renderPublicPage(<StaticRouter location="/protocol"><BobbyProtocolLanding /></StaticRouter>, 'en', 'en-US');
+}
+
+function renderPublicPage(element: ReactNode, language: string, locale: string) {
   const storage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
   const originalFetch = globalThis.fetch;
   const values = new Map([['bobby_lang', language], ['bobby_locale', locale]]);
@@ -28,7 +39,7 @@ export function renderApp(language: string, locale: string) {
     // Keep the static first paint readable. The existing client still owns animations.
     const body = renderToStaticMarkup(
       <HelmetProvider context={context}>
-        <AnimatePresence initial={false}><BobbyAppLandingWorld /></AnimatePresence>
+        <AnimatePresence initial={false}>{element}</AnimatePresence>
       </HelmetProvider>,
     );
     return {
