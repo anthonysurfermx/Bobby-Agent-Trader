@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react-swc';
 import { createRequire } from 'node:module';
 import { readFile, writeFile, readdir, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
+import { parse, serialize } from 'parse5';
 
 process.env.NODE_ENV = 'production';
 const root = process.cwd();
@@ -78,11 +79,20 @@ try {
   const protocolAssets = '<link rel="modulepreload" href="/' + protocol.file + '"/>'
     + [...styles].filter((style) => !template.includes('href="/' + style + '"')).map((style) => '<link rel="stylesheet" href="/' + style + '"/>').join('')
     + '<link id="nucleo-fonts" rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&amp;family=Geist+Mono:wght@400;500&amp;family=Sora:wght@200;300;400;500&amp;display=swap"/>';
-  const protocolHtml = documentFor(renderer.renderProtocol(), protocolAssets)
-    .replace('<body>', '<body class="nucleo-pages">')
-    .replace(/<meta\b(?=[^>]*\bname="keywords")[^>]*>/g, '')
-    .replace(/<meta\b(?=[^>]*\bproperty="og:locale:alternate")[^>]*>/g, '')
-    .replace(/<script\b[^>]*type="application\/ld\+json"[^>]*>[\s\S]*?<\/script>/g, '');
+  const protocolDocument = parse(documentFor(renderer.renderProtocol(), protocolAssets));
+  const htmlElement = protocolDocument.childNodes.find((node) => node.tagName === 'html');
+  const headElement = htmlElement?.childNodes.find((node) => node.tagName === 'head');
+  const bodyElement = htmlElement?.childNodes.find((node) => node.tagName === 'body');
+  if (!headElement || !bodyElement) throw new Error('The public protocol document is incomplete');
+  const attribute = (node, name) => node.attrs?.find((attr) => attr.name === name)?.value;
+  // Remove only the template's generic metadata nodes, never sanitize HTML with a regular expression.
+  headElement.childNodes = headElement.childNodes.filter((node) => !(
+    (node.tagName === 'script' && attribute(node, 'type') === 'application/ld+json')
+    || (node.tagName === 'meta' && attribute(node, 'name') === 'keywords')
+    || (node.tagName === 'meta' && attribute(node, 'property') === 'og:locale:alternate')
+  ));
+  bodyElement.attrs.push({ name: 'class', value: 'nucleo-pages' });
+  const protocolHtml = serialize(protocolDocument);
   await mkdir(path.join(out, '_seo', 'protocol'), { recursive: true });
   await writeFile(path.join(out, '_seo', 'protocol', 'index.html'), protocolHtml);
   console.log('Public prerender: /app (13 locales, 6 aliases) and /protocol (approved English copy, no fetched data).');
