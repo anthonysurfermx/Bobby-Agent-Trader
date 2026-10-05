@@ -1,6 +1,128 @@
 {
   "rewrites": [
     {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "en(?:[-_](?:US|GB|AU|CA|IE))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>en-(?:US|GB|AU|CA|IE))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "es(?:[-_](?:MX|ES|US))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>es-(?:MX|ES|US))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "fr(?:[-_](?:FR))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>fr-(?:FR))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "pt(?:[-_](?:PT|BR))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>pt-(?:PT|BR))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "it(?:[-_](?:IT))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>it-(?:IT))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "de(?:[-_](?:DE))?"
+        },
+        {
+          "type": "query",
+          "key": "locale",
+          "value": "(?<locale>de-(?:DE))"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "(?<locale>en-(?:US|GB|AU|CA|IE)|es-(?:MX|ES|US)|fr-FR|pt-(?:PT|BR)|it-IT|de-DE)"
+        }
+      ],
+      "destination": "/_seo/app/:locale.html"
+    },
+    {
+      "source": "/app",
+      "has": [
+        {
+          "type": "query",
+          "key": "lang",
+          "value": "(?<language>en|es|fr|pt|it|de)"
+        }
+      ],
+      "destination": "/_seo/app/:language.html"
+    },
+    {
+      "source": "/app",
+      "destination": "/_seo/app/en.html"
+    },
+    {
       "source": "/bobby",
       "destination": "/agentic-world/bobby"
     },
