@@ -541,7 +541,7 @@ export default function BobbyProtocolLanding() {
             {publicRecord?.latestDebate ? <ProtocolJourney debate={publicRecord.latestDebate} /> : (
               <div className="flex min-h-[430px] items-center rounded-2xl border border-white/10 bg-[#0B0A09] p-7">
                 <p className="text-sm leading-6 text-white/45">{stats
-                  ? 'The most recent debates were published before the public output guard existed, so none is featured here. The next debate runs at 12:00 UTC.'
+                  ? 'No public debate is available to replay right now.'
                   : 'Loading the latest debate from the public ledger…'}</p>
               </div>
             )}
