@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && node scripts/build-client-telemetry.mjs && vite build && node scripts/prerender-app.mjs",
+    "build": "node scripts/prod-source-guard.mjs && npm run check:api && npm run check:admin && node scripts/build-client-telemetry.mjs && vite build --manifest && node scripts/prerender-app.mjs",
     "build:dev": "node scripts/build-client-telemetry.mjs && vite build --mode development",
     "check:api": "tsc -p tsconfig.api.json && node scripts/ci/check-api-esm-imports.mjs",
     "lint": "eslint .",
@@ -179,6 +179,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "globals": "^15.15.0",
     "lovable-tagger": "^1.3.3",
+    "parse5": "8.0.1",
     "pg": "^8.23.0",
     "postcss": "^8.5.26",
     "tailwindcss": "^3.4.17",
