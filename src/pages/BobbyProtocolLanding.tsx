@@ -393,7 +393,7 @@ export default function BobbyProtocolLanding() {
           <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(5,5,5,.96)_0%,rgba(5,5,5,.7)_42%,rgba(5,5,5,.3)_100%)]" />
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_76%_46%,rgba(0,82,255,.4),transparent_35%)]" />
           <div className="relative z-10 mx-auto flex min-h-[calc(100vh-72px)] max-w-7xl flex-col justify-center px-5 pb-20 pt-20 lg:px-8 lg:pb-28 lg:pt-24">
-            <motion.div initial={{ opacity: 0, y: 18 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
+            <motion.div initial={false} animate={{ opacity: 1, y: 0 }} transition={{ duration: .55 }}>
               <a href="/record" className="mb-8 inline-flex items-center gap-2 font-mono text-[11px] font-bold uppercase tracking-[0.22em] text-[#7da6ff] transition hover:text-white">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#0052ff]" />The rules behind every answer Bobby gives about a market <span aria-hidden>›</span>
               </a>
@@ -558,7 +558,7 @@ export default function BobbyProtocolLanding() {
 
           <div className="relative z-10 mx-auto max-w-7xl px-5 pb-20 pt-24 lg:px-8 lg:pb-28 lg:pt-32">
             <motion.div
-              initial={{ opacity: 0, y: 18 }}
+              initial={false}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.25 }}
               className="max-w-3xl"
@@ -615,7 +615,7 @@ export default function BobbyProtocolLanding() {
               ].map(({ icon: Icon, eyebrow, title, text, state, step }, index) => (
                 <motion.article
                   key={title}
-                  initial={{ opacity: 0, y: 18 }}
+                  initial={false}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.07 }}
@@ -798,7 +798,7 @@ export default function BobbyProtocolLanding() {
                   href={point.href}
                   target="_blank"
                   rel="noreferrer"
-                  initial={{ opacity: 0, y: 14 }}
+                  initial={false}
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.06 }}
