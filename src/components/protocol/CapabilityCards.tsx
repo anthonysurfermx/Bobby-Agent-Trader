@@ -95,7 +95,7 @@ export default function CapabilityCards({ items }: { items: Capability[] }) {
         return (
           <motion.article
             key={cap.title}
-            initial={{ opacity: 0, y: 18 }}
+            initial={false}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, amount: 0.2 }}
             transition={{ delay: i * 0.06, duration: 0.5 }}
