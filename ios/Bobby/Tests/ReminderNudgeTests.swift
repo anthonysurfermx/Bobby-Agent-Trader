@@ -298,10 +298,9 @@ final class ReminderNudgeTests: XCTestCase {
     func testReminderCopyNeverSoundsLikeTheMarketWasWatched() {
         let rows = NativeTranslations18.reminders
         XCTAssertFalse(rows.isEmpty)
-        // A reminder is something the person set. The lock-screen line is the one place a market
-        // alert is named, to say this is not one.
-        let lockScreen = "You asked me to remind you to review a thesis. This is your reminder, not a market alert."
-        let intro = "A reminder is a note to yourself: on the day you choose, Bobby reminds you to review a thesis. Bobby does not watch the market for you."
+        // A reminder is something the person set. No line names a market alert, not even to deny it.
+        let lockScreen = "Your reminder to review a thesis."
+        let intro = "Your chosen date. Bobby does not monitor markets."
         for (english, translations) in rows {
             let all = [english] + translations.values
             for text in all {
@@ -310,9 +309,7 @@ final class ReminderNudgeTests: XCTestCase {
                     XCTAssertNil(text.range(of: "\\b\(word)", options: [.regularExpression, .caseInsensitive]), "\(word): \(text)")
                 }
             }
-            if english != lockScreen {
-                XCTAssertNil(english.range(of: "alert", options: .caseInsensitive), english)
-            }
+            XCTAssertNil(english.range(of: "alert", options: .caseInsensitive), english)
             if english != intro {
                 for word in ["watch", "monitor", "detect"] {
                     XCTAssertNil(english.range(of: word, options: .caseInsensitive), "\(word): \(english)")

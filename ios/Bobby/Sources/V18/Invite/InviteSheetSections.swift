@@ -12,6 +12,11 @@ enum InviteCopied: Equatable {
 
 /// The reward sentence and the share text, from the server's own numbers.
 enum InviteCopy {
+    /// The one line on the face: who gets what, for which accounts.
+    static func rewardShort(days: Int) -> String {
+        L.t("You get \(days) Pro days per new account.", "Recibes \(days) días Pro por cada cuenta nueva.")
+    }
+
     /// Who gets what. The friend who sends the invitation is the one rewarded.
     static func reward(days: Int, max: Int) -> String {
         L.t("You get \(days) days of Bobby Pro for each friend who creates an account with your invitation, up to \(max) friends.",
@@ -39,41 +44,34 @@ struct InviteOwnCode: View {
     @Binding var copied: InviteCopied?
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(L.t("YOUR CODE", "TU CÓDIGO"))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(Theme.warmDim)
-                    .accessibilityHidden(true)
+        Button {
+            UIPasteboard.general.string = code
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            copied = .code
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
                 Text(code)
-                    .font(.system(size: 28, weight: .medium, design: .monospaced))
+                    .font(.system(size: 26, weight: .medium, design: .monospaced))
                     .tracking(3)
                     .foregroundStyle(Theme.cream)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                    .textSelection(.enabled)
-                    .accessibilityLabel(L.t("Your invitation code", "Tu código de invitación"))
-                    .accessibilityValue(code.map(String.init).joined(separator: " "))
                     .accessibilityIdentifier("invite-own-code")
+                if copied == .code {
+                    Text(L.t("Copied", "Copiado")).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted)
+                } else {
+                    Image(systemName: "doc.on.doc").font(.system(size: 13, weight: .regular)).foregroundStyle(Theme.warmDim)
+                        .accessibilityHidden(true)
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 8)
-            Button {
-                UIPasteboard.general.string = code
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                copied = .code
-            } label: {
-                Text(copied == .code ? L.t("Copied", "Copiado") : L.t("Copy code", "Copiar código"))
-                    .font(.system(size: 14, weight: .medium))
-                    .padding(.horizontal, 16)
-                    .frame(minHeight: 44)
-                    .foregroundStyle(Theme.cream)
-                    .background(Capsule().stroke(Theme.nucleoStroke))
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("invite-copy-code")
+            .frame(minHeight: 48)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel(L.t("Your invitation code", "Tu código de invitación") + ", " + code.map(String.init).joined(separator: " "))
+        .accessibilityHint(L.t("Copy code", "Copiar código"))
+        .accessibilityIdentifier("invite-copy-code")
     }
 }
 
@@ -81,8 +79,12 @@ struct InviteAcceptSection: View {
     @ObservedObject var invites: InviteLinkCenter
     /// Runs after a Sign in with Apple that started here succeeded (the host binds the progress).
     var afterSignIn: (() async -> Void)?
+    /// Open from the start when an invitation is waiting or was just answered; otherwise one quiet
+    /// link ("Have a code?") unfolds the field.
+    var startsOpen = true
     @ObservedObject private var account = AccountSession.shared
     @State private var code = ""
+    @State private var open = false
     @FocusState private var focused: Bool
 
     private var signedIn: Bool { invites.isSignedIn }
@@ -96,11 +98,12 @@ struct InviteAcceptSection: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(L.t("DID A FRIEND INVITE YOU?", "¿TE INVITÓ UN AMIGO?"))
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .tracking(1.2)
-                .foregroundStyle(Theme.warmDim)
-                .accessibilityAddTraits(.isHeader)
+            if !(startsOpen || open) {
+                QuietLink(title: L.t("Have a code?", "¿Tienes un código?"), id: "invite-have-code") {
+                    withAnimation(.easeOut(duration: 0.2)) { open = true }
+                    focused = true
+                }
+            } else {
             HStack(spacing: 10) {
                 TextField(L.t("Invitation code", "Código de invitación"), text: $code)
                     .textInputAutocapitalization(.characters)
@@ -147,7 +150,7 @@ struct InviteAcceptSection: View {
             }
             if let saved = invites.pendingCode {
                 HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(L.t("Invitation \(saved) is saved on this phone.", "La invitación \(saved) está guardada en este teléfono."))
+                    Text(L.t("Saved on this iPhone.", "Guardada en este iPhone."))
                         .font(.system(size: 13))
                         .foregroundStyle(Theme.warmMuted)
                         .fixedSize(horizontal: false, vertical: true)
@@ -182,7 +185,7 @@ struct InviteAcceptSection: View {
                     .foregroundStyle(Theme.warmMuted)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("invite-sign-in-needed")
-                SignInWithAppleButton(.signIn) { account.prepareAppleRequest($0) } onCompletion: { result in
+                SignInWithAppleButton(.continue) { account.prepareAppleRequest($0) } onCompletion: { result in
                     Task {
                         await account.completeApple(result)
                         if account.isSignedIn { await afterSignIn?() }
@@ -192,6 +195,7 @@ struct InviteAcceptSection: View {
                 .frame(height: 48)
                 .clipShape(Capsule())
                 .accessibilityIdentifier("invite-apple-sign-in")
+            }
             }
         }
         .onAppear { if code.isEmpty, let saved = invites.pendingCode { code = saved } }

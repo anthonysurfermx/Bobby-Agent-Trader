@@ -124,7 +124,7 @@ final class ReminderCenterTests: XCTestCase {
         let notice = try XCTUnwrap(fake.requests["v18.thesis.\(nvda.id)"])
         XCTAssertEqual(notice.id, ReminderCenter.identifier(nvda.id))
         XCTAssertEqual(notice.title, "Bobby")
-        XCTAssertEqual(notice.body, "You asked me to remind you to review a thesis. This is your reminder, not a market alert.")
+        XCTAssertEqual(notice.body, "Your reminder to review a thesis.")
         XCTAssertEqual(notice.fireAt, at(2026, 10, 14, 18))
         XCTAssertEqual(notice.userInfo["kind"] as? String, "thesis-review")
         XCTAssertEqual(notice.userInfo["thesisId"] as? String, nvda.id)
@@ -389,7 +389,7 @@ final class ReminderCenterTests: XCTestCase {
             await c.cancel(thesisId: nvda.id)
         }
         XCTAssertEqual(Set(bodies.values).count, 6, "each language has its own sentence")
-        XCTAssertEqual(bodies["es"], "Me pediste que te recordara revisar una tesis. Este es tu recordatorio, no una alerta de mercado.")
+        XCTAssertEqual(bodies["es"], "Tu recordatorio para revisar una tesis.")
         XCTAssertTrue(try XCTUnwrap(bodies["fr"]).contains("thèse"))
         XCTAssertTrue(try XCTUnwrap(bodies["de"]).contains("These"))
         XCTAssertEqual(ReminderCopy.notificationBody(language: "xx"), bodies["en"], "an unknown language falls back to English")

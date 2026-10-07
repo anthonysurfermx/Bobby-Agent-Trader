@@ -462,6 +462,7 @@ struct NucleoInviteSheet: View {
     @State private var copied: InviteCopied? = nil
     /// Fixed when the sheet opens, so the section does not move while a code is being typed.
     @State private var acceptFirst: Bool? = nil
+    @State private var showsDetails = false
 
     /// The server's numbers for the reward sentence; nil while the app does not have them.
     private var reward: (days: Int, max: Int)? {
@@ -471,138 +472,79 @@ struct NucleoInviteSheet: View {
     /// An invitation is waiting or was just answered: that part of the sheet comes first.
     private var showsAcceptFirst: Bool { acceptFirst ?? (invites.pendingCode != nil || invites.notice != nil) }
 
+    /// V18-DESIGN.md, "Invite": who gets what in one line, the real progress, the code (a tap copies
+    /// it), one action, and a folded field for a friend's code. A waiting invitation comes first.
     var body: some View {
-        // Scrolls so the medium detent never clips the link on a small phone.
-        ScrollView {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack {
-                Text(L.t("INVITE A FRIEND", "INVITA A UN AMIGO"))
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .tracking(1.2)
-                    .foregroundStyle(Theme.warmDim)
-                Spacer()
-                Button(action: onClose) {
-                    Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmMuted)
-                        .frame(width: 44, height: 44).background(Circle().fill(Theme.nucleoGlass))
+        QuietSheet(title: showsAcceptFirst && invites.pendingCode != nil ? L.t("Invitation ready", "Invitación pendiente")
+                                                                       : L.t("Invite a friend", "Invita a un amigo"),
+                   subtitle: reason ?? (proPurchasable ? reward.map { InviteCopy.rewardShort(days: $0.days) } : nil),
+                   closeId: "invite-close", onClose: onClose,
+                   onInfo: proPurchasable && reward != nil ? { showsDetails = true } : nil) {
+            VStack(alignment: .leading, spacing: 0) {
+                if showsAcceptFirst {
+                    InviteAcceptSection(invites: invites, afterSignIn: afterSignIn).padding(.top, 16)
+                    Rectangle().fill(Theme.warmHair).frame(height: 1).padding(.top, 14)
                 }
-                .accessibilityLabel(L.t("Close", "Cerrar"))
-            }
-            if let reason {
-                Text(reason).font(.system(size: 14)).foregroundStyle(Theme.warmMuted)
-            }
-            if showsAcceptFirst {
-                InviteAcceptSection(invites: invites, afterSignIn: afterSignIn)
-                Divider().overlay(Theme.nucleoStroke)
-            }
-            Text(L.t("Invite a friend", "Invita a un amigo"))
-                .font(.system(size: 28, weight: .light))
-                .foregroundStyle(Theme.cream)
-            // Who gets what, in the server's own numbers, and only where Bobby Pro can be had.
-            if proPurchasable, let reward {
-            Text(InviteCopy.reward(days: reward.days, max: reward.max))
-                .font(.system(size: 15))
-                .foregroundStyle(Theme.warmMuted)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("invite-reward")
-            slots
-            } else {
-                Text(L.t("Share Bobby with someone you know.", "Comparte Bobby con alguien que conoces."))
-                    .font(.system(size: 15)).foregroundStyle(Theme.warmMuted)
-            }
-            if let referral = center.referral, let url = URL(string: referral.url) {
-                // The eight characters on their own: a friend who installs the app first can type them.
-                let ownCode = InviteLink.normalized(referral.code)
-                if let ownCode { InviteOwnCode(code: ownCode, copied: $copied) }
-                HStack(spacing: 10) {
+                // Real progress, and only where the reward exists.
+                if proPurchasable, reward != nil { slots.padding(.top, 16) }
+                if let referral = center.referral, let url = URL(string: referral.url) {
+                    // The eight characters on their own: a friend who installs the app first can type them.
+                    let ownCode = InviteLink.normalized(referral.code)
+                    if let ownCode { InviteOwnCode(code: ownCode, copied: $copied).padding(.top, 10) }
                     ShareLink(item: url, message: Text(InviteCopy.shareMessage(code: ownCode))) {
-                        Label(L.t("Share link", "Compartir link"), systemImage: "square.and.arrow.up")
-                            .font(.system(size: 15, weight: .semibold))
-                            .frame(maxWidth: .infinity, minHeight: 48)
-                            .foregroundStyle(Color.black)
+                        Text(L.t("Share", "Compartir")).quietFont(15, .medium, relativeTo: .callout)
+                            .foregroundStyle(Theme.bg)
+                            .frame(maxWidth: .infinity, minHeight: 50)
                             .background(Capsule().fill(Theme.cream))
+                            .contentShape(Capsule())
                     }
+                    .padding(.top, 10)
                     .accessibilityIdentifier("invite-share-link")
-                    Button {
-                        UIPasteboard.general.string = referral.url
-                        UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        copied = .link
-                    } label: {
-                        Text(copied == .link ? L.t("Copied", "Copiado") : L.t("Copy link", "Copiar link"))
-                            .font(.system(size: 15, weight: .medium))
-                            .padding(.horizontal, 14)
-                            .frame(minWidth: 88, minHeight: 48)
-                            .foregroundStyle(Theme.cream)
-                            .background(Capsule().stroke(Theme.nucleoStroke))
-                    }
-                    .accessibilityIdentifier("invite-copy-link")
+                } else if AccountSession.shared.isSignedIn {
+                    QuietNote(text: center.loaded ? L.t("Invite link unavailable.", "Link de invitación no disponible.")
+                                                  : L.t("Getting your link…", "Obteniendo tu link…"))
+                        .padding(.top, 16)
+                } else if !showsAcceptFirst {
+                    QuietNote(text: L.t("Sign in for your link.", "Inicia sesión para tener tu link.")).padding(.top, 16)
                 }
-                Text(referral.url.replacingOccurrences(of: "https://", with: ""))
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundStyle(Theme.warmDim)
-                    .lineLimit(1).truncationMode(.middle)
-            } else if AccountSession.shared.isSignedIn {
-                Text(center.loaded ? L.t("Your invite link isn’t ready yet.", "Tu link de invitación aún no está listo.")
-                                   : L.t("Loading your link…", "Cargando tu link…"))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmDim)
-            } else {
-                Text(L.t("Sign in to get your invite link.", "Entra con tu cuenta para tener tu link."))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmDim)
-            }
-            if !showsAcceptFirst {
-                Divider().overlay(Theme.nucleoStroke)
-                InviteAcceptSection(invites: invites, afterSignIn: afterSignIn)
-            }
-            if proPurchasable, let onPro {
-                Divider().overlay(Theme.nucleoStroke)
-                Button(action: onPro) {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Bobby Pro").font(.system(size: 16, weight: .semibold)).foregroundStyle(Theme.cream)
-                            Text(BobbyStore.Copy.benefits)
-                                .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                                .multilineTextAlignment(.leading)
-                                .fixedSize(horizontal: false, vertical: true)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(Theme.warmDim)
-                    }
-                    .padding(14)
-                    .background(RoundedRectangle(cornerRadius: 14).fill(Theme.nucleoGlass))
+                if !showsAcceptFirst {
+                    InviteAcceptSection(invites: invites, afterSignIn: afterSignIn, startsOpen: false).padding(.top, 8)
                 }
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.top, 18)
-        .padding(.bottom, 12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .scrollIndicators(.hidden)
-        .scrollBounceBehavior(.basedOnSize)
-        .background(Theme.nucleoSurface.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task { await center.refresh() }
         .onAppear { if acceptFirst == nil { acceptFirst = invites.pendingCode != nil || invites.notice != nil } }
         // The result line was on screen: it is said once.
         .onDisappear { invites.acknowledgeNotice() }
+        .sheet(isPresented: $showsDetails) {
+            QuietSheet(title: L.t("Details", "Detalles"), closeId: "invite-details-close", onClose: { showsDetails = false }) {
+                VStack(alignment: .leading, spacing: 12) {
+                    if let reward { QuietNote(text: InviteCopy.reward(days: reward.days, max: reward.max), id: "invite-reward") }
+                    QuietNote(text: L.t("New accounts only, within their first week.", "Solo cuentas nuevas, durante su primera semana."))
+                }
+                .padding(.top, 16)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.nucleoSurface)
+        }
     }
 
+    /// Five neutral slots and the count: what happened, not a decoration.
     private var slots: some View {
         let total = center.referral?.max ?? center.maxFriends
         let filled = min(center.referral?.accepted ?? 0, total)
-        return HStack(spacing: 10) {
+        return HStack(spacing: 8) {
             ForEach(0..<max(1, total), id: \.self) { i in
-                ZStack {
-                    Circle().stroke(Theme.nucleoStroke.opacity(i < filled ? 0 : 1), style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    if i < filled {
-                        Circle().fill(Theme.orbViolet.opacity(0.16))
-                        Image(systemName: "checkmark").font(.system(size: 14, weight: .semibold)).foregroundStyle(Theme.orbViolet)
-                    } else {
-                        Image(systemName: "plus").font(.system(size: 13)).foregroundStyle(Theme.warmDim)
-                    }
-                }
-                .frame(width: 44, height: 44)
+                Circle().fill(i < filled ? Theme.cream : Theme.warmFill)
+                    .overlay(Circle().stroke(Theme.nucleoStroke, lineWidth: i < filled ? 0 : 1))
+                    .frame(width: 10, height: 10)
             }
+            Spacer(minLength: 8)
+            Text("\(filled)/\(total)").quietFont(15, relativeTo: .callout).monospacedDigit().foregroundStyle(Theme.warmMuted)
         }
+        .frame(minHeight: 28)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(L.t("\(filled) of \(total) friends", "\(filled) de \(total) amigos"))
     }

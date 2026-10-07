@@ -304,3 +304,40 @@ struct QuietDisclosure<Content: View>: View {
         }
     }
 }
+
+/// A switch and what it switches. `detail` is for the one case where a state needs a sentence
+/// (a paused memory says what paused means); otherwise the label is enough.
+struct QuietToggle: View {
+    let label: String
+    var detail: String? = nil
+    let isOn: Bool
+    var saving = false
+    var enabled = true
+    let id: String
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(label).quietFont(16).foregroundStyle(Theme.cream).quietWraps()
+                    if let detail {
+                        Text(detail).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).quietWraps()
+                    }
+                }
+                Spacer(minLength: 8)
+                if saving { ProgressView().controlSize(.small).tint(Theme.warmMuted) }
+                Toggle("", isOn: Binding(get: { isOn }, set: { new in if enabled, new != isOn { onChange(new) } }))
+                    .labelsHidden()
+                    .tint(Theme.orbViolet)
+                    .disabled(!enabled)
+            }
+            .frame(minHeight: 52)
+            .padding(.vertical, 4)
+            Rectangle().fill(Theme.warmHair).frame(height: 1)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(saving ? L.t("Saving", "Guardando") : (isOn ? L.t("On", "Activado") : L.t("Off", "Desactivado")))
+        .accessibilityIdentifier(id)
+    }
+}

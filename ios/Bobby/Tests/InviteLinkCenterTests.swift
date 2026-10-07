@@ -1049,8 +1049,9 @@ final class InviteLinkCenterTests: XCTestCase {
                     "That invitation could not be applied.", "Sign in to accept an invitation.",
                     "Bobby could not check that code right now. It is saved and will be tried again.",
                     "Accept the risk notice first: until then Bobby sends nothing to its servers.",
-                    "DID A FRIEND INVITE YOU?", "Invitation code", "Apply", "Applying…", "Invitation {0} is saved on this phone.",
-                    "Remove", "Remove the saved invitation", "YOUR CODE", "Your invitation code", "Copy code", "Copy link",
+                    "Have a code?", "Invitation code", "Apply", "Applying…", "Saved on this iPhone.", "Invitation ready",
+                    "Remove", "Remove the saved invitation", "Your invitation code", "Copy code", "Share",
+                    "You get {0} Pro days per new account.", "New accounts only, within their first week.",
                     "You get {0} days of Bobby Pro for each friend who creates an account with your invitation, up to {1} friends.",
                     "My invitation code: {0}"]
         for english in said {

@@ -36,7 +36,7 @@ final class ReminderRequestTests: XCTestCase {
         let request = notice(fireAt: evening(in: calendar, days: 7), calendar: calendar).request()
         XCTAssertEqual(request.identifier, "v18.thesis.\(Self.thesisId)", "the thesis id as stored")
         XCTAssertEqual(request.content.title, "Bobby")
-        XCTAssertEqual(request.content.body, "You asked me to remind you to review a thesis. This is your reminder, not a market alert.")
+        XCTAssertEqual(request.content.body, "Your reminder to review a thesis.")
         XCTAssertEqual(request.content.subtitle, "")
         XCTAssertEqual(request.content.sound, UNNotificationSound.default)
         XCTAssertNil(request.content.badge, "a reminder never puts a number on the icon")

@@ -154,45 +154,30 @@ struct RemindersContent: View {
     @State private var consentMissing = false
     @State private var appeared = false
 
+    /// V18-DESIGN.md, "Reminders": one line of scope, then a row per thesis: its date, or the way
+    /// to set one. Only the row being set unfolds its four choices.
     var body: some View {
-        ScrollView {
+        QuietSheet(title: ReminderCopy.title, subtitle: ReminderCopy.intro, closeId: "reminders-close", onClose: actions.close) {
             VStack(alignment: .leading, spacing: 0) {
-                header
-                Text(ReminderCopy.intro)
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
-                    .accessibilityIdentifier("reminders-intro")
                 if model.rows.isEmpty {
-                    Text(ReminderCopy.empty)
-                        .font(.system(size: 14)).foregroundStyle(Theme.cream).fixedSize(horizontal: false, vertical: true)
-                        .padding(.top, 22)
+                    Text(ReminderCopy.empty).quietFont(16).foregroundStyle(Theme.cream).quietWraps()
+                        .padding(.top, 8)
                         .accessibilityIdentifier("reminders-empty")
                 } else {
-                    VStack(alignment: .leading, spacing: 0) {
-                        ForEach(model.rows) { row in thesisRow(row) }
-                    }
-                    .padding(.top, 14)
+                    ForEach(model.rows) { row in thesisRow(row) }
                 }
                 if !model.riskAccepted || consentMissing {
-                    BriefingNote(text: L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
-                                           "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores."))
-                        .accessibilityIdentifier("reminders-risk-required")
+                    QuietNote(text: CreditsRestoreNotice.beforeRiskNotice(), id: "reminders-risk-required").padding(.top, 14)
                 }
                 if model.permission == .denied { deniedFoot }
                 if model.showsBriefingRow {
-                    BriefingLinkRow(symbol: "calendar", label: ReminderCopy.briefingRow, detail: ReminderCopy.briefingRowDetail,
-                                    action: actions.openBriefing)
-                        .padding(.top, 18)
-                        .accessibilityIdentifier("reminders-briefing")
+                    QuietRow(label: ReminderCopy.briefingRow, chevron: true, hairline: false, spoken: ReminderCopy.briefingRow + ". " + ReminderCopy.briefingRowDetail,
+                             id: "reminders-briefing", action: actions.openBriefing)
+                        .padding(.top, 8)
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 18)
-            .padding(.bottom, 28)
+            .padding(.top, 12)
         }
-        .scrollIndicators(.hidden)
-        .background(Theme.nucleoSurface.ignoresSafeArea())
-        .environment(\.colorScheme, .dark)
         .environment(\.locale, L.locale)
         .onAppear {
             guard !appeared else { return }
@@ -205,205 +190,139 @@ struct RemindersContent: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .center) {
-            Text(ReminderCopy.title)
-                .font(.system(size: 26, weight: .light, design: .rounded)).foregroundStyle(Theme.cream)
-                .accessibilityAddTraits(.isHeader)
-                .accessibilityIdentifier("reminders-title")
-            Spacer(minLength: 12)
-            Button(action: actions.close) {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmMuted)
-                    .frame(width: 30, height: 30).background(Circle().fill(Theme.warmFill))
-                    .frame(width: 44, height: 44, alignment: .trailing)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(ReminderCopy.close)
-            .accessibilityIdentifier("reminders-close")
-        }
-    }
-
     // MARK: A thesis
 
     @ViewBuilder
     private func thesisRow(_ row: RemindersModel.Row) -> some View {
+        let step = row.step(openId: openId, pickingId: pickingId)
         VStack(alignment: .leading, spacing: 0) {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(row.symbol).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.cream)
-                    if !row.name.isEmpty, row.name.caseInsensitiveCompare(row.symbol) != .orderedSame {
-                        Text(row.name).font(.system(size: 13)).foregroundStyle(Theme.warmDim).lineLimit(1)
+            HStack(alignment: .center, spacing: 8) {
+                Text(row.symbol).quietFont(17).foregroundStyle(Theme.cream)
+                    .accessibilityIdentifier("reminders-thesis-\(row.symbol)")
+                Spacer(minLength: 12)
+                switch step {
+                case .busy:
+                    ProgressView().controlSize(.small).tint(Theme.warmMuted)
+                case .set:
+                    QuietLink(title: ReminderCopy.setReminder, id: "reminders-set-\(row.symbol)") { open(row) }
+                case .pending:
+                    if let fireAt = row.fireAt {
+                        // The date is the control: a tap changes it. Removing it is in the menu.
+                        Button { open(row) } label: { whenLabel(fireAt, ink: Theme.cream).frame(minHeight: 44).contentShape(Rectangle()) }
+                            .buttonStyle(.plain)
+                            .accessibilityHint(ReminderCopy.change)
+                            .accessibilityIdentifier("reminders-change-\(row.symbol)")
+                        Menu {
+                            Button(ReminderCopy.remove, role: .destructive) {
+                                failedId = nil
+                                Task { await actions.remove(row) }
+                            }
+                        } label: {
+                            QuietGlyph(systemImage: "ellipsis")
+                        }
+                        .accessibilityLabel(L.t("More options", "Más opciones") + ", " + row.symbol)
+                        .accessibilityIdentifier("reminders-remove-\(row.symbol)")
+                    }
+                case .choosing, .picking:
+                    // The reminder in place stays in view until a new day is confirmed.
+                    if let fireAt = row.fireAt { whenLabel(fireAt, ink: Theme.warmMuted) }
+                }
+            }
+            .frame(minHeight: 56)
+            .padding(.trailing, step == .pending ? -7 : 0)
+            if step == .choosing {
+                choices(row)
+                if row.offersWayBack(step) {
+                    QuietLink(title: ReminderCopy.keepDay, id: "reminders-keep-\(row.symbol)") {
+                        failedId = nil
+                        pickingId = nil
+                        openId = nil
                     }
                 }
-                Text(row.why).font(.system(size: 13)).foregroundStyle(Theme.warmMuted).lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("reminders-thesis-\(row.symbol)")
-
-            let step = row.step(openId: openId, pickingId: pickingId)
-            switch step {
-            case .busy:
-                ProgressView().controlSize(.small).tint(Theme.warmMuted).frame(minHeight: 44)
-            case .set:
-                ReminderPill(title: ReminderCopy.setReminder) { open(row) }
-                    .accessibilityIdentifier("reminders-set-\(row.symbol)")
-            case .pending:
-                if let fireAt = row.fireAt { pendingLine(row, fireAt: fireAt) }
-            case .choosing:
-                // The reminder in place stays in view while the person looks at other days.
-                if let fireAt = row.fireAt {
-                    if row.offersWayBack(step) { changingLine(row, fireAt: fireAt) } else { whenLabel(fireAt).frame(minHeight: 34) }
-                }
-                choices(row)
-            case .picking:
-                if let fireAt = row.fireAt { whenLabel(fireAt).frame(minHeight: 34) }
-                picker(row)
-            }
+            if step == .picking { picker(row) }
             if failedId == row.id {
-                Text(ReminderCopy.failed).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true).padding(.bottom, 6)
-                    .accessibilityIdentifier("reminders-failed")
+                QuietNote(text: ReminderCopy.failed, id: "reminders-failed").padding(.bottom, 8)
             }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.top, 12)
-        .padding(.bottom, 6)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-    }
-
-    private func pendingLine(_ row: RemindersModel.Row, fireAt: Date) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                whenLabel(fireAt)
-                Spacer(minLength: 8)
-                pendingButtons(row)
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                whenLabel(fireAt).frame(minHeight: 34)
-                HStack(spacing: 8) { pendingButtons(row) }
-            }
+            Rectangle().fill(Theme.warmHair).frame(height: 1)
         }
     }
 
-    /// The date in place next to the way back to it (and to Change / Remove).
-    private func changingLine(_ row: RemindersModel.Row, fireAt: Date) -> some View {
-        ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
-                whenLabel(fireAt)
-                Spacer(minLength: 8)
-                keepPill(row)
-            }
-            VStack(alignment: .leading, spacing: 0) {
-                whenLabel(fireAt).frame(minHeight: 34)
-                keepPill(row)
-            }
-        }
-    }
-
-    private func keepPill(_ row: RemindersModel.Row) -> some View {
-        ReminderPill(title: ReminderCopy.keepDay) {
-            failedId = nil
-            pickingId = nil
-            openId = nil
-        }
-        .accessibilityIdentifier("reminders-keep-\(row.symbol)")
-    }
-
-    private func whenLabel(_ fireAt: Date) -> some View {
+    private func whenLabel(_ fireAt: Date, ink: Color) -> some View {
         let when = ReminderCopy.when(fireAt)
         return HStack(spacing: 7) {
             Image(systemName: "bell").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.warmDim)
-            Text(when).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.cream)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(when).quietFont(15, relativeTo: .callout).monospacedDigit().foregroundStyle(ink).quietWraps()
         }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(ReminderCopy.reminderOn(when))
         .accessibilityIdentifier("reminders-when")
     }
 
-    @ViewBuilder
-    private func pendingButtons(_ row: RemindersModel.Row) -> some View {
-        ReminderPill(title: ReminderCopy.change) { open(row) }
-            .accessibilityIdentifier("reminders-change-\(row.symbol)")
-        ReminderPill(title: ReminderCopy.remove) {
-            failedId = nil
-            Task { await actions.remove(row) }
-        }
-        .accessibilityIdentifier("reminders-remove-\(row.symbol)")
-    }
-
-    /// The three presets and "Pick a day": one line when it fits, two when it does not, a column
+    /// The three presets and "Choose date": one line when it fits, two when it does not, a column
     /// for the largest text sizes.
     private func choices(_ row: RemindersModel.Row) -> some View {
         let presets = ReminderPreset.allCases
         return ViewThatFits(in: .horizontal) {
             HStack(spacing: 8) {
-                ForEach(presets) { presetPill($0, row) }
-                pickPill(row)
+                ForEach(presets) { presetChip($0, row) }
+                pickChip(row)
             }
-            VStack(alignment: .leading, spacing: 0) {
-                HStack(spacing: 8) { ForEach(presets.prefix(2)) { presetPill($0, row) } }
-                HStack(spacing: 8) { ForEach(presets.dropFirst(2)) { presetPill($0, row) }; pickPill(row) }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) { ForEach(presets.prefix(2)) { presetChip($0, row) } }
+                HStack(spacing: 8) { ForEach(presets.dropFirst(2)) { presetChip($0, row) }; pickChip(row) }
             }
-            VStack(alignment: .leading, spacing: 0) {
-                ForEach(presets) { presetPill($0, row) }
-                pickPill(row)
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(presets) { presetChip($0, row) }
+                pickChip(row)
             }
         }
+        .padding(.bottom, 10)
     }
 
-    private func presetPill(_ preset: ReminderPreset, _ row: RemindersModel.Row) -> some View {
-        ReminderPill(title: ReminderCopy.preset(preset)) {
+    private func presetChip(_ preset: ReminderPreset, _ row: RemindersModel.Row) -> some View {
+        QuietChip(title: ReminderCopy.preset(preset), id: "reminders-\(preset.rawValue)-\(row.symbol)") {
             run(row) { await actions.preset(row, preset) }
         }
-        .accessibilityIdentifier("reminders-\(preset.rawValue)-\(row.symbol)")
     }
 
-    private func pickPill(_ row: RemindersModel.Row) -> some View {
-        ReminderPill(title: ReminderCopy.pickDay) {
+    private func pickChip(_ row: RemindersModel.Row) -> some View {
+        QuietChip(title: ReminderCopy.pickDay, id: "reminders-pick-\(row.symbol)") {
             failedId = nil
             picked = ReminderSchedule.defaultPick(now: Date(), calendar: .autoupdatingCurrent)
             pickingId = row.id
         }
-        .accessibilityIdentifier("reminders-pick-\(row.symbol)")
     }
 
     private func picker(_ row: RemindersModel.Row) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             DatePicker(ReminderCopy.dayAndTime, selection: $picked,
                        in: ReminderSchedule.pickRange(now: Date(), calendar: .autoupdatingCurrent),
                        displayedComponents: [.date, .hourAndMinute])
                 .datePickerStyle(.compact)
-                .font(.system(size: 14)).foregroundStyle(Theme.cream)
+                .labelsHidden()
                 .tint(Theme.orbViolet)
                 .frame(minHeight: 44)
+                .accessibilityLabel(ReminderCopy.dayAndTime)
                 .accessibilityIdentifier("reminders-date-\(row.symbol)")
             HStack(spacing: 8) {
-                ReminderPill(title: ReminderCopy.confirmPick, prominent: true) {
+                QuietChip(title: ReminderCopy.confirmPick, selected: true, id: "reminders-confirm-\(row.symbol)") {
                     let date = picked
                     run(row) { await actions.pick(row, date) }
                 }
-                .accessibilityIdentifier("reminders-confirm-\(row.symbol)")
-                ReminderPill(title: ReminderCopy.cancel) { pickingId = nil }
-                    .accessibilityIdentifier("reminders-cancel-\(row.symbol)")
+                QuietChip(title: ReminderCopy.cancel, id: "reminders-cancel-\(row.symbol)") { pickingId = nil }
             }
         }
-        .padding(.top, 4)
+        .padding(.bottom, 10)
     }
 
     private var deniedFoot: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "bell.slash").font(.system(size: 12, weight: .medium)).foregroundStyle(Theme.warmDim)
-                Text(ReminderCopy.denied).font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-            ReminderPill(title: ReminderCopy.openSettings, action: actions.openSettings)
-                .accessibilityIdentifier("reminders-open-settings")
+        HStack(alignment: .center, spacing: 10) {
+            QuietNote(text: ReminderCopy.denied, systemImage: "bell.slash")
+            Spacer(minLength: 8)
+            QuietLink(title: ReminderCopy.openSettings, id: "reminders-open-settings", action: actions.openSettings)
         }
-        .padding(.top, 18)
+        .padding(.top, 10)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("reminders-denied")
     }

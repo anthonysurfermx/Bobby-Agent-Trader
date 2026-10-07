@@ -8,8 +8,7 @@ enum ReminderCopy {
     /// The lock-screen line: fixed and generic, in the app's language when the reminder is written.
     static func notificationBody(language: String = L.language) -> String {
         let text: (Bool) -> String = { spanish in
-            L.t("You asked me to remind you to review a thesis. This is your reminder, not a market alert.",
-                "Me pediste que te recordara revisar una tesis. Este es tu recordatorio, no una alerta de mercado.", spanish: spanish)
+            L.t("Your reminder to review a thesis.", "Tu recordatorio para revisar una tesis.", spanish: spanish)
         }
         switch language {
         case "es": return text(true)
@@ -21,34 +20,32 @@ enum ReminderCopy {
     static var title: String { L.t("Reminders", "Recordatorios") }
 
     static var intro: String {
-        L.t("A reminder is a note to yourself: on the day you choose, Bobby reminds you to review a thesis. Bobby does not watch the market for you.",
-            "Un recordatorio es una nota para ti: el día que elijas, Bobby te recuerda revisar una tesis. Bobby no vigila el mercado por ti.")
+        L.t("Your chosen date. Bobby does not monitor markets.", "Tú eliges la fecha. Bobby no vigila el mercado.")
     }
 
     static var empty: String {
-        L.t("Reminders are for theses you wrote. Write one after your next read.",
-            "Los recordatorios son para las tesis que escribiste. Escribe una después de tu próxima lectura.")
+        L.t("Write a thesis first.", "Escribe una tesis primero.")
     }
 
     static var denied: String {
-        L.t("Notifications are off for Bobby in iOS Settings.", "Las notificaciones de Bobby están apagadas en la Configuración de iOS.")
+        L.t("Bobby notifications are off.", "Las notificaciones de Bobby están apagadas.")
     }
 
     static var failed: String {
-        L.t("The reminder could not be set. Try again.", "No se pudo guardar el recordatorio. Inténtalo de nuevo.")
+        L.t("Reminder not set.", "Recordatorio no guardado.")
     }
 
     static func preset(_ preset: ReminderPreset) -> String {
         switch preset {
-        case .threeDays: return L.t("In 3 days", "En 3 días")
-        case .week: return L.t("In a week", "En una semana")
-        case .month: return L.t("In a month", "En un mes")
+        case .threeDays: return L.t("3 days", "3 días")
+        case .week: return L.t("1 week", "1 semana")
+        case .month: return L.t("1 month", "1 mes")
         }
     }
 
-    static var pickDay: String { L.t("Pick a day", "Elegir un día") }
-    static var setReminder: String { L.t("Set a reminder", "Poner un recordatorio") }
-    static var confirmPick: String { L.t("Remind me then", "Recuérdamelo ese día") }
+    static var pickDay: String { L.t("Choose date", "Elegir fecha") }
+    static var setReminder: String { L.t("Set reminder", "Poner recordatorio") }
+    static var confirmPick: String { L.t("Set", "Guardar") }
     static var dayAndTime: String { L.t("Day and time", "Día y hora") }
     static var change: String { L.t("Change", "Cambiar") }
     /// Leaves "Change" without changing anything.

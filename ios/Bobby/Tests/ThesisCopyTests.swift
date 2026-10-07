@@ -137,8 +137,6 @@ final class ThesisCopyTests: XCTestCase {
         for day in ["1 ott", "8 ott", "11 ott"] {
             XCTAssertEqual(L.t("Since \(day)", "Desde el \(day)"), "Dal giorno \(day)")
             XCTAssertEqual(L.t("Since \(day) · started at \(price)", "Desde el \(day) · empezó en \(price)"), "Dal giorno \(day) · partita da 120,50")
-            XCTAssertEqual(L.t("Started \(day)", "Empezó el \(day)"), "Partita il giorno \(day)")
-            XCTAssertEqual(L.t("Evidence dated \(day)", "Evidencia con fecha \(day)"), "Dati del giorno \(day)")
             XCTAssertEqual(L.t("Free reads come back on \(day).", "Las lecturas gratis vuelven el \(day)."), "Le analisi gratuite tornano il giorno \(day).")
         }
         XCTAssertEqual(L.t("Write my thesis", "Escribir mi tesis"), "Scrivo la mia tesi", "the person writes it; Bobby is not told to")

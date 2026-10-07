@@ -21,14 +21,20 @@ struct MemoryView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
-                if onClose != nil { BriefingTopBar(title: L.t("Memory", "Memoria"), onClose: onClose) }
-                Text(L.t("What Bobby remembers", "Lo que Bobby recuerda"))
-                    .font(.system(size: 26, weight: .light, design: .rounded)).foregroundStyle(Theme.cream)
-                    .padding(.top, onClose == nil ? 4 : 14)
-                content
+                HStack(alignment: .top, spacing: 0) {
+                    Text(L.t("Memory", "Memoria")).quietFont(26, .light, design: .rounded, relativeTo: .title)
+                        .foregroundStyle(Theme.cream).padding(.top, 6)
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    if let onClose {
+                        QuietGlyphButton(systemImage: "xmark", label: L.t("Close", "Cerrar"), id: "memory-close", action: onClose)
+                    }
+                }
+                .padding(.trailing, -7)
+                content.padding(.top, 2)
             }
-            .padding(.horizontal, 22)
-            .padding(.top, onClose == nil ? 8 : 16)
+            .padding(.horizontal, 24)
+            .padding(.top, 14)
             .padding(.bottom, 32)
         }
         .scrollIndicators(.hidden)
@@ -56,7 +62,7 @@ struct MemoryView: View {
             Button(L.t("Delete everything", "Borrar todo"), role: .destructive) { Task { await center.confirmForgetAll() } }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) { center.cancelForgetAll() }
         } message: {
-            Text(Self.deleteEverythingWarning)
+            Text(Self.deleteEverythingWarning + " " + Self.deliveredBriefingsNote)
         }
     }
 
@@ -64,6 +70,11 @@ struct MemoryView: View {
     static var deleteEverythingWarning: String {
         L.t("This deletes what Bobby's servers remember about your account, the shortcuts on this iPhone and the theses you wrote here. It cannot be undone.",
             "Esto borra lo que los servidores de Bobby recuerdan de tu cuenta, los accesos rápidos de este iPhone y las tesis que escribiste aquí. No se puede deshacer.")
+    }
+
+    static var deliveredBriefingsNote: String {
+        L.t("Memory-based briefings already delivered are removed too. A paused memory stays paused.",
+            "También se eliminan los resúmenes basados en memoria ya entregados. Si la memoria está en pausa, sigue en pausa.")
     }
 
     @ViewBuilder private var content: some View {
@@ -96,76 +107,74 @@ struct MemoryView: View {
         }
     }
 
+    /// V18-DESIGN.md, "Memory": two switches, the assets, and three rows that unfold (preferences,
+    /// what this iPhone keeps, how it works). Nothing that was explained on the face is gone: it is
+    /// one tap away, and the consent sheet says all of it before anything is turned on.
     @ViewBuilder private func loaded(_ s: MemorySnapshot) -> some View {
-        MemoryExplanation(retentionDays: s.retentionDays, compact: true)
-            .padding(.top, 2)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("memory-retention")
-        if !center.nativeOptedIn { turnOn }
-        BriefingToggleRow(label: L.t("Use account memory", "Usar memoria de la cuenta"),
-                          detail: s.enabled ? L.t("Bobby can use your memory for answers and opted-in briefings.",
-                                                  "Bobby puede usar tu memoria para respuestas y resúmenes aceptados.")
-                                            : L.t("Paused across web and iPhone: no new asks are saved or personalized.",
+        QuietToggle(label: L.t("Use account memory", "Usar memoria de la cuenta"),
+                    detail: s.enabled ? nil : L.t("Paused across web and iPhone: no new asks are saved or personalized.",
                                                   "En pausa en web y iPhone: no se guardan ni personalizan consultas nuevas."),
-                          footnote: nil, isOn: s.enabled, saving: center.saving, enabled: !center.saving) { on in
+                    isOn: s.enabled, saving: center.saving, enabled: !center.saving, id: "memory-enabled") { on in
             Task { await center.setEnabled(on) }
         }
-        .padding(.top, 18)
-        .accessibilityIdentifier("memory-enabled")
+        .padding(.top, 10)
         if center.nativeOptedIn {
             // On only through the consent sheet; switching it off here is immediate and needs no network.
-            BriefingToggleRow(label: L.t("Include iPhone questions", "Incluir preguntas del iPhone"),
-                              detail: L.t("New iPhone desk answers can update your account memory.",
-                                          "Las respuestas nuevas del desk en iPhone pueden actualizar la memoria de tu cuenta."),
-                              footnote: nil, isOn: center.nativeOptedIn, saving: false, enabled: !center.saving) { on in
+            QuietToggle(label: L.t("Include iPhone questions", "Incluir preguntas del iPhone"), isOn: true,
+                        enabled: !center.saving, id: "memory-native-opt-in") { on in
                 if !on { _ = center.setNativeCapture(false) }
             }
-            .padding(.top, 12)
-            .accessibilityIdentifier("memory-native-opt-in")
+        } else {
+            turnOn
         }
-        ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
-        BriefingSectionLabel(text: L.t("Assets", "Activos") + " · \(s.assets.count)")
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(L.t("Assets", "Activos")).quietFont(16).foregroundStyle(Theme.cream)
+            Text("\(s.assets.count)").quietFont(14, relativeTo: .callout).monospacedDigit().foregroundStyle(Theme.warmDim)
+        }
+        .frame(minHeight: 52)
+        .accessibilityElement(children: .combine)
         if s.assets.isEmpty {
-            Text(L.t("Nothing yet. Assets asked about on the web, or on an opted-in iPhone, appear here.",
-                     "Todavía nada. Aquí aparecen los activos consultados en la web o en un iPhone con permiso activado."))
-                .font(.system(size: 12)).foregroundStyle(Theme.warmDim)
-                .fixedSize(horizontal: false, vertical: true)
+            QuietNote(text: L.t("No remembered assets.", "Sin activos recordados.")).padding(.bottom, 12)
         } else {
             ForEach(s.assets) { asset in assetRow(asset) }
         }
-        onThisPhone(mentionsDeletion: true)
+        Rectangle().fill(Theme.warmHair).frame(height: 1)
+        QuietDisclosure(label: L.t("Your preferences", "Tus preferencias"), id: "memory-prefs") {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(MemoryPref.allCases) { field in prefPicker(field, current: s.value(field)) }
+            }
+        }
+        QuietDisclosure(label: L.t("On this iPhone", "En este iPhone"), id: "memory-local") {
+            VStack(alignment: .leading, spacing: 0) { onThisPhone(mentionsDeletion: true) }
+        }
+        QuietDisclosure(label: L.t("How it works", "Cómo funciona"), id: "memory-retention") {
+            MemoryExplanation(retentionDays: s.retentionDays, compact: true)
+        }
         deleteEverything(showsError: true)
         if center.notice == .erasedEverything, s.enabled, center.nativeOptedIn {
-            Text(L.t("Memory is still on: your next question starts it again. You can pause it above.",
-                     "La memoria sigue activa: tu próxima pregunta la empieza de nuevo. Puedes pausarla arriba."))
-                .font(.system(size: 12)).foregroundStyle(Theme.warmMuted).fixedSize(horizontal: false, vertical: true)
+            QuietNote(text: L.t("Memory stays on. Your next question restarts it.", "La memoria sigue activa. Tu próxima pregunta la reinicia."),
+                      id: "memory-still-on")
                 .padding(.top, 6)
-                .accessibilityIdentifier("memory-still-on")
         }
     }
 
     /// iPhone questions are not in memory: one line that says so and one button to the consent sheet.
     private var turnOn: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // "Not added to memory", not "not saved": the phone does keep the asset as a shortcut (below).
-            Text(L.t("Off on this iPhone: what you ask here is not added to memory.",
-                     "Desactivada en este iPhone: lo que preguntas aquí no se agrega a la memoria."))
-                .font(.system(size: 14)).foregroundStyle(Theme.cream).fixedSize(horizontal: false, vertical: true)
-            Button { showingConsent = true } label: {
-                Text(L.t("Turn on", "Activar")).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.bg)
-                    .padding(.horizontal, 18).frame(minHeight: 44)
-                    .background(Capsule().fill(Theme.cream))
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                // "Not added to memory", not "not saved": the phone does keep the asset as a shortcut.
+                Text(L.t("iPhone questions are not added to account memory.", "Las preguntas del iPhone no añaden memoria de cuenta."))
+                    .quietFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).quietWraps()
+                Spacer(minLength: 8)
+                QuietChip(title: L.t("Turn on", "Activar"), id: "memory-turn-on") { showingConsent = true }
+                    .disabled(center.saving)
+                    .accessibilityHint(L.t("Opens the full explanation before anything is turned on.",
+                                           "Abre la explicación completa antes de activar algo."))
             }
-            .buttonStyle(.plain)
-            .disabled(center.saving)
-            .accessibilityHint(L.t("Opens the full explanation before anything is turned on.",
-                                   "Abre la explicación completa antes de activar algo."))
-            .accessibilityIdentifier("memory-turn-on")
+            .frame(minHeight: 52)
+            .padding(.vertical, 4)
+            Rectangle().fill(Theme.warmHair).frame(height: 1)
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.nucleoGlass))
-        .padding(.top, 16)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("memory-off")
     }
@@ -185,7 +194,6 @@ struct MemoryView: View {
     /// What the phone keeps with no copy on Bobby's servers: the shortcut row and the theses written
     /// here (count only). `mentionsDeletion` is false where Forget and Delete everything are not on screen.
     @ViewBuilder private func onThisPhone(mentionsDeletion: Bool) -> some View {
-        BriefingSectionLabel(text: L.t("Kept on this iPhone", "Guardado en este iPhone"))
         Text(mentionsDeletion ? Self.onThisPhoneNote + " " + Self.onThisPhoneDeletionNote : Self.onThisPhoneNote)
             .font(.system(size: 12)).foregroundStyle(Theme.warmDim).fixedSize(horizontal: false, vertical: true)
             .padding(.bottom, 8)
@@ -236,9 +244,6 @@ struct MemoryView: View {
         .disabled(center.saving)
         .padding(.top, 18)
         .accessibilityIdentifier("memory-forget-all")
-        Text(L.t("Memory-based briefings already delivered are removed too. A paused memory stays paused.",
-                 "También se eliminan los resúmenes basados en memoria ya entregados. Si la memoria está en pausa, sigue en pausa."))
-            .font(.system(size: 12)).foregroundStyle(Theme.warmDim).fixedSize(horizontal: false, vertical: true)
         if let notice = center.notice {
             Text(notice.message).font(.system(size: 13)).foregroundStyle(Theme.cream).fixedSize(horizontal: false, vertical: true)
                 .padding(.top, 10)
@@ -312,14 +317,10 @@ struct MemoryView: View {
     private func assetRow(_ asset: RememberedAsset) -> some View {
         HStack(spacing: 12) {
             Text(asset.symbol).font(.mono(13, .medium)).foregroundStyle(Theme.cream).frame(minWidth: 56, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(asset.asks == 1 ? L.t("1 time", "1 vez") : L.t("\(asset.asks) times", "\(asset.asks) veces"))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                if let last = asset.lastAskedAt {
-                    Text(RelativeDateTimeFormatter.bobby.localizedString(for: last, relativeTo: Date()))
-                        .font(.mono(10.5)).foregroundStyle(Theme.warmDim)
-                }
-            }
+            Text([asset.asks == 1 ? L.t("1 time", "1 vez") : L.t("\(asset.asks) times", "\(asset.asks) veces"),
+                  asset.lastAskedAt.map { RelativeDateTimeFormatter.bobby.localizedString(for: $0, relativeTo: Date()) }]
+                    .compactMap { $0 }.joined(separator: " · "))
+                .quietFont(14, relativeTo: .callout).monospacedDigit().foregroundStyle(Theme.warmMuted).quietWraps()
             Spacer(minLength: 8)
             Button { Task { await center.forget(asset.symbol) } } label: {
                 Text(L.t("Forget", "Olvidar")).font(.system(size: 12.5, weight: .medium)).foregroundStyle(Theme.warmMuted)
