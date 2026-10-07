@@ -29,6 +29,15 @@ var SCRIPTS = {
     { drag: [252, 350, 150, 340], dur: 0.3, ease: 'swipe' },
     { wait: 'IDLE', after: 2.0 }
   ] },
+  /* the next question (§3.5): with ?followUp=<text> the read carries one; the hand-back shows it and a tap asks it */
+  'read-next': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 },
+    { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 },
+    { wait: 'HANDBACK', after: 3.0 },
+    { tap: '.chip.ask' },
+    { wait: 'HANDBACK', after: 3.0 }
+  ] },
   /* the metered-read beats (§8.3): ?scenario=signin_required&signin=ok · ?scenario=subscription_required&purchase=ok */
   'gate-signin': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },

@@ -98,7 +98,30 @@ enum NucleoDeskIO {
     /// Levels (Profundo / Máximo): the CIO's short synthesis, shown first.
     struct Synthesis: Sendable {
         let headline: String, why: String?, risk: String?, watch: String?
-        var json: [String: Any] { ["headline": headline, "why": orNull(why), "risk": orNull(risk), "watch": orNull(watch)] }
+        /// The CIO's next question (ARCHITECTURE.md §3.5). The page decides whether it is shown; native only carries it.
+        var followUp: String? = nil
+        /// Without a next question the object is exactly what it was before the key existed.
+        var json: [String: Any] {
+            var json: [String: Any] = ["headline": headline, "why": orNull(why), "risk": orNull(risk), "watch": orNull(watch)]
+            if let followUp { json["followUp"] = followUp }
+            return json
+        }
+    }
+
+    /// The server bounds the next question at 160 characters. A longer one is not a question the page could show:
+    /// it is dropped whole, never cut.
+    static let nextQuestionLimit = 160
+
+    static func nextQuestion(_ value: Any?) -> String? {
+        guard let text = (value as? String)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty,
+              text.count <= nextQuestionLimit else { return nil }
+        return text
+    }
+
+    /// Two wordings of one question differ only in their spaces (the page collapses them before it shows or asks it).
+    static func sameQuestion(_ a: String, _ b: String) -> Bool {
+        func words(_ s: String) -> [Substring] { s.split(whereSeparator: \.isWhitespace) }
+        return words(a) == words(b)
     }
 
     struct Sufficiency: Sendable {
@@ -378,7 +401,8 @@ enum NucleoDeskIO {
             debate.confirm = c; debate.invalidate = i
         }
         if let sy = (agents["synthesis"] ?? body["synthesis"]) as? [String: Any], let headline = text(sy["headline"]) {
-            debate.synthesis = Synthesis(headline: headline, why: text(sy["why"]), risk: text(sy["risk"]), watch: text(sy["watch"]))
+            debate.synthesis = Synthesis(headline: headline, why: text(sy["why"]), risk: text(sy["risk"]), watch: text(sy["watch"]),
+                                         followUp: nextQuestion(sy["followUp"]))
         }
         if let su = body["sufficiency"] as? [String: Any] {
             debate.sufficiency = Sufficiency(horizon: text(su["horizon"]),
@@ -511,6 +535,11 @@ final class NucleoDesk {
     var askFinished: ([String: Any]) -> Void = { _ in }
     var debateEvent: ([String: Any]) -> Void = { _ in }
     var sessionChanged: () -> Void = {}
+    /// The person tapped the question Bobby's CIO wrote for a read (the symbol of that read; never the words).
+    var nextQuestionPicked: (_ symbol: String) -> Void = { _ in }
+    /// Whether Bobby may put its own one-tap question after a read whose access receipt is this one (§3.5).
+    /// Withheld, the question never reaches the page, which shows its fixed chips. Always, until a rule says otherwise.
+    var offersNextQuestion: (BobbyReadAccess?) -> Bool = { _ in true }
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
     var meterAuth: BobbyMeterAuth = .account
@@ -548,6 +577,8 @@ final class NucleoDesk {
         let asOf: String
         let provider: String
         var saved: [String: Any]?
+        /// The next question the page received with this read (§3.5), if any.
+        var nextQuestion: String? { (result["synthesis"] as? [String: Any])?["followUp"] as? String }
 
         init(requestId: String, result: [String: Any], asset: NucleoAsset, generation: UUID, debate: NucleoDeskIO.Debate, price: Double?) {
             self.requestId = requestId
@@ -707,6 +738,11 @@ final class NucleoDesk {
         case let .followUp(previous, q):
             guard let read = reads.first(where: { $0.requestId == previous && $0.generation == generation })
             else { throw NucleoFault.invalid("unknown followUpOf") }
+            // The question is the one Bobby's CIO wrote for that read: the person picked it instead of typing their own.
+            // Only the asset is passed on; the words are compared here and kept nowhere.
+            if let offered = read.nextQuestion, NucleoDeskIO.sameQuestion(offered, q) {
+                nextQuestionPicked(read.asset.symbol)
+            }
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
                       generation: generation, startedAt: Date(), level: currentLevel())
         case let .question(q):
@@ -953,7 +989,10 @@ final class NucleoDesk {
             if let access { result["access"] = access.json }
             // Levels: the synthesis goes first; the rest of the debate sits behind it.
             result["level"] = debate.level ?? level.rawValue
-            if let synthesis = debate.synthesis { result["synthesis"] = synthesis.json }
+            if var synthesis = debate.synthesis {
+                if !offersNextQuestion(access) { synthesis.followUp = nil }
+                result["synthesis"] = synthesis.json
+            }
             if let sufficiency = debate.sufficiency { result["sufficiency"] = sufficiency.json }
             if let evidence = debate.evidence { result["evidenceUsed"] = evidence.json }
             // 1.8: the memory receipt rides the reply for native (the page ignores keys it does not know).

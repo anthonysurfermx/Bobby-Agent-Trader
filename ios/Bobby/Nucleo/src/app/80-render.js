@@ -454,8 +454,9 @@ function renderChart(cy, r){
 /* ---------- captions: karaoke with a 3-word pulse-sweep front, two slots for page hand-overs ---------- */
 function renderCaption(cy, r){
   for (var ci = 0; ci < 2; ci++) renderCap(CAPS[ci], cy, r);
-  var mh = capCur >= 0 ? CAPS[capCur].h : 62;
-  op(el.meta, A.metaO.x); if (A.metaO.x > 0.002) tf(el.meta, 0, A.capY.x + mh + 12 + A.metaY.x, null);
+  /* the meta line hangs under the caption; once the caption has left for the read's chips (metaPin) it holds its own place */
+  var mh = A.metaPin != null ? A.metaPin : (capCur >= 0 ? CAPS[capCur].h : 62);
+  op(el.meta, A.metaO.x); if (A.metaO.x > 0.002) tf(el.meta, 0, A.capY.x + mh + 12 + A.metaY.x + A.metaDrop.x, null);
 }
 function renderCap(c, cy, r){
   var root = c.el;
@@ -576,7 +577,7 @@ function renderChipList(list){
     op(c.el, c.o.x);
     if (c.o.x < 0.002) continue;
     var cx0 = 195 - c.w / 2, cy0 = 742;
-    tf(c.el, lerp(cx0, c.x + A.chipX.x, p), lerp(cy0, 640, p), lerp(0.6, 1, clamp(p, 0, 1.1)) * c.press.x); bl(c.el, 3 * (1 - clamp(p, 0, 1)));
+    tf(c.el, lerp(cx0, c.x + A.chipX.x, p), lerp(cy0, c.y, p), lerp(0.6, 1, clamp(p, 0, 1.1)) * c.press.x); bl(c.el, 3 * (1 - clamp(p, 0, 1)));
   }
 }
 function renderChips(){ tf(el.eyebrow, 0, A.eyebrowY.x, null); op(el.eyebrow, A.eyebrowO.x); renderChipList(A.chips); renderChipList(DYING); }

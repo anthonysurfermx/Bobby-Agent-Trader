@@ -210,6 +210,7 @@ enum NucleoFixtures {
                         "why": es ? "Las medias de 4H y diario apuntan arriba y el funding está neutral." : "The 4H and daily averages point up and funding is neutral.",
                         "risk": es ? "Un rechazo en la resistencia devuelve el precio al soporte de 1H." : "A rejection at resistance sends price back to the 1H support.",
                         "watch": es ? "Un cierre de 4H por encima de la resistencia con volumen." : "A 4H close above resistance on volume.",
+                        "followUp": es ? "¿Qué tendría que cambiar en \(symbol) para que cambie esta lectura?" : "What would have to change in \(symbol) for this read to change?",
                     ]
                     if level == "maximo" {
                         agents["rebuttal"] = es ? "Alpha responde: el rechazo ya se probó dos veces y el precio no perdió el soporte." : "Alpha answers: the rejection was tested twice and price never lost support."

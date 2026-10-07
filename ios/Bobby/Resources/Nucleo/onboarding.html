@@ -1137,6 +1137,67 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     return out;
   }
   function firstSentence(text) { return sentences(text)[0] || ''; }
+
+  /* ---- The next question (ARCHITECTURE.md §3.5). The desk's CIO writes one on every read (synthesis.followUp).
+     It becomes the first chip only when it passes every check below; otherwise the row is the fixed chips, and
+     nothing says why. The checks reject too much on purpose: a chip that is not shown costs nothing, a wrong one
+     is Bobby's own question, one tap away. ---- */
+  var NEXT_MIN = 8, NEXT_MAX = 90;   /* code points; the page also measures the drawn chip (two lines at most) */
+  /* Words and plain punctuation only: no currency sign, no percent, no markup, no address. */
+  var NEXT_CHARS = /^[A-Za-zÀ-ÖØ-öø-ÿŒœŸ0-9 '’,.\-–&():"“”«»¿?]+$/;
+  /* It asks what or why, never whether or when to act: it opens with the what/why word of the reply's language
+     (after a leading preposition where the language puts one). Matched on the folded text. */
+  var NEXT_OPENS = {
+    en: /^(?:what|why|which)(?![a-z])/,
+    es: /^(?:(?:a|de|en|con|por|para|sobre) )?(?:que|cual|cuales)(?![a-z])/,
+    fr: /^(?:pourquoi(?![a-z])|(?:(?:a|de|en|sur|par|pour|avec) )?(?:qu['’]|(?:que|quoi|quels?|quelles?)(?![a-z])))/,
+    pt: /^(?:porque(?![a-z])|(?:(?:a|de|em|com|por|para|sobre) )?(?:o )?(?:que|qual|quais)(?![a-z]))/,
+    it: /^(?:perche(?![a-z])|(?:(?:a|da|di|in|con|per|su) )?(?:cos['’]|(?:che cosa|che|cosa|quale|quali|qual)(?![a-z])))/,
+    de: /^(?:was|warum|wieso|weshalb|weswegen|welche[rsnm]?|wor(?:an|auf|in|um|uber)|wo(?:durch|von|mit|fur))(?![a-z])/
+  };
+  /* THE list: the words product copy never uses (buy, sell, profit, guaranteed, returns, advice, signal, alert)
+     with their conjugations and compounds in the six languages. Each pattern is tried on every folded word
+     (lowercase, accents removed). Unanchored patterns match inside a word, so "Kaufsignal" and "unprofitable"
+     are caught; the anchored ones keep innocent neighbours out (comprendre, involucra, Gesellschaft, Vertrag,
+     arsenal). What still over-matches (vendredi, a consejo that is a board) only costs a chip. */
+  var NEXT_FORBIDDEN = [
+    /* buy */ /buy|bought|purchas|kauf|acquist/, /^r?ach[ea]t/,
+    /^compr(?:a|as|an|am|ar|o|e|es|en|em|ei|ou|i|amos|ais|emos|eis|iamo|ate|ano|ando|ad[oa]s?|at[oaie]|ador[a-z]*|ator[ei]|ar[a-z]{1,4}|er[oae]i?|al[oa]s?|aba[a-z]*|aste|aron)$/,
+    /* sell */ /^(?:re)?sell|vend/, /^(?:sold|ventas?|ventes?)$/,
+    /* profit */ /profit|gananci|benefic|guadagn|gew[aio]nn/, /^lucr/,
+    /* guaranteed */ /guarant|garant|garanz/,
+    /* returns */ /^returns$/, /rendim|rendem|rentab|rendit|retorn/, /^ertrag/,
+    /* advice */ /^advi[cs]/, /recommend|recomi?end|recommand|raccomand|consej|asesor|assessor|conseil|conselh|consigl|consulenz|ratschl|berat|empf(?:ie|e|a|o)hl/,
+    /* signal */ /signal|signaux|segnal/, /^(?:senal|sinal|sinais)/,
+    /* alert */ /alert|allert|allarm|alarm/
+  ];
+  function fold(s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  /** The checked question, or why it is not shown: missing · long · number · shape · opener · word · same.
+   *  `asked` is the question this read answered: Bobby never offers the same one again (a tap would loop). */
+  function nextQuestion(raw, symbol, lang, asked) {
+    if (typeof raw !== 'string') return { text: null, reason: 'missing' };
+    var text = raw.replace(/\s+/g, ' ').trim();
+    if (!text) return { text: null, reason: 'missing' };
+    var n = Array.from(text).length;
+    if (n > NEXT_MAX) return { text: null, reason: 'long' };
+    /* No price, no level, no figure of any kind: the only digits allowed are the asset's own ticker (PETR4.SA). */
+    var sym = String(symbol || '').toUpperCase(), bare = text;
+    [sym, sym.split('.')[0]].forEach(function (s) { if (s) bare = bare.split(s).join(' '); });
+    if (/\d/.test(bare) || /[$€£¥₿₽₹%‰]/.test(text)) return { text: null, reason: 'number' };
+    /* One sentence that ends in its question mark: never a statement, never a statement with a question after it. */
+    if (n < NEXT_MIN || !NEXT_CHARS.test(text) || !/^¿?[^?¿]+\?$/.test(text) || sentences(text).length !== 1) return { text: null, reason: 'shape' };
+    var folded = fold(text.replace(/^¿\s*/, ''));
+    var opens = NEXT_OPENS[lang2(lang)];
+    if (!opens || !opens.test(folded)) return { text: null, reason: 'opener' };
+    var words = folded.split(/[^a-zßœæ0-9]+/).filter(Boolean);
+    for (var i = 0; i < words.length; i++) {
+      for (var k = 0; k < NEXT_FORBIDDEN.length; k++) if (NEXT_FORBIDDEN[k].test(words[i])) return { text: null, reason: 'word' };
+    }
+    if (typeof asked === 'string' && fold(asked.replace(/\s+/g, ' ').trim().replace(/^¿\s*/, '')) === folded) return { text: null, reason: 'same' };
+    return { text: text, reason: null };
+  }
+  /* French sets a space before the mark: it must not wrap onto a line of its own. */
+  function nextLabel(text) { return String(text).replace(/ \?$/, '\u202f?'); }
   function clipWords(text, max) {
     if (!(max > 0)) return '';
     if (text.length <= max) return text;
@@ -1364,8 +1425,13 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
         value: [tech.trend ? t(lang, 'trend.' + tech.trend) : null, fin(tech.rsi14) ? 'RSI ' + Math.round(tech.rsi14) : null].filter(Boolean).join(' · ') });
     }
     var sym = r.asset.symbol;
+    var syn = r.synthesis || (r.agents && r.agents.synthesis);
     return {
       requestId: r.requestId, symbol: sym, name: r.asset.name, isEquity: !!r.asset.isEquity, question: r.question, lang: lang,
+      /* the CIO's next question when it passed every check (in the reply's own language), else null */
+      next: nextQuestion(syn && syn.followUp, sym, r.language || lang, r.question).text,
+      /* who started this read: 'person' (they asked), 'followUp' (native started it from a follow-up), 'restored' */
+      origin: typeof opts.origin === 'string' && opts.origin ? opts.origin : 'person',
       verdict: { key: v, word: word, hue: VERDICT[v].hue, color: VERDICT[v].color, core: VERDICT[v].core, amb: VERDICT[v].amb,
         direction: r.agents.direction },
       ring: ring,
@@ -1502,14 +1568,23 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     }
   }
 
-  /** Follow-up chips after a save (§3.2 FOLLOWUPS): "Another question about {SYM}" (a follow-up of this read), then up to
-   *  2 REAL symbols from suggestions() (quickAccess first, then movers), never the current one. No invented questions. */
+  /** The chips of a read (§3.5), three at most, at hand-back and again after a save: the CIO's next question when the
+   *  model carries one (asked, on a tap, as a follow-up of this read), "Another question about {SYM}" (the person types
+   *  it), then REAL symbols from suggestions(): the person's quick access first, the day's movers only in a slot quick
+   *  access left empty, never the current symbol. A read the person did not start by themselves (a follow-up, a restored
+   *  page) never gets a mover or a starter asset: its chips are about their own question and their own assets. */
   function followUps(model, sugg, lang, opts) {
     lang = lang2(lang); opts = opts || {};
-    var sym = String(model.symbol || '').toUpperCase();
-    var out = [{ label: t(lang, 'follow.another', { symbol: sym }), action: { followUpOf: model.requestId, symbol: sym } }];
+    var sym = String(model.symbol || '').toUpperCase(), out = [];
+    if (typeof model.next === 'string' && model.next && model.requestId) {
+      out.push({ label: nextLabel(model.next), style: 'ask', action: { followUpOf: model.requestId, question: model.next, symbol: sym, next: true } });
+    }
+    out.push({ label: t(lang, 'follow.another', { symbol: sym }), action: { followUpOf: model.requestId, symbol: sym } });
     var seen = {}; seen[sym] = 1;
-    var qa = (sugg && sugg.quickAccess) || [], mv = (sugg && sugg.movers) || [];
+    var own = model.origin != null && model.origin !== 'person';
+    var qa = (sugg && sugg.quickAccess) || [], mv = own ? [] : ((sugg && sugg.movers) || []);
+    /* native marks the starters that only pad quick access (`own: false`): they are not the person's assets either */
+    if (own) qa = qa.filter(function (s) { return !s || s.own !== false; });
     qa.map(function (s) { return { s: s, kind: 'quick' }; }).concat(mv.map(function (s) { return { s: s, kind: 'mover' }; })).forEach(function (x) {
       var s = String(x.s && x.s.symbol || '').toUpperCase();
       if (out.length >= 3 || !/^[A-Z0-9.^=-]{1,20}$/.test(s) || seen[s]) return;
@@ -1560,6 +1635,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
     build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
+    nextQuestion: nextQuestion, NEXT: { min: NEXT_MIN, max: NEXT_MAX, opens: NEXT_OPENS, forbidden: NEXT_FORBIDDEN },
     _internal: { pulseAgrees: pulseAgrees, planOf: planOf, closedVolumeRatio: closedVolumeRatio, niceStep: niceStep }
   };
 })(typeof window !== 'undefined' ? window : globalThis);

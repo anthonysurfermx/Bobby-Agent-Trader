@@ -11,6 +11,7 @@
  *             lang=en|es|fr|pt|it|de  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
  *             say=<text for the fake STT>  latency=<desk ms>  xp=<int>  streak=<int>  rm=1
  *             signin=ok (signIn succeeds)  purchase=ok (the Bobby Pro sheet ends `subscribed`)
+ *             followUp=<text> (every ok reply carries a synthesis whose next question is that text, §3.5)
  * Determinism: engines that own a sim clock call nucleoBridge.mock.useClock(fn) and then
  * nucleoBridge.mock.pump() once per sim step; otherwise a real-time pump runs at 60 Hz.
  */
@@ -199,6 +200,12 @@
         var r = clone(base);
         r.requestId = requestId; r.question = question; r.language = r.language || lang;
         r.elapsedMs = desk; r.fixture = true;
+        /* the shape native builds from a desk that sent a synthesis (the lines are the native fixture's own); the
+           question is checked in the reply's language, which native takes from the app, so ?lang= decides it here */
+        if (q.get('followUp')) r.language = lang;
+        if (q.get('followUp')) r.synthesis = { headline: 'The trend is firm, but price is already pressed against resistance.',
+          why: 'The 4H and daily averages point up and funding is neutral.', risk: 'A rejection at resistance sends price back to the 1H support.',
+          watch: 'A 4H close above resistance on volume.', followUp: q.get('followUp') };
         state.lastOk[requestId] = key;
         finish(r);
       }));
@@ -469,6 +476,12 @@
     pump: pump,
     say: function (text) { B.mock.nextSay = text; },
     setMic: function (s) { state.mic = s; },
+    /** What native does on a follow-up's tap: a single-use token for a known asset, then `ask.start`. */
+    startRead: function (key, question) {
+      var token = 'mock-' + uuid();
+      state.tokens[token] = { question: question, next: key };
+      B.emit('ask.start', { token: token, question: question });
+    },
     reset: function () { location.reload(); }
   };
 })();

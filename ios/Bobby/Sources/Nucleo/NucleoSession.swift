@@ -165,6 +165,8 @@ final class NucleoSession: ObservableObject {
             self?.readDelivered(result)
         }
         desk.debateEvent = { [weak self] event in self?.notch.live(event) }
+        // A Bobby-authored question was picked: the harness counts it (only while it may record), by asset.
+        desk.nextQuestionPicked = { [weak self] symbol in self?.harness?.notePicked(symbol: symbol) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)
@@ -562,9 +564,16 @@ final class NucleoSession: ObservableObject {
 
     // MARK: - Suggestions
 
+    /// The quick-access row as the page gets it. `own` tells an asset the person asked about from a starter that
+    /// only pads the row: a read Bobby started offers their own assets only (ARCHITECTURE.md §3.5).
+    static func quickAccess(_ memory: DeskMemory, fallback: [String]) -> [[String: Any]] {
+        let asked = Set(memory.watchlist.map(\.symbol))
+        return memory.quickAccess(fallback: fallback).map { ["symbol": $0, "own": asked.contains($0)] }
+    }
+
     func suggestions() async -> [String: Any] {
         let consent = consentGeneration
-        let quick = DeskMemory().quickAccess(fallback: BobbyViewModel.defaultQuickAccess).map { ["symbol": $0] }
+        let quick = Self.quickAccess(DeskMemory(), fallback: BobbyViewModel.defaultQuickAccess)
         // R11: before consent nothing reaches the network; the local row is all there is.
         guard profile.acceptedRiskNotice else { return ["quickAccess": quick, "movers": [Any]()] }
         if let cache = suggestionsCache, Date().timeIntervalSince(cache.at) < Self.suggestionsCacheSeconds {

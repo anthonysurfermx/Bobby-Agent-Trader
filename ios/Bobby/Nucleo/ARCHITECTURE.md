@@ -30,7 +30,7 @@ The goal is the app Anthony asked for. He asks his own question by voice or text
 | R6 | Verdict words: `wait` becomes **Wait** (amber `#F6B94E`, scrim `#2A1C08`). `review` becomes **Review** (mint `#3FE0B5`, scrim `#082A20`). "Buy" and "Sell" never appear. Spanish: Espera / Revisa. | Colour lock (DIRECTION §2.1) and compliance. |
 | R7 | What Bobby speaks = up to 600 chars of **CIO sentences**, plus one closing line from the string table ("My call: wait." / "Mi lectura: esperar."). The verdict condenses on that closing word. The full agent texts live in the debate card. | Neither real CIO text contains the word "wait", so the condensation needs a deterministic sync point. The closing line is a label with the real verdict inserted; it is not invented analysis. |
 | R8 | Speech-to-text runs **on device when the phone holds Apple's model for the app language**; otherwise Apple's speech service transcribes it in that same language (`requiresOnDeviceRecognition` follows the recognizer's `supportsOnDeviceRecognition`). Apple's speech service is used **only after the user agreed to it** in a native prompt (the agreement is stored natively as `speech.appleServiceConsent.v1`): until then the mic state is `consent`, `speech.start` creates no recognition request and never opens the microphone, and a hold raises the prompt (allow, or type). The on-device path needs no agreement and has no prompt. If nothing can recognize the language right now (no local model and no connection), the mic is `unavailable` and the pill offers typing. | A language without a local model would otherwise have no voice input, and audio must not leave the phone on a promise the user never accepted. The risk notice and the speech usage string say which of the two transcribes; Bobby never stores the audio. |
-| R9 | These are dropped until a data source exists: Google sign-in, "Watch & ping me" with price pings, the notifications prompt, the Record face, the earnings satellite and chart marker, follow-up suggestions written by an LLM, and "level 12". | `.claude/rules/no-hardcode.md`. |
+| R9 | These are dropped until a data source exists: Google sign-in, "Watch & ping me" with price pings, the notifications prompt, the Record face, the earnings satellite and chart marker, follow-up suggestions written by an LLM, and "level 12". Since §3.5 one of them has a source: the desk's CIO writes one next question on every read (`synthesis.followUp`), and the page shows that text, unchanged, only when it passes the checks of §3.5. The page still writes no question of its own. | `.claude/rules/no-hardcode.md`. |
 | R10 | The horizon control (24h/3d/7d) is shown only when the user is **signed in and the verdict is Review**. | Only a `read_complete` seed has a horizon, and extending one needs sign-in plus an `inventoryId`. |
 | R11 | Onboarding's risk beat shows the **4 real `RiskNotice` statements**, fetched from native, as a hold-to-agree. It never shows the prototype's 3 paraphrased lines. No bridge call can reach the network before acceptance. | Statement 1 is the consent to AI processing. |
 | R12 | Native keeps a **local thesis ledger** (`nucleo.theses.<owner>`, 20 newest). It feeds the Theses face, the ghost satellite and `theses()`, and it saves even at the daily XP cap. | Signed out, pending awards vanish after sync, and a capped award queues nothing. |
@@ -173,7 +173,7 @@ Types: `S` string, `B` bool, `N` finite number, `I` integer, `?` nullable. "Sess
 |---|---|---|
 | `session` | `{page?: "app"\|"onboarding"\|"contract"}` | **Session** (below). The first call marks the page ready. |
 | `roster` | `{}` | `{companions:[{id S, webId S, label S, role S, selectLine S, requiredLevel I, voicePersona S, palette S, unlocked B}]}`. There are 18, in `bobbyCompanions` order, localized. `webId` is `"bobby"` for iOS `"orb"` and equals `id` otherwise. `palette` comes from `companions-meta.json`. Snapshot: `fixtures/native/roster.json`. |
-| `suggestions` | `{}` | `{quickAccess:[{symbol S}], movers:[{symbol S, name S, changePct N}]}`. Sources: `DeskMemory.quickAccess(fallback: BobbyViewModel.defaultQuickAccess)` and `BobbyAPI.topMovers(limit:3)`. Cached 5 min; a failure gives `[]`. |
+| `suggestions` | `{}` | `{quickAccess:[{symbol S, own B}], movers:[{symbol S, name S, changePct N}]}`. Sources: `DeskMemory.quickAccess(fallback: BobbyViewModel.defaultQuickAccess)` and `BobbyAPI.topMovers(limit:3)`. `own` is true for an asset the person asked about and false for a starter that only pads the row (§3.5). Cached 5 min; a failure gives `[]`. |
 | `ask` | exactly one of: `{question S (1…1200 code points after trim)}` · `{token S}` · `{followUpOf S(uuid), question S}` | **AskResult** (§2.4). One read at a time; otherwise the fault `busy`. |
 | `cancel` | `{}` | `{cancelled B}`. The in-flight `ask` then resolves `{status:"cancelled"}`. The server may already have spent quota; this is expected. |
 | `speech.permission` | `{}` | `{state: "granted"\|"denied"\|"undetermined"\|"restricted"\|"unavailable"\|"consent", onDevice B}` (§2.6). Never prompts. The page calls it again before deciding a hold from a cached state that cannot listen (§3.2). |
@@ -409,18 +409,18 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | TALK_EVIDENCE | | B4: satellites from `model.satellites` (4 slots, clockwise UL→UR→LR→LL; odometer `from`→`value`). Caption pages are the spoken sentences packed into ≤2-line pages; the karaoke timeline comes from `voice.word` (device), else `wordTimes(text, durationSec)` driven by `voice.progress`, else the reading clock. | the karaoke reaches sentence `spoken.stageAt.chart` (or sentence 0 ends plus 0.3 s when null) → TALK_CHART; skip if `model.chart == null` |
 | TALK_CHART | | B5: the chart is built from `model.chart` (48 closes, domain, 2 gridlines, NOW = last close, support **band** `band.lo…band.hi` labelled `band.label`, resistance line, plan lines only when present, bracket NOW→support at +0.30 s after the band, x-label `1H · provider · instrument · as of <local time>`). There is no earnings marker. | the karaoke reaches `spoken.verdictWordIndex − 0.03 s` → VERDICT |
 | VERDICT | | B6: satellites retract, filament collapse, IMPACT 2 in `verdict.color`; `uV`/scrim core = `verdict.core`. `verdict.word` condenses 30 ms before the spoken word, and that caption word takes the verdict colour. Ring: in `conviction` mode it fills to `pct` with odometer digits and `label`; in `complete` mode it draws 0→100% in 1100 ms with no digits and no label. Meta line = `model.meta` + `asOf`. | `voice.end` (or the reading clock ends) → HANDBACK |
-| HANDBACK | | two sags; hint "Pull down for the full read ⌄" while `hints.verdictPull < 3` (then `markHint`). The pill is a mic again. | vertical drag → PULLING; pill hold → RETURNING, then LISTENING; × → RETURNING; 90 s idle → RETURNING |
+| HANDBACK | | two sags; hint "Pull down for the full read ⌄" while `hints.verdictPull < 3` (then `markHint`). The pill is a mic again. One second in, the last spoken line goes back into the glass and **the read's chips** (§3.5) are born in its place, the CIO's next question first; the meta line keeps its place under them. No nudge and no eyebrow here. | chip → SENDING or TYPING (§3.5); vertical drag → PULLING, also when the finger went down on a chip (the row leaves for the cards and returns if the pull is let go); pill hold → RETURNING, then LISTENING; × → RETURNING; 90 s idle → RETURNING |
 | PULLING | | B7 25.50–26.10, tracked 1:1 | commit → CARDS; release before commit → HANDBACK |
 | CARDS | | B7 26.10–27.90: the track has three cards. **Debate**: `model.debate`, full texts, internal 1:1 scroller if needed. **Thesis**: `model.thesis`; horizon control when `thesis.horizon.show`. **Isla**: only if `island().available`. | Save → SAVING; × → RETURNING |
 | SAVING | Save press | B8 28.90–30.12: press, label roll, conic sweep; `saveThesis({requestId, horizonHours})`. The XP chip = `xpChip(awardedXP, verdict.key, lang)` (hidden if the save failed); the tpill `thesis.pill` arcs in. `evolution`/`unlocks` show as one caption line. | → FOLLOWUPS |
-| FOLLOWUPS | | B9 chips born from the pill: "Another question about {SYM}" (TYPING with `followUpOf`), plus up to 2 real symbols from `suggestions()` (quickAccess or movers, not the current symbol) using the strings template "How is {SYM} looking?". **Each sent chip is a paid desk read.** | chip → SENDING or TYPING; × or timeout → RETURNING |
+| FOLLOWUPS | | B9 chips born from the pill, above it: the same read's chips as at HANDBACK (§3.5), behind the nudge when there is one, under the eyebrow. **Each sent chip is a paid desk read.** | chip → SENDING or TYPING; × or timeout → RETURNING |
 | RETURNING | | B10 33.20–35.00: cards retract before the sphere moves, the verdict evaporates, the ring unwinds, the flood recedes, the tint returns. The ghost satellite comes from `theses().items[0]` if it was saved this session. | → IDLE |
 | FACE_DRAG / FACE(k) | drag in IDLE | B11 physics with the real pointer. Isla: `island()` summary and a chip that calls `openNative("isla")`. Squad: `roster()` belt plus `level`/`streak`, chip `openNative("squad")`. Theses: 2 satellites from `theses()`; tapping one opens its card read-only. | detent at Desk → IDLE |
 | ERROR(kind) / CANCELLED | | caption from `NucleoReadModel.failure()`. **No verdict, no ring, no XP.** The pill returns to mic. | 6 s or a tap → RETURNING |
 | RISK_GATE | reply `error/risk_not_accepted` (`failure().kind == "risk"`) | caption "First, the risk notice." plus one chip | chip → `openNative("riskNotice")` (native swaps in the risk beat); tap elsewhere or 30 s → RETURNING |
 | SIGNIN_GATE | reply `signin_required` (`failure().kind == "signin"`) | glass first: one line from the rim, "Create your free account to keep reading — 20 free reads a week.", the white **Sign in with Apple** chip (Apple logo U+F8FF, system font) and "Not now" | Apple chip → `signIn()`; `signedIn` → SENDING with `{token: retry}` (the same question, asked again automatically); `cancelled` stays; other → hint. "Not now", a tap elsewhere or 45 s (not while signing in) → RETURNING |
 | PRO_GATE | reply `subscription_required` (`failure().kind == "subscription"`) | one line "You’ve used this week’s free reads.", sub "They reset {date}. Bobby Pro has unlimited reads." (date from `access.resetsAt`), chips "See Bobby Pro" and "Not now". The Bobby Pro sheet opens **by itself once** (+1.2 s), never right after a purchase-retry | "See Bobby Pro" → `paywall()`; `subscribed` → SENDING with `{token: retry}`; `pending`/`failed` → hint; "Not now", a tap elsewhere or 45 s → RETURNING |
-| RESTORE | `pendingRead` at boot | builds the model and jumps to the settled HANDBACK frame (reduced choreography) | as HANDBACK |
+| RESTORE | `pendingRead` at boot | builds the model (origin `restored`, §3.5) and jumps to the settled HANDBACK frame: no caption, the read's chips at once (reduced choreography) | as HANDBACK |
 
 ### 3.3 Onboarding state machine (`onboarding.html`, Builder C)
 
@@ -457,8 +457,39 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | Thesis card | price at read, then either (plan: reference entry, stop, target) or (support, resistance), then trend · RSI | rows whose value is missing are dropped |
 | Debate card | the three full texts; "3 agents · N s" from `elapsedMs` | not applicable |
 | Meta | "Educational read · not financial advice" / "Lectura educativa · no es asesoría financiera" | not applicable |
+| Next question | `synthesis.followUp`, as written by the desk, when it passes every check of §3.5 (`model.next`) | the fixed chip takes its slot; nothing says why |
 
-Nothing else is shown. Earnings, volume "avg" claims beyond the computed ratio, calm-entry language, targets without an agreeing pulse, and invented follow-ups are all forbidden (R9).
+Nothing else is shown. Earnings, volume "avg" claims beyond the computed ratio, calm-entry language, targets without an agreeing pulse, and follow-ups the page invents are all forbidden (R9).
+
+### 3.5 The next question and the read's chips (`followUps()`, 2026-10-07)
+
+On every read the desk's CIO writes one next question, specific to what was just asked: `synthesis.followUp` in the desk reply, a string of at most 160 characters. Native carries it to the page inside the reply's `synthesis` object (`{headline, why, risk, watch, followUp?}`; the key is absent when the server sent none or sent more than 160 characters, so a reply without it is byte for byte what it was). The page decides whether it is shown. No model call is added and nothing about the reader is involved.
+
+**The row.** `NucleoReadModel.followUps(model, suggestions, lang)` returns at most three chips, drawn at HANDBACK (when the voice ends, no save needed) and again in FOLLOWUPS after a save:
+
+1. The CIO's question, as written (`style: "ask"`, action `{followUpOf: requestId, question, next: true}`), when `model.next` is set.
+2. "Another question about {SYM}" (action `{followUpOf}`: the person types their own).
+3. Real symbols from `suggestions()`: the person's quick access first; the day's movers only in a slot quick access left empty; never the current symbol. Two of them when there is no question, one when there is.
+
+**The checks** (`NucleoReadModel.nextQuestion(text, symbol, lang, asked)`; each failure has a reason the tests pin, and the person sees only the fixed chips):
+
+| Reason | Rule |
+|---|---|
+| `missing` | not a string, or empty |
+| `long` | more than 90 code points after collapsing white space |
+| `number` | any digit outside the asset's own ticker (`PETR4.SA`, `PETR4`), any currency sign, `%`: no price, no level, no figure |
+| `shape` | fewer than 8 code points; anything but letters, the ticker's digits and plain punctuation; not exactly one sentence ending in its question mark |
+| `opener` | it does not open with a what / why / which word of the reply's language (`NEXT_OPENS`, after a leading preposition where the language sets one): Bobby's own question asks what or why, never whether or when to act |
+| `word` | a word of `NEXT_FORBIDDEN`: buy, sell, profit, guaranteed, returns, advice, signal, alert with their conjugations and compounds in en, es, fr, pt, it, de. **This is the one list**; it lives in `src/shared/20-read-model.js` only |
+| `same` | it is the question this read just answered (a tap would ask it for ever) |
+
+The checks over-reject on purpose: a chip that is not shown costs nothing. One more check needs the drawn chip: `.chip.ask` keeps the type of every chip and may take two lines of the 350 px row; `fitNext()` measures it once per read and clears `model.next` when it would need a third.
+
+**The tap.** `ask({followUpOf, question})`, the path that already existed: native reuses that read's asset, so the page still names none (R3), and the read is an ordinary paid read asked as the person's own question. Native compares the question with the one it sent the page for that read (white space apart) and, when they match, tells the harness that a Bobby-authored question was picked: `NucleoDesk.nextQuestionPicked` → `HarnessCenter.notePicked(symbol:)`, which records only while it may record. The words are never stored.
+
+**Withholding it.** Native can keep the question from the page: `NucleoDesk.offersNextQuestion(access)` is asked once per read with that read's access receipt, and when it answers no the key does not travel (the page then shows its fixed chips and knows nothing of it). It answers yes for every read today; the rule that Bobby never offers a one-tap question the meter would refuse belongs there, with no change to the page.
+
+**Who started the read.** `READ.origin` is `person` (they asked), `followUp` (native started it: the page sets it around its `ask.start` handler) or `restored` (a page restored from `pendingRead` no longer knows). A read that continues the one on screen (a retry or confirm token, a `followUpOf`) keeps that read's origin, so a thread Bobby started stays one. `build(reply, {origin})` puts it in the model, and `followUps()` gives a read that is not the person's own **no mover chip and no starter**: its row is about their own question and their own assets only (quick-access entries native marked `own: false` are left out; an entry without the mark counts as their own). A read of the person's own keeps the row of before: quick access, starters included, and a mover only in a slot quick access left empty.
 
 ---
 
@@ -517,11 +548,13 @@ URL parameters:
 - `xp`, `streak`
 - `rm=1`
 - `debug=1` (logs haptics)
+- `followUp=<text>` (every ok reply carries a synthesis whose next question is that text, §3.5)
 
 Hooks:
 - `nucleoBridge.mock.useClock(fn)` and `.pump()` for sim-clock determinism.
 - `.say(text)` sets the next STT utterance.
 - `.setMic(state)`.
+- `.startRead(key, question)` does what native does on a follow-up's tap: a single-use token, then `ask.start`.
 
 ### 4.4 App fixture mode (`-nucleo-fixtures [scenario]`, DEBUG only; Builder A)
 
@@ -775,5 +808,6 @@ Supersedes R9 only where stated here: there is still no notification prompt at l
 From the first delivered read the phone keeps a ledger per reader (`HarnessLedger`: asks with symbol and price, follow-ups shown, opened or come back for, app opens; 300 events, 60 days; no question text). `HarnessProfile` (interest per asset, the hour they answer at, which kinds they ignore) and `HarnessPlanner` (the asset the next day, its sector the day after, the week on Monday, then silence; an answered follow-up or a new question starts again) are pure functions of it. `HarnessCenter` asks iOS for permission only on the person's "Yes, tell me" or the Follow-ups switch, hands the plan to iOS as local notifications (`v18.follow.<step>`), writes each one back as `sent` once its moment has passed, and reads one quota-free price to draw "NVDA +2.3% since you asked" on the glass. No server, no push token, no account. Each notification carries a tag of its reader (a digest, never the account id) and the moment it was planned for; a tap with another reader's tag does nothing, delivered notifications are cleared when the reader changes, and every change of plan ends in a serialized `sync` so the last one always leaves iOS holding the newest plan.
 
 - Session: `readDelivered` calls `noteAsk`; a tapped follow-up is stored in `HarnessIntent` and drained behind the briefing gate (asset: the glass line; sector or week: route `followUp`, native-only).
-- Page: one new event, `ask.start {token, question}`. Native issues a single-use token for an asset it already knows and writes the question; the page runs it exactly like a chip that carries a token, from `IDLE` or `FOLLOWUPS` only and never under a native sheet. `NucleoSession.startRead` emits it at once, or after the open sheet has closed.
+- Page: one new event, `ask.start {token, question}`. Native issues a single-use token for an asset it already knows and writes the question; the page runs it exactly like a chip that carries a token, from `IDLE` or `FOLLOWUPS` only and never under a native sheet. `NucleoSession.startRead` emits it at once, or after the open sheet has closed. Such a read has origin `followUp` on the page and never ends on a mover chip (§3.5).
+- The next question (§3.5): a tap on the CIO's chip reaches the harness as `notePicked(symbol:)` through `NucleoDesk.nextQuestionPicked`.
 - Nudge sources: `harness.move` (priority 95) and `harness.offer` (80).
