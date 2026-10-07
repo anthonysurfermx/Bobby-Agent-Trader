@@ -25,7 +25,7 @@ import { claimReferral, isReferralCode, referralStatus } from './_lib/referrals.
 import { isCouponCode, normalizeCoupon, redeemCoupon } from './_lib/coupons.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
-import { LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
+import { FREE_READS, LEVEL_LIMITS, REFERRAL } from './_lib/desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { revenueCatReady, syncRevenueCat } from './_lib/revenuecat.js';
 import { appLocale, isAppLanguage } from '../src/lib/app-language.js';
@@ -132,8 +132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       access, levels, referral,
       // The terms the app shows (single source: api/_lib/desk-levels.ts).
-      // freeReadsPerWeek mirrors bobby_consume_read (20260927120000): null while the free weekly cap is off.
-      plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? 10 : null },
+      // freeReadsPerWeek mirrors bobby_consume_read (20261007161949): null while the free weekly cap is off.
+      plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? FREE_READS.weekly : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),
       // App Store sales close only for a known account that still has a card plan able to charge. A signed-out

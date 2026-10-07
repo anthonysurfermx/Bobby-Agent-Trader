@@ -138,6 +138,7 @@ jobs:
       - run: npm run test:admin-live-pg
       - run: npm run test:client-telemetry-pg
       - run: npm run test:admin-compass-pg
+      - run: npm run test:free-reads-pg
       - run: |
           psql "$DATABASE_URL" -c 'create database briefings_pg' -c 'create database briefings_api' -c 'create database briefings_worker'
       - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_pg npm run test:briefings-pg

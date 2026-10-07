@@ -194,7 +194,7 @@ export default function NucleoDesk() {
   const [sheet, setSheet] = useState<Sheet>('none');
   const [signInPrompt, setSignInPrompt] = useState(false);
   const { account } = useBobbyAccount();
-  // Metered access (api/_lib/access.ts): 3 reads without an account, 10 a week with one, Bobby Pro unlimited.
+  // Metered access (api/_lib/access.ts): 6 reads without an account, 20 a week with one, Bobby Pro unlimited.
   const [accessState, setAccessState] = useState<AccessState | null>(null);
   // The analysis level (Rápido / Profundo / Máximo) and the pop-up when an allowance runs out.
   const [deskLevel, setDeskLevelState] = useState<DeskLevel>(() => storedLevel());
