@@ -27,7 +27,7 @@ import LandSeedCard from '@/components/companion/LandSeedCard';
 import { DeskSwapCard, SwapSheet } from '@/components/companion/DeskSwap';
 import { WalletBalancePill, useWalletConnected } from '@/components/companion/DeskWallet';
 import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
-import { deskSuggestions, deskSurfaces, howLooksIn } from '@/lib/desk-suggestions';
+import { deskSuggestions, deskSurfaces, howLooksIn, type DeskAllowances } from '@/lib/desk-suggestions';
 import ProgressSync from '@/components/companion/ProgressSync';
 import { bobbySupabase } from '@/lib/bobby-db-client';
 import { track } from '@/lib/track';
@@ -1033,10 +1033,12 @@ export default function NucleoDesk() {
 
   // After a read: the CIO's own follow-up question first (it runs as a new question on the same asset), then
   // another question of the reader's, then their other assets. Which of them are shown is decided in
-  // src/lib/desk-suggestions.ts: Bobby's question is left out while a transaction surface is on screen.
+  // src/lib/desk-suggestions.ts: Bobby's question is left out while a transaction surface is on screen, and
+  // while the reader has no read left to ask it with (a tap would open the sign-in or the Bobby Pro dialog).
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
+  const allowances: DeskAllowances = { read: allowanceFor('rapido', accessState)?.state ?? null, level: deskLevel === 'rapido' ? null : allowanceFor(deskLevel, accessState)?.state ?? null };
   const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = deskSuggestions({
-    done, symbol: snapshot?.symbol ?? null, followUp, surfaces,
+    done, symbol: snapshot?.symbol ?? null, followUp, surfaces, allowances,
     quickAccess: quickAccessRow(progress, 4).map((symbol) => ({ symbol, name: quickAccessName(symbol) })), language: lang(), locale: speechLocale(),
   }).map((chip) => (chip.kind === 'followUp' ? { label: chip.label, go: () => { void ask(chip.question, chip.label); } }
     : chip.kind === 'another' ? { label: chip.label, go: () => { setInput(`${chip.symbol} `); inputRef.current?.focus(); } }

@@ -9,6 +9,10 @@
 // swap row and balance) are where a reader acts with their own wallet. While any of them is on screen the next
 // question is not offered. The other chips are the reader's own: a blank question about the same asset and
 // "How does X look?" for the assets they asked about before. They stay as they were.
+//
+// A second rule: nothing Bobby does leads into a paywall. A tap on the next question asks it, and with no read
+// left that tap opens the sign-in or the Bobby Pro dialog instead. So the next question is offered only while a
+// read is open (readOpen), by the allowances the level control itself shows.
 import { findBaseToken, isStockToken, type BaseSwapToken } from './base-swap/tokens';
 import { pickIn, type Lang } from './companions/i18n';
 
@@ -66,6 +70,22 @@ export function deskSurfaces(screen: DeskScreen): DeskSurfaces {
 /** Whether any transaction surface is on screen. */
 export const besideTransaction = (surfaces: DeskSurfaces): boolean => surfaces.swapCard || surfaces.walletPill || surfaces.swapSheet || surfaces.profile;
 
+/** What a meter has left, as the level control states it (allowanceFor); null when the desk does not know. */
+export type AllowanceState = 'open' | 'locked' | 'empty' | null;
+/** The two meters a question spends. */
+export interface DeskAllowances {
+  /** The read meter every question spends, whatever its level (allowanceFor('rapido', …)). */
+  read: AllowanceState;
+  /** The selected level's own meter; null on Rápido, which has none. */
+  level: AllowanceState;
+}
+/**
+ * Whether a tap that asks a question would start a read, rather than open the sign-in or the Bobby Pro dialog.
+ * A meter the desk does not know counts as open: it hides nothing on a guess, and the server's answer to the
+ * read just finished is what fills the read meter.
+ */
+export const readOpen = (allowances: DeskAllowances): boolean => (allowances.read ?? 'open') === 'open' && (allowances.level ?? 'open') === 'open';
+
 /** "How does NVDA look?", the question a chip of the reader's own asset asks, in an explicit language. */
 export const howLooksIn = (symbol: string, language: Lang, locale: string): string =>
   pickIn({ en: `How does ${symbol} look?`, es: `¿Cómo se ve ${symbol}?`, pt: `Como está ${symbol}?` }, language, locale);
@@ -87,6 +107,8 @@ export interface DeskSuggestionInput {
   followUp: string | null;
   /** The transaction surfaces on screen (deskSurfaces). */
   surfaces: DeskSurfaces;
+  /** What the reader has left to ask with (the read meter and the selected level's). */
+  allowances: DeskAllowances;
   /** The reader's quick-access row, in order, each symbol with the name its chip shows; the first four are read. */
   quickAccess: ReadonlyArray<{ symbol: string; name: string }>;
   language: Lang;
@@ -96,16 +118,16 @@ export interface DeskSuggestionInput {
 /**
  * The chips under the stage, in order.
  * Before a read: the reader's first three quick-access assets, by name.
- * After a read: the CIO's next question first (unless a transaction surface is on screen), then another
- * question of the reader's own about that asset, then their other assets: one when the next question is
- * shown, two when it is not.
+ * After a read: the CIO's next question first (unless a transaction surface is on screen, or no read is left
+ * to ask it with), then another question of the reader's own about that asset, then their other assets: one
+ * when the next question is shown, two when it is not.
  */
 export function deskSuggestions(input: DeskSuggestionInput): DeskSuggestion[] {
   const { symbol, language, locale } = input;
   const look = (asset: string) => howLooksIn(asset, language, locale);
   // The chip shows the company (LVMH); the question it sends keeps the symbol the server resolves (MC.PA).
   if (!input.done || !symbol) return input.quickAccess.slice(0, 3).map((asset) => ({ kind: 'asset', label: asset.name, ariaLabel: look(asset.symbol), symbol: asset.symbol, question: look(asset.symbol) }));
-  const next = input.followUp && !besideTransaction(input.surfaces) ? input.followUp : null;
+  const next = input.followUp && !besideTransaction(input.surfaces) && readOpen(input.allowances) ? input.followUp : null;
   return [
     // The next question carries the asset only when it writes the ticker itself, in capitals and as a whole word: "near
     // resistance" is not NEAR, and "consolidación" does not name SOL. Otherwise the symbol leads the question.

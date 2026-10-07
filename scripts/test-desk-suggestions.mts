@@ -10,13 +10,17 @@
 //   · the desk renders from those same values: its source is read here, and a swap card, a wallet pill, a swap
 //     sheet or a profile drawer rendered any other way, or a next question that reaches a chip by another road,
 //     fails the script. So does a new wallet or swap surface on the desk that the function does not know.
+// A second rule, from the review of 2026-10-07: nothing Bobby does leads into a paywall. A tap on the next
+// question asks it; when the reader has no read left (the read meter, or the selected level's own) that tap
+// opens the sign-in or the Bobby Pro dialog. So the next question is offered only while a read is open, by the
+// same allowances the level control shows; the reader's own chips are not touched.
 // What stays as it was is pinned too: the chips of an idle desk and of a finished read, label by label.
 // The rendered desk itself is walked in scripts/test-web-activation.mjs (section 3b).
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const { deskSuggestions, deskSurfaces, deskSwapOffer, besideTransaction, howLooksIn } = await import('../src/lib/desk-suggestions.ts');
+const { deskSuggestions, deskSurfaces, deskSwapOffer, besideTransaction, howLooksIn, readOpen } = await import('../src/lib/desk-suggestions.ts');
 type Surfaces = ReturnType<typeof deskSurfaces>;
 type Lang = 'en' | 'es' | 'fr' | 'pt' | 'it' | 'de';
 
@@ -29,7 +33,9 @@ const NONE: Surfaces = { swapCard: false, walletPill: false, swapSheet: false, p
 const QUICK = [{ symbol: 'BTC', name: 'BTC' }, { symbol: 'MC.PA', name: 'LVMH' }, { symbol: 'NVDA', name: 'NVIDIA' }, { symbol: 'ETH', name: 'ETH' }, { symbol: 'SOL', name: 'SOL' }];
 const NEXT = 'What would confirm the NVDA trend?';
 const FIXED = 'What would have to change in NVDA for this read to change?';
-const base = { done: true, symbol: 'NVDA', followUp: NEXT, surfaces: NONE, quickAccess: QUICK, language: 'en' as Lang, locale: 'en-US' };
+type State = 'open' | 'locked' | 'empty' | null;
+const OPEN = { read: 'open' as State, level: null as State };
+const base = { done: true, symbol: 'NVDA', followUp: NEXT, surfaces: NONE, allowances: OPEN, quickAccess: QUICK, language: 'en' as Lang, locale: 'en-US' };
 
 // ---------- what the swap card offers, with the swap flag on and off ----------
 eq([deskSwapOffer('BTC', false)?.symbol, deskSwapOffer('BTC', true)?.symbol, deskSwapOffer('ETH', false)?.symbol], ['cbBTC', 'cbBTC', 'ETH'], 'a crypto asset on the allow-list is offered whatever the stock flag says');
@@ -78,18 +84,30 @@ for (const surface of ['swapCard', 'walletPill', 'swapSheet', 'profile'] as cons
   const chips = deskSuggestions({ ...base, surfaces: { ...NONE, [surface]: true } });
   eq(chips.map((c) => c.kind), ['another', 'asset', 'asset'], `${surface} on screen: Bobby's question is not offered, and the reader's own chips stand as when there is none`);
 }
+// ---------- never into a paywall ----------
+const STATES: State[] = ['open', 'locked', 'empty', null];
+for (const read of STATES) for (const level of STATES) {
+  const open = (read === 'open' || read === null) && (level === 'open' || level === null);
+  eq(readOpen({ read, level }), open, `read meter ${read}, level meter ${level}: a tap ${open ? 'starts a read' : 'would open a dialog'}`);
+  const chips = deskSuggestions({ ...base, allowances: { read, level } });
+  eq(chips.map((c) => c.kind), open ? ['followUp', 'another', 'asset'] : ['another', 'asset', 'asset'], `…so Bobby's question is ${open ? 'offered' : 'not offered, and the reader\'s own chips stand as when there is none'}`);
+}
+eq(deskSuggestions({ ...base, allowances: { read: 'empty', level: null } }), deskSuggestions({ ...base, followUp: null }), 'no read left: the chips are exactly those of a read with no next question');
+eq(deskSuggestions({ ...base, done: false, symbol: null, followUp: null, allowances: { read: 'empty', level: 'locked' } }).map((c) => c.kind), ['asset', 'asset', 'asset'], 'an idle desk keeps its three starters whatever is left');
+
 // Every state of the screen: no transaction surface and Bobby's question together, and nothing else is lost.
 let states = 0;
 for (const done of [true, false]) for (const direction of ['long', 'short', 'none', null] as const) for (const symbol of ['BTC', 'ETH', 'NVDA', 'AAPL', 'SOL', 'MC.PA', 'USDC', null])
   for (const stocksVisible of [true, false]) for (const desktop of [true, false]) for (const consented of [true, false]) for (const walletConnected of [true, false])
-    for (const sheet of ['none', 'profile', 'board', 'risk', 'catalog', 'pet', 'swap']) for (const followUp of [...questions, null]) {
+    for (const sheet of ['none', 'profile', 'board', 'risk', 'catalog', 'pet', 'swap']) for (const followUp of [...questions, null]) for (const allowances of [OPEN, { read: 'empty' as State, level: null as State }, { read: 'open' as State, level: 'locked' as State }]) {
       const surfaces = deskSurfaces({ done, direction, symbol, stocksVisible, desktop, consented, walletConnected, sheet });
-      const chips = deskSuggestions({ done, symbol, followUp, surfaces, quickAccess: QUICK, language: 'en', locale: 'en-US' });
+      const chips = deskSuggestions({ done, symbol, followUp, surfaces, allowances, quickAccess: QUICK, language: 'en', locale: 'en-US' });
       const authored = chips.filter((c) => c.kind === 'followUp' || (followUp !== null && (c.label.includes(followUp) || ('question' in c && c.question.includes(followUp)))));
-      const where = JSON.stringify({ done, direction, symbol, stocksVisible, desktop, consented, walletConnected, sheet, followUp });
+      const where = JSON.stringify({ done, direction, symbol, stocksVisible, desktop, consented, walletConnected, sheet, followUp, allowances });
       // The card the desk draws is the offer for this very symbol and flag: no second opinion about what is on screen.
       assert.equal(surfaces.swapCard, done && direction === 'long' && deskSwapOffer(symbol, stocksVisible) !== null, `the swap card is the offer: ${where}`);
       if (besideTransaction(surfaces)) assert.equal(authored.length, 0, `a transaction surface and Bobby's question on one screen: ${where}`);
+      else if (!readOpen(allowances)) assert.equal(authored.length, 0, `Bobby's question one tap from a paywall: ${where}`);
       else if (done && symbol && followUp) assert.deepEqual([chips[0].kind, chips[0].label, authored.length], ['followUp', followUp, 1], `no surface: the next question leads, once: ${where}`);
       else assert.equal(authored.length, 0, `no read or no next question: none is shown: ${where}`);
       // The reader's own chips never depend on the surfaces.
@@ -97,7 +115,7 @@ for (const done of [true, false]) for (const direction of ['long', 'short', 'non
       states++;
     }
 checks += states;
-ok(states === 2 * 4 * 8 * 2 * 2 * 2 * 2 * 7 * 5, `${states} states of the screen, the swap flag on and off: none shows Bobby's question beside a transaction surface`);
+ok(states === 2 * 4 * 8 * 2 * 2 * 2 * 2 * 7 * 5 * 3, `${states} states of the screen, the swap flag on and off, a read open or not: none shows Bobby's question beside a transaction surface or in front of a paywall`);
 
 // ---------- the desk renders from these values, and from nothing else ----------
 const desk = read('src/components/nucleo/NucleoDesk.tsx');
@@ -122,8 +140,11 @@ eq(count(desk, '.followUp'), 1, 'the desk reads synthesis.followUp in one place'
 const uses = desk.split('\n').filter((line) => /\bfollowUp\b/.test(line) && !line.trim().startsWith('//'));
 eq(uses.length, 3, 'followUp appears on three lines: where it is read, where it is handed to deskSuggestions, where its chip is built');
 ok(/const followUp = done && snapshot && !agentsFailed \? agents\?\.synthesis\?\.followUp \?\? null : null;/.test(uses[0]), '…read only from a finished read whose agents finished');
-ok(/done, symbol: snapshot\?\.symbol \?\? null, followUp, surfaces,/.test(uses[1]) && /chip\.kind === 'followUp' \? \{ label: chip\.label, go: \(\) => \{ void ask\(chip\.question, chip\.label\); \} \}/.test(uses[2]), '…and shown only as the chip deskSuggestions returned');
+ok(/done, symbol: snapshot\?\.symbol \?\? null, followUp, surfaces, allowances,/.test(uses[1]) && /chip\.kind === 'followUp' \? \{ label: chip\.label, go: \(\) => \{ void ask\(chip\.question, chip\.label\); \} \}/.test(uses[2]), '…and shown only as the chip deskSuggestions returned');
 eq(count(desk, 'deskSuggestions('), 1, 'the chips are decided once');
+// What is left comes from the function the level control and ask() read, for the read meter and for the selected level.
+ok(/const allowances: DeskAllowances = \{ read: allowanceFor\('rapido', accessState\)\?\.state \?\? null, level: deskLevel === 'rapido' \? null : allowanceFor\(deskLevel, accessState\)\?\.state \?\? null \};/.test(desk), 'the desk reads what is left from allowanceFor: the read meter, and the selected level\'s own');
+ok(/const allowance = lv === 'rapido' \? null : allowanceFor\(lv, accessRef\.current\);\s+if \(allowance && allowance\.state !== 'open'\) \{/.test(desk), '…the same function and the same test ask() stops a question with');
 ok(/suggestions\.map\(\(c, i\) => \(/.test(desk) && count(desk, 'className={`n-chip ${i === 0') === 1, 'the chip row renders that list');
 // The components behind the surfaces agree with the function about when they show anything.
 const swap = read('src/components/companion/DeskSwap.tsx'), wallet = read('src/components/companion/DeskWallet.tsx');
