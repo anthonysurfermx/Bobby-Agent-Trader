@@ -187,6 +187,8 @@ struct ThesisListSheet: View {
 }
 
 /// The list itself, on a model: the sheet above and the review fixtures both show this.
+/// V18-DESIGN.md, "My theses": a row is an asset and where its review stands. A tap opens the
+/// review (which sends nothing by itself); edit and archive are in the row's menu.
 struct ThesisListView: View {
     @ObservedObject var model: ThesisListModel
     let onReview: (String) -> Void
@@ -194,31 +196,26 @@ struct ThesisListView: View {
     /// Opens the editor on a draft from the read with this request id.
     var onWrite: (String) -> Void = { _ in }
     let onClose: () -> Void
-    @State private var showsArchived = false
     @State private var deleting: SavedThesis?
+    @State private var showsDetails = false
 
     var body: some View {
         ScrollViewReader { proxy in
-            ThesisScreen(title: L.t("Theses", "Tesis"), closeId: "theses-close", onClose: onClose) {
-                ThesisTitle(text: L.t("My theses", "Mis tesis"))
-                if let question = model.guestQuestion { guestRow(question) }
-                if model.isEmpty {
-                    empty
-                    if let read = model.writable { writeRow(read) }
-                } else {
-                    Text(model.counter).thesisFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted)
-                        .padding(.top, 6)
-                        .accessibilityIdentifier("theses-counter")
-                    if let read = model.writable { writeRow(read) }
-                    ForEach(model.active) { thesis in activeBlock(thesis).id(thesis.id) }
+            QuietSheet(title: L.t("My theses", "Mis tesis"), closeId: "theses-close", onClose: onClose,
+                       onInfo: { showsDetails = true }) {
+                VStack(alignment: .leading, spacing: 0) {
+                    if model.guestCount > 0 {
+                        guestRow
+                    } else if model.isEmpty {
+                        empty
+                    }
+                    if let read = model.writable { writeDoor(read) }
+                    ForEach(model.active) { thesis in activeRow(thesis).id(thesis.id) }
                     if !model.archived.isEmpty { archivedSection }
-                    Text(ThesisCopy.localOnly).thesisFont(12, relativeTo: .caption).foregroundStyle(Theme.warmDim).thesisWraps()
-                        .padding(.top, 26)
-                        .accessibilityIdentifier("theses-local-only")
                 }
+                .padding(.top, 14)
             }
             .onAppear {
-                if model.highlightIsArchived { showsArchived = true }
                 guard let id = model.highlight else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { withAnimation(.easeOut(duration: 0.3)) { proxy.scrollTo(id, anchor: .top) } }
             }
@@ -233,152 +230,138 @@ struct ThesisListView: View {
             }
             Button(L.t("Cancel", "Cancelar"), role: .cancel) { deleting = nil }
         }
+        .sheet(isPresented: $showsDetails) {
+            QuietSheet(title: L.t("Details", "Detalles"), closeId: "theses-details-close", onClose: { showsDetails = false }) {
+                QuietNote(text: ThesisCopy.localOnly, id: "theses-local-only").padding(.top, 16)
+            }
+            .presentationDetents([.medium])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(Theme.nucleoSurface)
+        }
     }
 
     // MARK: Empty
 
     private var empty: some View {
-        Text(L.t("Nothing here yet. Ask Bobby about an asset, save the read, and write down why you are looking at it. Next time, Bobby reviews it with you.",
-                 "Todavía no hay nada. Pregúntale a Bobby por un activo, guarda la lectura y escribe por qué lo estás mirando. La próxima vez, Bobby la revisa contigo."))
-            .thesisFont(15).foregroundStyle(Theme.warmMuted).lineSpacing(4).thesisWraps()
-            .padding(.top, 16)
-            .accessibilityIdentifier("theses-empty")
+        VStack(alignment: .leading, spacing: 6) {
+            Text(L.t("No theses yet.", "Aún no hay tesis.")).quietFont(16).foregroundStyle(Theme.cream)
+            QuietNote(text: L.t("Start with a saved read.", "Empieza con una lectura guardada."))
+        }
+        .padding(.top, 8).padding(.bottom, 10)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("theses-empty")
     }
 
     // MARK: The two quiet rows
 
-    /// Theses written before signing in: asked once, answered by the person.
-    private func guestRow(_ question: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(question).thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
-                .accessibilityIdentifier("theses-guest-question")
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { guestActions; Spacer(minLength: 0) }
-                VStack(alignment: .leading, spacing: 4) { guestActions }
+    /// Theses written before signing in: asked once, answered by the person. Two choices of equal weight.
+    private var guestRow: some View {
+        let one = model.guestCount == 1
+        return VStack(alignment: .leading, spacing: 6) {
+            Text(one ? L.t("1 guest thesis", "1 tesis sin cuenta")
+                     : L.t("\(model.guestCount) guest theses", "\(model.guestCount) tesis sin cuenta"))
+                .quietFont(16).foregroundStyle(Theme.cream)
+            QuietNote(text: one ? L.t("Keep it in this account?", "¿Conservarla en esta cuenta?")
+                                : L.t("Keep them in this account?", "¿Conservarlas en esta cuenta?"),
+                      id: "theses-guest-question")
+            HStack(spacing: 10) {
+                QuietChip(title: one ? L.t("Keep it", "Conservarla") : L.t("Keep them", "Conservarlas"), wide: true, id: "theses-guest-keep") {
+                    withAnimation(.easeOut(duration: 0.2)) { _ = model.keepGuestTheses() }
+                }
+                QuietChip(title: one ? L.t("Not mine", "No es mía") : L.t("Not mine", "No son mías"), wide: true, id: "theses-guest-decline") {
+                    withAnimation(.easeOut(duration: 0.2)) { model.declineGuestTheses() }
+                }
             }
+            .padding(.top, 6)
         }
-        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 8)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.nucleoGlass))
-        .padding(.top, 14)
+        .padding(.top, 8).padding(.bottom, 14)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("theses-guest")
     }
 
-    @ViewBuilder private var guestActions: some View {
-        ThesisButton(title: model.guestCount == 1 ? L.t("Keep it", "Mantenerla") : L.t("Keep them", "Conservarlas"), id: "theses-guest-keep") {
-            withAnimation(.easeOut(duration: 0.2)) { _ = model.keepGuestTheses() }
-        }
-        ThesisLink(title: model.guestCount == 1 ? L.t("Not mine", "No es mía") : L.t("Not mine", "No son mías"), id: "theses-guest-decline") {
-            withAnimation(.easeOut(duration: 0.2)) { model.declineGuestTheses() }
-        }
-    }
-
     /// The read the person last saved has no thesis yet: the editor opens on a draft from it.
-    private func writeRow(_ read: NucleoReadSummary) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text(L.t("You saved a read on \(read.symbol). Write down why you are looking at it.",
-                     "Guardaste una lectura de \(read.symbol). Escribe por qué lo estás mirando."))
-                .thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-            ThesisButton(title: L.t("Write my \(read.symbol) thesis", "Escribir mi tesis de \(read.symbol)"),
-                         prominent: model.isEmpty, id: "theses-write") { onWrite(read.requestId) }
+    @ViewBuilder private func writeDoor(_ read: NucleoReadSummary) -> some View {
+        let title = L.t("Write thesis", "Escribir tesis") + " · " + read.symbol
+        if model.isEmpty {
+            QuietPrimary(title: title, id: "theses-write") { onWrite(read.requestId) }.padding(.top, 8).padding(.bottom, 6)
+        } else {
+            QuietLink(title: title, systemImage: "square.and.pencil", id: "theses-write") { onWrite(read.requestId) }
         }
-        .padding(.top, 16).padding(.bottom, model.isEmpty ? 0 : 12)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("theses-write-row")
     }
 
     // MARK: Active
 
-    private func activeBlock(_ thesis: SavedThesis) -> some View {
-        let highlighted = model.highlight == thesis.id
-        return VStack(alignment: .leading, spacing: 0) {
-            Text(ThesisCopy.title(thesis)).thesisFont(14, .medium, design: .monospaced).foregroundStyle(Theme.cream).thesisWraps()
-            Text(thesis.hypothesis).thesisFont(15).foregroundStyle(Theme.cream).lineSpacing(3).lineLimit(2)
-                .padding(.top, 6)
-            Text(ThesisCopy.sinceLine(thesis)).thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
-                .padding(.top, 8)
-            Text(ThesisCopy.reviewedLine(thesis)).thesisFont(12.5, relativeTo: .footnote)
-                .foregroundStyle(model.isOverdue(thesis) ? Theme.cream : Theme.warmDim).thesisWraps()
-                .padding(.top, 2)
-            // Side by side when they fit; stacked at large text sizes, so no label is ever cut.
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { actions(thesis); Spacer(minLength: 0) }
-                VStack(alignment: .leading, spacing: 4) { actions(thesis) }
-            }
-            .padding(.top, 12)
+    /// "Review · Sep 23" once reviewed (the verdict is history here: plain ink), "Not reviewed · Oct 4" before.
+    private func state(_ thesis: SavedThesis) -> String {
+        if let last = thesis.lastReviewedAt {
+            return [ThesisCopy.verdictWord(thesis.lastReview?.verdict), ThesisCopy.day(last)].compactMap { $0 }.joined(separator: " · ")
         }
-        .padding(.vertical, 16)
-        .padding(.horizontal, highlighted ? 14 : 0)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(highlighted ? Theme.nucleoGlass : Color.clear))
-        .overlay(alignment: .top) { if !highlighted { Rectangle().fill(Theme.warmHair).frame(height: 1) } }
-        .padding(.top, highlighted ? 12 : 0)
+        return L.t("Not reviewed", "Sin revisar") + " · " + ThesisCopy.day(thesis.createdAt)
+    }
+
+    private func activeRow(_ thesis: SavedThesis) -> some View {
+        let highlighted = model.highlight == thesis.id
+        return VStack(spacing: 0) {
+            HStack(spacing: 4) {
+                Button { onReview(thesis.id) } label: {
+                    HStack(alignment: .firstTextBaseline, spacing: 10) {
+                        Text(thesis.symbol).quietFont(17, highlighted ? .medium : .regular).foregroundStyle(Theme.cream)
+                        Spacer(minLength: 12)
+                        Text(state(thesis)).quietFont(14, relativeTo: .callout).monospacedDigit()
+                            .foregroundStyle(model.isOverdue(thesis) ? Theme.cream : Theme.warmMuted)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .frame(minHeight: 56)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(L.t("Review \(thesis.symbol)", "Revisar \(thesis.symbol)") + ". " + state(thesis))
+                .accessibilityIdentifier("theses-review-\(thesis.symbol)")
+                Menu {
+                    Button(L.t("Edit", "Editar")) { onEdit(thesis.id) }
+                    Button(L.t("Archive", "Archivar")) { withAnimation(.easeOut(duration: 0.2)) { model.archive(thesis.id) } }
+                } label: {
+                    QuietGlyph(systemImage: "ellipsis")
+                }
+                .accessibilityLabel(L.t("More options", "Más opciones") + ", " + thesis.symbol)
+                .accessibilityIdentifier("theses-menu-\(thesis.symbol)")
+            }
+            Rectangle().fill(Theme.warmHair).frame(height: 1)
+        }
+        .padding(.trailing, -7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("theses-active-\(thesis.symbol)")
     }
 
-    /// Review and Edit are the two actions; Archive is the quiet way out that costs no read
-    /// (an archived thesis can then be deleted, so nothing kept here is ever stuck).
-    @ViewBuilder private func actions(_ thesis: SavedThesis) -> some View {
-        ThesisButton(title: L.t("Review", "Revisar"), prominent: true, id: "theses-review-\(thesis.symbol)") { onReview(thesis.id) }
-            .accessibilityLabel(L.t("Review \(thesis.symbol)", "Revisar \(thesis.symbol)"))
-        ThesisButton(title: L.t("Edit", "Editar"), id: "theses-edit-\(thesis.symbol)") { onEdit(thesis.id) }
-            .accessibilityLabel(L.t("Edit \(thesis.symbol)", "Editar \(thesis.symbol)"))
-        ThesisLink(title: L.t("Archive", "Archivar"), id: "theses-archive-\(thesis.symbol)") {
-            withAnimation(.easeOut(duration: 0.2)) { model.archive(thesis.id) }
-        }
-        .accessibilityLabel(L.t("Archive \(thesis.symbol)", "Archivar \(thesis.symbol)"))
-    }
-
     // MARK: Archived
 
-    @ViewBuilder private var archivedSection: some View {
-        Button {
-            withAnimation(.easeOut(duration: 0.2)) { showsArchived.toggle() }
-        } label: {
-            HStack(spacing: 8) {
-                Text((L.t("Archived", "Archivadas") + " · \(model.archived.count)").uppercased())
-                    .thesisFont(11, .medium, design: .monospaced, relativeTo: .caption).tracking(1.4).foregroundStyle(Theme.warmDim)
-                Image(systemName: showsArchived ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.warmDim)
-                Spacer(minLength: 0)
+    private var archivedSection: some View {
+        QuietDisclosure(label: L.t("Archived", "Archivadas"), count: model.archived.count, open: model.highlightIsArchived,
+                        id: "theses-archived-toggle") {
+            VStack(alignment: .leading, spacing: 0) {
+                if let problem = model.problemText() {
+                    QuietNote(text: problem, id: "theses-reopen-problem").padding(.bottom, 6)
+                }
+                ForEach(model.archived) { thesis in archivedRow(thesis).id(thesis.id) }
             }
-            .frame(minHeight: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .padding(.top, 18)
-        .accessibilityLabel(L.t("Archived", "Archivadas") + ", \(model.archived.count)")
-        .accessibilityValue(showsArchived ? L.t("Expanded", "Desplegado") : L.t("Collapsed", "Plegado"))
-        .accessibilityIdentifier("theses-archived-toggle")
-        if showsArchived {
-            if let problem = model.problemText() {
-                Text(problem).thesisFont(13, .medium, relativeTo: .footnote).foregroundStyle(Theme.cream).thesisWraps()
-                    .padding(.bottom, 8)
-                    .accessibilityIdentifier("theses-reopen-problem")
-            }
-            ForEach(model.archived) { thesis in archivedRow(thesis).id(thesis.id) }
         }
     }
 
     private func archivedRow(_ thesis: SavedThesis) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text(ThesisCopy.title(thesis)).thesisFont(14, .medium, design: .monospaced).foregroundStyle(Theme.warmMuted).thesisWraps()
-            Text(thesis.hypothesis).thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineSpacing(2).lineLimit(2)
-                .padding(.top, 4)
-            HStack(spacing: 8) {
-                ThesisLink(title: L.t("Reopen", "Reabrir"), tint: Theme.cream, id: "theses-reopen-\(thesis.symbol)") { model.reopen(thesis.id) }
-                    .accessibilityLabel(L.t("Reopen \(thesis.symbol)", "Reabrir \(thesis.symbol)"))
-                ThesisLink(title: L.t("Delete", "Eliminar"), id: "theses-delete-\(thesis.symbol)") { deleting = thesis }
-                    .accessibilityLabel(L.t("Delete \(thesis.symbol)", "Eliminar \(thesis.symbol)"))
-                Spacer(minLength: 0)
+        HStack(spacing: 4) {
+            Text(thesis.symbol).quietFont(16).foregroundStyle(Theme.warmMuted)
+            Spacer(minLength: 12)
+            Menu {
+                Button(L.t("Reopen", "Reabrir")) { model.reopen(thesis.id) }
+                Button(L.t("Delete", "Eliminar"), role: .destructive) { deleting = thesis }
+            } label: {
+                QuietGlyph(systemImage: "ellipsis")
             }
-            .padding(.top, 4)
+            .accessibilityLabel(L.t("More options", "Más opciones") + ", " + thesis.symbol)
+            .accessibilityIdentifier("theses-menu-\(thesis.symbol)")
         }
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(model.highlight == thesis.id ? Theme.nucleoGlass : Color.clear))
+        .frame(minHeight: 48)
+        .padding(.trailing, -7)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("theses-archived-\(thesis.symbol)")
     }

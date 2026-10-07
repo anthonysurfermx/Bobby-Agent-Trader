@@ -34,6 +34,8 @@ struct ThesisEditorSheet: View {
 }
 
 /// The editor itself, on a model: the sheet above and the review fixtures both show this.
+/// V18-DESIGN.md, "Thesis editor": one question and one generous field; the two optional
+/// questions unfold; the time frame is one row; where it is kept is one line above Save.
 struct ThesisEditorView: View {
     @ObservedObject var model: ThesisEditorModel
     let onSaved: (SavedThesis) -> Void
@@ -43,6 +45,8 @@ struct ThesisEditorView: View {
     private enum Field: Hashable { case hypothesis, worry, changeMind }
     @FocusState private var focus: Field?
     @State private var asksToDiscard = false
+    @State private var showsMore = false
+    @State private var showsDetails = false
 
     /// The X: words that are not saved are never dropped without asking once.
     private func close() {
@@ -53,20 +57,42 @@ struct ThesisEditorView: View {
         screen
             // A pull on the sheet cannot throw the words away either; the X asks.
             .interactiveDismissDisabled(model.hasUnsavedWords)
-            .confirmationDialog(L.t("Discard what you wrote?", "¿Descartar lo que escribiste?"), isPresented: $asksToDiscard, titleVisibility: .visible) {
+            .confirmationDialog(L.t("Discard your text?", "¿Descartar tu texto?"), isPresented: $asksToDiscard, titleVisibility: .visible) {
                 Button(L.t("Discard", "Descartar"), role: .destructive) { onClose() }
                 Button(L.t("Keep writing", "Seguir escribiendo"), role: .cancel) {}
             }
+            // Words that are already there are never folded away.
+            .onAppear { showsMore = !model.worry.isEmpty || !model.changeMind.isEmpty }
+            .sheet(isPresented: $showsDetails) {
+                QuietSheet(title: L.t("Details", "Detalles"), closeId: "thesis-editor-details-close", onClose: { showsDetails = false }) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if let price = model.startingPrice {
+                            QuietRow(label: L.t("Starting price", "Precio inicial"), value: ThesisCopy.price(price), hairline: false,
+                                     id: "thesis-editor-asset")
+                        }
+                        QuietNote(text: ThesisCopy.localOnly, id: "thesis-editor-local-only")
+                    }
+                    .padding(.top, 12)
+                }
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+            }
+    }
+
+    private var title: String {
+        let base = model.isNew ? L.t("Your thesis", "Tu tesis") : L.t("Edit thesis", "Editar tesis")
+        return model.symbol.map { base + " · " + $0 } ?? base
     }
 
     private var screen: some View {
-        ThesisScreen(title: L.t("Thesis", "Tesis"), closeId: "thesis-editor-close", onClose: close, bottom: bottomBar) {
+        QuietSheet(title: title, closeId: "thesis-editor-close", onClose: close,
+                   onInfo: showsWords ? { focus = nil; showsDetails = true } : nil, bottom: bottomBar) {
             switch (model.source, model.problem) {
             case (.missing, _), (_, .notFound?):
                 missing
             case (_, .stale?):
-                message(L.t("Your account changed. Open your theses again to keep writing.",
-                            "Tu cuenta cambió. Abre tus tesis otra vez para seguir escribiendo."), id: "thesis-editor-stale")
+                message(L.t("Account changed. Reopen your theses.", "Cuenta cambiada. Abre tus tesis de nuevo."), id: "thesis-editor-stale")
             case let (_, .alreadyActive(id)?):
                 exists(id)
             case (_, .limitReached?):
@@ -88,57 +114,47 @@ struct ThesisEditorView: View {
     // MARK: The words
 
     @ViewBuilder private var words: some View {
-        ThesisTitle(text: model.isNew ? L.t("Write your thesis", "Escribe tu tesis") : L.t("Edit your thesis", "Edita tu tesis"))
-        asset
         if model.draftedByBobby {
-            ThesisNote(text: L.t("Bobby’s draft from today’s read. Make it say what you think.",
-                                 "Borrador de Bobby a partir de la lectura de hoy. Haz que diga lo que tú piensas."))
-                .padding(.top, 16)
-                .accessibilityIdentifier("thesis-editor-draft-note")
+            // Said before saving: these first words are Bobby's, and the person's to change.
+            QuietNote(text: L.t("Bobby draft · editable", "Borrador de Bobby · editable"), id: "thesis-editor-draft-note")
+                .padding(.top, 12)
         }
-        field(L.t("Why I am looking at this", "Por qué lo estoy mirando"), text: $model.hypothesis, optional: false,
-              field: .hypothesis, id: "thesis-editor-why")
+        field(L.t("Why this asset?", "¿Por qué este activo?"), text: $model.hypothesis, field: .hypothesis, id: "thesis-editor-why", top: 16)
         if model.problem == .emptyHypothesis {
-            Text(L.t("Write why you are looking at this.", "Escribe por qué lo estás mirando."))
-                .thesisFont(13, .medium, relativeTo: .footnote).foregroundStyle(Theme.cream).thesisWraps()
+            QuietNote(text: L.t("Write why this asset interests you.", "Escribe por qué te interesa este activo."), id: "thesis-editor-empty")
                 .padding(.top, 6)
-                .accessibilityIdentifier("thesis-editor-empty")
         }
-        field(L.t("What worries me", "Lo que me preocupa"), text: $model.worry, optional: true,
-              field: .worry, id: "thesis-editor-worry")
-        field(L.t("What would change my mind", "Lo que me haría cambiar de opinión"), text: $model.changeMind, optional: true,
-              field: .changeMind, id: "thesis-editor-change-mind")
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) { showsMore.toggle() }
+        } label: {
+            HStack(spacing: 8) {
+                Text(showsMore ? L.t("Optional", "Opcional") : L.t("Add detail", "Añadir detalle"))
+                    .quietFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted)
+                Image(systemName: showsMore ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(Theme.warmDim).accessibilityHidden(true)
+                Spacer(minLength: 0)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.top, 6)
+        .accessibilityValue(showsMore ? L.t("Expanded", "Abierto") : L.t("Collapsed", "Cerrado"))
+        .accessibilityIdentifier("thesis-editor-more")
+        if showsMore {
+            field(L.t("What worries you?", "¿Qué te preocupa?"), text: $model.worry, field: .worry, id: "thesis-editor-worry", top: 2)
+            field(L.t("What changes your mind?", "¿Qué te haría cambiar?"), text: $model.changeMind, field: .changeMind,
+                  id: "thesis-editor-change-mind", top: 12)
+        }
         horizon
     }
 
-    @ViewBuilder private var asset: some View {
-        if let symbol = model.symbol {
-            VStack(alignment: .leading, spacing: 3) {
-                Text(ThesisCopy.title(symbol: symbol, name: model.name ?? symbol))
-                    .thesisFont(14, .medium, design: .monospaced).foregroundStyle(Theme.cream).thesisWraps()
-                if let price = model.startingPrice {
-                    Text(L.t("Starting point: \(ThesisCopy.price(price))", "Punto de partida: \(ThesisCopy.price(price))"))
-                        .thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
-                }
-            }
-            .padding(.top, 8)
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("thesis-editor-asset")
-        }
-    }
-
-    private func field(_ label: String, text: Binding<String>, optional: Bool, field: Field, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                ThesisLabel(text: label)
-                if optional {
-                    Text(L.t("Optional", "Opcional")).thesisFont(11, relativeTo: .caption).foregroundStyle(Theme.warmDim)
-                }
-                Spacer(minLength: 0)
-            }
-            TextField("", text: text, prompt: Text(L.t("In your own words", "Con tus palabras")).foregroundStyle(Theme.warmDim), axis: .vertical)
-                .lineLimit(2...10)
-                .thesisFont(15)
+    private func field(_ label: String, text: Binding<String>, field: Field, id: String, top: CGFloat) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(label).quietFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted)
+            TextField("", text: text, prompt: Text(L.t("Your words", "Tus palabras")).foregroundStyle(Theme.warmDim), axis: .vertical)
+                .lineLimit(field == .hypothesis ? 3...10 : 1...8)
+                .quietFont(16)
                 .foregroundStyle(Theme.cream)
                 .tint(Theme.orbViolet)
                 .focused($focus, equals: field)
@@ -149,45 +165,46 @@ struct ThesisEditorView: View {
                 .overlay(RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(Theme.nucleoStroke, lineWidth: focus == field ? 1 : 0))
                 .accessibilityLabel(label)
                 .accessibilityIdentifier(id)
-            Text("\(text.wrappedValue.count)/\(ThesisBook.textLimit)")
-                .thesisFont(10.5, design: .monospaced, relativeTo: .caption2).foregroundStyle(Theme.warmDim)
-                .frame(maxWidth: .infinity, alignment: .trailing)
-                .padding(.top, 4)
-                .accessibilityLabel(L.t("\(text.wrappedValue.count) of \(ThesisBook.textLimit) characters",
-                                        "\(text.wrappedValue.count) de \(ThesisBook.textLimit) caracteres"))
+            // The limit shows only when it is near, and only for the field being written.
+            if focus == field, text.wrappedValue.count > ThesisBook.textLimit - 80 {
+                Text("\(text.wrappedValue.count)/\(ThesisBook.textLimit)")
+                    .quietFont(11, relativeTo: .caption2).monospacedDigit().foregroundStyle(Theme.warmDim)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .accessibilityLabel(L.t("\(text.wrappedValue.count) of \(ThesisBook.textLimit) characters",
+                                            "\(text.wrappedValue.count) de \(ThesisBook.textLimit) caracteres"))
+            }
         }
+        .padding(.top, top)
     }
 
+    /// One row. No value is chosen for the person; picking the current one again clears it.
     private var horizon: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                ThesisLabel(text: L.t("How long are you looking at this?", "¿Por cuánto tiempo lo estás mirando?"))
-                Text(L.t("Optional", "Opcional")).thesisFont(11, relativeTo: .caption).foregroundStyle(Theme.warmDim)
-                Spacer(minLength: 0)
-            }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 132), spacing: 8, alignment: .leading)], alignment: .leading, spacing: 4) {
-                ForEach(ThesisHorizon.allCases, id: \.self) { option in
-                    let selected = model.horizon == option
-                    Button {
-                        // The pick is the person's; tapping it again clears it.
-                        model.horizon = selected ? nil : option
-                    } label: {
-                        Text(ThesisCopy.horizon(option)).thesisFont(13, .medium, relativeTo: .footnote)
-                            .foregroundStyle(selected ? Theme.bg : Theme.cream)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 12).padding(.vertical, 8)
-                            .frame(maxWidth: .infinity, minHeight: 36)
-                            .background(Capsule().fill(selected ? Theme.cream : Theme.warmFill))
-                            .overlay(Capsule().stroke(Theme.nucleoStroke, lineWidth: selected ? 0 : 1))
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(selected ? .isSelected : [])
-                    .accessibilityIdentifier("thesis-editor-horizon-\(option.rawValue)")
+        Menu {
+            ForEach(ThesisHorizon.allCases, id: \.self) { option in
+                Button {
+                    model.horizon = model.horizon == option ? nil : option
+                } label: {
+                    if model.horizon == option { Label(ThesisCopy.horizon(option), systemImage: "checkmark") } else { Text(ThesisCopy.horizon(option)) }
                 }
+                .accessibilityIdentifier("thesis-editor-horizon-\(option.rawValue)")
             }
+            if model.horizon != nil {
+                Button(L.t("Not set", "Sin definir")) { model.horizon = nil }
+            }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 10) {
+                Text(L.t("Time frame", "Plazo")).quietFont(16).foregroundStyle(Theme.cream)
+                Spacer(minLength: 12)
+                Text(model.horizon.map { ThesisCopy.horizon($0) } ?? L.t("Not set", "Sin definir"))
+                    .quietFont(16).foregroundStyle(Theme.warmMuted)
+                Image(systemName: "chevron.up.chevron.down").font(.system(size: 11, weight: .semibold)).foregroundStyle(Theme.warmDim)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 52)
+            .contentShape(Rectangle())
         }
+        .padding(.top, 8)
+        .accessibilityIdentifier("thesis-editor-horizon")
     }
 
     // MARK: Save
@@ -195,10 +212,8 @@ struct ThesisEditorView: View {
     private var bottomBar: AnyView? {
         guard showsWords else { return nil }
         return AnyView(VStack(alignment: .leading, spacing: 10) {
-            Text(ThesisCopy.localOnly)
-                .thesisFont(12, relativeTo: .caption).foregroundStyle(Theme.warmMuted).thesisWraps()
-                .accessibilityIdentifier("thesis-editor-local-only")
-            ThesisButton(title: L.t("Save", "Guardar"), prominent: true, wide: true, id: "thesis-editor-save") { save(model.save()) }
+            QuietNote(text: L.t("Only on this iPhone.", "Solo en este iPhone."), id: "thesis-editor-scope")
+            QuietPrimary(title: L.t("Save", "Guardar"), id: "thesis-editor-save") { save(model.save()) }
         })
     }
 
@@ -217,58 +232,47 @@ struct ThesisEditorView: View {
     // MARK: The states that are not the words
 
     @ViewBuilder private var missing: some View {
-        ThesisTitle(text: L.t("Write your thesis", "Escribe tu tesis"))
-        Text(model.problem == .notFound
-             ? L.t("This thesis is not available in this account.", "Esta tesis no está disponible en esta cuenta.")
-             : L.t("Ask Bobby about an asset first, then write your thesis from that read.",
-                   "Primero pregúntale a Bobby por un activo y luego escribe tu tesis desde esa lectura."))
-            .thesisFont(15).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-            .padding(.top, 14)
-            .accessibilityIdentifier("thesis-editor-missing")
-        ThesisButton(title: L.t("Close", "Cerrar"), id: "thesis-editor-done", action: onClose).padding(.top, 18)
+        message(model.problem == .notFound
+                ? L.t("This thesis is unavailable in this account.", "Esta tesis no está disponible en esta cuenta.")
+                : L.t("Ask about an asset first.", "Pregunta por un activo primero."), id: "thesis-editor-missing")
     }
 
     @ViewBuilder private func message(_ text: String, id: String) -> some View {
-        Text(text).thesisFont(15).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
-            .padding(.top, 24)
+        Text(text).quietFont(16).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+            .padding(.top, 22)
             .accessibilityIdentifier(id)
-        ThesisButton(title: L.t("Close", "Cerrar"), id: "thesis-editor-done", action: onClose).padding(.top, 18)
+        QuietChip(title: L.t("Close", "Cerrar"), id: "thesis-editor-done", action: onClose).padding(.top, 16)
     }
 
     @ViewBuilder private func exists(_ id: String) -> some View {
-        ThesisTitle(text: L.t("Write your thesis", "Escribe tu tesis"))
-        Text(L.t("You already have a thesis on \(model.symbol ?? "").", "Ya tienes una tesis sobre \(model.symbol ?? "")."))
-            .thesisFont(15).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
-            .padding(.top, 14)
+        Text(L.t("You already have a thesis for \(model.symbol ?? "").", "Ya tienes una tesis de \(model.symbol ?? "")."))
+            .quietFont(16).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+            .padding(.top, 22)
             .accessibilityIdentifier("thesis-editor-exists")
-        ThesisButton(title: L.t("Open it", "Ábrela"), prominent: true, id: "thesis-editor-open-existing") { onOpenExisting(id) }
+        QuietPrimary(title: L.t("Open it", "Ábrela"), id: "thesis-editor-open-existing") { onOpenExisting(id) }
             .padding(.top, 18)
     }
 
     @ViewBuilder private var limit: some View {
-        ThesisTitle(text: L.t("Three at a time", "Tres a la vez"))
-        Text(L.t("You have three active theses. Archive one to save this.", "Tienes tres tesis activas. Archiva una para guardar esta."))
-            .thesisFont(15).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-            .padding(.top, 10)
+        Text(L.t("3 active theses. Archive one first.", "3 tesis activas. Archiva una primero."))
+            .quietFont(16).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+            .padding(.top, 22).padding(.bottom, 8)
             .accessibilityIdentifier("thesis-editor-limit")
         ForEach(model.active) { thesis in
-            HStack(alignment: .center, spacing: 12) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(ThesisCopy.title(thesis)).thesisFont(14, .medium, design: .monospaced).foregroundStyle(Theme.cream).thesisWraps()
-                    Text(thesis.hypothesis).thesisFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineLimit(2)
+            VStack(spacing: 0) {
+                HStack(spacing: 12) {
+                    Text(thesis.symbol).quietFont(16).foregroundStyle(Theme.cream)
+                    Spacer(minLength: 8)
+                    QuietLink(title: L.t("Archive", "Archivar"), id: "thesis-editor-archive-\(thesis.symbol)") {
+                        save(model.archiveAndSave(thesis.id))
+                    }
+                    .accessibilityLabel(L.t("Archive \(thesis.symbol)", "Archivar \(thesis.symbol)"))
                 }
-                Spacer(minLength: 8)
-                ThesisLink(title: L.t("Archive", "Archivar"), id: "thesis-editor-archive-\(thesis.symbol)") {
-                    save(model.archiveAndSave(thesis.id))
-                }
-                .accessibilityLabel(L.t("Archive \(thesis.symbol)", "Archivar \(thesis.symbol)"))
+                .frame(minHeight: 52)
+                Rectangle().fill(Theme.warmHair).frame(height: 1)
             }
-            .frame(maxWidth: .infinity, minHeight: 56, alignment: .leading)
-            .padding(.vertical, 8)
-            .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-            .padding(.top, thesis.id == model.active.first?.id ? 16 : 0)
         }
-        ThesisButton(title: L.t("Back to my words", "Volver a mis palabras"), id: "thesis-editor-back") { model.backToWords() }
+        QuietChip(title: L.t("Back to my words", "Volver a mis palabras"), id: "thesis-editor-back") { model.backToWords() }
             .padding(.top, 18)
     }
 }

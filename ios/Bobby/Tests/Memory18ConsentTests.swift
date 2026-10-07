@@ -210,8 +210,8 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertTrue(ok)
         XCTAssertEqual(m.phase, .done)
         XCTAssertTrue(MemoryConsent(defaults: defaults).hasAccepted(user: "a"))
-        XCTAssertEqual(MemoryConsentSheet.failedLine, "I could not turn memory on. Try again.")
-        XCTAssertEqual(MemoryConsentSheet.doneLine, "Done. From your next question on, I will remember.")
+        XCTAssertEqual(MemoryConsentSheet.failedLine, "Could not enable memory.")
+        XCTAssertEqual(MemoryConsentSheet.doneLine, "On from your next question.")
     }
 
     func testRememberWaitsForTheRiskNoticeAndAnAccount() async {
@@ -271,47 +271,54 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertEqual(compact.map(\.id), ["keep", "sent", "howlong"], "the memory screen also says what reaches the AI provider")
         XCTAssertEqual(Array(full.prefix(3)), compact, "one explanation, the same words")
 
-        XCTAssertEqual(full[0].label, "What I keep")
-        XCTAssertEqual(full[0].text, "The asset, the date, the time frame you mention and its price that day. Not the text of your question.")
-        XCTAssertEqual(full[1].label, "What is sent when I answer")
-        XCTAssertEqual(full[1].text, "A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the time frame you named, its price that day and the change since, the preferences you set in Memory, and the assets you ask about most.")
-        XCTAssertEqual(full[2].label, "For how long")
-        XCTAssertEqual(full[2].text, "Bobby stops using an asset 90 days after you last asked about it.")
-        XCTAssertEqual(MemoryExplanation.items(retentionDays: 30)[2].text, "Bobby stops using an asset 30 days after you last asked about it.",
+        XCTAssertEqual(full[0].label, "Kept by Bobby")
+        XCTAssertEqual(full[0].text, "Asset · date · stated time frame · price that day")
+        XCTAssertEqual(full[0].note, "Your question text is not kept.")
+        XCTAssertEqual(full[1].label, "Sent to the AI that answers")
+        XCTAssertEqual(full[1].text, "Your first name · how often and when you asked about this asset · the time frame you named · its price that day and the change since · your preferences · your most-asked assets")
+        XCTAssertNil(full[2].label)
+        XCTAssertEqual(full[2].text, "Unused after 90 days without a question.")
+        XCTAssertEqual(MemoryExplanation.items(retentionDays: 30)[2].text, "Unused after 30 days without a question.",
                        "the retention is the server's number")
-        XCTAssertEqual(full[3].text, "See it, correct it, pause it or delete it any time in Memory.")
+        XCTAssertEqual(full[3].text, "Edit or delete in Memory.")
 
+        // An inventory, item by item: nothing is folded into "a summary".
         let sent = full[1].text
-        for fact in ["AI provider", "first name", "how often and when", "time frame you named", "its price that day", "the change since", "preferences", "assets you ask about most"] {
+        XCTAssertEqual(sent.components(separatedBy: " · ").count, 6)
+        for fact in ["first name", "how often and when", "time frame you named", "its price that day", "the change since", "preferences", "most-asked assets"] {
             XCTAssertTrue(sent.contains(fact), "the sent line names: \(fact)")
         }
+        XCTAssertFalse(sent.lowercased().contains("summary"))
         for item in full {
-            let text = (item.label + " " + item.text).lowercased()
+            let text = [item.label, item.text, item.note].compactMap { $0 }.joined(separator: " ").lowercased()
             if item.id != "sent" { XCTAssertFalse(text.contains("name"), "\(item.id) must not speak about the name: only the sent line does") }
             XCTAssertFalse(text.contains("never"), "\(item.id): nothing is denied that the server sends")
             XCTAssertFalse(text.contains("deleted after") || text.contains("for 90 days"), "\(item.id): no retention worded as a deletion guarantee")
         }
-        XCTAssertTrue(full[2].text.contains("stops using"))
+        XCTAssertTrue(full[2].text.contains("Unused after"), "the end of use, not a deletion date")
 
         // The same structure in six languages: every row is translated, and the sent line names the first name.
-        let firstName = ["en": "first name", "es": "nombre de pila", "fr": "prénom", "pt": "primeiro nome", "it": "il tuo nome", "de": "Vorname"]
-        let provider = ["en": "AI provider", "es": "proveedor de IA", "fr": "fournisseur d'IA", "pt": "fornecedor de IA", "it": "fornitore di IA", "de": "KI-Anbieter"]
+        let firstName = ["en": "first name", "es": "nombre de pila", "fr": "prénom", "pt": "primeiro nome", "it": "il tuo nome", "de": "vorname"]
+        let ai = ["en": "AI", "es": "IA", "fr": "IA", "pt": "IA", "it": "IA", "de": "KI"]
         let english = full
         for (language, word) in firstName {
             UserDefaults.standard.set(language, forKey: L.preferenceKey)
             let items = MemoryExplanation.items(retentionDays: 90)
             XCTAssertEqual(items.map(\.id), ["keep", "sent", "howlong", "control"], language)
-            XCTAssertTrue(items[1].text.contains(word), "\(language): \(items[1].text)")
-            XCTAssertTrue(items[1].text.contains(provider[language] ?? "?"), "\(language): \(items[1].text)")
+            XCTAssertTrue(items[1].text.lowercased().contains(word), "\(language): \(items[1].text)")
+            XCTAssertTrue(items[1].label?.contains(ai[language] ?? "?") == true, "\(language): the label says who receives it: \(items[1].label ?? "")")
+            XCTAssertEqual(items[1].text.components(separatedBy: " · ").count, 6, "\(language): six things are sent, each named")
             XCTAssertTrue(items[2].text.contains("90"), language)
             for item in items {
                 XCTAssertFalse(item.text.contains("{"), "\(language): an unfilled placeholder in \(item.text)")
                 if item.id != "sent" {
-                    for word in firstName.values { XCTAssertFalse(item.text.contains(word), "\(language) \(item.id): \(item.text)") }
+                    for word in firstName.values { XCTAssertFalse(item.text.lowercased().contains(word), "\(language) \(item.id): \(item.text)") }
                 }
                 if language != "en" {
                     XCTAssertNotEqual(item.text, english.first { $0.id == item.id }?.text, "\(language) \(item.id) is translated")
-                    XCTAssertNotEqual(item.label, english.first { $0.id == item.id }?.label, "\(language) \(item.id) label is translated")
+                    if item.label != nil {
+                        XCTAssertNotEqual(item.label, english.first { $0.id == item.id }?.label, "\(language) \(item.id) label is translated")
+                    }
                 }
             }
         }

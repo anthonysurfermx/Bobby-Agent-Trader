@@ -13,7 +13,6 @@ struct MemoryConsentSheet: View {
     @StateObject private var model: MemoryConsentModel
     let onClose: () -> Void
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @AppStorage(L.preferenceKey) private var languageSelection = "system"
 
     init(center: MemoryCenter = .shared, onClose: @escaping () -> Void) {
         _model = StateObject(wrappedValue: MemoryConsentModel(center: center))
@@ -27,41 +26,22 @@ struct MemoryConsentSheet: View {
     }
 
     var body: some View {
-        ScrollView {
+        // Everything a person agrees to is in front of them before the two answers, which follow the
+        // last line in the scroll: they are never pinned above something still unread.
+        QuietSheet(title: L.t("Remember this?", "¿Lo recuerdo?"), closeId: "memory-consent-close", onClose: onClose) {
             VStack(alignment: .leading, spacing: 0) {
-                topBar
-                Text(L.t("Should I remember what you ask about?", "¿Quieres que recuerde lo que me preguntas?"))
-                    .font(.system(size: 26, weight: .light, design: .rounded)).foregroundStyle(Theme.cream)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 12)
-                    .accessibilityAddTraits(.isHeader)
-                    .accessibilityIdentifier("memory-consent-title")
                 MemoryExplanation(retentionDays: model.retentionDays)
-                    .padding(.top, 6)
+                    .padding(.top, 8)
                 Link(destination: L.site("privacy")) {
                     Text(L.t("Privacy Policy", "Política de privacidad"))
-                        .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.cream).underline()
+                        .quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).underline()
                         .frame(minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                 }
                 .accessibilityIdentifier("memory-consent-privacy")
+                answer
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 16)
-            .padding(.bottom, 12)
         }
-        .scrollIndicators(.visible)
-        // The two answers stay in reach at the medium detent while the explanation scrolls above them.
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(alignment: .leading, spacing: 0) { answer }
-                .padding(.horizontal, 22)
-                .padding(.bottom, 14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Theme.nucleoSurface)
-                .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-        }
-        .background(Theme.nucleoSurface.ignoresSafeArea())
-        .environment(\.colorScheme, .dark)
         .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange)) { _ in model.accountChanged() }
         .onChange(of: model.phase) { _, phase in
             guard phase == .done || phase == .failed, UIAccessibility.isVoiceOverRunning else { return }
@@ -79,94 +59,49 @@ struct MemoryConsentSheet: View {
 
     static let doneLingerNanoseconds: UInt64 = 1_800_000_000
 
-    static var doneLine: String {
-        L.t("Done. From your next question on, I will remember.", "Listo. A partir de tu próxima pregunta, voy a recordar.")
-    }
+    static var doneLine: String { L.t("On from your next question.", "Activa desde tu próxima pregunta.") }
 
-    static var failedLine: String {
-        L.t("I could not turn memory on. Try again.", "No pude activar la memoria. Inténtalo de nuevo.")
-    }
-
-    private var topBar: some View {
-        HStack {
-            Text(L.t("Memory", "Memoria").uppercased()).font(.mono(11, .medium)).tracking(1.6).foregroundStyle(Theme.warmDim)
-            Spacer()
-            Button(action: onClose) {
-                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmMuted)
-                    .frame(width: 30, height: 30).background(Circle().fill(Theme.warmFill))
-                    .frame(width: 44, height: 44, alignment: .trailing)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.vertical, -7)
-            .accessibilityLabel(L.t("Close", "Cerrar"))
-            .accessibilityIdentifier("memory-consent-close")
-        }
-        .frame(minHeight: 30)
-    }
+    static var failedLine: String { L.t("Could not enable memory.", "No se pudo activar la memoria.") }
 
     @ViewBuilder private var answer: some View {
         if !model.signedIn {
-            Text(MemoryError.signedOut.message).font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 10)
-                .accessibilityIdentifier("memory-consent-signed-out")
+            QuietNote(text: MemoryError.signedOut.message, id: "memory-consent-signed-out").padding(.top, 6)
         } else if model.phase == .done {
-            Text(Self.doneLine).font(.system(size: 15)).foregroundStyle(Theme.cream)
-                .fixedSize(horizontal: false, vertical: true)
+            Text(Self.doneLine).quietFont(16).foregroundStyle(Theme.cream).quietWraps()
                 .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
-                .padding(.top, 10)
+                .padding(.top, 6)
                 .accessibilityIdentifier("memory-consent-done")
         } else {
             if model.phase == .failed {
-                Text(Self.failedLine).font(.system(size: 13)).foregroundStyle(Theme.cream)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 10)
-                    .accessibilityIdentifier("memory-consent-error")
+                QuietNote(text: Self.failedLine, id: "memory-consent-error").padding(.top, 6)
             }
-            // Side by side, or stacked at the large accessibility sizes: the same button twice.
+            // Side by side, or stacked at the large accessibility sizes: the same button twice,
+            // neither of them the highlighted one.
             let layout = dynamicTypeSize.isAccessibilitySize
                 ? AnyLayout(VStackLayout(spacing: 10)) : AnyLayout(HStackLayout(spacing: 10))
             layout {
-                choice(L.t("Not now", "Ahora no"), id: "memory-consent-decline") {
+                QuietChip(title: L.t("Not now", "Ahora no"), wide: true, id: "memory-consent-decline") {
                     model.decline()
                     onClose()
                 }
-                choice(L.t("Remember", "Recordar"), id: "memory-consent-accept", busy: model.phase == .working) {
+                QuietChip(title: L.t("Remember", "Recordar"), wide: true, id: "memory-consent-accept") {
                     Task { await model.remember() }
                 }
             }
             .disabled(model.phase == .working)
-            .padding(.top, 12)
+            .padding(.top, 8)
         }
-    }
-
-    /// Both answers share one style on purpose: neither is the highlighted one.
-    private func choice(_ title: String, id: String, busy: Bool = false, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                if busy { ProgressView().controlSize(.small).tint(Theme.cream) }
-                Text(title).font(.system(size: 15, weight: .medium)).foregroundStyle(Theme.cream)
-                    .multilineTextAlignment(.center)
-            }
-            .padding(.horizontal, 14).padding(.vertical, 12)
-            .frame(maxWidth: .infinity, minHeight: 48)
-            .background(Capsule().fill(Theme.warmFill))
-            .overlay(Capsule().stroke(Theme.nucleoStroke, lineWidth: 1))
-            .contentShape(Capsule())
-        }
-        .buttonStyle(.plain)
-        .accessibilityIdentifier(id)
     }
 }
 
-/// What memory is, in four short answers. The consent sheet shows all of it; the memory screen
-/// shows the same words, so there is one explanation and one consent.
+/// What memory is: two inventories and the end of use. The consent sheet shows all of it; the
+/// memory screen shows the same words, so there is one explanation and one consent.
 ///
-/// The "sent" answer mirrors `readerContext` in api/_lib/user-memory.ts, which hands the model that
-/// writes the answer: the first name, the three preferences, this asset's count, dates and price
-/// change, and up to five other assets asked about often. If that function sends something new,
-/// this text changes with it and `MemoryConsent.currentVersion` goes up.
+/// The "sent" inventory mirrors `readerContext` in api/_lib/user-memory.ts, which hands the model
+/// that writes the answer: the first name, the three preferences, this asset's count, dates, time
+/// frame, price and price change, and up to five other assets asked about often. If that function
+/// sends something new, this text changes with it and `MemoryConsent.currentVersion` goes up.
+/// Nothing here is folded, replaced by a glyph or called "a summary" (App Review 5.1.2(i)).
 struct MemoryExplanation: View {
     let retentionDays: Int
     /// The memory screen's compact form leaves out only where control lives (it is that screen).
@@ -175,27 +110,27 @@ struct MemoryExplanation: View {
 
     struct Item: Identifiable, Equatable {
         let id: String
-        let label: String
+        /// A small label above the text; nil for the closing lines.
+        let label: String?
         let text: String
+        /// A boundary that belongs with the inventory ("Your question text is not kept.").
+        var note: String? = nil
     }
 
     static func items(retentionDays: Int, compact: Bool = false) -> [Item] {
         var all = [
-            Item(id: "keep", label: L.t("What I keep", "Lo que guardo"),
-                 text: L.t("The asset, the date, the time frame you mention and its price that day. Not the text of your question.",
-                           "El activo, la fecha, el plazo que mencionas y su precio de ese día. No el texto de tu pregunta.")),
-            Item(id: "sent", label: L.t("What is sent when I answer", "Lo que se envía cuando respondo"),
-                 text: L.t("A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the time frame you named, its price that day and the change since, the preferences you set in Memory, and the assets you ask about most.",
-                           "Un resumen breve va al proveedor de IA que escribe la respuesta de Bobby: tu nombre de pila, cuántas veces y cuándo preguntaste por el activo, el plazo que mencionaste, su precio de ese día y el cambio desde entonces, las preferencias que defines en Memoria y los activos por los que más preguntas.")),
+            Item(id: "keep", label: L.t("Kept by Bobby", "Bobby guarda"),
+                 text: L.t("Asset · date · stated time frame · price that day", "Activo · fecha · plazo indicado · precio de ese día"),
+                 note: L.t("Your question text is not kept.", "Tu pregunta no se guarda como texto.")),
+            Item(id: "sent", label: L.t("Sent to the AI that answers", "Se envía a la IA que responde"),
+                 text: L.t("Your first name · how often and when you asked about this asset · the time frame you named · its price that day and the change since · your preferences · your most-asked assets",
+                           "Tu nombre de pila · cuántas veces y cuándo preguntaste por este activo · el plazo que mencionaste · su precio aquel día y el cambio desde entonces · tus preferencias · los activos por los que más preguntas")),
             // What the code guarantees (the server stops reading the row), not a deletion date.
-            Item(id: "howlong", label: L.t("For how long", "Por cuánto tiempo"),
-                 text: L.t("Bobby stops using an asset \(retentionDays) days after you last asked about it.",
-                           "Bobby deja de usar un activo \(retentionDays) días después de la última vez que preguntaste por él.")),
+            Item(id: "howlong", label: nil,
+                 text: L.t("Unused after \(retentionDays) days without a question.", "Deja de usarse a los \(retentionDays) días sin preguntar.")),
         ]
         guard !compact else { return all }
-        all.append(Item(id: "control", label: L.t("Your control", "Tu control"),
-                        text: L.t("See it, correct it, pause it or delete it any time in Memory.",
-                                  "Míralo, corrígelo, ponlo en pausa o bórralo cuando quieras en Memoria.")))
+        all.append(Item(id: "control", label: nil, text: L.t("Edit or delete in Memory.", "Edita o borra en Memoria.")))
         return all
     }
 
@@ -203,11 +138,17 @@ struct MemoryExplanation: View {
         VStack(alignment: .leading, spacing: 0) {
             ForEach(Self.items(retentionDays: retentionDays, compact: compact)) { item in
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(item.label.uppercased()).font(.mono(10.5, .medium)).tracking(1.2).foregroundStyle(Theme.warmDim)
-                    Text(item.text).font(.system(size: 14)).foregroundStyle(Theme.warmMuted)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if let label = item.label {
+                        Text(label).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmDim)
+                        Text(item.text).quietFont(15).foregroundStyle(Theme.cream).lineSpacing(4).quietWraps()
+                        if let note = item.note {
+                            Text(note).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).quietWraps()
+                        }
+                    } else {
+                        Text(item.text).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).quietWraps()
+                    }
                 }
-                .padding(.top, 14)
+                .padding(.top, item.label == nil ? 6 : 16)
                 .accessibilityElement(children: .combine)
                 .accessibilityIdentifier("memory-explain-\(item.id)")
             }
