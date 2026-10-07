@@ -99,6 +99,10 @@ final class NucleoSession: ObservableObject {
     @Published private(set) var selectedBriefId: String?
     /// Briefing notification taps (BobbyAppDelegate stores them; this session drains them once).
     let briefingIntent: BriefingIntent
+    /// Thesis reminder taps (1.8), drained through the same gate (Reminders/ReminderIntent.swift).
+    let reminderIntent: ReminderIntent
+    /// Whose thesis book a reminder tap is read against; tests stand in for the signed-in account.
+    var reminderOwner: (() -> String?)?
     var briefingGate: BriefingTapGate!
     /// Pause between a sheet going away and the next one presenting (SwiftUI dismissal animation).
     var briefingSheetDelay: TimeInterval = 0.4
@@ -121,9 +125,11 @@ final class NucleoSession: ObservableObject {
          speech: NucleoSpeech? = nil,
          ledger: NucleoLedger = NucleoLedger(),
          defaults: UserDefaults = .standard,
-         briefingIntent: BriefingIntent? = nil) {
+         briefingIntent: BriefingIntent? = nil,
+         reminderIntent: ReminderIntent? = nil) {
         self.fixtures = fixtures
         self.briefingIntent = briefingIntent ?? .shared
+        self.reminderIntent = reminderIntent ?? .shared
         self.profile = profile
         self.companions = companions
         let voice = voice ?? NeuralVoice()
@@ -448,6 +454,8 @@ final class NucleoSession: ObservableObject {
             await AccountSession.shared.checkAppleCredential()
             guard let self, self.signedIn, self.profile.acceptedRiskNotice, self.consentGeneration == consent else { return }
             await ProgressSync.shared.sync(store: self.companions, profile: self.profile)
+            // 1.8: what the Monday-briefing line on the glass reads (the centre refuses before consent).
+            if await BriefingsCenter.shared.refresh() { self.sessionChanged() }
         }
     }
 
@@ -791,6 +799,7 @@ final class NucleoSession: ObservableObject {
     private func sheetClosed(_ route: NucleoRoute) {
         emit("native.sheet", ["route": route.rawValue, "state": "closed"])
         if route == .paywall { finishPaywall() }
+        if route == .thesisReview { reminderIntent.markOpen(nil) }
         if route == .briefing {
             selectedBriefId = nil
             if briefingWantsPro {
@@ -855,7 +864,10 @@ final class NucleoSession: ObservableObject {
     func scheduleBriefingDrain(after delay: TimeInterval = 0) {
         guard !tornDown else { return }
         if delay > 0 {
-            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in self?.drainBriefingIntent() }
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                self?.drainBriefingIntent()
+                self?.drainReminderIntent()
+            }
             return
         }
         guard !briefingDrainScheduled else { return }
@@ -863,6 +875,7 @@ final class NucleoSession: ObservableObject {
         DispatchQueue.main.async { [weak self] in
             self?.briefingDrainScheduled = false
             self?.drainBriefingIntent()
+            self?.drainReminderIntent()
         }
     }
 
@@ -905,6 +918,36 @@ final class NucleoSession: ObservableObject {
         openSheet = .briefing
         sheet = .briefing
         emit("native.sheet", ["route": NucleoRoute.briefing.rawValue, "state": "open"])
+        return true
+    }
+
+    // MARK: - Thesis reminder taps (1.8)
+
+    /// Opens the review a tapped reminder asked for, behind the briefing tap's gate (page loaded, app
+    /// active, consent, no sheet, mic closed, desk idle, nothing speaking) but with no account needed:
+    /// reminders and theses live on this phone. Consumed once. True when a sheet opened.
+    @discardableResult
+    func drainReminderIntent() -> Bool {
+        guard !tornDown, let gate = briefingGate, reminderIntent.pending != nil else { return false }
+        guard currentPage == NucleoPage.app.name,
+              gate.appActive(),
+              profile.acceptedRiskNotice, onboarded,
+              sheet == nil, openSheet == nil, !speechPromptOpen,
+              !gate.listening(), !gate.deskBusy(), !gate.narrating(),
+              let tap = reminderIntent.take()
+        else { return false }
+        // The book of whoever uses the phone now: their account's, or the local one when signed out.
+        let owner = reminderOwner.map { $0() } ?? (signedIn ? AccountSession.shared.session?.userId : nil)
+        switch ReminderIntent.destination(for: tap, active: ThesisBook(defaults: defaults).active(owner: owner)) {
+        case .review(let thesisId):
+            V18Focus.thesisId = thesisId
+            guard openNative(.thesisReview) else { return false }
+            reminderIntent.markOpen(thesisId)
+        case .list:
+            // The thesis no longer exists or is archived: the list, never an empty review.
+            V18Focus.thesisId = nil
+            guard openNative(.theses) else { return false }
+        }
         return true
     }
 
@@ -955,6 +998,11 @@ final class NucleoSession: ObservableObject {
             .store(in: &cancellables)
         // A briefing notification was tapped (cold launch, warm, or while busy): try now; it waits otherwise.
         briefingIntent.$pending
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.scheduleBriefingDrain() }
+            .store(in: &cancellables)
+        // 1.8: a thesis reminder was tapped; it waits for the same moment.
+        reminderIntent.$pending
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
