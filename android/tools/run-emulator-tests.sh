@@ -23,6 +23,9 @@ argument=-Pandroid.testInstrumentationRunnerArguments
 
 mkdir -p "$out/shots"
 adb shell mkdir -p "$device_shots"
+# An emulator that draws in software sometimes shows "isn't responding" for its own launcher, over
+# the screen being photographed: the system is asked not to show those windows.
+adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c || true
 adb logcat -v threadtime > "$out/logcat.txt" 2>&1 &
 logcat=$!

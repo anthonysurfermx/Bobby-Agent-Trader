@@ -16,6 +16,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -201,8 +203,23 @@ object V18Shots {
 
     fun save(name: String) {
         require(Regex("^[a-z0-9][a-z0-9-]{0,100}$").matches(name)) { "A screenshot name is lowercase words and dashes: $name" }
+        sendAwayNotResponding()
         shell("mkdir -p $FOLDER")
         shell("screencap -p $FOLDER/$name.png")
+    }
+
+    /**
+     * An emulator that draws everything in software sometimes shows the system's "isn't responding"
+     * window for one of its own apps (the launcher), over whatever is on screen. "Wait" sends it away,
+     * so it is not what gets photographed.
+     */
+    private fun sendAwayNotResponding() {
+        val device = UiDevice.getInstance(InstrumentationRegistry.getInstrumentation())
+        repeat(3) {
+            val wait = device.findObject(By.res("android", "aerr_wait")) ?: return
+            wait.click()
+            Thread.sleep(800)
+        }
     }
 
     /** Runs a command as the shell user and waits for it to end. */

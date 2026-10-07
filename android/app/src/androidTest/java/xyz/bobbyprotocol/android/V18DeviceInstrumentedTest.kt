@@ -186,6 +186,8 @@ class V18DeviceInstrumentedTest {
         assumeTrue("Before Android 13 there is no question to ask", Build.VERSION.SDK_INT >= 33)
         assumeTrue("The system asks once per install, and this install already answered", !notificationsGranted())
         launch("en")
+        // The page has finished loading: the emulator is quiet enough for its own windows to be watched.
+        awaitTheGlass()
         val thesis = writeThesis()
         assertEquals(LocalNotifier.Permission.NOT_DETERMINED, onMain { host.notifier.status() })
 
@@ -194,15 +196,18 @@ class V18DeviceInstrumentedTest {
         waitForSheet(V18Routes.REMINDERS)
         await("reminders-week-NVDA")
         // Opening the screen asks nothing of the system.
+        assertFalse("The system must not ask before the person sets a reminder", systemQuestionInFront())
         assertNull("The system must not ask before the person sets a reminder", device.findObject(By.pkg(PERMISSION_WINDOW)))
         assertEquals(LocalNotifier.Permission.NOT_DETERMINED, onMain { host.notifier.status() })
         shot("reminders-before-the-question")
 
         compose.onNodeWithTag("reminders-week-NVDA", useUnmergedTree = true).performClick()
         // Now, and only now, the phone asks.
-        assertTrue("The system's question did not appear", device.wait(Until.hasObject(By.pkg(PERMISSION_WINDOW)), 15_000))
+        waitUntil(60_000) { systemQuestionInFront() }
         shot("notification-question")
-        val allow = device.findObject(By.res(ALLOW_BUTTON)) ?: device.findObject(By.text(Pattern.compile("(?i)allow")))
+        // The answer is given the way a person gives it. A slow emulator's accessibility tree can lag
+        // well behind its windows, so the button is waited for.
+        val allow = device.wait(Until.findObject(By.res(ALLOW_BUTTON)), 90_000) ?: device.findObject(By.text(Pattern.compile("(?i)allow")))
         assertNotNull("The system's question has no Allow button", allow)
         allow.click()
 
@@ -380,6 +385,13 @@ class V18DeviceInstrumentedTest {
             .putExtra(LocalNotices.EXTRA, JSONObject(notice.payload as Map<*, *>).toString())
         onMain { activity.startActivity(intent) }
     }
+
+    /**
+     * The system's permission window is the activity in front. Asked of the activity manager, which
+     * answers at once; the accessibility tree UiAutomator reads has lagged seconds behind on CI.
+     */
+    private fun systemQuestionInFront(): Boolean = V18Shots.shell("dumpsys activity activities").lineSequence()
+        .any { it.contains("ResumedActivity", ignoreCase = true) && it.contains("GrantPermissionsActivity") }
 
     private fun notificationsGranted(): Boolean = Build.VERSION.SDK_INT < 33 ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED

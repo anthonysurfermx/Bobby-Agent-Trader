@@ -13,6 +13,7 @@ import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -270,6 +271,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
         shot("reminders-picking")
         tap("reminders-date-BTC")
         await("reminders-day-confirm")
+        // Material's picker speaks the app's language, whatever the phone's (this emulator's is English).
+        val month = if (language == "es") "octubre" else "October"
+        assertTrue("The day picker does not say $month", compose.onAllNodes(hasText(month, substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
         shot("reminders-day-picker")
         tap("reminders-day-cancel")
         tap("reminders-time-BTC")
