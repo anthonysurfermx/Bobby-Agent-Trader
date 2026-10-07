@@ -477,16 +477,16 @@ struct NucleoInviteSheet: View {
     var body: some View {
         QuietSheet(title: showsAcceptFirst && invites.pendingCode != nil ? L.t("Invitation ready", "Invitación pendiente")
                                                                        : L.t("Invite a friend", "Invita a un amigo"),
-                   subtitle: reason ?? (proPurchasable ? reward.map { InviteCopy.rewardShort(days: $0.days) } : nil),
+                   subtitle: reason ?? (proPurchasable && center.referral != nil ? reward.map { InviteCopy.rewardShort(days: $0.days) } : nil),
                    closeId: "invite-close", onClose: onClose,
-                   onInfo: proPurchasable && reward != nil ? { showsDetails = true } : nil) {
+                   onInfo: proPurchasable && reward != nil && center.referral != nil ? { showsDetails = true } : nil) {
             VStack(alignment: .leading, spacing: 0) {
                 if showsAcceptFirst {
                     InviteAcceptSection(invites: invites, afterSignIn: afterSignIn).padding(.top, 16)
                     Rectangle().fill(Theme.warmHair).frame(height: 1).padding(.top, 14)
                 }
                 // Real progress, and only where the reward exists.
-                if proPurchasable, reward != nil { slots.padding(.top, 16) }
+                if proPurchasable, reward != nil, center.referral != nil { slots.padding(.top, 16) }
                 if let referral = center.referral, let url = URL(string: referral.url) {
                     // The eight characters on their own: a friend who installs the app first can type them.
                     let ownCode = InviteLink.normalized(referral.code)
