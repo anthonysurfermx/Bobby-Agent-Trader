@@ -655,6 +655,24 @@ class ReminderCenterTest {
         assertEquals(at(2026, 10, 14, 18), fake.requests[id(nvda)]?.fireAtEpochMs)
     }
 
+    @Test fun aPhoneThatFailsToAnswerNeverLeavesAReminderListed() = runTest {
+        val nvda = thesis("NVDA")
+        val btc = thesis("BTC")
+        val c = center()
+        c.schedule(nvda.id, "NVDA", ReminderPreset.WEEK)
+        // The phone's scheduler fails outright: the button answers "not set", and nothing is listed for it.
+        fake.scheduleThrows = true
+        assertEquals(ReminderCenter.Outcome.Failed, c.schedule(btc.id, "BTC", ReminderPreset.MONTH))
+        assertEquals(ReminderCenter.Outcome.Failed, c.schedule(nvda.id, "NVDA", ReminderPreset.MONTH))
+        assertEquals("the one that was set stays as it was", listOf(PendingReminder(nvda.id, "NVDA", at(2026, 10, 14, 18))), c.pending)
+        assertEquals(at(2026, 10, 14, 18), fake.requests[id(nvda)]?.fireAtEpochMs)
+        assertTrue(c.scheduling.isEmpty())
+        // Housekeeping never throws because of it either.
+        c.refresh()
+        fake.scheduleThrows = false
+        assertEquals(scheduled(at(2026, 11, 7, 18)), c.schedule(btc.id, "BTC", ReminderPreset.MONTH))
+    }
+
     @Test fun aListThatCannotBeReadIsAnEmptyList() = runTest {
         store.putString(ReminderCenter.STORE_KEY, "not json")
         assertTrue(center().pending.isEmpty())

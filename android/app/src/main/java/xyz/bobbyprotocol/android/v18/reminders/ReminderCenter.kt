@@ -238,7 +238,7 @@ class ReminderCenter(private val notifier: LocalNotifier, private val store: Key
         val listed = pending.map { identifier(it.thesisId) }.toSet()
         val existing = notifier.pendingIds().filter { it.startsWith(IDENTIFIER_PREFIX) }.toSet()
         val stale = existing - listed
-        if (stale.isNotEmpty()) notifier.cancel(stale.sorted())
+        if (stale.isNotEmpty()) attempt { notifier.cancel(stale.sorted()) }
         issued.keys.retainAll(wanted.map { it.id }.toSet())
         // Without permission nothing is written; the list stays and the screen says why.
         if (notifier.status() != LocalNotifier.Permission.ALLOWED) return
@@ -246,8 +246,17 @@ class ReminderCenter(private val notifier: LocalNotifier, private val store: Key
             if (issued[notice.id] == notice && notice.id in existing) continue
             // About to fire: whatever the phone already holds under this id stays as it is.
             if (notice.fireAtEpochMs - now() < ReminderSchedule.HAND_OFF_MARGIN_MS) continue
-            if (notifier.schedule(notice)) issued[notice.id] = notice else issued.remove(notice.id)
+            // A phone that fails to answer has not accepted it.
+            val accepted = attempt { notifier.schedule(notice) } ?: false
+            if (accepted) issued[notice.id] = notice else issued.remove(notice.id)
         }
+    }
+
+    /** The phone's answer, or null when it failed to answer at all: the list must stay what the phone will deliver. */
+    private inline fun <T> attempt(block: () -> T): T? = try {
+        block()
+    } catch (_: Exception) {
+        null
     }
 
     /** The phone accepted this thesis's notice, for that moment, during this launch. */

@@ -19,6 +19,8 @@ class FakeReminderNotifier(var now: () -> Long) : LocalNotifier {
     var addSucceeds = true
     /** Notices the phone refuses whatever `addSucceeds` says (by id). */
     var refusedIds: Set<String> = emptySet()
+    /** The phone's scheduler fails outright instead of answering. */
+    var scheduleThrows = false
     /** Runs while "the phone is asking" (an account switch, another tap, in the middle of the prompt). */
     var whileAsking: (suspend () -> Unit)? = null
     var permissionRequests = 0
@@ -37,6 +39,7 @@ class FakeReminderNotifier(var now: () -> Long) : LocalNotifier {
     }
 
     override fun schedule(notice: LocalNotice): Boolean {
+        if (scheduleThrows) throw IllegalStateException("the scheduler is not available")
         if (permission != LocalNotifier.Permission.ALLOWED || !LocalNotice.valid(notice) || notice.fireAtEpochMs <= now()) return false
         if (!addSucceeds || notice.id in refusedIds) return false
         added.add(notice)
@@ -80,21 +83,21 @@ object Wall {
 /** The app's own lookup (NucleoSession.text) over the two bundled catalogs, for one language. */
 object TestWords {
     val languages = listOf("en", "es", "fr", "pt", "it", "de")
-    private val android = JSONObject(File("src/main/assets/nucleo/native-android-translations.json").readText())
-    private val original = JSONObject(File("src/main/assets/nucleo/native-translations.json").readText())
+    private val androidCatalog = JSONObject(File("src/main/assets/nucleo/native-android-translations.json").readText())
+    private val originalCatalog = JSONObject(File("src/main/assets/nucleo/native-translations.json").readText())
 
     fun of(language: String): (String, String) -> String = { en, es ->
         when (language) {
             "en" -> en
-            "es" -> text(android.optJSONObject(en), "es") ?: es
-            else -> text(android.optJSONObject(en), language) ?: text(original.optJSONObject(en), language) ?: en
+            "es" -> text(androidCatalog.optJSONObject(en), "es") ?: es
+            else -> text(androidCatalog.optJSONObject(en), language) ?: text(originalCatalog.optJSONObject(en), language) ?: en
         }
     }
 
     /** The four translations the catalogs hold for an English line, by language; empty when it has no row. */
     fun translations(english: String): Map<String, String> =
         listOf("fr", "pt", "it", "de").mapNotNull { language ->
-            (text(android.optJSONObject(english), language) ?: text(original.optJSONObject(english), language))?.let { language to it }
+            (text(androidCatalog.optJSONObject(english), language) ?: text(originalCatalog.optJSONObject(english), language))?.let { language to it }
         }.toMap()
 
     private fun text(row: JSONObject?, key: String): String? = (row?.opt(key) as? String)?.takeIf { it.isNotEmpty() }
