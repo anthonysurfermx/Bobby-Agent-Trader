@@ -1,0 +1,513 @@
+{
+  "sourceHEAD": "507616c99eb143e466084c85bbb177d11315bf68",
+  "functions": [
+    {
+      "name": "bobby_read_access",
+      "argumentsSource": "p_identity uuid, p_device text, p_paywall boolean",
+      "bodyHash": "d5f6cf9b4de6dbf2e4bb64a092022d7d",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002140326_pro_gift_balance_visibility.sql",
+      "line": 4
+    },
+    {
+      "name": "bobby_consume_read",
+      "argumentsSource": "p_identity uuid, p_device text, p_network text, p_platform text, p_symbol text, p_paywall boolean",
+      "bodyHash": "add1df6e0dfe6b1bfc2a540570a0ebea",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql",
+      "line": 299
+    },
+    {
+      "name": "bobby_level_state",
+      "argumentsSource": "p_identity uuid, p_device text, p_limits jsonb",
+      "bodyHash": "3d67aae36ace38cd36cc658377c2278f",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+      "line": 181
+    },
+    {
+      "name": "bobby_consume_level",
+      "argumentsSource": "p_identity uuid, p_device text, p_level text, p_symbol text, p_limits jsonb",
+      "bodyHash": "891009a68984e9fc645a1d2ce363ea7d",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+      "line": 206
+    },
+    {
+      "name": "bobby_memory_record",
+      "argumentsSource": "p_identity uuid, p_symbol text, p_horizon text, p_price numeric default null",
+      "bodyHash": "98974b61b99d2e4d38de6b10c154d222",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql",
+      "line": 7
+    },
+    {
+      "name": "bobby_memory_summary",
+      "argumentsSource": "p_identity uuid, p_symbol text",
+      "bodyHash": "d83e782ad857b81f7feb6d7f89b940b8",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql",
+      "line": 39
+    },
+    {
+      "name": "bobby_memory_forget",
+      "argumentsSource": "p_identity uuid, p_symbol text default null",
+      "bodyHash": "ffe63bc70481aaa6a9b0b66229d5c489",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql",
+      "line": 111
+    },
+    {
+      "name": "bobby_return_bonus_read",
+      "argumentsSource": "",
+      "bodyHash": "0124ffc65160d0b839551be2ab37d73f",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+      "line": 259
+    },
+    {
+      "name": "bobby_return_bonus_level",
+      "argumentsSource": "",
+      "bodyHash": "4e118f4c9b68380813a137e0b6902f47",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+      "line": 269
+    },
+    {
+      "name": "bobby_admin_grant",
+      "argumentsSource": "p_identity uuid, p_reads int, p_profundo int, p_maximo int, p_pro_days int",
+      "bodyHash": "f51a232990305fac79cafac84f256c64",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002132827_admin_grant_idempotency.sql",
+      "line": 85
+    },
+    {
+      "name": "bobby_admin_grant_once",
+      "argumentsSource": "p_operation uuid, p_admin uuid, p_identity uuid, p_reads int, p_profundo int, p_maximo int, p_pro_days int",
+      "bodyHash": "93f541299959e05c043adda2e2665f9d",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002140326_pro_gift_balance_visibility.sql",
+      "line": 33
+    },
+    {
+      "name": "bobby_brief_is_paid_pro",
+      "argumentsSource": "p_identity uuid",
+      "bodyHash": "24d3bc196522f4bcbb20985e9e5a8939",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002184500_brief_paid_source_guard.sql",
+      "line": 3
+    },
+    {
+      "name": "bobby_brief_bad",
+      "argumentsSource": "p_what text",
+      "bodyHash": "abd019fca6029c17bcd1c23d4ef53596",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 350
+    },
+    {
+      "name": "bobby_brief_cadence_on",
+      "argumentsSource": "s public.bobby_brief_settings, p_cadence text",
+      "bodyHash": "b6d4b8cff6398d0ca747ffe4600849ff",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 357
+    },
+    {
+      "name": "bobby_brief_analysis_ok",
+      "argumentsSource": "s public.bobby_brief_settings",
+      "bodyHash": "2ecefa9ff896b453285e1f70b4d1027a",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 363
+    },
+    {
+      "name": "bobby_brief_settings_json",
+      "argumentsSource": "p_identity uuid",
+      "bodyHash": "305af0bf9b772def2dd752e783b8b424",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 368
+    },
+    {
+      "name": "bobby_brief_jbool",
+      "argumentsSource": "p jsonb, k text",
+      "bodyHash": "2bf1417bcb38f961ce10ddabf4373d5c",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 386
+    },
+    {
+      "name": "bobby_brief_jversion",
+      "argumentsSource": "p jsonb, k text",
+      "bodyHash": "78017960fb3bc75a34cfecfb5daf6e06",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 394
+    },
+    {
+      "name": "bobby_brief_settings_get",
+      "argumentsSource": "p_identity uuid",
+      "bodyHash": "bab4a318c650cbc4f11637c7fe75bc27",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 405
+    },
+    {
+      "name": "bobby_brief_settings_patch",
+      "argumentsSource": "p_identity uuid, p_expected_revision int, p_patch jsonb",
+      "bodyHash": "9fdee848e6f8780974b57b6965374454",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002185656_brief_languages_build55.sql",
+      "line": 14
+    },
+    {
+      "name": "bobby_brief_privacy_bump",
+      "argumentsSource": "p_identity uuid, p_reason text, p_purge_memory_content boolean",
+      "bodyHash": "e4fa5bf668014a09ba38d3bb0d3e704d",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 520
+    },
+    {
+      "name": "bobby_brief_memory_forgotten",
+      "argumentsSource": "p_identity uuid, p_symbol text",
+      "bodyHash": "8ef56f3dc522ba64594704482c82461b",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 551
+    },
+    {
+      "name": "bobby_brief_prefs_hook",
+      "argumentsSource": "",
+      "bodyHash": "36abee21a6ed074f91d717aacadc89f2",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 568
+    },
+    {
+      "name": "bobby_brief_assets_hook",
+      "argumentsSource": "",
+      "bodyHash": "2c52ce013ac91e377a7c46a34acb7e7a",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 588
+    },
+    {
+      "name": "bobby_brief_device_args",
+      "argumentsSource": "p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build int, p_max_active int",
+      "bodyHash": "99e6c5bd6a881f746f17b816acd2b90a",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 611
+    },
+    {
+      "name": "bobby_push_device_register",
+      "argumentsSource": "p_identity uuid, p_installation uuid, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build int, p_credential_verifier text, p_max_active int",
+      "bodyHash": "f7c827dde3e0b964c4d8c77a870fe392",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 627
+    },
+    {
+      "name": "bobby_push_device_rebind",
+      "argumentsSource": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build int, p_max_active int",
+      "bodyHash": "35386d8367a1606047e417c333f9ba42",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 658
+    },
+    {
+      "name": "bobby_push_device_revoke",
+      "argumentsSource": "p_identity uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text",
+      "bodyHash": "db704ec8e2fbd7d918f14e240f77bfe3",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 702
+    },
+    {
+      "name": "bobby_push_device_invalidate",
+      "argumentsSource": "p_registration uuid, p_binding_revision bigint, p_reason text",
+      "bodyHash": "16db0bb635429f62639915b304179182",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 722
+    },
+    {
+      "name": "bobby_brief_idem_begin",
+      "argumentsSource": "p_identity uuid, p_scope text, p_key text, p_digest text, p_ttl_seconds int",
+      "bodyHash": "1928eb48559c6bfbc6ea5db71de05f4a",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 738
+    },
+    {
+      "name": "bobby_brief_idem_finish",
+      "argumentsSource": "p_identity uuid, p_scope text, p_key text, p_status int, p_response text",
+      "bodyHash": "1874a05ff8777694479a01e92ab3c383",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 772
+    },
+    {
+      "name": "bobby_brief_seed",
+      "argumentsSource": "p_cadence text, p_period_key text, p_period_start timestamptz, p_period_end timestamptz, p_scheduled_at timestamptz, p_push_expires_at timestamptz, p_calendar_version text, p_policy_version text",
+      "bodyHash": "66082fa2c581e908afa2f8c11bf9a45f",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 785
+    },
+    {
+      "name": "bobby_brief_shared_claim",
+      "argumentsSource": "p_cadence text, p_period_key text, p_language text, p_worker text, p_lease_seconds int, p_max_attempts int",
+      "bodyHash": "439f94c09ba3a43b81da9a5389adc844",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002185656_brief_languages_build55.sql",
+      "line": 115
+    },
+    {
+      "name": "bobby_brief_shared_commit",
+      "argumentsSource": "p_id uuid, p_fence bigint, p_state text, p_evidence jsonb, p_narrative jsonb, p_data_as_of timestamptz, p_error text",
+      "bodyHash": "771adbf53a76ee89be6e96371f784755",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 841
+    },
+    {
+      "name": "bobby_brief_frequent_assets",
+      "argumentsSource": "p_identity uuid",
+      "bodyHash": "40848aa005b2efae6c2e1482f94aa124",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 869
+    },
+    {
+      "name": "bobby_brief_memory_for",
+      "argumentsSource": "s public.bobby_brief_settings",
+      "bodyHash": "77818880e6888b9ddbf615da47fe299b",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 878
+    },
+    {
+      "name": "bobby_brief_needed_assets",
+      "argumentsSource": "p_cadence text, p_period_key text, p_language text",
+      "bodyHash": "56d6874ccb16d7a3c90e0416720a0df2",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 891
+    },
+    {
+      "name": "bobby_brief_open_languages",
+      "argumentsSource": "p_cadence text, p_period_key text",
+      "bodyHash": "2ecd30e82e4a5c45f87a2330c3b296b8",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 910
+    },
+    {
+      "name": "bobby_brief_claim",
+      "argumentsSource": "p_cadence text, p_period_key text, p_worker text, p_lease_seconds int, p_limit int, p_voices jsonb, p_default_voice text",
+      "bodyHash": "d7ec2d57ee57729effa9818755aac6cb",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 922
+    },
+    {
+      "name": "bobby_brief_publish",
+      "argumentsSource": "p_id uuid, p_fence bigint, p_shared_id uuid, p_content jsonb, p_quality text, p_data_as_of timestamptz, p_uses_memory boolean, p_memory_assets text[], p_settings_revision int, p_privacy_epoch int",
+      "bodyHash": "d5a541126d362ba32c1cf24d297643dc",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 985
+    },
+    {
+      "name": "bobby_brief_fail",
+      "argumentsSource": "p_id uuid, p_fence bigint, p_error text, p_final boolean",
+      "bodyHash": "b3d0d22a9ddf590df5e71c05a75eedc6",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1027
+    },
+    {
+      "name": "bobby_brief_outbox_fill",
+      "argumentsSource": "p_limit int",
+      "bodyHash": "249f7df0a2e313904676e04a04149a97",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1047
+    },
+    {
+      "name": "bobby_brief_outbox_claim",
+      "argumentsSource": "p_worker text, p_lease_seconds int, p_limit int",
+      "bodyHash": "0d7b3f33a02c02635c552bfe7a35617d",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1071
+    },
+    {
+      "name": "bobby_brief_outbox_result",
+      "argumentsSource": "p_id uuid, p_fence bigint, p_outcome text, p_apns_status int, p_reason text, p_retry_after_seconds int",
+      "bodyHash": "c9bb65d3e2abe953d551114a1f2eb6f8",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1133
+    },
+    {
+      "name": "bobby_brief_budget_reserve",
+      "argumentsSource": "p_kind text, p_work_ref text, p_provider text, p_model text, p_reserve_usd numeric, p_day_cap numeric, p_month_cap numeric, p_max_slots int, p_max_attempts_per_work int, p_worker text",
+      "bodyHash": "ae96060aa9206afbdb092033cc623635",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1174
+    },
+    {
+      "name": "bobby_brief_attempt_cost",
+      "argumentsSource": "a public.bobby_brief_provider_attempts",
+      "bodyHash": "65002dcaf1b662194501cac853e1a2fc",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1213
+    },
+    {
+      "name": "bobby_brief_budget_dispatch",
+      "argumentsSource": "p_attempt uuid",
+      "bodyHash": "5bdeba88a90195eb15569353b2fb7a95",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1221
+    },
+    {
+      "name": "bobby_brief_budget_settle",
+      "argumentsSource": "p_attempt uuid, p_outcome text, p_actual_usd numeric, p_tokens_in int, p_tokens_out int, p_chars int, p_latency_ms int, p_estimated boolean",
+      "bodyHash": "e745a707280647c12815fea0d1e2e4d2",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1230
+    },
+    {
+      "name": "bobby_brief_budget_status",
+      "argumentsSource": "",
+      "bodyHash": "4c884ff904a984877a89e26082afad28",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1246
+    },
+    {
+      "name": "bobby_brief_audio_request",
+      "argumentsSource": "p_identity uuid, p_brief uuid, p_content_version int, p_segment int, p_cache_key text, p_voice text, p_language text",
+      "bodyHash": "c3dfd7901809d53c837abf434c21f6b9",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1273
+    },
+    {
+      "name": "bobby_brief_audio_claim",
+      "argumentsSource": "p_audio uuid, p_worker text, p_lease_seconds int",
+      "bodyHash": "4ab583b8719ed2669b15db22be6b2e6f",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1297
+    },
+    {
+      "name": "bobby_brief_audio_commit",
+      "argumentsSource": "p_audio uuid, p_fence bigint, p_state text, p_storage_path text, p_bytes int, p_error text",
+      "bodyHash": "86510e743f4b2d13a853a7fcb85c6eb3",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1329
+    },
+    {
+      "name": "bobby_brief_audio_authorize",
+      "argumentsSource": "p_identity uuid, p_audio uuid",
+      "bodyHash": "4d9c5c1ce47510e1dc56ccb63ef00c4a",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1360
+    },
+    {
+      "name": "bobby_brief_inbox",
+      "argumentsSource": "p_identity uuid, p_cadence text, p_before_scheduled timestamptz, p_before_id uuid, p_limit int",
+      "bodyHash": "5ce9898c668ed3b7a139aec0c9fbee4b",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1379
+    },
+    {
+      "name": "bobby_brief_get",
+      "argumentsSource": "p_identity uuid, p_id uuid",
+      "bodyHash": "0d74623cc9a57b3f641b9ce20a10ec5c",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1425
+    },
+    {
+      "name": "bobby_brief_reconcile",
+      "argumentsSource": "p_settle_seconds int",
+      "bodyHash": "0865c9fa9198b90e0d484f8648a4b5a4",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1444
+    },
+    {
+      "name": "bobby_brief_purge",
+      "argumentsSource": "p_report_days int, p_audio_days int, p_outbox_days int, p_attempt_days int, p_device_days int, p_idem_hours int, p_shared_days int, p_limit int",
+      "bodyHash": "44f519a5eb3c59d6eda730e1a5e93796",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+      "line": 1488
+    },
+    {
+      "name": "bobby_push_device_write_once",
+      "argumentsSource": "p_identity uuid, p_key text, p_digest text, p_action text, p_installation uuid, p_registration uuid, p_expected_revision bigint, p_proof_verifier text, p_new_verifier text, p_token_ciphertext text, p_token_fingerprint text, p_environment text, p_topic text, p_permission text, p_app_build int, p_max_active int, p_sealed_credential text",
+      "bodyHash": "91dd68cc67c7d99c97499e4b5bd2c022",
+      "securityDefinerExpected": false,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261002183000_brief_device_atomic.sql",
+      "line": 5
+    },
+    {
+      "name": "bobby_redeem_coupon",
+      "argumentsSource": "p_identity uuid, p_code text",
+      "bodyHash": "38b7f6d060be8f346b2c101dc4c04497",
+      "securityDefinerExpected": true,
+      "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+      "line": 58
+    }
+  ],
+  "tables": [
+    "bobby_admin_grant_operations",
+    "bobby_brief_audio",
+    "bobby_brief_audio_links",
+    "bobby_brief_idempotency",
+    "bobby_brief_outbox",
+    "bobby_brief_paid_periods",
+    "bobby_brief_provider_attempts",
+    "bobby_brief_settings",
+    "bobby_brief_shared",
+    "bobby_briefs",
+    "bobby_coupon_redemptions",
+    "bobby_coupons",
+    "bobby_level_uses",
+    "bobby_push_devices",
+    "bobby_reads",
+    "bobby_usage_bonus",
+    "bobby_user_assets",
+    "bobby_user_prefs"
+  ],
+  "migrationFiles": {
+    "supabase/bobby-protocol/supabase/migrations/20260927120000_access_reads_subscriptions.sql": "96a8337382fa42dff81a77831239ee4e2be1c9a999c5f681e2174fc783bb68ff",
+    "supabase/bobby-protocol/supabase/migrations/20260929150000_levels_referrals_usage.sql": "1c39652018ecfb97d0ba2ed45af79025d8e514c892348716c836f21186a30182",
+    "supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql": "832f3cbf07e86448e763557018dea8a1c005aa4f3e4ab0194a077c1f4966ebe7",
+    "supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql": "6f0005993863ed65f8d4a629ef6b22f8ef0ada4b71fc4ecf16eca40265130187",
+    "supabase/bobby-protocol/supabase/migrations/20260930121932_serialize_guest_network_quota.sql": "c3b78d5360c6876170a252e575290eb7410d9b6627fb4f0fd27a86ad313f51c0",
+    "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql": "c42c18777d512dc65ba8bf72406c865d605335e943ab1199a2db3d3183c7d69b",
+    "supabase/bobby-protocol/supabase/migrations/20261001180000_admin_dashboard.sql": "6649ce792723705e79c2d0f03e2239e3ad2d20ef095c2c5e9a42e6b5642aaf39",
+    "supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql": "21e0d5421f913fb6a08e2a5821eeac559c729e59f81230c34801634354a5e418",
+    "supabase/bobby-protocol/supabase/migrations/20261002132827_admin_grant_idempotency.sql": "9071cfb7c4660b0b190d5fbfbad689342a3bf12cfdff6c56a194e967415d137b",
+    "supabase/bobby-protocol/supabase/migrations/20261002140326_pro_gift_balance_visibility.sql": "46d1a2cf1e0003a2d2e0b834335ba0c5ba92c2de5369e7525036f263f29fa71e",
+    "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql": "3030cfdf646ad3a84c99de56eb9d52d11a7caf0eee0cfa62067035527a5b7a72",
+    "supabase/bobby-protocol/supabase/migrations/20261002183000_brief_device_atomic.sql": "c3b08536088f64e9f5845101d7c4779fd94eedfe1325757ecf86067ad7f2dbf6",
+    "supabase/bobby-protocol/supabase/migrations/20261002184500_brief_paid_source_guard.sql": "c231aa30b98c45c7421a649f455de5f15ac09e48f8ac0a7572c21fbdd9493b93",
+    "supabase/bobby-protocol/supabase/migrations/20261002185656_brief_languages_build55.sql": "977842c914d576893c11fce509c933abf7511c1b7909b02ddb0c4340ee094895"
+  }
+}

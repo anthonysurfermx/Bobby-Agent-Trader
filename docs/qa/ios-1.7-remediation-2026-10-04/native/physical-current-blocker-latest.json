@@ -1,0 +1,17 @@
+{
+  "observedAtUTC": "2026-10-04T13:30:47.564Z",
+  "source": "Root independently refreshed native iPhone Mirroring accessibility; observation directly reported to this worker.",
+  "result": "Mirroring still requires the existing Mac login password entered locally by the user.",
+  "secureFieldReadEnteredOrCopied": false,
+  "freshDeviceAppInventoryQueried": false,
+  "currentBobbyInstallationStatus": "unverified; earlier no-Bobby inventory is historical only",
+  "physicalAcceptance": "unverified",
+  "existingTestFlightInternalGroup": "Founder",
+  "nextSteps": [
+    "User unlocks iPhone Mirroring locally.",
+    "Install Bobby1.7(63) from the existing Founder TestFlight group.",
+    "Verify actual six-language flows and local/consented Apple speech fallback on the iPhone.",
+    "Verify Apple login, authorized existing paid/sandbox restore and APNs separately; no new purchase performed by this worker."
+  ],
+  "previousObservationPreserved": "physical-current-blocker.json"
+}

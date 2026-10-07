@@ -1,0 +1,356 @@
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest:
+INSTRUMENTATION_STATUS: test=removingTheFocusedOfflineNeighborReturnsHomeWithoutAStaleCaption
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=1
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=removingTheFocusedOfflineNeighborReturnsHomeWithoutAStaleCaption
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=offCenterPinchKeepsTheSameWorldPointUnderTheActualInjectedFingers
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=2
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=offCenterPinchKeepsTheSameWorldPointUnderTheActualInjectedFingers
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=twelveAndSixteenCellIslandsStartAtCanonicalHomeZoomAndReturnThereAfterZooming
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=3
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=twelveAndSixteenCellIslandsStartAtCanonicalHomeZoomAndReturnThereAfterZooming
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=reducedMotionKeepsTheCompleteMapOnTheSameRestingFrame
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=4
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=reducedMotionKeepsTheCompleteMapOnTheSameRestingFrame
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=5
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stack=java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'land-next')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:402)
+	at androidx.compose.ui.test.AndroidActions.performClickImpl(Actions.android.kt:23)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:60)
+	at xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest.readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft(TraderLandMapInstrumentedTest.kt:626)
+
+INSTRUMENTATION_STATUS: stream=
+Error in readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft(xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest):
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'land-next')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:402)
+	at androidx.compose.ui.test.AndroidActions.performClickImpl(Actions.android.kt:23)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:60)
+	at xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest.readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft(TraderLandMapInstrumentedTest.kt:626)
+
+INSTRUMENTATION_STATUS: test=readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft
+INSTRUMENTATION_STATUS_CODE: -2
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=zoomingBackIntoTheOwnIslandLeavesOverviewAndReopensEditingWithoutHome
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=6
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=zoomingBackIntoTheOwnIslandLeavesOverviewAndReopensEditingWithoutHome
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=initialSharedLinkNavigationPreservesTheAlreadyResolvedExtraIsland
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=7
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=initialSharedLinkNavigationPreservesTheAlreadyResolvedExtraIsland
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=realIslandTitlesRenderInTheOverviewAndRealIslandTapsVisitTheCorrectSlot
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=8
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=realIslandTitlesRenderInTheOverviewAndRealIslandTapsVisitTheCorrectSlot
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=sixFreeLotsRenderOnlyAfterAReadyReadAndRemainUntargetedOnTap
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=9
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=sixFreeLotsRenderOnlyAfterAReadyReadAndRemainUntargetedOnTap
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=growingTheOwnIslandPreservesTheActuallyPinchedAndPannedFrameUntilHome
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=10
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=growingTheOwnIslandPreservesTheActuallyPinchedAndPannedFrameUntilHome
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=liveCoreChangesActualCanvasPixelsWhileTheCameraAndPublicLayoutStayStill
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=11
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=liveCoreChangesActualCanvasPixelsWhileTheCameraAndPublicLayoutStayStill
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=tappingCoreRequiresItsCapabilityAndMoveStartsAtTheActualCoreBeforeCancel
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=12
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=tappingCoreRequiresItsCapabilityAndMoveStartsAtTheActualCoreBeforeCancel
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=overviewNextNeighborAndHomeReuseOneCanvasWithOfflinePublicIslands
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=13
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=overviewNextNeighborAndHomeReuseOneCanvasWithOfflinePublicIslands
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=bundledPublicShowcaseLoadsAllArtworkAndRendersAnActualIsometricMap
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=14
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=bundledPublicShowcaseLoadsAllArtworkAndRendersAnActualIsometricMap
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=rotatedTwoByOneDraftHandleUpdatesOnlyTheLocalDestinationAndPreservesPlacement
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=15
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=rotatedTwoByOneDraftHandleUpdatesOnlyTheLocalDestinationAndPreservesPlacement
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=externalNavigationVersionsRevisitTheSameTargetAndReturnHomeThroughHostButtons
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=16
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=externalNavigationVersionsRevisitTheSameTargetAndReturnHomeThroughHostButtons
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=17
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=firstTapSelectsARotatedPieceAndExplicitMoveCancelLeavesTheStoredOriginUntouched
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=17
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=firstTapSelectsARotatedPieceAndExplicitMoveCancelLeavesTheStoredOriginUntouched
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=18
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=archipelagoToggleReturnsHomeAndRestoresTheSameEditableCanvas
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=18
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=archipelagoToggleReturnsHomeAndRestoresTheSameEditableCanvas
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=19
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+INSTRUMENTATION_STATUS: test=draggingFromTheSecondTileOfARotatedDraftPreservesTheOriginalGrabOffset
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest
+INSTRUMENTATION_STATUS: current=19
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=draggingFromTheSecondTileOfARotatedDraftPreservesTheOriginalGrabOffset
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandSelectionSceneInstrumentedTest
+INSTRUMENTATION_STATUS: current=20
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.TraderLandSelectionSceneInstrumentedTest:
+INSTRUMENTATION_STATUS: test=actualSelectedPieceGetsAnAmberFootprintAndAnAmberHaloAboveTheGround
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.TraderLandSelectionSceneInstrumentedTest
+INSTRUMENTATION_STATUS: current=20
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=actualSelectedPieceGetsAnAmberFootprintAndAnAmberHaloAboveTheGround
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest
+INSTRUMENTATION_STATUS: current=21
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest:
+INSTRUMENTATION_STATUS: test=systemMotionChangeWhileOpenUpdatesPolicyAndNeverReplaysReceipt
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.CouponRedemptionInstrumentedTest
+INSTRUMENTATION_STATUS: current=21
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=systemMotionChangeWhileOpenUpdatesPolicyAndNeverReplaysReceipt
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=22
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=
+xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest:
+INSTRUMENTATION_STATUS: test=starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails
+INSTRUMENTATION_STATUS_CODE: 1
+INSTRUMENTATION_STATUS: class=xyz.bobbyprotocol.android.MainActivityAcceptanceInstrumentedTest
+INSTRUMENTATION_STATUS: current=22
+INSTRUMENTATION_STATUS: id=AndroidJUnitRunner
+INSTRUMENTATION_STATUS: numtests=22
+INSTRUMENTATION_STATUS: stream=.
+INSTRUMENTATION_STATUS: test=starterQuestionRetiresHomeLayersEvenWhenTheNativeTransportFails
+INSTRUMENTATION_STATUS_CODE: 0
+INSTRUMENTATION_RESULT: stream=
+
+Time: 62.944
+There was 1 failure:
+1) readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft(xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest)
+java.lang.AssertionError: Failed to inject touch input.
+Reason: Expected exactly '1' node but could not find any node that satisfies: (TestTag = 'land-next')
+
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow(SemanticsNodeInteraction.kt:178)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchOneOrThrow$default(SemanticsNodeInteraction.kt:150)
+	at androidx.compose.ui.test.SemanticsNodeInteraction.fetchSemanticsNode(SemanticsNodeInteraction.kt:84)
+	at androidx.compose.ui.test.ActionsKt.performTouchInput(Actions.kt:402)
+	at androidx.compose.ui.test.AndroidActions.performClickImpl(Actions.android.kt:23)
+	at androidx.compose.ui.test.ActionsKt.performClick(Actions.kt:60)
+	at xyz.bobbyprotocol.android.TraderLandMapInstrumentedTest.readonlyOwnMapAndFocusedPublicIslandCannotSelectOrStartADraft(TraderLandMapInstrumentedTest.kt:626)
+
+FAILURES!!!
+Tests run: 22,  Failures: 1
+
+
+INSTRUMENTATION_CODE: -1

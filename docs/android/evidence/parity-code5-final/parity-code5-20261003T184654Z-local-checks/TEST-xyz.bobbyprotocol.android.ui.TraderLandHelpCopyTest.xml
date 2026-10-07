@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:29:38.536Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="theGuestGuideDoesNotPromiseAccountBuildingAndKeepsTheSameProgressInstructions" classname="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" time="0.001"/>
+  <testcase name="everySupportedLanguageHasItsOwnCompleteHelpInsteadOfEnglishFallback" classname="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

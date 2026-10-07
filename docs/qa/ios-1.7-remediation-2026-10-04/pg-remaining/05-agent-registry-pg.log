@@ -1,0 +1,2 @@
+BP-10: create is insert-only; update is CAS on owner + version; owner changes only via single-use transfer; browser roles excluded
+agent registry (Postgres) tests passed

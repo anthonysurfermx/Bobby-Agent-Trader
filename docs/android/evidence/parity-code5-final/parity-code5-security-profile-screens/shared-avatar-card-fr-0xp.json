@@ -1,0 +1,15 @@
+{
+  "capturedAt": "2026-10-03T19:12:26.162326+00:00",
+  "source": "Own newly generated fresh-guest avatar PNG in scoped app cache, read-only extraction using existing task-owned userdebug emulator su 0",
+  "image": "parity-code5-security-profile-screens/shared-avatar-card-fr-0xp.png",
+  "mimeType": "image/png",
+  "width": 1080,
+  "height": 1440,
+  "bytes": 280818,
+  "sha256": "8ff6f5c9e076cd22a093461da28f6e5ff57de9fde13dff62cf20073c8d0d1745",
+  "fileProviderURI": "content://xyz.bobbyprotocol.bobby.avatar-share/avatar_cards/ce61a2cc-827c-4061-b047-eea29134d217.png",
+  "URIObservedIn": "Android chooser activity state; only own URI extracted; raw activity dump not stored",
+  "chooserPackage": "com.android.intentresolver",
+  "recipientOrAppSelected": false,
+  "sent": false
+}

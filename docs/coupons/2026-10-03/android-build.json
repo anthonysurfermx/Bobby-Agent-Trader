@@ -1,0 +1,85 @@
+{
+  "status": "PASS",
+  "version_code": 7,
+  "version_name": "1.1.2",
+  "branch": "codex/coupon-redemption-ux",
+  "canonical_reference": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+  "source_unchanged_during_build": true,
+  "fcm_enabled": false,
+  "uploaded": false,
+  "recorded_at": "2026-10-03T21:25:28.748386+00:00",
+  "source": {
+    "path": "android-source.json",
+    "sha256": "c00e81ae2ebfafbd040631709cc70623001c5c173f22192c94e361229349fa7c",
+    "source_sha256": "c1a619bda0a1b176365e063a21513250b71138a30b48b02b2694d7247815a166",
+    "files": 375
+  },
+  "tests": {
+    "node": {
+      "tests": 103,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "jvm": {
+      "tests": 217,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 60
+  },
+  "build_steps": [
+    {
+      "name": "node-contracts",
+      "exit_code": 0,
+      "started_at": "2026-10-03T21:12:00.767804+00:00",
+      "completed_at": "2026-10-03T21:12:01.349873+00:00",
+      "private_log_sha256": "6924add1b0e42cffe38d7a917417fc5a9446f05a1d79b99f009af18f45e69617"
+    },
+    {
+      "name": "unit-lint-debug-test-build",
+      "exit_code": 0,
+      "started_at": "2026-10-03T21:12:01.350121+00:00",
+      "completed_at": "2026-10-03T21:13:04.365375+00:00",
+      "private_log_sha256": "676abaa4d0c756e0b92e353967dd8017c1bb0a29c87547011a29f26ca4c2d25b"
+    },
+    {
+      "name": "signed",
+      "exit_code": 0,
+      "started_at": "2026-10-03T21:13:04.366304+00:00",
+      "completed_at": "2026-10-03T21:14:13.615582+00:00",
+      "private_log_sha256": "60396edbdb262ba7c41ea011f2024a54b8981cd2bfbd529e9bc53c5542bd1778"
+    }
+  ],
+  "artifacts": {
+    "release_apk": {
+      "path_in_worktree": "android/app/build/outputs/apk/release/app-release.apk",
+      "sha256": "850f659da41cff3eb2f8b8da05b742c91ab3c372216dfec55a55f9e87232e7e0",
+      "bytes": 47074880
+    },
+    "release_aab": {
+      "path_in_worktree": "android/app/build/outputs/bundle/release/app-release.aab",
+      "sha256": "42d35d9d7a2307e3dfd0b6b116661f1115a20ea1760aa8217cef929923a77028",
+      "bytes": 50420104
+    },
+    "debug_apk": {
+      "path_in_worktree": "android/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "209b52fedff5456b72bd18937d28f271a5b5024c4612c48038067b3cbeb22180",
+      "bytes": 60487023
+    },
+    "test_apk": {
+      "path_in_worktree": "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+      "sha256": "daa76005367b8b0a7c4cb9d4c9b75b0aea3afe6a4fbd42ce8ad8c43f6f7208b6",
+      "bytes": 1139497
+    }
+  },
+  "test_xml": {
+    "path": "android-unit-contracts.xml",
+    "sha256": "cf304c376be2bb88f8018a121eb7f2eab0d14127327a329b82a8f822f6dfa1b1"
+  },
+  "scope": "Local compile, JVM, contracts, lint and signed package build. Emulator and device evidence are separate; no remote coupon, purchase, restore or Play validation."
+}

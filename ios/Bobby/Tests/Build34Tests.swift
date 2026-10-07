@@ -78,7 +78,8 @@ final class Build34Tests: XCTestCase {
         }
         XCTAssertNil(calls.last?.body.flatMap { $0.isEmpty ? nil : $0 }, "no Apple code was asked for")
         XCTAssertTrue(account.manualAppleRevocationRequired)
-        XCTAssertEqual(account.manualRevocationURL.absoluteString, L.t("https://support.apple.com/en-us/102571", "https://support.apple.com/es-mx/102571"))
+        XCTAssertEqual(account.manualRevocationURL.absoluteString, "https://support.apple.com/\(L.localeIdentifier.lowercased())/102571",
+                       "Account deletion opens the current regional edition of Apple support")
         XCTAssertNil(account.session)
         XCTAssertNil(Keychain.read(service: service))
         XCTAssertTrue(AccountDeletionCopy.deleted(manualAppleSteps: true).contains(AccountSession.manualRevocationSteps))
@@ -166,7 +167,29 @@ final class Build34Tests: XCTestCase {
                        "https://support.apple.com/es-mx/102571", "never a non-Apple link, in either language")
         XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://support.apple.com/102571", spanish: true).absoluteString,
                        "https://support.apple.com/102571", "no locale segment: Apple picks the language")
-        XCTAssertEqual(AccountSession.defaultManualRevocationURL, AccountSession.defaultManualRevocationURL(spanish: L.isSpanish))
+        XCTAssertEqual(AccountSession.defaultManualRevocationURL.absoluteString,
+                       "https://support.apple.com/\(L.localeIdentifier.lowercased())/102571")
+    }
+
+    func testDefaultAppleSupportURLKeepsNewLanguagesAndLegacyOverrides() {
+        let previous = UserDefaults.standard.object(forKey: L.preferenceKey)
+        defer {
+            if let previous { UserDefaults.standard.set(previous, forKey: L.preferenceKey) }
+            else { UserDefaults.standard.removeObject(forKey: L.preferenceKey) }
+        }
+        for (language, edition) in [("fr", "fr-fr"), ("it", "it-it"), ("de", "de-de")] {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            XCTAssertEqual(AccountSession.defaultManualRevocationURL.absoluteString,
+                           "https://support.apple.com/\(edition)/102571", language)
+            XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://support.apple.com/en-us/102571?x=1").absoluteString,
+                           "https://support.apple.com/\(edition)/102571?x=1", language)
+            XCTAssertEqual(AccountSession.manualRevocationURL(from: "https://evil.example/en-us/102571").absoluteString,
+                           "https://support.apple.com/\(edition)/102571", "Untrusted hosts still fall back to Apple")
+            XCTAssertEqual(AccountSession.defaultManualRevocationURL(spanish: true).absoluteString,
+                           "https://support.apple.com/es-mx/102571", "Explicit legacy overrides keep their contract")
+            XCTAssertEqual(AccountSession.defaultManualRevocationURL(spanish: false).absoluteString,
+                           "https://support.apple.com/en-us/102571")
+        }
     }
 
     // MARK: Sign-in errors, worded once
@@ -196,6 +219,61 @@ final class Build34Tests: XCTestCase {
         await account.completeApple(.failure(ASAuthorizationError(.canceled)))
         XCTAssertNil(account.lastError, "a cancel clears the line instead of keeping an old error")
     }
+
+#if DEBUG
+    @MainActor func testProfileFixtureNeverRefreshesOrSendsItsFakeBearer() async throws {
+        let account = AccountSession(usesKeychain: false)
+        account.acceptQAFixture(userId: "qa-user", appleUserId: "qa-apple-user")
+        let started = account.generation
+        B34Stub.install { _ in .json(401, #"{"error":"Unauthorized"}"#) }
+        let token = await account.accessToken()
+        let refreshed = await account.accessToken(replacing: "qa-fixture")
+        XCTAssertNil(token)
+        XCTAssertNil(refreshed)
+        let result = try await account.send(URLRequest(url: BobbyAPI.base.appendingPathComponent("api/probe")))
+        XCTAssertEqual(result, .unavailable)
+        XCTAssertTrue(B34Stub.requests.isEmpty, "No fake bearer or refresh token may reach a transport")
+        XCTAssertTrue(account.isQAFixture)
+        XCTAssertTrue(account.isSignedIn)
+        XCTAssertEqual(account.session?.userId, "qa-user")
+        XCTAssertEqual(account.generation, started, "An unavailable fixture request must not sign it out")
+        XCTAssertNil(account.lastError)
+        await account.checkAppleCredential()
+        XCTAssertEqual(account.generation, started, "A synthetic Apple ID must not be checked with Apple")
+
+        account.accept(StoredSession(accessToken: "tok-real", refreshToken: "ref-real",
+                                     expiresAt: Date().addingTimeInterval(3600), userId: "real-user"))
+        XCTAssertFalse(account.isQAFixture)
+        B34Stub.install { _ in .json(200, #"{"ok":true}"#) }
+        let realToken = await account.accessToken()
+        XCTAssertEqual(realToken, "tok-real")
+        let realResult = try await account.send(URLRequest(url: BobbyAPI.base.appendingPathComponent("api/probe")))
+        XCTAssertEqual(realResult, .answered(Data(#"{"ok":true}"#.utf8), 200))
+        XCTAssertEqual(B34Stub.requests.compactMap(\.bearer), ["Bearer tok-real"], "Normal account transport still works")
+    }
+
+    @MainActor func testProfileFixtureBlocksMeteredRequestsBeforeNetworkWithoutSigningOut() async {
+        let account = AccountSession.shared
+        let previous = account.session
+        defer {
+            if let previous { account.accept(previous) } else { account.signOut() }
+        }
+        account.acceptQAFixture(userId: "qa-user", appleUserId: "qa-apple-user")
+        let started = account.generation
+        B34Stub.install { _ in .json(401, #"{"error":"Unauthorized"}"#) }
+        do {
+            _ = try await BobbyAccessAPI.send("api/bobby-access", method: "GET", auth: .account)
+            XCTFail("A QA profile must not issue a metered request")
+        } catch {
+            XCTAssertEqual((error as? URLError)?.code, .cancelled)
+        }
+        XCTAssertTrue(B34Stub.requests.isEmpty)
+        XCTAssertTrue(account.isSignedIn)
+        XCTAssertTrue(account.isQAFixture)
+        XCTAssertEqual(account.generation, started)
+        XCTAssertNil(account.lastError)
+    }
+#endif
 
     // MARK: A token that expired mid-operation
 
@@ -439,6 +517,64 @@ final class Build34Tests: XCTestCase {
         XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: false, spanish: true), "CRIPTO · OKX")
         XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: true, spanish: false), "EQUITIES · YAHOO")
         XCTAssertEqual(MarketSnapshot.sourceLabel(isEquity: true, spanish: true), "ACCIONES · YAHOO")
+    }
+
+    func testDebateAcceptsRequiredTextBesideNestedSynthesisAndScenarios() async throws {
+        for verdict in ["wait", "review"] {
+            let agents: [String: Any] = [
+                "alpha": "Support held on the hourly chart.", "red": "Resistance remains above price.",
+                "cio": "Watch for another close.", "verdict": verdict, "direction": "none",
+                "synthesis": ["headline": "Evidence remains mixed.", "why": "Support held.",
+                              "risk": "Resistance remains.", "watch": "Another hourly close.", "watchLevel": 100],
+                "scenarios": ["confirm": "Close above resistance.", "invalidate": "Close below support."],
+            ]
+            let body: [String: Any] = ["symbol": "BTC", "market": ["price": 100], "agents": agents]
+            let data = try JSONSerialization.data(withJSONObject: body)
+            B34Stub.install { _ in .json(200, String(decoding: data, as: UTF8.self)) }
+            let answer = await BobbyAPI.debate("BTC", question: "Where is support?")
+            XCTAssertFalse(answer.isUnavailable, "Nested metadata is additive, never a reason to discard valid agent text")
+            XCTAssertEqual(answer.alphaArgument, agents["alpha"] as? String)
+            XCTAssertEqual(answer.redArgument, agents["red"] as? String)
+            XCTAssertEqual(answer.cioArgument, agents["cio"] as? String)
+            XCTAssertEqual(answer.agentVerdict, verdict)
+            XCTAssertEqual(answer.isNoTrade, verdict == "wait")
+            XCTAssertEqual(answer.direction, "none")
+            XCTAssertEqual(answer.price, 100)
+        }
+    }
+
+    func testDebateRejectsEveryMissingEmptyOrMalformedRequiredAgentText() async throws {
+        let valid: [String: Any] = ["alpha": "Support held.", "red": "Resistance remains.",
+                                  "cio": "Watch another close.", "verdict": "wait", "direction": "none",
+                                  "synthesis": ["headline": "Mixed evidence."],
+                                  "scenarios": ["confirm": "Another close."]]
+        for field in ["alpha", "red", "cio", "verdict"] {
+            for bad in [NSNull() as Any, "", 42, ["text": "Invalid shape"]] {
+                var agents = valid
+                agents[field] = bad
+                let body: [String: Any] = ["symbol": "BTC", "market": ["price": 100], "agents": agents]
+                let data = try JSONSerialization.data(withJSONObject: body)
+                B34Stub.install { _ in .json(200, String(decoding: data, as: UTF8.self)) }
+                let answer = await BobbyAPI.debate("BTC", question: "Where is support?")
+                XCTAssertTrue(answer.isUnavailable, "\(field) must be required text; malformed fields cannot be rescued by a quote")
+                XCTAssertNil(answer.agentVerdict)
+                XCTAssertNil(answer.alphaArgument)
+            }
+            var agents = valid
+            agents.removeValue(forKey: field)
+            let data = try JSONSerialization.data(withJSONObject: ["symbol": "BTC", "agents": agents])
+            B34Stub.install { _ in .json(200, String(decoding: data, as: UTF8.self)) }
+            let answer = await BobbyAPI.debate("BTC", question: "Where is support?")
+            XCTAssertTrue(answer.isUnavailable, "Missing \(field) must refuse the answer")
+            XCTAssertNil(answer.agentVerdict)
+        }
+        var agents = valid
+        agents["verdict"] = "buy"
+        let data = try JSONSerialization.data(withJSONObject: ["symbol": "BTC", "agents": agents])
+        B34Stub.install { _ in .json(200, String(decoding: data, as: UTF8.self)) }
+        let answer = await BobbyAPI.debate("BTC", question: "Where is support?")
+        XCTAssertTrue(answer.isUnavailable, "Only wait/review are valid verdicts")
+        XCTAssertNil(answer.agentVerdict)
     }
 
     func testDebateCarriesTheServersRefusal() async {

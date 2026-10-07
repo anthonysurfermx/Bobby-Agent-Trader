@@ -10,6 +10,7 @@ files verbatim.
 Usage: python3 ios/Bobby/Nucleo/fixtures/normalize.py   (writes fixtures/ask/*.json + manifest.json)
 """
 import json, os, re, calendar, time
+from urllib.parse import parse_qs, urlsplit
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 RAW = os.path.join(HERE, "raw")
@@ -92,6 +93,15 @@ def pulse(body):
             "instrument": p.get("instrument"), "plan": plan}
 
 
+def candles_timeframe(capture):
+    """The chart interval comes from its recorded provider request, not the debate horizon."""
+    query = parse_qs(urlsplit(capture["request"]["path"]).query)
+    timeframe = (query.get("bar") or query.get("interval") or [None])[0]
+    if not timeframe:
+        raise ValueError("The candle capture has no explicit interval")
+    return timeframe.upper()
+
+
 def ok_result(slug, question, language="en"):
     search, debate = load(f"asset-search.{slug}.json"), load(f"desk-debate.{slug}.json")
     market, pul, cand = load(f"market.{slug}.json"), load(f"pulse.{slug}.json"), load(f"candles.{slug}.json")
@@ -113,6 +123,7 @@ def ok_result(slug, question, language="en"):
         "pulse": pulse(pul["body"]),
         "agents": {k: agents[k] for k in ("alpha", "red", "cio", "verdict", "direction")},
         "provenance": {k: body["provenance"][k] for k in ("provider", "instrument", "assetType", "timeframe", "asOf")},
+        "candlesTimeframe": candles_timeframe(cand),
         "candles": candles(cand["body"]),
         "receivedAt": iso_ms(debate["recordedAt"]),
         "elapsedMs": debate["elapsedMs"],

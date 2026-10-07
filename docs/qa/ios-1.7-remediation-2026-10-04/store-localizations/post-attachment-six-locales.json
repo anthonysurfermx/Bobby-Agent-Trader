@@ -1,0 +1,95 @@
+{
+  "source": "Safari native accessibility: fresh locale selections after build attachment/save/reload",
+  "appId": "6804460489",
+  "version": "1.7",
+  "build": "63",
+  "checks": [
+    {
+      "locale": "de-DE",
+      "observedAt": "2026-10-04T13:26:03.093Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    },
+    {
+      "locale": "fr-FR",
+      "observedAt": "2026-10-04T13:26:04.450Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    },
+    {
+      "locale": "it",
+      "observedAt": "2026-10-04T13:26:11.823Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    },
+    {
+      "locale": "pt-PT",
+      "observedAt": "2026-10-04T13:26:13.205Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    },
+    {
+      "locale": "es-MX",
+      "observedAt": "2026-10-04T13:26:19.990Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    },
+    {
+      "locale": "en-US",
+      "observedAt": "2026-10-04T13:26:21.373Z",
+      "screenshotFilenames": [
+        "01.png",
+        "02.png",
+        "03.png",
+        "04.png",
+        "06.png"
+      ],
+      "exactFive": true,
+      "build63Present": true,
+      "saveDisabled": true
+    }
+  ],
+  "allSixPassed": true,
+  "remoteByteIdentityVerified": false,
+  "captureProvenance": "Approved historical illustrative artwork, not fresh build63 captures. Remote filenames, order and persistence observed; remote image hashes not exposed by this UI."
+}

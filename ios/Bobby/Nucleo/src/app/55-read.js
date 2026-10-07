@@ -191,6 +191,31 @@ function fillSats(model){
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
 function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
+/* Keep the full localized subtitle in the 90 px beside the support bracket. */
+function chartSubtitle(text, y){
+  var node = el.cBrS, width = 90;
+  node.textContent = text || ''; att(node, 'y', f2(y));
+  if (!text || node.getComputedTextLength() <= width) return;
+  var best = null, bestWidth = Infinity;
+  function splitAt(i){
+    var a = text.slice(0, i).trim(), b = text.slice(i).trim();
+    if (!a || !b) return;
+    node.textContent = a; var wa = node.getComputedTextLength();
+    node.textContent = b; var wb = node.getComputedTextLength();
+    var w = Math.max(wa, wb);
+    if (w < bestWidth){ best = [a, b]; bestWidth = w; }
+  }
+  for (var i = 1; i < text.length; i++) if (/\s/.test(text.charAt(i))) splitAt(i);
+  /* A single long word can still use both lines without dropping characters. */
+  if (bestWidth > width) for (i = 1; i < text.length; i++) splitAt(i);
+  if (!best){ node.textContent = text; return; }
+  node.textContent = '';
+  best.forEach(function(line, index){
+    var span = D.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    span.setAttribute('x', '296'); span.setAttribute('y', f2(y + index * 14));
+    span.textContent = line; node.appendChild(span);
+  });
+}
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }
@@ -244,8 +269,8 @@ function buildChart(ch, prov, receivedAt){
   if (br && fin(br.to)){
     var ya = nowY, yb = Y(br.to), mid = (ya + yb) / 2;
     att(el.cBrL, 'y1', f2(ya)); att(el.cBrL, 'y2', f2(yb)); att(el.cBrA, 'y1', f2(ya)); att(el.cBrA, 'y2', f2(ya)); att(el.cBrB, 'y1', f2(yb)); att(el.cBrB, 'y2', f2(yb));
-    el.cBrT.textContent = br.label; el.cBrS.textContent = br.sub;
-    att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
+    el.cBrT.textContent = br.label; att(el.cBrT, 'y', f2(mid - 2));
+    chartSubtitle(br.sub, mid + 12);
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
   /* the UI never names the exchange behind the candles (Base-only naming) */
@@ -275,12 +300,17 @@ function fillCards(m){
     var ar = mk('div', 'ar');
     ar.style.setProperty('--c', e.id === 'alpha' || e.id === 'red' || e.id === 'cio' ? 'var(--' + e.id + ')' : (e.hue || 'var(--cio)'));
     ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name));
+    if (e.role) d.appendChild(mk('span', 'rl', e.role));
     if (e.text) d.appendChild(mk('p', null, e.text));
     (e.lines || []).forEach(function(l){ var p = mk('p'), lb = mk('span', null, l.label + ': '); lb.style.fontWeight = '600'; lb.style.color = 'var(--ink)'; p.appendChild(lb); p.appendChild(D.createTextNode(l.text)); d.appendChild(p); });
     ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
-  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - 250 + 12);
+  /* a header or a footer that wraps onto a second line takes its room from the scroller; the scroll ends with the
+     last line clear above the lower edge, where no fade is left (.scr.dn in renderCards) */
+  var sTop = Math.max(62, 24 + (el.card0.ch.offsetHeight || 0) + 21), sH = Math.min(312, 328 - (el.card0.disc.offsetHeight || 16)) - sTop;
+  el.card0.scr.style.top = sTop + 'px'; el.card0.scr.style.height = sH + 'px';
+  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - sH);
   fillThesisCard(m.thesis, { verdict: m.verdict.key, readOnly: false, horizon: m.thesis.horizon });
   var isla = ISLAND && ISLAND.available;
   A.nCards = isla ? 3 : 2;
@@ -300,11 +330,15 @@ function fillThesisCard(th, o){
   var c = el.card1;
   c.lb.textContent = th.header; c.mt.textContent = o.readOnly && th.when ? th.when : ''; c.ct.textContent = th.title;
   var n = th.rows.length, showHz = !!(o.horizon && o.horizon.show) && !o.readOnly;
-  var avail = 284 - 8 - (showHz ? 40 : 34) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
-  fillRows(c.rows, th.rows, rh);
-  var yUnder = 91 + n * rh + 6;
-  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  /* the note under the rows is measured, not assumed (two lines in most languages): the rows leave it room, and the
+     button, with the card's lower edge, comes after it, never over it */
   c.ln.textContent = th.line || '';
+  var lnH = showHz ? 32 : (c.ln.offsetHeight || 32);
+  var avail = 284 - 8 - (showHz ? 40 : Math.max(34, lnH + 2)) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
+  fillRows(c.rows, th.rows, rh);
+  var yUnder = 91 + n * rh + 6, saveTop = Math.max(284, yUnder + lnH + 4);
+  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (saveTop + 76) + 'px';
   c.hz.textContent = '';
   HZ = o.horizon && o.horizon.defaultHours || 24;
   if (showHz){
@@ -345,7 +379,51 @@ function showIdleSuggestions(){
     var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
     list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
-  if (list.length) chipsShow(list, true); else chipsHide();
+  list = withNudge(list);
+  if (list.length) chipsShow(list, nudgeEyebrow()); else chipsHide();
+}
+/* ---- the nudge: ONE line and ONE chip that native writes (credits, memory, theses, reminders, invites).
+   Native owns the copy, what the tap does and how often it may show; the page draws it first in the chip
+   row, reports every drawing and reports the tap. Nothing here names a feature. ---- */
+var NUDGE_SHOWN = null, NUDGE_BUSY = false;
+function nudgeNow(){
+  var n = SES && SES.nudge;
+  return n && typeof n.id === 'string' && n.id && typeof n.cta === 'string' && n.cta ? n : null;
+}
+/* what is on screen: a nudge whose words changed (a new language, a new number) is a different drawing */
+function nudgeKey(n){ return n ? n.id + '\n' + (typeof n.text === 'string' ? n.text : '') + '\n' + n.cta : null; }
+function withNudge(list){
+  var n = nudgeNow();
+  NUDGE_SHOWN = nudgeKey(n);
+  if (!n) return list;
+  /* native counts showings (it merges redraws); when it answers that this nudge is over, the row lets it go */
+  var id = n.id;
+  bcall('nudge.seen', { id: id }).then(function(r){
+    if (r && r.active === false && SES && SES.nudge && SES.nudge.id === id){ SES.nudge = null; nudgeSync(); }
+  }).catch(noop);
+  var text = typeof n.text === 'string' ? n.text : '';
+  return [{ label: n.cta, ariaLabel: text ? text + '. ' + n.cta : n.cta, style: 'nudge', action: { nudge: n.id } }].concat(list);
+}
+function nudgeEyebrow(){ var n = nudgeNow(); return n && typeof n.text === 'string' && n.text ? n.text : true; }
+function nudgeAct(id){
+  if (NUDGE_BUSY) return;
+  NUDGE_BUSY = true;
+  bcall('nudge.act', { id: id }).catch(noop).then(function(){ NUDGE_BUSY = false; });
+}
+/* the session changed: a nudge that came, went, was replaced or reworded redraws the row it lives in */
+function nudgeSync(){
+  if (nudgeKey(nudgeNow()) === NUDGE_SHOWN || !ST) return;
+  if (ST.name === 'IDLE') showIdleSuggestions();
+  else if (ST.name === 'FOLLOWUPS' && READ && READ.model) chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
+}
+/* ---- a read native starts on the person's tap outside the page (a follow-up's button, a row of a native
+   board). Native names the asset inside a single-use token and writes the question; the page runs it exactly
+   like a chip that carries a token, and only from the idle home or a finished read. ---- */
+function askStart(p){
+  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST) return;
+  if (ST.name !== 'IDLE' && ST.name !== 'FOLLOWUPS') return;
+  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '';
+  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660 });
 }
 function receiveSuggestions(reply){
   SUGG = reply;
@@ -357,7 +435,7 @@ function chipsShow(list, eyebrow){
   var x = 20;
   list.forEach(function(c, i){
     /* `apple`: the Sign in with Apple chip (white, the Apple logo in the system font); `pro`: the Bobby Pro chip */
-    var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
+    var style = c.style === 'apple' || c.style === 'pro' || c.style === 'nudge' ? ' ' + c.style : '';
     var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '\uF8FF'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
@@ -367,7 +445,8 @@ function chipsShow(list, eyebrow){
     ch.p.to(1, 'emit', null, i * 0.07); ch.o.tween(1, 0.2, E.fade, i * 0.07);
   });
   A.chipMax = Math.max(0, x - 8 - 370);
-  if (eyebrow){ el.eyebrow.textContent = tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
+  /* `eyebrow` true: the usual line; a string: the nudge's own line (native-localized) */
+  if (eyebrow){ el.eyebrow.textContent = typeof eyebrow === 'string' ? eyebrow : tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
 }
 function chipsHide(instant){
   var dead = A.chips, n = dead.length; A.chips = [];

@@ -1,0 +1,4 @@
+ok  agentProfiles decodes with the backend ABI (registered, registeredAt, stake, metadataURI)
+ok  getPrediction decodes with the backend ABI (hardnessScore in place, later fields aligned)
+ok  generated ABI (159 entries) equals the compiled artifact
+hardness ABI (anvil) tests passed

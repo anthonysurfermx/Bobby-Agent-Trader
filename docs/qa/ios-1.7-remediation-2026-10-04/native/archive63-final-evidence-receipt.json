@@ -1,0 +1,29 @@
+{
+  "archive": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "archiveAndVerification": "passed",
+  "minimumFreeGiBIncludingPhaseFinal": 5.825,
+  "upload": "not run; root gates remain in force",
+  "files": {
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-run-report.md": {
+      "sha256": "6a011e567bf535d41f1630e77910197541b861ec20f67fcd4c9a8f37e4921013",
+      "bytes": 4778
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/completion-receipt.json": {
+      "sha256": "5213111e8aa8d1e9f6f99c142f649338f02e4f2db231cfc8f30be5d62179d620",
+      "bytes": 4134
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-verification.json": {
+      "sha256": "5e7a9463fce2244bec88d45346b10fc19763ea224f9d79bbf084519df3202cdd",
+      "bytes": 2627
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/verification-history.json": {
+      "sha256": "aa91168a82b51abe778786b66f06b5a5328378aa1b57785bc8b4d7432338d42c",
+      "bytes": 822
+    },
+    "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper.py": {
+      "sha256": "609befc08b23475b1b7a7587f3b0e40127e68041b9e56f48f7e48ff27bb0b552",
+      "bytes": 16900
+    }
+  }
+}

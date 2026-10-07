@@ -1,0 +1,35 @@
+{
+  "reference": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+  "layers": [
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/anim_body_1024.png",
+      "asset": "core-body.png",
+      "sha256": "4459022ecde6e7c7df7504c3fb9a489b5473d197e3f5d7423e8795bc76089085"
+    },
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/anim_ring_back_1024.png",
+      "asset": "core-ring-back.png",
+      "sha256": "5a113dd259ce54645b274474553f22d3ae298fbdb5b30be98a03bfb1ee9e637b"
+    },
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/anim_sphere_1024.png",
+      "asset": "core-sphere.png",
+      "sha256": "16c896381fca25a6f6194e23e64b0ffcfbfbd7e14b6f6e1f34feb2f9318a9d36"
+    },
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/anim_ring_front_1024.png",
+      "asset": "core-ring-front.png",
+      "sha256": "eb542f82ce8f6c9d69db89e33b6abd3d8982c37395574d22b25714c63e603f3c"
+    },
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/stage1_glow_1024.png",
+      "asset": "core-glow.png",
+      "sha256": "3813a8a767fd5865fedb65e88defc5df75dc07fe654f23859d47ecca50827d42"
+    },
+    {
+      "source": "public/land/v1/gate-A/aura_core/ne/stage0_glow_1024.png",
+      "asset": "core-dormant-glow.png",
+      "sha256": "107486a29aa9a5fdda78086d78b6f439db0be5f19322f6912e99f14f0adab0e9"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+{
+  "status": "FAILED",
+  "started_at": "2026-10-04T00:04:57.278872+00:00",
+  "completed_at": "2026-10-04T00:11:55.626101+00:00",
+  "exit_code": 73,
+  "source": {
+    "path": "ios-coupon-build63-20261004T000457Z-source.json",
+    "sha256": "d469f5333836d1ef264932c3f4266d64a22eac4c21eed524a7c9aa60b667a1cc",
+    "source_sha256": "3039847aae9be3f0c2d74b4b99fcb879b5c4fdef44f44c1ddaf7f4eac83044ca",
+    "files": 116
+  },
+  "source_unchanged_during_tests": true,
+  "version": "1.7",
+  "build": "63",
+  "tests": 26,
+  "passed": 25,
+  "failed": 1,
+  "skipped": 0,
+  "test_groups": [
+    "CouponRedemptionTests",
+    "BobbyAccessTests",
+    "CouponRedemptionUITests"
+  ],
+  "target": {
+    "platform": "iOS Simulator",
+    "model": "iPhone 17 Pro",
+    "os": "26.1",
+    "architecture": "arm64"
+  },
+  "app_info_sha256": "f37215349f8ef937abc7fae6b1a6b0fba5240f7fc49484a2eb1992cf372ae040",
+  "app_dylib_sha256": "10ca9331eeda22817f2cd6b70b7b7fbae33e6ff7a058478c5b1a74dda8686a53",
+  "log": {
+    "path": "ios-coupon-build63-20261004T000457Z.log",
+    "sha256": "30e4b2df6530caa4dd4a4bc30965b756bf84355951fe65c5eb3603a0fa26686b"
+  },
+  "xcresult": "ios-coupon-build63-20261004T000457Z.xcresult",
+  "runner_sha256": "f1b6b061d4193a41cbfed560e1cae072c80339aae4f861462912f3a171d2153f",
+  "physical_device_tested": false,
+  "archived": false,
+  "uploaded": false,
+  "real_coupon_consumed": false,
+  "scope": "Actual XCTest/XCUITest on iOS simulator; fixture transports and offline confirmed/replayed coupon receipts. No authenticated coupon, purchase, restore or physical-device acceptance."
+}

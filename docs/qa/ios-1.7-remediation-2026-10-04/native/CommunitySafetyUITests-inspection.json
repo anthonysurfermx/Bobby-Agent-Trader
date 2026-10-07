@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T12:36:49.544039+00:00",
+  "stage": "CommunitySafetyUITests",
+  "class": "CommunitySafetyUITests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testEnglishVisitorCanBlockAndUnblockCreator",
+    "testSpanishVisitorCanBlockAndUnblockCreator"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "919a3719527e837ed848206c4231721b7b85ab53d8604b44c1f270f758cf341f",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "862fcb9df75287cc3dd745b41077582ebeeb41a38883615d885564b201917cfb",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "CommunitySafetyUITests/testEnglishVisitorCanBlockAndUnblockCreator()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/CommunitySafetyUITests/testEnglishVisitorCanBlockAndUnblockCreator",
+      "result": "Passed"
+    },
+    {
+      "identifier": "CommunitySafetyUITests/testSpanishVisitorCanBlockAndUnblockCreator()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/CommunitySafetyUITests/testSpanishVisitorCanBlockAndUnblockCreator",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

@@ -1,0 +1,115 @@
+{
+  "status": "PASS_ALL_OBSERVED_CHECKS_FOR_CODE_COMMIT",
+  "recorded_at": "2026-10-03T18:59:03.883319+00:00",
+  "code_commit": "7dbd1470041d62b3137588043dd551bae2c46f79",
+  "source_sha256": "d37effbf75ac707415ced82ab01f8f69d1e4aa04c4d29aeecdfb51faf03a17ca",
+  "source_files": 362,
+  "all_source_manifest_blobs_match_code_commit": true,
+  "pull_request": {
+    "baseRefName": "claude/feedback-build61",
+    "headRefOid": "7dbd1470041d62b3137588043dd551bae2c46f79",
+    "isDraft": true,
+    "number": 141,
+    "state": "OPEN",
+    "statusCheckRollup": [
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:55:50Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639733/job/111268875448",
+        "name": "native (false)",
+        "startedAt": "2026-10-03T18:49:58Z",
+        "status": "COMPLETED",
+        "workflowName": "Android"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:52:57Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639742/job/111268875602",
+        "name": "application",
+        "startedAt": "2026-10-03T18:49:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:50:04Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639775/job/111268875388",
+        "name": "secrets",
+        "startedAt": "2026-10-03T18:49:23Z",
+        "status": "COMPLETED",
+        "workflowName": "Security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:55:17Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639733/job/111268875380",
+        "name": "native (true)",
+        "startedAt": "2026-10-03T18:49:22Z",
+        "status": "COMPLETED",
+        "workflowName": "Android"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:54:29Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639742/job/111268875412",
+        "name": "integration",
+        "startedAt": "2026-10-03T18:49:25Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:54:02Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639775/job/111268875586",
+        "name": "codeql",
+        "startedAt": "2026-10-03T18:49:23Z",
+        "status": "COMPLETED",
+        "workflowName": "Security"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:52:27Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639742/job/111268875557",
+        "name": "ios-progress-transactions",
+        "startedAt": "2026-10-03T18:49:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:56:54Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/actions/runs/37145639742/job/111268875486",
+        "name": "contracts",
+        "startedAt": "2026-10-03T18:49:23Z",
+        "status": "COMPLETED",
+        "workflowName": "CI"
+      },
+      {
+        "__typename": "CheckRun",
+        "completedAt": "2026-10-03T18:53:58Z",
+        "conclusion": "SUCCESS",
+        "detailsUrl": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/runs/111269718715",
+        "name": "CodeQL",
+        "startedAt": "2026-10-03T18:53:54Z",
+        "status": "COMPLETED",
+        "workflowName": ""
+      }
+    ],
+    "url": "https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/141"
+  },
+  "codeql_annotations": [],
+  "deployments_for_full_code_sha": [],
+  "branch_deployment_enabled": false,
+  "phone_modified": false,
+  "play_uploaded": false,
+  "scope": "Actual remote checks for the pinned code commit, including both optional FCM build variants. Compilation does not prove FCM credentials, registration or delivery. This receipt does not apply to a later source commit or claim device/account/provider acceptance.",
+  "runner_sha256": "77adace2031deebd4d59ba241c3701b2637e50099f4496bebc0653e0d53c7684"
+}

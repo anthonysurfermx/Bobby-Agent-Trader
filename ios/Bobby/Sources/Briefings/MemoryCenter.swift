@@ -5,10 +5,18 @@
 //   DELETE ?symbol=X → forget one asset; DELETE (no symbol) → forget everything. Both answer the same body.
 // Invariants (the BriefingsCenter pattern):
 //  - Only the native opt-in bit is kept on the phone, keyed by account; memory data stays on the server.
+//  - 1.8: the bit alone affirms nothing. It counts only under this account's accepted record for the
+//    consent as it reads today (`MemoryConsent`). A bit without that record (the 1.7 switch, or a yes
+//    to an older wording) is revoked the moment it is read, so the opt-in header stops and the
+//    person is asked again through the consent sheet.
 //    The snapshot is cleared at once on an account change. Every answer is checked against the account
 //    it was asked for (user id + generation + this center's epoch) and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
+//  - 1.8: deletion is complete. "Forget" also takes the asset out of this phone's shortcut row, and
+//    "Delete everything" also clears that row and the theses written on this phone, for this account
+//    only. The phone's part runs first and needs no network; `notice` says honestly whether the
+//    server confirmed its part.
 //  - R11: no network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
 import Combine
@@ -83,6 +91,38 @@ enum MemoryPref: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// What this iPhone keeps for whoever is using it (the signed-in account, or the signed-out phone)
+/// with no copy on Bobby's servers: the recent assets shown as shortcuts and how many theses the
+/// person wrote here. A thesis's text does leave the phone inside a review the person starts.
+struct LocalMemory: Equatable, Sendable {
+    var shortcuts: [String] = []
+    var theses = 0
+}
+
+/// How the last deletion ended. The phone's part is done before the server is asked.
+enum MemoryNotice: Equatable, Sendable {
+    /// Server memory, shortcuts and theses are gone.
+    case erasedEverything
+    /// The phone's part is gone; the server did not confirm its part.
+    case erasedOnPhoneOnly
+    /// The asset left this phone's shortcuts; the server did not confirm it forgot it.
+    case forgotOnPhoneOnly(symbol: String)
+
+    var message: String {
+        switch self {
+        case .erasedEverything:
+            return L.t("Deleted: what Bobby's servers remembered, the shortcuts on this iPhone and the theses you wrote here.",
+                       "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este iPhone y las tesis que escribiste aquí.")
+        case .erasedOnPhoneOnly:
+            return L.t("Deleted on this iPhone. Bobby's servers did not confirm, so what they remember is still there. Try again.",
+                       "Borrado en este iPhone. Los servidores de Bobby no confirmaron, así que lo que recuerdan sigue ahí. Inténtalo de nuevo.")
+        case .forgotOnPhoneOnly(let symbol):
+            return L.t("Forgotten on this iPhone. Bobby's servers did not confirm, so they still remember \(symbol). Try again.",
+                       "Olvidado en este iPhone. Los servidores de Bobby no confirmaron, así que aún recuerdan \(symbol). Inténtalo de nuevo.")
+        }
+    }
+}
+
 enum MemoryError: Error, Equatable, Sendable {
     case signedOut
     case unavailable
@@ -113,6 +153,10 @@ final class MemoryCenter: ObservableObject {
     @Published private(set) var confirmingForgetAll = false
     /// Separate from the server's shared web/account preference. Defaults off for every account on this device.
     @Published private(set) var nativeOptedIn = false
+    /// What this iPhone alone keeps for the account (1.8). Read from the phone; never from the server.
+    @Published private(set) var local = LocalMemory()
+    /// How the last "Forget" or "Delete everything" ended, until the next action or account change.
+    @Published private(set) var notice: MemoryNotice?
 
     /// One HTTP call: (path with query, method, body) → (json, status). Tests replace it.
     var send: (_ path: String, _ method: String, _ body: [String: Any]?) async throws -> (json: Any?, status: Int) = { path, method, body in
@@ -122,18 +166,27 @@ final class MemoryCenter: ObservableObject {
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
+    var now: () -> Date = { Date() }
+    /// The consent text this build shows. Tests raise it to stand for a reworded sheet.
+    var consentVersion = MemoryConsent.currentVersion
+    /// This center's consent store: the record the capture gate reads and the sheet writes.
+    var consent: MemoryConsent { MemoryConsent(defaults: defaults, version: consentVersion) }
 
     private var owner: String?
     private var ownerGeneration: UUID?
     private var epoch = UUID()
     private var cancellables = Set<AnyCancellable>()
     private let defaults: UserDefaults
+    /// When this account erased everything, or one asset, during this launch (`erased(since:symbol:)`).
+    private var forgotAllAt: Date?
+    private var forgotAt: [String: Date] = [:]
 
     init(observeAccount: Bool = true, defaults: UserDefaults = .standard) {
         self.defaults = defaults
         owner = currentUser()
         ownerGeneration = currentGeneration()
-        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
+        nativeOptedIn = owner.map { consentedOptIn($0) } ?? false
+        local = readLocal()
         guard observeAccount else { return }
         NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.accountChanged() } }
@@ -146,12 +199,16 @@ final class MemoryCenter: ObservableObject {
         owner = currentUser()
         ownerGeneration = currentGeneration()
         epoch = UUID()
-        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
+        nativeOptedIn = owner.map { consentedOptIn($0) } ?? false
         snapshot = nil
         loading = false
         saving = false
         lastError = nil
         confirmingForgetAll = false
+        notice = nil
+        forgotAllAt = nil
+        forgotAt = [:]
+        local = readLocal()
     }
 
     private struct Ticket { let epoch: UUID; let user: String?; let generation: UUID }
@@ -162,9 +219,35 @@ final class MemoryCenter: ObservableObject {
 
     private var canCallServer: Bool { riskAccepted() && currentUser() != nil }
 
-    private static func nativeOptInKey(_ user: String) -> String {
+    private nonisolated static func nativeOptInKey(_ user: String) -> String {
         let digest = SHA256.hash(data: Data(user.utf8)).map { String(format: "%02x", $0) }.joined()
         return "agent.nativeMemoryOptIn.v1.\(digest)"
+    }
+
+    /// The stored switch of one account on this device, for code that only reads it (the nudge on the
+    /// glass). Being on here does not send the header by itself: `allowsNativeCapture` decides that,
+    /// and it also needs the account's accepted consent.
+    nonisolated static func storedNativeOptIn(user: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: nativeOptInKey(user))
+    }
+
+    /// The switch counts only under a yes to the consent as it reads today. A switch found without
+    /// one is removed here: nothing keeps affirming an opt-in the person never gave to this text.
+    private func consentedOptIn(_ user: String) -> Bool {
+        let key = Self.nativeOptInKey(user)
+        guard defaults.bool(forKey: key) else { return false }
+        guard consent.hasAccepted(user: user) else {
+            defaults.removeObject(forKey: key)
+            return false
+        }
+        return true
+    }
+
+    /// Reads the switch and the consent again for the current account (a desk request is leaving, the
+    /// memory screen appeared), so a stale or missing consent turns capture off before anything is sent.
+    private func reconcileConsent() {
+        let on = currentUser().map { consentedOptIn($0) } ?? false
+        if on != nativeOptedIn { nativeOptedIn = on }
     }
 
     private func revokeNativeCapture() {
@@ -173,9 +256,11 @@ final class MemoryCenter: ObservableObject {
     }
 
     /// Called only while constructing an authenticated desk POST. A late request from another account or
-    /// generation cannot borrow this account's consent. The server still checks its own memory preference.
+    /// generation cannot borrow this account's consent, and the switch without this account's accepted
+    /// consent affirms nothing. The server still checks its own memory preference.
     func allowsNativeCapture(user: String, generation: UUID) -> Bool {
         accountChanged()
+        reconcileConsent()
         return nativeOptedIn && riskAccepted() && owner == user && ownerGeneration == generation
             && currentUser() == user && currentGeneration() == generation
     }
@@ -185,6 +270,7 @@ final class MemoryCenter: ObservableObject {
     @discardableResult
     func refresh() async -> Bool {
         accountChanged()
+        reconcileConsent()
         guard canCallServer else {
             if currentUser() == nil { lastError = .signedOut }
             return false
@@ -231,27 +317,90 @@ final class MemoryCenter: ObservableObject {
         return await write("PATCH", Self.path, body: [field.rawValue: value ?? NSNull()])
     }
 
-    /// Forget one remembered asset.
+    /// Forget one remembered asset: first on this phone (its shortcut, no network needed), then on the
+    /// server. True when the server confirmed; otherwise `notice` says its part is still there.
     @discardableResult
     func forget(_ symbol: String) async -> Bool {
         guard symbol.range(of: MemorySnapshot.symbolPattern, options: .regularExpression) != nil else { return false }
-        return await write("DELETE", Self.path + "?symbol=" + BriefingsAPI.queryValue(symbol), body: nil)
+        accountChanged()
+        guard let user = currentUser() else { lastError = .signedOut; return false }
+        guard !saving else { return false }
+        let generation = currentGeneration()
+        notice = nil
+        DeskMemory.forget(symbol: symbol, owner: user, defaults: defaults)
+        forgotAt[symbol.uppercased()] = now()
+        local = readLocal()
+        let ok = await write("DELETE", Self.path + "?symbol=" + BriefingsAPI.queryValue(symbol), body: nil)
+        guard currentUser() == user, currentGeneration() == generation else { return false }
+        if !ok { notice = .forgotOnPhoneOnly(symbol: symbol) }
+        return ok
     }
 
-    /// Arms "Delete everything"; nothing leaves the phone until `confirmForgetAll`.
+    /// Arms "Delete everything"; nothing is deleted until `confirmForgetAll`. It needs an account but
+    /// not a loaded snapshot: the phone's part must be erasable while the server is unreachable.
     func requestForgetAll() {
-        guard snapshot != nil else { return }
+        accountChanged()
+        guard currentUser() != nil else { return }
         confirmingForgetAll = true
     }
 
     func cancelForgetAll() { confirmingForgetAll = false }
 
-    /// The confirmed "Delete everything": every asset and preference (a paused memory stays paused).
+    /// The confirmed "Delete everything": this account's shortcuts and theses on this phone, then every
+    /// asset and preference on the server (a paused memory stays paused). True when the server confirmed.
     @discardableResult
     func confirmForgetAll() async -> Bool {
+        accountChanged()
         guard confirmingForgetAll else { return false }
         confirmingForgetAll = false
-        return await write("DELETE", Self.path, body: nil)
+        guard let user = currentUser(), !saving else { return false }
+        let generation = currentGeneration()
+        notice = nil
+        DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
+        ThesisBook(defaults: defaults).deleteAll(owner: user)
+        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned.
+        HarnessStore(defaults: defaults).forget(owner: user)
+        NotificationCenter.default.post(name: HarnessCenter.erased, object: nil)
+        forgotAllAt = now()
+        local = readLocal()
+        let ok = await write("DELETE", Self.path, body: nil)
+        guard currentUser() == user, currentGeneration() == generation else { return false }
+        notice = ok ? .erasedEverything : .erasedOnPhoneOnly
+        return ok
+    }
+
+    // MARK: this iPhone only (1.8)
+
+    /// Reads the phone's own caches again (the screen appeared, a thesis was written elsewhere).
+    func reloadLocal() {
+        accountChanged()
+        reconcileConsent()
+        let fresh = readLocal()
+        if fresh != local { local = fresh }
+    }
+
+    /// Clears the shortcut row of whoever is using this phone (the account, or the signed-out phone's
+    /// own row). Nothing is sent anywhere, so it needs neither an account nor the network.
+    func clearShortcuts() {
+        accountChanged()
+        DeskMemory.forgetWatchlist(owner: currentUser(), defaults: defaults)
+        local = readLocal()
+    }
+
+    /// A receipt on the glass stops being true once the person erased what it names: true when this
+    /// account erased everything, or this asset, at or after `date` during this launch.
+    func erased(since date: Date, symbol: String) -> Bool {
+        accountChanged()
+        if let forgotAllAt, forgotAllAt >= date { return true }
+        if let at = forgotAt[symbol.uppercased()], at >= date { return true }
+        return false
+    }
+
+    /// Signed out, the phone still keeps a row and theses of its own (owner nil): they show too.
+    private func readLocal() -> LocalMemory {
+        let user = currentUser()
+        return LocalMemory(shortcuts: DeskMemory.watchlist(owner: user, defaults: defaults).map(\.symbol),
+                           theses: ThesisBook(defaults: defaults).all(owner: user).count)
     }
 
     private func write(_ method: String, _ path: String, body: [String: Any]?) async -> Bool {

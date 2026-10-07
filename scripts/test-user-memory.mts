@@ -6,8 +6,15 @@
 //   · the desk gives the reader to the CIO only, for a signed-in Apple/Google account, never to the client
 //     (only `personalized: true`); a stored horizon never changes sufficiency (nor the verdict); the stored
 //     "risk" reaches the CIO only as explainRiskDepth, under a rule that forbids suitability and sizing; the ask is
-//     recorded only after a delivered answer, never on a refusal, an outage or a guard rejection; anonymous
-//     and wallet requests make no memory call at all; iPhone asks need a separate per-request opt-in;
+//     recorded only once the answer is complete, never on a refusal, an outage, a guard rejection or an abandoned
+//     read; anonymous and wallet requests make no memory call at all; iPhone and Android asks need a separate
+//     per-request opt-in;
+//   · the reply says what memory kept (1.8): `memory: { recorded, asks, lastAskedDaysAgo, changeSinceLastAskPct }`
+//     with the numbers the CIO's reader carried. The write is awaited before the reply is built (at most
+//     MEMORY_RECORD_TIMEOUT_MS), so `recorded` is true only when the database confirmed it: false when it
+//     refused, failed or was too slow, and then `asks` does not count this question. `asks` is null when the
+//     count was not read (memory paused, summary unavailable), never a zero; no key at all when memory does not
+//     apply;
 //   · kill switch: without BOBBY_MEMORY=on the desk makes no memory call at all, while /api/memory still works.
 import assert from 'node:assert/strict';
 
@@ -27,7 +34,7 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS, MEMORY_RECORD_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -79,6 +86,10 @@ let summaryDelayMs = 0;
 let prefsRows: unknown[] = [];
 let assetRows: unknown[] = [];
 let storageDown = false;
+/** What bobby_memory_record answers, and what the reader had been sent when it was asked. */
+let recordReply: () => Response | Promise<Response> = () => json(true);
+let answeredBeforeRecord: boolean[] = [];
+let currentResponse: { body: unknown; chunks: string[]; writableEnded: boolean; close(): void } | null = null;
 function backend(c: Call): Response | Promise<Response> | null {
   if (c.url.includes('/rest/v1/api_cache')) return c.method === 'POST' ? json(null, 201) : json([]);
   if (c.url.includes('/auth/v1/user')) {
@@ -95,7 +106,10 @@ function backend(c: Call): Response | Promise<Response> | null {
     if (storageDown) return json({ message: 'down' }, 500);
     return summaryDelayMs ? new Promise((resolve) => setTimeout(() => resolve(json(summaryReply)), summaryDelayMs)) : json(summaryReply);
   }
-  if (c.url.includes('rpc/bobby_memory_record')) return json(true);
+  if (c.url.includes('rpc/bobby_memory_record')) {
+    answeredBeforeRecord.push(!!currentResponse && (currentResponse.body !== null || currentResponse.writableEnded || currentResponse.chunks.some((line) => line.includes('"final"'))));
+    return recordReply();
+  }
   if (c.url.includes('rpc/bobby_memory_forget')) return storageDown ? json({ message: 'down' }, 500) : json(3);
   if (c.url.includes('bobby_user_prefs?on_conflict=identity_id')) return storageDown ? json({ message: 'down' }, 500) : new Response('', { status: 201 });
   if (c.url.includes('bobby_user_prefs?identity_id=eq.')) return storageDown ? json({ message: 'down' }, 500) : json(prefsRows);
@@ -149,6 +163,35 @@ try {
       memoryDeskAllowed({ headers: {} } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
       memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'ios', {} as never)],
      [true, false, false, false], 'iOS needs exact affirmation and the global kill switch');
+  // Android (1.8) follows the iPhone's rule; the web needs no header; an unknown platform has no memory.
+  eq([...MEMORY_PLATFORMS].sort(), ['android', 'ios', 'web'], 'memory platforms: the web and both native apps');
+  eq([memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': 'true' } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': ['1', '1'] } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: {} } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'android', {} as never)],
+     [true, false, false, false, false], 'Android needs the same exact affirmation and the global kill switch');
+  eq([memoryDeskAllowed({ headers: {} } as never, 'web', { BOBBY_MEMORY: 'on' } as never), memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'tvos', { BOBBY_MEMORY: 'on' } as never)],
+     [true, false], 'the web needs no header; a platform that is not listed has no memory even with one');
+
+  // ---------- the receipt: what memory kept, from the summary, the reader built from it and the write's own answer ----------
+  {
+    const priced = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
+    const reader = readerContext(priced, 'NVDA', now, null, 230, 'en');
+    eq(memoryReceipt(priced, reader, true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'asked 7 times before and this one was written: the 8th, 3 days after the last, up 15%');
+    eq(memoryReceipt(priced, reader, false), { recorded: false, asks: 7, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'the write did not happen: not recorded, and this question is not counted');
+    eq([memoryReceipt(priced, reader, true).lastAskedDaysAgo, memoryReceipt(priced, reader, true).changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the very numbers the CIO was given');
+    eq(memoryReceipt(summary(), readerContext(summary(), 'NVDA', now), true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: null }, 'no stored price: no change, never a zero');
+    const first = summary({ top: [], thisAsset: null });
+    eq(memoryReceipt(first, readerContext(first, 'NVDA', now), true), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask counts itself and has no last time');
+    eq(memoryReceipt(first, readerContext(first, 'NVDA', now), false), { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask that was not written: memory was read and holds no ask of this asset, a true zero');
+    const empty = summary({ prefs: { horizon: null, experience: null, risk: null }, top: [], thisAsset: null });
+    eq(memoryReceipt(empty, readerContext(empty, 'NVDA', now), true), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'an empty memory has no reader and still records this first ask');
+    const paused = summary({ enabled: false });
+    eq([memoryReceipt(paused, readerContext(paused, 'NVDA', now), false), memoryReceipt(paused, null, true)], Array.from({ length: 2 }, () => ({ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null })), 'a paused memory records nothing and its count was not read: null, never a zero, whatever the rows hold');
+    eq([memoryReceipt(null, null, true), memoryReceipt(null, null, false)], [{ recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'the summary could not be read: only whether the write happened is known');
+    eq(Object.keys(memoryReceipt(priced, reader, true)), ['recorded', 'asks', 'lastAskedDaysAgo', 'changeSinceLastAskPct'], 'four facts: no text, no symbol list');
+  }
 
   // ---------- /api/memory ----------
   const memReq = (method: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
@@ -279,7 +322,6 @@ try {
   let levelGate: Record<string, unknown> = { allowed: true, code: null, useId: 91 };
   let spend = { day: 0, month: 0 };
   let cancelAtCio = false;
-  let currentResponse: ReturnType<typeof response> | null = null;
   const deskMock = () => mock((c) => {
     const r = backend(c); if (r) return r;
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
@@ -304,6 +346,7 @@ try {
     ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.2', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body });
   const run = async (body: Record<string, unknown>, headers: Record<string, string> = {}) => {
     deskMock();
+    answeredBeforeRecord = [];
     const res = response();
     currentResponse = res;
     await deskHandler(deskReq({ symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look?', ...body }, headers) as never, res as never);
@@ -330,8 +373,16 @@ try {
   ok(/explainRiskDepth/.test(READER_RULE) && /how much the answer explains risk/.test(READER_RULE) && /never sets suitability, position sizing or a recommendation/.test(READER_RULE), 'the rule says explainRiskDepth sets only how much risk is explained, never suitability, sizing or recommendations');
   ok(!('reader' in inputOf(byRoleCalls.alpha)) && !('reader' in inputOf(byRoleCalls.red)), 'Alpha and Red Team never see the reader');
   ok(!systemOf(byRoleCalls.alpha).includes('reader is this reader') && !systemOf(byRoleCalls.red).includes('reader is this reader'), '…nor its rule');
-  const wire = JSON.stringify(served.body);
+  // 1.8: the reply also says what memory kept. Its four numbers are the only memory-derived values on the wire;
+  // `lastAskedDaysAgo` is one of them, so the reader check below looks at the body without the receipt.
+  eq(served.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the receipt: recorded, the 8th ask, 2 days after the last, no stored price to compare');
+  // `recorded: true` is the database's own answer, already in hand when the reply was built: the write is not
+  // left for after the response (nothing to settle), and it was asked before anything was sent to the reader.
+  eq([recorded().length, answeredBeforeRecord], [1, [false]], 'the ask was written before the reply left, not after it');
+  const { memory: _receipt, ...withoutReceipt } = served.body;
+  const wire = JSON.stringify(withoutReceipt);
   ok(!/"reader"|oftenAsks|thisAsset|lastAskedDaysAgo|"experience"/.test(wire), 'the reader never reaches the client');
+  ok(!/"reader"|oftenAsks|thisAsset|"experience"|"prefs"|explainRiskDepth|lastHorizon|timesThisWeek|lastAskedOn|priceThen|firstName|BTC/.test(JSON.stringify(served.body)), '…and the receipt carries none of it: no preferences, no name, no other asset');
   eq(served.body.sufficiency.horizon, 'unspecified', 'a stored horizon preference never changes sufficiency');
   eq([inputOf(byRoleCalls.alpha).sufficiency.horizon, inputOf(byRoleCalls.red).sufficiency.horizon, inputOf(byRoleCalls.cio).sufficiency.horizon], ['unspecified', 'unspecified', 'unspecified'], '…for any role');
   eq([inputOf(byRoleCalls.alpha).reader, inputOf(byRoleCalls.red).reader], [undefined, undefined], 'alpha and red inputs carry no reader');
@@ -352,6 +403,25 @@ try {
   const plainAlpha = models().find((c) => byRole(c) === 'alpha')!;
   eq(plain.body.sufficiency, served.body.sufficiency, 'sufficiency is identical with and without a reader');
   eq([inputOf(plainAlpha).question, inputOf(plainAlpha).sufficiency, systemOf(plainAlpha)], [servedAlpha.question, servedAlpha.sufficiency, servedAlphaSystem], 'Alpha gets the same question, sufficiency and prompt with and without a reader');
+  eq(['memory' in plain.body, 'personalized' in plain.body], [false, false], 'memory does not apply to a guest: no receipt key at all');
+  // Without the receipt, the personalized body has exactly the keys a 1.7 reply had.
+  eq(Object.keys(withoutReceipt).sort(), [...Object.keys(plain.body), 'personalized'].sort(), 'the receipt is the only key memory adds beside `personalized`');
+
+  // A stored price and a change since: the receipt quotes what the CIO's reader carried, computed once.
+  summaryReply = { ...REMEMBERED, thisAsset: { ...REMEMBERED.thisAsset, lastPrice: 160 } };
+  const priced = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  const pricedReader = inputOf(models().find((c) => byRole(c) === 'cio')!).reader.thisAsset;
+  eq(priced.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: 25 }, 'from 160 to 200 since the last ask: +25%');
+  eq([priced.body.memory.changeSinceLastAskPct, priced.body.memory.lastAskedDaysAgo, priced.body.memory.asks], [pricedReader.changeSinceLastAskPct, pricedReader.lastAskedDaysAgo, pricedReader.asks + 1], '…the reader\'s own numbers, with this ask counted');
+  eq(calls.filter((c) => c.url.includes('rpc/bobby_memory_summary')).length, 1, '…from one summary read, not a second query');
+  eq(recorded().length, 1, '…and `recorded: true` is a request that records');
+  // A first ask about an asset: it counts itself, and there is no last time to speak of.
+  summaryReply = { ...REMEMBERED, thisAsset: null };
+  const firstAsk = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  eq([firstAsk.body.memory, recorded().length], [{ recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 1], 'a first ask: asks 1, nulls for what does not exist');
+  summaryReply = REMEMBERED;
 
   // A question that names its horizon keeps it.
   const today = await run({ question: '¿Cómo ves NVDA para hoy?', language: 'es' }, SIGNED_IN);
@@ -366,13 +436,53 @@ try {
   eq([off.statusCode, 'personalized' in off.body, off.body.sufficiency.horizon], [200, false, 'unspecified'], 'memory paused: a plain answer, the preference unused');
   ok(!models().some((c) => 'reader' in inputOf(c)), '…no reader for any role');
   eq(recorded().length, 0, '…and nothing recorded');
+  eq(off.body.memory, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says so: paused, nothing kept, and no count (it was not read), never a zero');
+  // A paused memory tells nothing even if the database were to return counts with it.
+  summaryReply = { ...REMEMBERED, enabled: false };
+  const pausedWithRows = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  eq([pausedWithRows.body.memory, 'personalized' in pausedWithRows.body, recorded().length], [{ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'paused: no stored count leaves the server, nothing recorded');
   summaryReply = REMEMBERED;
+
+  // The write did not happen: the read is still delivered, the receipt says `recorded: false`, and this
+  // question is not counted (7 asks before, 7 now).
+  {
+    const quietRecord = console.error; console.error = () => {};
+    for (const [what, reply] of [
+      ['the database refuses the ask (memory paused from another device meanwhile)', () => json(false)],
+      ['the database answers 500', () => json({ message: 'down' }, 500)],
+      ['the database answers something that is not true', () => json({ recorded: true })],
+      ['the request fails', () => { throw new TypeError('fetch failed'); }],
+    ] as const) {
+      recordReply = reply;
+      const res = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+      eq([res.statusCode, res.body.memory, res.body.personalized], [200, { recorded: false, asks: 7, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, true], `${what}: the answer is served, not recorded, asks stays 7`);
+      eq([recorded().length, calls.some((c) => c.method === 'DELETE')], [1, false], `${what}: asked once, never again, and nothing is refunded`);
+    }
+    // Slower than the cap: the reader is not kept waiting, and an ask without a confirmation is not claimed.
+    recordReply = () => new Promise((resolve) => setTimeout(() => resolve(json(true)), MEMORY_RECORD_TIMEOUT_MS + 2500));
+    const began = Date.now();
+    const slowWrite = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+    const waited = Date.now() - began;
+    recordReply = () => json(true);
+    console.error = quietRecord;
+    eq([slowWrite.statusCode, slowWrite.body.memory], [200, { recorded: false, asks: 7, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }], 'the write is slower than its cap: the answer is served with recorded false');
+    ok(waited >= MEMORY_RECORD_TIMEOUT_MS - 50 && waited < MEMORY_RECORD_TIMEOUT_MS + 2000, `…after the cap, not the write's own time (${waited} ms)`);
+    eq(MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, "the cap is the summary read's: 800 ms");
+    // A first ask whose write fails: memory was read and holds nothing of this asset.
+    summaryReply = { ...REMEMBERED, thisAsset: null };
+    recordReply = () => json(false);
+    const firstUnwritten = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+    recordReply = () => json(true);
+    eq(firstUnwritten.body.memory, { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask that was not written: asks 0 is what memory holds');
+    summaryReply = REMEMBERED;
+  }
 
   // Anonymous and wallet readers: not a single memory or identity call.
   for (const [who, headers] of [['anonymous', {}], ['wallet session', { 'x-bobby-session': 'bws.wallet-session-token' }], ['wallet bearer', { authorization: 'Bearer bws.wallet-session-token' }]] as const) {
     const res = await run({}, headers);
     await settle();
-    eq([res.statusCode, 'personalized' in res.body], [200, false], `${who}: a plain answer`);
+    eq([res.statusCode, 'personalized' in res.body, 'memory' in res.body], [200, false, false], `${who}: a plain answer, no receipt`);
     eq([memoryCalls().length, authCalls().length, calls.some((c) => c.url.includes('bobby_identities'))], [0, 0, false], `${who}: no memory, auth or identity call`);
     ok(!models().some((c) => 'reader' in inputOf(c)), `${who}: no reader`);
   }
@@ -381,12 +491,14 @@ try {
   const ios = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios' });
   await settle();
   eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 1], 'iPhone default off: no memory call or personalization; only the read meter resolves the account');
+  eq('memory' in ios.body, false, '…and no receipt: memory does not apply without the opt-in');
   const invalidIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': 'true' });
   await settle();
   eq([invalidIos.statusCode, memoryCalls().length, recorded().length], [200, 0, 0], 'non-exact iPhone affirmation records nothing');
   const optedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
   eq([optedIos.body.personalized, recorded().length, authCalls().length], [true, 1, 1], 'opted-in iPhone: personalized and recorded for its verified account');
+  eq(optedIos.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, '…with the receipt');
   eq(recorded()[0].body.p_identity, IDENT, 'native record belongs to the bearer account');
   const secondIos = await run({}, { ...SIGNED_IN_B, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
@@ -395,6 +507,30 @@ try {
   const pausedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
   eq([pausedIos.statusCode, 'personalized' in pausedIos.body, recorded().length], [200, false, 0], 'server-side pause blocks iPhone personalization and recording even with a header');
+  eq(pausedIos.body.memory.recorded, false, '…and the receipt says nothing was recorded');
+  summaryReply = REMEMBERED;
+
+  // Android (1.8) may use memory under the iPhone's rule: only with the per-request opt-in its app sends after
+  // its own consent. Without the header, or with any other value, the desk makes no memory call at all.
+  const android = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android' });
+  await settle();
+  eq([android.statusCode, 'personalized' in android.body, 'memory' in android.body, memoryCalls().length, authCalls().length], [200, false, false, 0, 1], 'Android without the opt-in header: no memory call, no personalization, no receipt');
+  ok(!models().some((c) => 'reader' in inputOf(c)), '…and no reader for any role');
+  const invalidAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': 'yes' });
+  await settle();
+  eq([invalidAndroid.statusCode, memoryCalls().length, recorded().length, 'memory' in invalidAndroid.body], [200, 0, 0, false], 'a non-exact Android affirmation fails closed');
+  const optedAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([optedAndroid.body.personalized, optedAndroid.body.memory, authCalls().length], [true, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 1], 'opted-in Android: personalized, with the receipt, for its verified account');
+  eq([calls.filter((c) => c.url.includes('rpc/bobby_memory_summary')).length, recorded().length, recorded()[0].body.p_identity], [1, 1, IDENT], '…one summary read and one record, for the bearer account');
+  ok('reader' in inputOf(models().find((c) => byRole(c) === 'cio')!) && !models().filter((c) => byRole(c) !== 'cio').some((c) => 'reader' in inputOf(c)), '…and the reader reaches the CIO only, as on the other platforms');
+  const guestAndroid = await run({}, { 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([guestAndroid.statusCode, memoryCalls().length, recorded().length, 'memory' in guestAndroid.body], [200, 0, 0, false], 'an Android guest cannot opt in by sending a header');
+  summaryReply = { ...REMEMBERED, enabled: false };
+  const pausedAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([pausedAndroid.body.memory, 'personalized' in pausedAndroid.body, recorded().length], [{ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'a server-side pause holds on Android too');
   summaryReply = REMEMBERED;
   const guestIos = await run({}, { 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
@@ -408,10 +544,13 @@ try {
     if (value === undefined) delete process.env.BOBBY_MEMORY; else process.env.BOBBY_MEMORY = value;
     const killed = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
     await settle();
-    eq([killed.statusCode, 'personalized' in killed.body], [200, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer`);
+    eq([killed.statusCode, 'personalized' in killed.body, 'memory' in killed.body], [200, false, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer, no receipt`);
     // The single auth lookup is the account's read meter; memory adds none.
     eq([memoryCalls().length, authCalls().length, recorded().length], [0, 1, 0], `BOBBY_MEMORY=${value ?? 'unset'}: no memory read, only the meter's identity lookup, nothing recorded`);
     ok(!models().some((c) => 'reader' in inputOf(c)), `BOBBY_MEMORY=${value ?? 'unset'}: no reader for any role`);
+    const killedAndroid = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+    await settle();
+    eq([killedAndroid.statusCode, 'memory' in killedAndroid.body, memoryCalls().length], [200, false, 0], `BOBBY_MEMORY=${value ?? 'unset'}: the Android opt-in changes nothing`);
   }
   process.env.BOBBY_MEMORY = 'on';
   const backOn = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
@@ -423,6 +562,11 @@ try {
   cancelAtCio = false;
   await settle();
   eq([cancelledIos.body, recorded().length], [null, 0], 'a native reader that closes before delivery records nothing');
+  cancelAtCio = true;
+  const cancelledWeb = await run({}, { ...SIGNED_IN, accept: 'application/x-ndjson' });
+  cancelAtCio = false;
+  await settle();
+  eq([cancelledWeb.lines().some((l: any) => l.type === 'final'), recorded().length], [false, 0], 'an abandoned live read records nothing either: the write waits for a complete answer whose reader is still there');
 
   // Storage down or slow: the read runs without memory, in time.
   storageDown = true;
@@ -433,12 +577,18 @@ try {
   await settle();
   eq([down.statusCode, 'personalized' in down.body], [200, false], 'memory storage down: the answer is served without memory');
   eq(recorded().length, 1, '…and the database still decides whether to record the delivered answer');
+  eq(down.body.memory, { recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says what is known: the write was confirmed, the counts could not be read (null, not zero)');
+  // Storage down for the write too: nothing recorded, nothing claimed.
+  storageDown = true; recordReply = () => json({ message: 'down' }, 500); console.error = () => {};
+  const allDown = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  storageDown = false; recordReply = () => json(true); console.error = quiet;
+  eq([allDown.statusCode, allDown.body.memory], [200, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'summary and write both down: the answer is served; not recorded, no counts');
   summaryDelayMs = MEMORY_SUMMARY_TIMEOUT_MS + 1200;
   const started = Date.now();
   const slow = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   const took = Date.now() - started;
   summaryDelayMs = 0;
-  eq([slow.statusCode, 'personalized' in slow.body], [200, false], 'a slow summary is skipped');
+  eq([slow.statusCode, 'personalized' in slow.body, slow.body.memory], [200, false, { recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'a slow summary is skipped: no personalization, and a receipt with the write\'s answer and no counts');
   ok(took < MEMORY_SUMMARY_TIMEOUT_MS + 1000, `…the answer is not held for it (${took} ms)`);
   await settle();
 
@@ -458,7 +608,7 @@ try {
   const rejected = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   await settle();
   console.error = errorLog;
-  eq([rejected.statusCode, rejected.body.code, recorded().length], [503, 'analysis_failed', 0], 'a guard rejection: analysis_failed and nothing recorded');
+  eq([rejected.statusCode, rejected.body.code, recorded().length, 'memory' in rejected.body], [503, 'analysis_failed', 0, false], 'a guard rejection: analysis_failed, nothing recorded and no receipt');
   cioReply = CIO;
 
   // Premium: the meter already resolved the account; memory reuses it, and the Sonnet CIO gets the reader.
@@ -476,7 +626,9 @@ try {
   const lines = live.lines();
   eq([lines.at(-1).type, lines.at(-1).data.personalized], ['final', true], 'the final line says personalized');
   ok(lines.every((l: any) => !/"reader"|oftenAsks|thisAsset/.test(JSON.stringify(l))), 'no streamed line carries the reader');
-  eq(recorded().length, 1, 'the streamed answer is recorded after the final line');
+  eq(lines.at(-1).data.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the final line carries the receipt');
+  ok(lines.slice(0, -1).every((l: any) => !('memory' in l) && !/"memory"|lastAskedDaysAgo/.test(JSON.stringify(l))), '…and no earlier line does');
+  eq([recorded().length, answeredBeforeRecord], [1, [false]], 'the streamed answer is recorded once it is complete, before the final line that says so');
 
   console.log(`user-memory: ${checks} checks passed`);
 } finally {

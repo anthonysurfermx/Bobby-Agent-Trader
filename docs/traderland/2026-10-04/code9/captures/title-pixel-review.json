@@ -1,0 +1,53 @@
+{
+  "status": "REVERIFIED_BY_ROOT",
+  "scope": "Read-only actual PNG pixel check; offline emulator fixture only; no physical or universal parity claim.",
+  "files": {
+    "archipelago-layout-lots.png": "e51bfcec2f05242699c7a13d992ac5f057ef095c4419c5b200365353f9aec7f7",
+    "archipelago-layout-grown.png": "e7327d406391d4d9be946700d2541ce1cf26092b125b05408fcf396b9ec11e09"
+  },
+  "regions": [
+    {
+      "title": "north",
+      "rectangle": [
+        400,
+        326,
+        615,
+        369
+      ],
+      "identical_rgba": true,
+      "gray_text_pixels": 791,
+      "rgba_sha256": "27ac96781a983fdcd2277df1c14506f1420b2ec36b0cbc414468ec7b6603fb1a"
+    },
+    {
+      "title": "east",
+      "rectangle": [
+        718,
+        481,
+        920,
+        524
+      ],
+      "identical_rgba": true,
+      "gray_text_pixels": 825,
+      "rgba_sha256": "de7329849d35021a938c45f8c04790b6c0a8d6264debd98005ea717b24c91627"
+    },
+    {
+      "title": "own",
+      "rectangle": [
+        406,
+        638,
+        610,
+        679
+      ],
+      "identical_rgba": true,
+      "gray_text_pixels": 1618,
+      "rgba_sha256": "fb089746ba157fc284f0884b5b3597b6a795952262bfc53983cb2982b9927912"
+    }
+  ],
+  "changed_pixels_bounds": [
+    330,
+    433,
+    685,
+    615
+  ],
+  "finding": "All three title regions remain byte-identical through grid8 to12; only own island art changes."
+}

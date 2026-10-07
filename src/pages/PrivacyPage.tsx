@@ -176,6 +176,39 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title={tr('Your theses and reminders', 'Tus tesis y recordatorios')}>
+          <p>
+            {tr(
+              'From iPhone version 1.8 you can write a thesis about an asset in your own words (why you are looking at it, what worries you, what would change your mind). Your theses, their history and the results of their reviews are stored on your iPhone only. Bobby’s servers keep no copy. You can edit, archive or delete each one in Profile → My theses, and “Delete everything” in Memory removes them from the phone.',
+              'Desde la versión 1.8 para iPhone puedes escribir una tesis sobre un activo con tus propias palabras (por qué lo miras, qué te preocupa, qué te haría cambiar de opinión). Tus tesis, su historial y los resultados de sus revisiones se guardan solo en tu iPhone. Los servidores de Bobby no conservan copia. Puedes editar, archivar o eliminar cada una en Perfil → Mis tesis, y “Borrar todo” en Memoria las quita del teléfono.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'When you tap “Review now”, the text of that thesis, the time frame you chose, the date you wrote it, its starting price and the date of its last review are sent with that one question to Bobby’s server and to the AI provider that writes the answer (Anthropic, or OpenAI when it takes over). Bobby’s server uses them for that answer and does not store them. A line above the button says this before anything is sent.',
+              'Cuando tocas “Revisar ahora”, el texto de esa tesis, el plazo que elegiste, la fecha en que la escribiste, su precio inicial y la fecha de su última revisión se envían con esa única pregunta al servidor de Bobby y al proveedor de IA que escribe la respuesta (Anthropic, u OpenAI cuando lo sustituye). El servidor de Bobby los usa para esa respuesta y no los guarda. Una línea sobre el botón lo dice antes de enviar nada.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'A reminder to review a thesis is a local notification that your iPhone schedules for the day you choose. It is not sent through Bobby’s servers or Apple’s push service, its text is generic (“Your reminder to review a thesis.”) and it names no asset or price. The reminder list stays on your iPhone and you can remove any reminder in Profile → Reminders.',
+              'Un recordatorio para revisar una tesis es una notificación local que tu iPhone programa para el día que eliges. No pasa por los servidores de Bobby ni por el servicio push de Apple, su texto es genérico (“Tu recordatorio para revisar una tesis.”) y no nombra ningún activo ni precio. La lista de recordatorios se queda en tu iPhone y puedes quitar cualquiera en Perfil → Recordatorios.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'After a read on iPhone, Bobby may offer to come back to you: “Shall I keep you posted on this?”. To make that offer and to follow up, the app keeps on your iPhone which assets you asked about, the price at that moment and whether you opened a follow-up. If you say yes, your iPhone schedules the follow-ups itself as local notifications (the asset the next day, its sector, your week). They are not sent through Bobby’s servers or Apple’s push service, they name the asset and no figure, and they stop on their own when you do not open them. To show how far an asset moved, the app asks Bobby’s server for its current price, as it does for any asset you look at. Turn follow-ups off in Profile → Reminders and that record is erased; “Delete everything” in Memory, withdrawing the AI consent and deleting your account erase it too.',
+              'Después de una lectura en iPhone, Bobby puede ofrecerte volver contigo: “¿Te voy contando cómo sigue?”. Para hacer esa oferta y darle seguimiento, la app guarda en tu iPhone qué activos consultaste, el precio en ese momento y si abriste un seguimiento. Si dices que sí, tu iPhone programa los seguimientos por sí mismo como notificaciones locales (el activo al día siguiente, su sector, tu semana). No pasan por los servidores de Bobby ni por el servicio push de Apple, nombran el activo y ninguna cifra, y se detienen solos cuando no los abres. Para mostrar cuánto se movió un activo, la app le pide su precio actual al servidor de Bobby, como hace con cualquier activo que miras. Apaga el seguimiento en Perfil → Recordatorios y ese registro se borra; “Borrar todo” en Memoria, retirar el consentimiento de IA y eliminar tu cuenta también lo borran.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'From version 1.8 the iPhone app asks about memory in the conversation: a screen lists what is kept and each item sent to the AI provider, and nothing from your iPhone questions is added to memory until you choose “Remember”. After an answer, the server tells the app how many times you have asked about that asset and how many days ago, so the app can show what was saved. An invitation code from a link you opened is kept on your iPhone until it is applied to your account or you remove it.',
+              'Desde la versión 1.8 la app para iPhone pregunta por la memoria en la conversación: una pantalla lista lo que se guarda y cada dato que se envía al proveedor de IA, y nada de tus preguntas en el iPhone entra a la memoria hasta que eliges “Recordar”. Después de una respuesta, el servidor le dice a la app cuántas veces has preguntado por ese activo y hace cuántos días, para que la app muestre lo que se guardó. El código de invitación de un link que abriste se guarda en tu iPhone hasta que se aplica a tu cuenta o lo quitas.',
+            )}
+          </p>
+        </Section>
+
         <Section title={tr('Questions and market analysis', 'Preguntas y análisis de mercado')}>
           <p>
             {tr(

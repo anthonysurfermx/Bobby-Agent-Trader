@@ -1,0 +1,224 @@
+{
+  "ok": true,
+  "world": {
+    "code": "showcase-satoshi",
+    "title": "Satoshi Nakamoto",
+    "size": 8,
+    "theme": "quiet_reef",
+    "core": {
+      "x": 3,
+      "y": 3,
+      "stage": 1
+    },
+    "placements": [
+      {
+        "item_id": "crypto_bay_context_buoy",
+        "x": 1,
+        "y": 2,
+        "rotation": 90
+      },
+      {
+        "item_id": "risk_reef_dual_orbit_antenna",
+        "x": 1,
+        "y": 5,
+        "rotation": 90
+      },
+      {
+        "item_id": "evidence_mines_crystal_vein_rock",
+        "x": 5,
+        "y": 1,
+        "rotation": 90
+      },
+      {
+        "item_id": "axiom_archive_aura_flower",
+        "x": 6,
+        "y": 5,
+        "rotation": 90
+      },
+      {
+        "item_id": "thesis_citadel_risk_shield",
+        "x": 4,
+        "y": 6,
+        "rotation": 90
+      },
+      {
+        "item_id": "axiom_archive_path_straight",
+        "x": 2,
+        "y": 3,
+        "rotation": 90
+      },
+      {
+        "item_id": "axiom_archive_path_straight",
+        "x": 2,
+        "y": 4,
+        "rotation": 90
+      },
+      {
+        "item_id": "thesis_citadel_double_gate",
+        "x": 3,
+        "y": 5,
+        "rotation": 90
+      },
+      {
+        "item_id": "evidence_mines_mother_crystal",
+        "x": 0,
+        "y": 6,
+        "rotation": 0
+      },
+      {
+        "item_id": "evidence_mines_lantern_drone",
+        "x": 7,
+        "y": 1,
+        "rotation": 90
+      }
+    ],
+    "stats": {
+      "pieces": 10,
+      "districts": [
+        "axiom_archive",
+        "crypto_bay",
+        "evidence_mines",
+        "risk_reef",
+        "thesis_citadel"
+      ]
+    }
+  },
+  "catalog": [
+    {
+      "id": "aura_core",
+      "footprint_w": 2,
+      "footprint_h": 2
+    },
+    {
+      "id": "crypto_bay_data_dock",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "crypto_bay_water_walkway",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "crypto_bay_context_buoy",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "crypto_bay_candle_tower",
+      "footprint_w": 2,
+      "footprint_h": 1
+    },
+    {
+      "id": "crypto_bay_waiting_lighthouse",
+      "footprint_w": 2,
+      "footprint_h": 2
+    },
+    {
+      "id": "evidence_mines_crystal_vein_rock",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "evidence_mines_open_tunnel",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "evidence_mines_lantern_drone",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "evidence_mines_evidence_workshop",
+      "footprint_w": 2,
+      "footprint_h": 1
+    },
+    {
+      "id": "evidence_mines_mother_crystal",
+      "footprint_w": 2,
+      "footprint_h": 2
+    },
+    {
+      "id": "thesis_citadel_wall_slab",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "thesis_citadel_fortified_ramp",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "thesis_citadel_risk_shield",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "thesis_citadel_double_gate",
+      "footprint_w": 2,
+      "footprint_h": 1
+    },
+    {
+      "id": "thesis_citadel_three_gate_citadel",
+      "footprint_w": 2,
+      "footprint_h": 2
+    },
+    {
+      "id": "risk_reef_reef_tile",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "risk_reef_blue_sluice",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "risk_reef_dual_orbit_antenna",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "risk_reef_red_team_observatory",
+      "footprint_w": 2,
+      "footprint_h": 1
+    },
+    {
+      "id": "risk_reef_double_bridge",
+      "footprint_w": 2,
+      "footprint_h": 2
+    },
+    {
+      "id": "axiom_archive_archive_ring_tile",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "axiom_archive_path_straight",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "axiom_archive_return_path_curve",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "axiom_archive_aura_flower",
+      "footprint_w": 1,
+      "footprint_h": 1
+    },
+    {
+      "id": "axiom_archive_lit_archive",
+      "footprint_w": 2,
+      "footprint_h": 1
+    },
+    {
+      "id": "axiom_archive_base_ring_seal",
+      "footprint_w": 2,
+      "footprint_h": 2
+    }
+  ],
+  "provenance": "Permanent read-only app example copied from release54/ios/Bobby/Sources/TraderLandShowcase.swift; never account inventory"
+}

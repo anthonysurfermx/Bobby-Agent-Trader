@@ -1,0 +1,8 @@
+exploit reproduced on the pre-fix policies (api_cache, agent_trades, agent_cycles readable by anon)
+post-migration effective privileges: both browser roles blocked from private tables and merge RPC; public views readable
+audit 2026-09-28 P0 reproduced: an anonymous UPDATE through agent_cycles_public rewrote agent_cycles
+audit 2026-09-28 P0: the browser roles read the shaped views and can write nothing through them (42501)
+P0-1 / P0-2: anon SELECT on api_cache, agent_trades, agent_cycles → 42501 permission denied
+BP-09: producer rows + migration 0011 views — wallet, manual and untagged cycles stay private; only the declared protocol cycle is public
+C-04: bobby_link_identities re-parents bobby_swap_receipts (no orphan)
+rls lock-down (Postgres) tests passed

@@ -128,6 +128,9 @@ enum NucleoDeskIO {
         var level: String? = nil
         var access: BobbyReadAccess? = nil
         var telemetry: BobbyTelemetryReceipt? = nil
+        /// 1.8, additive: the memory receipt and, for a question that carried a thesis, the review lists.
+        var memory: MemoryReceipt? = nil
+        var review: ThesisReviewNotes? = nil
         var agentsJSON: [String: Any] {
             var a: [String: Any] = ["alpha": alpha, "red": red, "cio": cio, "verdict": verdict, "direction": direction]
             if let rebuttal { a["rebuttal"] = rebuttal }
@@ -190,10 +193,13 @@ enum NucleoDeskIO {
                          proxyNote: resolution["proxyNote"] as? String)
     }
 
-    // MARK: Candles (1H, exactly the desk's request)
+    // MARK: Chart candles (fixed 1H, independent of the analysis horizon)
+
+    // The chart metadata and both provider URLs must describe the same candle interval.
+    static let candlesTimeframe = MarketTimeframe.oneHour
 
     static func candlePath(symbol: String, isEquity: Bool) -> String {
-        let tf = MarketTimeframe.oneHour
+        let tf = candlesTimeframe
         return isEquity
             ? "api/stock-candles?symbol=\(symbol)&range=\(tf.equityQuery.range)&interval=\(tf.equityQuery.interval)"
             : "api/okx-candles?instId=\(symbol)-USDT&bar=\(tf.cryptoBar)&limit=100"
@@ -295,12 +301,15 @@ enum NucleoDeskIO {
     /// Exactly `BobbyAPI.debate`'s request: POST api/desk-debate, Origin header, 100 s timeout.
     /// Uses the same account-scoped retry as other private requests.
     static func debate(symbol: String, question: String, isEquity: Bool, level: NucleoAnalysisLevel = .rapido,
-                       auth: BobbyMeterAuth = .account, requestId: String? = nil, onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
+                       auth: BobbyMeterAuth = .account, requestId: String? = nil, thesis: ThesisContext? = nil,
+                       onEvent: (@Sendable ([String: Any]) -> Void)? = nil) async -> DebateOutcome {
         do {
             var body: [String: Any] = ["symbol": symbol, "question": question, "language": L.ttsLang,
                                        "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any,
                                        "assetType": isEquity ? "equity" : "crypto", "level": level.rawValue]
             if let requestId { body["requestId"] = requestId }
+            // 1.8: a review the person started carries their thesis; a plain question never has this key.
+            if let thesis { body["thesis"] = thesis.json }
             let reply = try await BobbyAccessAPI.send("api/desk-debate", method: "POST",
                                                                body: body,
                                                                auth: auth, timeout: level.timeout, onEvent: onEvent)
@@ -385,6 +394,8 @@ enum NucleoDeskIO {
         }
         debate.level = text(body["level"])
         debate.access = BobbyReadAccess(json: body["access"])
+        debate.memory = MemoryReceipt(json: body["memory"])
+        debate.review = ThesisReviewNotes(json: body["review"])
         return .ok(debate)
     }
 }
@@ -747,6 +758,12 @@ final class NucleoDesk {
         return token
     }
 
+    /// 1.8: a single-use token for a question native writes on the person's tap about an asset it
+    /// already knows (a follow-up, a board row). Same lifetime and owner rules as every other token.
+    func token(for asset: NucleoAsset, question: String) -> String {
+        issueToken(asset, question: question)
+    }
+
     private func purgeTokens(now: Date = Date()) {
         tokens = tokens.filter { $0.value.expires > now && $0.value.generation == generation() }
     }
@@ -926,6 +943,7 @@ final class NucleoDesk {
                 "pulse": pulse.map { $0.json as Any } ?? NSNull(),
                 "agents": debate.agentsJSON,
                 "provenance": debate.provenance.json,
+                "candlesTimeframe": NucleoDeskIO.candlesTimeframe.rawValue,
                 "candles": candles,
                 "receivedAt": Int((receivedAt.timeIntervalSince1970 * 1000).rounded()),
                 "elapsedMs": Int((Date().timeIntervalSince(job.startedAt) * 1000).rounded()),
@@ -938,6 +956,12 @@ final class NucleoDesk {
             if let synthesis = debate.synthesis { result["synthesis"] = synthesis.json }
             if let sufficiency = debate.sufficiency { result["sufficiency"] = sufficiency.json }
             if let evidence = debate.evidence { result["evidenceUsed"] = evidence.json }
+            // 1.8: the memory receipt rides the reply for native (the page ignores keys it does not know).
+            if let memory = debate.memory {
+                result["memory"] = ["recorded": memory.recorded, "asks": memory.asks,
+                                    "lastAskedDaysAgo": NucleoDeskIO.orNull(memory.lastAskedDaysAgo),
+                                    "changeSinceLastAskPct": NucleoDeskIO.orNull(memory.changeSinceLastAskPct)] as [String: Any]
+            }
             if level.isPremium { meterChanged(level, nil) }
             // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
             recordQuery(symbol, isEquity)
@@ -1065,6 +1089,19 @@ final class NucleoDesk {
 
     /// The ledger belongs to the signed-in account; signed out (and fixture mode) is `local`.
     private func ledgerOwner() -> String? { fixtures ? nil : userID() }
+
+    /// 1.8: whose thesis book the screens read and write (the saved-reads ledger's owner).
+    var thesisOwner: String? { ledgerOwner() }
+
+    /// 1.8: what a screen may know about a recent read of the CURRENT account (the thesis editor drafts from it).
+    func readSummary(requestId: String) -> NucleoReadSummary? {
+        guard profile.acceptedRiskNotice, let read = reads.last(where: { $0.requestId == requestId }), read.generation == generation() else { return nil }
+        let synthesis = read.result["synthesis"] as? [String: Any]
+        func text(_ key: String) -> String? { (synthesis?[key] as? String).flatMap { $0.isEmpty ? nil : $0 } }
+        return NucleoReadSummary(requestId: requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity,
+                                 verdict: read.verdict, price: read.price, asOf: read.asOf,
+                                 headline: text("headline"), why: text("why"), risk: text("risk"), watch: text("watch"))
+    }
 
     func theses() -> [String: Any] {
         let owner = ledgerOwner()

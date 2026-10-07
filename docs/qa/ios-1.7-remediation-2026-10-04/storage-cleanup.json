@@ -1,0 +1,840 @@
+{
+  "createdAtUTC": "2026-10-04T13:39:33.571643+00:00",
+  "scope": "Generated Bobby QA artifacts and two named, stopped Bobby QA simulators; source tests, retained audit evidence, signed build63 archive, unrelated simulators and toolchains remain.",
+  "validatedRetainedEvidenceEntries": 309,
+  "retainedCanonicalEvidence": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04",
+  "retainedArchiveDirectory": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2",
+  "retainedArchiveExecutableSHA256": "f69898e5004a9f8742984295c48835ebf189d3808a2c00dd246e79866067983c",
+  "availableBytesBefore": 5476585472,
+  "temporaryArtifactsToDelete": [
+    {
+      "path": "/private/tmp/bobby-coupon-ios-derived",
+      "allocatedBytesBefore": 786460672
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-lock-build-20261004",
+      "allocatedBytesBefore": 16855040
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-qa-20261004-corrected.xcresult",
+      "allocatedBytesBefore": 6250496
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-qa-20261004.xcresult",
+      "allocatedBytesBefore": 95846400
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests.log",
+      "allocatedBytesBefore": 16384
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests.xcresult",
+      "allocatedBytesBefore": 1110016
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests.log",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests.xcresult",
+      "allocatedBytesBefore": 499712
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests.log",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests.xcresult",
+      "allocatedBytesBefore": 421888
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-tests.json",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests.log",
+      "allocatedBytesBefore": 20480
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests.xcresult",
+      "allocatedBytesBefore": 1916928
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests.log",
+      "allocatedBytesBefore": 24576
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests.xcresult",
+      "allocatedBytesBefore": 8421376
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ExportOptions-63-Upload.plist",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests.log",
+      "allocatedBytesBefore": 32768
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests.xcresult",
+      "allocatedBytesBefore": 10936320
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests.log",
+      "allocatedBytesBefore": 36864
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests.xcresult",
+      "allocatedBytesBefore": 14462976
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots.log",
+      "allocatedBytesBefore": 24576
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots.xcresult",
+      "allocatedBytesBefore": 13324288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots.log",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots.xcresult",
+      "allocatedBytesBefore": 1638400
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/README.md",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-inspection.json",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-tests.json",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests.log",
+      "allocatedBytesBefore": 81920
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests.xcresult",
+      "allocatedBytesBefore": 16150528
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests.log",
+      "allocatedBytesBefore": 16384
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests.xcresult",
+      "allocatedBytesBefore": 1794048
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots.log",
+      "allocatedBytesBefore": 36864
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots.xcresult",
+      "allocatedBytesBefore": 16592896
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-test02-activities.json",
+      "allocatedBytesBefore": 40960
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected.log",
+      "allocatedBytesBefore": 688128
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected.xcresult",
+      "allocatedBytesBefore": 80314368
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-test02-activities.json",
+      "allocatedBytesBefore": 24576
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-test02-test-details.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots.log",
+      "allocatedBytesBefore": 53248
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots.xcresult",
+      "allocatedBytesBefore": 83451904
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-inspection.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-tests.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests.log",
+      "allocatedBytesBefore": 32768
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests.xcresult",
+      "allocatedBytesBefore": 5603328
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/__pycache__",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/anvil",
+      "allocatedBytesBefore": 1015808
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/apply-chart-timeframe.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/apply-support-fix.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/apply-web-candle-timeframe.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/archive63",
+      "allocatedBytesBefore": 331776
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/archive63-derived",
+      "allocatedBytesBefore": 477433856
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/audit-final-nucleo-bundles.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/candle-request-spy-repair-manifest.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/candle-request-spy-repair.md",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-after.log",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-before.log",
+      "allocatedBytesBefore": 49152
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-mutations.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-mutations.mjs",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-report.md",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe-results.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/chart-timeframe.test.mjs",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/claude-review",
+      "allocatedBytesBefore": 96423936
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidate-evidence.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidate-final-privacy.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidate-processed-build63.py",
+      "allocatedBytesBefore": 16384
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidate-release-evidence.py",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidate-upload-acceptance.py",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/consolidation-copy-receipt.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/continue-ui-serial.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/correct-backend-report.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/coupon-recheck.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/curated-log-paths.nul",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/device-before.json",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/evidence-consolidation-copy-plan.json",
+      "allocatedBytesBefore": 28672
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/evidence-consolidation-review.md",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/exact-lock-preparation.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/extract-ui-official.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-audit-report.md",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-audit.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-manifest.json",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-subtitle-results.json",
+      "allocatedBytesBefore": 102400
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-subtitle.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/final-bundle-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/finalize-pg-qa.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/initial-report-corrected.md",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/iphone-live-chart-support-gates.md",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/live-site-locales",
+      "allocatedBytesBefore": 16384
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/lock-build",
+      "allocatedBytesBefore": 733184
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/monitor-ui-capacity.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native",
+      "allocatedBytesBefore": 4050944
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-execution.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-summary.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1-tests.json",
+      "allocatedBytesBefore": 323584
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1.log",
+      "allocatedBytesBefore": 417792
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-a135d6e1.xcresult",
+      "allocatedBytesBefore": 6303744
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-retry.log",
+      "allocatedBytesBefore": 311296
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-retry.xcresult",
+      "allocatedBytesBefore": 5627904
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract.log",
+      "allocatedBytesBefore": 159744
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract.xcresult",
+      "allocatedBytesBefore": 442368
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/normalized-goldens-after.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/nucleo-release-build.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/nucleo-suite-after.log",
+      "allocatedBytesBefore": 40960
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/nucleo-web-build.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/persist-qa-followup.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/pg",
+      "allocatedBytesBefore": 167936
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/pg-remaining",
+      "allocatedBytesBefore": 139264
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/prepare-qa-input-guard.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/production-schema",
+      "allocatedBytesBefore": 339968
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/refresh-release-evidence.py",
+      "allocatedBytesBefore": 24576
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/release-final-store-consolidation-receipt.json",
+      "allocatedBytesBefore": 32768
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/release-preparation-consolidation-receipt.json",
+      "allocatedBytesBefore": 32768
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/root-chart-test.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-lock-build.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-native-guarded.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-native.sh",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-pg-qa.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-pg-remaining.py",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/run-storeshots-corrected.py",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations",
+      "allocatedBytesBefore": 1601536
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-baseline.json",
+      "allocatedBytesBefore": 106496
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-baseline.log",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-fixed.json",
+      "allocatedBytesBefore": 102400
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-fixed.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-source-manifest.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/support-subtitle-report.md",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/test-final-bundle-subtitle.mjs",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/test-ios17-support-subtitle.mjs",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-driver-status.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-results.json",
+      "allocatedBytesBefore": 32768
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-storage-pause.json",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/ui-storage-monitor.json",
+      "allocatedBytesBefore": 8192
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/update-ui-report.py",
+      "allocatedBytesBefore": 12288
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/web-speech-results.json",
+      "allocatedBytesBefore": 40960
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/web-speech.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/web-transport-after.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/web-transport-before.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/xcodegen.log",
+      "allocatedBytesBefore": 4096
+    },
+    {
+      "path": "/private/tmp/bobby-live-native/DerivedData",
+      "allocatedBytesBefore": 829505536
+    },
+    {
+      "path": "/private/tmp/claude-501/-private-tmp-bobby-ios17-remediation-20261004-claude-review-workspace-124857-857538",
+      "allocatedBytesBefore": 135168
+    }
+  ],
+  "qaSimulatorsToDelete": [
+    {
+      "udid": "0025C304-8A10-4124-8308-EB94159F025C",
+      "name": "Bobby 1.7 QA 2026-10-04",
+      "stateBefore": "Shutdown",
+      "dataPath": "/Users/mrrobot/Library/Developer/CoreSimulator/Devices/0025C304-8A10-4124-8308-EB94159F025C/data",
+      "allocatedDeviceBytesBefore": 2389823488
+    },
+    {
+      "udid": "41D3E892-612F-437D-A4B4-EAB2324CE5CE",
+      "name": "Bobby Subscription QA",
+      "stateBefore": "Shutdown",
+      "dataPath": "/Users/mrrobot/Library/Developer/CoreSimulator/Devices/41D3E892-612F-437D-A4B4-EAB2324CE5CE/data",
+      "allocatedDeviceBytesBefore": 2960244736
+    }
+  ],
+  "otherSimulatorsPreserved": [
+    {
+      "udid": "29853E44-D7C5-4733-B06C-D39800CAE8A7",
+      "name": "iPhone 17 Pro"
+    }
+  ],
+  "result": "passed",
+  "startedAtUTC": "2026-10-04T13:39:34.092065+00:00",
+  "cleanupEndedAtUTC": "2026-10-04T13:40:56.596127+00:00",
+  "finalFilesystemObservedAtUTC": "2026-10-04T13:43:01.370298+00:00",
+  "availableBytesImmediatelyAfter": 7830843392,
+  "availableBytesFinalObserved": 12778262528,
+  "netObservedAvailableBytesChange": 7301677056,
+  "estimatedAllocatedBytesRemoved": 7940059136,
+  "deletedTemporaryItems": 194,
+  "deletedQASimulators": [
+    "0025C304-8A10-4124-8308-EB94159F025C",
+    "41D3E892-612F-437D-A4B4-EAB2324CE5CE"
+  ],
+  "allPlannedTemporaryPathsAbsent": true,
+  "deletedSimulatorDirectoriesAbsent": true,
+  "remainingSimulatorUDIDs": [
+    "29853E44-D7C5-4733-B06C-D39800CAE8A7"
+  ],
+  "retainedEvidenceUnchanged": true,
+  "retainedArchiveExecutableUnchanged": true,
+  "sourceTestsDeleted": false,
+  "rawXCResultsRemoved": true,
+  "firstAttempt": {
+    "result": "partial",
+    "error": "PermissionError: [Errno 13] Permission denied: '/private/tmp/bobby-ios17-remediation-20261004/claude-review/workspace-124857-857538/source'",
+    "deletedTemporaryItems": 116,
+    "resolution": "Only real directories in disposable read-only QA snapshots were made owner-writable; recursive traversal did not follow symlinks. Original code and external targets were untouched."
+  },
+  "readOnlyDisposableDirectoriesMadeOwnerWritable": 418,
+  "cleanupScriptSHA256": "c37b8199327f82d82050507fdf9ccc625fd58e5b45f48b5e91d26b49a2e5b4ba",
+  "spaceMeasurementBoundary": "du allocation is an estimate under APFS. Immediate free space was lower than the later measurement; final observed free space and directory absence are recorded separately. Concurrent disk activity can also affect the change."
+}

@@ -17,11 +17,16 @@ function velocityOf(P){
   return [(h[n - 1][1] - h[j][1]) / dt, (h[n - 1][2] - h[j][2]) / dt];
 }
 function inDebate(x, y){ var ti = CARDS.indexOf(cardD); return ti >= 0 && Math.round(W.track.x) === ti && y > 286 && y < 610 && DSCROLL.max > 2; }
+function riskScrollMax(){ return rbodyEl ? Math.max(0, rbodyEl.scrollHeight - rbodyEl.clientHeight) : 0; }
+/* a drag that starts anywhere on the consent copy (the statements, the body, the gap above the full-notice button) scrolls the body */
+function inRiskBody(x, y){ return W.state === 'RISK' && isOn('lines') && RISK_LAYOUT && x >= 30 && x <= 360 && y >= RISK_LAYOUT.top && y <= RISK_LAYOUT.notice && riskScrollMax() > 0; }
+function scrollRisk(y){ if (rbodyEl) rbodyEl.scrollTop = clamp(y, 0, riskScrollMax()); }
 function inDown(hit, idx, x, y){
   if (PTR) return;
   PTR = { hit:hit, idx:idx, x0:x, y0:y, x:x, y:y, kind:null, hist:[[nowS(), x, y]], moved:false };
   var s = W.state;
   if (hit === 'pill'){ W.pr.pill = [T, 1e9]; pillDown(); return; }
+  if (!hit && inRiskBody(x, y)){ PTR.kind = 'risk-scroll'; PTR.scroll0 = rbodyEl.scrollTop; return; }
   if (hit){ W.pr[hit === 'chip' ? 'chip' + idx : hit] = [T, 1e9]; return; }
   if (s === 'PICK' && W.pickReady && y > 98 && y < 720) PTR.kind = 'pick?';
   else if (s === 'HANDBACK' && y > 98 && y < 736) PTR.kind = 'pull?';
@@ -44,6 +49,7 @@ function inMove(x, y){
   }
   if ((P.kind === 'pick' || P.kind === 'track') && W.drag) W.drag.x = x;
   else if (P.kind === 'scroll' && W.drag) W.drag.y = y;
+  else if (P.kind === 'risk-scroll' && W.state === 'RISK') scrollRisk(P.scroll0 - dy);
   else if (P.kind === 'pull') W.pullY = y;
 }
 function inUp(x, y, upHit, cancelled){
@@ -147,6 +153,24 @@ document.addEventListener('click', function(e){
   if (h[0] === 'pill'){ W.pr.pill = [T, T + 0.1]; pillDown(); pillUp(false); }
   else action(h[0], h[1]);
 });
+// The scaled stage disables touch scrolling; keep the complete consent copy scrollable by pointer,
+// keyboard and trackpad without routing any of these gestures through the hold-to-agree button.
+document.addEventListener('keydown', function(e){
+  if (e.target !== rbodyEl || W.state !== 'RISK') return;
+  var y = rbodyEl.scrollTop, page = rbodyEl.clientHeight * 0.8;
+  if (e.key === 'ArrowDown') y += 18;
+  else if (e.key === 'ArrowUp') y -= 18;
+  else if (e.key === 'PageDown' || e.key === ' ') y += page;
+  else if (e.key === 'PageUp') y -= page;
+  else if (e.key === 'Home') y = 0;
+  else if (e.key === 'End') y = riskScrollMax();
+  else return;
+  e.preventDefault(); scrollRisk(y);
+});
+window.addEventListener('wheel', function(e){
+  var p = toStage(e.clientX, e.clientY);
+  if (inRiskBody(p[0], p[1])) scrollRisk(rbodyEl.scrollTop + e.deltaY / FIT);
+}, { passive:true });
 ['gesturestart', 'gesturechange', 'dblclick'].forEach(function(k){ document.addEventListener(k, function(e){ e.preventDefault(); }, { passive:false }); });
 if (HARNESS) document.addEventListener('touchmove', function(e){ if (e.touches && e.touches.length > 1) e.preventDefault(); }, { passive:false });
 

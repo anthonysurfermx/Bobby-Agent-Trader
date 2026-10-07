@@ -1,0 +1,506 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites><testsuite name="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" tests="32" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.078Z" hostname="MacBook-Pro-F-Society.local" time="0.123">
+  <properties />
+  <testcase name="transportEpochFencePreventsMutatingNewOwnersLedger" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.067" />
+  <testcase name="epochChangeDuringSalesOffRestoreDiscardsResultWithoutSyncingTheOldOwner" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.004" />
+  <testcase name="expiredGoogleMirrorCannotConfirmPurchaseEvenWhenGrantStillGivesPro" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003" />
+  <testcase name="missingReservationVersionNeverLaunchesStore" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="tokenlessStartedPurchaseRestoresPendingEvenWithEmptyCustomerInfo" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003" />
+  <testcase name="storeSheetAllowsOnlyOnePurchaseAtATime" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.004" />
+  <testcase name="consentRevokedDuringRestorePreventsSubsequentServerSynchronization" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="constructionDoesNotConfigureOrReachTheNetwork" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.0" />
+  <testcase name="accountSwitchDuringSheetDiscardsPurchaseResult" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="activityRecreationCannotChangeGlobalSdkOwnerUntilOriginalSheetCompletes" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="sameUserWithNewSessionEpochAlsoRejectsStaleResult" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="noActiveSubscriptionRestoresNothingAndListenerCanExpireAccess" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="disablingNewSalesDoesNotDisableAnExistingPurchaseRestore" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="anotherAttemptConfirmationDoesNotCompleteOriginalPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="userCancellationIsSilentAndClearsBusy" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="activeCardSubscriptionPreventsLaunchingPlaySheet" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="callsBeforeConsentNeverConfigureSdkOrPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="lostStartResponseKeepsSameAttemptAndNeverLaunchesOrRetriesSdk" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="salesOffRestoreCannotConfirmProFromAnUnrelatedProvider" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="serverMustConfirmSdkEntitlement" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="failedSyncCanBeRetriedByRestoreWithoutBuyingAgain" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="accountDeletionRetiresOriginalReceiptAndLateSuccessCannotResurrectIt" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="salesOffRestoreDoesNotTrustAnOldGooglePeriodOrAProGrant" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="successfulTokenSurvivesSdkRefreshFailureAndConfirmsOriginalAttempt" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.003" />
+  <testcase name="proFromAnotherProviderDoesNotConfirmPlayPurchase" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="proGrantDoesNotClaimRestoredGoogleSubscription" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="existingGoogleOwnerCanRestoreWithSalesOffOnlyAfterFreshServerConfirmation" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="withdrawingConsentAfterSdkSuccessKeepsReceiptWithoutExternalSynchronization" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="activeOtherProvidersNeverConfigureOrRestoreTheGoogleSdk" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="restoreNeedsConfiguredServerAndPublicKey" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <testcase name="lateSuccessfulTokenPersistsForOriginalOwnerWithoutSubmittingAsNewOwner" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.001" />
+  <testcase name="cancellationNeverErasesTheDurableObligationOrAllowsAnotherCharge" classname="xyz.bobbyprotocol.android.billing.BillingCoordinatorTest" time="0.002" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.billing.BillingPolicyTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.202Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="releaseAcceptsOnlyGooglePublicKeys" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="proGrantAlsoPreventsUnnecessaryPurchase" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="onlyAnActiveBoundedGooglePeriodConfirmsAPlaySubscription" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.001" />
+  <testcase name="malformedOrMissingSubscriptionStateFailsClosed" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="activeSubscriptionFromEveryProviderBlocksAnotherCharge" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="legacyAppleReadinessDoesNotAuthorizeGoogleCharge" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="restorationDoesNotRequireNewSalesAndExcludesActiveOtherProviders" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="onlyExplicitServerProConfirmsAccess" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.0" />
+  <testcase name="subscriptionManagementDoesNotOpenAnUntrustedUrl" classname="xyz.bobbyprotocol.android.billing.BillingPolicyTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.204Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="introductoryPhasesDoNotHideAutomaticRenewal" classname="xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest" time="0.0" />
+  <testcase name="prepaidPlanDoesNotPromiseAutomaticRenewal" classname="xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest" time="0.0" />
+  <testcase name="missingAndUnknownStorePhasesDoNotInventTerms" classname="xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.AccountDeletionEventsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.205Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="SubscriptionChangesDuringDeliveryOnlyAffectTheNextConfirmedDeletion" classname="xyz.bobbyprotocol.android.data.AccountDeletionEventsTest" time="0.001" />
+  <testcase name="failingLegacyPushCleanupDoesNotPreventOtherOwnersLocalCleanup" classname="xyz.bobbyprotocol.android.data.AccountDeletionEventsTest" time="0.001" />
+  <testcase name="duplicateSubscriptionRunsOnceAndUnsubscribePreservesLegacyHook" classname="xyz.bobbyprotocol.android.data.AccountDeletionEventsTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.208Z" hostname="MacBook-Pro-F-Society.local" time="0.003">
+  <properties />
+  <testcase name="manualDeletionKeepsOnlyTheOfficialInstructionsUrl" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.0" />
+  <testcase name="httpSuccessWithoutStrictOkCannotAuthorizeLocalLogout" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.002" />
+  <testcase name="nonAppleSuccessDoesNotOfferAnArbitraryResponseLink" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.001" />
+  <testcase name="bothAppleServerPathsRequireHonestManualInstructionsOnAndroid" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.0" />
+  <testcase name="confirmationCannotMoveToAnotherAccountOrANewerSession" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.0" />
+  <testcase name="malformedRequirementsNeverSkipTheAppleWarning" classname="xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.AccountFenceTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.212Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="aColdRepositoryCannotReplaceTheNextOwnersSession" classname="xyz.bobbyprotocol.android.data.AccountFenceTest" time="0.001" />
+  <testcase name="aSameOwnerNewEpochStillCancelsAnOldRefreshOrDelete" classname="xyz.bobbyprotocol.android.data.AccountFenceTest" time="0.0" />
+  <testcase name="credentialRotationKeepsTheSameAccountVersionAndGuestReadsRemainValid" classname="xyz.bobbyprotocol.android.data.AccountFenceTest" time="0.0" />
+  <testcase name="persistedLogoutOrMissingIdentityCannotBeResurrected" classname="xyz.bobbyprotocol.android.data.AccountFenceTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.AuthGuardsTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.213Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="pkceMatchesRfc7636TestVector" classname="xyz.bobbyprotocol.android.data.AuthGuardsTest" time="0.001" />
+  <testcase name="onlyRelativeBobbyApiPathsAreAllowed" classname="xyz.bobbyprotocol.android.data.AuthGuardsTest" time="0.001" />
+  <testcase name="exactCallbackAndAttemptStateAreRequired" classname="xyz.bobbyprotocol.android.data.AuthGuardsTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.BobbyLocalesTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.216Z" hostname="MacBook-Pro-F-Society.local" time="0.0">
+  <properties />
+  <testcase name="regionalVoiceLocalesPreserveLanguageAndApprovedRegion" classname="xyz.bobbyprotocol.android.data.BobbyLocalesTest" time="0.0" />
+  <testcase name="baseLanguageUsesSelectedMatchingLocaleAndInvalidRegionFallsBack" classname="xyz.bobbyprotocol.android.data.BobbyLocalesTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.BobbyParsersTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.217Z" hostname="MacBook-Pro-F-Society.local" time="0.003">
+  <properties />
+  <testcase name="failedOrPartialAnswersNeverBecomeNoTrade" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.0" />
+  <testcase name="questionLimitCountsUnicodeCodePointsAfterTrimming" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.001" />
+  <testcase name="candlesSkipNonFiniteMalformedRowsAndSort" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.002" />
+  <testcase name="streamSupportsNdjsonAndSseAndIgnoresMalformedProgressLines" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.0" />
+  <testcase name="nullResolutionNeverGuessesAnUnmentionedInstrument" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" tests="19" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.221Z" hostname="MacBook-Pro-F-Society.local" time="0.005">
+  <properties />
+  <testcase name="confirmedCouponWithMissingQuotaStillInvalidatesEarlierGet" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001" />
+  <testcase name="resetDatesRequireAnIsoInstantWhileNullAndAbsentStayUnknown" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001" />
+  <testcase name="actualGuestDeepAllowanceAndGiftedFreeUsesCanBeSelectedWithoutGrantingMax" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="onlyTheLatestGetMayApplyEvenIfAnOlderGetReturnsLast" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="resetInvalidatesARequestEvenWhenTheAccountIdentityIsUnchanged" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="couponIsTheServerBalanceAndInvalidatesAnEarlierGetWithoutAddingGifts" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001" />
+  <testcase name="generalReadPermitsOpenAnonButCouponDoesNotApplyItForAnAccount" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="unavailableLatestGetCannotAllowAnOlderSuccessfulGetToReappear" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="partialTierChangeRetiresTheOtherFieldsOldPlanAllowance" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="realProUnlimitedTripleNullKeepsGiftBalanceWithoutInventingUsed" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="partialSnapshotsMergeSameTierAndPreserveUnchangedMeters" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.001" />
+  <testcase name="accountSwitchAbAAndSameUserNewEpochNeverReviveOldQuotas" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="explicitZeroIsAValidBalanceAndNeverTreatedAsMissing" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="realNestedShapePreservesQuickAndBothPremiumGiftBalances" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="malformedOneFieldStillKeepsTheOtherValidatedPartialField" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="detectedOwnerChangeClearsStateBeforeStartingOrApplyingAnotherRequest" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="nullableQuotaFieldsRequirePresenceAndMalformedCountsNeverRound" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="flatOrIncompletePremiumShapeNeverFabricatesAZeroMeter" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <testcase name="strictCountsRejectBooleansStringsFractionsNegativeAndOverflow" classname="xyz.bobbyprotocol.android.data.BobbyQuotaStateTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" tests="10" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.227Z" hostname="MacBook-Pro-F-Society.local" time="0.003">
+  <properties />
+  <testcase name="changingTheReportLanguageDoesNotCarryAnotherLanguagesLocale" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="unsupportedMalformedOrUnpairedReportLocalesFailBeforeTransport" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001" />
+  <testcase name="missingStaleMalformedOptionsOrLocalConsentCannotEnableProcessing" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="assetsAndCompanionUseAuthoritativeOptionsAndActualSixAssetLimit" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001" />
+  <testcase name="savedCrossClientReportLanguagesCanChangeAssetsAndVoiceWithoutChangingConsent" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="brazilianReportLocaleSurvivesAnAssetEditAndSupportsAnExplicitPortugalChoice" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="unsupportedFieldsLegacyVersionNamesAndWrongTypesFailBeforeTransport" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.001" />
+  <testcase name="disablingNeedsNeitherLocalAiConsentNorAServerVersion" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="reportLanguageIsExplicitAndRejectsUnsupportedOrRegionalLanguageCodes" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <testcase name="enablingUsesTheRealCurrentVersionAndExactAcceptedField" classname="xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.CouponRedemptionTest" tests="25" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.231Z" hostname="MacBook-Pro-F-Society.local" time="0.017">
+  <properties />
+  <testcase name="noAccountOrInvalidCodeDoesNotSendOrApplyAnything" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.003" />
+  <testcase name="actualAlreadyRedeemedNullRpcBalancesDeriveOnlyTheVerifiedSnapshot" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="coherentUnlimitedProRetainsVerifiedCouponBalances" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="dismissingThePopupDoesNotApplyTheReceiptAgain" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="thrownHttpExceptionsKeepTheirActualStatusInsteadOfBecomingNetworkErrors" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="creditsRejectBooleansStringsFractionsNegativeAndOverflowCounts" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="recognizedServerRefusalsRemainSpecific" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="alreadyRedeemedIgnoresAnyUntrustedNewGrantAndDoesNotInferIncompleteBalances" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="aSupersededBalanceReadCannotShowTheOldBonusOrClearTheNewQuota" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="newlyGrantedCreditsAreConfirmedWithoutRequiringQuotaOrStoreFields" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="lateReplyAfterAccountAtoBtoANewEpochCannotPublishOrApply" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="accountChangedCancelsTheSheetOutcomeAndBusyState" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="failedHttpStatusCannotBeDisguisedByARedeemedBody" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="queuedAccountAIntentCannotSubmitOrCheckUsingAccountB" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="missingOrEmptyGrantCannotCreateASuccessCelebration" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="aConfirmedGiftStillInvalidatesOldGetsWhenQuotaIsUnavailable" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="failedOrPartialBalanceChecksDoNotInventZeros" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="normalizationMatchesTheAccountEndpointWithoutLocaleDependentCase" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="balanceCheckBlocksRedemptionAndNeverCreatesAnAwardOutcome" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.002" />
+  <testcase name="aSecondTapWhileRedeemingDoesNotSendAnotherPost" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="accountChangeDuringSnapshotPublicationCannotPublishTheOldReceipt" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="aLostResponseIsUnavailableAndCheckingBalanceOnlyGets" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="malformedExplicitBonusCannotBeReplacedWithADifferentInferredBalance" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0" />
+  <testcase name="cancelWithTransportIgnoringCancellationCannotClobberANewerOperation" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <testcase name="aStaleQueuedIntentDoesNotCancelTheNextOwnersValidRedemption" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.data.VoicePreferenceTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.249Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="offlinePreviewNeverUsesANetworkVoiceOrAnotherLanguage" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.001" />
+  <testcase name="selectedTypeReplacesPersonaWithoutChangingDefaultIdentity" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <testcase name="narrationOnlyStartsWhenAllConsentOwnerAndMuteGatesPermitIt" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <testcase name="absentOrUnrecognizedPreferenceKeepsCompanionVoice" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <testcase name="explicitGenderPrefersTheMatchingRegionalVoiceWhenNamedByTheEngine" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <testcase name="maleDoesNotMatchTheFemaleSubstringAndOpaqueNamesKeepTheLocaleFallback" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <testcase name="explicitTypeNeverUsesACompanionRecordingInAnyLanguage" classname="xyz.bobbyprotocol.android.data.VoicePreferenceTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.252Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="ownCompanionBypassesLevelButOtherCompanionsRemainLocked" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.0" />
+  <testcase name="accountSwitchDoesNotBorrowOtherOutfitsAndReturningOwnerRestoresOwn" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.0" />
+  <testcase name="firstReadAndActualXpThresholdsUnlockExactly" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.001" />
+  <testcase name="ownPageSortAndNextDropProgressMatchIos" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.0" />
+  <testcase name="allFourItemsCanBeEquippedAndTwoHandToolsDoNotEvictEachOther" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.0" />
+  <testcase name="guestOutfitTransfersOnlyToNewAccountAndExistingAccountWins" classname="xyz.bobbyprotocol.android.equipment.EquipmentRulesTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.254Z" hostname="MacBook-Pro-F-Society.local" time="0.003">
+  <properties />
+  <testcase name="genuine offline discipline is capped and respects local dates" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.001" />
+  <testcase name="resolved regional cash listings pass the same freshness guard as US stocks" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.001" />
+  <testcase name="cash ticker support remains bounded and cannot accept URL steering or substitutes" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0" />
+  <testcase name="question length matches server code points rather than UTF16 units" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0" />
+  <testcase name="booleans and nonfinite values never become market prices" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.0" />
+  <testcase name="invalid evidence is refused before metering" classname="xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.257Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="chart accepts only numeric complete rows and orders evidence by timestamp" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.0" />
+  <testcase name="missing conviction and prices stay null rather than invented values" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.001" />
+  <testcase name="an incomplete provider reply is never rendered as Wait" classname="xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.258Z" hostname="MacBook-Pro-F-Society.local" time="0.0">
+  <properties />
+  <testcase name="olderPartialServersKeepKnownAuraAndInvalidNewAuraBecomesUnknown" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <testcase name="missingAuraIsUnknownAndAConfirmedZeroIsRealZero" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <testcase name="anOwnerSwitchRejectsTheOldRequestEvenAtTheSameEpoch" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <testcase name="aLaterEpochRejectsOldRepliesFromTheSameAccountOrGuest" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <testcase name="applyingServerMetricsKeepsUnrelatedThesisAndAwardState" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <testcase name="malformedMetricsNeverBecomeZeroOrOverflow" classname="xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.259Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="oldOwnerAccountEpochOrConsentEpochCannotAcknowledge" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="onlyTheLatestCompletedReadCanBeObserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="startingAnotherReadRetiresThePreviousObservation" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="clearedObservationsDoNotSurviveCancellationOrBackgroundReset" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="guestAndSignedInIdentitiesHaveSeparateObservations" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="invalidOrTruncatedIdsCannotBeObserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="eligibleLatestVisibleReadIsObservedOnce" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <testcase name="hiddenOrBusyOrUnconsentedFramesRemainUnobserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.platform.DictationStateTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.260Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="automatic completion keeps logical hold and confirms only on release" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.001" />
+  <testcase name="bounded final timeout confirms latest recognized partial only after release" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0" />
+  <testcase name="missing final text uses recognized partial and an empty capture stays empty" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0" />
+  <testcase name="background cancellation discards held and awaiting finals" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0" />
+  <testcase name="release before final waits and delivers the actual final once" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0" />
+  <testcase name="new capture never inherits text after cancellation or restart" classname="xyz.bobbyprotocol.android.platform.DictationStateTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.261Z" hostname="MacBook-Pro-F-Society.local" time="0.009">
+  <properties />
+  <testcase name="localPreviewNeedsNoExternalConsentButStillHonorsMuteAndIdentity" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0" />
+  <testcase name="generatedAudioDoesNotStartAfterMuteOrConsentWithdrawal" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.001" />
+  <testcase name="anUnpublishedFileIsDeletedWithoutDeletingANewerPublishedFile" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.003" />
+  <testcase name="accountSwitchOrRefreshInvalidatesPreparedAndCompletionCallbacks" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0" />
+  <testcase name="promptCancellationAtTheIOBoundaryCleansOnlyTheCancelledOperationsFile" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.004" />
+  <testcase name="aPreparedCallbackFromAnOlderGenerationCannotStartTheNewAudio" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.0" />
+  <testcase name="rejectingAFileAfterOwnershipChangesRetainsItOnlyUntilTheFinallyCleanup" classname="xyz.bobbyprotocol.android.platform.PlaybackLeaseTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.push.PushPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.270Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="missingConfigOrAnyUserGateDisablesRegistration" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.001" />
+  <testcase name="oldOwnerRevisionEpochAndWithdrawalAreRejectedLocally" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.0" />
+  <testcase name="onlyMatchingExplicitFidCapabilityCanInitializeTheSdk" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.0" />
+  <testcase name="opaqueFidIsBoundedAndNeverAcceptedWithControls" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.001" />
+  <testcase name="currentServerAnalysisConsentAndWeeklyOptInAreRequired" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.0" />
+  <testcase name="malformedExpiredOrPrivateDataPayloadsCannotShowNotifications" classname="xyz.bobbyprotocol.android.push.PushPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.273Z" hostname="MacBook-Pro-F-Society.local" time="0.017">
+  <properties />
+  <testcase name="everyNativeRegionalLocaleSurvivesThePublicPageHandoff" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.014" />
+  <testcase name="countryIsNormalizedOnlyWhenItNamesARealIsoCountry" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.001" />
+  <testcase name="accountAndPaywallDestinationsPreserveAllSixInterfaceLanguages" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.001" />
+  <testcase name="malformedContextCannotSteerTheOriginPageOrQueryKeys" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.0" />
+  <testcase name="regionalLanguageInputsRemainCanonicalWithoutAddingPrivateContext" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.0" />
+  <testcase name="mismatchedOrUnapprovedLocaleFallsBackWithinTheSelectedLanguage" classname="xyz.bobbyprotocol.android.ui.BobbySupportLinksTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.291Z" hostname="MacBook-Pro-F-Society.local" time="0.009">
+  <properties />
+  <testcase name="guestLoadUsesOnlyGuestKeyAndNeverWrites" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="guestLayoutStaysLocalAcrossSignInAndReturnsOnlyUnderFreshGuestEpoch" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.003" />
+  <testcase name="ownerSwitchDuringWriteNeverReturnsAcceptedOrAppliesTheUiState" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0" />
+  <testcase name="successAppliesStateOnlyAfterDurableCommitAndAllowsRecreation" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="riskConsentRequiredForBothReadAndWrite" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="preferenceReadFailureIsNotTreatedAsAnEmptySavedIsland" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0" />
+  <testcase name="signedInOrStaleEpochCannotReadOrCommitPractice" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0" />
+  <testcase name="failedOrThrowingWritesDoNotApplyOptimisticStateAndCanRetry" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="stalePreviousStateAndUnloadedStateNeverOverwriteSavedLayout" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0" />
+  <testcase name="invalidCandidateDoesNotPersistUnknownCoreOverlapOrBogusFocus" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="concurrentCommitsOnlyAcceptOneStateDerivedFromTheSameSnapshot" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001" />
+  <testcase name="changingOwnerDuringReadRejectsLoadedState" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.LandPracticeTest" tests="15" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.302Z" hostname="MacBook-Pro-F-Society.local" time="0.013">
+  <properties />
+  <testcase name="rotationSwapsBoundsAndInvalidTurnsCannotPlace" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.002" />
+  <testcase name="undoHistoryRemainsBoundedAtTenAndNoopMoveDoesNotSpendHistory" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="repeatedBlueprintsDoNotAcquireAccountOrInventoryMeaning" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="initialFocusRejectsFogUntilExplicitRevealAndUndoRestoresIt" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0" />
+  <testcase name="savedFocusClampsAndValidEmptyPracticeDoesNotBecomeTheSample" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="invalidItemCoreMissingAndDuplicateIdentifiersFailClosed" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="malformedTopLevelAndIncorrectTypesRestoreTheApprovedFixture" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.002" />
+  <testcase name="invalidCallerStateCannotBypassOccupancyOrHistoryIntegrity" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="collisionsIncludeCoreAndEveryRotatedFootprint" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="persistedStateRoundTripsButLocalHistoryDoesNotPersist" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0" />
+  <testcase name="storeUndoAndResetPreserveTheExactPreviousLocalLayout" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="sanitizedSavedEntriesDropUnknownCoreDuplicatesCollisionsAndBadNumbers" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="corruptBundledFixtureCannotManufacturePractice" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0" />
+  <testcase name="movingReusesOwnCellsWithoutCoveringAnotherPiece" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.001" />
+  <testcase name="canonicalFixtureHasSevenPiecesAndFixedAwakeCore" classname="xyz.bobbyprotocol.android.ui.LandPracticeTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.316Z" hostname="MacBook-Pro-F-Society.local" time="0.0">
+  <properties />
+  <testcase name="malformedInventoryIsNotPresentedAsEarnedPieces" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0" />
+  <testcase name="completeEmptyInventoryIsAConfirmedZeroPieces" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0" />
+  <testcase name="seedsBloomedAndBuiltPiecesAllBelongToTheCountLikeTheCanonicalProfile" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0" />
+  <testcase name="partialErrorOrUnsupportedWorldNeverInventsMetrics" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.316Z" hostname="MacBook-Pro-F-Society.local" time="0.066">
+  <properties />
+  <testcase name="messageMatchesServerLengthCeilingWithoutSplittingUnicode" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.001" />
+  <testcase name="userTextAndKnownReasonAreRequired" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0" />
+  <testcase name="publicTransportNeverAttachesAccountOrInstallationHeaders" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.064" />
+  <testcase name="httpSuccessWithoutBothBooleanReceiptsNeverAcknowledgesSave" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0" />
+  <testcase name="payloadContainsOnlyExplicitTextAndApprovedMetadata" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0" />
+  <testcase name="failureStatusCannotAcknowledgeSaveEvenWithTrueBody" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.382Z" hostname="MacBook-Pro-F-Society.local" time="0.005">
+  <properties />
+  <testcase name="seaPanBoundsKeepEveryVisibleIslandReachable" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.002" />
+  <testcase name="hitTestingFindsActualNeighborsAndLeavesOpenSeaUntargeted" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <testcase name="firstRingMatchesCanonicalClockwiseOffsetsFromTheTop" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <testcase name="neighborFlightsCenterTheActualSlabAboveTheCardOnPhoneAndTablet" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <testcase name="allFourRingsHaveDistinctNonoverlappingIslands" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.002" />
+  <testcase name="invalidDragCoordinatesDoNotEscapeSceneBounds" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.001" />
+  <testcase name="refocusingPreservesHomeAndFindsEachNeighborAcrossZoomLevels" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <testcase name="closePanBoundsFollowVisitedIslandAndGrowthSlack" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <testcase name="overviewUsesRoomAboveTheCardAndSafeZoomLimits" classname="xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.388Z" hostname="MacBook-Pro-F-Society.local" time="0.004">
+  <properties />
+  <testcase name="aFailedPersistenceWriteNeverConsumesTheVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0" />
+  <testcase name="firstVisibleVisitIsDurableAcrossControllerRecreation" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001" />
+  <testcase name="offscreenAndOverlappingDialogsLeaveTheVisitUnspent" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0" />
+  <testcase name="guestAndEveryAccountKeepSeparateVisitsWithoutInheritingGuestState" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001" />
+  <testcase name="anAccountSwitchOrSameAccountNewEpochRejectsTheStaleVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.0" />
+  <testcase name="accountPreferenceKeysAreBoundedAndCannotCollideWithTheGuestNamespace" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001" />
+  <testcase name="simultaneousControllersOnlyPersistAndClaimOneVisit" classname="xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest" time="0.001" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.392Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties />
+  <testcase name="theGuestGuideDoesNotPromiseAccountBuildingAndKeepsTheSameProgressInstructions" classname="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" time="0.001" />
+  <testcase name="everySupportedLanguageHasItsOwnCompleteHelpInsteadOfEnglishFallback" classname="xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" tests="26" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.394Z" hostname="MacBook-Pro-F-Society.local" time="0.005">
+  <properties />
+  <testcase name="anOffCenterPinchKeepsTheSameWorldPointUnderStationaryFingers" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="theSeaCameraCanDeferBoundsWithoutLosingItsNeighborAnchor" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="allGrowthSizesKeepCanonicalSlabExtentInsteadOfAnOverflowingGrid" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="practicePanSlackIsSeventyPercentAtAllZoomLevelsAndGrownCornersRemainReachable" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="reachingThePanBoundaryClampsOnlyAfterCalculatingTheAnchoredTransform" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="pinchUsesTheActualClampedZoomRatioAtBothLimitsWithoutAJump" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="rotationMirrorsArtAndMovesItsContactPointToTheSwappedFootprintBottom" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.001" />
+  <testcase name="invalidTransformCoordinatesNeverSelectTheFirstCell" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="simultaneousZoomAndPanKeepTheWorldPointUnderTheMovingCentroid" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="dragClampsToEveryIslandEdgeAndRejectsInvalidSamplesWithoutMoving" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="canonicalPavementTopBoundsComeFromTheExistingAssetManifest" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="dragTranslationMatchesCanonicalDiagonalStepsAtAllGrowthSizesAndZooms" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="homeCameraUsesTheCanonicalLargeIslandZoomAndClearsOldPan" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="invalidGestureSamplesAndThePrelayoutViewportNeverCorruptTheCamera" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="sequentialPinchEventsPreserveTheirAnchorAtEveryGrowthSizeAndScreenDensity" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="buttonZoomAroundTheViewportCenterScalesExistingPanAsIOSDoes" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="pavementFacesFollowCanonicalContentBoundsWithoutChangingSpriteSizeOrGroundContact" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.001" />
+  <testcase name="everyBundledStateHasMetadataAndTheHistoricalPathAliasUsesTheSameArt" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="everyCellCanBeSelectedAtItsRenderedCenterOnPhoneAndTabletAfterZoomAndPan" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.001" />
+  <testcase name="dragPreservesTheOriginalAnchorAndUsesCanonicalHalfCellRounding" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="dormantCoreKeepsItsGroundContactWhileReducingArtToCanonicalScale" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="everySlabExtremityCanReturnToTheViewportAtMaximumZoomForEveryGrowthSize" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.002" />
+  <testcase name="coreAndTallSpritesHaveCanonicalAnchorsAndDepthOrdersTheirGroundContact" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="outsideSlabNeverSelectsAnEdgeCellAndHalfCellTiesUseCanonicalFloor" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="zoomingOutRetainsCanonicalPanSlackInsteadOfErasingTheFingerAnchor" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <testcase name="canonicalViewCenterAndFitMatchTheIOSCanvasOnPhoneTallAndWideViewports" classname="xyz.bobbyprotocol.android.ui.TraderLandProjectionTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testsuite name="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T23:43:04.399Z" hostname="MacBook-Pro-F-Society.local" time="0.002">
+  <properties />
+  <testcase name="movingPieceMayUseItsOwnCellsButNotAnotherPiece" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.001" />
+  <testcase name="rotatedFootprintCannotCrossTheEdgeOrCore" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0" />
+  <testcase name="accountAndPublicFootprintsUseRealCatalogContracts" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0" />
+  <testcase name="blockedCreatorHasStableStrictCodeAndCorruptPrefsAreEmpty" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.001" />
+  <testcase name="coreMayMoveFromItsOwnSpotButCannotCoverPieces" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0" />
+  <testcase name="seedExtensionOnlyUsesServerOfferedUpwardHorizons" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0" />
+  <system-out />
+  <system-err />
+</testsuite><testcase name="A→B immediately removes visible account collections and current read" time="0.001242" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="late collection replies from A cannot restore cards, island or suggestions under B" time="0.001015" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="an old logged-in signin gate is cleared on A→B" time="0.000322" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="explicit anonymous→login preserves the signin gate and its question for the native retry" time="0.000319" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="logout drops a gate and prevents pre-logout collection replies appearing to the guest" time="0.001335" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="consent withdrawal cancels current read/gate while preserving accessible saved account data" time="0.000423" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="account change during boot preserves BOOT and still discards its old pending read" time="0.000309" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs" />
+	<testcase name="hold past the ring: the read started (RESOLVING) and the release does not cancel it" time="0.002986" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/agree-release.test.mjs" />
+	<testcase name="the same through THINK_WAIT and a cancelled pointer" time="0.000566" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/agree-release.test.mjs" />
+	<testcase name="a tap that begins during the read still cancels it" time="0.000280" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/agree-release.test.mjs" />
+	<testcase name="Android request is correlated with one asynchronous JSON reply" time="0.001886" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="unknown methods are refused before they cross the native transport" time="0.000526" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="protocol faults and malformed native replies remain errors" time="0.000346" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="a missing native reply times out without retaining a pending request" time="0.000341" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="account and withdrawn-consent events reach the Android page without crossing transport" time="0.000326" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="a development transport cannot replace the Android native transport" time="0.000988" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="visible-read request carries only its UUID and accepts an honest negative native acknowledgment" time="0.000293" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs" />
+	<testcase name="both native coupon catalogs exactly match the shared six-language copy" time="0.003964" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/coupon-copy.test.mjs" />
+	<testcase name="coupon copy reports the actual grant and explains what to do without a store restore" time="0.000637" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/coupon-copy.test.mjs" />
+	<testcase name="CSS card rules match literal backslashes, attributes and adjacent-sibling selectors" time="0.000812" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs" />
+	<testcase name="android: the thesis note is measured; the button comes after it and stays inside the card" time="0.054414" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs" />
+	<testcase name="android: the debate header wraps instead of being cut, and the scroller starts under it" time="0.002633" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs" />
+	<testcase name="android: each voice shows its caption under its name, and labeled lines are kept, in six languages" time="0.006414" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs" />
+	<testcase name="Android consent step: the docked question stops 8 px before the Profile button and has its line back afterwards" time="0.003575" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs" />
+	<testcase name="every literal native UI string has all four additional translations" time="0.004578" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs" />
+	<testcase name="new Android entries preserve template placeholders and all translated fields" time="0.003832" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs" />
+	<testcase name="dynamic earned equipment names also resolve in the selected language" time="0.000492" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs" />
+	<testcase name="the actual roster, risk notice and level catalog contain all six languages" time="0.000588" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs" />
+	<testcase name="unconfigured microphone: short tap opens typing without permission" time="0.002129" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs" />
+	<testcase name="short tap on a result preserves the follow-up context" time="0.000335" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs" />
+	<testcase name="a deliberate hold opens the voice explanation" time="0.000307" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs" />
+	<testcase name="cancelled gesture neither requests permission nor types" time="0.000269" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs" />
+	<testcase name="all six language permission screens describe Android local dictation without another platform" time="0.002002" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="native sign-in remains generic and subscription confirmation names Google Play in all languages" time="0.002390" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="risk version 6 retains provider disclosure and local audio policy in six languages" time="0.000972" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="renderer keeps the pure-orb fallback and never bundles a development mock source" time="0.000208" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="the actual ordered shipping scripts compile for both pages without writing generated assets" time="0.110272" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="builder rejects obsolete, incomplete or foreign-platform consent without generating assets" time="0.214482" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs" />
+	<testcase name="valid parsed response alone does not claim presentation" time="0.001202" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="two visible settled frames acknowledge current request once without receipt/content" time="0.000886" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="hidden/background/sheet and unsettled cards do not acknowledge" time="0.001207" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="network failure and replaced read cannot acknowledge old request" time="0.000251" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="Android contract without read.rendered never invokes a missing native method" time="0.001387" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="a background interruption resets the visible frame count" time="0.000360" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs" />
+	<testcase name="android: the thesis note is measured; the save button and the card's lower edge come after it" time="0.011321" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs" />
+	<testcase name="android: the debate header may wrap, the scroller starts under it and scrolls until its last line is clear" time="0.014011" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs" />
+	<testcase name="android: each voice of the debate carries one short line saying what it does, in six languages" time="0.003894" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs" />
+	<testcase name="android: the idle hints are split, each next to what it is about, and stop after three sessions" time="0.002056" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs" />
+	<testcase name="android en: the complete consent copy fits in a scroll region above the full-notice button" time="0.002125" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android en: even four wrapped headings and a much longer body retain the final sentence" time="0.000573" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android es: the complete consent copy fits in a scroll region above the full-notice button" time="0.001825" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android es: even four wrapped headings and a much longer body retain the final sentence" time="0.000876" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android fr: the complete consent copy fits in a scroll region above the full-notice button" time="0.001691" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android fr: even four wrapped headings and a much longer body retain the final sentence" time="0.000387" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android pt: the complete consent copy fits in a scroll region above the full-notice button" time="0.000329" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android pt: even four wrapped headings and a much longer body retain the final sentence" time="0.000347" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android it: the complete consent copy fits in a scroll region above the full-notice button" time="0.000322" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android it: even four wrapped headings and a much longer body retain the final sentence" time="0.000367" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android de: the complete consent copy fits in a scroll region above the full-notice button" time="0.001388" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android de: even four wrapped headings and a much longer body retain the final sentence" time="0.000409" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: short copy uses its measured height without introducing overlap or an unnecessary scroll gesture" time="0.000375" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: copy that fits is shown whole, at its own height, with no fade and no cue" time="0.002109" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: copy taller than its viewport ends on a whole line and fades where it continues until the end is in view" time="0.001375" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: a viewport cut at the cap takes one more whole line when 4 px above the button are enough for it" time="0.000826" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: dragging the body to and across the agree button scrolls without accepting or opening a notice" time="0.000461" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: a drag that starts on a statement or just under the body scrolls the body too" time="0.000337" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: hold to agree and read-full-notice keep their own handlers" time="0.000468" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: keyboard and trackpad can reach all copy without activating agreement" time="0.000373" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: full accessible copy is hidden from focus outside its visible risk step" time="0.000410" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="android: the page carries the fades and the more-below chevron, placed under the viewport and driven by the scroll position" time="0.000168" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs" />
+	<testcase name="en: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.001962" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="en: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000485" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="es: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.000556" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="es: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000396" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="fr: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.000353" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="fr: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000345" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="pt: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.000368" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="pt: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000328" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="it: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.000535" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="it: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000887" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="de: withdrawal and relaunch keeps Profile accessible without renewed AI consent" time="0.000456" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="de: Android consent v5 upgraded to v6 keeps Profile accessible without renewed AI consent" time="0.000382" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="a new guest at the risk step can open Profile without accepting AI processing" time="0.000347" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="opening Profile releases a pending hold so it cannot accept while the native sheet is open" time="0.000350" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="cancelled profile pointer does not open an account sheet or accept risk" time="0.000880" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="TalkBack or keyboard activates the same Profile action without invoking hold-to-agree" time="0.000369" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="Profile leaves focus and pointer access outside RISK or while acceptance is being committed" time="0.001760" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="the release template contains a 44-pixel profile button hidden until the risk state renders it" time="0.000155" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="accessible consent activation is explicit and readiness guarded: false" time="0.000340" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="accessible consent activation is explicit and readiness guarded: true" time="0.000315" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs" />
+	<testcase name="Three UUID uses four cryptographic words and preserves lowercase version/variant formatting" time="0.002164" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs" />
+	<testcase name="Missing Web Crypto fails without falling back to Math.random" time="0.000422" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs" />
+	<testcase name="Unreviewed or duplicate UUID source blocks fail closed" time="0.001464" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs" />
+	<testcase name="Only the UUID entropy block changes; visual randomness and the formatter stay intact" time="0.001060" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs" />
+	<testcase name="android: German ordinals and abbreviations do not end a sentence" time="0.001236" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: a number that closes a sentence still ends it" time="0.000720" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: the German rules do not merge sentences in the other languages" time="0.000275" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: with voice input unavailable a tap opens the keyboard and a hold asks native again, then explains" time="0.004392" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: the consent state keeps the mic pill, and both pages ask native before deciding a hold" time="0.002015" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: the unavailable-voice line offers typing and no longer blames the microphone" time="0.001770" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: French greets with Bonjour in the afternoon and addresses the user as tu; Portuguese as tu" time="0.001329" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="android: the evening greeting starts at 20:00 in Spanish and Portuguese, 18:00 elsewhere" time="0.003894" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+	<testcase name="Android onboarding: the consent button label names what is agreed to in all six languages" time="0.000436" classname="test" file="/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs" />
+
+
+
+
+
+
+
+
+</testsuites>

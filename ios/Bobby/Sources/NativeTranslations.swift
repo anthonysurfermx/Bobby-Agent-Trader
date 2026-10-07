@@ -1062,6 +1062,8 @@ enum NativeTranslations {
         result["✓ YOUR FRIEND NOW"] = ["fr": "✓ TON AMI DÉSORMAIS", "pt": "✓ AGORA É TEU AMIGO", "it": "✓ ORA È TUO AMICO", "de": "✓ JETZT DEIN FREUND"]
         result["🔒 LEVEL {0} REQUIRED"] = ["fr": "🔒 NIVEAU {0} REQUIS", "pt": "🔒 NÍVEL {0} NECESSÁRIO", "it": "🔒 SERVE IL LIVELLO {0}", "de": "🔒 LEVEL {0} ERFORDERLICH"]
         result["🔥 day {0} with {1}"] = ["fr": "🔥 jour {0} avec {1}", "pt": "🔥 dia {0} com {1}", "it": "🔥 giorno {0} con {1}", "de": "🔥 Tag {0} mit {1}"]
+        // 1.8: one table per feature (V18/Translations). A row already above wins.
+        for table in NativeTranslations18.all { result.merge(table) { existing, _ in existing } }
         return result
     }()
 }

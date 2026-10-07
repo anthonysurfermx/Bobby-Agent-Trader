@@ -1,0 +1,24 @@
+{
+  "observedAtUTC": "2026-10-04T12:41:55.190185+00:00",
+  "archiveRebuiltForVerifierRepair": false,
+  "attempts": [
+    {
+      "context": "original wrapper automatic verification after archive",
+      "result": "failed",
+      "reason": "mock fixture code packaged",
+      "classification": "wrapper literal-name false positive",
+      "evidence": "native/archive63-wrapper-fixture-verifier-repair.json"
+    },
+    {
+      "context": "default sandbox manual verify",
+      "result": "failed",
+      "reason": "codesign subprocess exit1; stderr not captured",
+      "classification": "verification-context failure; cause not independently diagnosed"
+    },
+    {
+      "context": "authorized outside-sandbox manual verify",
+      "result": "passed",
+      "evidence": "archive63-r2/archive-verification.json"
+    }
+  ]
+}

@@ -8,7 +8,7 @@
  *
  * URL params: scenario=default|slow|hang|quota|too_long|failed|unavailable|gateway_timeout|offline
  *                      |signin_required|subscription_required   (metered-read gates, ARCHITECTURE.md §8)
- *             lang=en|es  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
+ *             lang=en|es|fr|pt|it|de  first=1  signedIn=1  risk=0  muted=1  companion=<iOS id>  mic=granted|denied|undetermined|unavailable
  *             say=<text for the fake STT>  latency=<desk ms>  xp=<int>  streak=<int>  rm=1
  *             signin=ok (signIn succeeds)  purchase=ok (the Bobby Pro sheet ends `subscribed`)
  * Determinism: engines that own a sim clock call nucleoBridge.mock.useClock(fn) and then
@@ -24,7 +24,7 @@
   var riskNoticeVersion = FX.native.riskNotice.version;
   var q = new URLSearchParams(location.search);
   var scenario = q.get('scenario') || 'default';
-  var lang = q.get('lang') === 'es' ? 'es' : 'en';
+  var lang = window.NucleoLocale.language(q.get('lang'));
   function now() { return clock(); }
   var clock = function () { return performance.now(); };
   var timers = [];
@@ -62,6 +62,8 @@
     dailyAwards: 0,
     theses: [],
     hints: {},
+    nudge: q.get('nudge') ? { id: 'mock.sample', text: q.get('nudgeText') || 'Bobby can remember this for you', cta: q.get('nudgeCta') || 'See how' } : null,
+    nudgeSeen: {},
     saved: {},
     lastOk: {},
     tokens: {},
@@ -89,7 +91,7 @@
       signedIn: state.signedIn, riskAccepted: state.riskVersion >= riskNoticeVersion, riskVersion: riskNoticeVersion,
       muted: state.muted, reducedMotion: q.get('rm') === '1' || matchMedia('(prefers-reduced-motion: reduce)').matches,
       mic: micState(), hints: state.hints, pendingRead: null,
-      fixtures: true, platform: 'web-mock', appVersion: 'mock'
+      fixtures: true, platform: 'web-mock', appVersion: 'mock', nudge: state.nudge
     };
   }
   /** Native sends session.changed after setCompanion, acceptRisk, signIn, saveThesis, setMuted. */
@@ -427,6 +429,17 @@
       if (typeof p.key !== 'string' || !/^[a-z][A-Za-z0-9_.-]{0,31}$/.test(p.key)) return Promise.resolve(fault('invalid_params', 'key'));
       state.hints[p.key] = (state.hints[p.key] || 0) + 1;
       return Promise.resolve(ok({ count: state.hints[p.key] }));
+    },
+    'nudge.seen': function (p) {
+      if (typeof p.id !== 'string' || !/^[a-z][a-z0-9_.-]{0,47}$/.test(p.id)) return Promise.resolve(fault('invalid_params', 'id'));
+      state.nudgeSeen[p.id] = (state.nudgeSeen[p.id] || 0) + 1;
+      return Promise.resolve(ok({ count: state.nudgeSeen[p.id], active: !!state.nudge && state.nudge.id === p.id }));
+    },
+    'nudge.act': function (p) {
+      if (typeof p.id !== 'string' || !/^[a-z][a-z0-9_.-]{0,47}$/.test(p.id)) return Promise.resolve(fault('invalid_params', 'id'));
+      var live = !!state.nudge && state.nudge.id === p.id;
+      if (live){ state.nudge = null; setTimeout(sessionChanged, 0); }
+      return Promise.resolve(ok({ status: live ? 'done' : 'gone' }));
     },
     'log': function (p) {
       if (['info', 'warn', 'error'].indexOf(p.level) < 0 || typeof p.message !== 'string' || p.message.length > 300) return Promise.resolve(fault('invalid_params', 'log'));

@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T11:56:59.400478+00:00",
+  "stage": "EquipmentUITests",
+  "class": "EquipmentUITests",
+  "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "expectedMethods": [
+    "testEnglishEquipmentChoices",
+    "testSpanishEquipmentChoices"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "cba351210441e2bb775a53d4a81f31c4f58372628a1831a7f76c53ce6e9b20d5",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "63b1cb8acddbf720dfddb01e68acbe73610af668d33a72bc4d7c501310bc747b",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "EquipmentUITests/testEnglishEquipmentChoices()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/EquipmentUITests/testEnglishEquipmentChoices",
+      "result": "Passed"
+    },
+    {
+      "identifier": "EquipmentUITests/testSpanishEquipmentChoices()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/EquipmentUITests/testSpanishEquipmentChoices",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

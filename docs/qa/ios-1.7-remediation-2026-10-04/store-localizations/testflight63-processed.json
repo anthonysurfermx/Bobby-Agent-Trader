@@ -1,0 +1,42 @@
+{
+  "observedAt": "2026-10-04T13:24:02.113Z",
+  "detailObservedAt": "2026-10-04T13:24:25.710Z",
+  "appId": "6804460489",
+  "version": "1.7",
+  "build": "63",
+  "source": "Safari native accessibility TestFlight iOS build list and build detail",
+  "url": "https://appstoreconnect.apple.com/teams/bccd998d-3e28-47e6-8e08-bf1894bc6070/apps/6804460489/testflight/ios/af0ec2a0-b9c8-4976-a703-f3933b62aa84",
+  "processedAndListed": true,
+  "stateObserved": "Lista para enviar",
+  "expiryObserved": "Caduca en 90 días",
+  "existingInternalGroup": "Founder",
+  "existingTesterCount": 1,
+  "groupAssociationChangedByRoot": false,
+  "newTestersInvited": false,
+  "externalGroupsObserved": 0,
+  "installsShown": "–",
+  "physicalInstallVerified": false,
+  "evidence": [
+    "87 row Compilación 63",
+    "89 celda Lista para enviar / Caduca en 90 días",
+    "90 celda Añadir grupo, Value: Founder",
+    "91 celda 1",
+    "24 encabezamiento 1.7 (63)",
+    "40 encabezamiento Grupo (1)",
+    "53 row Founder Interno 1",
+    "58 encabezamiento Testers individuales (0)"
+  ],
+  "binaryMetadata": {
+    "status": "Validado",
+    "shortVersion": "1.7",
+    "buildVersion": "63",
+    "uploadedAtDisplayed": "4 oct. 2026, a las 14:14",
+    "displayedTimezone": "Europe/Lisbon",
+    "bundleId": "xyz.bobbyprotocol.bobby",
+    "buildSDK": "23B77",
+    "compressedSizeDisplayed": "89,9 MB",
+    "includesSymbols": true,
+    "nonExemptEncryption": false
+  },
+  "physicalBlockerRechecked": "iPhone Mirroring still requires the Mac login password entered locally by the user; secure field untouched."
+}

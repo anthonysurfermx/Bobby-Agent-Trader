@@ -1,0 +1,1508 @@
+{
+  "files": 375,
+  "source_sha256": "c1a619bda0a1b176365e063a21513250b71138a30b48b02b2694d7247815a166",
+  "algorithm": "SHA-256 of UTF-8 compact JSON array sorted by relative path, each record contains path then sha256",
+  "scope": "All public Android inputs, generated assets, source/test fixtures, wrapper/build helpers, Android CI, lint and branch deployment guard; README/docs, private configuration, dependencies and generated Gradle outputs excluded.",
+  "manifest": [
+    {
+      "path": ".github/workflows/android.yml",
+      "sha256": "48f3e4ce5c145e2778453252a547e7d0a0ca64a3c0d73db6ddd385393d425dcb"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "6e0aef9c9f6d964d7e52c76760914ce336d0ccd9b9419a9b53c53507578f5597"
+    },
+    {
+      "path": "android/.gitattributes",
+      "sha256": "2bdc88531b4cb25a67213551b42cf54d932c713bd8bf65a3c42c7c8a410b3913"
+    },
+    {
+      "path": "android/.gitignore",
+      "sha256": "64bfdf4ae21ef3897084ab7d159825bad57d7e9453448ba198c34ef5c763508d"
+    },
+    {
+      "path": "android/app/build.gradle.kts",
+      "sha256": "1cd4766544970659df632c5348587806914576923cfabdf7394a0dad8575bafc"
+    },
+    {
+      "path": "android/app/proguard-rules.pro",
+      "sha256": "f724789f9af6e5b197c16cfa99bc26c05466528ce4b060dbd82c28c3a4e40656"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/CouponRedemptionInstrumentedTest.kt",
+      "sha256": "e1092bd26cd74a2f1c8421998571a2fe22e723ee1ab5aeddbedd6ade34f2aa75"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/EquipmentStageInstrumentedTest.kt",
+      "sha256": "ef1ee475b6632430f7153180d89d8577d012d4f6fc28395dcc0dae4ba84f6e37"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/MainActivityAcceptanceInstrumentedTest.kt",
+      "sha256": "c71539bbac53172c1894bea7599dfc05ef911b2b22ed2bdbf97a709f576a648a"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/NucleoBridgeInstrumentedTest.kt",
+      "sha256": "51cae215116f24907769a5abf45c9545b56a287c5581a2c316c58f357132f4fa"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/data/BobbyRepositoryCandleContractInstrumentedTest.kt",
+      "sha256": "cdfbed42164c337095be57cdf36f446315f73910b23e5734409aec5aacdcfac7"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/platform/AvatarShareCardInstrumentedTest.kt",
+      "sha256": "a28bc198ef2f4fff520dd1761302f855a4d29b9404a3bff8eab76a4551dd3519"
+    },
+    {
+      "path": "android/app/src/fcm/AndroidManifest.xml",
+      "sha256": "d10e9dcf0b2a033b85bef8247953ec3d63cc7386e50302aeac26294151aa396c"
+    },
+    {
+      "path": "android/app/src/fcm/java/xyz/bobbyprotocol/android/push/AndroidFcmRuntime.kt",
+      "sha256": "2697481a36a55754ecafdc66fbc52253a788c774fa7cceeb795a4f98f083c405"
+    },
+    {
+      "path": "android/app/src/fcm/java/xyz/bobbyprotocol/android/push/BobbyMessagingService.kt",
+      "sha256": "f333d87d060cb2c826ee6c710b250bc69da8e4200bf78b7b73db1068ed9544a8"
+    },
+    {
+      "path": "android/app/src/fcm/java/xyz/bobbyprotocol/android/push/PushRuntimeFactory.kt",
+      "sha256": "d6f5b4af45178939a56e6da40a9f0aa7ab28ddbb53d849ee31ba40979e5872be"
+    },
+    {
+      "path": "android/app/src/main/AndroidManifest.xml",
+      "sha256": "c018cd69ab324d68e553c8733f7ad22cd124706a10632cbbd4b73c39ddaf9e75"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/THREE-LICENSE.txt",
+      "sha256": "bfe119ea4fd413f5f7ca3fcd63adb0c4a073ed39daa2fe7d3e6b769e21272601"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/draco/draco_decoder.wasm",
+      "sha256": "a680d927bed9cb864ddbd63521868891af2bfbe755092761b4837487618df8ac"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/draco/draco_wasm_wrapper.js",
+      "sha256": "8bb2952d2ba7d67e1414f8df819410cb0434a666be53f671fff75f68843d76f6"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/index.html",
+      "sha256": "f28fdd8706dcd95c6837ee0a6fe1098b1c9bd39708e16e79b1c478ddf5565da6"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/axiom.glb",
+      "sha256": "cae175ec4c560ec69ce3de9fe3b879ebdad8280f6e1120463545ed9032b86280"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/byte.glb",
+      "sha256": "8fc969e83dadcfdf9f1d9bffa2b552c9b780fb99ce3491704c1b1464a7374f50"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/flux.glb",
+      "sha256": "6a672ce95cbe00f26892ca8bd04571bc7578a3c07a6122e0c77b624132b41e2d"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/glitch.glb",
+      "sha256": "20dd7db4a9c46a356137170f75570c8043f9068ebf8eebabbb8a462f71f5146c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/halo.glb",
+      "sha256": "e2e1d4550e778bf63232206964f2ed16657756c80aec21b1f128e924fd789b3d"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/iris.glb",
+      "sha256": "96dd0932a1bbd8c8fc2a7216c90d56d8e71f18fe2a5b621b452ecb5a56d7a3a7"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/keo.glb",
+      "sha256": "42cbfe68604835c965ba9933cc530adabc10f9898f61946bb0b88719ea720193"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/kora.glb",
+      "sha256": "f03d8388d4e77a885fad8cecc72d7188730bccf7d9c0c916f93704c4fbce0f95"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/mira.glb",
+      "sha256": "f5705af9bd91b78ccc3cd18c17195d02a9c39b82d62fb0e1e1e51ee9bdaf9d7d"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/momo.glb",
+      "sha256": "5a4a4637f4af465850bfcb61e1beac634eb40ef93bdd6c1a6a047a33e4223a9c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/nalu.glb",
+      "sha256": "eb5b9973abae2bc6cb1eccb95a53200f623dfd4c3cf4b064d1fdab199b8a9d6e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/noor.glb",
+      "sha256": "159edc671e7f148822d0d37b6d12954b17731dc12555034ff10a7bec95ac5576"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/orb.glb",
+      "sha256": "1b2e2d9f6fe5b3cb6d614e959f410b4c6a0a6bcca755f7ccfe52253d2b065226"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/rook.glb",
+      "sha256": "d5698831e5fcf33ca1829fb910c992a23ec54afa89ad58f70389a222925928e3"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/sol.glb",
+      "sha256": "b052e96ceb532d48b0bae0f61e5b10231c029ad7ab3c561db50f9aca252ae56a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/vega.glb",
+      "sha256": "7997898e524844be643e7fd8103f8d38ff85742fe703775248d8ab6181ed7c1d"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/zip.glb",
+      "sha256": "bc5d2cce42cc95d0995206dd2234ec967bcb94263a50a3e544c9707af9c4786d"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/models/zuri.glb",
+      "sha256": "26c68558c6fdf8c40141357f1cf269dad4ffe6df25ed79e1c3aaf10fc2c695f5"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/provenance.json",
+      "sha256": "778a36722d9809c8fcf45cf016646b37dd1b3ce5af6fa4f583a63fe1cdf628bc"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment-stage/viewer.js",
+      "sha256": "c513fff520219260f7de490255cab37adb3b7f692b4a2336fe63f1e6048339f5"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/axiom_thumb.png",
+      "sha256": "45c04bcd54aa2b31e991a7feac140a833a0ba402fa250f82f5f5804f0bf8e63f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/byte_thumb.png",
+      "sha256": "a8aab7a4b55208759cb83aa47eb22ea4c52d2cb31c0ad67283f501cec42f7241"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/catalog.json",
+      "sha256": "c35fb2dc0f02125db4712d30df08db9b995031f323a66ea8e2febb85953b12bc"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/flux_thumb.png",
+      "sha256": "3e686380faa1af27b72b18b7f5cef713eb91ddac0feb44e77598f25fec65defe"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/glitch_thumb.png",
+      "sha256": "b6e8854748d0e0685c412fa2d0f87986782efc3e0aa33c4356527c969a0ea228"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/halo_thumb.png",
+      "sha256": "aa7ae2615b63ddd8c1ed0ed3f02d89609ca79fcbc2e513c2b9aba14082aacb8c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/iris_thumb.png",
+      "sha256": "ad4c0b2a751bd11c14ab105de5377650605405a6b786ec8fafb7842d02195240"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/keo_thumb.png",
+      "sha256": "0518ce8f0aad98938d67cdd41479f7a56560fb02db2fb3a7f115b9acd87135a5"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/kora_thumb.png",
+      "sha256": "9023464949440ef960654a510794e23a7a2c2265f7cffaf8cad8f502fff3f347"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/mira_thumb.png",
+      "sha256": "524faffa294d4e76e78ffcc22acb0d8e2ae2483828e864053016336c61630726"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/momo_thumb.png",
+      "sha256": "c4582cf34a9310104feccc62a7381a8049c757a7243cd99c1c911c981bfcc2ab"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/nalu_thumb.png",
+      "sha256": "2be6be51106320a1adf23ca982db937ef7fc83f7e43db309177e9beb94d34687"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/noor_thumb.png",
+      "sha256": "2ee6c9d1e40a2fa59ef07d9fb4cfa9e4944e621b5e4ba9209814e3e6b58a9356"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/orb_thumb.png",
+      "sha256": "09ea097af4e49293967e36ffdc73213d2ced270a334a0962f918fbb3034f26aa"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_axiom.png",
+      "sha256": "4e1060ffec23d9063bd8f55fcf5fe8e9bea40c8a1440b0b177e74490c8591f82"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_byte.png",
+      "sha256": "f31a8055b39afdf2c154683421bb8c3a31e780b9fbed56dd603114f0deacc47a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_flux.png",
+      "sha256": "516cedf65997bf2f07393209d465dc4540fa7f358f6a9bfb40a03c2eede91053"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_glitch.png",
+      "sha256": "66973e7402898a7e7431a8bad06f287e0393ca3ae94015e9f1580a5ed161547a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_halo.png",
+      "sha256": "d22829b62a661774243584508f1922ee90c322fb236706bda18cc5ab27f87433"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_iris.png",
+      "sha256": "7ac18e63f9b4bffa8d780e42d21ed7a430b6d411ae416a4898d9e46125d2e4c1"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_keo.png",
+      "sha256": "ad358e052e311a10757d837394fcfb549a2da616be12d0f587fd9d0bbaf76761"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_kora.png",
+      "sha256": "1cf869333e78217c95c5e45b712ef85b7970f783d97289934af1c5e5357467e7"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_mira.png",
+      "sha256": "cdfa92dd87c94f9546b8a2b1d741f079307f442984752e48b05120273a18e473"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_momo.png",
+      "sha256": "f1e60d98cb7a036c1b262ca161976633096a2bc831599104dae7b0fe9f6caed4"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_nalu.png",
+      "sha256": "9d011f24940282bdcd98f4ad72d7d3c6bd1eca7af34f66b7d12086b0552056ca"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_noor.png",
+      "sha256": "a61ca861ed6768b162e621fe3e6ebbd22a8990b16809178151e86e47f8203e9b"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_orb.png",
+      "sha256": "18a531ce84cc195fd75a462c1d7abf9f091d5d9d385e1e0a36b552f64305e75f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_rook.png",
+      "sha256": "b27862c86b6c1600e5ad594e943f6ab1a3e89d6f0e6741e848063514a144b86a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_sol.png",
+      "sha256": "916fc3b234a46c9bd29eeb88566c4a549ddc77360d88f34a5484e7e8ca0c9ab3"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_vega.png",
+      "sha256": "97209be0929fc23d57220aea4eab65f901098b4ceeef353b4bd470f2234fac09"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_zip.png",
+      "sha256": "5914071446a29a874f1496907a89b2ccafc64ace83f722bbf6309df70bf4ce1e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/pet_zuri.png",
+      "sha256": "c9f2e5293fce855f783803611f73222f18c1ca7a45e3e68b18a421408f0eefb4"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/rook_thumb.png",
+      "sha256": "d8f6b4ff038ab5ed06513ca135d3fe5ff2c8d6bf861e2328595fcbb4e0d31261"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/sol_thumb.png",
+      "sha256": "4d61157a5ed32b5b02718b75e2115b8831e44cfc49863897b85207e37cc3fd98"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_axiom_1.png",
+      "sha256": "3ee6582dbfbf37797fe1a32e2c7803b6c7e92b42f0459a4bd7e77282b2fa83b6"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_axiom_2.png",
+      "sha256": "40889f9a5ceb854cce1aa106e0ebb069532e12a221c0bc5dac8dbbf0bfea4b77"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_axiom_3.png",
+      "sha256": "b454771df3e09ed5e20bd904a64fe940e1a9a061c07c7da41fcae47d825f801b"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_byte_1.png",
+      "sha256": "86efb723d3a13055a701490402e96768b8c008b327c4a1a83d31413b8b20df51"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_byte_2.png",
+      "sha256": "de9a8105b180129742ca2e3be0938e0a2cc42446b55d9acc524e8e04163e76ab"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_byte_3.png",
+      "sha256": "078900e1c345ca3532c8310ac80eadec701f352536979bcc9642b2f2e6d5ff3c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_flux_1.png",
+      "sha256": "59208844c0b3f8d5ad146ce63df0b530b9f30cb638ce1586b640f1db4ef9ec8f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_flux_2.png",
+      "sha256": "4b6cd86286de7e2a415702c4847b1d327336a73e32ebb2b52a899d09bec56964"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_flux_3.png",
+      "sha256": "600ef2cfdce642de753492d9cfc5c55e727544b22fea3eeb3eb16f7fa000e1dd"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_glitch_1.png",
+      "sha256": "b2b610f03db02aa92bcdf464c63391f99b79b1ea85efdc2be3d46e5bf025bdd8"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_glitch_2.png",
+      "sha256": "b4c2f2bedd415a65c3ea8d1498c7a7786e9219ba45477401e87e327b3e7d4475"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_glitch_3.png",
+      "sha256": "cfa875b426ba1e1943bc1b6ecd6657826b9f9983f1f08db16da864c841e4ea70"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_halo_1.png",
+      "sha256": "625a196f8075283f438de82e92a283c8aafc8acf706d77ede881cb961b19d62a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_halo_2.png",
+      "sha256": "0fa05456c3be6d86e4fa4f9aecb1cbb54e0066564e181b6a273b544cd3f671c1"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_halo_3.png",
+      "sha256": "10da848fb11d57dfb03288d98f53d8cb5cac24953fb183c46f8188bca12cc743"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_iris_1.png",
+      "sha256": "6e20df4b68763fdacd5edc79d49d7e879e3b48fee144549f6f5c488020ebb382"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_iris_2.png",
+      "sha256": "f2a259d05f52832a2d0dc5efc9bf831ee611622636ccf62647348ae91ca18cda"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_iris_3.png",
+      "sha256": "db87d9c098efccf3c7d8519db37e821d8c204f4e0d0c85af793c2c76876638df"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_keo_1.png",
+      "sha256": "79be1145900632900b5415c4b6dc1df7b4505602e1e895c9faf51dcafa51230c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_keo_2.png",
+      "sha256": "a3fcd83c0d60e994b2c722b540a8654805312aeb7153a159113227b56dc4cd8f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_keo_3.png",
+      "sha256": "52b08b52bad11afc8ee0820e40ccd687e176d6126f0baf1c83a4c45addcea112"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_kora_1.png",
+      "sha256": "7bac0b4098bf5bfd6ee0084c7bf78898e8a8cfd7f49e6e1e1f72d9456d8ea171"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_kora_2.png",
+      "sha256": "fabf34ae72ab90da0049c45c424b6bd12fff1070bb00a46c6135fa33a4e31673"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_kora_3.png",
+      "sha256": "4c6615fb2ff498c62fff3ddce9105960064af30b637a7334fa10c24de6e3051c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_mira_1.png",
+      "sha256": "75d2b8aea8333717dfa158292cf66e8de0f9f6737e0f1e497897e696b0eb4c0f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_mira_2.png",
+      "sha256": "70f9a483b3d729c0e8a086ae468d12a95b416613239020d30557ac679ed601c2"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_mira_3.png",
+      "sha256": "2e5bdf32de042055c227c87a85d8766aa6852c8fe80a72fa4e44b628841e44b1"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_momo_1.png",
+      "sha256": "f10a33eac4448bd7294569d2829696c475163b15a91db95bcea5822955f03b6a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_momo_2.png",
+      "sha256": "302d1b9e095167f1a6eaae01af6b04443a8f7396ec2dbbbe13fcf5ce71e154b3"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_momo_3.png",
+      "sha256": "d4dc3f81771c6a47efda4005ce9c7b438b1e5134e9ba8bbb1c73ae73f16a752a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_nalu_1.png",
+      "sha256": "bcce6603073342a8fdc8391b6de0cb4f98c9268f747bce573c0ae643b8e0859c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_nalu_2.png",
+      "sha256": "e8d1b19263c14afcae07acf01c99481c3a8fcd006edd25910d5fd154126b671e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_nalu_3.png",
+      "sha256": "a3b08b6539d93196b56fe7199fb34773b86c7fbaf676fb36cd9cf663af3388bc"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_noor_1.png",
+      "sha256": "ebf0fdbd88a6caa5a02d7f4a538968bfcf55dce4ad79376abd017c24d8513e71"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_noor_2.png",
+      "sha256": "886f1fc98fce383bb9ee49b64e3a81313802c51b3ac92a98ae9fd076fd2c8f46"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_noor_3.png",
+      "sha256": "4522fb98fbeb05b192319108172dd812c14c5304445e624b223b1d5cb0fd6ed8"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_orb_1.png",
+      "sha256": "b3b1502425fc942808b4512a23f5af2086bb441091eba8813db114e577300886"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_orb_2.png",
+      "sha256": "eec9b87b49cc299a697ad5fe10ca7dbd2185a64e484c558ded8ffe583dd3275b"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_orb_3.png",
+      "sha256": "36209b1401dc56e37f0bc585d506095ef2adef6e7a60f6895f22642195530125"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_rook_1.png",
+      "sha256": "52def010cdcfe318d86b0559f5aef70adc7b070fb43a02ddd3058ed0220ed6ba"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_rook_2.png",
+      "sha256": "6aea6601d0f1a91cb300003030ee4873fefe3105991cda177c467522646ac2c6"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_rook_3.png",
+      "sha256": "1afb3a8dde511662e10b06d4687d3b63c3d3b8dd0c03b62bd76675900ede4bda"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_sol_1.png",
+      "sha256": "427b026b5b89d11cc9d519bc1003ecd65708b9635f62017e563bb413aaa9118c"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_sol_2.png",
+      "sha256": "4f9f74e3c6870bc0cb41736cac1174c2b4e305a69456039d51e440b45c9969ac"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_sol_3.png",
+      "sha256": "c9664e36104212fdb0afb96a9436b8d6540f3faef9bfc192b1e2a2d7434f27d0"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_vega_1.png",
+      "sha256": "855095e23d016dc3de0059092401cd62572270d2220c0698fb5244ca316d3326"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_vega_2.png",
+      "sha256": "82b6d68d6f9021a97504c64ef0447f0effb020fb88e7ac0b9cd929afb854219e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_vega_3.png",
+      "sha256": "cb8baceb755978a41753dfa8232ed7c003f1ede5ab35561f7a7045ef8fbb6218"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zip_1.png",
+      "sha256": "701e876ac2cccd2fad2a6c0c71e888f81ea22d365118b477d6425c47b7fbb75b"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zip_2.png",
+      "sha256": "d0f5ec1d6ec7af3105a449c932a6d23a65db5f954dc097ea2b9352b47546bdfc"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zip_3.png",
+      "sha256": "28c886278160875629e2cfe411a0773d4b7e94a5df2909785066cd23b77f428a"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zuri_1.png",
+      "sha256": "194250f054500a5b7c94b3ae0d15989fabbfb9657c454d7738627dc147608b3f"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zuri_2.png",
+      "sha256": "496828581509febbb1995576fac9ec5606ce4ba5c74f36e02902fbc3e158750e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/tool_zuri_3.png",
+      "sha256": "5a7c98320ea586d68f568e8adb59294ea81ec5496f71b1d7d35360b919b5215e"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/vega_thumb.png",
+      "sha256": "dccbae50993a16aa86f68a4e2ac2a7ec705814de4303ebcab7109c3f50ac95af"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/zip_thumb.png",
+      "sha256": "b93dd78bd17bfecbd632120bbb82d0fb19299177731f8a47764e2dd7efb07859"
+    },
+    {
+      "path": "android/app/src/main/assets/equipment/zuri_thumb.png",
+      "sha256": "7a04cfdb4944a2b1684a246b41276647a674430398a1a230ff1321c8c7bb3a9e"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/app.html",
+      "sha256": "1e2292a42cacda7abb75eaec1adb24e9771d8a12588acfb2f580c678df1b67b4"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/build-info.json",
+      "sha256": "62994e3a237033bd9e3d2cd7b557cbfc81ef8f7c594096c6274b7ec7217f81e2"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/companions-meta.json",
+      "sha256": "6bea78fce51de95236bbcced27fd9fc5d46b473172dd2d7ed5465fca63633e4c"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/levels.json",
+      "sha256": "601e2622a0ded8aa69e3c426719ca27bf44480648f2fdb23db2c7bc47933e8b6"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/native-android-translations.json",
+      "sha256": "6d929a896a46cfe8982319d30e4bf6c573be59af964df8e8ccb236d08faa4364"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/native-translations.json",
+      "sha256": "cee02afa33b5fdf3fa053b03223898ef8bb01bbe4977eeeb856af5f43b4cdfba"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/onboarding.html",
+      "sha256": "22a1594b6c4473fde9e917fc8f03a0d68983f99a5d8cd5316a31e958337281f4"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/risk-notice.json",
+      "sha256": "f44d3e7fa47fa054f6e7abb187bcd3fe7be4ece396d5c7ad53503499a2deb98f"
+    },
+    {
+      "path": "android/app/src/main/assets/nucleo/roster.json",
+      "sha256": "1779214230b7a371bce9c4fdea2614039138fd9b09600ef0745dfcdec151c680"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/aura_core_stage0.png",
+      "sha256": "7736beb70f4bf1b98e0ff5010d1fc116a03d38ef987772d2b9cdd747393d4ad9"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/aura_core_stage1.png",
+      "sha256": "5f1640cae27425e62098775937389fb97186aa31f98decea041b61e533da66f9"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_archive_ring_tile_bloom.png",
+      "sha256": "1fe1e3a77a909ef44f675eb2a98b0d370ba423193aa4f5725be9341b8b184b35"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_aura_flower_bloom.png",
+      "sha256": "bae887c67525276c55c721712130c4cda018f80eae51f4728e565e43dcc2009b"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_base_ring_seal_bloom.png",
+      "sha256": "997e561420752d0f7db98d09091b4aa0dad7495b6c8b98b10030739689be55d5"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_lit_archive_bloom.png",
+      "sha256": "cddd1109d19f46a8eff7314a56c605e069e9c45bfa3f521bef287303c272610c"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_path_straight_bloom.png",
+      "sha256": "f34d862363668bd67c607df93c9c4ef11d79dd3656d4d9e95d15833465d9338f"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/axiom_archive_return_path_curve_bloom.png",
+      "sha256": "a37add380de81eb4084579325cbec96cdc1c54e508733407ceeb6354365e527f"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/crypto_bay_candle_tower_bloom.png",
+      "sha256": "72fbbd408cfd66e58a13152168122256e243c377dcc254bab0b8bdd24949cd34"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/crypto_bay_context_buoy_bloom.png",
+      "sha256": "4680ff25d32e87934ff5948d90d3764f2064ba846a72c23a79122211376c3eda"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/crypto_bay_data_dock_bloom.png",
+      "sha256": "79db9f015e3f741cbeba895cb2492480d28adda12a7a2816a76384d5537f8a84"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/crypto_bay_waiting_lighthouse_bloom.png",
+      "sha256": "23a7b04250c9419f5a49adc32aa1780b9224dea5614f35aa631714ea5b9f85d6"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/crypto_bay_water_walkway_bloom.png",
+      "sha256": "1ab323e833f66ae522dc15bda70ffdb0ef44069e6a3d75aabbdbdd2175da5ac5"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/evidence_mines_crystal_vein_rock_bloom.png",
+      "sha256": "c069a9efa363e0da87963164b0312d1a93787d5584d00b329a2cadc6da5e96ff"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/evidence_mines_evidence_workshop_bloom.png",
+      "sha256": "f519ebcd57fa665ff6bdeeb2467692a1dcf2153b4e08dc619037b11c6f4318fc"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/evidence_mines_lantern_drone_bloom.png",
+      "sha256": "61d25a95a159eab7747b4c7ea1e65eea0997d1f8608f2ed77565ee959cc85972"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/evidence_mines_mother_crystal_bloom.png",
+      "sha256": "3bd1cd405d1583be198baa1fa7a9898ac6a21c2384ebf76b220e9c5d6bc57580"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/evidence_mines_open_tunnel_bloom.png",
+      "sha256": "37c31bc954435395cdc379e602bb2d8089cdb74733d0496c74f2cc2fa80471e8"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/index.json",
+      "sha256": "151e873219d61f3fa1a74d8b93c42578085bf9c13ffb5dca2c6d1e78cae4155d"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/risk_reef_blue_sluice_bloom.png",
+      "sha256": "8867fb4baaa3dcd581f4966213031ff78b53ce3f28af073e846e0b451398cb82"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/risk_reef_double_bridge_bloom.png",
+      "sha256": "73ccef81aece2cae62e3e5f6e56177e973d983e1e76fc9eb899a36147181eac1"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/risk_reef_dual_orbit_antenna_bloom.png",
+      "sha256": "fa1272b16719a51bdbe920609e45f405305f762174d6634ba6ece5ffda9663f7"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/risk_reef_red_team_observatory_bloom.png",
+      "sha256": "bead8ef911a15036a672869f2bee1d1e92ca37cf14d26a43777eaca3a27dcbc8"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/risk_reef_reef_tile_bloom.png",
+      "sha256": "bf8f0d7af65d8ae7bf3c54c373de860b826cd98918af8d22851bd0882ba57ca7"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/showcase.json",
+      "sha256": "f102ab857f7e299ebea519861f13b0e12b4aa606b640cfa54a9f594e1425d472"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/thesis_citadel_double_gate_bloom.png",
+      "sha256": "66f3d1cfdaaa5f389fbe53324840c69e95c8c7bb6da72660f322382b981c458d"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/thesis_citadel_fortified_ramp_bloom.png",
+      "sha256": "95531f134e74b34b0d7bd0d2be074c6f8f91900594b5c91bf1c0ba5c15986206"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/thesis_citadel_risk_shield_bloom.png",
+      "sha256": "c76dd3215e2ff2d09470e1e1d8da9609ffc3521593b96de89ab0abe65aceddf9"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/thesis_citadel_three_gate_citadel_bloom.png",
+      "sha256": "3cbadc07862fc7704e6859888877e66111ad4d3aa25030b71cece930b63ff23a"
+    },
+    {
+      "path": "android/app/src/main/assets/traderland/thesis_citadel_wall_slab_bloom.png",
+      "sha256": "c310f75721d354918616ce389e50d178ea057cde585103b57c89fbbe99c7f7f0"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-axiom-en.mp3",
+      "sha256": "04b715ee32d44b04bf4e2643dca20fdd2b9ac490c3a18b4922b90f44861224c8"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-axiom-es.mp3",
+      "sha256": "e9d6f14f6bddc9e143d20930822bb5bc0ce62bd5aa8bc2b52a0407a0dd38bcfd"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-byte-en.mp3",
+      "sha256": "21d157c10efb086832dd5cfdc024569de4ef9fe9406a0cf04e904a60b96e373c"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-byte-es.mp3",
+      "sha256": "ab546a02a8096c4c9dd16a679b4593f6b5d6e758e33fac7b05654b7f7f428de3"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-flux-en.mp3",
+      "sha256": "42a3b14f119cacf12edb5c0c1cd144f8c03a61b480020415373a69aace9a90ff"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-flux-es.mp3",
+      "sha256": "731eb4174a000baf7109f7a5000f7985c9b5dc25e6ef3a1af4bd23b479e828c6"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-glitch-en.mp3",
+      "sha256": "21ee463aa1c3169247c8c539b58f0b8b59e111dabb20606b1b66ca3b486cb64c"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-glitch-es.mp3",
+      "sha256": "f5d011be1f0de70d6dc32652f1829d84548dfa24499f875f874b4ecb8ea9f71b"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-halo-en.mp3",
+      "sha256": "4e491bd39616355d8bed4f30ded5168f2053af75164bdafdf4f09d3f63ce2962"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-halo-es.mp3",
+      "sha256": "8f8f0336fa1432ead1083569e1a5c37a6ef92535d17bdcc7eca6b4a10c9df6fd"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-iris-en.mp3",
+      "sha256": "3a3259519e48dc660a932ac3fad6fcc32680ef4faa097718438f32dc363bd8f4"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-iris-es.mp3",
+      "sha256": "76b6ce89e45334de0fd40203af995b46be29a894245a3d57450fc64694021deb"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-keo-en.mp3",
+      "sha256": "4c03dce973ca31081bdc748f46b8110329ef3db87967f7c3a4ebf613308bd57a"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-keo-es.mp3",
+      "sha256": "6fc563658fc51e2d21b7ee91b7712a7747956253b8db7c3dc3738b42fe7f0be6"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-kora-en.mp3",
+      "sha256": "66c9d272e73a75fb83addd1edb6834a0ed414f5885c730d4615a64e56c68e6c3"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-kora-es.mp3",
+      "sha256": "c34838c834c3240dcd6b6afa8e7396b7cb9c28f49fd345f8e30c5c8246cb5e4a"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-mira-en.mp3",
+      "sha256": "21a3bcf9d077d0136e7b64deae4073e56b21a3b20316d8f35fce5296af8c878a"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-mira-es.mp3",
+      "sha256": "0d333cb731f32b14f8462f3a751d923c8b80087751359f236c3b559481904ab8"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-momo-en.mp3",
+      "sha256": "359ef9db88d89a3595298106323b0a0eaa4e42e4eedb1a7c17b9ffbd2b92bc2f"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-momo-es.mp3",
+      "sha256": "7ebbc54074d998151133fb66bee066a1024457404b3729ab0e32cd0aa5911398"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-nalu-en.mp3",
+      "sha256": "477155da4818f2293768718550e882784d6cc3c7a7141e2e1066ee9c17f68ce9"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-nalu-es.mp3",
+      "sha256": "2b953eef576fc4730a2a9afa9f47d303c9adb786623d35b9758dafeb4d6fcab1"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-noor-en.mp3",
+      "sha256": "788ce5f314ed00e750e165bb7a9031dbe569aa0a19fdabd85a879651e5594ff2"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-noor-es.mp3",
+      "sha256": "e96125154684163392ab49e102b8f8b8255186dd1fd1a4825383cc6da7ae518d"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-orb-en.mp3",
+      "sha256": "3cbbd35ea9abfdd4a4e945074b58cab3e734a7ca52d93a1b0786e22c5781e7a3"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-orb-es.mp3",
+      "sha256": "5c45cb2c28b7df9ae6bc1079ff092b54e9082dea8e113fa38a06d7a05f359047"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-rook-en.mp3",
+      "sha256": "f4a68948714e90a83e647bc0f11bab0d7c9e6a4ca2e43e2991d46baeb8e10620"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-rook-es.mp3",
+      "sha256": "6653a7a7f74137f5b0320d06766a7e351e0141d998fa79a989183865267cb3ac"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-sol-en.mp3",
+      "sha256": "c3ef2994ad6e17ee121e5bb4d676307029ea347bfe7a02885e0ff1712da5d05c"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-sol-es.mp3",
+      "sha256": "781bde4373671fc7557b7ad59685ad1693ac3568db197e4671a746de7462b548"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-vega-en.mp3",
+      "sha256": "de6cae5863bfec3810747c9de7e82f7d20101a7589d4cdc91cd37c73ef02b5fc"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-vega-es.mp3",
+      "sha256": "a7397fb2bc25860424359c5ebdaa4febcf8d5931f77cde838537c553cd0576a6"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-zip-en.mp3",
+      "sha256": "c8426fa4b1d66946c8c77b64c7e6bf17954bccac10e9dd56770d06d40a8ece45"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-zip-es.mp3",
+      "sha256": "1caeb4b170c44cf9d2c2fe2a2429b755cf807052f9652a4d7d7418d2438eb2ec"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-zuri-en.mp3",
+      "sha256": "40b2d6022e9c6a11a0c8a8059c053fd7d9730441b42778c45b49692cec8431ec"
+    },
+    {
+      "path": "android/app/src/main/assets/voice/select-zuri-es.mp3",
+      "sha256": "244b69b196704687b79bb38fce83a0b427e7fa8507376f13565eff333d39f39b"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/MainActivity.kt",
+      "sha256": "aac57923424f4cbc0415f344400b55c8c68be30845820d3febf6ae80e191fbad"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/BillingCoordinator.kt",
+      "sha256": "9f7696041786fcc2ace76df15de13d1155957bd2b26a517e7f14621ba774cf61"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/BillingJournal.kt",
+      "sha256": "48e1bdaf159888d741b414c51188bbf9afc35e2e3e6fa925851ed15f361d4bac"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/BillingModels.kt",
+      "sha256": "61bffd68022208dfdd07c78b2a98eac77367073fec5d39f128d28e538a646a77"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/BillingPolicy.kt",
+      "sha256": "90685b7e4b2112201b4f5511e04afe29e961829d48e31dd83e23af3193eb7d1b"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/BillingStore.kt",
+      "sha256": "ee2b2d6e2b0a75fa32edd81357d28d5e5090d1d23563c50e4efa612b97f07622"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/billing/RevenueCatClient.kt",
+      "sha256": "edba75031059d4153021b8f49517b1d156b76c84523ce8148a077881433bffb0"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/AccountCleanup.kt",
+      "sha256": "2c6f79825f6be7a5cd223b93cd218de89cc773d9d5d2a11973bf74b4b43621c4"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/AccountDeletionEvents.kt",
+      "sha256": "95433c88d513414718dd5586feffed07d34a82ad983d03b525193cb4cd5ae22e"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/AccountDeletionPolicy.kt",
+      "sha256": "dca3108f18bc83a91262357cd41626856bc8670d0261be9e78fb0b36db2625c1"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/AccountFence.kt",
+      "sha256": "f752cf7f4b4b6d181d15bd051a1b760e8831e7dd9111ee681bddfcb19df21666"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/AuthGuards.kt",
+      "sha256": "0d7c433888a313e5646b460e8df20ac373e73fd1b0383c376abd67b0ed1a18bb"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/BobbyLocales.kt",
+      "sha256": "34c318968da998aa5c9cd45d344750f209d82a57530ab3f4f16fcd2f2a8f27ab"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/BobbyQuotaState.kt",
+      "sha256": "91c3787a5c2eb9c982cf7e68301e5403f301a52f3e3add4d57cc5557bbeb841c"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/BobbyRepository.kt",
+      "sha256": "54ad8611d79ba92dc01eafab76b5ecd192330069d527e83aa0c9b4e3f703cbce"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/BriefingSettingsPolicy.kt",
+      "sha256": "4f9f57d6ca7961c33d86c9f13838fd9c44a5e3a32336a8089e18bfe7c3aecabf"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/CONTRACTS.md",
+      "sha256": "26a7640056c3049eeef825a35882c4e3d8cced7da618c74c361c2e48f33b808e"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/CouponRedemption.kt",
+      "sha256": "8d85cb68fa2ee6e238b76772b681692c124ca35ea6f69b756db60f2b6459251d"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/DeskStreamParser.kt",
+      "sha256": "f758db035e5afad0296383e2bcc878bcee62a5ccaad4e1e456c40c4fbd01a91f"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/Models.kt",
+      "sha256": "752b55300a12b87d354044c1e03c1bdbe3b88e40f3abefca97180a2c5ca40a0d"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/SecureStore.kt",
+      "sha256": "a5b0291ea6e029fa7a8cf5cc9831da0b84f5e3b139d6807e55fc77254a1bed48"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/VoicePreference.kt",
+      "sha256": "1f455ce5fa49440aeac7b324e7b0fdfea0dbec9a1e2029092814eb17355ab22f"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/equipment/EquipmentRules.kt",
+      "sha256": "cabaef19a20f4b643f1539b966bac19eb58a2870b78da59bd7e751ac63b48579"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/equipment/EquipmentStage.kt",
+      "sha256": "e4ac28b576834be9e09d9b12f02482aefa01c43e2dfcf318eba5158f33f4ddd9"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/equipment/EquipmentStore.kt",
+      "sha256": "80c7aabaa243aab87a5d13b14f9d6404226c84c4777de0c254819f66d67fd7c2"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/equipment/PROVENANCE.md",
+      "sha256": "2fc11550bdf0e1f5888ee6335fa149265c9f093be6a214ee23ea6b61e1b6237c"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/equipment/generate_catalog.py",
+      "sha256": "d82488bc40acde87582f59a3043fad8f75bdbec5ceff200391b6497bc8863c45"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/NucleoPolicy.kt",
+      "sha256": "11a5440ebbd520e0a6137628e0b23b153bb658086b7b1e25705218a09079aa3f"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/NucleoReadModel.kt",
+      "sha256": "3e504a49217f1f89667802ec8d7a98a0da5283fd31e8627e9c7c7db5cad7af63"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/NucleoSession.kt",
+      "sha256": "2f3c103d4fb4ddf8d4b5c8507d9c7aa5d414e0203690e31dce66fafe693ed8bf"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/NucleoStateStore.kt",
+      "sha256": "2fb889e93abb6c10b993422546d0e33ff101847520a83e5cbcd406e120ac3f70"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/ProfileProgressPolicy.kt",
+      "sha256": "e98712c8a2fe6a12d77cf5285d04bf4718374c55bf956538d6675bac830cca22"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/nucleo/ReadPresentationPolicy.kt",
+      "sha256": "888cde8bdfb9328c8104e42e3483b2b3287973e198f0cc7f0e96834584e34cbf"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/AndroidVoice.kt",
+      "sha256": "28cd54a84be129f02775ccbd2ea6740f4b772bfc4f9f9ba74a8c5dc2394928b6"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/AvatarShareCard.kt",
+      "sha256": "6443598517dd985375b014cc73a11f15966c59171af107d000067e35b6a037c8"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/BriefingNarrator.kt",
+      "sha256": "6c7b0c32634024dc3c81dcec9313a5fca90ac519bdb9ed99a97d1d7abab844f5"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/BriefingReminders.kt",
+      "sha256": "2e986b17b9807ec0e11cf171c06322df32e6edf7b1d245bfd0eb4d3afab196f0"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/DictationState.kt",
+      "sha256": "e9c13b2457b13410758f83d1428477c8929e525c2010ff04d83151ec6daca8a7"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/NucleoWebView.kt",
+      "sha256": "a185c2057c11d9796d4faf91ab3c1571df61b24fd746c7b6261a751af1c71ff3"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/platform/PlaybackLease.kt",
+      "sha256": "65709c64d15e03632a34d45cfc9f5728c82fc3542b59b8bf640e7622e525fb7f"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/push/PushNotifications.kt",
+      "sha256": "a7797ce7ca5c5a98812b5c6a3df2cca50abd31b77e706093e40fbc4edec07ef3"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/push/PushPolicy.kt",
+      "sha256": "621f626e23f7c08fe797785968796df4d08ce7b0eafacba54299d495005f5cdb"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/push/PushRuntime.kt",
+      "sha256": "4e06475e5573cc36f4398fedbd3281b51c3c84566ac1de206b06a9b857d5cc4c"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/push/PushStore.kt",
+      "sha256": "fd499500679b09639d0ef590003a2761438832c02c90f4ab26903167bf8648ca"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/AccountProfile.kt",
+      "sha256": "63c376154f3c52babfc3d20a20636ccd32099099da4d6e496587d72afbdc727f"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/BobbySheet.kt",
+      "sha256": "42ac7b09fea31016d3ae1b569799daa20132397e3b9b14557693d233da06392e"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/BobbySupportLinks.kt",
+      "sha256": "dcd841ae9d0d4fd7c763da9418102d86ad939149df485d812c3e42a66e8b27e5"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/CouponCelebration.kt",
+      "sha256": "5a006a3177d144173ffb6ed55e6e4ec68b1746189e9ef7c1fccc0a9df1204be6"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/CouponCopy.kt",
+      "sha256": "0c78173f34f361410a0e675ef0ec638273093a12d8381e5c20f48693a6ea4cb1"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/CouponRedemptionContent.kt",
+      "sha256": "6505e390eaa33a511241216715c5a9ece1aa96a161cef497b8707c3867cb58b1"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/DarkSheetSystemBars.kt",
+      "sha256": "0cdb866404fbc392857881cb8cb1f66e5479beb2d77c86bb9b10649bc80d3cd1"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/EquipmentLocker.kt",
+      "sha256": "f9bf805916e385837d8ee30cae227cd7b423c438328768a800484c904a8ea88b"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/ReportContentPolicy.kt",
+      "sha256": "b2a3da742c0dfbffd368f88b128ac5cc4f1bc4394069800382e6650850f9bcd9"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/ReportContentSheet.kt",
+      "sha256": "cef0d39df802955afee72f70b2048a1b482e341f6dc4b93fba548fe8370bd5af"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandFirstVisit.kt",
+      "sha256": "5949f17806d59c648037f82a61b1754977476cff3934245438c678aed60fa7e5"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandHelpCopy.kt",
+      "sha256": "a8cebd51f5a75b0e32065676921215730d252e57adcbdbb5252486d893d21fc4"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandHelpDialog.kt",
+      "sha256": "5dc15b5be8a9d12408e4a3c6c5ae515947398599dfd6d2edcc5ae9d697ae5750"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandProjection.kt",
+      "sha256": "5fb51c835b81a5b3a023a811e91e8d6eab65ef363a433173f45e4a5395add733"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandSheet.kt",
+      "sha256": "a8eadfea29b8c2888d91dc115c9c4d79721cf09e64d40f988b00ff1840a2b935"
+    },
+    {
+      "path": "android/app/src/main/res/drawable/ic_notification.xml",
+      "sha256": "20a8409ef0cb4be78ac16175f36ebaff83100b315347c3a5c284237953430900"
+    },
+    {
+      "path": "android/app/src/main/res/mipmap-nodpi/ic_launcher.png",
+      "sha256": "93b76ecba89a78807d3ee9d4449d8865f0dbbddbcc5cb6417514a69d8a7310c5"
+    },
+    {
+      "path": "android/app/src/main/res/values-v27/styles.xml",
+      "sha256": "a6cebfcefef967def5a18fb27e99d41d06df6a52ee682fe9c71fecf8c87ce1fd"
+    },
+    {
+      "path": "android/app/src/main/res/values/styles.xml",
+      "sha256": "2bbac0231e4f51554194bbc42cd1b38c1129c235837fb0e64a0076a4c65991fe"
+    },
+    {
+      "path": "android/app/src/main/res/xml/avatar_share_paths.xml",
+      "sha256": "a56e17d8fd1e09c58c725b4527daf55b7711719f16dbca13365c31fa04adc21b"
+    },
+    {
+      "path": "android/app/src/main/res/xml/backup_rules.xml",
+      "sha256": "2c5c697984f4c52b526337ab61113f5843e0bfc6af4722374916ffe6da38dd9a"
+    },
+    {
+      "path": "android/app/src/main/res/xml/data_extraction_rules.xml",
+      "sha256": "8b55ff5489071bb19a4e89967b604a16c0e4d1e87a2df3c73c64417314a59f22"
+    },
+    {
+      "path": "android/app/src/noFcm/java/xyz/bobbyprotocol/android/push/PushRuntimeFactory.kt",
+      "sha256": "be08c9fa424faa8d3139f2ea45f531880f312d9f2cbd0270f7cf29c60354d990"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/billing/BillingCoordinatorTest.kt",
+      "sha256": "af1e5507faea3a8cee6e9d3cf2be61a416b88266eb3cdf1664d1b5b0967cf43a"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/billing/BillingPolicyTest.kt",
+      "sha256": "3c6d858376c05b9027155c645662a92df63d41dbf25152478e3ee6258126b772"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/billing/BillingPricingPolicyTest.kt",
+      "sha256": "8bae38bd532239098d84bec14610b34b68984f7866068cce786994255a31acb8"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/AccountDeletionEventsTest.kt",
+      "sha256": "3d9e5e90724521b8e00ceec07b207c236b6596cc47310aea48dde81b0b27c0e6"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/AccountDeletionPolicyTest.kt",
+      "sha256": "bef8dd86bf8909f2ad4c583d0fec0049324ba9736065b1727c1a13abb4d76fab"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/AccountFenceTest.kt",
+      "sha256": "14b49df0aa455ea730d029ef81c74e1d48e4ac059575838b7aaaca66d54ea51b"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/AuthGuardsTest.kt",
+      "sha256": "7a1b59dbb0d7197f8a349cfafe56b68ca3d6e391270fc8baee7e6f7414f4ea8c"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/BobbyLocalesTest.kt",
+      "sha256": "2e6a12eafc4743277a9abbd7567f86d09c2e792fcf32a2cc59ea2412fd0de05c"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/BobbyParsersTest.kt",
+      "sha256": "9ca332381c70e7676a8c88dc3863b4216506043333d99cece29a8448d4c483da"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/BobbyQuotaStateTest.kt",
+      "sha256": "e2aa2101256d6280b05fc9d5d55f6e32b6f18da1f7b25b88385764e922c611eb"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/BriefingSettingsPolicyTest.kt",
+      "sha256": "f534a8c26bc20ab2fcac01c8d0518fd09ca61352289de99251b36f61fbf2d495"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/CouponRedemptionTest.kt",
+      "sha256": "6821d56b2dedfae875ab06417752e02e1ead5f9f69a33aff0c121e351578e1bc"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/VoicePreferenceTest.kt",
+      "sha256": "35aae614b9e6ceff3ddc1c23a90cd05adc615131e839a2cc9d74ec4cfe1f6896"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/equipment/EquipmentRulesTest.kt",
+      "sha256": "5c80646e0b7fd0f43480105d18f1fe9e651f2d2f495d484affb3ad70ce00c274"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/nucleo/NucleoPolicyTest.kt",
+      "sha256": "55a6156652f743dc92c22f87a7908808868ac7d082a3b0aa23d97e6e0b6974d4"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/nucleo/NucleoReadModelTest.kt",
+      "sha256": "172d62cbd0cc641ce9b07d48272a4356b8250a38f15206f1529ec4e5003ba190"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/nucleo/ProfileProgressPolicyTest.kt",
+      "sha256": "e84ff07f82abce599e4e92cac7f11d8728a7c5017e6ab8a072e51dce3db318b8"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/nucleo/ReadPresentationPolicyTest.kt",
+      "sha256": "d2a7fceb20e09df9c0d4675cf715c420d0a9e12005a723ce2fe9bd94438622e8"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/platform/DictationStateTest.kt",
+      "sha256": "74636d649c3d90026ed5f7a7ab681db5be0c008debcd2c7882b3aefa8bdce125"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/platform/PlaybackLeaseTest.kt",
+      "sha256": "2f5b85615197931f43538df20ed37ad12035b9dec57629310c8cd3ded5d49746"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/push/PushPolicyTest.kt",
+      "sha256": "b7bbd9993d61b46eede3ea5977209a65994026795dcf56726769572093053277"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/BobbySupportLinksTest.kt",
+      "sha256": "f3f384df671010d3e51a90492fc344beff38dd57ccee1a2bdb52c7efb9242591"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/ProfileLandMetricsTest.kt",
+      "sha256": "407eafa2c72dbd09f7742b269d4abb1d380a8485f3d3bd6c5570dd4415088ee5"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/ReportContentPolicyTest.kt",
+      "sha256": "66b997369826be6562446b18f0e37fb219dca14b09163b3b6316ecfb7c8bb371"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/TraderLandFirstVisitTest.kt",
+      "sha256": "96c87a7fb6047bf547b956b05df6c0322846ac8000eb9d2db874d75577f9d931"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/TraderLandHelpCopyTest.kt",
+      "sha256": "22efba4921e07d4df65ecb4c431f1e872a23272b05bad8a4a2daf4a31b259b91"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/TraderLandProjectionTest.kt",
+      "sha256": "ce135ba69c992f11e84b09b3ce6e5498301e661ee357a20dc04e5e97e13cf1cf"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/TraderLandRulesTest.kt",
+      "sha256": "deb6c6243bfea20d40affc9baaa544d82ae74433701269388cf4dc2501a8379a"
+    },
+    {
+      "path": "android/build.gradle.kts",
+      "sha256": "52f9b95bdc89db4b3641d7c0684e8d92f62cbfdd5c83168a9eead5ff041b4c95"
+    },
+    {
+      "path": "android/gradle.properties",
+      "sha256": "f694ce2981206ff7cefa930919357b049bc10d34142ad09583aada32239b3e34"
+    },
+    {
+      "path": "android/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "81a82aaea5abcc8ff68b3dfcb58b3c3c429378efd98e7433460610fecd7ae45f"
+    },
+    {
+      "path": "android/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "1bb6d43ff8af30abb0eaf03fe58f636ed9b37f758a748bf30a9cebd809639c9d"
+    },
+    {
+      "path": "android/gradlew",
+      "sha256": "734b3879d3501dce471cf0522d3bcbafe76873d9fc5129345b67fb43bd15e933"
+    },
+    {
+      "path": "android/gradlew.bat",
+      "sha256": "57931b17dd228e5c24dac90e815d0bf82477e831a4618dfab4136f5446b42a9f"
+    },
+    {
+      "path": "android/local.properties.example",
+      "sha256": "dcc58d76b4d132ebd1ec0244ce8e11c5a408d02069314c5ae60da6da61ca870d"
+    },
+    {
+      "path": "android/nucleo/PROVENANCE.md",
+      "sha256": "79485807d623516635a3a2c13c806674b78d0b207fe066da36f651a64ce075e3"
+    },
+    {
+      "path": "android/nucleo/build.py",
+      "sha256": "5a4a8f4305d9ed265a10d3d4f38b9f50ed676fd3c7da709c9f6d9766775ae7f9"
+    },
+    {
+      "path": "android/nucleo/companions.json",
+      "sha256": "8c0f23c4c718ac8eabdd7273da4d622986dc7078cc578d6218694d8fb4ea2731"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/MascotScene.ts",
+      "sha256": "4ae13fa9fc00d4ad43daaf57594c08ef6e176ddee32948e4282ed098d6166c0d"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/PROVENANCE.md",
+      "sha256": "983120fed10320f8a6ac38967e0fe276e722571a45fab2c32b061374d76aef0c"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/build.mjs",
+      "sha256": "fcdb75e45a045bf7fdbccb96007f2f43e07239ce463e58997de2fde43afdd929"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/main.ts",
+      "sha256": "e697af3f5df404e4083e1f149200d65b9b3a4de4d59b827a291e4dbfb407a718"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/mascot.ts",
+      "sha256": "2dcffb2f315746813f8c36e33ac1a22d56583e0e904fbd04b3df29adceaeef86"
+    },
+    {
+      "path": "android/nucleo/equipment-stage/secure-three-uuid.mjs",
+      "sha256": "92988767352c96d92bb2d02dc4135209fe1b827a6e5744dd8cf5ba9b01438054"
+    },
+    {
+      "path": "android/nucleo/risk-notice.json",
+      "sha256": "f44d3e7fa47fa054f6e7abb187bcd3fe7be4ece396d5c7ad53503499a2deb98f"
+    },
+    {
+      "path": "android/nucleo/src/app/10-core.js",
+      "sha256": "2bddc379c2438f18362f8aea2c7cd024380c7cefc016b83ce48365b7cc644036"
+    },
+    {
+      "path": "android/nucleo/src/app/20-gl.js",
+      "sha256": "47a4764c12f6022f35a76346b6480c60c270846b6250c1ab20600c6c025afe69"
+    },
+    {
+      "path": "android/nucleo/src/app/30-dom.js",
+      "sha256": "20e39117b0e15d8a7797c866e6865ccd052960b28bc5d3c1acafb90b28b5f06a"
+    },
+    {
+      "path": "android/nucleo/src/app/40-strings.js",
+      "sha256": "20dc4c1017086e0c0568007310e85ee1cf0feb9cae3d4481fcb15c7d006e5eae"
+    },
+    {
+      "path": "android/nucleo/src/app/50-actors.js",
+      "sha256": "a6c56661eabb645e63d0f25e4fc7a5b26add863123eebdf700150a6aaad4f560"
+    },
+    {
+      "path": "android/nucleo/src/app/55-read.js",
+      "sha256": "84d9b4175b4bd7fc3918e70df69f3ae49248ab3692c3785f3ee7aea64314caae"
+    },
+    {
+      "path": "android/nucleo/src/app/60-fsm.js",
+      "sha256": "0369a19e2ed185b236715a8349c678d797fc1c34e6c4f24adf776ac3e779dbfd"
+    },
+    {
+      "path": "android/nucleo/src/app/70-input.js",
+      "sha256": "4257f6a86c419b437321f9be5ac885d033518d3d7c91e803d552fb45bb7d2779"
+    },
+    {
+      "path": "android/nucleo/src/app/80-render.js",
+      "sha256": "597b4dd5aa78fc313de9622dab1a7f60f59eaf6a03f979d8d55dd0c3460d04c6"
+    },
+    {
+      "path": "android/nucleo/src/app/90-loop.js",
+      "sha256": "b62a8572abe7ac8ea2e07cddb348739be964dc42afbbfb4c54301ca0799a84ab"
+    },
+    {
+      "path": "android/nucleo/src/app/92-harness.js",
+      "sha256": "00e2a08e7f54633e0be36ef75a3ce7b2811a40b122119078db43bb41b8ed35c8"
+    },
+    {
+      "path": "android/nucleo/src/app/99-boot.js",
+      "sha256": "d15fcc89a8d82cf4d1d8f687f9ebcf1d22b1f3b505414c7711371179e353c02b"
+    },
+    {
+      "path": "android/nucleo/src/app/template.html",
+      "sha256": "b556204dbeace549b300facf2ad745619ad568968aecb842ba3e71f36074f604"
+    },
+    {
+      "path": "android/nucleo/src/contract/10-contract.js",
+      "sha256": "2de01b3ed9183187c249b1fbd0b88f8e451c44c11ef4f8964a016422b887ebf5"
+    },
+    {
+      "path": "android/nucleo/src/contract/template.html",
+      "sha256": "88245eedea11b93268b9b6638d807d833538e4f44a1d9b0d23a16f354c1251e4"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/10-core.js",
+      "sha256": "f1ec20258b42f2ce20d75f1ad0237f6d7079734e947b6f3353d11e62fd0a6b14"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/20-glass.js",
+      "sha256": "a49271a569ab021afe6f3b423338b17d3ca65d7b9ea9d0195b94866aa048413f"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/30-dom.js",
+      "sha256": "5b038e10ee107fff45edd21a44de2b1ca42537d35d5bef1979c4d980fc2907f2"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/40-strings.js",
+      "sha256": "db3f757f243d3603c21bbf7f211ba2a4806e49d7e6a3f1e5dbfdd07e533c0d35"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/50-world.js",
+      "sha256": "bb81b792844448112bd0b3aef9328be5144703c74e89ffa5f5dbb89a2fd90df6"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/60-fsm.js",
+      "sha256": "5d63c3fff022e904abb8edca6e966295b1d5a671519843120b5e117e144f619f"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/70-sim.js",
+      "sha256": "96f50a2a837e5a3827468974a8f594ea447468996c129ff48e129c2ac0eff268"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/80-render-glass.js",
+      "sha256": "80156815636c7800265ac0a522604f4c9bbd0bfdcea6cd2b85b0f7ccd40d3812"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/82-render-dom.js",
+      "sha256": "1ad461777a5aed03f5c5c4c7b680591056466650cb704ff16aeead45de290940"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/90-input.js",
+      "sha256": "994acaf87188278d97d730bb4085ebe55a4c05bf23882596487fe38941dcb914"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/95-harness.js",
+      "sha256": "4d63101d50b9f927737103c136c792cb73747a9f59ad2d7c26221b16fd401f88"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/99-boot.js",
+      "sha256": "e8a2097bd2ac50dfe3ee53822bc88cd6fec156ec921fa91ccdfab2527fbbcb32"
+    },
+    {
+      "path": "android/nucleo/src/onboarding/template.html",
+      "sha256": "69e02c791b29f080ab83e84f82f025a9ca2299e9ffbe552253654496f85a1199"
+    },
+    {
+      "path": "android/nucleo/src/shared/05-locale.js",
+      "sha256": "775a6c25ae2d09ba97f49e350008a663388caec3d16e6093fa4bbba64a0e8ef2"
+    },
+    {
+      "path": "android/nucleo/src/shared/10-bridge.js",
+      "sha256": "92cd9c7407d6ab73a767e511de23039a392a95e6cfec045c3a8ade4166ac7227"
+    },
+    {
+      "path": "android/nucleo/src/shared/20-read-model.js",
+      "sha256": "493de523cf3313c926d0bba7d8f90af2f23fbe5476da6fef61f5da44e6751be7"
+    },
+    {
+      "path": "android/nucleo/tests/ACCEPTANCE.md",
+      "sha256": "3bde4d5b4d4c4d511fc70bce7e3540636b96d6f6670e0b86909cc23cecd0f559"
+    },
+    {
+      "path": "android/nucleo/tests/account-isolation.test.mjs",
+      "sha256": "ed748565ed094e158a7f201f59c30ad7ef31d3d056b8c4608512ae750e3661ed"
+    },
+    {
+      "path": "android/nucleo/tests/agree-release.test.mjs",
+      "sha256": "c698f1a51b5bf4e8ddbf45839aa248d83a92cd792b507ccd2769fa94c7a62116"
+    },
+    {
+      "path": "android/nucleo/tests/bridge-android.test.mjs",
+      "sha256": "923cdb90537ed76334ec376fe9dce4835aa9822b831fbe65478a251f9a15ee43"
+    },
+    {
+      "path": "android/nucleo/tests/coupon-copy.test.mjs",
+      "sha256": "a42d71801aeee4f0e99434e728459494709039a05946346c8e710f96912d5b3e"
+    },
+    {
+      "path": "android/nucleo/tests/first-read-cards.test.mjs",
+      "sha256": "026c0ed9a7b16b34d4e4f8ec555073e513551a11a61d8256abf66e1a6ba30c1d"
+    },
+    {
+      "path": "android/nucleo/tests/fixtures/ask/btc.json",
+      "sha256": "2d4af2ee9a27106dc839cbeac182b55bfb171bdda4705a8d53ebec2af00020b5"
+    },
+    {
+      "path": "android/nucleo/tests/fixtures/ask/nvda.json",
+      "sha256": "5a7b737ae089e7b1fd19e42a674080723b7e4ff28341aa48d501cb5bf1677c0d"
+    },
+    {
+      "path": "android/nucleo/tests/localization-android.test.mjs",
+      "sha256": "788526861d986fbecccb56dfa6a1946381c671acf96c780c66dae15253d98263"
+    },
+    {
+      "path": "android/nucleo/tests/pill-input.test.mjs",
+      "sha256": "56fce3e721420ff5e084a6650d4da5957a75578a75d7621bf6857d2547ffd39e"
+    },
+    {
+      "path": "android/nucleo/tests/platform-android.test.mjs",
+      "sha256": "95c511ef809cfaa2f5f70ac12d5378dad60eadb89792d12998addb93733ec46e"
+    },
+    {
+      "path": "android/nucleo/tests/presentation-telemetry.test.mjs",
+      "sha256": "aa2a4e7ff5ea3ff7a28e85e076e380b7e6eff9fe2e834d21e6cd72d0d24ee90e"
+    },
+    {
+      "path": "android/nucleo/tests/read-cards-hints.test.mjs",
+      "sha256": "6ebfe1529b1bf0017e818d95cd545fcd7319a4391ec4f8e4a3e443089f07d319"
+    },
+    {
+      "path": "android/nucleo/tests/risk-layout.test.mjs",
+      "sha256": "3b152488b04df104e275977c5cc247ea9b1bfc11bb4de534e4df6b9198400f2c"
+    },
+    {
+      "path": "android/nucleo/tests/risk-profile-access.test.mjs",
+      "sha256": "c76be4af0c5ddf1155817c8fd855a748234a684abecc5b3ece3e4e66d94f4705"
+    },
+    {
+      "path": "android/nucleo/tests/secure-three-uuid.test.mjs",
+      "sha256": "792261b58c5543edf22fa107dce8b555060c285631924dfc0ca104717ee54994"
+    },
+    {
+      "path": "android/nucleo/tests/six-languages.test.mjs",
+      "sha256": "73d9a0fb92bcae37a9d8616421ff96bee3b9c6daff87b80ea2022f6cd4b44beb"
+    },
+    {
+      "path": "android/settings.gradle.kts",
+      "sha256": "98805a48e01e9262e55cc859b1377b7a00d9bc75e52c2bc8dbfa82ee8de51538"
+    },
+    {
+      "path": "android/tools/build-play-bundle.py",
+      "sha256": "6436dfdc93b30b5cb7f10e9ece4dfbb8027cd21d52f07952df85f18db1fc8940"
+    },
+    {
+      "path": "android/tools/collect-evidence.py",
+      "sha256": "74b8fcd807338f712ecc42d526bf704ca04a9a088d878ef7586465f0bdac5212"
+    },
+    {
+      "path": "android/twa-manifest.json",
+      "sha256": "db11cec98d26b02a7d6cb4593b596067054626c246942408be5fd5dd091eec72"
+    },
+    {
+      "path": "eslint.config.js",
+      "sha256": "f7aef00382299352530a4950f095326dd6a259b9b9b80f5b41e298881b05f500"
+    },
+    {
+      "path": "ios/Bobby/Sources/CouponCopy.swift",
+      "sha256": "cff702731648f7ba2419371a76d647835fcec38efa23e4715fda8e1c4c6951e1"
+    },
+    {
+      "path": "shared/coupon-copy.json",
+      "sha256": "66f92b4c224a90b46e378ad7f6e002a54c3b6da4abc209f14c6e687410aa671f"
+    },
+    {
+      "path": "vercel.json",
+      "sha256": "8633e5768bd21533c3ecdd03f450c5aa951590f658d8203f3bbae7c2b4a9c307"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+scenario 1 ok: one sell settles one lot, idempotent
+scenario 2 ok: out-of-order receipts converge, chain order respected, later-recorded earlier sell wins
+scenario 3 ok: concurrent confirms never over-consume a lot
+swap ledger (Postgres) tests passed

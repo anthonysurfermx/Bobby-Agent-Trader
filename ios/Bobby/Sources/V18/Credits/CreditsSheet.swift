@@ -1,0 +1,372 @@
+// Credits (1.8): the one place that says what you have, how to get more, and what "Restore" is for.
+// It opens from the Núcleo (`NucleoRoute.credits`, a nudge tap) and from the profile's Credits row.
+//   WHAT YOU HAVE   the server's balances, line by line (CreditsBalance)
+//   GET MORE        invite friends · redeem a code · Bobby Pro, each with one honest sentence
+//   ALREADY PAID?   Restore Purchases, explained before the tap, answered under the row
+// Restore Purchases is here signed in or signed out (App Review 3.1.1). Nothing is fetched before
+// the risk notice is accepted (R11): `CreditsFlow` holds that rule and the restore steps. The
+// invite, coupon and Bobby Pro sheets open over this one.
+import AuthenticationServices
+import StoreKit
+import SwiftUI
+
+struct CreditsSheet: View {
+    @ObservedObject private var profile: AgentProfile
+    private let proPurchasable: @MainActor () -> Bool
+    private let afterSignIn: () async -> Void
+    private let onRead: () -> Void
+    /// Leaves Credits for the place where the risk notice can be accepted; nil where there is none.
+    private let onRiskNotice: (() -> Void)?
+    private let onClose: () -> Void
+
+    @ObservedObject private var account = AccountSession.shared
+    @ObservedObject private var reads = BobbyAccessCenter.shared
+    @ObservedObject private var levels = NucleoLevelCenter.shared
+    /// Its package arriving changes what the invite row may promise.
+    @ObservedObject private var store = BobbyStore.shared
+    @StateObject private var flow: CreditsFlow
+    @State private var inner: Inner?
+    @State private var manageSubscription = false
+
+    /// The sheets this screen opens over itself.
+    private enum Inner: String, Identifiable {
+        case invite, coupon, pro
+        var id: String { rawValue }
+    }
+
+    /// From the Núcleo (`NucleoRoute.credits`).
+    @MainActor init(session: NucleoSession, onClose: @escaping () -> Void) {
+        self.init(profile: session.profile,
+                  proPurchasable: { session.proPurchasable },
+                  afterSignIn: { await session.signedInFromSheet() },
+                  onRead: onClose,
+                  onRiskNotice: { session.switchSheet(to: .riskNotice) },
+                  onClose: onClose)
+    }
+
+    /// From the profile. `onRead` closes everything so the person lands where they ask (the coupon's "Make a read").
+    @MainActor init(profile: AgentProfile, proPurchasable: @escaping @MainActor () -> Bool = { BobbyStore.shared.proPurchasable },
+         afterSignIn: @escaping () async -> Void, onRead: @escaping () -> Void, onRiskNotice: (() -> Void)? = nil,
+         onClose: @escaping () -> Void) {
+        self.profile = profile
+        self.proPurchasable = proPurchasable
+        self.afterSignIn = afterSignIn
+        self.onRead = onRead
+        self.onRiskNotice = onRiskNotice
+        self.onClose = onClose
+        _flow = StateObject(wrappedValue: CreditsFlow(.live(profile: profile, afterSignIn: afterSignIn)))
+    }
+
+    private var snapshot: CreditsSnapshot {
+        CreditsSnapshot(access: reads.access ?? levels.quickAccess, meters: levels.meters, referral: levels.referral,
+                        subscription: reads.subscription, proPurchasable: proPurchasable(), signedIn: account.isSignedIn,
+                        freeReadsPerWeek: CreditsPlans.freeReadsPerWeek, rewardDays: levels.rewardDays, maxFriends: levels.maxFriends)
+    }
+
+    var body: some View {
+        let snapshot = self.snapshot
+        CreditsScreen(riskAccepted: profile.acceptedRiskNotice, snapshot: snapshot, loading: flow.loading, loadFailed: flow.loadFailed,
+                      restore: flow.restore, accountError: account.lastError,
+                      actions: CreditsScreen.Actions(
+                        close: onClose,
+                        invite: { inner = .invite },
+                        coupon: { inner = .coupon },
+                        pro: { inner = .pro },
+                        restore: { Task { await flow.tapRestore() } },
+                        reload: { Task { await flow.refresh() } },
+                        manage: { manageSubscription = true },
+                        riskNotice: onRiskNotice,
+                        prepareApple: { account.prepareAppleRequest($0) },
+                        completeApple: { result, thenRestore in
+                            Task { await flow.signIn(thenRestore: thenRestore) { await account.completeApple(result) } }
+                        }))
+            .manageSubscriptionsSheet(isPresented: $manageSubscription)
+            .task { await flow.refresh() }
+            .onAppear { acknowledge(snapshot) }
+            .onChange(of: CreditsNudges.giftTotal(access: snapshot.access, meters: snapshot.meters)) { _, _ in acknowledge(self.snapshot) }
+            .onReceive(account.$session.map { $0?.userId }.removeDuplicates().dropFirst()) { _ in flow.accountChanged() }
+            .sheet(item: $inner, onDismiss: { Task { await flow.refresh() } }) { destination in
+                switch destination {
+                case .invite:
+                    NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: proPurchasable(), reason: nil,
+                                      onPro: {
+                                          // The invite sheet's Bobby Pro card: the paywall follows once it is gone.
+                                          inner = nil
+                                          DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { inner = .pro }
+                                      }, onClose: { inner = nil }, afterSignIn: afterSignIn)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                        .presentationBackground(Theme.nucleoSurface)
+                case .coupon:
+                    CouponRedemptionSheet(afterSignIn: afterSignIn,
+                                          onRead: { inner = nil; onRead() }) { inner = nil }
+                        .presentationDetents([.large])
+                        .presentationDragIndicator(.visible)
+                        .presentationBackground(Theme.nucleoSurface)
+                case .pro:
+                    NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
+                                       afterSignIn: afterSignIn, onOutcome: { _ in }) { inner = nil }
+                }
+            }
+    }
+
+    /// The gifted balance is on screen: the glass has no reason to announce it again.
+    private func acknowledge(_ snapshot: CreditsSnapshot) {
+        guard profile.acceptedRiskNotice, snapshot.access != nil else { return }
+        CreditsNudges.acknowledgeGifts()
+    }
+
+}
+
+/// `plans.freeReadsPerWeek` (what a free account gets every week), for the guest's line. The level
+/// centre already reads `/api/bobby-access` and drops this one field, so the Credits screen listens
+/// to that same reply instead of asking the server again. A plan constant: the same for everyone.
+@MainActor
+enum CreditsPlans {
+    private(set) static var freeReadsPerWeek: Int?
+    private static var attached = false
+
+    static func attach() {
+        guard !attached else { return }
+        attached = true
+        let center = NucleoLevelCenter.shared
+        let load = center.load
+        center.load = { auth in
+            let body = try await load(auth)
+            note(body)
+            return body
+        }
+    }
+
+    /// `null` means there is no weekly cap right now; a reply without `plans` says nothing.
+    static func note(_ body: [String: Any]?) {
+        guard let plans = body?["plans"] as? [String: Any] else { return }
+        freeReadsPerWeek = BobbyReadAccess.count(plans["freeReadsPerWeek"]).flatMap { $0 > 0 ? $0 : nil }
+    }
+}
+
+// MARK: - The screen (pure: the live sheet and the review fixtures draw the same view)
+
+/// V18-DESIGN.md, "Credits": rows of state, two quiet doors, restore with its answer under it.
+/// The sentences that used to sit under every row are one tap away, behind ⓘ.
+struct CreditsScreen: View {
+    struct Actions {
+        var close: () -> Void = {}
+        var invite: () -> Void = {}
+        var coupon: () -> Void = {}
+        var pro: () -> Void = {}
+        var restore: () -> Void = {}
+        var reload: () -> Void = {}
+        var manage: () -> Void = {}
+        /// Leaves Credits for the place where the risk notice can be accepted; nil hides the button.
+        var riskNotice: (() -> Void)? = nil
+        var prepareApple: (ASAuthorizationAppleIDRequest) -> Void = { _ in }
+        /// The Apple sheet answered; `thenRestore` when it was asked for from the restore row.
+        var completeApple: (Result<ASAuthorization, Error>, _ thenRestore: Bool) -> Void = { _, _ in }
+    }
+
+    let riskAccepted: Bool
+    let snapshot: CreditsSnapshot
+    var loading = false
+    var loadFailed = false
+    var restore: CreditsRestoreState = .idle
+    /// `AccountSession.lastError` after a sign in that did not finish.
+    var accountError: String? = nil
+    var now = Date()
+    var actions = Actions()
+    @State private var showsDetails = false
+    @State private var showsOtherAccount = false
+
+    private var balance: CreditsBalance { CreditsBalance.make(snapshot, now: now) }
+
+    var body: some View {
+        let balance = self.balance
+        ScrollViewReader { proxy in
+            QuietSheet(title: L.t("Credits", "Créditos"), closeId: "credits-close", onClose: actions.close,
+                       onInfo: riskAccepted && balance.isKnown ? { showsDetails = true } : nil) {
+                VStack(alignment: .leading, spacing: 0) {
+                    have(balance).padding(.top, 14)
+                    if riskAccepted { doors }
+                    restoreBlock(balance)
+                    if balance.manage {
+                        QuietLink(title: L.t("Manage subscription", "Gestionar suscripción"), id: "credits-manage-subscription",
+                                  action: actions.manage)
+                    }
+                }
+            }
+            // The answer to a restore lands under the row: bring it into view, never below the fold.
+            .onAppear { reveal(proxy, animated: false) }
+            .onChange(of: restore) { _, _ in reveal(proxy, animated: true) }
+        }
+        .sheet(isPresented: $showsDetails) {
+            CreditsDetails(balance: balance, snapshot: snapshot) { showsDetails = false }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        }
+        .accessibilityIdentifier("credits")
+    }
+
+    private static let noticeID = "credits-restore-notice"
+
+    private func reveal(_ proxy: ScrollViewProxy, animated: Bool) {
+        guard restoreNotice(balance) != nil else { return }
+        // After the notice is laid out.
+        DispatchQueue.main.async {
+            if animated { withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(Self.noticeID, anchor: .bottom) } }
+            else { proxy.scrollTo(Self.noticeID, anchor: .bottom) }
+        }
+    }
+
+    // MARK: What you have
+
+    @ViewBuilder private func have(_ balance: CreditsBalance) -> some View {
+        if !riskAccepted {
+            VStack(alignment: .leading, spacing: 10) {
+                QuietNote(text: CreditsRestoreNotice.beforeRiskNotice(), id: "credits-risk-required")
+                if let open = actions.riskNotice {
+                    QuietChip(title: L.t("Risk notice", "Aviso de riesgo"), id: "credits-risk-open", action: open)
+                }
+            }
+            .padding(.bottom, 8)
+        } else if balance.isKnown {
+            ForEach(balance.lines.filter { !$0.isGift && $0.kind != .pro }) { line in
+                QuietRow(label: line.label, value: line.face, note: line.faceNote, spoken: line.spoken,
+                         id: "credits-line-\(line.kind.rawValue)")
+            }
+            if let gifts = balance.giftFace {
+                QuietRow(label: L.t("Gifted", "De regalo"), value: gifts, spoken: balance.giftSpoken, id: "credits-line-gifts")
+            }
+            if let pro = balance.line(.pro) {
+                // The plan's state is the row; where there is something to offer, the row is the door.
+                QuietRow(label: pro.label, value: pro.face, note: pro.faceNote, chevron: balance.pro.offersPro, spoken: pro.spoken,
+                         id: balance.pro.offersPro ? "credits-pro" : "credits-line-pro",
+                         action: balance.pro.offersPro ? actions.pro : nil)
+            } else if balance.pro.offersPro {
+                QuietRow(label: "Bobby Pro", chevron: true, id: "credits-pro", action: actions.pro)
+            }
+            if !snapshot.signedIn {
+                if let weekly = snapshot.freeReadsPerWeek {
+                    QuietNote(text: L.t("Free account: \(weekly) Quick reads weekly.", "Cuenta gratis: \(weekly) lecturas Rápidas semanales."),
+                              id: "credits-free-account")
+                        .padding(.top, 14)
+                }
+                signInButton(thenRestore: false)
+                    .padding(.top, 12)
+                    .accessibilityIdentifier("credits-apple-sign-in")
+                if let accountError, restoreNotice(balance)?.action != .signIn { errorLine(accountError) }
+            }
+        } else if loading {
+            ProgressView().tint(Theme.warmMuted)
+                .frame(maxWidth: .infinity, minHeight: 60)
+                .accessibilityIdentifier("credits-loading")
+        } else if loadFailed {
+            VStack(alignment: .leading, spacing: 10) {
+                QuietNote(text: L.t("Balance unavailable.", "Saldo no disponible."))
+                QuietChip(title: L.t("Try again", "Reintentar"), id: "credits-retry", action: actions.reload)
+            }
+            .padding(.bottom, 8)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("credits-unavailable")
+        } else {
+            // Nothing asked yet (the first read is about to start): keep the place, show no number.
+            Color.clear.frame(height: 60)
+        }
+    }
+
+    // MARK: Get more
+
+    private var doors: some View {
+        HStack(spacing: 26) {
+            QuietLink(title: L.t("Invite", "Invitar"), systemImage: "person.2", id: "credits-invite", action: actions.invite)
+            QuietLink(title: L.t("Code", "Código"), systemImage: "gift", id: "credits-coupon", action: actions.coupon)
+        }
+        .padding(.top, 10)
+    }
+
+    // MARK: Restore
+
+    @ViewBuilder private func restoreBlock(_ balance: CreditsBalance) -> some View {
+        HStack(spacing: 8) {
+            QuietLink(title: restore == .running ? L.t("Checking…", "Comprobando…") : L.t("Restore Purchases", "Restaurar compras"),
+                      systemImage: "arrow.clockwise", id: "account-restore", action: actions.restore)
+                .disabled(restore == .running || !riskAccepted)
+            if restore == .running { ProgressView().controlSize(.small).tint(Theme.warmMuted) }
+        }
+        if let notice = restoreNotice(balance) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(notice.text).quietFont(14, relativeTo: .callout).foregroundStyle(Theme.cream).quietWraps()
+                    .accessibilityIdentifier("credits-restore-text")
+                if let more = notice.more {
+                    QuietLink(title: more.title, id: "credits-restore-more") {
+                        withAnimation(.easeOut(duration: 0.2)) { showsOtherAccount.toggle() }
+                    }
+                    if showsOtherAccount { QuietNote(text: more.text, id: "credits-restore-more-text") }
+                }
+                switch notice.action {
+                case .signIn:
+                    signInButton(thenRestore: true).accessibilityIdentifier("credits-restore-sign-in")
+                    if let accountError { errorLine(accountError) }
+                case .tryAgain:
+                    QuietChip(title: L.t("Try again", "Reintentar"), id: "credits-restore-retry", action: actions.restore)
+                case nil:
+                    EmptyView()
+                }
+            }
+            .padding(.bottom, 6)
+            .id(Self.noticeID)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier(Self.noticeID)
+            .onAppear { announce(notice.text) }
+            .onChange(of: notice.text) { _, text in announce(text) }
+        }
+    }
+
+    private func restoreNotice(_ balance: CreditsBalance) -> CreditsRestoreNotice? {
+        guard riskAccepted else { return nil }
+        return CreditsRestoreNotice.make(restore, pro: balance.pro, proPurchasable: snapshot.proPurchasable, now: now)
+    }
+
+    private func announce(_ text: String) {
+        if UIAccessibility.isVoiceOverRunning { UIAccessibility.post(notification: .announcement, argument: text) }
+    }
+
+    // MARK: Sign in
+
+    private func signInButton(thenRestore: Bool) -> some View {
+        SignInWithAppleButton(.continue) { request in
+            actions.prepareApple(request)
+        } onCompletion: { result in
+            actions.completeApple(result, thenRestore)
+        }
+        .signInWithAppleButtonStyle(.white)
+        .frame(height: 50)
+        .clipShape(Capsule())
+    }
+
+    private func errorLine(_ text: String) -> some View {
+        QuietNote(text: text, id: "credits-error").padding(.top, 8)
+    }
+}
+
+// MARK: - Details (ⓘ): the sentences that used to sit under every row
+
+struct CreditsDetails: View {
+    let balance: CreditsBalance
+    let snapshot: CreditsSnapshot
+    let onClose: () -> Void
+
+    var body: some View {
+        QuietSheet(title: L.t("Details", "Detalles"), closeId: "credits-details-close", onClose: onClose) {
+            VStack(alignment: .leading, spacing: 12) {
+                QuietNote(text: L.t("1 credit = 1 read", "1 crédito = 1 lectura"))
+                ForEach(balance.lines) { line in QuietNote(text: line.spoken) }
+                QuietNote(text: CreditsBalance.inviteDetail(snapshot))
+                QuietNote(text: L.t("Use this if you paid for Bobby Pro with your Apple Account on another iPhone or after reinstalling. Codes and gifts never need restoring.",
+                                    "Úsalo si pagaste Bobby Pro con tu cuenta de Apple en otro iPhone o después de reinstalar. Los códigos y regalos nunca necesitan restaurarse."))
+            }
+            .padding(.top, 16)
+        }
+        .accessibilityIdentifier("credits-details")
+    }
+}

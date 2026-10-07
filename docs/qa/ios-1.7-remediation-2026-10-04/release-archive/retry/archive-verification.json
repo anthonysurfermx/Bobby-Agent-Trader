@@ -1,0 +1,68 @@
+{
+  "verifiedAtUTC": "2026-10-04T12:41:13.669305+00:00",
+  "archive": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive",
+  "application": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive/Products/Applications/Bobby.app",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "version": "1.7",
+  "build": "63",
+  "archiveInfoSHA256": "04ed840360177a9453ff52f0564928704f80e6ba33ad24e75ed2711a267b755c",
+  "appInfoSHA256": "9867e349f44bbf2c6d45df1494ab7d0cf703fd2a2e5583e855721d208cf453ff",
+  "executableSHA256": "f69898e5004a9f8742984295c48835ebf189d3808a2c00dd246e79866067983c",
+  "archiveApplicationProperties": {
+    "ApplicationPath": "Applications/Bobby.app",
+    "Architectures": [
+      "arm64"
+    ],
+    "CFBundleIdentifier": "xyz.bobbyprotocol.bobby",
+    "CFBundleShortVersionString": "1.7",
+    "CFBundleVersion": "63",
+    "SigningIdentity": "Apple Distribution: GUILLERMO ANTHONY CHAVEZ (QZRTV6CMTT)",
+    "Team": "QZRTV6CMTT"
+  },
+  "entitlements": {
+    "application-identifier": "QZRTV6CMTT.xyz.bobbyprotocol.bobby",
+    "aps-environment": "production",
+    "beta-reports-active": true,
+    "com.apple.developer.applesignin": [
+      "Default"
+    ],
+    "com.apple.developer.team-identifier": "QZRTV6CMTT",
+    "com.apple.security.application-groups": [
+      "group.xyz.bobbyprotocol.bobby"
+    ],
+    "get-task-allow": false
+  },
+  "embeddedProfileUUID": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+  "releaseRevenueCatKeyType": "App Store public SDK key; value omitted",
+  "privacyManifestSHA256": "e7bc9597fd90b6c2b487f342a52844f96d740ad29e9215f11ef82362ec4cf13e",
+  "nucleoResources": [
+    {
+      "path": "Nucleo/app.html",
+      "sha256": "4bf4221c4899b0fb5c50b47cc5294f07d5b499d799c593c18eb4946d90291b76"
+    },
+    {
+      "path": "Nucleo/build-info.json",
+      "sha256": "d42f18295ce596101ab2dfe89716367ce30e26aa67a19cb30dcdccbc081248b7"
+    },
+    {
+      "path": "Nucleo/companions-meta.json",
+      "sha256": "6bea78fce51de95236bbcced27fd9fc5d46b473172dd2d7ed5465fca63633e4c"
+    },
+    {
+      "path": "Nucleo/onboarding.html",
+      "sha256": "571ad78f4dd55126ef4fa43b829a893834a00db159d5e506606fa91a353dc83f"
+    }
+  ],
+  "codesignVerification": "passed",
+  "debugFixtureResources": "absent",
+  "devMockBridgeAndFixtureAssignments": "absent; inert reads of undefined fixtures may remain",
+  "nucleoReleaseBuildInfo": {
+    "builtAt": "2026-10-04T09:40:14Z",
+    "release": true,
+    "pages": [
+      "app",
+      "onboarding"
+    ]
+  },
+  "result": "local signed Release archive verified; remote processing unverified"
+}

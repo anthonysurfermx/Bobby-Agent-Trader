@@ -1,0 +1,12 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["QZRTV6CMTT.xyz.bobbyprotocol.bobby"],
+        "components": [
+          { "/": "/i/*", "comment": "Bobby invitation links" }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "observedAt": "2026-10-04T12:13:43.684311+00:00",
+  "method": "native iPhone Mirroring accessibility UI",
+  "status": "Mac local login required",
+  "passwordEntered": false,
+  "testActionsPerformed": false,
+  "boundary": "Device interaction remains unavailable until user unlocks locally; current UI observation does not validate an installed artifact."
+}

@@ -1,0 +1,156 @@
+[
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20260927120000_access_reads_subscriptions.sql",
+    "feature": "access_reads_subscriptions",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20260926233727",
+        "name": "20260927120000_access_reads_subscriptions"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20260929150000_levels_referrals_usage.sql",
+    "feature": "levels_referrals_usage",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20260929100018",
+        "name": "levels_referrals_usage"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20260929190000_user_memory.sql",
+    "feature": "user_memory",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20260929133111",
+        "name": "user_memory"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20260929200000_user_memory_price.sql",
+    "feature": "user_memory_price",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20260929135052",
+        "name": "user_memory_price"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20260930121932_serialize_guest_network_quota.sql",
+    "feature": "serialize_guest_network_quota",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261001123718",
+        "name": "serialize_guest_network_quota"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261001160000_coupons_bonus_usage.sql",
+    "feature": "coupons_bonus_usage",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261001151448",
+        "name": "coupons_bonus_usage"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261001180000_admin_dashboard.sql",
+    "feature": "admin_dashboard",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261001154215",
+        "name": "admin_dashboard"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261001230000_admin_truth.sql",
+    "feature": "admin_truth",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261001220336",
+        "name": "admin_truth"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002132827_admin_grant_idempotency.sql",
+    "feature": "admin_grant_idempotency",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002144739",
+        "name": "admin_grant_idempotency_build54"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002140326_pro_gift_balance_visibility.sql",
+    "feature": "pro_gift_balance_visibility",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002144749",
+        "name": "pro_gift_balance_visibility_build54"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002180000_pro_briefings.sql",
+    "feature": "pro_briefings",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002142229",
+        "name": "pro_briefings_build54"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002183000_brief_device_atomic.sql",
+    "feature": "brief_device_atomic",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002142254",
+        "name": "brief_device_atomic_build54"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002184500_brief_paid_source_guard.sql",
+    "feature": "brief_paid_source_guard",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002142657",
+        "name": "brief_paid_source_guard_build54"
+      }
+    ]
+  },
+  {
+    "source": "supabase/bobby-protocol/supabase/migrations/20261002185656_brief_languages_build55.sql",
+    "feature": "brief_languages_build55",
+    "historyPresent": true,
+    "applied": [
+      {
+        "version": "20261002185656",
+        "name": "brief_languages_build55"
+      }
+    ]
+  }
+]

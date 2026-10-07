@@ -1,0 +1,6 @@
+{"pid":45918,"type":"anvil-spawn","childPid":45926,"executable":"anvil","args":["--port","63649","--host","127.0.0.1","--chain-id","31337"]}
+{"pid":45918,"type":"tcp","host":"127.0.0.1","port":63649,"allowed":true}
+{"pid":45918,"type":"tcp","host":"127.0.0.1","port":63649,"allowed":true}
+{"pid":45918,"type":"anvil-exit","childPid":45926,"code":0,"signal":null}
+{"pid":45918,"type":"node-exit","code":0,"assertions":{"calls":10,"failures":0,"byOperation":{"equal":10}}}
+{"pid":45915,"type":"node-exit","code":0,"assertions":{"calls":0,"failures":0,"byOperation":{}}}

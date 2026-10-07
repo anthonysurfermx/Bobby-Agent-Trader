@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.data.CouponRedemptionTest" tests="27" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.236Z" hostname="MacBook-Pro-F-Society.local" time="0.02">
+  <properties/>
+  <testcase name="noAccountOrInvalidCodeDoesNotSendOrApplyAnything" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.003"/>
+  <testcase name="actualAlreadyRedeemedNullRpcBalancesDeriveOnlyTheVerifiedSnapshot" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="coherentUnlimitedProRetainsVerifiedCouponBalances" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="dismissingThePopupDoesNotApplyTheReceiptAgain" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="thrownHttpExceptionsKeepTheirActualStatusInsteadOfBecomingNetworkErrors" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="creditsRejectBooleansStringsFractionsNegativeAndOverflowCounts" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="completePostRpcQuotaBalanceWinsWhileGrantStaysUnchanged" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="recognizedServerRefusalsRemainSpecific" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="alreadyRedeemedIgnoresAnyUntrustedNewGrantAndDoesNotInferIncompleteBalances" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="aSupersededBalanceReadCannotShowTheOldBonusOrClearTheNewQuota" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="newlyGrantedCreditsAreConfirmedWithoutRequiringQuotaOrStoreFields" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="lateReplyAfterAccountAtoBtoANewEpochCannotPublishOrApply" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.002"/>
+  <testcase name="accountChangedCancelsTheSheetOutcomeAndBusyState" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="failedHttpStatusCannotBeDisguisedByARedeemedBody" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="queuedAccountAIntentCannotSubmitOrCheckUsingAccountB" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="missingOrEmptyGrantCannotCreateASuccessCelebration" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="aConfirmedGiftStillInvalidatesOldGetsWhenQuotaIsUnavailable" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="failedOrPartialBalanceChecksDoNotInventZeros" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="normalizationMatchesTheAccountEndpointWithoutLocaleDependentCase" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="incompletePostRpcQuotaKeepsConfirmedRpcBalanceWithoutInventingMeters" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="balanceCheckBlocksRedemptionAndNeverCreatesAnAwardOutcome" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="aSecondTapWhileRedeemingDoesNotSendAnotherPost" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="accountChangeDuringSnapshotPublicationCannotPublishTheOldReceipt" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="aLostResponseIsUnavailableAndCheckingBalanceOnlyGets" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <testcase name="malformedExplicitBonusCannotBeReplacedWithADifferentInferredBalance" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.0"/>
+  <testcase name="cancelWithTransportIgnoringCancellationCannotClobberANewerOperation" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.002"/>
+  <testcase name="aStaleQueuedIntentDoesNotCancelTheNextOwnersValidRedemption" classname="xyz.bobbyprotocol.android.data.CouponRedemptionTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -490,7 +490,13 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification,
                                             withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         let briefId = BriefingIntent.briefId(from: notification.request.content.userInfo)
+        // 1.8: a thesis reminder the person set on this phone (a local notification, never a push).
+        let reminder = ReminderIntent.tap(from: notification.request.content.userInfo)
+        // 1.8: a follow-up the harness planned on this phone (V18/Harness).
+        let followUp = HarnessTap.tap(from: notification.request.content.userInfo)
         Task { @MainActor in
+            if let reminder { completionHandler(ReminderIntent.foregroundPresentation(reminder)); return }
+            if let followUp { completionHandler(HarnessIntent.foregroundPresentation(followUp)); return }
             completionHandler(PushRegistrar.presentation(briefId: briefId, openBriefId: BriefingIntent.shared.openBriefId))
         }
     }
@@ -499,9 +505,15 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
         let tapped = response.actionIdentifier == UNNotificationDefaultActionIdentifier
         let briefId = BriefingIntent.briefId(from: response.notification.request.content.userInfo)
+        let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
+        let followUp = HarnessTap.tap(from: response.notification.request.content.userInfo)
         Task { @MainActor in
             // Stored only: the experience drains it once the page, account and consent are ready.
             if tapped, let briefId { BriefingIntent.shared.store(briefId) }
+            // 1.8: a tapped thesis reminder waits the same way (Reminders/ReminderIntent.swift).
+            if tapped, let reminder { ReminderIntent.shared.store(reminder) }
+            // 1.8: so does a tapped follow-up (Harness/HarnessIntent.swift).
+            if tapped, let followUp { HarnessIntent.shared.store(followUp) }
             completionHandler()
         }
     }

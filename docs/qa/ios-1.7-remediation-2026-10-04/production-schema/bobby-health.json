@@ -1,0 +1,32 @@
+{
+  "fetchedAt": "2026-10-04T09:47:28.038956+00:00",
+  "url": "https://bobbyprotocol.xyz/api/bobby-health",
+  "result": {
+    "ok": true,
+    "db": {
+      "ref": "qbvdqkknnuweatptjohi",
+      "configured": true
+    },
+    "control": {
+      "writeFreeze": false,
+      "canary": false,
+      "source": "table",
+      "dynamic": true,
+      "note": "bobby-protocol primary; rollback drill passed 2026-09-03T08:40:48Z; legacy frozen as rollback target"
+    },
+    "ops": {
+      "manualRunsEnabled": true,
+      "rateLimitSaltConfigured": true,
+      "transcriptSecretSeparate": true
+    },
+    "deployment": {
+      "env": "production",
+      "sha": "e128cca",
+      "fullSha": "e128cca095562049705cbb65cf07cdb9af501b64",
+      "ref": "main",
+      "shaSource": "vercel-git",
+      "deploymentId": "dpl_8ntapp2amVJEnEqCgEeT5oPthPQH"
+    },
+    "checkedAt": "2026-10-04T09:47:28.334Z"
+  }
+}

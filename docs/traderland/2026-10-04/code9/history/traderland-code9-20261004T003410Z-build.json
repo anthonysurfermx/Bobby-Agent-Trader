@@ -1,0 +1,286 @@
+{
+  "status": "PASS",
+  "version_code": 9,
+  "version_name": "1.1.4",
+  "branch": "codex/android-traderland-parity",
+  "canonical_reference": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+  "project_directory": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "source": {
+    "path": "traderland-code9-20261004T003410Z-source.json",
+    "sha256": "077391a6af85d25aa0383af8bffb98d8412a1d6f731c2e1c00318f22ecca910e",
+    "source_sha256": "9d4dd2eb6e0dfc6d07e39a499c6c3160c13bb1964f400de7c26014687ce9cf09",
+    "files": 424
+  },
+  "source_unchanged_during_build": true,
+  "fcm_enabled": false,
+  "steps": [
+    {
+      "name": "node-contracts",
+      "exit_code": 0,
+      "command": [
+        "node",
+        "--test",
+        "--test-reporter=junit",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/agree-release.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/coupon-copy.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs"
+      ],
+      "cwd": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+      "started_at": "2026-10-04T00:34:11.047396+00:00",
+      "completed_at": "2026-10-04T00:34:11.524297+00:00",
+      "log": {
+        "path": "traderland-code9-20261004T003410Z-node-contracts.xml",
+        "sha256": "b5a43c7fb1e732ddedcc371b9cb9f3f0a94e7b815863c6192c751122c89a00ef",
+        "bytes": 27692
+      }
+    },
+    {
+      "name": "unit-lint-debug-test-build",
+      "exit_code": 0,
+      "command": [
+        "/private/tmp/bobby-android-toolchain/gradle-8.13/bin/gradle",
+        ":app:testDebugUnitTest",
+        ":app:lintDebug",
+        ":app:assembleDebug",
+        ":app:assembleDebugAndroidTest",
+        "--no-daemon"
+      ],
+      "cwd": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android",
+      "started_at": "2026-10-04T00:34:11.524577+00:00",
+      "completed_at": "2026-10-04T00:34:46.642413+00:00",
+      "log": {
+        "path": "traderland-code9-20261004T003410Z-unit-lint-debug-test-build.log",
+        "sha256": "f5dc302463a4798086c284e3044441b0d661c8a82b3686c88d5a37fdc73293a9",
+        "bytes": 5667
+      }
+    },
+    {
+      "name": "signed",
+      "exit_code": 0,
+      "command": [
+        "/opt/homebrew/opt/python@3.14/bin/python3.14",
+        "/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/android/tools/build-play-bundle.py",
+        "--with-apk",
+        "--gradle",
+        "/private/tmp/bobby-android-toolchain/gradle-traderland-code9"
+      ],
+      "cwd": "/Users/mrrobot/Documents/GitHub/Bobby-Agent-Trader/android",
+      "started_at": "2026-10-04T00:34:46.643567+00:00",
+      "completed_at": "2026-10-04T00:35:34.434349+00:00",
+      "log": {
+        "path": "traderland-code9-20261004T003410Z-signed.log",
+        "sha256": "2e00586586b3370227a710c79e0482570d7cc8c8123101a3fe2ef37773d52743",
+        "bytes": 4042
+      }
+    }
+  ],
+  "public_client_configuration_reused_without_copying": true,
+  "instrumentation_executed": false,
+  "physical_device_tested": false,
+  "uploaded": false,
+  "runner_sha256": "55ca9ee9175594e19346bbbf8b82995c045eaa3f41d8358530a065273095e6b3",
+  "signing_gradle_forwarder_sha256": "7b6d4af90b8b3490f75addd52cab3b02bc3cdcbcf89a31a7231684f264ef0c82",
+  "unit_tests": {
+    "tests": 277,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "unit_xml": [
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingCoordinatorTest.xml",
+      "sha256": "39214d62eb703bc06098103f6bea232e0e8c3e3bf058fb916372d4b709f768d5",
+      "bytes": 5454
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPolicyTest.xml",
+      "sha256": "e1392d25dbe0cba014a442fa66bdd0b088c75bce11f624738e0c93d78ef6b2a9",
+      "bytes": 1652
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest.xml",
+      "sha256": "f474f80d147a08745bc63470db6eea84c15577329564bfb0b9939666b4799886",
+      "bytes": 799
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionEventsTest.xml",
+      "sha256": "be35e941c7b077b3c8d96aed0244c26a2b9148e9756ed0d791eafff92dd5eb22",
+      "bytes": 859
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest.xml",
+      "sha256": "04003f23c0eab93f9194022db1a27483fff01c8c771760e111d3b2ebca69b161",
+      "bytes": 1284
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountFenceTest.xml",
+      "sha256": "9d65929cb0b67178314adf7fde8665ccf3c1cc08a848917f5e5274c717d3214f",
+      "bytes": 941
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AuthGuardsTest.xml",
+      "sha256": "3677bc83748fcec130afe16144ba8aa62d783e4611e09d598f3aa7bdb986c81d",
+      "bytes": 727
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyLocalesTest.xml",
+      "sha256": "160b896b92acd084c9ac330b09c553e22eead3b07222f5142e3f640ee6fdb0bb",
+      "bytes": 654
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyParsersTest.xml",
+      "sha256": "d29ee360ae3738e528b9af6ef4af464567c96a7b71a2cda37900daf612239102",
+      "bytes": 1061
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyQuotaStateTest.xml",
+      "sha256": "6cd2458acdde899570e935df248580ba8edc78c294726948971e20e01236d737",
+      "bytes": 3305
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest.xml",
+      "sha256": "3303d37ec178fceff0e601217afdad2c49964b5c28a25c64e8a58d28f0c68846",
+      "bytes": 2039
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.CouponRedemptionTest.xml",
+      "sha256": "673b8bc307f57daa38d41ca331f8e1b0561a0df98b2d7f51b68be1d6693b0143",
+      "bytes": 4539
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.data.VoicePreferenceTest.xml",
+      "sha256": "791c0c471e6daef6852dce460aff981feffa8738577c2ab145aa3d46579455cf",
+      "bytes": 1433
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.equipment.EquipmentRulesTest.xml",
+      "sha256": "e6ab90c1ba300335055d45aac807d5932075c01f36535b60b9e153e7f059b240",
+      "bytes": 1280
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest.xml",
+      "sha256": "512fb3cc242fbd49673aaaa0cc85812ab02813348ab0dab8ead85aae9d9749ff",
+      "bytes": 1309
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest.xml",
+      "sha256": "b78f119924560c02177901e87492a3abe3cc56c52dd2dad5683f477527e5649e",
+      "bytes": 845
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest.xml",
+      "sha256": "56201ec5637026d189984b71904ef075cff13ac3f6c9d75c2f0f24cbdcf1aeef",
+      "bytes": 1292
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest.xml",
+      "sha256": "81c876b37440431ac26c726bad0551bf2406a2bd2d021b925e5d07b7a1d92801",
+      "bytes": 1577
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.DictationStateTest.xml",
+      "sha256": "806b0d7fee5d966a06e2428ff424fb070731719790f37377c3d4fca88250869d",
+      "bytes": 1349
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.PlaybackLeaseTest.xml",
+      "sha256": "1ae806cab0868cd70890f6969bed030f8776feb3ee95e7315d6388302188d0bd",
+      "bytes": 1485
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.push.PushPolicyTest.xml",
+      "sha256": "225e2e47bba75fa6a15b5f2e3978c80b23dea87e7b4d673a8a1c9b9888688e14",
+      "bytes": 1207
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.BobbySupportLinksTest.xml",
+      "sha256": "6d306767d620d0c9a86b209b297ecdef8c6fa69a9fa270e16890af8e73ef1b16",
+      "bytes": 1274
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest.xml",
+      "sha256": "7d99076811d1eb5e482923ae26bcce80372fec964f3300a2bc501dc3fc6857e2",
+      "bytes": 2241
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.LandPracticeTest.xml",
+      "sha256": "e9b49e7b9dc4268ab246dba54d88c0b00fef4e1d9fd602aeed4f966196b6958a",
+      "bytes": 2543
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest.xml",
+      "sha256": "ff7e0ceb131fa841b694f8f52439e5cafc3c24da4f0acf3d2fc0bde5c25bf2fe",
+      "bytes": 951
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ReportContentPolicyTest.xml",
+      "sha256": "9135d0ce0f6d8a6a04f3c26f12c24d62e38169f1ec1d82b6d3130cc8d248103b",
+      "bytes": 1248
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest.xml",
+      "sha256": "7ee0c9a551938b20f2b0cb73036186316b921d644d9e2dc4c5f8abed8e9ba6c2",
+      "bytes": 2672
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest.xml",
+      "sha256": "c2e88f197fe62d90d99f62da03012bdf5fb12897f1e1f95694e7b1da0e7380ed",
+      "bytes": 1444
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest.xml",
+      "sha256": "94a0a77211a7ee50088262b54174c900dc032255105a8d9820e60c0e353c57a7",
+      "bytes": 694
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandProjectionTest.xml",
+      "sha256": "1ff1a347e45b9e178b64d0cad1b0396db56d115f98b944720bac8d26c23a913e",
+      "bytes": 4633
+    },
+    {
+      "path": "traderland-code9-20261004T003410Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandRulesTest.xml",
+      "sha256": "a2902853debda4447590022051cfec2be49eafada1fae2094801023e81e2b8d4",
+      "bytes": 1201
+    }
+  ],
+  "lint": {
+    "errors": 0,
+    "warnings": 62,
+    "path": "traderland-code9-20261004T003410Z-local-checks/lint-results-debug.xml",
+    "sha256": "603dce5f33e5f3eb2605a9ac85ec4b928548b5816ca3a3268fb872461b592693"
+  },
+  "artifacts": {
+    "release_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk",
+      "sha256": "50f8d516251661c1cb41c7d6a43b2cea8c64938b7e9b260017fc88f2a97f6baf",
+      "bytes": 58604662
+    },
+    "release_aab": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab",
+      "sha256": "4d81e7c847bfb311f4c3a6ad01580c46d6b5063ff09fd52280a9dc74d7f4247d",
+      "bytes": 61826842
+    },
+    "debug_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "d27e16000fa1203450e2e9fe91e6a5dc98bddb3a50817e26fb6f33b46c1279f3",
+      "bytes": 72792525
+    },
+    "test_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+      "sha256": "26f5d302c99d64bd630e95054aa98a6464c003de04676f6949f4f225535b4813",
+      "bytes": 1351500
+    }
+  },
+  "scope": "Actual six-language Node contracts, default JVM/lint, debug/test APK and signed release APK/AAB build; no native instrumentation, visual QA, private-account/provider lifecycle, physical device or Play evidence inferred."
+}

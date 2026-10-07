@@ -1,0 +1,25 @@
+#1 de Firmante:
+
+Certificate #1:
+Propietario: CN=Bobby Android Upload
+Emisor: CN=Bobby Android Upload
+Número de serie: 7cbc93bea8f0f644
+Válido desde: Sat Oct 03 09:28:01 WEST 2026 hasta: Wed Feb 18 08:28:01 WET 2054
+Huellas digitales del certificado:
+	 SHA1: BA:AB:71:94:85:E2:27:93:BF:B5:C2:BB:EA:38:29:F4:08:9E:EE:8F
+	 SHA256: FE:59:FA:16:B0:05:28:51:D7:41:53:9D:46:7D:36:E9:F6:6E:4C:01:22:04:A2:C1:BB:13:E1:5C:A3:D6:BC:CF
+Nombre del algoritmo de firma: SHA384withRSA
+Algoritmo de clave pública de asunto: Clave RSA de 4096 bits
+Versión: 3
+
+Extensiones: 
+
+#1: ObjectId: 2.5.29.14 Criticality=false
+SubjectKeyIdentifier [
+KeyIdentifier [
+0000: 9C EB A2 C9 6D EE 8B E4   0B B3 FA 25 12 3F 01 01  ....m......%.?..
+0010: 70 2D A6 3A                                        p-.:
+]
+]
+
+

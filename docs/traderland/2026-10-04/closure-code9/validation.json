@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "checked_at": "2026-10-04T07:53:31.367394+00:00",
+  "deadline_utc": "2026-10-04T08:00:29Z",
+  "status": "LOCAL_VERSION_FROZEN_PHYSICAL_ACCEPTANCE_PENDING",
+  "base_head": "6bdf35737b71979d44e950527059a9564ab8545a",
+  "code_commit": "2f191491eaa5282a149c103d2889082be3f1c10e",
+  "branch": "codex/android-traderland-parity",
+  "android": {
+    "version": "1.1.4",
+    "code": 9,
+    "installed_signed_payload_verified": true,
+    "keyguard_showing": true
+  },
+  "ios": {
+    "version": "1.7",
+    "build": 63,
+    "evidence": "iPhone 17 Pro / iOS 26.1 simulator only"
+  },
+  "capsule_index_sha256": "a208a136512bc5e231ad1916e02e3ae954df35e5390091b69126e19a12d7bf29",
+  "capsule_files_verified": 84,
+  "capsule_hash_errors": [],
+  "sources": [
+    {
+      "manifest": "traderland-code9-20261004T005043Z-source.json",
+      "files_verified": 424,
+      "source_sha256": "97ba02092fd8876edd5017892c945be9f8595636f71a280e2b13de6754869583",
+      "changed_files": []
+    },
+    {
+      "manifest": "ios-coupon-build63-20261004T001651Z-source.json",
+      "files_verified": 116,
+      "source_sha256": "e3a6024435699556f63fca1eca8df7d697b22bd0f3cdb507674aaa2f4089bc75",
+      "changed_files": []
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "android/app/build/outputs/apk/release/app-release.apk",
+      "bytes": 58604662,
+      "sha256": "c2a0bf1ea917ed3927538a14d8089e432f6d3de44d17ce422b17bfaa1d42b534"
+    },
+    {
+      "path": "android/app/build/outputs/bundle/release/app-release.aab",
+      "bytes": 61826744,
+      "sha256": "d96f15e5249b31571ed1b48f7b699ee867a3159688267b5f06856e74a5a8d6df"
+    }
+  ],
+  "test_counts": {
+    "android_jvm": 279,
+    "nucleo_node": 103,
+    "android_instrumentation": 62,
+    "ios_coupon_access_ui": 67
+  },
+  "tests_repeated_for_document_only_closure": false,
+  "brief_sha256": "e957c672f6fbf1ccb630a6f8f77e135d503f9ec8fcca864860618656f052f601",
+  "existing_claude_handoff_receipt_sha256": "581126df7c47bf3535d55e554a5806ff37984a3596dff217598d8a89ebad6c5b",
+  "new_build_or_install_performed": false,
+  "remote_publication_performed": false,
+  "full_goal_or_physical_acceptance_complete": false
+}

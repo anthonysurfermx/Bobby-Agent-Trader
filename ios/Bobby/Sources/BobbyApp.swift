@@ -77,6 +77,9 @@ struct BobbyApp: App {
             ["agent.onboarded", "agent.riskNoticeVersion", "companion.id"].forEach { defaults.removeObject(forKey: $0) }
         }
 #endif
+        if args.contains("-qa-coupon") {
+            NucleoFixtures.activate(scenario: "default", liveVoice: false)
+        }
         if let scenario = nucleoOptions.fixtures {
             NucleoFixtures.activate(scenario: scenario, liveVoice: args.contains("-nucleo-fixtures-live-voice"))
         }
@@ -104,6 +107,11 @@ struct BobbyApp: App {
 #if DEBUG
                 if Self.isUnitTestHost {
                     Color.clear
+                } else if let fixture = Self.argument(after: "-qa-v18") {
+                    // 1.8 review fixtures (V18/V18QA.swift): one screen, recorded state, no network.
+                    V18QA.view(named: fixture)
+                } else if ProcessInfo.processInfo.arguments.contains("-qa-coupon") {
+                    CouponCelebrationQAFixture(alreadyRedeemed: ProcessInfo.processInfo.arguments.contains("-qa-coupon-already"))
                 } else if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") {
                     TraderLandGateHarnessView()
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-skin") {
@@ -138,6 +146,9 @@ struct BobbyApp: App {
             .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange)) { _ in
                 BobbyTelemetry.shared.accountChanged()
             }
+            // An invitation link (1.8). The sign-in callback is not one and is left to AccountSession.
+            .onOpenURL { InviteLinkCenter.shared.receive($0) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { InviteLinkCenter.shared.receive(activity: $0) }
         }
     }
 }

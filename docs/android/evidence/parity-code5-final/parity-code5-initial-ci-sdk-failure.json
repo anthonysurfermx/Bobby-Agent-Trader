@@ -1,0 +1,14 @@
+{
+  "status": "FAILED_BEFORE_ANDROID_COMPILATION",
+  "run_id": 37143980915,
+  "head_sha": "164d060ae78d97225da76baf422d4e5af3e4e99c",
+  "job_name": "native (false)",
+  "step": "Install the compile SDK",
+  "exit_code": 127,
+  "reason": "sdkmanager executable was not on PATH",
+  "log_sha256": "cbbcda47f36f39afd52573e76c5d96a27b30950d6ff18550f38929fb7fbff0a6",
+  "native_true": "CANCELLED_BY_MATRIX_FAIL_FAST",
+  "fix_pending": "Resolve installed command-line tools explicitly under ANDROID_HOME; keep matrix variants independent.",
+  "runner_sdk_primary_source": "https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md",
+  "source_or_runtime_success_inferred": false
+}

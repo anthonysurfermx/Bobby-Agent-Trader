@@ -1,0 +1,16 @@
+{
+  "artifact": "plaintext execution log; official result summary incomplete",
+  "log": "/private/tmp/bobby-ios17-remediation-20261004/native-unit-contract-retry.log",
+  "sha256": "68ee188f6afced41aef8c950f647aeb792e163ab192c8bf1b6cefe0925a93e6d",
+  "sourceCommit": "507616c99eb143e466084c85bbb177d11315bf68",
+  "unitMethods": 534,
+  "unitPassedMethodsFromLog": 533,
+  "unitFailedMethods": [
+    "BobbyTests.NucleoBridgeTests testChartCandleMetadataUsesItsProviderIntervalForEveryAnalysisHorizon"
+  ],
+  "assertionFailures": 8,
+  "contractUIMethodsPassedFromLog": 2,
+  "xcresultAcceptance": "unknown/incomplete: mkstemp ENOSPC",
+  "exitCode": 65,
+  "noFullSuccessClaim": true
+}

@@ -33,6 +33,11 @@ final class NucleoHost: ObservableObject {
             defaults.set(true, forKey: Self.voiceMuteResetKey)
             session.voice.isMuted = false
         }
+        // 1.8: each feature speaks on the glass through one nudge source (V18/V18.swift).
+        if !BobbyApp.isUnitTestHost { V18.registerNudges() }
+#if DEBUG
+        if let name = BobbyApp.argument(after: "-qa-v18-nudge") { V18QA.installGlassNudge(named: name, session: session) }
+#endif
         bridge = NucleoBridge(session: session)
         controller = NucleoWebController(handler: bridge)
         session.emitter = controller
@@ -133,7 +138,8 @@ private struct NucleoStage: View {
             // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
                          onVoiceMutedChange: { session.sessionChanged() },
-                         onAIConsentWithdraw: { session.revokeRiskNoticeConsent() }) { session.sheet = nil }
+                         onAIConsentWithdraw: { session.revokeRiskNoticeConsent() },
+                         onOpenRoute: { session.switchSheet(to: $0) }) { session.sheet = nil }
         case .riskNotice:
             // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,
@@ -150,10 +156,57 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.nucleoSurface)
         case .invite:
             NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: session.proPurchasable, reason: session.inviteReason,
-                              onPro: { session.inviteChosePro() }) { session.sheet = nil }
+                              onPro: { session.inviteChosePro() }, onClose: { session.sheet = nil },
+                              afterSignIn: { await session.signedInFromSheet() })
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)
+        case .credits:
+            CreditsSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .theses:
+            ThesisListSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .thesisEditor:
+            ThesisEditorSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .thesisReview:
+            ThesisReviewSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memoryConsent:
+            MemoryConsentSheet { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .briefingSettings:
+            BriefingsSettingsView(riskAccepted: session.profile.acceptedRiskNotice,
+                                  onShowPro: { session.switchSheet(to: .paywall) }) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memory:
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .reminders:
+            RemindersSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .followUp:
+            HarnessBoardSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .briefing:
             // A drained notification tap (build 53): the report re-authorizes owner + Pro on open, and
             // its narration starts once loaded when the player's consent and mute allow it.

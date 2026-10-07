@@ -49,6 +49,7 @@
   "timeframe": "1H",
   "asOf": "2026-09-25T20:00:00.000Z"
  },
+ "candlesTimeframe": "1H",
  "candles": [
   {
    "t": 1789651800000,

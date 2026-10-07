@@ -1,0 +1,150 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-03T18:20:43.127265+00:00",
+  "status": "PASS_for_scoped_ordinary_signed_final_profile_UI",
+  "scope": "Actual ordinary UI on final signed release; no application instrumentation, contract fixtures or injected preferences. Actions: native taps/scrolls, normal app stop/start, Android chooser opened and dismissed.",
+  "phase": "final-signed-9652",
+  "installedAPK": {
+    "at": "2026-10-03T18:13:47.726662+00:00",
+    "scope": "Ordinary final signed UI, not instrumentation contracts",
+    "package": "xyz.bobbyprotocol.bobby",
+    "versionName": "1.1.0",
+    "versionCode": 5,
+    "minSdk": 26,
+    "targetSdk": 36,
+    "apkSHA256": "9652c63829743c030f1f509c8a6d49e1a1f6bbb17851f411b8d73779b6565df8",
+    "pinMatchesParent": true,
+    "avd": "Bobby_Parity_API35"
+  },
+  "parentReportedBuildSource": {
+    "sha256": "1bfab4ead58d53cbd51048a1d6c282b44c8c447f96d6c0453e0b3ac78a9403e7",
+    "sourceFileCount": 360,
+    "independentSourceInventoryPerformedByThisQA": false
+  },
+  "previousPhase": {
+    "receipt": "parity-code5-signed-profile-qa-phase-d6.json",
+    "APK_SHA256": "d6aeb7c0f32bb66ec271ec0bda2e1e60f601f91f6bb5291eaa718fe44e504411",
+    "preserved": true,
+    "claimsNotTransferredToFinal": true
+  },
+  "verified": {
+    "releaseUpdateResult": "Success; targeted isolated task-owned AVD only; no data clear or uninstall",
+    "guestProfileByte3DVisible": true,
+    "profileXPBeforeAndAfterFinalAppRestart": 40,
+    "levelVisible": "NIVEAU 1 · APPARU",
+    "unknownAuraAndPiecesShownAsDash": true,
+    "gearCountVisible": "10 / 72 · Gagnés",
+    "nativeLanguageMenuFinalContains": [
+      "Device language",
+      "English",
+      "Español",
+      "Português",
+      "Français",
+      "Italiano",
+      "Deutsch"
+    ],
+    "nativeFrenchReselectedOnFinal": true,
+    "FrenchInformalCopyVisibleExamples": [
+      "Invite tes amis",
+      "Ce que Bobby retient de tes actifs et préférences",
+      "Tu progresses par la discipline, jamais par le volume."
+    ],
+    "nativeVoiceOptionsFinal": [
+      "Voix de ton compagnon",
+      "Féminine",
+      "Masculine"
+    ],
+    "MasculineSelectedOnFinal": true,
+    "FrenchAndMasculinePersistedAfterFinalForceStopNormalStart": true,
+    "companionDefaultInheritedAtFinalStartup": true,
+    "companionDefaultReselectedOnFinalAndShown": true,
+    "AndroidImageChooserOpenedOnFinal": true,
+    "AndroidChooserDismissedWithoutSelection": true,
+    "ownGeneratedFinalPNG": {
+      "capturedAt": "2026-10-03T18:20:43.042832+00:00",
+      "source": "Own newly generated guest avatar PNG in scoped app cache",
+      "image": "parity-code5-final-profile-screens/shared-avatar-card-fr-final.png",
+      "mimeType": "image/png",
+      "width": 1080,
+      "height": 1440,
+      "bytes": 331495,
+      "sha256": "8d5503ee87cf32d13e2d581ddb011dcb952aabe614cafcee61875e149b5a9c2b",
+      "fileProviderURI": "content://xyz.bobbyprotocol.bobby.avatar-share/avatar_cards/2e246387-4cf9-4495-92b3-d7c50ef63f38.png",
+      "URIObservedIn": "Android chooser activity state; only own URI extracted; raw activity dump not stored",
+      "chooserPackage": "com.android.intentresolver",
+      "recipientOrAppSelected": false,
+      "sent": false
+    }
+  },
+  "screenshots": [
+    {
+      "file": "parity-code5-final-profile-screens/01-final-profile-fr.png",
+      "sha256": "e2a62ca3b4251863c566a2a20eaeb38aa2ceb60a6171bdf09591665d6909e1dc",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-final-profile-screens/02-final-voice-menu-fr.png",
+      "sha256": "658a14f0ed52b027089c7236900543c854eb085616f76402dd8a4d496869a4ea",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-final-profile-screens/03-final-fr-masculine-persisted.png",
+      "sha256": "482b28dcb25a20bbcf3093928061b79e55700fced50b89e695650085618d2d60",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-final-profile-screens/04-final-default-restored.png",
+      "sha256": "ee13deb8fb89bc625482de449424958a552f1a3540aaf4d66acc95f98a9f7321",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-final-profile-screens/05-final-share-chooser.png",
+      "sha256": "0a7dc00a5635ef37f7e864f91ab4fa8876a532dea70feb13aa7a081c1928b54c",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    }
+  ],
+  "safety": {
+    "IAConsentAcceptedByQA": false,
+    "riskNoticeStillPendingOnFinalRestart": true,
+    "microphonePermissionRequestedByQA": false,
+    "runtimePermissionChangesByQA": false,
+    "audioPlaybackOrGenerationRequested": false,
+    "analysisQuestionsOrAccountOrPaymentActions": false,
+    "recipientOrAppSelected": false,
+    "sent": false,
+    "phoneOperated": false,
+    "originalAVDOperatedDuringProfileQA": false,
+    "AndroidSourceEdited": false,
+    "preferenceInjection": false,
+    "rawAppSecretDumps": false
+  },
+  "limits": [
+    "Audible voice gender, remote synthesis, microphone recognition, account/billing/consent APIs and physical device behavior were outside this UI QA.",
+    "French selection was inherited from the prior phase, then explicitly reselected in the final native menu. Male choice and persistence were repeated on the final APK.",
+    "Companion default was observed after the final release update/start and then reselected on the final UI. There was no extra restart after the final reselection.",
+    "This profile receipt does not close the complete Android release or instrumentation gates."
+  ],
+  "handoff": {
+    "isolatedAVD": "Bobby_Parity_API35",
+    "controlReturnedToParent": true,
+    "currentLanguage": "fr",
+    "currentVoicePreference": "companion",
+    "chooserClosed": true,
+    "parentMayReplaceWithDebugForInstrumentation": true
+  }
+}

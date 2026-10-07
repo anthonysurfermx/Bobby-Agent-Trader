@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T11:55:30.098665+00:00",
+  "stage": "Store35Shots",
+  "class": "Store35Shots",
+  "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "expectedMethods": [
+    "testEnglishScreenshots",
+    "testSpanishScreenshots"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "edd23c525d1c81389ed7c70e8d89ad3a69e38961a5f12bbe503928edf71672aa",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "49075e3a22d38e9cce7ec622bb690c71452ef2fac2dc49a5a50722b3e1fdcf17",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "Store35Shots/testEnglishScreenshots()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/Store35Shots/testEnglishScreenshots",
+      "result": "Passed"
+    },
+    {
+      "identifier": "Store35Shots/testSpanishScreenshots()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/Store35Shots/testSpanishScreenshots",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

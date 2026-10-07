@@ -1,0 +1,380 @@
+[
+  {
+    "id": "aura_core",
+    "kind": "core",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Aura Core",
+      "es": "Núcleo de Aura",
+      "fr": "Cœur de l'aura",
+      "pt": "Núcleo da aura",
+      "it": "Nucleo dell'aura",
+      "de": "Aurakern"
+    }
+  },
+  {
+    "id": "crypto_bay_data_dock",
+    "kind": "ground",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Data Dock",
+      "es": "Muelle de Datos",
+      "fr": "Quai des données",
+      "pt": "Cais dos dados",
+      "it": "Molo dei dati",
+      "de": "Datenkai"
+    }
+  },
+  {
+    "id": "crypto_bay_water_walkway",
+    "kind": "path_pavement",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Water Walkway",
+      "es": "Pasarela de Agua",
+      "fr": "Passerelle sur l'eau",
+      "pt": "Passadiço sobre a água",
+      "it": "Passerella sull'acqua",
+      "de": "Wassersteg"
+    }
+  },
+  {
+    "id": "crypto_bay_context_buoy",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Context Buoy",
+      "es": "Boya de Contexto",
+      "fr": "Bouée de contexte",
+      "pt": "Boia de contexto",
+      "it": "Boa del contesto",
+      "de": "Kontextboje"
+    }
+  },
+  {
+    "id": "crypto_bay_candle_tower",
+    "kind": "building",
+    "footprint_w": 2,
+    "footprint_h": 1,
+    "name": {
+      "en": "Candle Tower",
+      "es": "Torre de Velas",
+      "fr": "Tour des bougies",
+      "pt": "Torre das velas",
+      "it": "Torre delle candele",
+      "de": "Kerzenturm"
+    }
+  },
+  {
+    "id": "crypto_bay_waiting_lighthouse",
+    "kind": "landmark",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Waiting Lighthouse",
+      "es": "Faro de la Espera",
+      "fr": "Phare de l'attente",
+      "pt": "Farol da espera",
+      "it": "Faro dell'attesa",
+      "de": "Leuchtturm des Wartens"
+    }
+  },
+  {
+    "id": "evidence_mines_crystal_vein_rock",
+    "kind": "ground",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Crystal Vein Rock",
+      "es": "Roca con Veta de Cristal",
+      "fr": "Roche à veine de cristal",
+      "pt": "Rocha com veio de cristal",
+      "it": "Roccia con vena di cristallo",
+      "de": "Kristalladerfelsen"
+    }
+  },
+  {
+    "id": "evidence_mines_open_tunnel",
+    "kind": "path_pavement",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Open Tunnel",
+      "es": "Túnel Abierto",
+      "fr": "Tunnel ouvert",
+      "pt": "Túnel aberto",
+      "it": "Tunnel aperto",
+      "de": "Offener Tunnel"
+    }
+  },
+  {
+    "id": "evidence_mines_lantern_drone",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Lantern Drone",
+      "es": "Dron Linterna",
+      "fr": "Drone lanterne",
+      "pt": "Drone lanterna",
+      "it": "Drone lanterna",
+      "de": "Laternendrohne"
+    }
+  },
+  {
+    "id": "evidence_mines_evidence_workshop",
+    "kind": "building",
+    "footprint_w": 2,
+    "footprint_h": 1,
+    "name": {
+      "en": "Evidence Workshop",
+      "es": "Taller de Evidencia",
+      "fr": "Atelier des preuves",
+      "pt": "Oficina dos dados",
+      "it": "Officina delle prove",
+      "de": "Belegwerkstatt"
+    }
+  },
+  {
+    "id": "evidence_mines_mother_crystal",
+    "kind": "landmark",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Mother Crystal",
+      "es": "Cristal Madre",
+      "fr": "Cristal mère",
+      "pt": "Cristal mãe",
+      "it": "Cristallo madre",
+      "de": "Mutterkristall"
+    }
+  },
+  {
+    "id": "thesis_citadel_wall_slab",
+    "kind": "ground",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Wall Slab",
+      "es": "Losa de Muralla",
+      "fr": "Dalle de rempart",
+      "pt": "Laje da muralha",
+      "it": "Lastra di mura",
+      "de": "Mauerplatte"
+    }
+  },
+  {
+    "id": "thesis_citadel_fortified_ramp",
+    "kind": "path_pavement",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Fortified Ramp",
+      "es": "Rampa Fortificada",
+      "fr": "Rampe fortifiée",
+      "pt": "Rampa fortificada",
+      "it": "Rampa fortificata",
+      "de": "Befestigte Rampe"
+    }
+  },
+  {
+    "id": "thesis_citadel_risk_shield",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Risk Shield",
+      "es": "Escudo de Riesgo",
+      "fr": "Bouclier du risque",
+      "pt": "Escudo do risco",
+      "it": "Scudo del rischio",
+      "de": "Risikoschild"
+    }
+  },
+  {
+    "id": "thesis_citadel_double_gate",
+    "kind": "building",
+    "footprint_w": 2,
+    "footprint_h": 1,
+    "name": {
+      "en": "Double Gate",
+      "es": "Puerta Doble",
+      "fr": "Double porte",
+      "pt": "Porta dupla",
+      "it": "Doppio portale",
+      "de": "Doppeltor"
+    }
+  },
+  {
+    "id": "thesis_citadel_three_gate_citadel",
+    "kind": "landmark",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Three Gate Citadel",
+      "es": "Ciudadela de Tres Puertas",
+      "fr": "Citadelle aux trois portes",
+      "pt": "Cidadela das três portas",
+      "it": "Cittadella dei tre portali",
+      "de": "Dreitörige Zitadelle"
+    }
+  },
+  {
+    "id": "risk_reef_reef_tile",
+    "kind": "ground",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Reef Tile",
+      "es": "Loseta de Arrecife",
+      "fr": "Dalle de récif",
+      "pt": "Ladrilho do recife",
+      "it": "Piastrella della scogliera",
+      "de": "Riffplatte"
+    }
+  },
+  {
+    "id": "risk_reef_blue_sluice",
+    "kind": "path_pavement",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Blue Sluice",
+      "es": "Compuerta Azul",
+      "fr": "Écluse bleue",
+      "pt": "Comporta azul",
+      "it": "Chiusa blu",
+      "de": "Blaue Schleuse"
+    }
+  },
+  {
+    "id": "risk_reef_dual_orbit_antenna",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Dual Orbit Antenna",
+      "es": "Antena de Doble Órbita",
+      "fr": "Antenne à double orbite",
+      "pt": "Antena de órbita dupla",
+      "it": "Antenna a doppia orbita",
+      "de": "Doppelorbitantenne"
+    }
+  },
+  {
+    "id": "risk_reef_red_team_observatory",
+    "kind": "building",
+    "footprint_w": 2,
+    "footprint_h": 1,
+    "name": {
+      "en": "Red Team Observatory",
+      "es": "Observatorio del Crítico",
+      "fr": "Observatoire critique",
+      "pt": "Observatório crítico",
+      "it": "Osservatorio critico",
+      "de": "Kritisches Observatorium"
+    }
+  },
+  {
+    "id": "risk_reef_double_bridge",
+    "kind": "landmark",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Double Bridge",
+      "es": "Puente Doble",
+      "fr": "Double pont",
+      "pt": "Ponte dupla",
+      "it": "Doppio ponte",
+      "de": "Doppelbrücke"
+    }
+  },
+  {
+    "id": "axiom_archive_archive_ring_tile",
+    "kind": "ground",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Archive Ring Tile",
+      "es": "Loseta del Anillo",
+      "fr": "Dalle de l'anneau des archives",
+      "pt": "Ladrilho do anel do arquivo",
+      "it": "Piastrella dell'anello dell'archivio",
+      "de": "Archivringplatte"
+    }
+  },
+  {
+    "id": "axiom_archive_path_straight",
+    "kind": "path_pavement",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Path Straight",
+      "es": "Camino Recto",
+      "fr": "Chemin droit",
+      "pt": "Caminho reto",
+      "it": "Sentiero diritto",
+      "de": "Gerader Weg"
+    }
+  },
+  {
+    "id": "axiom_archive_return_path_curve",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Return Path Curve",
+      "es": "Curva de Regreso",
+      "fr": "Courbe du chemin de retour",
+      "pt": "Curva do caminho de regresso",
+      "it": "Curva del ritorno",
+      "de": "Rückwegkurve"
+    }
+  },
+  {
+    "id": "axiom_archive_aura_flower",
+    "kind": "decor",
+    "footprint_w": 1,
+    "footprint_h": 1,
+    "name": {
+      "en": "Aura Flower",
+      "es": "Flor de Aura",
+      "fr": "Fleur d'aura",
+      "pt": "Flor da aura",
+      "it": "Fiore dell'aura",
+      "de": "Aurablume"
+    }
+  },
+  {
+    "id": "axiom_archive_lit_archive",
+    "kind": "building",
+    "footprint_w": 2,
+    "footprint_h": 1,
+    "name": {
+      "en": "Lit Archive",
+      "es": "Archivo Iluminado",
+      "fr": "Archives illuminées",
+      "pt": "Arquivo iluminado",
+      "it": "Archivio illuminato",
+      "de": "Beleuchtetes Archiv"
+    }
+  },
+  {
+    "id": "axiom_archive_base_ring_seal",
+    "kind": "landmark",
+    "footprint_w": 2,
+    "footprint_h": 2,
+    "name": {
+      "en": "Base Ring Seal",
+      "es": "Sello del Anillo Base",
+      "fr": "Sceau de l'anneau de base",
+      "pt": "Selo do anel da base",
+      "it": "Sigillo dell'anello di base",
+      "de": "Basisringsiegel"
+    }
+  }
+]

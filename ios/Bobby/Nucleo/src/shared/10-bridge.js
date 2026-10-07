@@ -21,10 +21,11 @@
     'speak', 'previewVoice', 'stopSpeaking', 'setMuted', 'haptic',
     'saveThesis', 'island', 'theses', 'record',
     'setCompanion', 'riskNotice', 'acceptRisk', 'signIn', 'paywall',
-    'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
+    'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log',
+    'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'analysis.level',
+    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'

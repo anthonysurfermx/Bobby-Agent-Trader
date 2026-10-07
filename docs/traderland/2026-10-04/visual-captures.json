@@ -1,0 +1,27 @@
+{
+  "status": "CAPTURED_AFTER_FINAL42_PASS",
+  "captured_at": "2026-10-03T23:52:19.311113+00:00",
+  "source_sha256": "28ceca2d8b9ceb8c9844e2d761b34e8155e1efe47ac882390f5f491ab0760ac7",
+  "debug_apk_sha256": "9466490e856b2e44374465c0ea313e7966a489650f1194d2f90e0d7e862ab6da",
+  "test_apk_sha256": "08c7faaa231d3f8769d041d9377772faaba51b68805ce35ef0a2695bb9b11296",
+  "instrumentation_receipt": "traderland-code8-instrumentation-20261003T234425Z.json",
+  "instrumentation_receipt_sha256": "5b0cebefb28b8949dea455dd083b0ae5abf39d4b3a0c9e461c585a6f3ab6f4d5",
+  "captures": [
+    {
+      "file": "showcase.png",
+      "bytes": 421565,
+      "sha256": "ab8d727237d0e2ec612666056d880c4e0225b5c1e2c87d5b27c867ee6cd842bd"
+    },
+    {
+      "file": "archipelago.png",
+      "bytes": 223328,
+      "sha256": "0f66aef9089a7ca651430a3d2693d03ef56944d478702beed3d29571202bded2"
+    },
+    {
+      "file": "lifted-draft.png",
+      "bytes": 233237,
+      "sha256": "2c7e7af0b5f451a4f21ad0b88c88e0d288e70d2b60208a9eddb0d1956d085e08"
+    }
+  ],
+  "scope": "Production Compose Canvas with approved offline public/guest fixtures on disposable API35 emulator; not a real account, physical Seeker or iOS screenshot."
+}

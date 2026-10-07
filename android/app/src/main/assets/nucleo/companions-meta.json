@@ -1,0 +1,113 @@
+{
+ "v": 1,
+ "companions": [
+  {
+   "id": "bobby",
+   "label": "Bobby",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "byte",
+   "label": "Byte",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "kora",
+   "label": "Kora",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "zip",
+   "label": "Zip",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "glitch",
+   "label": "Glitch",
+   "palette": "plasma",
+   "tint": "#a855f7"
+  },
+  {
+   "id": "momo",
+   "label": "Momo",
+   "palette": "plasma",
+   "tint": "#a855f7"
+  },
+  {
+   "id": "flux",
+   "label": "Flux",
+   "palette": "ice",
+   "tint": "#38bdf8"
+  },
+  {
+   "id": "rook",
+   "label": "Rook",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "axiom",
+   "label": "Axiom",
+   "palette": "gold",
+   "tint": "#facc15"
+  },
+  {
+   "id": "halo",
+   "label": "Halo",
+   "palette": "ghost",
+   "tint": "#94a3b8"
+  },
+  {
+   "id": "iris",
+   "label": "Iris",
+   "palette": "ice",
+   "tint": "#38bdf8"
+  },
+  {
+   "id": "sol",
+   "label": "Sol",
+   "palette": "gold",
+   "tint": "#facc15"
+  },
+  {
+   "id": "zuri",
+   "label": "Zuri",
+   "palette": "lava",
+   "tint": "#f97316"
+  },
+  {
+   "id": "mira",
+   "label": "Mira",
+   "palette": "ghost",
+   "tint": "#94a3b8"
+  },
+  {
+   "id": "nalu",
+   "label": "Nalu",
+   "palette": "lava",
+   "tint": "#f97316"
+  },
+  {
+   "id": "vega",
+   "label": "Vega",
+   "palette": "gold",
+   "tint": "#facc15"
+  },
+  {
+   "id": "noor",
+   "label": "Noor",
+   "palette": "matrix",
+   "tint": "#22c55e"
+  },
+  {
+   "id": "keo",
+   "label": "Keo",
+   "palette": "lava",
+   "tint": "#f97316"
+  }
+ ]
+}

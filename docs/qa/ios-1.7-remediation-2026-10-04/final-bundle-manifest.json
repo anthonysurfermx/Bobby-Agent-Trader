@@ -1,0 +1,364 @@
+{
+  "at": "2026-10-04T09:42:51.909133+00:00",
+  "worktree": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "clockControl": {
+    "ios": "2026-10-04T09:40:14Z",
+    "web": "2026-10-04T09:40Z",
+    "note": "Builder timestamp inputs are seeded from delivered build metadata for an exact byte comparison; no product source is modified."
+  },
+  "files": [
+    {
+      "tree": "ios",
+      "path": "ios/Bobby/Resources/Nucleo/app.html",
+      "bytes": 581350,
+      "sha256": "4bf4221c4899b0fb5c50b47cc5294f07d5b499d799c593c18eb4946d90291b76",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "ios",
+      "path": "ios/Bobby/Resources/Nucleo/build-info.json",
+      "bytes": 96,
+      "sha256": "d42f18295ce596101ab2dfe89716367ce30e26aa67a19cb30dcdccbc081248b7",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "ios",
+      "path": "ios/Bobby/Resources/Nucleo/companions-meta.json",
+      "bytes": 1651,
+      "sha256": "6bea78fce51de95236bbcced27fd9fc5d46b473172dd2d7ed5465fca63633e4c",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "ios",
+      "path": "ios/Bobby/Resources/Nucleo/onboarding.html",
+      "bytes": 569363,
+      "sha256": "571ad78f4dd55126ef4fa43b829a893834a00db159d5e506606fa91a353dc83f",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/index.html",
+      "bytes": 677558,
+      "sha256": "1f1c677d74903aef46953b5ca4665b788b9da563b190db5d2c8601970e5da114",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/onboarding.html",
+      "bytes": 674485,
+      "sha256": "494faa25bb80926a1abcbbde2f9734721f2c8329d0cfcf700307b7fe273fc11d",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-axiom-en.mp3",
+      "bytes": 56832,
+      "sha256": "04b715ee32d44b04bf4e2643dca20fdd2b9ac490c3a18b4922b90f44861224c8",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-axiom-es.mp3",
+      "bytes": 76800,
+      "sha256": "e9d6f14f6bddc9e143d20930822bb5bc0ce62bd5aa8bc2b52a0407a0dd38bcfd",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-byte-en.mp3",
+      "bytes": 49920,
+      "sha256": "21d157c10efb086832dd5cfdc024569de4ef9fe9406a0cf04e904a60b96e373c",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-byte-es.mp3",
+      "bytes": 69120,
+      "sha256": "ab546a02a8096c4c9dd16a679b4593f6b5d6e758e33fac7b05654b7f7f428de3",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-flux-en.mp3",
+      "bytes": 83328,
+      "sha256": "42a3b14f119cacf12edb5c0c1cd144f8c03a61b480020415373a69aace9a90ff",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-flux-es.mp3",
+      "bytes": 82560,
+      "sha256": "731eb4174a000baf7109f7a5000f7985c9b5dc25e6ef3a1af4bd23b479e828c6",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-glitch-en.mp3",
+      "bytes": 54528,
+      "sha256": "21ee463aa1c3169247c8c539b58f0b8b59e111dabb20606b1b66ca3b486cb64c",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-glitch-es.mp3",
+      "bytes": 53760,
+      "sha256": "f5d011be1f0de70d6dc32652f1829d84548dfa24499f875f874b4ecb8ea9f71b",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-halo-en.mp3",
+      "bytes": 57600,
+      "sha256": "4e491bd39616355d8bed4f30ded5168f2053af75164bdafdf4f09d3f63ce2962",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-halo-es.mp3",
+      "bytes": 67200,
+      "sha256": "8f8f0336fa1432ead1083569e1a5c37a6ef92535d17bdcc7eca6b4a10c9df6fd",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-iris-en.mp3",
+      "bytes": 64896,
+      "sha256": "3a3259519e48dc660a932ac3fad6fcc32680ef4faa097718438f32dc363bd8f4",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-iris-es.mp3",
+      "bytes": 71424,
+      "sha256": "76b6ce89e45334de0fd40203af995b46be29a894245a3d57450fc64694021deb",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-keo-en.mp3",
+      "bytes": 77568,
+      "sha256": "4c03dce973ca31081bdc748f46b8110329ef3db87967f7c3a4ebf613308bd57a",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-keo-es.mp3",
+      "bytes": 73728,
+      "sha256": "6fc563658fc51e2d21b7ee91b7712a7747956253b8db7c3dc3738b42fe7f0be6",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-kora-en.mp3",
+      "bytes": 61056,
+      "sha256": "66c9d272e73a75fb83addd1edb6834a0ed414f5885c730d4615a64e56c68e6c3",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-kora-es.mp3",
+      "bytes": 61056,
+      "sha256": "c34838c834c3240dcd6b6afa8e7396b7cb9c28f49fd345f8e30c5c8246cb5e4a",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-mira-en.mp3",
+      "bytes": 70656,
+      "sha256": "21a3bcf9d077d0136e7b64deae4073e56b21a3b20316d8f35fce5296af8c878a",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-mira-es.mp3",
+      "bytes": 56064,
+      "sha256": "0d333cb731f32b14f8462f3a751d923c8b80087751359f236c3b559481904ab8",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-momo-en.mp3",
+      "bytes": 44160,
+      "sha256": "359ef9db88d89a3595298106323b0a0eaa4e42e4eedb1a7c17b9ffbd2b92bc2f",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-momo-es.mp3",
+      "bytes": 44160,
+      "sha256": "7ebbc54074d998151133fb66bee066a1024457404b3729ab0e32cd0aa5911398",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-nalu-en.mp3",
+      "bytes": 66432,
+      "sha256": "477155da4818f2293768718550e882784d6cc3c7a7141e2e1066ee9c17f68ce9",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-nalu-es.mp3",
+      "bytes": 57600,
+      "sha256": "2b953eef576fc4730a2a9afa9f47d303c9adb786623d35b9758dafeb4d6fcab1",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-noor-en.mp3",
+      "bytes": 66432,
+      "sha256": "788ce5f314ed00e750e165bb7a9031dbe569aa0a19fdabd85a879651e5594ff2",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-noor-es.mp3",
+      "bytes": 70656,
+      "sha256": "e96125154684163392ab49e102b8f8b8255186dd1fd1a4825383cc6da7ae518d",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-orb-en.mp3",
+      "bytes": 57600,
+      "sha256": "3cbbd35ea9abfdd4a4e945074b58cab3e734a7ca52d93a1b0786e22c5781e7a3",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-orb-es.mp3",
+      "bytes": 81024,
+      "sha256": "5c45cb2c28b7df9ae6bc1079ff092b54e9082dea8e113fa38a06d7a05f359047",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-rook-en.mp3",
+      "bytes": 75264,
+      "sha256": "f4a68948714e90a83e647bc0f11bab0d7c9e6a4ca2e43e2991d46baeb8e10620",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-rook-es.mp3",
+      "bytes": 82560,
+      "sha256": "6653a7a7f74137f5b0320d06766a7e351e0141d998fa79a989183865267cb3ac",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-sol-en.mp3",
+      "bytes": 81792,
+      "sha256": "c3ef2994ad6e17ee121e5bb4d676307029ea347bfe7a02885e0ff1712da5d05c",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-sol-es.mp3",
+      "bytes": 78720,
+      "sha256": "781bde4373671fc7557b7ad59685ad1693ac3568db197e4671a746de7462b548",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-vega-en.mp3",
+      "bytes": 72960,
+      "sha256": "de6cae5863bfec3810747c9de7e82f7d20101a7589d4cdc91cd37c73ef02b5fc",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-vega-es.mp3",
+      "bytes": 70656,
+      "sha256": "a7397fb2bc25860424359c5ebdaa4febcf8d5931f77cde838537c553cd0576a6",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-zip-en.mp3",
+      "bytes": 54528,
+      "sha256": "c8426fa4b1d66946c8c77b64c7e6bf17954bccac10e9dd56770d06d40a8ece45",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-zip-es.mp3",
+      "bytes": 48768,
+      "sha256": "1caeb4b170c44cf9d2c2fe2a2429b755cf807052f9652a4d7d7418d2438eb2ec",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-zuri-en.mp3",
+      "bytes": 56064,
+      "sha256": "40b2d6022e9c6a11a0c8a8059c053fd7d9730441b42778c45b49692cec8431ec",
+      "byteEqualToFreshBuild": true
+    },
+    {
+      "tree": "web",
+      "path": "public/nucleo/voice/select-zuri-es.mp3",
+      "bytes": 44928,
+      "sha256": "244b69b196704687b79bb38fce83a0b427e7fa8507376f13565eff333d39f39b",
+      "byteEqualToFreshBuild": true
+    }
+  ],
+  "pages": [
+    {
+      "path": "ios/Bobby/Resources/Nucleo/app.html",
+      "checks": {
+        "noFixturePayload": true,
+        "noDevMockScript": true,
+        "noContractPage": true,
+        "actualCandleTimeframeUsed": true,
+        "mismatchGuardPresent": true,
+        "lastCandleTimestampUsed": true,
+        "measuredSubtitleWrap": true,
+        "twoLineTspanConstruction": true,
+        "wrapAppliedToBothBracketDirections": true
+      }
+    },
+    {
+      "path": "ios/Bobby/Resources/Nucleo/onboarding.html",
+      "checks": {
+        "noFixturePayload": true,
+        "noDevMockScript": true,
+        "noContractPage": true,
+        "actualCandleTimeframeUsed": true,
+        "mismatchGuardPresent": true,
+        "lastCandleTimestampUsed": true
+      }
+    },
+    {
+      "path": "public/nucleo/index.html",
+      "checks": {
+        "noFixturePayload": true,
+        "noDevMockScript": true,
+        "noContractPage": true,
+        "actualCandleTimeframeUsed": true,
+        "mismatchGuardPresent": true,
+        "lastCandleTimestampUsed": true,
+        "hourlyTransportConstant": true,
+        "hourlyResponseMetadata": true,
+        "measuredSubtitleWrap": true,
+        "twoLineTspanConstruction": true,
+        "wrapAppliedToBothBracketDirections": true
+      }
+    },
+    {
+      "path": "public/nucleo/onboarding.html",
+      "checks": {
+        "noFixturePayload": true,
+        "noDevMockScript": true,
+        "noContractPage": true,
+        "actualCandleTimeframeUsed": true,
+        "mismatchGuardPresent": true,
+        "lastCandleTimestampUsed": true,
+        "hourlyTransportConstant": true,
+        "hourlyResponseMetadata": true
+      }
+    }
+  ],
+  "freshOutputRemoved": true,
+  "freshOutputBytes": 4846903,
+  "result": "passed"
+}

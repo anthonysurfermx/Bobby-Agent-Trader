@@ -22,7 +22,7 @@ final class EquipmentUITests: XCTestCase {
 
     private func verify(spanish: Bool) {
         let app = XCUIApplication()
-        app.launchArguments = ["-store-shots", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "6", "-agent.onboarded", "YES", "-avatar.voiceMuted", "YES", "-companion.id", "momo", "-companion.disciplineXP", "500"]
+        app.launchArguments = ["-store-shots", "-AppleLanguages", spanish ? "(es)" : "(en)", "-agent.riskNoticeVersion", "6", "-agent.onboarded", "YES", "-avatar.voiceMuted", "YES", "-companion.id", "momo", "-companion.selected.v2.local", "momo", "-companion.disciplineXP", "500"]
         app.launch()
         let belt = "belt-tool-momo-2"
         let equipped = spanish ? "Equipado" : "Equipped"

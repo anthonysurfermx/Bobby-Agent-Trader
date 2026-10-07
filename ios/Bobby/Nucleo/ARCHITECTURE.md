@@ -276,7 +276,7 @@ Order is normative. The mock follows it too.
                   "plan":null | {"direction":S,"entry":N?,"stop":N?,"target":N?,"rewardRisk":N?,"invalidation":S?}},
   "agents":{"alpha":S,"red":S,"cio":S,"verdict":"wait|review","direction":"long|short|none"},
   "provenance":{"provider":"Yahoo Finance","instrument":"NVDA","assetType":"equity","timeframe":"1H","asOf":"2026-09-25T20:00:00.000Z"},
-  "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
+  "candlesTimeframe":"1H", "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
   "receivedAt":1790422570000, "elapsedMs":5378, "fixture":false,
   "access": Access }            // only when the server sent one (§8.2); a legacy server: no key at all
 { "v":1, "status":"confirm", "token":S, "asset":{"symbol":"XAUT","name":"Xau","isEquity":false,"assetClass":"commodity"}, "matchKind":"proxy|fuzzy|…", "proxyNote":S? }
@@ -295,6 +295,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 - trend: `alcista`→`up`, `bajista`→`down`, `lateral`→`sideways`.
 - momentum: `sobrecompra`→`overbought`, `sobreventa`→`oversold`, `neutral`→`neutral`.
 - Candles decode like `BobbyAPI.candles`: `ts` becomes an Int `t`; string numbers are parsed; volume defaults to 0; sorted ascending.
+- `candlesTimeframe` comes from the same native constant used by both candle request URLs. `provenance.timeframe` remains the debate/evidence horizon. The chart uses the candle interval and final plotted candle timestamp; explicit horizon mismatches suppress support, resistance, band, bracket, and plan overlays while the separate analysis cards retain them. Older replies without `candlesTimeframe` fall back to `provenance.timeframe`.
 - `plan` is null unless at least one of entry, stop or target is a number.
 - `asset.name` = `prettyName(first alias ≠ symbol)`.
 - `receivedAt` is ms at receipt. **In fixture mode it is the raw capture's `recordedAt`**, which keeps the golden replies deterministic.
@@ -395,7 +396,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 |---|---|---|---|
 | BOOT | page load | none (black `#0B0A09`) | `session()` → WAKE. If `pendingRead` → RESTORE |
 | WAKE | session | B0 0.00–0.90. The greeting comes from `localHour` plus the strings table; the sub line is the latest ledger thesis ("NVDA is saved.") or the default prompt. The XP arc is `level.progress`. The avatar is the `COMPANIONS` art for `companion.webId`. | → IDLE |
-| IDLE | | B1 breath; pill glow in antiphase. The hint "HOLD TO ASK · SWIPE THE SPHERE" shows while `hints.idle < 3`. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Tap on the header avatar → `openNative("account")` (also from FACES and HANDBACK). Long press on the wordmark → `openClassic` (dev builds only) |
+| IDLE | | B1 breath; pill glow in antiphase. While `hints.idle < 3`, two hint rows show, each next to what it is about: "HOLD TO ASK" above the pill ("TAP TO TYPE" when the mic cannot listen), and "SWIPE THE SPHERE" under the sphere while it has other faces and none has been visited yet. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Tap on the header avatar → `openNative("account")` (also from FACES and HANDBACK). Long press on the wordmark → `openClassic` (dev builds only) |
 | PRE_PERMISSION | first hold with mic undetermined | onboarding O3 card (bloom from the bottom rim): "I only listen while you hold." / "iOS will ask for the microphone and speech recognition once." / **Continue** | Continue → `speech.requestPermission` → granted: IDLE with hint "Hold to ask"; `consent` (the Apple speech prompt followed and the user chose to type): TYPING; otherwise IDLE with the unavailable hint |
 | (pill hold, mic not granted) | hold ≥ 0.25 s from a cached `unavailable`, `denied`, `restricted` or `consent` | The cached `session.mic` goes stale (the connection came back, a dictation model was installed), so the page calls `speech.permission` again and acts on the fresh answer; `denied` and `unavailable` are kept as native reports them. A short tap asks nothing and types. | `granted`: LISTENING in the same hold (or the hint "Hold to ask" if already released); `consent`: `speech.requestPermission` (the native prompt; allow → hint "Hold to ask", type → TYPING). The prompt's answer is followed where the hold began, or in IDLE / RETURNING if the glass went home under the alert (ERROR lasts 6 s); it never interrupts a read that began meanwhile. `undetermined`: PRE_PERMISSION; otherwise the unavailable hint |
 | LISTENING | `speech.start` → listening | B2 3.00–3.15 on press. Words are born from the `speech.partial` diff: the stable prefix keeps its spans, new words rise, revised tail words re-roll, and the tail stays ink2. | pointerup → `speech.stop` → wait for `speech.final` → SENDING, or STT_EMPTY if `""`. `speech.error` → IDLE with a hint |
@@ -734,3 +735,45 @@ After the preflight (so nothing unreadable is ever metered) and **before the des
 
 One subtle line from the server's access: "7 of 10 free reads left this week · Resets October 3", or for anonymous reads "2 of 3 free reads left", or "Bobby Pro · Unlimited reads · renews {date}" with **Manage** (Apple's `manageSubscriptionsSheet`, only for an App Store subscription). It refreshes with `GET api/bobby-access` when it opens (after consent only).
 
+
+---
+
+## 9. The nudge and the 1.8 screens (iOS 1.8 (64), 2026-10-07)
+
+1.8 makes credits, memory, theses, reminders and invitations reachable from the conversation. The glass stays the glass: the page gains ONE generic element and no feature code.
+
+### 9.1 The nudge (page side)
+
+- `session.nudge` is `{id S, text S, cta S}` or `null`. Native writes all three, already localized. The page never composes nudge copy (`tests/bridge-boot.test.mjs` pins this).
+- The page draws it as the FIRST chip of the chip row (class `chip nudge`) in `IDLE` and in `FOLLOWUPS`, and puts `text` in the eyebrow line above the row (one line, ellipsized past 350 px; native keeps it to 46 characters).
+- Two methods, both `{id S(^[a-z][a-z0-9_.-]{0,47}$)}`:
+  - `nudge.seen` → `{count I}`. Sent once per id per page life, when the chip is drawn.
+  - `nudge.act` → `{status: "done"|"gone"}`. Sent on tap. The page does not navigate: native decides what opens. `gone` means native no longer has that nudge; never a fault.
+- `session.changed` with a different nudge id (or none) redraws the row the nudge lives in.
+
+### 9.2 The nudge (native side, `Sources/Nucleo/NucleoNudge.swift`)
+
+- Each feature registers one `NudgeSource` (`V18.registerNudges`). `NudgeCenter` serves at most one, by priority (`NudgePriority`).
+- Etiquette, enforced in one place and persisted (`nucleo.nudges.v1`): two showings, then a week of rest, four showings ever; retired for good on tap; 15 minutes of quiet after any tap; redraws within 10 minutes count as one showing.
+- `NucleoSession.currentNudge()` returns nil before consent, during onboarding, under any sheet or system prompt, and in fixture mode (store shots and UI suites read a fixed page).
+- Sources read stored state only (no network in `candidate`) and may look at the last delivered read of this launch (`NudgeRead`: symbol, verdict, saved, the memory receipt; never the question).
+
+### 9.3 Screens
+
+`credits`, `theses`, `thesisEditor`, `thesisReview`, `memory`, `memoryConsent`, `reminders`, `briefingSettings` are native sheets (`NucleoRoute.nativeOnly`). The page cannot open them: `openNative` accepts exactly the routes 1.7 accepted. They open from a nudge tap, from the profile (`switchSheet(to:)`) or from a drained notification tap.
+
+### 9.4 What travels (additive to §2.4)
+
+- Request: a review the person starts adds `thesis` (`ThesisContext`: their words, the date and price it started from). A plain question never has the key.
+- Reply: `memory` (`MemoryReceipt`: recorded, asks, days since the last ask, percent change since) and, for a question that carried a thesis, `review` (`ThesisReviewNotes`: supports, challenges, unknowns, and `notChecked` codes for the evidence the desk does not load).
+- A server that sends none of it is read exactly as in 1.7 (`Tests/V18WireTests.swift`).
+
+Supersedes R9 only where stated here: there is still no notification prompt at launch or on the glass by itself; a reminder is requested from a native sheet after an explicit tap.
+
+### 9.5 The harness: follow-ups (`Sources/V18/Harness/`)
+
+From the first delivered read the phone keeps a ledger per reader (`HarnessLedger`: asks with symbol and price, follow-ups shown, opened or come back for, app opens; 300 events, 60 days; no question text). `HarnessProfile` (interest per asset, the hour they answer at, which kinds they ignore) and `HarnessPlanner` (the asset the next day, its sector the day after, the week on Monday, then silence; an answered follow-up or a new question starts again) are pure functions of it. `HarnessCenter` asks iOS for permission only on the person's "Yes, tell me" or the Follow-ups switch, hands the plan to iOS as local notifications (`v18.follow.<step>`), writes each one back as `sent` once its moment has passed, and reads one quota-free price to draw "NVDA +2.3% since you asked" on the glass. No server, no push token, no account. Each notification carries a tag of its reader (a digest, never the account id) and the moment it was planned for; a tap with another reader's tag does nothing, delivered notifications are cleared when the reader changes, and every change of plan ends in a serialized `sync` so the last one always leaves iOS holding the newest plan.
+
+- Session: `readDelivered` calls `noteAsk`; a tapped follow-up is stored in `HarnessIntent` and drained behind the briefing gate (asset: the glass line; sector or week: route `followUp`, native-only).
+- Page: one new event, `ask.start {token, question}`. Native issues a single-use token for an asset it already knows and writes the question; the page runs it exactly like a chip that carries a token, from `IDLE` or `FOLLOWUPS` only and never under a native sheet. `NucleoSession.startRead` emits it at once, or after the open sheet has closed.
+- Nudge sources: `harness.move` (priority 95) and `harness.offer` (80).

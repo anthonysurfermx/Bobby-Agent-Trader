@@ -1,0 +1,23 @@
+The files belonging to this database system will be owned by user "mrrobot".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are disabled.
+
+creating directory /private/tmp/bobby-ios17-remediation-20261004/pg-remaining/pg-55497-d10wd748/data ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Europe/Lisbon
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    /opt/homebrew/bin/pg_ctl -D /private/tmp/bobby-ios17-remediation-20261004/pg-remaining/pg-55497-d10wd748/data -l logfile start
+

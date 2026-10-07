@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T12:34:14.461071+00:00",
+  "stage": "NucleoPrivacyUITests",
+  "class": "NucleoPrivacyUITests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement",
+    "testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "7e6241fda9f3dae4f5b46ba97e38e3fd17533cc8cb69329c67832ea0a7aeebc5",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "ab36650ec01a44d8fe3c421c2fdd3f1225a6a8cf2b1f340216fe9eeee13bcf9a",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "NucleoPrivacyUITests/testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoPrivacyUITests/testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement",
+      "result": "Passed"
+    },
+    {
+      "identifier": "NucleoPrivacyUITests/testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoPrivacyUITests/testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

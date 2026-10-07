@@ -58,6 +58,46 @@ final class DeskMemory {
         if defaults.string(forKey: ownerKey) == userId { defaults.removeObject(forKey: ownerKey) }
     }
 
+    // MARK: Memory › Forget and Delete everything (1.8)
+
+    /// The shortcuts kept for one owner (nil = signed out), whoever is current on this phone.
+    static func watchlist(owner: String?, defaults: UserDefaults = .standard) -> [WatchedAsset] {
+        migrateLegacy(defaults: defaults)
+        guard let data = defaults.data(forKey: scoped(Key.watchlist, owner: owner)),
+              let list = try? JSONDecoder().decode([WatchedAsset].self, from: data) else { return [] }
+        return list
+    }
+
+    /// One asset leaves this owner's shortcuts, and nobody else's. False when it was not there.
+    @discardableResult
+    static func forget(symbol: String, owner: String?, defaults: UserDefaults = .standard) -> Bool {
+        let ticker = symbol.uppercased()
+        var list = watchlist(owner: owner, defaults: defaults)
+        let before = list.count
+        list.removeAll { $0.symbol == ticker }
+        guard list.count != before else { return false }
+        let key = scoped(Key.watchlist, owner: owner)
+        if list.isEmpty { defaults.removeObject(forKey: key) }
+        else if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: key) }
+        return true
+    }
+
+    /// Every shortcut of this owner. The streak counts days, not assets, and stays.
+    static func forgetWatchlist(owner: String?, defaults: UserDefaults = .standard) {
+        migrateLegacy(defaults: defaults)
+        defaults.removeObject(forKey: scoped(Key.watchlist, owner: owner))
+    }
+
+    /// The same two for whoever is current on this phone.
+    @discardableResult
+    func forget(symbol: String) -> Bool {
+        Self.forget(symbol: symbol, owner: defaults.string(forKey: Self.ownerKey), defaults: defaults)
+    }
+
+    func forgetWatchlist() {
+        Self.forgetWatchlist(owner: defaults.string(forKey: Self.ownerKey), defaults: defaults)
+    }
+
     // MARK: streak
 
     /// Call once per app session. Consecutive calendar days grow the streak;

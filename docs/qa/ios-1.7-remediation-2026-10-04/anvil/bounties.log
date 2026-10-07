@@ -1,0 +1,12 @@
+ok  generated bounties ABI (75 entries) equals the compiled artifact
+ok  readBounty: OPEN, bondWei from bountyBond(id), claim-window deadline
+ok  reproduction: submitChallenge with value 0x0 reverts (Challenge bond required)
+ok  MCP bobby_bounty_challenge forwards bountyBond(id); an unposted id is refused (no 0x0 tx)
+ok  built challenge tx (value = bountyBond) mines; status CHALLENGED with resolve deadline
+ok  global setChallengeBond does not reprice bounty 1; bounty 2 carries the new bond
+ok  PENDING_RESOLUTION with resolutionFinalizeAfter
+ok  DISPUTED with settlementAfter and disputedBy
+ok  RESOLVED (terminal, no deadline)
+ok  WITHDRAWN (terminal, no deadline)
+ok  listRecentBounties: every row carries bondWei and a named status
+bounties ABI (anvil) tests passed

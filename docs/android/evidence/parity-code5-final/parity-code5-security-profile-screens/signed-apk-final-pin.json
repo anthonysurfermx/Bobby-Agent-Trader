@@ -1,0 +1,12 @@
+{
+  "at": "2026-10-03T19:14:14.868084+00:00",
+  "scope": "Ordinary security-final signed UI; fresh guest, not instrumentation or historical 40 XP migration",
+  "package": "xyz.bobbyprotocol.bobby",
+  "versionName": "1.1.0",
+  "versionCode": 5,
+  "minSdk": 26,
+  "targetSdk": 36,
+  "apkSHA256": "20e7eb849105b81ab53bc9bbe8eb25e851781665443ef59b69b7a0a572c567ec",
+  "pinMatchesParent": true,
+  "avd": "Bobby_Parity_API35"
+}

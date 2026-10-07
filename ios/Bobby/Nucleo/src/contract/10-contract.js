@@ -31,6 +31,18 @@
     return errs;
   }
   function strip(o, keys) { var c = JSON.parse(JSON.stringify(o)); keys.forEach(function (k) { delete c[k]; }); return c; }
+  // Native reads add the active regional context and the recorded equity currency.
+  // Keep the golden comparison strict: these fields must match the declared fixture/session.
+  function expectedRead(golden) {
+    var expected = strip(golden, []);
+    if (B.native) {
+      expected.language = ctx.session.language;
+      expected.locale = ctx.session.locale;
+      expected.country = ctx.session.country;
+      if (expected.asset.symbol === 'NVDA') expected.market.currency = 'USD';
+    }
+    return expected;
+  }
   function diff(a, b, path, out) {
     path = path || '$'; out = out || [];
     if (out.length > 6) return out;
@@ -47,7 +59,7 @@
     companion: nullOr({ id: T.str, webId: T.str, label: T.str, palette: T.str, voicePersona: T.str }),
     xp: T.int, level: { number: T.int, name: T.str, progress: T.num, nextMinXP: nullOr(T.int) }, streak: T.int,
     signedIn: T.bool, riskAccepted: T.bool, riskVersion: T.int, muted: T.bool, reducedMotion: T.bool,
-    mic: { state: oneOf('granted', 'denied', 'undetermined', 'restricted', 'unavailable'), onDevice: T.bool },
+    mic: { state: oneOf('granted', 'denied', 'undetermined', 'restricted', 'unavailable', 'consent'), onDevice: T.bool },
     hints: T.obj, pendingRead: nullOr(T.obj), fixtures: T.bool, platform: T.str, appVersion: T.str
   };
   var CANDLE = { t: T.int, o: T.num, h: T.num, l: T.num, c: T.num, v: T.num };
@@ -60,7 +72,7 @@
     pulse: T.any,
     agents: { alpha: T.str, red: T.str, cio: T.str, verdict: oneOf('wait', 'review'), direction: oneOf('long', 'short', 'none') },
     provenance: { provider: T.str, instrument: T.str, assetType: oneOf('equity', 'crypto'), timeframe: T.str, asOf: T.str },
-    candles: arrayOf(CANDLE), receivedAt: T.int, elapsedMs: T.int, fixture: T.bool
+    candlesTimeframe: eq('1H'), candles: arrayOf(CANDLE), receivedAt: T.int, elapsedMs: T.int, fixture: T.bool
   };
   /* the server's word on the caller's reads (§8): anon / free / pro */
   var ACCESS = { tier: oneOf('anon', 'free', 'pro'), used: T.int, limit: nullOr(T.int), remaining: nullOr(T.int), resetsAt: nullOr(T.str), paywall: T.bool };
@@ -99,7 +111,9 @@
     return B.api.session({ page: 'contract' }).then(function (s) {
       ctx.session = s;
       metaEl.textContent = (B.native ? 'native' : 'mock') + ' · lang ' + s.language + ' · fixtures ' + s.fixtures + ' · signedIn ' + s.signedIn + ' · risk ' + s.riskAccepted;
-      var e = check(s, SESSION); if (e.length) throw new Error(e.join('\n'));
+      var e = check(s, SESSION);
+      if (B.native) e = e.concat(check(s, { locale: T.str, country: nullOr(function (x) { return /^[A-Z]{2}$/.test(x); }) }));
+      if (e.length) throw new Error(e.join('\n'));
     });
   });
   test('roster(): 18 companions, orb<->bobby, ids unique', function () {
@@ -150,6 +164,17 @@
     });
   });
 
+  test('nudge.seen / nudge.act: a well-formed id is counted and an unknown nudge is gone, never a fault', function () {
+    return Promise.all([B.api.nudgeSeen({ id: 'contract.none' }), B.api.nudgeAct({ id: 'contract.none' }),
+      faultCode(B.api.nudgeAct({ id: 'Not An Id' })), faultCode(B.api.nudgeSeen({}))]).then(function (r) {
+      var e = [].concat(check(r[0], { count: T.int, active: T.bool }), check(r[1], { status: T.str }));
+      if (r[0].active !== false) e.push('a nudge native never served is not active');
+      if (r[1].status !== 'gone') e.push('an unknown nudge must answer gone, got ' + r[1].status);
+      if (r[2] !== 'invalid_params' || r[3] !== 'invalid_params') e.push('bad ids must be invalid_params, got ' + r[2] + ' / ' + r[3]);
+      if (e.length) throw new Error(e.join('\n'));
+    });
+  });
+
   function fixturesOnly() { if (!ctx.session || !ctx.session.fixtures) return 'skip: not in fixture mode (never spend desk quota from the contract page)'; }
   /* mock only: under ?scenario=signin_required|subscription_required every metered read is refused */
   function gateScenario() { return B.mock && FX && FX.manifest.gates ? FX.manifest.gates[B.mock.scenario] || null : null; }
@@ -193,7 +218,7 @@
       off();
       var e = check(r, ASK_OK); if (e.length) throw new Error(e.join('\n'));
       var vol = FX.manifest.volatileKeys;
-      var d = diff(strip(r, vol), strip(FX.ask.nvda, vol)); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
+      var d = diff(strip(r, vol), strip(expectedRead(FX.ask.nvda), vol)); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
       var want = ['resolving', 'accepted', 'market', 'candles'];
       var seen = stages.filter(function (x) { return want.indexOf(x) >= 0; });
       if (JSON.stringify(seen) !== JSON.stringify(want)) throw new Error('stages ' + JSON.stringify(stages));
@@ -205,7 +230,7 @@
     var s = okReads(); if (s) return Promise.resolve(s);
     return B.api.ask({ question: 'Is now a good time for Bitcoin?' }).then(function (r) {
       var vol = FX.manifest.volatileKeys;
-      var d = diff(strip(r, vol), strip(FX.ask.btc, vol)); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
+      var d = diff(strip(r, vol), strip(expectedRead(FX.ask.btc), vol)); if (d.length) throw new Error('golden drift:\n' + d.join('\n'));
     });
   });
   test('one read at a time (busy) and cancel -> cancelled', function () {

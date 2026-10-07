@@ -1,0 +1,35 @@
+{
+  "observedAt": "2026-10-04T13:23:45.870Z",
+  "appId": "6804460489",
+  "version": "1.7",
+  "build": "63",
+  "source": "Safari native accessibility after save and fresh reload",
+  "url": "https://appstoreconnect.apple.com/apps/6804460489/distribution/ios/version/inflight",
+  "status": "En preparación para el envío",
+  "saveDisabled": true,
+  "build63SelectedAndPersisted": true,
+  "manualReleaseSelected": true,
+  "addForReviewClicked": false,
+  "published": false,
+  "localeObserved": "en-US",
+  "screenshotFilenamesObserved": [
+    "01.png",
+    "02.png",
+    "03.png",
+    "04.png",
+    "06.png"
+  ],
+  "evidence": [
+    "29 link 1.7 En preparación para el envío",
+    "66 encabezamiento App para iOS Versión 1.7",
+    "68 botón (disabled) Guardar",
+    "69 botón Añadir a revisión",
+    "172 celda Icono de la app, Value: 63",
+    "173 celda 1.7",
+    "215 botón de selección Publicar esta versión manualmente, Value: 1"
+  ],
+  "limits": [
+    "Fresh draft reload directly rechecked en-US screenshots; all six locales have earlier complete persisted metadata and image receipts.",
+    "No App Review submission or public release performed."
+  ]
+}

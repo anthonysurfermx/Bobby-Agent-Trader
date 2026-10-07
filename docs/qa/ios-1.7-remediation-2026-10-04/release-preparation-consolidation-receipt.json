@@ -1,0 +1,577 @@
+{
+  "consolidatedAtUTC": "2026-10-04T12:45:29.568913+00:00",
+  "headBefore": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "headAfter": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "scope": "Docs-only copies and report integration. No stage/commit, source/project mutation, simulator/build/upload/ASC action.",
+  "copiedFiles": 84,
+  "copiedBytes": 2186578,
+  "fullArchiveCopied": false,
+  "fullArtworkCopied": false,
+  "originalPreparationReceiptsUnchanged": true,
+  "rootReportedRemoteStoreState": {
+    "recordedAtUTC": "2026-10-04T12:45:29.552970+00:00",
+    "evidenceSource": "Root release coordinator reports in the parent task; this consolidation worker did not independently query ASC.",
+    "appStoreVersion": "1.7",
+    "targetBinaryBuild": "63",
+    "versionDraftCreated": true,
+    "versionMetadata": {
+      "en-US": "saved by root in current ASC1.7draft",
+      "es-MX": "saved by root in current ASC1.7draft",
+      "pt-PT": "saved by root in current ASC1.7draft",
+      "de-DE": "saved by root in current ASC1.7draft",
+      "fr-FR": "saved by root in current ASC1.7draft",
+      "it": "saved by root in current ASC1.7draft"
+    },
+    "localizedAppInfoNameSubtitle": "Prepared in metadata; save state not separately specified by root, so not claimed here.",
+    "screenshots": {
+      "de-DE": {
+        "count": 5,
+        "state": "uploaded by root"
+      },
+      "fr-FR": {
+        "state": "in progress at coordinator report; completion not claimed"
+      },
+      "it": {
+        "state": "upload not yet confirmed"
+      },
+      "pt-PT": {
+        "state": "new upload not yet confirmed"
+      },
+      "en-US": {
+        "state": "new upload not yet confirmed; previous inherited state not re-queried"
+      },
+      "es-MX": {
+        "state": "new upload not yet confirmed; previous inherited state not re-queried"
+      }
+    },
+    "preparedCopyArtifacts": "Original preparation receipts retain savedInAppStoreConnect=false because that worker performed no remote actions. This separate current-state receipt records later coordinator actions without rewriting original evidence.",
+    "binaryArchive": "local signed1.7(63)archive verified",
+    "binaryUpload": "not run by this worker; blocked until root trigger after UI diagnosis and Claude verdict",
+    "testFlightProcessing": "unverified",
+    "physicalAcceptance": "unverified"
+  },
+  "copiedArtifacts": [
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/preflight.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/preflight.json",
+      "bytes": 144428,
+      "sha256": "87c581293b2fb84124714a87dfdae03d4384985851dfa1e8e81f3f24252df571"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/coordination.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/coordination.json",
+      "bytes": 573,
+      "sha256": "07c1ea3b1d689a1298db4a2283d3c44b400cad99d75efa7418b8c6ea69f3baf5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/completion-receipt.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/completion-receipt.json",
+      "bytes": 4134,
+      "sha256": "5213111e8aa8d1e9f6f99c142f649338f02e4f2db231cfc8f30be5d62179d620"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-verification.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/archive-verification.json",
+      "bytes": 2627,
+      "sha256": "5e7a9463fce2244bec88d45346b10fc19763ea224f9d79bbf084519df3202cdd"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/verification-history.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/verification-history.json",
+      "bytes": 822,
+      "sha256": "aa91168a82b51abe778786b66f06b5a5328378aa1b57785bc8b4d7432338d42c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/wrapper-before-fixture-verifier-repair.py",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/wrapper-before-fixture-verifier-repair.py",
+      "bytes": 16056,
+      "sha256": "104e799f17735be4e7cd49e58b6e337b6ee4081fede056cb1bdd349f643d9c48"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-phase/phase-receipt.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/archive-phase/phase-receipt.json",
+      "bytes": 1640,
+      "sha256": "291f9ae62c96ec1f956e19fb341d77218151dcd919868b0974130cdfd08fefe7"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-phase/xcodebuild.log",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/retry/archive-phase/xcodebuild.log",
+      "bytes": 546050,
+      "sha256": "6de5ba39a148e9293b662fc26117231c1553037fd9b3d8ae6c014f46b5fed1d4"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63/preflight.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/first-attempt/preflight.json",
+      "bytes": 144428,
+      "sha256": "2493bd08defb6120e4922b5c9e53b39027a7ac72926a60ddf6d9002a5f93c152"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63/coordination.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/first-attempt/coordination.json",
+      "bytes": 792,
+      "sha256": "e2c36e17fd687360712a91e738023bdfb265aa810e399f614d6372b8ab035308"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63/first-attempt-wrapper.py",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/first-attempt/first-attempt-wrapper.py",
+      "bytes": 15939,
+      "sha256": "97cb718b0221434570c2dc16a28e1a75e2c85190f080b6f83772b55aa8feba97"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63/archive-phase/phase-receipt.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/first-attempt/archive-phase/phase-receipt.json",
+      "bytes": 1558,
+      "sha256": "585340ad9273bf1c08d1550e95a988d6a16057d45594cab9b89de05f67fe4f71"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63/archive-phase/xcodebuild.log",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/first-attempt/archive-phase/xcodebuild.log",
+      "bytes": 4718,
+      "sha256": "98ffbe7e2f12605d829110d3ff164571cdb27ead827713498c205b338654d3b8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-run-report.md",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-run-report.md",
+      "bytes": 4778,
+      "sha256": "6a011e567bf535d41f1630e77910197541b861ec20f67fcd4c9a8f37e4921013"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-final-evidence-receipt.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-final-evidence-receipt.json",
+      "bytes": 1317,
+      "sha256": "954687c42a5e45531bca2022ee772e20cb58504aede64b912dc96852b0b0075f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper-signing-repair.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-wrapper-signing-repair.json",
+      "bytes": 1209,
+      "sha256": "0868a5f20e28ac559dbe879c5f7f99a4ed9a6eb079adae572e8ab46df926039d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper-fixture-verifier-repair.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-wrapper-fixture-verifier-repair.json",
+      "bytes": 1060,
+      "sha256": "8e216215921f984c8a9c1ea067c56eb2695446491e9b6f006c2797a9b45ff598"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-target-signing-settings.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-target-signing-settings.json",
+      "bytes": 482,
+      "sha256": "a64451069ec4517e2c44f4ae51d847ea3cf7c2301f20829d3193f1a520460c16"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper.py",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/native/archive63-wrapper.py",
+      "bytes": 16900,
+      "sha256": "609befc08b23475b1b7a7587f3b0e40127e68041b9e56f48f7e48ff27bb0b552"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/README.md",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/README.md",
+      "bytes": 10717,
+      "sha256": "3f983178b1d4fad26b76b02137da09d23ab4f2ce89a9d945dda48186fbbc9662"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/assets-inventory.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/assets-inventory.json",
+      "bytes": 312288,
+      "sha256": "ba1a644a704bcb8c883af7024a5db89cc41516d54a7469b5c337a36bd0a91ff9"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-de.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-de.jpg",
+      "bytes": 128694,
+      "sha256": "f4f3555de782a679e1c31eb7e3a3dafeeeae00581df5090d0501745de92b6627"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-en.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-en.jpg",
+      "bytes": 122435,
+      "sha256": "ce8ca3fec362cc70a36308f267fbe892ebb508f6c474b50346bacb921279a723"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-es.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-es.jpg",
+      "bytes": 123205,
+      "sha256": "9710525701d70c282bd3f99ecfb125e13106831f7cad52e8f07ed627be9bb282"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-fr.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-fr.jpg",
+      "bytes": 129609,
+      "sha256": "c40a75df0bdc8243ef94faad8bd6967cfa2d98a9c76f19274e2997ea0245cb34"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-it.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-it.jpg",
+      "bytes": 127489,
+      "sha256": "7dbf0cceddb3b925ee4bab5a79e3b78171d72c85330b8ad6025bcb2d3e075a19"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/contact-sheet-pt.jpg",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/contact-sheet-pt.jpg",
+      "bytes": 123822,
+      "sha256": "9de39c789a1ecf21af32a2499a3a63257546609ba3f65d887cda2fee68b45452"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/description.txt",
+      "bytes": 3331,
+      "sha256": "fa6e1f238f65bb1f8929de2db56a1c40af9a59e62b6b25387e612fca4d67419f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/keywords.txt",
+      "bytes": 69,
+      "sha256": "7c6d617e1f593a747c6a5df37781d5f1291df9a7edae445553d05ca4115eb275"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/name.txt",
+      "bytes": 25,
+      "sha256": "7ab877f5e48fd2f03d40cb3f84c9d607af3f006211509246b84b9a52eb404756"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "29cc0e0867ba1f93a539ac864505b5eb8d1b3474bb8f61445296ece420a492d7"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/promotionalText.txt",
+      "bytes": 154,
+      "sha256": "d3a4936ef36d40776396f708961c548aab3a62a326824198ab6b5880d434b0a6"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/subtitle.txt",
+      "bytes": 27,
+      "sha256": "3b3563e51ba6316c44600fa57bcfcfb804c214f24a43f09a480dbe8097639259"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/supportURL.txt",
+      "bytes": 42,
+      "sha256": "f327d575cc95e617caac0188c1285bb47ef3e7ed9bed725014f69ceaca41b948"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/de-DE/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/de-DE/whatsNew.txt",
+      "bytes": 516,
+      "sha256": "c07f5d01e7e3c79dfd2d6db1f99b82ffbf303f021590c367b56d9c031e96473b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/description.txt",
+      "bytes": 2872,
+      "sha256": "fdafec040624baf51445534361e880190a7cd3b6aa9f8e37017e074955db215a"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/keywords.txt",
+      "bytes": 79,
+      "sha256": "efdcdb7faa5a59cfd9c8722ff1a0879207103e47e38422c7125da74a0a069ce0"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/name.txt",
+      "bytes": 30,
+      "sha256": "65a7477d3f64c430758e74eb5f83cbe5fbe22331d097978cfe577a3d5a30698c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "0c0b13d9282565de5da222c6c9d6f03d90af2b318be11e9a771cf2ba25d38be3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/promotionalText.txt",
+      "bytes": 156,
+      "sha256": "cee94086a917e7c0ececce8bbd587bf650c25241314a6e400bead28149c6ef90"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/subtitle.txt",
+      "bytes": 26,
+      "sha256": "f39e36508ac8bb75a913256662aa11d84d64a70bccd56ff17c8490dd63f07917"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/supportURL.txt",
+      "bytes": 42,
+      "sha256": "894ef52956f0fdf123fd7f8b6fec0e0c6971dcf4a7bf20d640f20760d665a4be"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/en-US/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/en-US/whatsNew.txt",
+      "bytes": 436,
+      "sha256": "d909e75becd611cc3adbcfb3f8337f6cc6a1db474e975c72190a761696b6ecae"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/description.txt",
+      "bytes": 3154,
+      "sha256": "f22d7e0407a1cdcb197d91d483d777519f8a1cb2ef016f29c66401e6be66ad59"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/keywords.txt",
+      "bytes": 89,
+      "sha256": "ab13fb558eaced5544532aa27ef4522928f3b64f3e36e7558484785d3d4a7c70"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/name.txt",
+      "bytes": 30,
+      "sha256": "d319d0c4ceb7b2301a8f03e887435c1c6b5f12f4370a511189ca58c402d22870"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "701329ea38d94ac1eb4c97329049a3fe310d82490cb63940d1ca380f981ef91c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/promotionalText.txt",
+      "bytes": 158,
+      "sha256": "94f45258a61b4e55cfb09f626a04a437df889c5459e864c040e3ecee9752aa62"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/subtitle.txt",
+      "bytes": 25,
+      "sha256": "e279dd793fc91508c18c7aecc53994b0a2a4b8150fb27a88a57cf626896f2c93"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/supportURL.txt",
+      "bytes": 42,
+      "sha256": "c0a8a29fa43f575fdf8519eb48cde849bd29f864cd027fa50923237aa3eba10c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/es-MX/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/es-MX/whatsNew.txt",
+      "bytes": 483,
+      "sha256": "b38e234c92f1c8d726737dcb3f0c0dcb1ec2342300c1149e537dd350c662feee"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/final-artwork-manifest.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/final-artwork-manifest.json",
+      "bytes": 79430,
+      "sha256": "c80e365e1d1ac2d8dce9302aa60f2344a714ac9cdecd338142a4d9c47f77bbe1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/description.txt",
+      "bytes": 3429,
+      "sha256": "2fc05bbb79dfdeed25c924df3bb24682d35792c8f5211825d328587686a63dd3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/keywords.txt",
+      "bytes": 75,
+      "sha256": "3965f506a1d276dc6d2594e7f03b273733848931bd70e5f61166ae57f87e5131"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/name.txt",
+      "bytes": 27,
+      "sha256": "5bf825fb2ec908fa9f5fa146f8579d307e809868b09e2909a1691d74f2d2d287"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "6d27690b2141175668b86c761f2e96ad286482bc3ce84cf08a1073f92e822cf8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/promotionalText.txt",
+      "bytes": 158,
+      "sha256": "ac0d760b5642a965e809a734644f6c91ea0f73c1bdc43a18558c60270de935d7"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/subtitle.txt",
+      "bytes": 29,
+      "sha256": "17d283ebab165bb0325912abb19bd2cf3a853b7b3449218cec703b0abc96056c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/supportURL.txt",
+      "bytes": 42,
+      "sha256": "176dff83c1ac3c6530f5381852282a2c59c78b41f0b6d4445cda655d4953cd01"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/fr-FR/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/fr-FR/whatsNew.txt",
+      "bytes": 538,
+      "sha256": "aa714df0aa9156a1a12530d78679749f54b38d1988fc4f7b90bfd7536aa4ad7c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/description.txt",
+      "bytes": 3223,
+      "sha256": "3fa0fe9cf729580a41e8f0d68ec8c92fb8fd33e3db74177f61d1c6ab57684702"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/keywords.txt",
+      "bytes": 69,
+      "sha256": "8debcdd6a695dcc59fdb35e1f5490f885cc4f1b8b00e5a0e454160d87ce69bad"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/name.txt",
+      "bytes": 30,
+      "sha256": "9722c187cf236b00f6470f6d6242e9504b13f0e898f8e6932b1ab8cd391b6ac8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "e47c485119569e4da3049e61b2ca29d898676be91fbdac89bf1dd589a44d9206"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/promotionalText.txt",
+      "bytes": 147,
+      "sha256": "ce4bba7315c49d66482862db76a7ad468951698826bc052b0006401f71690d49"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/subtitle.txt",
+      "bytes": 28,
+      "sha256": "dbfda7913b0074e278a1d5f2fe33796c2cd33c60e84a9efa345038a087af1f11"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/supportURL.txt",
+      "bytes": 42,
+      "sha256": "183bd1cc24c36b748922479b5cda50123c1c5122df38df81aece6f7b18ea33df"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/it/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/it/whatsNew.txt",
+      "bytes": 481,
+      "sha256": "2fc86eaecd054869cf8b4a6dafa16700cbad28e6509c6593d8c73e29f465be04"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-1.7-63-four-new-locales.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/metadata-1.7-63-four-new-locales.json",
+      "bytes": 21323,
+      "sha256": "7aa55c11f83288933073661fa3b131bc5e518afa1b3c35f2baf8569f9ee583f8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-1.7-63.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/metadata-1.7-63.json",
+      "bytes": 29561,
+      "sha256": "7f2b12f204da2935e610fb9e1bf7bd24699703d88b197101120b7fc34f27bbe9"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-validation.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/metadata-validation.json",
+      "bytes": 5761,
+      "sha256": "8f9d31b7872bcf7da9d720484224b0675727616e6d58347265d52557ad91ebad"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/prepare-metadata.py",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/prepare-metadata.py",
+      "bytes": 14465,
+      "sha256": "8b3ebe7fe426e6470c74790aaefcf4c7a4a6c8f141efa1ae90f67a6812fad0ca"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/description.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/description.txt",
+      "bytes": 3279,
+      "sha256": "63802c0490325e353a6b2f52d0b9ad787ef822f5a08c33f5e701e883837bba6e"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/keywords.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/keywords.txt",
+      "bytes": 81,
+      "sha256": "83fd1ca97020e8fbf520e5825d133d4e9cb10fda6942c436dc30277db7fd009e"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/name.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/name.txt",
+      "bytes": 31,
+      "sha256": "cbcbe7101e4a75c44da0f5bd3b21da305a311a1525f4971b154a2e4245fa1fa6"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/privacyPolicyURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/privacyPolicyURL.txt",
+      "bytes": 42,
+      "sha256": "03fb98e3687d1340f55aaf1b73980a1ee61b57c46012e6a4f46c980d669f64d0"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/promotionalText.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/promotionalText.txt",
+      "bytes": 147,
+      "sha256": "11340db403af97499fe9691f64fef6d27f2d65a5754360541819c0ab8874f65f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/subtitle.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/subtitle.txt",
+      "bytes": 30,
+      "sha256": "c3b0cb26fade1e5773c90183945cfea1295e369a165d9f62c93859c38980e2a9"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/supportURL.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/supportURL.txt",
+      "bytes": 42,
+      "sha256": "4552889f947245c9dcc6d927480579add2a093a9c8ebddda885b1ca6d8da74c1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/pt-PT/whatsNew.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/pt-PT/whatsNew.txt",
+      "bytes": 492,
+      "sha256": "4de0b5b01b124fadd09653ddc8176b3182121c8a18c5e658b5ce76bb4585f5d3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/receipt.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/receipt.json",
+      "bytes": 11207,
+      "sha256": "4fdf2bffb912ae05d7aa5f2f2395c41a106051724c7c9729b439af316f23a499"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/review-notes-en.txt",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/review-notes-en.txt",
+      "bytes": 2385,
+      "sha256": "b2914d3e1e5adfabbe3a9f71809e50cc6621246506d7e9ec3a514db24e298349"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/url-checks.json",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/url-checks.json",
+      "bytes": 4495,
+      "sha256": "bc674ab13143df9fdf3ca8b029725b122aaa07329362bb2916928287d8b86489"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/validate-assets.py",
+      "destination": "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/validate-assets.py",
+      "bytes": 5723,
+      "sha256": "63e6e0baf0c41fc9d9acf3221cb0ce6d01068bf0007ebe008163dca3466f2c63"
+    }
+  ],
+  "integratedDocs": {
+    "docs/qa/ios-1.7-remediation-2026-10-04/README.md": {
+      "sha256": "1b2bdf9512b81003dc87c4402d62154fa5f7f79b690b44f6fb65d7b78531a547",
+      "bytes": 13184
+    },
+    "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/current-store-state.json": {
+      "sha256": "a0edac1f7ec4616f176738703a148be1b618210330145b308ead67f82bbcaaca",
+      "bytes": 1787
+    },
+    "docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/current-store-state.md": {
+      "sha256": "c2c2bdab090ace35d1a64a4a279da069c59486f2bbe59006375b3ec1e500bd8a",
+      "bytes": 1749
+    },
+    "docs/qa/ios-1.7-remediation-2026-10-04/release-archive/upload-command-ready.md": {
+      "sha256": "1db13b81f7aa350fd2e82b67a7b413e5a19ba2bf031822dee63a5fde1d3630e9",
+      "bytes": 1554
+    }
+  }
+}

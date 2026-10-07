@@ -1,0 +1,108 @@
+{
+  "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "head": "393776c332b2c3f6e21d6cad457869431dd28a62",
+  "version": "1.7",
+  "build": "63",
+  "remaining_class_count": 14,
+  "remaining_method_count": 57,
+  "rows": [
+    {
+      "class": "CommunitySafetyUITests",
+      "methods": 2,
+      "scope": "Local neighbor fixture / shared community UI",
+      "acceptance_boundary": "Block/unblock UI only; no real community moderation write.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "CompanionLoadTests",
+      "methods": 1,
+      "scope": "DEBUG skin fixture / bundled models",
+      "acceptance_boundary": "One method iterates 18 companions; prior runner failed before test execution.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "CouponRedemptionUITests",
+      "methods": 2,
+      "scope": "DEBUG coupon response fixture",
+      "acceptance_boundary": "UI confirmation/already-redeemed behavior; no real coupon is redeemed.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "DeskHarvestCardTests",
+      "methods": 10,
+      "scope": "DEBUG harvest fixture / native card",
+      "acceptance_boundary": "10 UI methods; account/world results are fixture data.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "EquipmentUITests",
+      "methods": 2,
+      "scope": "DEBUG classic desk / local companion and XP seed",
+      "acceptance_boundary": "Corrected owner-scoped momo seed; English/Spanish assertions unchanged.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "LockerTests",
+      "methods": 6,
+      "scope": "DEBUG locker fixture",
+      "acceptance_boundary": "Corrected owner-scoped companion seed; 6 methods, including model budget and ladder.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "NucleoPrivacyUITests",
+      "methods": 2,
+      "scope": "Shipping Nucleo page / offline fixture backend",
+      "acceptance_boundary": "Readable explicit consent, withdrawal and persistence; no remote identity verification.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "NucleoStoreScreenshots",
+      "methods": 2,
+      "scope": "Shipping Nucleo page / recorded HTTP fixture backend",
+      "acceptance_boundary": "2 captures; successful fixture analysis is separate from live server behavior.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "ProReviewShots",
+      "methods": 2,
+      "scope": "Shipping Nucleo profile plus isolated DEBUG signed-in profile / live RevenueCat Test Store offering",
+      "acceptance_boundary": "No Subscribe/Restore tap; Test Store price/readiness UI, no Apple purchase lifecycle evidence.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "ReleaseReadinessTests",
+      "methods": 14,
+      "scope": "Mixed DEBUG classic onboarding/desk and shared Trader Land UI / local account-neighbor fixtures",
+      "acceptance_boundary": "Bundled voice selection now explicitly seeds companion voice; account publish/share results use fixtures.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "SquadGalleryTests",
+      "methods": 4,
+      "scope": "DEBUG squad fixture / real gallery and bundled models",
+      "acceptance_boundary": "Corrected owner-scoped selection; unlock and active companion assertions preserved.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "Store35Shots",
+      "methods": 2,
+      "scope": "DEBUG classic desk / live Bobby analysis backend / bundled showcase island",
+      "acceptance_boundary": "Live tests remain intact. Legacy JSON parser repaired; current HTTP/provider behavior still requires rerun.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "StoreShots",
+      "methods": 5,
+      "scope": "DEBUG classic desk / live Bobby backend plus DEBUG bundled gear fixtures",
+      "acceptance_boundary": "5 methods; screenshot rig is stateful and some success checks are optional. Passing captures alone do not establish live verdict success.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    },
+    {
+      "class": "TraderLandGateTests",
+      "methods": 3,
+      "scope": "Shared Trader Land UI / local practice and account-neighbor fixtures",
+      "acceptance_boundary": "Movement/collision/undo/persistence UI; no real account island publication.",
+      "current_remediation_run": "pending_root_full_simulator_run"
+    }
+  ]
+}

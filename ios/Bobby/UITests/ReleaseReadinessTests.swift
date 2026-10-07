@@ -93,7 +93,8 @@ final class ReleaseReadinessTests: XCTestCase {
     func testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice() {
         let app = XCUIApplication()
         app.launchArguments = ["-AppleLanguages", "(en)", "-agent.riskNoticeVersion", "6", "-agent.onboarded", "YES",
-                               "-companion.id", "byte", "-companion.disciplineXP", "1000", "-avatar.voiceMuted", "NO"]
+                               "-companion.id", "byte", "-companion.selected.v2.local", "byte",
+                               "-companion.disciplineXP", "1000", "-avatar.voiceMuted", "NO", "-voice.gender", "companion"]
         app.launch()
         let portrait = app.buttons["squad-portrait"]
         XCTAssertTrue(portrait.waitForExistence(timeout: 15))

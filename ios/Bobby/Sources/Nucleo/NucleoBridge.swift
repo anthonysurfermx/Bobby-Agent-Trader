@@ -77,6 +77,7 @@ final class NucleoBridge: NSObject, WKScriptMessageHandlerWithReply {
             "saveThesis", "island", "theses", "record",
             "setCompanion", "riskNotice", "acceptRisk", "signIn", "paywall",
             "openNative", "finishOnboarding", "markHint", "log",
+            "nudge.seen", "nudge.act",
         ]
 #if DEBUG
         // The hidden exit to the classic desk exists in DEBUG builds only (App Review 2.3.1).
