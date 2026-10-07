@@ -34,6 +34,18 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="bobby" android:host="auth" android:path="/callback" />
             </intent-filter>
+            <!-- 1.8: an invitation link (https://bobbyprotocol.xyz/i/CODE) opens the app, which keeps the code
+                 until an account can accept it (v18/invite). Android opens these links here only once the site's
+                 /.well-known/assetlinks.json names this package with its signing certificate. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" />
+                <data android:host="bobbyprotocol.xyz" />
+                <data android:host="www.bobbyprotocol.xyz" />
+                <data android:pathPrefix="/i/" />
+            </intent-filter>
         </activity>
     </application>
 </manifest>
