@@ -248,7 +248,7 @@ final class HarnessCenterTests: XCTestCase {
         await center.appActive()
         XCTAssertEqual(center.ledger.events(.sent).map(\.step), [.asset], "written once")
         XCTAssertEqual(center.ledger.events(.sent).first?.at, at(8, 16, 40))
-        XCTAssertEqual(center.ledger.events(.returned), [], "sixteen hours later is not coming back for it")
+        XCTAssertEqual(center.ledger.events(.returned), [], "opening the app is not an answer")
         XCTAssertEqual(center.upcoming.map(\.step), [.sector, .week], "ignored: the sector at 48 hours, then Monday")
         XCTAssertEqual(fake.requests["v18.follow.sector"]?.fireAt, at(9, 16, 40))
     }
@@ -259,17 +259,16 @@ final class HarnessCenterTests: XCTestCase {
         _ = await center.accept()
         clock = at(8, 18)
         fake.deliver(before: clock)
-        await center.appActive()                      // back within hours: counted as coming back
-        XCTAssertEqual(center.ledger.events(.returned).count, 1)
+        await center.appActive()
+        XCTAssertEqual(center.ledger.events(.returned), [], "back in the app is not yet an answer")
         await center.opened(HarnessTap(step: .asset, symbol: "NVDA", sector: nil))
-        XCTAssertEqual(center.ledger.events(.returned), [], "the tap replaces it: one answer, not two")
         XCTAssertEqual(center.ledger.events(.opened).map(\.step), [.asset])
         XCTAssertEqual(center.upcoming.first?.step, .asset)
         XCTAssertEqual(center.upcoming.first?.fireAt, at(9, 18), "they opened it: another one the next day")
         XCTAssertEqual(fake.requests["v18.follow.asset"]?.body.contains("2"), true, "two days after the question")
     }
 
-    func testAFollowUpThatFiresWhileTheyAreInTheAppIsAnsweredWithoutABanner() async {
+    func testAFollowUpThatFiresWhileTheyAreInTheAppShowsOnTheGlassWithoutABanner() async {
         let center = make()
         await ask(center, "NVDA")
         _ = await center.accept()
@@ -277,8 +276,42 @@ final class HarnessCenterTests: XCTestCase {
         fake.deliver(before: clock)
         await center.firedInForeground(HarnessTap(step: .asset, symbol: "NVDA", sector: nil))
         XCTAssertEqual(center.ledger.events(.sent).count, 1)
-        XCTAssertEqual(center.ledger.events(.returned).count, 1)
+        XCTAssertEqual(center.ledger.events(.returned), [], "shown is not answered")
         XCTAssertEqual(center.move?.symbol, "NVDA", "the glass says it instead")
+    }
+
+    func testActingOnAFollowUpWithoutTappingItIsAnAnswerAndOpeningTheAppIsNot() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 18)                              // shown at 16:40; they open the app by themselves
+        fake.deliver(before: clock)
+        prices["NVDA"] = 101
+        await center.appActive()
+        XCTAssertEqual(center.ledger.events(.returned), [])
+        XCTAssertEqual(center.upcoming.map(\.step), [.sector, .week], "nothing answered: the plan goes on as if ignored")
+        center.notePicked(symbol: "NVDA")              // "What changed?" on the glass
+        await settle()
+        XCTAssertEqual(center.ledger.events(.returned).map(\.ref), [at(8, 16, 40)], "that answers the follow-up they were shown")
+        XCTAssertEqual(center.upcoming.first?.step, .asset, "answered: another one the next day")
+        XCTAssertEqual(center.upcoming.first?.fireAt, at(9, 18))
+        center.notePicked(symbol: "NVDA")
+        XCTAssertEqual(center.ledger.events(.returned).count, 1, "one answer per follow-up")
+    }
+
+    func testAskingAboutSomethingElseDoesNotAnswerAnAssetFollowUp() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 18)
+        fake.deliver(before: clock)
+        await center.appActive()
+        await ask(center, "BTC", equity: false)
+        XCTAssertEqual(center.ledger.events(.returned), [], "a question about another asset is a new thread, not an answer")
+        clock = at(8, 19)
+        await ask(center, "NVDA")
+        XCTAssertEqual(center.ledger.events(.returned).count, 1, "asking about that asset within a day is")
+        XCTAssertEqual(center.ledger.anchor(before: clock)?.kind, .ask, "and what follows starts from the question")
     }
 
     func testThreeIgnoredFollowUpsAndBobbyGoesQuiet() async {
@@ -322,7 +355,8 @@ final class HarnessCenterTests: XCTestCase {
         _ = await center.accept()
         clock = at(8, 17)
         fake.deliver(before: clock)
-        await center.appActive()                       // they are back: written as coming back
+        await center.appActive()
+        center.notePicked(symbol: "NVDA")              // they acted on the line before the tap was honoured
         XCTAssertEqual(center.ledger.events(.returned).count, 1)
         clock = at(8, 17, 12)                           // a sheet kept the tap waiting twelve minutes
         let tap = HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: "local", stamp: at(8, 16, 40))

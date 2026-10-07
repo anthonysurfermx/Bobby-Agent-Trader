@@ -37,7 +37,8 @@ struct HarnessEvent: Codable, Equatable {
         case sent
         /// They tapped a follow-up notification.
         case opened
-        /// They came back to the app soon after a follow-up without tapping it.
+        /// They did something useful with a follow-up without tapping it: within a day they asked
+        /// about it, or acted on its line in the app. Opening the app is not an answer.
         case returned
         /// They acted on a follow-up inside the app (the line on the glass, a row of a board).
         case picked

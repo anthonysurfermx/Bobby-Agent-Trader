@@ -62,8 +62,13 @@ final class HarnessGlassTests: XCTestCase {
     func testTheOfferNamesTheAssetWhenItFits() {
         inEveryLanguage { language in
             XCTAssertTrue(HarnessCopy.offerLine(symbol: "NVDA").contains("NVDA"), language)
-            XCTAssertFalse(HarnessCopy.offerLine(symbol: "ABCDEFGHIJKLMNOPQRST").contains("ABCDEF"), "\(language): too long, the plain line")
+            // A symbol too long for the line gives the plain line, never a cut one.
+            let long = HarnessCopy.offerLine(symbol: "ABCDEFGHIJKLMNOPQRST")
+            XCTAssertLessThanOrEqual(long.count, NucleoNudge.textLimit, language)
+            XCTAssertTrue(long.contains("ABCDEFGHIJKLMNOPQRST") || !long.contains("ABCDEF"), "\(language): whole or absent")
         }
+        L.select("en")
+        XCTAssertEqual(HarnessCopy.offerLine(symbol: "ABCDEFGHIJKLMNOPQRST"), "Shall I keep you posted on this?")
     }
 
     func testTheMoveSaysWhatThePhoneRead() {
@@ -76,7 +81,7 @@ final class HarnessGlassTests: XCTestCase {
         L.select("es")
         XCTAssertEqual(HarnessCopy.moveLine(symbol: "NVDA", pct: 2.34, days: 1), "NVDA \(HarnessCopy.signed(2.34)) desde que preguntaste",
                        "the number in the language's own notation")
-        XCTAssertEqual(HarnessCopy.offerLine(symbol: "NVDA"), "¿Te cuento mañana cómo se movió NVDA?")
+        XCTAssertEqual(HarnessCopy.offerLine(symbol: "NVDA"), "¿Te voy contando cómo sigue NVDA?", "an ongoing follow-up, said as one")
     }
 
     func testTheLockScreenIsWrittenInTheAppsLanguage() {
@@ -206,7 +211,7 @@ final class HarnessGlassTests: XCTestCase {
         let fresh = NudgeMoment(signedIn: false, now: t0.addingTimeInterval(60), lastRead: read, readsThisLaunch: 1)
         let offer = HarnessNudges.offer(fresh, mode: .undecided)
         XCTAssertEqual(offer?.id, "harness.offer.v1")
-        XCTAssertEqual(offer?.text, "Tell you tomorrow how NVDA moved?")
+        XCTAssertEqual(offer?.text, "Shall I keep you posted on NVDA?")
         XCTAssertEqual(offer?.cta, "Yes, tell me")
         XCTAssertNil(HarnessNudges.offer(fresh, mode: .on), "they already said yes")
         XCTAssertNil(HarnessNudges.offer(fresh, mode: .off), "they said no: never again")

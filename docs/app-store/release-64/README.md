@@ -21,7 +21,7 @@ Draft text for the 1.8 listing. Nothing here has been entered in App Store Conne
 
 ## Follow-ups: what to check on a real iPhone
 
-- After a read, "Tell you tomorrow how NVDA moved?" > "Yes, tell me" shows the iOS permission prompt once.
+- After a read, "Shall I keep you posted on NVDA?" > "Yes, tell me" shows the iOS permission prompt once.
 - A follow-up is delivered the next day at the time of the question, names the asset and no figure.
 - Tapping it opens the app with "NVDA +x% since you asked" on the glass; "What changed?" starts a read.
 - Not opening it: the sector arrives the day after, the week on Monday, then nothing.

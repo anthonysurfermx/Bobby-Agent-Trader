@@ -327,7 +327,7 @@ Surfaces, each one line and one action:
 
 | Where | Line | Action |
 | --- | --- | --- |
-| Glass, after a read, until they decide | Tell you tomorrow how NVDA moved? | Yes, tell me |
+| Glass, after a read, until they decide | Shall I keep you posted on NVDA? | Yes, tell me |
 | Lock screen, next day | NVDA, a day later. See how it moved. | tap |
 | Lock screen, day after (not opened) | Semiconductors today. NVDA is part of it. | tap |
 | Lock screen, next Monday (not opened) | Your week: NVDA and 2 more. | tap |
@@ -335,7 +335,7 @@ Surfaces, each one line and one action:
 | Board (a sector, the week) | title + "Last 24 hours" / "Since you asked" | a row asks Bobby |
 | Reminders | Follow-ups · Bobby comes back to what you asked. | switch |
 
-Spanish: ¿Te cuento mañana cómo se movió NVDA? · Sí, cuéntame · NVDA, un día después. Mira cómo se
+Spanish: ¿Te voy contando cómo sigue NVDA? · Sí, cuéntame · NVDA, un día después. Mira cómo se
 movió. · Semiconductores hoy. NVDA es parte. · Tu semana: NVDA y 2 más. · NVDA +2.3% desde que
 preguntaste · ¿Qué cambió? · Seguimiento · Bobby vuelve a lo que preguntaste.
 

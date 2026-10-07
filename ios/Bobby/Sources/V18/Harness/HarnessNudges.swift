@@ -1,6 +1,6 @@
 // The harness on the glass (1.8). Two lines, both written here and drawn by the page:
 //  - the offer, once a read has been delivered and the person has not decided yet:
-//    "Tell you tomorrow how NVDA moved?" · "Yes, tell me". The tap is the person's own request, so
+//    "Shall I keep you posted on NVDA?" · "Yes, tell me". The tap is the person's own request, so
 //    it is the one place (with the Follow-ups switch) where iOS may be asked for permission;
 //  - the move, when they come back (on their own or through a follow-up) to an asset they asked
 //    about at least a day ago: "NVDA +2.3% since you asked" · "What changed?". The number costs

@@ -27,10 +27,11 @@ enum HarnessCopy {
 
     // MARK: The glass (46 characters for the line, 22 for the button, in every language)
 
-    /// The offer after a read. Names the asset when the line still fits.
+    /// The offer after a read. It says what the person is agreeing to: Bobby coming back to this
+    /// asset over the next days, not one message. Names the asset when the line still fits.
     static func offerLine(symbol: String) -> String {
-        let named = L.t("Tell you tomorrow how \(symbol) moved?", "¿Te cuento mañana cómo se movió \(symbol)?")
-        return named.count <= NucleoNudge.textLimit ? named : L.t("Tell you tomorrow how it moved?", "¿Te cuento mañana cómo se movió?")
+        let named = L.t("Shall I keep you posted on \(symbol)?", "¿Te voy contando cómo sigue \(symbol)?")
+        return named.count <= NucleoNudge.textLimit ? named : L.t("Shall I keep you posted on this?", "¿Te voy contando cómo sigue?")
     }
 
     static var offerButton: String { L.t("Yes, tell me", "Sí, cuéntame") }

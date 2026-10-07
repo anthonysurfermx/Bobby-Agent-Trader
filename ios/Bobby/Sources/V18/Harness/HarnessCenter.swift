@@ -181,8 +181,8 @@ final class HarnessCenter: ObservableObject {
     static let dueAfter: TimeInterval = 20 * 3_600
     /// And for this long.
     static let dueDays = 14.0
-    /// Back in the app this soon after a follow-up counts as having come back for it.
-    static let returnWindow: TimeInterval = 6 * 3_600
+    /// Asking about a follow-up's asset, or acting on its line, this soon after it answers it.
+    static let usefulWindow: TimeInterval = 24 * 3_600
     /// A tapped follow-up keeps the glass on its asset this long.
     static let focusWindow: TimeInterval = 30 * 60
     static let quoteLifetime: TimeInterval = 10 * 60
@@ -328,7 +328,10 @@ final class HarnessCenter: ObservableObject {
     /// A read was delivered. The first one starts everything.
     func noteAsk(symbol: String, name: String, isEquity: Bool, price: Double?) {
         guard recording else { return }
-        note(HarnessEvent(kind: .ask, at: now(), symbol: symbol, name: name, isEquity: isEquity, price: price))
+        let clock = now()
+        // The answer comes first in time: what follows starts from the question itself.
+        answerIfUseful(symbol: symbol, at: clock.addingTimeInterval(-0.001))
+        note(HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: name, isEquity: isEquity, price: price))
         // They are looking at it now: the line about "since you asked" has nothing to say yet.
         if move?.symbol == symbol.uppercased() { move = nil }
         Task { await replan() }
@@ -342,9 +345,30 @@ final class HarnessCenter: ObservableObject {
     /// They acted on a follow-up inside the app.
     func notePicked(symbol: String) {
         guard recording else { return }
-        note(HarnessEvent(kind: .picked, at: now(), symbol: symbol))
+        let clock = now()
+        note(HarnessEvent(kind: .picked, at: clock, symbol: symbol))
         if focus?.symbol == symbol.uppercased() { focus = nil }
         if move?.symbol == symbol.uppercased() { move = nil }
+        if answerIfUseful(symbol: symbol, at: clock) { Task { await replan() } }
+    }
+
+    /// A follow-up shown in the last day that nobody answered yet is answered by something useful
+    /// about it: its asset (or an asset of its sector; anything, for the week). True when it was.
+    @discardableResult
+    private func answerIfUseful(symbol: String, at clock: Date) -> Bool {
+        guard let symbol = HarnessLedger.validSymbol(symbol),
+              let shown = ledger.events(.sent).last(where: { clock.timeIntervalSince($0.at) <= Self.usefulWindow && $0.at <= clock }),
+              !ledger.events.contains(where: { $0.isEngagement && $0.ref == shown.at }) else { return false }
+        let about: Bool
+        switch shown.step {
+        case .asset: about = shown.symbol == symbol
+        case .sector: about = shown.symbol == symbol || (shown.sector != nil && HarnessSectors.sector(of: symbol)?.id == shown.sector)
+        case .week: about = true
+        case nil: about = false
+        }
+        guard about else { return false }
+        note(HarnessEvent(kind: .returned, at: clock, symbol: shown.symbol, step: shown.step, sector: shown.sector, ref: shown.at))
+        return true
     }
 
     /// The offer's "Yes, tell me", or the switch turned on. The ONLY place iOS is asked.
@@ -395,13 +419,12 @@ final class HarnessCenter: ObservableObject {
         await refreshMove()
     }
 
-    /// A follow-up fired while the person was in the app: it counts as answered, without a banner.
+    /// A follow-up fired while the person was in the app: no banner, the glass says it. It is
+    /// written as shown; whether it is answered depends on what they do with that line.
     func firedInForeground(_ tap: HarnessTap) async {
         guard recording, accepts(tap) else { return }
         settle()
-        let clock = now()
-        note(HarnessEvent(kind: .returned, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector, ref: tap.stamp))
-        if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, clock) }
+        if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, now()) }
         await replan()
         await refreshMove()
     }
@@ -417,11 +440,6 @@ final class HarnessCenter: ObservableObject {
         guard recording else { await sync(); return }
         settle()
         let clock = now()
-        // Back soon after a follow-up they did not tap: they came back for it.
-        if let last = ledger.events(.sent).last, clock.timeIntervalSince(last.at) <= Self.returnWindow,
-           !ledger.events.contains(where: { $0.isEngagement && ($0.ref == last.at || $0.at >= last.at) }) {
-            note(HarnessEvent(kind: .returned, at: clock, symbol: last.symbol, step: last.step, sector: last.sector, ref: last.at))
-        }
         let lastOpen = ledger.events(.appOpen).last?.at
         if lastOpen.map({ clock.timeIntervalSince($0) >= Self.openGap }) ?? true { note(HarnessEvent(kind: .appOpen, at: clock)) }
         await replan()

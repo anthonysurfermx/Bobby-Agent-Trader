@@ -12,8 +12,8 @@ extension NativeTranslations18 {
         result["Your week with {0}."] = ["fr": "Ta semaine avec {0}.", "pt": "A tua semana com {0}.", "it": "La tua settimana con {0}.", "de": "Deine Woche mit {0}."]
         result["Your week: {0} and {1} more."] = ["fr": "Ta semaine : {0} et {1} de plus.", "pt": "A tua semana: {0} e mais {1}.", "it": "La tua settimana: {0} e altri {1}.", "de": "Deine Woche: {0} und {1} weitere."]
         // The glass.
-        result["Tell you tomorrow how {0} moved?"] = ["fr": "Je te dis demain comment {0} a bougé ?", "pt": "Conto-te amanhã como se moveu a {0}?", "it": "Ti dico domani come si è mossa {0}?", "de": "Soll ich dir morgen sagen, wie {0} lief?"]
-        result["Tell you tomorrow how it moved?"] = ["fr": "Je te dis demain comment ça a bougé ?", "pt": "Conto-te amanhã como se moveu?", "it": "Ti dico domani come si è mosso?", "de": "Soll ich dir morgen sagen, wie es lief?"]
+        result["Shall I keep you posted on {0}?"] = ["fr": "Je te tiens au courant pour {0} ?", "pt": "Vou-te contando como vai a {0}?", "it": "Ti tengo aggiornato su {0}?", "de": "Halte ich dich zu {0} auf dem Laufenden?"]
+        result["Shall I keep you posted on this?"] = ["fr": "Je te tiens au courant ?", "pt": "Vou-te contando como vai?", "it": "Ti tengo aggiornato?", "de": "Halte ich dich auf dem Laufenden?"]
         result["Yes, tell me"] = ["fr": "Oui, dis-moi", "pt": "Sim, conta-me", "it": "Sì, dimmelo", "de": "Ja, sag es mir"]
         result["{0}, a day later"] = ["fr": "{0}, un jour plus tard", "pt": "{0}, um dia depois", "it": "{0}, un giorno dopo", "de": "{0}, einen Tag später"]
         result["{0}, {1} days later"] = ["fr": "{0}, {1} jours plus tard", "pt": "{0}, {1} dias depois", "it": "{0}, {1} giorni dopo", "de": "{0}, {1} Tage später"]
