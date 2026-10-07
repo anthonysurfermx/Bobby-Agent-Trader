@@ -14,7 +14,7 @@ enum CreditsQA {
             "credits-pro": { screen(paidPro) },
             "credits-pro-card": { screen(cardPro) },
             "credits-gifted-pro": { screen(giftedPro) },
-            "credits-risk": { screen(guest, riskAccepted: false) },
+            "credits-risk": { screen(guest, riskAccepted: false, riskNotice: {}) },
             "credits-loading": { screen(CreditsSnapshot(access: nil), loading: true) },
             "credits-unavailable": { screen(CreditsSnapshot(access: nil, signedIn: true), loadFailed: true) },
             "credits-restore-running": { screen(free, restore: .running) },
@@ -25,13 +25,15 @@ enum CreditsQA {
             "credits-restore-signin": { screen(guest, restore: .signedOut) },
             "credits-restore-pending": { screen(free, restore: .done(.pending)) },
             "credits-restore-failed": { screen(free, restore: .done(.failed(BobbyStore.Copy.unreachable))) },
-            "credits-restore-risk": { screen(guest, riskAccepted: false, restore: .needsRiskNotice) },
+            "credits-pro-unknown": { screen(unknownPro) },
         ]
     }
 
     private static func screen(_ snapshot: CreditsSnapshot, riskAccepted: Bool = true, loading: Bool = false,
-                               loadFailed: Bool = false, restore: CreditsRestoreState = .idle) -> AnyView {
-        AnyView(CreditsScreen(riskAccepted: riskAccepted, snapshot: snapshot, loading: loading, loadFailed: loadFailed, restore: restore))
+                               loadFailed: Bool = false, restore: CreditsRestoreState = .idle,
+                               riskNotice: (() -> Void)? = nil) -> AnyView {
+        AnyView(CreditsScreen(riskAccepted: riskAccepted, snapshot: snapshot, loading: loading, loadFailed: loadFailed, restore: restore,
+                              actions: CreditsScreen.Actions(riskNotice: riskNotice)))
     }
 
     // MARK: Sample accounts
@@ -102,6 +104,11 @@ enum CreditsQA {
         CreditsSnapshot(access: proAccess, meters: proMeters, referral: referral(),
                         subscription: BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: iso(daysFromNow: 12)),
                         proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+    }
+
+    /// Bobby Pro, and the subscription has not reached the app yet (the first moment after launch).
+    static var unknownPro: CreditsSnapshot {
+        CreditsSnapshot(access: proAccess, meters: proMeters, proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
     }
 
     /// Bobby Pro from invitations: no subscription anywhere.

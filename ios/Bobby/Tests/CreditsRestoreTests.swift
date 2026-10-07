@@ -101,13 +101,15 @@ final class CreditsRestoreTests: XCTestCase {
         XCTAssertEqual(notice(.signedOut, CreditsSnapshot(access: nil), spanish: true)?.text,
                        "Primero inicia sesión con Apple: Bobby Pro queda en tu cuenta de Bobby. Después Bobby revisa si esta cuenta de Apple tiene una compra.")
 
-        let risk = try XCTUnwrap(notice(.needsRiskNotice, CreditsSnapshot(access: nil)))
-        XCTAssertEqual(risk.kind, .needsRiskNotice)
-        XCTAssertEqual(risk.text, "Accept the risk notice first: until then Bobby sends nothing to its servers.")
-        XCTAssertNil(risk.action)
-
         XCTAssertNil(notice(.idle, account))
         XCTAssertNil(notice(.running, account))
         XCTAssertNil(notice(.done(.cancelled), account), "a cancelled Apple sheet says nothing")
+    }
+
+    func testBeforeTheRiskNoticeTheRowSaysWhyAndThatRestoreWorksAfterwards() throws {
+        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: false), "Accept the risk notice first; then you can restore here.")
+        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: true), "Primero acepta el aviso de riesgo; después podrás restaurar aquí.")
+        let row = try XCTUnwrap(NativeTranslations18.credits["Accept the risk notice first; then you can restore here."])
+        XCTAssertEqual(Set(row.keys), ["fr", "pt", "it", "de"])
     }
 }

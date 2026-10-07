@@ -565,7 +565,10 @@ struct AccountSheet: View {
             // Credits opens its own sheets (invite, redeem a code, Bobby Pro) over itself.
             CreditsSheet(profile: profile,
                          afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
-                         onRead: { route = nil; onClose() }) { route = nil }
+                         onRead: { route = nil; onClose() },
+                         // Before the risk notice: the Núcleo leads to the place where it can be accepted
+                         // (the row below opens it read-only). The classic desk has no such place.
+                         onRiskNotice: onOpenRoute.map { open in { route = nil; open(.riskNotice) } }) { route = nil }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)

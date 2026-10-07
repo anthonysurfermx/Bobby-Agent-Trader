@@ -55,8 +55,11 @@ struct CreditsProStatus: Equatable {
     var giftSource: GiftSource? = nil
 
     var isPro: Bool { plan != .none }
-    /// A plan the person pays for: the Bobby Pro offer is hidden for it.
+    /// A plan the person pays for.
     var pays: Bool { plan == .appStore || plan == .card }
+    /// The Bobby Pro offer has a place: the account has no plan, or only gifted days. An account
+    /// the server calls Pro is not offered it while the reason has not reached the app.
+    var offersPro: Bool { plan == .none || plan == .gifted }
 
     static func make(_ snapshot: CreditsSnapshot, now: Date = .now) -> CreditsProStatus {
         guard let access = snapshot.access, access.isPro else { return CreditsProStatus() }

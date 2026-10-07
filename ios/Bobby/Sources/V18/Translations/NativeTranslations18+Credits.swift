@@ -1,8 +1,8 @@
 import Foundation
 
 extension NativeTranslations18 {
-    /// Credits: balances, how to get more, restore. Also the two profile rows this track adds for
-    /// the theses and reminders tracks ("My theses", "Reminders"), since they sit in AccountSheet.
+    /// Credits: balances, how to get more, restore. Also the detail lines of the two profile rows
+    /// this track adds for the theses and reminders tracks (their titles are the lead's shared keys).
     static let credits: [String: [String: String]] = {
         var result: [String: [String: String]] = [:]
         // The screen
@@ -35,8 +35,8 @@ extension NativeTranslations18 {
         result["Every {0} days"] = ["fr": "Tous les {0} jours", "pt": "A cada {0} dias", "it": "Ogni {0} giorni", "de": "Alle {0} Tage"]
         result["Every {0} days · resets {1}"] = ["fr": "Tous les {0} jours · renouvellement le {1}", "pt": "A cada {0} dias · renova a {1}", "it": "Ogni {0} giorni · si rinnova il {1}", "de": "Alle {0} Tage · Erneuerung am {1}"]
         result["Used after your plan's reads run out."] = ["fr": "Utilisées quand les analyses de ton forfait sont épuisées.", "pt": "Usadas quando as análises do teu plano acabam.", "it": "Usate quando finiscono le analisi del tuo piano.", "de": "Werden genutzt, wenn die Analysen deines Plans aufgebraucht sind."]
-        result["Kept for when you are not on Bobby Pro."] = ["fr": "Gardées pour quand tu n'auras plus Bobby Pro.", "pt": "Guardadas para quando não tiveres Bobby Pro.", "it": "Conservate per quando non avrai Bobby Pro.", "de": "Bleiben erhalten, bis du Bobby Pro nicht mehr hast."]
-        result["Kept for when Quick reads have a weekly limit."] = ["fr": "Gardées pour quand les analyses Rapides auront une limite hebdomadaire.", "pt": "Guardadas para quando as análises Rápidas tiverem um limite semanal.", "it": "Conservate per quando le analisi Rapide avranno un limite settimanale.", "de": "Bleiben erhalten, bis Schnelle Analysen ein Wochenlimit haben."]
+        result["Kept for when you are not on Bobby Pro."] = ["fr": "Gardées pour quand tu n'auras plus Bobby Pro.", "pt": "Guardadas para quando não tiveres Bobby Pro.", "it": "Conservate per quando non avrai Bobby Pro.", "de": "Aufgehoben für die Zeit, in der du kein Bobby Pro hast."]
+        result["Kept for when Quick reads have a weekly limit."] = ["fr": "Gardées pour quand les analyses Rapides auront une limite hebdomadaire.", "pt": "Guardadas para quando as análises Rápidas tiverem um limite semanal.", "it": "Conservate per quando le analisi Rapide avranno un limite settimanale.", "de": "Aufgehoben für die Zeit, in der Schnelle Analysen ein Wochenlimit haben."]
         result["Not active"] = ["fr": "Inactif", "pt": "Não ativo", "it": "Non attivo", "de": "Nicht aktiv"]
         result["Active"] = ["fr": "Actif", "pt": "Ativo", "it": "Attivo", "de": "Aktiv"]
         result["Active · renews {0}"] = ["fr": "Actif · renouvellement le {0}", "pt": "Ativo · renova a {0}", "it": "Attivo · si rinnova il {0}", "de": "Aktiv · verlängert sich am {0}"]
@@ -62,17 +62,16 @@ extension NativeTranslations18 {
         result["Your account already has Bobby Pro, paid by card on the web. There is no App Store purchase to restore."] = ["fr": "Ton compte a déjà Bobby Pro, payé par carte sur le web. Il n'y a aucun achat App Store à restaurer.", "pt": "A tua conta já tem Bobby Pro, pago com cartão na web. Não há nenhuma compra da App Store para restaurar.", "it": "Il tuo account ha già Bobby Pro, pagato con carta sul web. Non c'è nessun acquisto App Store da ripristinare.", "de": "Dein Konto hat Bobby Pro bereits, per Karte im Web bezahlt. Es gibt keinen App-Store-Kauf zum Wiederherstellen."]
         result["Your account already has Bobby Pro. There is no other App Store purchase to restore."] = ["fr": "Ton compte a déjà Bobby Pro. Il n'y a aucun autre achat App Store à restaurer.", "pt": "A tua conta já tem Bobby Pro. Não há outra compra da App Store para restaurar.", "it": "Il tuo account ha già Bobby Pro. Non c'è nessun altro acquisto App Store da ripristinare.", "de": "Dein Konto hat Bobby Pro bereits. Es gibt keinen weiteren App-Store-Kauf zum Wiederherstellen."]
         result["Sign in with Apple first: Bobby Pro belongs to your Bobby account. Bobby then checks this Apple Account for a purchase."] = ["fr": "Connecte-toi d'abord avec Apple : Bobby Pro est lié à ton compte Bobby. Bobby vérifie ensuite si ce compte Apple a un achat.", "pt": "Inicia sessão com a Apple primeiro: Bobby Pro pertence à tua conta Bobby. Depois o Bobby verifica se esta Conta Apple tem uma compra.", "it": "Accedi prima con Apple: Bobby Pro è associato al tuo account Bobby. Poi Bobby controlla se questo Account Apple ha un acquisto.", "de": "Melde dich zuerst mit Apple an: Bobby Pro gehört zu deinem Bobby-Konto. Danach prüft Bobby, ob es für diesen Apple Account einen Kauf gibt."]
+        result["Accept the risk notice first; then you can restore here."] = ["fr": "Accepte d'abord l'avis de risque ; ensuite, tu pourras restaurer ici.", "pt": "Aceita primeiro o aviso de risco; depois podes restaurar aqui.", "it": "Accetta prima l'avviso sui rischi; poi potrai ripristinare qui.", "de": "Akzeptiere zuerst den Risikohinweis; danach kannst du hier wiederherstellen."]
         // On the glass (the page ellipsizes past 46 characters; the button holds 22)
         result["{0} reads left this week"] = ["fr": "Il te reste {0} analyses cette semaine", "pt": "Restam-te {0} análises esta semana", "it": "Ti restano {0} analisi questa settimana", "de": "Noch {0} Analysen diese Woche"]
         result["1 read left this week"] = ["fr": "Il te reste 1 analyse cette semaine", "pt": "Resta-te 1 análise esta semana", "it": "Ti resta 1 analisi questa settimana", "de": "Noch 1 Analyse diese Woche"]
-        result["No reads left this week"] = ["fr": "Plus d'analyses cette semaine", "pt": "Sem análises esta semana", "it": "Nessuna analisi rimasta questa settimana", "de": "Keine Analysen mehr diese Woche"]
+        result["No reads left this week"] = ["fr": "Plus aucune analyse cette semaine", "pt": "Sem análises esta semana", "it": "Nessuna analisi rimasta questa settimana", "de": "Keine Analysen mehr diese Woche"]
         result["See credits"] = ["fr": "Voir mes crédits", "pt": "Ver créditos", "it": "Vedi crediti", "de": "Credits ansehen"]
         result["Bobby gave you {0} reads"] = ["fr": "Bobby t'a offert {0} analyses", "pt": "O Bobby ofereceu-te {0} análises", "it": "Bobby ti ha regalato {0} analisi", "de": "Bobby hat dir {0} Analysen geschenkt"]
         result["Bobby gave you 1 read"] = ["fr": "Bobby t'a offert 1 analyse", "pt": "O Bobby ofereceu-te 1 análise", "it": "Bobby ti ha regalato 1 analisi", "de": "Bobby hat dir 1 Analyse geschenkt"]
-        // The profile rows for the theses and reminders tracks
-        result["My theses"] = ["fr": "Mes thèses", "pt": "As minhas teses", "it": "Le mie tesi", "de": "Meine Thesen"]
+        // The detail lines of the profile rows for the theses and reminders tracks
         result["What you are looking at, and why"] = ["fr": "Ce que tu regardes, et pourquoi", "pt": "O que estás a ver, e porquê", "it": "Cosa stai guardando, e perché", "de": "Was du dir ansiehst und warum"]
-        result["Reminders"] = ["fr": "Rappels", "pt": "Lembretes", "it": "Promemoria", "de": "Erinnerungen"]
         result["Review reminders you set"] = ["fr": "Les rappels de révision que tu as créés", "pt": "Lembretes de revisão que definiste", "it": "Promemoria di revisione che hai impostato", "de": "Erinnerungen zur Überprüfung, die du gesetzt hast"]
         return result
     }()

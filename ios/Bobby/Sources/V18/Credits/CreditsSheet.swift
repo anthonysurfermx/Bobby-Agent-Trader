@@ -4,7 +4,8 @@
 //   GET MORE        invite friends · redeem a code · Bobby Pro, each with one honest sentence
 //   ALREADY PAID?   Restore Purchases, explained before the tap, answered under the row
 // Restore Purchases is here signed in or signed out (App Review 3.1.1). Nothing is fetched before
-// the risk notice is accepted (R11). The invite, coupon and Bobby Pro sheets open over this one.
+// the risk notice is accepted (R11): `CreditsFlow` holds that rule and the restore steps. The
+// invite, coupon and Bobby Pro sheets open over this one.
 import AuthenticationServices
 import StoreKit
 import SwiftUI
@@ -14,6 +15,8 @@ struct CreditsSheet: View {
     private let proPurchasable: @MainActor () -> Bool
     private let afterSignIn: () async -> Void
     private let onRead: () -> Void
+    /// Leaves Credits for the place where the risk notice can be accepted; nil where there is none.
+    private let onRiskNotice: (() -> Void)?
     private let onClose: () -> Void
 
     @ObservedObject private var account = AccountSession.shared
@@ -21,10 +24,8 @@ struct CreditsSheet: View {
     @ObservedObject private var levels = NucleoLevelCenter.shared
     /// Its package arriving changes what the invite row may promise.
     @ObservedObject private var store = BobbyStore.shared
+    @StateObject private var flow: CreditsFlow
     @State private var inner: Inner?
-    @State private var restore: CreditsRestoreState = .idle
-    @State private var loading = false
-    @State private var loadFailed = false
     @State private var manageSubscription = false
 
     /// The sheets this screen opens over itself.
@@ -38,17 +39,22 @@ struct CreditsSheet: View {
         self.init(profile: session.profile,
                   proPurchasable: { session.proPurchasable },
                   afterSignIn: { await session.signedInFromSheet() },
-                  onRead: onClose, onClose: onClose)
+                  onRead: onClose,
+                  onRiskNotice: { session.switchSheet(to: .riskNotice) },
+                  onClose: onClose)
     }
 
     /// From the profile. `onRead` closes everything so the person lands where they ask (the coupon's "Make a read").
-    init(profile: AgentProfile, proPurchasable: @escaping @MainActor () -> Bool = { BobbyStore.shared.proPurchasable },
-         afterSignIn: @escaping () async -> Void, onRead: @escaping () -> Void, onClose: @escaping () -> Void) {
+    @MainActor init(profile: AgentProfile, proPurchasable: @escaping @MainActor () -> Bool = { BobbyStore.shared.proPurchasable },
+         afterSignIn: @escaping () async -> Void, onRead: @escaping () -> Void, onRiskNotice: (() -> Void)? = nil,
+         onClose: @escaping () -> Void) {
         self.profile = profile
         self.proPurchasable = proPurchasable
         self.afterSignIn = afterSignIn
         self.onRead = onRead
+        self.onRiskNotice = onRiskNotice
         self.onClose = onClose
+        _flow = StateObject(wrappedValue: CreditsFlow(.live(profile: profile, afterSignIn: afterSignIn)))
     }
 
     private var snapshot: CreditsSnapshot {
@@ -59,27 +65,27 @@ struct CreditsSheet: View {
 
     var body: some View {
         let snapshot = self.snapshot
-        CreditsScreen(riskAccepted: profile.acceptedRiskNotice, snapshot: snapshot, loading: loading, loadFailed: loadFailed,
-                      restore: restore, accountError: account.lastError,
+        CreditsScreen(riskAccepted: profile.acceptedRiskNotice, snapshot: snapshot, loading: flow.loading, loadFailed: flow.loadFailed,
+                      restore: flow.restore, accountError: account.lastError,
                       actions: CreditsScreen.Actions(
                         close: onClose,
                         invite: { inner = .invite },
                         coupon: { inner = .coupon },
                         pro: { inner = .pro },
-                        restore: tapRestore,
-                        reload: { Task { await refresh() } },
+                        restore: { Task { await flow.tapRestore() } },
+                        reload: { Task { await flow.refresh() } },
                         manage: { manageSubscription = true },
+                        riskNotice: onRiskNotice,
                         prepareApple: { account.prepareAppleRequest($0) },
-                        completeApple: completeSignIn))
+                        completeApple: { result, thenRestore in
+                            Task { await flow.signIn(thenRestore: thenRestore) { await account.completeApple(result) } }
+                        }))
             .manageSubscriptionsSheet(isPresented: $manageSubscription)
-            .task { await refresh() }
+            .task { await flow.refresh() }
             .onAppear { acknowledge(snapshot) }
             .onChange(of: CreditsNudges.giftTotal(access: snapshot.access, meters: snapshot.meters)) { _, _ in acknowledge(self.snapshot) }
-            .onReceive(account.$session.map { $0?.userId }.removeDuplicates().dropFirst()) { _ in
-                // Another account (or none): the last answer was about someone else.
-                if restore != .running { restore = .idle }
-            }
-            .sheet(item: $inner, onDismiss: { Task { await refresh() } }) { destination in
+            .onReceive(account.$session.map { $0?.userId }.removeDuplicates().dropFirst()) { _ in flow.accountChanged() }
+            .sheet(item: $inner, onDismiss: { Task { await flow.refresh() } }) { destination in
                 switch destination {
                 case .invite:
                     NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: proPurchasable(), reason: nil,
@@ -110,45 +116,6 @@ struct CreditsSheet: View {
         CreditsNudges.acknowledgeGifts()
     }
 
-    private func refresh() async {
-        // R11: nothing reaches the network before the risk notice is accepted.
-        guard profile.acceptedRiskNotice else { return }
-        loading = true
-        CreditsPlans.attach()
-        let read = await reads.refresh()
-        await levels.refresh()
-        loading = false
-        loadFailed = !read && reads.access == nil && levels.quickAccess == nil
-    }
-
-    private func tapRestore() {
-        guard restore != .running else { return }
-        guard profile.acceptedRiskNotice else { restore = .needsRiskNotice; return }
-        // Signed out: say why an Apple sheet is coming before it comes.
-        guard account.isSignedIn else { restore = .signedOut; return }
-        runRestore()
-    }
-
-    private func runRestore() {
-        guard restore != .running else { return }
-        restore = .running
-        Task {
-            let outcome = await BobbyProRestore.run(afterSignIn: afterSignIn)
-            // What the account has now decides the sentence (Pro by gift or by card has nothing to restore).
-            await refresh()
-            restore = outcome == .cancelled ? .idle : .done(outcome)
-        }
-    }
-
-    private func completeSignIn(_ result: Result<ASAuthorization, Error>, thenRestore: Bool) {
-        Task {
-            await account.completeApple(result)
-            guard account.isSignedIn else { return }
-            await afterSignIn()
-            await refresh()
-            if thenRestore { runRestore() }
-        }
-    }
 }
 
 /// `plans.freeReadsPerWeek` (what a free account gets every week), for the guest's line. The level
@@ -189,6 +156,8 @@ struct CreditsScreen: View {
         var restore: () -> Void = {}
         var reload: () -> Void = {}
         var manage: () -> Void = {}
+        /// Leaves Credits for the place where the risk notice can be accepted; nil hides the button.
+        var riskNotice: (() -> Void)? = nil
         var prepareApple: (ASAuthorizationAppleIDRequest) -> Void = { _ in }
         /// The Apple sheet answered; `thenRestore` when it was asked for from the restore row.
         var completeApple: (Result<ASAuthorization, Error>, _ thenRestore: Bool) -> Void = { _, _ in }
@@ -309,8 +278,19 @@ struct CreditsScreen: View {
 
     @ViewBuilder private func have(_ balance: CreditsBalance) -> some View {
         if !riskAccepted {
-            note(L.t("Accept the risk notice to see your credits.", "Acepta el aviso de riesgo para ver tus créditos."))
-                .accessibilityIdentifier("credits-risk-required")
+            VStack(alignment: .leading, spacing: 10) {
+                Text(L.t("Accept the risk notice to see your credits.", "Acepta el aviso de riesgo para ver tus créditos."))
+                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("credits-risk-required")
+                if let open = actions.riskNotice {
+                    CreditsPill(title: L.t("Risk notice", "Aviso de riesgo"), action: open)
+                        .accessibilityIdentifier("credits-risk-open")
+                }
+            }
+            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            .padding(.vertical, 8)
+            .overlay(alignment: .top) { CreditsHairline() }
         } else if balance.isKnown {
             let lines = balance.lines
             ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
@@ -357,8 +337,9 @@ struct CreditsScreen: View {
                                      "¿Tienes un código de Bobby? Tus lecturas se agregan a tu cuenta al instante."),
                          action: actions.coupon)
             .accessibilityIdentifier("credits-coupon")
-        // An account that already pays has nothing to be offered; gifted days can still become a plan.
-        if !balance.pro.pays {
+        // An account on Bobby Pro has nothing to be offered, whether or not the reason has reached the
+        // app yet; gifted days can still become a plan.
+        if balance.pro.offersPro {
             CreditsActionRow(symbol: "infinity", label: "Bobby Pro", detail: BobbyStore.Copy.benefits, action: actions.pro)
                 .accessibilityIdentifier("credits-pro")
         }
@@ -372,9 +353,17 @@ struct CreditsScreen: View {
                                      "Úsalo si pagaste Bobby Pro con tu cuenta de Apple en otro iPhone o después de reinstalar. Los códigos y regalos nunca necesitan restaurarse."),
                          trailing: restore == .running ? .working(L.t("Restoring…", "Restaurando…")) : .none,
                          action: actions.restore)
-            .disabled(restore == .running)
+            .disabled(restore == .running || !riskAccepted)
             .accessibilityIdentifier("account-restore")
-        if let notice = restoreNotice(balance) {
+        if !riskAccepted {
+            // The reason is on the screen from the start, not behind a tap (the store starts after the notice).
+            Text(CreditsRestoreNotice.beforeRiskNotice())
+                .font(.system(size: 13)).foregroundStyle(Theme.cream)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 44).padding(.top, 2).padding(.bottom, 8)
+                .accessibilityIdentifier("credits-restore-risk")
+        } else if let notice = restoreNotice(balance) {
             VStack(alignment: .leading, spacing: 12) {
                 Text(notice.text).font(.system(size: 13)).foregroundStyle(Theme.cream)
                     .fixedSize(horizontal: false, vertical: true)
@@ -406,7 +395,8 @@ struct CreditsScreen: View {
     }
 
     private func restoreNotice(_ balance: CreditsBalance) -> CreditsRestoreNotice? {
-        CreditsRestoreNotice.make(restore, pro: balance.pro, proPurchasable: snapshot.proPurchasable, now: now)
+        guard riskAccepted else { return nil }
+        return CreditsRestoreNotice.make(restore, pro: balance.pro, proPurchasable: snapshot.proPurchasable, now: now)
     }
 
     private func announce(_ text: String) {

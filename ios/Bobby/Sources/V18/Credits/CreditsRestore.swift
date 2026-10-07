@@ -1,6 +1,7 @@
 // Restore Purchases, in words (1.8). The row says what it is for before it is tapped, and its
 // outcome is a sentence with a next step under the row, never a system alert. The store call
-// itself is unchanged (`BobbyProRestore.run`); this file only decides what the person reads.
+// itself is unchanged (`BobbyProRestore.run`); this file only decides what the person reads
+// (`CreditsFlow` decides when the store may be asked).
 // It also knows what the account already has, so a person who is on Bobby Pro by a gift or by a
 // card plan is not told "no active subscription".
 import Foundation
@@ -11,13 +12,11 @@ enum CreditsRestoreState: Equatable {
     case running
     /// Nobody is signed in: explain first, the Apple sheet comes after the person asks for it.
     case signedOut
-    /// The risk notice is not accepted: nothing may reach the network yet (R11).
-    case needsRiskNotice
     case done(BobbyStore.Outcome)
 }
 
 struct CreditsRestoreNotice: Equatable {
-    enum Kind: Equatable { case restored, nothingToRestore, alreadyPro, needsSignIn, needsRiskNotice, pending, failed }
+    enum Kind: Equatable { case restored, nothingToRestore, alreadyPro, needsSignIn, pending, failed }
     enum Action: Equatable {
         /// Sign in with Apple, then the restore runs.
         case signIn
@@ -30,17 +29,19 @@ struct CreditsRestoreNotice: Equatable {
     let text: String
     let action: Action?
 
+    /// The line under the row while the risk notice is not accepted. It is there from the start, not
+    /// after a tap: the store starts only after the notice (R11), and this says restore works then.
+    static func beforeRiskNotice(spanish: Bool? = nil) -> String {
+        L.t("Accept the risk notice first; then you can restore here.",
+            "Primero acepta el aviso de riesgo; después podrás restaurar aquí.", spanish: spanish)
+    }
+
     /// What to show under the row; nil while idle or running, and after a cancelled Apple sheet.
     static func make(_ state: CreditsRestoreState, pro: CreditsProStatus, proPurchasable: Bool, now: Date = .now,
                      spanish: Bool? = nil, timeZone: TimeZone = .current) -> CreditsRestoreNotice? {
         switch state {
         case .idle, .running:
             return nil
-        case .needsRiskNotice:
-            return CreditsRestoreNotice(kind: .needsRiskNotice,
-                                        text: L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
-                                                  "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.", spanish: spanish),
-                                        action: nil)
         case .signedOut, .done(.needsSignIn):
             return CreditsRestoreNotice(kind: .needsSignIn,
                                         text: L.t("Sign in with Apple first: Bobby Pro belongs to your Bobby account. Bobby then checks this Apple Account for a purchase.",

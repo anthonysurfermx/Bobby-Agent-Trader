@@ -214,6 +214,7 @@ final class CreditsBalanceTests: XCTestCase {
         XCTAssertEqual(balance(account).line(.pro)?.value, "Not active")
         XCTAssertEqual(balance(account, spanish: true).line(.pro)?.value, "No activo")
         XCTAssertFalse(balance(account).pro.isPro)
+        XCTAssertTrue(balance(account).pro.offersPro, "no plan: Bobby Pro is offered")
 
         let apple = BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z")
         let store = balance(CreditsSnapshot(access: pro, subscription: apple, signedIn: true))
@@ -222,6 +223,7 @@ final class CreditsBalanceTests: XCTestCase {
         XCTAssertNil(store.line(.pro)?.detail)
         XCTAssertTrue(store.manage, "an App Store plan is managed from the phone")
         XCTAssertTrue(store.pro.pays)
+        XCTAssertFalse(store.pro.offersPro)
         XCTAssertEqual(store.summary, "Bobby Pro active")
         XCTAssertEqual(balance(CreditsSnapshot(access: pro, subscription: apple, signedIn: true), spanish: true).line(.pro)?.value,
                        "Activo · se renueva el 27 de octubre")
@@ -232,6 +234,7 @@ final class CreditsBalanceTests: XCTestCase {
         XCTAssertEqual(card.line(.pro)?.detail, "Managed on the web.")
         XCTAssertFalse(card.manage)
         XCTAssertTrue(card.pro.pays)
+        XCTAssertFalse(card.pro.offersPro)
         let cardEs = balance(CreditsSnapshot(access: pro, subscription: BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: nil), signedIn: true), spanish: true)
         XCTAssertEqual(cardEs.line(.pro)?.value, "Activo")
         XCTAssertEqual(cardEs.line(.pro)?.detail, "Se administra en la web.")
@@ -244,6 +247,8 @@ final class CreditsBalanceTests: XCTestCase {
         XCTAssertEqual(bare.pro.plan, .active, "the server says Pro and the reason did not reach the app")
         XCTAssertEqual(bare.line(.pro)?.value, "Active")
         XCTAssertFalse(bare.pro.pays)
+        XCTAssertFalse(bare.pro.offersPro, "a Pro account is not offered Bobby Pro while its subscription has not been read")
+        XCTAssertFalse(bare.manage, "and Manage waits for the word that it is an App Store plan")
     }
 
     func testGiftedProNamesItsSourceAndItsLastDay() throws {
@@ -253,7 +258,8 @@ final class CreditsBalanceTests: XCTestCase {
         XCTAssertEqual(en.line(.pro)?.value, "Gifted until November 12")
         XCTAssertEqual(en.line(.pro)?.detail, "From your invitations.")
         XCTAssertFalse(en.manage)
-        XCTAssertFalse(en.pro.pays, "gifted days can still become a plan: the Bobby Pro offer stays")
+        XCTAssertFalse(en.pro.pays)
+        XCTAssertTrue(en.pro.offersPro, "gifted days can still become a plan: the Bobby Pro offer stays")
         XCTAssertEqual(en.summary, "Bobby Pro until Nov 12")
         let es = balance(invited, spanish: true)
         XCTAssertEqual(es.line(.pro)?.value, "Regalado hasta el 12 de noviembre")
