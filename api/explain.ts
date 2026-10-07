@@ -2,11 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { appLanguage, appLocale, languageName, type AppLanguage } from '../src/lib/app-language.js';
 import { explainError } from './_lib/explain-localization.js';
-
-const OPENAI_KEY = process.env.OPENAI_API_KEY || '';
+import { streamText } from './_lib/llm.js';
 
 // Persistent caps (api_cache-backed, survive cold starts): per-IP daily
-// quota plus a global daily ceiling that bounds worst-case OpenAI spend
+// quota plus a global daily ceiling that bounds worst-case model spend
 // even under IP rotation.
 const DAILY_LIMIT_PER_IP = 10;
 const DAILY_LIMIT_GLOBAL = 300;
@@ -689,6 +688,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   const systemPrompt = buildExplainSystemPrompt(context, outputLanguage, outputLocale);
+  const controller = new AbortController();
+  const onClose = () => { if (!res.writableEnded) controller.abort(); };
+  res.once?.('close', onClose);
 
   try {
     // Set up SSE streaming
@@ -697,50 +699,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Connection', 'keep-alive');
     res.setHeader('Access-Control-Allow-Origin', '*');
 
-    if (!OPENAI_KEY) throw new Error('OPENAI_API_KEY not configured');
-
-    let streamed = false;
-
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_KEY}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        max_tokens: 800,
-        stream: true,
-        messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }],
-      }),
+    await streamText({
+      endpoint: 'explain',
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }],
+      maxTokens: 800,
+      signal: controller.signal,
+      onDelta: (text) => { res.write(`data: ${JSON.stringify({ text })}\n\n`); },
     });
-    if (!openaiRes.ok) {
-      const errText = await openaiRes.text().catch(() => '');
-      throw new Error(`OpenAI ${openaiRes.status}: ${errText.slice(0, 200)}`);
-    }
-    const reader = openaiRes.body?.getReader();
-    const decoder = new TextDecoder();
-    if (reader) {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value);
-        const lines = chunk.split('\n').filter(l => l.startsWith('data: '));
-        for (const line of lines) {
-          const jsonStr = line.slice(6);
-          if (jsonStr === '[DONE]') continue;
-          try {
-            const parsed = JSON.parse(jsonStr);
-            const text = parsed.choices?.[0]?.delta?.content;
-            if (text) res.write(`data: ${JSON.stringify({ text })}\n\n`);
-          } catch {}
-        }
-      }
-      streamed = true;
-    }
-
-    if (!streamed) throw new Error('OpenAI stream unavailable');
 
     res.write('data: [DONE]\n\n');
     res.end();
   } catch (error: any) {
+    if (controller.signal.aborted) return;
     console.error('AI explain error:', error);
     if (!res.headersSent) {
       res.status(500).json({ code: 'generation_failed', error: explainError(outputLanguage, 'generation_failed') });
@@ -748,5 +719,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       res.write(`data: ${JSON.stringify({ code: 'stream_interrupted', error: explainError(outputLanguage, 'stream_interrupted') })}\n\n`);
       res.end();
     }
+  } finally {
+    res.removeListener?.('close', onClose);
   }
 }

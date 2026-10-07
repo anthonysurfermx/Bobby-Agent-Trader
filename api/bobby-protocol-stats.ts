@@ -32,6 +32,7 @@ import { trackRecordWinRateFunction } from './_lib/trackrecord-stats-adapter.js'
 import { bobbyDbUrl, bobbyReadKey } from './_lib/bobby-db.js';
 import { COMMIT_CONVICTION_FLOOR } from './_lib/commit-policy.js';
 import { publicTextViolation } from './_lib/desk-debate.js';
+import { appTextModel } from './_lib/app-model.js';
 
 // Base mainnet cut-over: agent_events rows before it are X Layer transactions and must never be linked on Basescan.
 const BASE_MAINNET_SINCE = '2026-08-21T00:00:00Z';
@@ -523,7 +524,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           return { level, alpha: p.alpha.model, red: p.red.model, rebuttal: p.rebuttal?.model ?? null, cio: p.cio.model, evidence: p.evidence, scenarios: p.scenarios };
         }),
       },
-      cycle: { endpoint: '/api/bobby-cycle', schedule: 'daily 12:00 UTC', models: { alpha: 'gpt-4o-mini', redTeam: 'gpt-4o-mini', cio: 'gpt-4o' }, commitConvictionFloor: COMMIT_CONVICTION_FLOOR, horizonHours: 48 },
+      cycle: { endpoint: '/api/bobby-cycle', schedule: 'daily 12:00 UTC', models: { alpha: appTextModel(), redTeam: appTextModel(), cio: appTextModel() }, commitConvictionFloor: COMMIT_CONVICTION_FLOOR, horizonHours: 48 },
       resolver: { endpoint: '/api/forum-resolve', schedule: 'daily 12:30 UTC', method: '1H candle path, first touch, stop wins a same-bar tie' },
     },
     market: {

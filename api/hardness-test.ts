@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import OpenAI from 'openai';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend } from './_lib/app-model.js';
 import { computeHardnessScore, isHardnessRegistryConfigured, recordHardnessActivity } from './_lib/hardness-registry.js';
 import { enforcePublicRateLimit, isInternalRequest } from './_lib/request-security.js';
 
@@ -14,7 +15,6 @@ export function levelGeometryError(direction: string, entry: number, target: num
   return 'direction must be long or short';
 }
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 interface HardnessTestRequest {
   agent?: string;
@@ -30,21 +30,9 @@ interface HardnessTestRequest {
   commitOnchain?: boolean;
 }
 
-const client = OPENAI_API_KEY ? new OpenAI({ apiKey: OPENAI_API_KEY }) : null;
-
 async function callJson<T>(system: string, prompt: string): Promise<T> {
-  if (!client) throw new Error('OPENAI_API_KEY not configured');
-  const response = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    response_format: { type: 'json_object' },
-    messages: [
-      { role: 'system', content: system },
-      { role: 'user', content: prompt },
-    ],
-    max_tokens: 700,
-  });
-
-  const raw = response.choices[0]?.message?.content || '{}';
+  const { text } = await callLlm({ endpoint: 'hardness-test', system, user: prompt, maxTokens: 700 });
+  const raw = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   return JSON.parse(raw) as T;
 }
 
@@ -86,8 +74,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'Invalid prediction' });
   }
 
-  if (!client) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!hasAppTextBackend()) {
+    return res.status(503).json({ error: 'App text provider not configured' });
   }
 
   try {
