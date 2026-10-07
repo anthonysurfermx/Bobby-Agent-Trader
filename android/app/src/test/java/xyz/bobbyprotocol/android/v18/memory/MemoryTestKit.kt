@@ -23,10 +23,15 @@ class FakeMemoryGateway(private val owner: () -> String?) : MemoryGateway {
         return reply(path, method, body)
     }
 
-    override fun nativeOptIn(): Boolean = owner()?.let { bits[it] } ?: false
+    /** The repository's account. It follows the reader unless a test holds it back to stand for the instant before the session catches up. */
+    var accountOverride: (() -> String?)? = null
+
+    override fun account(): String? = (accountOverride ?: owner)()
+
+    override fun nativeOptIn(): Boolean = account()?.let { bits[it] } ?: false
 
     override fun setNativeOptIn(enabled: Boolean) {
-        val user = owner() ?: return
+        val user = account() ?: return
         bits[user] = enabled
     }
 

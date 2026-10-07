@@ -477,6 +477,35 @@ class Memory18ConsentTest {
         assertTrue("the choice stays stored for that account only", phone.gateway.stored("a"))
     }
 
+    /**
+     * The switch is stored by the repository for ITS account, and the session learns of an account
+     * change a moment later. In that moment the centre reads nobody's switch as the reader's and
+     * writes nobody's: one account is never affirmed, or switched off, with another's.
+     */
+    @Test fun whileTheRepositoryIsAheadOfTheSessionNobodysSwitchIsReadOrWritten() = runTest {
+        val phone = Phone(this)
+        val center = phone.center()
+        assertTrue(phone.model(center).remember())
+        // B said yes on this phone too.
+        phone.gateway.bits["b"] = true
+        phone.consent.set(true, "b", phone.clock)
+        // The repository already holds B's session; the session still reads A.
+        phone.gateway.accountOverride = { "b" }
+        assertFalse("A is not affirmed with B's switch", center.allowsNativeCapture())
+        center.reloadLocal()
+        assertTrue("and B's switch is not turned off for A's reasons", phone.gateway.stored("b"))
+        assertTrue(phone.gateway.stored("a"))
+        assertFalse("nothing is turned on for an account that is not the reader", center.setNativeCapture(true))
+        center.setNativeCapture(false)
+        assertTrue("nor switched off by A's hand", phone.gateway.stored("b"))
+        // The session catches up: B is the reader, with B's own switch and consent.
+        phone.gateway.accountOverride = null
+        phone.bench.changeAccount("b")
+        center.accountChanged()
+        assertTrue(center.allowsNativeCapture())
+        assertTrue("A's choice is still stored for A", phone.gateway.stored("a"))
+    }
+
     @Test fun memoryCopyAvoidsTheWordsBobbyNeverUses() {
         val banned = setOf("buy", "sell", "profit", "guaranteed", "returns", "advice", "signal", "alert", "watched", "monitored", "detected")
         val copy = MemoryCopy(words)

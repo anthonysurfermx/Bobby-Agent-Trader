@@ -288,6 +288,21 @@ class Memory18EraseTest {
         assertFalse("B erased nothing", center.erased(readAt, "NVDA"))
     }
 
+    @Test fun whatWasErasedIsStillKnownAfterTheScreenIsRebuilt() = runTest {
+        val phone = Phone(this)
+        val center = phone.center()
+        center.refresh()
+        val readAt = phone.bench.clock
+        phone.bench.clock += 60_000L
+        center.forget("NVDA")
+        // A rotation rebuilds the centre; the app (and its nudge centre) is the same one.
+        val rebuilt = phone.center()
+        assertTrue("a receipt for NVDA must still not speak", rebuilt.erased(readAt, "NVDA"))
+        assertFalse(rebuilt.erased(readAt, "BTC"))
+        // Another launch of the app knows nothing of it: it is never written to disk.
+        assertFalse(Phone(this).center().erased(readAt, "NVDA"))
+    }
+
     @Test fun theNoticesSayWhatHappenedInTheAppsOwnWords() {
         assertTrue(copy.notice(MemoryNotice.ErasedEverything).contains("the shortcuts on this phone and the theses you wrote here"))
         assertTrue(copy.notice(MemoryNotice.ErasedOnPhoneOnly).contains("did not confirm"))

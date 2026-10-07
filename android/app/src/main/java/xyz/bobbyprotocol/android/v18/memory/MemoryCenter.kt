@@ -10,6 +10,7 @@ import xyz.bobbyprotocol.android.v18.theses.HostWords
 import xyz.bobbyprotocol.android.v18.theses.ThesisCopy
 import java.net.URLEncoder
 import java.util.Locale
+import java.util.WeakHashMap
 
 // Account memory on the phone (1.8), a port of ios/Bobby/Sources/Briefings/MemoryCenter.swift:
 // see, correct, pause and delete what Bobby remembers about a signed-in account, through /api/memory:
@@ -130,9 +131,11 @@ class MemoryReply(val json: JSONObject?, val status: Int)
 interface MemoryGateway {
     /** One call to /api/memory (`path` may carry a query). Throws when no answer came. */
     suspend fun send(path: String, method: String, body: JSONObject?): MemoryReply
-    /** The stored native opt-in of the signed-in account (false signed out). */
+    /** The account whose switch the two calls below read and write, or null signed out. */
+    fun account(): String?
+    /** The stored native opt-in of that account (false signed out). */
     fun nativeOptIn(): Boolean
-    /** Stores it for the signed-in account. Turning it on throws without the risk notice. */
+    /** Stores it for that account. Turning it on throws without the risk notice. */
     fun setNativeOptIn(enabled: Boolean)
 }
 
@@ -143,6 +146,8 @@ class RepositoryMemoryGateway(private val host: V18Host) : MemoryGateway {
     } catch (refused: ApiException) {
         MemoryReply(refused.payload, refused.status)
     }
+
+    override fun account(): String? = host.repository.session.value?.userId
 
     override fun nativeOptIn(): Boolean = host.repository.nativeMemoryOptIn()
 
@@ -192,9 +197,6 @@ class MemoryCenter(
     private var owner: String? = host.owner
     private var ownerEpoch: Long = host.accountEpoch
     private var generation = 0
-    /** When this account erased everything, or one asset, during this launch (`erased`). */
-    private var forgotAllAt: Long? = null
-    private val forgotAt = HashMap<String, Long>()
 
     private class Ticket(val generation: Int, val user: String?, val epoch: Long)
     private class Answer(val snapshot: MemorySnapshot?, val error: MemoryError?)
@@ -217,11 +219,12 @@ class MemoryCenter(
         lastError = null
         confirmingForgetAll = false
         notice = null
-        forgotAllAt = null
-        forgotAt.clear()
         local = readLocal()
         changed()
     }
+
+    /** What the current reader erased during this launch (`erased`); nothing signed out, where there is no memory to erase. */
+    private fun erasedMarks(): ErasedThisLaunch.Marks? = host.owner?.let { ErasedThisLaunch.of(host.nudges, it) }
 
     private fun ticket(): Ticket = Ticket(generation, host.owner, host.accountEpoch)
     private fun isCurrent(ticket: Ticket): Boolean =
@@ -229,18 +232,32 @@ class MemoryCenter(
 
     private val canCallServer: Boolean get() = host.riskAccepted && host.owner != null
 
-    /** The stored switch of the signed-in account, as it is (the nudge on the glass reads it with the consent). */
-    fun storedNativeOptIn(): Boolean = try {
+    /**
+     * The stored switch is the repository's, kept for ITS account. For the instant in which the
+     * repository already has another account than the reader this centre knows, the switch is not
+     * this reader's: it is neither read as theirs nor written for them.
+     */
+    private fun switchIsOf(user: String?): Boolean = user != null && try {
+        gateway.account() == user
+    } catch (_: Exception) {
+        false
+    }
+
+    /** The stored switch of the current reader, as it is (the nudge on the glass reads it with the consent). */
+    fun storedNativeOptIn(): Boolean = switchIsOf(host.owner) && try {
         gateway.nativeOptIn()
     } catch (_: Exception) {
         false
     }
 
-    private fun storeNativeOptIn(enabled: Boolean): Boolean = try {
-        gateway.setNativeOptIn(enabled)
-        true
-    } catch (_: Exception) {
-        false
+    private fun storeNativeOptIn(enabled: Boolean): Boolean {
+        if (!switchIsOf(host.owner)) return false
+        return try {
+            gateway.setNativeOptIn(enabled)
+            true
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
@@ -248,7 +265,7 @@ class MemoryCenter(
      * one is turned off here: nothing keeps affirming an opt-in the person never gave to this text.
      */
     private fun consentedOptIn(user: String): Boolean {
-        if (!storedNativeOptIn()) return false
+        if (user != host.owner || !storedNativeOptIn()) return false
         if (!consent.hasAccepted(user)) {
             storeNativeOptIn(false)
             return false
@@ -372,7 +389,7 @@ class MemoryCenter(
         val epoch = host.accountEpoch
         notice = null
         host.forgetShortcut(symbol)
-        forgotAt[symbol.uppercase(Locale.ROOT)] = host.now()
+        erasedMarks()?.let { it.assets[symbol.uppercase(Locale.ROOT)] = host.now() }
         local = readLocal()
         changed()
         val ok = write("DELETE", PATH + "?symbol=" + URLEncoder.encode(symbol, "UTF-8"), null)
@@ -420,7 +437,7 @@ class MemoryCenter(
         host.theses.deleteAll(user)
         // What the follow-ups learned on this phone goes too, with what they planned.
         host.eraseEverything()
-        forgotAllAt = host.now()
+        erasedMarks()?.all = host.now()
         local = readLocal()
         changed()
         val ok = write("DELETE", PATH, null)
@@ -460,9 +477,10 @@ class MemoryCenter(
      */
     fun erased(sinceMillis: Long, symbol: String): Boolean {
         accountChanged()
-        val all = forgotAllAt
+        val marks = erasedMarks() ?: return false
+        val all = marks.all
         if (all != null && all >= sinceMillis) return true
-        val one = forgotAt[symbol.uppercase(Locale.ROOT)]
+        val one = marks.assets[symbol.uppercase(Locale.ROOT)]
         return one != null && one >= sinceMillis
     }
 
@@ -538,6 +556,23 @@ class MemoryCenter(
         /** The one centre of a host: its nudge source and its two screens share it. */
         fun of(host: V18Host): MemoryCenter = host.service(SERVICE) { MemoryCenter(host, RepositoryMemoryGateway(host)) }
     }
+}
+
+/**
+ * When each reader erased everything, or one asset, since the app started. It lives with the nudge
+ * centre (the process in the app), not with one screen: a rotation rebuilds the memory centre, and
+ * a receipt on the glass must still not say "saved" about what the person erased a moment ago.
+ * Never written to disk.
+ */
+internal object ErasedThisLaunch {
+    class Marks {
+        var all: Long? = null
+        val assets = HashMap<String, Long>()
+    }
+
+    private val readers = WeakHashMap<Any, HashMap<String, Marks>>()
+
+    fun of(anchor: Any, owner: String): Marks = readers.getOrPut(anchor) { HashMap() }.getOrPut(owner) { Marks() }
 }
 
 /** The words of the memory screens that are not on the consent sheet. */
