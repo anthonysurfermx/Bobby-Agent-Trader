@@ -262,11 +262,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // cannot show and delete memory yet (MEMORY_PLATFORMS), nor while the kill switch is off (BOBBY_MEMORY).
     const memoryOwner = memoryDeskAllowed(req, clientPlatform(req)) ? memoryIdentity(req, knownIdentity) : Promise.resolve(null);
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
-    const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level).evidence, timeframeRequestOf(question, language));
+    // The database-confirmed account plan selects the model, never the requested analysis level or a client tier.
+    const tier = access.tier === 'pro' ? 'pro' : 'free';
+    const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level, tier).evidence, timeframeRequestOf(question, language));
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
     const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale, evidence.provenance.assetType === 'crypto' ? 'crypto' : 'equity');
     const asked = horizonOf(question, language);
-    const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
+    const result = await runDeskDebate(question, evidence, language, { locale, level, tier, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
     const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);

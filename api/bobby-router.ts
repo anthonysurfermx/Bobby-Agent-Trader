@@ -1,7 +1,7 @@
 // ============================================================
 // POST /api/bobby-router — Hybrid intent classifier
 // Layer 1: deterministic regex (free, instant)
-// Layer 2: Haiku classifier (cheap, only for ambiguous)
+// Layer 2: plan-selected classifier (only for ambiguous)
 // Returns: { intent, confidence, language, reason }
 // ============================================================
 
@@ -9,8 +9,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { callLlm } from './_lib/llm.js';
 import { hasAppTextBackend } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
-export const config = { maxDuration: 10 };
+// Allow plan verification before the separately bounded classifier call.
+export const config = { maxDuration: 30 };
 
 
 const VALID_INTENTS = [
@@ -58,6 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    const tier = await resolveAppRequestTier(req);
     const systemPrompt = `You are a trading platform intent classifier. Classify the user's message into exactly ONE intent.
 
 INTENTS:
@@ -105,7 +108,7 @@ Respond ONLY with JSON, no markdown:
 {"intent":"trade_chat","confidence":0.95,"language":"es","reason":"market outlook question"}`;
 
     const { toolInput } = await callLlm({
-      endpoint: 'bobby-router', system: systemPrompt, maxTokens: 256, timeoutMs: 8_000,
+      endpoint: 'bobby-router', tier, system: systemPrompt, maxTokens: 256, timeoutMs: 8_000,
       user: context
         ? `Previous Bobby response: "${context.slice(0, 200)}"\n\nUser message: "${message}"`
         : `User message: "${message}"`,

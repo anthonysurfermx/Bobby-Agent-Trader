@@ -3,6 +3,7 @@
 // scripts/fixtures/desk-plain-snapshot.json, which was written from the code before the 1.8 thesis review
 // existed (commit 5ee241a9): a request from a shipped client (iOS 1.5-1.7, Android, the web) must keep producing
 // the same prompts and reply, byte for byte. Model ids alone were adopted to Haiku 5.5 on 2026-10-07.
+// The eight Free captures stay unchanged; Pro account captures use Opus 5.5 at each of the same levels.
 //
 //   npx tsx scripts/desk-plain-snapshot.mts            compare (exit 1 on any difference)
 //   npx tsx scripts/desk-plain-snapshot.mts --write    rewrite the fixture (only when a change to the plain
@@ -34,7 +35,7 @@ const ENV: Record<string, string> = {
  * Every switch the desk path reads from the environment (api/desk-debate.ts and what it imports). A scenario may
  * set some; every other run has them unset, whatever the shell that runs the capture carries.
  */
-const SWITCHES = ['BOBBY_APP_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
+const SWITCHES = ['BOBBY_APP_TEXT_MODEL', 'BOBBY_PRO_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
   'BOBBY_CLIENT_TELEMETRY', 'BOBBY_LLM_DAILY_CAP_USD', 'BOBBY_LLM_MONTHLY_CAP_USD', 'BOBBY_LLM_ALERT_USD', 'VERCEL_ENV'] as const;
 
 interface Scenario {
@@ -43,6 +44,8 @@ interface Scenario {
   headers?: Record<string, string>;
   env?: Partial<Record<(typeof SWITCHES)[number], string>>;
   live?: boolean;
+  /** The trusted access RPC's answer, separate from all client-controlled request fields. */
+  tier?: 'pro';
 }
 export const SCENARIOS: Scenario[] = [
   { name: 'rapido-equity-en-json', body: { symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look this week?' } },
@@ -53,6 +56,7 @@ export const SCENARIOS: Scenario[] = [
   { name: 'maximo-equity-pt-json', body: { symbol: 'NVDA', assetType: 'equity', question: 'A NVDA merece uma revisão esta semana?', language: 'pt', level: 'maximo' } },
   { name: 'rapido-memory-web-it', body: { symbol: 'NVDA', assetType: 'equity', question: 'Come vedi NVDA adesso?', language: 'it' }, headers: { authorization: 'Bearer good-apple-token', 'x-bobby-platform': 'web' }, env: { BOBBY_MEMORY: 'on' } },
   { name: 'rapido-ios-no-optin-en', body: { symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look?' }, headers: { authorization: 'Bearer good-apple-token', 'x-bobby-platform': 'ios' }, env: { BOBBY_MEMORY: 'on' } },
+  ...(['rapido', 'profundo', 'maximo'] as const).map(level => ({ name: `pro-${level}-equity-en`, tier: 'pro' as const, body: { symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look this week?', level, tier: 'free' }, headers: { authorization: 'Bearer good-apple-token' }, live: level === 'profundo' })),
 ];
 
 const ALPHA = 'The recent structure supports a conditional long if the range breaks.';
@@ -69,7 +73,7 @@ const bars = (n: number, step: number, base: number) => Array.from({ length: n }
 interface Captured { models: Array<{ host: string; body: unknown }>; status: number; contentType: string | null; reply: string }
 export type Snapshot = Record<string, Captured>;
 
-function world(models: Captured['models']) {
+function world(models: Captured['models'], tier: 'free' | 'pro') {
   return (async (input: string | URL, init?: RequestInit) => {
     const url = String(input), method = init?.method ?? 'GET';
     const headers = Object.fromEntries(Object.entries((init?.headers ?? {}) as Record<string, string>).map(([k, v]) => [k.toLowerCase(), v]));
@@ -97,8 +101,8 @@ function world(models: Captured['models']) {
     });
     if (url.includes('rpc/bobby_memory_record')) return json(true);
     if (url.includes('rpc/bobby_consume_desk_quota')) return json(true);
-    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, code: null, readId: 1, tier: 'free', used: 1, limit: 10 });
-    if (url.includes('rpc/bobby_consume_level')) return json({ allowed: true, code: null, useId: 91, tier: 'free', used: 1, limit: 3, resetsAt: null });
+    if (url.includes('rpc/bobby_consume_read')) return json({ allowed: true, code: null, readId: 1, tier, used: 1, limit: 10 });
+    if (url.includes('rpc/bobby_consume_level')) return json({ allowed: true, code: null, useId: 91, tier, used: 1, limit: 3, resetsAt: null });
     if (url.includes('rpc/bobby_llm_spend')) return json({ day: 0, month: 0 });
     if (url.includes('rpc/bobby_record_outcome')) return json(null);
     if (url.includes('bobby_llm_usage')) return json(null, 201);
@@ -134,7 +138,7 @@ export async function capturePlainSnapshot(): Promise<Snapshot> {
       Object.assign(process.env, scenario.env ?? {});
       resetLlmSpendCache();
       const models: Captured['models'] = [];
-      globalThis.fetch = world(models);
+      globalThis.fetch = world(models, scenario.tier ?? 'free');
       const res = {
         statusCode: 200, sent: null as unknown, headers: {} as Record<string, string>, chunks: [] as string[], writableEnded: false, writableFinished: false,
         setHeader(k: string, v: string) { this.headers[k.toLowerCase()] = v; }, status(n: number) { this.statusCode = n; return this; },

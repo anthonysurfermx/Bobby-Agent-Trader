@@ -1,10 +1,11 @@
-// Shared app text transport. Anthropic Haiku is the default; an explicit provider switch and
+// Shared app text transport. Free uses Haiku and verified Pro uses Opus; an explicit provider switch and
 // credit/rate fallback retain availability without changing safety gates or leaking prompts.
 import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
 import { alertProviderCredit } from './provider-alert.js';
 import { waitUntil } from '@vercel/functions';
 import { logLlmUsage } from './llm-usage.js';
-import { appPrimaryProvider, appTextModel } from './app-model.js';
+import { appPrimaryProvider, appTextModel, type AppTextTier } from './app-model.js';
+import { appToolWireSchema, appToolInputValid } from './app-tool-schema.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -21,6 +22,8 @@ export interface LlmCallOptions {
   user: string;
   /** Kept for caller compatibility; the central app model setting selects Anthropic. */
   model?: string;
+  /** Selected by server-verified account access, never by a request-body model or level. */
+  tier?: AppTextTier;
   effort?: 'low' | 'medium' | 'high';
   maxTokens?: number;
   timeoutMs?: number;
@@ -38,9 +41,13 @@ export interface StreamTextOptions extends Omit<LlmCallOptions, 'user' | 'tool'>
 }
 function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-function textSpecs(opts: Pick<LlmCallOptions, 'model' | 'effort' | 'maxTokens' | 'timeoutMs'>): ModelSpec[] {
+const adaptiveOnly = (model: string) => /^claude-(?:opus|sonnet)-5-5(?:$|-)/.test(model);
+function textSpecs(opts: Pick<LlmCallOptions, 'model' | 'tier' | 'effort' | 'maxTokens' | 'timeoutMs'>): ModelSpec[] {
   const size = { maxTokens: opts.maxTokens ?? 4096, timeoutMs: opts.timeoutMs ?? 30_000 };
-  const claude: ModelSpec = { ...size, provider: 'anthropic', model: appTextModel(), effort: opts.effort ?? 'low' };
+  const model = appTextModel(process.env, opts.tier);
+  const claude: ModelSpec = { ...size, provider: 'anthropic', model, effort: opts.effort ?? 'low',
+    // Opus always thinks; leave room for its reasoning as well as the small visible answer.
+    maxTokens: adaptiveOnly(model) ? Math.max(size.maxTokens, 2048) : size.maxTokens };
   const openai: ModelSpec = { ...size, provider: 'openai', model: process.env.BOBBY_DESK_MODEL || 'gpt-6-luna' };
   return appPrimaryProvider() === 'openai' ? [openai, claude] : [claude, openai];
 }
@@ -58,8 +65,10 @@ function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], s
     const body: Record<string, unknown> = { model: spec.model, max_tokens: spec.maxTokens, system, messages,
       output_config: { effort: spec.effort ?? 'low' }, ...(stream ? { stream: true } : {}) };
     // Small text/tool ceilings belong to the answer; keep adaptive thinking for the desk adapter.
-    if ((spec.effort ?? 'low') === 'low' || tool) body.thinking = { type: 'disabled' };
-    if (tool) {
+    if (!adaptiveOnly(spec.model) && ((spec.effort ?? 'low') === 'low' || tool)) body.thinking = { type: 'disabled' };
+    if (tool && adaptiveOnly(spec.model)) {
+      body.output_config = { effort: spec.effort ?? 'low', format: { type: 'json_schema', schema: appToolWireSchema(tool.parameters) } };
+    } else if (tool) {
       body.tools = [{ name: tool.name, description: tool.description, input_schema: tool.parameters }];
       body.tool_choice = { type: 'tool', name: tool.name };
     }
@@ -109,12 +118,19 @@ function streamProviderError(event: any, endpoint: string, spec: ModelSpec): Llm
 function resultOf(data: any, spec: ModelSpec, tool?: LlmToolSchema): LlmResult {
   if (spec.provider === 'anthropic') {
     const stop = data?.stop_reason;
-    if (stop !== (tool ? 'tool_use' : 'end_turn')) throw new LlmIncompleteError('App text response incomplete or refused');
+    const structuredTool = Boolean(tool && adaptiveOnly(spec.model));
+    if (stop !== (tool && !structuredTool ? 'tool_use' : 'end_turn')) throw new LlmIncompleteError('App text response incomplete or refused');
     const blocks = Array.isArray(data.content) ? data.content : [];
     const text = blocks.filter((b: any) => b.type === 'text' && typeof b.text === 'string').map((b: any) => b.text).join('');
     const calls = blocks.filter((b: any) => b.type === 'tool_use');
     const call = calls[0];
-    if (tool && (calls.length !== 1 || call?.name !== tool.name || !call.input || typeof call.input !== 'object' || Array.isArray(call.input))) throw new Error('Invalid app text tool response');
+    if (structuredTool && tool) {
+      let input: unknown;
+      try { input = JSON.parse(text); } catch { throw new Error('Invalid app text tool response'); }
+      if (calls.length || !input || typeof input !== 'object' || Array.isArray(input) || !appToolInputValid(input, tool.parameters)) throw new Error('Invalid app text tool response');
+      return { text, toolInput: input as Record<string, unknown>, provider: spec.provider, model: spec.model };
+    }
+    if (tool && (calls.length !== 1 || call?.name !== tool.name || !call.input || typeof call.input !== 'object' || Array.isArray(call.input) || !appToolInputValid(call.input, tool.parameters))) throw new Error('Invalid app text tool response');
     if (!tool && !text.trim()) throw new Error('Empty app text response');
     return { text, toolInput: tool ? call.input : null, provider: spec.provider, model: spec.model };
   }
@@ -126,7 +142,7 @@ function resultOf(data: any, spec: ModelSpec, tool?: LlmToolSchema): LlmResult {
     if (choice.message.tool_calls.length !== 1 || call?.name !== tool.name || typeof call.arguments !== 'string') throw new Error('Invalid app text tool response');
     let input: unknown;
     try { input = JSON.parse(call.arguments); } catch { throw new Error('Invalid app text tool response'); }
-    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid app text tool response');
+    if (!input || typeof input !== 'object' || Array.isArray(input) || !appToolInputValid(input, tool.parameters)) throw new Error('Invalid app text tool response');
     toolInput = input as Record<string, unknown>;
   }
   const text = choice?.message?.content ?? '';

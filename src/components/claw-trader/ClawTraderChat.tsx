@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { parseChatIntent, type ChatIntent } from '@/lib/chat-intents';
+import { accessHeaders } from '@/lib/access-client';
 
 // --- Types ---
 
@@ -285,7 +286,7 @@ export const ClawTraderChat: React.FC = () => {
     try {
       const res = await fetchWithTimeout('/api/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) },
         body: JSON.stringify({ context, data, language: 'auto' }),
       });
 

@@ -30,7 +30,8 @@ import {
   type PolyLeaderboardEntry,
 } from './_lib/polymarket.js';
 import { callLlm, type LlmResult } from './_lib/llm.js';
-import { appTextModel, hasAppTextBackend } from './_lib/app-model.js';
+import { appTextModel, hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 import { checkPersistentLimit } from './_lib/rate-limit-persistent.js';
 import { getClientIpKey } from './_lib/rate-limit.js';
 import { isInternalRequest, requireInternalAuth } from './_lib/request-security.js';
@@ -59,6 +60,7 @@ async function callClaude(
   systemPrompt: string,
   userMsg: string,
   toolSchema?: { name: string; description: string; input_schema: Record<string, unknown> },
+  tier: AppTextTier = 'free',
 ): Promise<LlmResult> {
   if (!hasAppTextBackend()) throw new Error('App text provider missing — agent cannot run debate');
 
@@ -67,7 +69,8 @@ async function callClaude(
       endpoint: 'agent-run',
       system: systemPrompt,
       user: userMsg,
-      model: appTextModel(),
+      model: appTextModel(process.env, tier),
+      tier,
       maxTokens: 1024,
       tool: toolSchema
         ? { name: toolSchema.name, description: toolSchema.description, parameters: toolSchema.input_schema }
@@ -190,11 +193,11 @@ interface DebateResult {
   llmModel: string | null;
 }
 
-async function multiAgentDebate(
+export async function multiAgentDebate(
   signals: FilteredSignal[],
   polyConsensusData?: SmartMoneyConsensus[],
   selfOptimizedPrompt?: string,
-  opts?: { signalAgeMs?: number; performanceCtx?: string },
+  opts?: { signalAgeMs?: number; performanceCtx?: string; tier?: AppTextTier },
 ): Promise<DebateResult> {
   if (!hasAppTextBackend()) return { decisions: [], reasoning: 'No API key', alphaView: '', redTeamView: '', judgeVerdict: '', llmModel: null };
 
@@ -211,6 +214,7 @@ Be BULLISH and find alpha. Max 3 trades. Call execute_decisions.`;
     alphaPrompt,
     `${signalCtx}\n\nFind the best alpha opportunities and call execute_decisions.`,
     tradeToolSchema,
+    opts?.tier,
   );
 
   // ── AGENT 2: Red Team (parallel with Alpha) ──
@@ -221,6 +225,8 @@ whale manipulation, front-running exposure, smart money exit signals (high sold 
 For Polymarket, check if consensus is just herd behavior vs informed positioning.
 Be SKEPTICAL and adversarial. Output a risk assessment for each signal.`,
     `${signalCtx}\n\nFor each signal, explain WHY this trade could fail. Be specific and adversarial.`,
+    undefined,
+    opts?.tier,
   );
 
   // Run Alpha + Red Team in parallel
@@ -261,6 +267,7 @@ VOICE: Write your reasoning like Bobby Axelrod talks — direct, cynical, confid
 OUTPUT: Call execute_decisions. Set confidence as conviction_score (0.0-1.0). Max 3 trades.`,
     `ALPHA HUNTER THESIS:\n${alphaView}\n\nAlpha proposed trades:\n${JSON.stringify(alphaTrades, null, 1)}\n\nRED TEAM RISKS:\n${redTeamView}\n\nMake your final judgment. Call execute_decisions.`,
     tradeToolSchema,
+    opts?.tier,
   );
 
   const judgeVerdict = judgeResult.toolInput
@@ -337,7 +344,7 @@ async function persistOptimizedPrompt(prompt: string): Promise<void> {
   }
 }
 
-async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string }>): Promise<string | null> {
+async function selfOptimizePrompt(recentCycles: Array<{ llm_reasoning: string; trades_executed: number; trades_successful: number; status: string }>, tier: AppTextTier = 'free'): Promise<string | null> {
   if (recentCycles.length < 3) return null;
 
   // First check if we have a stored prompt from a previous cycle
@@ -365,6 +372,8 @@ RULES:
 - Add lessons learned from the cycle reasoning below
 - Output ONLY the new system prompt (1-3 paragraphs). No explanations.`,
       `Recent cycle history:\n${cyclesSummary}\n\nGenerate the next evolution of the Alpha Hunter prompt.`,
+      undefined,
+      tier,
     );
 
     const newPrompt = result.text?.trim();
@@ -964,6 +973,11 @@ async function logToSupabase(provenance: CycleProvenance, data: Record<string, u
 // ============================================================
 // HANDLER
 // ============================================================
+/** Shared cron analysis stays Free; manual model access comes only from the authenticated account. */
+export async function resolveAgentRunTier(req: VercelRequest, isManual: boolean): Promise<AppTextTier> {
+  return isManual ? resolveAppRequestTier(req) : 'free';
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!(await requireWritesOpen(res))) return;
   if (req.method !== 'GET' && req.method !== 'POST') {
@@ -1129,9 +1143,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Phase 3: Self-optimization + Safe Mode analysis
     console.log('[Agent] Self-optimizing prompt + analyzing performance...');
+    const tier = await resolveAgentRunTier(req, isManual);
     const recentCycles = await fetchRecentCycles(10);
     const selfPrompt = recentCycles.length >= 3
-      ? await selfOptimizePrompt(recentCycles)
+      ? await selfOptimizePrompt(recentCycles, tier)
       : null;
     if (selfPrompt) console.log('[Agent] Using self-optimized Alpha prompt');
 
@@ -1151,6 +1166,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const debate = await multiAgentDebate(filtered, polyConsensus, selfPrompt || undefined, {
       signalAgeMs,
       performanceCtx,
+      tier,
     });
     console.log(`[Agent] Debate complete: ${debate.decisions.length} decisions`);
 

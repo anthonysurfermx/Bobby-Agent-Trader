@@ -8,6 +8,7 @@ import { alternateProvider, levelPlan, type DeskLevel, type LevelPlan } from './
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { changeSinceLastAsk, readerForModel, signedPercent, type AssetClass, type ReaderContext } from './user-memory.js';
 import { FOLLOW_UP_MAX, NEXT_QUESTION_RULE, nextQuestionFallback, nextQuestionSecond, nextQuestionViolation, repeatsQuestion } from './desk-next-question.js';
+import type { AppTextTier } from './app-model.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
@@ -406,14 +407,14 @@ export function sufficiencyOf(question: string, available: string[], language?: 
   return { horizon, ...(requested.length ? { requested } : {}), available, missing, sufficient: missing.length === 0 && horizon !== 'long' };
 }
 
-interface RoleCtx { usage: LlmUsage[]; deadline: number; fallback: ModelSpec | null; signal?: AbortSignal; level: DeskLevel; unavailable: Set<ModelSpec['provider']> }
+interface RoleCtx { usage: LlmUsage[]; deadline: number; fallback: ModelSpec | null; signal?: AbortSignal; level: DeskLevel; tier: AppTextTier; unavailable: Set<ModelSpec['provider']> }
 async function role<T>(spec: ModelSpec, name: string, system: string, input: unknown, schema: z.ZodType<T>, json: JsonSchemaSpec, ctx: RoleCtx): Promise<T> {
   // The reader left (the stream closed): no more model calls on their behalf.
   if (ctx.signal?.aborted) throw new Error('Desk request closed');
   const left = ctx.deadline - Date.now();
   if (left < 5000) throw new Error('Desk deadline reached');
   const call = (s: ModelSpec) => completeJson({ ...s, timeoutMs: Math.min(s.timeoutMs, ctx.deadline - Date.now() - 1000) }, system, JSON.stringify(input), json, { endpoint: 'desk-debate', role: name, usage: ctx.usage });
-  const active = (ctx.unavailable.has(spec.provider) || !(spec.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY)) ? alternateProvider(spec, ctx.level) : spec;
+  const active = (ctx.unavailable.has(spec.provider) || !(spec.provider === 'openai' ? process.env.OPENAI_API_KEY : process.env.ANTHROPIC_API_KEY)) ? alternateProvider(spec, ctx.level, ctx.tier) : spec;
   if (!active || ctx.unavailable.has(active.provider)) throw new Error('Desk providers unavailable');
   try {
     return schema.parse(await call(active));
@@ -422,7 +423,7 @@ async function role<T>(spec: ModelSpec, name: string, system: string, input: unk
     const providerLimited = error instanceof LlmHttpError && (error.status === 429 || error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
     if (providerLimited) {
       ctx.unavailable.add(active.provider);
-      const alternate = alternateProvider(active, ctx.level);
+      const alternate = alternateProvider(active, ctx.level, ctx.tier);
       if (!alternate || ctx.unavailable.has(alternate.provider) || ctx.signal?.aborted) throw error;
       console.error(JSON.stringify({ route: 'desk-debate', event: 'provider_failover', from: active.provider, to: alternate.provider, status: error.status, providerCode: error.providerCode, role: name }));
       try { return schema.parse(await call(alternate)); }
@@ -858,7 +859,8 @@ function cleared(text: string): string {
  *   · it is skipped when under REVIEWER_MIN_LEFT_MS of the level's budget remain, and never outlives it;
  *   · its tokens and cost land in the same `usage` as the debate's (role 'reviewer'), so the ledger and the
  *     spend guard count it, and it streams nothing.
- * Provider routing and failover are the debate's (role); a failover stays on the cheap tier whatever the level.
+ * Provider routing and failover are the debate's (role); a failover keeps the account tier and the reviewer's
+ * small ceiling, with low effort on Anthropic whatever the analysis level.
  * The log line carries the class of the failure, never the note or the model's text.
  */
 async function reviewThesis(spec: ModelSpec, system: string, input: unknown, verdict: 'wait' | 'review', ctx: RoleCtx): Promise<Pick<ThesisReview, 'supports' | 'challenges' | 'unknowns'>> {
@@ -884,7 +886,8 @@ async function reviewThesis(spec: ModelSpec, system: string, input: unknown, ver
 
 /**
  * Three isolated model calls (four on Máximo). The judge sees every argument and the original question.
- * `level` picks the models and the evidence (api/_lib/desk-levels.ts); `usage` collects each call's
+ * `level` picks the evidence, effort and rounds; server-confirmed `tier` picks the account's model.
+ * `usage` collects each call's
  * tokens and cost, even when the debate then fails. `onEvent` hears each argument once it passed the guard
  * (the live desk); `signal` stops the remaining calls when the reader leaves.
  *
@@ -898,12 +901,13 @@ async function reviewThesis(spec: ModelSpec, system: string, input: unknown, ver
  */
 export async function runDeskDebate(
   question: string, evidence: DeskEvidence & Partial<Awaited<ReturnType<typeof loadDeskEvidenceV2>>>, language: AppLanguage,
-  opts: { locale?: string; level?: DeskLevel; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | null; thesis?: DeskThesis | null; now?: number } = {},
+  opts: { locale?: string; level?: DeskLevel; tier?: AppTextTier; usage?: LlmUsage[]; onEvent?: (event: DeskEvent) => void; signal?: AbortSignal; reader?: ReaderContext | null; thesis?: DeskThesis | null; now?: number } = {},
 ) {
   const level = opts.level ?? 'rapido';
-  const plan = levelPlan(level);
+  const tier = opts.tier === 'pro' ? 'pro' : 'free';
+  const plan = levelPlan(level, tier);
   const emit = opts.onEvent ?? (() => {});
-  const ctx: RoleCtx = { usage: opts.usage ?? [], deadline: Date.now() + plan.budgetMs, fallback: plan.fallback, signal: opts.signal, level, unavailable: new Set() };
+  const ctx: RoleCtx = { usage: opts.usage ?? [], deadline: Date.now() + plan.budgetMs, fallback: plan.fallback, signal: opts.signal, level, tier, unavailable: new Set() };
   const available = evidence.timeframes ? Object.keys(evidence.timeframes) : [evidence.provenance.timeframe];
   const sufficiency = sufficiencyOf(question, available, language);
   const shortHistory = [evidence.technicals, ...Object.values(evidence.timeframes ?? {})].some(block => block?.trend === 'insufficient_history');

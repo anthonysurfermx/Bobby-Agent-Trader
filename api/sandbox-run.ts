@@ -13,6 +13,8 @@ import { enforcePublicRateLimit } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
 import { callLlm, streamText } from './_lib/llm.js';
+import type { AppTextTier } from './_lib/app-model.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 import { hasAppTextBackend } from './_lib/app-model.js';
 
 export const config = { maxDuration: 180 };
@@ -298,6 +300,7 @@ async function streamAgent(
   phase: string,
   system: string,
   userPayload: string,
+  tier: AppTextTier,
 ): Promise<string> {
   send('phase_start', { phase });
   let full = '';
@@ -307,7 +310,7 @@ async function streamAgent(
 
   try {
     await streamText({
-      endpoint: 'sandbox-run', system, messages: [{ role: 'user', content: userPayload }],
+      endpoint: 'sandbox-run', tier, system, messages: [{ role: 'user', content: userPayload }],
       maxTokens: 700, timeoutMs: PHASE_TIMEOUT_MS, signal: controller.signal,
       onDelta(token) { full += token; send('phase_token', { phase, token }); },
     });
@@ -330,10 +333,10 @@ async function streamAgent(
   }
 }
 
-async function textOneShot(phase: string, system: string, user: string, maxTokens: number): Promise<string> {
+async function textOneShot(phase: string, system: string, user: string, maxTokens: number, tier: AppTextTier): Promise<string> {
   const timeoutMs = 25_000;
   try {
-    const { text } = await callLlm({ endpoint: 'sandbox-run', system, user, maxTokens, timeoutMs });
+    const { text } = await callLlm({ endpoint: 'sandbox-run', tier, system, user, maxTokens, timeoutMs });
     return text;
   } catch (err) {
     const wrapped = new PhaseTimeoutError(phase, 0);
@@ -486,6 +489,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  const tier = await resolveAppRequestTier(req);
+
   // SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -552,11 +557,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     ].filter(Boolean).join('\n');
 
     // 1) Alpha Hunter
-    const alphaText = await streamAgent(send, 'alpha_hunter', prompts.alpha, ctx);
+    const alphaText = await streamAgent(send, 'alpha_hunter', prompts.alpha, ctx, tier);
     record.alpha_text = alphaText;
 
     // 2) Red Team
-    const redText = await streamAgent(send, 'red_team', prompts.red, `${ctx}\n\nBULL THESIS:\n${alphaText}`);
+    const redText = await streamAgent(send, 'red_team', prompts.red, `${ctx}\n\nBULL THESIS:\n${alphaText}`, tier);
     record.red_text = redText;
 
     // 3) CIO
@@ -565,6 +570,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       'cio',
       prompts.cio,
       `${ctx}\n\nBULL THESIS:\n${alphaText}\n\nRED TEAM REBUTTAL:\n${redText}`,
+      tier,
     );
     record.cio_text = cioText;
     const { action, conviction } = parseCio(cioText);
@@ -579,6 +585,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       prompts.judge,
       `DEBATE TRANSCRIPT:\n\n[ALPHA]\n${alphaText}\n\n[RED TEAM]\n${redText}\n\n[CIO]\n${cioText}`,
       200,
+      tier,
     );
     const judgeScores = parseJudge(judgeText);
     record.judge_scores = judgeScores;
