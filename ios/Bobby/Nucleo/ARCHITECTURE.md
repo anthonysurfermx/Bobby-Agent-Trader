@@ -418,7 +418,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 | FACE_DRAG / FACE(k) | drag in IDLE | B11 physics with the real pointer. Isla: `island()` summary and a chip that calls `openNative("isla")`. Squad: `roster()` belt plus `level`/`streak`, chip `openNative("squad")`. Theses: 2 satellites from `theses()`; tapping one opens its card read-only. | detent at Desk → IDLE |
 | ERROR(kind) / CANCELLED | | caption from `NucleoReadModel.failure()`. **No verdict, no ring, no XP.** The pill returns to mic. | 6 s or a tap → RETURNING |
 | RISK_GATE | reply `error/risk_not_accepted` (`failure().kind == "risk"`) | caption "First, the risk notice." plus one chip | chip → `openNative("riskNotice")` (native swaps in the risk beat); tap elsewhere or 30 s → RETURNING |
-| SIGNIN_GATE | reply `signin_required` (`failure().kind == "signin"`) | glass first: one line from the rim, "Create your free account to keep reading — 10 free reads a week.", the white **Sign in with Apple** chip (Apple logo U+F8FF, system font) and "Not now" | Apple chip → `signIn()`; `signedIn` → SENDING with `{token: retry}` (the same question, asked again automatically); `cancelled` stays; other → hint. "Not now", a tap elsewhere or 45 s (not while signing in) → RETURNING |
+| SIGNIN_GATE | reply `signin_required` (`failure().kind == "signin"`) | glass first: one line from the rim, "Create your free account to keep reading — 20 free reads a week.", the white **Sign in with Apple** chip (Apple logo U+F8FF, system font) and "Not now" | Apple chip → `signIn()`; `signedIn` → SENDING with `{token: retry}` (the same question, asked again automatically); `cancelled` stays; other → hint. "Not now", a tap elsewhere or 45 s (not while signing in) → RETURNING |
 | PRO_GATE | reply `subscription_required` (`failure().kind == "subscription"`) | one line "You’ve used this week’s free reads.", sub "They reset {date}. Bobby Pro has unlimited reads." (date from `access.resetsAt`), chips "See Bobby Pro" and "Not now". The Bobby Pro sheet opens **by itself once** (+1.2 s), never right after a purchase-retry | "See Bobby Pro" → `paywall()`; `subscribed` → SENDING with `{token: retry}`; `pending`/`failed` → hint; "Not now", a tap elsewhere or 45 s → RETURNING |
 | RESTORE | `pendingRead` at boot | builds the model and jumps to the settled HANDBACK frame (reduced choreography) | as HANDBACK |
 
@@ -697,7 +697,7 @@ The three builders work in parallel, and no file is owned by two of them. None m
 
 ## 8. Metered reads and Bobby Pro (iOS 1.5 (43), 2026-09-27)
 
-Owner's decisions (Anthony): anyone can try Bobby without an account for **3 reads**; from the 4th read, **Sign in with Apple** is required; a signed-in account gets **10 free reads per rolling 7 days**; after that, **Bobby Pro** at $4.99/month, which on iOS is an App Store auto-renewable subscription (subscription group "Bobby Pro", product `xyz.bobbyprotocol.bobby.pro.monthly`), sold through **RevenueCat**. The server counts and decides; the app never keeps its own count.
+Owner's decisions (Anthony): anyone can try Bobby without an account for **6 reads** (3 until 2026-10-07); from the 7th read, **Sign in with Apple** is required; a signed-in account gets **20 free reads per rolling 7 days** (10 until 2026-10-07); after that, **Bobby Pro** at $4.99/month, which on iOS is an App Store auto-renewable subscription (subscription group "Bobby Pro", product `xyz.bobbyprotocol.bobby.pro.monthly`), sold through **RevenueCat**. The server counts and decides; the app never keeps its own count.
 
 ### 8.1 Who is asking (headers)
 
@@ -719,7 +719,7 @@ After the preflight (so nothing unreadable is ever metered) and **before the des
 
 `{status:"signin_required"|"subscription_required", token, message, access}`. `token` is a native retry token (single use, 10 min, like a confirm token) for the same question about the same asset. `NucleoReadModel.failure()` puts it in the chip's `retry` (never `token`), so the page can only re-ask **after** a real sign in or a confirmed subscription:
 
-- **Sign-in beat** (app: SIGNIN_GATE; onboarding: its ERROR caption): "Create your free account to keep reading — 10 free reads a week." / "Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana." + the white Apple chip → `signIn()` → `ask({token})` automatically. (The "10" is the owner's copy; the 401 carries only the anonymous access, so the free allowance is not in the reply.)
+- **Sign-in beat** (app: SIGNIN_GATE; onboarding: its ERROR caption): "Create your free account to keep reading — 20 free reads a week." / "Crea tu cuenta gratis para seguir leyendo: 20 lecturas gratis a la semana." + the white Apple chip → `signIn()` → `ask({token})` automatically. (The "20" is the owner's copy, the server's `FREE_READS.weekly`; the 401 carries only the anonymous access, so the free allowance is not in the reply.)
 - **Bobby Pro beat** (app: PRO_GATE): "You’ve used this week’s free reads." + "They reset {date}." from `access.resetsAt`; the native sheet opens by itself once → `paywall()` → `subscribed` → `ask({token})`.
 
 ### 8.4 Bobby Pro (native, RevenueCat)
@@ -733,7 +733,7 @@ After the preflight (so nothing unreadable is ever metered) and **before the des
 
 ### 8.5 The account sheet
 
-One subtle line from the server's access: "7 of 10 free reads left this week · Resets October 3", or for anonymous reads "2 of 3 free reads left", or "Bobby Pro · Unlimited reads · renews {date}" with **Manage** (Apple's `manageSubscriptionsSheet`, only for an App Store subscription). It refreshes with `GET api/bobby-access` when it opens (after consent only).
+One subtle line from the server's access: "17 of 20 free reads left this week · Resets October 3", or for anonymous reads "5 of 6 free reads left", or "Bobby Pro · Unlimited reads · renews {date}" with **Manage** (Apple's `manageSubscriptionsSheet`, only for an App Store subscription). It refreshes with `GET api/bobby-access` when it opens (after consent only).
 
 
 ---

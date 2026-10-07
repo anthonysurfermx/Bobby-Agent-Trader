@@ -356,8 +356,8 @@ export function buildInsights(input: InsightInput): Insight[] {
       add({
         id: 'wall-conversion', level: 'warn', area: 'conversion', tab: 'funnel', impact: 74, sample: wall,
         title: `El muro de registro convierte ${share(afterWall, wall)}`,
-        detail: `${int(wall)} instalaciones usaron sus 3 lecturas gratis y pidieron una 4.ª; ${int(afterWall)} crearon o vincularon cuenta después.${small(wall)}`,
-        action: `Cambia el mensaje del muro: qué ganan con la cuenta (${ig.paywall === true ? '10 lecturas por semana, ' : ig.paywall === false ? 'lecturas Rápido sin límite, ' : ''}que Bobby recuerde lo que preguntaron), en un solo toque con Apple/Google.`,
+        detail: `${int(wall)} instalaciones usaron todas sus lecturas de invitado (6 desde el 7 de octubre; antes 3) y pidieron otra; ${int(afterWall)} crearon o vincularon cuenta después.${small(wall)}`,
+        action: `Cambia el mensaje del muro: qué ganan con la cuenta (${ig.paywall === true ? '20 lecturas por semana, ' : ig.paywall === false ? 'lecturas Rápido sin límite, ' : ''}que Bobby recuerde lo que preguntaron), en un solo toque con Apple/Google.`,
         evidence: [`chocaron con el muro: ${int(wall)}`, `cuenta después: ${int(afterWall)}`],
       });
     }
@@ -365,7 +365,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'nobody-uses-3', level: 'info', area: 'conversion', tab: 'funnel', impact: 50, sample: readers,
       title: 'Nadie llega a 3 lecturas',
-      detail: `${readers === 1 ? '1 instalación nueva leyó y no llegó' : `${int(readers)} instalaciones nuevas leyeron, ninguna llegó`} a 3 (el muro de registro está después de 3 lecturas como invitado). El registro no es el freno: la gente no vuelve a preguntar.`,
+      detail: `${readers === 1 ? '1 instalación nueva leyó y no llegó' : `${int(readers)} instalaciones nuevas leyeron, ninguna llegó`} a 3 (el muro de registro está después de 6 lecturas como invitado). El registro no es el freno: la gente no vuelve a preguntar.`,
       action: 'Trabaja la segunda lectura (sugerir el siguiente activo, recordatorio) antes que el muro de registro.',
       evidence: [`leyeron: ${int(readers)}`, `3+ lecturas: 0`],
     });
@@ -432,7 +432,7 @@ export function buildInsights(input: InsightInput): Insight[] {
     add({
       id: 'paywall-off', level: 'info', area: 'monetizacion', tab: 'membresias', impact: 45, sample: null,
       title: 'El cobro está apagado: las cuentas gratis leen Rápido sin límite',
-      detail: 'Los invitados siguen limitados a 3 lecturas y Profundo/Máximo se miden siempre; pero ninguna cuenta gratis llega al muro de pago de lecturas.',
+      detail: 'Los invitados siguen limitados a 6 lecturas y Profundo/Máximo se miden siempre; pero ninguna cuenta gratis llega al muro de pago de lecturas.',
       action: 'Activa BOBBY_PAYWALL cuando el flujo de compra de la versión distribuida esté verificado.',
       evidence: ['BOBBY_PAYWALL: apagado'],
     });

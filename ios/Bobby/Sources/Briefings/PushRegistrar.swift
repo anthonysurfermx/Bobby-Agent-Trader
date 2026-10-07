@@ -1,7 +1,7 @@
 // Bobby Pro market briefings — APNs registration and the app delegate (build 53).
 // Contract: docs/product/pro-market-briefings-api-contracts.md §Devices and implementation spec D7/D9.
 // Invariants:
-//  - iOS permission is asked ONLY when the person enables a briefing (BriefingsCenter), never at launch.
+//  - iOS permission is asked ONLY when the person enables a briefing or Bobby news, never at launch.
 //  - `registerForRemoteNotifications` runs only after the risk notice is accepted (R11) and with an account.
 //  - The binding lives in one Keychain record (service xyz.bobbyprotocol.bobby.push, this-device-only):
 //    a stable installation UUID, the server's registration id + binding revision, the installation
@@ -137,6 +137,8 @@ final class PushRegistrar: ObservableObject {
         if center.settings == nil { _ = await center.refresh() }
         return center.settings?.weeklyEnabled == true
     }
+    /// Separate promotional consent: free and Pro accounts are equally eligible.
+    var newsEnabled: () async -> Bool = { await NewsPushCenter.shared.confirmedEnabled() }
     var registerForRemote: () -> Void = { UIApplication.shared.registerForRemoteNotifications() }
     var environment: () -> String = { PushRegistrar.apnsEnvironment(profileText: PushRegistrar.embeddedProfileText()) }
     var appBuild: () -> Int = { Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0 }
@@ -197,10 +199,10 @@ final class PushRegistrar: ObservableObject {
 
     /// After an enable (or a sign-in that already had a binding): ask iOS for the token. R11 + account gated.
     func register() {
-        guard riskAccepted(), currentUser() != nil else { return }
+        guard riskAccepted(), let owner = currentUser() else { return }
         Task {
             let status = await currentPermission()
-            guard status.allowsDelivery, riskAccepted(), currentUser() != nil else { return }
+            guard status.allowsDelivery, riskAccepted(), currentUser() == owner else { return }
             registerForRemote()
         }
     }
@@ -226,8 +228,13 @@ final class PushRegistrar: ObservableObject {
         Task {
             let status = await currentPermission()
             guard riskAccepted(), currentUser() == owner else { return }
-            if storage.load()?.hasBinding != true {
-                guard status.allowsDelivery, await weeklyEnabled(), currentUser() == owner else { return }
+            let news = await newsEnabled()
+            guard riskAccepted(), currentUser() == owner else { return }
+            if storage.load()?.ownerUserId != owner {
+                guard status.allowsDelivery else { return }
+                let weekly = await weeklyEnabled()
+                let optedIn = weekly || news
+                guard optedIn, currentUser() == owner else { return }
             }
             registerForRemote()
         }
@@ -257,7 +264,13 @@ final class PushRegistrar: ObservableObject {
         guard riskAccepted(), currentUser() != nil else { return }
         // Only a device that was registering this launch, or still holds a binding, follows the new account.
         guard tokenHex != nil || storage.load()?.hasBinding == true else { return }
-        if tokenHex != nil { enqueue { await $0.syncNow() } } else { register() }
+        // The new account must have its own confirmed choice before adopting this installation.
+        let owner = currentUser()
+        enqueue { registrar in
+            let weekly = await registrar.weeklyEnabled(), news = await registrar.newsEnabled()
+            guard owner != nil, registrar.currentUser() == owner, weekly || news else { return }
+            if registrar.tokenHex != nil { await registrar.syncNow() } else { registrar.register() }
+        }
     }
 
     /// Account deletion: the server cascade removed the binding; forget it locally only when it was that account's.
@@ -342,6 +355,10 @@ final class PushRegistrar: ObservableObject {
         let status = await currentPermission()
         guard currentUser() == owner, let bearer = await accessToken(nil), currentUser() == owner else { return }
         var record = loadRecord()
+        if record.ownerUserId != owner {
+            let weekly = await weeklyEnabled(), news = await newsEnabled()
+            guard status.allowsDelivery, riskAccepted(), currentUser() == owner, weekly || news else { return }
+        }
         let env = environment()
         let hash = Self.sha256(token)
         let device = BriefingDeviceRegistration(installationId: record.installationId, apnsToken: token,
@@ -475,6 +492,7 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         guard !BobbyApp.isUnitTestHost else { return true }
         // Set before launch finishes so a tap that launched the app is delivered to us.
         UNUserNotificationCenter.current().delegate = self
+        _ = NewsPushCenter.shared
         PushRegistrar.shared.start()
         return true
     }
@@ -506,12 +524,14 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
         let tapped = response.actionIdentifier == UNNotificationDefaultActionIdentifier
         let briefId = BriefingIntent.briefId(from: response.notification.request.content.userInfo)
         let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
+        let news = NewsPushIntent.tap(from: response.notification.request.content.userInfo)
         let followUp = HarnessTap.tap(from: response.notification.request.content.userInfo)
         Task { @MainActor in
             // Stored only: the experience drains it once the page, account and consent are ready.
             if tapped, let briefId { BriefingIntent.shared.store(briefId) }
             // 1.8: a tapped thesis reminder waits the same way (Reminders/ReminderIntent.swift).
             if tapped, let reminder { ReminderIntent.shared.store(reminder) }
+            if tapped, news != nil { NewsPushIntent.shared.store(response.notification.request.content.userInfo) }
             // 1.8: so does a tapped follow-up (Harness/HarnessIntent.swift).
             if tapped, let followUp { HarnessIntent.shared.store(followUp) }
             completionHandler()

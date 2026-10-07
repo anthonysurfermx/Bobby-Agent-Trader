@@ -187,8 +187,8 @@ export function integrationChecks(i: AdminIntegrations, sc?: SearchConsoleData |
   rows.push(i.paywall == null ? { id: 'paywall', name: 'Cobro (BOBBY_PAYWALL)', status: 'off', tag: 'Pendiente de consulta', detail: 'El servidor todavía no confirmó el estado del cobro', problem: null } : {
     id: 'paywall', name: 'Cobro (BOBBY_PAYWALL)', status: i.paywall ? 'ok' : 'off', tag: i.paywall ? 'Encendido' : 'Apagado',
     detail: i.paywall
-      ? 'Invitados: 3 lecturas y luego cuenta · cuentas gratis: límite semanal de lecturas, después Bobby Pro · Profundo y Máximo siempre con su propio límite'
-      : 'Invitados: 3 lecturas y luego cuenta · cuentas gratis: Rápido sin límite · Profundo y Máximo siempre con su propio límite (también en Pro)',
+      ? 'Invitados: 6 lecturas y luego cuenta · cuentas gratis: límite semanal de lecturas, después Bobby Pro · Profundo y Máximo siempre con su propio límite'
+      : 'Invitados: 6 lecturas y luego cuenta · cuentas gratis: Rápido sin límite · Profundo y Máximo siempre con su propio límite (también en Pro)',
     problem: null,
   });
   rows.push({ id: 'vercel', name: 'Vercel Analytics', status: 'off', tag: 'No verificable desde aquí', detail: 'Sin API de lectura: revisa el panel de Vercel para confirmar que recibe visitas', problem: null });

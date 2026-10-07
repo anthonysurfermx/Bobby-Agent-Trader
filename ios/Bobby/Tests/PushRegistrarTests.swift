@@ -54,7 +54,7 @@ final class PushRegistrarTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
-        user = "a"; status = .authorized; keys = 0; weeklyOn = false
+        user = "a"; status = .authorized; keys = 0; weeklyOn = true
         clock = Date(timeIntervalSince1970: 1_790_000_000)
         server = DeviceServer()
         suite = "bobby.push.tests.\(UUID().uuidString)"
@@ -75,6 +75,7 @@ final class PushRegistrarTests: XCTestCase {
         r.authorizationStatus = { [unowned self] in self.status }
         r.requestAuthorization = { true }
         r.weeklyEnabled = { [unowned self] in self.weeklyOn }
+        r.newsEnabled = { false }
         r.registerForRemote = {}
         r.environment = { "sandbox" }
         r.appBuild = { 53 }
@@ -309,6 +310,40 @@ final class PushRegistrarTests: XCTestCase {
     }
 
     // MARK: account changes
+
+    func testNewsOnlyOptInRecoversRegistrationOnForegroundWithoutAnOSPrompt() async throws {
+        let r = registrar(); weeklyOn = false
+        var prompts = 0
+        r.requestAuthorization = { prompts += 1; return true }
+        r.newsEnabled = { true }
+        let asked = expectation(description: "news-only account receives an APNs token")
+        r.registerForRemote = { [unowned r, tokenA] in r.didRegister(tokenHex: tokenA); asked.fulfill() }
+        server.responder = { [regA] _ in DeviceServer.receipt(regA, revision: 1, credential: "news-credential") }
+        r.appBecameActive()
+        await fulfillment(of: [asked], timeout: 3); await r.settle()
+        XCTAssertEqual(prompts, 0); XCTAssertEqual(server.calls.count, 1)
+        XCTAssertEqual(r.state, .registered)
+    }
+
+    func testCallbackCannotBindAnAccountWithoutItsOwnWeeklyOrNewsConsent() async {
+        let r = registrar(); weeklyOn = false
+        r.didRegister(tokenHex: tokenA); await r.settle()
+        XCTAssertTrue(server.calls.isEmpty)
+        r.newsEnabled = { true }; status = .denied
+        r.didRegister(tokenHex: tokenA); await r.settle()
+        XCTAssertTrue(server.calls.isEmpty, "denied iOS permission cannot bind a new owner")
+    }
+
+    func testFailedOutgoingRevokeCannotRebindAnOptedOutNewOwnerOnForeground() async {
+        let storage = PushRecordStorage.memory(); storage.save(bound())
+        let r = registrar(storage: storage); weeklyOn = false; user = "b"
+        var registrations = 0
+        r.registerForRemote = { registrations += 1 }
+        r.accountDidChange(); await r.settle()
+        r.didRegister(tokenHex: tokenA); await r.settle()
+        XCTAssertEqual(registrations, 0); XCTAssertTrue(server.calls.isEmpty)
+        XCTAssertEqual(storage.load()?.ownerUserId, "a", "the old proof is retained solely for an authorized rebind")
+    }
 
     private func stored(_ user: String) -> StoredSession {
         StoredSession(accessToken: "token-\(user)", refreshToken: "refresh-\(user)", expiresAt: Date().addingTimeInterval(3600),
