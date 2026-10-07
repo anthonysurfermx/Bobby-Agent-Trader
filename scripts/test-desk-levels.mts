@@ -6,7 +6,7 @@
 //     scenarios, the guard covers them, and the horizon-sufficiency note reaches every role;
 //   · the endpoint spends a premium allowance before any model call, refuses with a stable code and the
 //     meter, gives the allowance back when the analysis fails, and writes only numbers to the cost ledger;
-//   · the invite code format, creation and claim parameters.
+//   · the invite code format, creation and claim parameters, and the shape of the link every client shares.
 import assert from 'node:assert/strict';
 
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
@@ -25,7 +25,7 @@ const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../ap
 const { LEVEL_LIMITS, REFERRAL, levelPlan } = await import('../api/_lib/desk-levels.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
-const { isReferralCode, referralCode, claimReferral } = await import('../api/_lib/referrals.ts');
+const { isReferralCode, referralCode, claimReferral, referralStatus, inviteUrl } = await import('../api/_lib/referrals.ts');
 
 const original = globalThis.fetch;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
@@ -349,6 +349,20 @@ try {
   eq(await claimReferral('22222222-2222-4222-8222-222222222222', codeNow), 'claimed', 'a claim returns the database verdict');
   eq([calls[0].body.p_reward_days, calls[0].body.p_max, calls[0].body.p_new_account_days], [REFERRAL.rewardDays, 5, 7], 'claim parameters: reward days, five friends, new accounts only');
   eq(REFERRAL.rewardDays, 30, 'one month of Pro per friend by default');
+  // The link every client shares (iOS 1.5-1.7, Android and the web print the server's string as it is).
+  mock((c) => {
+    if (c.url.includes('bobby_referral_codes')) return json([{ code: 'K7M9QRST' }]);
+    if (c.url.includes('bobby_referrals')) return json([{ created_at: '2026-10-01T12:00:00+00:00' }]);
+    if (c.url.includes('bobby_pro_grants')) return json([]);
+    throw new Error(`Unexpected request ${c.url}`);
+  });
+  const shared = await referralStatus('11111111-1111-4111-8111-111111111111', 'https://bobbyprotocol.xyz');
+  eq(shared, { code: 'K7M9QRST', url: 'https://bobbyprotocol.xyz/i/K7M9QRST', accepted: 1, max: 5, rewardDays: REFERRAL.rewardDays, proUntil: null, proSource: null, friends: [{ joinedAt: '2026-10-01T12:00:00.000Z' }] },
+    'the invite link is the invitation page /i/CODE; every other field of the status keeps its shape');
+  const sharedUrl = new URL(shared.url);
+  eq([sharedUrl.protocol, sharedUrl.host, sharedUrl.pathname, sharedUrl.search, sharedUrl.hash], ['https:', 'bobbyprotocol.xyz', '/i/K7M9QRST', '', ''], 'shipped clients: it parses as a URL (iOS) and starts with https://bobbyprotocol.xyz/ (Android)');
+  ok(shared.url.startsWith('https://bobbyprotocol.xyz/') && !shared.url.includes('/desk'), 'the shared link no longer opens the web desk');
+  eq([inviteUrl('https://bobby-preview.vercel.app', 'ABCDEFGH'), inviteUrl('http://localhost:8080', 'ABCDEFGH')], ['https://bobby-preview.vercel.app/i/ABCDEFGH', 'http://localhost:8080/i/ABCDEFGH'], 'previews and local servers link to their own host');
 
   // ---------- Sonnet first (owner's rule, 2026-10-01), OpenAI when Sonnet is out of credit ----------
   {

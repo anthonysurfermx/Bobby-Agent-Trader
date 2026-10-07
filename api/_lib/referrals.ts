@@ -39,6 +39,14 @@ export async function referralCode(identityId: string): Promise<string> {
   throw new Error('referral code unavailable');
 }
 
+/**
+ * The link every client shares (iOS, Android and the web print this string as it is). It opens the invitation
+ * page (/i/CODE, src/pages/BobbyInvitePage.tsx), which sends a phone to the app or the store and keeps the code;
+ * the iPhone app claims the same path as a universal link (public/.well-known/apple-app-site-association).
+ * Links already shared as /desk?ref=CODE&v=2 keep working on the web desk.
+ */
+export const inviteUrl = (origin: string, code: string): string => `${origin}/i/${code}`;
+
 export async function referralStatus(identityId: string, origin: string): Promise<ReferralStatus> {
   const code = await referralCode(identityId);
   const [friends, grant] = await Promise.all([
@@ -48,8 +56,7 @@ export async function referralStatus(identityId: string, origin: string): Promis
   const until = grant[0]?.pro_until ? new Date(grant[0].pro_until) : null;
   const active = !!until && until.getTime() > Date.now();
   return {
-    // A new URL lets messaging apps fetch the refreshed share card for an existing code.
-    code, url: `${origin}/desk?ref=${code}&v=2`, accepted: friends.length, max: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays,
+    code, url: inviteUrl(origin, code), accepted: friends.length, max: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays,
     proUntil: active ? until!.toISOString() : null,
     proSource: active && (grant[0]?.source === 'admin' || grant[0]?.source === 'referral') ? grant[0].source : null,
     friends: friends.map((f) => ({ joinedAt: new Date(f.created_at).toISOString() })),
