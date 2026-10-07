@@ -134,16 +134,57 @@ final class ThesisBookTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: ThesisBook.key(owner: "u1")), "nothing of a deleted book remains in the store")
     }
 
-    func testGuestThesesFollowThePersonIntoANewAccountOnceAndNeverMerge() throws {
+    func testGuestThesesNeverMoveByThemselvesAndTheAccountIsAskedOnce() throws {
         try book.create(draft("NVDA"), owner: nil, now: t0)
         try book.create(draft("BTC"), owner: nil, now: t0)
-        XCTAssertEqual(book.adoptLocal(into: "u1"), 2)
-        XCTAssertEqual(Set(book.active(owner: "u1").map(\.symbol)), ["NVDA", "BTC"])
+        XCTAssertEqual(book.pendingLocalCount(for: "u1"), 2)
+        XCTAssertTrue(book.all(owner: "u1").isEmpty, "signing in moves nothing")
+        book.declineLocal(for: "u1")
+        XCTAssertEqual(book.pendingLocalCount(for: "u1"), 0, "\"Not mine\" is remembered")
+        XCTAssertEqual(book.adoptLocal(into: "u1"), 0, "and cannot be undone by a later call")
+        XCTAssertEqual(book.all(owner: nil).count, 2, "the guest theses stay where they were")
+        XCTAssertEqual(book.pendingLocalCount(for: "u2"), 2, "another account has its own answer to give")
+        XCTAssertEqual(book.adoptLocal(into: "u2", now: t0.addingTimeInterval(5)), 2)
+        XCTAssertEqual(Set(book.active(owner: "u2").map(\.symbol)), ["NVDA", "BTC"])
         XCTAssertTrue(book.all(owner: nil).isEmpty, "they moved; no copy stays behind for the next person on this phone")
         try book.create(draft("ETH"), owner: nil, now: t0)
-        XCTAssertEqual(book.adoptLocal(into: "u1"), 0, "an account that already has theses never absorbs another book")
+        XCTAssertEqual(book.pendingLocalCount(for: "u2"), 0, "an account is asked once")
+        XCTAssertEqual(book.adoptLocal(into: "u2"), 0)
         XCTAssertEqual(book.all(owner: nil).count, 1)
-        XCTAssertEqual(book.all(owner: "u1").count, 2)
+        ThesisBook.forgetOwner("u2", defaults: defaults)
+        XCTAssertNil(defaults.object(forKey: ThesisBook.adoptionKey("u2")), "a deleted account's answer leaves the phone too")
+    }
+
+    func testAdoptedThesesRespectTheAccountsOwnLimits() throws {
+        for symbol in ["NVDA", "BTC"] { try book.create(draft(symbol, "mine"), owner: "u1", now: t0) }
+        for (i, symbol) in ["NVDA", "ETH", "SAP.DE"].enumerated() {
+            try book.create(draft(symbol, "guest"), owner: nil, now: t0.addingTimeInterval(Double(i + 1)))
+        }
+        XCTAssertEqual(book.adoptLocal(into: "u1", now: t0.addingTimeInterval(60)), 3)
+        let active = book.active(owner: "u1")
+        XCTAssertEqual(active.count, ThesisBook.activeLimit)
+        XCTAssertEqual(active.filter { $0.symbol == "NVDA" }.map(\.hypothesis), ["mine"], "the account's own thesis on an asset stays the active one")
+        XCTAssertEqual(Set(active.map(\.symbol)), ["NVDA", "BTC", "SAP.DE"], "the newest guest thesis took the free slot")
+        let archived = book.archived(owner: "u1")
+        XCTAssertEqual(Set(archived.map(\.symbol)), ["NVDA", "ETH"], "the rest arrive archived, never dropped")
+        XCTAssertTrue(archived.allSatisfy { $0.revisions.last?.kind == .archived })
+    }
+
+    func testAThesisWrittenWithoutAPriceNeverBorrowsALaterOneAsItsOrigin() throws {
+        let saved = try book.create(draft("NVDA", price: nil), owner: nil, now: t0)
+        XCTAssertNil(saved.startingPoint)
+        let reviewed = try book.recordReview(id: saved.id, owner: nil, price: 130, asOf: "2026-10-20T12:00:00Z", verdict: "wait",
+                                             supports: [], challenges: [], unknowns: [], now: t0.addingTimeInterval(86_400))
+        XCTAssertNil(reviewed.startingPoint, "a review's price is today's price, not where the thesis started")
+        XCTAssertNil(ThesisContext(reviewed).json["priceAtSave"])
+        XCTAssertEqual(reviewed.lastReview?.price, 130)
+    }
+
+    func testIdsAreLowercaseSoTheyCanTravelInANudgeId() throws {
+        let saved = try book.create(draft("NVDA"), owner: nil, now: t0)
+        XCTAssertEqual(saved.id, saved.id.lowercased())
+        XCTAssertEqual(saved.revisions.first?.id, saved.revisions.first?.id.lowercased())
+        XCTAssertNotNil(("theses.due." + saved.id.prefix(8)).range(of: NucleoNudge.idPattern, options: .regularExpression))
     }
 
     func testArchivedThesesAreBoundedButActiveOnesNeverFallOff() throws {

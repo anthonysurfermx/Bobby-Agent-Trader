@@ -50,9 +50,12 @@ struct MemoryReceipt: Sendable, Equatable {
     let changeSinceLastAskPct: Double?
 
     init?(json: Any?) {
-        guard let body = json as? [String: Any], let recorded = body["recorded"] as? Bool else { return nil }
+        // An incomplete receipt is no receipt: an unknown count is never turned into a zero, and a
+        // recorded ask counts itself.
+        guard let body = json as? [String: Any], let recorded = body["recorded"] as? Bool,
+              let asks = BobbyReadAccess.count(body["asks"]), !recorded || asks >= 1 else { return nil }
         self.recorded = recorded
-        asks = max(0, BobbyReadAccess.count(body["asks"]) ?? 0)
+        self.asks = asks
         lastAskedDaysAgo = BobbyReadAccess.count(body["lastAskedDaysAgo"]).flatMap { $0 >= 0 ? $0 : nil }
         let pct = (body["changeSinceLastAskPct"] as? NSNumber)?.doubleValue
         changeSinceLastAskPct = pct.flatMap { $0.isFinite && abs($0) < 10_000 ? $0 : nil }

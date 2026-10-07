@@ -30,7 +30,7 @@ struct ThesisRevision: Codable, Equatable, Identifiable {
     var challenges: [String] = []
     var unknowns: [String] = []
 
-    init(id: String = UUID().uuidString, at: Date, kind: Kind, price: Double? = nil, asOf: String? = nil, verdict: String? = nil,
+    init(id: String = UUID().uuidString.lowercased(), at: Date, kind: Kind, price: Double? = nil, asOf: String? = nil, verdict: String? = nil,
          supports: [String] = [], challenges: [String] = [], unknowns: [String] = []) {
         self.id = id; self.at = at; self.kind = kind; self.price = price; self.asOf = asOf; self.verdict = verdict
         self.supports = supports; self.challenges = challenges; self.unknowns = unknowns
@@ -60,9 +60,11 @@ struct SavedThesis: Codable, Equatable, Identifiable {
     /// Oldest first.
     var revisions: [ThesisRevision]
 
-    /// The price and date the thesis started from (its first entry that carries one).
+    /// The price and date the thesis started from: only what was recorded when it was written. A
+    /// thesis written without a price has no starting point; a later review never becomes its origin.
     var startingPoint: (price: Double, at: Date)? {
-        revisions.first { $0.price != nil }.flatMap { r in r.price.map { ($0, r.at) } }
+        guard let created = revisions.first, created.kind == .created, let price = created.price else { return nil }
+        return (price, created.at)
     }
 
     var lastReview: ThesisRevision? { revisions.last { $0.kind == .reviewed } }
@@ -143,7 +145,7 @@ final class ThesisBook {
         if let existing = activeThesis(symbol: draft.symbol, owner: owner) { throw BookError.alreadyActive(id: existing.id) }
         guard canAddActive(owner: owner) else { throw BookError.limitReached }
         let thesis = SavedThesis(
-            id: UUID().uuidString, symbol: draft.symbol.uppercased(), name: draft.name, isEquity: draft.isEquity, status: .active,
+            id: UUID().uuidString.lowercased(), symbol: draft.symbol.uppercased(), name: draft.name, isEquity: draft.isEquity, status: .active,
             horizon: draft.horizon, hypothesis: hypothesis, worry: Self.clean(draft.worry), changeMind: Self.clean(draft.changeMind),
             createdAt: now, updatedAt: now, lastReviewedAt: nil, sourceRequestId: draft.sourceRequestId,
             revisions: [ThesisRevision(at: now, kind: .created, price: draft.price, asOf: draft.asOf, verdict: draft.verdict)])
@@ -237,19 +239,56 @@ final class ThesisBook {
         announce(owner)
     }
 
-    /// Account deletion: only the deleted account's theses.
+    /// Account deletion: only the deleted account's theses, and its answer about the guest theses.
     static func forgetOwner(_ userId: String, defaults: UserDefaults = .standard) {
         defaults.removeObject(forKey: key(owner: userId))
+        defaults.removeObject(forKey: adoptionKey(userId))
     }
 
-    /// A person who wrote theses signed out and then created their account: the theses follow them,
-    /// once, and only into an account that has none (never merged into existing ones).
+    // MARK: Theses written before signing in
+
+    /// Theses written signed out stay in the guest book. They never move by themselves: the account
+    /// that signs in is asked once ("Keep them in this account?") and its answer is remembered, so a
+    /// second person signing in on this phone does not silently receive someone else's theses.
+    static func adoptionKey(_ userId: String) -> String { "v18.theses.adoption." + userId }
+
+    /// How many guest theses this account may still be offered (0 once it answered, either way).
+    func pendingLocalCount(for userId: String) -> Int {
+        defaults.string(forKey: Self.adoptionKey(userId)) == nil ? all(owner: nil).count : 0
+    }
+
+    /// "Not mine": the guest theses stay where they are and this account is not asked again.
+    func declineLocal(for userId: String) {
+        defaults.set("declined", forKey: Self.adoptionKey(userId))
+        announce(userId)
+    }
+
+    /// "Keep them": the guest theses move into this account, once. The account's own limits hold:
+    /// a moved thesis stays active only while there is room and no active thesis on the same asset;
+    /// otherwise it arrives archived. Returns how many moved.
     @discardableResult
-    func adoptLocal(into userId: String) -> Int {
+    func adoptLocal(into userId: String, now: Date = Date()) -> Int {
+        guard defaults.string(forKey: Self.adoptionKey(userId)) == nil else { return 0 }
         let local = all(owner: nil)
-        guard !local.isEmpty, all(owner: userId).isEmpty else { return 0 }
-        write(local, owner: userId)
+        defaults.set("adopted", forKey: Self.adoptionKey(userId))
+        guard !local.isEmpty else { return 0 }
+        var mine = all(owner: userId)
+        for var thesis in local.sorted(by: { $0.updatedAt > $1.updatedAt }) {
+            guard !mine.contains(where: { $0.id == thesis.id }) else { continue }
+            if thesis.status == .active {
+                let activeNow = mine.filter { $0.status == .active }
+                let clash = activeNow.contains { $0.symbol.caseInsensitiveCompare(thesis.symbol) == .orderedSame }
+                if clash || activeNow.count >= Self.activeLimit {
+                    thesis.status = .archived
+                    thesis.updatedAt = now
+                    Self.append(ThesisRevision(at: now, kind: .archived), to: &thesis)
+                }
+            }
+            mine.append(thesis)
+        }
+        write(mine, owner: userId)
         defaults.removeObject(forKey: Self.key(owner: nil))
+        announce(nil)
         return local.count
     }
 

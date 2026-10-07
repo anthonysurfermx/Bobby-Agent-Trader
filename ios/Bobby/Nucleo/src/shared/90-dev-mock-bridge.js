@@ -433,7 +433,7 @@
     'nudge.seen': function (p) {
       if (typeof p.id !== 'string' || !/^[a-z][a-z0-9_.-]{0,47}$/.test(p.id)) return Promise.resolve(fault('invalid_params', 'id'));
       state.nudgeSeen[p.id] = (state.nudgeSeen[p.id] || 0) + 1;
-      return Promise.resolve(ok({ count: state.nudgeSeen[p.id] }));
+      return Promise.resolve(ok({ count: state.nudgeSeen[p.id], active: !!state.nudge && state.nudge.id === p.id }));
     },
     'nudge.act': function (p) {
       if (typeof p.id !== 'string' || !/^[a-z][a-z0-9_.-]{0,47}$/.test(p.id)) return Promise.resolve(fault('invalid_params', 'id'));

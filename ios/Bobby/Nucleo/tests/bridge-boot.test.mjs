@@ -51,7 +51,7 @@ class Element {
   blur() {}
 }
 
-function harness({ legacyEvents = false, language = 'en', rejectCollections = false } = {}) {
+function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true } = {}) {
   const nodes = new Map(), calls = [], errors = [];
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
     const attributes = Object.fromEntries([...match[0].matchAll(/([\w-]+)="([^"]*)"/g)].map((entry) => [entry[1], entry[2]]));
@@ -83,7 +83,8 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     webkit: { messageHandlers: { nucleo: { postMessage(envelope) {
       calls.push(JSON.parse(JSON.stringify(envelope)));
       if (rejectCollections && ['theses', 'roster', 'island', 'suggestions'].includes(envelope.method)) return Promise.reject(new Error('offline'));
-      const result = { session, roster, theses: { v: 1, items: [] }, island: { v: 1, available: false }, suggestions: { v: 1, quickAccess: [] } }[envelope.method] || { v: 1, opened: true };
+      const result = { session, roster, theses: { v: 1, items: [] }, island: { v: 1, available: false }, suggestions: { v: 1, quickAccess: [] },
+        'nudge.seen': { count: 1, active: nudgeActive }, 'nudge.act': { status: 'done' } }[envelope.method] || { v: 1, opened: true };
       return Promise.resolve({ v: 1, ok: true, result });
     } } } },
   });
@@ -189,8 +190,9 @@ test('actual account handler receives native changes and refreshes collections',
 
 // ---- the nudge (1.8): one native-written line and one chip; the page only draws, reports and forwards ----
 const chipsOf = (app) => app.nodes.get('chipRow').children.filter((node) => node.getAttribute('data-hit') === 'chip');
+const nudgeChips = (app) => chipsOf(app).filter((node) => /\bnudge\b/.test(node.className || ''));
 
-test('a native nudge is the first idle chip, its line is the eyebrow, and it is reported seen exactly once', async () => {
+test('a native nudge is the first idle chip, its line is the eyebrow, and every drawing is reported', async () => {
   const app = harness();
   app.session.nudge = { id: 'memory.offer', text: 'I can pick this up next time', cta: 'Remember it' };
   app.boot(); await flush(); app.advance(1.2); await flush();
@@ -201,10 +203,24 @@ test('a native nudge is the first idle chip, its line is the eyebrow, and it is 
   assert.match(chips[0].className, /\bnudge\b/);
   assert.equal(chips[0].getAttribute('aria-label'), 'I can pick this up next time. Remember it');
   assert.equal(app.nodes.get('eyebrow').textContent, 'I can pick this up next time');
-  // a second session with the same nudge does not report it again
+  assert.deepEqual(app.calls.filter((call) => call.method === 'nudge.seen').map((call) => call.params), [{ id: 'memory.offer' }]);
+  // the same nudge in a later session is not redrawn (no flicker, no extra report)
   app.context.nucleoBridge.emit('session.changed', { ...app.session });
   await flush();
-  assert.deepEqual(app.calls.filter((call) => call.method === 'nudge.seen').map((call) => call.params), [{ id: 'memory.offer' }]);
+  assert.equal(app.calls.filter((call) => call.method === 'nudge.seen').length, 1);
+  assert.deepEqual(app.errors, []);
+});
+
+test('a nudge whose words changed under the same id is redrawn with the new words', async () => {
+  const app = harness();
+  app.session.nudge = { id: 'credits.low', text: '2 reads left this week', cta: 'See credits' };
+  app.boot(); await flush(); app.advance(1.2); await flush();
+  app.context.nucleoBridge.emit('session.changed', { ...app.session, nudge: { id: 'credits.low', text: '1 read left this week', cta: 'See credits' } });
+  await flush(); app.advance(0.6); await flush();
+  assert.equal(app.nodes.get('eyebrow').textContent, '1 read left this week');
+  const live = nudgeChips(app);
+  assert.equal(live[live.length - 1].getAttribute('aria-label'), '1 read left this week. See credits');
+  assert.equal(app.calls.filter((call) => call.method === 'nudge.seen').length, 2, 'a new drawing is a new report');
   assert.deepEqual(app.errors, []);
 });
 
@@ -217,8 +233,17 @@ test('tapping the nudge chip forwards only its id; when native withdraws it the 
   assert.deepEqual(app.calls.filter((call) => call.method === 'nudge.act').map((call) => call.params), [{ id: 'credits.low' }]);
   assert.equal(app.context.nucleo.state(), 'IDLE');   // the page does not navigate by itself: native decides what opens
   app.context.nucleoBridge.emit('session.changed', { ...app.session, nudge: null });
-  await flush(); app.advance(0.5);
-  assert.equal(chipsOf(app).filter((node) => /\bnudge\b/.test(node.className || '')).length, 0);
+  await flush(); app.advance(0.6);
+  assert.equal(nudgeChips(app).length, 0);
+  assert.deepEqual(app.errors, []);
+});
+
+test('when native answers that a drawn nudge is over, the row lets it go without waiting for a session', async () => {
+  const app = harness({ nudgeActive: false });
+  app.session.nudge = { id: 'memory.offer', text: 'I can pick this up next time', cta: 'Remember it' };
+  app.boot(); await flush(); app.advance(1.2); await flush(); app.advance(0.6); await flush();
+  assert.equal(app.context.nucleo.session().nudge, null);
+  assert.equal(nudgeChips(app).length, 0);
   assert.deepEqual(app.errors, []);
 });
 
@@ -239,4 +264,9 @@ test('the page never writes nudge copy: no feature words live in the nudge code 
   assert.ok(block.length > 200);
   assert.doesNotMatch(block, /tt\(|RMOD\.t\(/);                       // native-localized text only
   assert.doesNotMatch(block, /['"][^'"\n]*(credit|thesis|remind|invit|briefing)[^'"\n]*['"]/i);   // no feature copy in string literals
+});
+
+test('the Android page carries the same nudge code as iOS', () => {
+  const cut = (source) => source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('function receiveSuggestions'));
+  assert.equal(cut(read('../../../../android/nucleo/src/app/55-read.js')), cut(read('../src/app/55-read.js')));
 });

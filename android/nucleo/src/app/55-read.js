@@ -362,17 +362,23 @@ function showIdleSuggestions(){
 }
 /* ---- the nudge: ONE line and ONE chip that native writes (credits, memory, theses, reminders, invites).
    Native owns the copy, what the tap does and how often it may show; the page draws it first in the chip
-   row, reports that it was seen and reports the tap. Nothing here names a feature. ---- */
-var NUDGE_SEEN = {}, NUDGE_SHOWN = null, NUDGE_BUSY = false;
+   row, reports every drawing and reports the tap. Nothing here names a feature. ---- */
+var NUDGE_SHOWN = null, NUDGE_BUSY = false;
 function nudgeNow(){
   var n = SES && SES.nudge;
   return n && typeof n.id === 'string' && n.id && typeof n.cta === 'string' && n.cta ? n : null;
 }
+/* what is on screen: a nudge whose words changed (a new language, a new number) is a different drawing */
+function nudgeKey(n){ return n ? n.id + '\n' + (typeof n.text === 'string' ? n.text : '') + '\n' + n.cta : null; }
 function withNudge(list){
   var n = nudgeNow();
-  NUDGE_SHOWN = n ? n.id : null;
+  NUDGE_SHOWN = nudgeKey(n);
   if (!n) return list;
-  if (!NUDGE_SEEN[n.id]){ NUDGE_SEEN[n.id] = 1; bcall('nudge.seen', { id: n.id }).catch(noop); }
+  /* native counts showings (it merges redraws); when it answers that this nudge is over, the row lets it go */
+  var id = n.id;
+  bcall('nudge.seen', { id: id }).then(function(r){
+    if (r && r.active === false && SES && SES.nudge && SES.nudge.id === id){ SES.nudge = null; nudgeSync(); }
+  }).catch(noop);
   var text = typeof n.text === 'string' ? n.text : '';
   return [{ label: n.cta, ariaLabel: text ? text + '. ' + n.cta : n.cta, style: 'nudge', action: { nudge: n.id } }].concat(list);
 }
@@ -382,10 +388,9 @@ function nudgeAct(id){
   NUDGE_BUSY = true;
   bcall('nudge.act', { id: id }).catch(noop).then(function(){ NUDGE_BUSY = false; });
 }
-/* the session changed: a nudge that came, went or was replaced redraws the row it lives in */
+/* the session changed: a nudge that came, went, was replaced or reworded redraws the row it lives in */
 function nudgeSync(){
-  var n = nudgeNow(), id = n ? n.id : null;
-  if (id === NUDGE_SHOWN || !ST) return;
+  if (nudgeKey(nudgeNow()) === NUDGE_SHOWN || !ST) return;
   if (ST.name === 'IDLE') showIdleSuggestions();
   else if (ST.name === 'FOLLOWUPS' && READ && READ.model) chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
 }

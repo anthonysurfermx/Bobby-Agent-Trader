@@ -93,35 +93,136 @@ final class NucleoNudgeTests: XCTestCase {
         let center = center()
         center.register(source("memory", priority: 60))
         let id = "memory.one"
+        XCTAssertNotNil(center.current(moment(center)))
         XCTAssertEqual(center.seen(id), 1)
         clock.addTimeInterval(60)
         XCTAssertEqual(center.seen(id), 1, "a redraw a minute later is the same showing")
-        XCTAssertNotNil(center.current(moment(center)))
         clock.addTimeInterval(3_600)
+        XCTAssertNotNil(center.current(moment(center)))
         XCTAssertEqual(center.seen(id), 2)
+        XCTAssertNotNil(center.current(moment(center)), "the showing in progress is not pulled from under the reader")
+        XCTAssertEqual(center.showingEnds(id), clock.addingTimeInterval(600))
+        clock.addTimeInterval(11 * 60)
         XCTAssertNil(center.current(moment(center)), "after two unanswered showings it rests")
+        XCTAssertEqual(center.seen(id), 2, "a stale page drawing it while it rests is not a showing")
         clock.addTimeInterval(6 * 86_400)
         XCTAssertNil(center.current(moment(center)), "six days is still rest")
         clock.addTimeInterval(86_400 + 60)
         XCTAssertNotNil(center.current(moment(center)), "a week later it may return")
         XCTAssertEqual(center.seen(id), 3)
         clock.addTimeInterval(3_600)
+        XCTAssertNotNil(center.current(moment(center)))
         XCTAssertEqual(center.seen(id), 4)
-        clock.addTimeInterval(30 * 86_400)
-        XCTAssertNil(center.current(moment(center)), "four showings ever: it never returns")
+        clock.addTimeInterval(11 * 60)
+        XCTAssertNil(center.current(moment(center)), "four showings ever")
+        clock.addTimeInterval(400 * 86_400)
+        XCTAssertNil(center.current(moment(center)), "and it never returns, however long ago that was")
         XCTAssertFalse(center.eligible(id, at: clock))
+        XCTAssertEqual(center.seen(id), 4)
     }
 
     func testEtiquetteSurvivesARelaunch() {
         let first = center()
         first.register(source("memory", priority: 60))
+        _ = first.current(moment(first))
         first.seen("memory.one")
         clock.addTimeInterval(3_600)
+        _ = first.current(moment(first))
         first.seen("memory.one")
+        clock.addTimeInterval(11 * 60)
         let relaunched = center()
         relaunched.register(source("memory", priority: 60))
         XCTAssertEqual(relaunched.showings("memory.one"), 2)
         XCTAssertNil(relaunched.current(moment(relaunched)))
+    }
+
+    func testThePageCannotCountANudgeTheCentreNeverServed() {
+        let center = center()
+        center.register(source("memory", priority: 60, when: { _ in false }))
+        XCTAssertEqual(center.seen("memory.one"), 0)
+        XCTAssertEqual(center.seen("made.up"), 0)
+        XCTAssertEqual(center.showings("made.up"), 0)
+    }
+
+    func testIdsAreLowercaseEverywhere() {
+        let center = center()
+        center.register(source("theses", priority: 70, id: "theses.due.3FA85F64.2026-W41"))
+        let nudge = center.current(moment(center))
+        XCTAssertEqual(nudge?.id, "theses.due.3fa85f64.2026-w41", "a UUID fragment or an ISO week in capitals still reaches the page")
+        XCTAssertEqual(center.seen("THESES.DUE.3FA85F64.2026-W41"), 1)
+        XCTAssertTrue(center.isCurrent("theses.due.3fa85f64.2026-w41"))
+    }
+
+    func testOneAccountsHistoryNeverSilencesAnother() async {
+        let center = center()
+        center.register(source("memory", priority: 60, id: "memory.offer.v1"))
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        center.owner = "account-a"
+        XCTAssertNotNil(center.current(moment(center)))
+        let tapped = await center.act("memory.offer.v1", session: session)
+        XCTAssertEqual(tapped, "done")
+        XCTAssertTrue(center.isRetired("memory.offer.v1"))
+        clock.addTimeInterval(16 * 60)
+        center.owner = "account-b"
+        XCTAssertFalse(center.isRetired("memory.offer.v1"), "B never decided")
+        XCTAssertEqual(center.current(moment(center))?.id, "memory.offer.v1")
+        center.owner = nil
+        XCTAssertNotNil(center.current(moment(center)), "nor did the phone signed out")
+        center.owner = "account-a"
+        XCTAssertNil(center.current(moment(center)), "A's decision stands")
+        NudgeCenter.forgetOwner("account-a", defaults: defaults)
+        XCTAssertFalse(center.isRetired("memory.offer.v1"), "a deleted account's history leaves the phone")
+    }
+
+    func testTheQuietAfterATapSurvivesARelaunchAndAnAccountChange() async {
+        let first = center()
+        first.register(source("theses", priority: 70))
+        first.register(source("credits", priority: 40))
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        _ = first.current(moment(first))
+        _ = await first.act("theses.one", session: session)
+        let relaunched = center()
+        relaunched.register(source("credits", priority: 40))
+        clock.addTimeInterval(60)
+        XCTAssertNil(relaunched.current(moment(relaunched)), "a relaunch does not open the floor to the next nudge")
+        relaunched.owner = "someone-else"
+        relaunched.forgetMoment()
+        XCTAssertNil(relaunched.current(moment(relaunched)), "nor does an account change")
+        clock.addTimeInterval(15 * 60)
+        XCTAssertEqual(relaunched.current(moment(relaunched))?.id, "credits.one")
+    }
+
+    func testRetiredNudgesStayRetiredHoweverOldWhileUnansweredOnesAreForgotten() {
+        let center = center()
+        center.register(source("credits", priority: 40))
+        center.register(source("memory", priority: 60))
+        _ = center.current(moment(center))
+        center.seen("memory.one")
+        center.retire("credits.one")
+        clock.addTimeInterval(400 * 86_400)
+        center.retire("something.else")   // any later write prunes the store
+        XCTAssertTrue(center.isRetired("credits.one"), "never again survives pruning")
+        XCTAssertEqual(center.showings("memory.one"), 0, "an unanswered nudge from over half a year ago starts over")
+    }
+
+    func testOnlyTheNudgeOnScreenCanBeTapped() async {
+        let center = center()
+        var acted: [String] = []
+        center.register(source("theses", priority: 70, act: { nudge, _ in acted.append(nudge.id) }))
+        center.register(source("credits", priority: 40, act: { nudge, _ in acted.append(nudge.id) }))
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        XCTAssertEqual(center.current(moment(center))?.id, "theses.one")
+        center.withhold()   // a sheet came up
+        let late = await center.act("theses.one", session: session)
+        XCTAssertEqual(late, "gone")
+        XCTAssertFalse(center.isRetired("theses.one"), "a late tap retires nothing")
+        XCTAssertTrue(acted.isEmpty)
+        XCTAssertEqual(center.current(moment(center))?.id, "theses.one")
+        let stale = await center.act("credits.one", session: session)
+        XCTAssertEqual(stale, "gone", "a nudge served earlier but no longer on screen cannot be tapped")
     }
 
     func testATapRetiresTheNudgeRunsItsSourceOnceAndQuietsTheGlass() async {
@@ -234,6 +335,10 @@ final class NucleoNudgeTests: XCTestCase {
         _ = await result(bridge, "session", ["page": "app"])
         let seen = await result(bridge, "nudge.seen", ["id": "credits.one"])
         XCTAssertEqual(seen["count"] as? Int, 1)
+        XCTAssertEqual(seen["active"] as? Bool, true)
+        let unknown = await result(bridge, "nudge.seen", ["id": "theses.never-served"])
+        XCTAssertEqual(unknown["count"] as? Int, 0)
+        XCTAssertEqual(unknown["active"] as? Bool, false, "the page lets go of a nudge native does not have")
         let invented = await result(bridge, "nudge.act", ["id": "theses.never-served"])
         XCTAssertEqual(invented["status"] as? String, "gone")
         XCTAssertTrue(acted.isEmpty)

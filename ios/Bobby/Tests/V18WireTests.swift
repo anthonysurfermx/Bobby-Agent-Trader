@@ -34,9 +34,13 @@ final class V18WireTests: XCTestCase {
         XCTAssertEqual(good.memory, MemoryReceipt(recorded: true, asks: 3, lastAskedDaysAgo: 5, changeSinceLastAskPct: 4.25))
         let first = try XCTUnwrap(debate(body(["memory": ["recorded": true, "asks": 1, "lastAskedDaysAgo": NSNull(), "changeSinceLastAskPct": NSNull()]])))
         XCTAssertEqual(first.memory, MemoryReceipt(recorded: true, asks: 1))
-        let wild = try XCTUnwrap(debate(body(["memory": ["recorded": false, "asks": -4, "lastAskedDaysAgo": "soon", "changeSinceLastAskPct": 9.9e9]])))
-        XCTAssertEqual(wild.memory, MemoryReceipt(recorded: false, asks: 0))
-        for junk in [["asks": 2] as Any, "yes", 1, ["recorded": "true"]] {
+        let wild = try XCTUnwrap(debate(body(["memory": ["recorded": false, "asks": 2, "lastAskedDaysAgo": "soon", "changeSinceLastAskPct": 9.9e9]])))
+        XCTAssertEqual(wild.memory, MemoryReceipt(recorded: false, asks: 2), "numbers that make no sense are dropped, not guessed")
+        let paused = try XCTUnwrap(debate(body(["memory": ["recorded": false, "asks": 0]])))
+        XCTAssertEqual(paused.memory, MemoryReceipt(recorded: false, asks: 0))
+        // An incomplete receipt is no receipt: an unknown count never becomes a zero.
+        for junk in [["asks": 2] as Any, "yes", 1, ["recorded": "true"], ["recorded": true], ["recorded": true, "asks": 0],
+                     ["recorded": true, "asks": -4], ["recorded": false, "asks": "many"]] {
             XCTAssertNil(try XCTUnwrap(debate(body(["memory": junk]))).memory, "\(junk)")
         }
     }

@@ -170,6 +170,8 @@ final class NucleoSession: ObservableObject {
         if !fixtures, !BobbyApp.isUnitTestHost {
             BriefingPlaybackFactory.make = { [weak self] in self?.makeBriefingPlayback() ?? AnyBriefingPlayback(NoBriefingPlayback()) }
         }
+        // 1.8: showings and taps of a nudge are counted for the account on screen (fixtures are signed out).
+        if !BobbyApp.isUnitTestHost { NudgeCenter.shared.owner = fixtures ? nil : AccountSession.shared.session?.userId }
         observeStores()
         synchronizeAccountState()
     }
@@ -280,7 +282,9 @@ final class NucleoSession: ObservableObject {
             return ["count": markHint(key)]
         case "nudge.seen":
             let id = try p.string("id", pattern: NucleoNudge.idPattern)!
-            return ["count": NudgeCenter.shared.seen(id)]
+            let count = NudgeCenter.shared.seen(id)
+            scheduleNudgeRefresh(for: id)
+            return ["count": count, "active": NudgeCenter.shared.isCurrent(id) && NudgeCenter.shared.eligible(id, at: NudgeCenter.shared.now())]
         case "nudge.act":
             let id = try p.string("id", pattern: NucleoNudge.idPattern)!
             let status = await nudgeTapped(id)
@@ -340,14 +344,34 @@ final class NucleoSession: ObservableObject {
 
     /// One line and one button for the app page, or nil: after consent only, never under a sheet.
     func currentNudge() -> NucleoNudge? {
-        guard nudgesEnabled ?? !fixtures, profile.acceptedRiskNotice, onboarded, currentPage == NucleoPage.app.name,
-              sheet == nil, openSheet == nil, !speechPromptOpen else { return nil }
+        guard glassIsFreeForANudge else { NudgeCenter.shared.withhold(); return nil }
         return NudgeCenter.shared.current(NudgeCenter.shared.moment(signedIn: signedIn))
+    }
+
+    private var glassIsFreeForANudge: Bool {
+        (nudgesEnabled ?? !fixtures) && profile.acceptedRiskNotice && onboarded && currentPage == NucleoPage.app.name
+            && sheet == nil && openSheet == nil && !speechPromptOpen
+    }
+
+    private var nudgeRefreshAt: Date?
+
+    /// A nudge that just finished its round stays for its showing, then the page is told it is gone
+    /// (otherwise a page that never hears another session change would keep drawing it).
+    private func scheduleNudgeRefresh(for id: String) {
+        guard let ends = NudgeCenter.shared.showingEnds(id), nudgeRefreshAt != ends else { return }
+        nudgeRefreshAt = ends
+        let delay = max(1, ends.timeIntervalSince(NudgeCenter.shared.now()) + 1)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            guard let self, !self.tornDown, self.nudgeRefreshAt == ends else { return }
+            self.nudgeRefreshAt = nil
+            self.sessionChanged()
+        }
     }
 
     /// The page forwarded a tap on the nudge chip: its source acts, then the page learns what is next.
     private func nudgeTapped(_ id: String) async -> String {
-        guard profile.acceptedRiskNotice else { return "gone" }
+        // A late tap (a sheet came up, consent went away, the nudge was replaced) retires nothing and opens nothing.
+        guard glassIsFreeForANudge, NudgeCenter.shared.isCurrent(id) else { return "gone" }
         nucleoVoice.stop()
         speech.cancel()
         let status = await NudgeCenter.shared.act(id, session: self)
@@ -375,10 +399,21 @@ final class NucleoSession: ObservableObject {
     /// the open sheet goes away first, then the next one presents. With nothing open it presents at once.
     func switchSheet(to route: NucleoRoute) {
         guard sheet != nil || openSheet != nil else { _ = openNative(route); return }
+        // The next sheet presents when this one has really gone (`sheetDismissed`), never on a timer,
+        // and only for the account that asked.
+        sheetHandoff = (route, accountGeneration)
         sheet = nil
-        DispatchQueue.main.asyncAfter(deadline: .now() + briefingSheetDelay) { [weak self] in
-            guard let self, !self.tornDown else { return }
-            _ = self.openNative(route)
+    }
+
+    private var sheetHandoff: (route: NucleoRoute, generation: UUID?)?
+
+    private func continueSheetHandoff() {
+        guard let handoff = sheetHandoff else { return }
+        sheetHandoff = nil
+        guard !tornDown, handoff.generation == accountGeneration else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.tornDown, handoff.generation == self.accountGeneration else { return }
+            _ = self.openNative(handoff.route)
         }
     }
 
@@ -581,6 +616,7 @@ final class NucleoSession: ObservableObject {
         bootSynced = false
         levelsRequested = false
         NudgeCenter.shared.forgetMoment()
+        sheetHandoff = nil
         NucleoLevelCenter.shared.accountChanged(force: true)
         paywallStatus = "cancelled"
         finishPaywall()
@@ -746,6 +782,8 @@ final class NucleoSession: ObservableObject {
         openSheet = nil
         sheet = nil
         sheetClosed(route)
+        // One sheet handing over to another (1.8) goes first; a waiting notification tap opens after.
+        continueSheetHandoff()
         // A tap that arrived while this sheet was up opens once it is gone.
         scheduleBriefingDrain(after: briefingSheetDelay)
     }
@@ -956,14 +994,14 @@ final class NucleoSession: ObservableObject {
         nucleoVoice.stop()
         if let userId = accountUserID { companions.bind(to: userId) } else { companions.unbind() }
         DeskMemory.setOwner(accountUserID, defaults: defaults)
-        // 1.8: theses written before creating the account follow the person into it (once, never merged).
-        if wasAnonymous, let userId = accountUserID { ThesisBook(defaults: defaults).adoptLocal(into: userId) }
         suggestionsCache = nil
         bootSynced = false
         NucleoLevelCenter.shared.accountChanged()
         BobbyAccessCenter.shared.accountChanged()
+        NudgeCenter.shared.owner = accountUserID
         NudgeCenter.shared.forgetMoment()
         V18Focus.clear()
+        sheetHandoff = nil
         emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }

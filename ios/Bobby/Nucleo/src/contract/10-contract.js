@@ -167,7 +167,8 @@
   test('nudge.seen / nudge.act: a well-formed id is counted and an unknown nudge is gone, never a fault', function () {
     return Promise.all([B.api.nudgeSeen({ id: 'contract.none' }), B.api.nudgeAct({ id: 'contract.none' }),
       faultCode(B.api.nudgeAct({ id: 'Not An Id' })), faultCode(B.api.nudgeSeen({}))]).then(function (r) {
-      var e = [].concat(check(r[0], { count: T.int }), check(r[1], { status: T.str }));
+      var e = [].concat(check(r[0], { count: T.int, active: T.bool }), check(r[1], { status: T.str }));
+      if (r[0].active !== false) e.push('a nudge native never served is not active');
       if (r[1].status !== 'gone') e.push('an unknown nudge must answer gone, got ' + r[1].status);
       if (r[2] !== 'invalid_params' || r[3] !== 'invalid_params') e.push('bad ids must be invalid_params, got ' + r[2] + ' / ' + r[3]);
       if (e.length) throw new Error(e.join('\n'));
