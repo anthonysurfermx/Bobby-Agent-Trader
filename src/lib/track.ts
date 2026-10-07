@@ -3,7 +3,7 @@
 // utm_source. Fire-and-forget; never blocks or breaks a page.
 import { accessHeaders, deviceId } from '@/lib/access-client';
 
-export type TrackEvent = 'visit' | 'desk_entered' | 'appstore_click' | 'signin_start' | 'paywall_view' | 'purchase_start';
+export type TrackEvent = 'visit' | 'desk_entered' | 'appstore_click' | 'signin_start' | 'paywall_view' | 'purchase_start' | 'engaged';
 
 const SURFACES: Array<[RegExp, string]> = [
   [/^\/desk/, 'desk'], [/^\/redeem/, 'redeem'], [/^\/signin/, 'signin'], [/^\/protocol/, 'protocol'],
@@ -67,6 +67,16 @@ export function startTracking() {
     } as History['pushState'];
   }
   window.addEventListener('popstate', visit);
+  // The first real interaction of this tab marks the install as a person's (scripted browsers load the page and
+  // leave without one). Sent once; synthetic events are not trusted.
+  const SIGNS = ['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll'] as const;
+  const engaged = (e: Event) => {
+    if (!e.isTrusted) return;
+    for (const type of SIGNS) window.removeEventListener(type, engaged, true);
+    try { if (sessionStorage.getItem('bobby-engaged')) return; sessionStorage.setItem('bobby-engaged', '1'); } catch { /* private mode: send it */ }
+    if (surfaceOf(location.pathname)) track('engaged');
+  };
+  for (const type of SIGNS) window.addEventListener(type, engaged, { capture: true, passive: true });
   document.addEventListener('click', (e) => {
     const link = (e.target as Element | null)?.closest?.('a[href*="apps.apple.com"]');
     if (link) track('appstore_click');

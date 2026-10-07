@@ -3,6 +3,8 @@
 // POST { event, surface?, device?, platform?, referrer?, utm? } (JSON, or text/plain from sendBeacon) → 204.
 // bobby_record_event stores the event and touches the device (bobby_devices: first touch, active days).
 //   event: visit | desk_entered | appstore_click | signin_start | paywall_view | purchase_start
+//   engaged (first real interaction on a page) is not a funnel event: it only marks the install (bobby_mark_device_signal),
+//   as does a web visit that arrives from a hosting network. Both feed the traffic split of the dashboard.
 // The install id is stored as the same salted hash the read meter uses (api/_lib/access.ts), so a visit and
 // a later guest read of the same browser line up; no IP, user agent, URL path beyond a short surface name,
 // or free text is kept. Referrers keep their host only. Web events keep the country and region Vercel derives
@@ -11,13 +13,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { createLimiter, getClientIpKey, saltedKey } from './_lib/rate-limit.js';
-import { requestGeo } from './_lib/geo.js';
+import { fromDatacenter, requestGeo } from './_lib/geo.js';
 import { callerHash } from './_lib/access.js';
 import { resolveIdentity } from './_lib/user-identity.js';
 
 export const config = { maxDuration: 10 };
 
-const EVENTS = new Set(['visit', 'desk_entered', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start']);
+const EVENTS = new Set(['visit', 'desk_entered', 'appstore_click', 'signin_start', 'paywall_view', 'purchase_start', 'engaged']);
+const markSignal = (device: string, signal: { p_engaged?: boolean; p_datacenter?: boolean }) =>
+  fetch(bobbyRest('rpc/bobby_mark_device_signal'), { method: 'POST', headers: bobbyServiceHeaders(), signal: AbortSignal.timeout(2000),
+    body: JSON.stringify({ p_device: device, ...signal }) }).then(() => undefined, () => undefined);
 const OWN_HOSTS = /(^|\.)(bobbyprotocol\.xyz|vercel\.app|localhost)$/;
 const limiter = createLimiter(120, 60_000);
 // Crawlers and link previewers that run JS (Googlebot, Bytespider, headless Chrome, Lighthouse…) are not visitors:
@@ -59,6 +64,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   catch { return res.status(400).json({ error: 'Invalid JSON' }); }
   const row = normalizeEvent(raw);
   if (!row) return res.status(400).json({ error: 'Unknown event' });
+  if (row.event === 'engaged') {
+    // A signal about the install, best effort: a lost one leaves it unverified, which is what it was.
+    if (row.device_hash && row.platform === 'web') await markSignal(row.device_hash, { p_engaged: true });
+    return res.status(204).end();
+  }
   const geo = requestGeo(req);
   let failure: string | null = null;
   try {
@@ -74,6 +84,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }),
     });
     if (!r.ok) failure = `storage ${r.status}`;
+    else if (row.event === 'visit' && row.platform === 'web' && row.device_hash && fromDatacenter(req)) await markSignal(row.device_hash, { p_datacenter: true });
   } catch (e) {
     failure = e instanceof Error ? e.name : 'error';
   }

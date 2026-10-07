@@ -210,6 +210,8 @@ export interface Growth {
     stages: Record<PeopleStage, number>; byPlatform: Record<string, number>; proInactive: number; accountsNeverRead: number;
     /** Of the people with Pro access (stages.pro: paid, test, unverified or gifted), those with a verified payment; null = not sent. */
     proPaidVerified: number | null; proInactivePaid: number | null;
+    /** active7d split by signal (bobby_admin_traffic); the three add up to it. null = the server did not send it. */
+    traffic: { verified7d: number; datacenter7d: number; unverified7d: number; signalSince: string | null } | null;
   };
   cohorts: { web: GrowthCohort; ios: GrowthCohort; android: GrowthCohort | null };
   history: { web: GrowthHistory; ios: GrowthHistory; android: GrowthHistory | null };
@@ -939,6 +941,8 @@ export function normalizeGrowth(v: unknown): Growth | null {
       stages: { new: num(st.new), active: num(st.active), recurring: num(st.recurring), pro: num(st.pro), atRisk: num(st.atRisk), lost: num(st.lost) },
       byPlatform: counts(p.byPlatform), proInactive: num(p.proInactive), accountsNeverRead: num(p.accountsNeverRead),
       proPaidVerified: numOrNull(p.proPaidVerified), proInactivePaid: numOrNull(p.proInactivePaid),
+      traffic: isObj(p.traffic) && typeof p.traffic.verified7d === 'number'
+        ? { verified7d: num(p.traffic.verified7d), datacenter7d: num(p.traffic.datacenter7d), unverified7d: num(p.traffic.unverified7d), signalSince: strOrNull(p.traffic.signalSince) } : null,
     },
     cohorts: { web: normalizeCohortV2(co.web), ios: normalizeCohortV2(co.ios), android: isObj(co.android) ? normalizeCohortV2(co.android) : null },
     history: { web: normalizeHistory(hi.web), ios: normalizeHistory(hi.ios), android: isObj(hi.android) ? normalizeHistory(hi.android) : null },

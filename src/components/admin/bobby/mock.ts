@@ -395,6 +395,7 @@ function growth(n: number, bare: boolean) {
       stages: { new: r(430), active: r(975), recurring: r(318), pro: r(24), atRisk: r(905), lost: r(1402) },
       byPlatform: { web: r(3310), ios: r(790), android: r(20) }, proInactive: bare ? 0 : 2, accountsNeverRead: r(14),
       proPaidVerified: subscriptionsSummary(bare).paidVerified, proInactivePaid: bare ? 0 : 1,
+      traffic: { verified7d: r(1210) - r(260) - r(190), datacenter7d: r(260), unverified7d: r(190), signalSince: bare ? null : iso(NOW - 6 * DAY) },
     },
     cohorts: { web: cohort(3400, 1690, 690), ios: cohort(640, 512, 512), android: { ...cohort(20, 15, 10), signinStart: 0 } },
     history: { web: { installs: 8, readers: 8, reads: 13, read2: 4, linked: 0, since: iso(NOW - 40 * DAY), until: iso(NOW - 36 * DAY) }, ios: { installs: 4, readers: 4, reads: 6, read2: 2, linked: 0, since: iso(NOW - 39 * DAY), until: iso(NOW - 36 * DAY) }, android: { installs: 0, readers: 0, reads: 0, read2: 0, linked: 0, since: null, until: null } },

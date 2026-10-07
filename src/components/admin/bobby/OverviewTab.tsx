@@ -27,6 +27,7 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify, mark
   const llmPeriod = o.llm.providers.anthropic.period + o.llm.providers.openai.period;
   const act = o.activity.activation;
   const premium = o.activity.levels.profundo + o.activity.levels.maximo;
+  const tf = g?.people.traffic ?? null;
   const peopleSplit = g ? `${fmtInt(g.people.accounts)} cuentas + ${fmtInt(g.people.guests)} instalaciones sin cuenta` : 'dato no disponible';
   const hero: Record<HeroMetric, { label: string; values: number[]; path: string; format: ValueFormat; series?: number[]; history?: number; display: string }> = {
     reads: { label: 'Lecturas consumidas', values: readsDaily, path: 'activity.readsDaily', format: 'int', series: cmp?.reads, history: READS_HISTORY_DAYS, display: show('activity.reads', fmtInt(o.activity.reads)) },
@@ -46,8 +47,11 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify, mark
         <span className="text-[11px] text-[#8B8B8B]">Histórico · {period} días · {o.includeInternal ? 'con equipo' : markFailed ? 'sin equipo, sin verificar' : 'sin equipo'}</span>
       </div>
       <KpiStrip compact items={[
-        { label: 'Cuentas e instalaciones activas · 7d', value: g ? fmtInt(g.people.active7d) : DASH,
-          caption: 'No son personas únicas' },
+        tf
+          ? { label: 'Activos con señal de persona · 7d', value: fmtInt(tf.verified7d),
+            caption: `De ${fmtInt(g!.people.active7d)} activos: ${fmtInt(tf.datacenter7d)} de centro de datos · ${fmtInt(tf.unverified7d)} sin señal` }
+          : { label: 'Cuentas e instalaciones activas · 7d', value: g ? fmtInt(g.people.active7d) : DASH,
+            caption: 'No son personas únicas' },
         { label: `Lecturas consumidas · ${period}d`, value: show('activity.reads', fmtInt(o.activity.reads)), delta: delta('activity.readsDaily', cmp?.reads, READS_HISTORY_DAYS),
           caption: 'Descontadas del cupo' },
         { label: 'Pagadores Pro verificados', value: show('subscriptions.paidVerified', fmtInt(o.subscriptions.paidVerified)),
