@@ -29,6 +29,8 @@ import xyz.bobbyprotocol.android.v18.V18Process
 import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
+import xyz.bobbyprotocol.android.v18.notify.NoticeTiming
+import java.time.ZoneId
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 
@@ -41,6 +43,11 @@ import java.util.concurrent.TimeUnit
 //
 // What is planned is also written to `bobby.v18.notices`, so `pendingIds()` answers at once and a
 // cancelled or replaced notice can never be shown by work that was already queued.
+//
+// Because the phone can run late, the worker asks `NoticeTiming` before it shows anything: a
+// follow-up that comes due at night waits for 09:00 (it stays pending and the same work is queued
+// again), one that is more than a day late is dropped unseen, and a thesis reminder is shown however
+// late. The decision is tested on the JVM; that WorkManager carries it out was never seen on a device.
 
 /** Plans, lists and clears Bobby's own local notices. `ask` is the activity's permission launcher. */
 class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Boolean) : LocalNotifier {
@@ -62,12 +69,7 @@ class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Bool
         val now = System.currentTimeMillis()
         if (!LocalNotice.valid(notice) || notice.fireAtEpochMs <= now || status() != LocalNotifier.Permission.ALLOWED) return false
         index.put(notice)
-        val work = OneTimeWorkRequestBuilder<LocalNoticeWorker>()
-            .setInitialDelay(notice.fireAtEpochMs - now, TimeUnit.MILLISECONDS)
-            .setInputData(Data.Builder().putString(LocalNotices.WORK_ID, notice.id).putLong(LocalNotices.WORK_FIRE_AT, notice.fireAtEpochMs).build())
-            .addTag(LocalNotices.WORK_TAG)
-            .build()
-        WorkManager.getInstance(app).enqueueUniqueWork(LocalNotices.workName(notice.id), ExistingWorkPolicy.REPLACE, work)
+        LocalNotices.enqueue(app, notice, notice.fireAtEpochMs - now)
         return true
     }
 
@@ -97,14 +99,16 @@ internal class LocalNoticeIndex(context: Context) {
             val json = JSONObject(raw)
             val payload = LinkedHashMap<String, String>()
             json.optJSONObject("payload")?.let { map -> for (key in map.keys()) payload[key] = map.optString(key) }
-            LocalNotice(id, json.getString("title"), json.getString("body"), json.getLong("fireAt"), json.getString("channel"), payload)
+            val channel = json.getString("channel")
+            LocalNotice(id, json.getString("title"), json.getString("body"), json.getLong("fireAt"), channel, payload,
+                        LocalNotice.Delivery.fromJson(json.optJSONObject("delivery"), channel))
         } catch (_: Exception) { null }
     }
 
     @SuppressLint("ApplySharedPref")
     fun put(notice: LocalNotice) {
         val json = JSONObject().put("title", notice.title).put("body", notice.body).put("fireAt", notice.fireAtEpochMs)
-            .put("channel", notice.channel).put("payload", LocalNotices.payloadJson(notice.payload))
+            .put("channel", notice.channel).put("payload", LocalNotices.payloadJson(notice.payload)).put("delivery", notice.delivery.toJson())
         prefs.edit().putString(notice.id, json.toString()).commit()
     }
 
@@ -125,6 +129,19 @@ object LocalNotices {
     internal const val WORK_ID = "id"
     internal const val WORK_FIRE_AT = "fireAt"
     internal fun workName(id: String) = "bobby-v18-notice:$id"
+
+    /**
+     * Queues the work that will show `notice`, `delayMs` from now, in place of whatever was queued
+     * under the same id (one piece of work per notice, so cancelling the id cancels a waiting one too).
+     */
+    internal fun enqueue(context: Context, notice: LocalNotice, delayMs: Long) {
+        val work = OneTimeWorkRequestBuilder<LocalNoticeWorker>()
+            .setInitialDelay(maxOf(0L, delayMs), TimeUnit.MILLISECONDS)
+            .setInputData(Data.Builder().putString(WORK_ID, notice.id).putLong(WORK_FIRE_AT, notice.fireAtEpochMs).build())
+            .addTag(WORK_TAG)
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(workName(notice.id), ExistingWorkPolicy.REPLACE, work)
+    }
 
     fun status(context: Context): LocalNotifier.Permission = when {
         BriefingReminders.permissionGranted(context) -> LocalNotifier.Permission.ALLOWED
@@ -201,16 +218,31 @@ object LocalNotices {
     }
 }
 
-/** Runs when a planned notice comes due. A notice that was cancelled or replaced meanwhile is not shown. */
+/**
+ * Runs when a planned notice comes due, which on an idle phone can be hours after its moment. A
+ * notice that was cancelled or replaced meanwhile is not shown; one that asks for allowed hours
+ * waits for them; one that has expired is dropped (`NoticeTiming`).
+ */
 class LocalNoticeWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val id = inputData.getString(LocalNotices.WORK_ID) ?: return Result.success()
         val index = LocalNoticeIndex(applicationContext)
         val notice = index.get(id) ?: return Result.success()
         if (notice.fireAtEpochMs != inputData.getLong(LocalNotices.WORK_FIRE_AT, -1L)) return Result.success()
-        // From here it is no longer pending, shown or not.
-        index.remove(listOf(id))
-        try { LocalNotices.post(applicationContext, notice) } catch (_: Exception) { }
+        val now = System.currentTimeMillis()
+        when (val decision = NoticeTiming.decide(notice, now, ZoneId.systemDefault())) {
+            is NoticeTiming.Decision.Wait -> {
+                // Still pending: the index keeps it, and the same work asks again at the next allowed hour.
+                // Queuing it replaces this run, so it is the last thing done here.
+                try { LocalNotices.enqueue(applicationContext, notice, decision.untilEpochMs - now) } catch (_: Exception) { }
+            }
+            NoticeTiming.Decision.Drop -> index.remove(listOf(id))
+            NoticeTiming.Decision.Post -> {
+                // From here it is no longer pending, shown or not.
+                index.remove(listOf(id))
+                try { LocalNotices.post(applicationContext, notice) } catch (_: Exception) { }
+            }
+        }
         return Result.success()
     }
 }

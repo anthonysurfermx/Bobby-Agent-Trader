@@ -1,11 +1,18 @@
 package xyz.bobbyprotocol.android.v18.notify
 
+import org.json.JSONObject
+import java.time.Instant
+import java.time.LocalTime
+import java.time.ZoneId
+import java.time.ZonedDateTime
+
 // What the reminders and the follow-ups both use to show a line on the phone later, so neither
 // invents its own. No Android classes here: the real one is platform/AndroidLocalNotifier.kt, and
 // tests use MemoryLocalNotifier.
 //
 // Delivery on Android is inexact (WorkManager): the system may hold a notice back while the phone
-// is idle. Copy must never promise a minute.
+// is idle. Copy must never promise a minute. Because of that a notice says what it asks of a late
+// phone (`LocalNotice.Delivery`), and `NoticeTiming` decides what the worker does when it finally runs.
 
 /** One planned line: what the phone shows and what a tap carries. */
 data class LocalNotice(
@@ -22,7 +29,57 @@ data class LocalNotice(
      * reader, and a tap by anyone else opens nothing.
      */
     val payload: Map<String, String> = emptyMap(),
+    /**
+     * What it asks of a phone that runs late. The channel's own unless the notice says otherwise: a
+     * follow-up keeps to the day's allowed hours and expires; a thesis reminder is shown however late.
+     */
+    val delivery: Delivery = Delivery.of(channel),
 ) {
+    /**
+     * The system may hold planned work back for hours while the phone is idle, and a phone that was
+     * off runs what it missed when it comes back. A notice may therefore ask for:
+     *  - allowed hours on the phone's own clock, from `fromHour`:00 to `untilHour`:00. Outside them
+     *    it is not shown; it waits for the next allowed hour;
+     *  - an expiry. Later than `expiresAfterMs` after its moment it is not shown at all.
+     * `ANY_TIME` asks for neither.
+     */
+    data class Delivery(val fromHour: Int? = null, val untilHour: Int? = null, val expiresAfterMs: Long? = null) {
+        /** Both hours or neither, a real span inside one day, and an expiry that is a length of time. */
+        val isValid: Boolean
+            get() {
+                val from = fromHour
+                val until = untilHour
+                val hours = (from == null && until == null) || (from != null && until != null && from in 0..22 && until in 1..23 && from < until)
+                return hours && (expiresAfterMs == null || expiresAfterMs > 0)
+            }
+
+        fun toJson(): JSONObject = JSONObject().also { json ->
+            if (fromHour != null) json.put("from", fromHour)
+            if (untilHour != null) json.put("until", untilHour)
+            if (expiresAfterMs != null) json.put("expiresAfterMs", expiresAfterMs)
+        }
+
+        companion object {
+            /** Shown whenever the phone gets to it, however late: a thesis reminder, on the day the person chose. */
+            val ANY_TIME = Delivery()
+
+            /**
+             * A follow-up: 09:00 to 21:00 on the phone's clock (the hours HarnessPlanner plans inside)
+             * and never more than a day late. Past that the same line already waits on the glass.
+             */
+            val FOLLOW_UP = Delivery(fromHour = 9, untilHour = 21, expiresAfterMs = 24 * 3_600_000L)
+
+            fun of(channel: String): Delivery = if (channel == CHANNEL_FOLLOW_UPS) FOLLOW_UP else ANY_TIME
+
+            /** What was stored with a planned notice; the channel's own when nothing usable was. */
+            fun fromJson(json: JSONObject?, channel: String): Delivery {
+                if (json == null) return of(channel)
+                val parsed = Delivery((json.opt("from") as? Number)?.toInt(), (json.opt("until") as? Number)?.toInt(), (json.opt("expiresAfterMs") as? Number)?.toLong())
+                return if (parsed.isValid) parsed else of(channel)
+            }
+        }
+    }
+
     companion object {
         const val CHANNEL_THESIS_REMINDERS = "thesis-reminders"
         const val CHANNEL_FOLLOW_UPS = "follow-ups"
@@ -40,7 +97,52 @@ data class LocalNotice(
         /** A notice the phone can keep and hand back: a plain id, a known channel, something to say, a small payload. */
         fun valid(notice: LocalNotice): Boolean =
             ID_PATTERN.matches(notice.id) && notice.channel in CHANNELS && notice.title.isNotBlank() && notice.body.isNotBlank() &&
-                notice.payload.size <= PAYLOAD_LIMIT && notice.payload.all { (key, value) -> key.isNotEmpty() && key.length <= 40 && value.length <= VALUE_LIMIT }
+                notice.payload.size <= PAYLOAD_LIMIT && notice.payload.all { (key, value) -> key.isNotEmpty() && key.length <= 40 && value.length <= VALUE_LIMIT } &&
+                notice.delivery.isValid
+    }
+}
+
+/**
+ * What the phone does with a planned notice when its work finally runs. Pure: the clock and the
+ * time zone are handed in, so every case is a unit test. The worker (platform/AndroidLocalNotifier.kt)
+ * only carries the answer out.
+ */
+object NoticeTiming {
+    /**
+     * The phone is never exact, and the last allowed moment is itself a moment follow-ups are planned
+     * for (someone who asks late in the evening is answered at 21:00). A notice may run this far past
+     * the end of its allowed hours and still be shown; later than that it waits for the morning.
+     */
+    const val GRACE_MS = 15 * 60_000L
+
+    sealed class Decision {
+        /** Show it now. */
+        data object Post : Decision()
+
+        /** Not now: it stays pending and the phone asks again at this moment, the next allowed hour. */
+        data class Wait(val untilEpochMs: Long) : Decision()
+
+        /** Too late to be worth showing. It is no longer pending and nothing is shown. */
+        data object Drop : Decision()
+    }
+
+    fun decide(notice: LocalNotice, nowMs: Long, zone: ZoneId): Decision = decide(notice.fireAtEpochMs, notice.delivery, nowMs, zone)
+
+    fun decide(fireAtMs: Long, delivery: LocalNotice.Delivery, nowMs: Long, zone: ZoneId): Decision {
+        val expires = delivery.expiresAfterMs
+        if (expires != null && nowMs - fireAtMs > expires) return Decision.Drop
+        val from = delivery.fromHour
+        val until = delivery.untilHour
+        if (from == null || until == null || !delivery.isValid) return Decision.Post
+        val day = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+        fun at(hour: Int, daysAhead: Long): Long = ZonedDateTime.of(day.plusDays(daysAhead), LocalTime.of(hour, 0), zone).toInstant().toEpochMilli()
+        val opens = at(from, 0)
+        if (nowMs >= opens && nowMs <= at(until, 0) + GRACE_MS) return Decision.Post
+        // Before the day's first allowed hour it waits for it; after the last, for tomorrow's.
+        val next = if (nowMs < opens) opens else at(from, 1)
+        // Waiting would carry it past its expiry: dropped now, so nothing stays listed that will never be shown.
+        if (expires != null && next - fireAtMs > expires) return Decision.Drop
+        return Decision.Wait(next)
     }
 }
 
@@ -80,6 +182,11 @@ interface LocalNotifier {
 
 /** The notifier for tests: nothing leaves memory, and time is whatever the test says it is. */
 class MemoryLocalNotifier(var now: () -> Long = { System.currentTimeMillis() }) : LocalNotifier {
+    /**
+     * The phone's time zone. With one set, `deliverDue` asks `NoticeTiming` what the phone's worker
+     * asks (allowed hours, expiry); without one every due notice is shown, as a punctual phone would.
+     */
+    var zone: ZoneId? = null
     var permission = LocalNotifier.Permission.NOT_DETERMINED
     /** What the person answers when asked. */
     var grantsWhenAsked = true
@@ -119,11 +226,25 @@ class MemoryLocalNotifier(var now: () -> Long = { System.currentTimeMillis() }) 
 
     override fun pendingIds(): Set<String> = pending.keys.toSet()
 
-    /** Time passed: every notice due by now is shown (when still allowed) and is no longer pending. Returns what was shown. */
+    /**
+     * Time passed: every notice due by now is shown (when still allowed) and is no longer pending.
+     * With a `zone`, a notice outside its allowed hours stays pending and an expired one is dropped
+     * unseen, as on the phone. Returns what was shown.
+     */
     fun deliverDue(): List<LocalNotice> {
-        val due = pending.values.filter { it.fireAtEpochMs <= now() }.sortedBy { it.fireAtEpochMs }
-        for (notice in due) pending.remove(notice.id)
-        val shown = if (permission == LocalNotifier.Permission.ALLOWED) due else emptyList()
+        val clock = now()
+        val phone = zone
+        val shown = ArrayList<LocalNotice>()
+        for (notice in pending.values.filter { it.fireAtEpochMs <= clock }.sortedBy { it.fireAtEpochMs }) {
+            when (if (phone == null) NoticeTiming.Decision.Post else NoticeTiming.decide(notice, clock, phone)) {
+                is NoticeTiming.Decision.Wait -> Unit
+                NoticeTiming.Decision.Drop -> pending.remove(notice.id)
+                NoticeTiming.Decision.Post -> {
+                    pending.remove(notice.id)
+                    if (permission == LocalNotifier.Permission.ALLOWED) shown.add(notice)
+                }
+            }
+        }
         delivered.addAll(shown)
         return shown
     }
