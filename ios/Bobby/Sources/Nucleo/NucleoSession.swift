@@ -45,11 +45,11 @@ enum NucleoPage: Equatable {
 /// open from a nudge tap or the profile, never from a page call.
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
-    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings
+    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp
     var id: String { rawValue }
 
     static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .thesisEditor, .thesisReview,
-                                               .memory, .memoryConsent, .reminders, .briefingSettings]
+                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp]
     static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
@@ -101,6 +101,11 @@ final class NucleoSession: ObservableObject {
     let briefingIntent: BriefingIntent
     /// Thesis reminder taps (1.8), drained through the same gate (Reminders/ReminderIntent.swift).
     let reminderIntent: ReminderIntent
+    /// Follow-up taps (1.8, V18/Harness), drained through the same gate.
+    let harnessIntent: HarnessIntent
+    /// The harness this session feeds and draws from. Nil in fixture mode and in the unit-test host
+    /// (suites that test it pass their own).
+    let harness: HarnessCenter?
     /// Whose thesis book a reminder tap is read against; tests stand in for the signed-in account.
     var reminderOwner: (() -> String?)?
     var briefingGate: BriefingTapGate!
@@ -126,10 +131,14 @@ final class NucleoSession: ObservableObject {
          ledger: NucleoLedger = NucleoLedger(),
          defaults: UserDefaults = .standard,
          briefingIntent: BriefingIntent? = nil,
-         reminderIntent: ReminderIntent? = nil) {
+         reminderIntent: ReminderIntent? = nil,
+         harnessIntent: HarnessIntent? = nil,
+         harness: HarnessCenter? = nil) {
         self.fixtures = fixtures
         self.briefingIntent = briefingIntent ?? .shared
         self.reminderIntent = reminderIntent ?? .shared
+        self.harnessIntent = harnessIntent ?? .shared
+        self.harness = harness ?? (fixtures || BobbyApp.isUnitTestHost ? nil : .shared)
         self.profile = profile
         self.companions = companions
         let voice = voice ?? NeuralVoice()
@@ -178,6 +187,8 @@ final class NucleoSession: ObservableObject {
         }
         // 1.8: showings and taps of a nudge are counted for the account on screen (fixtures are signed out).
         if !BobbyApp.isUnitTestHost { NudgeCenter.shared.owner = fixtures ? nil : AccountSession.shared.session?.userId }
+        // 1.8: the harness has a new line for the glass (a price arrived, a follow-up was opened).
+        self.harness?.changed = { [weak self] in self?.sessionChanged() }
         observeStores()
         synchronizeAccountState()
     }
@@ -249,6 +260,7 @@ final class NucleoSession: ObservableObject {
             let saved = try await desk.saveThesis(p)
             if saved["status"] as? String == "saved", let requestId = try p.string("requestId", required: false) {
                 NudgeCenter.shared.noteSaved(requestId: requestId)
+                if let symbol = desk.readSummary(requestId: requestId)?.symbol { harness?.noteSaved(symbol: symbol) }
                 sessionChanged()
             }
             return saved
@@ -394,8 +406,45 @@ final class NucleoSession: ObservableObject {
                                               isEquity: asset["isEquity"] as? Bool ?? false,
                                               verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
                                               memory: MemoryReceipt(json: result["memory"])))
+        // 1.8: from the first question, the harness knows what to come back to (on this phone only).
+        harness?.noteAsk(symbol: symbol, name: asset["name"] as? String ?? symbol, isEquity: asset["isEquity"] as? Bool ?? false,
+                         price: desk.readSummary(requestId: requestId)?.price)
         sessionChanged()
     }
+
+    // MARK: - Reads native starts (1.8)
+
+    /// Asks Bobby about an asset native already knows, on the glass: a follow-up's button, a row of a
+    /// board. The page runs it exactly like a chip that carries a token. With a sheet open the sheet
+    /// goes away first. False when the glass cannot take a question now.
+    @discardableResult
+    func startRead(symbol: String, name: String, isEquity: Bool, question: String) -> Bool {
+        guard !tornDown, profile.acceptedRiskNotice, onboarded, currentPage == NucleoPage.app.name, !desk.isBusy, !speechPromptOpen else { return false }
+        let asset = NucleoAsset(symbol: symbol, name: name, isEquity: isEquity, assetClass: isEquity ? "equity" : "crypto")
+        if sheet != nil || openSheet != nil {
+            readHandoff = (asset, question, accountGeneration)
+            sheet = nil
+            return true
+        }
+        emit("ask.start", ["token": desk.token(for: asset, question: question), "question": question])
+        return true
+    }
+
+    private var readHandoff: (asset: NucleoAsset, question: String, generation: UUID?)?
+
+    /// The sheet a read was started from is gone: the page hears about the read after it hears the sheet closed.
+    private func continueReadHandoff() {
+        guard let handoff = readHandoff else { return }
+        readHandoff = nil
+        guard !tornDown, handoff.generation == accountGeneration else { return }
+        DispatchQueue.main.async { [weak self] in
+            guard let self, !self.tornDown, handoff.generation == self.accountGeneration, self.sheet == nil, self.openSheet == nil,
+                  self.profile.acceptedRiskNotice, !self.desk.isBusy else { return }
+            self.emit("ask.start", ["token": self.desk.token(for: handoff.asset, question: handoff.question), "question": handoff.question])
+        }
+    }
+
+    func haptic(_ kind: String) { haptics.play(kind) }
 
     /// Opens a 1.8 native screen from a nudge or another sheet's action; false when something else is up.
     @discardableResult
@@ -625,6 +674,7 @@ final class NucleoSession: ObservableObject {
         levelsRequested = false
         NudgeCenter.shared.forgetMoment()
         sheetHandoff = nil
+        readHandoff = nil
         NucleoLevelCenter.shared.accountChanged(force: true)
         paywallStatus = "cancelled"
         finishPaywall()
@@ -792,6 +842,7 @@ final class NucleoSession: ObservableObject {
         sheetClosed(route)
         // One sheet handing over to another (1.8) goes first; a waiting notification tap opens after.
         continueSheetHandoff()
+        continueReadHandoff()
         // A tap that arrived while this sheet was up opens once it is gone.
         scheduleBriefingDrain(after: briefingSheetDelay)
     }
@@ -867,6 +918,7 @@ final class NucleoSession: ObservableObject {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 self?.drainBriefingIntent()
                 self?.drainReminderIntent()
+                self?.drainHarnessIntent()
             }
             return
         }
@@ -876,6 +928,7 @@ final class NucleoSession: ObservableObject {
             self?.briefingDrainScheduled = false
             self?.drainBriefingIntent()
             self?.drainReminderIntent()
+            self?.drainHarnessIntent()
         }
     }
 
@@ -951,6 +1004,27 @@ final class NucleoSession: ObservableObject {
         return true
     }
 
+    // MARK: - Follow-up taps (1.8)
+
+    /// Honours a tapped follow-up behind the same gate as a reminder tap, with no account needed (the
+    /// harness lives on this phone). The asset's follow-up lands on the glass: the harness writes
+    /// the line and its button asks Bobby. A sector or a week opens its board. Consumed once.
+    @discardableResult
+    func drainHarnessIntent() -> Bool {
+        guard !tornDown, let gate = briefingGate, harnessIntent.pending != nil, let harness else { return false }
+        guard currentPage == NucleoPage.app.name,
+              gate.appActive(),
+              profile.acceptedRiskNotice, onboarded,
+              sheet == nil, openSheet == nil, !speechPromptOpen,
+              !gate.listening(), !gate.deskBusy(), !gate.narrating(),
+              let tap = harnessIntent.take()
+        else { return false }
+        Task { await harness.opened(tap) }
+        guard tap.step != .asset else { return true }
+        HarnessBoardFocus.pending = tap
+        return openNative(.followUp)
+    }
+
     /// The mic closes and the voice stops; an in-flight read keeps going.
     func appWentBackground() {
         speech.cancel()
@@ -1006,6 +1080,11 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
+        // 1.8: a follow-up was tapped; it waits for the same moment.
+        harnessIntent.$pending
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.scheduleBriefingDrain() }
+            .store(in: &cancellables)
         // 1.8: an invitation was answered (accepted, already used, not new): the glass says so now.
         InviteLinkCenter.shared.$answer
             .map { $0 != nil }
@@ -1058,6 +1137,7 @@ final class NucleoSession: ObservableObject {
         NudgeCenter.shared.forgetMoment()
         V18Focus.clear()
         sheetHandoff = nil
+        readHandoff = nil
         emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }

@@ -758,6 +758,12 @@ final class NucleoDesk {
         return token
     }
 
+    /// 1.8: a single-use token for a question native writes on the person's tap about an asset it
+    /// already knows (a follow-up, a board row). Same lifetime and owner rules as every other token.
+    func token(for asset: NucleoAsset, question: String) -> String {
+        issueToken(asset, question: question)
+    }
+
     private func purgeTokens(now: Date = Date()) {
         tokens = tokens.filter { $0.value.expires > now && $0.value.generation == generation() }
     }

@@ -372,12 +372,15 @@ final class NucleoNudgeTests: XCTestCase {
         XCTAssertEqual(acted, 0)
     }
 
-    func testTheFiveFeatureSourcesRegisterThroughOneEntryPoint() {
+    func testTheFeatureSourcesRegisterThroughOneEntryPoint() {
         let center = center()
         V18.registerNudges(center: center)
-        // Placeholders register nothing; a landed feature registers exactly its own key.
-        XCTAssertTrue(Set(center.sourceKeys).isSubset(of: ["invite", "memory", "theses", "reminders", "credits"]))
-        XCTAssertEqual(Set([NudgePriority.invite, NudgePriority.theses, NudgePriority.memory, NudgePriority.reminders, NudgePriority.credits]).count, 5,
+        // Placeholders register nothing; a landed feature registers exactly its own keys (the harness
+        // has two voices: coming back to an asset, and the offer to do so).
+        XCTAssertTrue(Set(center.sourceKeys).isSubset(of: ["invite", "memory", "theses", "reminders", "credits", "harness.move", "harness.offer"]))
+        XCTAssertEqual(center.sourceKeys.first, "harness.move", "coming back to what they asked about speaks first")
+        XCTAssertEqual(Set([NudgePriority.followUp, NudgePriority.invite, NudgePriority.followUpOffer, NudgePriority.theses, NudgePriority.memory,
+                            NudgePriority.reminders, NudgePriority.credits]).count, 7,
                        "two features never share a priority")
     }
 }

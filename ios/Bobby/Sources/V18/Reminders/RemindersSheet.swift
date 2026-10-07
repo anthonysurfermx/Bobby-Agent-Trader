@@ -52,10 +52,16 @@ struct RemindersModel: Equatable {
     /// An eligible paying account with the weekly briefing off: one quiet row at the end.
     var showsBriefingRow: Bool
     var riskAccepted: Bool
+    /// The Follow-ups switch (V18/Harness): nil hides it.
+    var followUps: HarnessMode? = nil
+    var followUpsSaving = false
+    /// Follow-ups are on and the week has something in it: one row opens it.
+    var showsWeekRow = false
 
     /// The focused thesis first, then the order of the book (most recently touched first).
     static func make(theses: [SavedThesis], pending: [PendingReminder], scheduling: Set<String> = [], focus: String? = nil,
-                     permission: ReminderPermission, showsBriefingRow: Bool = false, riskAccepted: Bool = true) -> RemindersModel {
+                     permission: ReminderPermission, showsBriefingRow: Bool = false, riskAccepted: Bool = true,
+                     followUps: HarnessMode? = nil, followUpsSaving: Bool = false, showsWeekRow: Bool = false) -> RemindersModel {
         let focusId = focus.flatMap { id in theses.first { $0.id.caseInsensitiveCompare(id) == .orderedSame }?.id }
         let ordered = theses.filter { $0.id == focusId } + theses.filter { $0.id != focusId }
         let rows = ordered.map { thesis in
@@ -63,7 +69,8 @@ struct RemindersModel: Equatable {
                 fireAt: pending.first { $0.thesisId == thesis.id }?.fireAt, busy: scheduling.contains(thesis.id))
         }
         return RemindersModel(rows: rows, focusId: focusId, permission: permission, showsBriefingRow: showsBriefingRow,
-                              riskAccepted: riskAccepted)
+                              riskAccepted: riskAccepted, followUps: followUps, followUpsSaving: followUpsSaving,
+                              showsWeekRow: showsWeekRow && followUps == .on)
     }
 
     /// The row whose choices are open when the screen appears: the focused thesis, or the only
@@ -83,6 +90,9 @@ struct RemindersActions {
     var openSettings: () -> Void
     var openBriefing: () -> Void
     var close: () -> Void
+    /// The Follow-ups switch; true may make iOS ask for permission. False when the risk notice is missing.
+    var followUps: (Bool) async -> Bool = { _ in true }
+    var openWeek: () -> Void = {}
 }
 
 // MARK: - The sheet (route `.reminders`)
@@ -93,6 +103,7 @@ struct RemindersSheet: View {
     @ObservedObject private var center = ReminderCenter.shared
     @ObservedObject private var briefings = BriefingsCenter.shared
     @ObservedObject private var account = AccountSession.shared
+    @ObservedObject private var harness = HarnessCenter.shared
     @State private var theses: [SavedThesis] = []
     @State private var focus: String?
     @State private var ready = false
@@ -102,7 +113,9 @@ struct RemindersSheet: View {
     private var model: RemindersModel {
         .make(theses: theses, pending: center.pending, scheduling: center.scheduling, focus: focus, permission: center.status,
               showsBriefingRow: session.signedIn && ReminderNudges.BriefingOffer.current(briefings).shouldOffer,
-              riskAccepted: session.profile.acceptedRiskNotice)
+              riskAccepted: session.profile.acceptedRiskNotice,
+              followUps: session.harness == nil ? nil : harness.mode, followUpsSaving: harness.saving,
+              showsWeekRow: !harness.ledger.assets(since: Date().addingTimeInterval(-7 * 86_400), now: Date()).isEmpty)
     }
 
     var body: some View {
@@ -114,7 +127,16 @@ struct RemindersSheet: View {
                     remove: { row in await center.cancel(thesisId: row.id) },
                     openSettings: { BriefingsCenter.shared.openSystemSettings() },
                     openBriefing: { session.switchSheet(to: .briefingSettings) },
-                    close: onClose))
+                    close: onClose,
+                    followUps: { on in
+                        if on { return await harness.accept() != .consentRequired }
+                        await harness.turnOff()
+                        return true
+                    },
+                    openWeek: {
+                        HarnessBoardFocus.pending = nil
+                        session.switchSheet(to: .followUp)
+                    }))
             } else {
                 Theme.nucleoSurface.ignoresSafeArea()
             }
@@ -165,6 +187,16 @@ struct RemindersContent: View {
                         .accessibilityIdentifier("reminders-empty")
                 } else {
                     ForEach(model.rows) { row in thesisRow(row) }
+                }
+                if let followUps = model.followUps {
+                    QuietToggle(label: HarnessCopy.switchLabel, detail: HarnessCopy.switchDetail, isOn: followUps == .on,
+                                saving: model.followUpsSaving, enabled: !model.followUpsSaving, id: "reminders-follow-ups") { on in
+                        Task { @MainActor in if await !actions.followUps(on) { consentMissing = true } }
+                    }
+                    .padding(.top, model.rows.isEmpty ? 14 : 0)
+                    if model.showsWeekRow {
+                        QuietRow(label: HarnessCopy.weekTitle, chevron: true, hairline: true, id: "reminders-week", action: actions.openWeek)
+                    }
                 }
                 if !model.riskAccepted || consentMissing {
                     QuietNote(text: CreditsRestoreNotice.beforeRiskNotice(), id: "reminders-risk-required").padding(.top, 14)

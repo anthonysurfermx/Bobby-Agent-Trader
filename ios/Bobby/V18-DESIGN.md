@@ -318,6 +318,38 @@ SPY               Poner recordatorio
 | Open Settings | Abrir Configuración |
 | Scheduled reminder; notifications are off. | Recordatorio programado; notificaciones apagadas. |
 
+### Follow-ups (the harness) — about 12 words per surface
+
+Added after the first pass (`Sources/V18/Harness/`). Bobby comes back to what the person asked.
+Everything is planned on the phone from a small ledger; nothing is sent anywhere.
+
+Surfaces, each one line and one action:
+
+| Where | Line | Action |
+| --- | --- | --- |
+| Glass, after a read, until they decide | Tell you tomorrow how NVDA moved? | Yes, tell me |
+| Lock screen, next day | NVDA, a day later. See how it moved. | tap |
+| Lock screen, day after (not opened) | Semiconductors today. NVDA is part of it. | tap |
+| Lock screen, next Monday (not opened) | Your week: NVDA and 2 more. | tap |
+| Glass, when they come back | NVDA +2.3% since you asked | What changed? |
+| Board (a sector, the week) | title + "Last 24 hours" / "Since you asked" | a row asks Bobby |
+| Reminders | Follow-ups · Bobby comes back to what you asked. | switch |
+
+Spanish: ¿Te cuento mañana cómo se movió NVDA? · Sí, cuéntame · NVDA, un día después. Mira cómo se
+movió. · Semiconductores hoy. NVDA es parte. · Tu semana: NVDA y 2 más. · NVDA +2.3% desde que
+preguntaste · ¿Qué cambió? · Seguimiento · Bobby vuelve a lo que preguntaste.
+
+Rules that are not folded away:
+
+- The lock screen names the asset and never a figure or a direction. "See how it moved", never
+  "see how it rose": the number is read when the person opens it.
+- A number the phone does not have is not shown ("NVDA, a day later" without it; a board row
+  without it).
+- Numbers are cream, never green or red: colour means a verdict only.
+- iOS permission is asked only on "Yes, tell me" or the switch.
+- Three unopened follow-ups and Bobby goes quiet; a kind shown twice in a month and never opened
+  rests; never more than four in seven days.
+
 ### Invite — about 20 words (was about 60)
 
 ```

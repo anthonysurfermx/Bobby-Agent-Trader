@@ -9,7 +9,7 @@ enum V18QA {
     /// name → screen. Names are `<feature>-<state>`, for example `credits-free` or `theses-three`.
     static var fixtures: [String: () -> AnyView] {
         var all: [String: () -> AnyView] = [:]
-        for table in [CreditsQA.fixtures, MemoryQA.fixtures, ThesesQA.fixtures, RemindersQA.fixtures, InviteQA.fixtures] {
+        for table in [CreditsQA.fixtures, MemoryQA.fixtures, ThesesQA.fixtures, RemindersQA.fixtures, InviteQA.fixtures, HarnessQA.fixtures] {
             all.merge(table) { first, _ in first }
         }
         return all
@@ -29,6 +29,9 @@ enum V18QA {
                                     cta: q("See credits", "Ver créditos")), .credits),
             "reminders": (NucleoNudge(id: "qa.reminders", text: q("Want a reminder to review it?", "¿Quieres un recordatorio para revisarla?"),
                                       cta: q("Remind me", "Recuérdamelo")), .reminders),
+            "follow-offer": (NucleoNudge(id: "qa.follow.offer", text: HarnessCopy.offerLine(symbol: "NVDA"), cta: HarnessCopy.offerButton), .reminders),
+            "follow-move": (NucleoNudge(id: "qa.follow.move", text: HarnessCopy.moveLine(symbol: "NVDA", pct: 2.3, days: 1),
+                                        cta: HarnessCopy.moveButton), .followUp),
         ]
     }
 

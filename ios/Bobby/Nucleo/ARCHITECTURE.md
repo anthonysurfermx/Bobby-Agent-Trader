@@ -770,3 +770,10 @@ One subtle line from the server's access: "7 of 10 free reads left this week · 
 
 Supersedes R9 only where stated here: there is still no notification prompt at launch or on the glass by itself; a reminder is requested from a native sheet after an explicit tap.
 
+### 9.5 The harness: follow-ups (`Sources/V18/Harness/`)
+
+From the first delivered read the phone keeps a ledger per reader (`HarnessLedger`: asks with symbol and price, follow-ups shown, opened or come back for, app opens; 300 events, 60 days; no question text). `HarnessProfile` (interest per asset, the hour they answer at, which kinds they ignore) and `HarnessPlanner` (the asset the next day, its sector the day after, the week on Monday, then silence; an answered follow-up or a new question starts again) are pure functions of it. `HarnessCenter` asks iOS for permission only on the person's "Yes, tell me" or the Follow-ups switch, hands the plan to iOS as local notifications (`v18.follow.<step>`), writes each one back as `sent` once its moment has passed, and reads one quota-free price to draw "NVDA +2.3% since you asked" on the glass. No server, no push token, no account.
+
+- Session: `readDelivered` calls `noteAsk`; a tapped follow-up is stored in `HarnessIntent` and drained behind the briefing gate (asset: the glass line; sector or week: route `followUp`, native-only).
+- Page: one new event, `ask.start {token, question}`. Native issues a single-use token for an asset it already knows and writes the question; the page runs it exactly like a chip that carries a token, from `IDLE` or `FOLLOWUPS` only and never under a native sheet. `NucleoSession.startRead` emits it at once, or after the open sheet has closed.
+- Nudge sources: `harness.move` (priority 95) and `harness.offer` (80).

@@ -393,6 +393,7 @@ final class AccountSession: ObservableObject {
             // 1.8: the theses this account wrote live only on this phone; they go with the account.
             ThesisBook.forgetOwner(deletingUserId, defaults: defaults)
             NudgeCenter.forgetOwner(deletingUserId, defaults: defaults)
+            HarnessStore.forgetOwner(deletingUserId, defaults: defaults)
             // The server cascade removed the device binding; forget its local proof (only if it was this account's).
             PushRegistrar.forgetOwner(deletingUserId)
             guard generation == started else { return .deleted }

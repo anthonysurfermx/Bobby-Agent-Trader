@@ -358,6 +358,9 @@ final class MemoryCenter: ObservableObject {
         notice = nil
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
+        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned.
+        HarnessStore(defaults: defaults).forget(owner: user)
+        NotificationCenter.default.post(name: HarnessCenter.erased, object: nil)
         forgotAllAt = now()
         local = readLocal()
         let ok = await write("DELETE", Self.path, body: nil)

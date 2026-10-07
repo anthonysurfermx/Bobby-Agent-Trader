@@ -258,6 +258,28 @@ test('no nudge, a malformed nudge or one without a button draws nothing and repo
   }
 });
 
+// ---- a read native starts (1.8): a follow-up's button or a row of a native board. Native names the asset
+// inside a single-use token and writes the question; the page runs it like a chip that carries a token ----
+test('ask.start asks with the token native issued, from the idle home, and never under a sheet or over a read', async () => {
+  const app = harness();
+  app.boot(); await flush(); app.advance(1.2); await flush();
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  const asks = () => app.calls.filter((call) => call.method === 'ask').map((call) => call.params);
+  app.context.nucleoBridge.emit('native.sheet', { route: 'followUp', state: 'open' });
+  app.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question: 'What changed in NVDA since I asked?' });
+  await flush();
+  assert.deepEqual(asks(), [], 'behind a native sheet nothing starts');
+  app.context.nucleoBridge.emit('native.sheet', { route: 'followUp', state: 'closed' });
+  for (const payload of [null, {}, { token: '' }, { token: 7 }, { question: 'no token' }]) app.context.nucleoBridge.emit('ask.start', payload);
+  await flush();
+  assert.deepEqual(asks(), [], 'a payload without a token asks nothing');
+  app.context.nucleoBridge.emit('ask.start', { token: 'tok-2', question: 'What changed in NVDA since I asked?' });
+  assert.equal(app.context.nucleo.state(), 'SENDING');
+  assert.deepEqual(asks(), [{ token: 'tok-2' }], 'only the token travels: the page never names the asset');
+  app.context.nucleoBridge.emit('ask.start', { token: 'tok-3', question: 'another' });
+  assert.deepEqual(asks(), [{ token: 'tok-2' }], 'a read in flight is not replaced');
+});
+
 test('the page never writes nudge copy: no feature words live in the nudge code path', () => {
   const source = read('../src/app/55-read.js');
   const block = source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('function receiveSuggestions'));

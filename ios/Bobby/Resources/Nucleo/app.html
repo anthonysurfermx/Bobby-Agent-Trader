@@ -489,7 +489,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'analysis.level',
+    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -3286,6 +3286,15 @@ function nudgeSync(){
   if (ST.name === 'IDLE') showIdleSuggestions();
   else if (ST.name === 'FOLLOWUPS' && READ && READ.model) chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
 }
+/* ---- a read native starts on the person's tap outside the page (a follow-up's button, a row of a native
+   board). Native names the asset inside a single-use token and writes the question; the page runs it exactly
+   like a chip that carries a token, and only from the idle home or a finished read. ---- */
+function askStart(p){
+  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST) return;
+  if (ST.name !== 'IDLE' && ST.name !== 'FOLLOWUPS') return;
+  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '';
+  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660 });
+}
 function receiveSuggestions(reply){
   SUGG = reply;
   if (ST.name === 'IDLE') showIdleSuggestions();
@@ -5594,6 +5603,7 @@ function wire(){
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
+  BR.on('ask.start', askStart);
   BR.on('analysis.level', lvlApply);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });
   BR.on('speech.level', function(p){ SPEECH.lvl = clamp(+(p && p.level) || 0, 0, 1); SPEECH.at = clk; });

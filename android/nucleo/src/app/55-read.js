@@ -394,6 +394,15 @@ function nudgeSync(){
   if (ST.name === 'IDLE') showIdleSuggestions();
   else if (ST.name === 'FOLLOWUPS' && READ && READ.model) chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
 }
+/* ---- a read native starts on the person's tap outside the page (a follow-up's button, a row of a native
+   board). Native names the asset inside a single-use token and writes the question; the page runs it exactly
+   like a chip that carries a token, and only from the idle home or a finished read. ---- */
+function askStart(p){
+  if (!p || typeof p.token !== 'string' || !p.token || SHEET || !ST) return;
+  if (ST.name !== 'IDLE' && ST.name !== 'FOLLOWUPS') return;
+  var q = typeof p.question === 'string' ? p.question.slice(0, 300) : '';
+  go('SENDING', { params: { token: p.token }, question: q, origin: 'chip', cx: 195, cy: 660 });
+}
 function receiveSuggestions(reply){
   SUGG = reply;
   if (ST.name === 'IDLE') showIdleSuggestions();

@@ -202,6 +202,11 @@ private struct NucleoStage: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .followUp:
+            HarnessBoardSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .briefing:
             // A drained notification tap (build 53): the report re-authorizes owner + Pro on open, and
             // its narration starts once loaded when the player's consent and mute allow it.
