@@ -36,8 +36,6 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import xyz.bobbyprotocol.android.billing.BillingState
-import xyz.bobbyprotocol.android.billing.BillingStore
 import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.data.VoicePreference
 import xyz.bobbyprotocol.android.equipment.*
@@ -46,6 +44,7 @@ import xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicy
 import xyz.bobbyprotocol.android.platform.AvatarShareSpec
 import xyz.bobbyprotocol.android.platform.AvatarShareGear
 import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.credits.CreditsCenter
 
 internal object ProfilePalette {
     val background = Color(0xFF040306)
@@ -63,10 +62,10 @@ internal object ProfilePalette {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AccountProfile(
-    session: NucleoSession, repository: BobbyRepository, billing: BillingStore, billingState: BillingState,
+    session: NucleoSession, repository: BobbyRepository,
     busy: Boolean, onOpen: (String) -> Unit, onSignIn: (String) -> Unit,
     onExternal: (String) -> Unit, onShareAvatar: (AvatarShareSpec) -> Unit,
-    onSync: () -> Unit, onDelete: () -> Unit, onSignOut: () -> Unit, onRestore: () -> Unit,
+    onSync: () -> Unit, onDelete: () -> Unit, onSignOut: () -> Unit,
 ) {
     val context = LocalContext.current
     val account by repository.session.collectAsStateWithLifecycle()
@@ -74,9 +73,9 @@ internal fun AccountProfile(
     val owner = account?.userId
     val t: (String) -> String = { session.text(it) }
     var snapshot by remember(epoch, owner) { mutableStateOf(session.snapshot()) }
-    val quotaState by repository.quota.collectAsStateWithLifecycle()
-    val quota = quotaState.takeIf { it.owner?.userId == owner && it.owner?.epoch == epoch }
-    val access = quota?.access
+    // 1.8: the balance the Credits row says in one line. A new revision redraws it.
+    val credits = remember(session) { CreditsCenter.of(session.v18) }
+    val creditsRevision by credits.revision.collectAsStateWithLifecycle()
     var landMetrics by remember(epoch, owner) { mutableStateOf<ProfileLandMetrics?>(null) }
     val equipment = remember(context) { EquipmentStore(context) }
     val catalog = remember(context) { EquipmentStore.catalog(context) }
@@ -119,7 +118,6 @@ internal fun AccountProfile(
     val companions = roster.map { EquipmentCompanion(it.getString("id"), it.getString("label"), it.optInt("requiredLevel", 1)) }
     val owned = EquipmentLedger.ownedIds(catalog, companions, session.companionId, xp)
     val worn = if (equipmentReady) catalog.filter { it.companionId == companionId && EquipmentLedger.isEquipped(it.id, owned, disabled) } else emptyList()
-    val confirmedPro = access?.tier?.let { it == "pro" } ?: billingState.isPro
     val aura = landMetrics?.aura ?: ProfileProgressPolicy.count(snapshot.opt("aura"))
     val privacy = { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.PRIVACY, session.language, session.locale, repository.country)) }
     val help = { onExternal(BobbySupportLinks.url(BobbySupportLinks.Page.SUPPORT, session.language, session.locale, repository.country)) }
@@ -183,28 +181,15 @@ internal fun AccountProfile(
 
         ProfileSection(t("Account"))
         // 1.8: what you have, what you are looking at and why, and the reminders you set. Each opens its own sheet.
-        ProfileRow(session.text("Credits", "Créditos"), session.text("What you have and how to get more", "Lo que tienes y cómo conseguir más"),
+        // Credits says the balance in one line ("7 of 10 reads · 3 gifted") once the server has answered. Reads left,
+        // gifted reads, Bobby Pro, Restore purchases, invitations and codes live behind it, as on iOS.
+        val creditsSummary = remember(creditsRevision, epoch, owner, language, snapshot.optBoolean("riskAccepted")) { credits.summary() }
+        ProfileRow(session.text("Credits", "Créditos"), creditsSummary ?: session.text("What you have and how to get more", "Lo que tienes y cómo conseguir más"),
             ProfileSymbol.CREDITS, tag = "account-credits") { onOpen(V18Routes.CREDITS) }
         ProfileRow(session.text("My theses", "Mis tesis"), session.text("What you are looking at, and why", "Lo que estás viendo, y por qué"),
             ProfileSymbol.THESES, tag = "account-theses") { onOpen(V18Routes.THESES) }
         ProfileRow(session.text("Reminders", "Recordatorios"), session.text("Review reminders you set", "Recordatorios de revisión que tú pusiste"),
             ProfileSymbol.REMINDERS, tag = "account-reminders") { onOpen(V18Routes.REMINDERS) }
-        val remaining = access?.remaining
-        ProfileRow(if (confirmedPro) "Bobby Pro" else t("Reads left this week"), if (confirmedPro) t("Your account confirms Pro access") else remaining?.toString() ?: "—", ProfileSymbol.READS,
-            trailing = if (confirmedPro && billing.managementUri() != null) t("Manage") else null, tag = "account-reads") {
-            billing.managementUri()?.takeIf { confirmedPro }?.let { onExternal(it.toString()) } ?: onOpen("levels")
-        }
-        val gifts = listOfNotNull(
-            access?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("quickBalance", it, language) },
-            quota?.levels?.profundo?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("deepBalance", it, language) },
-            quota?.levels?.maximo?.bonus?.takeIf { it > 0 }?.let { CouponCopy.text("maxBalance", it, language) })
-        if (gifts.isNotEmpty()) ProfileRow(CouponCopy.text("balance", language = language), gifts.joinToString(" · "),
-            ProfileSymbol.GIFT, tag = "account-bonus") { onOpen("levels") }
-        if (!confirmedPro) ProfileRow("Bobby Pro", t("Explore the plans available for your account"), ProfileSymbol.PRO, tag = "account-pro") { onOpen("paywall") }
-        ProfileRow(t("Restore purchases"), CouponCopy.text("restoreDetail", language = language), ProfileSymbol.SYNC,
-            enabled = !busy && (account == null || billingState.canRestore), tag = "account-restore") { if (account == null) onOpen("paywall") else onRestore() }
-        ProfileRow(t("Invite friends"), t("Share Bobby with someone you know"), ProfileSymbol.INVITE, tag = "account-invite") { onOpen("invite") }
-        ProfileRow(t("Redeem a code"), t("Use a benefit confirmed by your account"), ProfileSymbol.GIFT) { onOpen("coupon") }
         ProfileRow(t("Market briefings"), t("Your reports and delivery settings"), ProfileSymbol.BRIEFING, tag = "account-briefings") { onOpen("briefings") }
         ProfileRow(t("Briefing settings"), t("Choose assets, language and scheduled consent"), ProfileSymbol.SETTINGS) { onOpen("briefingSettings") }
         HorizontalDivider(color = ProfilePalette.hairline)
@@ -309,17 +294,16 @@ private fun voiceName(preference: VoicePreference, t: (String) -> String): Strin
         Canvas(Modifier.size(12.dp)) { drawLine(ProfilePalette.dim, Offset(size.width*.3f,size.height*.2f),Offset(size.width*.7f,size.height*.5f),2f); drawLine(ProfilePalette.dim,Offset(size.width*.7f,size.height*.5f),Offset(size.width*.3f,size.height*.8f),2f) }
     }
 }
-private enum class ProfileSymbol { AVATAR, SHARE, GEAR, ISLAND, READS, PRO, SYNC, INVITE, GIFT, BRIEFING, SETTINGS, VOICE, LANGUAGE, MEMORY, RISK, CREDITS, THESES, REMINDERS }
+private enum class ProfileSymbol { AVATAR, SHARE, GEAR, ISLAND, SYNC, BRIEFING, SETTINGS, VOICE, LANGUAGE, MEMORY, RISK, CREDITS, THESES, REMINDERS }
 @Composable private fun ProfileIcon(symbol: ProfileSymbol) {
     Canvas(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(ProfilePalette.fill)) {
         val stroke=Stroke(1.4.dp.toPx()); val ink=ProfilePalette.muted; val mid=Offset(size.width/2,size.height/2); val r=size.width*.22f
         fun line(x1:Float,y1:Float,x2:Float,y2:Float) = drawLine(ink,Offset(size.width*x1,size.height*y1),Offset(size.width*x2,size.height*y2),stroke.width)
         when(symbol) {
-            ProfileSymbol.AVATAR, ProfileSymbol.INVITE -> { drawCircle(ink,r*.45f,Offset(mid.x,mid.y-r*.4f),style=stroke); drawArc(ink,180f,180f,false,Offset(mid.x-r,mid.y),Size(r*2,r*1.6f),style=stroke) }
+            ProfileSymbol.AVATAR -> { drawCircle(ink,r*.45f,Offset(mid.x,mid.y-r*.4f),style=stroke); drawArc(ink,180f,180f,false,Offset(mid.x-r,mid.y),Size(r*2,r*1.6f),style=stroke) }
             ProfileSymbol.LANGUAGE -> { drawCircle(ink,r,mid,style=stroke); drawOval(ink,Offset(mid.x-r*.45f,mid.y-r),Size(r*.9f,r*2),style=stroke); line(.28f,.5f,.72f,.5f) }
             ProfileSymbol.VOICE -> { val path=Path().apply { moveTo(size.width*.3f,size.height*.42f);lineTo(size.width*.42f,size.height*.42f);lineTo(size.width*.56f,size.height*.3f);lineTo(size.width*.56f,size.height*.7f);lineTo(size.width*.42f,size.height*.58f);lineTo(size.width*.3f,size.height*.58f);close() }; drawPath(path,ink,style=stroke); drawArc(ink,-60f,120f,false,Offset(mid.x,mid.y-r),Size(r*1.2f,r*2),style=stroke) }
             ProfileSymbol.SHARE -> { line(.5f,.64f,.5f,.27f);line(.5f,.27f,.37f,.4f);line(.5f,.27f,.63f,.4f);line(.28f,.55f,.28f,.73f);line(.28f,.73f,.72f,.73f);line(.72f,.73f,.72f,.55f) }
-            ProfileSymbol.PRO -> { drawOval(ink,Offset(mid.x-r,mid.y-r*.45f),Size(r*1.2f,r*.9f),style=stroke);drawOval(ink,Offset(mid.x-r*.2f,mid.y-r*.45f),Size(r*1.2f,r*.9f),style=stroke) }
             ProfileSymbol.SYNC -> { drawArc(ink,-45f,285f,false,Offset(mid.x-r,mid.y-r),Size(r*2,r*2),style=stroke);line(.69f,.34f,.7f,.52f);line(.7f,.52f,.52f,.48f) }
             ProfileSymbol.RISK -> { val p=Path().apply { moveTo(mid.x,size.height*.25f);lineTo(size.width*.73f,size.height*.35f);lineTo(size.width*.68f,size.height*.62f);lineTo(mid.x,size.height*.77f);lineTo(size.width*.32f,size.height*.62f);lineTo(size.width*.27f,size.height*.35f);close() };drawPath(p,ink,style=stroke);line(.5f,.37f,.5f,.56f);drawCircle(ink,stroke.width*.7f,Offset(mid.x,size.height*.65f)) }
             ProfileSymbol.MEMORY -> { drawCircle(ink,r,mid,style=stroke);line(.5f,.28f,.5f,.72f);line(.37f,.36f,.44f,.45f);line(.63f,.36f,.56f,.45f);line(.37f,.62f,.44f,.55f);line(.63f,.62f,.56f,.55f) }

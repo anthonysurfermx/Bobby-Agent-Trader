@@ -36,6 +36,9 @@ import xyz.bobbyprotocol.android.v18.SavedThesis
 import xyz.bobbyprotocol.android.v18.ThesisRevision
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.reminders.ReminderCopy
+import xyz.bobbyprotocol.android.v18.reminders.ReminderEntry
+import xyz.bobbyprotocol.android.v18.reminders.ReminderIntent
 import xyz.bobbyprotocol.android.v18.theses.ThesisCopy
 import xyz.bobbyprotocol.android.v18.theses.ThesisEvents
 import xyz.bobbyprotocol.android.v18.theses.ThesisRefusalCopy
@@ -64,13 +67,16 @@ fun ThesisReviewSheet(host: V18Host, onClose: () -> Unit) {
     val words = remember(host) { V18HostWords(host) }
     val copy = remember(words) { ThesisCopy(words) }
     val events = remember(host) { ThesisEvents.of(host) }
+    val reminders = remember(host) { ReminderIntent.of(host) }
     // Evaluated once, when the sheet appears: the hand-off is consumed here and nowhere else.
     val reviewer = remember(host) { ThesisReviewer(host.focus.takeThesisId(), ThesisReviewer.live(host), host.scope) }
     val r = observedModel(reviewer, reviewer.changes)
 
     DisposableEffect(host, reviewer) {
-        // A reminder for the thesis on screen has nothing to announce while it is open.
+        // A reminder for the thesis on screen has nothing to announce while it is open: the
+        // reminders are told which thesis that is, and told again when the screen goes.
         events.openThesisId = reviewer.thesis?.id
+        reminders.markOpen(reviewer.thesis?.id)
         // The book changed under the screen (theses written signed out follow the person into an account).
         val stopBook = host.theses.addListener { reviewer.reload() }
         val stopAccount = host.onAccountChanged { reviewer.accountChanged() }
@@ -78,6 +84,7 @@ fun ThesisReviewSheet(host: V18Host, onClose: () -> Unit) {
             // Closing the sheet cancels a review in flight; its reply, if one still comes, is ignored.
             reviewer.cancel()
             events.openThesisId = null
+            reminders.markOpen(null)
             stopBook()
             stopAccount()
         }
@@ -110,10 +117,8 @@ fun ThesisReviewSheet(host: V18Host, onClose: () -> Unit) {
                 if (reviewer.decide(ThesisEvents.ARCHIVE)) onClose()
             })
         }
-        items.add(QuietMenuItem(host.text("Set reminder", "Poner recordatorio"), "thesis-review-remind") {
-            host.focus.thesisId = thesis.id
-            host.switchSheet(V18Routes.REMINDERS)
-        })
+        // The Reminders screen opens on this thesis, with its choices unfolded.
+        items.add(QuietMenuItem(ReminderCopy.of(host).setReminder, "thesis-review-remind") { ReminderEntry.open(host, thesis.id) })
         QuietMenu(host.text("More options", "Más opciones"), "thesis-review-menu", items)
     })
     // Pinned under the scroll while the review has not started: where the person's words go,

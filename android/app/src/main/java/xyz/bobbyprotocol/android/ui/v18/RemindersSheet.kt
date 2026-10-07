@@ -75,11 +75,13 @@ import java.util.Locale
 // What it shows is decided by `RemindersModel` (pure, tested); this file only draws it.
 
 /**
- * `followUps` is the ONE slot at the foot of the list that the harness track fills: its Follow-ups
- * switch and its "Your week" row. The sheet draws it when given, between the theses and the notes.
+ * `followUps` is the ONE slot at the foot of the list that the harness fills: its Follow-ups
+ * switch and its "Your week" row. The sheet draws it when given, between the theses and the notes,
+ * and hands it the way to say "the risk notice comes first": the same line a reminder button shows
+ * (`reminders-risk-required`), as on iOS, where the switch sets `consentMissing`.
  */
 @Composable
-fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable () -> Unit)? = null) {
+fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable (onConsentRequired: () -> Unit) -> Unit)? = null) {
     val center = remember(host) { ReminderCenter.of(host) }
     val briefing = remember(host) { BriefingOffers.of(host) }
     val copy = remember(host, host.language) { ReminderCopy.of(host) }
@@ -187,9 +189,11 @@ fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable (
                     )
                 }
             }
-            // The slot the harness track fills: the Follow-ups switch and the "Your week" row.
+            // The slot the harness fills: the Follow-ups switch and the "Your week" row.
             if (followUps != null) {
-                Column(Modifier.fillMaxWidth().padding(top = if (model.rows.isEmpty()) 14.dp else 0.dp)) { followUps() }
+                Column(Modifier.fillMaxWidth().padding(top = if (model.rows.isEmpty()) 14.dp else 0.dp)) {
+                    followUps { face.consentMissing = true }
+                }
             }
             if (!model.riskAccepted || face.consentMissing) {
                 QuietNote(copy.riskRequired, Modifier.padding(top = 14.dp), tag = "reminders-risk-required")

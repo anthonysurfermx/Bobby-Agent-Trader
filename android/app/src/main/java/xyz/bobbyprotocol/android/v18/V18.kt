@@ -5,6 +5,7 @@ import xyz.bobbyprotocol.android.v18.harness.HarnessNudges
 import xyz.bobbyprotocol.android.v18.invite.InviteNudges
 import xyz.bobbyprotocol.android.v18.memory.MemoryNudges
 import xyz.bobbyprotocol.android.v18.reminders.ReminderNudges
+import xyz.bobbyprotocol.android.v18.theses.ThesisEvents
 import xyz.bobbyprotocol.android.v18.theses.ThesisNudges
 
 // Bobby 1.8: the companion that picks the thread back up. Each feature lives in its own package
@@ -29,6 +30,19 @@ object V18 {
         MemoryNudges.register(host)
         ReminderNudges.register(host)
         CreditsNudges.register(host)
+        connect(host)
+    }
+
+    /**
+     * What one feature tells another. Each package stays ignorant of the others; what crosses
+     * between them is written here, once per activity, where iOS posts a notification.
+     */
+    private fun connect(host: V18Host) {
+        // A thesis just written, or a review just decided (keep, edit or archive): the moment the
+        // reminder offer may speak on the glass (`V18.thesisSaved` and `V18.thesisReviewed` on iOS).
+        val theses = ThesisEvents.of(host)
+        theses.onSaved { thesisId -> ReminderNudges.thesisSaved(host, thesisId) }
+        theses.onReviewed { thesisId, _ -> ReminderNudges.thesisReviewed(host, thesisId) }
     }
 }
 

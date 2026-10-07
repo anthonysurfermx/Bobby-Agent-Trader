@@ -63,8 +63,6 @@ import xyz.bobbyprotocol.android.v18.invite.InviteNotice
 // progress, the person's own code (a tap copies it), one action, and a folded field for a friend's
 // code. An invitation that is waiting, or was just answered, comes first.
 // The route `invite` exists since 1.1.4; this screen draws it now.
-/** True: V18Sheets draws this screen for the route `invite` instead of BobbySheet's 1.1.4 one. */
-const val INVITE_SHEET_READY = true
 
 @Composable
 fun InviteSheet(host: V18Host, onClose: () -> Unit) {

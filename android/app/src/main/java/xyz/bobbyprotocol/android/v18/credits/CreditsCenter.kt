@@ -17,6 +17,8 @@ import xyz.bobbyprotocol.android.data.BobbyQuotaState
 import xyz.bobbyprotocol.android.data.QuotaMeter
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
+import java.time.ZoneId
+import java.util.Locale
 
 // Credits (1.8) as the app runs it on Android: what the server said about the reader who is here
 // now, the restore steps, the gift ledger, and the hooks that keep them current. One per host
@@ -215,6 +217,16 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
             rewardDays = referral?.rewardDays ?: plans.rewardDays,
             maxFriends = plans.maxFriends,
         )
+    }
+
+    /**
+     * One line for the profile's Credits row ("7 of 10 reads · 3 gifted"): the server's word about
+     * the reader who is here now. Null until it has answered and before the risk notice; the row
+     * then says what Credits is, never a number the app does not have.
+     */
+    fun summary(zone: ZoneId = ZoneId.systemDefault()): String? {
+        if (!host.riskAccepted) return null
+        return CreditsBalance.make(snapshot(), CreditsCopy(HostWords(host), host.now(), Locale.forLanguageTag(host.locale), zone)).summary
     }
 
     // What the screens ask for

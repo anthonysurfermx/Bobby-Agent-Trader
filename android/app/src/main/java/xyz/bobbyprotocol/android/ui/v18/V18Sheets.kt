@@ -20,13 +20,11 @@ object V18Sheets {
     /** The screens that need the whole height (a keyboard, a pinned action). The others open at half height so the sphere stays visible above them. */
     private val TALL: Set<String> = setOf(V18Routes.THESIS_EDITOR, V18Routes.THESIS_REVIEW, "memory")
 
-    /**
-     * True when this map draws `route`. `memory` and `invite` are 1.1.4 routes that BobbySheet draws
-     * until the 1.8 screen is ready: its owner flips the switch in its own file (MemorySheet.kt,
-     * InviteSheet.kt), and no shared file changes.
-     */
-    fun draws(route: String): Boolean = route in V18Routes.NATIVE_ONLY ||
-        (route == "memory" && MEMORY_SHEET_READY) || (route == "invite" && INVITE_SHEET_READY)
+    /** The two 1.1.4 routes whose screen is the 1.8 one now (BobbySheet no longer has them). The page may still open both. */
+    private val TAKEN_OVER: Set<String> = setOf("memory", "invite")
+
+    /** True when this map draws `route`: every 1.8 screen, and the two routes it took over. */
+    fun draws(route: String): Boolean = route in V18Routes.NATIVE_ONLY || route in TAKEN_OVER
 
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
@@ -44,7 +42,8 @@ object V18Sheets {
                     V18Routes.THESIS_EDITOR -> ThesisEditorSheet(host, onClose)
                     V18Routes.THESIS_REVIEW -> ThesisReviewSheet(host, onClose)
                     V18Routes.MEMORY_CONSENT -> MemoryConsentSheet(host, onClose)
-                    V18Routes.REMINDERS -> RemindersSheet(host, onClose)
+                    // The harness's switch and its "Your week" row sit under the theses, as on iOS.
+                    V18Routes.REMINDERS -> RemindersSheet(host, onClose, followUps = { consentRequired -> FollowUpsRows(host, consentRequired) })
                     V18Routes.FOLLOW_UP -> FollowUpSheet(host, onClose)
                     "memory" -> MemorySheet(host, onClose)
                     "invite" -> InviteSheet(host, onClose)

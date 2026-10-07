@@ -47,7 +47,7 @@ import xyz.bobbyprotocol.android.v18.memory.RememberedAsset
 import xyz.bobbyprotocol.android.v18.theses.V18HostWords
 
 // Owned by the `memory-theses` track: the 1.8 Memory screen (ios/Bobby/Sources/Briefings/MemoryView.swift).
-// The route `memory` exists since 1.1.4; with the switch below on, this screen draws it instead of BobbySheet.
+// The route `memory` exists since 1.1.4; this screen draws it now.
 //
 // Profile › Memory: what Bobby remembers about the account, and what this phone keeps.
 // ios/Bobby/V18-DESIGN.md, "Memory": two switches, the assets, and three rows that unfold
@@ -55,9 +55,6 @@ import xyz.bobbyprotocol.android.v18.theses.V18HostWords
 // memory, "Turn on" opens the consent (one consent path: the same screen the offer on the glass
 // opens). MemoryCenter owns account isolation and makes deletion complete (server, shortcuts,
 // theses, and what the other 1.8 features keep). What the phone keeps shows to everyone, signed in or not.
-
-/** True: this screen draws the route `memory`. */
-const val MEMORY_SHEET_READY = true
 
 @Composable
 fun MemorySheet(host: V18Host, onClose: () -> Unit) {

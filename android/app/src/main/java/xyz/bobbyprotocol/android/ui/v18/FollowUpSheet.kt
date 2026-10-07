@@ -100,7 +100,8 @@ fun FollowUpsRows(host: V18Host, onConsentRequired: () -> Unit = {}) {
             center.turnOff()
         }
     }
-    if (view.hasWeek) {
+    // Only while follow-ups are on, as iOS (`showsWeekRow && followUps == .on`).
+    if (view.hasWeek && view.mode == HarnessMode.ON) {
         QuietRow(label = center.copy.weekTitle, tag = "reminders-week", chevron = true, hairline = true) {
             center.focusBoard(null)
             host.switchSheet(V18Routes.FOLLOW_UP)

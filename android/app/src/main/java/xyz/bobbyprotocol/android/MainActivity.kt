@@ -231,7 +231,7 @@ class MainActivity : ComponentActivity() {
                             else BobbySheet(current, session, repository, billing,
                                 onClose = { closeSheet() }, onOpen = { openSheet(it) },
                                 onSignIn = { provider -> startSignIn(provider) },
-                                onExternal = { url -> openExternal(url) }, onShare = { text -> share(text) },
+                                onExternal = { url -> openExternal(url) },
                                 onShareAvatar = { spec -> shareAvatar(spec) },
                                 narrationStatus = narrationStatus,
                                 onNarrate = { report -> narrator.play(report) { narrationStatus = it } },
