@@ -24,8 +24,12 @@ const ENV: Record<string, string> = {
   BOBBY_SUPABASE_URL: 'https://db.test', BOBBY_SUPABASE_ANON_KEY: 'test-anon', BOBBY_SUPABASE_SERVICE_ROLE_KEY: 'test-service',
   OPENAI_API_KEY: 'test-openai', ANTHROPIC_API_KEY: 'test-anthropic', BOBBY_PROTOCOL_BASE_URL: 'https://bobby.test', RATE_LIMIT_SALT: 'test-salt',
 };
-/** Switches a scenario may set; every other run has them unset. */
-const SWITCHES = ['BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_CLIENT_TELEMETRY', 'BOBBY_CLIENT_RECEIPT_SECRET'] as const;
+/**
+ * Every switch the desk path reads from the environment (api/desk-debate.ts and what it imports). A scenario may
+ * set some; every other run has them unset, whatever the shell that runs the capture carries.
+ */
+const SWITCHES = ['BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
+  'BOBBY_CLIENT_TELEMETRY', 'BOBBY_LLM_DAILY_CAP_USD', 'BOBBY_LLM_MONTHLY_CAP_USD', 'BOBBY_LLM_ALERT_USD', 'VERCEL_ENV'] as const;
 
 interface Scenario {
   name: string;
