@@ -61,8 +61,15 @@ const element = (type, props, key) => ({ type, props: props || {}, key });
 export const jsx = element, jsxs = element, jsxDEV = element, Fragment = 'fragment';
 `;
 // Named after what they stand in for; each export is a marker the tree can be searched for.
-const marker = (name, exports = ['default']) => `const make = (key) => Object.assign(function () { return null; }, { stub: ${JSON.stringify(name)} + ':' + key });
-${exports.map((key) => (key === 'default' ? `export default make('default');` : `export const ${key} = make(${JSON.stringify(key)});`)).join('\n')}`;
+// The stub's source is built from names: only plain module names and identifiers are allowed into it.
+const STUB_NAME = /^[\w@./ :-]+$/;
+const IDENTIFIER = /^[A-Za-z_$][\w$]*$/;
+const marker = (name, exports = ['default']) => {
+  if (!STUB_NAME.test(name)) throw new Error(`stub name not allowed in generated source: ${name}`);
+  for (const key of exports) if (!IDENTIFIER.test(key)) throw new Error(`export name not allowed in generated source: ${key}`);
+  const lines = exports.map((key) => (key === 'default' ? `export default make('default');` : `export const ${key} = make('${key}');`));
+  return `const make = (key) => Object.assign(function () { return null; }, { stub: '${name}:' + key });\n${lines.join('\n')}`;
+};
 const STUBS = {
   react: REACT,
   'react/jsx-runtime': JSX,
@@ -848,7 +855,9 @@ check('home: the first screen has the ask pill, three examples, the iPhone link 
   // The iPhone app: words at every width, in a place of its own after the examples (the Apple glyph alone reads as a
   // fourth example: the same glyph orbits the glass as AAPL).
   const examples = /<div class="eg"[^>]*>([\s\S]*?)<\/div>/.exec(hero);
-  assert.ok(examples && !examples[1].includes('apps.apple.com'), 'the App Store link is not in the example row');
+  const exampleLinks = examples ? [...examples[1].matchAll(/href="([^"]*)"/g)].map((match) => match[1]) : [];
+  assert.ok(examples && exampleLinks.length === 3 && exampleLinks.every((href) => href.startsWith('/desk?')),
+    'every link in the example row asks the desk: the App Store link is not among them');
   assert.match(hero.slice(hero.indexOf(examples[0]) + examples[0].length), /^\s*<!--[^>]*-->\s*<div class="start-more"><a class="start-ios" id="start-ios" href="https:\/\/apps\.apple\.com\/app\/bobby-the-market-argues-back\/id6804460489"><span class="ico" aria-hidden="true"[^>]*><\/span><span data-i18n="t\.ios">Get the iPhone app<\/span><\/a><\/div>/);
   const css = home.slice(home.indexOf('<style'), home.indexOf('</style>'));
   assert.ok(!/eg-ios/.test(home), 'the icon-only chip is gone');
