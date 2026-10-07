@@ -158,6 +158,10 @@ const DOES: Record<AppLanguage, { verb: ReadonlySet<string>; caused: RegExp } | 
 const MOVES_IT = setOf('move moving drive driving push pushing pull pulling lift lifting drag dragging pressure pressuring support supporting hurt hurting help helping fuel fueling fuelling hit hitting weigh weighing cause causing make making lead leading trigger triggering limit limiting capping reject rejecting slow slowing stall stalling stop stopping holding keeping');
 const NOT_A_VERB = setOf('the this that these those a an its their all any both each every no other another such during something anything nothing everything');
 const ACTS_ON_IT = new RegExp(` (?:to ([a-z]+)|([a-z]+ing)) (?:(?:the|this|that|these|those|some|more|any|all|a|an) )?${ASSET}(?! s )`, 'g');
+// The listed verbs that are an act once the asset is their object, whoever is named as doing it: "why would
+// traders drop NVDA?" proposes it as surely as "what if someone…". English keeps its object behind its verb, so
+// "NVDA dropped" and "why did NVDA not follow the market?" are not read here.
+const TAKES_IT_UP = new RegExp(` (?:drop|drops|dropped|close|closes|closed|follow|follows|followed|fade|fades|faded|open|opens|opened|build|builds|built|fill|fills|filled|back) (?:(?:the|this|that|these|those|some|more|any|all|a|an) )?${ASSET}(?! s )`);
 
 // An infinitive with the asset as its object is an act named as a thing: "¿qué significaría cerrar NVDA hoy?",
 // "que voudrait dire changer NVDA ?". It is the asset that acts, or is acted on by the market, only when a helper
@@ -434,7 +438,7 @@ function suggests(run: string, language: AppLanguage): boolean {
 function bareAct(run: string, words: readonly string[], language: AppLanguage): boolean {
   if (language === 'en') {
     const then = /^ (?:(?:and|so|but) )?why ([a-z]+) /.exec(run)?.[1];
-    if ((then !== undefined && !WHY_THEN.has(then)) || AMOUNT_OF_IT.en.test(run)) return true;
+    if ((then !== undefined && !WHY_THEN.has(then)) || AMOUNT_OF_IT.en.test(run) || TAKES_IT_UP.test(run)) return true;
     // After "to", any word but an article is read as the verb: "to back NVDA" acts as surely as "to trade NVDA".
     for (const [, base, gerund] of run.matchAll(ACTS_ON_IT)) {
       if (base ? !NOT_A_VERB.has(base) && !MOVES_IT.has(base) : !MOVES_IT.has(gerund) && !NOT_A_VERB.has(gerund)) return true;
