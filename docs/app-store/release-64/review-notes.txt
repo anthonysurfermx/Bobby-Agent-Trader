@@ -1,0 +1,24 @@
+Bobby 1.8 (64) adds a thesis loop, local reminders and clearer credits. Bobby provides educational stock and crypto market analysis. It does not execute trades, connect wallets, hold funds or private keys. Outcomes are only Wait or Review.
+
+What changed since 1.7:
+
+1. Theses. After a read is saved, the person may write a short thesis in their own words (why they are looking at the asset, what worries them, what would change their mind). Theses are stored on the device only, three active at most, and can be edited, archived and deleted (Profile > My theses, row menu).
+2. Thesis review. "Review now" sends the thesis text with one analysis request to Bobby and its AI providers (Anthropic, or OpenAI on failover). The sentence that says so is pinned directly above the button, before anything is sent. The result states that only price evidence was read and lists what was not checked.
+3. Memory consent. Memory for questions asked on iPhone is off until the person agrees on a consent screen that lists what is kept and each item sent to the AI provider (first name, how often and when they asked about the asset, the time frame they named, its price that day and the change since, their preferences, the assets they ask about most). Both answers have equal weight. Profile > Memory shows, pauses and deletes it.
+4. Reminders. A person can set a local notification to review one of their theses on a day they choose. It is scheduled on the device, sends nothing to a server, and its text is generic ("Your reminder to review a thesis."). Notification permission is requested only when the first reminder is set.
+5. Credits. Profile > Credits shows the weekly reads per level, gifted reads and Bobby Pro in one place. RESTORE PURCHASES MOVED: it is now at Profile > Credits > Restore Purchases (signed in or signed out), and every outcome shows a result under the link.
+6. Invitations. Links of the form https://bobbyprotocol.xyz/i/CODE open the app (Associated Domains: applinks:bobbyprotocol.xyz). The code is applied after sign-in. The reward goes to the person who invited.
+7. One native line with one button may appear on the main screen after a read (for example "Why are you looking at NVDA?" > "Write my thesis"). It never appears before the AI/risk notice is accepted.
+
+Review steps:
+1. Select a companion, accept the AI/risk notice, ask about NVIDIA or Bitcoin, and save the read.
+2. Tap "Write my thesis" on the main screen (or Profile > My theses), save it, open it and tap "Review now".
+3. From the review menu (…), choose "Set reminder" and pick a day.
+4. Profile > Credits: balances, Invite, Code, Restore Purchases.
+5. Profile > Memory > Turn on shows the consent screen.
+
+No new purchase types. Subscriptions, prices and terms are unchanged. Guest analysis does not require credentials.
+
+Privacy: https://bobbyprotocol.xyz/privacy?lang=en
+Support: https://bobbyprotocol.xyz/support?lang=en
+Release is manual after approval.
