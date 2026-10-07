@@ -149,8 +149,12 @@ interface V18Host {
      * handler runs once the glass can honour it: page loaded, app in front, notice accepted, no sheet,
      * mic closed, no read running, nothing speaking. Consumed once; newest wins; an account change
      * clears it; a payload tagged for another reader (`LocalNotice.OWNER`) opens nothing.
+     *
+     * `accepts` says whether a payload really is this feature's (a well-formed id, a known step).
+     * It is asked when the tap is STORED, as iOS does: a payload its feature refuses is never kept,
+     * so a malformed tap cannot take the place of a good one that is still waiting.
      */
-    fun onNotificationTap(kind: String, handler: (Map<String, String>) -> Unit)
+    fun onNotificationTap(kind: String, accepts: (Map<String, String>) -> Boolean = { true }, handler: (Map<String, String>) -> Unit)
     /** The stored tap, consumed, for a feature that would rather pull it. */
     fun takeNotificationTap(): Map<String, String>?
     /**

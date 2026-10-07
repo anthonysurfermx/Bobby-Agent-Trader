@@ -91,7 +91,8 @@ object ReminderNudges {
         host.onAppActive { if (briefing.stale) readBriefing(host, briefing) }
         readBriefing(host, briefing)
 
-        host.onNotificationTap(ReminderCenter.KIND) { payload -> intent.open(host, payload) }
+        // Only a reminder with a well-formed thesis id is kept: a malformed tap never replaces one that is waiting.
+        host.onNotificationTap(ReminderCenter.KIND, accepts = { payload -> ReminderIntent.tap(payload) != null }) { payload -> intent.open(host, payload) }
         host.onNotificationDue(ReminderCenter.KIND) { payload ->
             // It was delivered (or is about to be): it is no longer pending.
             center.reconcile()

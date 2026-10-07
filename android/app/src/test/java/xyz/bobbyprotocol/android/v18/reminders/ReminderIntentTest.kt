@@ -134,6 +134,24 @@ class ReminderIntentTest {
         assertEquals(btc.id, bench.host.focus.takeThesisId())
     }
 
+    @Test fun theNewestTapWinsAndAMalformedOneDoesNotReplaceIt() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        started(bench)
+        val nvda = thesis(bench, "NVDA")
+        val btc = thesis(bench, "BTC")
+        bench.shell.active = false
+        assertTrue(bench.host.noteTap(payload(nvda.id)))
+        assertTrue(bench.host.noteTap(payload(btc.id)))
+        assertFalse("rejected when it is stored, as iOS does", bench.host.noteTap(payload("garbage")))
+        runCurrent()
+        bench.shell.active = true
+        bench.host.appBecameActive()
+        runCurrent()
+        assertEquals(listOf(V18Routes.THESIS_REVIEW), bench.shell.opened)
+        assertEquals(btc.id, bench.host.focus.takeThesisId())
+        assertNull(bench.host.takeNotificationTap())
+    }
+
     @Test fun anAccountChangeClearsThePendingTap() = runTest {
         val bench = V18TestBench(backgroundScope)
         started(bench)

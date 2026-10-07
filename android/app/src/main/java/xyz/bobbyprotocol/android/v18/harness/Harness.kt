@@ -68,7 +68,8 @@ object Harness {
 
         // A tapped follow-up, once the glass can honour it. The asset's lands on the glass: the
         // centre writes the line and its button asks Bobby. A sector or a week opens its board.
-        host.onNotificationTap(HarnessCenter.KIND) { payload ->
+        // Only a payload that reads as a follow-up is kept: a malformed tap never replaces one that is waiting.
+        host.onNotificationTap(HarnessCenter.KIND, accepts = { payload -> HarnessTap.from(payload) != null }) { payload ->
             val tap = HarnessTap.from(payload)
             if (tap != null && center.accepts(tap)) {
                 host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.opened(tap) }

@@ -41,9 +41,9 @@ interface V18Desk {
     /** A single-use token for a question native writes about an asset it already knows. */
     fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject
-    /** The quick-access symbols stored for the current owner (never the defaults shown when none are stored). */
+    /** The quick-access symbols the current owner kept (never the default tickers shown when they keep none). */
     val shortcuts: List<String>
-    /** Replaces them. An empty list is kept as "none", and an account's change reaches its other devices. */
+    /** Replaces them. None removes the stored row, so the glass falls back to its default tickers; an account's change reaches its other devices. */
     fun keepShortcuts(symbols: List<String>)
     val repository: BobbyRepository
 }
@@ -130,6 +130,7 @@ class V18Runtime(
     private val deletedListeners = Listeners<(String) -> Unit>()
     private val eraseListeners = Listeners<(String?) -> Unit>()
     private val tapHandlers = HashMap<String, (Map<String, String>) -> Unit>()
+    private val tapChecks = HashMap<String, (Map<String, String>) -> Boolean>()
     private val dueHandlers = HashMap<String, (Map<String, String>) -> Boolean>()
     private val linkHandlers = CopyOnWriteArrayList<(String) -> Boolean>()
     private val services = HashMap<String, Any>()
@@ -166,6 +167,7 @@ class V18Runtime(
         sheetHandoff = null
         readHandoff = null
         tapHandlers.clear()
+        tapChecks.clear()
         dueHandlers.clear()
         linkHandlers.clear()
         nudges.withhold()
@@ -339,11 +341,31 @@ class V18Runtime(
         drainSoon()
     }
 
-    /** A notification of ours was tapped. Newest wins. */
-    fun noteTap(payload: Map<String, String>) {
+    /**
+     * A notification of ours was tapped. Newest wins, among taps worth keeping: a payload that is
+     * not a notice of ours, or that its own feature refuses (a malformed id, an unknown step), is
+     * not stored, so it never takes the place of a good tap that is still waiting. False when it
+     * was not kept.
+     */
+    fun noteTap(payload: Map<String, String>): Boolean {
+        if (!keepsTap(payload)) return false
         taps.tap = payload
         drainSoon()
+        return true
     }
+
+    private fun keepsTap(payload: Map<String, String>): Boolean {
+        val kind = payload[LocalNotice.KIND]
+        // Not a notice of ours: it will never have a feature to open it.
+        if (kind.isNullOrEmpty()) return false
+        val accepts = tapChecks[kind]
+        // Its feature is not listening yet. It may wait for it, but not in the place of a tap that already waits.
+        if (accepts == null) return taps.tap == null
+        return accepted(accepts, payload)
+    }
+
+    private fun accepted(accepts: (Map<String, String>) -> Boolean, payload: Map<String, String>): Boolean =
+        try { accepts(payload) } catch (_: Exception) { false }
 
     /**
      * An https link opened the app. The first feature that keeps it has it; a link nobody wants is
@@ -511,8 +533,12 @@ class V18Runtime(
         sessionChanged()
     }
 
-    override fun onNotificationTap(kind: String, handler: (Map<String, String>) -> Unit) {
+    override fun onNotificationTap(kind: String, accepts: (Map<String, String>) -> Boolean, handler: (Map<String, String>) -> Unit) {
+        tapChecks[kind] = accepts
         tapHandlers[kind] = handler
+        // A tap kept before its feature was listening (the screen was rebuilt) is the feature's to judge now.
+        val waiting = taps.tap
+        if (waiting != null && waiting[LocalNotice.KIND] == kind && !accepted(accepts, waiting)) taps.tap = null
         drainSoon()
     }
 

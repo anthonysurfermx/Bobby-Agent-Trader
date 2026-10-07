@@ -396,6 +396,31 @@ class V18RuntimeTest {
         assertNotNull("a tap whose feature is not there yet keeps waiting", bench.host.takeNotificationTap())
     }
 
+    @Test fun aTapItsFeatureRefusesIsNeverStoredSoItCannotReplaceAGoodOne() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val opened = ArrayList<Map<String, String>>()
+        bench.host.onNotificationTap("thesis-review", accepts = { it["thesisId"]?.length == 36 }) { opened.add(it) }
+        val good = mapOf(LocalNotice.KIND to "thesis-review", "thesisId" to "3fa85f64-5717-4562-b3fc-2c963f66afa6")
+        bench.shell.active = false // still coming to the front: the tap waits
+        assertTrue(bench.host.noteTap(good))
+        assertFalse("refused by its own feature", bench.host.noteTap(mapOf(LocalNotice.KIND to "thesis-review", "thesisId" to "garbage")))
+        assertFalse("not a notice of ours", bench.host.noteTap(mapOf("thesisId" to "3fa85f64-5717-4562-b3fc-2c963f66afa6")))
+        assertFalse("a kind nobody listens for does not take a waiting tap's place", bench.host.noteTap(mapOf(LocalNotice.KIND to "a-kind-nobody-registered")))
+        bench.shell.active = true
+        bench.host.appBecameActive(); runCurrent()
+        assertEquals("the good tap was still the one waiting", listOf(good), opened)
+
+        // A feature that fails while judging keeps nothing.
+        bench.host.onNotificationTap("follow-up", accepts = { throw IllegalStateException("broken") }) { opened.add(it) }
+        assertFalse(bench.host.noteTap(mapOf(LocalNotice.KIND to "follow-up")))
+        // A tap kept before its feature was listening is the feature's to judge when it arrives.
+        assertTrue(bench.host.noteTap(mapOf(LocalNotice.KIND to "later-kind", "id" to "bad")))
+        bench.host.onNotificationTap("later-kind", accepts = { it["id"] == "good" }) { opened.add(it) }
+        runCurrent()
+        assertNull(bench.host.takeNotificationTap())
+        assertEquals(1, opened.size)
+    }
+
     @Test fun aNoticeDueWhileTheAppIsInFrontAsksItsFeature() = runTest {
         val bench = V18TestBench(backgroundScope)
         val payload = mapOf(LocalNotice.KIND to "follow-up")
