@@ -7,6 +7,8 @@
 // Nothing is sent before the risk notice is accepted or without an account. A reply is applied only
 // to the account that asked (the account generation is captured before the request). Only the friend
 // who invited is rewarded by the server; nothing here promises the person accepting anything.
+// A final answer is kept for the account that asked until the invite sheet has shown it (`answer`),
+// so a link opened with an account still gets its answer in words (InviteNudges puts it on the glass).
 import Combine
 import Foundation
 import UIKit
@@ -18,11 +20,23 @@ struct InvitePending: Equatable, Sendable {
     let at: Date
 }
 
+/// A final answer nobody has read yet: which invitation, what the server said, and when.
+struct InviteAnswer: Equatable, Sendable {
+    let code: String
+    let notice: InviteNotice
+    let at: Date
+}
+
 /// What the person is told, once, in words.
-enum InviteNotice: Equatable, Sendable {
+enum InviteNotice: String, Equatable, Sendable {
     case accepted, ownInvitation, notNew, alreadyClaimed, inviterFull, invalid, notApplied
     /// The code is kept: an account is needed, or the server could not be reached.
     case signInNeeded, savedForLater
+    /// The code is kept: nothing is sent before the risk notice is accepted.
+    case consentNeeded
+
+    /// The server's final answers (the only ones kept as an `InviteAnswer`).
+    static let final: Set<InviteNotice> = [.accepted, .ownInvitation, .notNew, .alreadyClaimed, .inviterFull, .invalid, .notApplied]
 
     var text: String {
         switch self {
@@ -48,6 +62,10 @@ enum InviteNotice: Equatable, Sendable {
         case .savedForLater:
             return L.t("Bobby could not check that code right now. It is saved and will be tried again.",
                        "Bobby no pudo revisar ese código ahora. Quedó guardado y se intentará de nuevo.")
+        case .consentNeeded:
+            // The same sentence the memory and briefing screens use.
+            return L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
+                       "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.")
         }
     }
 }
@@ -76,12 +94,17 @@ final class InviteLinkCenter: ObservableObject {
     /// Device-level, not per account: `{code, at}`.
     static let storeKey = "v18.invite.pending"
     static let lifetime: TimeInterval = 30 * 86_400
+    /// Per account: `{code, result, at, user}`. Removed once read, when the account leaves, or after a week.
+    static let answerKey = "v18.invite.answer"
+    static let answerLifetime: TimeInterval = 7 * 86_400
     /// After an attempt that could not be settled, the next one waits this long.
     static let backOff: TimeInterval = 60
     static let timeout: TimeInterval = 20
 
     @Published private(set) var pending: InvitePending?
     @Published private(set) var notice: InviteNotice?
+    /// The last final answer, until the invite sheet has shown it (`acknowledgeNotice`).
+    @Published private(set) var answer: InviteAnswer?
     @Published private(set) var isClaiming = false
 
     var now: () -> Date
@@ -131,6 +154,7 @@ final class InviteLinkCenter: ObservableObject {
         ownerGeneration = currentGeneration()
         pending = Self.read(defaults)
         purgeExpired()
+        restoreAnswer()
         guard observe else { return }
         NotificationCenter.default.publisher(for: AccountSession.didChange)
             .receive(on: DispatchQueue.main)
@@ -140,6 +164,9 @@ final class InviteLinkCenter: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in self?.appBecameActive() }
             .store(in: &cancellables)
+        // A launch is a moment too: an invitation kept from an earlier run (the server could not be
+        // reached, or the session was refused) is tried again without waiting for another event.
+        trigger()
     }
 
     /// Fixture mode (DEBUG) answers every request from recorded captures: no invitation is claimed there.
@@ -153,10 +180,19 @@ final class InviteLinkCenter: ObservableObject {
 
     // MARK: What the screens read
 
-    /// The waiting code, or nil once it is older than thirty days.
-    var pendingCode: String? {
+    /// The waiting invitation, or nil once it is older than thirty days.
+    var waiting: InvitePending? {
         guard let pending, !expired(pending) else { return nil }
-        return pending.code
+        return pending
+    }
+
+    var pendingCode: String? { waiting?.code }
+
+    /// The answer the account that is here now has not read yet (never another account's, never an old one).
+    var unreadAnswer: InviteAnswer? {
+        guard let answer, let owner, !owner.isEmpty, owner == currentUser(), ownerGeneration == currentGeneration(),
+              !expired(answer) else { return nil }
+        return answer
     }
 
     var isSignedIn: Bool { !(currentUser() ?? "").isEmpty }
@@ -189,7 +225,10 @@ final class InviteLinkCenter: ObservableObject {
         }
         store(code)
         notice = nil
-        guard riskAccepted() else { return nil }
+        guard riskAccepted() else {
+            notice = .consentNeeded
+            return notice
+        }
         guard let user = currentUser(), !user.isEmpty else {
             notice = .signInNeeded
             return notice
@@ -222,12 +261,15 @@ final class InviteLinkCenter: ObservableObject {
     func forget() {
         clearPending()
         notice = nil
+        clearAnswer()
     }
 
-    /// The result line was on screen: it is not repeated the next time the sheet opens.
+    /// The result line was on screen: it is not repeated the next time the sheet opens, and the
+    /// answer kept for it is removed from the phone.
     func acknowledgeNotice() {
         guard !isClaiming else { return }
         notice = nil
+        clearAnswer()
     }
 
     // MARK: Triggers
@@ -242,6 +284,10 @@ final class InviteLinkCenter: ObservableObject {
         purgeExpired()
         trigger()
     }
+
+    /// Makes sure the centre exists (InviteNudges calls it when the Núcleo starts), so its observers
+    /// and the launch attempt do not wait for the first invitation link or the first nudge.
+    func wake() {}
 
     /// Everything this centre started has finished (suites and review fixtures).
     func idle() async {
@@ -261,8 +307,11 @@ final class InviteLinkCenter: ObservableObject {
         guard owner != currentUser() || ownerGeneration != currentGeneration() else { return }
         owner = currentUser()
         ownerGeneration = currentGeneration()
-        // The result line was the previous account's.
+        // The result line and the answer behind it were the previous account's.
         notice = nil
+        clearAnswer()
+        // So was the back-off: whoever is here now has not been refused anything yet.
+        retryNotBefore = nil
     }
 
     // MARK: The claim
@@ -282,6 +331,8 @@ final class InviteLinkCenter: ObservableObject {
             if left > 0, left <= Self.backOff { return nil }
         }
         let generation = currentGeneration()
+        // The consent is here now: the line that asked for it is out of date.
+        if notice == .consentNeeded { notice = nil }
         let task = Task { @MainActor in await self.attempt(code: code, user: user, generation: generation) }
         flight = task
         isClaiming = true
@@ -310,6 +361,7 @@ final class InviteLinkCenter: ObservableObject {
             if result == .accepted || !superseded {
                 clearPending()
                 notice = result
+                keepAnswer(InviteAnswer(code: code, notice: result, at: now()), for: user)
             } else {
                 trigger()
             }
@@ -353,13 +405,26 @@ final class InviteLinkCenter: ObservableObject {
         return age >= Self.lifetime || age < -Self.lifetime
     }
 
+    private func expired(_ answer: InviteAnswer) -> Bool {
+        let age = now().timeIntervalSince(answer.at)
+        return age >= Self.answerLifetime || age < -Self.answerLifetime
+    }
+
     private func purgeExpired() {
         if let pending, expired(pending) { clearPending() }
+        if let answer, expired(answer) {
+            // A week-old answer is not news any more: its line goes with it.
+            if notice == answer.notice { notice = nil }
+            clearAnswer()
+        }
     }
 
     /// Newest wins: a second invitation replaces the first, and its own result line follows.
     private func store(_ code: String) {
-        if pending?.code != code { notice = nil }
+        if pending?.code != code {
+            notice = nil
+            clearAnswer()
+        }
         let fresh = InvitePending(code: code, at: now())
         pending = fresh
         defaults.set(["code": fresh.code, "at": fresh.at.timeIntervalSince1970], forKey: Self.storeKey)
@@ -368,6 +433,39 @@ final class InviteLinkCenter: ObservableObject {
     private func clearPending() {
         pending = nil
         defaults.removeObject(forKey: Self.storeKey)
+    }
+
+    // MARK: The answer nobody has read yet
+
+    private func keepAnswer(_ fresh: InviteAnswer, for user: String) {
+        answer = fresh
+        defaults.set(["code": fresh.code, "result": fresh.notice.rawValue, "at": fresh.at.timeIntervalSince1970, "user": user],
+                     forKey: Self.answerKey)
+    }
+
+    private func clearAnswer() {
+        if answer != nil { answer = nil }
+        if defaults.object(forKey: Self.answerKey) != nil { defaults.removeObject(forKey: Self.answerKey) }
+    }
+
+    /// A relaunch: the answer comes back only for the account it was given to, and with it the
+    /// line the invite sheet shows. Anything else (another account, nobody, a broken or old record) is removed.
+    private func restoreAnswer() {
+        guard let stored = defaults.dictionary(forKey: Self.answerKey) else { return }
+        guard let user = stored["user"] as? String, !user.isEmpty, user == owner,
+              let code = (stored["code"] as? String).flatMap(InviteLink.normalized),
+              let result = (stored["result"] as? String).flatMap(InviteNotice.init(rawValue:)), InviteNotice.final.contains(result),
+              let at = (stored["at"] as? NSNumber)?.doubleValue, at.isFinite else {
+            defaults.removeObject(forKey: Self.answerKey)
+            return
+        }
+        let kept = InviteAnswer(code: code, notice: result, at: Date(timeIntervalSince1970: at))
+        guard !expired(kept) else {
+            defaults.removeObject(forKey: Self.answerKey)
+            return
+        }
+        answer = kept
+        notice = result
     }
 
     private static func read(_ defaults: UserDefaults) -> InvitePending? {
@@ -382,6 +480,7 @@ final class InviteLinkCenter: ObservableObject {
     func showForReview(pendingCode: String?, notice: InviteNotice?) {
         pending = pendingCode.map { InvitePending(code: $0, at: now()) }
         self.notice = notice
+        answer = nil
     }
 #endif
 }

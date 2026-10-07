@@ -1,6 +1,7 @@
 // Invitations: DEBUG review fixtures (`-qa-v18 <name>`). The invite sheet with a sample referral,
-// with a waiting invitation, and with each result line. Fixed sample values: no account, nothing
-// stored outside a scratch suite, and no request leaves the process (the sender only fails).
+// with a waiting invitation, with each result line, and before the risk notice is accepted. Fixed
+// sample values: no account, nothing stored outside a scratch suite, and no request leaves the
+// process (the sender only fails).
 #if DEBUG
 import SwiftUI
 
@@ -13,6 +14,7 @@ enum InviteQA {
             "invite-signed-out": { AnyView(InviteQASheet(signedIn: false, referral: false)) },
             "invite-pending": { AnyView(InviteQASheet(signedIn: false, referral: false, pendingCode: friendCode)) },
             "invite-result-saved": { AnyView(InviteQASheet(signedIn: true, pendingCode: friendCode, notice: .savedForLater)) },
+            "invite-consent-needed": { AnyView(InviteQASheet(signedIn: false, referral: false, pendingCode: friendCode, consent: false)) },
         ]
         for (name, notice) in results {
             all["invite-result-\(name)"] = { AnyView(InviteQASheet(signedIn: true, notice: notice)) }
@@ -52,9 +54,9 @@ enum InviteQA {
         return center
     }
 
-    static func invites(signedIn: Bool, pendingCode: String?, notice: InviteNotice?) -> InviteLinkCenter {
+    static func invites(signedIn: Bool, pendingCode: String?, notice: InviteNotice?, consent: Bool = true) -> InviteLinkCenter {
         let generation = UUID()
-        let center = InviteLinkCenter(defaults: scratch(), riskAccepted: { true }, auth: .none,
+        let center = InviteLinkCenter(defaults: scratch(), riskAccepted: { consent }, auth: .none,
                                       currentUser: { signedIn ? "qa-account" : nil }, currentGeneration: { generation },
                                       observe: false,
                                       send: { _, _, _, _, _ in throw URLError(.notConnectedToInternet) },
@@ -75,10 +77,11 @@ private struct InviteQASheet: View {
     @StateObject private var levels: NucleoLevelCenter
     @StateObject private var invites: InviteLinkCenter
 
-    init(signedIn: Bool, referral: Bool = true, proPurchasable: Bool = true, pendingCode: String? = nil, notice: InviteNotice? = nil) {
+    init(signedIn: Bool, referral: Bool = true, proPurchasable: Bool = true, pendingCode: String? = nil, notice: InviteNotice? = nil,
+         consent: Bool = true) {
         self.proPurchasable = proPurchasable
         _levels = StateObject(wrappedValue: InviteQA.levels(referral: referral))
-        _invites = StateObject(wrappedValue: InviteQA.invites(signedIn: signedIn, pendingCode: pendingCode, notice: notice))
+        _invites = StateObject(wrappedValue: InviteQA.invites(signedIn: signedIn, pendingCode: pendingCode, notice: notice, consent: consent))
     }
 
     var body: some View {

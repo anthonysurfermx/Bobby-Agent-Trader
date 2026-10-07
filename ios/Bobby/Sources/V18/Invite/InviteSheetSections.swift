@@ -87,9 +87,10 @@ struct InviteAcceptSection: View {
 
     private var signedIn: Bool { invites.isSignedIn }
 
-    /// The result in words. "Sign in…" is already the section's own line while signed out.
+    /// The result in words. "Sign in…" is already the section's own line while signed out, and
+    /// so is the consent line while the risk notice is not accepted.
     private var result: String? {
-        guard let notice = invites.notice, !(notice == .signInNeeded && !signedIn) else { return nil }
+        guard let notice = invites.notice, notice != .consentNeeded, !(notice == .signInNeeded && !signedIn) else { return nil }
         return notice.text
     }
 
@@ -167,23 +168,30 @@ struct InviteAcceptSection: View {
                     .accessibilityIdentifier("invite-forget")
                 }
             }
-            if !signedIn {
+            if !invites.riskAccepted() {
+                // Without the risk notice nothing is sent, with or without an account: a code typed
+                // here is only kept on the phone, and this line says why nothing else happened.
+                Text(InviteNotice.consentNeeded.text)
+                    .font(.system(size: 13))
+                    .foregroundStyle(Theme.warmMuted)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("invite-consent-needed")
+            } else if !signedIn {
                 Text(InviteNotice.signInNeeded.text)
                     .font(.system(size: 13))
                     .foregroundStyle(Theme.warmMuted)
                     .fixedSize(horizontal: false, vertical: true)
-                if invites.riskAccepted() {
-                    SignInWithAppleButton(.signIn) { account.prepareAppleRequest($0) } onCompletion: { result in
-                        Task {
-                            await account.completeApple(result)
-                            if account.isSignedIn { await afterSignIn?() }
-                        }
+                    .accessibilityIdentifier("invite-sign-in-needed")
+                SignInWithAppleButton(.signIn) { account.prepareAppleRequest($0) } onCompletion: { result in
+                    Task {
+                        await account.completeApple(result)
+                        if account.isSignedIn { await afterSignIn?() }
                     }
-                    .signInWithAppleButtonStyle(.white)
-                    .frame(height: 48)
-                    .clipShape(Capsule())
-                    .accessibilityIdentifier("invite-apple-sign-in")
                 }
+                .signInWithAppleButtonStyle(.white)
+                .frame(height: 48)
+                .clipShape(Capsule())
+                .accessibilityIdentifier("invite-apple-sign-in")
             }
         }
         .onAppear { if code.isEmpty, let saved = invites.pendingCode { code = saved } }
@@ -193,7 +201,8 @@ struct InviteAcceptSection: View {
         }
     }
 
-    /// Capitals and eight characters at most; a pasted invitation link becomes its code.
+    /// Capitals and eight characters at most; a pasted invitation link, or the whole message the
+    /// app shares (the pitch, "My invitation code: …" and the link), becomes its code.
     static func tidy(_ typed: String) -> String {
         if typed.count > InviteLink.codeLength, let pasted = InviteLink.code(fromEntry: typed) { return pasted }
         let kept = typed.uppercased().unicodeScalars.filter { $0.isASCII && CharacterSet.alphanumerics.contains($0) }

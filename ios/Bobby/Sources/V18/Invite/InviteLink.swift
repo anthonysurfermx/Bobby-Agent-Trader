@@ -45,15 +45,38 @@ enum InviteLink {
         }
     }
 
-    /// What a person typed or pasted: the eight characters (spaces ignored), or a whole invitation link.
+    /// What a person typed or pasted: the eight characters (spaces ignored), a whole invitation
+    /// link (with or without `https://`), or a message that carries one of them, such as the text
+    /// the app itself shares (the pitch, "My invitation code: ABCD2345" and the link). Two different
+    /// invitations in one text are nobody's invitation: nil.
     static func code(fromEntry raw: String) -> String? {
         guard raw.utf8.count <= 512 else { return nil }
-        let text = String(String.UnicodeScalarView(raw.unicodeScalars.filter {
-            !CharacterSet.whitespacesAndNewlines.contains($0)
-        }))
-        if let code = normalized(text) { return code }
-        guard text.contains(":"), let url = URL(string: text) else { return nil }
-        return code(from: url)
+        let words = raw.unicodeScalars
+            .split(whereSeparator: { CharacterSet.whitespacesAndNewlines.contains($0) })
+            .map { String(String.UnicodeScalarView($0)) }
+        // The eight characters alone, however they were spaced.
+        if let code = normalized(words.joined()) { return code }
+        let bare = words.map { $0.trimmingCharacters(in: wrapping) }
+        // An invitation link anywhere in the text.
+        let linked = Set(bare.compactMap(code(inWord:)))
+        if !linked.isEmpty { return linked.count == 1 ? linked.first : nil }
+        // Otherwise one code standing alone among other words: in capitals as the app writes it,
+        // or with a digit in it (an ordinary eight-letter word in a sentence is not a code).
+        guard words.count > 1 else { return nil }
+        let alone = Set(bare.filter { $0 == $0.uppercased() || $0.contains(where: \.isNumber) }.compactMap(normalized))
+        return alone.count == 1 ? alone.first : nil
+    }
+
+    /// Punctuation a sentence or a chat bubble puts around a link or a code.
+    private static let wrapping = CharacterSet(charactersIn: ".,;:!?()[]{}<>\"'«»“”‘’")
+
+    /// One word that is, on its own, an invitation link. Without a scheme it must start with the
+    /// site's own host (`bobbyprotocol.xyz/i/CODE`, as the invite sheet prints the link).
+    private static func code(inWord word: String) -> String? {
+        if word.contains(":") { return URL(string: word).flatMap(code(from:)) }
+        let lower = word.lowercased()
+        guard hosts.contains(where: { lower.hasPrefix($0 + "/") }) else { return nil }
+        return URL(string: "https://" + word).flatMap(code(from:))
     }
 
     private static func code(inPath path: String, after prefix: String) -> String? {
