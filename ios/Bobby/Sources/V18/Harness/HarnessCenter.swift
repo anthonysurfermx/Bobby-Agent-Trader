@@ -308,8 +308,6 @@ final class HarnessCenter: ObservableObject {
     static let focusWindow: TimeInterval = 30 * 60
     static let quoteLifetime: TimeInterval = 10 * 60
     static let quoteTimeout: Double = 8
-    /// One `appOpen` per this long.
-    static let openGap: TimeInterval = 30 * 60
     /// What is held in memory about recent reads until the person says yes: this many, this long
     /// (the desk keeps its own reads the same way: NucleoDesk.readsKept, pendingReadWindow).
     static let heldEvents = 5
@@ -682,9 +680,6 @@ final class HarnessCenter: ObservableObject {
         guard keeping else { await sync(); return }
         if recording {
             settle()
-            let clock = now()
-            let lastOpen = ledger.events(.appOpen).last?.at
-            if lastOpen.map({ clock.timeIntervalSince($0) >= Self.openGap }) ?? true { note(HarnessEvent(kind: .appOpen, at: clock)) }
             await replan()
         } else {
             await sync()

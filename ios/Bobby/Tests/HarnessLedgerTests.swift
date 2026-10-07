@@ -87,6 +87,19 @@ final class HarnessLedgerTests: XCTestCase {
         XCTAssertEqual(ledger.asset("TSLA", since: t0, now: t0.addingTimeInterval(90))?.asks, 2)
     }
 
+    func testAnAppOpeningIsRefusedAndOnesKeptByTheFirstBuildAreDropped() throws {
+        var ledger = HarnessLedger()
+        ledger.note(HarnessEvent(kind: .appOpen, at: t0))
+        XCTAssertTrue(ledger.isEmpty, "the ledger does not take one")
+        // A ledger the first 1.8 build wrote: the openings go with the next thing written.
+        let encoder = JSONEncoder(), decoder = JSONDecoder()
+        let old = try encoder.encode(["events": [HarnessEvent(kind: .appOpen, at: t0), HarnessEvent(kind: .appOpen, at: t0.addingTimeInterval(1_800))]])
+        ledger = try decoder.decode(HarnessLedger.self, from: old)
+        XCTAssertEqual(ledger.events.count, 2)
+        ledger.note(ask("NVDA", 3_600))
+        XCTAssertEqual(ledger.events.map(\.kind), [.ask])
+    }
+
     func testOnlyARealAnswerIsAnAnswer() {
         let kinds: [HarnessEvent.Kind] = [.ask, .saved, .appOpen, .sent, .opened, .returned, .picked, .thesis]
         XCTAssertEqual(kinds.filter { HarnessEvent(kind: $0, at: t0).isAnswer }, [.returned], "not a tap, and not a pick that answers no follow-up")

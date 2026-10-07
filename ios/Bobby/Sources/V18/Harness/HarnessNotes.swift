@@ -135,7 +135,7 @@ struct HarnessNotes: Equatable {
                      lines drawn: Int = 0, options: HarnessPlanner.Options = HarnessPlanner.Options()) -> HarnessNotes {
         let ledger = whole.upTo(now)
         var kept: [String: Kept] = [:]
-        var shown = 0, tapped = 0, answered = 0, opens = 0
+        var shown = 0, tapped = 0, answered = 0
         for event in ledger.events {
             func asset(_ change: (inout Kept) -> Void) {
                 guard let symbol = event.symbol else { return }
@@ -171,7 +171,8 @@ struct HarnessNotes: Equatable {
             case .returned:
                 answered += 1
             case .appOpen:
-                opens += 1
+                // Never kept: the ledger refuses it (HarnessLedger.note).
+                break
             }
         }
 
@@ -237,9 +238,6 @@ struct HarnessNotes: Equatable {
         if shown + tapped + answered > 0 {
             notes.general.append(L.t("Follow-ups: \(shown) shown, \(tapped) tapped, \(answered) answered.",
                                      "Seguimientos: \(shown) mostrados, \(tapped) tocados, \(answered) respondidos."))
-        }
-        if opens > 0 {
-            notes.general.append(L.t("Times you opened the app: \(opens).", "Veces que abriste la app: \(opens)."))
         }
         // Not in the ledger: the glass's own count of the lines it drew, one per asset and question.
         if drawn > 0 {

@@ -91,7 +91,6 @@ enum HarnessQA {
                 ledger.note(HarnessEvent(kind: .opened, at: shown.addingTimeInterval(600), symbol: "TSLA", step: .asset, ref: shown))
                 if answered { ledger.note(HarnessEvent(kind: .returned, at: shown.addingTimeInterval(900), symbol: "TSLA", step: .asset, ref: shown)) }
             }
-            for day in 1...6 { ledger.note(HarnessEvent(kind: .appOpen, at: at(10, day, 8))) }
             upcoming.append(HarnessFollowUp(step: .week, fireAt: at(10, 19, 14, 10), symbol: "NVDA", others: 1))
         }
         return HarnessNotes.make(ledger: ledger, mode: .on, upcoming: upcoming, now: at(10, 7, 12), calendar: calendar)

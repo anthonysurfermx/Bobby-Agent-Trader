@@ -483,7 +483,8 @@ drift from what the phone does.
 ```
 
 - Times are ISO 8601 with an offset (instants); `timeZone` is the calendar the plan is made in.
-- An event: `kind` (ask, saved, appOpen, sent, opened, returned, picked, thesis), `at`, and where
+- An event: `kind` (ask, saved, sent, opened, returned, picked, thesis; `appOpen` is read from an
+  older ledger and dropped: opening the app is never written), `at`, and where
   they apply `symbol`, `price`, `step`, `sector`, `ref`, `origin` (`followUp`: Bobby wrote the
   question, a chip included; absent: the person, in their own words),
   `thread`, `horizon` (intraday, week, month, long, unspecified), `horizonHours` (24, 72, 168).
@@ -517,7 +518,7 @@ Rules that are not folded away:
 | State | In the ledger | Elsewhere on the phone |
 | --- | --- | --- |
 | Undecided (never asked, or not answered) | One entry per read they asked for (typed, spoken, or an asset picked on a chip): the asset (symbol, name, stock or crypto), its price, the moment. | How often the glass drew the offer and the line about an asset, and whether it was tapped (the nudge history every line of the glass has). The lines about assets are counted on the Memory screen, go with Erase and Erase notes, and are kept sixty days like the ledger. |
-| On | Everything the planner reads, from the yes on: every read with who started it, saves, taps on Bobby's lines, app openings (one per half hour), follow-ups shown, tapped and answered, the horizon a question named, the review chosen on a save, a pointer to each active thesis. | The switch, the plan (two follow-ups at most), the same nudge history. |
+| On | Everything the planner reads, from the yes on: every read with who started it, saves, taps on Bobby's lines, follow-ups shown, tapped and answered, the horizon a question named, the review chosen on a save, a pointer to each active thesis. | The switch, the plan (two follow-ups at most), the same nudge history. |
 | Off | Nothing. What was there is erased when it is turned off. | The switch itself (the no), and nothing about any asset: the history of the lines goes too. |
 
 Undecided, nothing else is written: no app opening, no save, no tap, no horizon, no thesis
@@ -608,7 +609,6 @@ Borrar notas
 | Three in a row unanswered | Quiet until Oct 21. | En silencio hasta el 21 oct. |
 | A kind is resting | Fewer follow-ups for now. | Menos seguimiento por ahora. |
 | Follow-ups were shown | Follow-ups: 3 shown, 2 tapped, 1 answered. | Seguimientos: 3 mostrados, 2 tocados, 1 respondidos. |
-| App openings are kept | Times you opened the app: 6. | Veces que abriste la app: 6. |
 | The glass drew lines about their assets | “Since you asked” lines shown: 2. | Líneas “desde que preguntaste” mostradas: 2. |
 | Nothing kept | No follow-up notes. | Sin notas de seguimiento. |
 | Follow-ups off | Follow-ups are off. | El seguimiento está apagado. |

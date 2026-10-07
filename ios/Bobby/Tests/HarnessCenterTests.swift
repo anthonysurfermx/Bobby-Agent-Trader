@@ -857,18 +857,17 @@ final class HarnessCenterTests: XCTestCase {
         XCTAssertEqual(center.move?.pct ?? 0, 10, accuracy: 0.001)
     }
 
-    func testAnAppOpenIsWrittenAtMostEveryHalfHour() async {
+    func testOpeningTheAppIsNeverWritten() async {
         let center = make()
         await ask(center, "NVDA")
         await center.appActive()
         XCTAssertEqual(center.ledger.events(.appOpen).count, 0, "undecided: opening the app is not written")
         _ = await center.accept()
+        let kept = center.ledger.events.count
         await center.appActive()
-        clock = clock.addingTimeInterval(600)
-        await center.appActive()
-        XCTAssertEqual(center.ledger.events(.appOpen).count, 1)
         clock = clock.addingTimeInterval(1_800)
         await center.appActive()
-        XCTAssertEqual(center.ledger.events(.appOpen).count, 2)
+        XCTAssertEqual(center.ledger.events(.appOpen).count, 0, "nor with follow-ups on: nothing reads it, so nothing keeps it")
+        XCTAssertEqual(center.ledger.events.count, kept)
     }
 }

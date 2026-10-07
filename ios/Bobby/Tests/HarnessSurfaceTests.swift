@@ -233,7 +233,7 @@ final class HarnessSurfaceTests: XCTestCase {
         await settle()
 
         let kinds = Set(center.ledger.events.map(\.kind))
-        XCTAssertEqual(kinds, [.ask, .saved, .picked, .appOpen, .sent, .opened, .returned, .thesis], "every kind of event, from the yes on")
+        XCTAssertEqual(kinds, [.ask, .saved, .picked, .sent, .opened, .returned, .thesis], "every kind of event the planner reads, from the yes on; opening the app is not one")
         let asks = center.ledger.events(.ask)
         XCTAssertEqual(asks.map(\.thread), [nil, true, nil, nil])
         XCTAssertEqual(asks.map(\.origin), [nil, nil, .followUp, nil])
@@ -1173,7 +1173,7 @@ final class HarnessSurfaceTests: XCTestCase {
         let seven = HarnessCopy.hour(19, calendar: calendar)
         XCTAssertTrue(seven.hasPrefix("7:00") && seven.hasSuffix("PM"), seven)
         XCTAssertEqual(notes.general, ["Your week arrives on Oct 19.", "Follow-ups arrive around \(seven).",
-                                       "Follow-ups: 3 shown, 3 tapped, 3 answered.", "Times you opened the app: 6."])
+                                       "Follow-ups: 3 shown, 3 tapped, 3 answered."])
         L.select("es")
         notes = HarnessNotes.make(ledger: full.ledger, mode: .on, upcoming: full.upcoming, now: now, calendar: calendar)
         XCTAssertEqual(notes.assets[0].lines.first, "Preguntaste 3 veces, la última el \(HarnessCopy.day(at(5, 14, 10), calendar: calendar)).")
@@ -1182,7 +1182,7 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(notes.assets[2].lines.last, "Tu tesis mira a semanas.")
         XCTAssertEqual(notes.general[1], "El seguimiento llega hacia las \(HarnessCopy.hour(19, calendar: calendar)).")
         XCTAssertEqual(notes.general[2], "Seguimientos: 3 mostrados, 3 tocados, 3 respondidos.")
-        XCTAssertEqual(notes.general[3], "Veces que abriste la app: 6.")
+        XCTAssertEqual(notes.general.count, 3, "and nothing about opening the app: it is not kept")
         // Six languages: a sentence of its own in each, and no placeholder left in any.
         var firsts = Set<String>()
         inEveryLanguage { language in
@@ -1326,7 +1326,7 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(center.upcoming, [], "with no question left, nothing is planned")
         XCTAssertEqual(fake.requests.count, 0)
         XCTAssertEqual(fake.delivered.count, 0, "nothing on the lock screen names it either")
-        XCTAssertEqual(center.notes.general, ["Follow-ups: 1 shown, 1 tapped, 0 answered.", "Times you opened the app: 1."])
+        XCTAssertEqual(center.notes.general, ["Follow-ups: 1 shown, 1 tapped, 0 answered."])
         XCTAssertEqual(center.mode, .on, "follow-ups stay on: only the notes went")
         // Erasing all of them leaves nothing, and keeps the yes.
         await center.forgetLedger()
@@ -1567,13 +1567,13 @@ final class HarnessSurfaceTests: XCTestCase {
                 for name in ["OKX", "OKB", "X Layer"] { XCTAssertFalse(line.contains(name), "\(language), \(place): “\(line)”") }
             }
         }
-        // Every sentence the notes can say was in the sweep: 2 + 2 + 4 + 4 + 3 + 1 about an asset, 7 about what Bobby does and keeps.
+        // Every sentence the notes can say was in the sweep: 2 + 2 + 4 + 4 + 3 + 1 about an asset, 6 about what Bobby does and keeps.
         let english = everythingSaid()
         let memory = Set(english.filter { $0.place == "memory" }.map(\.line))
         for needle in ["Asked once", "Asked 3 times", "about today", "about this week", "about this month", "about months or years",
                        "You saved a read.", "review in a day", "review in 3 days", "review in a week", "You wrote a thesis", "weeks ahead",
                        "months or more ahead", "Bobby comes back on", "Your week arrives on", "Follow-ups arrive around", "Quiet until",
-                       "Fewer follow-ups", "Follow-ups: 3 shown", "Times you opened the app",
+                       "Fewer follow-ups", "Follow-ups: 3 shown",
                        "One read from a question Bobby wrote", "3 reads from questions Bobby wrote", "lines shown: 4"] {
             XCTAssertTrue(memory.contains { $0.contains(needle) }, "the sweep never produced “\(needle)”")
         }

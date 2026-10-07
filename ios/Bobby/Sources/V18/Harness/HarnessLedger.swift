@@ -66,7 +66,8 @@ struct HarnessEvent: Codable, Equatable {
         case ask
         /// They saved that read.
         case saved
-        /// The app came to the front.
+        /// The app came to the front. Never written any more: the first 1.8 build kept one per half
+        /// hour and nothing read them, so the ledger refuses them and drops the ones it finds.
         case appOpen
         /// A follow-up's moment passed with the notification handed to iOS.
         case sent
@@ -152,6 +153,7 @@ struct HarnessLedger: Codable, Equatable {
 
     /// Adds one event in its place in time and drops what is too old or too much.
     mutating func note(_ event: HarnessEvent) {
+        guard event.kind != .appOpen else { return }
         var event = event
         if let symbol = event.symbol {
             guard let valid = Self.validSymbol(symbol) else { return }
@@ -167,7 +169,7 @@ struct HarnessLedger: Codable, Equatable {
     /// A thesis pointer is not pruned: it goes when its thesis does (HarnessCenter keeps them in step).
     mutating func prune(now: Date) {
         let cutoff = now.addingTimeInterval(-Double(Self.retentionDays) * 86_400)
-        events.removeAll { $0.at < cutoff && $0.kind != .thesis }
+        events.removeAll { $0.kind == .appOpen || ($0.at < cutoff && $0.kind != .thesis) }
         var extra = events.count - Self.maxEvents
         if extra > 0 {
             events.removeAll { event in
