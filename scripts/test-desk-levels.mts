@@ -6,7 +6,10 @@
 //     scenarios, the guard covers them, and the horizon-sufficiency note reaches every role;
 //   · the endpoint spends a premium allowance before any model call, refuses with a stable code and the
 //     meter, gives the allowance back when the analysis fails, and writes only numbers to the cost ledger;
-//   · the invite code format, creation and claim parameters, and the shape of the link every client shares.
+//   · the invite code format, creation and claim parameters, and the shape of the link every client shares;
+//   · the next question (synthesis.followUp): it asks what or why, never whether or when to act, in six
+//     languages; one that breaks the rule or the guard is replaced by a fixed question in the reply's language
+//     and the read is served as it was, with the replacement logged by its class and never by a text.
 import assert from 'node:assert/strict';
 
 process.env.BOBBY_SUPABASE_URL = 'https://db.test';
@@ -21,7 +24,8 @@ delete process.env.BOBBY_DESK_MODEL;
 process.env.BOBBY_LLM_PRIMARY = 'openai';
 
 const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
-const { runDeskDebate, DeskOutputRejected, sufficiencyOf } = await import('../api/_lib/desk-debate.ts');
+const { runDeskDebate, DeskOutputRejected, sufficiencyOf, servedFollowUp, publicTextViolation } = await import('../api/_lib/desk-debate.ts');
+const { nextQuestionViolation, nextQuestionFallback, NEXT_QUESTION_RULE, FOLLOW_UP_MIN, FOLLOW_UP_MAX } = await import('../api/_lib/desk-next-question.ts');
 const { LEVEL_LIMITS, REFERRAL, levelPlan } = await import('../api/_lib/desk-levels.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: deskHandler } = await import('../api/desk-debate.ts');
@@ -121,7 +125,9 @@ try {
   eq(pricePosition({ price: 715.6, support: 537.3 })!.support, { level: 537.3, where: 'below price', pctOfPrice: 24.92 }, 'distances are in % of the price, not of the level');
   ok(calls.every((c) => JSON.parse(c.body.messages[1].content).evidence.technicals.position !== undefined), 'every role receives the computed position');
   eq(quick.agents.direction, 'none', "'wait' keeps direction none");
-  eq(quick.agents.synthesis, SYN, 'the CIO returns the synthesis the reader sees first');
+  eq(quick.agents.synthesis, { ...SYN, followUp: '¿Qué tendría que cambiar en BTC para que cambie esta lectura?' }, 'the CIO returns the synthesis the reader sees first (its English next question, in a Spanish reply, is replaced)');
+  debateMock();
+  eq((await runDeskDebate('Is BTC worth a look this week?', evidence, 'en')).agents.synthesis, SYN, 'an English reply keeps the CIO\'s own next question, untouched');
   mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, watchLevel: 5000 } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
   eq((await runDeskDebate('Is this real?', evidence, 'en')).agents.synthesis.watchLevel, null, 'a watch level far from the price is never drawn');
   mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, watchLevel: 0 } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
@@ -141,6 +147,153 @@ try {
   ok(!calls.some((c) => byRole(c) === 'red'), 'nor paid for past it');
   mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, why: 'This breakout offers guaranteed profits for patient holders.' } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
   await assert.rejects(runDeskDebate('Is this real?', evidence, 'en'), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee inside the synthesis fails the debate'); checks++;
+  // ---------- the next question: what it may ask, and what is served when it asks something else ----------
+  {
+    const LANGS = ['en', 'es', 'fr', 'pt', 'it', 'de'] as const;
+    const FALLBACK: Record<(typeof LANGS)[number], string> = {
+      en: 'What would have to change in BTC for this read to change?',
+      es: '¿Qué tendría que cambiar en BTC para que cambie esta lectura?',
+      fr: 'Qu’est-ce qui devrait changer sur BTC pour que cette analyse change ?',
+      pt: 'O que teria de mudar em BTC para esta análise mudar?',
+      it: 'Che cosa dovrebbe cambiare in BTC perché questa analisi cambi?',
+      de: 'Was müsste sich bei BTC ändern, damit sich diese Analyse ändert?',
+    };
+    // The words Bobby's copy never uses (buy, sell, profit, guaranteed, returns, advice, signal, alert), by their stems in the six languages.
+    const FORBIDDEN = /\b(?:buy|sell|sold|bought|profit|gain|guarant|return|advi[cs]e|recommend|signal|alert|compr[aáoeé]|vend|venta|ganancia|beneficio|lucro|garant|retorno|rendim|consejo|asesor|recom[ei]|señal|alerta|achet|achat|vente|bénéfice|rendement|conseil|signaux|alerte|ganho|conselho|sina[li]|acquist|vendit|profitt|guadagn|garanz|consigli|segnal|allert|kauf|gewinn|rendite|ertrag|empfehl|beratung|alarm)/iu;
+    const silent = <T,>(run: () => T): { value: T; lines: string[] } => {
+      const lines: string[] = [], saved = console.error;
+      console.error = (...args: unknown[]) => { lines.push(args.map(String).join(' ')); };
+      try { return { value: run(), lines }; } finally { console.error = saved; }
+    };
+    const quiet = async <T,>(run: () => Promise<T>): Promise<{ value: T; lines: string[] }> => {
+      const lines: string[] = [], saved = console.error;
+      console.error = (...args: unknown[]) => { lines.push(args.map(String).join(' ')); };
+      try { return { value: await run(), lines }; } finally { console.error = saved; }
+    };
+
+    // The six fixed questions: pinned, inside the wire bounds, one question each, and clean under both checks for any symbol.
+    for (const lang of LANGS) {
+      eq(nextQuestionFallback(lang, 'BTC'), FALLBACK[lang], `${lang}: the fixed next question`);
+      for (const symbol of ['BTC', 'NVDA', 'MC.PA', '7203.T', '1INCH', 'BRK-B', 'NOW', 'ADD', 'HOLD', 'BUY', 'SELL', 'ME', 'I', 'A', 'ABCDEFGHIJ0123456789']) {
+        const fixed = nextQuestionFallback(lang, symbol);
+        eq([nextQuestionViolation(fixed, lang, symbol), publicTextViolation(fixed)], [null, null], `${lang} ${symbol}: the fixed question passes the next-question rule and the output guard`);
+        ok(fixed.length >= FOLLOW_UP_MIN && fixed.length <= FOLLOW_UP_MAX && fixed.includes(symbol) && fixed.split('?').length === 2 && !/[.!;:\n]/.test(fixed.replace(symbol, '')), `${lang} ${symbol}: one sentence naming the symbol, inside the bounds every client decodes`);
+      }
+      ok(!FORBIDDEN.test(nextQuestionFallback(lang, 'XYZ')), `${lang}: the fixed question uses none of the forbidden words`);
+    }
+    eq([FOLLOW_UP_MIN, FOLLOW_UP_MAX], [6, 160], 'the wire bounds are the ones the contract always had');
+
+    // Good questions pass untouched. The English and Spanish ones were written by the models (the paired eval of
+    // 2026-09-29, docs/ai/data) or are this repository's own fixtures; the other four languages are in their shape.
+    const GOOD: Record<(typeof LANGS)[number], Array<[string, string]>> = {
+      en: [['BTC', 'What if BTC loses the range low?'], ['BTC', 'What would confirm the BTC trend?'], ['MC.PA', 'What is missing for MC.PA?'], ['NVDA', 'What would confirm a NVDA breakout?'],
+        ['NVDA', 'What would invalidate the bullish case for NVDA?'], ['AAPL', 'How would a weekly chart change the AAPL outlook?'], ['AAPL', 'What do AAPL’s daily and weekly charts show?'],
+        ['MSFT', "What would make MSFT's uptrend fail over the next month?"], ['BTC', 'Why is BTC trading inside its range?'], ['BTC', 'What does the 4H chart say about BTC?'], ['NVDA', 'How does NVDA look?']],
+      es: [['SOL', '¿Qué confirmaría una ruptura de SOL?'], ['TSLA', '¿Qué tendría que cambiar en TSLA para confirmar un rebote?'], ['TSLA', '¿Qué dice el gráfico semanal de TSLA sobre su tendencia?'],
+        ['DOGE', '¿Qué le falta a DOGE para confirmar una tendencia en 4H?'], ['DOGE', '¿Qué nivel de soporte mantiene el sesgo alcista diario de DOGE?'], ['SOL', '¿Qué significa que SOL esté sobrecomprado en el gráfico diario?'],
+        ['BTC', '¿Por qué pierde fuerza la tendencia de BTC?'], ['BTC', '¿Y si BTC pierde el mínimo del rango?'], ['BTC', '¿De qué depende la tendencia de BTC?']],
+      fr: [['BTC', 'Qu’est-ce qui confirmerait une cassure de BTC ?'], ['NVDA', 'Pourquoi la tendance de NVDA faiblit-elle ?'], ['NVDA', 'Que montre le graphique hebdomadaire de NVDA ?'], ['BTC', 'Et si BTC perdait le bas de son range ?'], ['MC.PA', 'À quoi tient la tendance de MC.PA ?']],
+      pt: [['BTC', 'O que confirmaria um rompimento de BTC?'], ['NVDA', 'Por que a tendência de NVDA perdeu força?'], ['NVDA', 'O que mostra o gráfico semanal de NVDA?'], ['BTC', 'E se BTC perder o suporte?'], ['BTC', 'Qual é o principal risco para BTC?']],
+      it: [['BTC', 'Che cosa confermerebbe una rottura di BTC?'], ['NVDA', 'Perché il trend di NVDA si è indebolito?'], ['NVDA', 'Cosa mostra il grafico settimanale di NVDA?'], ['BTC', 'E se BTC perdesse il supporto?'], ['BTC', 'Da cosa dipende il trend di BTC?']],
+      de: [['BTC', 'Was würde einen Ausbruch bei BTC bestätigen?'], ['NVDA', 'Warum verliert der Trend von NVDA an Kraft?'], ['NVDA', 'Was zeigt der Wochenchart von NVDA?'], ['BTC', 'Wie würde ein Bruch der Unterstützung das Bild bei BTC ändern?'], ['BTC', 'Unter welchen Bedingungen dreht der Trend bei BTC?']],
+    };
+    for (const lang of LANGS) for (const [symbol, question] of GOOD[lang]) {
+      const { value, lines } = silent(() => servedFollowUp(`  ${question} `, lang, symbol));
+      eq([nextQuestionViolation(question, lang, symbol), value, lines], [null, question, []], `${lang}: "${question}" is a what-or-why question and is served as written, with nothing logged`);
+    }
+
+    // Whether or when to act, in each language: refused, whatever the wording.
+    const ACT: Record<(typeof LANGS)[number], string[]> = {
+      en: ['Is now a good moment for BTC?', 'Is it too late for BTC?', 'Should I add to BTC here?', 'When should I enter BTC?', 'What is the best entry for BTC?', 'Why not hold BTC through the week?', 'What should I do with BTC now?',
+        'How long should BTC be held?', 'Is BTC worth a look here?', 'What price is attractive for BTC?', 'How much BTC makes sense here?', 'Why wait on BTC?', 'What is the exit plan for BTC?', 'What would you do with BTC?',
+        // The fear of being late, asked as a what or a why.
+        'Why is everyone afraid of missing out on BTC?', 'How far can BTC run from here?', 'What upside is left in BTC?', 'What makes BTC attractive here?', 'Why is BTC still cheap?'],
+      es: ['¿Es buen momento para BTC?', '¿Conviene entrar a BTC ahora?', '¿Es demasiado tarde para BTC?', '¿Qué hago con BTC ahora?', '¿Cuándo conviene salir de BTC?', '¿Por qué debería esperar con BTC?', '¿Qué niveles intradía de BTC conviene vigilar?',
+        '¿Vale la pena mantener BTC?', '¿Qué me conviene hacer con BTC?', '¿Cómo entrar en BTC sin apuro?'],
+      fr: ['Est-ce le bon moment pour BTC ?', 'Faut-il attendre sur BTC ?', 'Est-il trop tard pour BTC ?', 'Que dois-je faire avec BTC ?', 'Pourquoi ne pas renforcer BTC maintenant ?', 'Quand entrer sur BTC ?', 'Que faire avec BTC maintenant ?', 'Comment entrer sur BTC ?'],
+      pt: ['É um bom momento para BTC?', 'Vale a pena entrar em BTC agora?', 'É tarde demais para BTC?', 'O que faço com BTC agora?', 'Quando devo sair de BTC?', 'Por que não esperar com BTC?', 'O que fazer com BTC agora?', 'Como entrar em BTC?'],
+      it: ['È un buon momento per BTC?', 'Conviene entrare su BTC adesso?', 'È troppo tardi per BTC?', 'Cosa faccio con BTC adesso?', 'Quando dovrei uscire da BTC?', 'Perché non aspettare su BTC?', 'Che fare con BTC adesso?', 'Come entrare su BTC?'],
+      de: ['Ist jetzt ein guter Zeitpunkt für BTC?', 'Lohnt sich ein Einstieg bei BTC?', 'Ist es zu spät für BTC?', 'Was soll ich mit BTC tun?', 'Wann sollte ich bei BTC aussteigen?', 'Warum nicht bei BTC abwarten?', 'Was ist jetzt bei BTC zu tun?', 'Wie lange BTC noch halten?'],
+    };
+    for (const lang of LANGS) for (const question of ACT[lang]) {
+      eq(nextQuestionViolation(question, lang, 'BTC'), 'act', `${lang}: "${question}" asks whether or when to act`);
+      eq(silent(() => servedFollowUp(question, lang, 'BTC')).value, FALLBACK[lang], `${lang}: …and the fixed question is served in its place`);
+    }
+    // The other rules, each by its class.
+    for (const [question, lang, want, what] of [
+      ['Could BTC retest its range low?', 'en', 'opener', 'a yes/no question'],
+      ['¿Puede BTC romper su resistencia?', 'es', 'opener', 'a yes/no question in Spanish'],
+      ['Est-ce que BTC reste dans son range ?', 'fr', 'opener', 'a yes/no question in French'],
+      ['What if BTC loses the range low?', 'es', 'opener', 'an English question in a Spanish reply'],
+      ['BTC: what would change this read?', 'en', 'shape', 'a label before the question'],
+      ['BTC looks ready to break out here.', 'en', 'shape', 'a statement'],
+      ['What a week for BTC', 'en', 'shape', 'no question mark'],
+      ['BTC is weak. What would change that?', 'en', 'shape', 'a statement before the question'],
+      ['What would change this? And why?', 'en', 'shape', 'two questions'],
+      ['Why BTC?', 'en', 'shape', 'too little to be a question'],
+      [`What would ${'really '.repeat(30)}change BTC?`, 'en', 'shape', 'longer than the wire allows'],
+      ['Why?', 'en', 'shape', 'shorter than the wire allows'],
+      ['What happens if BTC closes above 104?', 'en', 'number', 'a price'],
+      ['What would take BTC to $120k?', 'en', 'number', 'a price with a currency'],
+      ['What if BTC loses its EMA20?', 'en', 'number', 'a level by its number'],
+      ['What if BTC drops ten percent?', 'en', 'number', 'a percentage in words'],
+      ['¿Qué pasaría con BTC si pierde el soporte de 82,556?', 'es', 'number', "a model's own what-if at a price"],
+      ['Was passiert, wenn BTC unter hunderttausend fällt?', 'de', null, 'a compound number word is not read (documented limit)'],
+      ['What signals would confirm a BTC breakout?', 'en', 'word', 'the word signal'],
+      ['¿Qué señales confirmarían una ruptura de BTC?', 'es', 'word', "a model's own question with señales"],
+      ['What returns has BTC shown this month?', 'en', 'word', 'the word returns'],
+      ['What guarantees a BTC breakout?', 'en', 'word', 'the word guarantee'],
+      ['Why is BTC advice so mixed?', 'en', 'word', 'the word advice'],
+      ['Quel signal confirmerait la cassure de BTC ?', 'fr', 'word', 'signal in French'],
+      ['Welches Kaufsignal fehlt bei BTC?', 'de', 'word', 'a compound with Kauf'],
+    ] as const) eq(nextQuestionViolation(question, lang, 'BTC'), want, `${what}: ${want ?? 'passes'}`);
+    eq([nextQuestionViolation(42, 'en', 'BTC'), nextQuestionViolation(null, 'en', 'BTC'), nextQuestionViolation(undefined, 'en', 'BTC'), nextQuestionViolation({ text: 'What?' }, 'en', 'BTC')], ['shape', 'shape', 'shape', 'shape'], 'anything but a string is refused');
+    // The ticker is set aside before any word is read: an asset called NOW, ADD or 7203.T is not a word or a number.
+    eq([nextQuestionViolation('What would confirm a NOW breakout?', 'en', 'NOW'), nextQuestionViolation('What would confirm an ADD breakout?', 'en', 'ADD'), nextQuestionViolation('What would confirm a 7203.T breakout?', 'en', '7203.T'), nextQuestionViolation('What would confirm an ADD breakout?', 'en', 'BTC')],
+      [null, null, null, 'act'], 'the asked asset\'s own ticker is never read as a word or a number; the same letters as a word are');
+
+    // Through the debate: each kind of bad next question, and the read is the read it would have been.
+    debateMock();
+    const clean = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
+    const cioCall = calls.find((c) => byRole(c) === 'cio')!;
+    ok(cioCall.body.messages[0].content.includes(NEXT_QUESTION_RULE) && /followUp asks what happened, why, or what would change this read/.test(NEXT_QUESTION_RULE) && /never whether or when to act/.test(NEXT_QUESTION_RULE), 'the CIO is told the rule beside the description of followUp');
+    ok(calls.filter((c) => byRole(c) !== 'cio').every((c) => !c.body.messages[0].content.includes(NEXT_QUESTION_RULE)), '…and only the CIO');
+    const bad = (followUp: unknown) => mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, followUp } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+    for (const [followUp, lang, reason, what] of [
+      ['You should buy BTC now, right?', 'en', 'advice', 'an instruction to buy (the output guard)'],
+      ['Why is BTC a guaranteed profit this week?', 'en', 'guarantee', 'a guarantee (the output guard)'],
+      ['BTC looks ready to break out here.', 'en', 'shape', 'a statement instead of a question'],
+      ['What happens if BTC closes above 104?', 'en', 'number', 'a price'],
+      [`What would ${'really '.repeat(30)}change BTC?`, 'en', 'shape', 'a question longer than the contract'],
+      ['Why?', 'en', 'shape', 'a question shorter than the contract'],
+      [42, 'en', 'shape', 'a number where the question belongs'],
+      [null, 'en', 'shape', 'null where the question belongs'],
+      ...LANGS.map((l) => [ACT[l][0], l, 'act', `when to act, in ${l}`] as const),
+      ...LANGS.map((l) => [ACT[l][1], l, 'act', `whether to act, in ${l}`] as const),
+    ] as const) {
+      bad(followUp);
+      const { value: read, lines } = await quiet(() => runDeskDebate('Is BTC worth a look this week?', evidence, lang, { level: 'rapido' }));
+      const { followUp: served, ...rest } = read.agents.synthesis;
+      const { followUp: _clean, ...cleanRest } = clean.agents.synthesis;
+      eq([served, rest, read.agents.verdict, read.agents.direction, read.agents.cio], [FALLBACK[lang], cleanRest, clean.agents.verdict, clean.agents.direction, clean.agents.cio], `${what}: the read is served with the same verdict and synthesis, and the fixed question in ${lang}`);
+      eq(lines.map((l) => JSON.parse(l)), [{ route: 'desk-debate', event: 'follow_up_replaced', reason, language: lang, level: 'rapido' }], `${what}: one log line, by class`);
+      ok(typeof followUp !== 'string' || !lines.join('').includes(followUp), `${what}: the log never carries the question`);
+    }
+    // No followUp at all in the model's answer: still a read, still a string on the wire.
+    mock((c) => { const { followUp: _none, ...withoutFollowUp } = SYN; return openai(byRole(c) === 'cio' ? { ...CIO, synthesis: withoutFollowUp } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }); });
+    eq((await quiet(() => runDeskDebate('Is BTC worth a look this week?', evidence, 'pt'))).value.agents.synthesis.followUp, FALLBACK.pt, 'a synthesis without a next question is served with the fixed one');
+    // The rest of the synthesis is still held to the guard: only the next question is forgiven.
+    mock((c) => openai(byRole(c) === 'cio' ? { ...CIO, synthesis: { ...SYN, followUp: 'Should I buy BTC now?', watch: 'This breakout offers guaranteed profits for patient holders.' } } : { analysis: byRole(c) === 'alpha' ? ALPHA : RED }));
+    await assert.rejects(quiet(() => runDeskDebate('Is this real?', evidence, 'en')), (e: unknown) => e instanceof DeskOutputRejected, 'a guarantee in another synthesis line still fails the debate'); checks++;
+    // Every level, and the scenarios beside it: Máximo's CIO is the same contract.
+    mock((c) => { const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : r === 'rebuttal' ? { analysis: REBUTTAL } : { ...CIO, synthesis: { ...SYN, followUp: 'Ist jetzt ein guter Zeitpunkt für BTC?' }, scenarios: SCEN }; return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content); });
+    const maxRead = (await quiet(() => runDeskDebate('Wie sieht BTC diese Woche aus?', v2, 'de', { level: 'maximo' })));
+    eq([maxRead.value.agents.synthesis.followUp, maxRead.value.agents.scenarios, JSON.parse(maxRead.lines[0]).level], [FALLBACK.de, SCEN, 'maximo'], 'Máximo: the same replacement, the scenarios untouched, the level in the log');
+    // watchLevel is a separate field and stays what it was: the next question never reads it or changes it.
+    bad('What happens if BTC closes above 104?');
+    eq((await quiet(() => runDeskDebate('Is this real?', evidence, 'en'))).value.agents.synthesis.watchLevel, SYN.watchLevel, 'the level to watch is untouched by a replaced next question');
+  }
+
   const gone = new AbortController(); gone.abort();
   debateMock();
   await assert.rejects(runDeskDebate('Is this real?', evidence, 'en', { signal: gone.signal })); checks++;
@@ -208,6 +361,7 @@ try {
   let level: { allowed: boolean; code: string | null; useId: number | null } = { allowed: false, code: 'upgrade_required', useId: null };
   let modelFails = false;
   let providerRefusal: string | null = null;
+  let cioReply: unknown = CIO;
   const endpointMock = () => mock((c) => {
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
     if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, readId: 88, tier: 'anon', used: 1, limit: 3, remaining: 2 });
@@ -222,7 +376,7 @@ try {
     if (hostOf(c.url) === 'api.openai.com' || hostOf(c.url) === 'api.anthropic.com') {
       if (providerRefusal) return json({ error: { code: providerRefusal, message: 'private question must never be logged' } }, 429);
       if (modelFails) return hostOf(c.url) === 'api.anthropic.com' ? claude({ analysis: 'x' }, 'max_tokens') : openai({ analysis: 'x' }, 'length');
-      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : CIO;
+      const r = byRole(c); const content = r === 'alpha' ? { analysis: ALPHA } : r === 'red' ? { analysis: RED } : cioReply;
       return hostOf(c.url) === 'api.anthropic.com' ? claude(content) : openai(content);
     }
     throw new Error(`Unexpected request ${c.url}`);
@@ -288,6 +442,60 @@ try {
   await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, quickServed as never);
   eq([quickServed.statusCode, quickServed.body.level], [200, 'rapido'], 'no level: Rápido, as before');
   ok(!calls.some((c) => c.url.includes('bobby_consume_level')), 'Rápido never touches the premium meter');
+
+  // The next question over the wire: a bad one is a 200 with the fixed question, never an analysis_failed. Same
+  // verdict, same synthesis otherwise, nothing given back, and the only trace is one log line without a text.
+  {
+    endpointMock();
+    const goodRead = response();
+    await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }) as never, goodRead as never);
+    eq([goodRead.statusCode, goodRead.body.agents.synthesis.followUp], [200, SYN.followUp], 'a good next question reaches the client as the CIO wrote it');
+    const fixed: Record<string, string> = {
+      en: 'What would have to change in BTC for this read to change?', es: '¿Qué tendría que cambiar en BTC para que cambie esta lectura?',
+      fr: 'Qu’est-ce qui devrait changer sur BTC pour que cette analyse change ?', pt: 'O que teria de mudar em BTC para esta análise mudar?',
+      it: 'Che cosa dovrebbe cambiare in BTC perché questa analisi cambi?', de: 'Was müsste sich bei BTC ändern, damit sich diese Analyse ändert?',
+    };
+    for (const [followUp, language, reason, what] of [
+      ['You should buy BTC now, right?', 'en', 'advice', 'an advice word'],
+      ['Why is BTC a guaranteed profit this week?', 'en', 'guarantee', 'a guarantee'],
+      ['BTC looks ready to break out here.', 'en', 'shape', 'a statement instead of a question'],
+      ['What happens if BTC closes above 104?', 'en', 'number', 'a price'],
+      ['Is now a good moment for BTC?', 'en', 'act', 'when to act (en)'],
+      ['¿Conviene entrar a BTC ahora?', 'es', 'act', 'when to act (es)'],
+      ['Est-ce le bon moment pour BTC ?', 'fr', 'act', 'when to act (fr)'],
+      ['Vale a pena entrar em BTC agora?', 'pt', 'act', 'when to act (pt)'],
+      ['È troppo tardi per BTC?', 'it', 'act', 'when to act (it)'],
+      ['Lohnt sich ein Einstieg bei BTC?', 'de', 'act', 'when to act (de)'],
+    ] as const) {
+      cioReply = { ...CIO, synthesis: { ...SYN, followUp } };
+      endpointMock();
+      const res = response();
+      const logs: string[] = [];
+      const previousError = console.error;
+      console.error = (...args: unknown[]) => logs.push(args.map(String).join(' '));
+      try { await deskHandler(request({ symbol: 'BTC', question: 'PRIVATE_QUESTION about BTC', language }) as never, res as never); }
+      finally { console.error = previousError; }
+      const { followUp: served, ...rest } = res.body.agents.synthesis;
+      const { followUp: _written, ...expected } = SYN;
+      eq([res.statusCode, res.body.code, res.body.agents.verdict, res.body.agents.direction, rest, served], [200, undefined, 'wait', 'none', expected, fixed[language]], `${what}: 200, the same verdict and synthesis, the fixed question in ${language}`);
+      eq(Object.keys(res.body.agents.synthesis), Object.keys(goodRead.body.agents.synthesis), `${what}: the synthesis keeps its keys and their order`);
+      ok(typeof served === 'string' && served.length >= 6 && served.length <= 160, `${what}: a string inside the bounds shipped clients decode, never null`);
+      ok(!calls.some((c) => c.method === 'DELETE'), `${what}: nothing is given back, the read was delivered`);
+      eq(calls.filter((c) => c.url.includes('rpc/bobby_record_outcome')).map((c) => c.body.p_event), ['read_done'], `${what}: the funnel records a finished read, not a failed one`);
+      const replaced = logs.map((x) => { try { return JSON.parse(x); } catch { return null; } }).filter((x) => x?.event === 'follow_up_replaced');
+      eq(replaced, [{ route: 'desk-debate', event: 'follow_up_replaced', reason, language, level: 'rapido' }], `${what}: logged once by its class`);
+      ok(!logs.join('\n').includes(followUp) && !logs.join('\n').includes('PRIVATE_QUESTION') && !logs.join('\n').includes(SYN.headline) && !logs.some((x) => x.includes('analysis_failed') || x.includes('model output rejected')), `${what}: no question, no answer and no failure in the log`);
+    }
+    // The live desk carries the same body.
+    cioReply = { ...CIO, synthesis: { ...SYN, followUp: 'Should I add to BTC here?' } };
+    endpointMock();
+    const liveRead = response();
+    const savedError = console.error; console.error = () => {};
+    await deskHandler(request({ symbol: 'BTC', question: 'Is this real?' }, { accept: 'application/x-ndjson' }) as never, liveRead as never);
+    console.error = savedError;
+    eq([liveRead.lines().at(-1).type, liveRead.lines().at(-1).data.agents.synthesis.followUp], ['final', fixed.en], 'the NDJSON final line carries the fixed question too, and no error line');
+    cioReply = CIO;
+  }
 
   // The live desk over the wire: NDJSON lines, the same final body, and an honest error line.
   level = { allowed: true, code: null, useId: 78 };

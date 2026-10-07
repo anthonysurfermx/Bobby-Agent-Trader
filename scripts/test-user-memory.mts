@@ -34,7 +34,7 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS, MEMORY_RECORD_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, readerForModel, changeSinceLastAsk, CALLBACK_MOVE_BOUND, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS, MEMORY_RECORD_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -140,11 +140,55 @@ try {
     // Callback: price at the last ask (2026-09-26, a Saturday in UTC) vs the evidence price now, computed here.
     const withPrice = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
     const es = readerContext(withPrice, 'NVDA', now, null, 230, 'es')?.thisAsset;
-    eq([es?.priceThen, es?.changeSinceLastAskPct, es?.lastAskedOn], [200, 15, 'sábado'], 'up 15% since Saturday, quoted from the server');
-    eq(readerContext(withPrice, 'NVDA', now, null, 170, 'en')?.thisAsset?.changeSinceLastAskPct, -15, 'a fall keeps its sign');
-    eq(readerContext(withPrice, 'NVDA', now, null, null, 'en')?.thisAsset?.changeSinceLastAskPct, undefined, 'no price now: no callback');
+    eq([es?.changeSinceLastAskPct, es?.lastAskedOn, es?.sinceLastAsk], [15, 'sábado', { change: '+15%', since: 'sábado' }], 'up 15% since Saturday: the figure and its day, finished by the server');
+    ok(!('priceThen' in (es ?? {})), 'the stored price itself is no longer part of the reader: there is nothing to compute another figure from');
+    eq(readerContext(withPrice, 'NVDA', now, null, 170, 'en')?.thisAsset?.sinceLastAsk, { change: '-15%', since: 'Saturday' }, 'a fall keeps its sign');
+    eq(readerContext(withPrice, 'NVDA', now, null, 206.4, 'en')?.thisAsset?.sinceLastAsk, { change: '+3.2%', since: 'Saturday' }, 'one decimal when there is one');
+    eq(readerContext(withPrice, 'NVDA', now, null, 200, 'en')?.thisAsset?.sinceLastAsk, { change: '0%', since: 'Saturday' }, 'unchanged is said without a sign');
+    // The figure is written in the answer's locale, so the CIO quotes it as it stands.
+    eq((['en', 'es', 'fr', 'pt', 'it', 'de'] as const).map((l) => readerContext(withPrice, 'NVDA', now, null, 206.4, l)?.thisAsset?.sinceLastAsk?.change),
+      (['en-US', 'es-MX', 'fr-FR', 'pt-PT', 'it-IT', 'de-DE'] as const).map((l) => new Intl.NumberFormat(l, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format(0.032)), 'the figure is written out in each language\'s own number format');
+    ok(/^\+3[.,]2\s?%$/.test(readerContext(withPrice, 'NVDA', now, null, 206.4, 'de')?.thisAsset?.sinceLastAsk?.change ?? ''), '…always sign, digits, percent');
+    // From a week on there is no weekday: the day is counted, in the answer's language.
+    const older = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-17T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 0, lastPrice: 200 } });
+    eq([readerContext(older, 'NVDA', now, null, 230, 'en')?.thisAsset?.sinceLastAsk, readerContext(older, 'NVDA', now, null, 230, 'es')?.thisAsset?.sinceLastAsk?.since, readerContext(older, 'NVDA', now, null, 230, 'de')?.thisAsset?.sinceLastAsk?.since],
+      [{ change: '+15%', since: '12 days ago' }, 'hace 12 días', 'vor 12 Tagen'], 'twelve days later: "12 days ago", never a weekday that could be any week');
+    eq(readerContext(withPrice, 'NVDA', now, null, null, 'en')?.thisAsset?.sinceLastAsk, undefined, 'no price now: no callback');
     const sameDay = summary({ thisAsset: { asks: 2, lastAskedAt: '2026-09-29T09:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
-    eq(readerContext(sameDay, 'NVDA', now, null, 230, 'en')?.thisAsset?.changeSinceLastAskPct, undefined, 'same day: no callback, the chart already shows it');
+    eq([readerContext(sameDay, 'NVDA', now, null, 230, 'en')?.thisAsset?.sinceLastAsk, readerContext(sameDay, 'NVDA', now, null, 230, 'en')?.thisAsset?.changeSinceLastAskPct], [undefined, undefined], 'same day: no callback, the chart already shows it');
+
+    // ---------- the figure is given only when both prices can be trusted ----------
+    eq([changeSinceLastAsk(200, 230), changeSinceLastAsk(200, 170), changeSinceLastAsk(200, 206.4), changeSinceLastAsk(200, 200)], [15, -15, 3.2, 0], 'an ordinary move: one decimal, with its sign');
+    for (const [then, price, what] of [[null, 230, 'no stored price'], [undefined, 230, 'no stored price'], [0, 230, 'a stored zero'], [-5, 230, 'a negative price'], [NaN, 230, 'not a number'], [Infinity, 230, 'not finite'], ['abc', 230, 'not a number'],
+      [200, null, 'no price now'], [200, 0, 'a zero now'], [200, NaN, 'not a number now'], [200, Infinity, 'not finite now'], [200, 1e13, 'an absurd price']] as const) {
+      eq([changeSinceLastAsk(then, price, 'equity'), changeSinceLastAsk(then, price, 'crypto')], [null, null], `${what}: no figure`);
+    }
+    eq(CALLBACK_MOVE_BOUND, { equity: { down: 25, up: 25 }, crypto: { down: 60, up: 150 } }, 'the bounds, per asset class');
+    // A stock: a split leaves the stored price on the old share count, and reads as a crash or a rally.
+    for (const [then, price, what] of [[1000, 100, 'a 10-for-1 split (-90%)'], [300, 100, 'a 3-for-1 split (-66.7%)'], [200, 100, 'a 2-for-1 split (-50%)'], [150, 100, 'a 3-for-2 split (-33.3%)'],
+      [150, 110, 'a 3-for-2 split and a 10% rise (-26.7%)'], [100, 200, 'a 1-for-2 reverse split (+100%)'], [100, 1000, 'a 1-for-10 reverse split (+900%)'], [200, 150, 'exactly -25%'], [200, 250, 'exactly +25%']] as const) {
+      eq(changeSinceLastAsk(then, price, 'equity'), null, `a stock, ${what}: no figure`);
+      const split = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: then } });
+      const reader = readerContext(split, 'NVDA', now, null, price, 'en', undefined, 'equity');
+      eq([reader?.thisAsset?.sinceLastAsk, reader?.thisAsset?.changeSinceLastAskPct, memoryReceipt(split, reader, true).changeSinceLastAskPct], [undefined, undefined, null], `a stock, ${what}: nothing for the CIO to quote, and null in the receipt`);
+      ok(!JSON.stringify(readerForModel(reader!)).includes(String(then)), `a stock, ${what}: the stored price is not in what the model sees either`);
+    }
+    eq([changeSinceLastAsk(200, 151, 'equity'), changeSinceLastAsk(200, 249, 'equity')], [-24.5, 24.5], 'a stock just inside the bound keeps its figure');
+    // Crypto has no splits; the bound there is for a change of unit or another instrument, and real moves are larger.
+    eq([changeSinceLastAsk(100, 45, 'crypto'), changeSinceLastAsk(100, 240, 'crypto'), changeSinceLastAsk(100, 70, 'crypto')], [-55, 140, -30], 'crypto: a large genuine move is still quoted');
+    eq([changeSinceLastAsk(100, 40, 'crypto'), changeSinceLastAsk(100, 250, 'crypto'), changeSinceLastAsk(1000, 1, 'crypto'), changeSinceLastAsk(1, 1000, 'crypto')], [null, null, null, null], 'crypto: at or beyond a factor of 2.5, and a redenomination, give none');
+    eq([changeSinceLastAsk(100, 140), changeSinceLastAsk(100, 140, 'bond' as never)], [null, null], 'an unknown asset class is held to the stricter bound');
+    const cryptoReader = readerContext(summary({ thisAsset: { asks: 3, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 100 } }), 'BTC', now, null, 140, 'en', undefined, 'crypto');
+    eq([cryptoReader?.thisAsset?.sinceLastAsk, readerContext(summary({ thisAsset: { asks: 3, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 100 } }), 'NVDA', now, null, 140, 'en')?.thisAsset?.sinceLastAsk],
+      [{ change: '+40%', since: 'Saturday' }, undefined], 'the same +40% is quoted for a crypto asset and not for a stock');
+
+    // ---------- what the model is handed: the finished figure, no number to work on ----------
+    const full = readerContext(withPrice, 'NVDA', now, 'Anthony', 230, 'en')!;
+    const seen = readerForModel(full);
+    eq(seen, { firstName: 'Anthony', prefs: { horizon: 'month', experience: 'new' }, thisAsset: { asks: 7, lastAskedDaysAgo: 3, lastHorizon: 'week', timesThisWeek: 2, lastAskedOn: 'Saturday', sinceLastAsk: { change: '+15%', since: 'Saturday' } }, oftenAsks: [{ symbol: 'BTC', asks: 3 }] }, 'the model sees the reader with the finished figure');
+    ok(!/changeSinceLastAskPct|priceThen|lastPrice|"200"|:200\b|:230\b/.test(JSON.stringify(seen)), '…and neither the raw change nor either price');
+    eq(full.thisAsset?.changeSinceLastAskPct, 15, '…while the server keeps the number for the receipt');
+    eq(readerForModel(readerContext(summary(), 'NVDA', now)!), readerContext(summary(), 'NVDA', now), 'a reader without a figure is handed over as it is');
   }
   eq(readerContext(summary({ enabled: false }), 'NVDA', now, 'Anthony'), null, 'memory off: not even the name');
   eq(readerContext(summary({ thisAsset: { asks: 1, lastAskedAt: '2026-09-28T12:00:00.000Z', lastHorizon: 'unspecified' } }), 'NVDA', now)?.thisAsset?.timesThisWeek, 1, 'a summary without the weekly count reads as this question only');
@@ -180,7 +224,8 @@ try {
     const reader = readerContext(priced, 'NVDA', now, null, 230, 'en');
     eq(memoryReceipt(priced, reader, true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'asked 7 times before and this one was written: the 8th, 3 days after the last, up 15%');
     eq(memoryReceipt(priced, reader, false), { recorded: false, asks: 7, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'the write did not happen: not recorded, and this question is not counted');
-    eq([memoryReceipt(priced, reader, true).lastAskedDaysAgo, memoryReceipt(priced, reader, true).changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the very numbers the CIO was given');
+    eq([memoryReceipt(priced, reader, true).lastAskedDaysAgo, memoryReceipt(priced, reader, true).changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the reader\'s own numbers');
+    eq(reader!.thisAsset!.sinceLastAsk?.change, '+15%', '…and the change is the figure the CIO was handed, as a number');
     eq(memoryReceipt(summary(), readerContext(summary(), 'NVDA', now), true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: null }, 'no stored price: no change, never a zero');
     const first = summary({ top: [], thisAsset: null });
     eq(memoryReceipt(first, readerContext(first, 'NVDA', now), true), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask counts itself and has no last time');
@@ -408,12 +453,26 @@ try {
   eq(Object.keys(withoutReceipt).sort(), [...Object.keys(plain.body), 'personalized'].sort(), 'the receipt is the only key memory adds beside `personalized`');
 
   // A stored price and a change since: the receipt quotes what the CIO's reader carried, computed once.
-  summaryReply = { ...REMEMBERED, thisAsset: { ...REMEMBERED.thisAsset, lastPrice: 160 } };
+  summaryReply = { ...REMEMBERED, thisAsset: { ...REMEMBERED.thisAsset, lastPrice: 185 } };
   const priced = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   await settle();
-  const pricedReader = inputOf(models().find((c) => byRole(c) === 'cio')!).reader.thisAsset;
-  eq(priced.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: 25 }, 'from 160 to 200 since the last ask: +25%');
-  eq([priced.body.memory.changeSinceLastAskPct, priced.body.memory.lastAskedDaysAgo, priced.body.memory.asks], [pricedReader.changeSinceLastAskPct, pricedReader.lastAskedDaysAgo, pricedReader.asks + 1], '…the reader\'s own numbers, with this ask counted');
+  const pricedCio = models().find((c) => byRole(c) === 'cio')!;
+  const pricedReader = inputOf(pricedCio).reader.thisAsset;
+  eq(priced.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: 8.1 }, 'from 185 to 200 since the last ask: +8.1%');
+  eq([pricedReader.sinceLastAsk.change, pricedReader.sinceLastAsk.since, pricedReader.lastAskedDaysAgo, pricedReader.asks + 1], ['+8.1%', pricedReader.lastAskedOn, priced.body.memory.lastAskedDaysAgo, priced.body.memory.asks], '…the figure the CIO was handed, finished, beside its day, with this ask counted');
+  // S4: the model never does arithmetic on a reader's history. It gets the finished figure and no operand.
+  ok(!('changeSinceLastAskPct' in pricedReader) && !('priceThen' in pricedReader) && !/185|8\.1(?!%)/.test(JSON.stringify(inputOf(pricedCio).reader)), 'the CIO gets neither the stored price nor the raw change: only "+8.1%" and its day');
+  ok(/quotes change exactly as written/.test(READER_RULE) && /or leave the callback out/.test(READER_RULE) && /never compute, round, convert or reword that figure/.test(READER_RULE) && /never state any other price, change or percentage about this reader's earlier questions/.test(READER_RULE), 'the rule: quote the figure as given or leave it out; never compute, round or restate another');
+  ok(!/changeSinceLastAskPct|priceThen/.test(READER_RULE), '…and it names no field a figure could be computed from');
+  ok(/timesThisWeek is 2 or more/.test(READER_RULE), 'the count callback is the one the owner approved, unchanged');
+  // A split-sized move since the last ask: the read is served, and no figure reaches the prompt or the receipt.
+  summaryReply = { ...REMEMBERED, thisAsset: { ...REMEMBERED.thisAsset, lastPrice: 2000 } };
+  const afterSplit = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  const splitCio = models().find((c) => byRole(c) === 'cio')!;
+  eq([afterSplit.statusCode, afterSplit.body.personalized, afterSplit.body.memory], [200, true, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }], 'NVDA stored at 2000, now 200 (a 10-for-1 split): served, with no change in the receipt');
+  ok(!('sinceLastAsk' in inputOf(splitCio).reader.thisAsset) && !/2000|90/.test(JSON.stringify(inputOf(splitCio).reader)), '…and nothing about that move in what the CIO is handed: no "-90%" to say');
+  eq(inputOf(splitCio).reader.thisAsset.timesThisWeek, 1, '…the rest of the reader is as before');
   eq(calls.filter((c) => c.url.includes('rpc/bobby_memory_summary')).length, 1, '…from one summary read, not a second query');
   eq(recorded().length, 1, '…and `recorded: true` is a request that records');
   // A first ask about an asset: it counts itself, and there is no last time to speak of.

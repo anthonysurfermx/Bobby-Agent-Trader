@@ -124,7 +124,7 @@ const deskMock = () => mock((c) => {
   if (c.url.includes('agent_events')) return json(null, 201);
   if (c.url.includes('/auth/v1/user')) return c.headers.authorization === 'Bearer good-apple-token' ? json({ id: 'a11ce000-0000-4000-8000-000000000001', email: 'reader@example.com', app_metadata: { provider: 'apple' } }) : json({ msg: 'bad token' }, 401);
   if (c.url.includes('bobby_identities?on_conflict=auth_user_id')) return json([{ id: '0b8f0a52-0000-4000-8000-00000000c0de', auth_user_id: 'a11ce000-0000-4000-8000-000000000001', wallet_address: null }]);
-  if (c.url.includes('rpc/bobby_memory_summary')) return json({ enabled: true, prefs: { horizon: 'month', experience: 'new', risk: null }, top: [], thisAsset: { asks: 3, lastAskedAt: new Date(Date.now() - 2 * DAY).toISOString(), lastHorizon: 'week', asksThisWeek: 1, lastPrice: 160 } });
+  if (c.url.includes('rpc/bobby_memory_summary')) return json({ enabled: true, prefs: { horizon: 'month', experience: 'new', risk: null }, top: [], thisAsset: { asks: 3, lastAskedAt: new Date(Date.now() - 2 * DAY).toISOString(), lastHorizon: 'week', asksThisWeek: 1, lastPrice: 185 } });
   if (c.url.includes('rpc/bobby_memory_record')) return json(true);
   if (isModel(c)) {
     const own = intercept(c);
@@ -430,7 +430,7 @@ try {
   eq(bodies(debate()), bodies(rememberedModels), 'a remembered reader with a thesis: the debate is the remembered debate without one, byte for byte');
   ok(systemOf(roleCall('cio')).includes(READER_RULE) && 'reader' in inputOf(roleCall('cio')) && !systemOf(roleCall('cio')).includes(THESIS_RULE), 'the CIO has the reader and its rule, and nothing of the thesis');
   ok(!('reader' in inputOf(roleCall('reviewer'))) && !systemOf(roleCall('reviewer')).includes(READER_RULE) && !/"reader"|oftenAsks|thisAsset|explainRiskDepth/.test(roleCall('reviewer').raw), "the reviewer has the note and nothing of the reader's memory");
-  eq([both.body.personalized, both.body.memory, both.body.review.notChecked.length], [true, { recorded: true, asks: 4, lastAskedDaysAgo: 2, changeSinceLastAskPct: 25 }, 5], '…and the reply carries the memory receipt and the review');
+  eq([both.body.personalized, both.body.memory, both.body.review.notChecked.length], [true, { recorded: true, asks: 4, lastAskedDaysAgo: 2, changeSinceLastAskPct: 8.1 }, 5], '…and the reply carries the memory receipt and the review');
   { const { review: _review, ...rest } = both.body; eq(rest, remembered.body, '…on top of the remembered reply, unchanged'); }
   ok(!MARKERS.test(calls.find((c) => c.url.includes('rpc/bobby_memory_record'))!.raw) && !MARKERS.test(calls.find((c) => c.url.includes('rpc/bobby_memory_summary'))!.raw), 'memory records the ask as always: symbol, horizon and price, nothing of the note');
 

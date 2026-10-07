@@ -92,6 +92,13 @@ const copy = deskErrorCopy;
  * says so first. The level, the model calls and the meters are the same as without it. The question is the only
  * signal: no request field, and a question that names none answers on 1H exactly as before.
  *
+ * Next question: `agents.synthesis.followUp` is always a string of 6 to 160 characters (shipped clients decode
+ * it). It is the CIO's own when that is a what-or-why question about the asset; when it breaks the output guard
+ * or the next-question rule (api/_lib/desk-next-question.ts: whether or when to act, a statement, a price, a word
+ * the copy never uses) the reply carries a fixed question in the reply's language instead and the read is
+ * served: never an `analysis_failed`, never a refund. The log line `{ route: 'desk-debate', event:
+ * 'follow_up_replaced', reason, language, level }` counts how often, by class and without any text.
+ *
  * Outcomes (bobby_events, the owner's funnel): every request that passes validation records exactly one, with the
  * caller resolved before any gate (a budget pause by a signed-in account carries that account). A 405, a foreign
  * origin or a 400 is not a desk attempt and records none. A reader who closes the request before the answer
@@ -253,7 +260,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summaryTask = memoryOwner.then((id) => (id ? memorySummary(id.id, symbol) : null));
     const evidence = await loadDeskEvidenceFor(symbol, assetType, levelPlan(level).evidence, timeframeRequestOf(question, language));
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
-    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
+    const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale, evidence.provenance.assetType === 'crypto' ? 'crypto' : 'equity');
     const asked = horizonOf(question, language);
     const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.

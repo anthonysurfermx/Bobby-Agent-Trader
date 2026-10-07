@@ -6,13 +6,19 @@ import { isEquitySymbol } from '../../src/lib/voice-assets.js';
 import { completeJson, LlmHttpError, LlmIncompleteError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 import { alternateProvider, levelPlan, type DeskLevel, type LevelPlan } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
-import type { ReaderContext } from './user-memory.js';
+import { readerForModel, type ReaderContext } from './user-memory.js';
+import { FOLLOW_UP_MAX, NEXT_QUESTION_RULE, nextQuestionFallback, nextQuestionViolation } from './desk-next-question.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
 const Line = z.string().trim().min(6).max(240);
-/** The answer for a reader in a hurry: one line that answers the question, then why, the risk, what to watch. */
-const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line, watchLevel: z.number().finite().min(0), followUp: z.string().trim().min(6).max(160) });
+/**
+ * The answer for a reader in a hurry: one line that answers the question, then why, the risk, what to watch.
+ * followUp, the next question, is the one field whose contract is not enforced here: whatever the model wrote
+ * (too long, too short, not a string, nothing) is judged by servedFollowUp, which replaces a bad one. A next
+ * question must never cost the read it follows.
+ */
+const Synthesis = z.object({ headline: z.string().trim().min(6).max(180), why: Line, risk: Line, watch: Line, watchLevel: z.number().finite().min(0), followUp: z.unknown() });
 const Verdict = Argument.extend({ verdict: z.enum(['wait', 'review']), direction: z.enum(['long','short','none']), synthesis: Synthesis });
 const Scenario = z.string().trim().min(10).max(600);
 const VerdictWithScenarios = Verdict.extend({ scenarios: z.object({ confirm: Scenario, invalidate: Scenario }) });
@@ -665,7 +671,7 @@ export function pricePosition(t: Levels) {
 const positioned = <T extends Levels>(t: T) => ({ ...t, position: pricePosition(t) });
 
 /** The CIO's rule for the reader's memory, sent only when there is one. */
-export const READER_RULE = "reader is this reader's explicit preferences and how often they asked about assets: use it only to frame the answer (their usual horizon as context, the depth of explanation for their stated experience, a brief 'you often look at NVDA' when it helps; when reader.firstName is present, open the headline or the why by that first name once, warmly and naturally; when reader.thisAsset.timesThisWeek is 2 or more, say it in one short clause, e.g. 'second time this week you ask about NVDA'; when reader.thisAsset.changeSinceLastAskPct is present, open with a short callback that quotes it exactly with its sign and the day (reader.thisAsset.lastAskedOn, else lastAskedDaysAgo days ago), e.g. 'Remember you asked me about AMZN on Monday? It is up 15% since then.' — a fact about the past, never proof the thesis was right or a reason to act — then answer as usual); never let it change the verdict, the direction or the sufficiency note, never judge suitability or give personalized advice, never infer anything else about the person. reader.prefs.explainRiskDepth (low, medium or high) sets only how much the answer explains risk (high: spell out the main risks and what would go wrong; low: one short risk line); it never sets suitability, position sizing or a recommendation, and never softens or hides the main risk.";
+export const READER_RULE = "reader is this reader's explicit preferences and how often they asked about assets: use it only to frame the answer (their usual horizon as context, the depth of explanation for their stated experience, a brief 'you often look at NVDA' when it helps; when reader.firstName is present, open the headline or the why by that first name once, warmly and naturally; when reader.thisAsset.timesThisWeek is 2 or more, say it in one short clause, e.g. 'second time this week you ask about NVDA'; when reader.thisAsset.sinceLastAsk is present, it is the price change since this reader last asked about the asset, already computed and written out by the desk: change is the figure (e.g. '+3.2%') and since the day it counts from; you may open with a short callback that quotes change exactly as written, with its sign, its digits and its decimal mark, beside since, e.g. 'Remember you asked me about AMZN on Monday? It is +3.2% since then.', or leave the callback out — a fact about the past, never proof the thesis was right or a reason to act — then answer as usual; never compute, round, convert or reword that figure, and never state any other price, change or percentage about this reader's earlier questions: when sinceLastAsk is absent the desk has no such figure and you give none); never let it change the verdict, the direction or the sufficiency note, never judge suitability or give personalized advice, never infer anything else about the person. reader.prefs.explainRiskDepth (low, medium or high) sets only how much the answer explains risk (high: spell out the main risks and what would go wrong; low: one short risk line); it never sets suitability, position sizing or a recommendation, and never softens or hides the main risk.";
 
 /**
  * The roles' rules for a chart timeframe the question asked for by name, sent only when it did. Fixed text: the
@@ -792,6 +798,23 @@ export function reviewNotesOf(raw: unknown, verdict?: 'wait' | 'review'): Pick<T
   return { supports: reviewList(review.supports, verdict), challenges: reviewList(review.challenges, verdict), unknowns: reviewList(review.unknowns, verdict) };
 }
 
+/**
+ * The next question the reply carries. The CIO's own when it passes both checks: the desk's output guard (a
+ * guarantee, a personal instruction) and the next-question rule (api/_lib/desk-next-question.ts: a what-or-why
+ * question about the asset, never whether or when to act, no price, no forbidden word). Otherwise the fixed
+ * question for that language, built from the symbol. Either way the reply holds a string of the size every
+ * shipped client decodes, and the read is served: a chip the reader has not seen yet is never a failed read.
+ * A replacement is logged by its class, with the language and the level, never with a text.
+ */
+export function servedFollowUp(written: unknown, language: AppLanguage, symbol: string, level: DeskLevel = 'rapido'): string {
+  const asked = typeof written === 'string' ? written.trim() : '';
+  // Length first: a runaway text is refused before any pattern reads it.
+  const reason = asked.length > FOLLOW_UP_MAX ? 'shape' as const : publicTextViolation(asked) ?? nextQuestionViolation(asked, language, symbol);
+  if (!reason) return asked;
+  console.error(JSON.stringify({ route: 'desk-debate', event: 'follow_up_replaced', reason, language, level }));
+  return nextQuestionFallback(language, symbol);
+}
+
 /** What the desk says while it works: each argument as soon as it has passed the guard, never before. */
 export type DeskEvent =
   | { type: 'evidence'; timeframes: string[]; sufficiency: ReturnType<typeof sufficiencyOf> }
@@ -884,10 +907,11 @@ export async function runDeskDebate(
     ? await role(plan.rebuttal, 'rebuttal', `${rules} Your role is Alpha Hunter in the second round: answer Red Team's strongest objection directly, concede what is right, and restate the conditional case only if it survives. Return {"analysis":"..."}.`, { ...input, alpha, red }, Argument, ARGUMENT_SCHEMA, ctx)
     : null;
   if (rebuttal) emit({ type: 'agent', role: 'rebuttal', text: cleared(rebuttal.analysis) });
-  const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.${sufficiency.requested ? TIMEFRAME_HEADLINE_RULE : ''}`;
+  const cioPrompt = `${rules} Your role is CIO: weigh ${rebuttal ? 'both rounds' : 'both arguments'} and answer the original question. verdict "wait" means the evidence does not support a clear case; "review" means a conditional idea merits further research, never an instruction to trade. If relevant evidence is missing, choose wait. Include direction "long", "short" or "none" for the conditional thesis, never a trade instruction. Also return synthesis, the first thing the reader sees, in plain words for someone new to markets: headline answers the question directly in one sentence of at most 14 words; why is the main reason (at most 18 words); risk is the main risk or what is missing (at most 18 words); watch is the one observable thing to watch next, with its level when the evidence gives one (at most 18 words); watchLevel is that price level as a plain number taken from the evidence, or 0 when watch names no level; followUp is the natural next question this reader could ask about this asset, naming the asset, in their language, at most 12 words, never asking what to buy or sell.${NEXT_QUESTION_RULE}${sufficiency.requested ? TIMEFRAME_HEADLINE_RULE : ''}`;
   const synthesisShape = '"synthesis":{"headline":"...","why":"...","risk":"...","watch":"...","watchLevel":0,"followUp":"..."}';
-  // The reader's memory (api/_lib/user-memory.ts) reaches the CIO only, and only to frame the answer.
-  const reader = opts.reader ?? null;
+  // The reader's memory (api/_lib/user-memory.ts) reaches the CIO only, and only to frame the answer. The change
+  // since their last ask arrives finished (figure and day) or not at all: the CIO is given no number to work on.
+  const reader = opts.reader ? readerForModel(opts.reader) : null;
   const cioInput = { ...input, alpha, red, ...(rebuttal ? { rebuttal } : {}), ...(reader ? { reader } : {}) };
   const readerRule = reader ? ` ${READER_RULE}` : '';
   const cio = plan.scenarios
@@ -901,8 +925,9 @@ export async function runDeskDebate(
   // stray figure (0 means the CIO named none).
   const price = evidence.technicals.price;
   const near = typeof price === 'number' && price > 0 && cio.synthesis.watchLevel > price * 0.5 && cio.synthesis.watchLevel < price * 1.5;
-  const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null };
-  for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch, synthesis.followUp]) {
+  const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null, followUp: servedFollowUp(cio.synthesis.followUp, language, evidence.symbol, level) };
+  // The next question is not in this list: it was judged apart, just above, and a bad one was replaced, not thrown.
+  for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch]) {
     if (!extra) continue;
     const violation = publicTextViolation(extra);
     if (violation) throw new DeskOutputRejected(violation);
