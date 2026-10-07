@@ -239,6 +239,27 @@ final class NudgeCenter {
         if kept.isEmpty { defaults.removeObject(forKey: key) } else if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: key) }
     }
 
+    /// How many ids under `prefix` this reader has a history for (the Memory screen says so, so that
+    /// what the glass keeps about a feature's lines can be seen and erased with the feature's notes).
+    static func count(prefix raw: String, owner: String?, defaults: UserDefaults = .standard) -> Int {
+        let prefix = raw.lowercased()
+        guard !prefix.isEmpty, let data = defaults.data(forKey: storeKey(owner: owner)),
+              let all = try? JSONDecoder().decode([String: Record].self, from: data) else { return 0 }
+        return all.keys.filter { $0.hasPrefix(prefix) }.count
+    }
+
+    /// A feature keeps the history of its lines no longer than what they were about: ids under
+    /// `prefix` last touched before `cutoff` go, retired or not (the general rule keeps a retired id
+    /// much longer, so that "never again" survives; here the thing it was about is itself gone).
+    static func prune(prefix raw: String, before cutoff: Date, owner: String?, defaults: UserDefaults = .standard) {
+        let prefix = raw.lowercased(), key = storeKey(owner: owner)
+        guard !prefix.isEmpty, let data = defaults.data(forKey: key),
+              let all = try? JSONDecoder().decode([String: Record].self, from: data) else { return }
+        let kept = all.filter { !($0.key.hasPrefix(prefix) && $0.value.at < cutoff.timeIntervalSince1970) }
+        guard kept.count != all.count else { return }
+        if kept.isEmpty { defaults.removeObject(forKey: key) } else if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: key) }
+    }
+
     func showings(_ id: String) -> Int { records[id.lowercased()]?.shown ?? 0 }
     func isRetired(_ id: String) -> Bool { records[id.lowercased()]?.done == true }
 

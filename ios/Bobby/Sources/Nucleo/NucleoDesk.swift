@@ -501,14 +501,19 @@ extension CompanionStore {
     }
 }
 
-/// Who started a read. Follow-ups belong to a question the person asked by themselves (V18/Harness).
+/// Who started a read. Follow-ups belong to a question the person asked by themselves (V18/Harness):
+/// typed or spoken, in their own words.
 enum NucleoReadOrigin: Equatable, Sendable {
-    /// The person: typed, spoken, or a chip that only names an asset.
+    /// The person, in their own words: typed or spoken.
     case person
     /// The person again: their own second question about the read on screen.
     case thread
     /// Bobby: the question it wrote after a read, the button of a follow-up, a row of a board.
     case followUp
+    /// The person picked an asset on a chip and Bobby wrote the question it asks: an asset of the
+    /// idle home, an asset or a mover of the row after a read. One tap, not their words: the harness
+    /// never starts a chain of follow-ups from it (the page marks it: `ask {question, chip: true}`).
+    case chip
 }
 
 @MainActor
@@ -547,8 +552,10 @@ final class NucleoDesk {
     var sessionChanged: () -> Void = {}
     /// The person tapped the question Bobby's CIO wrote for a read (the symbol of that read; never the words).
     var nextQuestionPicked: (_ symbol: String) -> Void = { _ in }
-    /// Whether Bobby may put its own one-tap question after a read whose access receipt is this one (§3.5).
-    /// Withheld, the question never reaches the page, which shows its fixed chips. Always, until a rule says otherwise.
+    /// Whether Bobby may put a one-tap question after a read whose access receipt is this one (§3.5):
+    /// the CIO's, and the chips that ask about another asset. Asked once per read. On a no the CIO's
+    /// question never reaches the page and the reply says `oneTap: false`, so the row keeps only
+    /// "Another question", which the person types. Always, until a rule says otherwise.
     var offersNextQuestion: (BobbyReadAccess?) -> Bool = { _ in true }
     var recordQuery: (_ symbol: String, _ isEquity: Bool) -> Void = { DeskMemory().recordQuery(symbol: $0, isEquity: $1) }
     /// Whose bearer the metered read carries (fixture mode: nobody).
@@ -713,14 +720,18 @@ final class NucleoDesk {
             guard !raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { throw NucleoFault.invalid("question is empty") }
             return raw
         }
-        // 1. Params: exactly one of {question} · {token} · {followUpOf, question}.
+        // 1. Params: exactly one of {question} · {token} · {followUpOf, question}. A plain question may
+        //    say it came from a chip whose words Bobby wrote (`chip: true`); nothing else may.
+        let chip = try p.bool("chip", required: false) ?? false
         let source: Source
         if p.has("token") {
             guard !p.has("question"), !p.has("followUpOf") else { throw NucleoFault.invalid("token takes no question") }
+            guard !p.has("chip") else { throw NucleoFault.invalid("chip marks a plain question") }
             let token = try p.string("token", maxLength: 128)!
             guard !token.isEmpty else { throw NucleoFault.invalid("token is empty") }
             source = .token(token)
         } else if p.has("followUpOf") {
+            guard !p.has("chip") else { throw NucleoFault.invalid("chip marks a plain question") }
             let previous = try p.string("followUpOf", maxLength: 36, pattern: Self.uuidPattern)!
             source = .followUp(previous, try question())
         } else {
@@ -762,8 +773,9 @@ final class NucleoDesk {
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
                       generation: generation, startedAt: Date(), level: picked ? .rapido : currentLevel(), origin: picked ? .followUp : .thread)
         case let .question(q):
+            // A chip keeps the level the person saved (they picked the asset); only who wrote the words differs.
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
-                      generation: generation, startedAt: Date(), level: currentLevel())
+                      generation: generation, startedAt: Date(), level: currentLevel(), origin: chip ? .chip : .person)
         }
         // 4.
         emit("ask.stage", ["requestId": requestId, "stage": "resolving"])
@@ -1010,8 +1022,12 @@ final class NucleoDesk {
             if let access { result["access"] = access.json }
             // Levels: the synthesis goes first; the rest of the debate sits behind it.
             result["level"] = debate.level ?? level.rawValue
+            // Bobby never invites someone into a wall: when the next read would be refused, this read
+            // hands back no question that asks by itself. Without the key the reply is what it always was.
+            let offers = offersNextQuestion(access)
+            if !offers { result["oneTap"] = false }
             if var synthesis = debate.synthesis {
-                if !offersNextQuestion(access) { synthesis.followUp = nil }
+                if !offers { synthesis.followUp = nil }
                 result["synthesis"] = synthesis.json
             }
             if let sufficiency = debate.sufficiency { result["sufficiency"] = sufficiency.json }

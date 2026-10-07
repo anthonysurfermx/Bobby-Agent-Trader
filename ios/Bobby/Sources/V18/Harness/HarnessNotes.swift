@@ -4,16 +4,22 @@
 // Invariants:
 //  - One computation. The sentences come from the ledger the planner plans from and from the same
 //    `HarnessProfile.make` it calls: the screen cannot describe a profile the planner does not use.
-//  - Nothing is left out by accident. Every kind of event the ledger can hold and every field of
-//    the profile goes through an exhaustive `switch` below: a new one does not compile until it
-//    has a sentence or is marked internal with the reason.
+//  - Nothing is left out by accident. Every kind of event the ledger can hold, every field an
+//    event carries and every field of the profile goes through an exhaustive `switch` below: a new
+//    one does not compile until it has a sentence or is marked internal with the reason.
+//  - A question the person asked is counted apart from a read whose question Bobby wrote: the
+//    planner follows up the first and never the second, and the screen says which is which.
+//  - What the glass keeps about the lines it drew ("NVDA +2.3% since you asked": how often, whether
+//    it was tapped) is said here too and goes with "Erase notes"; it lasts as long as the ledger.
 //  - Facts and what Bobby does, never what the person "is": "Asked 3 times, last on Oct 5.",
 //    "Follow-ups arrive around 7:00 PM.". What the person said is said as theirs ("You saved a
 //    read, to review in a week."). No sentence promises anything about a verdict.
-//  - The header states a construction fact: these notes are not sent to the AI. The only things
-//    read from the ledger that ever leave the phone are an asset's symbol and kind inside a
-//    question the person sees and sends by their own tap (HarnessCopy.changedQuestion,
-//    lookQuestion); HarnessNotesTests pins it.
+//  - The header states a construction fact: these notes are not sent to the AI. What is read from
+//    the ledger and leaves the phone is an asset's symbol, in two ways only: inside a question the
+//    person sees and sends by their own tap (HarnessCopy.changedQuestion, lookQuestion), and, with
+//    no tap, in the request for that asset's price that draws the number on the glass and on the
+//    week's board (HarnessCenter.quote, HarnessBoardSheet.market: the quote endpoint, no account,
+//    no device, nothing else of the ledger). HarnessSurfaceTests pins both.
 import Foundation
 
 extension HarnessProfile {
@@ -30,7 +36,43 @@ extension HarnessProfile {
     }
 }
 
+extension HarnessEvent {
+    /// The stored fields of an event, one case each (HarnessSurfaceTests checks the list against
+    /// the struct itself, so a field added there fails until it has its case here).
+    enum Field: String, CaseIterable {
+        case kind, at, symbol, name, isEquity, price, step, sector, ref, origin, thread, horizon, horizonHours
+    }
+}
+
 struct HarnessNotes: Equatable {
+    /// Whether something an event carries is said on the Memory screen, or why it is not.
+    enum Told: Equatable {
+        /// The sentence (or the place) that says it.
+        case said(String)
+        /// Internal, with the reason.
+        case kept(String)
+    }
+
+    /// Every field of an event, decided. Exhaustive: a new field does not compile until someone
+    /// has said where the person reads it, or why they do not.
+    static func told(_ field: HarnessEvent.Field) -> Told {
+        switch field {
+        case .kind: return .said("each kind has its sentence or its count (the switch in `make`)")
+        case .at: return .said("the day of their last question, and the days Bobby comes back")
+        case .symbol: return .said("the title of the asset's row")
+        case .origin: return .said("“N reads from questions Bobby wrote.”, apart from “Asked N times”")
+        case .horizon: return .said("“Your question was about …” and “Your thesis looks … ahead.”")
+        case .horizonHours: return .said("“You saved a read, to review in …”")
+        case .step: return .said("“Follow-ups: N shown, N tapped, N answered.” counts every kind together")
+        case .name: return .kept("the asset's display name: it says nothing the symbol in the row's title does not")
+        case .isEquity: return .kept("stock or crypto: it only chooses which bound the number on the glass is held to")
+        case .price: return .kept("the price at the question, kept to say how far the asset moved since; the move is shown on the glass, the price nowhere")
+        case .sector: return .kept("which sector a sector follow-up was about; no chain that ships sends one")
+        case .ref: return .kept("which follow-up a tap or an answer belongs to, so neither is counted twice")
+        case .thread: return .kept("a second question of their own about the same read: it is one of “Asked N times”; the mark only makes that asset weigh more when the week picks the one it names")
+        }
+    }
+
     /// What is kept about one asset.
     struct Asset: Equatable, Identifiable {
         let symbol: String
@@ -72,8 +114,13 @@ struct HarnessNotes: Equatable {
 
     /// What one asset's notes hold while they are being read from the ledger.
     private struct Kept {
+        /// Questions they asked in their own words, and the last of them.
         var asks = 0
         var lastAsked: Date?
+        /// Reads whose question Bobby wrote (a follow-up's button, a board row, a chip).
+        var started = 0
+        /// The last read of either kind: the order of the rows.
+        var lastRead: Date?
         var named: HarnessHorizon?
         var saved = false
         var savedHours: Int?
@@ -83,8 +130,9 @@ struct HarnessNotes: Equatable {
         var own = false
     }
 
+    /// `lines`: how many lines the glass still has a history for (HarnessCenter.linesKept).
     static func make(ledger whole: HarnessLedger, mode: HarnessMode, upcoming: [HarnessFollowUp], now: Date, calendar: Calendar,
-                     options: HarnessPlanner.Options = HarnessPlanner.Options()) -> HarnessNotes {
+                     lines drawn: Int = 0, options: HarnessPlanner.Options = HarnessPlanner.Options()) -> HarnessNotes {
         let ledger = whole.upTo(now)
         var kept: [String: Kept] = [:]
         var shown = 0, tapped = 0, answered = 0, opens = 0
@@ -96,10 +144,16 @@ struct HarnessNotes: Equatable {
             switch event.kind {
             case .ask:
                 asset {
-                    $0.asks += 1
-                    $0.lastAsked = event.at
-                    // `unspecified` is the absence of a horizon: there is nothing to say about it.
-                    if let horizon = event.horizon, horizon != .unspecified { $0.named = horizon }
+                    if event.isQuestion {
+                        // What the planner follows up: the count, the day and the horizon are of these only.
+                        $0.asks += 1
+                        $0.lastAsked = event.at
+                        // `unspecified` is the absence of a horizon: there is nothing to say about it.
+                        if let horizon = event.horizon, horizon != .unspecified { $0.named = horizon }
+                    } else {
+                        $0.started += 1
+                    }
+                    $0.lastRead = event.at
                     $0.own = true
                 }
             case .saved:
@@ -123,7 +177,7 @@ struct HarnessNotes: Equatable {
 
         var notes = HarnessNotes(mode: mode)
         let order = kept.keys.sorted { a, b in
-            let left = kept[a]?.lastAsked ?? .distantPast, right = kept[b]?.lastAsked ?? .distantPast
+            let left = kept[a]?.lastRead ?? .distantPast, right = kept[b]?.lastRead ?? .distantPast
             return left == right ? a < b : left > right
         }
         for symbol in order {
@@ -133,6 +187,11 @@ struct HarnessNotes: Equatable {
                 let day = HarnessCopy.day(last, calendar: calendar)
                 lines.append(asset.asks <= 1 ? L.t("Asked once, on \(day).", "Preguntaste una vez, el \(day).")
                              : L.t("Asked \(asset.asks) times, last on \(day).", "Preguntaste \(asset.asks) veces, la última el \(day)."))
+            }
+            if asset.started == 1 {
+                lines.append(L.t("One read from a question Bobby wrote.", "Una lectura desde una pregunta que escribió Bobby."))
+            } else if asset.started > 1 {
+                lines.append(L.t("\(asset.started) reads from questions Bobby wrote.", "\(asset.started) lecturas desde preguntas que escribió Bobby."))
             }
             if let named = asset.named { lines.append(sentence(named: named)) }
             if asset.saved { lines.append(sentence(savedHours: asset.savedHours)) }
@@ -181,6 +240,10 @@ struct HarnessNotes: Equatable {
         }
         if opens > 0 {
             notes.general.append(L.t("Times you opened the app: \(opens).", "Veces que abriste la app: \(opens)."))
+        }
+        // Not in the ledger: the glass's own count of the lines it drew, one per asset and question.
+        if drawn > 0 {
+            notes.general.append(L.t("“Since you asked” lines shown: \(drawn).", "Líneas “desde que preguntaste” mostradas: \(drawn)."))
         }
         return notes
     }

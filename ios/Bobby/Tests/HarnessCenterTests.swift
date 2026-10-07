@@ -404,6 +404,96 @@ final class HarnessCenterTests: XCTestCase {
         XCTAssertEqual(fake.requests.count, 0)
     }
 
+    /// The commonest person: asks about once a week and never opens a follow-up.
+    func testTwoQuestionsAndNoAppOpenNeverDeliverAFourthUnansweredInARow() async {
+        clock = at(1, 14, 10)                           // Thursday 1
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(6, 15, 0)                            // Tuesday 6: the asset (Fri 2) and the week (Mon 5) arrived unopened
+        fake.deliver(before: clock)
+        XCTAssertEqual(Set(fake.delivered.keys), ["v18.follow.asset", "v18.follow.week"])
+        await center.appActive()
+        await ask(center, "NVDA")
+        XCTAssertEqual(center.ledger.events(.returned), [], "the question came more than a day after the week: it answers nothing")
+        XCTAssertEqual(center.ledger.unansweredStreak(before: clock).count, 2)
+        // What iOS holds now is everything that arrives if the app is not opened again.
+        XCTAssertEqual(fake.requests.keys.sorted(), ["v18.follow.asset"], "the third in a row, and no fourth behind it")
+        XCTAssertEqual(fake.requests["v18.follow.asset"]?.fireAt, at(7, 15, 0))
+        XCTAssertEqual(center.upcoming.map(\.step), [.asset])
+        clock = at(20, 9)
+        fake.deliver(before: clock)
+        await center.appActive()
+        XCTAssertEqual(center.ledger.events(.sent).map(\.at), [at(2, 14, 10), at(5, 14, 10), at(7, 15, 0)])
+        XCTAssertEqual(center.ledger.unansweredStreak(before: clock).count, 3, "three, then quiet")
+        XCTAssertEqual(fake.requests.count, 0)
+    }
+
+    // MARK: A no stays a no; an account that said no keeps nothing (review of 2026-10-07)
+
+    func testStopHoldsThroughASignInAndASignOut() async {
+        let center = make()                             // signed out
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        await center.turnOff()                          // what "Stop" on a notification does
+        XCTAssertEqual(center.mode, .off)
+        user = "u1"
+        await center.accountChanged()
+        XCTAssertEqual(center.mode, .off, "the account inherits the no")
+        user = nil
+        await center.accountChanged()
+        XCTAssertEqual(center.mode, .off, "and the phone, signed out again, has not forgotten it")
+        clock = at(9, 10)
+        await ask(center, "BTC", equity: false)
+        XCTAssertTrue(center.ledger.isEmpty, "nothing is kept again")
+        let read = NudgeRead(requestId: "r", symbol: "BTC", name: "Bitcoin", isEquity: false, verdict: "wait", saved: false, at: clock, memory: nil)
+        XCTAssertNil(HarnessNudges.offer(NudgeMoment(signedIn: false, now: clock, lastRead: read, readsThisLaunch: 1), mode: center.mode),
+                     "and the offer is not made again")
+        XCTAssertEqual(fake.permissionRequests, 1)
+    }
+
+    func testAYesSignedOutIsNotAskedForAgainByItsAccountAndTheLocalReaderStartsOver() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        user = "u1"
+        await center.accountChanged()
+        XCTAssertEqual(center.mode, .on)
+        XCTAssertEqual(center.ledger.events(.ask).compactMap(\.symbol), ["NVDA"], "what the phone learned signed out goes with them")
+        user = nil
+        await center.accountChanged()
+        XCTAssertEqual(center.mode, .undecided, "nobody said no here: a signed-out reader is simply new")
+        XCTAssertTrue(center.ledger.isEmpty)
+    }
+
+    func testAnAccountThatSaidNoTakesNothingFromTheSignedOutReader() async {
+        user = "u1"
+        let center = make()
+        await center.turnOff()                          // on this phone, u1 said no
+        let store = HarnessStore(defaults: defaults)
+        for decided in [true, false] {
+            user = nil
+            await center.accountChanged()
+            // Signed out, someone asks, and (once) says yes and saves with a week's review.
+            await ask(center, "NVDA")
+            if decided {
+                _ = await center.accept()
+                center.noteSaved(symbol: "NVDA", horizonHours: 168)
+                await settle()
+            }
+            XCTAssertFalse(store.ledger(owner: nil).isEmpty)
+            user = "u1"
+            await center.accountChanged()
+            XCTAssertEqual(center.mode, .off, "decided signed out: \(decided)")
+            XCTAssertTrue(center.ledger.isEmpty, "off keeps nothing, whoever used the phone signed out (decided: \(decided))")
+            XCTAssertTrue(store.ledger(owner: "u1").isEmpty)
+            XCTAssertTrue(center.notes.assets.isEmpty, "so the Memory screen has no notes under follow-ups that are off")
+            XCTAssertTrue(store.ledger(owner: nil).isEmpty, "and the signed-out reader's notes did not stay behind either")
+            XCTAssertEqual(center.upcoming, [])
+            XCTAssertEqual(fake.requests.count, 0)
+        }
+    }
+
     func testOpeningTheAppJustBeforeAFollowUpDoesNotCancelIt() async {
         let center = make()
         await ask(center, "NVDA")

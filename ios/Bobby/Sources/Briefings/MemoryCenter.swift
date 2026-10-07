@@ -359,8 +359,9 @@ final class MemoryCenter: ObservableObject {
         notice = nil
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
-        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned.
-        HarnessStore(defaults: defaults).forget(owner: user)
+        // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned. A no
+        // to follow-ups is not a note: it stays, so erasing never brings the offer back.
+        HarnessStore(defaults: defaults).forgetNotes(owner: user)
         NotificationCenter.default.post(name: HarnessCenter.erased, object: nil)
         forgotAllAt = now()
         local = readLocal()

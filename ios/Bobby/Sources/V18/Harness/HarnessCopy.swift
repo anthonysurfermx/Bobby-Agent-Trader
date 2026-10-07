@@ -105,16 +105,24 @@ enum HarnessCopy {
     ///
     /// The line stays on the glass for up to `HarnessCenter.dueDays` (two weeks) after the
     /// question, so each bound is for a fortnight, not for a day, and holds at every age.
-    ///  - A stock: between 0.6 and 1.6 times the price at the question (-40% to +60%). A 2-for-1
-    ///    split reads 0.5, a 3-for-1 reads 0.33, a 1-for-2 reverse split reads 2: all outside,
-    ///    however many days passed. An earnings day (around a quarter either way) and a bad
-    ///    fortnight are inside. A 3-for-2 split (0.67) is inside too: by size alone it cannot be
-    ///    told from a fall, and the phone has no list of corporate actions to ask.
+    ///  - A stock: more than 0.7 and less than 1.4 times the price at the question (-30% to +40%).
+    ///    The band is built so a split can never pass for a move: its top is twice its bottom, so
+    ///    a 2-for-1 split, or any larger one, forward or reverse, on top of ANY move the band
+    ///    itself would print lands outside it. 100 → 62 is 2-for-1 and +24%: 0.62, no number (a
+    ///    wider band printed "-38%"). A split that slipped through would need the stock to have
+    ///    moved by more than the phone ever prints.
+    ///    It is not narrowed for the first days: an earnings day (a quarter either way) is as large
+    ///    as an ordinary fortnight, a narrower band would only take the number away on the days it
+    ///    is wanted, and what keeps splits out is the shape of the band, at every age.
+    ///    What stays possible: a 3-for-2 split (0.67) with a rise of 5% or more on top reads as a
+    ///    fall of up to 30%. By size alone it cannot be told from one, and the phone has no list
+    ///    of corporate actions to ask; a split-adjusted reference from the quote endpoint would
+    ///    close it.
     ///  - Crypto has no splits. What goes wrong there is a ticker that now names another coin, a
     ///    redenomination (1 for 1,000) or a bad tick: 0.2 to 5 times (-80% to +400%) lets a small
     ///    coin's wildest ordinary week through and stops those.
     /// Outside the bound the phone says no number, never a corrected one.
-    static let stockMove: ClosedRange<Double> = 0.6...1.6
+    static let stockMove: ClosedRange<Double> = 0.7...1.4
     static let cryptoMove: ClosedRange<Double> = 0.2...5
 
     /// The move between the price at the question and the price now, in percent. Nil when the

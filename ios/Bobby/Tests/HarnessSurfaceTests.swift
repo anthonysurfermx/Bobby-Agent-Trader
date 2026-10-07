@@ -298,9 +298,10 @@ final class HarnessSurfaceTests: XCTestCase {
             XCTAssertNil(HarnessCopy.move(from: 480, to: 480 * ratio * 1.08, isEquity: true), split)
             XCTAssertNil(HarnessCopy.move(from: 480, to: 480 * ratio * 0.92, isEquity: true), split)
         }
-        XCTAssertNil(HarnessCopy.move(from: 100, to: 60, isEquity: true), "the bound itself is outside")
-        XCTAssertNil(HarnessCopy.move(from: 100, to: 160, isEquity: true))
-        XCTAssertNotNil(HarnessCopy.move(from: 100, to: 60.5, isEquity: true))
+        XCTAssertNil(HarnessCopy.move(from: 100, to: 70, isEquity: true), "the bound itself is outside")
+        XCTAssertNil(HarnessCopy.move(from: 100, to: 140, isEquity: true))
+        XCTAssertNotNil(HarnessCopy.move(from: 100, to: 70.5, isEquity: true))
+        XCTAssertNotNil(HarnessCopy.move(from: 100, to: 139.5, isEquity: true))
         // Crypto: wide, and still not anything.
         XCTAssertEqual(HarnessCopy.move(from: 1, to: 3.4, isEquity: false) ?? 0, 240, accuracy: 0.0001, "a small coin's wild week")
         XCTAssertEqual(HarnessCopy.move(from: 1, to: 0.3, isEquity: false) ?? 0, -70, accuracy: 0.0001)
@@ -315,9 +316,11 @@ final class HarnessSurfaceTests: XCTestCase {
                 XCTAssertNil(HarnessCopy.move(from: then, to: now, isEquity: isEquity), "\(String(describing: then)) → \(String(describing: now))")
             }
         }
-        // The bounds hold whatever the age of the question: they do not grow with the days.
+        // The bounds hold whatever the age of the question: they do not grow with the days. And the
+        // band cannot contain both a move and that move after a 2-for-1 split: its top is at most twice its bottom.
         XCTAssertLessThan(HarnessCopy.stockMove.upperBound, 2)
         XCTAssertGreaterThan(HarnessCopy.stockMove.lowerBound, 0.5, "a 2-for-1 split is outside on every day of the two weeks")
+        XCTAssertLessThanOrEqual(HarnessCopy.stockMove.upperBound, 2 * HarnessCopy.stockMove.lowerBound)
     }
 
     func testOutsideTheBoundTheGlassAndTheBoardSayNoNumber() async throws {
@@ -587,6 +590,15 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertNil(HarnessWall.current([ended, nil], now: now), "so the phone asks again instead of keeping the button away")
         XCTAssertNil(HarnessWall.current([nil, nil], now: now))
         XCTAssertEqual(HarnessWall.current([Self.guest(left: 0)], now: now), Self.guest(left: 0), "a guest's reads do not come back by themselves")
+        // Closed is knowing the next read is refused. It is never true together with open, and not knowing is neither:
+        // Bobby starts nothing of its own without knowing, and the home keeps its chips until the phone knows.
+        for (receipt, open, closed) in [(nil, false, false), (Self.unread, false, false), (Self.pro, true, false), (Self.guest(left: 1), true, false),
+                                        (Self.guest(left: 0), false, true), (Self.free(left: 0), false, true), (Self.free(left: 0, bonus: 2), true, false),
+                                        (Self.free(left: 0, paywall: false), true, false), (Self.free(left: 7), true, false)] as [(BobbyReadAccess?, Bool, Bool)] {
+            XCTAssertEqual(HarnessWall.open(receipt), open, String(describing: receipt))
+            XCTAssertEqual(HarnessWall.closed(receipt), closed, String(describing: receipt))
+        }
+        XCTAssertTrue(HarnessWall.closed(BobbyReadAccess(tier: "free", used: 20, limit: 20, remaining: nil, resetsAt: nil, paywall: true)))
     }
 
     func testWhenTheNextReadWouldBeRefusedTheLineStaysAndAsksNothing() async throws {
@@ -773,6 +785,329 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual(read["status"] as? String, "ok", "the read itself is delivered")
         XCTAssertEqual(receipts.count, 1)
         XCTAssertNil((read["synthesis"] as? [String: Any])?["followUp"] as? String, "without the question that would lead into the wall")
+    }
+
+    // MARK: A chip Bobby wrote, and the row after the last read (review of 2026-10-07)
+
+    private func said(_ center: HarnessCenter) -> [String] {
+        center.ledger.events(.ask).map { "\($0.symbol ?? "-")(\($0.origin?.rawValue ?? "own"))" }
+    }
+
+    private func coming(_ center: HarnessCenter) -> [String] {
+        center.upcoming.map { "\($0.step.rawValue) \($0.symbol ?? "-") \(Int($0.fireAt.timeIntervalSince(at(1, 0)) / 60))" }
+    }
+
+    private func moment(_ step: HarnessStep, _ symbol: String, _ date: Date) -> String {
+        "\(step.rawValue) \(symbol) \(Int(date.timeIntervalSince(at(1, 0)) / 60))"
+    }
+
+    /// Through the real bridge, desk and centre: one typed question, a yes, the follow-up, its
+    /// button, and then the one-tap chip of that read's row.
+    func testAChipBobbyWroteIsAtMostAnAnswerAndStartsNoChain() async throws {
+        let center = make()
+        let (session, bridge, recorder) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        session.desk.currentLevel = { .rapido }
+        session.desk.setLevel = { _ in }
+        _ = await call(bridge, "session", ["page": "app"])
+        // Wednesday 7 at 16:40: one typed question about NVDA, then yes.
+        let own = await call(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(own["status"] as? String, "ok")
+        await settle()
+        _ = await center.accept()
+        XCTAssertEqual(coming(center), [moment(.asset, "NVDA", at(8, 16, 40)), moment(.week, "NVDA", at(12, 16, 40))])
+        // Thursday: the follow-up arrives, they tap it, then "What changed?" on the glass.
+        clock = at(8, 17, 5)
+        fake.deliver(before: clock)
+        prices["NVDA"] = 102
+        await center.appActive()
+        let source = HarnessNudges.moveSource(center)
+        let nudge = try XCTUnwrap(source.candidate(NudgeMoment(signedIn: false, now: clock, lastRead: nil, readsThisLaunch: 0)))
+        await source.act(nudge, session)
+        let token = try XCTUnwrap(recorder.named("ask.start").last?["token"] as? String)
+        let changed = await call(bridge, "ask", ["token": token])
+        XCTAssertEqual(changed["status"] as? String, "ok")
+        await settle()
+        XCTAssertEqual(said(center), ["NVDA(own)", "NVDA(followUp)"])
+        XCTAssertEqual(coming(center), [moment(.week, "NVDA", at(12, 16, 40))])
+        // The row of that read offers "How is BTC looking?": one tap. The page says the words were Bobby's.
+        let chip = await call(bridge, "ask", ["question": "How is BTC looking?", "chip": true])
+        XCTAssertEqual(chip["status"] as? String, "ok")
+        XCTAssertEqual((chip["asset"] as? [String: Any])?["symbol"] as? String, "BTC")
+        await settle()
+        XCTAssertEqual(said(center), ["NVDA(own)", "NVDA(followUp)", "BTC(followUp)"], "a read Bobby started, not a question of theirs")
+        XCTAssertEqual(coming(center).count, 1, "no new chain: nothing about BTC tomorrow")
+        XCTAssertEqual(center.upcoming.first?.step, .week)
+        XCTAssertEqual(center.upcoming.first?.fireAt, at(12, 16, 40), "and the week of the one question they asked stays where it was")
+        // The idle home's asset chips and a mover's chip travel the same way.
+        clock = at(9, 10)
+        let home = await call(bridge, "ask", ["question": "How is NVDA looking?", "chip": true])
+        XCTAssertEqual(home["status"] as? String, "ok")
+        await settle()
+        XCTAssertEqual(said(center).last, "NVDA(followUp)")
+        XCTAssertEqual(center.upcoming.map(\.step), [.week])
+        // Their own words still start a chain: typed (or spoken) is the only way one starts.
+        clock = at(9, 11)
+        let typed = await call(bridge, "ask", ["question": "What is going on with bitcoin today?"])
+        XCTAssertEqual(typed["status"] as? String, "ok")
+        await settle()
+        XCTAssertEqual(said(center).last, "BTC(own)")
+        XCTAssertEqual(center.upcoming.first?.step, .asset)
+        XCTAssertEqual(center.upcoming.first?.symbol, "BTC")
+        // The mark is a boolean and nothing else.
+        // The mark is a boolean or it is nothing, and it never rides a token or a question about the read on screen.
+        for params in [["question": "How is BTC looking?", "chip": "yes"], ["token": "t", "chip": true],
+                       ["followUpOf": try XCTUnwrap(typed["requestId"] as? String), "question": "And the volume?", "chip": true]] as [[String: Any]] {
+            let (reply, _) = await bridge.handle(body: ["v": 1, "method": "ask", "params": params], trusted: true)
+            XCTAssertEqual((reply as? [String: Any])?["ok"] as? Bool, false, "\(params)")
+            XCTAssertEqual(((reply as? [String: Any])?["error"] as? [String: Any])?["code"] as? String, "invalid_params", "\(params)")
+        }
+        XCTAssertEqual(said(center).count, 5, "and none of those asked anything")
+    }
+
+    /// Before the yes there is no chain to protect, and the yes is the person's own request about
+    /// what they just read: a chip is kept the way a question is, so that yes has something to follow.
+    func testBeforeTheYesAChipIsKeptLikeAQuestionAndAfterItStartsNothing() async throws {
+        let center = make()
+        let (session, bridge, _) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        session.desk.currentLevel = { .rapido }
+        session.desk.setLevel = { _ in }
+        _ = await call(bridge, "session", ["page": "app"])
+        let first = await call(bridge, "ask", ["question": "How is NVDA looking?", "chip": true])
+        XCTAssertEqual(first["status"] as? String, "ok")
+        await settle()
+        XCTAssertEqual(center.mode, .undecided)
+        let kept = try storedEvents()
+        XCTAssertEqual(kept.map { Set($0.keys) }, [["kind", "at", "symbol", "name", "isEquity", "price"]], "the asset, its price, the moment: nothing more than for a typed question")
+        // "Shall I keep you posted on NVDA?" · "Yes, tell me".
+        _ = await center.accept()
+        XCTAssertEqual(coming(center), [moment(.asset, "NVDA", at(8, 16, 40)), moment(.week, "NVDA", at(12, 16, 40))], "the yes has something to follow")
+        // From the yes on, a chip starts nothing.
+        clock = at(7, 18)
+        _ = await call(bridge, "ask", ["question": "How is BTC looking?", "chip": true])
+        await settle()
+        XCTAssertEqual(said(center), ["NVDA(own)", "BTC(followUp)"])
+        XCTAssertEqual(center.upcoming.map(\.step), [.asset, .week])
+        XCTAssertEqual(center.upcoming.first?.symbol, "NVDA")
+        XCTAssertEqual(center.upcoming.first?.fireAt, at(8, 16, 40))
+    }
+
+    /// From a follow-up to the paywall in two taps: the read that spends the last one hands back no
+    /// one-tap question, and the home offers none either.
+    func testTheReadThatSpendsTheLastOneHandsBackNoOneTapQuestion() async throws {
+        reads = Self.free(left: 1)
+        let center = make()
+        await ask(center, "NVDA", price: 100)
+        _ = await center.accept()
+        let (session, bridge, recorder) = makeSession(harness: center, intent: HarnessIntent(observeAccount: false))
+        defer { session.teardown() }
+        session.desk.currentLevel = { .rapido }
+        session.desk.setLevel = { _ in }
+        // The app's own rule on the receipt of each read (a fixture reply carries none: this is what the server said).
+        var receipt: BobbyReadAccess? = Self.free(left: 0)
+        session.desk.offersNextQuestion = { _ in HarnessWall.open(receipt) }
+        _ = await call(bridge, "session", ["page": "app"])
+        XCTAssertNil(session.sessionJSON()["oneTap"], "one read left: the home is as it always was")
+        clock = at(8, 17)
+        fake.deliver(before: clock)
+        prices["NVDA"] = 102
+        await center.appActive()
+        let source = HarnessNudges.moveSource(center)
+        let nudge = try XCTUnwrap(source.candidate(NudgeMoment(signedIn: false, now: clock, lastRead: nil, readsThisLaunch: 0)))
+        XCTAssertEqual(nudge.cta, "What changed?", "one read is left: the button asks")
+        await source.act(nudge, session)
+        reads = Self.free(left: 0)                      // the receipt of the read that follows
+        let read = await call(bridge, "ask", ["token": try XCTUnwrap(recorder.named("ask.start").last?["token"] as? String)])
+        XCTAssertEqual(read["status"] as? String, "ok", "the read itself is delivered")
+        XCTAssertNil((read["synthesis"] as? [String: Any])?["followUp"])
+        XCTAssertEqual(read["oneTap"] as? Bool, false, "the page is told: after this read, no question that asks by itself")
+        XCTAssertEqual(session.sessionJSON()["oneTap"] as? Bool, false, "and none on the home")
+        XCTAssertEqual((session.sessionJSON()["pendingRead"] as? [String: Any])?["oneTap"] as? Bool, false, "a page restored from that read is told too")
+        // With reads left neither key travels: every reply and every session is byte for byte what it was.
+        receipt = Self.free(left: 3)
+        reads = Self.free(left: 3)
+        clock = at(8, 18)
+        let open = await call(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        XCTAssertEqual(open["status"] as? String, "ok")
+        XCTAssertNil(open["oneTap"])
+        XCTAssertNil(session.sessionJSON()["oneTap"])
+        // The home only loses its chips when the phone KNOWS the next read is refused: not knowing (the first launch,
+        // no network, a server that could not read the meter) leaves it as it was.
+        for unknown in [nil, Self.unread] as [BobbyReadAccess?] {
+            reads = unknown
+            XCTAssertNil(session.sessionJSON()["oneTap"])
+        }
+        for wall in [Self.guest(left: 0), Self.free(left: 0)] {
+            reads = wall
+            XCTAssertEqual(session.sessionJSON()["oneTap"] as? Bool, false)
+        }
+        for free in [Self.pro, Self.guest(left: 1), Self.free(left: 0, bonus: 1), Self.free(left: 0, paywall: false)] {
+            reads = free
+            XCTAssertNil(session.sessionJSON()["oneTap"])
+        }
+    }
+
+    // MARK: A no stays a no (review of 2026-10-07)
+
+    func testDeleteEverythingErasesTheNotesAndKeepsTheNo() async throws {
+        user = "u1"
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        await center.turnOff()                          // "Stop"
+        let memory = MemoryCenter(observeAccount: false, defaults: defaults)
+        memory.currentUser = { [unowned self] in self.user }
+        memory.currentGeneration = { [unowned self] in self.generation }
+        memory.riskAccepted = { true }
+        memory.now = { [unowned self] in self.clock }
+        memory.send = { _, _, _ in (json: nil, status: 200) }
+        memory.accountChanged(force: true)
+        memory.requestForgetAll()
+        _ = await memory.confirmForgetAll()
+        await center.reloadAfterErase()                 // what the centre does when it hears `HarnessCenter.erased`
+        XCTAssertEqual(center.mode, .off, "the notes go; the no does not")
+        clock = at(9, 10)
+        await ask(center, "TSLA")
+        XCTAssertTrue(center.ledger.isEmpty)
+        let read = NudgeRead(requestId: "r", symbol: "TSLA", name: "Tesla", isEquity: true, verdict: "wait", saved: false, at: clock, memory: nil)
+        XCTAssertNil(HarnessNudges.offer(NudgeMoment(signedIn: true, now: clock, lastRead: read, readsThisLaunch: 1), mode: center.mode))
+        // With follow-ups on, "Delete everything" erases what was kept and what was planned, as before.
+        user = "u2"
+        await center.accountChanged()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        XCTAssertFalse(center.upcoming.isEmpty)
+        memory.accountChanged(force: true)
+        memory.requestForgetAll()
+        _ = await memory.confirmForgetAll()
+        await center.reloadAfterErase()
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertEqual(center.upcoming, [])
+        XCTAssertEqual(fake.requests.count, 0)
+    }
+
+    // MARK: A split with a rise on top (review of 2026-10-07)
+
+    func testASplitTogetherWithAnyMoveThePhoneWouldPrintShowsNoNumber() {
+        XCTAssertNil(HarnessCopy.move(from: 100, to: 62, isEquity: true), "2-for-1 and +24%: 0.62 is not a fall of 38%")
+        XCTAssertNil(HarnessCopy.move(from: 100, to: 61, isEquity: true))
+        XCTAssertNil(HarnessCopy.move(from: 150, to: 100, isEquity: true), "a 3-for-2 with no move of its own read as -33.3%")
+        XCTAssertEqual(HarnessCopy.moveLine(symbol: "NVDA", pct: HarnessCopy.move(from: 100, to: 62, isEquity: true), days: 14), "NVDA, 14 days later")
+        // A split of 2-for-1 or more, forward or reverse, on top of ANY move the phone would itself print,
+        // lands outside what it prints: the two can never be confused, whatever the stock did.
+        var printed = 0
+        for hundredths in 1...300 {
+            let real = Double(hundredths) / 100
+            guard HarnessCopy.move(from: 100, to: 100 * real, isEquity: true) != nil else { continue }
+            printed += 1
+            for split in [2.0, 3, 4, 5, 10, 20, 50] {
+                XCTAssertNil(HarnessCopy.move(from: 100, to: 100 * real / split, isEquity: true), "\(split)-for-1 with a move of x\(real)")
+                XCTAssertNil(HarnessCopy.move(from: 100, to: 100 * real * split, isEquity: true), "1-for-\(split) with a move of x\(real)")
+            }
+        }
+        XCTAssertGreaterThan(printed, 50, "the band is still wide enough to say ordinary moves")
+        // Ordinary large moves are still said.
+        for (now, pct) in [(76.0, -24.0), (124.0, 24.0), (88.0, -12.0), (135.0, 35.0)] {
+            XCTAssertEqual(try XCTUnwrap(HarnessCopy.move(from: 100, to: now, isEquity: true)), pct, accuracy: 1e-9)
+        }
+    }
+
+    // MARK: The notes say what the planner reads (review of 2026-10-07)
+
+    func testTheNotesCountTheirOwnQuestionsApartFromTheReadsBobbyStarted() {
+        var ledger = HarnessLedger()
+        ledger.note(HarnessEvent(kind: .ask, at: at(5, 10), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100, horizon: .month))
+        ledger.note(HarnessEvent(kind: .ask, at: at(6, 10), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 101, origin: .followUp))
+        ledger.note(HarnessEvent(kind: .ask, at: at(7, 10), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 102, origin: .followUp))
+        ledger.note(HarnessEvent(kind: .ask, at: at(7, 11), symbol: "BTC", name: "Bitcoin", isEquity: false, price: 60_000, origin: .followUp))
+        let notes = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: [], now: at(7, 12), calendar: calendar)
+        let nvda = try? XCTUnwrap(notes.assets.first { $0.symbol == "NVDA" })
+        XCTAssertEqual(nvda?.lines.first, "Asked once, on Oct 5.", "the one question the chain belongs to: its day, not the day of a read Bobby started")
+        XCTAssertFalse(notes.assets.flatMap(\.lines).contains { $0.contains("Asked 3 times") })
+        XCTAssertEqual(nvda?.lines.contains("Your question was about this month."), true)
+        XCTAssertEqual(nvda?.lines, ["Asked once, on Oct 5.", "2 reads from questions Bobby wrote.", "Your question was about this month."])
+        // An asset they only ever reached through something Bobby wrote says so, and no question is claimed.
+        XCTAssertEqual(notes.assets.map(\.symbol), ["BTC", "NVDA"], "the latest read first, whoever started it")
+        XCTAssertEqual(notes.assets.first?.lines, ["One read from a question Bobby wrote."])
+        XCTAssertEqual(notes.assets.first?.erasable, true)
+        // The horizon said is the one of their own question, as the planner reads it: never of a read Bobby started.
+        ledger.note(HarnessEvent(kind: .ask, at: at(7, 11, 30), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 102, origin: .followUp, horizon: .long))
+        let later = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: [], now: at(7, 12), calendar: calendar)
+        XCTAssertEqual(later.assets.first { $0.symbol == "NVDA" }?.lines.last, "Your question was about this month.")
+        XCTAssertEqual(HarnessPlanner.wait(for: try XCTUnwrap(ledger.question(before: at(7, 12))), in: ledger, now: at(7, 12)),
+                       HarnessPlanner.Wait(days: 7, source: .named), "and that is the horizon the planner goes by")
+        L.select("es")
+        let spanish = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: [], now: at(7, 12), calendar: calendar)
+        XCTAssertEqual(spanish.assets.first { $0.symbol == "BTC" }?.lines, ["Una lectura desde una pregunta que escribió Bobby."])
+        XCTAssertEqual(spanish.assets.first { $0.symbol == "NVDA" }?.lines[1], "3 lecturas desde preguntas que escribió Bobby.")
+        L.select("en")
+    }
+
+    func testEveryFieldOfAnEventIsSaidOrMarkedInternalWithItsReason() {
+        // The list the notes decide over is the struct itself: a field added to an event fails here until it has a case.
+        let labels = Mirror(reflecting: HarnessEvent(kind: .ask, at: at(7, 12))).children.compactMap(\.label)
+        XCTAssertEqual(labels, HarnessEvent.Field.allCases.map(\.rawValue))
+        var said = 0, internalOnes = 0
+        for field in HarnessEvent.Field.allCases {
+            switch HarnessNotes.told(field) {
+            case let .said(place): said += 1; XCTAssertFalse(place.isEmpty, field.rawValue)
+            case let .kept(reason): internalOnes += 1; XCTAssertGreaterThan(reason.count, 20, "\(field.rawValue): the reason is part of the decision")
+            }
+        }
+        XCTAssertEqual(said + internalOnes, HarnessEvent.Field.allCases.count)
+        // The two the review found unsaid.
+        XCTAssertEqual(HarnessNotes.told(.origin), .said("“N reads from questions Bobby wrote.”, apart from “Asked N times”"))
+        guard case .kept = HarnessNotes.told(.thread) else { return XCTFail("a second question is counted as a question; its mark is internal") }
+    }
+
+    /// What the glass keeps about the lines it drew is said with the notes, erased with them, and
+    /// kept no longer than the question they were about.
+    func testTheLinesTheGlassDrewAreSaidErasedAndForgottenWithTheLedger() async throws {
+        let center = make()
+        let nudges = NudgeCenter(defaults: defaults)
+        nudges.now = { [unowned self] in self.clock }
+        nudges.register(HarnessNudges.moveSource(center))
+        await ask(center, "NVDA", price: 100)           // follow-ups undecided: the line is drawn before any yes
+        clock = at(8, 17)
+        prices["NVDA"] = 102
+        await center.appActive()
+        let line = try XCTUnwrap(nudges.current(nudges.moment(signedIn: false)))
+        XCTAssertEqual(line.id, "harness.move.nvda.20261007")
+        nudges.seen(line.id)
+        XCTAssertEqual(center.linesKept(nil), 1)
+        XCTAssertEqual(center.notes.general, ["“Since you asked” lines shown: 1."], "the glass's own history is on the Memory screen")
+        XCTAssertFalse(center.notes.isEmpty)
+        // With the ledger gone and the line's history still there, the section is not the quiet line: "Erase notes" is reachable.
+        var alone = HarnessNotes.make(ledger: HarnessLedger(), mode: .undecided, upcoming: [], now: clock, calendar: calendar, lines: 2)
+        XCTAssertFalse(alone.isEmpty)
+        XCTAssertEqual(alone.general, ["“Since you asked” lines shown: 2."])
+        alone = HarnessNotes.make(ledger: HarnessLedger(), mode: .undecided, upcoming: [], now: clock, calendar: calendar, lines: 0)
+        XCTAssertTrue(alone.isEmpty)
+        // "Erase notes" takes it.
+        await center.forgetLedger()
+        XCTAssertEqual(center.linesKept(nil), 0)
+        XCTAssertTrue(center.notes.isEmpty)
+        // And without anybody erasing, it lasts as long as the ledger keeps the question: sixty days, tapped or not.
+        clock = at(9, 10)
+        await ask(center, "TSLA", price: 200)
+        clock = at(10, 12)
+        prices["TSLA"] = 204
+        await center.appActive()
+        let second = try XCTUnwrap(nudges.current(nudges.moment(signedIn: false)))
+        nudges.seen(second.id)
+        nudges.retire(second.id)                        // tapped: the general rule would keep it "for good"
+        XCTAssertEqual(center.linesKept(nil), 1)
+        clock = at(10, 12).addingTimeInterval(59 * 86_400)
+        await center.appActive()
+        XCTAssertEqual(center.linesKept(nil), 1, "inside the ledger's days")
+        clock = at(10, 12).addingTimeInterval(61 * 86_400)
+        await center.appActive()
+        XCTAssertEqual(center.linesKept(nil), 0, "the question is out of the ledger: so is what the glass kept about its line")
+        XCTAssertFalse(storedKeys().contains { $0.hasPrefix(NudgeCenter.storePrefix) })
+        // Another feature's history is not the harness's to prune.
+        NudgeCenter.prune(prefix: "", before: .distantFuture, owner: nil, defaults: defaults)
+        XCTAssertEqual(NudgeCenter.count(prefix: "", owner: nil, defaults: defaults), 0, "an empty prefix names nothing")
     }
 
     // MARK: C6 — what Bobby keeps is on the Memory screen, in sentences
@@ -1054,17 +1389,88 @@ final class HarnessSurfaceTests: XCTestCase {
             .resolvingSymlinksInPath()
         let marks = ["HarnessLedger", "HarnessStore", "HarnessProfile", "HarnessNotes", "harness.ledger", "harness?.ledger", "harness.profile",
                      "harness.notes", "HarnessCenter.shared.ledger", "HarnessCenter.shared.profile", "HarnessCenter.shared.notes"]
+        // Everything in the app that can start a request, by the name it is called with.
+        let network = ["NucleoDeskIO.", "BobbyAPI.", "BobbyAccessAPI.", "URLSession", "URLRequest", "NucleoLevelCenter.shared.refresh", "BobbyAccessCenter.shared.refresh"]
         var readers = Set<String>()
+        var inside: [String: [String]] = [:]
         let files = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
         for case let file as URL in files where file.pathExtension == "swift" {
             let path = file.resolvingSymlinksInPath().path.replacingOccurrences(of: sources.path + "/", with: "")
-            guard !path.hasPrefix("V18/Harness/") else { continue }
             let text = try String(contentsOf: file, encoding: .utf8)
-            if marks.contains(where: { text.contains($0) }) { readers.insert(path) }
+            if path.hasPrefix("V18/Harness/") {
+                // Code only: a comment may name what it explains.
+                let code = text.components(separatedBy: "\n").filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+                for line in code {
+                    for mark in network where line.contains(mark) { inside[String(path.dropFirst("V18/Harness/".count)), default: []].append(line.trimmingCharacters(in: .whitespaces)) }
+                }
+            } else if marks.contains(where: { text.contains($0) }) {
+                readers.insert(path)
+            }
         }
         XCTAssertGreaterThan(readers.count, 0, "the sources were found")
         XCTAssertEqual(readers, ["AccountSession.swift", "Briefings/MemoryCenter.swift", "Briefings/MemoryView.swift", "V18/Reminders/RemindersSheet.swift"],
                        "a new reader of the ledger has to be looked at: does anything it reads leave the phone?")
+        // 4. Inside its own folder the harness talks to a server in three lines, and they are these. Two send a value
+        //    read from the ledger, WITHOUT a tap: the symbol of an asset, to the quote endpoint, to draw the number on
+        //    the glass (when the app comes to the front, also before the yes) and on the week's board (once per row).
+        //    The third asks how many reads are left and sends nothing of the ledger.
+        XCTAssertEqual(inside.keys.sorted(), ["HarnessBoard.swift", "HarnessCenter.swift"], "a new place that reaches a server has to be looked at")
+        XCTAssertEqual(inside["HarnessBoard.swift"], ["let market = await NucleoDeskIO.market(symbol)"])
+        XCTAssertEqual(inside["HarnessCenter.swift"], ["(await NucleoAsync.withTimeout(HarnessCenter.quoteTimeout) { await NucleoDeskIO.market(symbol).price }) ?? nil",
+                                                      "if !BobbyApp.isUnitTestHost { await NucleoLevelCenter.shared.refresh() }"])
+        // What that request is: the symbol and nothing else, through the plain client (the metered read is the one
+        // that carries the device and the account: BobbyAccessAPI).
+        let desk = try String(contentsOf: sources.appendingPathComponent("Nucleo/NucleoDesk.swift"), encoding: .utf8)
+        let from = try XCTUnwrap(desk.range(of: "static func market(_ symbol: String) async -> Market {"))
+        let body = String(desk[from.upperBound...].prefix(260))
+        XCTAssertTrue(body.contains("BobbyAPI.response(\"api/voice-tool\", method: \"POST\""), body)
+        XCTAssertTrue(body.contains("body: [\"tool\": \"get_market\", \"args\": [\"symbol\": symbol]]"), body)
+        XCTAssertFalse(body.contains("BobbyAccessAPI"), "the quote is not the metered call")
+        // And it happens exactly as said: a question a day old, follow-ups undecided, the app comes to the front.
+        var quoted: [String] = []
+        user = "someone-else"                           // their own store: nothing of the reader above
+        let quiet = make()
+        quiet.quote = { symbol in await MainActor.run { quoted.append(symbol); return nil } }
+        clock = at(7, 16, 40)
+        quiet.noteAsk(symbol: "TSLA", name: "Tesla", isEquity: true, price: 250)
+        await quiet.appActive()
+        XCTAssertEqual(quoted, [], "the same day: nothing is asked")
+        clock = at(8, 17)
+        await quiet.appActive()
+        XCTAssertEqual(quoted, ["TSLA"], "a day later: one request, for that symbol, with no tap and before any yes")
+        XCTAssertEqual(quiet.mode, .undecided)
+        await quiet.turnOff()
+        clock = at(9, 17)
+        await quiet.appActive()
+        XCTAssertEqual(quoted, ["TSLA"], "off: nothing is kept, so nothing can be asked about")
+    }
+
+    /// The trigger is an instant, on purpose (HarnessCenter's header and V18-DESIGN.md say why): a
+    /// follow-up arrives at the moment the plan chose, in the time zone the plan was made in.
+    func testAFollowUpIsHandedToIOSAsAnInstantInTheTimeZoneOfThePlan() async throws {
+        let center = make()
+        let asked = at(7, 20, 30)
+        clock = asked
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        let notice = try XCTUnwrap(fake.requests["v18.follow.asset"])
+        XCTAssertEqual(notice.fireAt, at(8, 20, 30))
+        let trigger = try XCTUnwrap(notice.request().trigger as? UNCalendarNotificationTrigger)
+        XCTAssertEqual(trigger.dateComponents.timeZone, TimeZone(identifier: "America/Mexico_City"), "the hour is the hour of the plan's clock")
+        XCTAssertEqual(trigger.dateComponents.hour, 20)
+        XCTAssertEqual(trigger.dateComponents.minute, 30)
+        XCTAssertFalse(trigger.repeats)
+        XCTAssertEqual(trigger.nextTriggerDate(), at(8, 20, 30), "that instant, wherever the phone is: 04:30 in Madrid, if they flew there and did not open the app")
+        // Opening the app there plans again on the clock of where they are: inside 09:00–21:00.
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "Europe/Madrid"))
+        clock = asked.addingTimeInterval(90 * 60)       // an hour and a half after the question: 06:00 in Madrid
+        await center.appActive()
+        let moved = try XCTUnwrap(fake.requests["v18.follow.asset"])
+        let hour = calendar.component(.hour, from: moved.fireAt)
+        XCTAssertTrue((9...21).contains(hour), "\(hour) in Madrid")
+        XCTAssertNotEqual(moved.fireAt, notice.fireAt, "what iOS held was replaced")
+        XCTAssertEqual((try XCTUnwrap(moved.request().trigger as? UNCalendarNotificationTrigger)).dateComponents.timeZone, calendar.timeZone)
+        calendar.timeZone = try XCTUnwrap(TimeZone(identifier: "America/Mexico_City"))
     }
 
     // MARK: C7 — a gate on words
@@ -1134,9 +1540,14 @@ final class HarnessSurfaceTests: XCTestCase {
             for day in (index == 0 ? [2, 6] : index == 1 ? [2, 5, 6] : []) { ledger.note(HarnessEvent(kind: .sent, at: at(day, 10), symbol: "NVDA", step: .asset)) }
             ledgers.append((ledger, []))
         }
+        // Reads whose question Bobby wrote, one and several, and the lines the glass drew.
+        var started = HarnessLedger()
+        started.note(HarnessEvent(kind: .ask, at: at(2, 10), symbol: "BTC", name: "Bitcoin", isEquity: false, price: 100, origin: .followUp))
+        for day in [3, 4, 5] { started.note(HarnessEvent(kind: .ask, at: at(day, 10), symbol: "NVDA", name: "NVIDIA", isEquity: true, price: 100, origin: .followUp)) }
+        ledgers.append((started, []))
         var sentences = Set<String>()
         for (ledger, upcoming) in ledgers {
-            let notes = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: upcoming, now: now, calendar: calendar)
+            let notes = HarnessNotes.make(ledger: ledger, mode: .on, upcoming: upcoming, now: now, calendar: calendar, lines: 4)
             sentences.formUnion(notes.assets.flatMap(\.lines) + notes.general)
         }
         add("memory", sentences.sorted())
@@ -1156,13 +1567,14 @@ final class HarnessSurfaceTests: XCTestCase {
                 for name in ["OKX", "OKB", "X Layer"] { XCTAssertFalse(line.contains(name), "\(language), \(place): “\(line)”") }
             }
         }
-        // Every sentence the notes can say was in the sweep: 2 + 4 + 4 + 3 + 1 about an asset, 6 about what Bobby does.
+        // Every sentence the notes can say was in the sweep: 2 + 2 + 4 + 4 + 3 + 1 about an asset, 7 about what Bobby does and keeps.
         let english = everythingSaid()
         let memory = Set(english.filter { $0.place == "memory" }.map(\.line))
         for needle in ["Asked once", "Asked 3 times", "about today", "about this week", "about this month", "about months or years",
                        "You saved a read.", "review in a day", "review in 3 days", "review in a week", "You wrote a thesis", "weeks ahead",
                        "months or more ahead", "Bobby comes back on", "Your week arrives on", "Follow-ups arrive around", "Quiet until",
-                       "Fewer follow-ups", "Follow-ups: 3 shown", "Times you opened the app"] {
+                       "Fewer follow-ups", "Follow-ups: 3 shown", "Times you opened the app",
+                       "One read from a question Bobby wrote", "3 reads from questions Bobby wrote", "lines shown: 4"] {
             XCTAssertTrue(memory.contains { $0.contains(needle) }, "the sweep never produced “\(needle)”")
         }
         XCTAssertGreaterThanOrEqual(perLanguage.values.min() ?? 0, 55, "the sweep is as long in every language: \(perLanguage)")

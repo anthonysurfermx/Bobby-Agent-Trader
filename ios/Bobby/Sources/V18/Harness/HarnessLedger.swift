@@ -387,6 +387,15 @@ struct HarnessStore {
         for prefix in [Self.prefix, Self.modePrefix, Self.planPrefix] { defaults.removeObject(forKey: Self.key(prefix, owner: owner)) }
     }
 
+    /// What was kept and what was planned go; a no stays (the Memory screen's "Delete everything").
+    /// Erasing notes is not a way to be asked again: a reader who turned follow-ups off stays off.
+    /// Any other answer goes with the notes, so a yes is asked for again before anything is kept.
+    func forgetNotes(owner: String?) {
+        let refused = mode(owner: owner) == .off
+        forget(owner: owner)
+        if refused { write(.off, owner: owner) }
+    }
+
     /// Account deletion (AccountSession): nothing of that account stays on the phone.
     static func forgetOwner(_ userId: String, defaults: UserDefaults = .standard) {
         HarnessStore(defaults: defaults).forget(owner: userId)

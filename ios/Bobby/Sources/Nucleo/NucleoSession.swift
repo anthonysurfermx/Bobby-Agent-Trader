@@ -348,7 +348,7 @@ final class NucleoSession: ObservableObject {
             ["id": c.id, "webId": Self.webId(c.id), "label": c.label, "palette": Self.palette(webId: Self.webId(c.id)),
              "voicePersona": c.voicePersona]
         } ?? NSNull()
-        return [
+        var json: [String: Any] = [
             "v": 1, "page": NucleoDeskIO.orNull(currentPage), "firstRun": !onboarded, "onboarded": onboarded,
             "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "localHour": Calendar.current.component(.hour, from: Date()),
             "companion": companion, "xp": companions.disciplineXP, "level": companions.nucleoLevel,
@@ -360,6 +360,11 @@ final class NucleoSession: ObservableObject {
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
+        // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
+        // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
+        // nothing, and without the key the session is what it always was.
+        if let harness, HarnessWall.closed(harness.access()) { json["oneTap"] = false }
+        return json
     }
 
     // MARK: - The nudge (1.8)
@@ -414,10 +419,12 @@ final class NucleoSession: ObservableObject {
                                               verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
                                               memory: MemoryReceipt(json: result["memory"])))
         // 1.8: from the first question, the harness knows what to come back to (on this phone only). A read
-        // Bobby started is told apart here: only the person's own question is followed up.
+        // Bobby started is told apart here: only the person's own question is followed up, and a chip
+        // whose words Bobby wrote is not one (`chip` lets the centre keep it before the yes).
         let origin = desk.readOrigin(requestId: requestId) ?? .person
         harness?.noteAsk(symbol: symbol, name: asset["name"] as? String ?? symbol, isEquity: asset["isEquity"] as? Bool ?? false,
-                         price: desk.readSummary(requestId: requestId)?.price, origin: origin == .followUp ? .followUp : nil,
+                         price: desk.readSummary(requestId: requestId)?.price,
+                         origin: origin == .followUp || origin == .chip ? .followUp : nil, chip: origin == .chip,
                          thread: origin == .thread, horizon: HarnessHorizon(named: (result["sufficiency"] as? [String: Any])?["horizon"]))
         sessionChanged()
     }
@@ -1111,6 +1118,17 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
+        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase).
+        // When that flips whether the next read is refused, the home loses or regains its one-tap chips.
+        if let harness {
+            Publishers.Merge(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () })
+                .receive(on: DispatchQueue.main)
+                .map { [weak harness] in HarnessWall.closed(harness?.access()) }
+                .removeDuplicates()
+                .dropFirst()
+                .sink { [weak self] _ in self?.sessionChanged() }
+                .store(in: &cancellables)
+        }
         // 1.8: an invitation was answered (accepted, already used, not new): the glass says so now.
         InviteLinkCenter.shared.$answer
             .map { $0 != nil }
