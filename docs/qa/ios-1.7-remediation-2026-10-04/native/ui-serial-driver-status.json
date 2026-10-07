@@ -1,0 +1,9 @@
+{
+  "at": "2026-10-04T12:59:13.138616+00:00",
+  "stage": "all-remaining-ui",
+  "phase": "complete-after-approved-harness-repair",
+  "acceptedClasses": 14,
+  "acceptedMethods": 57,
+  "originalFailedAttemptPreserved": true,
+  "officialCompletionReceipt": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-completion-receipt.json"
+}

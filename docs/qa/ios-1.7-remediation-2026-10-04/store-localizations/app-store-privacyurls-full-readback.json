@@ -1,0 +1,38 @@
+{
+  "observedAtUTC": "2026-10-04T13:02:48.647Z",
+  "surface": "ASC distribution/privacy",
+  "method": "Saved only locale URL fields, reload and six locale readbacks",
+  "locales": [
+    {
+      "locale": "en-US",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=en",
+      "match": true
+    },
+    {
+      "locale": "de-DE",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=de",
+      "match": true
+    },
+    {
+      "locale": "fr-FR",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=fr",
+      "match": true
+    },
+    {
+      "locale": "it",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=it",
+      "match": true
+    },
+    {
+      "locale": "pt-PT",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=pt",
+      "match": true
+    },
+    {
+      "locale": "es-MX",
+      "url": "https://bobbyprotocol.xyz/privacy?lang=es",
+      "match": true
+    }
+  ],
+  "privacyDataDisclosuresModified": false
+}

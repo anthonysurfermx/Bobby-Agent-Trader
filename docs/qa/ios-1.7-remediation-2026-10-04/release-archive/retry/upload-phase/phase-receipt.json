@@ -1,0 +1,25 @@
+{
+  "startedAtUTC": "2026-10-04T13:05:00.824871+00:00",
+  "argv": [
+    "/usr/bin/xcrun",
+    "xcodebuild",
+    "-exportArchive",
+    "-archivePath",
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/Bobby-1.7-63.xcarchive",
+    "-exportPath",
+    "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-export",
+    "-exportOptionsPlist",
+    "/private/tmp/bobby-ios17-remediation-20261004/ExportOptions-63-Upload.plist"
+  ],
+  "freeBeforeBytes": 4934942720,
+  "minimumStartBytes": 3221225472,
+  "stopBelowBytes": 2147483648,
+  "minimumObservedFreeBytes": 4462026752,
+  "log": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-phase/xcodebuild.log",
+  "status": "passed",
+  "endedAtUTC": "2026-10-04T13:09:04.728985+00:00",
+  "elapsedSeconds": 243.9,
+  "exitCode": 0,
+  "freeAfterBytes": 4496056320,
+  "logSHA256": "5ae1eaffd0bddcdc44612cbe2275e59b98e015f54bb75cb3a3490bdbe2ae5cf4"
+}

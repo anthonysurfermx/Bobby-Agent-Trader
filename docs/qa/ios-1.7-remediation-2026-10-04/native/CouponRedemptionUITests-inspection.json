@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T12:34:42.135496+00:00",
+  "stage": "CouponRedemptionUITests",
+  "class": "CouponRedemptionUITests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testConfirmedGiftShowsActualCountsAndReturnAction",
+    "testAlreadyRedeemedDoesNotPromiseAnotherGift"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "07f6107613b667000f077b11cf866c6b36895acaeecaa80d2d38866b2ac418c4",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "f1eec268c532f90ab2974f5b41ab280239e5bda75202c88ab5888abea9e9ef84",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "CouponRedemptionUITests/testAlreadyRedeemedDoesNotPromiseAnotherGift()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/CouponRedemptionUITests/testAlreadyRedeemedDoesNotPromiseAnotherGift",
+      "result": "Passed"
+    },
+    {
+      "identifier": "CouponRedemptionUITests/testConfirmedGiftShowsActualCountsAndReturnAction()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/CouponRedemptionUITests/testConfirmedGiftShowsActualCountsAndReturnAction",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

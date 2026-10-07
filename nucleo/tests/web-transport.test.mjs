@@ -202,6 +202,35 @@ async function run() {
     await p.call('saveThesis', { requestId: '00000000-0000-4000-8000-000000000000' }).then(() => ok(false, 'unknown id'), (e) => eq(e.code, 'invalid_params', 'unknown requestId faults'));
   }
 
+  // Candle transport metadata and chart source stay separate from the requested evidence horizon.
+  for (const [symbol, assetClass] of [["BTC", "crypto"], ["NVDA", "equity"]]) {
+    for (const timeframe of ["1H", "4H", "1D", "1W"]) {
+      const label = `${symbol}/${timeframe}`;
+      const p = page({ ls: ONBOARDED, routes: backend({
+        search: () => RESOLVED(symbol, assetClass),
+        candles: () => reply(200, { candles: bars(100, HOUR) }),
+        desk: () => reply(200, { ...DEBATE_OK, provenance: { ...DEBATE_OK.provenance,
+          instrument: assetClass === "crypto" ? symbol + "-USDT" : symbol, assetType: assetClass, timeframe } })
+      }) });
+      await p.call("session", { page: "app" });
+      const r = await p.call("ask", { question: `Should I buy ${symbol} on the ${timeframe} timeframe?` });
+      eq(r.status, "ok", `${label}: mocked read succeeds`);
+      eq(r.candlesTimeframe, "1H", `${label}: candle metadata matches the provider interval`);
+      const candleURL = assetClass === "crypto"
+        ? "/api/okx-candles?instId=BTC-USDT&bar=1H&limit=100"
+        : "/api/stock-candles?symbol=NVDA&range=7d&interval=1h";
+      ok(p.calls.some((call) => call[1] === candleURL), `${label}: actual transport URL is hourly`);
+      eq(r.provenance.timeframe, timeframe, `${label}: analysis horizon is preserved`);
+      vm.runInContext(fs.readFileSync(path.join(SRC, "shared", "20-read-model.js"), "utf8"), p.sandbox);
+      const m = p.sandbox.NucleoReadModel.build(r, {});
+      eq(m.chart.source.timeframe, "1H", `${label}: chart names its actual candle interval`);
+      eq(m.chart.source.asOf, new Date(r.candles.at(-1).t).toISOString(), `${label}: chart timestamp comes from its final candle`);
+      eq(m.chart.lines.length, timeframe === "1H" ? 2 : 0, `${label}: only matching horizon overlays are shown`);
+      eq([!!m.chart.band, !!m.chart.bracket], timeframe === "1H" ? [true, true] : [false, false], `${label}: unmatched support annotations are omitted`);
+      p.sandbox.__nucleoWeb.desk.teardown();
+    }
+  }
+
   // desk refusals and failures: never a verdict
   const cases = [
     ['429 quota', () => reply(429, { error: 'Bobby reached today’s analysis limit.', code: 'daily_limit' }, { 'content-type': 'application/json', 'retry-after': '3600' }),

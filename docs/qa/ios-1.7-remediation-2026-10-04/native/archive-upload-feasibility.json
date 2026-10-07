@@ -1,0 +1,55 @@
+{
+  "checked_at_utc": "2026-10-04T09:43:23.660453+00:00",
+  "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "head": "393776c332b2c3f6e21d6cad457869431dd28a62",
+  "version": "1.7",
+  "build": "63",
+  "matching_distribution_identity_sha1": "A485BF8AE5E66C9127F54E508C426C916B518C26",
+  "distribution_identity_reported_valid": true,
+  "matching_distribution_profiles_with_aps_production": [
+    {
+      "path": "/Users/mrrobot/Library/Developer/Xcode/UserData/Provisioning Profiles/d3f3f625-1017-4983-b70f-fb0b8ae4e9ef.mobileprovision",
+      "name": "Bobby App Store 1.2 build 35",
+      "uuid": "d3f3f625-1017-4983-b70f-fb0b8ae4e9ef",
+      "created": "2026-10-02T12:15:02Z",
+      "expires": "2027-09-22T12:35:26Z",
+      "team": [
+        "QZRTV6CMTT"
+      ],
+      "app": "QZRTV6CMTT.xyz.bobbyprotocol.bobby",
+      "all_devices": false,
+      "device_count": 0,
+      "entitlements": {
+        "beta-reports-active": true,
+        "aps-environment": "production",
+        "com.apple.security.application-groups": [
+          "group.xyz.bobbyprotocol.bobby"
+        ],
+        "application-identifier": "QZRTV6CMTT.xyz.bobbyprotocol.bobby",
+        "keychain-access-groups": [
+          "QZRTV6CMTT.*",
+          "com.apple.token"
+        ],
+        "get-task-allow": false,
+        "com.apple.developer.team-identifier": "QZRTV6CMTT",
+        "com.apple.developer.applesignin": [
+          "Default"
+        ]
+      },
+      "certificate_sha1s": [
+        "A485BF8AE5E66C9127F54E508C426C916B518C26"
+      ],
+      "is_expired": false,
+      "verification": "CMS signature verified; certificate chain not verified"
+    }
+  ],
+  "local_profile_CMS_signatures_verified": true,
+  "certificate_chain_trust_verified": false,
+  "latest_checked_archive_build": "61",
+  "archive_63_verified": false,
+  "remote_build63_available_verified": false,
+  "upload_performed": false,
+  "app_store_connect_auth_and_role_verified": false,
+  "disk_blocks_work": true,
+  "signing_feasibility": "local prerequisites available; actual Release archive/export and remote acceptance pending"
+}

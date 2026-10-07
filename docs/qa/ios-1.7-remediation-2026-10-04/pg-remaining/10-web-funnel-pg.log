@@ -1,0 +1,3 @@
+[user-identity] auth service unavailable
+[track] Error
+web funnel: 64 checks passed (local PostgreSQL, mocked provider HTTP)

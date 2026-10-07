@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:29:38.538Z" hostname="MacBook-Pro-F-Society.local" time="0.003">
+  <properties/>
+  <testcase name="movingPieceMayUseItsOwnCellsButNotAnotherPiece" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.001"/>
+  <testcase name="rotatedFootprintCannotCrossTheEdgeOrCore" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0"/>
+  <testcase name="accountAndPublicFootprintsUseRealCatalogContracts" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.001"/>
+  <testcase name="blockedCreatorHasStableStrictCodeAndCorruptPrefsAreEmpty" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.001"/>
+  <testcase name="coreMayMoveFromItsOwnSpotButCannotCoverPieces" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0"/>
+  <testcase name="seedExtensionOnlyUsesServerOfferedUpwardHorizons" classname="xyz.bobbyprotocol.android.ui.TraderLandRulesTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

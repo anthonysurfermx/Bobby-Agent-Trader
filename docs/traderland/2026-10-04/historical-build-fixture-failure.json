@@ -1,0 +1,75 @@
+{
+  "status": "FAILED",
+  "version_code": 8,
+  "version_name": "1.1.3",
+  "branch": "codex/android-traderland-parity",
+  "canonical_reference": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+  "project_directory": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+  "source": {
+    "path": "traderland-code8-20261003T232659Z-source.json",
+    "sha256": "f3ceb483a98ef902f8c8b1567f73c4b4c479dd1c8203558f901effcb74dc8390",
+    "source_sha256": "6c7cbddb7d65181fa01836e371442c2c05591647e409511f09268b0fbfa93a82",
+    "files": 394
+  },
+  "source_unchanged_during_build": true,
+  "fcm_enabled": false,
+  "steps": [
+    {
+      "name": "node-contracts",
+      "exit_code": 0,
+      "command": [
+        "node",
+        "--test",
+        "--test-reporter=junit",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/account-isolation.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/agree-release.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/bridge-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/coupon-copy.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/first-read-cards.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/localization-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/pill-input.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/platform-android.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/presentation-telemetry.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/read-cards-hints.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-layout.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/risk-profile-access.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/secure-three-uuid.test.mjs",
+        "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/nucleo/tests/six-languages.test.mjs"
+      ],
+      "cwd": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader",
+      "started_at": "2026-10-03T23:27:00.154487+00:00",
+      "completed_at": "2026-10-03T23:27:00.644944+00:00",
+      "log": {
+        "path": "traderland-code8-20261003T232659Z-node-contracts.xml",
+        "sha256": "d15086e1493f8998feb7d9e66163869506e932bfb5673f371b6d29c2ed04c2c8",
+        "bytes": 27690
+      }
+    },
+    {
+      "name": "unit-lint-debug-test-build",
+      "exit_code": 1,
+      "command": [
+        "/private/tmp/bobby-android-toolchain/gradle-8.13/bin/gradle",
+        ":app:testDebugUnitTest",
+        ":app:lintDebug",
+        ":app:assembleDebug",
+        ":app:assembleDebugAndroidTest",
+        "--no-daemon"
+      ],
+      "cwd": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android",
+      "started_at": "2026-10-03T23:27:00.645185+00:00",
+      "completed_at": "2026-10-03T23:27:33.919577+00:00",
+      "log": {
+        "path": "traderland-code8-20261003T232659Z-unit-lint-debug-test-build.log",
+        "sha256": "4ab1b120076dcd0d6db3bea6ddbb85220dc2399c5a06c4b868f92ba2c613bd2e",
+        "bytes": 5019
+      }
+    }
+  ],
+  "public_client_configuration_reused_without_copying": true,
+  "instrumentation_executed": false,
+  "physical_device_tested": false,
+  "uploaded": false,
+  "runner_sha256": "10770b6ade9c9ebbf96bfe0a8231998f26b9c173a5388be62dc9fc739af887cf",
+  "signing_gradle_forwarder_sha256": "7b6d4af90b8b3490f75addd52cab3b02bc3cdcbcf89a31a7231684f264ef0c82"
+}

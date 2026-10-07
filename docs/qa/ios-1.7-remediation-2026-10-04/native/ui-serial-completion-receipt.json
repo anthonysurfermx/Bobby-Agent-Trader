@@ -1,0 +1,37 @@
+{
+  "at": "2026-10-04T12:59:13.138616+00:00",
+  "uiClasses": 14,
+  "uiUniqueMethods": 57,
+  "uiMethodsAllPassed": true,
+  "uiFailedOrSkippedFinal": 0,
+  "initialNativeUnitMethods": 534,
+  "initialContractUIMethods": 2,
+  "uniqueAcceptedCombinedMethods": 593,
+  "contractMethodsExcludedFromAdditionalUI": 2,
+  "originalFailedAttemptRetained": {
+    "stage": "StoreShots",
+    "passed": 2,
+    "failed": 3,
+    "skipped": 0
+  },
+  "correctedStoreShots": {
+    "stage": "StoreShots-consent-corrected",
+    "passed": 5,
+    "failed": 0,
+    "skipped": 0,
+    "methodExecutionOrder": [
+      "test01_OnboardingAndCompanion",
+      "test02_VerdictAndEvolution",
+      "test03_BoardAndSuggestions",
+      "test04_ShareSkin",
+      "test05_GearAttachmentMatrix"
+    ],
+    "uniqueGearCaptures": 50,
+    "testOnlyCommit": "a44b98b5"
+  },
+  "sourceBindingOriginal": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-source-binding.json",
+  "sourceBindingCorrected": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-source-binding-corrected.json",
+  "testOnlyRepair": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-consent-harness-remediation.json",
+  "scope": "Current Debug Simulator, offline fixtures and stated live backend/Test Store reads only; no physical/TestFlight/Apple purchase lifecycle or universal acceptance",
+  "testOnlyCommit": "a44b98b5eed6ce5445dec3d57d3cf4030f967902"
+}

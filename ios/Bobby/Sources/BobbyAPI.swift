@@ -637,11 +637,11 @@ enum BobbyAPI {
             return refused
         }
         guard (200..<300).contains(reply.status), let obj = reply.json as? [String: Any],
-              let agents = obj["agents"] as? [String: String],
-              let alpha = agents["alpha"], !alpha.isEmpty,
-              let red = agents["red"], !red.isEmpty,
-              let cio = agents["cio"], !cio.isEmpty,
-              let verdict = agents["verdict"], ["wait", "review"].contains(verdict)
+              let agents = obj["agents"] as? [String: Any],
+              let alpha = agents["alpha"] as? String, !alpha.isEmpty,
+              let red = agents["red"] as? String, !red.isEmpty,
+              let cio = agents["cio"] as? String, !cio.isEmpty,
+              let verdict = agents["verdict"] as? String, ["wait", "review"].contains(verdict)
         else { return BobbyAnswer(symbol: symbol) }
         guard await AccountSession.shared.generation == generation else { return BobbyAnswer(symbol: symbol) }
         if let receipt = BobbyTelemetryReceipt(json: obj["telemetry"], expectedRequestId: requestId) {
@@ -650,7 +650,7 @@ enum BobbyAPI {
         var answer = decodeEvidence(obj, symbol: symbol)
         answer.alphaArgument = alpha; answer.redArgument = red; answer.cioArgument = cio
         answer.agentVerdict = verdict
-        answer.direction = agents["direction"]
+        answer.direction = agents["direction"] as? String
         if let source = obj["provenance"] as? [String: String] {
             answer.evidenceLabel = [source["provider"], source["instrument"], source["timeframe"], source["asOf"]].compactMap { $0 }.joined(separator: " · ")
         }

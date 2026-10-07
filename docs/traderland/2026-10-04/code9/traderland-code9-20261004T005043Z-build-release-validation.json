@@ -1,0 +1,125 @@
+{
+  "status": "PASS",
+  "started_at": "2026-10-04T00:51:37.207447+00:00",
+  "completed_at": "2026-10-04T00:51:39.004316+00:00",
+  "source_sha256": "97ba02092fd8876edd5017892c945be9f8595636f71a280e2b13de6754869583",
+  "source_files": 424,
+  "source_unchanged": true,
+  "artifacts": {
+    "release_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/release/app-release.apk",
+      "sha256": "c2a0bf1ea917ed3927538a14d8089e432f6d3de44d17ce422b17bfaa1d42b534",
+      "bytes": 58604662
+    },
+    "release_aab": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/bundle/release/app-release.aab",
+      "sha256": "d96f15e5249b31571ed1b48f7b699ee867a3159688267b5f06856e74a5a8d6df",
+      "bytes": 61826744
+    },
+    "debug_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/debug/app-debug.apk",
+      "sha256": "551c6188800ac9c182649e82049e17fbf30ecc14ae3f8c5e9a31a8d1e8f25b93",
+      "bytes": 72792106
+    },
+    "test_apk": {
+      "path": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+      "sha256": "213aa5c98068b3d3fec5e9996e151fc6dad5ee3993e9e91f5237e67d31bfd2b6",
+      "bytes": 1356535
+    }
+  },
+  "identity": {
+    "package": "xyz.bobbyprotocol.bobby",
+    "version_code": 9,
+    "version_name": "1.1.4",
+    "min_sdk": 26,
+    "target_sdk": 36,
+    "compile_sdk": 36
+  },
+  "tools": {
+    "apksigner": {
+      "exit_code": 0
+    },
+    "jarsigner": {
+      "exit_code": 0
+    },
+    "zipalign": {
+      "exit_code": 0
+    },
+    "badging": {
+      "exit_code": 0
+    },
+    "bundletool": {
+      "exit_code": 0
+    },
+    "config": {
+      "exit_code": 0
+    },
+    "manifest": {
+      "exit_code": 0
+    },
+    "aab-certificate": {
+      "exit_code": 0
+    }
+  },
+  "apk_v2_signature_verified": true,
+  "apk_and_aab_same_existing_upload_certificate": true,
+  "aab_jar_signature_verified": true,
+  "aab_native_page_alignment": "PAGE_ALIGNMENT_16K",
+  "apk_zipalign_16kb_passed": true,
+  "assets_byte_equal_frozen_source": {
+    "apk": 226,
+    "aab": 226
+  },
+  "elf": [
+    {
+      "artifact": "apk",
+      "path": "lib/arm64-v8a/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "apk",
+      "path": "lib/armeabi-v7a/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "apk",
+      "path": "lib/x86/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "apk",
+      "path": "lib/x86_64/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "aab",
+      "path": "base/lib/arm64-v8a/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "aab",
+      "path": "base/lib/armeabi-v7a/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "aab",
+      "path": "base/lib/x86/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    },
+    {
+      "artifact": "aab",
+      "path": "base/lib/x86_64/libandroidx.graphics.path.so",
+      "load_segments": 3,
+      "all_16kb_aligned": true
+    }
+  ],
+  "certificate_digest_disclosed": false,
+  "scope": "Static package validation only; no Play processing, provider lifecycle, coupon redemption or physical UI acceptance."
+}

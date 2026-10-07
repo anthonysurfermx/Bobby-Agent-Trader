@@ -1,0 +1,23 @@
+{
+  "status": "CAPTURED",
+  "recorded_at": "2026-10-03T21:13:56.944479+00:00",
+  "platform": "iOS Simulator",
+  "version": "1.7",
+  "build": "62",
+  "app_dylib_matches_test_product": true,
+  "app_dylib_sha256": "b1dc12dc8c8e8e0d4e202ae2fabc4c6c4f37f19412e6b3258884d6bc913eae82",
+  "language": "es",
+  "input": "DEBUG -qa-coupon, offline receipt: granted/bonus reads10 profundo2 maximo1",
+  "video": {
+    "path": "ios-coupon-celebration.mp4",
+    "sha256": "90d21f76be8a6449d7f647bceda302f39513174d9055fc3588f36da654cca348",
+    "bytes": 1835455
+  },
+  "screenshot": {
+    "path": "ios-confirmed-gift.png",
+    "sha256": "3edca4a29b374195ef3df029df7f7c75356b05feeab0a266a6db1715bd54d7cf"
+  },
+  "real_coupon_consumed": false,
+  "account_or_store_operation": false,
+  "physical_acceptance": false
+}

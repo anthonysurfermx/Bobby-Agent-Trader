@@ -1,0 +1,696 @@
+{
+  "schema": 2,
+  "scope": "Immutable public receipts for the latest signed build, static package checks, debug instrumentation and signed guest UI. Older receipts retain their original source and APK bindings, including failed attempts. Original docs/android/evidence/<name> paths relocate here as <name>. No package binaries, credentials, real account data or physical-device serials included.",
+  "source_sha256": "d37effbf75ac707415ced82ab01f8f69d1e4aa04c4d29aeecdfb51faf03a17ca",
+  "latest_build": "parity-code5-20261003T184654Z-build.json",
+  "latest_static_validation": "parity-code5-security-release-validation.json",
+  "latest_instrumentation": "parity-code5-instrumentation-20261003T184819Z.json",
+  "latest_signed_gui": "parity-code5-security-signed-profile-qa.json",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "9220f067577551c8e4d95b1bf32d3f355761690e92d634cb1d566ee71175f6f0",
+      "bytes": 97
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-build.json",
+      "sha256": "d52101682707f83c54a2a7eb2a8f62bb482505169fb1ad89201359d128cd54ab",
+      "bytes": 13030
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingCoordinatorTest.xml",
+      "sha256": "c6d3d769b1e75f1816cd15564aaa7f35d6d272f70e3616258b9751e7b37dfd88",
+      "bytes": 5456
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPolicyTest.xml",
+      "sha256": "fd9723308f9d8988c3d2a9f9a86d06e1f9da2168f1d999fa4e3cb298f5b7115d",
+      "bytes": 1656
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest.xml",
+      "sha256": "ac1a6dc1e5a3eacc599841d6c2d29b4875dd6285c24b72c3a799009742013afc",
+      "bytes": 803
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionEventsTest.xml",
+      "sha256": "9f8c823c62997339b02271df20ce19f4c4425d7c42f1b03746e734aeec22dffe",
+      "bytes": 859
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest.xml",
+      "sha256": "a7bdfce6cd2ef09b24773ff14490d23b8b969a3386aab1765d7ef17a431f1b73",
+      "bytes": 1286
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountFenceTest.xml",
+      "sha256": "2392d378d257cbd4adfeb0b402767b117d2b8399727cd7c73f25d8fec8c871da",
+      "bytes": 943
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AuthGuardsTest.xml",
+      "sha256": "2e519ad43b8d69b480806dc55ac0be56572593377f918d51b971ada332402f28",
+      "bytes": 727
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyLocalesTest.xml",
+      "sha256": "77ba4329b122597d91aff06e77c34217c976125a257f0cb0c8802bed71099c67",
+      "bytes": 650
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyParsersTest.xml",
+      "sha256": "e11a097464ce356823990453c5e170f053f1474dc8f4604d3a231474dd354358",
+      "bytes": 1061
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest.xml",
+      "sha256": "d2c4c6a15fe0312cd05dab29c284198cba1586c0d588be1763b59b2712da1023",
+      "bytes": 2039
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.data.VoicePreferenceTest.xml",
+      "sha256": "058ff69bc405fc8af938d2491ca16c4402b40566c593a6bfe36b86d7d7d09871",
+      "bytes": 1433
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.equipment.EquipmentRulesTest.xml",
+      "sha256": "578f4faa957d808e9d7545ada64e4c04e0b03db296bb1a20a7bd4680a5d0d4e8",
+      "bytes": 1280
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest.xml",
+      "sha256": "a1b33d6fa92f01df9ea0614bd3e825236bddefc5123dca2d93fd367532914638",
+      "bytes": 1309
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest.xml",
+      "sha256": "e957afbed6d7d801d81c0ec1a548bddc2c70085b024b022d111baf70d2de80a3",
+      "bytes": 845
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest.xml",
+      "sha256": "cf282575fc229b05d893b12d02c17093f757a71b94cdf73794d4a5b40899c8c7",
+      "bytes": 1292
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest.xml",
+      "sha256": "06ae3e3146281970dfa73db20f9028c9a35a9e4f84f07b82ac626a905850150c",
+      "bytes": 1575
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.DictationStateTest.xml",
+      "sha256": "cdc6d20ce7252cc6550c0fa6e5a8f8c1a5257afc1ee65060046165395fdb36e5",
+      "bytes": 1349
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.PlaybackLeaseTest.xml",
+      "sha256": "f548b73c08ddeb5290591de240eb175ed8938fc301c2797d3a7488e06430dfb9",
+      "bytes": 1486
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.push.PushPolicyTest.xml",
+      "sha256": "9ad9a2bdc5ea8ba4316c4fed80b931005ab26b1dbf21472b16ae91d5846fbf50",
+      "bytes": 1207
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.BobbySupportLinksTest.xml",
+      "sha256": "331a858e69efc76f2209cd764b3c943835640461ae36bb5788c4b973201464aa",
+      "bytes": 1277
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest.xml",
+      "sha256": "09565634fdd08eb40b2989f7ca99c2a2701ee2a0109d8cc15bd475840e8d243d",
+      "bytes": 951
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ReportContentPolicyTest.xml",
+      "sha256": "96c8dab70a8587a24b0ab72aea9f2b8cd827f75d5a66390115d8190874ea3bba",
+      "bytes": 1250
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest.xml",
+      "sha256": "25928a259feeaf025a6cb5b5467db9f874622ea25cca90098a14efc383758c44",
+      "bytes": 1442
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest.xml",
+      "sha256": "3758106691a047a462f13aeaf1d5ff5f4b130cbcf5e773a63905a20ccc9dc7db",
+      "bytes": 694
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandRulesTest.xml",
+      "sha256": "088c36d826193a2619a5afea25147e8647eefcefce292a89a7de3211c1f3e939",
+      "bytes": 1202
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-local-checks/lint-results-debug.xml",
+      "sha256": "c389c8c7dc992c65b204fe6d4947a9f9a36d2b3c743ab067526a36a5d83fbea7",
+      "bytes": 57680
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-node-contracts.xml",
+      "sha256": "aae5d687c505f6bd616b249d225e64fcb141052781861540fb5ad72f3a862db7",
+      "bytes": 25869
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-signed.log",
+      "sha256": "18c75584013283b316e1f1fa3d8e13a2e2fa6bc628b280fb45871a475f418dd9",
+      "bytes": 3984
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-source.json",
+      "sha256": "2add6b7614ffa22080278b2bf05d8baff424756fa5b977c0c84cd9a96fd5f14b",
+      "bytes": 62138
+    },
+    {
+      "path": "parity-code5-20261003T181017Z-unit-lint-debug-test-build.log",
+      "sha256": "f998d9fe65a0b0b58a3858e6713d83c7417a96482e05b6e503953ebf55129a60",
+      "bytes": 5539
+    },
+    {
+      "path": "parity-code5-20261003T182924Z-build.json",
+      "sha256": "0a993782fe3e63d1f020d40454beb55e3afa7047210ff4b8595854c3aa16e8b6",
+      "bytes": 13030
+    },
+    {
+      "path": "parity-code5-20261003T182924Z-source.json",
+      "sha256": "02a78949c127cbcd8c24795dc6bcf0a48e550ad53edb9f1174d24b965f2d8279",
+      "bytes": 62138
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-build.json",
+      "sha256": "46b6cb7a209dd84f83b37cafd1b958eb59ff3795bbdc430c42d63d39b6cadbd6",
+      "bytes": 13167
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingCoordinatorTest.xml",
+      "sha256": "41403c1f7d0fa40105e6150296ec5d6f2faa64641f3b0499a6cab7cdb8859256",
+      "bytes": 5456
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPolicyTest.xml",
+      "sha256": "a421ffa76f757ea60358d9d76c325c7aef6427f43c36b3b57c4f669398846a6d",
+      "bytes": 1656
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest.xml",
+      "sha256": "393c75921284ac7a42116e78920b681aeb66e1c66c234bd214b875ca71d363ce",
+      "bytes": 803
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionEventsTest.xml",
+      "sha256": "18a999b50cdac96ec6b5e750aae7ff02c1d32f80cd70922f18d20f6400ffca9b",
+      "bytes": 859
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest.xml",
+      "sha256": "a92383928b913baf77b0bf8990b1c68c255c9e0adde3c23ba433872df2db9a7f",
+      "bytes": 1286
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountFenceTest.xml",
+      "sha256": "c1d332399bd143b525ec4b50fe07e15237ea897c421c42d837be398c3ee41aa3",
+      "bytes": 941
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AuthGuardsTest.xml",
+      "sha256": "8f1072ccf476e4fa92503384a9ca7b6600ffdb52afed9bc7a1cd9e574e135307",
+      "bytes": 729
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyLocalesTest.xml",
+      "sha256": "bfdcbc663c17389f09f53aca15b54ccc4ee045a117f6e11f7d02b237dcd2a6ee",
+      "bytes": 654
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyParsersTest.xml",
+      "sha256": "02520a57367186ddd888a7e1673163b93d8498d9fb25553ab051ef5ff9245727",
+      "bytes": 1057
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest.xml",
+      "sha256": "c83a1b1efa059b2a0da06d8157e8884e6a818fdf5304cfb9e16b839aebbf52a1",
+      "bytes": 2043
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.data.VoicePreferenceTest.xml",
+      "sha256": "fa659e589d7c27748eeea19d95092cbd181ef06dec04cff79a64a13705fc2c6c",
+      "bytes": 1433
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.equipment.EquipmentRulesTest.xml",
+      "sha256": "111c4fa41d1aeccc40a8ddd0a1571f7b5c0bf28ae9184917621918f226aa0e54",
+      "bytes": 1284
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest.xml",
+      "sha256": "54c5ae043039c9a49c5d9cbbc76028b40d76deb658ae049446d391530995754c",
+      "bytes": 1309
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest.xml",
+      "sha256": "7c71a908db56f01fe368d0ff98b0aae47185a4ea9c8e81e253d1cc935ce9368b",
+      "bytes": 845
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest.xml",
+      "sha256": "b2d575ca3649592990a9d1060fb43c679dbfc082cf53c787b8984a0e0315de82",
+      "bytes": 1296
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest.xml",
+      "sha256": "f37a607801277975bbb9ec19e6b46b51b1472b797376ad891db7daa838985c8b",
+      "bytes": 1575
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.DictationStateTest.xml",
+      "sha256": "05dc4b55886811777c1cc335043e1e9ef026e0dc863e88d6a10be3b43b14ee87",
+      "bytes": 1349
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.PlaybackLeaseTest.xml",
+      "sha256": "ac6a5fbf9c733e850615254e55a2c1b930dc700d3d886c10f98ecac2c20dfa87",
+      "bytes": 1486
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.push.PushPolicyTest.xml",
+      "sha256": "01cdb3e7ddfa4b8fc363b6d985db703e95d594c0847e02507e6a41dfc9bfff32",
+      "bytes": 1209
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.BobbySupportLinksTest.xml",
+      "sha256": "502183fbdad56f010c3737ede0bb111169034936281568de669c87a38cf6445f",
+      "bytes": 1279
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest.xml",
+      "sha256": "93dbcbc381f8b38f6526dd2ef71b78d56dc396685e731cbc1962a538dc9034e3",
+      "bytes": 951
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ReportContentPolicyTest.xml",
+      "sha256": "d4d3f54612ad876d9eaae606df2ba5af2448da0a2da2ce6c97f6614f57b5a5ee",
+      "bytes": 1252
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest.xml",
+      "sha256": "e85161abd266547167e51b513717a015dec482158fe0c459d8398698d8c130dd",
+      "bytes": 1444
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest.xml",
+      "sha256": "0e2dd7e10d7c2fd19c2cee65ecc5641ce8bd795ee9df2fddeb3bc4a9883f4bfb",
+      "bytes": 694
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandRulesTest.xml",
+      "sha256": "e5f3a7aed4943f2c996721c33d6ae45e139a240b9bf8e39f6ca4e6d107226b19",
+      "bytes": 1205
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-local-checks/lint-results-debug.xml",
+      "sha256": "c389c8c7dc992c65b204fe6d4947a9f9a36d2b3c743ab067526a36a5d83fbea7",
+      "bytes": 57680
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-node-contracts.xml",
+      "sha256": "5c3c2caf1fbbd4ea8c8b5d2b77cfe7bb8c1a2c918212643c649a6ec1b5cdf675",
+      "bytes": 27177
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-signed.log",
+      "sha256": "f04b4299a47cd29a354ef0e4014b5247e1e000f9a2ba8662866ddd537bbfec4e",
+      "bytes": 3865
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-source.json",
+      "sha256": "667459e6619028d6c750a6956de4568c858a8709365aa4a514c7740ef34b294f",
+      "bytes": 62465
+    },
+    {
+      "path": "parity-code5-20261003T184654Z-unit-lint-debug-test-build.log",
+      "sha256": "c41408794cc2d454c7224dc83a06d6bd1ba270b04d8b09f6d22496eef9d9a09d",
+      "bytes": 5398
+    },
+    {
+      "path": "parity-code5-eslint-final-20261003T181023Z.json",
+      "sha256": "7e31cb34b395060f73b2eb3cab5fc64573899e4c87ba73583eaa7ff8a2b85645",
+      "bytes": 420
+    },
+    {
+      "path": "parity-code5-eslint-final-20261003T181023Z.log",
+      "sha256": "0a5d6820db4a17f272f8b21607ea9ea0c2608a2785c0e24c48af294e927e6289",
+      "bytes": 55
+    },
+    {
+      "path": "parity-code5-eslint-security-final-20261003T184741Z.json",
+      "sha256": "fd237b0bb70d5649dd44699dabcc9acde64aca9831060817939869368e7924e9",
+      "bytes": 420
+    },
+    {
+      "path": "parity-code5-eslint-security-final-20261003T184741Z.log",
+      "sha256": "0a5d6820db4a17f272f8b21607ea9ea0c2608a2785c0e24c48af294e927e6289",
+      "bytes": 55
+    },
+    {
+      "path": "parity-code5-final-profile-screens/01-final-profile-fr.png",
+      "sha256": "e2a62ca3b4251863c566a2a20eaeb38aa2ceb60a6171bdf09591665d6909e1dc",
+      "bytes": 378943
+    },
+    {
+      "path": "parity-code5-final-profile-screens/02-final-voice-menu-fr.png",
+      "sha256": "658a14f0ed52b027089c7236900543c854eb085616f76402dd8a4d496869a4ea",
+      "bytes": 198654
+    },
+    {
+      "path": "parity-code5-final-profile-screens/03-final-fr-masculine-persisted.png",
+      "sha256": "482b28dcb25a20bbcf3093928061b79e55700fced50b89e695650085618d2d60",
+      "bytes": 194723
+    },
+    {
+      "path": "parity-code5-final-profile-screens/04-final-default-restored.png",
+      "sha256": "ee13deb8fb89bc625482de449424958a552f1a3540aaf4d66acc95f98a9f7321",
+      "bytes": 197412
+    },
+    {
+      "path": "parity-code5-final-profile-screens/05-final-share-chooser.png",
+      "sha256": "0a7dc00a5635ef37f7e864f91ab4fa8876a532dea70feb13aa7a081c1928b54c",
+      "bytes": 224013
+    },
+    {
+      "path": "parity-code5-final-profile-screens/shared-avatar-card-fr-final.png",
+      "sha256": "8d5503ee87cf32d13e2d581ddb011dcb952aabe614cafcee61875e149b5a9c2b",
+      "bytes": 331495
+    },
+    {
+      "path": "parity-code5-final-release-validation.json",
+      "sha256": "88d5d1b7d7a51bc17e9512745b119d61ee814ff914997968d579de8279eaf4c1",
+      "bytes": 730536
+    },
+    {
+      "path": "parity-code5-initial-ci-sdk-failure.json",
+      "sha256": "7d91e421f5e213a57a2901c899f64d9acb84701533908f0bca14806d3fad9462",
+      "bytes": 717
+    },
+    {
+      "path": "parity-code5-initial-ci-sdk-failure.log",
+      "sha256": "cbbcda47f36f39afd52573e76c5d96a27b30950d6ff18550f38929fb7fbff0a6",
+      "bytes": 1280
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T182111Z.json",
+      "sha256": "12f961fd14d714d6f59971472e3759fcfb41194e225bb7f1b54d3aeffd2cc2d3",
+      "bytes": 19510
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T182111Z.log",
+      "sha256": "98fb98fa8b48a82b5fbd1e8f6af36de13fffe98c3d1eb1b4870f56451aa81ff7",
+      "bytes": 23510
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T182111Z.xml",
+      "sha256": "98c4f461908f5dc5995c611bcc666fa38d1332169ef837fd66c4df1304c767b2",
+      "bytes": 4857
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T183155Z.json",
+      "sha256": "52f7dd60c73178ae8100f2f43a82afe1c1ea36e662709d6afcba723a093a9bd3",
+      "bytes": 19050
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T183155Z.log",
+      "sha256": "37d7766d4661fec6a8dbbcb2da18644c3a2dacaed962f05cf5dd942c52f7a295",
+      "bytes": 19494
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T183155Z.xml",
+      "sha256": "ea159cae8ee971b3db19f90e833cdecf0e56ab05a8949ebdb1dc4075f9bce4a1",
+      "bytes": 4081
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T184819Z.json",
+      "sha256": "5fa463f35ccc50a551c6b716fc916985c7f3200eee68535d5f477167a2ee97cc",
+      "bytes": 18891
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T184819Z.log",
+      "sha256": "f9151df9603100b6ba9f6811cf672356e80bab784c15c265ef779e87b41586e6",
+      "bytes": 17955
+    },
+    {
+      "path": "parity-code5-instrumentation-20261003T184819Z.xml",
+      "sha256": "f166ff71d578c77632489c6c4a8f395a674d363d7b109b6d06a9b48f5ee9af4b",
+      "bytes": 3920
+    },
+    {
+      "path": "parity-code5-polished-release-validation.json",
+      "sha256": "76ef08ee3c3e8bceeaada0db247b8fdde5e16c80da4934c98c921f3f832d3b67",
+      "bytes": 732357
+    },
+    {
+      "path": "parity-code5-release-validation.json",
+      "sha256": "3022a64b2135c2808b76a34e0df19f6cc07dd46805b924c2b9c221672aa3bd25",
+      "bytes": 93758
+    },
+    {
+      "path": "parity-code5-security-profile-screens/00-initial-guest-before-consent.xml",
+      "sha256": "0a4249c1adb0325bf3cbc6dd7f8a156fe0d86f423bacdad15c12ef49c6da6b68",
+      "bytes": 3053
+    },
+    {
+      "path": "parity-code5-security-profile-screens/00-initial-guest-ready.xml",
+      "sha256": "023cb826b7abdbc243951bf0e29c237d119fec332c74b7b9a0ac4cd315d80cb7",
+      "bytes": 59952
+    },
+    {
+      "path": "parity-code5-security-profile-screens/00-initial-guest.png",
+      "sha256": "7c14f9af238f185c4c171c30e71974ce352687763f06e93d7731921fee6c3261",
+      "bytes": 836950
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-language-menu-six.png",
+      "sha256": "6c6cbfede353b35fdc2b20656e8355ce5ed514f56f46a64f436bbfb83e449388",
+      "bytes": 182897
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-normal-restart-initial.xml",
+      "sha256": "0a4249c1adb0325bf3cbc6dd7f8a156fe0d86f423bacdad15c12ef49c6da6b68",
+      "bytes": 3053
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-normal-restart-ready.xml",
+      "sha256": "532ca82652cc1ab67c99a99034795b9221f2f404462e0a53824ad52b7892cf32",
+      "bytes": 60214
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-profile-after-render.xml",
+      "sha256": "58022e18b275198db1f167ab80ac2880ea8ab8ef01e402af3981f29f048341f9",
+      "bytes": 59952
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-profile-en.xml",
+      "sha256": "023cb826b7abdbc243951bf0e29c237d119fec332c74b7b9a0ac4cd315d80cb7",
+      "bytes": 59952
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-profile-opening.png",
+      "sha256": "6926e3a7e3025244218ec460667fb42f4cb9a9145c056bd8499cd7ce7d88c66e",
+      "bytes": 842602
+    },
+    {
+      "path": "parity-code5-security-profile-screens/01-profile-second-normal-tap.xml",
+      "sha256": "c4c140be3c543b78295816e41e1215bfd76bd58f58d586827e12e95ef5f4a97a",
+      "bytes": 59952
+    },
+    {
+      "path": "parity-code5-security-profile-screens/02-risk-profile-route.xml",
+      "sha256": "15ee179eb51b974884f228df4da44b01b882f690c6020d4060692134c227cff3",
+      "bytes": 62735
+    },
+    {
+      "path": "parity-code5-security-profile-screens/02-voice-menu-fr.png",
+      "sha256": "8a6229e6c9be9e513d4497f6b5953a3e93957a153851e93b4f4bc931e087ed18",
+      "bytes": 196197
+    },
+    {
+      "path": "parity-code5-security-profile-screens/03-native-profile-en.xml",
+      "sha256": "0027d35c7ea5e6578741d1039a3babd2638c777c9f8b983341accb0c9dedacd6",
+      "bytes": 19731
+    },
+    {
+      "path": "parity-code5-security-profile-screens/03-profile-fr-0xp.png",
+      "sha256": "a21e6d316d29d8f0d9b95223c30eefa50823685e400a737076aa5e4077b53ea2",
+      "bytes": 354860
+    },
+    {
+      "path": "parity-code5-security-profile-screens/04-fr-masculine-persisted.png",
+      "sha256": "c85d48375d29dc4eac8e48d909bb03da3cce6c0e0fdd82c794a55644306bc543",
+      "bytes": 189273
+    },
+    {
+      "path": "parity-code5-security-profile-screens/04-native-profile-preferences-en.xml",
+      "sha256": "4c9dcde4fb226ed1f05679727ecf4be8fd54051c1678752f5da5605bac890468",
+      "bytes": 22426
+    },
+    {
+      "path": "parity-code5-security-profile-screens/05-companion-restored-fr.png",
+      "sha256": "23cb39b14a0b7c7c1ce2943567a15153a1fba74c46cb2167e7080fec3974c8af",
+      "bytes": 191475
+    },
+    {
+      "path": "parity-code5-security-profile-screens/05-native-settings-en.xml",
+      "sha256": "5b8bbb2f03648ec432f19b2640a8e06485b6ac94b47028aa85db8a51114bfc9b",
+      "bytes": 20546
+    },
+    {
+      "path": "parity-code5-security-profile-screens/06-settings-language-voice-en.xml",
+      "sha256": "8d431f4b1ce4c328e4c30e4a91892fdea227c5bbec7a23c45d5d1c3afb27bfe3",
+      "bytes": 21226
+    },
+    {
+      "path": "parity-code5-security-profile-screens/06-share-chooser.png",
+      "sha256": "82209dd4a936f8306b1c21bf1d622be0d960490b1dc497281d41b9c0e78126ac",
+      "bytes": 289612
+    },
+    {
+      "path": "parity-code5-security-profile-screens/07-language-menu-six.xml",
+      "sha256": "dd107e0d2bc5fca228b264cd381cfd048ff1eaa692e097acc0ff1ad0a1dbeda0",
+      "bytes": 6395
+    },
+    {
+      "path": "parity-code5-security-profile-screens/08-settings-fr.xml",
+      "sha256": "fb30d0b181f0a8e1ce366965ab13c2ad3012455494ebffc4bf01d09714ab41e7",
+      "bytes": 21368
+    },
+    {
+      "path": "parity-code5-security-profile-screens/09-voice-menu-fr.xml",
+      "sha256": "711c7e32b97f5575764d91fde3aa168f1068fa0b97795f9003eb90d524474806",
+      "bytes": 3768
+    },
+    {
+      "path": "parity-code5-security-profile-screens/10-fr-masculine-selected.xml",
+      "sha256": "3c72df33bdd64c3bea2ec5886c749ae7511b0b81f611dd0615b474dafae3b75a",
+      "bytes": 21356
+    },
+    {
+      "path": "parity-code5-security-profile-screens/11-restart-fr-before-consent.xml",
+      "sha256": "0a4249c1adb0325bf3cbc6dd7f8a156fe0d86f423bacdad15c12ef49c6da6b68",
+      "bytes": 3053
+    },
+    {
+      "path": "parity-code5-security-profile-screens/12-restart-fr-ready.xml",
+      "sha256": "d78a2317c42adbcf71bdc5ca6acdc0a496e783462b3acb354c60697fb3e9b94c",
+      "bytes": 60270
+    },
+    {
+      "path": "parity-code5-security-profile-screens/13-restart-risk-fr.xml",
+      "sha256": "d85a5ea462361acacfc2518df1aa72b697c181106eef8d2a4b4997a79a0041bf",
+      "bytes": 62876
+    },
+    {
+      "path": "parity-code5-security-profile-screens/14-profile-fr-after-restart.xml",
+      "sha256": "bcb159b2d5de8e576935f46624c2aebba388ad4192215a4397c30832ff012ea4",
+      "bytes": 19432
+    },
+    {
+      "path": "parity-code5-security-profile-screens/15-fr-masculine-persisted.xml",
+      "sha256": "c6ae1704bf6258aa7972a8b0ed9b40a00f7c82a9fe4192737b23f1bbf7800259",
+      "bytes": 20316
+    },
+    {
+      "path": "parity-code5-security-profile-screens/16-voice-restoration-menu-fr.xml",
+      "sha256": "0b45d20cf36ad410d0973af2600c9d221cceb433bf36022247c98e0c83d32173",
+      "bytes": 3768
+    },
+    {
+      "path": "parity-code5-security-profile-screens/17-companion-restored-fr.xml",
+      "sha256": "13e493c55cdcbd524452440420882ec455f32dd11a7934b61083ae0a53544eb2",
+      "bytes": 20328
+    },
+    {
+      "path": "parity-code5-security-profile-screens/18-share-avatar-row-fr.xml",
+      "sha256": "bcb159b2d5de8e576935f46624c2aebba388ad4192215a4397c30832ff012ea4",
+      "bytes": 19432
+    },
+    {
+      "path": "parity-code5-security-profile-screens/19-android-share-chooser.xml",
+      "sha256": "a0f441751638e150d4a86a8f3d86b40aee1914c9419b5fb2629ade46635802fe",
+      "bytes": 14012
+    },
+    {
+      "path": "parity-code5-security-profile-screens/20-chooser-closed-profile-fr.xml",
+      "sha256": "bcb159b2d5de8e576935f46624c2aebba388ad4192215a4397c30832ff012ea4",
+      "bytes": 19432
+    },
+    {
+      "path": "parity-code5-security-profile-screens/shared-avatar-card-fr-0xp.json",
+      "sha256": "9df4bc2758bc6ea5c1fa48124a2e5e9bc35c7e9aca9a271b7ee0578fcca50c46",
+      "bytes": 782
+    },
+    {
+      "path": "parity-code5-security-profile-screens/shared-avatar-card-fr-0xp.png",
+      "sha256": "8ff6f5c9e076cd22a093461da28f6e5ff57de9fde13dff62cf20073c8d0d1745",
+      "bytes": 280818
+    },
+    {
+      "path": "parity-code5-security-profile-screens/signed-apk-final-pin.json",
+      "sha256": "3a61608a42a74d765f3c5f8e184d034f349e4738625e122d8d0bcb31546c5a73",
+      "bytes": 422
+    },
+    {
+      "path": "parity-code5-security-profile-screens/signed-apk-pin.json",
+      "sha256": "b4bc912c5d04f89bb222473341fe76ca43b964bad81b41201a6b2261822acb2f",
+      "bytes": 422
+    },
+    {
+      "path": "parity-code5-security-release-validation.json",
+      "sha256": "502d2565c89e09bc15cbbc9cacea41fbfb714d368020b1c5ca70401776cbbbb9",
+      "bytes": 756832
+    },
+    {
+      "path": "parity-code5-security-signed-profile-qa.json",
+      "sha256": "a55fc0f57819666d40d60c878bb8369d3161a988a8dda5adfaa55ece598b362c",
+      "bytes": 9512
+    },
+    {
+      "path": "parity-code5-seeker-readiness-20261003T185240Z.json",
+      "sha256": "fa824c806ac9b303c7e4448646e8d61204ec08aa01d2c5d578c92d6190a30a6d",
+      "bytes": 393
+    },
+    {
+      "path": "parity-code5-signed-profile-qa-phase-d6.json",
+      "sha256": "6caa181eec0bb09492017d98387fa944d6ba44c176b98483fd4a639dca4a98b4",
+      "bytes": 3356
+    },
+    {
+      "path": "parity-code5-signed-profile-qa.json",
+      "sha256": "189d736232a31fcf84bb64e5e224ef9211e5cda9c30c56879b81b58f2658741a",
+      "bytes": 5831
+    },
+    {
+      "path": "parity-code5-source-commit-ci-20261003T185903Z.json",
+      "sha256": "560e014f39adab443b33a8439d164276be6dbb5b5cf5d29b7b1f5840dc68f784",
+      "bytes": 4652
+    },
+    {
+      "path": "parity-code5-web-build-final-20261003T181023Z.json",
+      "sha256": "55052ec01bdde685c7b57f148177d8aa9f972288e9b99ffaff9fa8305a178c9e",
+      "bytes": 396
+    },
+    {
+      "path": "parity-code5-web-build-final-20261003T181023Z.log",
+      "sha256": "d280e396d5e5c6358b0450466b256c53d7812d4ba5ee8525991a1e914a04e1f3",
+      "bytes": 41021
+    },
+    {
+      "path": "parity-code5-web-build-security-final-20261003T184741Z.json",
+      "sha256": "b5bfe6b730731e6d767f782cf3e1487b542c583bdf0a91968befafa073485c19",
+      "bytes": 396
+    },
+    {
+      "path": "parity-code5-web-build-security-final-20261003T184741Z.log",
+      "sha256": "068a93dd36095252998b131d05ff1a7cdfe58a8253e8823e047fd43211e1249e",
+      "bytes": 41021
+    }
+  ]
+}

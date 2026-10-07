@@ -1,0 +1,156 @@
+{
+  "classes": [
+    {
+      "class": "CommunitySafetyUITests",
+      "methods": [
+        "testEnglishVisitorCanBlockAndUnblockCreator",
+        "testSpanishVisitorCanBlockAndUnblockCreator"
+      ],
+      "count": 2
+    },
+    {
+      "class": "CompanionLoadTests",
+      "methods": [
+        "testEveryCompanionModelLoads"
+      ],
+      "count": 1
+    },
+    {
+      "class": "CouponRedemptionUITests",
+      "methods": [
+        "testConfirmedGiftShowsActualCountsAndReturnAction",
+        "testAlreadyRedeemedDoesNotPromiseAnotherGift"
+      ],
+      "count": 2
+    },
+    {
+      "class": "DeskHarvestCardTests",
+      "methods": [
+        "testSignedOutCardKeepsItsButtonIdentifiers",
+        "testBloomedCardOffersBuildIt",
+        "testCappedCardOpensTheIsland",
+        "testPickerAsksBeforeGrowingTheSeed",
+        "testConfirmedHorizonBecomesTheSeeds",
+        "testGrownSeedsNameTheirHorizon",
+        "testNoTradeAndOlderServersShowNoPicker",
+        "testAReviewThatOpenedLocksTheChoice",
+        "testTheChoiceLocksWhenTheReviewOpensOnScreen",
+        "testChipCarriesItsBadge"
+      ],
+      "count": 10
+    },
+    {
+      "class": "EquipmentUITests",
+      "methods": [
+        "testEnglishEquipmentChoices",
+        "testSpanishEquipmentChoices"
+      ],
+      "count": 2
+    },
+    {
+      "class": "LockerTests",
+      "methods": [
+        "testOpensOnYourCompanionWithTheRealCount",
+        "testCounterAcrossTheLadder",
+        "testLockedCompanionShowsSilverAndItsPrice",
+        "testTappingABoxShowsThePiece",
+        "testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost",
+        "testANewDropIsFlagged"
+      ],
+      "count": 6
+    },
+    {
+      "class": "NucleoContractUITests",
+      "methods": [
+        "testContractPassesOnTheNativeBridge",
+        "testContractPassesAfterAnOnboardingReset"
+      ],
+      "count": 2
+    },
+    {
+      "class": "NucleoPrivacyUITests",
+      "methods": [
+        "testOlderNoticeRequiresCompleteReadableDisclosureAndExplicitAgreement",
+        "testWithdrawingConsentKeepsProfileAvailableAndPersistsAfterRelaunch"
+      ],
+      "count": 2
+    },
+    {
+      "class": "NucleoStoreScreenshots",
+      "methods": [
+        "testEnglishScreenshots",
+        "testSpanishScreenshots"
+      ],
+      "count": 2
+    },
+    {
+      "class": "ProReviewShots",
+      "methods": [
+        "testProfileProRows",
+        "testPaywallPurchasable"
+      ],
+      "count": 2
+    },
+    {
+      "class": "ReleaseReadinessTests",
+      "methods": [
+        "testAIConsentIsRequiredBeforeEnteringDesk",
+        "testAvatarVoiceStyleReturnsToOnboarding",
+        "testSpanishAvatarVoiceStyleReturnsToOnboarding",
+        "testDeskCanMuteAndRestoreAvatarNarration",
+        "testSpanishDeskCanMuteAndRestoreAvatarNarration",
+        "testSquadSelectionSpeaksAndChangingAvatarStopsThePreviousVoice",
+        "testMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+        "testSpanishMuteChoiceSurvivesOnboardingGalleryAndRelaunch",
+        "testOrdinaryPracticeIslandCanZoomOutToTheArchipelago",
+        "testSpanishOrdinaryPracticeIslandIncludesSatoshiNakamoto",
+        "testPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+        "testSpanishPracticeExplorationKeepsLocalProgressAndRequiresSignInToPublish",
+        "testAccountIslandCanSaveNamePublishShareAndBecomePrivate",
+        "testSpanishAccountIslandCanSaveNamePublishShareAndBecomePrivate"
+      ],
+      "count": 14
+    },
+    {
+      "class": "SquadGalleryTests",
+      "methods": [
+        "testEveryCompanionLoadsInTheSquad",
+        "testLockedCompanionShowsItsUnlockTarget",
+        "testActiveCompanionIsNeverShownLocked",
+        "testUnlockedCompanionHasNoLock"
+      ],
+      "count": 4
+    },
+    {
+      "class": "Store35Shots",
+      "methods": [
+        "testEnglishScreenshots",
+        "testSpanishScreenshots"
+      ],
+      "count": 2
+    },
+    {
+      "class": "StoreShots",
+      "methods": [
+        "test01_OnboardingAndCompanion",
+        "test03_BoardAndSuggestions",
+        "test04_ShareSkin",
+        "test05_GearAttachmentMatrix",
+        "test02_VerdictAndEvolution"
+      ],
+      "count": 5
+    },
+    {
+      "class": "TraderLandGateTests",
+      "methods": [
+        "testPreviewMoveCancelCollisionUndoAndPersistence",
+        "testAccountFixtureMovesTheCoreAndExtendsASeed",
+        "testArchipelagoArrowsVisitNeighboursAndReturnHome"
+      ],
+      "count": 3
+    }
+  ],
+  "class_count": 15,
+  "method_count": 59,
+  "remaining_classes_excluding_already_verified_contract": 14
+}

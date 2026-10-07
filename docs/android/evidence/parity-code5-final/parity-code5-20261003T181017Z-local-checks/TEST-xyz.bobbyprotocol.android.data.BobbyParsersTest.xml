@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.data.BobbyParsersTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:05:29.465Z" hostname="MacBook-Pro-F-Society.local" time="0.008">
+  <properties/>
+  <testcase name="failedOrPartialAnswersNeverBecomeNoTrade" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.001"/>
+  <testcase name="questionLimitCountsUnicodeCodePointsAfterTrimming" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.001"/>
+  <testcase name="candlesSkipNonFiniteMalformedRowsAndSort" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.004"/>
+  <testcase name="streamSupportsNdjsonAndSseAndIgnoresMalformedProgressLines" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.001"/>
+  <testcase name="nullResolutionNeverGuessesAnUnmentionedInstrument" classname="xyz.bobbyprotocol.android.data.BobbyParsersTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,137 @@
+{
+  "supplementalNegativeControls": 20,
+  "controls": [
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "btc",
+      "timeframe": "4H",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "btc",
+      "timeframe": "1D",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "btc",
+      "timeframe": "1W",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "btc",
+      "mutation": "analysis horizon substituted for candle interval",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "btc",
+      "mutation": "analysis timestamp substituted for candle timestamp",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "nvda",
+      "timeframe": "4H",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "nvda",
+      "timeframe": "1D",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "nvda",
+      "timeframe": "1W",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "nvda",
+      "mutation": "analysis horizon substituted for candle interval",
+      "detected": true
+    },
+    {
+      "tree": "ios/Bobby/Nucleo",
+      "slug": "nvda",
+      "mutation": "analysis timestamp substituted for candle timestamp",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "btc",
+      "timeframe": "4H",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "btc",
+      "timeframe": "1D",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "btc",
+      "timeframe": "1W",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "btc",
+      "mutation": "analysis horizon substituted for candle interval",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "btc",
+      "mutation": "analysis timestamp substituted for candle timestamp",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "nvda",
+      "timeframe": "4H",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "nvda",
+      "timeframe": "1D",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "nvda",
+      "timeframe": "1W",
+      "mutation": "overlay guard removed",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "nvda",
+      "mutation": "analysis horizon substituted for candle interval",
+      "detected": true
+    },
+    {
+      "tree": "nucleo",
+      "slug": "nvda",
+      "mutation": "analysis timestamp substituted for candle timestamp",
+      "detected": true
+    }
+  ]
+}

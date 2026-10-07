@@ -1,0 +1,10 @@
+{
+  "observedAtUTC": "2026-10-04T12:52:04.062184+00:00",
+  "surface": "native iPhone Mirroring AX",
+  "deviceInventoryBobbyInstalled": false,
+  "connectionResumedByRoot": true,
+  "result": "Mirroring is locked and requires existing Mac login password entered locally by human",
+  "passwordReadEnteredOrCopied": false,
+  "physicalAppInstallAndSixLanguageFlows": "unverified",
+  "requestedUserLocalUnlock": true
+}

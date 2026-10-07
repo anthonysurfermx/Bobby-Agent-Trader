@@ -1,0 +1,62 @@
+{
+  "at": "2026-10-04T12:07:50.816241+00:00",
+  "stage": "LockerTests",
+  "class": "LockerTests",
+  "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "expectedMethods": [
+    "testOpensOnYourCompanionWithTheRealCount",
+    "testCounterAcrossTheLadder",
+    "testLockedCompanionShowsSilverAndItsPrice",
+    "testTappingABoxShowsThePiece",
+    "testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost",
+    "testANewDropIsFlagged"
+  ],
+  "expectedCount": 6,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "f5446f9663da91d6caa9c082f2e01b9338e9331b1111de24d40fe04062905eaa",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "10374d68ba6313ed7c7e437e4c0c93f986c7f9f4d8ea625f0875cfa92e6316a5",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 6,
+    "passedTests": 6,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "LockerTests/testANewDropIsFlagged()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testANewDropIsFlagged",
+      "result": "Passed"
+    },
+    {
+      "identifier": "LockerTests/testCounterAcrossTheLadder()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testCounterAcrossTheLadder",
+      "result": "Passed"
+    },
+    {
+      "identifier": "LockerTests/testLockedCompanionShowsSilverAndItsPrice()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testLockedCompanionShowsSilverAndItsPrice",
+      "result": "Passed"
+    },
+    {
+      "identifier": "LockerTests/testOpensOnYourCompanionWithTheRealCount()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testOpensOnYourCompanionWithTheRealCount",
+      "result": "Passed"
+    },
+    {
+      "identifier": "LockerTests/testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testSwipingTheWholeSquadKeepsThreeLiveModelsAtMost",
+      "result": "Passed"
+    },
+    {
+      "identifier": "LockerTests/testTappingABoxShowsThePiece()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/LockerTests/testTappingABoxShowsThePiece",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

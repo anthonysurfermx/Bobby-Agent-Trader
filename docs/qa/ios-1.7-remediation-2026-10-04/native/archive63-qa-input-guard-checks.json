@@ -1,0 +1,70 @@
+{
+  "checkedAtUTC": "2026-10-04T12:53:04.087603+00:00",
+  "cases": [
+    {
+      "case": "strict default rejects the changed UI-test hash",
+      "result": "PASS: rejected",
+      "reason": "build-input drift: ios/Bobby/UITests/StoreShots.swift"
+    },
+    {
+      "case": "exact reviewed UI-test-only delta allowed",
+      "result": "PASS",
+      "strictUnchangedInputs": 749,
+      "boundedNonShippingDelta": 1
+    },
+    {
+      "case": "product Swift input hash mismatch stays blocked",
+      "result": "PASS: rejected",
+      "reason": "build-input drift: ios/Bobby/Sources/Nucleo/NucleoSpeech.swift"
+    },
+    {
+      "case": "test receipt tampered current hash blocked",
+      "result": "PASS: rejected",
+      "reason": "current test hash differs from the reviewed receipt"
+    },
+    {
+      "case": "receipt cannot bless product code",
+      "result": "PASS: rejected",
+      "reason": "only the explicitly reviewed StoreShots test delta is eligible"
+    },
+    {
+      "case": "target project proof mismatch stays blocked",
+      "result": "PASS: rejected",
+      "reason": "target membership/settings changed since archive"
+    },
+    {
+      "case": "package cache hash mismatch stays blocked",
+      "result": "PASS: rejected",
+      "reason": "package-cache state drift"
+    },
+    {
+      "case": "wrong --expected-head archive attribution is blocked before signing/export",
+      "result": "PASS: rejected",
+      "reason": "FAILED: expected archive source does not match preserved preflight"
+    }
+  ],
+  "total": 8,
+  "passed": 8,
+  "failed": 0,
+  "realProductOrArchiveFilesModified": false,
+  "sourceVerification": {
+    "archiveSourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+    "observedCurrentHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+    "strictInputHashCount": 749,
+    "approvedNonShippingDeltas": [
+      {
+        "path": "ios/Bobby/UITests/StoreShots.swift",
+        "archivedSHA256": "e631a5cbda5875ed5bd38db1461b463ab3ec6ab72abadc0bc703f23fb76224e4",
+        "currentTestOnlySHA256": "2e9837c8a6bbce1ccc0c61f8ac50744f06d6b49c9ecab31742fa639ece733971",
+        "receipt": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/qa-test-only-input-receipt.json",
+        "receiptSHA256": "c03be253d8d399a031c2ee53ee76f29ca9ea936d3eafbbc85d5bf59255125343",
+        "membership": "BobbyUITests only; excluded from Release archive target",
+        "delta": "Three riskNoticeVersion6 launch preconditions; all assertions preserved"
+      }
+    ],
+    "productResourceProjectCacheHashes": "all unchanged; no product exception permitted"
+  },
+  "wrapperSHA256": "d0777aec824afe34d84a72ef8d6b94eac72211f7208f4310612fc95d4a1b7df7",
+  "scope": "Real current source/target membership verified. Negative cases mutate only in-memory expected hashes or disposable approval JSON; no build, simulator or upload.",
+  "updatedAtUTC": "2026-10-04T12:57:58.690792+00:00"
+}

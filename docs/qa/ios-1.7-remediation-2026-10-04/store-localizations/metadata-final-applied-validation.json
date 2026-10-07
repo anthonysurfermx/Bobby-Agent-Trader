@@ -1,0 +1,282 @@
+{
+  "validatedAtUTC": "2026-10-04T13:02:39.658340+00:00",
+  "source": "metadata-final-applied.json",
+  "sourceSHA256": "23e04ee02fe661886ae5188f8d12755854c725a26d9a491fb746e43b35c12172",
+  "locales": {
+    "en-US": {
+      "name": {
+        "characters": 29,
+        "utf16Units": 29,
+        "utf8Bytes": 29,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 25,
+        "utf16Units": 25,
+        "utf8Bytes": 25,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 2865,
+        "utf16Units": 2865,
+        "utf8Bytes": 2871,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 155,
+        "utf16Units": 155,
+        "utf8Bytes": 155,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 435,
+        "utf16Units": 435,
+        "utf8Bytes": 435,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 78,
+        "utf16Units": 78,
+        "utf8Bytes": 78,
+        "limit": 100,
+        "pass": true
+      }
+    },
+    "es-MX": {
+      "name": {
+        "characters": 29,
+        "utf16Units": 29,
+        "utf8Bytes": 29,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 24,
+        "utf16Units": 24,
+        "utf8Bytes": 24,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 3125,
+        "utf16Units": 3125,
+        "utf8Bytes": 3176,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 156,
+        "utf16Units": 156,
+        "utf8Bytes": 157,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 472,
+        "utf16Units": 472,
+        "utf8Bytes": 482,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 86,
+        "utf16Units": 86,
+        "utf8Bytes": 88,
+        "limit": 100,
+        "pass": true
+      }
+    },
+    "fr-FR": {
+      "name": {
+        "characters": 25,
+        "utf16Units": 25,
+        "utf8Bytes": 26,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 27,
+        "utf16Units": 27,
+        "utf8Bytes": 28,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 3324,
+        "utf16Units": 3324,
+        "utf8Bytes": 3428,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 155,
+        "utf16Units": 155,
+        "utf8Bytes": 157,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 517,
+        "utf16Units": 517,
+        "utf8Bytes": 537,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 73,
+        "utf16Units": 73,
+        "utf8Bytes": 74,
+        "limit": 100,
+        "pass": true
+      }
+    },
+    "pt-PT": {
+      "name": {
+        "characters": 30,
+        "utf16Units": 30,
+        "utf8Bytes": 30,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 28,
+        "utf16Units": 28,
+        "utf8Bytes": 29,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 3171,
+        "utf16Units": 3171,
+        "utf8Bytes": 3278,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 141,
+        "utf16Units": 141,
+        "utf8Bytes": 146,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 470,
+        "utf16Units": 470,
+        "utf8Bytes": 491,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 75,
+        "utf16Units": 75,
+        "utf8Bytes": 80,
+        "limit": 100,
+        "pass": true
+      }
+    },
+    "it": {
+      "name": {
+        "characters": 29,
+        "utf16Units": 29,
+        "utf8Bytes": 29,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 27,
+        "utf16Units": 27,
+        "utf8Bytes": 27,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 3183,
+        "utf16Units": 3183,
+        "utf8Bytes": 3222,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 145,
+        "utf16Units": 145,
+        "utf8Bytes": 146,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 471,
+        "utf16Units": 471,
+        "utf8Bytes": 480,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 68,
+        "utf16Units": 68,
+        "utf8Bytes": 68,
+        "limit": 100,
+        "pass": true
+      }
+    },
+    "de-DE": {
+      "name": {
+        "characters": 23,
+        "utf16Units": 23,
+        "utf8Bytes": 24,
+        "limit": 30,
+        "pass": true
+      },
+      "subtitle": {
+        "characters": 26,
+        "utf16Units": 26,
+        "utf8Bytes": 26,
+        "limit": 30,
+        "pass": true
+      },
+      "description": {
+        "characters": 3281,
+        "utf16Units": 3281,
+        "utf8Bytes": 3330,
+        "limit": 4000,
+        "pass": true
+      },
+      "promotionalText": {
+        "characters": 151,
+        "utf16Units": 151,
+        "utf8Bytes": 153,
+        "limit": 170,
+        "pass": true
+      },
+      "whatsNew": {
+        "characters": 509,
+        "utf16Units": 509,
+        "utf8Bytes": 515,
+        "limit": 4000,
+        "pass": true
+      },
+      "keywords": {
+        "characters": 68,
+        "utf16Units": 68,
+        "utf8Bytes": 68,
+        "limit": 100,
+        "pass": true
+      }
+    }
+  },
+  "keywordLimitUsesConservativeUTF8Bytes": true,
+  "allPass": true,
+  "differencesFromInitialPreparedLocaleFields": [
+    {
+      "locale": "es-MX",
+      "field": "description",
+      "preparedCharacters": 3102,
+      "appliedCharacters": 3125
+    }
+  ],
+  "reviewNotesCharacters": 2384
+}

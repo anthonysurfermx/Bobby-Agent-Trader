@@ -1,0 +1,331 @@
+{
+  "version": 1,
+  "canonical_commit": "bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92",
+  "scope": "Approved 1024 PNG albedo/glow bytes; decoded at 512 pixels for native Android composition. No generated or edited imagery.",
+  "assets": [
+    {
+      "asset": "aura_core_stage0.png",
+      "source": "public/land/v1/gate-A/aura_core/ne/stage0_albedo_1024.png",
+      "sha256": "787fde08c88400652b68f4d0b57f6154fb960740a7403264bd5f136f84353f17",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "aura_core_stage1.png",
+      "source": "public/land/v1/gate-A/aura_core/ne/stage1_albedo_1024.png",
+      "sha256": "b4054341644b96785aeb8fd55611035d5f870867d09048ef1da4d9b16c76d6d9",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_data_dock_bloom.png",
+      "source": "public/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_albedo_1024.png",
+      "sha256": "1b62587cbfb5021207dfd5675e8abc6b825c6ce7ad7a05006a6e7a4d4d94a425",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_data_dock_bloom_glow.png",
+      "source": "public/land/v1/gate-A/crypto_bay_data_dock/ne/bloom_glow_1024.png",
+      "sha256": "d97e02088fd09acddabc625bc76eb8dff4f92c716e7f1981805e207435f7224a",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_water_walkway_bloom.png",
+      "source": "public/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_albedo_1024.png",
+      "sha256": "d37f37ffb659e489a7b6116a00ced4531387bb9e531a57b431f42cc481a27e2e",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_water_walkway_bloom_glow.png",
+      "source": "public/land/v1/gate-A/crypto_bay_water_walkway/ne/bloom_glow_1024.png",
+      "sha256": "e68e58fb9867846396ded0f577351226dbb2e0488bd50edeb74afd370717ae74",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_context_buoy_bloom.png",
+      "source": "public/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_albedo_1024.png",
+      "sha256": "cedb4785c40c59f8724f7ba63401fc9331b1a56cd95ff36a1f3907d2876b76ec",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_context_buoy_bloom_glow.png",
+      "source": "public/land/v1/gate-A/crypto_bay_context_buoy/ne/bloom_glow_1024.png",
+      "sha256": "3a9be64b11bfe717cd98053d01012e8a5672d2384995a5bc012d22cbcf0f516c",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_candle_tower_bloom.png",
+      "source": "public/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_albedo_1024.png",
+      "sha256": "766be4bb0cc30a930d7cf889ed175e13927a6fc23f0f14d078541f98cba15769",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_candle_tower_bloom_glow.png",
+      "source": "public/land/v1/gate-A/crypto_bay_candle_tower/ne/bloom_glow_1024.png",
+      "sha256": "6e1654322fd4da1ea516b59e8db69ec0df6d2cf748d0be024ef34af902e2fca1",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_waiting_lighthouse_bloom.png",
+      "source": "public/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_albedo_1024.png",
+      "sha256": "9d4cdb623f1ca446638a96f2315f56dcc1d83db37bd85678ca4c3760ca8c3691",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "crypto_bay_waiting_lighthouse_bloom_glow.png",
+      "source": "public/land/v1/gate-A/crypto_bay_waiting_lighthouse/ne/bloom_glow_1024.png",
+      "sha256": "b98484473e83530fee25fca413231c9445578307f87e4dbbf00a6381df4a3153",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_crystal_vein_rock_bloom.png",
+      "source": "public/land/v1/gate-A/evidence_mines_crystal_vein_rock/ne/bloom_albedo_1024.png",
+      "sha256": "0c1d9495f6faea16bcbdaa05ab9abf2fd3a7c7d5e9287ade579aeec2ea26cd37",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_crystal_vein_rock_bloom_glow.png",
+      "source": "public/land/v1/gate-A/evidence_mines_crystal_vein_rock/ne/bloom_glow_1024.png",
+      "sha256": "e9dc055cd55336a0160a93ecfec96efca6cdc46068381aa47fe930dceca35d60",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_open_tunnel_bloom.png",
+      "source": "public/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_albedo_1024.png",
+      "sha256": "a1b6bd514d697aad1f367426b9d881d38a954d78fe92f90aea47ea3cf4daa0de",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_open_tunnel_bloom_glow.png",
+      "source": "public/land/v1/gate-A/evidence_mines_open_tunnel/ne/bloom_glow_1024.png",
+      "sha256": "3e80a11654a2799773fe8257c0c5fea03f901a7fb948b2db7ce65608eeea5a77",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_lantern_drone_bloom.png",
+      "source": "public/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_albedo_1024.png",
+      "sha256": "6759f48e874555b173bc0f50efb16fa15bd4fd22e458304b46a56d5c79892a1d",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_lantern_drone_bloom_glow.png",
+      "source": "public/land/v1/gate-A/evidence_mines_lantern_drone/ne/bloom_glow_1024.png",
+      "sha256": "f4b11918c1d9fa45dbb16b4584bb95e687374df4d0d4630074fb0a85b753d1e7",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_evidence_workshop_bloom.png",
+      "source": "public/land/v1/gate-A/evidence_mines_evidence_workshop/ne/bloom_albedo_1024.png",
+      "sha256": "562a82894e87a3d833babfa2d7312770112bcfd6fa6e620fb33eeaa10aa550d5",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_evidence_workshop_bloom_glow.png",
+      "source": "public/land/v1/gate-A/evidence_mines_evidence_workshop/ne/bloom_glow_1024.png",
+      "sha256": "bd1fc9550733426bc7faa6d6d206f2715466a4bc783142a6911d0875896c2db4",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_mother_crystal_bloom.png",
+      "source": "public/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_albedo_1024.png",
+      "sha256": "05f948a6e7567d4df3dac4dbbdfe204635c63133c16ff8a074e9f5257636f601",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "evidence_mines_mother_crystal_bloom_glow.png",
+      "source": "public/land/v1/gate-A/evidence_mines_mother_crystal/ne/bloom_glow_1024.png",
+      "sha256": "b64be6b526d1a545c21d91d2775056d92f01930736e37b6c8eb0fd87f9dfc90d",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_wall_slab_bloom.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_albedo_1024.png",
+      "sha256": "7f8afeab4f673ce2b3013e98f7ba2ca421c52db653fefbf54f7a354ecf8513c6",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_wall_slab_bloom_glow.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_wall_slab/ne/bloom_glow_1024.png",
+      "sha256": "95e0cbb436ddc88dcaee97f86ba4fb88ec422009d478819447f2e7b8e9de03b0",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_fortified_ramp_bloom.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_albedo_1024.png",
+      "sha256": "b2ef113e68041c95f4c874b13e9995c82cf09de2c1df5b060b02acffb4dcb669",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_fortified_ramp_bloom_glow.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_fortified_ramp/ne/bloom_glow_1024.png",
+      "sha256": "af837b5295d33317bf74e5cf34d5dac44336b496719e8b997fe9331e7ef2da88",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_risk_shield_bloom.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_albedo_1024.png",
+      "sha256": "82ec1d327bd771c5539dc5cefabb1934c3df33e6f1994d4798699ccad2c49c83",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_risk_shield_bloom_glow.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_risk_shield/ne/bloom_glow_1024.png",
+      "sha256": "3aaf78ab11f33f23f65576747ebdac4d3dd2a665c9ceb9d6db7fce8f17ef0969",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_double_gate_bloom.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_albedo_1024.png",
+      "sha256": "bc30bdc506190f8dbb8f4def44f1e97cb38192eaa32c611e993bc72b5afcd7cc",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_double_gate_bloom_glow.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_double_gate/ne/bloom_glow_1024.png",
+      "sha256": "259df2313cdad2be72d9553ea3c4e845283f0391c75ccff51282912698921a5c",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_three_gate_citadel_bloom.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_three_gate_citadel/ne/bloom_albedo_1024.png",
+      "sha256": "8a3872eef475ff7232d1b175366c238e80d8455f7c044134df8b82b0b95f8799",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "thesis_citadel_three_gate_citadel_bloom_glow.png",
+      "source": "public/land/v1/gate-A/thesis_citadel_three_gate_citadel/ne/bloom_glow_1024.png",
+      "sha256": "4f6ec0c7246a9d580c66521203744da497e0e746b02d30824b30c7ff7aadca12",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_reef_tile_bloom.png",
+      "source": "public/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_albedo_1024.png",
+      "sha256": "d23ff14513f857392c1be1e2230214a9177fd75b7cc704186c773eb2e02a807a",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_reef_tile_bloom_glow.png",
+      "source": "public/land/v1/gate-A/risk_reef_reef_tile/ne/bloom_glow_1024.png",
+      "sha256": "3a1515666f6b882fac48c8245520c4ccbbba1b9525fee452a9b653d8fbadc47a",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_blue_sluice_bloom.png",
+      "source": "public/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_albedo_1024.png",
+      "sha256": "6a456505029bc91583792a2a2d997563d3a2e8c04624c231b94879168885f492",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_blue_sluice_bloom_glow.png",
+      "source": "public/land/v1/gate-A/risk_reef_blue_sluice/ne/bloom_glow_1024.png",
+      "sha256": "2692176e51e8983c4a607ac66d2ae09e993942e4580ccbba80b3c57b276b32fe",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_dual_orbit_antenna_bloom.png",
+      "source": "public/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_albedo_1024.png",
+      "sha256": "92f67d3798cd0ac4deab6beea521a41970b5a942e0fadb4c4ffc9715a490c216",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_dual_orbit_antenna_bloom_glow.png",
+      "source": "public/land/v1/gate-A/risk_reef_dual_orbit_antenna/ne/bloom_glow_1024.png",
+      "sha256": "2b371b55f4d1429aa4a015a0683c56b0223470459adb23f379c146022c4d16df",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_red_team_observatory_bloom.png",
+      "source": "public/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_albedo_1024.png",
+      "sha256": "b184650d7ba9640cfe8fb17bcd42dc763156b43c6bca6e73d84b81ccb9880e6e",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_red_team_observatory_bloom_glow.png",
+      "source": "public/land/v1/gate-A/risk_reef_red_team_observatory/ne/bloom_glow_1024.png",
+      "sha256": "3955850040a1d66bcc765b1e2a8b3669bc5c8687659c8978a4f043bfcd041a9e",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_double_bridge_bloom.png",
+      "source": "public/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_albedo_1024.png",
+      "sha256": "625330617ef3b490da3f165024c5b0388d3e08255f5cd591e8fc6103fa862010",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "risk_reef_double_bridge_bloom_glow.png",
+      "source": "public/land/v1/gate-A/risk_reef_double_bridge/ne/bloom_glow_1024.png",
+      "sha256": "21c91a0fe57a61dac09fafd567508ccd3757e8dfa3ff20b3f2d6fef53d8d9266",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_archive_ring_tile_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_albedo_1024.png",
+      "sha256": "08bd4dcdc32d4431b465d016eac943d30b68398d9826493e00b71d140f1869bd",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_archive_ring_tile_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_archive_ring_tile/ne/bloom_glow_1024.png",
+      "sha256": "5aa6fd62cf6ad18ace6a76907cea62284d79639bfd33e2bb2eac95e3f40863b0",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_path_straight_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_albedo_1024.png",
+      "sha256": "237709d8e6881bd9b03f3592ed78393c844ebaff6f462b18f7f90b87da33e68e",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_path_straight_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_path_straight/ne_sw/bloom_glow_1024.png",
+      "sha256": "993609238ba092935df42a61fbc26305b6021353a1dfb618fb4a3774ff1e0ce4",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_return_path_curve_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_albedo_1024.png",
+      "sha256": "1bd1d3acc17f09fd7a1a87ad3915c54d7cd2ad0c3a179caebd7f565adff0ab2b",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_return_path_curve_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_return_path_curve/curve_a/bloom_glow_1024.png",
+      "sha256": "be45811f7c82808cb9971edad4f44ba01affec8c6ece20d1106123bc7b3657a4",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_aura_flower_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_albedo_1024.png",
+      "sha256": "cf427d4749e1b6734874e9c528179c2a6c75f9bbeb5e5e51ab807db9af3758d6",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_aura_flower_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_aura_flower/ne/bloom_glow_1024.png",
+      "sha256": "7033f7a46c3c1232a5b74c619af2acd9cb7eedb3f408b016a3f3c9c58c12c8db",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_lit_archive_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_albedo_1024.png",
+      "sha256": "b14c49145061f24c81ab6fbb7ef3ab1df7073f04ab0c1845798b564750890a14",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_lit_archive_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_lit_archive/ne/bloom_glow_1024.png",
+      "sha256": "c8357163437803c502dc048035a78561bb8d3011755b8d722ed9a9825104017e",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_base_ring_seal_bloom.png",
+      "source": "public/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_albedo_1024.png",
+      "sha256": "13847c1c9ad2d34663a1c7caa849f06f5c06adb45f640a69faf76c4b02c79777",
+      "decoded_resolution": 512
+    },
+    {
+      "asset": "axiom_archive_base_ring_seal_bloom_glow.png",
+      "source": "public/land/v1/gate-A/axiom_archive_base_ring_seal/ne/bloom_glow_1024.png",
+      "sha256": "3e494ea50b7c3c52fb0d0b2614e7bc710f3d61c2236747b2f5443386c15f3bf5",
+      "decoded_resolution": 512
+    }
+  ]
+}

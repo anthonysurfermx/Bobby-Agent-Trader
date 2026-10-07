@@ -428,6 +428,7 @@ ENTER.RISK = function(a){
 };
 function riskLinesIn(){
   buildRisk(RISK_NOTICE.statements); var L = layoutRisk(452);
+  sc(rmoreEl, 'top', f1(L.body + L.bodyHeight + 1) + 'px');
   tb('lines');
   at(0.30, function(){
     sc(noticeEl, 'top', f1(L.notice) + 'px'); tb('notice');

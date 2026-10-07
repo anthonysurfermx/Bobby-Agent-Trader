@@ -1,0 +1,16 @@
+{
+  "recordedAtUTC": "2026-10-04T13:09:04.730547+00:00",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "version": "1.7",
+  "build": "63",
+  "xcodebuildExitCode": 0,
+  "explicitUploadSuccessMarker": true,
+  "result": "upload accepted by xcodebuild",
+  "testFlightProcessing": "Xcode reports uploaded package is processing; TestFlight completed processing not verified",
+  "installationAndPhysicalAcceptance": "not verified",
+  "explicitUploadSuccessLines": [
+    "2026-10-04 14:09:04.072 xcodebuild[74401:5910202] Progress 100%: Upload succeeded."
+  ],
+  "markerReparsedAtUTC": "2026-10-04T13:10:10.876161+00:00",
+  "originalReceiptPreserved": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-acceptance-before-marker-repair.json"
+}

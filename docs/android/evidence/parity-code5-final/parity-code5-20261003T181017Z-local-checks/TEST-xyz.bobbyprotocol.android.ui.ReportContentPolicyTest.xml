@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:05:29.532Z" hostname="MacBook-Pro-F-Society.local" time="0.077">
+  <properties/>
+  <testcase name="messageMatchesServerLengthCeilingWithoutSplittingUnicode" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.001"/>
+  <testcase name="userTextAndKnownReasonAreRequired" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0"/>
+  <testcase name="publicTransportNeverAttachesAccountOrInstallationHeaders" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.076"/>
+  <testcase name="httpSuccessWithoutBothBooleanReceiptsNeverAcknowledgesSave" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0"/>
+  <testcase name="payloadContainsOnlyExplicitTextAndApprovedMetadata" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0"/>
+  <testcase name="failureStatusCannotAcknowledgeSaveEvenWithTrueBody" classname="xyz.bobbyprotocol.android.ui.ReportContentPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

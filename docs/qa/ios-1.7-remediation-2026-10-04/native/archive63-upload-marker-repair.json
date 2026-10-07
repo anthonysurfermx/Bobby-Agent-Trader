@@ -1,0 +1,41 @@
+{
+  "updatedAtUTC": "2026-10-04T13:10:10.876538+00:00",
+  "wrapperExecutedForUploadSHA256": "d0777aec824afe34d84a72ef8d6b94eac72211f7208f4310612fc95d4a1b7df7",
+  "wrapperAfterMarkerRepairSHA256": "a5c5d5f7c30a280bed520208f764da6b3c4d89b31b23bd56f5b5234fa10b84d3",
+  "scope": "Explicit upload-marker recognizer only. No source/project/archive change; no repeat upload.",
+  "actualAppleSuccessLines": [
+    "2026-10-04 14:09:04.072 xcodebuild[74401:5910202] Progress 100%: Upload succeeded."
+  ],
+  "cases": [
+    {
+      "case": "actual Apple log accepted",
+      "accepted": true,
+      "result": "PASS"
+    },
+    {
+      "case": "export success alone is not upload acceptance",
+      "accepted": false,
+      "result": "PASS"
+    },
+    {
+      "case": "100percent processing alone is not upload acceptance",
+      "accepted": false,
+      "result": "PASS"
+    },
+    {
+      "case": "upload failed is blocked",
+      "accepted": false,
+      "result": "PASS"
+    },
+    {
+      "case": "legacy explicit uppercase upload marker accepted",
+      "accepted": true,
+      "result": "PASS"
+    }
+  ],
+  "passed": 5,
+  "failed": 0,
+  "originalFalseNegativeReceiptPreserved": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-acceptance-before-marker-repair.json",
+  "originalAppleLogSHA256": "5ae1eaffd0bddcdc44612cbe2275e59b98e015f54bb75cb3a3490bdbe2ae5cf4",
+  "serverResult": "xcodebuild exit0 and Apple Upload succeeded status; remote completed processing requires separate receipt"
+}

@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-03T20:18:40.857873+00:00",
+  "public_extract": "parity-code6-traderland-20261003T200229043433Z-apksigner.log",
+  "public_extract_sha256": "184d8456e0693d3129b1acd6e85e8ff7800b1ac10b41b5ff6a43e3545640237c",
+  "public_extract_bytes": 997,
+  "original_coordinator_log": "docs/android/evidence/parity-code6-traderland-20261003T200229043433Z-apksigner.log",
+  "original_sha256": "fb92afcdce2504281e03d10b0c0acddeb603754ad7c3f0a70ebb24a7f6435214",
+  "original_bytes": 945,
+  "original_is_unchanged": true,
+  "redacted_fields": [
+    "Signer #1 public key SHA-256 digest",
+    "Signer #1 public key SHA-1 digest"
+  ],
+  "reason": "Gitleaks generic-api-key falsely treats these two public signing-key fingerprints as API keys. The public extract retains signature verification results and the approved certificate fingerprint. Original tool receipt/log digest remain valid; this public extract has its separate hash. No secret/private key was exposed, no security rule was disabled and no app source changed."
+}

@@ -1,0 +1,11 @@
+{
+  "at": "2026-10-04T09:37:51.886Z",
+  "baseHEAD": "393776c332b2c3f6e21d6cad457869431dd28a62",
+  "files": {
+    "ios/Bobby/Nucleo/src/app/55-read.js": "2231d5b64f72d18adf7d52395a4cb2ca4e548e5dd486ecbe4613037202e4d612",
+    "nucleo/src/app/55-read.js": "749ae1df22ee8ddc8e916659f2045ba0ebe5d32831ee91ac1e569a0771235b40",
+    "scripts/qa/test-ios17-support-subtitle.mjs": "de94507855d397ebf81d2c44c6166f4e9b3524559a45e9cf33049f31d5bf78f4"
+  },
+  "committedByRootAs": "507616c99eb143e466084c85bbb177d11315bf68",
+  "hashesStillMatch": true
+}

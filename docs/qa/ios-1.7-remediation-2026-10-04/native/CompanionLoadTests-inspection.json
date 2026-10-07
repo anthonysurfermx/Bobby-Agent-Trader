@@ -1,0 +1,32 @@
+{
+  "at": "2026-10-04T12:40:53.187812+00:00",
+  "stage": "CompanionLoadTests",
+  "class": "CompanionLoadTests",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testEveryCompanionModelLoads"
+  ],
+  "expectedCount": 1,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "01b59bae17723c897adf9ca892eca8ad3b12f78e4e552cafa0c40bcf16eb4eb8",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "056279f501932c8a26620c798db732d55cf3cf20eb267b4aee4591fa0e868cf6",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 1,
+    "passedTests": 1,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "CompanionLoadTests/testEveryCompanionModelLoads()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/CompanionLoadTests/testEveryCompanionModelLoads",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

@@ -1,0 +1,8 @@
+{
+  "sourceHead": "507616c99eb143e466084c85bbb177d11315bf68",
+  "status": "repair implemented; native re-run pending storage recovery",
+  "files": {
+    "ios/Bobby/Sources/Nucleo/NucleoFixtures.swift": "547556c498ecdf7de6142744dad8f739a6597d4da3fff1d610983d4b86c586ed",
+    "ios/Bobby/Tests/NucleoBridgeTests.swift": "e63ab3a3cfe85661fb72611849f811e9d76e8c073f48fb0d9df1504f2fa3767c"
+  }
+}

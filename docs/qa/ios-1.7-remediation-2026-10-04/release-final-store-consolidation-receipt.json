@@ -1,0 +1,645 @@
+{
+  "consolidatedAtUTC": "2026-10-04T13:28:17.309999+00:00",
+  "destination": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04",
+  "archiveSourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "observedCurrentHead": "0073a762943153b4c39c9f4f3e9a73989b6b8e1e",
+  "sourceChangesByThisWorker": "docs only; temporary verifier copy updated, no product edits",
+  "copiedFileCount": 102,
+  "copiedBytes": 2784558,
+  "files": [
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-screenshots-saved.json",
+      "destination": "store-localizations/app-store-screenshots-saved.json",
+      "bytes": 1817,
+      "sha256": "280a13558910bbff13d1d738f09eb5193c27dd9c155a87121572c8404fbb61d3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-metadata-saved.json",
+      "destination": "store-localizations/app-store-metadata-saved.json",
+      "bytes": 742,
+      "sha256": "b4451437457bb93eb76198b6c173633a69ee1b94c2086f9c31dd5da1f98b114d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-metadata-full-readback.json",
+      "destination": "store-localizations/app-store-metadata-full-readback.json",
+      "bytes": 1831,
+      "sha256": "54fca45edf795d9a02441ee646730c6857b475715f7b944723fcac74ff9f08d1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-appinfo-full-readback.json",
+      "destination": "store-localizations/app-store-appinfo-full-readback.json",
+      "bytes": 907,
+      "sha256": "0872e3773fdafc49ab514166f911c46f7c5a2817fd890154e3384a2061c04d82"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-final-applied.json",
+      "destination": "store-localizations/metadata-final-applied.json",
+      "bytes": 29797,
+      "sha256": "23e04ee02fe661886ae5188f8d12755854c725a26d9a491fb746e43b35c12172"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-final-applied-validation.json",
+      "destination": "store-localizations/metadata-final-applied-validation.json",
+      "bytes": 6091,
+      "sha256": "bab15f2c065eabeb64003fd6022796787f20898ea80bae8869f51d815dae1897"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-wrapper.py",
+      "destination": "native/archive63-wrapper.py",
+      "bytes": 22725,
+      "sha256": "a5c5d5f7c30a280bed520208f764da6b3c4d89b31b23bd56f5b5234fa10b84d3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-qa-input-guard-repair.json",
+      "destination": "native/archive63-qa-input-guard-repair.json",
+      "bytes": 1404,
+      "sha256": "00c99c9b8ae9d1c876a7228094b58d091506983f748f4a512d2c90c12e54ecad"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-qa-input-guard-checks.json",
+      "destination": "native/archive63-qa-input-guard-checks.json",
+      "bytes": 2907,
+      "sha256": "1250acc699d44cfa3ae6fca7288010561bc2235f9b9ec124546abf0d21a228fa"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/physical-current-blocker.json",
+      "destination": "native/physical-current-blocker.json",
+      "bytes": 412,
+      "sha256": "0c6dd6e5a79f304c230e4b595e88c26620392fc57328a8ee27e5c97d2b6079c1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-run-report.md",
+      "destination": "native/ui-serial-run-report.md",
+      "bytes": 7418,
+      "sha256": "438c9fd06e60d60fa9d5bf71a65bf256426c6dd4ee37f2016cf0e5aee4cf92c2"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-source-binding-corrected.json",
+      "destination": "native/ui-serial-source-binding-corrected.json",
+      "bytes": 4017,
+      "sha256": "7029a7b1fbef45aa881d2676c799c9544b54278d1c2fd573bb4d1abc88cea7e9"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/ui-serial-completion-receipt.json",
+      "destination": "native/ui-serial-completion-receipt.json",
+      "bytes": 1426,
+      "sha256": "6cbb6800669b04d1825cef6c74f2befd2c5659974fe7051afcbf2335c8d927a5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-corrected-verdict-capture.json",
+      "destination": "native/StoreShots-corrected-verdict-capture.json",
+      "bytes": 918,
+      "sha256": "44e8d4e18e61f547762c5abea8693b77aa1a7328baca2f8dcfb6d0e0c89f761e"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-consent-harness-patch.diff",
+      "destination": "native/StoreShots-consent-harness-patch.diff",
+      "bytes": 1906,
+      "sha256": "4ff91fd4f22a1cc6a544fc851215c42fdd1375edca233c55f8ff8b2d93c061fc"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-consent-harness-remediation.json",
+      "destination": "native/StoreShots-consent-harness-remediation.json",
+      "bytes": 1029,
+      "sha256": "25c9d0b56520ae0342b796f02c0bede4f9bb5e77a1e9190ca784a8e5799780c0"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-failure-extraction.json",
+      "destination": "native/StoreShots-failure-extraction.json",
+      "bytes": 948,
+      "sha256": "814014a4628d918901ec7f97b84e4e2d5148599798cc67bbee71bcb9b3c86e33"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-test02-hierarchy.txt",
+      "destination": "native/StoreShots-test02-hierarchy.txt",
+      "bytes": 6547,
+      "sha256": "bd811b32defbd056b5a57323b71c56d9e017bd17f8769db91908faa224320961"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-corrected-09-verdict.png",
+      "destination": "native/StoreShots-corrected-09-verdict.png",
+      "bytes": 1763619,
+      "sha256": "c476107479406fe5d5fb59e6d7128203311becf63f2b07ec26225e629fc29e42"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/archive-verification-with-qa-input-delta.json",
+      "destination": "release-archive/retry/archive-verification-with-qa-input-delta.json",
+      "bytes": 3605,
+      "sha256": "309b79162e199b31a19c30ca4501f0bcdb7cd33899c65ddaa717590e83d60fc5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/qa-test-only-input-receipt.json",
+      "destination": "release-archive/retry/qa-test-only-input-receipt.json",
+      "bytes": 1313,
+      "sha256": "c03be253d8d399a031c2ee53ee76f29ca9ea936d3eafbbc85d5bf59255125343"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/approved-storeshots-test-delta.patch",
+      "destination": "release-archive/retry/approved-storeshots-test-delta.patch",
+      "bytes": 1704,
+      "sha256": "32db1b176555c6584de0fbb8261656f825a3fa4d25e60620afd0563941779a44"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/wrapper-before-qa-input-guard.py",
+      "destination": "release-archive/retry/wrapper-before-qa-input-guard.py",
+      "bytes": 16900,
+      "sha256": "609befc08b23475b1b7a7587f3b0e40127e68041b9e56f48f7e48ff27bb0b552"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-results.json",
+      "destination": "native/ui-serial-results.json",
+      "bytes": 31663,
+      "sha256": "1892756230cc73ddd168151300cfa6de598811e06da5b2c247bd5e41ec042a7b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ui-serial-driver-status.json",
+      "destination": "native/ui-serial-driver-status.json",
+      "bytes": 344,
+      "sha256": "dc7215be5230a28e485ef920f28f2a5183a47e6339f7117b9ac34342684abb19"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-summary.json",
+      "destination": "native/ProReviewShots-summary.json",
+      "bytes": 708,
+      "sha256": "d6fe2634a86c691585498d1f64053fa530c259de0d5d6d5d067b2609a966cc92"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-tests.json",
+      "destination": "native/ProReviewShots-tests.json",
+      "bytes": 1444,
+      "sha256": "6ce196ef1334073fd9006a7d4ae63b0452b56a127a2875fdb534a397b7b0cffe"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-inspection.json",
+      "destination": "native/ProReviewShots-inspection.json",
+      "bytes": 1151,
+      "sha256": "4e3377f367d672214ddb27129ec3f751cc70421c2d2d9a07d2af49da126d33b2"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ProReviewShots-execution.json",
+      "destination": "native/ProReviewShots-execution.json",
+      "bytes": 2109,
+      "sha256": "8988d74540abbd2fb12accd231848a8e775e9dd0d9f8b5adfc2fb05acfd2b6f0"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-summary.json",
+      "destination": "native/Store35Shots-summary.json",
+      "bytes": 709,
+      "sha256": "edd23c525d1c81389ed7c70e8d89ad3a69e38961a5f12bbe503928edf71672aa"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-tests.json",
+      "destination": "native/Store35Shots-tests.json",
+      "bytes": 1446,
+      "sha256": "49075e3a22d38e9cce7ec622bb690c71452ef2fac2dc49a5a50722b3e1fdcf17"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-inspection.json",
+      "destination": "native/Store35Shots-inspection.json",
+      "bytes": 1151,
+      "sha256": "0e836b9310d366e3329954d8b015f35f1f0b2d427ba9954a778963c9ed7bef2d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/Store35Shots-execution.json",
+      "destination": "native/Store35Shots-execution.json",
+      "bytes": 2098,
+      "sha256": "307a43216bcdd0531f1dd613824efb2ba53d782fcce9ae1829442c7887eda17c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-summary.json",
+      "destination": "native/EquipmentUITests-summary.json",
+      "bytes": 709,
+      "sha256": "cba351210441e2bb775a53d4a81f31c4f58372628a1831a7f76c53ce6e9b20d5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-tests.json",
+      "destination": "native/EquipmentUITests-tests.json",
+      "bytes": 1831,
+      "sha256": "63b1cb8acddbf720dfddb01e68acbe73610af668d33a72bc4d7c501310bc747b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-inspection.json",
+      "destination": "native/EquipmentUITests-inspection.json",
+      "bytes": 1205,
+      "sha256": "2ef23d77c5f098f1731376fc37a620b8b83d70584b96b89acccee91fb5b8037c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/EquipmentUITests-execution.json",
+      "destination": "native/EquipmentUITests-execution.json",
+      "bytes": 2121,
+      "sha256": "a041bfe9b19e9674e99875423eb96a72ba74578cb80b1986e96b6c29cadae05f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-summary.json",
+      "destination": "native/LockerTests-summary.json",
+      "bytes": 709,
+      "sha256": "f5446f9663da91d6caa9c082f2e01b9338e9331b1111de24d40fe04062905eaa"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-tests.json",
+      "destination": "native/LockerTests-tests.json",
+      "bytes": 3145,
+      "sha256": "10374d68ba6313ed7c7e437e4c0c93f986c7f9f4d8ea625f0875cfa92e6316a5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-inspection.json",
+      "destination": "native/LockerTests-inspection.json",
+      "bytes": 2251,
+      "sha256": "b33097db552d0b8b8c8ba66d8815cefe92c6ff5e95c9ba234accbe08200f856f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/LockerTests-execution.json",
+      "destination": "native/LockerTests-execution.json",
+      "bytes": 2091,
+      "sha256": "db7cc104d868b899f880634093bf87aa1f2596f416f9f3788004032a9b511051"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-summary.json",
+      "destination": "native/SquadGalleryTests-summary.json",
+      "bytes": 708,
+      "sha256": "4e9596db1bedcf576ccd107d7e80fbb5e7ac807b8d3d5e9a186e0764ad367eab"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-tests.json",
+      "destination": "native/SquadGalleryTests-tests.json",
+      "bytes": 2389,
+      "sha256": "e5e120e278747b682070d28c4471e5f93040f628d7b1f00cea2a7bb3b967c24b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-inspection.json",
+      "destination": "native/SquadGalleryTests-inspection.json",
+      "bytes": 1800,
+      "sha256": "c112a3f5b39545abced42e8512bcd8fcdcd29ec61588de4174861a32b7afd5dd"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/SquadGalleryTests-execution.json",
+      "destination": "native/SquadGalleryTests-execution.json",
+      "bytes": 2127,
+      "sha256": "d3dd616a76508533b5e4253e08b0991a253791884238e6e9d3b11e9acf09ff8b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-summary.json",
+      "destination": "native/ReleaseReadinessTests-summary.json",
+      "bytes": 712,
+      "sha256": "12ec860fedbb71de304700a34227a728881265f75896edb0b0f2d09615665a4f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-tests.json",
+      "destination": "native/ReleaseReadinessTests-tests.json",
+      "bytes": 7092,
+      "sha256": "5d1d9473871bf820266ab0eee78bd92401e0a1feb5985eda6824f6fa0d265345"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-inspection.json",
+      "destination": "native/ReleaseReadinessTests-inspection.json",
+      "bytes": 5426,
+      "sha256": "f8475155a50e996ef0e35469f8d43018fbf3cf3ac1bf7c1c147b7fcf44f89511"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/ReleaseReadinessTests-execution.json",
+      "destination": "native/ReleaseReadinessTests-execution.json",
+      "bytes": 2152,
+      "sha256": "29d3dea8b62cc51cdee69d2b8e419a27ffc1c4564e0a95dcc7cae234856a3aa2"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-summary.json",
+      "destination": "native/NucleoPrivacyUITests-summary.json",
+      "bytes": 709,
+      "sha256": "7e6241fda9f3dae4f5b46ba97e38e3fd17533cc8cb69329c67832ea0a7aeebc5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-tests.json",
+      "destination": "native/NucleoPrivacyUITests-tests.json",
+      "bytes": 1695,
+      "sha256": "ab36650ec01a44d8fe3c421c2fdd3f1225a6a8cf2b1f340216fe9eeee13bcf9a"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-inspection.json",
+      "destination": "native/NucleoPrivacyUITests-inspection.json",
+      "bytes": 1475,
+      "sha256": "9958d1d4b649b27914575ad7563f096172ac278fd430da20cd0a6df12dfbd22f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoPrivacyUITests-execution.json",
+      "destination": "native/NucleoPrivacyUITests-execution.json",
+      "bytes": 2146,
+      "sha256": "4d0ce06698a893ce48199aaccb9cf21b651b6332d71d09453ec26d73adf653a1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-summary.json",
+      "destination": "native/CouponRedemptionUITests-summary.json",
+      "bytes": 709,
+      "sha256": "07f6107613b667000f077b11cf866c6b36895acaeecaa80d2d38866b2ac418c4"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-tests.json",
+      "destination": "native/CouponRedemptionUITests-tests.json",
+      "bytes": 1497,
+      "sha256": "f1eec268c532f90ab2974f5b41ab280239e5bda75202c88ab5888abea9e9ef84"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-inspection.json",
+      "destination": "native/CouponRedemptionUITests-inspection.json",
+      "bytes": 1364,
+      "sha256": "8e50481b80885d39015e11013c5b5cc2bddc264a8e5778da53de6a62a819047f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CouponRedemptionUITests-execution.json",
+      "destination": "native/CouponRedemptionUITests-execution.json",
+      "bytes": 2163,
+      "sha256": "a6d31971f30efecf5eb70bdca56761cc994759a21df31dcf06477ffc0492d61d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-summary.json",
+      "destination": "native/DeskHarvestCardTests-summary.json",
+      "bytes": 712,
+      "sha256": "5d2c8f95785d6faa9abf34288d39a6d358871cdb30b19b090f485c914305e794"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-tests.json",
+      "destination": "native/DeskHarvestCardTests-tests.json",
+      "bytes": 4123,
+      "sha256": "32a55381aae127e27f89cf0a0686de635d92d4fab8c4527fc44fc6cc3ff1dc29"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-inspection.json",
+      "destination": "native/DeskHarvestCardTests-inspection.json",
+      "bytes": 3465,
+      "sha256": "e6a6cda550b8bd6661dd986f844cf9f372aa877430ae782e302a07c62788363d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/DeskHarvestCardTests-execution.json",
+      "destination": "native/DeskHarvestCardTests-execution.json",
+      "bytes": 2145,
+      "sha256": "15498a24d564db345409d670db82a9c2857849dac2e7cc818c06423627600468"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-summary.json",
+      "destination": "native/CommunitySafetyUITests-summary.json",
+      "bytes": 709,
+      "sha256": "919a3719527e837ed848206c4231721b7b85ab53d8604b44c1f270f758cf341f"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-tests.json",
+      "destination": "native/CommunitySafetyUITests-tests.json",
+      "bytes": 1473,
+      "sha256": "862fcb9df75287cc3dd745b41077582ebeeb41a38883615d885564b201917cfb"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-inspection.json",
+      "destination": "native/CommunitySafetyUITests-inspection.json",
+      "bytes": 1337,
+      "sha256": "137d8a58297ed4a3fc71831608aaf295085b88bffbbb578df273dfbdbe2b2a81"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CommunitySafetyUITests-execution.json",
+      "destination": "native/CommunitySafetyUITests-execution.json",
+      "bytes": 2157,
+      "sha256": "4c832897a455a9c38d51bb5b5798afce1a8d5f193bb82dec5a6674a253aefcc5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-summary.json",
+      "destination": "native/TraderLandGateTests-summary.json",
+      "bytes": 709,
+      "sha256": "df0e48867096f403bfdc57c2c8a2767aef049c23da7bcca0f6405b481c404e78"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-tests.json",
+      "destination": "native/TraderLandGateTests-tests.json",
+      "bytes": 1863,
+      "sha256": "84249cff9d09d5ba7e4aa73a928d0c1251894daa429b32501630e5c094db18c1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-inspection.json",
+      "destination": "native/TraderLandGateTests-inspection.json",
+      "bytes": 1658,
+      "sha256": "3c2723de87c26bfbb177336eb4ca9b47020c8e2ce1877e8bae97451eb3effcce"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/TraderLandGateTests-execution.json",
+      "destination": "native/TraderLandGateTests-execution.json",
+      "bytes": 2139,
+      "sha256": "19e6f35af39f00fea3d20fa8250588911c2672800c0e86b257db80519dbbf78a"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-summary.json",
+      "destination": "native/NucleoStoreScreenshots-summary.json",
+      "bytes": 709,
+      "sha256": "40c9f96f1538f4c3ec6269542579b3c6696f6260429ff408acedbcd27e548f76"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-tests.json",
+      "destination": "native/NucleoStoreScreenshots-tests.json",
+      "bytes": 1346,
+      "sha256": "ee09dbc1eeb25db1b786f37376ba2b8f370f19e7e4084183b17524123cb7fff5"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-inspection.json",
+      "destination": "native/NucleoStoreScreenshots-inspection.json",
+      "bytes": 1211,
+      "sha256": "1b2b525e2226cc994c1aaa890a0518fe2be20ba69e9990ecb7b2ec93aaf993c2"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/NucleoStoreScreenshots-execution.json",
+      "destination": "native/NucleoStoreScreenshots-execution.json",
+      "bytes": 2158,
+      "sha256": "fb89d9b68692d99f35f75a117f4f9c0dc655c31decebd5665a78792b1761ef6c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-summary.json",
+      "destination": "native/CompanionLoadTests-summary.json",
+      "bytes": 709,
+      "sha256": "01b59bae17723c897adf9ca892eca8ad3b12f78e4e552cafa0c40bcf16eb4eb8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-tests.json",
+      "destination": "native/CompanionLoadTests-tests.json",
+      "bytes": 1123,
+      "sha256": "056279f501932c8a26620c798db732d55cf3cf20eb267b4aee4591fa0e868cf6"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-inspection.json",
+      "destination": "native/CompanionLoadTests-inspection.json",
+      "bytes": 970,
+      "sha256": "b1a5941efd61f2b722bd6031d27c373ddc16142f81c9db97ae909be2976db351"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/CompanionLoadTests-execution.json",
+      "destination": "native/CompanionLoadTests-execution.json",
+      "bytes": 2133,
+      "sha256": "60026c526511f24e92f1368ef983eda1d244a4bd59e01b47b868caa018b6b856"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-summary.json",
+      "destination": "native/StoreShots-summary.json",
+      "bytes": 1563,
+      "sha256": "9e2a0b72a4a7d5be0d5645074bef931f3b1aacbb4c9c2b00115f908d1c26f8ba"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-tests.json",
+      "destination": "native/StoreShots-tests.json",
+      "bytes": 2629,
+      "sha256": "80ccd1b2500d5978b9e98c10ba882d6c0c8fa53eb0e6f318aa8d77ed2bc848b9"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-inspection.json",
+      "destination": "native/StoreShots-inspection.json",
+      "bytes": 2062,
+      "sha256": "5e49ae27f3143bf44c5e9249954a38ed90c02a12ddc529a0f67d2cf07591c08d"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-execution.json",
+      "destination": "native/StoreShots-execution.json",
+      "bytes": 2092,
+      "sha256": "02d4c7f34b9ebfb93137affe7a9bd1fb5f9b2f49f59d8e5c42a9de342d61b369"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-summary.json",
+      "destination": "native/StoreShots-consent-corrected-summary.json",
+      "bytes": 709,
+      "sha256": "17f0a2b8e89a399fba75e871ca6f1ba38b5040b198591b2ed59acc9552ac8cba"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-tests.json",
+      "destination": "native/StoreShots-consent-corrected-tests.json",
+      "bytes": 2713,
+      "sha256": "277deb73dab042995d958b1c96d9cde11efb5c37335775b51b899d2cee4f5377"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-inspection.json",
+      "destination": "native/StoreShots-consent-corrected-inspection.json",
+      "bytes": 1856,
+      "sha256": "45e221c8cf0aa97e85e7e47f9945f2da14a78a876b9acf05ec95739c7455fbb1"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected-execution.json",
+      "destination": "native/StoreShots-consent-corrected-execution.json",
+      "bytes": 2267,
+      "sha256": "21347caec4a317f5383e3d10b4e65cce4fc31428e3f194030b66b2aa3c3b2908"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-consent-corrected.log",
+      "destination": "native/StoreShots-consent-corrected.log",
+      "bytes": 684714,
+      "sha256": "d946402a1693b913030cdd37a88ecb4aea6159cade2700eab419ba96c3281761"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/current-store-state.json",
+      "destination": "store-localizations/current-store-state.json",
+      "bytes": 4422,
+      "sha256": "c08b63979dd5fd6ae95431b4de9a8fcf107e14775167e2e318b0ea382d32977a"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/current-store-state.md",
+      "destination": "store-localizations/current-store-state.md",
+      "bytes": 4425,
+      "sha256": "683a8182cdde036109819c5da7a6a2b5027fadac70d47ac8507586976f0e2bd4"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/app-store-privacyurls-full-readback.json",
+      "destination": "store-localizations/app-store-privacyurls-full-readback.json",
+      "bytes": 923,
+      "sha256": "5784c9296c8de7581867caa105079afe85fec379b5b245fec6b960bd55cd96cd"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/store-localizations/metadata-final-saved.json",
+      "destination": "store-localizations/metadata-final-saved.json",
+      "bytes": 30063,
+      "sha256": "9bd095811bcc43a002b90655ca7e87cb0663bae5356f48edc2d54ec85fe681d8"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-phase/phase-receipt.json",
+      "destination": "release-archive/retry/upload-phase/phase-receipt.json",
+      "bytes": 927,
+      "sha256": "f496f790a2094abff15e01117e6cbff0e9fa462c57e4b0172b3ec599d6e84df3"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-phase/xcodebuild.log",
+      "destination": "release-archive/retry/upload-phase/xcodebuild.log",
+      "bytes": 17433,
+      "sha256": "5ae1eaffd0bddcdc44612cbe2275e59b98e015f54bb75cb3a3490bdbe2ae5cf4"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-acceptance.json",
+      "destination": "release-archive/retry/upload-acceptance.json",
+      "bytes": 766,
+      "sha256": "ed1d021786ef204e7c8b70d10e60d4d93da116565eb55cf0f8e1c39a9f1b5dbe"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/upload-acceptance-before-marker-repair.json",
+      "destination": "release-archive/retry/upload-acceptance-before-marker-repair.json",
+      "bytes": 439,
+      "sha256": "ee06dab4515ee754bfb2ad74ab6f377839552eda52c236368b6daeee9d1eb39c"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/candidate-upload-receipt.json",
+      "destination": "release-archive/retry/candidate-upload-receipt.json",
+      "bytes": 1085,
+      "sha256": "892a96563d050f4833f9a5e382bd29a10b77de7749affdb5592a26b599e656d2"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/live-site-locales/rendered-receipts.json",
+      "destination": "live-site-locales/rendered-receipts.json",
+      "bytes": 9935,
+      "sha256": "6ddbd3dbbf69e372e17f25f4a92d380bf140e10395d10b9dda003a6ab4b6c611"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/live-site-locales/report.md",
+      "destination": "live-site-locales/report.md",
+      "bytes": 2208,
+      "sha256": "1ce9f5d26d160538f6022fe0f0823371a28144f9749ac714c71e9b3c1311f96b"
+    },
+    {
+      "source": "/private/tmp/bobby-ios17-remediation-20261004/native/archive63-upload-marker-repair.json",
+      "destination": "native/archive63-upload-marker-repair.json",
+      "bytes": 1502,
+      "sha256": "8e9c1b940c9376589f8963f26b3fa3b4b9683cc0717279e7ed2cd64f5a8ee807"
+    },
+    {
+      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/app-store-build63-attached.json",
+      "destination": "store-localizations/app-store-build63-attached.json",
+      "bytes": 1166,
+      "sha256": "a9a5d582bdd096f1236bd3de729075544781bd4b0e3b203687fb9cf88b9f94bb"
+    },
+    {
+      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/testflight63-processed.json",
+      "destination": "store-localizations/testflight63-processed.json",
+      "bytes": 1581,
+      "sha256": "148bd636595ea63a18b49515b7e2b27906b1076720ba873ee994839886427600"
+    },
+    {
+      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/store-localizations/post-attachment-six-locales.json",
+      "destination": "store-localizations/post-attachment-six-locales.json",
+      "bytes": 2218,
+      "sha256": "5ec74659d495e89e342d6fd2f48ba57ce9e9cf3a0010d307991a2d14173f8118"
+    },
+    {
+      "source": "/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader/docs/qa/ios-1.7-remediation-2026-10-04/native/physical-current-blocker-latest.json",
+      "destination": "native/physical-current-blocker-latest.json",
+      "bytes": 979,
+      "sha256": "ccc86501fb61d1c61316ccd8c1e38d4962e5f7a0289b81d2264a32394b1b2164"
+    }
+  ],
+  "screenshotsVerified": 30,
+  "versionMetadataFieldsVerified": 30,
+  "appInfoFieldsVerified": 12,
+  "privacyPolicyRemoteReadback": "verified six locale URLs after reload at13:02:48UTC",
+  "acceptedRemainingUIClasses": 14,
+  "acceptedRemainingUIMethods": 57,
+  "uploadExecuted": true,
+  "fullArchiveOrArtworkCopied": false,
+  "commitOrStageExecuted": false,
+  "mainReportSHA256": "40acfcaee86b1c5a6f799086d7d4613f4ca9532622a96ca5c32113c4ade57a8a",
+  "preparedUploadCommandSHA256": "e837cc40a17d3aa6a7a773a18d63d6e1891b31494151e6ee5252b708825d2412",
+  "totalVerifiedLocalizedMetadataFields": 48,
+  "uploadStatus": "accepted by Apple with explicit success marker and exit0",
+  "appReviewSubmissionExecuted": false,
+  "publicationExecuted": false,
+  "uploadAcceptedAtUTC": "2026-10-04T13:09:04.728985+00:00",
+  "testFlightProcessing": "verified processed/listed, Validado binary; remote receipt13:24UTC",
+  "buildAttachedToDraft": true,
+  "buildAttachmentObservedAtUTC": "2026-10-04T13:23:45.870Z",
+  "postAttachmentSixLocalesVerified": true,
+  "remoteImageByteIdentityVerified": false,
+  "currentPhysicalInstallation": "unverified; no fresh device inventory query"
+}

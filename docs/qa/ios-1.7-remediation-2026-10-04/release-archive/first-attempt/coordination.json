@@ -1,0 +1,16 @@
+{
+  "recordedAtUTC": "2026-10-04T12:31:30.624986+00:00",
+  "sourceHead": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "shippingCodeMatchesA135d6e1": true,
+  "trackedSourceCleanPreLaunch": true,
+  "archivePhase": "local Release archive+verify only",
+  "concurrentUI": "Root explicitly authorized parallel archive while its UI test-without-building is in progress. Separate Release DerivedData; no simulator action.",
+  "derivedData": "/private/tmp/bobby-ios17-remediation-20261004/archive63-derived",
+  "archiveJobs": 2,
+  "minimumStartGiB": 4,
+  "stopBelowGiB": 2,
+  "uploadAuthorizedToThisWorker": false,
+  "uploadState": "Blocked pending full UI acceptance, Claude review and root coordination.",
+  "releaseGO": false,
+  "testFlightPhysicalClaims": "Not established by a local archive."
+}

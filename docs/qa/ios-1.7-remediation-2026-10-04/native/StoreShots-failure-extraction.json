@@ -1,0 +1,27 @@
+{
+  "stage": "StoreShots",
+  "test": "StoreShots/test02_VerdictAndEvolution()",
+  "readOnly": true,
+  "extracts": [
+    {
+      "kind": "test-details",
+      "exitCode": 0,
+      "bytes": 1284,
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-test02-test-details.json",
+      "error": ""
+    },
+    {
+      "kind": "activities",
+      "exitCode": 0,
+      "bytes": 20587,
+      "path": "/private/tmp/bobby-ios17-remediation-20261004/StoreShots-test02-activities.json",
+      "error": ""
+    }
+  ],
+  "attachments": {
+    "exitCode": 0,
+    "stdout": "Skipped export for StoreShots/test02_VerdictAndEvolution(): no matching attachments\n\nGenerated manifest file with attachment details: /private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-test02-failure-attachments/manifest.json\n",
+    "stderr": "",
+    "path": "/private/tmp/bobby-ios17-remediation-20261004/native/StoreShots-test02-failure-attachments"
+  }
+}

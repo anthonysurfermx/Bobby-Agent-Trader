@@ -1,0 +1,1379 @@
+{
+  "sourceRef": "working-tree",
+  "sourcePath": "nucleo/src/web/40-web-speech.js",
+  "sourceSha256": "691c3ed6df8bc818b79c9694e62361be5e1ddee44821480c5004501ee9d812e6",
+  "passed": 339,
+  "failed": 0,
+  "total": 339,
+  "locales": [
+    "en-US",
+    "es-MX",
+    "fr-FR",
+    "pt-PT",
+    "pt-BR",
+    "it-IT",
+    "de-DE"
+  ],
+  "realMicrophone": false,
+  "osPrompts": false,
+  "networkRequests": 0,
+  "scope": "Actual shipping wrapper and actual visibilitychange handler, with fake Recognition/GUM/audio/timers. Browser may use cloud speech; onDevice:false and consent guard are preserved.",
+  "outcomes": [
+    {
+      "label": "en-US/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "en-US/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "es-MX/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "fr-FR/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "pt-PT/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "pt-BR/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "it-IT/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/consented start uses selected locale and truthful cloud capability",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/Unicode partial and price formatting preserve original text",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/release closes every local capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/explicit release confirms one final and restores playback",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/duplicates cannot produce a second final",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/synchronous stop completion cannot leave a delayed final timer",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/cumulative recognizer segments preserve previous words and Unicode",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/cumulative segments confirm the complete text on explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/recognizer end while held closes hardware but does not confirm",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/ended held recognizer confirms only on release",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late error or text after held onend cannot erase its saved transcript",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/final wait returns latest partial once without truncation",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late deadline duplicate ignored",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/revised and long transcript remains whole",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/cancel during hold blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/cancel after release blocks final and late callbacks",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/actual background lifecycle during hold never sends",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/actual background lifecycle after release never sends",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/registered navigation cleanup never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/old task does not mutate or stop the retry",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/60-second bound cancels instead of auto confirming hold",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/language changes during hold invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/language changes after release invalidate old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/locale change also invalidates final deadline without callback",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/microphone permission revocation closes capture immediately",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/permission-revoked callback cannot send",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/network error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/audio-capture error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/service-not-allowed error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/language-not-supported error while held never confirms",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/provider error after explicit release settles latest text once",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/no speech while held does not send",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/explicit silent release returns honest empty final",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late GUM after cancel closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late GUM after release closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late GUM after background closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/late GUM after locale closes every incoming track",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/cloud STT cannot start without accepted risk notice",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/consent withdrawal cannot deliver old transcript",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/WebKit uses recognizer-owned audio without second GUM capture",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/WebKit confirms held text only on release",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/constructorError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/startError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/stopError leaves no orphaned capture",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/meter levels remain finite and bounded",
+      "status": "passed"
+    },
+    {
+      "label": "de-DE/meter emits no levels after explicit release",
+      "status": "passed"
+    },
+    {
+      "label": "unsupported/{\"noRecognition\":true}",
+      "status": "passed"
+    },
+    {
+      "label": "unsupported/{\"noGUM\":true}",
+      "status": "passed"
+    },
+    {
+      "label": "unsupported/{\"secure\":false}",
+      "status": "passed"
+    },
+    {
+      "label": "permission/prompt start never opens microphone",
+      "status": "passed"
+    },
+    {
+      "label": "permission/denied start never opens microphone",
+      "status": "passed"
+    },
+    {
+      "label": "permission/NotAllowedError explicit request failure",
+      "status": "passed"
+    },
+    {
+      "label": "permission/NotFoundError explicit request failure",
+      "status": "passed"
+    },
+    {
+      "label": "permission/NotReadableError explicit request failure",
+      "status": "passed"
+    },
+    {
+      "label": "permission/OverconstrainedError explicit request failure",
+      "status": "passed"
+    },
+    {
+      "label": "explicit permission closes its temporary GUM capture",
+      "status": "passed"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "at": "2026-10-04T11:53:46.075964+00:00",
+  "sourceCommit": "a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2",
+  "scope": "Serial UI test compiled Debug Simulator products; no Release/archive identity claim",
+  "uiSources": {
+    "ios/Bobby/UITests/CommunitySafetyUITests.swift": "7f7f624ca3a806ec7742353f3050d90a58276e81f35ff53e98d4ab30b85e7fae",
+    "ios/Bobby/UITests/CompanionLoadTests.swift": "ba6bb7c42aad074b3913595ac3d63404fa94afe9b9a289cbab435802cafd5cd7",
+    "ios/Bobby/UITests/CouponRedemptionUITests.swift": "5aee37011b9ee28abb5b4d8c9781f7fdc035bf7f32c76df81d38649b0a7c9f94",
+    "ios/Bobby/UITests/DeskHarvestCardTests.swift": "14d156ec67c0417f40cc9429dd4ff4e2b021d2fdd899db7399ba0d260bbd5a86",
+    "ios/Bobby/UITests/EquipmentUITests.swift": "59677ccec62cbf6722e0618aad7200234d92dc06310c213ce61d396170c36c49",
+    "ios/Bobby/UITests/LockerTests.swift": "e4b0d984c1f461f0b293a3758f907553fdd2d9b9f695299b96a92b4e9e1e7b3d",
+    "ios/Bobby/UITests/NucleoPrivacyUITests.swift": "91e3b476a91321f7bd5b12e153b319179c3d9da96d9a8135a8ec0853f8063145",
+    "ios/Bobby/UITests/NucleoStoreScreenshots.swift": "ec66dd8227f3614f8af75140a906571cbba7fc62fc73a791692f97538210ffb0",
+    "ios/Bobby/UITests/ProReviewShots.swift": "8e294743b791b3fe798ff5da0e1049a8bb1b93cf421e2c7fa115dd3fa47422bc",
+    "ios/Bobby/UITests/ReleaseReadinessTests.swift": "3f859db9f55949e5b51918ebfbad485594e7ee8f44db5f01be0b8f6423fd1d3a",
+    "ios/Bobby/UITests/SquadGalleryTests.swift": "6d749e489e3e9ddbe2c4484faaff31d67b5b15d0430ef080e9785c6a429142e2",
+    "ios/Bobby/UITests/Store35Shots.swift": "6b76f1ec4e71f0382fb87eb03ebe841874f2318de977d7c7af836bfb73f78ba5",
+    "ios/Bobby/UITests/StoreShots.swift": "e631a5cbda5875ed5bd38db1461b463ab3ec6ab72abadc0bc703f23fb76224e4",
+    "ios/Bobby/UITests/TraderLandGateTests.swift": "79133c48623288b48204227257a4ea4aba3a0f7f3d5e263f7d34850ee1cda30e"
+  },
+  "products": {
+    "Bobby.app/Bobby": {
+      "bytes": 39640,
+      "sha256": "be9cf1c5edf8c350476497de38a61a4908ed80e9c27f4533fba5304810b51cac"
+    },
+    "BobbyUITests-Runner.app/PlugIns/BobbyUITests.xctest/BobbyUITests": {
+      "bytes": 723520,
+      "sha256": "083fe7dda087fe77029e76786416fcfc0f84abf347c3a95e9e32647904c5dc7a"
+    },
+    "Bobby.app/Nucleo/app.html": {
+      "bytes": 581350,
+      "sha256": "4bf4221c4899b0fb5c50b47cc5294f07d5b499d799c593c18eb4946d90291b76"
+    },
+    "Bobby.app/Nucleo/contract.html": {
+      "bytes": 374079,
+      "sha256": "fedc5d41ee108d341a120973a9363dfc25bb314f9b1261a75a33e7bf735363bd"
+    }
+  },
+  "appInfo": {
+    "CFBundleIdentifier": "xyz.bobbyprotocol.bobby",
+    "CFBundleShortVersionString": "1.7",
+    "CFBundleVersion": "63"
+  }
+}

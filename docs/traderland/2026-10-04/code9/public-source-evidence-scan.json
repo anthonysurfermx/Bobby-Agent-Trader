@@ -1,0 +1,395 @@
+{
+  "status": "PASS",
+  "recorded_at": "2026-10-04T01:02:28.720338+00:00",
+  "files_scanned": 96,
+  "tool": "gitleaks8.30.1 dir --redact",
+  "exit_code": 0,
+  "findings": 0,
+  "scope": "Only allowlisted changed public source and new code9 evidence docs; no credentials/signing/config/auth files inspected.",
+  "manifest": [
+    {
+      "path": "android/app/build.gradle.kts",
+      "sha256": "84f2f8303e2a378dbb3c68c78667d4a6a90b0f3064bd7ae87f9d84e3deee8abf"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/CouponRedemptionInstrumentedTest.kt",
+      "sha256": "df409cff97236c17601b860bcc72d9819bcb76257702e0edc77bff03fbe6b557"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/LandPracticeStorageInstrumentedTest.kt",
+      "sha256": "69cac8725e309913a40a1ee36ae79706c9d5a6346644f82a7632d4945214e988"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/MainActivityAcceptanceInstrumentedTest.kt",
+      "sha256": "f1ae502bae8e1efc17a8d242b362d03fcb62027ff9fde4408f04b8361b9a83e0"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/TraderLandMapInstrumentedTest.kt",
+      "sha256": "c086584431c536bfe1f6739387bcbbd0527120917a2d49489bd5bb31ac766d5a"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/TraderLandSceneInstrumentedTest.kt",
+      "sha256": "56948340a8a26cc33e2c6843a3fddb746f1707e107d81b6eb65232bbe27878aa"
+    },
+    {
+      "path": "android/app/src/androidTest/java/xyz/bobbyprotocol/android/TraderLandSelectionSceneInstrumentedTest.kt",
+      "sha256": "0a90062d2a00e3299d6ca0ffeec9ce38828e02f2ad4db43f45dee1ed346364a3"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/data/CouponRedemption.kt",
+      "sha256": "75a392618b7f136b25158f3bb1cf3e55eedda7df8688d98cfe0a472fad952fd7"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/CouponCelebration.kt",
+      "sha256": "0f6758018d56c91f7c43add7355cbfac301367f3193b41db356e0f1ed44fcb10"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/CouponRedemptionContent.kt",
+      "sha256": "3f789c586e8b9b6e6392d74867ca5a3eefc375642aeb900e0910084bd6520eb1"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandArchipelago.kt",
+      "sha256": "3b90b08fae5f6e59eb0d7b8e574300a0381cce09c9f1b3697bdc330bbc746de9"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandScene.kt",
+      "sha256": "02412e43dbf2b2412ef2201c25f0f112003fb2c09b6aa46eca92a0f636eb7b7a"
+    },
+    {
+      "path": "android/app/src/main/java/xyz/bobbyprotocol/android/ui/TraderLandSheet.kt",
+      "sha256": "dc54ae158404b64a4d8308a0fba2a36eb554bb0a73547847392055e8c8d1116e"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/data/CouponRedemptionTest.kt",
+      "sha256": "d3f42e1c819ae424762c40adcc2dcee8e694d38d670c822e941469e1769a0af9"
+    },
+    {
+      "path": "android/app/src/test/java/xyz/bobbyprotocol/android/ui/TraderLandArchipelagoTest.kt",
+      "sha256": "67008e9f207a364d4359bf0c9d397064c03e1ab00c3b767a6ba00fb2565ba6c7"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/BRIEF-CLAUDE.md",
+      "sha256": "e957c672f6fbf1ccb630a6f8f77e135d503f9ec8fcca864860618656f052f601"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/archipelago-labels.png",
+      "sha256": "e4a1b9d1d233a56e37ace2dad0707a31178a332d2a3f74b6b5ee96684a8d4afb"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/archipelago-layout-grown.png",
+      "sha256": "e7327d406391d4d9be946700d2541ce1cf26092b125b05408fcf396b9ec11e09"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/archipelago-layout-lots.png",
+      "sha256": "e51bfcec2f05242699c7a13d992ac5f057ef095c4419c5b200365353f9aec7f7"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/archipelago-layout-six.png",
+      "sha256": "c61554c39405b24a133182b90ee7740bdb76bc5c62e39c4ac9a12849f2db4a4e"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/archipelago.png",
+      "sha256": "be689f6a1eb8d3dd5079935824d4f01c209cc5a46488794ef6d6c02e0debd435"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/captures.json",
+      "sha256": "634a970fffa9fa76c682fec448abb32da75301fc693f60a6dba1695562abb240"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/coupon-confirmed.png",
+      "sha256": "901c2c0228fc0eec8706b70ca43b935617d9d5ea988f2ec84047aeb9ea3aacf7"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/free-lots.png",
+      "sha256": "2336f39982fac05824b8ea15a416d2ce272da6947f53b366b69b061ca3f7ac35"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/ground-soft-contact.png",
+      "sha256": "3ea507a4880938831cb2739cc3560e64982582b77c4aec6d2dc3bd6cd4d5ba37"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/ground-violet-halo.png",
+      "sha256": "5d9bcbf9d07b254e25eda2674c278f69843aa3fc9b044d2eb2c5a5084c506172"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/lifted-draft.png",
+      "sha256": "7f6117f9a960ed675f6af747952200b02d4a225178c64b7d2460aeb9c1407203"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/selected-piece.png",
+      "sha256": "02d95eedd7d86fae9b624ee262cba3de75e7f198e007ba56a663246176dc1ce9"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/showcase.png",
+      "sha256": "a84155aecebc44840e818411447ead29f1d2f48720a81d576063d13ba9405c8b"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/title-pixel-review.json",
+      "sha256": "adf08f0accabb98bbda9868aa06af8ec141672beab39313ca860688fc738ba24"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/captures/visual-review.json",
+      "sha256": "a8b495609c39eaa24b09d39def248afc7b71bba44b73c042f9f035b2d9ce3704"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/ios-coupon-build63-20261004T000457Z-tests.json",
+      "sha256": "014c8aece803c4bb07e71e479f1cffdced01893a85935f152f0ce3d553da7782"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T002346Z-build.json",
+      "sha256": "074e6622f7de80c5e20f94a1dfd8fdf2e2c9ce88c6f0cf44695da76b6608c765"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T002346Z-source.json",
+      "sha256": "cadc73a6a8a2505caa1a9990fd9fc3089e6c0fc3522b3941067693f8af7e1c56"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T003410Z-build.json",
+      "sha256": "bc6316a75d5a389130ddd4e5dd59cd6196b4b309d21ef6fd1a4cd20308e23e66"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T003410Z-source.json",
+      "sha256": "077391a6af85d25aa0383af8bffb98d8412a1d6f731c2e1c00318f22ecca910e"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T004149Z-build.json",
+      "sha256": "52916141015c06d6a4e4926202495d87aaf1c37e2a5c84354cab37372e9a7367"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-20261004T004149Z-source.json",
+      "sha256": "3610a1410c57cdc44e1582df0c3e6ecc25ed962de80b7347db0bfe440712c476"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-focused-20261004T003616Z.json",
+      "sha256": "fd5b6b8f8c612f8ddcd81649dc308ba469c27000380d058fd8e784a9f0e73c61"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-focused-20261004T003616Z.xml",
+      "sha256": "73b9a304a0425c8012a258ef878026e540213b4480fa10dda199c7fe6d1f8751"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-instrumentation-20261004T002542Z.json",
+      "sha256": "4f141fa4e34c285fc140159ec57dd02465d5e53c9e60997db583e2527bcfae95"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-instrumentation-20261004T002542Z.xml",
+      "sha256": "d77c341a94d31b40a6694ad14e66e2bf0e86eeea7c7d16f9298570d834ecd952"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-instrumentation-20261004T004334Z.json",
+      "sha256": "f5e9e297e8761c61c2fe0f6b938a331a77c0f333d96484d188b084dadead8160"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/history/traderland-code9-instrumentation-20261004T004334Z.xml",
+      "sha256": "87d11ad70d5f9e26a61f48fe7d285c957b36d0f57fec8572f171e3d288501b26"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/ios-confirmed-gift-build63.png",
+      "sha256": "3f53ecb80ad2b24e2316c27298713bc098f26a21921e5afe1bd44eb2f940c992"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/ios-coupon-build63-20261004T001651Z-source.json",
+      "sha256": "c3e2a9ce2f70fd54488981640cd2b9ea847729ec99128a9c87b48c589c5f8473"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/ios-coupon-build63-20261004T001651Z-tests.json",
+      "sha256": "d5e7540eae3e5683f86ffd852d0df40b9c281a6ae71834811fb15c52b58a0308"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/ios-visual-capture-build63.json",
+      "sha256": "0e807654bca97262289d8c54e2a99cd6acbbcc1a439d10c2b8e1d0487e2c188f"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/seeker-code9-final-revalidation-20261004T005148Z.json",
+      "sha256": "b77e617a10b8615cfd70c157e41d772ce4fce9416a3693a60de4fded79d6cc8f"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/seeker-code9-signed-install-20261004T004357186445Z.json",
+      "sha256": "e0af313c2418b2aa974636c35de4cdb619195731a4397c40e415d6b11bc47949"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T004149Z-source.json",
+      "sha256": "3610a1410c57cdc44e1582df0c3e6ecc25ed962de80b7347db0bfe440712c476"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-build-release-validation.json",
+      "sha256": "35fb219b2addc954181e032931307698adfb53ec594f9c76048f7ddc3f56b47b"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-build.json",
+      "sha256": "89acbbe6cd3875f329855c0ed404f2426d6817592bdf4c7cff27328db8f8d879"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingCoordinatorTest.xml",
+      "sha256": "5404ad0fe288062132fe4f7090f52ea705e95aa1073a1404be0c53a47bca196f"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPolicyTest.xml",
+      "sha256": "ff48806d21bcabc8e92dad8ee94b429e4e315041218623f3681535bda63fc112"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest.xml",
+      "sha256": "9fa8ceca1787a2f8ea221e377a7729295c290f2e458a5f5faaa5016e10fb36a3"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionEventsTest.xml",
+      "sha256": "bd89183e417ff8c8f595a254a27ea747ee82db3796bd33838efe9bbd50ebdbfe"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest.xml",
+      "sha256": "008510867e5aed56c60ee46744d2ee8aeb448ec61ee4447eb19ebede61f5312d"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountFenceTest.xml",
+      "sha256": "1f71b0e28ffb52b9d0805afc98e2812eb3421a8a1172707b0d79ac9e515a0f2c"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AuthGuardsTest.xml",
+      "sha256": "b4f38bf8f554f9d423b6e9a5f550977e2c9cc980880f35d558bb5f747923dfe9"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyLocalesTest.xml",
+      "sha256": "aae8d8fea7f55adcf66e9a0de15621f557642d2ac72d4a3c5a59fe7958756701"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyParsersTest.xml",
+      "sha256": "25bce0bbdbec039adf7928bf6ad8df7705a79cc7210b0327765ccb875d0371b7"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyQuotaStateTest.xml",
+      "sha256": "ebb4cec95ab08a269153598b234bfe31b3eaef2781c5a35b5a0083d341a59b91"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest.xml",
+      "sha256": "d5b495d9989b951ccd15df32a02826542fdd7d1ab2db45909f69084d49f7330a"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.CouponRedemptionTest.xml",
+      "sha256": "8c666d65eae0a745907494f8bc88f04f2d5ff62fe43709e1fb7dbfb819f7f2ba"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.data.VoicePreferenceTest.xml",
+      "sha256": "101ab05bb0b2257799138d09043e733175d89040e22b82b3b25c6876c52dfad4"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.equipment.EquipmentRulesTest.xml",
+      "sha256": "3257c3aa49858683d33755e8dbfbae50b9bffdcefc8e8222ffc2f08b056f7c12"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest.xml",
+      "sha256": "813e25f61e178d6f68d5d58aa213b8d811e97a0d965dd606ab7b8b1d81cdb7b5"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest.xml",
+      "sha256": "03e67c352e74f001fa3b465c02bdbd351f81f3ad0860aee14a41d2ea053ccf46"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest.xml",
+      "sha256": "2d1fd01c0c09132629a15a79b6b779d32cbb1f14e03c76244c35aff1d8c4f6d4"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest.xml",
+      "sha256": "3fef77a65b80483414277083c37264d1c6be7dfe9ce86c2b3c292e2155c20a98"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.DictationStateTest.xml",
+      "sha256": "a48a59c32e3b484ccd038284cffc3b09c346676b27b27a9c47cb4768ecd95a23"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.PlaybackLeaseTest.xml",
+      "sha256": "5cda76bf9ebecfcb00f6afd0ec772169effff474ab0d55cf2dc30000614cc3bd"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.push.PushPolicyTest.xml",
+      "sha256": "7534347e3112da89f13b4947f4c9daf93603075c5372ba082f03c8421cd7cffe"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.BobbySupportLinksTest.xml",
+      "sha256": "258a942be29201caebf67baa31557bfe44827264e813166ec5628cf13019c1f5"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest.xml",
+      "sha256": "59c3f5b8944afb2a97d2b6d4b57d3dfb60440a05d72ae9f10a4190aad4e5eae9"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.LandPracticeTest.xml",
+      "sha256": "f95aa143b31226e19531c142df6e58a7a1a3fd77971a4aad4e96e647d3aac35d"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest.xml",
+      "sha256": "93ba868152ad8ca050c940118824b262744110788e94f6589e0dbf829c28126b"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ReportContentPolicyTest.xml",
+      "sha256": "9db92f50bdd64fcdbf1f4cbdd57b1e7663b2b07cb7c9d5605e34dc135f7dea31"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandArchipelagoTest.xml",
+      "sha256": "e139e6b96fd2bd05f0d13149fceaa55831e9aa8948d34b083602d01a4ce86a47"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest.xml",
+      "sha256": "50ca5c3a5bb67c40f2d629cfbb77a05c50ebd674001b8929b53124229971a340"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest.xml",
+      "sha256": "28b94bee00a2fbfca755f2d79dfee98e0804d010ab2630187c8632140bcc4312"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandProjectionTest.xml",
+      "sha256": "0207f090fd11d7ecffa8a54f66ed04b65aa267c6f91869cb9c5a13055a8de85a"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandRulesTest.xml",
+      "sha256": "9b0304d834272f428b82bb935cec5c02040e935454fd3d1770a995279bbab37d"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-local-checks/lint-results-debug.xml",
+      "sha256": "29846e04d2eb6cce710e7f99a2fbc74acf3e77081aeaa37fd04581d512fef1e6"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-node-contracts.xml",
+      "sha256": "e134e903d298c79d656d911faef44b8d345274295486f3746cf97dc4b8c75806"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-20261004T005043Z-source.json",
+      "sha256": "d4507b8eb0b43839222f3f566ddeab9d7448bafcc16d1e4c82f626268341ee41"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-instrumentation-20261004T005134Z.json",
+      "sha256": "43d365877ae29e8efabbddca25c33799470c033ba84b68861ab8644d0e07ca99"
+    },
+    {
+      "path": "docs/traderland/2026-10-04/code9/traderland-code9-instrumentation-20261004T005134Z.xml",
+      "sha256": "ad3a89183806d62a591b29e9a9fa8c1f8e30cb19215dd3f0b8894caf8dc40ea3"
+    },
+    {
+      "path": "ios/Bobby/Sources/CouponCelebration.swift",
+      "sha256": "7b158d35643f31069779bbd5839773b6cf36ec748a4ae6280fe66c471ad132db"
+    },
+    {
+      "path": "ios/Bobby/Sources/CouponCopy.swift",
+      "sha256": "3600d66dbf65d07eb7c0aff59167ebba8a8cb45815b4230ab805cf910e540823"
+    },
+    {
+      "path": "ios/Bobby/Sources/CouponRedemption.swift",
+      "sha256": "15ec6647afa53b43c500eaa39ebff57ead3d8d22f6fae9328c08ca536eb3cb90"
+    },
+    {
+      "path": "ios/Bobby/Sources/CouponRedemptionSheet.swift",
+      "sha256": "f872d2f3e724aa779fd36bc6fa44901c2a604206a9f8eadf9038b9c08358981a"
+    },
+    {
+      "path": "ios/Bobby/Sources/Nucleo/NucleoLevels.swift",
+      "sha256": "c7a08f4829175cc46d687aae6e15ec9140342cee268e954aeeecbd21876967f3"
+    },
+    {
+      "path": "ios/Bobby/Tests/CouponRedemptionTests.swift",
+      "sha256": "6876bdf0223dee16c4d22faea04f4088b650d75bce9ad7f98fd9f51c3a466d1f"
+    },
+    {
+      "path": "ios/Bobby/project.yml",
+      "sha256": "798aecd56d5664c7542e16e355cff511c2e5deae920cc040a81718f00a6d355e"
+    }
+  ]
+}

@@ -1,0 +1,218 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-03T19:13:48.474183+00:00",
+  "status": "PASS_for_scoped_ordinary_signed_security_profile_UI",
+  "scope": "Actual ordinary UI on the exact final security signed release in a task-owned isolated emulator with fresh guest 0 XP; no application instrumentation, contract fixtures or preference injection. Not a claim about physical-device acceptance or full Android release completion.",
+  "phase": "security-final-signed-20e7-fresh-guest-0xp",
+  "installedAPK": {
+    "at": "2026-10-03T18:59:16.580492+00:00",
+    "scope": "Ordinary security-final signed UI; fresh guest, not instrumentation or historical 40 XP migration",
+    "package": "xyz.bobbyprotocol.bobby",
+    "versionName": "1.1.0",
+    "versionCode": 5,
+    "minSdk": 26,
+    "targetSdk": 36,
+    "apkSHA256": "20e7eb849105b81ab53bc9bbe8eb25e851781665443ef59b69b7a0a572c567ec",
+    "pinMatchesParent": true,
+    "avd": "Bobby_Parity_API35",
+    "bytesOfParentAuthorizedLocalAPK": 47042112,
+    "installationResult": "Success; only clone Bobby debug and Bobby instrumentation packages removed, then exact signed release installed"
+  },
+  "parentReportedBuildSource": {
+    "receipt": "parity-code5-20261003T184654Z-source.json",
+    "sha256": "d37effbf75ac707415ced82ab01f8f69d1e4aa04c4d29aeecdfb51faf03a17ca",
+    "sourceFileCount": 362,
+    "independentSourceInventoryPerformedByThisQA": false
+  },
+  "separateInstrumentation": {
+    "receipt": "parity-code5-instrumentation-20261003T184819Z.json",
+    "performedByParent": true,
+    "thisQADidNotRunInstrumentation": true
+  },
+  "historicalMigrationEvidence": {
+    "receipt": "parity-code5-signed-profile-qa.json",
+    "apkSHA256": "9652c63829743c030f1f509c8a6d49e1a1f6bbb17851f411b8d73779b6565df8",
+    "guestXP": 40,
+    "separateExecution": true,
+    "notOverwrittenByThisQA": true,
+    "migrationClaimsNotTransferredToThisFreshGuestQA": true,
+    "originalCode3Guest40AVDOperatedByThisQA": false
+  },
+  "ordinaryActions": [
+    "Normal app launch with fresh guest after clone-only debug/test removal and exact signed APK installation",
+    "Two taps on decorative initial avatar had no profile navigation; captures retained",
+    "Normal app force-stop/start to check initial state; no preferences changed or deleted",
+    "BTC chip -> local pending RISK -> visible Profile button -> native profile, without accepting the notice",
+    "Native language menu -> Français; native voice menu -> Masculine",
+    "Normal app force-stop/start -> French ASK_TEACH -> BTC chip -> local RISK -> Ton profil -> observed Masculine + Français",
+    "Native voice menu -> Voix de ton compagnon restored",
+    "Partager mon avatar -> Android image chooser; own newly generated PNG read-only captured; KEYCODE_BACK dismisses chooser without selecting recipient or application"
+  ],
+  "verified": {
+    "guestProfileByte3DVisible": true,
+    "profileXPBeforeAndAfterRestartAndChooser": 0,
+    "levelVisible": "NIVEAU 1 · APPARU",
+    "streakVisible": 0,
+    "unknownAuraAndPiecesShownAsDash": true,
+    "gearCountVisible": "0 / 72 · Earned",
+    "nativeLanguageMenuContains": [
+      "Device language",
+      "English",
+      "Español",
+      "Português",
+      "Français",
+      "Italiano",
+      "Deutsch"
+    ],
+    "FrenchSelectedOnThisFinalAPK": true,
+    "FrenchInformalCopyVisibleExamples": [
+      "Tu progresses par la discipline, jamais par le volume.",
+      "Invite tes amis",
+      "Ce que Bobby retient de tes actifs et préférences"
+    ],
+    "nativeVoiceOptions": [
+      "Voix de ton compagnon",
+      "Féminine",
+      "Masculine"
+    ],
+    "MasculineSelectedOnThisFinalAPK": true,
+    "FrenchAndMasculinePersistedAfterForceStopNormalStart": true,
+    "companionDefaultReselectedAndShown": true,
+    "riskNoticeStillPendingDuringQA": true,
+    "AndroidImageChooserOpened": true,
+    "AndroidChooserDismissedWithoutSelection": true,
+    "ownGeneratedPNG": {
+      "capturedAt": "2026-10-03T19:12:26.162326+00:00",
+      "source": "Own newly generated fresh-guest avatar PNG in scoped app cache, read-only extraction using existing task-owned userdebug emulator su 0",
+      "image": "parity-code5-security-profile-screens/shared-avatar-card-fr-0xp.png",
+      "mimeType": "image/png",
+      "width": 1080,
+      "height": 1440,
+      "bytes": 280818,
+      "sha256": "8ff6f5c9e076cd22a093461da28f6e5ff57de9fde13dff62cf20073c8d0d1745",
+      "fileProviderURI": "content://xyz.bobbyprotocol.bobby.avatar-share/avatar_cards/ce61a2cc-827c-4061-b047-eea29134d217.png",
+      "URIObservedIn": "Android chooser activity state; only own URI extracted; raw activity dump not stored",
+      "chooserPackage": "com.android.intentresolver",
+      "recipientOrAppSelected": false,
+      "sent": false,
+      "BOBBYTitleFullyVisibleOnOriginalPNGAndChooserPreview": true,
+      "visualInspection": "Original PNG and ordinary chooser screenshot inspected; complete BOBBY text is below the top edge and above the companion art"
+    }
+  },
+  "screenshots": [
+    {
+      "file": "parity-code5-security-profile-screens/00-initial-guest.png",
+      "sha256": "7c14f9af238f185c4c171c30e71974ce352687763f06e93d7731921fee6c3261",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/01-language-menu-six.png",
+      "sha256": "6c6cbfede353b35fdc2b20656e8355ce5ed514f56f46a64f436bbfb83e449388",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/01-profile-opening.png",
+      "sha256": "6926e3a7e3025244218ec460667fb42f4cb9a9145c056bd8499cd7ce7d88c66e",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/02-voice-menu-fr.png",
+      "sha256": "8a6229e6c9be9e513d4497f6b5953a3e93957a153851e93b4f4bc931e087ed18",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/03-profile-fr-0xp.png",
+      "sha256": "a21e6d316d29d8f0d9b95223c30eefa50823685e400a737076aa5e4077b53ea2",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/04-fr-masculine-persisted.png",
+      "sha256": "c85d48375d29dc4eac8e48d909bb03da3cce6c0e0fdd82c794a55644306bc543",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/05-companion-restored-fr.png",
+      "sha256": "23cb39b14a0b7c7c1ce2943567a15153a1fba74c46cb2167e7080fec3974c8af",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    },
+    {
+      "file": "parity-code5-security-profile-screens/06-share-chooser.png",
+      "sha256": "82209dd4a936f8306b1c21bf1d622be0d960490b1dc497281d41b9c0e78126ac",
+      "dimensions": [
+        1080,
+        2400
+      ]
+    }
+  ],
+  "safetyAndEvidenceLimits": {
+    "AIConsentAcceptedByQA": false,
+    "riskAgreementPressedOrHeldByQA": false,
+    "audioPreviewPlaybackOrGenerationRequestedByQA": false,
+    "microphoneASRActivatedByQA": false,
+    "runtimePermissionChangesByQA": false,
+    "authPurchaseRestoreOrAccountActionsTriggeredByQA": false,
+    "BTCChipTappedForLocalRiskNavigation": true,
+    "AIAnswerStartedByQA": false,
+    "networkTrafficMeasuredInThisSignedQA": false,
+    "absenceOfAllNetworkTrafficClaimed": false,
+    "phoneOperated": false,
+    "originalAVDOperatedDuringThisQA": false,
+    "AndroidSourceEditedByThisQA": false,
+    "preferenceInjection": false,
+    "rawAppSecretsOrAccountDumpsStored": false,
+    "recipientOrAppSelected": false,
+    "sent": false
+  },
+  "limitsAndFollowUps": [
+    "Audio gender, synthesis, microphone recognition, live account or billing flows and physical-device behavior were outside this UI QA.",
+    "The six languages are present in the native menu; this ordinary GUI run selected and visually checked French, not every translated screen in all six languages.",
+    "The initial ASK_TEACH avatar is decorative. Source review by parent confirms the local BTC -> RISK -> Profile route before consent; improve discovery for a new guest in the Claude review.",
+    "Risk consent remains unaccepted. BTC taps here navigated to the local risk UI; this signed run did not measure all network traffic, so it makes no absolute no-network claim.",
+    "The restored companion preference was observed in the final UI; no extra restart was performed after this final restoration.",
+    "The 40 XP migration receipt belongs to the previous 9652 APK run and is retained as separate evidence; this final signed run uses a fresh 0 XP guest."
+  ],
+  "handoff": {
+    "isolatedAVD": "Bobby_Parity_API35",
+    "controlReturnedToParent": true,
+    "currentLanguage": "fr",
+    "currentVoicePreference": "companion",
+    "chooserClosed": true,
+    "currentScreen": "Native guest profile",
+    "parentMayOperateCloneAgain": true
+  },
+  "postQAPKRevalidation": {
+    "at": "2026-10-03T19:14:14.868084+00:00",
+    "scope": "Ordinary security-final signed UI; fresh guest, not instrumentation or historical 40 XP migration",
+    "package": "xyz.bobbyprotocol.bobby",
+    "versionName": "1.1.0",
+    "versionCode": 5,
+    "minSdk": 26,
+    "targetSdk": 36,
+    "apkSHA256": "20e7eb849105b81ab53bc9bbe8eb25e851781665443ef59b69b7a0a572c567ec",
+    "pinMatchesParent": true,
+    "avd": "Bobby_Parity_API35",
+    "receipt": "parity-code5-security-profile-screens/signed-apk-final-pin.json",
+    "matchesInitialInstalledPin": true
+  }
+}

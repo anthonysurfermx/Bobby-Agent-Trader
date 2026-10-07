@@ -1,0 +1,5 @@
+[user-identity] auth service unavailable
+[bobby-access] redeem-coupon coupon redeem 503
+[access] bobby_read_access 503 {"tier":"free","used":10,"limit":10,"remaining":0,"bonus":6,"paywall":true,"resetsAt":null}
+[access] bobby_level_state 503 {"tier":"free","levels":{"profundo":{"used":3,"limit":3,"remaining":0,"windowDays":7,"bonus":3,"resetsAt":null},"maximo":{"used":1,"limit":1,"remaining":0,"windowDays":7,"bonus":1,"resetsAt":null}}}
+{"result":"PASS","checks":41,"scenarios":15,"source":"/Users/mrrobot/.codex/worktrees/bobby-android-parity-ios17/Bobby-Agent-Trader","scope":"Actual coupon/access handler with strict offline HTTP, verified-owner binding, rate and outage cases; no real coupon/account/purchase/production writes."}

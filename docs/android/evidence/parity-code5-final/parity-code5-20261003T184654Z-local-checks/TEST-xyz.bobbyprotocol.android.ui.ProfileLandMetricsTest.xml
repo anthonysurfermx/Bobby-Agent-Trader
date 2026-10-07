@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" tests="4" skipped="0" failures="0" errors="0" timestamp="2026-10-03T18:29:38.430Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="malformedInventoryIsNotPresentedAsEarnedPieces" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.001"/>
+  <testcase name="completeEmptyInventoryIsAConfirmedZeroPieces" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0"/>
+  <testcase name="seedsBloomedAndBuiltPiecesAllBelongToTheCountLikeTheCanonicalProfile" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0"/>
+  <testcase name="partialErrorOrUnsupportedWorldNeverInventsMetrics" classname="xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

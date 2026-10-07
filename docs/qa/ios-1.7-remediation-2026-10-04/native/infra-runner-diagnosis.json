@@ -1,0 +1,23 @@
+{
+  "classification": "runner/CoreSimulator infrastructure failure before any XCTest method",
+  "build_result": "succeeded",
+  "executed_test_methods": 0,
+  "passed_methods": 0,
+  "synthetic_infrastructure_failures": 2,
+  "confirmed_facts": [
+    "testmanagerd accepted unit session at 10:51:07.622 WEST",
+    "testmanagerd and runner sockets disconnected at 10:51:10.578-10.580 WEST",
+    "simulator reported Shutdown at 10:51:10.597 WEST",
+    "simulator reported Booting again with changed last_booted_at at 10:51:10.812 WEST",
+    "UI app install failed with NSMachErrorDomain -308 server died at 10:51:35.607 WEST"
+  ],
+  "unverified": [
+    "reason for simulator shutdown/reboot",
+    "specific CoreSimulator service crash cause",
+    "new product runtime behavior"
+  ],
+  "product_crash_evidence_found": false,
+  "extracted_file_count": 7,
+  "extracted_bytes": 32265,
+  "actions_performed": "Read xcresult and logs; exported 32265 bytes of diagnostics; no simulator/process mutation"
+}

@@ -1,0 +1,325 @@
+{
+  "schema": 2,
+  "recorded_at": "2026-10-03T20:18:40.866226+00:00",
+  "scope": "Code6 local build/static/actual installation/new instrumentation and exact-head CI when available. Failed attempts retained. Code5 install/CLI/CI are historical. No APK/AAB or secret/device/account identifier included. JSON preserves original coordinator paths for traceability. No phone map/GPU/provider/account acceptance inferred.",
+  "files": 63,
+  "total_bytes": 1133619,
+  "manifest": [
+    {
+      "path": ".gitattributes",
+      "sha256": "0ded296e877d1b2a383ec19feee9b1536073a064a02e90a23f4a62d84bdef214",
+      "bytes": 18
+    },
+    {
+      "path": "REDACTIONS.json",
+      "sha256": "94a75a4718579525a5ce3836748761028e48617f006b768d5b6d8a04dd670d22",
+      "bytes": 1047
+    },
+    {
+      "path": "parity-code5-claude-cli-handoff-20261003T193828Z.json",
+      "sha256": "04611c61dc1680e7b99880deda0d3cb67ef947e5b9a53ea4d4fc611f42ddf605",
+      "bytes": 5145
+    },
+    {
+      "path": "parity-code5-final-head-ci-20261003T192926Z.json",
+      "sha256": "ca70ebb04205f4ba400f32972c643e717c16f2dcfea307ebcdc5f6a71a96d2e1",
+      "bytes": 144190
+    },
+    {
+      "path": "parity-code6-traderland-20261003T195650Z-build.json",
+      "sha256": "047b454a40779e24624f587a84f27bc145ebfeff48f9513818941b170f70f9c1",
+      "bytes": 4177
+    },
+    {
+      "path": "parity-code6-traderland-20261003T195650Z-failed-projection-tests.xml",
+      "sha256": "88f9314057e741dbe4965fd99903d94fc3ff43682f94a11ae97168e6d8770f64",
+      "bytes": 6173
+    },
+    {
+      "path": "parity-code6-traderland-20261003T195650Z-node-contracts.xml",
+      "sha256": "7b2eb0b0b1b0b9beae3f55992e2fb349a2346d6d7fff3b84d88404f3c6117a0e",
+      "bytes": 27177
+    },
+    {
+      "path": "parity-code6-traderland-20261003T195650Z-source.json",
+      "sha256": "e870326e916d35708dd177c49c2bd217e2357ca449d531c2278559543f255cd3",
+      "bytes": 62853
+    },
+    {
+      "path": "parity-code6-traderland-20261003T195650Z-unit-lint-debug-test-build.log",
+      "sha256": "417e415abb02b90a781fb749a254d2da0d50a968e5229314e14d0bddc556d026",
+      "bytes": 6133
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-build.json",
+      "sha256": "0e147b4a4a039e75fcb9822457e40497d64e26e4888307253e5a5d822cdbacfc",
+      "bytes": 13781
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingCoordinatorTest.xml",
+      "sha256": "1a5cb0f86e290f62c81f689fb1df5589c887c6da9d56bd966105a93ac698e19b",
+      "bytes": 5456
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPolicyTest.xml",
+      "sha256": "d8f1a2df8945f69634b14fb647736a48db86899df11e1f8a0940681820626195",
+      "bytes": 1652
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.billing.BillingPricingPolicyTest.xml",
+      "sha256": "597bf2e8edfb0c6cefa439acbc15e2e49cc85fe29d4a51fa2f194584e518827f",
+      "bytes": 803
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionEventsTest.xml",
+      "sha256": "72ffd1c3f01c07a4dd9771b4319427810ad3050a2f2cfead08d5b56baa6ad379",
+      "bytes": 859
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountDeletionPolicyTest.xml",
+      "sha256": "11d0829b28826750e89ffaa4497ef924de0a406714bed353a768f9f849bdd69c",
+      "bytes": 1286
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AccountFenceTest.xml",
+      "sha256": "03b2589934396c82888cb7d581b960094c4d26bac9eceeacec121f1f14b7b6b2",
+      "bytes": 941
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.AuthGuardsTest.xml",
+      "sha256": "5eb9dc23272ddad47c25b03fed10604281f255e88c7968810c9d1ca64bfd03bd",
+      "bytes": 727
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyLocalesTest.xml",
+      "sha256": "9729b3d733c7f954f8b602c2d050ff057a28dd92911b482d9366ed6571cccd84",
+      "bytes": 650
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BobbyParsersTest.xml",
+      "sha256": "594edff190ec1a38a3213d74b20847f30f3ea894e3fcdc64f881be3ac97d0d32",
+      "bytes": 1061
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.BriefingSettingsPolicyTest.xml",
+      "sha256": "65ca948264fa64a354feec471cc04352034bafa30a49f1cfc55512eb085273ea",
+      "bytes": 2039
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.data.VoicePreferenceTest.xml",
+      "sha256": "b8f40dc3707e35b9b68f6cf55ea9c8090ab2d95efec3bc5b710c714d498c1969",
+      "bytes": 1433
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.equipment.EquipmentRulesTest.xml",
+      "sha256": "216be89deb4480295cb08e59c4e1a5613fb4d7caf6aaf97f866fa464040f8e9f",
+      "bytes": 1282
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoPolicyTest.xml",
+      "sha256": "4d0843a349b7481fff63dae8c55b544efb988eeb34abb13180d306a889b9d213",
+      "bytes": 1309
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.NucleoReadModelTest.xml",
+      "sha256": "5162b8f6d5efad96c978a691bd5c273daeef43fb0f85b7d4c44b7dc81280eacb",
+      "bytes": 845
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicyTest.xml",
+      "sha256": "6d4c0c2cc1a576e631ebf0014ddbf244a35ef9ff450baa9d970b7269cf7a3b94",
+      "bytes": 1296
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest.xml",
+      "sha256": "014106cede1e6fceca5ab10dfe7a27188133e1ab62f32edf3346be2d8d27aae4",
+      "bytes": 1577
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.DictationStateTest.xml",
+      "sha256": "c17780d3a208a0c88dd91b45e6f461c8f1409aa75ffecfaf4c37301706cae69e",
+      "bytes": 1349
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.platform.PlaybackLeaseTest.xml",
+      "sha256": "7f6b40a7df4fa846af28e064237841557c99222ab45af60b651dc7b411a436ee",
+      "bytes": 1486
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.push.PushPolicyTest.xml",
+      "sha256": "1ce55f0f01a0305c34baad53e761bf9fed3d185bd4e415ea34dcb28fe10df649",
+      "bytes": 1207
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.BobbySupportLinksTest.xml",
+      "sha256": "bfa1f605a17251a6af9ffe6eabb7ed95a3f908772ab6c46819f91bd4735f0e09",
+      "bytes": 1275
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ProfileLandMetricsTest.xml",
+      "sha256": "1e94a1f7a25bb947bc85b042c5199d0473c4c846b2e1c1ed61ba36b443e34d6e",
+      "bytes": 951
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.ReportContentPolicyTest.xml",
+      "sha256": "fe360b5a9628e919de821bf6b175e0fdcd7864977e4b0025e4f91134af1ca558",
+      "bytes": 1252
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandFirstVisitTest.xml",
+      "sha256": "2ab2f89a79da49a0b2471360cdb5526d4464f2478321b1a800b4657d8b0b2b58",
+      "bytes": 1442
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandHelpCopyTest.xml",
+      "sha256": "ac90a96a76e28d5b83a77b8b8bd0c2611c59339f0c335fc5fd6c0994aa2a424d",
+      "bytes": 694
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandProjectionTest.xml",
+      "sha256": "db9efa8d745e2fb59597ac631edf2f6529f22759189cdab4ab0604dfe9918cd5",
+      "bytes": 2000
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/TEST-xyz.bobbyprotocol.android.ui.TraderLandRulesTest.xml",
+      "sha256": "aa443dfe8becf55214bff3f7d9114d3a2b0a8834d200335f1330b875a61e6551",
+      "bytes": 1203
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-local-checks/lint-results-debug.xml",
+      "sha256": "edac317f744ae50e8e5a20171ceba1d7e70fd50243ba9c3a18b5d67ba13fff77",
+      "bytes": 59110
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-node-contracts.xml",
+      "sha256": "ced73b3059b5ee516acff40214cb33e366ce7bfaa71d87d4cfaaddd1e8f3fb26",
+      "bytes": 27177
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-signed.log",
+      "sha256": "9b07fd8f2d77dade5a298288c11a808db73d487b7c469537aaceda1b51cd17fa",
+      "bytes": 4591
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-source.json",
+      "sha256": "0df6f2c9f04ad9a9fbf41eb105a35026cefbbf228367cf1d8592f375d17373b6",
+      "bytes": 62853
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200103Z-unit-lint-debug-test-build.log",
+      "sha256": "332235ee2f9a93626674828215fcb00627c0971977ddc96508fac50430aabb1e",
+      "bytes": 5589
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-aab-certificate.log",
+      "sha256": "686ee8c4cdb928110c6dbd97b945a42df118042925e5985d1ff021d374431cfc",
+      "bytes": 785
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-aab-config.log",
+      "sha256": "14ca18c6d109ad46db8d67efadc6f1be74a71a7303f800bf220a8a1d2ee47bdf",
+      "bytes": 978
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-aab-launcher-resources.log",
+      "sha256": "0f5491e7e71be54e199286c82ca0720a4f1000bdfc806e577f42f5404ba7dd91",
+      "bytes": 129
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-aab-manifest.log",
+      "sha256": "d21b75d912a2a059c1e1b66bf128377d7c10151b5451e50d850f131d3443b18a",
+      "bytes": 12161
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-apk-badging.log",
+      "sha256": "6fa125b54726a07874c8a658227939f8d31e9f580955c6e43d1d97f2cb1ff423",
+      "bytes": 4728
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-apk-launcher-manifest.log",
+      "sha256": "10f3e4ec2efa0426b004a2c2c5e6ebc67d6223905094e25b13c00d2858c21d6e",
+      "bytes": 25544
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-apk-launcher-resources.log",
+      "sha256": "9410c1f700fa79fbacfbd21c7b25cd9e467580f81fe78430fcad3815c0abaa70",
+      "bytes": 249289
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-apksigner.log",
+      "sha256": "184d8456e0693d3129b1acd6e85e8ff7800b1ac10b41b5ff6a43e3545640237c",
+      "bytes": 997
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-bundletool.log",
+      "sha256": "51f2c2003762d8727cc0e89cc676e69366305e29376cf6e8a27f194c98016a62",
+      "bytes": 17240
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-jarsigner.log",
+      "sha256": "2b8f16dcf73ead92b04a6076b260de64def40f98d0a2dda63a7b86ffbc15f3c9",
+      "bytes": 198681
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-release-validation.json",
+      "sha256": "a171a20a28e566f74a9bd6db70f38f96551e957799b69e5a393fc12c8644ee70",
+      "bytes": 43628
+    },
+    {
+      "path": "parity-code6-traderland-20261003T200229043433Z-zipalign-p16.log",
+      "sha256": "ff7db09cef4d142cb99fa365777400bd11dca12d733d78f7a20bbcae6cf99d0d",
+      "bytes": 19409
+    },
+    {
+      "path": "parity-code6-traderland-eslint-security-final-20261003T195653Z.json",
+      "sha256": "1e7b049624bc038b8cc54ea31c044613d1ac20c312f21f29677b331b5498529b",
+      "bytes": 420
+    },
+    {
+      "path": "parity-code6-traderland-eslint-security-final-20261003T195653Z.log",
+      "sha256": "0a5d6820db4a17f272f8b21607ea9ea0c2608a2785c0e24c48af294e927e6289",
+      "bytes": 55
+    },
+    {
+      "path": "parity-code6-traderland-generated-cache-cleanup.json",
+      "sha256": "68d6b0ae10496af0ee80970123041ecab90b9927033b984098bd345f48df337d",
+      "bytes": 448
+    },
+    {
+      "path": "parity-code6-traderland-instrumentation-20261003T200427Z.json",
+      "sha256": "edbf70e51c29a3d66259584f104ebcfd32ef53d53904999102f5e8cdf738f0d1",
+      "bytes": 18677
+    },
+    {
+      "path": "parity-code6-traderland-instrumentation-20261003T200427Z.log",
+      "sha256": "c5b40230b06f8f578cba7729283dd28091a5d75bbc57fe7dc31c6e678f5619a7",
+      "bytes": 17955
+    },
+    {
+      "path": "parity-code6-traderland-instrumentation-20261003T200427Z.xml",
+      "sha256": "6704cde2de47efed8c701732c92d4c45cacb94d08d9066ecdf76e88cb8dbfa71",
+      "bytes": 3930
+    },
+    {
+      "path": "parity-code6-traderland-web-build-security-final-20261003T195653Z.json",
+      "sha256": "e07b0c6834065573412d244d337fb3d9be036b47ea50d02aa72fbb046b65c726",
+      "bytes": 396
+    },
+    {
+      "path": "parity-code6-traderland-web-build-security-final-20261003T195653Z.log",
+      "sha256": "14448a1b5e51d3186bcb146a77334b2e00b7469a42c64a5aa81db5edc91f8425",
+      "bytes": 41020
+    },
+    {
+      "path": "seeker-code5-signed-install-20261003T194233057699Z.json",
+      "sha256": "2328c7342bb5be810f157ba37b86e4e1caf042fa5a2d458f1eadc6118fed8c62",
+      "bytes": 5811
+    },
+    {
+      "path": "seeker-code6-signed-install-20261003T200309399230Z.json",
+      "sha256": "ed6872e540c9568e06434def362cdb2fc183f40b434778e75fd1e733276e8865",
+      "bytes": 5249
+    }
+  ],
+  "public_log_extract_redactions": "REDACTIONS.json"
+}

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" tests="8" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.268Z" hostname="MacBook-Pro-F-Society.local" time="0.001">
+  <properties/>
+  <testcase name="oldOwnerAccountEpochOrConsentEpochCannotAcknowledge" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.001"/>
+  <testcase name="onlyTheLatestCompletedReadCanBeObserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="startingAnotherReadRetiresThePreviousObservation" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="clearedObservationsDoNotSurviveCancellationOrBackgroundReset" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="guestAndSignedInIdentitiesHaveSeparateObservations" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="invalidOrTruncatedIdsCannotBeObserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="eligibleLatestVisibleReadIsObservedOnce" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <testcase name="hiddenOrBusyOrUnconsentedFramesRemainUnobserved" classname="xyz.bobbyprotocol.android.nucleo.ReadPresentationPolicyTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

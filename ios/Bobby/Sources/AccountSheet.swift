@@ -367,10 +367,12 @@ struct AccountSheet: View {
             }
             .accessibilityIdentifier("account-pro")
         }
+        ProfileRow(label: CouponCopy.text("title"), detail: CouponCopy.text("intro"),
+                   detailLineLimit: nil, action: { route = .coupon }) { ProfileIcon(symbol: "gift") }
+            .accessibilityIdentifier("account-coupon")
         ProfileRow(label: L.t("Restore Purchases", "Restaurar compras"),
-                   detail: L.t("Already subscribed with this Apple Account? Bring Bobby Pro back.",
-                               "¿Ya te suscribiste con esta cuenta de Apple? Recupera Bobby Pro."),
-                   trailing: restoring ? L.t("Restoring…", "Restaurando…") : nil,
+                   detail: CouponCopy.text("restoreDetail"),
+                   trailing: restoring ? L.t("Restoring…", "Restaurando…") : nil, detailLineLimit: nil,
                    action: restorePurchases) { ProfileIcon(symbol: "arrow.clockwise") }
             .disabled(restoring)
             .accessibilityIdentifier("account-restore")
@@ -644,6 +646,12 @@ struct AccountSheet: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .coupon:
+            CouponRedemptionSheet(afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
+                                  onRead: { route = nil; onClose() }) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .pro:
             NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
                                afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
@@ -694,7 +702,7 @@ struct AccountSheet: View {
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet, pro, briefings, memory
+    case avatar, invite, locker, land, risk, pet, pro, briefings, memory, coupon
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -709,6 +717,7 @@ enum ProfileRoute: Identifiable {
         case .pro: return "pro"
         case .briefings: return "briefings"
         case .memory: return "memory"
+        case .coupon: return "coupon"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
         }
@@ -958,8 +967,9 @@ enum AccountDeletionCopy {
 /// Backend-free profile for QA screenshots: `-qa-profile signed-out|signed-in`, progress via
 /// `-companion.disciplineXP <n> -companion.disciplineStreak <n> -companion.aura <n> -companion.id <id>`,
 /// `-qa-pieces <n>` for the island count, `-qa-given-name <name>` for the greeting. The signed-in
-/// session lives in memory only (never the Keychain) and the risk notice stays unaccepted, so
-/// nothing reaches the network.
+/// session lives in memory only (never the Keychain). AccountSession and BobbyAccessAPI refuse
+/// its authenticated transport even with accepted consent; RevenueCat Test Store offerings stay
+/// available for the separate paywall capture, which never purchases or restores.
 struct ProfileQAFixtureView: View {
     @StateObject private var store = CompanionStore()
     @StateObject private var profile = AgentProfile()

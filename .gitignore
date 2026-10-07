@@ -52,17 +52,13 @@ supabase/.temp/
 # migration exports contain private rows — never commit
 .ai/migration/export/
 
-# Android TWA build (Bubblewrap). The keystore is the upload key: keep it out of git.
+# Android native source is tracked; build outputs and upload credentials stay private.
 android/*.keystore
 android/*.jks
-android/app/
+android/app/build/
 android/build/
-android/gradle/
-android/gradlew
-android/gradlew.bat
 android/build.gradle
 android/settings.gradle
-android/gradle.properties
 android/local.properties
 android/*.aab
 android/*.apk

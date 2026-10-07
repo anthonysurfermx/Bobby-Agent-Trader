@@ -1,0 +1,13 @@
+{
+  "at": "2026-10-04T12:04:39.849366+00:00",
+  "freeBeforeBytes": 2499780608,
+  "retainedProducts": "/private/tmp/bobby-coupon-ios-derived/Build/Products",
+  "appExecutableSHA256Before": "be9cf1c5edf8c350476497de38a61a4908ed80e9c27f4533fba5304810b51cac",
+  "objectFilesRemoved": 684,
+  "compilerObjectLogicalBytes": 130037824,
+  "keptBuildDatabaseAndMetadata": true,
+  "sourcePackagesUntouched": true,
+  "xcresultsUntouched": true,
+  "freeAfterBytes": 2801369088,
+  "appExecutableSHA256After": "be9cf1c5edf8c350476497de38a61a4908ed80e9c27f4533fba5304810b51cac"
+}

@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "recordedAt": "2026-10-03T18:13:24.872924+00:00",
+  "phase": "previous-signed-d6",
+  "scope": "Ordinary visible UI on the signed release APK; not instrumented contracts or fixtures",
+  "installedAPK": {
+    "at": "2026-10-03T18:07:31.087999+00:00",
+    "scope": "Ordinary signed UI, not instrumentation contracts",
+    "package": "xyz.bobbyprotocol.bobby",
+    "versionName": "1.1.0",
+    "versionCode": 5,
+    "minSdk": 26,
+    "targetSdk": 36,
+    "apkSHA256": "d6aeb7c0f32bb66ec271ec0bda2e1e60f601f91f6bb5291eaa718fe44e504411",
+    "pinMatchesParent": true,
+    "avd": "Bobby_Parity_API35"
+  },
+  "verified": {
+    "profileGuestByte3DVisible": true,
+    "profileVisibleXP": 40,
+    "nativeFrenchMenuSelection": true,
+    "nativeProfileFrenchInformalCopyVisible": true,
+    "nativeMasculineSelection": true,
+    "FrenchAndMasculinePersistedAcrossForceStopNormalStart": true,
+    "companionDefaultReselectedThroughNativeMenu": true,
+    "AndroidImageChooserOpened": true,
+    "sharedPNGDimensions": [
+      1080,
+      1440
+    ],
+    "FileProviderURIObserved": true
+  },
+  "notVerified": [
+    "Audible voice gender or provider output; no audio was generated or played",
+    "Companion-default persistence after second restart: APK refresh scheduled before that UI check",
+    "Behavior of the newer final APK; this phase is not transferred to it"
+  ],
+  "safety": {
+    "IAConsentAcceptedByQA": false,
+    "microphonePermissionRequestedByQA": false,
+    "permissionChangesByQA": false,
+    "questionAnalysisOrAccountOrPaymentActions": false,
+    "recipientOrAppSelected": false,
+    "sent": false,
+    "phoneOperated": false,
+    "sourceEdited": false
+  },
+  "screenshots": [
+    {
+      "file": "parity-code5-profile-screens/01-profile-en-hero.png",
+      "sha256": "63bd540770ce6510b18b7294e5203bc2ecadfce04b48cd4771fa427cf41b7275"
+    },
+    {
+      "file": "parity-code5-profile-screens/02-settings-fr-masculine.png",
+      "sha256": "ff72eb04b4449fd076e8806719111db4f7c9183d36304060b3ff0cdf504245f9"
+    },
+    {
+      "file": "parity-code5-profile-screens/03-profile-fr-after-restart.png",
+      "sha256": "a8ecd5ce966f06597dc7d0d2fd89e6b781d8c3fed2ba6549e993883565d05149"
+    },
+    {
+      "file": "parity-code5-profile-screens/04-voice-default-menu-fr.png",
+      "sha256": "fb756ebb52ea36283dba6b26727ae07ee69a11acd7bd6616a4a0928a9053b5d5"
+    },
+    {
+      "file": "parity-code5-profile-screens/05-avatar-share-chooser-fr.png",
+      "sha256": "d9d87cbdb27a8cc1d96e1e176cd9a6ad8ee50cdcc085c645af8c3790d41fb6e9"
+    }
+  ],
+  "sharedCard": {
+    "capturedAt": "2026-10-03T18:12:20.095564+00:00",
+    "source": "Own generated guest avatar PNG in scoped app cache",
+    "image": "shared-avatar-card-fr.png",
+    "mimeType": "image/png",
+    "width": 1080,
+    "height": 1440,
+    "bytes": 331495,
+    "sha256": "8d5503ee87cf32d13e2d581ddb011dcb952aabe614cafcee61875e149b5a9c2b",
+    "fileProviderURI": "content://xyz.bobbyprotocol.bobby.avatar-share/avatar_cards/f0c5ad19-e5d3-4d96-802f-d7943cc45c2d.png",
+    "URIObservedIn": "Android activity chooser dump; only own URI extracted, no raw activity dump saved",
+    "chooserPackage": "com.android.intentresolver",
+    "recipientOrAppSelected": false,
+    "sent": false
+  },
+  "laterFinalAPKExpectedSHA256": "9652c63829743c030f1f509c8a6d49e1a1f6bbb17851f411b8d73779b6565df8"
+}

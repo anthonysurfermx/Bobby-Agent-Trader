@@ -1,0 +1,56 @@
+{
+  "at": "2026-10-04T12:57:16.525162+00:00",
+  "stage": "StoreShots-consent-corrected",
+  "class": "StoreShots",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "test01_OnboardingAndCompanion",
+    "test03_BoardAndSuggestions",
+    "test04_ShareSkin",
+    "test05_GearAttachmentMatrix",
+    "test02_VerdictAndEvolution"
+  ],
+  "expectedCount": 5,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "17f0a2b8e89a399fba75e871ca6f1ba38b5040b198591b2ed59acc9552ac8cba",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "277deb73dab042995d958b1c96d9cde11efb5c37335775b51b899d2cee4f5377",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 5,
+    "passedTests": 5,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "StoreShots/test01_OnboardingAndCompanion()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test01_OnboardingAndCompanion",
+      "result": "Passed"
+    },
+    {
+      "identifier": "StoreShots/test02_VerdictAndEvolution()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test02_VerdictAndEvolution",
+      "result": "Passed"
+    },
+    {
+      "identifier": "StoreShots/test03_BoardAndSuggestions()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test03_BoardAndSuggestions",
+      "result": "Passed"
+    },
+    {
+      "identifier": "StoreShots/test04_ShareSkin()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test04_ShareSkin",
+      "result": "Passed"
+    },
+    {
+      "identifier": "StoreShots/test05_GearAttachmentMatrix()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/StoreShots/test05_GearAttachmentMatrix",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

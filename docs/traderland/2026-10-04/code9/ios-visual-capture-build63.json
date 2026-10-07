@@ -1,0 +1,17 @@
+{
+  "status": "CAPTURED_OFFLINE_POPUP",
+  "captured_at": "2026-10-04T00:20:46.360186+00:00",
+  "version": "1.7",
+  "build": "63",
+  "source_sha256": "e3a6024435699556f63fca1eca8df7d697b22bd0f3cdb507674aaa2f4089bc75",
+  "app_info_sha256": "f37215349f8ef937abc7fae6b1a6b0fba5240f7fc49484a2eb1992cf372ae040",
+  "app_dylib_sha256": "f696c795b509138923fdc483667479ebba71069a1321a5cdd6f8cb2a97bfb0ac",
+  "tests_receipt": "ios-coupon-build63-20261004T001651Z-tests.json",
+  "tests_receipt_sha256": "d5e7540eae3e5683f86ffd852d0df40b9c281a6ae71834811fb15c52b58a0308",
+  "capture": {
+    "path": "ios-confirmed-gift-build63.png",
+    "sha256": "3f53ecb80ad2b24e2316c27298713bc098f26a21921e5afe1bd44eb2f940c992",
+    "bytes": 276903
+  },
+  "scope": "Actual production popup in DEBUG offline QA fixture on tested iPhone 17 Pro/iOS26.1 simulator; no real coupon/account/physical iPhone; still frame does not prove animation timing."
+}

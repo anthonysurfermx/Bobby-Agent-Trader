@@ -1,0 +1,11 @@
+native (false)	Install the compile SDK	﻿2026-10-03T18:24:27.3041368Z ##[group]Run sdkmanager 'platforms;android-36' 'build-tools;35.0.0'
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3041869Z [36;1msdkmanager 'platforms;android-36' 'build-tools;35.0.0'[0m
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3104938Z shell: /usr/bin/bash -e {0}
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3105198Z env:
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3105402Z   BOBBY_FCM_ENABLED: false
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3105775Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3106277Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3106685Z   MAVEN_ARGS: -ntp
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3106896Z ##[endgroup]
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3195467Z /home/runner/work/_temp/12a12c3c-8106-4162-ba8f-00a3b1faca84.sh: line 1: sdkmanager: command not found
+native (false)	Install the compile SDK	2026-10-03T18:24:27.3209555Z ##[error]Process completed with exit code 127.

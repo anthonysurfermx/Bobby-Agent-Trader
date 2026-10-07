@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" tests="12" skipped="0" failures="0" errors="0" timestamp="2026-10-04T00:42:04.300Z" hostname="MacBook-Pro-F-Society.local" time="0.009">
+  <properties/>
+  <testcase name="guestLoadUsesOnlyGuestKeyAndNeverWrites" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <testcase name="guestLayoutStaysLocalAcrossSignInAndReturnsOnlyUnderFreshGuestEpoch" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.003"/>
+  <testcase name="ownerSwitchDuringWriteNeverReturnsAcceptedOrAppliesTheUiState" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0"/>
+  <testcase name="successAppliesStateOnlyAfterDurableCommitAndAllowsRecreation" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <testcase name="riskConsentRequiredForBothReadAndWrite" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0"/>
+  <testcase name="preferenceReadFailureIsNotTreatedAsAnEmptySavedIsland" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <testcase name="signedInOrStaleEpochCannotReadOrCommitPractice" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0"/>
+  <testcase name="failedOrThrowingWritesDoNotApplyOptimisticStateAndCanRetry" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0"/>
+  <testcase name="stalePreviousStateAndUnloadedStateNeverOverwriteSavedLayout" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <testcase name="invalidCandidateDoesNotPersistUnknownCoreOverlapOrBogusFocus" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.0"/>
+  <testcase name="concurrentCommitsOnlyAcceptOneStateDerivedFromTheSameSnapshot" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <testcase name="changingOwnerDuringReadRejectsLoadedState" classname="xyz.bobbyprotocol.android.ui.LandPracticePersistenceTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

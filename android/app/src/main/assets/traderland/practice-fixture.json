@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "gridSize": 8,
+  "focusLevel": 1,
+  "core": { "itemId": "aura_core", "col": 3, "row": 3 },
+  "placements": [
+    { "uid": "context-buoy", "itemId": "crypto_bay_context_buoy", "col": 2, "row": 1 },
+    { "uid": "risk-antenna", "itemId": "risk_reef_dual_orbit_antenna", "col": 5, "row": 1 },
+    { "uid": "evidence-rock", "itemId": "evidence_mines_crystal_vein_rock", "col": 1, "row": 5 },
+    { "uid": "aura-flower", "itemId": "axiom_archive_aura_flower", "col": 5, "row": 6 },
+    { "uid": "risk-shield", "itemId": "thesis_citadel_risk_shield", "col": 6, "row": 4 },
+    { "uid": "path-a", "itemId": "axiom_archive_path_straight", "col": 3, "row": 2, "orientation": "ne_sw" },
+    { "uid": "path-b", "itemId": "axiom_archive_path_straight", "col": 4, "row": 2, "orientation": "ne_sw" }
+  ],
+  "expectedPathConnectors": {
+    "path-a": ["SE"],
+    "path-b": ["NW"]
+  }
+}

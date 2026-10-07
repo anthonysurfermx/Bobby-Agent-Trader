@@ -1,0 +1,135 @@
+{
+  "status": "SIGNED_CODE7_INSTALLED_BYTE_AND_VERSION_VERIFIED",
+  "started_at_utc": "2026-10-03T21:18:21.597538+00:00",
+  "package": "xyz.bobbyprotocol.bobby",
+  "version_name": "1.1.2",
+  "version_code": 7,
+  "source_sha256": "c1a619bda0a1b176365e063a21513250b71138a30b48b02b2694d7247815a166",
+  "source_files": 375,
+  "source_manifest": "android-source.json",
+  "source_manifest_sha256": "c00e81ae2ebfafbd040631709cc70623001c5c173f22192c94e361229349fa7c",
+  "selected_apk": {
+    "path_in_worktree": "android/app/build/outputs/apk/release/app-release.apk",
+    "sha256": "850f659da41cff3eb2f8b8da05b742c91ab3c372216dfec55a55f9e87232e7e0",
+    "bytes": 47074880
+  },
+  "device": {
+    "serial_stored": false,
+    "transport_id_stored": false,
+    "hardware_identifier_stored": false,
+    "authorized_physical_seeker_matches": 1
+  },
+  "operations": [
+    {
+      "operation": "input.apk_metadata",
+      "return_code": 0
+    },
+    {
+      "operation": "input.apk_signature",
+      "return_code": 0
+    },
+    {
+      "operation": "device.enumeration",
+      "return_code": 0
+    },
+    {
+      "operation": "device.model",
+      "return_code": 0
+    },
+    {
+      "operation": "device.product",
+      "return_code": 0
+    },
+    {
+      "operation": "device.hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.kernel_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.authorized_state",
+      "return_code": 0
+    },
+    {
+      "operation": "package.path",
+      "return_code": 0
+    },
+    {
+      "operation": "package.actual_apk",
+      "return_code": 0
+    },
+    {
+      "operation": "package.version",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.focus",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.resume",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.focus",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.resume",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.focus",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.resume",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.focus",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.resume",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.focus",
+      "return_code": 0
+    },
+    {
+      "operation": "launch.resume",
+      "return_code": 0
+    }
+  ],
+  "install_attempted_by_this_verification": false,
+  "prior_install_command_reported_success": true,
+  "prior_install_receipt_save_failed_due_to_full_host_disk": true,
+  "account_or_coupon_operation": false,
+  "play_upload_or_distribution_performed": false,
+  "scope": "Read-only post-install identity and actual bytes verification. No real coupon, login, purchase, restore, audio or physical visual acceptance.",
+  "actual_installed_apk": {
+    "sha256": "850f659da41cff3eb2f8b8da05b742c91ab3c372216dfec55a55f9e87232e7e0",
+    "bytes": 47074880
+  },
+  "actual_installed_version": {
+    "version_code": 7,
+    "version_name": "1.1.2"
+  },
+  "installed_payload_verified": true,
+  "source_and_apk_pins_unchanged_after_verification": true,
+  "bobby_main_activity_focused": false,
+  "bobby_main_activity_resumed": false,
+  "completed_at_utc": "2026-10-03T21:18:30.117040+00:00"
+}

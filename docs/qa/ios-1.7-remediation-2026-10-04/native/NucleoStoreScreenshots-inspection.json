@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-04T12:39:44.206575+00:00",
+  "stage": "NucleoStoreScreenshots",
+  "class": "NucleoStoreScreenshots",
+  "sourceCommit": "be3e8b1389294e7d477a77b87e107f044ea3f55e",
+  "expectedMethods": [
+    "testEnglishScreenshots",
+    "testSpanishScreenshots"
+  ],
+  "expectedCount": 2,
+  "executionExitCode": 0,
+  "issues": [],
+  "summaryExtractionExitCode": 0,
+  "summarySHA256": "40c9f96f1538f4c3ec6269542579b3c6696f6260429ff408acedbcd27e548f76",
+  "testsExtractionExitCode": 0,
+  "testsSHA256": "ee09dbc1eeb25db1b786f37376ba2b8f370f19e7e4084183b17524123cb7fff5",
+  "officialSummary": {
+    "result": "Passed",
+    "totalTestCount": 2,
+    "passedTests": 2,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "expectedFailures": 0
+  },
+  "actualCases": [
+    {
+      "identifier": "NucleoStoreScreenshots/testEnglishScreenshots()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoStoreScreenshots/testEnglishScreenshots",
+      "result": "Passed"
+    },
+    {
+      "identifier": "NucleoStoreScreenshots/testSpanishScreenshots()",
+      "url": "test://com.apple.xcode/Bobby/BobbyUITests/NucleoStoreScreenshots/testSpanishScreenshots",
+      "result": "Passed"
+    }
+  ],
+  "accepted": true
+}

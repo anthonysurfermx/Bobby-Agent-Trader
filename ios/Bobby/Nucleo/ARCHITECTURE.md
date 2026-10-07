@@ -276,7 +276,7 @@ Order is normative. The mock follows it too.
                   "plan":null | {"direction":S,"entry":N?,"stop":N?,"target":N?,"rewardRisk":N?,"invalidation":S?}},
   "agents":{"alpha":S,"red":S,"cio":S,"verdict":"wait|review","direction":"long|short|none"},
   "provenance":{"provider":"Yahoo Finance","instrument":"NVDA","assetType":"equity","timeframe":"1H","asOf":"2026-09-25T20:00:00.000Z"},
-  "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
+  "candlesTimeframe":"1H", "candles":[{"t":1790366400000,"o":N,"h":N,"l":N,"c":N,"v":N}],
   "receivedAt":1790422570000, "elapsedMs":5378, "fixture":false,
   "access": Access }            // only when the server sent one (§8.2); a legacy server: no key at all
 { "v":1, "status":"confirm", "token":S, "asset":{"symbol":"XAUT","name":"Xau","isEquity":false,"assetClass":"commodity"}, "matchKind":"proxy|fuzzy|…", "proxyNote":S? }
@@ -295,6 +295,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 - trend: `alcista`→`up`, `bajista`→`down`, `lateral`→`sideways`.
 - momentum: `sobrecompra`→`overbought`, `sobreventa`→`oversold`, `neutral`→`neutral`.
 - Candles decode like `BobbyAPI.candles`: `ts` becomes an Int `t`; string numbers are parsed; volume defaults to 0; sorted ascending.
+- `candlesTimeframe` comes from the same native constant used by both candle request URLs. `provenance.timeframe` remains the debate/evidence horizon. The chart uses the candle interval and final plotted candle timestamp; explicit horizon mismatches suppress support, resistance, band, bracket, and plan overlays while the separate analysis cards retain them. Older replies without `candlesTimeframe` fall back to `provenance.timeframe`.
 - `plan` is null unless at least one of entry, stop or target is a number.
 - `asset.name` = `prettyName(first alias ≠ symbol)`.
 - `receivedAt` is ms at receipt. **In fixture mode it is the raw capture's `recordedAt`**, which keeps the golden replies deterministic.
@@ -395,7 +396,7 @@ Normalization rules follow `fixtures/normalize.py` exactly; it is normative:
 |---|---|---|---|
 | BOOT | page load | none (black `#0B0A09`) | `session()` → WAKE. If `pendingRead` → RESTORE |
 | WAKE | session | B0 0.00–0.90. The greeting comes from `localHour` plus the strings table; the sub line is the latest ledger thesis ("NVDA is saved.") or the default prompt. The XP arc is `level.progress`. The avatar is the `COMPANIONS` art for `companion.webId`. | → IDLE |
-| IDLE | | B1 breath; pill glow in antiphase. The hint "HOLD TO ASK · SWIPE THE SPHERE" shows while `hints.idle < 3`. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Tap on the header avatar → `openNative("account")` (also from FACES and HANDBACK). Long press on the wordmark → `openClassic` (dev builds only) |
+| IDLE | | B1 breath; pill glow in antiphase. While `hints.idle < 3`, two hint rows show, each next to what it is about: "HOLD TO ASK" above the pill ("TAP TO TYPE" when the mic cannot listen), and "SWIPE THE SPHERE" under the sphere while it has other faces and none has been visited yet. | pill pointerdown: `mic.state` granted → LISTENING, undetermined → PRE_PERMISSION, else TYPING. Pill tap <250 ms → TYPING. Horizontal drag on the sphere → FACE_DRAG. Chip → SENDING. Tap on the header avatar → `openNative("account")` (also from FACES and HANDBACK). Long press on the wordmark → `openClassic` (dev builds only) |
 | PRE_PERMISSION | first hold with mic undetermined | onboarding O3 card (bloom from the bottom rim): "I only listen while you hold." / "iOS will ask for the microphone and speech recognition once." / **Continue** | Continue → `speech.requestPermission` → granted: IDLE with hint "Hold to ask"; `consent` (the Apple speech prompt followed and the user chose to type): TYPING; otherwise IDLE with the unavailable hint |
 | (pill hold, mic not granted) | hold ≥ 0.25 s from a cached `unavailable`, `denied`, `restricted` or `consent` | The cached `session.mic` goes stale (the connection came back, a dictation model was installed), so the page calls `speech.permission` again and acts on the fresh answer; `denied` and `unavailable` are kept as native reports them. A short tap asks nothing and types. | `granted`: LISTENING in the same hold (or the hint "Hold to ask" if already released); `consent`: `speech.requestPermission` (the native prompt; allow → hint "Hold to ask", type → TYPING). The prompt's answer is followed where the hold began, or in IDLE / RETURNING if the glass went home under the alert (ERROR lasts 6 s); it never interrupts a read that began meanwhile. `undetermined`: PRE_PERMISSION; otherwise the unavailable hint |
 | LISTENING | `speech.start` → listening | B2 3.00–3.15 on press. Words are born from the `speech.partial` diff: the stable prefix keeps its spans, new words rise, revised tail words re-roll, and the tail stays ink2. | pointerup → `speech.stop` → wait for `speech.final` → SENDING, or STT_EMPTY if `""`. `speech.error` → IDLE with a hint |

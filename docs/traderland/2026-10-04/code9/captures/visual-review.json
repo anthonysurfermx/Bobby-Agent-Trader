@@ -1,0 +1,83 @@
+{
+  "status": "REVIEWED_NO_BLOCKER",
+  "reviewed_at": "2026-10-04T01:01:20.911303+00:00",
+  "source_sha256": "97ba02092fd8876edd5017892c945be9f8595636f71a280e2b13de6754869583",
+  "instrumentation_receipt": "traderland-code9-instrumentation-20261004T005134Z.json",
+  "instrumentation_receipt_sha256": "43d365877ae29e8efabbddca25c33799470c033ba84b68861ab8644d0e07ca99",
+  "captures_json_sha256": "634a970fffa9fa76c682fec448abb32da75301fc693f60a6dba1695562abb240",
+  "reviewed_captures": [
+    {
+      "file": "showcase.png",
+      "bytes": 428579,
+      "sha256": "a84155aecebc44840e818411447ead29f1d2f48720a81d576063d13ba9405c8b"
+    },
+    {
+      "file": "archipelago.png",
+      "bytes": 243494,
+      "sha256": "be689f6a1eb8d3dd5079935824d4f01c209cc5a46488794ef6d6c02e0debd435"
+    },
+    {
+      "file": "lifted-draft.png",
+      "bytes": 236997,
+      "sha256": "7f6117f9a960ed675f6af747952200b02d4a225178c64b7d2460aeb9c1407203"
+    },
+    {
+      "file": "free-lots.png",
+      "bytes": 129670,
+      "sha256": "2336f39982fac05824b8ea15a416d2ce272da6947f53b366b69b061ca3f7ac35"
+    },
+    {
+      "file": "archipelago-labels.png",
+      "bytes": 258721,
+      "sha256": "e4a1b9d1d233a56e37ace2dad0707a31178a332d2a3f74b6b5ee96684a8d4afb"
+    },
+    {
+      "file": "ground-violet-halo.png",
+      "bytes": 124802,
+      "sha256": "5d9bcbf9d07b254e25eda2674c278f69843aa3fc9b044d2eb2c5a5084c506172"
+    },
+    {
+      "file": "ground-soft-contact.png",
+      "bytes": 33712,
+      "sha256": "3ea507a4880938831cb2739cc3560e64982582b77c4aec6d2dc3bd6cd4d5ba37"
+    },
+    {
+      "file": "selected-piece.png",
+      "bytes": 59256,
+      "sha256": "02d95eedd7d86fae9b624ee262cba3de75e7f198e007ba56a663246176dc1ce9"
+    },
+    {
+      "file": "archipelago-layout-six.png",
+      "bytes": 500616,
+      "sha256": "c61554c39405b24a133182b90ee7740bdb76bc5c62e39c4ac9a12849f2db4a4e"
+    },
+    {
+      "file": "archipelago-layout-lots.png",
+      "bytes": 255936,
+      "sha256": "e51bfcec2f05242699c7a13d992ac5f057ef095c4419c5b200365353f9aec7f7"
+    },
+    {
+      "file": "archipelago-layout-grown.png",
+      "bytes": 226631,
+      "sha256": "e7327d406391d4d9be946700d2541ce1cf26092b125b05408fcf396b9ec11e09"
+    },
+    {
+      "file": "coupon-confirmed.png",
+      "bytes": 159025,
+      "sha256": "901c2c0228fc0eec8706b70ca43b935617d9d5ea988f2ec84047aeb9ea3aacf7"
+    }
+  ],
+  "scope": "Codex visual inspection of the actual12 source/binary-bound offline emulator screenshots, with an independent camera/render review and read-only pixel re-derivation of names through8to12; not a physical acceptance or pixel-identical iOS comparison.",
+  "findings": [
+    "Seven islands fit in overview and remain legible; four/six free lots use native screen-size labels.",
+    "Fixed selected piece has amber outline and halo; moving draft has an explicit handle and selected/resting states remain distinct.",
+    "Showcase preserves complete approved artwork and scene depth; contact softness and own ambient glow are present.",
+    "Coupon modal confirms10/3/1 granted separately from8/2/1 available, with readable next instruction and return CTA.",
+    "Copy polish possible: Spanish mode names in the coupon sentence sound rigid; no technical blocker."
+  ],
+  "title_pixel_review": "title-pixel-review.json",
+  "limits": [
+    "API35/4KB emulator with offline fixtures; no physicalSeeker/iPhone, account or coupon/provider lifecycle acceptance.",
+    "Still frames do not establish motion timing, framerate, touch feel or exact iOS raster/compositing parity."
+  ]
+}

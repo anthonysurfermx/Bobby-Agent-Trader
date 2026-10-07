@@ -88,8 +88,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #meri b{position:absolute;left:0;top:0;width:4px;height:4px;border-radius:2px;background:var(--cio)}
 #meriHit{position:absolute;left:115px;top:462px;width:160px;height:44px;border-radius:22px;cursor:pointer}
 
-/* hint row */
-#hint{left:20px;top:713px;width:350px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);text-align:center;pointer-events:none}
+/* hint rows: hold (or tap) to ask sits above the pill, swipe sits right under the sphere and its face dots */
+#hint,#hintS{left:20px;top:713px;width:350px;height:14px;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2);text-align:center;pointer-events:none}
+#hintS{top:494px}
 .roll span{position:absolute;left:0;right:0;top:0;white-space:nowrap}
 /* a failure or gate line may need two lines: it wraps and grows upward, never into the pill */
 #hint span{white-space:normal;text-wrap:balance;top:auto;bottom:0}
@@ -159,9 +160,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* cards */
 .card{width:330px;height:360px;border-radius:28px;background:linear-gradient(180deg,rgba(34,30,27,.96),rgba(23,21,19,.96));border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05);overflow:hidden;transform-origin:165px 180px}
 .card > .p{position:absolute;left:24px;right:24px}
-.card .ch{top:24px;display:flex;justify-content:space-between;align-items:baseline}
+.card .ch{top:24px;display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .card .ch .lb{font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
-.card .ch .mt{font:400 13px/16px var(--sans);color:var(--ink2)}
+.card .ch .mt{flex:none;font:400 13px/16px var(--sans);color:var(--ink2);white-space:nowrap}   /* a long header wraps onto a second line; this one stays whole */
 .card .ct{top:48px;font:300 24px/27px var(--serif);letter-spacing:-.035em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .card .rows{top:91px}
 .card .rows div{display:flex;justify-content:space-between;align-items:center;height:36px;border-bottom:.5px solid rgba(242,237,228,.06)}
@@ -179,13 +180,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
 .save .roll{position:absolute;left:0;top:16px;right:0;height:20px;pointer-events:none}
 .save .roll span{text-align:center}
-.card .scr{top:62px;height:250px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
+.card .scr{top:62px;height:250px;overflow:hidden}
+/* only an edge the debate continues past fades (.up / .dn): scrolled to an end, its last line is clear of any mask */
+.card .scr.dn{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
+.card .scr.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px);mask-image:linear-gradient(180deg,transparent,#000 20px)}
+.card .scr.up.dn{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent)}
 .card .scr .in{position:absolute;left:0;right:0;top:0}
 .card .ar{display:flex;gap:12px;margin-bottom:16px}
 .card .ar i{flex:0 0 6px;height:6px;border-radius:50%;background:var(--c);margin-top:4px}
 .card .ar b{display:block;font:500 11px/14px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--c)}
+.card .ar .rl{display:block;margin-top:2px;font:400 12px/16px var(--sans);color:var(--ink2)}   /* what this voice does */
 .card .ar p{margin-top:4px;font:400 16px/23px var(--sans)}
-.card .disc{top:322px;font:400 12px/16px var(--sans);color:var(--ink2)}
+.card .ar > div{min-width:0;overflow-wrap:anywhere}   /* a word wider than the column breaks: it never widens the column past the card */
+.card .disc{bottom:22px;font:400 12px/16px var(--sans);color:var(--ink2)}
 .card .bd{top:91px;font:400 16px/23px var(--sans);color:var(--ink2)}
 .card .go{top:284px;height:52px;border-radius:26px;background:rgba(242,237,228,.08);border:.5px solid var(--line);color:var(--ink);font:600 16px/52px var(--sans);text-align:center;cursor:pointer}
 #tpill{height:24px;padding:0 10px;border-radius:12px;font:500 11px/23px var(--mono);letter-spacing:.06em;text-align:center;white-space:nowrap;transform-origin:50% 50%;pointer-events:none}
@@ -233,8 +240,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 /* Translated copy can use two lines inside the existing controls. */
 #hint .roll,#hint .roll>span{height:28px;white-space:normal;line-height:13px}
 #hint{height:28px}
-.card dt{max-width:52%;white-space:normal;line-height:13px;overflow-wrap:anywhere}
-.card dd{max-width:48%;overflow-wrap:anywhere}
+/* a row's value keeps one line whenever it fits; its label wraps in the room that is left */
+.card dt{flex:1 1 0;min-width:0;white-space:normal;line-height:13px;overflow-wrap:anywhere}
+.card dd{flex:none;max-width:64%;padding-left:12px;overflow-wrap:anywhere}
 </style>
 </head>
 <body data-page="app">
@@ -369,9 +377,9 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     <div id="meri" aria-hidden="true"><i></i><i></i><i></i><i></i><b></b></div>
     <button id="meriHit" type="button" data-hit="meri" aria-label=""></button>
 
-    <article class="card a" id="card0">
+    <article class="card a" id="card0" data-hit="scroll">
       <div class="p ch"><span class="lb"></span><span class="mt"></span></div>
-      <div class="p scr" data-hit="scroll"><div class="in"></div></div>
+      <div class="p scr"><div class="in"></div></div>
       <div class="p disc"></div>
     </article>
     <article class="card a" id="card1">
@@ -406,6 +414,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     <div id="dockA" class="a"></div>
     <button id="avatar" class="a" type="button" data-hit="avatar"><span class="ph"></span><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="18" fill="none" stroke="rgba(242,237,228,.14)" stroke-width="2"/><circle id="xpArc" cx="20" cy="20" r="18" fill="none" stroke="#F2EDE4" stroke-width="2" stroke-linecap="round" transform="rotate(-90 20 20)" stroke-dasharray="0 200"/></svg></button>
 
+    <div id="hintS" class="a" aria-hidden="true"></div>
     <div id="hint" class="a" aria-hidden="true"></div>
     <div id="micGlow" class="a"><i></i></div>
     <button id="pill" type="button" data-hit="pill">
@@ -566,6 +575,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'verdict.wait': 'Wait', 'verdict.review': 'Review',
       'ring.conviction': 'CONVICTION',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'The summary in one line', 'role.alpha': 'Looks for the evidence in favor',
+      'role.red': 'Questions the thesis, looks for what breaks it', 'role.cio': 'Weighs both sides and states the limits',
       'sat.rsi': 'RSI 14', 'sat.hot': 'hot', 'sat.cold': 'cold',
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
       'sat.trend': 'Trend', 'sat.ema': 'EMA 20 / 50',
@@ -616,6 +627,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       'verdict.wait': 'Espera', 'verdict.review': 'Revisa',
       'ring.conviction': 'CONVICCIÓN',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
+      'role.syn': 'El resumen en una línea', 'role.alpha': 'Busca la evidencia a favor',
+      'role.red': 'Cuestiona la tesis y busca qué la rompe', 'role.cio': 'Sopesa ambos lados y marca los límites',
       'sat.rsi': 'RSI 14', 'sat.hot': 'caliente', 'sat.cold': 'frío',
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
       'sat.trend': 'Tendencia', 'sat.ema': 'EMA 20 / 50',
@@ -670,6 +683,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Le résumé en une ligne",
+    "role.alpha": "Cherche les éléments favorables",
+    "role.red": "Questionne la thèse et cherche ses failles",
+    "role.cio": "Pèse les deux côtés et précise les limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "surachat",
     "sat.cold": "survente",
@@ -770,6 +787,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "O resumo numa linha",
+    "role.alpha": "Procura a evidência a favor",
+    "role.red": "Questiona a tese e procura o que a invalida",
+    "role.cio": "Pondera os dois lados e indica os limites",
     "sat.rsi": "RSI 14",
     "sat.hot": "sobrecompra",
     "sat.cold": "sobrevenda",
@@ -871,6 +892,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Il riassunto in una riga",
+    "role.alpha": "Cerca gli elementi a favore",
+    "role.red": "Contesta la tesi e cerca ciò che la invalida",
+    "role.cio": "Soppesa i due lati e indica i limiti",
     "sat.rsi": "RSI 14",
     "sat.hot": "ipercomprato",
     "sat.cold": "ipervenduto",
@@ -971,6 +996,10 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     "agent.alpha": "ALPHA HUNTER",
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
+    "role.syn": "Die Zusammenfassung in einer Zeile",
+    "role.alpha": "Sucht die Belege, die dafür sprechen",
+    "role.red": "Prüft die These auf Schwachstellen",
+    "role.cio": "Wägt beide Seiten ab, nennt die Grenzen",
     "sat.rsi": "RSI 14",
     "sat.hot": "überkauft",
     "sat.cold": "überverkauft",
@@ -1260,7 +1289,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     }
     if (fin(tech.support) && fin(tech.resistance)) {
       sats.push({ slot: 'LL', id: 'range', key: t(lang, 'sat.range'), value: money(tech.support, lang, currency, locale) + '–' + money(tech.resistance, lang, currency, locale), from: null,
-        delta: t(lang, 'sat.range30'), dot: 'neutral' });
+        delta: fin(tech.bars) ? '' : t(lang, 'sat.range30'), dot: 'neutral' });
     }
     return sats.slice(0, firstRead ? 3 : 4);
   }
@@ -1271,11 +1300,14 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     if (c.length < 10) return null;
     var pts = c.slice(-48);
     var closes = pts.map(function (x) { return x.c; });
-    var tech = r.technicals || {};
+    var timeframe = r.candlesTimeframe || r.provenance.timeframe;
+    // Legacy replies lack candle metadata. Explicit mismatched horizons cannot share overlays.
+    var aligned = !r.candlesTimeframe || String(r.candlesTimeframe).toUpperCase() === String(r.provenance.timeframe).toUpperCase();
+    var tech = aligned ? (r.technicals || {}) : {};
     var lines = [];
     if (fin(tech.support)) lines.push({ kind: 'support', price: tech.support, label: t(lang, 'chart.support', { price: money(tech.support, lang, currency, locale) }) });
     if (fin(tech.resistance)) lines.push({ kind: 'resistance', price: tech.resistance, label: t(lang, 'chart.resistance', { price: money(tech.resistance, lang, currency, locale) }) });
-    if (plan) {
+    if (plan && aligned) {
       ['entry', 'stop', 'target'].forEach(function (k) {
         lines.push({ kind: k, price: plan[k], label: t(lang, 'chart.' + k, { price: money(plan[k], lang, currency, locale) }) });
       });
@@ -1289,6 +1321,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     var grid = [];
     for (var g = lo + step; g < hi - step * 0.5 && grid.length < 2; g += step) grid.push(+g.toFixed(10));
     var now = pts[pts.length - 1];
+    var lastTime = new Date(now.t);
+    var asOf = fin(now.t) && !isNaN(lastTime.getTime()) ? lastTime.toISOString() : null;
     var band = null, bracket = null;
     if (fin(tech.support)) {
       var atr = fin(tech.atrPct) && fin(now.c) ? now.c * tech.atrPct / 100 : 0;
@@ -1303,7 +1337,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       domain: [lo, hi], gridlines: grid,
       now: { price: now.c, t: now.t, label: money(now.c, lang, currency, locale) },
       band: band, lines: lines, bracket: bracket,
-      source: { timeframe: r.provenance.timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: r.provenance.asOf }
+      source: { timeframe: timeframe, provider: r.provenance.provider, instrument: r.provenance.instrument, asOf: asOf }
     };
   }
 
@@ -1418,18 +1452,19 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
   }
 
   /** The debate card: the synthesis on top (when there is one), then Alpha, Red Team, the second round, the CIO,
-   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text. */
+   *  the scenarios, what data is missing for the horizon, and the evidence the desk used. Only real server text.
+   *  The four voices carry `role`: one fixed line under the name saying what that voice does. */
   function debateEntries(r, lang) {
     var out = [], syn = synthesisOf(r), a = r.agents || {};
     if (syn) {
-      out.push({ id: 'syn', name: t(lang, 'syn.name'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
+      out.push({ id: 'syn', name: t(lang, 'syn.name'), role: t(lang, 'role.syn'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
         lines: [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].filter(function (x) { return x[1]; })
           .map(function (x) { return { label: t(lang, 'syn.' + x[0]), text: x[1] }; }) });
     }
-    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), hue: HUES.alpha, text: a.alpha });
-    out.push({ id: 'red', name: t(lang, 'agent.red'), hue: HUES.red, text: a.red });
+    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), role: t(lang, 'role.alpha'), hue: HUES.alpha, text: a.alpha });
+    out.push({ id: 'red', name: t(lang, 'agent.red'), role: t(lang, 'role.red'), hue: HUES.red, text: a.red });
     if (typeof a.rebuttal === 'string' && a.rebuttal) out.push({ id: 'rebuttal', name: t(lang, 'agent.rebuttal'), hue: HUES.alpha, text: a.rebuttal });
-    out.push({ id: 'cio', name: t(lang, 'agent.cio'), hue: HUES.cio, text: a.cio });
+    out.push({ id: 'cio', name: t(lang, 'agent.cio'), role: t(lang, 'role.cio'), hue: HUES.cio, text: a.cio });
     var sc = a.scenarios;
     if (sc && typeof sc.confirm === 'string' && typeof sc.invalidate === 'string') {
       out.push({ id: 'scenarios', name: t(lang, 'agent.scenarios'), hue: '#9A5CFF', text: '',
@@ -2267,7 +2302,7 @@ var el = {
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),
   eyebrow: $('eyebrow'), chipRow: $('chipRow'), perm: $('perm'), wm: $('wm'), close: $('close'), dockQ: $('dockQ'), dockA: $('dockA'), avatar: $('avatar'), xpArc: $('xpArc'),
-  hint: $('hint'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
+  hint: $('hint'), hintS: $('hintS'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
   typeBox: $('typeBox'), ta: $('ta'), taSend: $('taSend')
 };
 el.micGlowI = el.micGlow.querySelector('i');
@@ -2287,13 +2322,13 @@ el.agSt = el.ag.map(function(a){ return a.querySelector('.st'); });
 el.cioSw = el.ag[2].querySelector('.sw'); el.cioVf = el.ag[2].querySelector('.vf');
 el.satK = el.sats.map(function(s){ return s.querySelector('.k'); }); el.satV = el.sats.map(function(s){ return s.querySelector('.v'); });
 el.satOdo = [0, 1, 2, 3].map(function(){ return new Odo(mk('span', 'od')); });
-el.card0 = { lb: el.cards[0].querySelector('.lb'), mt: el.cards[0].querySelector('.mt'), scr: el.cards[0].querySelector('.scr'), inn: el.cards[0].querySelector('.scr .in'), disc: el.cards[0].querySelector('.disc') };
+el.card0 = { ch: el.cards[0].querySelector('.ch'), lb: el.cards[0].querySelector('.lb'), mt: el.cards[0].querySelector('.mt'), scr: el.cards[0].querySelector('.scr'), inn: el.cards[0].querySelector('.scr .in'), disc: el.cards[0].querySelector('.disc') };
 el.card1 = { lb: el.cards[1].querySelector('.lb'), mt: el.cards[1].querySelector('.mt'), ct: el.cards[1].querySelector('.ct'), rows: el.cards[1].querySelector('.rows'),
   ln: el.cards[1].querySelector('.ln'), hz: el.cards[1].querySelector('.hz'), xp: el.cards[1].querySelector('.xp') };
 el.card2 = { lb: el.cards[2].querySelector('.lb'), mt: el.cards[2].querySelector('.mt'), ct: el.cards[2].querySelector('.ct'), rows: el.cards[2].querySelector('.rows'), go: el.cards[2].querySelector('.go') };
 el.permH = el.perm.querySelector('h4'); el.permP = el.perm.querySelector('p'); el.permBtn = el.perm.querySelector('button');
 
-var hintRoll = new Roll(el.hint), saveRoll = new Roll($('saveRoll')), vfRoll = new Roll(el.cioVf);
+var hintRoll = new Roll(el.hint), swipeRoll = new Roll(el.hintS), saveRoll = new Roll($('saveRoll')), vfRoll = new Roll(el.cioVf);
 (function(){ [el.d100, el.d10, el.d1].forEach(function(col){ for (var d = 0; d < 10; d++) col.appendChild(mk('span', null, String(d))); }); })();
 el.d100P = el.d100.parentNode; el.d10P = el.d10.parentNode;
 
@@ -2341,7 +2376,7 @@ var STR = /*STRINGS-BEGIN*/{
     'greet.morning': 'Good morning.', 'greet.afternoon': 'Good afternoon.', 'greet.evening': 'Good evening.',
     'greet.sub.day': 'What are you weighing today?', 'greet.sub.night': 'What are you weighing tonight?',
     'greet.saved': '{symbol} is saved.',
-    'hint.idle': 'Hold to ask · swipe the sphere', 'hint.idleType': 'Tap to type · swipe the sphere', 'hint.hold': 'Hold to ask',
+    'hint.idleType': 'Tap to type', 'hint.hold': 'Hold to ask',
     'hint.release': 'Release to send', 'hint.debating': 'Three agents debating', 'hint.debatingS': 'Three agents debating · {s} s',
     'hint.still': 'Still weighing · deep reads take up to a minute', 'hint.long': 'Taking longer than usual · tap to cancel',
     'hint.pull': 'Pull down for the full read ⌄', 'hint.swipe': 'Swipe the sphere',
@@ -2371,7 +2406,7 @@ var STR = /*STRINGS-BEGIN*/{
     'greet.morning': 'Buenos días.', 'greet.afternoon': 'Buenas tardes.', 'greet.evening': 'Buenas noches.',
     'greet.sub.day': '¿Qué estás evaluando hoy?', 'greet.sub.night': '¿Qué estás evaluando esta noche?',
     'greet.saved': '{symbol} quedó guardada.',
-    'hint.idle': 'Mantén para preguntar · desliza la esfera', 'hint.idleType': 'Toca para escribir · desliza la esfera', 'hint.hold': 'Mantén para preguntar',
+    'hint.idleType': 'Toca para escribir', 'hint.hold': 'Mantén para preguntar',
     'hint.release': 'Suelta para enviar', 'hint.debating': 'Tres agentes debatiendo', 'hint.debatingS': 'Tres agentes debatiendo · {s} s',
     'hint.still': 'Sigue pensando · puede tardar hasta un minuto', 'hint.long': 'Tarda más de lo normal · toca para cancelar',
     'hint.pull': 'Desliza hacia abajo para verlo completo ⌄', 'hint.swipe': 'Desliza la esfera',
@@ -2405,8 +2440,7 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.sub.day": "Que veux-tu évaluer aujourd’hui ?",
     "greet.sub.night": "Que veux-tu évaluer ce soir ?",
     "greet.saved": "{symbol} est enregistré.",
-    "hint.idle": "Maintiens pour demander · balaie la sphère",
-    "hint.idleType": "Touche pour écrire · balaie la sphère",
+    "hint.idleType": "Touche pour écrire",
     "hint.hold": "Maintiens pour demander",
     "hint.release": "Relâche pour envoyer",
     "hint.debating": "Trois agents débattent",
@@ -2476,8 +2510,7 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.sub.day": "O que queres avaliar hoje?",
     "greet.sub.night": "O que queres avaliar esta noite?",
     "greet.saved": "{symbol} foi guardado.",
-    "hint.idle": "Mantém para perguntar · desliza a esfera",
-    "hint.idleType": "Toca para escrever · desliza a esfera",
+    "hint.idleType": "Toca para escrever",
     "hint.hold": "Mantém para perguntar",
     "hint.release": "Solta para enviar",
     "hint.debating": "Três agentes a debater",
@@ -2548,8 +2581,7 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.sub.day": "Cosa vuoi valutare oggi?",
     "greet.sub.night": "Cosa vuoi valutare stasera?",
     "greet.saved": "{symbol} è stato salvato.",
-    "hint.idle": "Tieni premuto per chiedere · scorri la sfera",
-    "hint.idleType": "Tocca per scrivere · scorri la sfera",
+    "hint.idleType": "Tocca per scrivere",
     "hint.hold": "Tieni premuto per chiedere",
     "hint.release": "Rilascia per inviare",
     "hint.debating": "Tre agenti discutono",
@@ -2619,8 +2651,7 @@ var STR = /*STRINGS-BEGIN*/{
     "greet.sub.day": "Was möchtest du heute bewerten?",
     "greet.sub.night": "Was möchtest du heute Abend bewerten?",
     "greet.saved": "{symbol} wurde gespeichert.",
-    "hint.idle": "Zum Fragen halten · Kugel wischen",
-    "hint.idleType": "Zum Schreiben tippen · Kugel wischen",
+    "hint.idleType": "Zum Schreiben tippen",
     "hint.hold": "Zum Fragen halten",
     "hint.release": "Zum Senden loslassen",
     "hint.debating": "Drei Agenten diskutieren",
@@ -2793,7 +2824,8 @@ function greetIn(){ A.greet.x.set(0); A.greet.o.set(1); lineIn(A.greet); }
 function greetOut(){ lineOut(A.greet); }
 function noteIn(t, s){ lineSet(A.note, t || '', s || '', el.noteT, el.noteS); A.note.o.set(1); lineIn(A.note, 0.045); }
 function noteOut(){ lineOut(A.note); }
-function hint(t){ hintRoll.set(t || ''); }
+/* `t` is the line above the pill, `swipe` the line under the sphere (idle only): any other line, or none, takes it away */
+function hint(t, swipe){ hintRoll.set(t || ''); swipeRoll.set(swipe || ''); }
 
 /* haptics: the real one through the bridge (≤1/40 ms, native throttles too) + the visual tick of the prototype */
 var lastHaptic = -1;
@@ -3027,6 +3059,31 @@ function fillSats(model){
 var CH = null, LUT_N = 512, LUT_LEAD = new Float32Array((LUT_N + 1) * 2), LUT_LINE = new Float32Array((LUT_N + 1) * 2), LUT_OK = false, PT = { x: 0, y: 0 };
 var NOW_X = 280;
 function axisFmt(v, step){ if (Math.abs(step) >= 1) return Math.round(v).toLocaleString(LOCALE); var dp = step >= 0.1 ? 1 : step >= 0.01 ? 2 : 4; return v.toLocaleString(LOCALE, { minimumFractionDigits:dp, maximumFractionDigits:dp }); }
+/* Keep the full localized subtitle in the 90 px beside the support bracket. */
+function chartSubtitle(text, y){
+  var node = el.cBrS, width = 90;
+  node.textContent = text || ''; att(node, 'y', f2(y));
+  if (!text || node.getComputedTextLength() <= width) return;
+  var best = null, bestWidth = Infinity;
+  function splitAt(i){
+    var a = text.slice(0, i).trim(), b = text.slice(i).trim();
+    if (!a || !b) return;
+    node.textContent = a; var wa = node.getComputedTextLength();
+    node.textContent = b; var wb = node.getComputedTextLength();
+    var w = Math.max(wa, wb);
+    if (w < bestWidth){ best = [a, b]; bestWidth = w; }
+  }
+  for (var i = 1; i < text.length; i++) if (/\s/.test(text.charAt(i))) splitAt(i);
+  /* A single long word can still use both lines without dropping characters. */
+  if (bestWidth > width) for (i = 1; i < text.length; i++) splitAt(i);
+  if (!best){ node.textContent = text; return; }
+  node.textContent = '';
+  best.forEach(function(line, index){
+    var span = D.createElementNS('http://www.w3.org/2000/svg', 'tspan');
+    span.setAttribute('x', '296'); span.setAttribute('y', f2(y + index * 14));
+    span.textContent = line; node.appendChild(span);
+  });
+}
 function buildChart(ch, prov, receivedAt){
   el.cLines.textContent = '';
   if (!ch){ CH = null; return; }
@@ -3080,8 +3137,8 @@ function buildChart(ch, prov, receivedAt){
   if (br && fin(br.to)){
     var ya = nowY, yb = Y(br.to), mid = (ya + yb) / 2;
     att(el.cBrL, 'y1', f2(ya)); att(el.cBrL, 'y2', f2(yb)); att(el.cBrA, 'y1', f2(ya)); att(el.cBrA, 'y2', f2(ya)); att(el.cBrB, 'y1', f2(yb)); att(el.cBrB, 'y2', f2(yb));
-    el.cBrT.textContent = br.label; el.cBrS.textContent = br.sub;
-    att(el.cBrT, 'y', f2(mid - 2)); att(el.cBrS, 'y', f2(mid + 12));
+    el.cBrT.textContent = br.label; att(el.cBrT, 'y', f2(mid - 2));
+    chartSubtitle(br.sub, mid + 12);
   } else { el.cBrT.textContent = ''; el.cBrS.textContent = ''; }
   var src = ch.source || {};
   /* the UI never names the exchange behind the candles (Base-only naming) */
@@ -3111,12 +3168,17 @@ function fillCards(m){
     var ar = mk('div', 'ar');
     ar.style.setProperty('--c', e.id === 'alpha' || e.id === 'red' || e.id === 'cio' ? 'var(--' + e.id + ')' : (e.hue || 'var(--cio)'));
     ar.appendChild(mk('i')); var d = mk('div'); d.appendChild(mk('b', null, e.name));
+    if (e.role) d.appendChild(mk('span', 'rl', e.role));
     if (e.text) d.appendChild(mk('p', null, e.text));
     (e.lines || []).forEach(function(l){ var p = mk('p'), lb = mk('span', null, l.label + ': '); lb.style.fontWeight = '600'; lb.style.color = 'var(--ink)'; p.appendChild(lb); p.appendChild(D.createTextNode(l.text)); d.appendChild(p); });
     ar.appendChild(d);
     el.card0.inn.appendChild(ar);
   });
-  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - 250 + 12);
+  /* a header or a footer that wraps onto a second line takes its room from the scroller; the scroll ends with the
+     last line clear above the lower edge, where no fade is left (.scr.dn in renderCards) */
+  var sTop = Math.max(62, 24 + (el.card0.ch.offsetHeight || 0) + 21), sH = Math.min(312, 328 - (el.card0.disc.offsetHeight || 16)) - sTop;
+  el.card0.scr.style.top = sTop + 'px'; el.card0.scr.style.height = sH + 'px';
+  A.dscr.set(0); A.dscrMax = Math.max(0, (el.card0.inn.offsetHeight || 0) - sH);
   fillThesisCard(m.thesis, { verdict: m.verdict.key, readOnly: false, horizon: m.thesis.horizon });
   var isla = ISLAND && ISLAND.available;
   A.nCards = isla ? 3 : 2;
@@ -3136,11 +3198,15 @@ function fillThesisCard(th, o){
   var c = el.card1;
   c.lb.textContent = th.header; c.mt.textContent = o.readOnly && th.when ? th.when : ''; c.ct.textContent = th.title;
   var n = th.rows.length, showHz = !!(o.horizon && o.horizon.show) && !o.readOnly;
-  var avail = 284 - 8 - (showHz ? 40 : 34) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
-  fillRows(c.rows, th.rows, rh);
-  var yUnder = 91 + n * rh + 6;
-  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  /* the note under the rows is measured, not assumed (two lines in most languages): the rows leave it room, and the
+     button, with the card's lower edge, comes after it, never over it */
   c.ln.textContent = th.line || '';
+  var lnH = showHz ? 32 : (c.ln.offsetHeight || 32);
+  var avail = 284 - 8 - (showHz ? 40 : Math.max(34, lnH + 2)) - 91, rh = Math.max(28, Math.min(36, Math.floor(avail / Math.max(1, n))));
+  fillRows(c.rows, th.rows, rh);
+  var yUnder = 91 + n * rh + 6, saveTop = Math.max(284, yUnder + lnH + 4);
+  c.ln.style.top = yUnder + 'px'; c.xp.style.top = yUnder + 'px'; c.hz.style.top = yUnder + 'px';
+  el.save.style.top = saveTop + 'px'; el.cards[1].style.height = (saveTop + 76) + 'px';
   c.hz.textContent = '';
   HZ = o.horizon && o.horizon.defaultHours || 24;
   if (showHz){
@@ -3312,7 +3378,11 @@ function setGreeting(){
 }
 function idleHint(){
   var n = SES && SES.hints ? (SES.hints.idle || 0) : 0;
-  if (n < 3){ hint(tt(idleMode() === 'mic' ? 'hint.idle' : 'hint.idleType')); if (!HINTED.idle){ HINTED.idle = true; markHint('idle'); } }
+  if (n < 3){
+    /* each hint next to what it is about: hold (or tap) above the pill, swipe under the sphere while it has other faces */
+    hint(tt(idleMode() === 'mic' ? 'hint.hold' : 'hint.idleType'), FACES.length > 1 && !HINTED.swipe ? tt('hint.swipe') : '');
+    if (!HINTED.idle){ HINTED.idle = true; markHint('idle'); }
+  }
   else hint('');
 }
 function agentNames(){ ['alpha', 'red', 'cio'].forEach(function(k, i){ el.agNm[i].textContent = RMOD.t(LANG, 'agent.' + k); }); el.agSt[0].textContent = ''; el.agSt[1].textContent = ''; el.cioSw.textContent = ''; vfRoll.set('', true); A.cioSwO.set(1); A.vfO.set(0); A.ag.forEach(function(a){ a.stW = []; a.stT = 1e9; }); }
@@ -4014,7 +4084,7 @@ STATES.SAVING = {
   enter: function(){
     var r = READ, m = r.model;
     A.savePress.to(1, 'emit'); saveRoll.set(m.thesis.savedLabel); A.saved.tween(1, 0.24, E.fade); A.sweepT = clk; tick('success');
-    A.lnO.tween(0, 0.16, E.fade);
+    A.lnO.tween(0, 0.16, E.fade); op(el.card1.hz, 0);   /* the horizon is chosen: its selector leaves the row to the XP chip */
     var params = { requestId: r.requestId }; if (m.thesis.horizon.show) params.horizonHours = HZ;
     bcall('saveThesis', params).then(function(res){ onSaved(r, res); }, function(){ onSaved(r, { status: 'failed' }); });
     cue(1.8, function(){ go('FOLLOWUPS'); });
@@ -4026,7 +4096,9 @@ function onSaved(r, res){
   r.save = res;
   var m = r.model;
   if (!res || res.status !== 'saved'){
-    saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(1, 0.2, E.fade);
+    /* the card goes back to what it showed before the press: the horizon selector, or the note where there is none */
+    var hz = m.thesis.horizon.show;
+    saveRoll.set(m.thesis.saveLabel); A.saved.tween(0, 0.24, E.fade); A.lnO.tween(hz ? 0 : 1, 0.2, E.fade); op(el.card1.hz, hz ? 1 : 0);
     hint(tt(res && res.status === 'stale' ? 'save.stale' : 'save.failed')); tick('warning');
     return;
   }
@@ -4233,7 +4305,7 @@ function faceText(k, dir){
   A.ftxCur = slot;
 }
 STATES.FACES = {
-  enter: function(){ U.faceOn.to(1); att(el.sphereA, 'aria-label', tt('aria.faces')); if (!HINTED.swipe) hint(tt('hint.swipe')); },
+  enter: function(){ U.faceOn.to(1); att(el.sphereA, 'aria-label', tt('aria.faces')); if (!HINTED.swipe) hint('', tt('hint.swipe')); },
   tick: function(){
     if (A.fRel && !A.fDrag && Math.abs(A.th.x - A.th.t) < 0.002 && Math.abs(A.th.v) < 0.05){
       A.fRel = false; A.detT = clk; gulp(0.02); tick('selection');
@@ -4627,7 +4699,7 @@ function render(){
   op(uiEl, dimK); op(inGlass, dimK);
   var igr = Math.round(r * 100) / 100, igc = Math.round(cy * 100) / 100;
   if (inGlass._r !== igr || inGlass._cy !== igc){ inGlass._r = igr; inGlass._cy = igc; inGlass.style.clipPath = 'circle(' + igr + 'px at 195px ' + igc + 'px)'; }
-  renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render();
+  renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render(); swipeRoll.render();
   renderPill(); renderTranscript(cy, r); renderAgents(cy, r); renderSats(cy, r); renderChart(cy, r);
   renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderFaces(cy, r, th); renderPerm(cy, r);
   if (TB.shown || A.type.o.x > 0.002) placeTypeBox();
@@ -4996,6 +5068,9 @@ function renderCards(cy, r){
     }
   }
   tf(el.card0.inn, 0, -A.dscr.x, null);
+  /* the debate scroller fades only the edge it continues past */
+  var sk = (A.dscr.x > 1 ? 1 : 0) + (A.dscrMax - A.dscr.x > 1 ? 2 : 0), scr = el.card0.scr;
+  if (scr._sk !== sk){ scr._sk = sk; scr.classList.toggle('up', (sk & 1) > 0); scr.classList.toggle('dn', (sk & 2) > 0); }
   var vc = VC[A.saveC] || VC.wait;
   tf(el.save, 0, 0, A.savePress.x);
   var sv = A.saved.x; stc(el.save, 'background', mixCTo(X.save, C.ink, vc.saveBg, sv)); stc(el.save, 'color', mixCTo(X.saveInk, SAVE_INK, vc.c, sv));

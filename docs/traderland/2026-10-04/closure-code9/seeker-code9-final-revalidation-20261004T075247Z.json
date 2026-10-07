@@ -1,0 +1,91 @@
+{
+  "status": "SIGNED_CODE9_REVALIDATED_BYTE_VERSION_VERIFIED",
+  "started_at": "2026-10-04T07:52:38.994631+00:00",
+  "device": {
+    "serial_stored": false,
+    "authorized_physical_seeker_matches": 1
+  },
+  "operations": [
+    {
+      "operation": "input.apk_metadata",
+      "return_code": 0
+    },
+    {
+      "operation": "input.apk_signature",
+      "return_code": 0
+    },
+    {
+      "operation": "device.enumeration",
+      "return_code": 0
+    },
+    {
+      "operation": "device.model",
+      "return_code": 0
+    },
+    {
+      "operation": "device.product",
+      "return_code": 0
+    },
+    {
+      "operation": "device.hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_hardware",
+      "return_code": 0
+    },
+    {
+      "operation": "device.kernel_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "device.boot_qemu",
+      "return_code": 0
+    },
+    {
+      "operation": "package.path",
+      "return_code": 0
+    },
+    {
+      "operation": "package.actual_apk",
+      "return_code": 0
+    },
+    {
+      "operation": "package.version",
+      "return_code": 0
+    },
+    {
+      "operation": "keyguard.read_only",
+      "return_code": 0
+    }
+  ],
+  "source_sha256": "97ba02092fd8876edd5017892c945be9f8595636f71a280e2b13de6754869583",
+  "source_manifest": "traderland-code9-20261004T005043Z-source.json",
+  "source_manifest_sha256": "d4507b8eb0b43839222f3f566ddeab9d7448bafcc16d1e4c82f626268341ee41",
+  "version_code": 9,
+  "version_name": "1.1.4",
+  "prior_install_receipt": "seeker-code9-signed-install-20261004T004357186445Z.json",
+  "prior_install_receipt_sha256": "e0af313c2418b2aa974636c35de4cdb619195731a4397c40e415d6b11bc47949",
+  "install_attempted": false,
+  "launch_requested": false,
+  "data_clearing_requested": false,
+  "uninstall_requested": false,
+  "runtime_permissions_granted_by_tool": false,
+  "purchase_or_authenticated_flow_executed": false,
+  "scope": "Read-only verification binds previously installed exact signed bytes to final source/build after test-only fixture changes; no UI acceptance, account, coupon, permission or launch mutation.",
+  "actual_installed_apk": {
+    "sha256": "c2a0bf1ea917ed3927538a14d8089e432f6d3de44d17ce422b17bfaa1d42b534",
+    "bytes": 58604662
+  },
+  "actual_installed_version": {
+    "version_code": 9,
+    "version_name": "1.1.4"
+  },
+  "installed_payload_verified": true,
+  "source_and_apk_pins_unchanged_after_verification": true,
+  "keyguard_state_known": true,
+  "keyguard_showing": true,
+  "bobby_main_activity_focused": false,
+  "bobby_main_activity_resumed": false,
+  "completed_at": "2026-10-04T07:52:47.279961+00:00"
+}

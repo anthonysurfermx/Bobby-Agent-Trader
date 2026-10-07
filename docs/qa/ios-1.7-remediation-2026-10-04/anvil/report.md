@@ -1,0 +1,20 @@
+# Local Anvil ABI acceptance — 1.7 QA candidate
+
+Both suites passed against isolated, unforked Anvil 1.5.1 nodes on 4 October 2026. Candidate HEAD `a135d6e107dee1a9c9f7057532cc2f6d9fc7b6b2` remained clean and unchanged. There were **2 executed suites, 61 assertion calls, 0 failed assertions**. The 14 “ok” log sections are scenario summaries, not additional tests; TCP connects are a separate transport count.
+
+| Suite | Assertion calls | Failed | Logical ok sections | Exit | Owned localhost port |
+| --- | ---: | ---: | ---: | ---: | --- |
+| Hardness ABI | 10 | 0 | 3 | 0 | 63649 |
+| Bounties ABI | 51 | 0 | 11 | 0 | 64365 |
+
+[Structured result](result.json) preserves exact commands, timestamps, hashes and assertion operation counts. [Hardness log](hardness.log) SHA-256 `49fce945936c0d788aad8fb42ec12ef1f69595b554d5867aab6e4c7258fc36c9`; [Bounties log](bounties.log) SHA-256 `c72c04a8480d6b061441330ee2f0a0479c3baaebf445c8a45592151527414e3a`. The [Hardness audit](hardness-network.jsonl) and [Bounties audit](bounties-network.jsonl) record script/CLI exit0, exact server PIDs, all observed TCP destinations and assertion counters.
+
+Hardness deployed the compiled registry to its local node, registered a synthetic agent, committed a prediction, read the backend ABI getters and required exact artifact ABI equality. Bounties deployed the compiled bounty contract, exercised the production readers/unsigned builder/MCP challenge handler, required the bond-bearing transaction to mine locally, checked post-time bond snapshots, six statuses/deadlines, recent-list fields and fail-closed missing/terminal/zero-evidence cases. All funds, accounts, addresses, time jumps and transactions belong to synthetic local chain31337.
+
+Each suite copied its original test script; the sole script change replaces random port selection with an explicitly allocated free QA port. All original assertions remained intact. A preload requires Anvil to bind127.0.0.1 with chain31337 and no fork, and blocks Node TCP destinations outside that suite's owned localhost port. The audit observed2 Hardness and8 Bounties TCP connection calls, exclusively to127.0.0.1 on the expected port, with zero blocked attempts. Reused TCP connections are not RPC request counts. Bounties also retains its original synthetic non-RPC fetch responses and dummy service configuration; no real Supabase/provider RPC was contacted. Runtime environment excluded provider credentials.
+
+Both Anvil servers exited0 and their ports were verified free after completion. Cleanup addressed only the exact recorded QA children; no unrelated process was stopped. The first wrapper's post-run bind lacked SO_REUSEADDR and mistook TCP TIME_WAIT for a remaining listener. That bookkeeping error is preserved in [first-run-wrapper-receipt.json](first-run-wrapper-receipt.json); ECONNREFUSED, no LISTEN entry and a successful REUSEADDR bind established the server had ended. The cleanup check was corrected and Hardness was not repeated. Its observed test/script/CLI exit0 and all assertion results remain the original run.
+
+The candidate lacked contracts/out, so the workspace copied the two existing compiled JSON artifacts from the relocated primary checkout. Their metadata source Keccak hashes match the candidate's complete source sets (one source each), and their ABI arrays equal the generated backend ABI. Compiler0.8.24, optimizer runs1 and viaIR=true match candidate foundry.toml. Artifact/source/script/ABI/harness hashes are preserved. Forge compilation, tool/dependency installation, production deployment and native/frontend/PG execution were not performed in this scope.
+
+The private workspace footprint was 922377 bytes (below1 MiB) before adding this report; its250 MiB limit includes its TSX cache. Start guards required2.5 GiB; monitoring stopped below2 GiB. Both runs stayed above the reserve. api and node_modules were linked for reads; candidate and primary repositories were not written. This establishes local compiled-contract/backend compatibility, not deployed-chain, payment-wallet or public-provider acceptance.

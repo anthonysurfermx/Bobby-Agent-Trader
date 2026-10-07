@@ -24,6 +24,12 @@ enum NucleoFixtures {
     private static var _registered = false
     private static var _log: [String] = []
     private static var _accessHeaders: [[String: String]] = []
+    private static var _candleRequests: [CandleRequest] = []
+
+    struct CandleRequest {
+        let method: String
+        let url: URL
+    }
 
     /// nil = fixture mode off.
     static var scenario: String? { lock.lock(); defer { lock.unlock() }; return _scenario }
@@ -33,6 +39,8 @@ enum NucleoFixtures {
     static var timeScale: Double { lock.lock(); defer { lock.unlock() }; return _timeScale }
     /// "METHOD /path -> status" for every request served (never bodies, never question text).
     static var log: [String] { lock.lock(); defer { lock.unlock() }; return _log }
+    /// Actual candle requests received by URLProtocol. No request headers or bodies are retained.
+    static var candleRequests: [CandleRequest] { lock.lock(); defer { lock.unlock() }; return _candleRequests }
     /// The access headers of every request to voice-tool, bobby-access and desk-debate: `path`
     /// (`/api/voice-tool#run_debate` names the tool), `x-bobby-device`, `x-bobby-platform`, and
     /// `authorization` = "bearer" | "none" (never the token itself).
@@ -45,6 +53,7 @@ enum NucleoFixtures {
         _liveVoice = liveVoice
         _timeScale = timeScale
         _log = []
+        _candleRequests = []
         let register = !_registered
         _registered = true
         lock.unlock()
@@ -65,7 +74,13 @@ enum NucleoFixtures {
         print("[NucleoFixture]", line)
     }
 
-    static func clearLog() { lock.lock(); _log = []; _accessHeaders = []; lock.unlock() }
+    static func clearLog() { lock.lock(); _log = []; _accessHeaders = []; _candleRequests = []; lock.unlock() }
+
+    fileprivate static func recordCandleRequest(_ request: URLRequest) {
+        guard let url = request.url, ["/api/okx-candles", "/api/stock-candles"].contains(url.path) else { return }
+        let entry = CandleRequest(method: request.httpMethod ?? "GET", url: url)
+        lock.lock(); _candleRequests.append(entry); lock.unlock()
+    }
 
     static func recordAccessHeaders(path: String, headers: [String: String]) {
         let lower = Dictionary(headers.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { a, _ in a })
@@ -262,6 +277,7 @@ final class NucleoFixtureProtocol: URLProtocol {
             return
         }
         let method = request.httpMethod ?? "GET"
+        NucleoFixtures.recordCandleRequest(request)
         let body = request.httpBody ?? request.httpBodyStream.map(Self.read)
         if ["/api/voice-tool", "/api/bobby-access", "/api/desk-debate"].contains(url.path) {
             let tool = body.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }?["tool"] as? String

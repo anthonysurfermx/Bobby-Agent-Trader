@@ -1,0 +1,36 @@
+{
+  "at": "2026-10-04T13:04:36.676524+00:00",
+  "providerRunExited": 0,
+  "elapsedSeconds": 882.884,
+  "elapsedDisplay": "14m42.884s; not rounded to15min",
+  "requestedCLIModel": "claude-opus-5-5",
+  "modelsObservedInActualResponses": [
+    "claude-opus-5-5"
+  ],
+  "workflowModelIds": [
+    "claude-opus-5-5"
+  ],
+  "workflowDistinctAgents": 2,
+  "workflowAgentFinalStates": {
+    "review:chart-localization-ui-contracts": "done",
+    "review:speech-privacy-backend-evidence": "done"
+  },
+  "primaryEffortRequested": "max",
+  "workflowAgentEffortDeclared": "high (generatedscript override; root explicitly accepted continuation)",
+  "workflowToolCalls": 1,
+  "workflowCompletedNotification": true,
+  "toolUseCounts": {
+    "Glob": 11,
+    "Workflow": 1,
+    "Read": 29,
+    "Grep": 21
+  },
+  "forbiddenToolNamesObserved": [],
+  "sourceFilesRehashed": 1431,
+  "sourceFilesChangedByReview": [],
+  "firstFailureReceiptPreserved": "review-execution-first-auth-failure.json",
+  "consolidationBoundary": "Primary returned an initial direct report and then a second consolidated report. The second supersedes the first but consumes only the first5 mergedfindings (4complete+1truncated) because the inline workflowresult was truncated by~112000characters and the full output was outside its restrictedworkspace. Both full independent structuredreports and deterministicworkflowoutput were separately recovered and preserved by QA.",
+  "livePrivacyCheckWebTool": "webopen could not access the page; no404 claim. Separate actual Chrome DOM receipts now prove5privacy(EN,DE,FR,IT,PT)+4support(DE,FR,IT,PT)pages. Source/runtime1.7Applefallback gap is closed withinthat observed9page scope.",
+  "scope": "Protocol/model/mode/source-integrity audit; passedexecution is not a releaseGO.",
+  "mainResultEventCount": 2
+}

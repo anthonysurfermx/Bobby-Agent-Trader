@@ -97,7 +97,14 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
 #agC .st .roll{height:42px}#agC .st .roll>span{white-space:normal}
 #lines{left:20px;width:350px;top:0;opacity:1}
 #lines .ln{position:absolute;left:0;width:350px;text-align:center;font:400 22px/26px var(--serif);letter-spacing:-.01em;text-wrap:balance}
-#lines .rb{position:absolute;left:10px;width:330px;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
+#lines .rb{position:absolute;left:10px;width:330px;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(163,156,145,.45) transparent;text-align:center;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance}
+/* copy taller than its viewport: the edge it continues past fades, and a chevron under it says there is more below.
+   The fades are capped at a share of the viewport, so a two-line viewport still shows one line at full strength. */
+#lines .rb.dn{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - min(28px,45%)),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - min(28px,45%)),transparent)}
+#lines .rb.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%));mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%))}
+#lines .rb.up.dn{-webkit-mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%),#000 calc(100% - min(28px,45%)),transparent);mask-image:linear-gradient(180deg,transparent,#000 min(12px,20%),#000 calc(100% - min(28px,45%)),transparent)}
+#rmore{left:188px;width:14px;height:7px}
+#rmore svg{display:block}
 #notice.tap{pointer-events:auto}
 #notice{left:95px;width:200px;top:640px;height:44px;font:400 13px/16px var(--sans);color:var(--ink2);text-decoration:underline;text-underline-offset:3px;text-decoration-color:rgba(163,156,145,.5)}
 .sat{min-width:100px;height:52px;border-radius:16px;padding:7px 12px;background:var(--glass);border:.5px solid var(--hair);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px -12px rgba(0,0,0,.7);white-space:nowrap}
@@ -149,15 +156,22 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   background:linear-gradient(180deg,rgba(34,30,27,.96),rgba(23,21,19,.96));border:1px solid var(--hair);
   box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 26px 60px -22px rgba(0,0,0,.85)}
 .card::after{content:'';position:absolute;inset:0;border-radius:28px;background:linear-gradient(180deg,#221E1B,#171513);opacity:var(--veil,0);pointer-events:none}
-.ch{display:flex;justify-content:space-between;gap:12px;color:var(--ink2)}
-.ch span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ch{display:flex;justify-content:space-between;align-items:baseline;gap:12px;color:var(--ink2)}
+.ch span:last-child{flex:none;white-space:nowrap}   /* a long first label wraps onto a second line; nothing is cut with an ellipsis */
 .card h3{font:400 28px/31px var(--serif);letter-spacing:-.01em;margin-top:18px;color:var(--ink)}
 .dsc{position:absolute;left:24px;right:24px;top:50px;bottom:46px;overflow:hidden}
+#dRows{display:flow-root;padding-bottom:16px}   /* its height holds the first row's margin and leaves the last line clear of the lower edge */
+/* only an edge the debate continues past fades (.up / .more): scrolled to an end, its last line is clear of any mask */
 .dsc.more{-webkit-mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,#000 calc(100% - 28px),transparent)}
+.dsc.up{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px);mask-image:linear-gradient(180deg,transparent,#000 20px)}
+.dsc.up.more{-webkit-mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent);mask-image:linear-gradient(180deg,transparent,#000 20px,#000 calc(100% - 28px),transparent)}
 .row{display:flex;gap:12px;margin-top:14px}
 .row i{flex:0 0 5px;height:5px;border-radius:50%;background:var(--c);margin-top:5px}
 .row b{display:block;color:var(--c);font-weight:500}
 .row p{font:400 15px/21px var(--sans);margin-top:2px;color:var(--ink);text-transform:none;letter-spacing:0}
+.row p .lk{font-weight:600}
+.row .rl{display:block;margin-top:2px;font:400 12px/16px var(--sans);color:var(--ink2);text-transform:none;letter-spacing:0}   /* what this voice does */
+.row > div{min-width:0;overflow-wrap:anywhere}   /* a word wider than the column breaks: it never widens the column past the card */
 .card dl{margin-top:12px}
 .card dl div{display:flex;justify-content:space-between;align-items:center;height:32px;border-bottom:1px solid rgba(242,237,228,.06)}
 .card dt{color:var(--ink2)}
@@ -276,6 +290,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
   <div id="agC" class="ag a" style="--c:#F6B94E;left:85px;top:528px"><div class="nm lbl"><i></i><span class="n"></span></div><div class="st"><span class="roll"><span></span><span></span></span></div></div>
 
   <div id="lines" class="a"></div>
+  <div id="rmore" class="a" aria-hidden="true"><svg width="14" height="7" viewBox="0 0 14 7"><path d="M1 1 L7 6 L13 1" fill="none" stroke="#F2EDE4" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
   <button id="notice" class="a" data-hit="notice" tabindex="0"></button>
   <div id="tx" class="a" aria-hidden="true"><div id="txIn"></div></div>
   <div id="tbead" class="a"></div>

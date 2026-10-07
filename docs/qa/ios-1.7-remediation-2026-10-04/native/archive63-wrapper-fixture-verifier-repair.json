@@ -1,0 +1,17 @@
+{
+  "changedAtUTC": "2026-10-04T12:39:38.949501+00:00",
+  "scope": "Verifier only; archive/source/resources unchanged, no rebuild.",
+  "reason": "Literal NUCLEO_FIXTURES test incorrectly rejected inert release guards. Build.py release excludes injected fixture assignment and dev mock implementation, while core/harness keep guarded references.",
+  "oldWrapperSHA256": "104e799f17735be4e7cd49e58b6e337b6ee4081fede056cb1bdd349f643d9c48",
+  "newWrapperSHA256": "609befc08b23475b1b7a7587f3b0e40127e68041b9e56f48f7e48ff27bb0b552",
+  "preservedBefore": "/private/tmp/bobby-ios17-remediation-20261004/archive63-r2/wrapper-before-fixture-verifier-repair.py",
+  "strictChecks": [
+    "No window/W.NUCLEO_FIXTURES assignment",
+    "No shared/90-dev-mock-bridge.js section",
+    "No B.mock implementation install",
+    "Nucleo/build-info.json release true and pages exactly app/onboarding",
+    "Existing byte equality, no fixturefolder/contract, signing/profile/privacy/build-input checks retained"
+  ],
+  "archiveUnchanged": true,
+  "canonicalSourceUnchanged": true
+}

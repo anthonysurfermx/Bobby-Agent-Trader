@@ -1,0 +1,78 @@
+{
+  "observedAtUTC": "2026-10-04T12:53:57.944Z",
+  "version": "1.7",
+  "method": "Fresh page reload, locale switch, native selection exposes complete textarea text beyond 512-character AX child truncation",
+  "locales": [
+    {
+      "locale": "en-US",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    },
+    {
+      "locale": "de-DE",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    },
+    {
+      "locale": "fr-FR",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    },
+    {
+      "locale": "it",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    },
+    {
+      "locale": "pt-PT",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    },
+    {
+      "locale": "es-MX",
+      "match": {
+        "promotionalText": true,
+        "description": true,
+        "whatsNew": true,
+        "keywords": true,
+        "supportURL": true
+      },
+      "saveDisabled": true
+    }
+  ],
+  "all30VersionFieldsMatchAppliedMetadata": true,
+  "preparedAppliedCopy": "metadata-final-applied.json",
+  "buildAttached": false,
+  "submittedForReview": false,
+  "appInfoNameSubtitlePrivacyURL": "still pending"
+}
