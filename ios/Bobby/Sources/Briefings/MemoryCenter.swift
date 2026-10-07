@@ -9,6 +9,10 @@
 //    it was asked for (user id + generation + this center's epoch) and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
 //  - "Delete everything" needs a confirmation: `requestForgetAll` only arms it; `confirmForgetAll` sends.
+//  - 1.8: deletion is complete. "Forget" also takes the asset out of this phone's shortcut row, and
+//    "Delete everything" also clears that row and the theses written on this phone, for this account
+//    only. The phone's part runs first and needs no network; `notice` says honestly whether the
+//    server confirmed its part.
 //  - R11: no network before the risk notice is accepted; signed out = no calls.
 //  - The server's text is never shown; failures map to the app's own copy.
 import Combine
@@ -83,6 +87,37 @@ enum MemoryPref: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
+/// What stays on this iPhone only for the signed-in account (never sent to Bobby's servers): the
+/// recent assets shown as shortcuts and how many theses the person wrote here.
+struct LocalMemory: Equatable, Sendable {
+    var shortcuts: [String] = []
+    var theses = 0
+}
+
+/// How the last deletion ended. The phone's part is done before the server is asked.
+enum MemoryNotice: Equatable, Sendable {
+    /// Server memory, shortcuts and theses are gone.
+    case erasedEverything
+    /// The phone's part is gone; the server did not confirm its part.
+    case erasedOnPhoneOnly
+    /// The asset left this phone's shortcuts; the server did not confirm it forgot it.
+    case forgotOnPhoneOnly(symbol: String)
+
+    var message: String {
+        switch self {
+        case .erasedEverything:
+            return L.t("Deleted: what Bobby's servers remembered, the shortcuts on this iPhone and the theses you wrote here.",
+                       "Borrado: lo que recordaban los servidores de Bobby, los accesos rápidos de este iPhone y las tesis que escribiste aquí.")
+        case .erasedOnPhoneOnly:
+            return L.t("Deleted on this iPhone. Bobby's servers did not confirm, so what they remember is still there. Try again.",
+                       "Borrado en este iPhone. Los servidores de Bobby no confirmaron, así que lo que recuerdan sigue ahí. Inténtalo de nuevo.")
+        case .forgotOnPhoneOnly(let symbol):
+            return L.t("Forgotten on this iPhone. Bobby's servers did not confirm, so they still remember \(symbol). Try again.",
+                       "Olvidado en este iPhone. Los servidores de Bobby no confirmaron, así que aún recuerdan \(symbol). Inténtalo de nuevo.")
+        }
+    }
+}
+
 enum MemoryError: Error, Equatable, Sendable {
     case signedOut
     case unavailable
@@ -113,6 +148,10 @@ final class MemoryCenter: ObservableObject {
     @Published private(set) var confirmingForgetAll = false
     /// Separate from the server's shared web/account preference. Defaults off for every account on this device.
     @Published private(set) var nativeOptedIn = false
+    /// What this iPhone alone keeps for the account (1.8). Read from the phone; never from the server.
+    @Published private(set) var local = LocalMemory()
+    /// How the last "Forget" or "Delete everything" ended, until the next action or account change.
+    @Published private(set) var notice: MemoryNotice?
 
     /// One HTTP call: (path with query, method, body) → (json, status). Tests replace it.
     var send: (_ path: String, _ method: String, _ body: [String: Any]?) async throws -> (json: Any?, status: Int) = { path, method, body in
@@ -122,18 +161,23 @@ final class MemoryCenter: ObservableObject {
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
+    var now: () -> Date = { Date() }
 
     private var owner: String?
     private var ownerGeneration: UUID?
     private var epoch = UUID()
     private var cancellables = Set<AnyCancellable>()
     private let defaults: UserDefaults
+    /// When this account erased everything, or one asset, during this launch (`erased(since:symbol:)`).
+    private var forgotAllAt: Date?
+    private var forgotAt: [String: Date] = [:]
 
     init(observeAccount: Bool = true, defaults: UserDefaults = .standard) {
         self.defaults = defaults
         owner = currentUser()
         ownerGeneration = currentGeneration()
         nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
+        local = readLocal()
         guard observeAccount else { return }
         NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)
             .sink { [weak self] _ in MainActor.assumeIsolated { self?.accountChanged() } }
@@ -152,6 +196,10 @@ final class MemoryCenter: ObservableObject {
         saving = false
         lastError = nil
         confirmingForgetAll = false
+        notice = nil
+        forgotAllAt = nil
+        forgotAt = [:]
+        local = readLocal()
     }
 
     private struct Ticket { let epoch: UUID; let user: String?; let generation: UUID }
@@ -162,9 +210,15 @@ final class MemoryCenter: ObservableObject {
 
     private var canCallServer: Bool { riskAccepted() && currentUser() != nil }
 
-    private static func nativeOptInKey(_ user: String) -> String {
+    private nonisolated static func nativeOptInKey(_ user: String) -> String {
         let digest = SHA256.hash(data: Data(user.utf8)).map { String(format: "%02x", $0) }.joined()
         return "agent.nativeMemoryOptIn.v1.\(digest)"
+    }
+
+    /// The stored choice of one account on this device, for code that only reads it (the nudge on the
+    /// glass). Being on here does not send the header by itself: `allowsNativeCapture` decides that.
+    nonisolated static func storedNativeOptIn(user: String, defaults: UserDefaults = .standard) -> Bool {
+        defaults.bool(forKey: nativeOptInKey(user))
     }
 
     private func revokeNativeCapture() {
@@ -231,27 +285,85 @@ final class MemoryCenter: ObservableObject {
         return await write("PATCH", Self.path, body: [field.rawValue: value ?? NSNull()])
     }
 
-    /// Forget one remembered asset.
+    /// Forget one remembered asset: first on this phone (its shortcut, no network needed), then on the
+    /// server. True when the server confirmed; otherwise `notice` says its part is still there.
     @discardableResult
     func forget(_ symbol: String) async -> Bool {
         guard symbol.range(of: MemorySnapshot.symbolPattern, options: .regularExpression) != nil else { return false }
-        return await write("DELETE", Self.path + "?symbol=" + BriefingsAPI.queryValue(symbol), body: nil)
+        accountChanged()
+        guard let user = currentUser() else { lastError = .signedOut; return false }
+        guard !saving else { return false }
+        let generation = currentGeneration()
+        notice = nil
+        DeskMemory.forget(symbol: symbol, owner: user, defaults: defaults)
+        forgotAt[symbol.uppercased()] = now()
+        local = readLocal()
+        let ok = await write("DELETE", Self.path + "?symbol=" + BriefingsAPI.queryValue(symbol), body: nil)
+        guard currentUser() == user, currentGeneration() == generation else { return false }
+        if !ok { notice = .forgotOnPhoneOnly(symbol: symbol) }
+        return ok
     }
 
-    /// Arms "Delete everything"; nothing leaves the phone until `confirmForgetAll`.
+    /// Arms "Delete everything"; nothing is deleted until `confirmForgetAll`. It needs an account but
+    /// not a loaded snapshot: the phone's part must be erasable while the server is unreachable.
     func requestForgetAll() {
-        guard snapshot != nil else { return }
+        accountChanged()
+        guard currentUser() != nil else { return }
         confirmingForgetAll = true
     }
 
     func cancelForgetAll() { confirmingForgetAll = false }
 
-    /// The confirmed "Delete everything": every asset and preference (a paused memory stays paused).
+    /// The confirmed "Delete everything": this account's shortcuts and theses on this phone, then every
+    /// asset and preference on the server (a paused memory stays paused). True when the server confirmed.
     @discardableResult
     func confirmForgetAll() async -> Bool {
+        accountChanged()
         guard confirmingForgetAll else { return false }
         confirmingForgetAll = false
-        return await write("DELETE", Self.path, body: nil)
+        guard let user = currentUser(), !saving else { return false }
+        let generation = currentGeneration()
+        notice = nil
+        DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
+        ThesisBook(defaults: defaults).deleteAll(owner: user)
+        forgotAllAt = now()
+        local = readLocal()
+        let ok = await write("DELETE", Self.path, body: nil)
+        guard currentUser() == user, currentGeneration() == generation else { return false }
+        notice = ok ? .erasedEverything : .erasedOnPhoneOnly
+        return ok
+    }
+
+    // MARK: this iPhone only (1.8)
+
+    /// Reads the phone's own caches again (the screen appeared, a thesis was written elsewhere).
+    func reloadLocal() {
+        accountChanged()
+        let fresh = readLocal()
+        if fresh != local { local = fresh }
+    }
+
+    /// Clears the shortcut row of this account on this phone. Nothing is sent anywhere.
+    func clearShortcuts() {
+        accountChanged()
+        guard let user = currentUser() else { return }
+        DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
+        local = readLocal()
+    }
+
+    /// A receipt on the glass stops being true once the person erased what it names: true when this
+    /// account erased everything, or this asset, at or after `date` during this launch.
+    func erased(since date: Date, symbol: String) -> Bool {
+        accountChanged()
+        if let forgotAllAt, forgotAllAt >= date { return true }
+        if let at = forgotAt[symbol.uppercased()], at >= date { return true }
+        return false
+    }
+
+    private func readLocal() -> LocalMemory {
+        guard let user = currentUser() else { return LocalMemory() }
+        return LocalMemory(shortcuts: DeskMemory.watchlist(owner: user, defaults: defaults).map(\.symbol),
+                           theses: ThesisBook(defaults: defaults).all(owner: user).count)
     }
 
     private func write(_ method: String, _ path: String, body: [String: Any]?) async -> Bool {
