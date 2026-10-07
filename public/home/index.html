@@ -10,6 +10,8 @@
 <meta name="description" content="Ask about an asset. Three perspectives challenge the idea, risk can say wait, and the decision is yours.">
 <link rel="canonical" href="https://bobbyprotocol.xyz/">
 <meta name="theme-color" content="#0B0A09">
+<!-- Smart App Banner on iPhone Safari. The id is the number in APP_STORE_URL (src/lib/app-store.ts); scripts/test-web-activation.mjs fails if they differ. -->
+<meta name="apple-itunes-app" content="app-id=6804460489">
 <script>window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };</script>
 <script defer src="/_vercel/insights/script.js"></script>
 <script defer src="/client-telemetry.js"></script>
@@ -169,6 +171,45 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 .s0 h1{margin:0; font-family:var(--display); font-weight:var(--dw); letter-spacing:var(--dtrack); font-size:calc(clamp(28px, 3.7vw, 54px) * var(--dscale)); line-height:1.06; text-wrap:balance;
   text-shadow:0 2px 30px rgba(11,10,9,.9)}
 .s0 h1 em{font-style:var(--emstyle); font-weight:var(--emw); color:var(--ink2)}
+/* start here: ask from the first screen. The row lives in the band between the top bar and the glass, so the glass,
+   the headline and the scroll cue stay exactly where they are. It fades with the hero line; the story is untouched.
+   The glass is centred and its radius is .226 × S, so its top edge is at 50% − .226 S: the row is centred in the band
+   above it, and it paints over the orbiting assets that cross that band. */
+.start{position:absolute; left:50%; z-index:1000; box-sizing:border-box; width:min(92vw, 900px); transform:translate(-50%, -50%); pointer-events:auto;
+  --band-top:calc(env(safe-area-inset-top, 0px) + 50px); --band-bottom:calc(50% - var(--S) * .226);
+  top:calc((var(--band-top) + var(--band-bottom)) / 2);
+  display:flex; flex-wrap:wrap; align-items:center; justify-content:center; gap:8px 10px}
+/* the desk's ask pill (nucleo-desk.css .n-ask): same glass, same cream send button */
+.ask{box-sizing:border-box; display:flex; align-items:center; gap:8px; flex:0 1 350px; min-width:0; height:46px; margin:0; padding:4px 4px 4px 18px; border-radius:999px;
+  background:rgba(20,18,16,.92); border:1px solid var(--line); box-shadow:inset 0 1px 0 rgba(255,255,255,.06), 0 18px 40px -26px rgba(0,0,0,.9);
+  -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); transition:border-color .2s ease; text-align:left}
+.ask:hover, .ask:focus-within{border-color:rgba(242,237,228,.32)}
+.ask input{flex:1; min-width:0; height:100%; margin:0; padding:0; border:0; outline:0; background:transparent; color:var(--ink); font:400 15px/1 var(--sans); letter-spacing:0}
+.ask input::placeholder{color:var(--ink3); opacity:1}
+.ask-send{flex:none; width:38px; height:38px; margin:0; padding:0; border:0; border-radius:50%; display:grid; place-items:center; background:var(--ink); color:#0B0A09; cursor:pointer}
+.ask-send svg{display:block; width:16px; height:16px}
+.ask-send:focus-visible, .ask-tap:focus-visible, .eg-chip:focus-visible{outline:2px solid var(--listen); outline-offset:3px}
+/* a touch screen gets the pill as a way into the desk: a keyboard opening here would scroll the pinned story */
+.ask-tap{display:none; justify-content:space-between; text-decoration:none; color:var(--ink3); font:400 15px/1 var(--sans)}
+.ask-tap > span:first-child{min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; line-height:1.3}
+@media (pointer: coarse){ .ask-type{display:none} .ask-tap{display:flex} }
+.eg{display:flex; align-items:center; justify-content:center; gap:8px; min-width:0}
+.eg-chip{position:relative; flex:none; box-sizing:border-box; display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 15px; border-radius:999px; white-space:nowrap; text-decoration:none;
+  background:rgba(34,30,27,.9); border:1px solid var(--hair); color:var(--ink2); font:400 14px/1 var(--sans); transition:border-color .2s ease, color .2s ease}
+.eg-chip::after{content:""; position:absolute; inset:-4px 0}
+.eg-chip:hover{border-color:rgba(242,237,228,.28); color:var(--ink)}
+/* the iPhone app, smaller: a quiet chip at the end of the row (the glyph alone where the row is narrow) */
+.eg-ios{background:rgba(0,0,0,.35); font-size:13px}
+.eg-ios .ico{width:13px; height:13px; margin-top:-2px}
+@media (max-width: 1040px){
+  .eg-chip.eg-ios{padding:0; aspect-ratio:1; justify-content:center}
+  .eg-ios span:last-child{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+}
+/* a short, wide window leaves a thin band above the glass: the row gets smaller instead of touching it */
+@media (max-height: 680px) and (min-width: 761px){
+  .ask{height:40px; padding-left:16px} .ask-send{width:32px; height:32px}
+  .eg-chip{height:34px; padding:0 13px}
+}
 .cue{display:flex; align-items:center; gap:10px; font:500 10px/1 var(--mono); letter-spacing:.2em; color:var(--ink3); text-transform:uppercase}
 .cue i{display:block; width:1px; height:26px; background:linear-gradient(var(--ink3), transparent); animation:cue 2.4s ease-in-out infinite; transform-origin:top}
 @keyframes cue{0%{transform:scaleY(0); opacity:0} 40%{transform:scaleY(1); opacity:1} 100%{transform:scaleY(1); opacity:0}}
@@ -256,6 +297,13 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   .note{font-size:13.5px}
   .same{font-size:calc(17px * var(--dscale))}
 }
+@media (max-width: 760px){
+  .start{gap:7px}
+  .ask{flex-basis:100%; max-width:420px; height:44px}
+  .ask-send{width:36px; height:36px}
+  .eg{gap:7px}
+  .eg-chip{height:34px; padding:0 13px}
+}
 @media (max-width: 420px){ .s0 h1{font-size:calc(28px * var(--dscale))} .fail{font-size:calc(20px * var(--dscale))} .voice p{font-size:14px} }
 
 /* ---------- try (after the story): no account to start, the app asks later ---------- */
@@ -330,7 +378,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
         <button class="lang-opt" type="button" role="menuitemradio" aria-checked="false" tabindex="-1" data-lang="fr" lang="fr">Français<i aria-hidden="true"></i></button>
       </div>
     </div>
-    <a class="tb-app" href="/desk">App</a>
+    <a class="tb-app" href="/desk" data-i18n="t.try">Try Bobby</a>
   </div>
 </header>
 
@@ -345,6 +393,23 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
       <div class="line">
         <h1 data-i18n="hero.h1">Asking an AI about your asset is <em>no longer an edge.</em></h1>
         <div class="cue" aria-hidden="true"><i></i><span data-i18n="hero.cue">Scroll</span></div>
+      </div>
+      <!-- start here: a question from the first screen. An example goes to /desk?ask=SYMBOL (the desk starts that starter
+           question); a typed question goes to /desk?q=… (the desk only fills its pill, the visitor sends it there). -->
+      <div class="start" id="start">
+        <form class="ask ask-type" id="ask" action="/desk" method="get" role="search">
+          <input id="ask-q" name="q" type="text" maxlength="300" autocomplete="off" spellcheck="false" enterkeyhint="go" placeholder="Ask about a stock or a crypto asset" aria-label="Ask about a stock or a crypto asset" data-i18n-aria="hero.ask">
+          <input type="hidden" name="utm_source" value="home_ask">
+          <button class="ask-send" type="submit" aria-label="Ask" data-i18n-aria="hero.send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+        </form>
+        <a class="ask ask-tap" id="ask-tap" href="/desk?utm_source=home_ask"><span data-i18n="hero.ask">Ask about a stock or a crypto asset</span><span class="ask-send" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span></a>
+        <div class="eg" role="group" aria-label="Examples" data-i18n-aria="hero.eg">
+          <a class="eg-chip" href="/desk?ask=NVDA&amp;utm_source=home_example">NVIDIA</a>
+          <a class="eg-chip" href="/desk?ask=BTC&amp;utm_source=home_example">Bitcoin</a>
+          <a class="eg-chip" id="eg-local" href="/desk?ask=ETH&amp;utm_source=home_example">Ethereum</a>
+        </div>
+        <!-- APP_STORE_URL in src/lib/app-store.ts -->
+        <a class="eg-chip eg-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489"><span class="ico" style="--logo:url(/home/assets/logos/apple.svg)"></span><span data-i18n="t.ios">Get the iPhone app</span></a>
       </div>
     </section>
 
@@ -454,6 +519,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
       'tb.lang': 'Idioma',
       'hero.h1': 'Preguntarle a una IA por tu activo <em>ya no es ventaja.</em>',
       'hero.cue': 'Desliza',
+      'hero.ask': 'Pregunta por una acción o una cripto',
+      'hero.send': 'Preguntar',
+      'hero.eg': 'Ejemplos',
       'p.aria': 'El problema',
       'p.eyebrow': 'Cualquier chat de IA · Ejemplo',
       'p.asst': 'Asistente',
@@ -514,6 +582,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
       'tb.lang': 'Idioma',
       'hero.h1': 'Perguntar a uma IA sobre o seu ativo <em>não é mais vantagem.</em>',
       'hero.cue': 'Role',
+      'hero.ask': 'Pergunte sobre uma ação ou uma cripto',
+      'hero.send': 'Perguntar',
+      'hero.eg': 'Exemplos',
       'p.aria': 'O problema',
       'p.eyebrow': 'Qualquer chat de IA · Exemplo',
       'p.asst': 'Assistente',
@@ -577,6 +648,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     "tb.lang": "Langue",
     "hero.h1": "Interroger une IA sur votre actif <em>ne suffit plus à vous donner un avantage.</em>",
     "hero.cue": "Défiler",
+    "hero.ask": "Question sur une action ou une crypto",
+    "hero.send": "Demander",
+    "hero.eg": "Exemples",
     "p.aria": "Le problème",
     "p.eyebrow": "Un chat IA quelconque · Exemple",
     "p.asst": "Assistant",
@@ -645,6 +719,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     "tb.lang": "Lingua",
     "hero.h1": "Chiedere a un’IA del tuo asset <em>non è più un vantaggio.</em>",
     "hero.cue": "Scorri",
+    "hero.ask": "Chiedi di un’azione o di una cripto",
+    "hero.send": "Chiedi",
+    "hero.eg": "Esempi",
     "p.aria": "Il problema",
     "p.eyebrow": "Una chat IA qualsiasi · Esempio",
     "p.asst": "Assistente",
@@ -713,6 +790,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     "tb.lang": "Sprache",
     "hero.h1": "Eine KI zu deinem Vermögenswert zu befragen <em>ist kein Vorsprung mehr.</em>",
     "hero.cue": "Scrollen",
+    "hero.ask": "Frag nach einer Aktie oder Krypto",
+    "hero.send": "Fragen",
+    "hero.eg": "Beispiele",
     "p.aria": "Das Problem",
     "p.eyebrow": "Ein beliebiger KI-Chat · Beispiel",
     "p.asst": "Assistent",
@@ -781,6 +861,9 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
     "tb.lang": "Idioma",
     "hero.h1": "Perguntar a uma IA pelo teu ativo <em>já não é uma vantagem.</em>",
     "hero.cue": "Desliza",
+    "hero.ask": "Pergunta sobre uma ação ou uma cripto",
+    "hero.send": "Perguntar",
+    "hero.eg": "Exemplos",
     "p.aria": "O problema",
     "p.eyebrow": "Qualquer conversa com IA · Exemplo",
     "p.asst": "Assistente",
@@ -991,6 +1074,41 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 })();
 </script>
 
+<script>
+/* ---------- start here: the first screen leads to a question ----------
+   The third example is the visitor's home market: the same symbols and names as the desk's own starter row
+   (src/lib/companions/progress.ts, listings from src/lib/regional-stocks.ts). No prices, nothing invented;
+   scripts/test-web-activation.mjs fails if this table and the desk disagree. */
+(function(){
+  'use strict';
+  /* examples:start */
+  var EXAMPLES = { fallback: ['ETH', 'Ethereum'],
+    local: { 'fr-FR': ['MC.PA', 'LVMH'], 'pt-PT': ['EDP.LS', 'EDP'], 'pt-BR': ['PETR4.SA', 'Petrobras'], 'it-IT': ['ISP.MI', 'Intesa Sanpaolo'], 'de-DE': ['SAP.DE', 'SAP'] } };
+  /* examples:end */
+  var I = window.BobbyI18n; if (!I) return;
+  var form = document.getElementById('ask'), input = document.getElementById('ask-q'), local = document.getElementById('eg-local');
+  /* a desk link in the page language; `utm_source` is the label the first-party tracker already stores with the visit */
+  function desk(params){
+    var url = new URL('/desk', location.origin), k;
+    for (k in params) if (params[k]) url.searchParams.set(k, params[k]);
+    url.searchParams.set('lang', I.lang()); url.searchParams.set('locale', I.locale());
+    return url.pathname + url.search;
+  }
+  function sync(){
+    var third = EXAMPLES.local[I.locale()] || EXAMPLES.fallback;
+    local.textContent = third[1];
+    local.setAttribute('href', desk({ ask: third[0], utm_source: 'home_example' }));
+    input.setAttribute('placeholder', I.t('hero.ask'));
+  }
+  /* typed and sent: the desk receives the words in its pill and sends nothing until the visitor does */
+  form.addEventListener('submit', function(e){
+    e.preventDefault();
+    location.assign(desk({ q: input.value.replace(/\s+/g, ' ').trim(), utm_source: 'home_ask' }));
+  });
+  sync(); I.onChange(sync);
+})();
+</script>
+
 <script src="/home/assets/sphere.js"></script>
 <script>
 (function(){
@@ -1046,7 +1164,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 
   var $ = function(id){ return document.getElementById(id); };
   var story = $('story'), stage = $('stage');
-  var S0 = $('s0'), S1 = $('s1'), S2 = $('s2'), S3 = $('s3'), HEAD2 = S2.querySelector('.head');
+  var S0 = $('s0'), S1 = $('s1'), S2 = $('s2'), S3 = $('s3'), HEAD2 = S2.querySelector('.head'), START = $('start');
   var C1 = $('c1'), C2 = $('c2'), FAIL = $('fail'), SLOT = $('slot');
   var VA = $('va'), VR = $('vr'), VC = $('vc');
   var WORD = $('word'), RING = $('ring'), WTXT = $('wordtxt');
@@ -1169,6 +1287,8 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
 
     /* ----- overlays ----- */
     S0.style.opacity = kHero.toFixed(3);
+    /* the first-screen controls leave with the hero line: once it fades they cannot be tapped, tabbed to or read out */
+    START.style.pointerEvents = kHero > 0.6 ? 'auto' : 'none'; START.style.visibility = kHero < 0.02 ? 'hidden' : 'visible';
     S1.style.opacity = band(p, 0.12, 0.18, 0.40, 0.46).toFixed(3);
     rise(C1, ss(0.15, 0.21, p)); rise(C2, ss(0.23, 0.29, p)); rise(FAIL, ss(0.31, 0.36, p));
     S2.style.opacity = band(p, 0.47, 0.52, 0.70, 0.75).toFixed(3);
