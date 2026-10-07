@@ -45,10 +45,11 @@ enum NucleoPage: Equatable {
 /// open from a nudge tap or the profile, never from a page call.
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
-    case credits, theses, memory, reminders
+    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings
     var id: String { rawValue }
 
-    static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .memory, .reminders]
+    static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .thesisEditor, .thesisReview,
+                                               .memory, .memoryConsent, .reminders, .briefingSettings]
     static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
@@ -361,13 +362,25 @@ final class NucleoSession: ObservableObject {
         let agents = result["agents"] as? [String: Any]
         NudgeCenter.shared.noteRead(NudgeRead(requestId: requestId, symbol: symbol, name: asset["name"] as? String ?? symbol,
                                               isEquity: asset["isEquity"] as? Bool ?? false,
-                                              verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date()))
+                                              verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
+                                              memory: MemoryReceipt(json: result["memory"])))
         sessionChanged()
     }
 
     /// Opens a 1.8 native screen from a nudge or another sheet's action; false when something else is up.
     @discardableResult
     func present(_ route: NucleoRoute) -> Bool { openNative(route) }
+
+    /// One sheet hands over to another (the profile's Credits row, a review that opens the editor):
+    /// the open sheet goes away first, then the next one presents. With nothing open it presents at once.
+    func switchSheet(to route: NucleoRoute) {
+        guard sheet != nil || openSheet != nil else { _ = openNative(route); return }
+        sheet = nil
+        DispatchQueue.main.asyncAfter(deadline: .now() + briefingSheetDelay) { [weak self] in
+            guard let self, !self.tornDown else { return }
+            _ = self.openNative(route)
+        }
+    }
 
     /// The page's first call: it is ready for events.
     private func pageStarted(_ page: String?) -> [String: Any] {
@@ -950,6 +963,7 @@ final class NucleoSession: ObservableObject {
         NucleoLevelCenter.shared.accountChanged()
         BobbyAccessCenter.shared.accountChanged()
         NudgeCenter.shared.forgetMoment()
+        V18Focus.clear()
         emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }

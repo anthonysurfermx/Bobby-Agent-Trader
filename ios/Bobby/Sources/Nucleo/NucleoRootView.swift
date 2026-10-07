@@ -166,6 +166,27 @@ private struct NucleoStage: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .thesisEditor:
+            ThesisEditorSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .thesisReview:
+            ThesisReviewSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memoryConsent:
+            MemoryConsentSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .briefingSettings:
+            BriefingsSettingsView(riskAccepted: session.profile.acceptedRiskNotice,
+                                  onShowPro: { session.switchSheet(to: .paywall) }) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .memory:
             MemoryView(riskAccepted: session.profile.acceptedRiskNotice) { session.sheet = nil }
                 .presentationDetents([.large])

@@ -32,6 +32,8 @@ struct NudgeRead: Equatable {
     let verdict: String
     var saved: Bool
     let at: Date
+    /// What the server says its memory holds about this asset (nil when memory did not apply).
+    var memory: MemoryReceipt? = nil
 }
 
 /// What a source may look at when it decides whether it has something to say.
