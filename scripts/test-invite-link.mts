@@ -4,7 +4,10 @@
 //   · /i/CODE keeps the code in the storage the desk reads (one writer), so a friend who continues on the web
 //     is claimed exactly as before, and a link already shared as /desk?ref=CODE&v=2 still works;
 //   · the page shows the right way in for an iPhone, an Android phone and a computer, in six languages,
-//     names no store it cannot name, and promises the friend nothing.
+//     names no store it cannot name, and promises the friend nothing;
+//   · an iPhone is sent to the app only once the App Store serves a version that accepts invitations
+//     (IOS_INVITE_LIVE), and then to the App Store first: whoever lands on this page has no app yet;
+//   · a first visit sends the server two requests, neither with the code.
 // The page, the access client and the link helpers are the real sources, bundled as the app bundles them.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
@@ -22,7 +25,7 @@ const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got
 const ok = (value: unknown, what: string) => { assert.ok(value, what); checks++; };
 
 const { APP_STORE_URL } = await import('../src/lib/app-store.ts');
-const { inviteCodeFrom, appInviteUrl, appStoreId, smartBannerContent, inviteDevice } = await import('../src/lib/invite-link.ts');
+const { IOS_INVITE_LIVE, inviteCodeFrom, appInviteUrl, appStoreId, smartBannerContent, inviteDevice, inviteLayout } = await import('../src/lib/invite-link.ts');
 const { isReferralCode, inviteUrl } = await import('../api/_lib/referrals.ts');
 
 const AASA_PATH = '/.well-known/apple-app-site-association';
@@ -99,6 +102,9 @@ const LANGS = ['en', 'es', 'fr', 'pt', 'it', 'de'] as const;
   };
   eq([inviteDevice(UA.iphone, 5), inviteDevice(UA.ipad, 5), inviteDevice(UA.mac, 5), inviteDevice(UA.mac, 0), inviteDevice(UA.android, 5), inviteDevice(UA.windows, 10), inviteDevice(UA.instagram, 5), inviteDevice('')],
     ['ios', 'ios', 'ios', 'other', 'android', 'other', 'ios', 'other'], 'iPhone, iPad (also when it calls itself a Mac), Android, and computers');
+  eq([inviteLayout('ios', true), inviteLayout('ios', false), inviteLayout('android', true), inviteLayout('android', false), inviteLayout('other', true), inviteLayout('other', false)],
+    ['app', 'web', 'android', 'android', 'web', 'web'], 'an iPhone is sent to the app only when the app in the store accepts invitations; until then it gets the web page');
+  ok(typeof IOS_INVITE_LIVE === 'boolean' && inviteLayout('ios') === (IOS_INVITE_LIVE ? 'app' : 'web'), 'the switch is IOS_INVITE_LIVE');
 }
 
 // ---------- the page and the access client, as the app bundles them ----------
@@ -109,10 +115,13 @@ const bundle = (await build({
     import { HelmetProvider } from 'react-helmet-async';
     import Page, { InviteView } from './src/pages/BobbyInvitePage';
     export { storeReferral, captureReferral, pendingReferral, claimPendingReferral } from './src/lib/access-client';
-    export function renderPage(path) {
+    export { track } from './src/lib/track';
+    // live: whether the App Store serves an app that accepts invitations; left out, the page decides (IOS_INVITE_LIVE).
+    export function renderPage(path, live) {
       const context = {};
+      const page = live === undefined ? <Page /> : <Page appInvites={live} />;
       const html = renderToStaticMarkup(<HelmetProvider context={context}><StaticRouter location={path}><Routes>
-        <Route path="i/:code" element={<Page />} /><Route path="i" element={<Page />} /></Routes></StaticRouter></HelmetProvider>);
+        <Route path="i/:code" element={page} /><Route path="i" element={page} /></Routes></StaticRouter></HelmetProvider>);
       return { html, meta: context.helmet.meta.toString(), title: context.helmet.title.toString(), htmlAttributes: context.helmet.htmlAttributes.toString() };
     }
     export const renderView = (props) => renderToStaticMarkup(<InviteView {...props} />);
@@ -130,7 +139,7 @@ const bundle = (await build({
 })).outputFiles[0].text;
 
 interface Sent { url: string; method: string; body: Record<string, unknown> | null; headers: Record<string, string> }
-function browser(href: string, options: { userAgent?: string; touch?: number; storage?: Map<string, string>; refuseStorage?: boolean; session?: unknown; claim?: { status: number; body: unknown }; languages?: string[] } = {}) {
+function browser(href: string, options: { userAgent?: string; touch?: number; storage?: Map<string, string>; refuseStorage?: boolean; session?: unknown; claim?: { status: number; body: unknown }; languages?: string[]; referrer?: string } = {}) {
   const storage = options.storage ?? new Map<string, string>();
   const sent: Sent[] = [];
   const at = new URL(href);
@@ -140,6 +149,7 @@ function browser(href: string, options: { userAgent?: string; touch?: number; st
     console, URL, URLSearchParams, Response, AbortController, AbortSignal, setTimeout, clearTimeout, queueMicrotask, TextEncoder, TextDecoder, process,
     require, module: { exports: {} }, __session: options.session ?? null,
     location, crypto: { randomUUID: () => '00000000-0000-4000-8000-000000000018' },
+    ...(options.referrer === undefined ? {} : { document: { referrer: options.referrer } }),
     localStorage: {
       getItem: (k: string) => storage.get(k) ?? null,
       setItem: (k: string, v: string) => { if (options.refuseStorage) throw new Error('storage refused'); storage.set(k, String(v)); },
@@ -166,6 +176,10 @@ const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.1
 const hrefs = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*data-invite-action="([^"]+)"/g)].map((m) => `${m[2]} ${m[1]}`);
 const text = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, '’').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim();
 const STORE_ID = appStoreId()!;
+const buttonClass = (html: string, action: string) => new RegExp(`<a [^>]*class="([^"]*)"[^>]*data-invite-action="${action}"`).exec(html)?.[1] ?? '';
+const isPrimary = (html: string, action: string) => buttonClass(html, action).includes('bg-[#F2EDE4]');
+const IPHONE_LIVE = [`store ${APP_STORE_URL}`, `open-app bobbyprotocol://invite/${CODE}`, 'web /desk'];
+const WEB_FIRST = ['web /desk', `store ${APP_STORE_URL}`];
 
 // ---- the one writer, and the link that is already out there ----
 {
@@ -179,24 +193,29 @@ const STORE_ID = appStoreId()!;
     'a link already shared as /desk?ref=CODE&v=2 still stores the code and cleans the address');
   const none = browser('https://bobbyprotocol.xyz/desk?ref=nope');
   eq([none.api.captureReferral(), none.storage.has(REF_KEY), none.location.search], [null, false, ''], 'a bad ?ref stores nothing and is removed from the address, as before');
-  const refused = browser(`https://bobbyprotocol.xyz/desk?ref=${CODE}&v=2`, { refuseStorage: true });
+  const refused = browser(`https://bobbyprotocol.xyz/desk?ref=${CODE}&v=2`, { refuseStorage: true, session: { access_token: 'friend-token' }, claim: { status: 200, body: { result: 'claimed' } } });
   eq([refused.api.captureReferral(), refused.location.search], [null, `?ref=${CODE}&v=2`], 'storage refused: the address is left as it is, as before');
+  eq([refused.api.pendingReferral(), await refused.api.claimPendingReferral(), refused.sent.filter((s) => s.method === 'POST')], [null, null, []],
+    'and a code that is only in the address is never claimed: without storage the web cannot hold an invitation');
 }
 
-// ---- the page: a valid invitation on an iPhone ----
+// ---- the page: a valid invitation on an iPhone, once the App Store serves an app that accepts it ----
 {
   const b = browser(`https://bobbyprotocol.xyz/i/abcd2345?lang=en`, { userAgent: IPHONE, touch: 5 });
-  const page = b.api.renderPage('/i/abcd2345');
+  const page = b.api.renderPage('/i/abcd2345', true);
   eq(b.storage.get(REF_KEY), CODE, 'opening /i/CODE stores the code (any case) for the web desk');
-  eq(hrefs(page.html), [`open-app bobbyprotocol://invite/${CODE}`, `store ${APP_STORE_URL}`, 'web /desk'], 'iPhone: open the app, then the App Store, then the web');
+  // An iPhone with the app never sees this page (the universal link opens the app), so its visitors have no app
+  // yet, or are inside another app's browser, where bobbyprotocol:// is an error or does nothing.
+  eq(hrefs(page.html), IPHONE_LIVE, 'iPhone: the App Store first, then the installed app, then the web');
+  eq([isPrimary(page.html, 'store'), isPrimary(page.html, 'open-app')], [true, false], 'iPhone: the main button is the App Store; the app link is the second one');
   ok(new RegExp(`<span data-invite-code="true"[^>]*>${CODE}</span>`).test(page.html), 'the code is on screen');
   const words = text(page.html);
   for (const sentence of ['A friend invited you to Bobby', 'Ask about a stock or a crypto asset. Three AI agents debate it and tell you what to review and what to wait for.', 'Education, not financial advice.',
-    'Copy code', 'Open in the app', 'Get Bobby on the App Store', 'Install Bobby and create your account.', 'Tap your friend’s link again, or type the code in Profile, Credits, Invite friends.', 'Continue on the web']) ok(words.includes(sentence), `iPhone shows: ${sentence}`);
+    'Copy code', 'Get Bobby on the App Store', 'Already have Bobby? Open the app', 'Install Bobby and create your account.', 'Tap your friend’s link again, or type the code in Profile, Credits, Invite friends.', 'Continue on the web']) ok(words.includes(sentence), `iPhone shows: ${sentence}`);
   eq((page.html.match(/<li>/g) ?? []).length, 2, 'two numbered steps');
   ok(page.meta.includes(`name="apple-itunes-app" content="app-id=${STORE_ID}, app-argument=https://bobbyprotocol.xyz/i/${CODE}"`), 'Safari is told which app this page belongs to, with the invitation as its argument');
   ok(page.meta.includes('name="robots" content="noindex"') && page.title.includes('A friend invited you to Bobby | Bobby') && page.htmlAttributes.includes('lang="en-US"'), 'the page is not indexed and names itself');
-  eq(b.sent.filter((s) => s.url.startsWith('/api/')), [], 'the page itself asks the server for nothing');
+  eq(b.sent, [], 'the page sends the code nowhere: with the language already known it makes no request at all');
 
   // …and the friend who continues on the web is claimed exactly as a /desk?ref= visitor is.
   const web = browser('https://bobbyprotocol.xyz/desk', { storage: b.storage, session: { access_token: 'friend-token' }, claim: { status: 200, body: { result: 'claimed' } } });
@@ -206,26 +225,66 @@ const STORE_ID = appStoreId()!;
   eq(web.storage.has(REF_KEY), false, 'a final answer forgets the code');
 }
 
+// ---- the same iPhone while the App Store still serves 1.5-1.7, which cannot accept an invitation ----
+{
+  const b = browser(`https://bobbyprotocol.xyz/i/abcd2345?lang=en`, { userAgent: IPHONE, touch: 5 });
+  const page = b.api.renderPage('/i/abcd2345', false);
+  const words = text(page.html);
+  eq(b.storage.get(REF_KEY), CODE, 'not live yet: the code is stored for the web desk all the same');
+  eq(hrefs(page.html), WEB_FIRST, 'not live yet: an iPhone continues on the web first (the desk does claim); the App Store is second');
+  eq([isPrimary(page.html, 'web'), isPrimary(page.html, 'store')], [true, false], 'not live yet: the main button is the web');
+  ok(!page.html.includes('bobbyprotocol://') && !words.includes('Open the app'), 'not live yet: no link into an app that would open and do nothing');
+  ok(!page.html.includes('<li>') && !words.includes('Invite friends') && !words.includes('Install Bobby'), 'not live yet: no steps through a screen the installed app does not have');
+  ok(!page.meta.includes('apple-itunes-app'), 'not live yet: Safari’s banner does not send the invitation to the App Store either');
+  ok(page.html.includes(`>${CODE}</span>`) && words.includes('A friend invited you to Bobby') && words.includes('Copy code'), 'not live yet: the invitation and its code are still shown');
+  eq(page.html.replace(/data-invite-device="ios"/, 'data-invite-device="other"'), browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC }).api.renderPage(`/i/${CODE}`, false).html,
+    'not live yet: it is the page a computer gets');
+
+  // The route passes no switch: what ships follows IOS_INVITE_LIVE.
+  const shipped = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: IPHONE, touch: 5 }).api.renderPage(`/i/${CODE}`);
+  eq([hrefs(shipped.html), shipped.meta.includes('app-argument')], [IOS_INVITE_LIVE ? IPHONE_LIVE : WEB_FIRST, IOS_INVITE_LIVE], 'the route shows an iPhone what IOS_INVITE_LIVE says');
+}
+
+// ---- a friend's first visit: no ?lang, no stored language, no cached country ----
+{
+  const b = browser(`https://bobbyprotocol.xyz/i/${CODE}`, { userAgent: IPHONE, touch: 5, referrer: 'https://chat.example/thread' });
+  b.api.renderPage(`/i/${CODE}`);
+  b.api.track('visit'); // what startTracking (src/main.tsx) sends for every page view
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  eq(b.sent.map((s) => `${s.method} ${s.url}`), ['GET /api/geo', 'POST /api/track'], 'a first visit asks for the country, to choose the language, and counts the visit; nothing else');
+  const [geo, visit] = b.sent;
+  eq([geo.body, Object.keys(geo.headers)], [null, []], 'the country request carries nothing');
+  eq([Object.keys(visit.body!).sort(), visit.body!.event, visit.body!.surface, visit.body!.referrer], [['at', 'device', 'event', 'platform', 'referrer', 'surface'], 'visit', 'invite', 'https://chat.example/thread'],
+    'the visit names the surface "invite", not the address');
+  ok(!JSON.stringify(b.sent).toUpperCase().includes(CODE), 'neither request carries the invitation code');
+  eq(b.storage.get(REF_KEY), CODE, 'and the code is kept in this browser');
+}
+
 // ---- Android, a computer, and an iPad that calls itself a Mac ----
 {
-  const android = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: ANDROID, touch: 5 }).api.renderPage(`/i/${CODE}`);
+  const android = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: ANDROID, touch: 5 }).api.renderPage(`/i/${CODE}`, true);
   eq(hrefs(android.html), ['web /desk'], 'Android: the web is the only button');
+  eq(browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: ANDROID, touch: 5 }).api.renderPage(`/i/${CODE}`, false).html, android.html, 'Android: the same page whatever the iPhone app can do');
   ok(text(android.html).includes('Type this code in Bobby under Invite friends.') && android.html.includes(`>${CODE}</span>`), 'Android: the code and where to type it');
   ok(!/apps\.apple\.com|play\.google\.com|market:\/\/|bobbyprotocol:\/\//.test(android.html), 'Android: no store link is invented and the iPhone links are not shown');
 
-  const mac = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, touch: 0 }).api.renderPage(`/i/${CODE}`);
-  eq(hrefs(mac.html), ['web /desk', `store ${APP_STORE_URL}`], 'a computer: continue on the web first, the App Store second');
-  const ipad = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, touch: 5 }).api.renderPage(`/i/${CODE}`);
-  eq(hrefs(ipad.html)[0], `open-app bobbyprotocol://invite/${CODE}`, 'an iPad in desktop mode gets the iPhone page');
+  const mac = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, touch: 0 }).api.renderPage(`/i/${CODE}`, true);
+  eq(hrefs(mac.html), WEB_FIRST, 'a computer: continue on the web first, the App Store second');
+  const ipad = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, touch: 5 }).api.renderPage(`/i/${CODE}`, true);
+  eq(hrefs(ipad.html), IPHONE_LIVE, 'an iPad in desktop mode gets the iPhone page');
 
-  const refused = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, refuseStorage: true }).api.renderPage(`/i/${CODE}`);
-  eq(hrefs(refused.html)[0], `web /desk?ref=${CODE}&amp;v=2`, 'storage refused: the desk receives the code in its address instead');
+  // A browser that refuses storage cannot hold an invitation on the web (the desk drops a code in its address
+  // the same way, see above), so the page does not offer a link that only looks as if it carried one.
+  const refusing = browser(`https://bobbyprotocol.xyz/i/${CODE}?lang=en`, { userAgent: MAC, refuseStorage: true });
+  const refused = refusing.api.renderPage(`/i/${CODE}`, true);
+  eq([hrefs(refused.html), refusing.storage.has(REF_KEY)], [WEB_FIRST, false], 'storage refused: the web link is the plain desk; nothing is stored and no address pretends to carry the code');
+  ok(refused.html.includes(`>${CODE}</span>`), 'storage refused: the code stays on screen for the app');
 }
 
 // ---- a link that is not an invitation ----
-for (const path of ['/i/ABCDEFGI', '/i/ABC', '/i/ABCD2345X', '/i']) {
+for (const path of ['/i/ABCDEFGI', '/i/ABC', '/i/ABCD2345X', '/i']) for (const live of [true, false]) {
   const b = browser(`https://bobbyprotocol.xyz${path}?lang=en`, { userAgent: IPHONE, touch: 5 });
-  const page = b.api.renderPage(path);
+  const page = b.api.renderPage(path, live);
   eq([b.storage.has(REF_KEY), hrefs(page.html)], [false, [`store ${APP_STORE_URL}`, 'web /desk']], `${path}: nothing is stored; the App Store and the web remain`);
   ok(text(page.html).includes('This invitation link is not valid. Ask your friend to share it again.') && !page.html.includes('data-invite-code') && !page.html.includes('bobbyprotocol://'), `${path}: a calm message, no code, no app link`);
   ok(page.meta.includes(`content="app-id=${STORE_ID}"`) && !page.meta.includes('app-argument'), `${path}: the banner carries no invitation`);
@@ -243,10 +302,11 @@ for (const path of ['/i/ABCDEFGI', '/i/ABC', '/i/ABCD2345X', '/i']) {
   const perLanguage = LANGS.map((language) => {
     const b = browser(`https://bobbyprotocol.xyz/i/${CODE}`, { languages: [language] });
     const states = [
-      b.api.renderView({ code: CODE, device: 'ios', language, webHref: '/desk' }),
-      b.api.renderView({ code: CODE, device: 'android', language, webHref: '/desk' }),
-      b.api.renderView({ code: CODE, device: 'other', language, webHref: '/desk' }),
-      b.api.renderView({ code: null, device: 'ios', language, webHref: '/desk' }),
+      b.api.renderView({ code: CODE, device: 'ios', language, appInvites: true }),
+      b.api.renderView({ code: CODE, device: 'android', language, appInvites: true }),
+      b.api.renderView({ code: CODE, device: 'other', language, appInvites: true }),
+      b.api.renderView({ code: null, device: 'ios', language, appInvites: true }),
+      b.api.renderView({ code: CODE, device: 'ios', language, appInvites: false }),
     ].map(text);
     return { language, states };
   });
