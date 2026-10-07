@@ -56,6 +56,8 @@ export function memoryDeskAllowed(req: VercelRequest, platform: string, env: Nod
 }
 /** How long the desk waits for the summary before answering without it. */
 export const MEMORY_SUMMARY_TIMEOUT_MS = 800;
+/** How long the desk waits for the ask to be recorded before answering; past it the reply says `recorded: false`. */
+export const MEMORY_RECORD_TIMEOUT_MS = 800;
 /** An asset counts as one the reader "often" looks at from this many asks. */
 const OFTEN_MIN_ASKS = 2;
 
@@ -139,11 +141,15 @@ export async function memorySummary(identityId: string, symbol: string, timeoutM
   }
 }
 
-/** Record one answered ask. Best effort: false when it was not recorded (paused, not an account, storage down). */
-export async function recordAsk(identityId: string, symbol: string, horizon: AskedHorizon, price?: number | null): Promise<boolean> {
+/**
+ * Record one answered ask. True only when the database confirmed the write; false when it was not recorded
+ * (paused, not an account) or no confirmation came back in `timeoutMs` (storage down or slow: the request is
+ * then abandoned, and the caller must not say it was recorded).
+ */
+export async function recordAsk(identityId: string, symbol: string, horizon: AskedHorizon, price?: number | null, timeoutMs = 3000): Promise<boolean> {
   if (!MEMORY_SYMBOL.test(symbol)) return false;
   try {
-    return (await rpc('bobby_memory_record', { p_identity: identityId, p_symbol: symbol, p_horizon: horizon, p_price: positive(price) }, 3000)) === true;
+    return (await rpc('bobby_memory_record', { p_identity: identityId, p_symbol: symbol, p_horizon: horizon, p_price: positive(price) }, timeoutMs)) === true;
   } catch {
     return false;
   }
@@ -250,22 +256,27 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
 }
 
 /**
- * `memory` in the desk's reply (1.8): what memory holds about the asked asset and whether this question is being
- * added to it, so an app can show a receipt. Facts only: counts, days and a percentage, never text or a symbol
- * list.
- *   · `recorded`: this request records the ask (the same condition as the desk's `remember()`: memory was read
- *     and is not paused). The write itself runs after the answer is delivered; the database has the last word.
- *   · `asks`: how often this account asked about the asset, this question included when it is recorded.
+ * `memory` in the desk's reply (1.8), for a request memory applies to (an Apple/Google account on an allowed
+ * platform, with its opt-in where one is needed, while BOBBY_MEMORY is on): whether this question was added to
+ * memory and what memory holds about the asked asset, so an app can show a receipt. Facts only: a flag, a count,
+ * days and a percentage, never text or a symbol list.
+ *   · `recorded`: true only when the database confirmed, before the reply was built, that this ask was written.
+ *     False when memory is paused, when the write was refused or failed, and when no confirmation came back in
+ *     time (MEMORY_RECORD_TIMEOUT_MS).
+ *   · `asks`: how often this account asked about the asset, as the summary read it, plus this question when it
+ *     was recorded. It counts asks inside the retention window (MEMORY_RETENTION_DAYS): an asset last asked
+ *     about longer ago reads as never asked. Null when the count was not read, because memory is paused or the
+ *     summary could not be read: a number the server does not have is not sent as a zero.
  *   · `lastAskedDaysAgo`, `changeSinceLastAskPct`: about the ask before this one; null when there was none or it
  *     cannot be computed. They are the numbers the CIO's reader carried, not a second reading.
- * A paused memory is not read (the summary returns no counts for it): `recorded` is false, `asks` is 0 and
- * both facts are null. Null when memory does not apply to the request or the summary could not be read: then
- * the reply carries no `memory` key at all, because nothing true can be said.
+ * The desk builds no receipt when memory does not apply: the reply then has no `memory` key at all.
  */
-export interface MemoryReceipt { recorded: boolean; asks: number; lastAskedDaysAgo: number | null; changeSinceLastAskPct: number | null }
-export function memoryReceipt(summary: MemorySummary | null, reader: ReaderContext | null): MemoryReceipt | null {
-  if (!summary) return null;
-  if (!summary.enabled) return { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null };
+export interface MemoryReceipt { recorded: boolean; asks: number | null; lastAskedDaysAgo: number | null; changeSinceLastAskPct: number | null }
+export function memoryReceipt(summary: MemorySummary | null, reader: ReaderContext | null, recorded: boolean): MemoryReceipt {
+  // Unreadable, or paused (a paused memory records nothing, whatever the caller believes): nothing about the
+  // asset was read, so nothing is said about it.
+  if (!summary) return { recorded, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null };
+  if (!summary.enabled) return { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null };
   const before = reader?.thisAsset;
-  return { recorded: true, asks: (before?.asks ?? 0) + 1, lastAskedDaysAgo: before?.lastAskedDaysAgo ?? null, changeSinceLastAskPct: before?.changeSinceLastAskPct ?? null };
+  return { recorded, asks: (before?.asks ?? 0) + (recorded ? 1 : 0), lastAskedDaysAgo: before?.lastAskedDaysAgo ?? null, changeSinceLastAskPct: before?.changeSinceLastAskPct ?? null };
 }

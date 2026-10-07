@@ -13,7 +13,7 @@ import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
-import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
+import { memoryDeskAllowed, MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemoryReceipt, type MemorySummary } from './_lib/user-memory.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -32,8 +32,8 @@ const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetT
 
 /**
  * Kill switch for the thesis review: with BOBBY_THESIS_REVIEW exactly 'off' a valid `thesis` is ignored and the
- * request is answered as a plain read (no `review` key, the CIO never sees the note). Unset or anything else = on.
- * Read per request, never cached.
+ * request is answered as a plain read (no reviewer call, no `review` key, the note goes nowhere). Unset or
+ * anything else = on. Read per request, never cached.
  */
 const thesisReviewOn = (env: NodeJS.ProcessEnv = process.env) => env.BOBBY_THESIS_REVIEW !== 'off';
 
@@ -57,21 +57,33 @@ const copy = deskErrorCopy;
  * compact `reader` (explicit preferences, how often they asked), for framing only: sufficiency and the verdict
  * depend on the question and the evidence alone. The reader never reaches the client: the body only says
  * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'; iOS also requires an explicit opt-in on this request. The ask is
- * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
- * make no memory call; the iPhone and Android apps also need their per-request memory opt-in. When memory was
- * read for the request, the body also carries `memory: { recorded, asks, lastAskedDaysAgo,
- * changeSinceLastAskPct }`: what memory holds about this asset and whether this question is being added to it.
- * Numbers only, from the summary the CIO's reader was built from; no key at all when memory does not apply or
- * could not be read.
+ * recorded once the answer is complete and its reader is still there, never on a refusal, a failure or an
+ * abandoned read. Anonymous and wallet requests make no memory call; the iPhone and Android apps also need
+ * their per-request memory opt-in. For a request memory applies to, the write is awaited (at most
+ * MEMORY_RECORD_TIMEOUT_MS) before the reply is built, and the body carries `memory: { recorded, asks,
+ * lastAskedDaysAgo, changeSinceLastAskPct }`: `recorded` is true only when the database confirmed the write, and
+ * `asks` counts this question only then. Numbers only, from the summary the CIO's reader was built from; `asks`
+ * is null when that count was not read (memory paused, or the summary unavailable: the ask is still offered to
+ * the database, which decides, and `recorded` says what it answered). No `memory` key at all when memory does
+ * not apply, and then no memory call is made either.
  *
  * Thesis review (1.8): a request may carry `thesis`, the person's own note (hypothesis, what worries them, what
  * would change their mind, a horizon, when they saved it and at what price). The read is the same read at the
- * requested level, with the same meters, quotas, refunds and ledger; Alpha and Red Team never see the note. The
- * CIO gets it as untrusted data with the server-computed change since it was saved, and the body gains
- * `review: { supports, challenges, unknowns, notChecked }` (the NDJSON `final` line carries the same body).
- * `notChecked` is written by the server: the evidence kinds the desk does not load. A request without `thesis`
- * is answered exactly as before, with no `review` key; so is every request while BOBBY_THESIS_REVIEW is 'off'.
- * The note is used for that one answer: it is never stored, logged, or written to the ledger or the funnel.
+ * requested level, with the same meters, quotas and refunds, and no agent of the debate sees the note: Alpha,
+ * Red Team, the second round and the CIO receive exactly the requests of the same question without it, so the
+ * verdict, the direction, the sufficiency note and the synthesis cannot depend on it. When they are final, one
+ * more model call (the "reviewer": the level's cheapest model at low effort, with a small token ceiling) reads
+ * the note as untrusted data beside the same evidence, the finished answer and the server-computed change since
+ * the note was saved, and returns three lists and nothing else. The body gains
+ * `review: { supports, challenges, unknowns, notChecked }` (the NDJSON `final` line carries the same body; no
+ * new event is streamed). `notChecked` is written by the server: the evidence kinds the desk does not load. If
+ * the reviewer fails, times out, is cut off, is skipped for lack of time or has every item rejected by the
+ * guard, the read is served all the same with three empty lists and `notChecked`: it is never an
+ * `analysis_failed`, never refunded and never asked again. Its cost is a row of its own in the ledger (role
+ * `reviewer`, surface `desk`), which the spend guard sums. A request without `thesis` is answered exactly as
+ * before, with no reviewer call and no `review` key; so is every request while BOBBY_THESIS_REVIEW is 'off'.
+ * The note is used for that one answer and leaves the server in that one request to the AI provider: it is
+ * never stored, logged, or written to the ledger or the funnel.
  *
  * Chart timeframe: a question that names one ("en diario", "weekly chart", "4H") is analysed on it at every level.
  * Its candles are loaded beside the level's evidence and its block becomes `technicals`, with `provenance.timeframe`
@@ -125,7 +137,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const { symbol, question, language, assetType, level, requestId } = parsed.data;
   const locale = appLocale(language, parsed.data.locale);
-  // Validated above even when the review is switched off; from here on it only ever travels to the CIO call.
+  // Validated above even when the review is switched off; from here on it only ever travels to the reviewer call.
   const thesis = thesisReviewOn() ? parsed.data.thesis ?? null : null;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
@@ -247,19 +259,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
     const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);
-    // What memory kept, when it was read for this request: the same summary the reader came from, no second query.
-    const memory = memoryReceipt(summary, reader);
+    // Memory, for a request it applies to (no owner: no memory call and no `memory` key). The answer is complete
+    // and its reader is still here, so the ask is recorded now and the reply says what really happened: the
+    // write is awaited for at most MEMORY_RECORD_TIMEOUT_MS and `recorded` is the database's own answer, false
+    // when it refused, failed or did not confirm in time. A memory the summary showed paused is not even asked;
+    // when the summary was unavailable the database decides (it skips paused memories and non-accounts).
+    // Nothing is recorded on a refusal, a failure or an abandoned read: none of them reaches this line. (A
+    // reader who goes away during this last wait is like one who goes away as the reply is being sent: the
+    // answer was complete and theirs, and it is sent.)
+    const owner = await memoryOwner.catch(() => null);
+    let memory: MemoryReceipt | null = null;
+    if (owner) {
+      const paused = summary !== null && !summary.enabled;
+      const kept = !paused && await within(recordAsk(owner.id, symbol, asked, evidence.technicals.price, MEMORY_RECORD_TIMEOUT_MS), MEMORY_RECORD_TIMEOUT_MS) === true;
+      // The counts come from the summary the reader was built from: no second query.
+      memory = memoryReceipt(summary, reader, kept);
+    }
     const body = { ...result, access, ...(reader ? { personalized: true } : {}), ...(memory ? { memory } : {}), ...(telemetry ? { telemetry } : {}) };
-    // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
-    // summary was unavailable the database decides (it skips paused memories and non-accounts).
-    const remember = () => {
-      if (summary && !summary.enabled) return;
-      waitUntil(memoryOwner.then((id) => (id ? recordAsk(id.id, symbol, asked, evidence.technicals.price) : false)).catch(() => false));
-    };
-    if (!live) { res.status(200).json(body); remember(); outcome('read_done', level); return; }
+    if (!live) { res.status(200).json(body); outcome('read_done', level); return; }
     send({ type: 'final', data: body });
     res.end();
-    remember();
     outcome('read_done', level);
     return;
   } catch (error) {

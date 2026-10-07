@@ -6,11 +6,15 @@
 //   · the desk gives the reader to the CIO only, for a signed-in Apple/Google account, never to the client
 //     (only `personalized: true`); a stored horizon never changes sufficiency (nor the verdict); the stored
 //     "risk" reaches the CIO only as explainRiskDepth, under a rule that forbids suitability and sizing; the ask is
-//     recorded only after a delivered answer, never on a refusal, an outage or a guard rejection; anonymous
-//     and wallet requests make no memory call at all; iPhone and Android asks need a separate per-request opt-in;
+//     recorded only once the answer is complete, never on a refusal, an outage, a guard rejection or an abandoned
+//     read; anonymous and wallet requests make no memory call at all; iPhone and Android asks need a separate
+//     per-request opt-in;
 //   · the reply says what memory kept (1.8): `memory: { recorded, asks, lastAskedDaysAgo, changeSinceLastAskPct }`
-//     with the numbers the CIO's reader carried, `recorded` false for a paused memory, and no key at all when
-//     memory does not apply or could not be read;
+//     with the numbers the CIO's reader carried. The write is awaited before the reply is built (at most
+//     MEMORY_RECORD_TIMEOUT_MS), so `recorded` is true only when the database confirmed it: false when it
+//     refused, failed or was too slow, and then `asks` does not count this question. `asks` is null when the
+//     count was not read (memory paused, summary unavailable), never a zero; no key at all when memory does not
+//     apply;
 //   · kill switch: without BOBBY_MEMORY=on the desk makes no memory call at all, while /api/memory still works.
 import assert from 'node:assert/strict';
 
@@ -30,7 +34,7 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS, MEMORY_RECORD_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -82,6 +86,10 @@ let summaryDelayMs = 0;
 let prefsRows: unknown[] = [];
 let assetRows: unknown[] = [];
 let storageDown = false;
+/** What bobby_memory_record answers, and what the reader had been sent when it was asked. */
+let recordReply: () => Response | Promise<Response> = () => json(true);
+let answeredBeforeRecord: boolean[] = [];
+let currentResponse: { body: unknown; chunks: string[]; writableEnded: boolean; close(): void } | null = null;
 function backend(c: Call): Response | Promise<Response> | null {
   if (c.url.includes('/rest/v1/api_cache')) return c.method === 'POST' ? json(null, 201) : json([]);
   if (c.url.includes('/auth/v1/user')) {
@@ -98,7 +106,10 @@ function backend(c: Call): Response | Promise<Response> | null {
     if (storageDown) return json({ message: 'down' }, 500);
     return summaryDelayMs ? new Promise((resolve) => setTimeout(() => resolve(json(summaryReply)), summaryDelayMs)) : json(summaryReply);
   }
-  if (c.url.includes('rpc/bobby_memory_record')) return json(true);
+  if (c.url.includes('rpc/bobby_memory_record')) {
+    answeredBeforeRecord.push(!!currentResponse && (currentResponse.body !== null || currentResponse.writableEnded || currentResponse.chunks.some((line) => line.includes('"final"'))));
+    return recordReply();
+  }
   if (c.url.includes('rpc/bobby_memory_forget')) return storageDown ? json({ message: 'down' }, 500) : json(3);
   if (c.url.includes('bobby_user_prefs?on_conflict=identity_id')) return storageDown ? json({ message: 'down' }, 500) : new Response('', { status: 201 });
   if (c.url.includes('bobby_user_prefs?identity_id=eq.')) return storageDown ? json({ message: 'down' }, 500) : json(prefsRows);
@@ -163,21 +174,23 @@ try {
   eq([memoryDeskAllowed({ headers: {} } as never, 'web', { BOBBY_MEMORY: 'on' } as never), memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'tvos', { BOBBY_MEMORY: 'on' } as never)],
      [true, false], 'the web needs no header; a platform that is not listed has no memory even with one');
 
-  // ---------- the receipt: what memory kept, from the summary and the reader built from it ----------
+  // ---------- the receipt: what memory kept, from the summary, the reader built from it and the write's own answer ----------
   {
     const priced = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
     const reader = readerContext(priced, 'NVDA', now, null, 230, 'en');
-    eq(memoryReceipt(priced, reader), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'asked 7 times before: this is the 8th, 3 days after the last, up 15%');
-    eq([memoryReceipt(priced, reader)!.lastAskedDaysAgo, memoryReceipt(priced, reader)!.changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the very numbers the CIO was given');
-    eq(memoryReceipt(summary(), readerContext(summary(), 'NVDA', now)), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: null }, 'no stored price: no change, never a zero');
+    eq(memoryReceipt(priced, reader, true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'asked 7 times before and this one was written: the 8th, 3 days after the last, up 15%');
+    eq(memoryReceipt(priced, reader, false), { recorded: false, asks: 7, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'the write did not happen: not recorded, and this question is not counted');
+    eq([memoryReceipt(priced, reader, true).lastAskedDaysAgo, memoryReceipt(priced, reader, true).changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the very numbers the CIO was given');
+    eq(memoryReceipt(summary(), readerContext(summary(), 'NVDA', now), true), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: null }, 'no stored price: no change, never a zero');
     const first = summary({ top: [], thisAsset: null });
-    eq(memoryReceipt(first, readerContext(first, 'NVDA', now)), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask counts itself and has no last time');
+    eq(memoryReceipt(first, readerContext(first, 'NVDA', now), true), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask counts itself and has no last time');
+    eq(memoryReceipt(first, readerContext(first, 'NVDA', now), false), { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask that was not written: memory was read and holds no ask of this asset, a true zero');
     const empty = summary({ prefs: { horizon: null, experience: null, risk: null }, top: [], thisAsset: null });
-    eq(memoryReceipt(empty, readerContext(empty, 'NVDA', now)), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'an empty memory has no reader and still records this first ask');
-    const paused = summary({ enabled: false, top: [], thisAsset: null });
-    eq(memoryReceipt(paused, readerContext(paused, 'NVDA', now)), { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a paused memory records nothing and tells nothing');
-    eq(memoryReceipt(null, null), null, 'no summary (memory does not apply, or could not be read): no receipt');
-    eq(Object.keys(memoryReceipt(priced, reader)!), ['recorded', 'asks', 'lastAskedDaysAgo', 'changeSinceLastAskPct'], 'four facts: no text, no symbol list');
+    eq(memoryReceipt(empty, readerContext(empty, 'NVDA', now), true), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'an empty memory has no reader and still records this first ask');
+    const paused = summary({ enabled: false });
+    eq([memoryReceipt(paused, readerContext(paused, 'NVDA', now), false), memoryReceipt(paused, null, true)], Array.from({ length: 2 }, () => ({ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null })), 'a paused memory records nothing and its count was not read: null, never a zero, whatever the rows hold');
+    eq([memoryReceipt(null, null, true), memoryReceipt(null, null, false)], [{ recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'the summary could not be read: only whether the write happened is known');
+    eq(Object.keys(memoryReceipt(priced, reader, true)), ['recorded', 'asks', 'lastAskedDaysAgo', 'changeSinceLastAskPct'], 'four facts: no text, no symbol list');
   }
 
   // ---------- /api/memory ----------
@@ -309,7 +322,6 @@ try {
   let levelGate: Record<string, unknown> = { allowed: true, code: null, useId: 91 };
   let spend = { day: 0, month: 0 };
   let cancelAtCio = false;
-  let currentResponse: ReturnType<typeof response> | null = null;
   const deskMock = () => mock((c) => {
     const r = backend(c); if (r) return r;
     if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
@@ -334,6 +346,7 @@ try {
     ({ method: 'POST', headers: { origin: 'https://bobbyprotocol.xyz', 'x-forwarded-for': '10.9.0.2', 'x-bobby-device': 'device-1234567890abcdef', ...headers }, body });
   const run = async (body: Record<string, unknown>, headers: Record<string, string> = {}) => {
     deskMock();
+    answeredBeforeRecord = [];
     const res = response();
     currentResponse = res;
     await deskHandler(deskReq({ symbol: 'NVDA', assetType: 'equity', question: 'Is NVDA worth a look?', ...body }, headers) as never, res as never);
@@ -363,6 +376,9 @@ try {
   // 1.8: the reply also says what memory kept. Its four numbers are the only memory-derived values on the wire;
   // `lastAskedDaysAgo` is one of them, so the reader check below looks at the body without the receipt.
   eq(served.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the receipt: recorded, the 8th ask, 2 days after the last, no stored price to compare');
+  // `recorded: true` is the database's own answer, already in hand when the reply was built: the write is not
+  // left for after the response (nothing to settle), and it was asked before anything was sent to the reader.
+  eq([recorded().length, answeredBeforeRecord], [1, [false]], 'the ask was written before the reply left, not after it');
   const { memory: _receipt, ...withoutReceipt } = served.body;
   const wire = JSON.stringify(withoutReceipt);
   ok(!/"reader"|oftenAsks|thisAsset|lastAskedDaysAgo|"experience"/.test(wire), 'the reader never reaches the client');
@@ -420,13 +436,47 @@ try {
   eq([off.statusCode, 'personalized' in off.body, off.body.sufficiency.horizon], [200, false, 'unspecified'], 'memory paused: a plain answer, the preference unused');
   ok(!models().some((c) => 'reader' in inputOf(c)), '…no reader for any role');
   eq(recorded().length, 0, '…and nothing recorded');
-  eq(off.body.memory, { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says so: memory was read, is paused, kept nothing');
+  eq(off.body.memory, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says so: paused, nothing kept, and no count (it was not read), never a zero');
   // A paused memory tells nothing even if the database were to return counts with it.
   summaryReply = { ...REMEMBERED, enabled: false };
   const pausedWithRows = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   await settle();
-  eq([pausedWithRows.body.memory, 'personalized' in pausedWithRows.body, recorded().length], [{ recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'paused: no stored count leaves the server, nothing recorded');
+  eq([pausedWithRows.body.memory, 'personalized' in pausedWithRows.body, recorded().length], [{ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'paused: no stored count leaves the server, nothing recorded');
   summaryReply = REMEMBERED;
+
+  // The write did not happen: the read is still delivered, the receipt says `recorded: false`, and this
+  // question is not counted (7 asks before, 7 now).
+  {
+    const quietRecord = console.error; console.error = () => {};
+    for (const [what, reply] of [
+      ['the database refuses the ask (memory paused from another device meanwhile)', () => json(false)],
+      ['the database answers 500', () => json({ message: 'down' }, 500)],
+      ['the database answers something that is not true', () => json({ recorded: true })],
+      ['the request fails', () => { throw new TypeError('fetch failed'); }],
+    ] as const) {
+      recordReply = reply;
+      const res = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+      eq([res.statusCode, res.body.memory, res.body.personalized], [200, { recorded: false, asks: 7, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, true], `${what}: the answer is served, not recorded, asks stays 7`);
+      eq([recorded().length, calls.some((c) => c.method === 'DELETE')], [1, false], `${what}: asked once, never again, and nothing is refunded`);
+    }
+    // Slower than the cap: the reader is not kept waiting, and an ask without a confirmation is not claimed.
+    recordReply = () => new Promise((resolve) => setTimeout(() => resolve(json(true)), MEMORY_RECORD_TIMEOUT_MS + 2500));
+    const began = Date.now();
+    const slowWrite = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+    const waited = Date.now() - began;
+    recordReply = () => json(true);
+    console.error = quietRecord;
+    eq([slowWrite.statusCode, slowWrite.body.memory], [200, { recorded: false, asks: 7, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }], 'the write is slower than its cap: the answer is served with recorded false');
+    ok(waited >= MEMORY_RECORD_TIMEOUT_MS - 50 && waited < MEMORY_RECORD_TIMEOUT_MS + 2000, `…after the cap, not the write's own time (${waited} ms)`);
+    eq(MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, "the cap is the summary read's: 800 ms");
+    // A first ask whose write fails: memory was read and holds nothing of this asset.
+    summaryReply = { ...REMEMBERED, thisAsset: null };
+    recordReply = () => json(false);
+    const firstUnwritten = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+    recordReply = () => json(true);
+    eq(firstUnwritten.body.memory, { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask that was not written: asks 0 is what memory holds');
+    summaryReply = REMEMBERED;
+  }
 
   // Anonymous and wallet readers: not a single memory or identity call.
   for (const [who, headers] of [['anonymous', {}], ['wallet session', { 'x-bobby-session': 'bws.wallet-session-token' }], ['wallet bearer', { authorization: 'Bearer bws.wallet-session-token' }]] as const) {
@@ -480,7 +530,7 @@ try {
   summaryReply = { ...REMEMBERED, enabled: false };
   const pausedAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
   await settle();
-  eq([pausedAndroid.body.memory, 'personalized' in pausedAndroid.body, recorded().length], [{ recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'a server-side pause holds on Android too');
+  eq([pausedAndroid.body.memory, 'personalized' in pausedAndroid.body, recorded().length], [{ recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'a server-side pause holds on Android too');
   summaryReply = REMEMBERED;
   const guestIos = await run({}, { 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
@@ -512,6 +562,11 @@ try {
   cancelAtCio = false;
   await settle();
   eq([cancelledIos.body, recorded().length], [null, 0], 'a native reader that closes before delivery records nothing');
+  cancelAtCio = true;
+  const cancelledWeb = await run({}, { ...SIGNED_IN, accept: 'application/x-ndjson' });
+  cancelAtCio = false;
+  await settle();
+  eq([cancelledWeb.lines().some((l: any) => l.type === 'final'), recorded().length], [false, 0], 'an abandoned live read records nothing either: the write waits for a complete answer whose reader is still there');
 
   // Storage down or slow: the read runs without memory, in time.
   storageDown = true;
@@ -522,13 +577,18 @@ try {
   await settle();
   eq([down.statusCode, 'personalized' in down.body], [200, false], 'memory storage down: the answer is served without memory');
   eq(recorded().length, 1, '…and the database still decides whether to record the delivered answer');
-  eq('memory' in down.body, false, '…with no receipt: what memory holds could not be read, so nothing is claimed');
+  eq(down.body.memory, { recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says what is known: the write was confirmed, the counts could not be read (null, not zero)');
+  // Storage down for the write too: nothing recorded, nothing claimed.
+  storageDown = true; recordReply = () => json({ message: 'down' }, 500); console.error = () => {};
+  const allDown = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  storageDown = false; recordReply = () => json(true); console.error = quiet;
+  eq([allDown.statusCode, allDown.body.memory], [200, { recorded: false, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'summary and write both down: the answer is served; not recorded, no counts');
   summaryDelayMs = MEMORY_SUMMARY_TIMEOUT_MS + 1200;
   const started = Date.now();
   const slow = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   const took = Date.now() - started;
   summaryDelayMs = 0;
-  eq([slow.statusCode, 'personalized' in slow.body, 'memory' in slow.body], [200, false, false], 'a slow summary is skipped, and so is the receipt');
+  eq([slow.statusCode, 'personalized' in slow.body, slow.body.memory], [200, false, { recorded: true, asks: null, lastAskedDaysAgo: null, changeSinceLastAskPct: null }], 'a slow summary is skipped: no personalization, and a receipt with the write\'s answer and no counts');
   ok(took < MEMORY_SUMMARY_TIMEOUT_MS + 1000, `…the answer is not held for it (${took} ms)`);
   await settle();
 
@@ -548,7 +608,7 @@ try {
   const rejected = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   await settle();
   console.error = errorLog;
-  eq([rejected.statusCode, rejected.body.code, recorded().length], [503, 'analysis_failed', 0], 'a guard rejection: analysis_failed and nothing recorded');
+  eq([rejected.statusCode, rejected.body.code, recorded().length, 'memory' in rejected.body], [503, 'analysis_failed', 0, false], 'a guard rejection: analysis_failed, nothing recorded and no receipt');
   cioReply = CIO;
 
   // Premium: the meter already resolved the account; memory reuses it, and the Sonnet CIO gets the reader.
@@ -568,7 +628,7 @@ try {
   ok(lines.every((l: any) => !/"reader"|oftenAsks|thisAsset/.test(JSON.stringify(l))), 'no streamed line carries the reader');
   eq(lines.at(-1).data.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the final line carries the receipt');
   ok(lines.slice(0, -1).every((l: any) => !('memory' in l) && !/"memory"|lastAskedDaysAgo/.test(JSON.stringify(l))), '…and no earlier line does');
-  eq(recorded().length, 1, 'the streamed answer is recorded after the final line');
+  eq([recorded().length, answeredBeforeRecord], [1, [false]], 'the streamed answer is recorded once it is complete, before the final line that says so');
 
   console.log(`user-memory: ${checks} checks passed`);
 } finally {
