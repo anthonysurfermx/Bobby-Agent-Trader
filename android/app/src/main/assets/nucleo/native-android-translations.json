@@ -1115,6 +1115,12 @@
     "it": "Posso riprenderlo la prossima volta",
     "de": "Ich kann das nächstes Mal aufgreifen"
   },
+  "Include questions from this phone": {
+    "fr": "Inclure les questions de ce téléphone",
+    "pt": "Incluir perguntas deste telemóvel",
+    "it": "Includi le domande di questo telefono",
+    "de": "Fragen von diesem Gerät einbeziehen"
+  },
   "Include this payment reference when contacting Help.": {
     "fr": "Indiquez cette référence de paiement lorsque vous contactez l’assistance.",
     "pt": "Inclua esta referência de pagamento ao contactar a Ajuda.",
@@ -1695,6 +1701,12 @@
     "it": "Facoltativo",
     "de": "Optional"
   },
+  "Paused across web and phone: no new asks are saved or personalized.": {
+    "fr": "Suspendue sur le web et le téléphone : les nouvelles consultations ne sont ni enregistrées ni personnalisées.",
+    "pt": "Pausada na web e no telemóvel: novas consultas não são guardadas nem personalizadas.",
+    "it": "Sospesa sul web e sul telefono: le nuove richieste non vengono salvate né personalizzate.",
+    "de": "Im Web und auf dem Gerät pausiert: Neue Anfragen werden nicht gespeichert oder personalisiert."
+  },
   "Payment coins": {
     "fr": "Cryptos de paiement",
     "pt": "Moedas de pagamento",
@@ -2248,6 +2260,12 @@
     "pt": "Inicia sessão para teres o teu link.",
     "it": "Accedi per avere il tuo link.",
     "de": "Melde dich an, um deinen Link zu erhalten."
+  },
+  "Sign in so Bobby can remember your assets and preferences.": {
+    "fr": "Connecte-toi pour que Bobby mémorise tes actifs et préférences.",
+    "pt": "Inicia sessão para o Bobby recordar os teus ativos e preferências.",
+    "it": "Accedi perché Bobby ricordi i tuoi asset e le tue preferenze.",
+    "de": "Melde dich an, damit Bobby sich deine Werte und Vorlieben merken kann."
   },
   "Sign in so your XP, streak, gear and island follow you": {
     "en": "Sign in so your XP, streak, gear and island follow you",
