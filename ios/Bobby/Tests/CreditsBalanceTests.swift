@@ -58,17 +58,17 @@ final class CreditsBalanceTests: XCTestCase {
         let snapshot = CreditsSnapshot(access: free(), signedIn: true)
         let en = try XCTUnwrap(balance(snapshot).line(.quick))
         XCTAssertEqual(en.value, "7 of 10 left this week")
-        XCTAssertEqual(en.detail, "Resets on Friday")
+        XCTAssertEqual(en.detail, "Next read back on Friday")
         let es = try XCTUnwrap(balance(snapshot, spanish: true).line(.quick))
         XCTAssertEqual(es.value, "Te quedan 7 de 10 esta semana")
-        XCTAssertEqual(es.detail, "Se renuevan el viernes")
-        XCTAssertEqual(en.spoken, "Quick reads: 7 of 10 left this week. Resets on Friday")
+        XCTAssertEqual(es.detail, "La próxima vuelve el viernes")
+        XCTAssertEqual(en.spoken, "Quick reads: 7 of 10 left this week. Next read back on Friday")
 
         XCTAssertEqual(balance(CreditsSnapshot(access: free(used: 4, remaining: nil), signedIn: true)).line(.quick)?.value, "6 of 10 left this week")
-        XCTAssertEqual(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-07T20:00:00Z"), signedIn: true)).line(.quick)?.detail, "Resets today")
-        XCTAssertEqual(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-07T20:00:00Z"), signedIn: true), spanish: true).line(.quick)?.detail, "Se renuevan hoy")
+        XCTAssertEqual(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-07T20:00:00Z"), signedIn: true)).line(.quick)?.detail, "Next read back today")
+        XCTAssertEqual(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-07T20:00:00Z"), signedIn: true), spanish: true).line(.quick)?.detail, "La próxima vuelve hoy")
         XCTAssertEqual(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-14T11:00:00Z"), signedIn: true)).line(.quick)?.detail,
-                       "Resets October 14", "a weekday a week away would read as today's")
+                       "Next read back October 14", "a weekday a week away would read as today's")
         XCTAssertNil(balance(CreditsSnapshot(access: free(used: 0, remaining: 10, resetsAt: nil), signedIn: true)).line(.quick)?.detail)
         XCTAssertNil(balance(CreditsSnapshot(access: free(resetsAt: "2026-10-01T00:00:00Z"), signedIn: true)).line(.quick)?.detail,
                      "a reset that already happened is not a date to wait for")
@@ -99,14 +99,14 @@ final class CreditsBalanceTests: XCTestCase {
         let deep = try XCTUnwrap(balance(account).line(.deep))
         XCTAssertEqual(deep.title, "Deep reads")
         XCTAssertEqual(deep.value, "2 of 3 left this week")
-        XCTAssertEqual(deep.detail, "Resets on Sunday")
+        XCTAssertEqual(deep.detail, "Next read back on Sunday")
         let max = try XCTUnwrap(balance(account).line(.max))
         XCTAssertEqual(max.title, "Max reads")
         XCTAssertEqual(max.value, "1 of 1 left this week", "remaining falls back to limit − used")
         XCTAssertNil(max.detail)
         XCTAssertEqual(balance(account, spanish: true).line(.deep)?.title, "Lecturas Profundas")
         XCTAssertEqual(balance(account, spanish: true).line(.deep)?.value, "Te quedan 2 de 3 esta semana")
-        XCTAssertEqual(balance(account, spanish: true).line(.deep)?.detail, "Se renuevan el domingo")
+        XCTAssertEqual(balance(account, spanish: true).line(.deep)?.detail, "La próxima vuelve el domingo")
         XCTAssertEqual(balance(account, spanish: true).line(.max)?.title, "Lecturas Máximas")
 
         let monthly: [NucleoAnalysisLevel: NucleoLevelMeter] = [
@@ -115,10 +115,10 @@ final class CreditsBalanceTests: XCTestCase {
         ]
         let paid = CreditsSnapshot(access: pro, meters: monthly, signedIn: true)
         XCTAssertEqual(balance(paid).line(.deep)?.value, "48 of 60 left")
-        XCTAssertEqual(balance(paid).line(.deep)?.detail, "Every 30 days · resets October 25")
+        XCTAssertEqual(balance(paid).line(.deep)?.detail, "Every 30 days · next read back October 25")
         XCTAssertEqual(balance(paid).line(.max)?.detail, "Every 30 days")
         XCTAssertEqual(balance(paid, spanish: true).line(.deep)?.value, "Te quedan 48 de 60")
-        XCTAssertEqual(balance(paid, spanish: true).line(.deep)?.detail, "Cada 30 días · se renuevan el 25 de octubre")
+        XCTAssertEqual(balance(paid, spanish: true).line(.deep)?.detail, "Cada 30 días · la próxima vuelve el 25 de octubre")
         XCTAssertEqual(balance(paid, spanish: true).line(.max)?.detail, "Cada 30 días")
     }
 

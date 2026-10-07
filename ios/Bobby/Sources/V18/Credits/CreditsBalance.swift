@@ -262,13 +262,14 @@ struct CreditsBalance: Equatable {
         /// The level as the level pill names it.
         func label(_ level: NucleoAnalysisLevel) -> String { level.name }
 
-        /// "↻ Sat" inside the coming week, "↻ Nov 2" beyond it; nil when there is nothing to wait for.
+        /// "+1 Sat" inside the coming week, "+1 Nov 2" beyond it: the day the next read comes back
+        /// (the oldest one leaves the rolling window). Nil when there is nothing to wait for.
         func renewal(_ date: Date?) -> String? {
             guard let date, date > now else { return nil }
             let when = date.timeIntervalSince(now) < 6 * 86_400
                 ? Self.format(date, "EEE", spanish: spanish, timeZone: timeZone, template: false)
                 : short(date)
-            return "↻ " + when
+            return "+1 " + when
         }
 
         func giftTitle(_ level: NucleoAnalysisLevel) -> String {
@@ -288,18 +289,19 @@ struct CreditsBalance: Equatable {
                    : L.t("\(left) of \(limit) left", "Te quedan \(left) de \(limit)", spanish: spanish)
         }
 
-        /// "Resets on Friday" inside the coming week, the date beyond it; nil when there is nothing to wait for.
+        /// "Next read back on Friday" inside the coming week, the date beyond it; nil when there is nothing
+        /// to wait for. The server's window rolls: on that day the oldest read comes back, not all of them.
         func resets(_ date: Date?) -> String? {
             guard let date, date > now else { return nil }
             var calendar = Calendar(identifier: .gregorian)
             calendar.timeZone = timeZone
-            if calendar.isDate(date, inSameDayAs: now) { return L.t("Resets today", "Se renuevan hoy", spanish: spanish) }
+            if calendar.isDate(date, inSameDayAs: now) { return L.t("Next read back today", "La próxima vuelve hoy", spanish: spanish) }
             if date.timeIntervalSince(now) < 6 * 86_400 {
                 let weekday = Self.format(date, "EEEE", spanish: spanish, timeZone: timeZone, template: false)
-                return L.t("Resets on \(weekday)", "Se renuevan el \(weekday)", spanish: spanish)
+                return L.t("Next read back on \(weekday)", "La próxima vuelve el \(weekday)", spanish: spanish)
             }
             let day = self.day(date)
-            return L.t("Resets \(day)", "Se renuevan el \(day)", spanish: spanish)
+            return L.t("Next read back \(day)", "La próxima vuelve el \(day)", spanish: spanish)
         }
 
         /// "Every 30 days · resets November 2" for a window that is not a week.
@@ -307,7 +309,7 @@ struct CreditsBalance: Equatable {
             guard let days, days > 0 else { return resets(date) }
             guard let date, date > now else { return L.t("Every \(days) days", "Cada \(days) días", spanish: spanish) }
             let day = self.day(date)
-            return L.t("Every \(days) days · resets \(day)", "Cada \(days) días · se renuevan el \(day)", spanish: spanish)
+            return L.t("Every \(days) days · next read back \(day)", "Cada \(days) días · la próxima vuelve el \(day)", spanish: spanish)
         }
 
         func proValue(_ pro: CreditsProStatus) -> String {

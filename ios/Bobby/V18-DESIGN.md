@@ -27,16 +27,16 @@ Counts are the words on the face of the reference state. `›` leads somewhere, 
 
 ```
 Créditos                                    ⓘ ✕
-Rápida                        ↻ sáb      7/10
-Profunda                      ↻ dom       2/3
-Máxima                                    1/1
-De regalo            Rápida 3 · Profunda 2
+Rápido                        +1 sáb     7/10
+Profundo                      +1 dom      2/3
+Máximo                                    1/1
+De regalo            Rápido 3 · Profundo 2
 Bobby Pro                         Inactivo  ›
 Invitar ›      Código ›
 Restaurar compras
 ```
 - Deleted: the credit definition, "Lo que tienes", "Consigue más", "¿Ya pagaste?", the sentence under every row, the Pro benefits text, the restore explanation.
-- A level row is `QuietRow(label, value: "7/10", note: "↻ sáb")`; the day shows only when the server gave one. Pro shows its real state or source (`Activo`, `De regalo hasta el 16 oct`, `Plan web`, `Plan App Store`). Unlimited Quick reads on Pro: `Ilimitadas · uso justo`. Gifts are one row, omitted when confirmed empty.
+- A level row is `QuietRow(label, value: "7/10", note: "+1 sáb")`: the server's window rolls, so on that day the oldest read comes back, not all of them (never "resets"). The day shows only when the server gave one. `↻` is kept for a subscription's real renewal date. Pro shows its real state or source (`Activo`, `De regalo hasta el 16 oct`, `Plan web`, `Plan App Store`). Unlimited Quick reads on Pro: `Ilimitadas · uso justo`. Gifts are one row, omitted when confirmed empty.
 - `ⓘ` holds: `1 crédito = 1 lectura`, when gifted reads are used, the Pro allowances from server data, the free-account line.
 - Signed out: the guest balances, one line `Cuenta gratis: 10 lecturas Rápidas semanales.` (server number only), the system Continue with Apple button. Zero: `0/10` with its real day. Unknown: `Saldo no disponible.` + `Reintentar`, never 0.
 - Restore: the link becomes `Comprobando…`, then ONE result line that stays under it (scrolled into view, announced): `Restaurado. Bobby Pro está activo.` · `Sin compra de Bobby Pro en esta cuenta Apple.` (with a quiet `¿Usaste otra cuenta Apple?` that unfolds `Usa esa cuenta Apple en este iPhone; reintenta.`) · `Pendiente de confirmación de App Store.` · `Restauración cancelada.` · `No se pudieron restaurar las compras.` + `Reintentar` · `Bobby Pro sigue activo. Sin otra compra de App Store.` · `Inicia sesión para restaurar.`

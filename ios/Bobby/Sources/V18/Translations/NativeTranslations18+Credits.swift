@@ -22,10 +22,7 @@ extension NativeTranslations18 {
         result["{0} of {1} left"] = ["fr": "{0} sur {1} restantes", "pt": "{0} de {1} restantes", "it": "{0} su {1} rimaste", "de": "{0} von {1} übrig"]
         result["Create your free account to get {0} every week"] = ["fr": "Crée ton compte gratuit pour en avoir {0} chaque semaine", "pt": "Cria a tua conta gratuita para teres {0} todas as semanas", "it": "Crea il tuo account gratuito per averne {0} ogni settimana", "de": "Erstelle dein kostenloses Konto und erhalte jede Woche {0}"]
         result["Create your free account to keep reading"] = ["fr": "Crée ton compte gratuit pour continuer", "pt": "Cria a tua conta gratuita para continuares", "it": "Crea il tuo account gratuito per continuare", "de": "Erstelle dein kostenloses Konto, um weiterzulesen"]
-        result["Resets on {0}"] = ["fr": "Renouvellement {0}", "pt": "Renovação: {0}", "it": "Rinnovo: {0}", "de": "Erneuerung am {0}"]
-        result["Resets today"] = ["fr": "Renouvellement aujourd'hui", "pt": "Renova hoje", "it": "Si rinnova oggi", "de": "Erneuerung heute"]
         result["Every {0} days"] = ["fr": "Tous les {0} jours", "pt": "A cada {0} dias", "it": "Ogni {0} giorni", "de": "Alle {0} Tage"]
-        result["Every {0} days · resets {1}"] = ["fr": "Tous les {0} jours · renouvellement le {1}", "pt": "A cada {0} dias · renova a {1}", "it": "Ogni {0} giorni · si rinnova il {1}", "de": "Alle {0} Tage · Erneuerung am {1}"]
         result["Used after your plan's reads run out."] = ["fr": "Utilisées quand les analyses de ton forfait sont épuisées.", "pt": "Usadas quando as análises do teu plano acabam.", "it": "Usate quando finiscono le analisi del tuo piano.", "de": "Werden genutzt, wenn die Analysen deines Plans aufgebraucht sind."]
         result["Kept for when you are not on Bobby Pro."] = ["fr": "Gardées pour quand tu n'auras plus Bobby Pro.", "pt": "Guardadas para quando não tiveres Bobby Pro.", "it": "Conservate per quando non avrai Bobby Pro.", "de": "Aufgehoben für die Zeit, in der du kein Bobby Pro hast."]
         result["Kept for when Quick reads have a weekly limit."] = ["fr": "Gardées pour quand les analyses Rapides auront une limite hebdomadaire.", "pt": "Guardadas para quando as análises Rápidas tiverem um limite semanal.", "it": "Conservate per quando le analisi Rapide avranno un limite settimanale.", "de": "Aufgehoben für die Zeit, in der Schnelle Analysen ein Wochenlimit haben."]
@@ -75,6 +72,10 @@ extension NativeTranslations18 {
         result["Used another Apple Account?"] = ["fr": "Tu as utilisé un autre compte Apple ?", "pt": "Usaste outra conta Apple?", "it": "Hai usato un altro account Apple?", "de": "Anderen Apple-Account genutzt?"]
         result["Use that Apple Account on this iPhone; retry."] = ["fr": "Utilise ce compte Apple sur cet iPhone, puis réessaie.", "pt": "Usa essa conta Apple neste iPhone e tenta outra vez.", "it": "Usa quell'account Apple su questo iPhone e riprova.", "de": "Nutze diesen Apple-Account auf diesem iPhone und versuch es erneut."]
         result["Active until {0}"] = ["fr": "Actif jusqu'au {0}", "pt": "Ativo até {0}", "it": "Attivo fino al {0}", "de": "Aktiv bis {0}"]
+        result["Next read back today"] = ["fr": "Prochaine analyse de retour aujourd'hui", "pt": "A próxima volta hoje", "it": "La prossima torna oggi", "de": "Nächste Analyse heute zurück"]
+        result["Next read back on {0}"] = ["fr": "Prochaine analyse de retour {0}", "pt": "A próxima volta: {0}", "it": "La prossima torna: {0}", "de": "Nächste Analyse zurück: {0}"]
+        result["Next read back {0}"] = ["fr": "Prochaine analyse de retour le {0}", "pt": "A próxima volta a {0}", "it": "La prossima torna il {0}", "de": "Nächste Analyse zurück am {0}"]
+        result["Every {0} days · next read back {1}"] = ["fr": "Tous les {0} jours · prochaine analyse le {1}", "pt": "A cada {0} dias · a próxima volta a {1}", "it": "Ogni {0} giorni · la prossima torna il {1}", "de": "Alle {0} Tage · nächste Analyse am {1}"]
         return result
     }()
 }
