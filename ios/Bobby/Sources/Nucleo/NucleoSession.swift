@@ -41,12 +41,15 @@ enum NucleoPage: Equatable {
 
 /// Native screens shown as sheets over the page. `openNative` opens every route but `paywall`,
 /// which only the awaited `paywall` method presents (§8.4), and `briefing`, which only a drained
-/// notification tap opens (build 53).
+/// notification tap opens (build 53). The 1.8 screens (`credits`, `theses`, `memory`, `reminders`)
+/// open from a nudge tap or the profile, never from a page call.
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
+    case credits, theses, memory, reminders
     var id: String { rawValue }
 
-    static let openable: Set<String> = Set(allCases.filter { $0 != .paywall && $0 != .invite && $0 != .briefing }.map(\.rawValue))
+    static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .memory, .reminders]
+    static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
 /// What a briefing notification tap waits for before its report opens, read live at every drain.
@@ -141,7 +144,10 @@ final class NucleoSession: ObservableObject {
         let emit: (String, [String: Any]) -> Void = { [weak self] name, payload in self?.emit(name, payload) }
         desk.emit = emit
         desk.debateStarted = { [weak self] level in self?.notch.debating(level) }
-        desk.askFinished = { [weak self] result in self?.notch.finished(result) }
+        desk.askFinished = { [weak self] result in
+            self?.notch.finished(result)
+            self?.readDelivered(result)
+        }
         desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
@@ -231,7 +237,12 @@ final class NucleoSession: ObservableObject {
             haptics.play(kind)
             return [String: Any]()
         case "saveThesis":
-            return try await desk.saveThesis(p)
+            let saved = try await desk.saveThesis(p)
+            if saved["status"] as? String == "saved", let requestId = try p.string("requestId", required: false) {
+                NudgeCenter.shared.noteSaved(requestId: requestId)
+                sessionChanged()
+            }
+            return saved
         case "island":
             return await desk.island()
         case "theses":
@@ -266,6 +277,13 @@ final class NucleoSession: ObservableObject {
         case "markHint":
             let key = try p.string("key", pattern: Self.hintPattern)!
             return ["count": markHint(key)]
+        case "nudge.seen":
+            let id = try p.string("id", pattern: NucleoNudge.idPattern)!
+            return ["count": NudgeCenter.shared.seen(id)]
+        case "nudge.act":
+            let id = try p.string("id", pattern: NucleoNudge.idPattern)!
+            let status = await nudgeTapped(id)
+            return ["status": status]
         case "log":
             let level = try p.string("level", oneOf: ["info", "warn", "error"])!
             let message = try p.string("message", maxLength: 300)!
@@ -310,8 +328,46 @@ final class NucleoSession: ObservableObject {
             "mic": speech.permission().json, "hints": hints,
             "pendingRead": desk.pendingRead() ?? NSNull(), "fixtures": fixtures, "platform": "ios", "appVersion": appVersion,
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
+            "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
     }
+
+    // MARK: - The nudge (1.8)
+
+    /// Nudges are off in fixture mode (store shots and UI suites read a fixed page) unless a test turns them on.
+    var nudgesEnabled: Bool?
+
+    /// One line and one button for the app page, or nil: after consent only, never under a sheet.
+    func currentNudge() -> NucleoNudge? {
+        guard nudgesEnabled ?? !fixtures, profile.acceptedRiskNotice, onboarded, currentPage == NucleoPage.app.name,
+              sheet == nil, openSheet == nil, !speechPromptOpen else { return nil }
+        return NudgeCenter.shared.current(NudgeCenter.shared.moment(signedIn: signedIn))
+    }
+
+    /// The page forwarded a tap on the nudge chip: its source acts, then the page learns what is next.
+    private func nudgeTapped(_ id: String) async -> String {
+        guard profile.acceptedRiskNotice else { return "gone" }
+        nucleoVoice.stop()
+        speech.cancel()
+        let status = await NudgeCenter.shared.act(id, session: self)
+        sessionChanged()
+        return status
+    }
+
+    /// A delivered read: what the nudge sources may look at (symbol and verdict, never the question).
+    private func readDelivered(_ result: [String: Any]) {
+        guard result["status"] as? String == "ok", let requestId = result["requestId"] as? String,
+              let asset = result["asset"] as? [String: Any], let symbol = asset["symbol"] as? String else { return }
+        let agents = result["agents"] as? [String: Any]
+        NudgeCenter.shared.noteRead(NudgeRead(requestId: requestId, symbol: symbol, name: asset["name"] as? String ?? symbol,
+                                              isEquity: asset["isEquity"] as? Bool ?? false,
+                                              verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date()))
+        sessionChanged()
+    }
+
+    /// Opens a 1.8 native screen from a nudge or another sheet's action; false when something else is up.
+    @discardableResult
+    func present(_ route: NucleoRoute) -> Bool { openNative(route) }
 
     /// The page's first call: it is ready for events.
     private func pageStarted(_ page: String?) -> [String: Any] {
@@ -511,6 +567,7 @@ final class NucleoSession: ObservableObject {
         suggestionsCache = nil
         bootSynced = false
         levelsRequested = false
+        NudgeCenter.shared.forgetMoment()
         NucleoLevelCenter.shared.accountChanged(force: true)
         paywallStatus = "cancelled"
         finishPaywall()
@@ -886,10 +943,13 @@ final class NucleoSession: ObservableObject {
         nucleoVoice.stop()
         if let userId = accountUserID { companions.bind(to: userId) } else { companions.unbind() }
         DeskMemory.setOwner(accountUserID, defaults: defaults)
+        // 1.8: theses written before creating the account follow the person into it (once, never merged).
+        if wasAnonymous, let userId = accountUserID { ThesisBook(defaults: defaults).adoptLocal(into: userId) }
         suggestionsCache = nil
         bootSynced = false
         NucleoLevelCenter.shared.accountChanged()
         BobbyAccessCenter.shared.accountChanged()
+        NudgeCenter.shared.forgetMoment()
         emit("account.changed", ["wasSignedIn": !wasAnonymous, "signedIn": accountUserID != nil])
     }
 }

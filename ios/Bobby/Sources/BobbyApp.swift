@@ -107,6 +107,9 @@ struct BobbyApp: App {
 #if DEBUG
                 if Self.isUnitTestHost {
                     Color.clear
+                } else if let fixture = Self.argument(after: "-qa-v18") {
+                    // 1.8 review fixtures (V18/V18QA.swift): one screen, recorded state, no network.
+                    V18QA.view(named: fixture)
                 } else if ProcessInfo.processInfo.arguments.contains("-qa-coupon") {
                     CouponCelebrationQAFixture(alreadyRedeemed: ProcessInfo.processInfo.arguments.contains("-qa-coupon-already"))
                 } else if ProcessInfo.processInfo.arguments.contains("-trader-land-gate") {

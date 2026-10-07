@@ -33,6 +33,8 @@ final class NucleoHost: ObservableObject {
             defaults.set(true, forKey: Self.voiceMuteResetKey)
             session.voice.isMuted = false
         }
+        // 1.8: each feature speaks on the glass through one nudge source (V18/V18.swift).
+        if !BobbyApp.isUnitTestHost { V18.registerNudges() }
         bridge = NucleoBridge(session: session)
         controller = NucleoWebController(handler: bridge)
         session.emitter = controller
@@ -154,6 +156,26 @@ private struct NucleoStage: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)
+        case .credits:
+            CreditsSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .theses:
+            ThesisListSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .memory:
+            MemoryView(riskAccepted: session.profile.acceptedRiskNotice) { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
+        case .reminders:
+            RemindersSheet(session: session) { session.sheet = nil }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .briefing:
             // A drained notification tap (build 53): the report re-authorizes owner + Pro on open, and
             // its narration starts once loaded when the player's consent and mute allow it.

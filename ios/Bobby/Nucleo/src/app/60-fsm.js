@@ -814,6 +814,7 @@ function chipAct(c){
   if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
   if (a.signIn){ gateSignIn(a.retry); return; }
   if (a.paywall){ gatePaywall(a.retry); return; }
+  if (a.nudge){ nudgeAct(a.nudge); return; }
   if (a.dismiss){ go('RETURNING'); return; }
   if (a.retype){ openTyping({ fromRead: false }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
@@ -821,7 +822,7 @@ function chipAct(c){
   if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
-  enter: function(){ chipsShow(RMOD.followUps(READ.model, SUGG || {}, LANG), true); },
+  enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
   tick: function(){ if (inState() > 45) go('RETURNING'); },
   down: cardsDown
 };

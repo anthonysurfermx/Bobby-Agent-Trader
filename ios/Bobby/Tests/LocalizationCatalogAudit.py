@@ -42,9 +42,14 @@ for line in s.splitlines():
   if len(values)>=5:
    for en,es in [(values[1],values[2]),(values[3],values[4])]:keys.setdefault(en,{'en':en,'es':es,'files':[str(p.relative_to(root))]})
 catalog={}
-for row in (root/'ios/Bobby/Sources/NativeTranslations.swift').read_text().splitlines():
- match=re.search(r'^\s*result\[("(?:\\.|[^"\\])*")\] = \[(.*)\]$',row)
- if match:catalog[json.loads(match[1])]=json.loads('{'+match[2]+'}')
+catalog_files=[root/'ios/Bobby/Sources/NativeTranslations.swift']+sorted((root/'ios/Bobby/Sources/V18/Translations').glob('*.swift'))
+for catalog_file in catalog_files:
+ for row in catalog_file.read_text().splitlines():
+  match=re.search(r'^\s*result\[("(?:\\.|[^"\\])*")\] = \[(.*)\]$',row)
+  if match:
+   key=json.loads(match[1])
+   assert key not in catalog, f'duplicate catalog row: {key} ({catalog_file.name})'
+   catalog[key]=json.loads('{'+match[2]+'}')
 assert catalog, 'Catalog must exist'
 
 missing=sorted(set(keys)-set(catalog))

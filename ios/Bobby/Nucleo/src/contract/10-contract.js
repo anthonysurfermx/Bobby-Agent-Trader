@@ -164,6 +164,16 @@
     });
   });
 
+  test('nudge.seen / nudge.act: a well-formed id is counted and an unknown nudge is gone, never a fault', function () {
+    return Promise.all([B.api.nudgeSeen({ id: 'contract.none' }), B.api.nudgeAct({ id: 'contract.none' }),
+      faultCode(B.api.nudgeAct({ id: 'Not An Id' })), faultCode(B.api.nudgeSeen({}))]).then(function (r) {
+      var e = [].concat(check(r[0], { count: T.int }), check(r[1], { status: T.str }));
+      if (r[1].status !== 'gone') e.push('an unknown nudge must answer gone, got ' + r[1].status);
+      if (r[2] !== 'invalid_params' || r[3] !== 'invalid_params') e.push('bad ids must be invalid_params, got ' + r[2] + ' / ' + r[3]);
+      if (e.length) throw new Error(e.join('\n'));
+    });
+  });
+
   function fixturesOnly() { if (!ctx.session || !ctx.session.fixtures) return 'skip: not in fixture mode (never spend desk quota from the contract page)'; }
   /* mock only: under ?scenario=signin_required|subscription_required every metered read is refused */
   function gateScenario() { return B.mock && FX && FX.manifest.gates ? FX.manifest.gates[B.mock.scenario] || null : null; }

@@ -33,6 +33,7 @@ class Element {
   get textContent() { return this.text || this.children.map((child) => child.textContent).join(''); }
   get firstChild() { return this.children[0] || this.appendChild(new Element()); }
   appendChild(child) { child.parentNode = this; this.children.push(child); return child; }
+  removeChild(child) { this.children = this.children.filter((node) => node !== child); child.parentNode = null; return child; }
   setAttribute(name, value) { this.attributes[name] = String(value); }
   getAttribute(name) { return this.attributes[name] ?? null; }
   removeAttribute(name) { delete this.attributes[name]; }
@@ -184,4 +185,58 @@ test('actual account handler receives native changes and refreshes collections',
   assert.equal(app.context.nucleo.state(), 'RETURNING');
   assert.deepEqual(app.calls.slice(callsBefore).filter((call) => ['theses', 'island', 'roster', 'suggestions'].includes(call.method)).map((call) => call.method), ['theses', 'island', 'roster', 'suggestions']);
   assert.deepEqual(app.errors, []);
+});
+
+// ---- the nudge (1.8): one native-written line and one chip; the page only draws, reports and forwards ----
+const chipsOf = (app) => app.nodes.get('chipRow').children.filter((node) => node.getAttribute('data-hit') === 'chip');
+
+test('a native nudge is the first idle chip, its line is the eyebrow, and it is reported seen exactly once', async () => {
+  const app = harness();
+  app.session.nudge = { id: 'memory.offer', text: 'I can pick this up next time', cta: 'Remember it' };
+  app.boot(); await flush(); app.advance(1.2); await flush();
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  const chips = chipsOf(app);
+  assert.equal(chips.length, 1);
+  assert.equal(chips[0].textContent, 'Remember it');
+  assert.match(chips[0].className, /\bnudge\b/);
+  assert.equal(chips[0].getAttribute('aria-label'), 'I can pick this up next time. Remember it');
+  assert.equal(app.nodes.get('eyebrow').textContent, 'I can pick this up next time');
+  // a second session with the same nudge does not report it again
+  app.context.nucleoBridge.emit('session.changed', { ...app.session });
+  await flush();
+  assert.deepEqual(app.calls.filter((call) => call.method === 'nudge.seen').map((call) => call.params), [{ id: 'memory.offer' }]);
+  assert.deepEqual(app.errors, []);
+});
+
+test('tapping the nudge chip forwards only its id; when native withdraws it the row redraws without it', async () => {
+  const app = harness();
+  app.session.nudge = { id: 'credits.low', text: '2 reads left this week', cta: 'See credits' };
+  app.boot(); await flush(); app.advance(1.2); await flush();
+  app.nodes.get('stage').listeners.click({ target: chipsOf(app)[0], detail: 0 });
+  await flush();
+  assert.deepEqual(app.calls.filter((call) => call.method === 'nudge.act').map((call) => call.params), [{ id: 'credits.low' }]);
+  assert.equal(app.context.nucleo.state(), 'IDLE');   // the page does not navigate by itself: native decides what opens
+  app.context.nucleoBridge.emit('session.changed', { ...app.session, nudge: null });
+  await flush(); app.advance(0.5);
+  assert.equal(chipsOf(app).filter((node) => /\bnudge\b/.test(node.className || '')).length, 0);
+  assert.deepEqual(app.errors, []);
+});
+
+test('no nudge, a malformed nudge or one without a button draws nothing and reports nothing', async () => {
+  for (const nudge of [undefined, null, { id: 'x' }, { cta: 'Tap' }, { id: '', cta: 'Tap' }, { id: 'a.b', cta: '' }, 'text']) {
+    const app = harness();
+    if (nudge !== undefined) app.session.nudge = nudge;
+    app.boot(); await flush(); app.advance(1.2); await flush();
+    assert.equal(chipsOf(app).length, 0, JSON.stringify(nudge));
+    assert.equal(app.calls.filter((call) => call.method.startsWith('nudge.')).length, 0, JSON.stringify(nudge));
+    assert.deepEqual(app.errors, []);
+  }
+});
+
+test('the page never writes nudge copy: no feature words live in the nudge code path', () => {
+  const source = read('../src/app/55-read.js');
+  const block = source.slice(source.indexOf('/* ---- the nudge:'), source.indexOf('function receiveSuggestions'));
+  assert.ok(block.length > 200);
+  assert.doesNotMatch(block, /tt\(|RMOD\.t\(/);                       // native-localized text only
+  assert.doesNotMatch(block, /['"][^'"\n]*(credit|thesis|remind|invit|briefing)[^'"\n]*['"]/i);   // no feature copy in string literals
 });
