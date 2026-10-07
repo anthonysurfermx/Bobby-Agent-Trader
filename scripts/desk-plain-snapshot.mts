@@ -13,6 +13,8 @@
 // rule, a next question that breaks it is replaced in the reply by the fixed one of the reply's language (this
 // world's CIO always answers in English, so the five non-English scenarios carry the fixed question), and a
 // remembered reader is handed the finished change since their last ask instead of the stored price.
+// And once more the same day, after the adversarial review: the next-question rule the CIO is told names the
+// ticker, other people, suggestions, forecasts and plain market words. Nothing else moved.
 // One key is left out of the compared reply on purpose: `memory` (the receipt of what memory kept), which
 // 1.8 adds for an account whose memory applies. Everything around it must stay identical.
 import assert from 'node:assert/strict';

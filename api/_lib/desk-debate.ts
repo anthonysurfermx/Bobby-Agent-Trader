@@ -2,12 +2,12 @@ import { z } from 'zod';
 import { languageName, type AppLanguage } from '../../src/lib/app-language.js';
 import { regionalStock, isListedStockSymbol } from '../../src/lib/regional-stocks.js';
 import { analyzeCandles, analysisSummary, type MarketAnalysis } from '../../src/lib/market-indicators.js';
-import { isEquitySymbol } from '../../src/lib/voice-assets.js';
+import { getVoiceAsset, isEquitySymbol } from '../../src/lib/voice-assets.js';
 import { completeJson, LlmHttpError, LlmIncompleteError, type JsonSchemaSpec, type LlmUsage, type ModelSpec } from './llm.js';
 import { alternateProvider, levelPlan, type DeskLevel, type LevelPlan } from './desk-levels.js';
 import { bobbyRest, bobbyServiceHeaders } from './bobby-db.js';
 import { readerForModel, type ReaderContext } from './user-memory.js';
-import { FOLLOW_UP_MAX, NEXT_QUESTION_RULE, nextQuestionFallback, nextQuestionViolation } from './desk-next-question.js';
+import { FOLLOW_UP_MAX, NEXT_QUESTION_RULE, nextQuestionFallback, nextQuestionSecond, nextQuestionViolation, repeatsQuestion } from './desk-next-question.js';
 
 const Paragraph = z.string().trim().min(20).max(1800);
 const Argument = z.object({ analysis: Paragraph });
@@ -799,20 +799,37 @@ export function reviewNotesOf(raw: unknown, verdict?: 'wait' | 'review'): Pick<T
 }
 
 /**
+ * The names the asked asset goes by in the desk's own lists, as a sentence writes them ("Nvidia", "Bitcoin",
+ * "Louis Vuitton"): the next-question check sets them aside as it does the ticker. An alias is kept in lower case
+ * in those lists; here it is capitalised, so a common word that is also a company ("block", "gap") stays a word.
+ */
+export function assetNames(symbol: string): string[] {
+  const voice = getVoiceAsset(symbol), regional = regionalStock(symbol);
+  const titled = (alias: string) => alias.replace(/(^|[\s-])(\p{L})/gu, (_all, lead: string, letter: string) => lead + letter.toUpperCase());
+  return [...new Set([voice?.name, regional?.name, ...[...(voice?.aliases ?? []), ...(regional?.aliases ?? [])].map(titled)].filter((name): name is string => Boolean(name)))];
+}
+
+/**
  * The next question the reply carries. The CIO's own when it passes both checks: the desk's output guard (a
  * guarantee, a personal instruction) and the next-question rule (api/_lib/desk-next-question.ts: a what-or-why
- * question about the asset, never whether or when to act, no price, no forbidden word). Otherwise the fixed
- * question for that language, built from the symbol. Either way the reply holds a string of the size every
- * shipped client decodes, and the read is served: a chip the reader has not seen yet is never a failed read.
- * A replacement is logged by its class, with the language and the level, never with a text.
+ * question about the asset, never whether or when to act, no price, no forbidden word, no word outside the list
+ * such a question is written with), and is not `question`,
+ * the one the reader just asked. Otherwise the fixed question for that language, built from the symbol; and when
+ * that is the question just asked (the reader tapped it, and the CIO's next one was refused again), the second
+ * fixed question. A tap on Bobby's chip is a metered read: it never buys the question it just answered.
+ * Either way the reply holds a string of the size every shipped client decodes, and the read is served: a chip
+ * the reader has not seen yet is never a failed read. A replacement is logged by its class ('repeat' for a sound
+ * question that only repeats the reader's), with the language and the level, never with a text.
  */
-export function servedFollowUp(written: unknown, language: AppLanguage, symbol: string, level: DeskLevel = 'rapido'): string {
-  const asked = typeof written === 'string' ? written.trim() : '';
+export function servedFollowUp(written: unknown, language: AppLanguage, symbol: string, level: DeskLevel = 'rapido', question = ''): string {
+  const own = typeof written === 'string' ? written.trim() : '';
   // Length first: a runaway text is refused before any pattern reads it.
-  const reason = asked.length > FOLLOW_UP_MAX ? 'shape' as const : publicTextViolation(asked) ?? nextQuestionViolation(asked, language, symbol);
-  if (!reason) return asked;
+  const refused = own.length > FOLLOW_UP_MAX ? 'shape' as const : publicTextViolation(own) ?? nextQuestionViolation(own, language, symbol, assetNames(symbol));
+  const reason = refused ?? (repeatsQuestion(own, question, symbol) ? 'repeat' as const : null);
+  if (!reason) return own;
   console.error(JSON.stringify({ route: 'desk-debate', event: 'follow_up_replaced', reason, language, level }));
-  return nextQuestionFallback(language, symbol);
+  const fixed = nextQuestionFallback(language, symbol);
+  return repeatsQuestion(fixed, question, symbol) ? nextQuestionSecond(language, symbol) : fixed;
 }
 
 /** What the desk says while it works: each argument as soon as it has passed the guard, never before. */
@@ -925,7 +942,7 @@ export async function runDeskDebate(
   // stray figure (0 means the CIO named none).
   const price = evidence.technicals.price;
   const near = typeof price === 'number' && price > 0 && cio.synthesis.watchLevel > price * 0.5 && cio.synthesis.watchLevel < price * 1.5;
-  const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null, followUp: servedFollowUp(cio.synthesis.followUp, language, evidence.symbol, level) };
+  const synthesis = { ...cio.synthesis, watchLevel: near ? cio.synthesis.watchLevel : null, followUp: servedFollowUp(cio.synthesis.followUp, language, evidence.symbol, level, question) };
   // The next question is not in this list: it was judged apart, just above, and a bad one was replaced, not thrown.
   for (const extra of [rebuttal?.analysis, scenarios?.confirm, scenarios?.invalidate, synthesis.headline, synthesis.why, synthesis.risk, synthesis.watch]) {
     if (!extra) continue;

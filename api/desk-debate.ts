@@ -95,9 +95,13 @@ const copy = deskErrorCopy;
  * Next question: `agents.synthesis.followUp` is always a string of 6 to 160 characters (shipped clients decode
  * it). It is the CIO's own when that is a what-or-why question about the asset; when it breaks the output guard
  * or the next-question rule (api/_lib/desk-next-question.ts: whether or when to act, a statement, a price, a word
- * the copy never uses) the reply carries a fixed question in the reply's language instead and the read is
- * served: never an `analysis_failed`, never a refund. The log line `{ route: 'desk-debate', event:
- * 'follow_up_replaced', reason, language, level }` counts how often, by class and without any text.
+ * the copy never uses, another language than the reply's, a word outside the list such a question is written
+ * with), or is the very question this request asked, the reply carries a fixed question in the reply's language
+ * instead and the read is served: never an `analysis_failed`, never a refund. There are two fixed questions, so
+ * a reader who taps the first and is answered is offered the second, never the one just answered. The log line
+ * `{ route: 'desk-debate', event: 'follow_up_replaced', reason, language, level }` counts how often, by class
+ * (advice, guarantee, act, word, number, shape, opener, language, unlisted; 'repeat' for the question just
+ * asked) and without any text.
  *
  * Outcomes (bobby_events, the owner's funnel): every request that passes validation records exactly one, with the
  * caller resolved before any gate (a budget pause by a signed-in account carries that account). A 405, a foreign
