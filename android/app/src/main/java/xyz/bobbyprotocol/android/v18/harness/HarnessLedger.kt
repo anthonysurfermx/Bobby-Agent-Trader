@@ -1,0 +1,414 @@
+package xyz.bobbyprotocol.android.v18.harness
+
+import org.json.JSONArray
+import org.json.JSONObject
+import xyz.bobbyprotocol.android.v18.KeyValueStore
+import java.time.Instant
+import java.time.ZoneId
+import java.util.Locale
+import java.util.TreeMap
+import kotlin.math.pow
+
+// The harness (1.8): Bobby picks the thread back up. From the first question the phone keeps a
+// small ledger of what the person did (which asset they asked about, whether a follow-up was
+// opened, at what hour they come back), and everything Bobby does next is derived from it: which
+// asset to come back to, when, and when to stop. A port of ios/Bobby/Sources/V18/Harness.
+//   HarnessLedger    what happened (this file)
+//   HarnessProfile   what that says about the person (this file, pure)
+//   HarnessPlanner   the follow-ups that come next (pure)
+//   HarnessCenter    the phone: permission, local notices, the line on the glass
+// Invariants:
+//  - It lives on this phone, per reader (an account, or `local` signed out). Nothing here is sent
+//    anywhere, and no question text is ever kept: a symbol, a price, a moment.
+//  - Bounded: `MAX_EVENTS` events and `RETENTION_DAYS` days. Older ones go on every write.
+//  - Erasable: `forget` removes a reader's ledger. Turning follow-ups off, withdrawing the risk
+//    notice, "Delete everything" and deleting the account all call it.
+// Every moment is epoch milliseconds.
+
+internal const val HARNESS_HOUR_MS = 3_600_000L
+internal const val HARNESS_DAY_MS = 86_400_000L
+
+/** The three follow-ups Bobby can come back with. */
+enum class HarnessStep(val raw: String) {
+    /** How the asset they asked about has moved. */
+    ASSET("asset"),
+    /** The sector that asset belongs to. */
+    SECTOR("sector"),
+    /** Their week: the assets they asked about. */
+    WEEK("week");
+
+    companion object {
+        fun of(raw: String?): HarnessStep? = entries.firstOrNull { it.raw == raw }
+    }
+}
+
+/** One thing the person did, or one follow-up the phone showed them. */
+data class HarnessEvent(
+    val kind: Kind,
+    val at: Long,
+    val symbol: String? = null,
+    val name: String? = null,
+    val isEquity: Boolean? = null,
+    /** `ASK`: the price the read was delivered with. */
+    val price: Double? = null,
+    /** `SENT`, `OPENED`, `RETURNED`: which follow-up. */
+    val step: HarnessStep? = null,
+    /** `SENT`, `OPENED`, `RETURNED` of a sector follow-up: the sector's id. */
+    val sector: String? = null,
+    /** `OPENED`, `RETURNED`: the moment of the follow-up they answer (its `SENT` has that `at`). */
+    val ref: Long? = null,
+) {
+    enum class Kind(val raw: String) {
+        /** A read was delivered. */
+        ASK("ask"),
+        /** They saved that read. */
+        SAVED("saved"),
+        /** The app came to the front. */
+        APP_OPEN("appOpen"),
+        /** A follow-up's moment passed with the notice handed to the phone. */
+        SENT("sent"),
+        /** They tapped a follow-up notification. */
+        OPENED("opened"),
+        /**
+         * They did something useful with a follow-up without tapping it: within a day they asked
+         * about it, or acted on its line in the app. Opening the app is not an answer.
+         */
+        RETURNED("returned"),
+        /** They acted on a follow-up inside the app (the line on the glass, a row of a board). */
+        PICKED("picked");
+
+        companion object {
+            fun of(raw: String?): Kind? = entries.firstOrNull { it.raw == raw }
+        }
+    }
+
+    /** Kinds that say "this person answers Bobby": the next follow-ups start from here. */
+    val isEngagement: Boolean get() = kind == Kind.OPENED || kind == Kind.RETURNED
+
+    /** Only what is there is written: a symbol, a price, a moment. Never a question. */
+    fun toJson(): JSONObject {
+        val json = JSONObject().put("kind", kind.raw).put("at", at)
+        if (symbol != null) json.put("symbol", symbol)
+        if (name != null) json.put("name", name)
+        if (isEquity != null) json.put("isEquity", isEquity)
+        if (price != null) json.put("price", price)
+        if (step != null) json.put("step", step.raw)
+        if (sector != null) json.put("sector", sector)
+        if (ref != null) json.put("ref", ref)
+        return json
+    }
+
+    companion object {
+        fun fromJson(json: JSONObject): HarnessEvent? {
+            val kind = Kind.of(HarnessJson.text(json, "kind")) ?: return null
+            val at = HarnessJson.long(json, "at") ?: return null
+            return HarnessEvent(kind, at, HarnessJson.text(json, "symbol"), HarnessJson.text(json, "name"), json.opt("isEquity") as? Boolean,
+                                HarnessJson.double(json, "price"), HarnessStep.of(HarnessJson.text(json, "step")), HarnessJson.text(json, "sector"),
+                                HarnessJson.long(json, "ref"))
+        }
+    }
+}
+
+/** An asset the person asked about, as the ledger knows it. */
+data class HarnessAsset(
+    val symbol: String,
+    val name: String,
+    val isEquity: Boolean,
+    /** The first ask still in the ledger (inside the window `assets` was called with). */
+    val firstAskedAt: Long,
+    val lastAskedAt: Long,
+    /** The price at the last ask, when the read had one. */
+    val lastPrice: Double?,
+    /** The price at the first ask of the window `assets` was called with that had one. */
+    val firstPrice: Double?,
+    val asks: Int,
+)
+
+class HarnessLedger {
+    private val list = ArrayList<HarnessEvent>()
+
+    /** Oldest first. */
+    val events: List<HarnessEvent> get() = list
+
+    val isEmpty: Boolean get() = list.isEmpty()
+
+    /** Adds one event in its place in time and drops what is too old or too much. */
+    fun note(event: HarnessEvent) {
+        var kept = event
+        if (kept.symbol != null) {
+            val valid = validSymbol(kept.symbol) ?: return
+            kept = kept.copy(symbol = valid)
+        }
+        val price = kept.price
+        if (price != null && !(price.isFinite() && price > 0)) kept = kept.copy(price = null)
+        val index = list.indexOfLast { it.at <= kept.at } + 1
+        list.add(index, kept)
+        prune(list.last().at)
+    }
+
+    fun prune(now: Long) {
+        val cutoff = now - RETENTION_DAYS * HARNESS_DAY_MS
+        list.removeAll { it.at < cutoff }
+        while (list.size > MAX_EVENTS) list.removeAt(0)
+    }
+
+    /** Removes events matching `drop` (a `RETURNED` that turned out to be a tap, for instance). True when something went. */
+    fun remove(drop: (HarnessEvent) -> Boolean): Boolean = list.removeAll(drop)
+
+    /** Another ledger's events join this one (a signed-out reader signs in on the same phone). */
+    fun merge(other: HarnessLedger) {
+        if (other.list.isEmpty()) return
+        val all = (list + other.list).sortedBy { it.at }
+        list.clear()
+        list.addAll(all)
+        prune(list.last().at)
+    }
+
+    // Reading
+
+    fun events(kind: HarnessEvent.Kind, since: Long? = null): List<HarnessEvent> =
+        list.filter { it.kind == kind && (since == null || it.at > since) }
+
+    /** Follow-ups shown since the person last answered one, and when the latest of them was. */
+    class Streak(val count: Int, val last: Long?)
+
+    fun unansweredStreak(before: Long): Streak {
+        val lastAnswer = list.lastOrNull { it.at <= before && it.isEngagement }?.at
+        val shown = list.filter { it.kind == HarnessEvent.Kind.SENT && it.at <= before && (lastAnswer == null || it.at > lastAnswer) }
+        return Streak(shown.size, shown.lastOrNull()?.at)
+    }
+
+    /** The latest event that the next follow-ups start from: a question, or an answered follow-up. */
+    fun anchor(before: Long): HarnessEvent? = list.lastOrNull { it.at <= before && (it.kind == HarnessEvent.Kind.ASK || it.isEngagement) }
+
+    /** The assets asked about since `since`, most recently asked first. */
+    fun assets(since: Long, now: Long): List<HarnessAsset> {
+        val bySymbol = LinkedHashMap<String, ArrayList<HarnessEvent>>()
+        for (event in list) {
+            if (event.kind != HarnessEvent.Kind.ASK || event.at < since || event.at > now) continue
+            val symbol = event.symbol ?: continue
+            bySymbol.getOrPut(symbol) { ArrayList() }.add(event)
+        }
+        return bySymbol.map { (symbol, asks) ->
+            val first = asks.first()
+            val last = asks.last()
+            HarnessAsset(symbol, last.name ?: symbol, last.isEquity ?: false, first.at, last.at, last.price,
+                         asks.firstOrNull { it.price != null }?.price, asks.size)
+        }.sortedByDescending { it.lastAskedAt }
+    }
+
+    fun asset(symbol: String, since: Long, now: Long): HarnessAsset? {
+        val wanted = symbol.uppercase(Locale.ROOT)
+        return assets(since, now).firstOrNull { it.symbol == wanted }
+    }
+
+    // Stored as `{"events": [...]}`, the shape iOS writes.
+
+    fun toJson(): JSONObject {
+        val array = JSONArray()
+        for (event in list) array.put(event.toJson())
+        return JSONObject().put("events", array)
+    }
+
+    override fun equals(other: Any?): Boolean = other is HarnessLedger && other.list == list
+    override fun hashCode(): Int = list.hashCode()
+    override fun toString(): String = "HarnessLedger($list)"
+
+    companion object {
+        const val MAX_EVENTS = 300
+        const val RETENTION_DAYS = 60
+        /** Same rule as the desk's symbols. */
+        val SYMBOL_PATTERN = Regex("^[A-Z0-9][A-Z0-9.^=-]{0,19}$")
+
+        fun validSymbol(raw: String?): String? {
+            val symbol = raw?.uppercase(Locale.ROOT) ?: return null
+            return if (SYMBOL_PATTERN.matches(symbol)) symbol else null
+        }
+
+        /** What was stored, read back. Anything that is not a ledger is an empty one; an entry that is not an event is skipped. */
+        fun fromJson(raw: String?): HarnessLedger {
+            val ledger = HarnessLedger()
+            if (raw.isNullOrEmpty()) return ledger
+            val array = try { JSONObject(raw).optJSONArray("events") } catch (_: Exception) { null } ?: return ledger
+            val read = ArrayList<HarnessEvent>()
+            for (i in 0 until array.length()) {
+                val event = array.optJSONObject(i)?.let { HarnessEvent.fromJson(it) } ?: continue
+                // The same two rules `note` applies, for a store somebody else may have written to.
+                val symbol = if (event.symbol == null) null else validSymbol(event.symbol) ?: continue
+                val price = event.price?.takeIf { it.isFinite() && it > 0 }
+                read.add(event.copy(symbol = symbol, price = price))
+            }
+            ledger.list.addAll(read.sortedBy { it.at })
+            return ledger
+        }
+    }
+}
+
+/**
+ * What the ledger says about the person. Pure, recomputed whenever it is needed, never stored:
+ * deleting the ledger deletes everything Bobby "learned".
+ */
+class HarnessProfile(
+    /** How much each asset matters to them right now (recent and repeated actions weigh more). */
+    val interest: Map<String, Double>,
+    /** The hour they tend to answer follow-ups at, once there is enough to tell. Local time. */
+    val hour: Int?,
+    /** Follow-ups shown in the last `STATS_DAYS`, per kind. */
+    val sent: Map<HarnessStep, Int>,
+    /** Of those, the ones they opened or came back for. */
+    val engaged: Map<HarnessStep, Int>,
+    /** Per kind: how many of the latest ones in a row went unanswered. */
+    val ignored: Map<HarnessStep, Int>,
+) {
+    /**
+     * Its last `IGNORED_LIMIT` showings went unanswered: Bobby stops sending that kind for now. An
+     * answer from before those showings does not count for them.
+     */
+    fun rests(step: HarnessStep): Boolean = (ignored[step] ?: 0) >= IGNORED_LIMIT
+
+    /** The asset that matters most among `symbols`; ties go to the order given. */
+    fun favourite(symbols: List<String>): String? {
+        var best: String? = null
+        var bestScore = 0.0
+        for (symbol in symbols) {
+            val score = interest[symbol] ?: 0.0
+            if (best == null || score > bestScore) {
+                best = symbol
+                bestScore = score
+            }
+        }
+        return best
+    }
+
+    companion object {
+        /** Interest halves every this many days. */
+        const val HALF_LIFE_DAYS = 7.0
+        const val STATS_DAYS = 30L
+        /** A kind whose last showings, this many in a row, went unanswered rests until they leave the window. */
+        const val IGNORED_LIMIT = 2
+        /** Answers needed before the hour they come at is trusted over the hour they asked at. */
+        const val HOUR_SAMPLES = 3
+
+        val WEIGHTS: Map<HarnessEvent.Kind, Double> = mapOf(
+            HarnessEvent.Kind.ASK to 1.0, HarnessEvent.Kind.SAVED to 1.0, HarnessEvent.Kind.PICKED to 1.0,
+            HarnessEvent.Kind.OPENED to 1.5, HarnessEvent.Kind.RETURNED to 0.5,
+        )
+
+        fun make(ledger: HarnessLedger, now: Long, zone: ZoneId): HarnessProfile {
+            val interest = HashMap<String, Double>()
+            val sent = HashMap<HarnessStep, Int>()
+            val engaged = HashMap<HarnessStep, Int>()
+            val ignored = HashMap<HarnessStep, Int>()
+            // hour -> (answers at that hour, the latest of them)
+            val hours = TreeMap<Int, Pair<Int, Long>>()
+            val statsFrom = now - STATS_DAYS * HARNESS_DAY_MS
+            for (event in ledger.events) {
+                if (event.at > now) continue
+                val weight = WEIGHTS[event.kind]
+                if (event.symbol != null && weight != null) {
+                    val ageDays = (now - event.at) / HARNESS_DAY_MS.toDouble()
+                    interest[event.symbol] = (interest[event.symbol] ?: 0.0) + weight * 0.5.pow(ageDays / HALF_LIFE_DAYS)
+                }
+                val step = event.step
+                if (event.at < statsFrom || step == null) continue
+                if (event.kind == HarnessEvent.Kind.SENT) {
+                    sent[step] = (sent[step] ?: 0) + 1
+                    ignored[step] = (ignored[step] ?: 0) + 1
+                }
+                if (event.isEngagement) {
+                    engaged[step] = (engaged[step] ?: 0) + 1
+                    ignored[step] = 0
+                    val hour = Instant.ofEpochMilli(event.at).atZone(zone).hour
+                    val seen = hours[hour]
+                    hours[hour] = Pair((seen?.first ?: 0) + 1, maxOf(seen?.second ?: event.at, event.at))
+                }
+            }
+            val samples = hours.values.sumOf { it.first }
+            // The hour with the most answers; between two, the one answered at most recently.
+            val best = hours.entries.maxWithOrNull(compareBy<Map.Entry<Int, Pair<Int, Long>>>({ it.value.first }, { it.value.second }))
+            return HarnessProfile(interest, if (samples >= HOUR_SAMPLES) best?.key else null, sent, engaged, ignored)
+        }
+    }
+}
+
+/** Whether the person wants Bobby to come back to them. */
+enum class HarnessMode(val raw: String) {
+    /** Never asked. The ledger is kept so the offer can be made; nothing is ever scheduled. */
+    UNDECIDED("undecided"),
+    ON("on"),
+    /** They said no: nothing is kept and nothing is scheduled. */
+    OFF("off");
+
+    companion object {
+        fun of(raw: String?): HarnessMode? = entries.firstOrNull { it.raw == raw }
+    }
+}
+
+/** Where each reader's ledger is kept on the phone (the `bobby.v18` store, the keys iOS uses). */
+class HarnessStore(private val store: KeyValueStore) {
+    fun ledger(owner: String?): HarnessLedger = HarnessLedger.fromJson(store.getString(key(PREFIX, owner)))
+
+    fun write(ledger: HarnessLedger, owner: String?) {
+        val key = key(PREFIX, owner)
+        if (ledger.isEmpty) store.remove(key) else store.putString(key, ledger.toJson().toString())
+    }
+
+    fun mode(owner: String?): HarnessMode = HarnessMode.of(store.getString(key(MODE_PREFIX, owner))) ?: HarnessMode.UNDECIDED
+
+    fun write(mode: HarnessMode, owner: String?) {
+        val key = key(MODE_PREFIX, owner)
+        if (mode == HarnessMode.UNDECIDED) store.remove(key) else store.putString(key, mode.raw)
+    }
+
+    fun plan(owner: String?): List<HarnessPlanned> {
+        val raw = store.getString(key(PLAN_PREFIX, owner)) ?: return emptyList()
+        val array = try { JSONArray(raw) } catch (_: Exception) { return emptyList() }
+        val plan = ArrayList<HarnessPlanned>()
+        for (i in 0 until array.length()) plan.add(array.optJSONObject(i)?.let { HarnessPlanned.fromJson(it) } ?: return emptyList())
+        return plan
+    }
+
+    fun write(plan: List<HarnessPlanned>, owner: String?) {
+        val key = key(PLAN_PREFIX, owner)
+        if (plan.isEmpty()) {
+            store.remove(key)
+            return
+        }
+        val array = JSONArray()
+        for (item in plan) array.put(item.toJson())
+        store.putString(key, array.toString())
+    }
+
+    /** Everything the harness keeps about one reader. */
+    fun forget(owner: String?) {
+        for (prefix in listOf(PREFIX, MODE_PREFIX, PLAN_PREFIX)) store.remove(key(prefix, owner))
+    }
+
+    companion object {
+        const val PREFIX = "v18.harness.v1."
+        const val MODE_PREFIX = "v18.harness.mode."
+        const val PLAN_PREFIX = "v18.harness.plan."
+
+        fun key(prefix: String, owner: String?): String = prefix + (owner ?: "local")
+
+        /** Account deletion: nothing of that account stays on the phone. */
+        fun forgetOwner(userId: String, store: KeyValueStore) {
+            HarnessStore(store).forget(userId)
+        }
+    }
+}
+
+/** Reading stored JSON the same way on the phone and in JVM tests (`optString` on a JSON null differs between them). */
+internal object HarnessJson {
+    fun text(json: JSONObject, key: String): String? = if (json.isNull(key)) null else json.opt(key) as? String
+
+    fun double(json: JSONObject, key: String): Double? =
+        if (json.isNull(key)) null else (json.opt(key) as? Number)?.toDouble()?.takeIf { it.isFinite() }
+
+    fun long(json: JSONObject, key: String): Long? {
+        val number = double(json, key) ?: return null
+        return if (number >= 0 && number < 9e15) Math.round(number) else null
+    }
+
+    fun int(json: JSONObject, key: String): Int? = long(json, key)?.takeIf { it <= Int.MAX_VALUE }?.toInt()
+}
