@@ -18,6 +18,14 @@ final class FakeHarnessNotifier: HarnessNotifying {
     private(set) var requests: [String: HarnessNotice] = [:]
     /// What sits on the lock screen: delivered and not yet cleared.
     private(set) var delivered: [String: HarnessNotice] = [:]
+    /// What iOS was last told about the kinds of follow-up, and how often it was told.
+    private(set) var categories: [HarnessCategory] = []
+    private(set) var registrations = 0
+
+    func register(_ categories: [HarnessCategory]) async {
+        self.categories = categories
+        registrations += 1
+    }
 
     func status() async -> ReminderPermission { permission }
 
@@ -465,7 +473,7 @@ final class HarnessCenterTests: XCTestCase {
         center.noteSaved(symbol: "NVDA", horizonHours: 168)
         await settle()
         var stored = HarnessStore(defaults: defaults).ledger(owner: nil)
-        XCTAssertEqual(stored.events.map(\.kind), [.ask, .saved], "the question and the save are registered, as before")
+        XCTAssertEqual(stored.events.map(\.kind), [.ask], "undecided: the question, and not the save")
         XCTAssertTrue(stored.events.allSatisfy { $0.horizon == nil && $0.horizonHours == nil && $0.thread == nil },
                       "undecided: nothing they said about their horizon is on the phone yet")
         XCTAssertEqual(center.ledger, stored)
@@ -475,8 +483,9 @@ final class HarnessCenterTests: XCTestCase {
         stored = HarnessStore(defaults: defaults).ledger(owner: nil)
         XCTAssertEqual(stored.events(.ask).first?.horizon, .week)
         XCTAssertEqual(stored.events(.ask).first?.thread, true)
-        XCTAssertEqual(stored.events(.saved).first?.horizonHours, 168)
-        XCTAssertEqual(stored.events.count, 2, "completed in place: nothing is written twice")
+        XCTAssertEqual(stored.events(.saved).first?.horizonHours, 168, "the save of that read is written at the yes, whole")
+        XCTAssertEqual(stored.events(.saved).first?.at, at(7, 16, 42), "at the moment it happened")
+        XCTAssertEqual(stored.events.count, 2, "the question completed in place, the save once: nothing is written twice")
         XCTAssertEqual(center.upcoming.map(\.step), [.asset], "the review they chose on the save: a week from the question")
         XCTAssertEqual(center.upcoming.first?.fireAt, at(14, 16, 40))
         XCTAssertEqual(center.upcoming.first?.days, 7)
@@ -728,11 +737,20 @@ final class HarnessCenterTests: XCTestCase {
         await center.appActive()
         XCTAssertNotNil(center.move)
         center.notePicked(symbol: "NVDA")
-        XCTAssertNil(center.move)
-        XCTAssertEqual(center.ledger.events(.picked).count, 1)
+        XCTAssertNil(center.move, "the line they acted on leaves the glass")
+        XCTAssertEqual(center.ledger.events(.picked).count, 0, "undecided: the tap itself is not written")
         await ask(center, "NVDA", price: 99)
         await center.refreshMove()
         XCTAssertNil(center.move, "they are looking at it now")
+        // With follow-ups on, the same tap is written.
+        _ = await center.accept()
+        clock = at(9, 18)
+        prices["NVDA"] = 98
+        await center.appActive()
+        XCTAssertNotNil(center.move)
+        center.notePicked(symbol: "NVDA")
+        XCTAssertNil(center.move)
+        XCTAssertEqual(center.ledger.events(.picked).count, 1)
     }
 
     func testATappedFollowUpPutsItsAssetOnTheGlassEvenIfAnotherWasAskedLater() async {
@@ -752,6 +770,9 @@ final class HarnessCenterTests: XCTestCase {
     func testAnAppOpenIsWrittenAtMostEveryHalfHour() async {
         let center = make()
         await ask(center, "NVDA")
+        await center.appActive()
+        XCTAssertEqual(center.ledger.events(.appOpen).count, 0, "undecided: opening the app is not written")
+        _ = await center.accept()
         await center.appActive()
         clock = clock.addingTimeInterval(600)
         await center.appActive()

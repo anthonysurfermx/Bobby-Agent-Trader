@@ -227,6 +227,18 @@ final class NudgeCenter {
         if currentId == id { currentId = nil }
     }
 
+    /// A feature erased what its nudges were about: their history (which ids were shown, when,
+    /// whether they were tapped) goes with it. By owner and straight on the store, so it also works
+    /// when no centre is serving that reader (the app was woken for a notification's action).
+    static func forget(prefix raw: String, owner: String?, defaults: UserDefaults = .standard) {
+        let prefix = raw.lowercased(), key = storeKey(owner: owner)
+        guard !prefix.isEmpty, let data = defaults.data(forKey: key),
+              let all = try? JSONDecoder().decode([String: Record].self, from: data) else { return }
+        let kept = all.filter { !$0.key.hasPrefix(prefix) }
+        guard kept.count != all.count else { return }
+        if kept.isEmpty { defaults.removeObject(forKey: key) } else if let data = try? JSONEncoder().encode(kept) { defaults.set(data, forKey: key) }
+    }
+
     func showings(_ id: String) -> Int { records[id.lowercased()]?.shown ?? 0 }
     func isRetired(_ id: String) -> Bool { records[id.lowercased()]?.done == true }
 

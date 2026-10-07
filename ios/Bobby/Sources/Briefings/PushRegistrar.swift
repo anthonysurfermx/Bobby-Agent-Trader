@@ -503,18 +503,30 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
-        let tapped = response.actionIdentifier == UNNotificationDefaultActionIdentifier
-        let briefId = BriefingIntent.briefId(from: response.notification.request.content.userInfo)
-        let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
-        let followUp = HarnessTap.tap(from: response.notification.request.content.userInfo)
+        let action = response.actionIdentifier
+        let userInfo = response.notification.request.content.userInfo
+        let briefId = BriefingIntent.briefId(from: userInfo)
+        let reminder = ReminderIntent.tap(from: userInfo)
+        let followUp = HarnessTap.tap(from: userInfo)
         Task { @MainActor in
+            let tapped = action == UNNotificationDefaultActionIdentifier
             // Stored only: the experience drains it once the page, account and consent are ready.
             if tapped, let briefId { BriefingIntent.shared.store(briefId) }
             // 1.8: a tapped thesis reminder waits the same way (Reminders/ReminderIntent.swift).
             if tapped, let reminder { ReminderIntent.shared.store(reminder) }
-            // 1.8: so does a tapped follow-up (Harness/HarnessIntent.swift).
-            if tapped, let followUp { HarnessIntent.shared.store(followUp) }
+            // 1.8: a follow-up (V18/Harness). iOS is told it is done only once "Stop" has stopped.
+            await Self.followUpResponse(action: action, tap: followUp)
             completionHandler()
         }
+    }
+
+    /// A follow-up notification was answered: its tap is stored like the others, and its "Stop"
+    /// action turns follow-ups off at once, with the app in the background (HarnessIntent.respond).
+    /// A notification that is not a follow-up of this app has no tap and does nothing here. The
+    /// centre and the store are parameters so the suite drives this with its own.
+    @MainActor
+    static func followUpResponse(action: String, tap: HarnessTap?, intent: HarnessIntent? = nil, harness: HarnessCenter? = nil) async {
+        guard let tap else { return }
+        await (intent ?? .shared).respond(action: action, tap: tap, center: harness ?? .shared)
     }
 }

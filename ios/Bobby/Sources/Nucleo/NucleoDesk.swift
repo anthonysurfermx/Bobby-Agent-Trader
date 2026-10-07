@@ -757,8 +757,10 @@ final class NucleoDesk {
             // Only the asset is passed on; the words are compared here and kept nowhere.
             let picked = read.nextQuestion.map { NucleoDeskIO.sameQuestion($0, q) } ?? false
             if picked { nextQuestionPicked(read.asset.symbol) }
+            // A read Bobby started runs at Quick whatever level is saved (`token(for:question:)`): the
+            // question was Bobby's, so it never spends, or runs out of, a level the person rations.
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
-                      generation: generation, startedAt: Date(), level: currentLevel(), origin: picked ? .followUp : .thread)
+                      generation: generation, startedAt: Date(), level: picked ? .rapido : currentLevel(), origin: picked ? .followUp : .thread)
         case let .question(q):
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
                       generation: generation, startedAt: Date(), level: currentLevel())
@@ -812,8 +814,11 @@ final class NucleoDesk {
 
     /// 1.8: a single-use token for a question native writes on the person's tap about an asset it
     /// already knows (a follow-up, a board row). Same lifetime and owner rules as every other token.
+    /// It runs at the Quick level whatever level is saved, and does not change the saved one: Bobby
+    /// started this read, so only the general read meter can stand in its way, and HarnessWall
+    /// looks at that meter before the read is offered.
     func token(for asset: NucleoAsset, question: String) -> String {
-        issueToken(asset, question: question, origin: .followUp)
+        issueToken(asset, question: question, level: .rapido, origin: .followUp)
     }
 
     private func purgeTokens(now: Date = Date()) {

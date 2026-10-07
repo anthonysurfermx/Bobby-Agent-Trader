@@ -91,13 +91,13 @@ final class HarnessGlassTests: XCTestCase {
         let week = HarnessFollowUp(step: .week, fireAt: t0, symbol: "NVDA", others: 2)
         let alone = HarnessFollowUp(step: .week, fireAt: t0, symbol: "NVDA", others: 0)
         L.select("en")
-        XCTAssertEqual(HarnessCopy.body(asset), "NVDA, a day later. See how it moved.")
-        XCTAssertEqual(HarnessCopy.body(later), "NVDA, 3 days later. See how it moved.")
+        XCTAssertEqual(HarnessCopy.body(asset), "NVDA: back to your question.")
+        XCTAssertEqual(HarnessCopy.body(later), "NVDA: back to your question.", "the day count is not said on the lock screen")
         XCTAssertEqual(HarnessCopy.body(sector), "Semiconductors today. NVDA is part of it.")
         XCTAssertEqual(HarnessCopy.body(week), "Your week: NVDA and 2 more.")
         XCTAssertEqual(HarnessCopy.body(alone), "Your week with NVDA.")
         L.select("es")
-        XCTAssertEqual(HarnessCopy.body(asset), "NVDA, un día después. Mira cómo se movió.")
+        XCTAssertEqual(HarnessCopy.body(asset), "NVDA: de vuelta a tu pregunta.")
         XCTAssertEqual(HarnessCopy.body(sector), "Semiconductores hoy. NVDA es parte.")
         XCTAssertEqual(HarnessCopy.body(week), "Tu semana: NVDA y 2 más.")
         var seen = Set<String>()
@@ -120,6 +120,7 @@ final class HarnessGlassTests: XCTestCase {
             said += [HarnessCopy.offerLine(symbol: "NVDA"), HarnessCopy.offerButton, HarnessCopy.moveButton, HarnessCopy.switchLabel,
                      HarnessCopy.switchDetail, HarnessCopy.weekTitle, HarnessCopy.sinceAsked, HarnessCopy.last24h, HarnessCopy.boardFoot,
                      HarnessCopy.boardEmpty, HarnessCopy.changedQuestion(symbol: "NVDA"), HarnessCopy.lookQuestion(symbol: "NVDA"),
+                     HarnessCopy.moveSeen, HarnessCopy.stopAction, HarnessCopy.hiddenBody(.asset), HarnessCopy.hiddenBody(.week),
                      HarnessCopy.moveLine(symbol: "NVDA", pct: 3, days: 1), HarnessCopy.moveLine(symbol: "NVDA", pct: nil, days: 2),
                      HarnessCopy.body(HarnessFollowUp(step: .asset, fireAt: t0, symbol: "NVDA")),
                      HarnessCopy.body(HarnessFollowUp(step: .sector, fireAt: t0, symbol: "NVDA", sector: "semis")),
@@ -304,6 +305,8 @@ final class HarnessGlassTests: XCTestCase {
 
     func testATappedSectorOpensItsBoardAndATappedAssetStaysOnTheGlass() async {
         let center = harness()
+        // A notification only exists for someone who said yes, and only then is its tap written down.
+        _ = await center.accept()
         let intent = HarnessIntent(observeAccount: false)
         let (session, bridge, recorder) = makeSession(harness: center, intent: intent)
         defer { session.teardown() }

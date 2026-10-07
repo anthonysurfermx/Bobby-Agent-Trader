@@ -167,6 +167,9 @@ final class NucleoSession: ObservableObject {
         desk.debateEvent = { [weak self] event in self?.notch.live(event) }
         // A Bobby-authored question was picked: the harness counts it (only while it may record), by asset.
         desk.nextQuestionPicked = { [weak self] symbol in self?.harness?.notePicked(symbol: symbol) }
+        // Bobby's own question is put after a read only when the receipt of that read says the next
+        // one is answered: it never leads into the sign-in or the paywall. (Fixture replies carry no receipt.)
+        if !fixtures { desk.offersNextQuestion = { HarnessWall.open($0) } }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)

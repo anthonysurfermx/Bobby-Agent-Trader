@@ -32,6 +32,12 @@ enum V18QA {
             "follow-offer": (NucleoNudge(id: "qa.follow.offer", text: HarnessCopy.offerLine(symbol: "NVDA"), cta: HarnessCopy.offerButton), .reminders),
             "follow-move": (NucleoNudge(id: "qa.follow.move", text: HarnessCopy.moveLine(symbol: "NVDA", pct: 2.3, days: 1),
                                         cta: HarnessCopy.moveButton), .followUp),
+            // No number the phone should not say (a price is missing, or the move is outside what a stock does).
+            "follow-move-plain": (NucleoNudge(id: "qa.follow.plain", text: HarnessCopy.moveLine(symbol: "NVDA", pct: nil, days: 2),
+                                              cta: HarnessCopy.moveButton), .followUp),
+            // The next read would be refused: the same line, and a button that asks nothing.
+            "follow-move-wall": (NucleoNudge(id: "qa.follow.wall", text: HarnessCopy.moveLine(symbol: "NVDA", pct: -1.1, days: 1),
+                                             cta: HarnessCopy.moveSeen), .followUp),
         ]
     }
 

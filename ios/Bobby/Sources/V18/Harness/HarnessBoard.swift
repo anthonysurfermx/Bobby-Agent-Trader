@@ -55,15 +55,13 @@ struct HarnessBoard: Equatable {
     }
 
     /// One row's number from a fresh quote. A sector reads the day's change; a week compares with
-    /// the price at the question, and shows nothing when either price is missing.
+    /// the price at the question, and shows nothing when either price is missing or the move is one
+    /// the phone should not put a number on (a split, a renamed ticker: HarnessCopy.move).
     func change(for row: Row, price: Double?, changePct: Double?) -> Double? {
-        let value: Double?
         switch kind {
-        case .sector: value = changePct
-        case .week:
-            if let then = row.priceThen, let price, then > 0, price > 0 { value = (price / then - 1) * 100 } else { value = nil }
+        case .sector: return changePct.flatMap { $0.isFinite && abs($0) < 1_000 ? $0 : nil }
+        case .week: return HarnessCopy.move(from: row.priceThen, to: price, isEquity: row.isEquity)
         }
-        return value.flatMap { $0.isFinite && abs($0) < 1_000 ? $0 : nil }
     }
 
     mutating func set(_ change: Double?, for symbol: String) {
@@ -86,11 +84,17 @@ struct HarnessBoardSheet: View {
     @State private var board: HarnessBoard?
     /// Whose assets the board shows: it closes the moment someone else is using the phone.
     @State private var generation = AccountSession.shared.generation
+    /// Where the phone hears how many reads are left: when either says something new, the rows are
+    /// drawn again as buttons or as plain rows.
+    @ObservedObject private var receipts = BobbyAccessCenter.shared
+    @ObservedObject private var levels = NucleoLevelCenter.shared
 
     var body: some View {
         Group {
             if let board {
-                HarnessBoardContent(board: board, onClose: onClose) { row in
+                // A row asks Bobby, which is a read: rows are only buttons when the next read is answered.
+                HarnessBoardContent(board: board, asks: HarnessCenter.shared.readsOpen, onClose: onClose) { row in
+                    guard HarnessCenter.shared.readsOpen else { return }
                     HarnessCenter.shared.notePicked(symbol: row.symbol)
                     session.startRead(symbol: row.symbol, name: row.name, isEquity: row.isEquity,
                                       question: HarnessCopy.lookQuestion(symbol: row.symbol))
@@ -105,6 +109,8 @@ struct HarnessBoardSheet: View {
             let made = HarnessBoard.make(for: HarnessBoardFocus.take(), ledger: HarnessCenter.shared.ledger, now: Date())
             board = made
             guard session.profile.acceptedRiskNotice else { return }
+            // Not awaited: the numbers do not wait for the receipt, and the rows redraw when it arrives.
+            if HarnessCenter.shared.access() == nil { Task { await HarnessCenter.shared.refreshAccess() } }
             await withTaskGroup(of: (String, Double?).self) { group in
                 for row in made.rows {
                     group.addTask {
@@ -129,6 +135,8 @@ struct HarnessBoardSheet: View {
 
 struct HarnessBoardContent: View {
     let board: HarnessBoard
+    /// False when the next read would be refused: the board is the same, and no row invites a read.
+    var asks = true
     let onClose: () -> Void
     let onPick: (HarnessBoard.Row) -> Void
 
@@ -143,12 +151,12 @@ struct HarnessBoardContent: View {
                 } else {
                     ForEach(Array(board.rows.enumerated()), id: \.element.id) { index, row in
                         let change = row.change.map(HarnessCopy.signed)
-                        QuietRow(label: row.symbol, value: change, note: row.name == row.symbol ? nil : row.name, chevron: true,
+                        QuietRow(label: row.symbol, value: change, note: row.name == row.symbol ? nil : row.name, chevron: asks,
                                  hairline: index < board.rows.count - 1,
                                  spoken: HarnessCopy.rowSpoken(symbol: row.symbol, name: row.name, change: change),
-                                 id: "follow-row-\(row.symbol)") { onPick(row) }
+                                 id: "follow-row-\(row.symbol)", action: asks ? { onPick(row) } : nil)
                     }
-                    QuietNote(text: HarnessCopy.boardFoot, id: "follow-foot").padding(.top, 14)
+                    if asks { QuietNote(text: HarnessCopy.boardFoot, id: "follow-foot").padding(.top, 14) }
                 }
             }
             .padding(.top, 12)

@@ -137,6 +137,8 @@ final class NextQuestionTests: XCTestCase {
 
     func testPickingTheQuestionBobbyWroteIsCountedForItsAssetAndTypingAnotherIsNot() async throws {
         let center = harness()
+        // A pick is written only once the person said yes to follow-ups.
+        _ = await center.accept()
         let (session, bridge) = make(harness: center)
         defer { session.teardown() }
 
@@ -177,6 +179,15 @@ final class NextQuestionTests: XCTestCase {
         let picked = await ask(bridge, ["followUpOf": id, "question": Self.offered])
         XCTAssertEqual(picked["status"] as? String, "ok", "the read itself is served as always")
         XCTAssertTrue(off.ledger.isEmpty)
+
+        // Undecided: the question they asked is kept, and neither the pick nor the read it started.
+        let undecided = harness()
+        let (waiting, waitingBridge) = make(harness: undecided)
+        defer { waiting.teardown() }
+        let asked = await ask(waitingBridge, ["question": "Should I buy NVIDIA right now?"])
+        _ = await ask(waitingBridge, ["followUpOf": try XCTUnwrap(asked["requestId"] as? String), "question": Self.offered])
+        XCTAssertEqual(undecided.ledger.events.map(\.kind), [.ask], "one entry: their own question")
+        XCTAssertNil(undecided.ledger.events.first?.origin)
 
         // No harness at all (fixture mode, the unit-test host): the tap is an ordinary read.
         let (plain, plainBridge) = make(harness: nil)
