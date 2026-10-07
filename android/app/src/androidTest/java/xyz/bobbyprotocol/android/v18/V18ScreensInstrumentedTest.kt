@@ -2,18 +2,24 @@ package xyz.bobbyprotocol.android.v18
 
 import android.os.Build
 import android.util.Log
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
+import androidx.compose.ui.test.ComposeTimeoutException
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.test.performTouchInput
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.UiDevice
 import kotlinx.coroutines.CompletableDeferred
@@ -50,9 +56,11 @@ import kotlin.math.roundToInt
  */
 @RunWith(Parameterized::class)
 class V18ScreensInstrumentedTest(private val language: String) {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
     private var staged: V18Stage? = null
+    /** The system's font size as it was, when a test changed it. */
+    private var fontScaleBefore: String? = null
 
     @Before fun requireEmulator() {
         assumeTrue(Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.contains("emulator") || Build.MODEL.contains("sdk_gphone") ||
@@ -60,6 +68,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
     }
 
     @After fun leaveTheStage() {
+        val before = fontScaleBefore
+        fontScaleBefore = null
+        if (before != null) V18Shots.shell("settings put system font_scale " + (before.toFloatOrNull() ?: 1f))
         val made = staged ?: return
         staged = null
         compose.runOnUiThread {
@@ -178,6 +189,11 @@ class V18ScreensInstrumentedTest(private val language: String) {
         // Words that are already there are never folded away: the two optional questions show.
         for (tag in listOf("thesis-editor-draft-note", "thesis-editor-worry", "thesis-editor-change-mind", "thesis-editor-horizon")) assertShown(tag)
         shot("editor-draft")
+        // A long press on the words: the keyboard comes up, a word is selected, the handles show.
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).performTouchInput { longClick(Offset(width * 0.3f, height * 0.3f)) }
+        compose.waitForIdle()
+        Thread.sleep(1_500)
+        shot("editor-selecting")
     }
 
     @Test fun thesisReviewBeforeAndAfter() {
@@ -239,11 +255,21 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertAbsent("reminders-set-NVDA")
         assertAbsent("reminders-risk-required")
         shot("reminders")
-        expandSheet()
-        shot("reminders-full")
         tap("reminders-set-BTC")
         await("reminders-week-BTC")
         shot("reminders-choosing")
+        // "Choose date": the day and the time, each a capsule that opens Material's own picker.
+        tap("reminders-pick-BTC")
+        await("reminders-date-BTC")
+        expandSheet()
+        shot("reminders-picking")
+        tap("reminders-date-BTC")
+        await("reminders-day-confirm")
+        shot("reminders-day-picker")
+        tap("reminders-day-cancel")
+        tap("reminders-time-BTC")
+        await("reminders-time-confirm")
+        shot("reminders-time-picker")
     }
 
     @Test fun followUpBoardOfTheWeek() {
@@ -268,7 +294,8 @@ class V18ScreensInstrumentedTest(private val language: String) {
     // ---- The two densest screens at the largest font size ----
 
     @Test fun thesisReviewAfterAtDoubleFontSize() {
-        reviewStage(fontScale = 2f)
+        useSystemFontScale(2f)
+        reviewStage()
         tap("thesis-review-start")
         await("thesis-review-keep", 40_000)
         shot("review-after-200")
@@ -279,7 +306,8 @@ class V18ScreensInstrumentedTest(private val language: String) {
     }
 
     @Test fun memoryConsentAtDoubleFontSize() {
-        val stage = open(fontScale = 2f) { memory.reply = { _, _, _ -> V18Fixtures.memory() } }
+        useSystemFontScale(2f)
+        val stage = open { memory.reply = { _, _, _ -> V18Fixtures.memory() } }
         present(stage, V18Routes.MEMORY_CONSENT, "memory-consent-close")
         expandSheet()
         shot("memory-consent-200")
@@ -292,9 +320,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
     // ---- The stage ----
 
     /** A reader with the two theses, on the review of NVDA, before it starts. */
-    private fun reviewStage(fontScale: Float = 1f): V18Stage {
+    private fun reviewStage(): V18Stage {
         lateinit var theses: V18Fixtures.Theses
-        val stage = open(fontScale = fontScale) {
+        val stage = open {
             network.answer("GET", ACCESS, V18Fixtures.freeAccount())
             network.answer("POST", DEBATE) { V18Fixtures.review(language) }
             theses = V18Fixtures.theses(this)
@@ -328,7 +356,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
      * Builds the reader and draws the screen. `prepare` runs before the features register on the
      * host (the network's answers, what the phone already holds).
      */
-    private fun open(owner: String? = V18Stage.ACCOUNT, fontScale: Float = 1f, prepare: V18Stage.() -> Unit = {}): V18Stage {
+    private fun open(owner: String? = V18Stage.ACCOUNT, prepare: V18Stage.() -> Unit = {}): V18Stage {
         val made = compose.runOnUiThread {
             V18Stage(instrumentation.targetContext, language, owner).also {
                 it.prepare()
@@ -336,9 +364,20 @@ class V18ScreensInstrumentedTest(private val language: String) {
             }
         }
         staged = made
-        compose.setContent { StageScreen(made, fontScale) }
+        compose.setContent { StageScreen(made) }
         compose.waitForIdle()
         return made
+    }
+
+    /**
+     * The system's own font size setting, as a person changes it in Settings: the activity is rebuilt
+     * for it, and so is every sheet. Call it before the stage is opened; it is put back when the test ends.
+     */
+    private fun useSystemFontScale(scale: Float) {
+        fontScaleBefore = V18Shots.shell("settings get system font_scale").trim()
+        V18Shots.shell("settings put system font_scale $scale")
+        compose.waitUntil(30_000) { compose.activity.resources.configuration.fontScale == scale }
+        compose.waitForIdle()
     }
 
     /** Runs what a person's tap would start, on the host's own scope, and waits for its answer. */
@@ -355,10 +394,21 @@ class V18ScreensInstrumentedTest(private val language: String) {
     private fun present(stage: V18Stage, route: String, tag: String) {
         compose.runOnUiThread { stage.present(route) }
         await(tag)
+        // The sheet is a window of its own: composed is not yet on the display. A row under the fold of
+        // a half-height sheet never is, so this wait gives up quietly.
+        runCatching {
+            compose.waitUntil(5_000) { runCatching { compose.onNodeWithTag(tag, useUnmergedTree = true).assertIsDisplayed() }.isSuccess }
+        }
     }
 
     private fun await(tag: String, timeoutMillis: Long = 20_000) {
-        compose.waitUntil(timeoutMillis) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        try {
+            compose.waitUntil(timeoutMillis) { compose.onAllNodesWithTag(tag, useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty() }
+        } catch (late: ComposeTimeoutException) {
+            // What was on the screen instead, for whoever reads the failure.
+            runCatching { V18Shots.save("failed-waiting-for-" + tag.lowercase() + "-" + language) }
+            throw late
+        }
     }
 
     private fun assertShown(tag: String) {
@@ -385,7 +435,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
     private fun shot(name: String) {
         compose.waitForIdle()
         // The frame that was just composed has to reach the display before it is captured.
-        Thread.sleep(400)
+        Thread.sleep(700)
         V18Shots.save("$name-$language")
         measureTouchTargets("$name-$language")
     }

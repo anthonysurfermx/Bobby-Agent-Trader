@@ -37,6 +37,8 @@ part() {
   cp -R app/build/reports/androidTests/connected "$out/$name/report" 2>/dev/null || true
   cp -R app/build/outputs/androidTest-results/connected "$out/$name/results" 2>/dev/null || true
   adb pull "$device_shots/." "$out/shots" > /dev/null 2>&1 || true
+  # A screen test sets the system's font size and puts it back; if it was cut short, the next part still starts at 100%.
+  adb shell settings put system font_scale 1.0 > /dev/null 2>&1 || true
 }
 
 part screens "$argument.class=$screens" "$@"

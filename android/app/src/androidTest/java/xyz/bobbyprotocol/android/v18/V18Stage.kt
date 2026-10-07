@@ -9,15 +9,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.Density
 import androidx.test.platform.app.InstrumentationRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -65,6 +62,8 @@ class StageNetwork {
         val reply = routes[call.method + " " + call.path]?.invoke(call) ?: Reply(503, "{\"error\":\"The staged network has no answer for this request\"}")
         Response.Builder().request(request).protocol(Protocol.HTTP_1_1).code(reply.status)
             .message(if (reply.status in 200..299) "OK" else "Refused")
+            // The repository tells a stream from a plain reply by this header, as with a real server.
+            .header("Content-Type", reply.type)
             .body(reply.body.toResponseBody(reply.type.toMediaType())).build()
     }.build()
 
@@ -178,20 +177,18 @@ class V18Stage(context: Context, val language: String = "en", owner: String? = A
 /**
  * The activity's screen around a staged sheet: the same theme MainActivity sets (its primary colour
  * is mint, so a default Material control would show green here exactly as it would in the app) and
- * the dark glass behind the sheet. `fontScale` stands for the system's font size setting.
+ * the dark glass behind the sheet. A sheet is a window of its own and takes its font size from the
+ * system, not from here: a test that wants large type changes the system's setting.
  */
 @Composable
-fun StageScreen(stage: V18Stage, fontScale: Float = 1f) {
-    val density = LocalDensity.current
-    CompositionLocalProvider(LocalDensity provides Density(density.density, fontScale)) {
-        MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF3FE0B5), background = Color(0xFF050505), surface = Color(0xFF111419), onSurface = Color(0xFFF2EDE4))) {
-            Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                Box(Modifier.fillMaxSize().background(Color(0xFF050505)))
-                val current = stage.route
-                // A 1.8 sheet may hand over to a 1.1.4 one (the paywall, a code): those are not staged.
-                if (current != null && V18Sheets.draws(current)) {
-                    key(current) { V18Sheets.Sheet(current, stage.host, onClose = { stage.bench.closeSheet() }) }
-                }
+fun StageScreen(stage: V18Stage) {
+    MaterialTheme(colorScheme = darkColorScheme(primary = Color(0xFF3FE0B5), background = Color(0xFF050505), surface = Color(0xFF111419), onSurface = Color(0xFFF2EDE4))) {
+        Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+            Box(Modifier.fillMaxSize().background(Color(0xFF050505)))
+            val current = stage.route
+            // A 1.8 sheet may hand over to a 1.1.4 one (the paywall, a code): those are not staged.
+            if (current != null && V18Sheets.draws(current)) {
+                key(current) { V18Sheets.Sheet(current, stage.host, onClose = { stage.bench.closeSheet() }) }
             }
         }
     }
@@ -203,7 +200,7 @@ object V18Shots {
     private const val FOLDER = "/data/local/tmp/bobby-shots"
 
     fun save(name: String) {
-        require(Regex("^[a-z0-9][a-z0-9-]{0,80}$").matches(name)) { "A screenshot name is lowercase words and dashes: $name" }
+        require(Regex("^[a-z0-9][a-z0-9-]{0,100}$").matches(name)) { "A screenshot name is lowercase words and dashes: $name" }
         shell("mkdir -p $FOLDER")
         shell("screencap -p $FOLDER/$name.png")
     }

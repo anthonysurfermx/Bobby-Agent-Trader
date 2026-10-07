@@ -97,6 +97,8 @@ class V18DeviceInstrumentedTest {
     private val backups = linkedMapOf<String, Map<String, *>>()
     private var offline = false
     private var rotated = false
+    /** The intent the activity was started with (a tapped notice replaces it). */
+    private var launchIntent: Intent? = null
 
     /** The 1.8 host of the activity on screen. */
     private val host: V18Runtime get() = checkNotNull(V18Process.runtime) { "MainActivity has no 1.8 host" }
@@ -124,6 +126,9 @@ class V18DeviceInstrumentedTest {
     @After fun tearDown() {
         if (rotated) runCatching { device.setOrientationNatural(); device.unfreezeRotation() }
         if (offline) runCatching { V18Shots.shell("cmd connectivity airplane-mode disable") }
+        // The scenario follows the activity only while its intent is the one it was started with, and a
+        // tapped notice replaces it (`onNewIntent`): it is put back, or closing waits for an end it cannot see.
+        runCatching { onMain { launchIntent?.let { started -> if (::activity.isInitialized) activity.intent = started } } }
         scenario?.close(); scenario = null
         runCatching { WorkManager.getInstance(context).cancelAllWorkByTag(LocalNotices.WORK_TAG).result.get(10, TimeUnit.SECONDS) }
         runCatching { notifications.cancelAll() }
@@ -294,7 +299,8 @@ class V18DeviceInstrumentedTest {
         assertEquals(listOf(thesis.id), onMain { host.theses.active(host.owner).map { it.id } })
         assertNull(onMain { host.sheetRoute })
 
-        // And the screens still open, sideways.
+        // And the screens still open, sideways, over the page drawn again.
+        awaitTheGlass()
         onMain { ReminderEntry.open(host, thesis.id) }
         waitForSheet(V18Routes.REMINDERS)
         await("reminders-thesis-NVDA")
@@ -334,6 +340,7 @@ class V18DeviceInstrumentedTest {
     /** The activity on screen, its repository on the staged network. */
     private fun adopt(actual: MainActivity) {
         activity = actual
+        if (launchIntent == null) launchIntent = Intent(actual.intent)
         val repository: BobbyRepository = field(actual, "repository")
         assertNull(repository.session.value)
         network.attach(repository)
