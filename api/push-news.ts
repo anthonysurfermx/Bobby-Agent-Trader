@@ -113,7 +113,8 @@ export function createPushNewsHandler(over: Partial<PushNewsDeps> = {}) {
           patch.locale = appLocale(body.language, body.locale);
           patch.language = body.language === 'pt' && patch.locale === 'pt-BR' ? 'pt-BR' : body.language;
         }
-        const saved = await d.patchSettings(account.id, expected, patch, observedCountry(req));
+        // The RPC retains country only under the final current opt-in; withdrawal never carries a new country.
+        const saved = await d.patchSettings(account.id, expected, patch, body.newsEnabled === false ? null : observedCountry(req));
         if (!saved.ok) fail(409, 'revision_conflict', { revision: (saved as { revision: number }).revision });
         const settings = (saved as { settings: db.NewsSettings }).settings;
         res.setHeader('ETag', etag(settings.revision));
