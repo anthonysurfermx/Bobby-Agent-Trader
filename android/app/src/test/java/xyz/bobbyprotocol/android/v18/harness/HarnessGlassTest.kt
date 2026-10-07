@@ -449,6 +449,24 @@ class HarnessGlassTest {
                    bench.host.allowsDueNotice(mapOf(LocalNotice.KIND to HarnessCenter.KIND, "step" to "price")))
     }
 
+    /** Android has no "language changed" hook: the next drawing of the glass notices, and the lines are written again after it. */
+    @Test fun anotherLanguageRewritesTheLockScreenOnceTheGlassIsDrawnAgain() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        HarnessNudges.register(bench.host)
+        val center = Harness.center(bench.host)
+        runCurrent()
+        bench.deliver(symbol = "NVDA")
+        center.accept()
+        assertEquals("NVDA, a day later. See how it moved.", bench.notifier.notice("v18.follow.asset")?.body)
+        bench.desk.language = "es"
+        bench.host.nudgeJson()
+        assertEquals("drawing the glass only reads", "NVDA, a day later. See how it moved.", bench.notifier.notice("v18.follow.asset")?.body)
+        runCurrent()
+        assertEquals("NVDA, un día después. Mira cómo se movió.", bench.notifier.notice("v18.follow.asset")?.body)
+        assertEquals(3, bench.notifier.pendingIds().size)
+        assertFalse(center.wordsAreStale)
+    }
+
     @Test fun nothingIsKeptBeforeTheRiskNoticeAndTheAppsHooksEraseWhatIs() = runTest {
         val bench = V18TestBench(backgroundScope)
         bench.desk.riskNotice = RiskNotice.WITHDRAWN

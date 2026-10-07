@@ -4,6 +4,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.yield
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
 
@@ -77,8 +78,13 @@ object Harness {
             }
         }
 
-        // The Núcleo is starting: the harness keeps itself true from here.
-        host.scope.launch { center.appActive() }
+        // The Núcleo is starting: the harness keeps itself true from here. After this turn: the
+        // app's scope runs a launch at once on the main thread, and nothing may reach back for the
+        // centre while it is still being built.
+        host.scope.launch {
+            yield()
+            center.appActive()
+        }
         return center
     }
 

@@ -1,6 +1,7 @@
 package xyz.bobbyprotocol.android.v18.harness
 
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import xyz.bobbyprotocol.android.v18.NucleoNudge
 import xyz.bobbyprotocol.android.v18.NudgeMoment
 import xyz.bobbyprotocol.android.v18.NudgePriority
@@ -53,7 +54,12 @@ object HarnessNudges {
         { _ ->
             // The app speaks another language since the lock-screen lines were written: they are
             // written again, after this turn (a candidate only ever reads).
-            if (harness.wordsAreStale) host.scope.launch { harness.rewriteWords() }
+            if (harness.wordsAreStale) {
+                host.scope.launch {
+                    yield()
+                    harness.rewriteWords()
+                }
+            }
             harness.moveOnGlass()?.let { nudge(it, harness.copy) }
         },
         { nudge ->
