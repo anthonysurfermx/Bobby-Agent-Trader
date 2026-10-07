@@ -1049,17 +1049,20 @@ final class HarnessSurfaceTests: XCTestCase {
         XCTAssertEqual((start["token"] as? String)?.count, 36, "an opaque token: the asset it stands for stays in native")
         // 3. In the source: outside its own folder the ledger is read by the two screens that show it
         //    and by the two places that erase it, and by nothing that talks to a server.
+        // Resolved, so the relative paths below come out right when the checkout sits behind a symbolic link.
         let sources = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Sources")
+            .resolvingSymlinksInPath()
         let marks = ["HarnessLedger", "HarnessStore", "HarnessProfile", "HarnessNotes", "harness.ledger", "harness?.ledger", "harness.profile",
                      "harness.notes", "HarnessCenter.shared.ledger", "HarnessCenter.shared.profile", "HarnessCenter.shared.notes"]
         var readers = Set<String>()
         let files = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
         for case let file as URL in files where file.pathExtension == "swift" {
-            let path = file.path.replacingOccurrences(of: sources.path + "/", with: "")
+            let path = file.resolvingSymlinksInPath().path.replacingOccurrences(of: sources.path + "/", with: "")
             guard !path.hasPrefix("V18/Harness/") else { continue }
             let text = try String(contentsOf: file, encoding: .utf8)
             if marks.contains(where: { text.contains($0) }) { readers.insert(path) }
         }
+        XCTAssertGreaterThan(readers.count, 0, "the sources were found")
         XCTAssertEqual(readers, ["AccountSession.swift", "Briefings/MemoryCenter.swift", "Briefings/MemoryView.swift", "V18/Reminders/RemindersSheet.swift"],
                        "a new reader of the ledger has to be looked at: does anything it reads leave the phone?")
     }
