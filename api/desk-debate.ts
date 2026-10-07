@@ -15,7 +15,7 @@ import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
 import { memoryDeskAllowed, MEMORY_RECORD_TIMEOUT_MS, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemoryReceipt, type MemorySummary } from './_lib/user-memory.js';
 
-// Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
+// Máximo runs four app-model calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
 
 /**

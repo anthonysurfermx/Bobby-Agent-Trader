@@ -59,7 +59,8 @@ final class BriefingsExperienceTests: XCTestCase {
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
         let intent = BriefingIntent(observeAccount: false)
         let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
-                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults, briefingIntent: intent)
+                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults, briefingIntent: intent,
+                                    newsIntent: NewsPushIntent(observeAccount: false))
         profile.onboarded = onboarded
         session.companions.companionId = onboarded ? "orb" : nil
         session.briefingSheetDelay = 0
@@ -100,6 +101,33 @@ final class BriefingsExperienceTests: XCTestCase {
     }
 
     // MARK: - Tap routing
+
+    func testNewsColdTapWaitsForReadyPageAndOpensLanguageControlsOnlyOnce() async {
+        let (session, bridge, recorder, _) = make()
+        let selection = L.selection
+        XCTAssertTrue(session.newsIntent.store(["newsCampaignId": "bobby-languages-2026-10", "language": "de", "screen": "language"]))
+        await settle()
+        XCTAssertNil(session.sheet); XCTAssertNotNil(session.newsIntent.pending)
+        await startApp(bridge)
+        XCTAssertEqual(session.sheet, .languageSettings); XCTAssertNil(session.newsIntent.pending)
+        XCTAssertEqual(L.selection, selection, "the campaign cannot overwrite the person's app language")
+        XCTAssertEqual(recorder.sheetStates("languageSettings"), ["open"])
+        session.sheetDismissed(); session.appBecameActive(); await settle()
+        XCTAssertNil(session.sheet, "a later foreground cannot replay the news tap")
+    }
+
+    func testNewsTapWaitsWhileBusyAndUntilRiskConsentAllowsTheApp() async {
+        let (session, bridge, _, _) = make(riskAccepted: false)
+        await startApp(bridge)
+        session.newsIntent.store(["newsCampaignId": "test-1234", "language": "pt-BR", "screen": "language"])
+        await settle()
+        XCTAssertNil(session.sheet); XCTAssertNotNil(session.newsIntent.pending)
+        session.profile.riskNoticeVersion = RiskNotice.currentVersion
+        deskBusy = true; session.scheduleBriefingDrain(); await settle()
+        XCTAssertNil(session.sheet)
+        deskBusy = false; session.scheduleBriefingDrain(); await settle()
+        XCTAssertEqual(session.sheet, .languageSettings); XCTAssertNil(session.newsIntent.pending)
+    }
 
     func testBriefingIsNeverOpenableFromThePage() {
         XCTAssertFalse(NucleoRoute.openable.contains(NucleoRoute.briefing.rawValue))

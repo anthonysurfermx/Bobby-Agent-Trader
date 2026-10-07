@@ -25,6 +25,7 @@ interface AgentCycle {
   trades_blocked: number;
   total_usd_deployed: number;
   latency_ms: number;
+  llm_model?: string | null;
   llm_reasoning: string;
   status: string;
   error: string | null;
@@ -774,7 +775,7 @@ export function AgentDashboard({ advisorName, scanIntervalHours, onCycleComplete
                               {/* Meta footer */}
                               <div className="flex items-center gap-3 mt-1.5 text-[9px] text-neutral-600">
                                 <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {(cycle.latency_ms / 1000).toFixed(1)}s</span>
-                                <span>Claude Sonnet 4</span>
+                                {cycle.llm_model && <span>{cycle.llm_model}</span>}
                                 {cycle.trades_blocked > 0 && (
                                   <span className="flex items-center gap-1 text-red-400/50">
                                     <Shield className="w-3 h-3" /> {cycle.trades_blocked} blocked

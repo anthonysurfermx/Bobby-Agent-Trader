@@ -24,7 +24,7 @@ process.env.OPENAI_API_KEY = 'test-openai';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
-for (const key of ['BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_LLM_PRIMARY', 'BOBBY_THESIS_REVIEW', 'BOBBY_MEMORY']) delete process.env[key];
+for (const key of ['BOBBY_APP_TEXT_MODEL', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_LLM_PRIMARY', 'BOBBY_THESIS_REVIEW', 'BOBBY_MEMORY']) delete process.env[key];
 
 // waitUntil (@vercel/functions) reads the request context from this symbol: capture what the handler defers.
 const deferred: Promise<unknown>[] = [];

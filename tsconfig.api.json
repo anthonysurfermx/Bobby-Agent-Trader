@@ -105,6 +105,7 @@
     "api/_lib/market-snapshot.ts",
     "api/briefings.ts",
     "api/briefing-worker.ts",
+    "api/push-news.ts",
     "api/bobby-intel.ts",
     "api/admin.ts",
     "api/revenuecat-webhook.ts",

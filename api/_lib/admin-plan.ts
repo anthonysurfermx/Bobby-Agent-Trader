@@ -14,8 +14,8 @@ import { logLlmUsage } from './llm-usage.js';
 import { claimCache, getCache, releaseCache, setCache } from './api-cache.js';
 import type { Insight } from './admin-insights.js';
 import { AdminError } from './admin.js';
+import { appModelSpec, appTextModel } from './app-model.js';
 
-const MODEL = 'claude-sonnet-5-5';
 const CACHE_SEC = 6 * 3600;
 const LOCK_KEY = 'admin-plan:lock';
 const LOCK_SEC = 120;               // longer than one generation (45 s model timeout); a crashed one frees itself
@@ -83,12 +83,13 @@ const leaves = (v: unknown): string[] => (v == null ? [] : typeof v === 'object'
  *  (the caller's function budget); `team`: what the figures say about the team's own traffic. */
 export async function growthPlan(insights: Insight[], metrics: Record<string, unknown>, force = false,
   opts: { deadline?: number; team?: PlanTeam } = {}): Promise<GrowthPlan> {
+  const model = appTextModel();
   const team = opts.team ?? 'excluded';
   const input = {
     metrics: { ...metrics, team } as Record<string, unknown>,
     findings: insights.map((i) => ({ id: i.id, level: i.level, area: i.area, title: i.title, detail: i.detail, action: i.action, evidence: i.evidence, sample: i.sample })),
   };
-  const key = `admin-plan:${createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 24)}`;
+  const key = `admin-plan:${createHash('sha256').update(JSON.stringify({ model, input })).digest('hex').slice(0, 24)}`;
   if (!force) {
     const hit = await getCache<GrowthPlan>(key);
     if (hit) return { ...hit, cached: true };
@@ -110,7 +111,7 @@ export async function growthPlan(insights: Insight[], metrics: Record<string, un
     let raw: { summary?: unknown; priorities?: unknown };
     try {
       raw = await completeJson(
-        { provider: 'anthropic', model: MODEL, effort: 'low', maxTokens: 4000, timeoutMs },
+        appModelSpec('low', 4000, timeoutMs),
         system(team), JSON.stringify(input), SCHEMA, { endpoint: 'admin-plan', role: 'plan', usage },
       ) as { summary?: unknown; priorities?: unknown };
     } finally {
@@ -141,7 +142,7 @@ export async function growthPlan(insights: Insight[], metrics: Record<string, un
     const known = new Set(numbers([...leaves(input.findings), ...leaves(figures)].join(' ')));
     const summary = str(raw.summary, 400);
     const plan: GrowthPlan = {
-      generatedAt: new Date().toISOString(), model: MODEL, summary: tokens(summary).every((t) => known.has(t.value) || dayFigure(t, metrics.days)) ? summary : '', priorities, cached: false,
+      generatedAt: new Date().toISOString(), model, summary: tokens(summary).every((t) => known.has(t.value) || dayFigure(t, metrics.days)) ? summary : '', priorities, cached: false,
       usd: Number(usage.reduce((t, u) => t + u.usd, 0).toFixed(4)),
     };
     if (priorities.length) await setCache(key, plan, CACHE_SEC);

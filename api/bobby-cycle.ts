@@ -16,6 +16,7 @@ import { evaluateCommitPolicy, assessCommitReceipt, digestKind } from './_lib/co
 import { recordAuthHeaders } from './_lib/record-auth.js';
 import { logHarnessEvent, buildVerdict, distillEpisode } from './_lib/harness-events.js';
 import { callLlm } from './_lib/llm.js';
+import { appTextModel, hasAppTextBackend } from './_lib/app-model.js';
 import { internalAuthHeaders, requireInternalAuth, requireOpsAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKeyOptional } from './_lib/bobby-db.js';
 import { publicTextViolation } from './_lib/desk-debate.js';
@@ -102,24 +103,15 @@ async function sbPatch(table: string, filters: string, data: Record<string, unkn
   }
 }
 
-// ---- OpenAI helper ----
-
-// Model mapping: Anthropic model id → OpenAI equivalent
-const OPENAI_FALLBACK: Record<string, string> = {
-  'claude-haiku-4-5-20251001': 'gpt-4o-mini',
-  'claude-sonnet-4-20250514': 'gpt-4o',
-};
-
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+// ---- App text helper ----
 
 // Thin adapter over _lib/llm.ts (retry/backoff/abort live there).
-async function callClaude(model: string, system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
-  const openaiModel = OPENAI_FALLBACK[model] || 'gpt-4o-mini';
+async function callClaude(system: string, userMsg: string, maxTokens: number, timeoutMs = 25000): Promise<string> {
   const result = await callLlm({
     endpoint: 'bobby-cycle',
     system,
     user: userMsg,
-    model: openaiModel,
+    model: appTextModel(),
     maxTokens,
     timeoutMs,
   });
@@ -146,7 +138,7 @@ async function guardedPublic(role: string, lang: string, produce: (extraRule: st
     : '[Withheld by the output guard: this argument contained a personal trading instruction or a guarantee.]';
 }
 
-// ---- Structured Verdict via OpenAI function calling ----
+// ---- Structured Verdict via app text tool calling ----
 
 interface StructuredVerdict {
   action: 'open' | 'close' | 'none';
@@ -188,7 +180,7 @@ async function callStructuredVerdict(system: string, userMsg: string, timeoutMs 
     endpoint: 'bobby-cycle',
     system,
     user: userMsg,
-    model: 'gpt-4o',
+    model: appTextModel(),
     maxTokens: 500,
     timeoutMs,
     tool: {
@@ -665,8 +657,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST' && req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  if (!OPENAI_API_KEY) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!hasAppTextBackend()) {
+    return res.status(503).json({ error: 'App text provider not configured' });
   }
 
   // Every path can spend API quota and persist cycle output; live paths can
@@ -847,7 +839,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const backendConv = typeof intel.performance?.dynamicConviction === 'number' ? intel.performance.dynamicConviction : 0;
 
     // Alpha Hunter (Haiku — cheap, aggressive, scans full market)
-    alphaPost = await guardedPublic('alpha', lang, (extraRule) => callClaude('claude-haiku-4-5-20251001',
+    alphaPost = await guardedPublic('alpha', lang, (extraRule) => callClaude(
       `You are Alpha Hunter — a young hungry female trader. Scan ALL assets (crypto + stocks). Find the single strongest trade thesis. Be SPECIFIC: reference entry, target, stop and invalidation. You MUST reference the TECHNICAL_PULSE section — cite the composite score, the signal (BULLISH/BEARISH), and at least 2 specific indicators (RSI, MACD, BB, SuperTrend, AHR999) with their exact values from the TECHNICAL_PULSE block. If the technical score supports your thesis, say so explicitly.${contradictionNote} ${langRule} 2-3 short paragraphs.\n${PUBLIC_VOICE}${extraRule}`,
       `MARKET SCAN:\n${contextBlock}`, 350
     ));
@@ -870,7 +862,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       redTeamIntensity = `You are Red Team — 15-year risk veteran. Destroy Alpha's thesis. Attack data gaps, selection bias, timing. Every paragraph is a kill shot.`;
     }
-    redPost = await guardedPublic('redteam', lang, (extraRule) => callClaude('claude-haiku-4-5-20251001',
+    redPost = await guardedPublic('redteam', lang, (extraRule) => callClaude(
       `${redTeamIntensity} Reference the TECHNICAL_PULSE composite score — if it contradicts Alpha, use it as ammunition. Cite specific indicator readings (RSI, MACD, BB, SuperTrend) from the TECHNICAL_PULSE block with exact numbers. ${langRule} 2-3 short paragraphs.${
         hasContradictions ? ` Recent failures: ${corrections.block}` : ''}\n${PUBLIC_VOICE}${extraRule}`,
       `MARKET DATA:\n${contextBlock}\n\nALPHA HUNTER'S THESIS:\n${alphaPost}`, 350
@@ -879,7 +871,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Analyst — SKIP on cron to save ~30s (Codex P0: timeout fuel)
     let analystPost = '';
     if (kind !== 'cron') {
-      analystPost = await callClaude('claude-haiku-4-5-20251001',
+      analystPost = await callClaude(
         `You are the Head Quantitative Analyst. Distill the <MORNING_BRIEFING> XML data and the Alpha/Red Team debates into a concise <EXECUTIVE_SUMMARY> plain-text report. Highlight market regime, conviction clusters, and major risks / points of friction. Keep it 3 bullet points exactly.`,
         `DATA:\n${contextBlock}\n\nALPHA HUNTER:\n${alphaPost}\n\nRED TEAM:\n${redPost}`, 350
       );
@@ -1282,7 +1274,7 @@ IDLE CASH CONTEXT:
 YIELD CANDIDATES:
 ${yieldInventoryBlock}`;
 
-      const yieldAlphaPost = await callClaude('claude-haiku-4-5-20251001',
+      const yieldAlphaPost = await callClaude(
         `You are Alpha Hunter. The trade was rejected, so now you are Bobby's treasury offense. Pick the single best idle-cash parking trade from the YIELD CANDIDATES only.
 
 RULES:
@@ -1294,7 +1286,7 @@ ${langRule} Keep it to 2 short paragraphs.`,
         `YIELD PARKING TASK:\n${yieldContextBlock}`, 350
       );
 
-      const yieldRedPost = await callClaude('claude-haiku-4-5-20251001',
+      const yieldRedPost = await callClaude(
         `You are Red Team. Destroy Alpha's yield idea.
 
 RULES:
@@ -1305,7 +1297,7 @@ ${langRule} Keep it to 2 short paragraphs.`,
         `YIELD PARKING TASK:\n${yieldContextBlock}\n\nALPHA HUNTER'S YIELD THESIS:\n${yieldAlphaPost}`, 350
       );
 
-      const yieldCioPost = await callClaude('claude-sonnet-4-20250514',
+      const yieldCioPost = await callClaude(
         `You are Bobby CIO. The trade was rejected because conviction stayed below threshold. Decide whether Bobby should keep cash idle or park it in one yield product until the next trade.
 
 RULES:
@@ -1518,7 +1510,7 @@ ${challengeMode.toUpperCase()}
 
 ${lang === 'es' ? 'Responde en español mexicano, casual pero inteligente. Como un mensaje de WhatsApp de tu trader de confianza. Menciona brevemente si se abrio trade o por que no.' : 'Respond in English, casual but smart. Like a morning text from your trusted trader. Mention if a trade was opened or why not.'}`;
 
-    const digestSummary = await callClaude('claude-haiku-4-5-20251001',
+    const digestSummary = await callClaude(
       'You write ultra-concise morning market digests. No greetings, no fluff. Jump straight to what matters.',
       digestPrompt, 150
     );
@@ -1850,7 +1842,7 @@ MCP: ${BOBBY_PROTOCOL_BASE_URL}/api/mcp-http | Checkpoint: ${BOBBY_PROTOCOL_BASE
     const shouldScoreQuality = threadId && !useTestVerdict && kind !== 'cron' && conviction !== null && conviction >= 0.35;
     if (shouldScoreQuality) {
       try {
-        const qualityRaw = await callClaude('claude-haiku-4-5-20251001',
+        const qualityRaw = await callClaude(
           `You are a trading debate evaluator. Score this 3-agent debate on each dimension using integers 1-5.
 Calibration anchors:
 - 1 = vague, no data, generic advice anyone could give

@@ -22,7 +22,8 @@ process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
 delete process.env.BOBBY_DESK_MODEL;
-// The suite below pins the OpenAI-first plans; the Sonnet-first default is checked in its own block at the end.
+delete process.env.BOBBY_APP_TEXT_MODEL;
+// The suite below pins the OpenAI-first plans; the Haiku-first default is checked in its own block at the end.
 process.env.BOBBY_LLM_PRIMARY = 'openai';
 
 const { completeJson, LlmIncompleteError } = await import('../api/_lib/llm.ts');
@@ -74,7 +75,7 @@ try {
     eq([calls[0].body.max_tokens, calls[0].body.temperature, 'max_completion_tokens' in calls[0].body], [650, 0.2, false], 'GPT-4o keeps max_tokens + temperature');
 
     mock(() => claude({ analysis: 'ok' }));
-    await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', effort: 'high', maxTokens: 6000, timeoutMs: 10_000 }, 'sys', 'user', schema, { endpoint: 't' });
+    await completeJson({ provider: 'anthropic', model: 'claude-haiku-5-5', effort: 'high', maxTokens: 6000, timeoutMs: 10_000 }, 'sys', 'user', schema, { endpoint: 't' });
     const c = calls[0];
     eq([c.url, c.headers['x-api-key'], c.headers['anthropic-version']], ['https://api.anthropic.com/v1/messages', 'test-anthropic', '2023-06-01'], 'Claude: endpoint and headers');
     eq([c.body.max_tokens, c.body.system, c.body.output_config.effort, c.body.output_config.format.type], [6000, 'sys', 'high', 'json_schema'], 'Claude: effort + json_schema in output_config');
@@ -82,19 +83,19 @@ try {
 
     const cut: any[] = [];
     mock(() => claude({ analysis: 'partial' }, 'max_tokens'));
-    await assert.rejects(completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 10, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't', usage: cut }), LlmIncompleteError); checks++;
+    await assert.rejects(completeJson({ provider: 'anthropic', model: 'claude-haiku-5-5', maxTokens: 10, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't', usage: cut }), LlmIncompleteError); checks++;
     eq([cut[0].ok, cut[0].stop, cut[0].tokensOut], [false, 'max_tokens', 500], 'a token-limited answer is a failure, still billed in the ledger');
     mock(() => openai({ analysis: 'partial' }, 'length'));
     await assert.rejects(completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 10, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), LlmIncompleteError); checks++;
 
     let n = 0;
     mock(() => (++n === 1 ? json({ error: 'overloaded' }, 529) : claude({ analysis: 'after retry' })));
-    eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'after retry' }, 'one retry on 529');
+    eq(await completeJson({ provider: 'anthropic', model: 'claude-haiku-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'after retry' }, 'one retry on 529');
     mock(() => json({ error: 'bad request' }, 400));
     await assert.rejects(completeJson({ provider: 'openai', model: 'gpt-6-luna', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' })); checks++;
     eq(calls.filter((c) => hostOf(c.url) === 'api.openai.com').length, 1, 'a 400 is not retried');
     mock(() => json({ stop_reason: 'end_turn', content: [{ type: 'text', text: '```json\n{"analysis":"fenced"}\n```' }], usage: {} }));
-    eq(await completeJson({ provider: 'anthropic', model: 'claude-sonnet-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'fenced' }, 'a stray code fence around valid JSON is tolerated');
+    eq(await completeJson({ provider: 'anthropic', model: 'claude-haiku-5-5', maxTokens: 100, timeoutMs: 10_000 }, 's', 'u', schema, { endpoint: 't' }), { analysis: 'fenced' }, 'a stray code fence around valid JSON is tolerated');
   }
 
   // ---------- levels ----------
@@ -600,14 +601,14 @@ try {
   debateMock();
   const usage: any[] = [];
   const deep = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'profundo', usage });
-  eq(calls.map((c) => [byRole(c), c.url.includes('anthropic') ? `${c.body.model}:${c.body.output_config.effort}` : c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'claude-sonnet-5-5:medium']], 'Profundo: luna debaters, Sonnet medium CIO');
+  eq(calls.map((c) => [byRole(c), c.url.includes('anthropic') ? `${c.body.model}:${c.body.output_config.effort}` : c.body.model]), [['alpha', 'gpt-6-luna'], ['red', 'gpt-6-luna'], ['cio', 'claude-haiku-5-5:medium']], 'Profundo: luna debaters, Haiku medium CIO');
   eq([deep.sufficiency.sufficient, deep.evidenceUsed.timeframes, deep.evidenceUsed.derivatives, deep.evidenceUsed.record?.wins], [true, ['1H', '4H', '1D'], true, 6], 'Profundo: v2 evidence covers the weekly horizon');
   ok(/evidence\.timeframes holds/.test(calls[0].body.messages[0].content) && JSON.parse(calls[0].body.messages[1].content).evidence.record.wins === 6, 'Profundo: the roles see the timeframes and Bobby\'s record');
   eq(usage.map((u) => u.role), ['alpha', 'red', 'cio'], 'Profundo: one ledger row per call');
 
   debateMock();
   const max = await runDeskDebate('Is BTC good for the next few days?', v2, 'en', { level: 'maximo' });
-  eq(calls.map((c) => [byRole(c), `${c.body.model}:${c.body.output_config?.effort}`]), [['alpha', 'claude-sonnet-5-5:high'], ['red', 'claude-sonnet-5-5:high'], ['rebuttal', 'claude-sonnet-5-5:high'], ['cio', 'claude-sonnet-5-5:high']], 'Máximo: Sonnet high ×4 with the second round');
+  eq(calls.map((c) => [byRole(c), `${c.body.model}:${c.body.output_config?.effort}`]), [['alpha', 'claude-haiku-5-5:high'], ['red', 'claude-haiku-5-5:high'], ['rebuttal', 'claude-haiku-5-5:high'], ['cio', 'claude-haiku-5-5:high']], 'Máximo: Haiku high ×4 with the second round');
   eq([max.agents.rebuttal, max.agents.scenarios], [REBUTTAL, SCEN], 'Máximo: second round and scenarios returned');
   ok(JSON.parse(calls[3].body.messages[0].content).rebuttal.analysis === REBUTTAL, 'the CIO weighs the second round');
   debateMock({ confirm: 'A close above the range means guaranteed profits for the week.', invalidate: SCEN.invalidate });
@@ -623,7 +624,7 @@ try {
   console.error = () => {};
   await assert.rejects(runDeskDebate('Is this real?', v2, 'en', { level: 'profundo' })); checks++;
   console.error = originalErr;
-  ok(!calls.some((c) => c.url.includes('openai') && byRole(c) === 'cio'), 'Profundo never swaps its Sonnet CIO for another model');
+  ok(!calls.some((c) => c.url.includes('openai') && byRole(c) === 'cio'), 'Profundo never swaps its Haiku CIO for another model');
   eq(levelPlan('maximo').budgetMs <= 170_000, true, 'Máximo fits inside maxDuration');
   eq(sufficiencyOf('Long term, is SOL worth holding for years?', ['1H', '4H', '1D', '1W']).sufficient, false, 'a multi-year horizon is never covered by the evidence');
 
@@ -642,7 +643,7 @@ try {
     eq(result.agents.verdict, 'wait', 'credit failover still returns a validated verdict');
     eq(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.openai.com' : 'api.anthropic.com')).length, 1, 'exhausted provider tried only once per debate');
     eq(usage.filter(u => u.ok).length, direction === 'openai' ? 3 : 4, 'all roles run on the available provider, including Max rebuttal');
-    ok(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.anthropic.com' : 'api.openai.com')).every(c => direction === 'openai' ? c.body.model === 'claude-sonnet-5-5' : c.body.model === 'gpt-6-sol'), 'alternate model family matches the analysis level');
+    ok(calls.filter(c => hostOf(c.url) === (direction === 'openai' ? 'api.anthropic.com' : 'api.openai.com')).every(c => direction === 'openai' ? c.body.model === 'claude-haiku-5-5' : c.body.model === 'gpt-6-sol'), 'alternate model family matches the analysis level');
   }
 
   // ---------- the endpoint: premium allowance, refusal, refund, ledger ----------
@@ -895,21 +896,37 @@ try {
   ok(shared.url.startsWith('https://bobbyprotocol.xyz/') && !shared.url.includes('/desk'), 'the shared link no longer opens the web desk');
   eq([inviteUrl('https://bobby-preview.vercel.app', 'ABCDEFGH'), inviteUrl('http://localhost:8080', 'ABCDEFGH')], ['https://bobby-preview.vercel.app/i/ABCDEFGH', 'http://localhost:8080/i/ABCDEFGH'], 'previews and local servers link to their own host');
 
-  // ---------- Sonnet first (owner's rule, 2026-10-01), OpenAI when Sonnet is out of credit ----------
+  // ---------- Haiku by default; explicit rollback and reciprocal provider failover stay available ----------
   {
-    process.env.BOBBY_LLM_PRIMARY = 'anthropic';
+    delete process.env.BOBBY_LLM_PRIMARY;
     const models = (l: 'rapido' | 'profundo' | 'maximo') => { const p = levelPlan(l); return [p.alpha.model, p.red.model, p.cio.model]; };
-    eq([models('rapido'), models('profundo'), models('maximo')], [['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5']], 'Sonnet answers every role first on every level');
+    eq([models('rapido'), models('profundo'), models('maximo')], [['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5'], ['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5'], ['claude-haiku-5-5', 'claude-haiku-5-5', 'claude-haiku-5-5']], 'Haiku answers every role first on every level');
+    eq([levelPlan('rapido').alpha.provider, levelPlan('profundo').red.provider, levelPlan('maximo').rebuttal?.provider], ['anthropic', 'anthropic', 'anthropic'], 'without a provider override every level and second round uses Anthropic');
+    process.env.BOBBY_APP_TEXT_MODEL = 'claude-sonnet-5-5';
+    eq([models('rapido'), models('profundo'), models('maximo'), levelPlan('maximo').rebuttal?.model], [
+      ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'],
+      ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'],
+      ['claude-sonnet-5-5', 'claude-sonnet-5-5', 'claude-sonnet-5-5'], 'claude-sonnet-5-5',
+    ], 'explicit app text-model rollback reaches every level and the second round');
+    delete process.env.BOBBY_APP_TEXT_MODEL;
     eq([levelPlan('rapido').cio.effort, levelPlan('profundo').alpha.effort, levelPlan('profundo').cio.effort, levelPlan('maximo').cio.effort], ['low', 'low', 'medium', 'high'], 'effort grows with the level');
     eq(levelPlan('rapido').fallback?.provider, 'openai', 'Rápido model-access fallback is on the other provider');
 
     debateMock();
-    const sonnetFirst = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
-    eq(calls.map((c) => [byRole(c), hostOf(c.url), c.body.model]), [['alpha', 'api.anthropic.com', 'claude-sonnet-5-5'], ['red', 'api.anthropic.com', 'claude-sonnet-5-5'], ['cio', 'api.anthropic.com', 'claude-sonnet-5-5']], 'Rápido runs on Sonnet');
-    eq(calls.map((c) => c.body.output_config?.effort), ['low', 'low', 'low'], 'Rápido asks Sonnet for low effort');
-    eq(sonnetFirst.agents.verdict, 'wait', 'Sonnet-first returns a validated verdict');
+    const haikuFirst = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
+    eq(calls.map((c) => [byRole(c), hostOf(c.url), c.body.model]), [['alpha', 'api.anthropic.com', 'claude-haiku-5-5'], ['red', 'api.anthropic.com', 'claude-haiku-5-5'], ['cio', 'api.anthropic.com', 'claude-haiku-5-5']], 'Rápido runs on Haiku');
+    eq(calls.map((c) => c.body.output_config?.effort), ['low', 'low', 'low'], 'Rápido asks Haiku for low effort');
+    eq(haikuFirst.agents.verdict, 'wait', 'Haiku-first returns a validated verdict');
+    for (const stop of ['refusal', 'max_tokens']) {
+      const rejectedUsage: any[] = [];
+      mock(() => claude({ analysis: ALPHA }, stop));
+      await assert.rejects(runDeskDebate('Is this real?', evidence, 'en', { usage: rejectedUsage }), LlmIncompleteError); checks++;
+      eq(calls.filter((c) => hostOf(c.url) === 'api.anthropic.com').length, 1, `${stop}: only the original Anthropic call is spent`);
+      eq(calls.filter((c) => hostOf(c.url) === 'api.openai.com').length, 0, `${stop}: a refused or incomplete answer never crosses providers`);
+      eq([rejectedUsage[0].ok, rejectedUsage[0].stop, rejectedUsage[0].tokensOut], [false, stop, 500], `${stop}: unsuccessful output still records its billable tokens`);
+    }
 
-    // Sonnet out of credit: the role moves to OpenAI once, the later roles start there, and the owner gets one email.
+    // Haiku out of credit: the role moves to OpenAI once, the later roles start there, and the owner gets one email.
     (await import('../api/_lib/provider-alert.ts')).resetProviderAlerts();
     process.env.RESEND_API_KEY = 'test-resend';
     process.env.BOBBY_ALERT_EMAIL = 'owner@bobby.test';
@@ -926,7 +943,7 @@ try {
     const failedOver = await runDeskDebate('Is BTC worth a look this week?', evidence, 'en');
     await new Promise((r) => setTimeout(r, 50));
     const ai = calls.filter((c) => ['api.anthropic.com', 'api.openai.com'].includes(hostOf(c.url)));
-    eq(ai.map((c) => [byRole(c), hostOf(c.url)]), [['alpha', 'api.anthropic.com'], ['alpha', 'api.openai.com'], ['red', 'api.openai.com'], ['cio', 'api.openai.com']], 'one refused Sonnet call, then OpenAI for every role; no retry of exhausted credit');
+    eq(ai.map((c) => [byRole(c), hostOf(c.url)]), [['alpha', 'api.anthropic.com'], ['alpha', 'api.openai.com'], ['red', 'api.openai.com'], ['cio', 'api.openai.com']], 'one refused Haiku call, then OpenAI for every role; no retry of exhausted credit');
     eq(failedOver.agents.verdict, 'wait', 'the failed-over debate still returns a validated verdict');
     const emails = calls.filter((c) => hostOf(c.url) === 'api.resend.com');
     eq(emails.length, 1, 'exhausted credit sends one alert email');

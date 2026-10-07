@@ -19,6 +19,8 @@ export interface Identity {
   authUserId: string | null;
   wallet: string | null;
   via: 'wallet' | 'supabase';
+  /** Authentication provider verified by Supabase, never inferred from client profile fields. */
+  provider?: string | null;
   /** First name from the Apple/Google profile (Supabase user_metadata), when the provider shared one. */
   firstName?: string | null;
 }
@@ -100,7 +102,7 @@ export async function resolveIdentity(req: VercelRequest, transport: IdentityTra
   const user = await verifySupabaseToken(token, transport);
   if (!user) return null;
   const row = await upsertIdentity('auth_user_id', { auth_user_id: user.id, email: user.email, provider: user.provider }, transport);
-  return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'supabase', firstName: user.firstName } : null;
+  return row ? { id: row.id, authUserId: row.auth_user_id, wallet: row.wallet_address, via: 'supabase', provider: user.provider, firstName: user.firstName } : null;
 }
 
 export async function requireIdentity(req: VercelRequest, res: VercelResponse, transport: IdentityTransport = defaultTransport): Promise<Identity | null> {

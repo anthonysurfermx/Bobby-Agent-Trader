@@ -36,6 +36,7 @@ struct AccountSheet: View {
     @ObservedObject private var invites = NucleoLevelCenter.shared
     /// The account's market briefing choices (the row detail); nil until read.
     @ObservedObject private var briefings = BriefingsCenter.shared
+    @ObservedObject private var news = NewsPushCenter.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
     @StateObject private var land = LandPulse()
     @AppStorage(L.preferenceKey) private var languageSelection = "system"
@@ -90,7 +91,7 @@ struct AccountSheet: View {
             await reads.refresh()
             await invites.refresh()
             if pieces == nil, account.isSignedIn { await land.refresh() }
-            if account.isSignedIn { await briefings.refresh() }
+            if account.isSignedIn { await briefings.refresh(); await news.refresh() }
         }
         .sheet(item: $route, onDismiss: {
             // A thesis closed on the island or a piece planted: bring the pieces up to date.
@@ -357,6 +358,10 @@ struct AccountSheet: View {
                    detail: BriefingCopy.summary(account.isSignedIn ? briefings.settings : nil),
                    action: { route = .briefings }) { ProfileIcon(symbol: "calendar") }
             .accessibilityIdentifier("account-briefings")
+        ProfileRow(label: NewsPushCopy.text(.title),
+                   detail: account.isSignedIn && news.settings?.newsEnabled == true ? L.t("On", "Activadas") : L.t("Off", "Desactivadas"),
+                   action: { route = .news }) { ProfileIcon(symbol: "bell.badge") }
+            .accessibilityIdentifier("account-news")
         if let voice {
             VoiceSwitchRow(voice: voice, onChange: onVoiceMutedChange)
             VoiceGenderRow(voice: voice)
@@ -612,6 +617,11 @@ struct AccountSheet: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .news:
+            NewsPushSettingsView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .memory:
             MemoryView(riskAccepted: profile.acceptedRiskNotice) { route = nil }
                 .presentationDetents([.large])
@@ -623,7 +633,7 @@ struct AccountSheet: View {
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, credits, locker, land, risk, pet, pro, briefings, memory
+    case avatar, credits, locker, land, risk, pet, pro, briefings, news, memory
     case share(UIImage)
     case tool(CompanionTool)
 
@@ -637,6 +647,7 @@ enum ProfileRoute: Identifiable {
         case .pet: return "pet"
         case .pro: return "pro"
         case .briefings: return "briefings"
+        case .news: return "news"
         case .memory: return "memory"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
