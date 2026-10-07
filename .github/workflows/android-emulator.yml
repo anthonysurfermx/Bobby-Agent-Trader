@@ -1,0 +1,80 @@
+name: Android emulator
+
+# Runs the instrumented tests (android/app/src/androidTest) on a real Android system image and keeps
+# what they leave behind: the test report, logcat and every screenshot a test saved. The `Android`
+# workflow only compiles these tests; this one runs them. No secret is used: the debug build as it is.
+
+on:
+  pull_request:
+    paths: ['android/**', '.github/workflows/android-emulator.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 22
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Install locked viewer dependencies
+        run: npm ci
+      - name: Generate the bundled equipment viewer
+        run: node android/nucleo/equipment-stage/build.mjs
+      - name: Generate the bundled production engine
+        run: python3 android/nucleo/build.py --release
+      - name: Install the compile SDK
+        run: |
+          for android_sdk_manager in "$ANDROID_HOME"/cmdline-tools/latest/bin/sdkmanager "$ANDROID_HOME"/cmdline-tools/*/bin/sdkmanager; do
+            if [ -x "$android_sdk_manager" ]; then
+              "$android_sdk_manager" 'platforms;android-36' 'build-tools;35.0.0'
+              exit 0
+            fi
+          done
+          echo 'Android command-line tools are missing from the hosted SDK.' >&2
+          exit 1
+      - name: Let the emulator use hardware acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      # Built before the emulator starts, so it never sits idle through a compile.
+      - name: Build the app and its instrumented tests
+        working-directory: android
+        run: ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest --no-daemon
+      - name: Run the instrumented tests on an emulator
+        uses: ReactiveCircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          cores: 4
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
+          working-directory: android
+          script: bash tools/run-emulator-tests.sh
+      - name: Keep the report, the log and the screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: android-emulator
+          path: |
+            android/app/build/reports/androidTests/connected
+            android/app/build/outputs/androidTest-results/connected
+            android/build/emulator
+          if-no-files-found: warn
+          retention-days: 14
