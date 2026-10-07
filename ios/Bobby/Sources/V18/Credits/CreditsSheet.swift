@@ -93,7 +93,7 @@ struct CreditsSheet: View {
                                           // The invite sheet's Bobby Pro card: the paywall follows once it is gone.
                                           inner = nil
                                           DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { inner = .pro }
-                                      }) { inner = nil }
+                                      }, onClose: { inner = nil }, afterSignIn: afterSignIn)
                         .presentationDetents([.medium, .large])
                         .presentationDragIndicator(.visible)
                         .presentationBackground(Theme.nucleoSurface)

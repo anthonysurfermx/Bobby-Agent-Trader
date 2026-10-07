@@ -153,7 +153,8 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.nucleoSurface)
         case .invite:
             NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: session.proPurchasable, reason: session.inviteReason,
-                              onPro: { session.inviteChosePro() }) { session.sheet = nil }
+                              onPro: { session.inviteChosePro() }, onClose: { session.sheet = nil },
+                              afterSignIn: { await session.signedInFromSheet() })
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)

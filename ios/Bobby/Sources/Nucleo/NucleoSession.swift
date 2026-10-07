@@ -1006,6 +1006,14 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
+        // 1.8: an invitation was answered (accepted, already used, not new): the glass says so now.
+        InviteLinkCenter.shared.$answer
+            .map { $0 != nil }
+            .removeDuplicates()
+            .dropFirst()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.sessionChanged() }
+            .store(in: &cancellables)
         // Bobby stopped speaking: a waiting tap may open.
         voice.$speaking
             .removeDuplicates()

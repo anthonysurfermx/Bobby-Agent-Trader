@@ -76,8 +76,6 @@ final class ThesisReviewer: ObservableObject {
     @MainActor
     struct Environment {
         var book: ThesisBook = .shared
-        /// Where "Not mine" is remembered for theses written before signing in (`ThesisGuestBook`).
-        var guestDefaults: UserDefaults = .standard
         var owner: () -> String? = { AccountSession.shared.session?.userId }
         var generation: () -> UUID = { AccountSession.shared.generation }
         var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
@@ -160,7 +158,7 @@ final class ThesisReviewer: ObservableObject {
     /// it is still in the guest book, and My theses asks whether to keep it in this account.
     private var waitsInGuestBook: Bool {
         guard let thesisId, let owner = env.owner(), env.book.thesis(id: thesisId, owner: nil) != nil else { return false }
-        return ThesisGuestBook(book: env.book, defaults: env.guestDefaults).pendingLocalCount(for: owner) > 0
+        return env.book.pendingLocalCount(for: owner) > 0
     }
 
     // MARK: One review

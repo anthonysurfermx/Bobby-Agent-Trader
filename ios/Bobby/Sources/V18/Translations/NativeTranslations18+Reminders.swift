@@ -21,7 +21,6 @@ extension NativeTranslations18 {
         result["Remind me then"] = ["fr": "Rappelle-le-moi ce jour-là", "pt": "Lembra-me nesse dia", "it": "Ricordamelo quel giorno", "de": "Erinnere mich dann"]
         result["Reminder on {0}"] = ["fr": "Rappel le {0}", "pt": "Lembrete a {0}", "it": "Promemoria il {0}", "de": "Erinnerung am {0}"]
         result["Reminders are for theses you wrote. Write one after your next read."] = ["fr": "Les rappels sont pour les thèses que tu as écrites. Écris-en une après ta prochaine analyse.", "pt": "Os lembretes são para as teses que escreveste. Escreve uma depois da tua próxima análise.", "it": "I promemoria sono per le tesi che hai scritto. Scrivine una dopo la tua prossima analisi.", "de": "Erinnerungen sind für Thesen, die du geschrieben hast. Schreib eine nach deiner nächsten Analyse."]
-        result["Remove"] = ["fr": "Retirer", "pt": "Remover", "it": "Rimuovi", "de": "Entfernen"]
         result["Set a reminder"] = ["fr": "Créer un rappel", "pt": "Criar um lembrete", "it": "Imposta un promemoria", "de": "Erinnerung einrichten"]
         result["The reminder could not be set. Try again."] = ["fr": "Le rappel n’a pas pu être créé. Réessaie.", "pt": "Não foi possível criar o lembrete. Tenta outra vez.", "it": "Non è stato possibile impostare il promemoria. Riprova.", "de": "Die Erinnerung konnte nicht eingerichtet werden. Versuch es noch einmal."]
         result["Turn it on"] = ["fr": "L’activer", "pt": "Ativar", "it": "Attivalo", "de": "Einschalten"]

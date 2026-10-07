@@ -119,7 +119,7 @@ enum ThesesQA {
     private static func list(seeded: Bool, highlight symbol: String? = nil, owner: String? = nil,
                              lastSavedRead: NucleoReadSummary? = nil) -> AnyView {
         let book = book(seeded: seeded)
-        let model = ThesisListModel(book: book, guests: ThesisGuestBook(book: book, defaults: store), owner: { owner },
+        let model = ThesisListModel(book: book, guests: ThesisGuestBook(book: book), owner: { owner },
                                     highlight: symbol.flatMap { book.activeThesis(symbol: $0, owner: nil)?.id },
                                     lastSavedRead: { lastSavedRead })
         return AnyView(ThesisListView(model: model, onReview: { _ in }, onEdit: { _ in }, onClose: {}))
@@ -144,7 +144,6 @@ enum ThesesQA {
         if case .refused(.riskNotice) = state { riskAccepted = false }
         var env = ThesisReviewer.Environment()
         env.book = book
-        env.guestDefaults = store
         env.owner = { nil }
         env.generation = { generation }
         env.riskAccepted = { riskAccepted }

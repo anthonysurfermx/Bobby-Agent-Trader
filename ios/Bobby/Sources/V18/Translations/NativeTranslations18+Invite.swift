@@ -28,7 +28,6 @@ extension NativeTranslations18 {
         result["Apply"] = ["fr": "Appliquer", "pt": "Aplicar", "it": "Applica", "de": "Anwenden"]
         result["Applying…"] = ["fr": "Vérification…", "pt": "A aplicar…", "it": "Verifica in corso…", "de": "Wird angewendet…"]
         result["Invitation {0} is saved on this phone."] = ["fr": "L'invitation {0} est enregistrée sur ce téléphone.", "pt": "O convite {0} está guardado neste telemóvel.", "it": "L'invito {0} è salvato su questo telefono.", "de": "Die Einladung {0} ist auf diesem Telefon gespeichert."]
-        result["Remove"] = ["fr": "Retirer", "pt": "Remover", "it": "Rimuovi", "de": "Entfernen"]
         result["Remove the saved invitation"] = ["fr": "Retirer l'invitation enregistrée", "pt": "Remover o convite guardado", "it": "Rimuovi l'invito salvato", "de": "Gespeicherte Einladung entfernen"]
         // The invite sheet: the person's own code.
         result["YOUR CODE"] = ["fr": "TON CODE", "pt": "O TEU CÓDIGO", "it": "IL TUO CODICE", "de": "DEIN CODE"]

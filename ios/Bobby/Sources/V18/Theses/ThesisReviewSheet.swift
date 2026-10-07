@@ -52,9 +52,15 @@ struct ThesisReviewSheet: View {
                 V18Focus.thesisId = id
                 session.switchSheet(to: .thesisEditor)
             },
+            remind: { id in session.openReminders(thesisId: id) },
             close: onClose))
+            // A reminder for the thesis on screen has nothing to announce while it is open.
+            .onAppear { session.reminderIntent.markOpen(reviewer.thesis?.id) }
             // Closing the sheet cancels a review in flight; its reply, if one still comes, is ignored.
-            .onDisappear { reviewer.cancel() }
+            .onDisappear {
+                reviewer.cancel()
+                session.reminderIntent.markOpen(nil)
+            }
     }
 
     /// The system Sign in with Apple button finished: `signedIn` | `cancelled` | `failed` | `unavailable`.
@@ -89,6 +95,8 @@ struct ThesisReviewView: View {
         var showCredits: () -> Void = {}
         var showTheses: () -> Void = {}
         var edit: (String) -> Void = { _ in }
+        /// Opens Reminders on this thesis (nil where there is no session: the door is not shown).
+        var remind: ((String) -> Void)? = nil
         var close: () -> Void = {}
     }
 
@@ -296,6 +304,12 @@ struct ThesisReviewView: View {
                 VStack(alignment: .leading, spacing: 6) { decisions(result) }
             }
             .padding(.top, 4)
+            if let remind = actions.remind {
+                ThesisLink(title: ReminderCenter.shared.hasReminder(for: result.thesis.id)
+                               ? L.t("Reminders", "Recordatorios") : ReminderCopy.setReminder,
+                           id: "thesis-review-remind") { remind(result.thesis.id) }
+                    .padding(.top, 2)
+            }
         }
     }
 

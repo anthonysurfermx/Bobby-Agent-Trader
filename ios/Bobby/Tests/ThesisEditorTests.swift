@@ -379,7 +379,7 @@ final class ThesisListTests: XCTestCase {
     }
 
     private func model(highlight: String? = nil, owner: String? = "u1", lastSavedRead: NucleoReadSummary? = nil) -> ThesisListModel {
-        ThesisListModel(book: book, guests: ThesisGuestBook(book: book, defaults: defaults), owner: { owner }, highlight: highlight,
+        ThesisListModel(book: book, guests: ThesisGuestBook(book: book), owner: { owner }, highlight: highlight,
                         lastSavedRead: { lastSavedRead }, now: { [now] in now }, observe: false)
     }
 
@@ -451,10 +451,10 @@ final class ThesisListTests: XCTestCase {
         XCTAssertEqual(model(owner: nil).active.map(\.id), [local.id])
         XCTAssertEqual(model(owner: "u2").guestCount, 1, "the answer was this account's, not the phone's")
 
-        // An account that already has theses is never asked: books are not merged.
+        // An account that already has theses is asked too: what it keeps arrives within its own limits.
         try seed("BTC", daysAgo: 1, owner: "u3")
-        XCTAssertEqual(model(owner: "u3").guestCount, 0)
-        XCTAssertEqual(ThesisGuestBook.declinedKey("u1"), "v18.theses.guestDeclined.u1")
+        XCTAssertEqual(model(owner: "u3").guestCount, 1)
+        XCTAssertEqual(ThesisBook.adoptionKey("u1"), "v18.theses.adoption.u1")
     }
 
     func testTheGuestRowFitsItsWordsInSixLanguages() throws {

@@ -85,7 +85,6 @@ final class ThesisReviewerTests: XCTestCase {
         let identity = identity!
         var env = ThesisReviewer.Environment()
         env.book = book
-        env.guestDefaults = defaults
         env.owner = { identity.user }
         env.generation = { identity.generation }
         env.riskAccepted = { identity.riskAccepted }
@@ -484,7 +483,7 @@ final class ThesisReviewerTests: XCTestCase {
         XCTAssertEqual(requests.count, 1, "nothing is sent for a thesis that is not in this account's book")
 
         // "Keep them" in My theses: the screen picks the thesis up again.
-        let guests = ThesisGuestBook(book: book, defaults: defaults)
+        let guests = ThesisGuestBook(book: book)
         XCTAssertEqual(guests.adoptLocal(into: "account-c"), 1)
         reviewer.reload()
         XCTAssertEqual(reviewer.phase, .ready)
@@ -573,7 +572,6 @@ final class ThesisReviewerTests: XCTestCase {
             return holds ? await pending.wait() : self.reply()
         }
         env.book = book
-        env.guestDefaults = defaults
         env.now = { [unowned self] in self.now }
         env.accessChanged = { _ in }
         env.meterChanged = { _, _ in }
