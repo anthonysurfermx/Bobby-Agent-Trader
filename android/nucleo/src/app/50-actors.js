@@ -33,7 +33,7 @@ function buildState(){
     sat: [0, 1, 2, 3].map(function(){ return { p: new V(0, 'emit'), tE: 1e9, on: false, hw: 50, talk: [0, 0], chartP: [0, 0] }; }),
     satLay: new V(0, 'soft'), orbDraw: new V(0, 'soft'), orbO: new V(1, 'soft'),
     satG: { p: new V(0, 'emit'), o: new V(0, 'soft'), on: false, hw: 59 }, satT: [{ p: new V(0, 'emit'), on: false, hw: 50 }, { p: new V(0, 'emit'), on: false, hw: 50 }],
-    capY: new V(488, 'soft', true), metaO: new V(0, 'soft'), metaY: new V(6, 'emit', true),
+    capY: new V(488, 'soft', true), metaO: new V(0, 'soft'), metaY: new V(6, 'emit', true), metaPin: null, metaDrop: new V(0, 'soft', true),
     chartT0: 1e9, chartExit: 1e9, nowS: new V(0, 'emit'),
     vCond: new V(0, 'soft'), ringFill: new V(0, 'soft'), ringOff: new V(14, 'soft', true), ringO: new V(0, 'soft'), landT: -9, pctPos: new V(0, 'soft', true), convO: new V(0, 'soft'),
     rev: [new V(0, 'glide'), new V(0, 'glide'), new V(0, 'glide')], trk: new V(0, 'glide', true), cardsOn: false, commit: false, pullOn: false, cardIdx: 0, nCards: 2,

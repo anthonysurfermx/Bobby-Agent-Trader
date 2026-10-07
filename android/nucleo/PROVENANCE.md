@@ -2,6 +2,8 @@
 
 The renderer reference is **iOS 1.7 (build 61)**, PR #140, commit `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. The canonical source was read using `git show` from that exact commit. Android incorporates the daily and first-read layout fixes, full synthesis/scenario text, six-language debate role captions, separate sphere/pill hints, readable consent scrolling, fresh native microphone-permission queries, regional company chip labels, French/Portuguese informal copy and language-aware greeting times.
 
+The page half of Bobby 1.8 (the nudge, `ask.start`) and of the follow-ups' slice 1 came later, from the iPhone page at `harness/ios-slice1`: commits `630e01b3` (the next question is the first chip when the voice ends) and `37155fe0` (a chip says its words were Bobby's, the row goes quiet at the wall, the tighter check). They were applied to the Android copy as patches, hunk by hunk; the Android adaptations below were kept. `android/README.md`, "The next question, and who wrote the words", lists every file that still differs from the iPhone copy and why.
+
 ## Android adaptations
 
 - `src/shared/10-bridge.js` retains `BobbyNucleo`, correlated asynchronous JSON replies, the 180-second timeout, native `receive`, and protection against mock transport replacing native transport. Account/consent events remain supported.

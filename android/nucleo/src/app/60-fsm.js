@@ -554,6 +554,7 @@ function prepRead(m){
   VIDX = m.spoken.verdictWordIndex >= 0 ? m.spoken.verdictWordIndex : m.spoken.words.length - 1;
   fillSats(m); buildChart(m.chart, res.provenance, res.receivedAt); A.chartT0 = 1e9; A.chartExit = 1e9; A.nowS.set(0);
   fillCards(m);
+  fitNext(m); A.metaPin = null; A.metaDrop.set(0);
   el.vWord.textContent = m.verdict.word;
   el.convL.textContent = m.ring.mode === 'conviction' ? m.ring.label : '';
   var prov = res.provenance || {};
@@ -659,7 +660,8 @@ STATES.VERDICT = {
   down: talkDown
 };
 
-/* ---------- HANDBACK: two sags, the pull hint, the pill is a mic again ---------- */
+/* ---------- HANDBACK: two sags, the pull hint, the pill is a mic again, and the read's chips: the next question
+   was already there (§3.5). No save is needed first. ---------- */
 STATES.HANDBACK = {
   enter: function(prev, d){
     if (!d.restored){ sag(); at(0.55, sag); }
@@ -667,16 +669,49 @@ STATES.HANDBACK = {
     var vp = SES && SES.hints ? (SES.hints.verdictPull || 0) : 0;
     if (vp < 3){ hint(tt('hint.pull')); if (!HINTED.verdictPull){ HINTED.verdictPull = true; markHint('verdictPull'); } } else hint('');
     pillMode(idleMode()); this.idleT = clk; A.commit = false;
+    /* the voice is done: after the second sag its last line goes back into the glass and the row is born in its place
+       (at once when the glass is only being put back: a restored read, a pull that was let go) */
+    if (d.restored) readChips(); else cue(1.0, readChips);
   },
   tick: function(){ if (clk - this.idleT > 90) go('RETURNING'); },
-  down: function(h, p){
+  down: function(h, p, hitEl){
     this.idleT = clk;
     if (h === 'close') return tapG(function(){ go('RETURNING'); });
     if (h === 'pill') return pillDown(p, true);
     if (h === 'avatar') return avatarG();
+    if (h === 'chip') return chipOrPullG(hitEl);
     return pullG();
   }
 };
+/* the read's own row, without a nudge and without an eyebrow: this moment belongs to the question */
+function readChips(){
+  var r = READ; if (!r || !r.model || ST.name !== 'HANDBACK') return;
+  if (capCur >= 0){
+    /* the meta line stays where a two-line caption left it (a shorter last page lets it settle there) */
+    var h = CAPS[capCur].h || 54;
+    A.metaPin = h; A.metaDrop.set(0); A.metaDrop.to(54 - h, 'soft');
+    capsOff();
+  }
+  chipsShow(RMOD.followUps(r.model, SUGG || {}, LANG), false, true);
+}
+/* the row lies where a pull usually starts: a finger that goes down on a chip still pulls the cards, sideways it
+   scrolls the row, and only a still finger is a tap */
+function chipOrPullG(hitEl){
+  var chip = chipG(hitEl), pull = pullG(), mode = null;
+  if (!chip) return pull;
+  return {
+    move: function(p){
+      if (!mode && p.moved){
+        var dx = p.x - p.x0, dy = p.y - p.y0;
+        mode = dy > 0 && Math.abs(dy) >= Math.abs(dx) ? 'pull' : 'row';
+        if (mode === 'pull') chip.cancel(p);
+      }
+      if (mode === 'pull') pull.move(p); else chip.move(p);
+    },
+    up: function(p){ if (mode === 'pull') pull.up(p); else chip.up(p); },
+    cancel: function(p){ if (mode === 'pull') pull.cancel(p); else chip.cancel(p); }
+  };
+}
 /* ---------- PULLING: B7 25.50–26.10, tracked 1:1 with the rubber band ---------- */
 function pullG(){
   var locked = null;
@@ -691,7 +726,7 @@ function pullG(){
   };
 }
 STATES.PULLING = {
-  enter: function(){ A.pullOn = true; A.cardsOn = true; A.commit = false; hint(''); },
+  enter: function(){ A.pullOn = true; A.cardsOn = true; A.commit = false; hint(''); chipsHide(); },   /* the cards pour over the row's band */
   track: function(dy){
     var rub = (1 - 1 / (dy * 0.55 / 260 + 1)) * 260;
     S.pull.set(Math.min(0.14, rub * 0.0009));
@@ -808,7 +843,7 @@ function chipRowG(){
   };
 }
 function chipAct(c){
-  var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = 660;
+  var a = c.action || {}, cx = c.x + c.w / 2 + A.chipX.x, cy = (c.y != null ? c.y : 640) + (c.h || 40) / 2;
   tick('light');
   if (a.risk){ openNative('riskNotice'); return; }   /* native replaces this page with the risk beat (onboarding#risk) */
   if (a.signIn){ gateSignIn(a.retry); return; }
@@ -816,9 +851,15 @@ function chipAct(c){
   if (a.nudge){ nudgeAct(a.nudge); return; }
   if (a.dismiss){ go('RETURNING'); return; }
   if (a.retype){ openTyping({ fromRead: false }); return; }
+  /* the next question (§3.5): one tap asks it as the person's own question about the same read. Native reuses that
+     read's asset (followUpOf), so the page still names none. */
+  if (a.followUpOf && a.question){ go('SENDING', { params: { followUpOf: a.followUpOf, question: a.question }, question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: true }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
-  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
+  /* what is left is a chip whose question Bobby wrote (an asset of the idle home, an asset or a mover of a read's row).
+     `chip` tells native so: the person picked the asset, the words were not theirs, and the harness never takes such a
+     read for a question they asked by themselves (§3.5). */
+  if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
   enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
@@ -1028,7 +1069,9 @@ STATES.THESIS_VIEW = {
 STATES.RESTORE = {
   enter: function(prev, d){
     var res = d.read, r = { id: ++READ_SEQ, params: null, question: res.question || '', accepted: true, asset: res.asset, market: res.market, reply: res, model: null, requestId: res.requestId, askT: clk };
-    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn) }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
+    /* who started a restored read is not known any more: it is treated as not the person's own (no movers) */
+    r.origin = 'restored';
+    try { r.model = RMOD.build(res, { lang: LANG, locale: LOCALE, signedIn: !!(SES && SES.signedIn), origin: r.origin }); } catch (e) { logErr('restore', e); go('WAKE'); return; }
     READ = r; READS_DONE++;
     A.greet.o.set(0); A.meri.forEach(function(m){ m.p.set(0); m.o.set(0); }); A.satG.o.set(0); if (A.note.o.t > 0) A.note.o.set(0);
     prepRead(r.model);
@@ -1039,7 +1082,7 @@ STATES.RESTORE = {
     A.dim.set(1); A.hdr.set(1); A.pillY.set(0); A.pillO.set(1);
     A.vCond.set(1); A.ringO.set(1); A.ringFill.set(r.model.ring.mode === 'conviction' ? r.model.ring.pct / 100 : 1); A.convO.set(r.model.ring.mode === 'conviction' ? 1 : 0);
     if (r.model.chart){ A.chartT0 = clk - 6; A.nowS.set(1); }
-    A.capY.set(592); capShow(PAGES.length - 1); CAPS[capCur].inT = clk - 1;
+    A.capY.set(592); A.metaPin = 54;   /* settled: the row stands where the last spoken line was */
     A.qText = r.question; A.qT0 = clk - 10; A.dockO.set(1); A.closeO.set(1); A.wmO.set(0); dockAsset();
     go('HANDBACK', { restored: true });
   }
