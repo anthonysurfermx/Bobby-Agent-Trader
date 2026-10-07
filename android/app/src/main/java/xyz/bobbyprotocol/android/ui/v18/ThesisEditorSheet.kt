@@ -102,7 +102,9 @@ fun ThesisEditorSheet(host: V18Host, onClose: () -> Unit) {
     val showsWords = !missing && (problem == null || problem == ThesisEditorModel.Problem.EmptyHypothesis)
     val base = if (model.isNew) host.text("Your thesis", "Tu tesis") else host.text("Edit thesis", "Editar tesis")
     val symbol = model.symbol
-    val title = if (symbol == null) base else "$base · $symbol"
+    // A no-break space after the dot: where the title takes two lines (a 360 dp phone) it breaks before
+    // the dot, "· AAPL" together, and never leaves the dot alone at the end of the first line.
+    val title = if (symbol == null) base else "$base ·\u00A0$symbol"
     val info: (() -> Unit)? = if (showsWords) ({ showsDetails = true }) else null
     val bottom: (@Composable ColumnScope.() -> Unit)? = if (!showsWords) null else ({
         QuietNote(host.text("Only on this phone.", "Solo en este teléfono."), tag = "thesis-editor-scope")

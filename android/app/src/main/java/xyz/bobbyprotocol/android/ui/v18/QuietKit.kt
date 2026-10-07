@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -345,10 +346,14 @@ fun QuietProgress(modifier: Modifier = Modifier) {
     CircularProgressIndicator(modifier.size(18.dp), color = QuietColors.muted, strokeWidth = 2.dp)
 }
 
-/** Colours for an `OutlinedTextField` on a 1.8 sheet: cream ink, a violet focus line, nothing green. */
+/**
+ * Colours for an `OutlinedTextField` on a 1.8 sheet: cream ink, a violet focus line, nothing green.
+ * The selection and its handles are named too: Material's own take the theme's primary colour.
+ */
 @Composable
 fun quietFieldColors(): TextFieldColors = OutlinedTextFieldDefaults.colors(
     focusedTextColor = QuietColors.cream, unfocusedTextColor = QuietColors.cream, cursorColor = QuietColors.violet,
+    selectionColors = TextSelectionColors(handleColor = QuietColors.violet, backgroundColor = QuietColors.violet.copy(alpha = .4f)),
     focusedBorderColor = QuietColors.violet, unfocusedBorderColor = QuietColors.stroke,
     focusedLabelColor = QuietColors.muted, unfocusedLabelColor = QuietColors.dim,
     focusedPlaceholderColor = QuietColors.dim, unfocusedPlaceholderColor = QuietColors.dim,

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
@@ -127,9 +128,11 @@ fun ThesisListSheet(host: V18Host, onClose: () -> Unit) {
                     key(thesis.id) {
                         Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("theses-archived-" + thesis.symbol), verticalAlignment = Alignment.CenterVertically) {
                             Text(thesis.symbol, Modifier.weight(1f), color = QuietColors.muted, fontSize = 16.sp)
-                            QuietMenu(host.text("More options", "Más opciones") + ", " + thesis.symbol, "theses-menu-" + thesis.symbol, listOf(
-                                QuietMenuItem(host.text("Reopen", "Reabrir"), "theses-reopen-" + thesis.symbol) { model.reopen(thesis.id) },
-                                QuietMenuItem(host.text("Delete", "Eliminar"), "theses-delete-" + thesis.symbol) { deleting = thesis }))
+                            Box(Modifier.offset(x = 7.dp)) {
+                                QuietMenu(host.text("More options", "Más opciones") + ", " + thesis.symbol, "theses-menu-" + thesis.symbol, listOf(
+                                    QuietMenuItem(host.text("Reopen", "Reabrir"), "theses-reopen-" + thesis.symbol) { model.reopen(thesis.id) },
+                                    QuietMenuItem(host.text("Delete", "Eliminar"), "theses-delete-" + thesis.symbol) { deleting = thesis }))
+                            }
                         }
                     }
                 }
@@ -175,7 +178,8 @@ private fun ThesisRow(symbol: String, state: String, marked: Boolean, overdue: B
                 Text(state, Modifier.weight(1f), color = if (overdue) QuietColors.cream else QuietColors.muted, fontSize = 14.sp, lineHeight = 19.sp, textAlign = TextAlign.End,
                      style = LocalTextStyle.current.copy(fontFeatureSettings = "tnum"))
             }
-            menu()
+            // Under the sheet's close button: the header's glyphs reach 7 dp into the margin (iOS: trailing -7).
+            Box(Modifier.offset(x = 7.dp)) { menu() }
         }
         Box(Modifier.fillMaxWidth().height(1.dp).background(QuietColors.hairline))
     }
