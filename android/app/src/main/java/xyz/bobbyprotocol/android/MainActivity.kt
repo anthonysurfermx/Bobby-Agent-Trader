@@ -67,6 +67,7 @@ import xyz.bobbyprotocol.android.push.PushRuntimeFactory
 import xyz.bobbyprotocol.android.ui.BobbySheet
 import xyz.bobbyprotocol.android.ui.ReportContentSheet
 import xyz.bobbyprotocol.android.ui.v18.V18Sheets
+import xyz.bobbyprotocol.android.v18.LaunchIntent
 import xyz.bobbyprotocol.android.v18.V18
 import xyz.bobbyprotocol.android.v18.V18Process
 import xyz.bobbyprotocol.android.v18.V18Shell
@@ -245,8 +246,12 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-        handleCallback(intent)
-        handleNotification(intent)
+        // Only the first time: an activity the system rebuilds is handed the intent that first started
+        // it, and the link, the sign-in callback or the tapped notice in it was honoured then.
+        if (LaunchIntent.isFirstDelivery(restored = savedInstanceState != null)) {
+            handleCallback(intent)
+            handleNotification(intent)
+        }
     }
 
     private suspend fun dispatch(method: String, params: JSONObject): Any = when (method) {
@@ -335,11 +340,12 @@ class MainActivity : ComponentActivity() {
         if (intent?.getBooleanExtra("openBriefings", false) == true && repository.session.value != null && session.riskAccepted) openSheet("briefings")
         intent?.removeExtra("openBriefings")
         // 1.8: a tapped reminder or follow-up. It is only stored: the host honours it once the glass is free,
-        // for the reader it was planned for. Consumed here, and never replayed when the app is reopened from recents.
+        // for the reader it was planned for. Consumed here, and never replayed: not when the task is rebuilt
+        // from recents, and not when the system restores the activity (onCreate does not come here then).
         if (intent == null) return
         val notice = intent.getStringExtra(LocalNotices.EXTRA) ?: return
         intent.removeExtra(LocalNotices.EXTRA)
-        if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0) return
+        if (!LaunchIntent.isPersonsTap(fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)) return
         LocalNotices.payload(notice)?.let { session.v18.noteTap(it) }
     }
     private fun setReminders(enabled: Boolean) {
@@ -356,13 +362,17 @@ class MainActivity : ComponentActivity() {
         if (intent == null) return
         val uri = intent.data ?: return
         // 1.8: a bobbyprotocol.xyz link that opened the app (an invitation) goes to whichever feature claims it.
-        // No link reaches here until the manifest declares one.
+        // Only the path the manifest opens (/i/CODE): any app can start this activity with another one.
         if (uri.scheme == "https" && uri.host in setOf("bobbyprotocol.xyz", "www.bobbyprotocol.xyz")) {
+            // Consumed in the intent itself, which is the object the system hands back if it rebuilds the activity.
+            intent.data = null
             setIntent(Intent(this, MainActivity::class.java))
-            if ((intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) == 0) session.v18.noteLink(uri.toString())
+            if (LaunchIntent.isInvitationPath(uri.path) &&
+                LaunchIntent.isPersonsTap(fromHistory = (intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0)) session.v18.noteLink(uri.toString())
             return
         }
         if (uri.scheme != "bobby" || uri.host != "auth" || uri.path != "/callback") return
+        intent.data = null
         setIntent(Intent(this, MainActivity::class.java))
         lifecycleScope.launch {
             try {
@@ -446,6 +456,9 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() {
         if (::voice.isInitialized) voice.close()
         if (::session.isInitialized) { if (V18Process.runtime === session.v18) V18Process.runtime = null; session.close() }
+        // Closed for good (Back, not a rebuild): a tap or a link that never found its moment does not wait
+        // in the process for whatever activity comes next, however much later.
+        if (isFinishing) V18Process.taps.clear()
         if (::billing.isInitialized) billing.close()
         if (::narrator.isInitialized) narrator.stop()
         if (::push.isInitialized) push.close()

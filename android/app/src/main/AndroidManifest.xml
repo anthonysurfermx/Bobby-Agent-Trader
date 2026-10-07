@@ -23,7 +23,15 @@
             android:authorities="${applicationId}.avatar-share" android:exported="false" android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/avatar_share_paths" />
         </provider>
-        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTop" android:windowSoftInputMode="adjustResize">
+        <!-- One instance, ever (singleTask): the activity owns the session, the page and the 1.8 host, and a
+             second one on top of a browser tab (a tapped notice, the sign-in callback) would take the glass
+             from the first and leave it mute. A link or a notice reaches the one instance through onNewIntent.
+             configChanges: the activity is NOT rebuilt for a rotation, a fold, split screen, the system's
+             font size or its dark theme. Compose and the page lay themselves out again; a rebuild would
+             close the open sheet, drop a thesis being written and cancel a review already sent. -->
+        <activity android:name=".MainActivity" android:exported="true" android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|uiMode|fontScale|density|keyboard|keyboardHidden|navigation"
+            android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -35,8 +43,11 @@
                 <data android:scheme="bobby" android:host="auth" android:path="/callback" />
             </intent-filter>
             <!-- 1.8: an invitation link (https://bobbyprotocol.xyz/i/CODE) opens the app, which keeps the code
-                 until an account can accept it (v18/invite). Android opens these links here only once the site's
-                 /.well-known/assetlinks.json names this package with its signing certificate. -->
+                 until an account can accept it (v18/invite). Android 12 and later open these links here by
+                 themselves only once the site's /.well-known/assetlinks.json names this package with its
+                 signing certificate. Before that the filter is already live: Android 8 to 11 list Bobby in
+                 "Open with", a person can turn the links on under "Open by default", and any app can start
+                 the activity with such a link. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />

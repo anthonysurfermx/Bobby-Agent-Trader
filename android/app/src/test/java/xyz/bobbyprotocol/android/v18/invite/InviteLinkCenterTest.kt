@@ -250,6 +250,55 @@ class InviteLinkCenterTest {
         assertEquals("levels and access are read again after an accepted invitation", 1, world.refreshed)
     }
 
+    @Test fun theSameLinkAgainWhileItsAnswerIsUnreadIsThatInvitationNotANewOne() = runTest {
+        // Android can hand the link that opened the app to the app again. An invitation that was
+        // accepted must not be asked about a second time: the server answers `already_claimed` to
+        // the repeat, and the glass would say "not accepted" about an invitation that was.
+        val world = World()
+        val center = newCenter(world)
+        assertTrue(center.receive(link("ABCD2345")))
+        center.idle()
+        assertEquals(InviteNotice.ACCEPTED, center.unreadAnswer?.notice)
+        val answeredAt = center.unreadAnswer?.atMillis
+
+        world.now += 3_600_000L
+        world.answer = { reply("already_claimed") }
+        assertTrue("it is still an invitation link", center.receive(link("ABCD2345")))
+        center.idle()
+        assertEquals("nothing is sent for it again", 1, world.sent.size)
+        assertEquals(InviteNotice.ACCEPTED, center.unreadAnswer?.notice)
+        assertEquals("the answer the person is owed is untouched", answeredAt, center.unreadAnswer?.atMillis)
+        assertNull("and it does not wait as a new invitation", center.pendingCode)
+
+        // After the system killed the process: a new centre over the same phone, the same link again.
+        val restored = newCenter(world)
+        assertTrue(restored.receive("https://www.bobbyprotocol.xyz/i/abcd2345"))
+        restored.idle()
+        assertEquals(1, world.sent.size)
+        assertEquals(InviteNotice.ACCEPTED, restored.unreadAnswer?.notice)
+        assertEquals(InviteNotice.ACCEPTED, restored.notice)
+
+        // Another friend's link is another invitation, and so is this one for another account.
+        world.answer = { reply("already_claimed") }
+        assertTrue(restored.receive(link("WXYZ6789")))
+        restored.idle()
+        assertEquals(listOf("ABCD2345", "WXYZ6789"), world.codes)
+        assertEquals(InviteNotice.ALREADY_CLAIMED, restored.unreadAnswer?.notice)
+        world.switchTo("account-b")
+        world.answer = { reply("claimed") }
+        assertTrue(restored.receive(link("WXYZ6789")))
+        restored.idle()
+        assertEquals("the answer was the previous account's: this one asks for itself", 3, world.sent.size)
+        assertEquals("account-b", world.sent.last().user)
+
+        // Once the answer was read it is gone from the phone; opening the link again is the person's own act.
+        restored.acknowledgeNotice()
+        world.answer = { reply("already_claimed") }
+        assertTrue(restored.receive(link("WXYZ6789")))
+        restored.idle()
+        assertEquals(4, world.sent.size)
+    }
+
     @Test fun theClaimCarriesTheCodeInCapitalsForTheAccountThatIsHereAndNothingElse() = runTest {
         // The request itself (one authenticated POST of {action, code}) is InviteDesk.liveSender: it
         // needs the network, so it is compiled and read, not run here.

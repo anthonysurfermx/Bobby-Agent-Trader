@@ -7,16 +7,22 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Build
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
+import androidx.compose.ui.test.performSemanticsAction
+import androidx.compose.ui.text.AnnotatedString
 import androidx.core.content.ContextCompat
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -35,6 +41,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Assume.assumeTrue
@@ -57,6 +64,7 @@ import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.V18Routes
 import xyz.bobbyprotocol.android.v18.V18Runtime
 import xyz.bobbyprotocol.android.v18.V18Shots
+import xyz.bobbyprotocol.android.v18.invite.InviteLinkCenter
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
 import xyz.bobbyprotocol.android.v18.reminders.PendingReminder
@@ -69,7 +77,8 @@ import java.util.regex.Pattern
 
 /**
  * Bobby 1.8 in the real app on an emulator: MainActivity, its session, the bundled page and the
- * phone's own services (the permission question, WorkManager, the notification shade, a rotation).
+ * phone's own services (the permission question, WorkManager, the notification shade, a rotation,
+ * Back, the system rebuilding the activity).
  *
  * The reader is a guest who has finished onboarding and accepted the risk notice. That state is
  * written through the app's own store before the activity starts, not walked through the page: the
@@ -100,6 +109,8 @@ class V18DeviceInstrumentedTest {
     private var rotated = false
     /** The intent the activity was started with (a tapped notice replaces it). */
     private var launchIntent: Intent? = null
+    /** Activities started without a scenario (a link consumes its own intent, which a scenario cannot follow). */
+    private val loose = ArrayList<MainActivity>()
 
     /** The 1.8 host of the activity on screen. */
     private val host: V18Runtime get() = checkNotNull(V18Process.runtime) { "MainActivity has no 1.8 host" }
@@ -131,6 +142,9 @@ class V18DeviceInstrumentedTest {
         // tapped notice replaces it (`onNewIntent`): it is put back, or closing waits for an end it cannot see.
         runCatching { onMain { launchIntent?.let { started -> if (::activity.isInitialized) activity.intent = started } } }
         scenario?.close(); scenario = null
+        for (started in loose) runCatching { instrumentation.runOnMainSync { if (!started.isFinishing && !started.isDestroyed) started.finish() } }
+        if (loose.isNotEmpty()) runCatching { waitUntil(30_000) { loose.all { it.isDestroyed } } }
+        loose.clear()
         runCatching { WorkManager.getInstance(context).cancelAllWorkByTag(LocalNotices.WORK_TAG).result.get(10, TimeUnit.SECONDS) }
         runCatching { notifications.cancelAll() }
         V18Process.taps.clear()
@@ -282,9 +296,9 @@ class V18DeviceInstrumentedTest {
         await("thesis-review-start")
     }
 
-    // ---- A rotation ----
+    // ---- A rotation, and Back over words that are not saved ----
 
-    @Test fun case5_theAppSurvivesARotationWithASheetOpen() {
+    @Test fun case5_aRotationKeepsTheSheetAndTheWordsAndBackAsksBeforeDroppingThem() {
         launch("en")
         val thesis = writeThesis()
         onMain {
@@ -293,38 +307,102 @@ class V18DeviceInstrumentedTest {
         }
         waitForSheet(V18Routes.THESIS_EDITOR)
         await("thesis-editor-save")
+        // The person rewrites why. Set through the field's own semantics, as a paste is: no keyboard comes up.
+        val typed = "Demand is still ahead of supply, and I want to see one more quarter of margins."
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).performSemanticsAction(SemanticsActions.SetText) { it(AnnotatedString(typed)) }
+        compose.waitForIdle()
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).assert(hasText(typed, substring = true))
         val first = activity
 
         rotated = true
         device.setOrientationLeft()
-        waitUntil(60_000) { resumed()?.let { it !== first } == true }
-        adopt(checkNotNull(resumed()))
+        waitUntil(60_000) { onMain { activity.resources.configuration.orientation } == Configuration.ORIENTATION_LANDSCAPE }
+        // The activity is not rebuilt for a rotation: the same one, with its sheet and the words in it.
+        assertSame("The activity was rebuilt by the rotation", first, resumed())
         assertFalse(activity.isFinishing)
-        assertTrue("The rebuilt activity is on the app page, past the risk notice", onMain { host.riskAccepted })
-        // What the person wrote is still in the book. The sheet itself does not come back: the
-        // activity keeps its sheet in memory only, so a rotation returns to the glass.
-        assertEquals(listOf(thesis.id), onMain { host.theses.active(host.owner).map { it.id } })
-        assertNull(onMain { host.sheetRoute })
+        assertEquals(V18Routes.THESIS_EDITOR, onMain { host.sheetRoute })
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).assert(hasText(typed, substring = true))
+        shot("rotation-editor-sideways")
 
-        // And the screens still open, sideways, over the page drawn again.
-        awaitTheGlass()
-        onMain { ReminderEntry.open(host, thesis.id) }
-        waitForSheet(V18Routes.REMINDERS)
-        await("reminders-thesis-NVDA")
-        shot("rotation-reminders-sideways")
-
-        val sideways = activity
         device.setOrientationNatural()
-        waitUntil(60_000) { resumed()?.let { it !== sideways } == true }
-        adopt(checkNotNull(resumed()))
+        waitUntil(60_000) { onMain { activity.resources.configuration.orientation } == Configuration.ORIENTATION_PORTRAIT }
+        assertSame(first, resumed())
+        assertEquals(V18Routes.THESIS_EDITOR, onMain { host.sheetRoute })
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).assert(hasText(typed, substring = true))
+
+        // Back with words that are not saved: the question is asked over a sheet that is still there.
+        device.pressBack()
+        await("thesis-editor-discard")
+        assertEquals(V18Routes.THESIS_EDITOR, onMain { host.sheetRoute })
+        shot("editor-back-asks")
+        compose.onNodeWithTag("thesis-editor-discard-cancel", useUnmergedTree = true).performClick()
+        compose.waitUntil(20_000) { compose.onAllNodesWithTag("thesis-editor-discard", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        // "Keep writing": the sheet is on screen with the words in it, not hidden behind a window that takes every touch.
+        compose.onNodeWithTag("thesis-editor-why", useUnmergedTree = true).assertIsDisplayed().assert(hasText(typed, substring = true))
+        assertEquals(V18Routes.THESIS_EDITOR, onMain { host.sheetRoute })
+        shot("editor-keep-writing")
+
+        // Back again, and this time the words are let go: the sheet leaves, and nothing of them was saved.
+        device.pressBack()
+        await("thesis-editor-discard")
+        compose.onNodeWithTag("thesis-editor-discard-confirm", useUnmergedTree = true).performClick()
+        waitForNoSheet()
         assertFalse(activity.isFinishing)
-        assertEquals(listOf(thesis.id), onMain { host.theses.active(host.owner).map { it.id } })
+        assertEquals(thesis.hypothesis, onMain { host.theses.active(host.owner).single().hypothesis })
+    }
+
+    // ---- The system rebuilds the activity ----
+
+    @Test fun case6_aLinkThatOpenedTheAppIsNotHandledAgainWhenTheActivityIsRebuilt() {
+        prepareGuest("en")
+        val preferences = context.getSharedPreferences("bobby.v18", Context.MODE_PRIVATE)
+        // A friend's invitation link opens the app (an Android 8 to 11 chooser, a verified link, another app).
+        val link = Intent(Intent.ACTION_VIEW, Uri.parse("https://bobbyprotocol.xyz/i/ABCD2345"))
+            .setClass(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        // Started plainly and found by its lifecycle: handling the link consumes the intent, which a scenario follows its activity by.
+        context.startActivity(link)
+        waitUntil(120_000) { resumed() != null }
+        val started = checkNotNull(resumed())
+        loose.add(started)
+        waitUntil(60_000) { preferences.getString(InviteLinkCenter.STORE_KEY, null)?.contains("ABCD2345") == true }
+        assertNull("The link is consumed, not left for the next activity", onMain { V18Process.taps.link })
+
+        // The person removes the invitation; then the system rebuilds the activity (as it does after it killed
+        // the process, or for a change of configuration the activity does not handle itself).
+        assertTrue(preferences.edit().remove(InviteLinkCenter.STORE_KEY).commit())
+        onMain { started.recreate() }
+        waitUntil(60_000) { resumed()?.let { it !== started } == true }
+        val rebuilt = checkNotNull(resumed())
+        loose.add(rebuilt)
+        Thread.sleep(1_500)
+        assertNull("The link that started the activity was handled a second time when the activity was rebuilt",
+                   preferences.getString(InviteLinkCenter.STORE_KEY, null))
+        assertNull(onMain { V18Process.taps.link })
+        assertFalse(rebuilt.isFinishing)
+
+        // A link the person opens now still arrives: the rebuilt activity is not deaf to new ones.
+        onMain { rebuilt.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.bobbyprotocol.xyz/i/WXYZ6789")).setClass(context, MainActivity::class.java)) }
+        waitUntil(60_000) { preferences.getString(InviteLinkCenter.STORE_KEY, null)?.contains("WXYZ6789") == true }
+        // And a page of the site that is not an invitation is not forwarded at all.
+        assertTrue(preferences.edit().remove(InviteLinkCenter.STORE_KEY).commit())
+        onMain { rebuilt.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://bobbyprotocol.xyz/desk?ref=WXYZ6789")).setClass(context, MainActivity::class.java)) }
+        Thread.sleep(2_000)
+        assertNull(preferences.getString(InviteLinkCenter.STORE_KEY, null))
     }
 
     // ---- The app ----
 
     /** Starts the real activity for a guest in `language` who has finished onboarding and accepted the risk notice. */
     private fun launch(language: String) {
+        prepareGuest(language)
+        scenario = ActivityScenario.launch(MainActivity::class.java).also { launched -> launched.onActivity { actual -> adopt(actual) } }
+        assertTrue("The guest is past the risk notice", onMain { host.riskAccepted })
+        assertFalse(onMain { host.signedIn })
+        assertEquals(language, onMain { host.language })
+    }
+
+    /** What the phone holds for a guest in `language` who has finished onboarding and accepted the risk notice. */
+    private fun prepareGuest(language: String) {
         val assets = context.assets
         val notice = assets.open("nucleo/risk-notice.json").bufferedReader().use { JSONObject(it.readText()) }.getInt("version")
         val roster = assets.open("nucleo/roster.json").bufferedReader().use { JSONObject(it.readText()) }.getJSONArray("companions")
@@ -338,10 +416,6 @@ class V18DeviceInstrumentedTest {
         }
         // The store writes behind the caller: what the activity is about to read must be on disk.
         assertTrue(context.getSharedPreferences("bobby.nucleo", Context.MODE_PRIVATE).edit().commit())
-        scenario = ActivityScenario.launch(MainActivity::class.java).also { launched -> launched.onActivity { actual -> adopt(actual) } }
-        assertTrue("The guest is past the risk notice", onMain { host.riskAccepted })
-        assertFalse(onMain { host.signedIn })
-        assertEquals(language, onMain { host.language })
     }
 
     /** The activity on screen, its repository on the staged network. */

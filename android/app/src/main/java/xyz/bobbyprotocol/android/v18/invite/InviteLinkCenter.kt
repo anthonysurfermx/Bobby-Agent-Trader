@@ -149,6 +149,12 @@ class InviteLinkCenter(
     /** An invitation link opened the app. False for every other URL (the sign-in callback included). */
     fun receive(url: String): Boolean {
         val code = InviteLink.code(url) ?: return false
+        // The same link again while its answer is still waiting to be read by the account it was
+        // given to: it is that invitation, already settled. Keeping it as a new one would throw the
+        // answer away and ask the server a second time, and an accepted invitation would then be
+        // reported as "not accepted" (the server answers `already_claimed` to the repeat).
+        accountChanged()
+        if (unreadAnswer?.code == code) return true
         keep(code)
         trigger()
         return true
