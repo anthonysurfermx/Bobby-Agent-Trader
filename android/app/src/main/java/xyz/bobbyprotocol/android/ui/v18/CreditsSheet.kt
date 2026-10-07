@@ -68,7 +68,7 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
     val loading = center.flow.loading
     val loadFailed = center.flow.loadFailed
     val restoreState = center.flow.restore
-    val storeConfigured = center.storeConfigured
+    val restoreAvailable = center.restoreAvailable
 
     LaunchedEffect(center) { center.flow.refresh() }
     // The gifted balance is on screen: the glass has no reason to announce it again.
@@ -76,7 +76,7 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
     DisposableEffect(center) { onDispose { center.screenGone() } }
 
     if (showsDetails) {
-        CreditsDetails(host, balance, CreditsBalance.inviteDetail(snapshot, words), storeConfigured) { showsDetails = false }
+        CreditsDetails(host, balance, CreditsBalance.inviteDetail(snapshot, words), restoreAvailable) { showsDetails = false }
     } else {
         val openDetails: () -> Unit = { showsDetails = true }
         val openPro: () -> Unit = { host.switchSheet("paywall") }
@@ -136,8 +136,8 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
                 }
             }
 
-            // Restore: only where this build can ask Google Play (a restore that cannot restore is not shown).
-            if (storeConfigured) {
+            // Restore: only where it can restore (this build can ask Google Play and the server can confirm it).
+            if (restoreAvailable) {
                 val running = restoreState == CreditsRestoreState.Running
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     QuietLink(if (running) host.text("Checking…", "Comprobando…") else host.text("Restore purchases", "Restaurar compras"),

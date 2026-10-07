@@ -198,6 +198,9 @@ object CreditsWire {
         return out
     }
 
+    /** The server can confirm what a store says right now. Without that a restore cannot restore (BillingPolicy's `restoreAllowed`). */
+    fun storeSyncReady(body: JSONObject?): Boolean = body?.optJSONObject("payments")?.opt("revenuecat") == true
+
     /** The server sells Bobby Pro through Google Play right now (the rule BillingPolicy applies before a purchase). */
     fun googleSalesReady(body: JSONObject?): Boolean {
         if (body == null) return false

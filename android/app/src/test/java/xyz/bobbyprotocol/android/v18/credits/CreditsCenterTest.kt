@@ -103,12 +103,16 @@ class CreditsCenterTest {
         assertEquals(5, snapshot.maxFriends)
         assertTrue("the server sells Bobby Pro through Google Play and this build can ask the store", snapshot.proPurchasable)
 
+        assertTrue("and a restore can restore", set.center.restoreAvailable)
+
         // A build without the store's key can neither sell nor restore: no Pro promise, no restore row.
         set.bench.shell.billing.value = BillingState(offeringsStatus = BillingOfferingsStatus.NOT_CONFIGURED)
         assertFalse(set.center.storeConfigured)
         assertFalse(set.center.snapshot().proPurchasable)
+        assertFalse("a restore that cannot restore is never shown", set.center.restoreAvailable)
         set.bench.shell.billing.value = BillingState()
         assertTrue(set.center.storeConfigured)
+        assertTrue(set.center.restoreAvailable)
 
         // What the app read since (another screen's balance, a redeemed code) is the newest word on the meters.
         set.backend.held = FakeCreditsBackend.held("u1", set.bench.desk.accountEpoch, remaining = 2, deep = 4)
@@ -124,6 +128,13 @@ class CreditsCenterTest {
         assertNull(other.referral)
         assertFalse(set.center.loaded)
         assertEquals("the plan's terms are the same for everyone", 10, other.freeReadsPerWeek)
+        assertTrue("until the server has spoken about this reader, the row is there to be asked", set.center.restoreAvailable)
+
+        // The server says it cannot confirm store purchases right now: restore could not restore, so it is not offered.
+        set.backend.reply = FakeCreditsBackend.reply().put("payments", JSONObject().put("stripe", true).put("revenuecat", false))
+        assertTrue(set.center.load())
+        assertFalse(set.center.restoreAvailable)
+        assertFalse(set.center.snapshot().proPurchasable)
     }
 
     @Test fun aRequestThatFailsWithNothingKnownIsSaidAndOneWithSomethingKnownIsNot() = runTest {

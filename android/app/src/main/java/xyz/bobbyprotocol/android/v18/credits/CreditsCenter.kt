@@ -176,6 +176,17 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
     /** Google Play purchases exist in this build (it carries the store's key): restore can restore, Bobby Pro can be sold. */
     val storeConfigured: Boolean get() = host.billing.value.offeringsStatus != BillingOfferingsStatus.NOT_CONFIGURED
 
+    /**
+     * A restore can restore: this build can ask Google Play, and the server, once it has spoken,
+     * can confirm what the store says. Where it cannot, the row is not shown at all.
+     */
+    val restoreAvailable: Boolean
+        get() {
+            if (!storeConfigured) return false
+            val reply = mine() ?: return true
+            return CreditsWire.storeSyncReady(reply)
+        }
+
     /** The freshest word on Quick reads for the reader who is here now, or null. */
     fun access(): ReadAccess? = heldNow()?.access ?: mine()?.let { ReadAccess.fromJson(it.optJSONObject("access")) }
 
