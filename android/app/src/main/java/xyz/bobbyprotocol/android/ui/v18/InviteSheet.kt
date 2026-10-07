@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -83,12 +84,14 @@ fun InviteSheet(host: V18Host, onClose: () -> Unit) {
     val notice = remember(revision) { invites.notice }
     val claiming = remember(revision) { invites.isClaiming }
     val linkKnown = credits.loaded || credits.flow.loadFailed
+    val riskAccepted = host.riskAccepted
     // Fixed when the sheet opens, so the section does not move while a code is being typed.
     val acceptFirst = rememberSaveable { pendingCode != null || notice != null }
     // The server's numbers for the reward sentence; null while the app does not have them.
     val reward = InviteCopy.rewardTerms(referral, snapshot.rewardDays, snapshot.maxFriends ?: 0)
-    // The reward is promised only where Bobby Pro can be had in this build.
-    val promises = snapshot.proPurchasable && reward != null && referral != null
+    // The reward is promised only to an account with an invitation of its own, and only where
+    // Bobby Pro can be had in this build.
+    val promised = if (snapshot.proPurchasable && referral != null) reward else null
 
     LaunchedEffect(credits) { credits.flow.refresh() }
     DisposableEffect(desk) { onDispose { desk.screenGone() } }
@@ -105,15 +108,15 @@ fun InviteSheet(host: V18Host, onClose: () -> Unit) {
         QuietSheet(host,
                    if (acceptFirst && pendingCode != null) host.text("Invitation ready", "Invitación pendiente") else host.text("Invite a friend", "Invita a un amigo"),
                    "invite-close", onClose,
-                   subtitle = if (promises && reward != null) InviteCopy.rewardShort(reward.days, words) else null,
-                   onInfo = if (promises) openDetails else null) {
+                   subtitle = promised?.let { InviteCopy.rewardShort(it.days, words) },
+                   onInfo = if (promised != null) openDetails else null) {
             if (acceptFirst) {
                 Spacer(Modifier.height(16.dp))
                 InviteAccept(host, desk, words, startsOpen = true, pendingCode = pendingCode, notice = notice, claiming = claiming)
                 Box(Modifier.padding(top = 14.dp).fillMaxWidth().height(1.dp).background(QuietColors.hairline))
             }
             // Real progress, and only where the reward exists.
-            if (promises && referral != null) {
+            if (promised != null && referral != null) {
                 Spacer(Modifier.height(16.dp))
                 InviteSlots(host, minOf(referral.accepted, referral.max), referral.max)
             }
@@ -127,6 +130,10 @@ fun InviteSheet(host: V18Host, onClose: () -> Unit) {
                 }
                 Spacer(Modifier.height(10.dp))
                 QuietPrimary(host.text("Share", "Compartir"), "invite-share-link") { host.share(InviteCopy.shareMessage(ownCode, words) + "\n" + link) }
+            } else if (!riskAccepted) {
+                // Nothing is asked of the server before the risk notice, so there is no link to wait for:
+                // the line says what comes first (the section above already says it when it is open).
+                if (!acceptFirst) QuietNote(InviteNotice.CONSENT_NEEDED.text(words), Modifier.padding(top = 16.dp), tag = "invite-consent-first")
             } else if (snapshot.signedIn) {
                 QuietNote(if (linkKnown) host.text("Invite link unavailable.", "Link de invitación no disponible.") else host.text("Getting your link…", "Obteniendo tu link…"),
                           Modifier.padding(top = 16.dp))
@@ -135,7 +142,7 @@ fun InviteSheet(host: V18Host, onClose: () -> Unit) {
             }
             if (!acceptFirst) {
                 Spacer(Modifier.height(8.dp))
-                InviteAccept(host, desk, words, startsOpen = false, pendingCode = pendingCode, notice = notice, claiming = claiming)
+                InviteAccept(host, desk, words, startsOpen = false, pendingCode = pendingCode, notice = notice, claiming = claiming, saysConsent = false)
             }
         }
     }
@@ -179,7 +186,8 @@ private fun InviteOwnCode(host: V18Host, code: String, copied: Boolean, onCopied
  * is waiting or was just answered; otherwise one quiet link unfolds the field.
  */
 @Composable
-private fun InviteAccept(host: V18Host, desk: InviteDesk, words: Words, startsOpen: Boolean, pendingCode: String?, notice: InviteNotice?, claiming: Boolean) {
+private fun InviteAccept(host: V18Host, desk: InviteDesk, words: Words, startsOpen: Boolean, pendingCode: String?, notice: InviteNotice?, claiming: Boolean,
+                         saysConsent: Boolean = true) {
     val invites = desk.center
     var code by rememberSaveable { mutableStateOf(pendingCode ?: "") }
     var open by rememberSaveable { mutableStateOf(false) }
@@ -188,9 +196,13 @@ private fun InviteAccept(host: V18Host, desk: InviteDesk, words: Words, startsOp
     // The result in words. "Sign in…" is already the section's own line while signed out, and so is
     // the consent line while the risk notice is not accepted.
     val result = notice?.takeIf { it != InviteNotice.CONSENT_NEEDED && !(it == InviteNotice.SIGN_IN_NEEDED && !signedIn) }?.text(words)
-    val apply: () -> Unit = {
+    val focus = LocalFocusManager.current
+    val send: () -> Unit = {
         val typed = code
-        if (!invites.isClaiming && typed.isNotEmpty()) host.scope.launch { invites.submit(typed) }
+        if (!invites.isClaiming && typed.isNotEmpty()) {
+            focus.clearFocus()
+            host.scope.launch { invites.submit(typed) }
+        }
     }
     // An invitation link arrived while the sheet was open, or the code was settled. What the person
     // is typing is never replaced by a result line alone.
@@ -215,11 +227,11 @@ private fun InviteAccept(host: V18Host, desk: InviteDesk, words: Words, startsOp
                     singleLine = true,
                     textStyle = TextStyle(fontSize = 17.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, keyboardType = KeyboardType.Ascii, imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { apply() }),
+                    keyboardActions = KeyboardActions(onDone = { send() }),
                     colors = quietFieldColors(),
                 )
                 QuietChip(if (claiming) host.text("Applying…", "Aplicando…") else host.text("Apply", "Aplicar"), "invite-apply",
-                          enabled = !claiming && code.isNotEmpty(), onClick = apply)
+                          enabled = !claiming && code.isNotEmpty(), onClick = send)
             }
             if (result != null) {
                 Text(result, Modifier.testTag("invite-result").semantics { liveRegion = LiveRegionMode.Polite }, color = QuietColors.cream, fontSize = 14.sp, lineHeight = 19.sp)
@@ -236,7 +248,7 @@ private fun InviteAccept(host: V18Host, desk: InviteDesk, words: Words, startsOp
             if (!riskAccepted) {
                 // Without the risk notice nothing is sent, with or without an account: a code typed
                 // here is only kept on the phone, and this line says why nothing else happened.
-                QuietNote(InviteNotice.CONSENT_NEEDED.text(words), tag = "invite-consent-needed")
+                if (saysConsent) QuietNote(InviteNotice.CONSENT_NEEDED.text(words), tag = "invite-consent-needed")
             } else if (!signedIn) {
                 QuietNote(InviteNotice.SIGN_IN_NEEDED.text(words), tag = "invite-sign-in-needed")
                 QuietSignIn(host, "invite-sign-in") { provider -> desk.signIn(provider) }

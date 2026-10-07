@@ -115,8 +115,11 @@ class SignInReturn(private val host: V18Host, private val route: String) {
 
     companion object {
         const val STEP = 250L
-        /** Past this the sheet is not brought back: whatever is open stays. */
-        const val WAIT_LIMIT = 120_000L
+        /**
+         * Past this the sheet is not brought back: whatever is open stays. The activity closes the
+         * first sheet as soon as it has synced the account that arrived (a second or two).
+         */
+        const val WAIT_LIMIT = 20_000L
     }
 }
 
