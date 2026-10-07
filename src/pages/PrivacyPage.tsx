@@ -176,6 +176,33 @@ export default function PrivacyPage() {
           </p>
         </Section>
 
+        <Section title={tr('Your theses and reminders', 'Tus tesis y recordatorios')}>
+          <p>
+            {tr(
+              'From iPhone version 1.8 you can write a thesis about an asset in your own words (why you are looking at it, what worries you, what would change your mind). Your theses, their history and the results of their reviews are stored on your iPhone only. Bobby’s servers keep no copy. You can edit, archive or delete each one in Profile → My theses, and “Delete everything” in Memory removes them from the phone.',
+              'Desde la versión 1.8 para iPhone puedes escribir una tesis sobre un activo con tus propias palabras (por qué lo miras, qué te preocupa, qué te haría cambiar de opinión). Tus tesis, su historial y los resultados de sus revisiones se guardan solo en tu iPhone. Los servidores de Bobby no conservan copia. Puedes editar, archivar o eliminar cada una en Perfil → Mis tesis, y “Borrar todo” en Memoria las quita del teléfono.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'When you tap “Review now”, the text of that thesis, the time frame you chose, the date you wrote it, its starting price and the date of its last review are sent with that one question to Bobby’s server and to the AI provider that writes the answer (Anthropic, or OpenAI when it takes over). Bobby’s server uses them for that answer and does not store them. A line above the button says this before anything is sent.',
+              'Cuando tocas “Revisar ahora”, el texto de esa tesis, el plazo que elegiste, la fecha en que la escribiste, su precio inicial y la fecha de su última revisión se envían con esa única pregunta al servidor de Bobby y al proveedor de IA que escribe la respuesta (Anthropic, u OpenAI cuando lo sustituye). El servidor de Bobby los usa para esa respuesta y no los guarda. Una línea sobre el botón lo dice antes de enviar nada.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'A reminder to review a thesis is a local notification that your iPhone schedules for the day you choose. It is not sent through Bobby’s servers or Apple’s push service, its text is generic (“Your reminder to review a thesis.”) and it names no asset or price. The reminder list stays on your iPhone and you can remove any reminder in Profile → Reminders.',
+              'Un recordatorio para revisar una tesis es una notificación local que tu iPhone programa para el día que eliges. No pasa por los servidores de Bobby ni por el servicio push de Apple, su texto es genérico (“Tu recordatorio para revisar una tesis.”) y no nombra ningún activo ni precio. La lista de recordatorios se queda en tu iPhone y puedes quitar cualquiera en Perfil → Recordatorios.',
+            )}
+          </p>
+          <p>
+            {tr(
+              'From version 1.8 the iPhone app asks about memory in the conversation: a screen lists what is kept and each item sent to the AI provider, and nothing from your iPhone questions is added to memory until you choose “Remember”. After an answer, the server tells the app how many times you have asked about that asset and how many days ago, so the app can show what was saved. An invitation code from a link you opened is kept on your iPhone until it is applied to your account or you remove it.',
+              'Desde la versión 1.8 la app para iPhone pregunta por la memoria en la conversación: una pantalla lista lo que se guarda y cada dato que se envía al proveedor de IA, y nada de tus preguntas en el iPhone entra a la memoria hasta que eliges “Recordar”. Después de una respuesta, el servidor le dice a la app cuántas veces has preguntado por ese activo y hace cuántos días, para que la app muestre lo que se guardó. El código de invitación de un link que abriste se guarda en tu iPhone hasta que se aplica a tu cuenta o lo quitas.',
+            )}
+          </p>
+        </Section>
+
         <Section title={tr('Questions and market analysis', 'Preguntas y análisis de mercado')}>
           <p>
             {tr(
