@@ -50,6 +50,8 @@ class FakeDesk : V18Desk {
     override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject = JSONObject()
         .put("symbol", symbol).put("question", question).put("language", language).put("locale", locale).put("country", JSONObject.NULL)
         .put("assetType", if (isEquity) "equity" else "crypto").put("level", level)
+    override var shortcuts: List<String> = emptyList()
+    override fun setShortcuts(symbols: List<String>) { shortcuts = symbols }
     override val repository: BobbyRepository
         get() = throw IllegalStateException("No network in unit tests: put a small interface in front of the repository and fake it")
 
@@ -104,7 +106,8 @@ class FakeShell : V18Shell {
     override suspend fun restorePurchases(): BillingOutcome { restores += 1; return restoreOutcome }
     override fun manageSubscriptionUrl(): String? = managementUrl
     override var briefingNotifications = false
-    override fun setBriefingNotifications(enabled: Boolean) { briefingNotifications = enabled }
+        private set
+    override fun switchBriefingNotifications(enabled: Boolean) { briefingNotifications = enabled }
 }
 
 /** The real host with everything around it in memory. Pass `backgroundScope` from `runTest`. */

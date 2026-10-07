@@ -96,6 +96,15 @@ interface V18Host {
      */
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String = analysisLevel): JSONObject
 
+    // ---- What this phone keeps besides the theses ----
+
+    /** The quick-access shortcuts kept for the current reader (symbols they asked about, newest first). Empty when none were kept. */
+    val shortcuts: List<String>
+    /** Removes one symbol from the shortcuts. False when it was not there. */
+    fun forgetShortcut(symbol: String): Boolean
+    /** Removes every shortcut of the current reader ("Clear the shortcuts on this phone", "Delete everything"). */
+    fun clearShortcuts()
+
     // ---- Stores and services ----
 
     val nudges: NudgeCenter
@@ -173,5 +182,5 @@ interface V18Host {
     /** The existing "notify me when reports are ready" switch for this account (false signed out). */
     val briefingNotifications: Boolean
     /** Turns that switch on or off (asks for the notification permission when needed). */
-    fun setBriefingNotifications(enabled: Boolean)
+    fun switchBriefingNotifications(enabled: Boolean)
 }

@@ -121,6 +121,15 @@ class NucleoSession(
             question, this@NucleoSession.analysisLevel)
         override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
             this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
+        override val shortcuts: List<String> get() {
+            val stored = store.state(this@NucleoSession.owner).optJSONArray("quickAccess") ?: return emptyList()
+            return (0 until stored.length()).mapNotNull { index -> (stored.opt(index) as? String)?.takeIf { it.isNotEmpty() } }
+        }
+        override fun setShortcuts(symbols: List<String>) {
+            store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(6)))
+            // An account's quick access is part of its synced profile: its other devices follow.
+            if (riskAccepted && this@NucleoSession.signedIn) scope.launch { syncProgress() }
+        }
         override val repository: BobbyRepository get() = this@NucleoSession.repository
     }
     val v18: V18Runtime = V18Runtime(desk, V18Process.store(context), V18Process.nudges(context),

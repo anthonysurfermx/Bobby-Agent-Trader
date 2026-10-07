@@ -41,6 +41,10 @@ interface V18Desk {
     /** A single-use token for a question native writes about an asset it already knows. */
     fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject
+    /** The quick-access symbols stored for the current owner (never the defaults shown when none are stored). */
+    val shortcuts: List<String>
+    /** Replaces them. An empty list is kept as "none", and an account's change reaches its other devices. */
+    fun setShortcuts(symbols: List<String>)
     val repository: BobbyRepository
 }
 
@@ -71,7 +75,7 @@ interface V18Shell {
     suspend fun restorePurchases(): BillingOutcome
     fun manageSubscriptionUrl(): String?
     val briefingNotifications: Boolean
-    fun setBriefingNotifications(enabled: Boolean)
+    fun switchBriefingNotifications(enabled: Boolean)
 }
 
 /** A tapped notification and a link that opened the app, waiting for their moment. In memory only: never replayed on a later launch. */
@@ -471,6 +475,20 @@ class V18Runtime(
     override val analysisLevel: String get() = desk.analysisLevel
     override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject = desk.deskBody(symbol, question, isEquity, level)
 
+    override val shortcuts: List<String> get() = desk.shortcuts
+
+    override fun forgetShortcut(symbol: String): Boolean {
+        val kept = desk.shortcuts
+        val left = kept.filterNot { it.equals(symbol, ignoreCase = true) }
+        if (left.size == kept.size) return false
+        desk.setShortcuts(left)
+        return true
+    }
+
+    override fun clearShortcuts() {
+        if (desk.shortcuts.isNotEmpty()) desk.setShortcuts(emptyList())
+    }
+
     override val repository: BobbyRepository get() = desk.repository
     override fun now(): Long = clock()
 
@@ -534,7 +552,7 @@ class V18Runtime(
     override fun manageSubscriptionUrl(): String? = shell?.manageSubscriptionUrl()
     override val briefingNotifications: Boolean get() = shell?.briefingNotifications ?: false
 
-    override fun setBriefingNotifications(enabled: Boolean) {
-        shell?.setBriefingNotifications(enabled)
+    override fun switchBriefingNotifications(enabled: Boolean) {
+        shell?.switchBriefingNotifications(enabled)
     }
 }

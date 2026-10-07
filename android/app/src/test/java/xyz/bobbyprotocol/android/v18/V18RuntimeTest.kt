@@ -439,7 +439,7 @@ class V18RuntimeTest {
         bench.host.haptic("success"); bench.host.share("a link"); bench.host.copy("K7QM2XWP"); bench.host.signIn("google")
         assertTrue(bench.host.openExternal("https://bobbyprotocol.xyz/privacy"))
         bench.host.openNotificationSettings()
-        bench.host.setBriefingNotifications(true)
+        bench.host.switchBriefingNotifications(true)
         bench.shell.restoreOutcome = BillingOutcome.SUBSCRIBED
         assertEquals(BillingOutcome.SUBSCRIBED, bench.host.restorePurchases())
         assertEquals(listOf("success"), bench.shell.haptics)
@@ -454,6 +454,17 @@ class V18RuntimeTest {
         assertEquals("rapido", body.getString("level"))
         assertFalse("a plain body never carries a thesis", body.has("thesis"))
         assertEquals(bench.clock, bench.host.now())
+    }
+
+    @Test fun shortcutsAreForgottenOneByOneOrAllAtOnce() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        assertFalse("nothing kept, nothing to forget", bench.host.forgetShortcut("NVDA"))
+        bench.desk.shortcuts = listOf("NVDA", "BTC", "ETH")
+        assertTrue(bench.host.forgetShortcut("btc"))
+        assertEquals(listOf("NVDA", "ETH"), bench.host.shortcuts)
+        assertFalse(bench.host.forgetShortcut("BTC"))
+        bench.host.clearShortcuts()
+        assertTrue(bench.host.shortcuts.isEmpty())
     }
 
     @Test fun afterTheActivityIsGoneNothingOfItIsCalled() = runTest {

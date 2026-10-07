@@ -156,7 +156,7 @@ class MainActivity : ComponentActivity() {
         }
         override fun manageSubscriptionUrl(): String? = this@MainActivity.billing.managementUri()?.toString()
         override val briefingNotifications: Boolean get() = BriefingReminders.enabled(this@MainActivity, repository.session.value?.userId)
-        override fun setBriefingNotifications(enabled: Boolean) = setReminders(enabled)
+        override fun switchBriefingNotifications(enabled: Boolean) = setReminders(enabled)
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
