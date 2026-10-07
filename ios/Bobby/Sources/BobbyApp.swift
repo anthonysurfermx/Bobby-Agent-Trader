@@ -146,6 +146,9 @@ struct BobbyApp: App {
             .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange)) { _ in
                 BobbyTelemetry.shared.accountChanged()
             }
+            // An invitation link (1.8). The sign-in callback is not one and is left to AccountSession.
+            .onOpenURL { InviteLinkCenter.shared.receive($0) }
+            .onContinueUserActivity(NSUserActivityTypeBrowsingWeb) { InviteLinkCenter.shared.receive(activity: $0) }
         }
     }
 }

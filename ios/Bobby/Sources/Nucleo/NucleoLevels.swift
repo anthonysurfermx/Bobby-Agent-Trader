@@ -4,7 +4,8 @@
 //   POST /api/desk-debate {…, level}        403 signin_required | upgrade_required | level_exhausted
 //                                            503 budget_paused (premium paused today; Rápido still works)
 //   GET  /api/bobby-access                  levels {tier, levels{profundo, maximo}}, referral, plans
-//   (POST /api/bobby-access {action:"referral-claim"} is not called: the app opens no invite links yet)
+//   POST /api/bobby-access {action:"referral-claim", code}   an invitation link or a typed code
+//                                            (V18/Invite/InviteLinkCenter.swift owns the claim)
 import SwiftUI
 import UIKit
 
@@ -454,9 +455,21 @@ struct NucleoInviteSheet: View {
     let reason: String?
     let onPro: (() -> Void)?
     let onClose: () -> Void
-    @State private var copied = false
+    /// After a Sign in with Apple that started in this sheet (the host binds the progress to the account).
+    var afterSignIn: (() async -> Void)? = nil
+    /// The invitation a friend sent: a link that opened the app, or a code typed below (1.8).
+    @ObservedObject var invites = InviteLinkCenter.shared
+    @State private var copied: InviteCopied? = nil
+    /// Fixed when the sheet opens, so the section does not move while a code is being typed.
+    @State private var acceptFirst: Bool? = nil
 
-    private var days: Int { center.referral?.rewardDays ?? center.rewardDays ?? 30 }
+    /// The server's numbers for the reward sentence; nil while the app does not have them.
+    private var reward: (days: Int, max: Int)? {
+        InviteCopy.rewardTerms(referral: center.referral, planDays: center.rewardDays, planMax: center.maxFriends)
+    }
+
+    /// An invitation is waiting or was just answered: that part of the sheet comes first.
+    private var showsAcceptFirst: Bool { acceptFirst ?? (invites.pendingCode != nil || invites.notice != nil) }
 
     var body: some View {
         // Scrolls so the medium detent never clips the link on a small phone.
@@ -477,41 +490,51 @@ struct NucleoInviteSheet: View {
             if let reason {
                 Text(reason).font(.system(size: 14)).foregroundStyle(Theme.warmMuted)
             }
+            if showsAcceptFirst {
+                InviteAcceptSection(invites: invites, afterSignIn: afterSignIn)
+                Divider().overlay(Theme.nucleoStroke)
+            }
             Text(L.t("Invite a friend", "Invita a un amigo"))
                 .font(.system(size: 28, weight: .light))
                 .foregroundStyle(Theme.cream)
-            if proPurchasable {
-            Text(L.t("Every friend who creates an account with your link gives you \(days) days of Bobby Pro.",
-                     "Cada amigo que crea su cuenta con tu link te da \(days) días de Bobby Pro."))
+            // Who gets what, in the server's own numbers, and only where Bobby Pro can be had.
+            if proPurchasable, let reward {
+            Text(InviteCopy.reward(days: reward.days, max: reward.max))
                 .font(.system(size: 15))
                 .foregroundStyle(Theme.warmMuted)
                 .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("invite-reward")
             slots
             } else {
                 Text(L.t("Share Bobby with someone you know.", "Comparte Bobby con alguien que conoces."))
                     .font(.system(size: 15)).foregroundStyle(Theme.warmMuted)
             }
             if let referral = center.referral, let url = URL(string: referral.url) {
+                // The eight characters on their own: a friend who installs the app first can type them.
+                let ownCode = InviteLink.normalized(referral.code)
+                if let ownCode { InviteOwnCode(code: ownCode, copied: $copied) }
                 HStack(spacing: 10) {
-                    ShareLink(item: url, message: Text(L.t("Bobby: three AI agents debate any stock or crypto before you decide.",
-                                                           "Bobby: tres agentes de IA debaten cualquier acción o cripto antes de que decidas."))) {
+                    ShareLink(item: url, message: Text(InviteCopy.shareMessage(code: ownCode))) {
                         Label(L.t("Share link", "Compartir link"), systemImage: "square.and.arrow.up")
                             .font(.system(size: 15, weight: .semibold))
                             .frame(maxWidth: .infinity, minHeight: 48)
                             .foregroundStyle(Color.black)
                             .background(Capsule().fill(Theme.cream))
                     }
+                    .accessibilityIdentifier("invite-share-link")
                     Button {
                         UIPasteboard.general.string = referral.url
                         UINotificationFeedbackGenerator().notificationOccurred(.success)
-                        copied = true
+                        copied = .link
                     } label: {
-                        Text(copied ? L.t("Copied", "Copiado") : L.t("Copy", "Copiar"))
+                        Text(copied == .link ? L.t("Copied", "Copiado") : L.t("Copy link", "Copiar link"))
                             .font(.system(size: 15, weight: .medium))
+                            .padding(.horizontal, 14)
                             .frame(minWidth: 88, minHeight: 48)
                             .foregroundStyle(Theme.cream)
                             .background(Capsule().stroke(Theme.nucleoStroke))
                     }
+                    .accessibilityIdentifier("invite-copy-link")
                 }
                 Text(referral.url.replacingOccurrences(of: "https://", with: ""))
                     .font(.system(size: 11, design: .monospaced))
@@ -524,6 +547,10 @@ struct NucleoInviteSheet: View {
             } else {
                 Text(L.t("Sign in to get your invite link.", "Entra con tu cuenta para tener tu link."))
                     .font(.system(size: 13)).foregroundStyle(Theme.warmDim)
+            }
+            if !showsAcceptFirst {
+                Divider().overlay(Theme.nucleoStroke)
+                InviteAcceptSection(invites: invites, afterSignIn: afterSignIn)
             }
             if proPurchasable, let onPro {
                 Divider().overlay(Theme.nucleoStroke)
@@ -554,6 +581,9 @@ struct NucleoInviteSheet: View {
         .background(Theme.nucleoSurface.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .task { await center.refresh() }
+        .onAppear { if acceptFirst == nil { acceptFirst = invites.pendingCode != nil || invites.notice != nil } }
+        // The result line was on screen: it is said once.
+        .onDisappear { invites.acknowledgeNotice() }
     }
 
     private var slots: some View {
