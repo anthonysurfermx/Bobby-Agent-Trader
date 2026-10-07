@@ -347,8 +347,11 @@ Rules that are not folded away:
   without it).
 - Numbers are cream, never green or red: colour means a verdict only.
 - iOS permission is asked only on "Yes, tell me" or the switch.
-- Three unopened follow-ups and Bobby goes quiet; a kind shown twice in a month and never opened
-  rests; never more than four in seven days.
+- Three follow-ups in a row that nobody answered and Bobby says nothing for two weeks, whatever is
+  asked; a kind whose last two went unanswered rests; never more than four in seven days, never
+  two on the same day, never sooner than 18 hours after the last one.
+- A follow-up belongs to the reader it was planned for: another account never sees it, on the
+  lock screen or in the app.
 
 ### Invite — about 20 words (was about 60)
 

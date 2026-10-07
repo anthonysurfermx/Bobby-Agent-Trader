@@ -106,6 +106,19 @@ final class HarnessLedgerTests: XCTestCase {
         XCTAssertFalse(profile.rests(.asset), "after a month the count starts again")
     }
 
+    func testTheUnansweredStreakCountsWhatWasShownSinceTheLastAnswer() {
+        var ledger = HarnessLedger()
+        XCTAssertEqual(ledger.unansweredStreak(before: t0).count, 0)
+        ledger.note(HarnessEvent(kind: .sent, at: t0, symbol: "NVDA", step: .asset))
+        ledger.note(HarnessEvent(kind: .opened, at: t0.addingTimeInterval(60), symbol: "NVDA", step: .asset, ref: t0))
+        ledger.note(HarnessEvent(kind: .sent, at: t0.addingTimeInterval(86_400), symbol: "NVDA", step: .sector, sector: "semis"))
+        ledger.note(HarnessEvent(kind: .sent, at: t0.addingTimeInterval(2 * 86_400), symbol: "NVDA", step: .week))
+        let streak = ledger.unansweredStreak(before: t0.addingTimeInterval(3 * 86_400))
+        XCTAssertEqual(streak.count, 2, "the one they opened ended the streak before it")
+        XCTAssertEqual(streak.last, t0.addingTimeInterval(2 * 86_400))
+        XCTAssertEqual(ledger.unansweredStreak(before: t0.addingTimeInterval(30)).count, 1, "only what has happened by then")
+    }
+
     func testEachReaderHasTheirOwnLedgerAndForgettingRemovesAllOfIt() {
         let store = HarnessStore(defaults: defaults)
         var mine = HarnessLedger(); mine.note(ask("NVDA", 0))

@@ -10,10 +10,14 @@ final class FakeHarnessNotifier: HarnessNotifying {
     var grantsWhenAsked = true
     var addSucceeds = true
     var whileAsking: (() -> Void)?
+    /// Runs while "iOS is writing" a request, before it answers.
+    var whileAdding: ((HarnessNotice) async -> Void)?
     private(set) var permissionRequests = 0
     private(set) var added: [HarnessNotice] = []
     private(set) var removed: [String] = []
     private(set) var requests: [String: HarnessNotice] = [:]
+    /// What sits on the lock screen: delivered and not yet cleared.
+    private(set) var delivered: [String: HarnessNotice] = [:]
 
     func status() async -> ReminderPermission { permission }
 
@@ -25,10 +29,15 @@ final class FakeHarnessNotifier: HarnessNotifying {
     }
 
     func add(_ notice: HarnessNotice) async -> Bool {
+        await whileAdding?(notice)
         guard addSucceeds else { return false }
         added.append(notice)
         requests[notice.id] = notice
         return true
+    }
+
+    func removeDelivered(_ ids: [String]) {
+        for id in ids { delivered[id] = nil }
     }
 
     func remove(_ ids: [String]) {
@@ -38,8 +47,11 @@ final class FakeHarnessNotifier: HarnessNotifying {
 
     func pendingIds() async -> Set<String> { Set(requests.keys) }
 
-    /// iOS delivered what was due: it is no longer pending.
-    func deliver(before date: Date) { requests = requests.filter { $0.value.fireAt > date } }
+    /// iOS delivered what was due: it is no longer pending, and it sits on the lock screen.
+    func deliver(before date: Date) {
+        for (id, notice) in requests where notice.fireAt <= date { delivered[id] = notice }
+        requests = requests.filter { $0.value.fireAt > date }
+    }
 }
 
 /// The harness (1.8), the phone's side: from the first question, with permission asked only on the
@@ -149,6 +161,8 @@ final class HarnessCenterTests: XCTestCase {
         XCTAssertEqual(asset.userInfo["kind"] as? String, "follow-up")
         XCTAssertEqual(asset.userInfo["step"] as? String, "asset")
         XCTAssertEqual(asset.userInfo["symbol"] as? String, "NVDA")
+        XCTAssertEqual(asset.userInfo["owner"] as? String, "local", "signed out: no account to tag")
+        XCTAssertEqual(asset.userInfo["at"] as? Double, at(8, 16, 40).timeIntervalSince1970)
         XCTAssertEqual(fake.requests["v18.follow.sector"]?.userInfo["sector"] as? String, "semis")
         // A second yes does not ask iOS again, and writes nothing twice.
         let writes = fake.added.count
@@ -177,11 +191,12 @@ final class HarnessCenterTests: XCTestCase {
         // The real trigger, three days out: iOS resolves it to the very minute the plan chose.
         let fireAt = try XCTUnwrap(calendar.date(bySettingHour: 16, minute: 40, second: 0, of: Date().addingTimeInterval(3 * 86_400)))
         let notice = HarnessNotice(id: "v18.follow.asset", title: "Bobby", body: "NVDA, a day later. See how it moved.", fireAt: fireAt,
-                                   step: .asset, symbol: "NVDA", sector: nil, calendar: calendar)
+                                   step: .asset, symbol: "NVDA", sector: nil, owner: HarnessCenter.ownerTag(nil), calendar: calendar)
         let trigger = try XCTUnwrap(notice.request().trigger as? UNCalendarNotificationTrigger)
         XCTAssertEqual(trigger.nextTriggerDate(), fireAt)
-        XCTAssertEqual(HarnessTap.tap(from: notice.request().content.userInfo), HarnessTap(step: .asset, symbol: "NVDA", sector: nil),
-                       "what the phone delivers is what a tap reads back")
+        XCTAssertEqual(HarnessTap.tap(from: notice.request().content.userInfo),
+                       HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: "local", stamp: fireAt),
+                       "what the phone delivers is what a tap reads back: whose it is and when it was for")
     }
 
     func testWhenIOSSaysNoFollowUpsStayInsideTheApp() async {
@@ -278,6 +293,65 @@ final class HarnessCenterTests: XCTestCase {
         XCTAssertEqual(fake.requests.count, 0)
     }
 
+    func testOpeningTheAppJustBeforeAFollowUpDoesNotCancelIt() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 16, 39).addingTimeInterval(30)   // thirty seconds before it fires
+        await center.appActive()
+        XCTAssertEqual(fake.requests["v18.follow.asset"]?.fireAt, at(8, 16, 40), "what iOS already holds stays")
+        XCTAssertFalse(fake.removed.contains("v18.follow.asset"))
+        XCTAssertEqual(center.upcoming.first?.step, .asset)
+    }
+
+    func testAFollowUpThatWasShownCountsEvenIfThePermissionIsTakenAwayAfterwards() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 16, 46)                           // shown at 16:40; notifications turned off at 16:45
+        fake.deliver(before: clock)
+        fake.permission = .denied
+        await center.appActive()
+        XCTAssertEqual(center.ledger.events(.sent).map(\.step), [.asset], "it reached the person: the limits count it")
+        XCTAssertEqual(center.status, .denied)
+    }
+
+    func testATapHonouredLateIsStillOneAnswer() async {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        clock = at(8, 17)
+        fake.deliver(before: clock)
+        await center.appActive()                       // they are back: written as coming back
+        XCTAssertEqual(center.ledger.events(.returned).count, 1)
+        clock = at(8, 17, 12)                           // a sheet kept the tap waiting twelve minutes
+        let tap = HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: "local", stamp: at(8, 16, 40))
+        await center.opened(tap)
+        await center.opened(tap)
+        XCTAssertEqual(center.ledger.events(.returned), [], "the same follow-up, answered once")
+        XCTAssertEqual(center.ledger.events(.opened).count, 1)
+        XCTAssertEqual(center.ledger.events(.opened).first?.ref, at(8, 16, 40))
+    }
+
+    func testAPlanThatChangesWhileIOSIsWritingNeverLeavesAStaleFollowUp() async {
+        let center = make()
+        await ask(center, "NVDA")
+        var once = false
+        fake.whileAdding = { [unowned self] _ in
+            guard !once else { return }
+            once = true
+            // The person turns follow-ups off while the first request is still being written.
+            Task { @MainActor in await center.turnOff() }
+            await self.settle()
+        }
+        _ = await center.accept()
+        await settle()
+        await settle()
+        XCTAssertEqual(center.mode, .off)
+        XCTAssertEqual(fake.requests.count, 0, "nothing arrives after they said no")
+        XCTAssertEqual(center.upcoming, [])
+    }
+
     // MARK: Off, withdrawn, another reader
 
     func testTurningFollowUpsOffErasesAndCancels() async {
@@ -319,18 +393,32 @@ final class HarnessCenterTests: XCTestCase {
         await ask(center, "NVDA")
         _ = await center.accept()
         XCTAssertEqual(fake.requests.count, 3)
+        XCTAssertEqual(fake.requests["v18.follow.asset"]?.owner, HarnessCenter.ownerTag("u1"))
+        XCTAssertFalse(fake.requests["v18.follow.asset"]?.owner.contains("u1") ?? true, "a tag, never the account id")
+        // One was already delivered when the next person signs in.
+        clock = at(8, 17)
+        fake.deliver(before: clock)
+        XCTAssertEqual(fake.delivered.count, 1)
         user = "u2"
         generation = UUID()
         await center.accountChanged()
         XCTAssertEqual(fake.requests.count, 0)
+        XCTAssertEqual(fake.delivered.count, 0, "what was on the lock screen goes too")
         XCTAssertEqual(center.mode, .undecided)
         XCTAssertTrue(center.ledger.isEmpty)
+        // A tap on a notification planned for the first reader does nothing for the second.
+        let theirs = HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: HarnessCenter.ownerTag("u1"), stamp: at(8, 16, 40))
+        XCTAssertFalse(center.accepts(theirs))
+        await center.opened(theirs)
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertNil(center.move)
         // The first reader comes back: their ledger is still theirs, and the plan is made again.
         user = "u1"
         generation = UUID()
         await center.accountChanged()
         XCTAssertEqual(center.ledger.events(.ask).compactMap(\.symbol), ["NVDA"])
-        XCTAssertEqual(fake.requests.count, 3)
+        XCTAssertEqual(center.ledger.events(.sent).map(\.step), [.asset], "what they were shown before leaving was written down")
+        XCTAssertEqual(fake.requests.keys.sorted(), ["v18.follow.sector", "v18.follow.week"], "and is not sent again")
     }
 
     func testSigningInKeepsWhatThePhoneLearnedSignedOut() async {
@@ -348,6 +436,23 @@ final class HarnessCenterTests: XCTestCase {
         user = nil
         generation = UUID()
         await center.accountChanged()
+        XCTAssertTrue(center.ledger.isEmpty)
+        XCTAssertEqual(fake.requests.count, 0)
+    }
+
+    func testTwoAccountChangesInARowEndOnTheReaderWhoIsThere() async {
+        user = "u1"
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        // u1 → u2 starts and, before it finishes, the session is already u3.
+        user = "u2"; generation = UUID()
+        async let first: Void = center.accountChanged()
+        user = "u3"; generation = UUID()
+        async let second: Void = center.accountChanged()
+        _ = await (first, second)
+        await settle()
+        XCTAssertEqual(center.owner, "u3")
         XCTAssertTrue(center.ledger.isEmpty)
         XCTAssertEqual(fake.requests.count, 0)
     }

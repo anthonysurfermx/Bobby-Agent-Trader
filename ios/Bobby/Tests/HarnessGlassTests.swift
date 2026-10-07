@@ -163,21 +163,39 @@ final class HarnessGlassTests: XCTestCase {
     // MARK: The tapped payload
 
     func testOnlyAFollowUpPayloadIsATap() {
-        XCTAssertEqual(HarnessTap.tap(from: ["kind": "follow-up", "step": "asset", "symbol": "NVDA"]),
-                       HarnessTap(step: .asset, symbol: "NVDA", sector: nil))
-        XCTAssertEqual(HarnessTap.tap(from: ["kind": "follow-up", "step": "sector", "symbol": "nvda", "sector": "semis"]),
-                       HarnessTap(step: .sector, symbol: "NVDA", sector: "semis"))
-        XCTAssertEqual(HarnessTap.tap(from: ["kind": "follow-up", "step": "week"]), HarnessTap(step: .week, symbol: nil, sector: nil))
-        XCTAssertNil(HarnessTap.tap(from: ["kind": "thesis-review", "step": "asset", "symbol": "NVDA"]))
-        XCTAssertNil(HarnessTap.tap(from: ["step": "asset", "symbol": "NVDA"]), "no kind: not ours")
-        XCTAssertNil(HarnessTap.tap(from: ["kind": "follow-up", "step": "price", "symbol": "NVDA"]))
-        XCTAssertNil(HarnessTap.tap(from: ["kind": "follow-up", "step": "asset"]), "an asset follow-up names its asset")
-        XCTAssertNil(HarnessTap.tap(from: ["kind": "follow-up", "step": "asset", "symbol": "NVDA; drop"]))
-        XCTAssertNil(HarnessTap.tap(from: ["kind": "follow-up", "step": "sector", "symbol": "NVDA", "sector": "made-up"]))
-        XCTAssertNil(HarnessTap.tap(from: ["aps": ["kind": "follow-up", "step": "week"]]), "only the top level is read")
+        let at = 1_800_000_000.0, when = Date(timeIntervalSince1970: at)
+        func payload(_ step: String, symbol: Any? = nil, sector: String? = nil, kind: String? = "follow-up", owner: Any? = "local", at stamp: Any? = at) -> [AnyHashable: Any] {
+            var info: [AnyHashable: Any] = ["step": step]
+            if let kind { info["kind"] = kind }
+            if let symbol { info["symbol"] = symbol }
+            if let sector { info["sector"] = sector }
+            if let owner { info["owner"] = owner }
+            if let stamp { info["at"] = stamp }
+            return info
+        }
+        XCTAssertEqual(HarnessTap.tap(from: payload("asset", symbol: "NVDA")),
+                       HarnessTap(step: .asset, symbol: "NVDA", sector: nil, owner: "local", stamp: when))
+        XCTAssertEqual(HarnessTap.tap(from: payload("sector", symbol: "nvda", sector: "semis", owner: "a1b2c3d4e5f60718")),
+                       HarnessTap(step: .sector, symbol: "NVDA", sector: "semis", owner: "a1b2c3d4e5f60718", stamp: when))
+        XCTAssertEqual(HarnessTap.tap(from: payload("week")), HarnessTap(step: .week, symbol: nil, sector: nil, owner: "local", stamp: when))
+        XCTAssertNil(HarnessTap.tap(from: payload("asset", symbol: "NVDA", kind: "thesis-review")))
+        XCTAssertNil(HarnessTap.tap(from: payload("asset", symbol: "NVDA", kind: nil)), "no kind: not ours")
+        XCTAssertNil(HarnessTap.tap(from: payload("price", symbol: "NVDA")))
+        XCTAssertNil(HarnessTap.tap(from: payload("asset")), "an asset follow-up names its asset")
+        XCTAssertNil(HarnessTap.tap(from: payload("asset", symbol: "NVDA; drop")))
+        XCTAssertNil(HarnessTap.tap(from: payload("sector", symbol: "NVDA", sector: "made-up")))
+        XCTAssertNil(HarnessTap.tap(from: payload("asset", symbol: "NVDA", owner: nil)), "it does not say whose it is")
+        XCTAssertNil(HarnessTap.tap(from: payload("asset", symbol: "NVDA", at: nil)), "it does not say when it was for")
+        XCTAssertNil(HarnessTap.tap(from: ["aps": payload("week")]), "only the top level is read")
         // A follow-up is never mistaken for a reminder or a briefing, nor the other way round.
-        XCTAssertNil(ReminderIntent.tap(from: ["kind": "follow-up", "step": "week"]))
-        XCTAssertNil(BriefingIntent.briefId(from: ["kind": "follow-up", "step": "week"]))
+        XCTAssertNil(ReminderIntent.tap(from: payload("week")))
+        XCTAssertNil(BriefingIntent.briefId(from: payload("week")))
+        // The tag is a digest: the same reader always gets the same one, and it never holds the account id.
+        XCTAssertEqual(HarnessCenter.ownerTag(nil), "local")
+        XCTAssertEqual(HarnessCenter.ownerTag("user-1"), HarnessCenter.ownerTag("user-1"))
+        XCTAssertNotEqual(HarnessCenter.ownerTag("user-1"), HarnessCenter.ownerTag("user-2"))
+        XCTAssertEqual(HarnessCenter.ownerTag("user-1").count, 16)
+        XCTAssertFalse(HarnessCenter.ownerTag("user-1").contains("user"))
     }
 
     // MARK: The nudges
@@ -291,6 +309,11 @@ final class HarnessGlassTests: XCTestCase {
         XCTAssertNil(session.sheet, "the asset's follow-up is a line on the glass, not a screen")
         XCTAssertNil(intent.pending, "consumed once")
         XCTAssertEqual(center.ledger.events(.opened).map(\.step), [.asset])
+        // A notification planned for another reader of this phone opens nothing and is still consumed.
+        intent.store(HarnessTap(step: .sector, symbol: "NVDA", sector: "semis", owner: HarnessCenter.ownerTag("someone-else"), stamp: t0))
+        await settle()
+        XCTAssertNil(session.sheet)
+        XCTAssertNil(intent.pending)
         intent.store(HarnessTap(step: .sector, symbol: "NVDA", sector: "semis"))
         await settle()
         XCTAssertEqual(session.sheet, .followUp)

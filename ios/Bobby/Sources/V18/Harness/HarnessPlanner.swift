@@ -13,8 +13,10 @@
 //    a few, at the hour they answer;
 //  - the asset: after an answered follow-up, the next one is about the asset that matters most to
 //    them among the others they asked about;
-//  - when to stop: a kind shown twice in a month and never answered rests, a sector is not
-//    repeated within a week, and never more than `maxPerWeek` follow-ups in seven days.
+//  - when to stop: three follow-ups in a row that nobody answered and Bobby says nothing for two
+//    weeks, whatever is asked; a kind whose last two showings went unanswered rests; a sector is
+//    not repeated within a week; never more than `maxPerWeek` follow-ups in seven days, never two
+//    on the same day, never sooner than 18 hours after the last one.
 // Nothing here says the market did anything: a follow-up is a moment in time, the numbers are
 // read when the person opens it.
 import Foundation
@@ -64,8 +66,10 @@ enum HarnessPlanner {
         /// Assets a week looks back for.
         var weekWindowDays = 7.0
         var maxPerWeek = 4
-        /// A moment closer than this is not handed to iOS.
-        var minimumLead: TimeInterval = 60
+        /// This many follow-ups in a row that nobody answered, and Bobby says nothing for `quietDays`,
+        /// whatever is asked in the meantime.
+        var quietAfter = 3
+        var quietDays = 14.0
         var sectorOf: (String) -> String? = { HarnessSectors.sector(of: $0)?.id }
     }
 
@@ -73,6 +77,8 @@ enum HarnessPlanner {
     static func plan(ledger: HarnessLedger, now: Date, calendar: Calendar, options: Options = Options()) -> [HarnessFollowUp] {
         guard let anchor = ledger.anchor(before: now),
               now.timeIntervalSince(anchor.at) <= options.anchorDays * 86_400 else { return [] }
+        let streak = ledger.unansweredStreak(before: now)
+        if streak.count >= options.quietAfter, let last = streak.last, now.timeIntervalSince(last) < options.quietDays * 86_400 { return [] }
         let profile = HarnessProfile.make(ledger, now: now, calendar: calendar)
         let sentSince = ledger.events(.sent, since: anchor.at)
         let done = Set(sentSince.compactMap(\.step))
@@ -137,13 +143,35 @@ enum HarnessPlanner {
             }
         }
 
-        // Never in the past, never too many in a week.
-        let upcoming = result.filter { $0.fireAt.timeIntervalSince(now) >= options.minimumLead }.sorted { $0.fireAt < $1.fireAt }
+        // Never in the past; never the same local day as, or sooner than `minimumGap` after, what the
+        // person was really shown before (the clock, the time zone or the plan may have moved since);
+        // never too many in a week.
+        var previous = ledger.events(.sent).last?.at
         var kept: [HarnessFollowUp] = []
-        for followUp in upcoming {
-            let weekBefore = followUp.fireAt.addingTimeInterval(-7 * 86_400)
+        for candidate in result.sorted(by: { $0.fireAt < $1.fireAt }) where candidate.fireAt > now {
+            var fireAt = candidate.fireAt
+            let tooClose: (Date) -> Bool = { date in
+                if date.timeIntervalSince(anchor.at) < options.minimumGap { return true }
+                guard let previous else { return false }
+                return date.timeIntervalSince(previous) < options.minimumGap || calendar.isDate(date, inSameDayAs: previous)
+            }
+            var tries = 0
+            // An asset or a sector moves to the next day; the week stays a Monday.
+            while tooClose(fireAt), tries < 8 {
+                fireAt = calendar.date(byAdding: .day, value: candidate.step == .week ? 7 : 1, to: fireAt) ?? fireAt.addingTimeInterval(86_400)
+                tries += 1
+            }
+            guard !tooClose(fireAt) else { continue }
+            let weekBefore = fireAt.addingTimeInterval(-7 * 86_400)
             let shown = ledger.events(.sent, since: weekBefore).count + kept.filter { $0.fireAt > weekBefore }.count
-            if shown < options.maxPerWeek { kept.append(followUp) }
+            guard shown < options.maxPerWeek else { continue }
+            var followUp = candidate
+            if fireAt != candidate.fireAt {
+                followUp = HarnessFollowUp(step: candidate.step, fireAt: fireAt, symbol: candidate.symbol, name: candidate.name,
+                                           isEquity: candidate.isEquity, sector: candidate.sector, days: candidate.days, others: candidate.others)
+            }
+            kept.append(followUp)
+            previous = fireAt
         }
         return kept
     }

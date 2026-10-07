@@ -1019,6 +1019,8 @@ final class NucleoSession: ObservableObject {
               !gate.listening(), !gate.deskBusy(), !gate.narrating(),
               let tap = harnessIntent.take()
         else { return false }
+        // A notification planned for another reader of this phone opens nothing.
+        guard harness.accepts(tap) else { return false }
         Task { await harness.opened(tap) }
         guard tap.step != .asset else { return true }
         HarnessBoardFocus.pending = tap

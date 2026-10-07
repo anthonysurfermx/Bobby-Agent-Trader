@@ -105,17 +105,41 @@ final class HarnessPlannerTests: XCTestCase {
         XCTAssertEqual(plan(at(20, 9)), [], "and stays quiet")
     }
 
-    func testAKindIgnoredTwiceInAMonthRests() {
+    func testAKindWhoseLastTwoShowingsWentUnansweredRests() {
         ask("NVDA", at(1, 12))
-        sent(.asset, at(2, 12)); sent(.sector, at(3, 12), sector: "semis"); sent(.week, at(5, 12))
-        ask("TSLA", at(6, 12))
-        sent(.asset, at(7, 12), symbol: "TSLA")
-        // Two asset follow-ups shown, none answered: the next question does not get one.
-        ask("AAPL", at(8, 12))
-        let steps = plan(at(8, 12, 1))
-        XCTAssertFalse(steps.contains { $0.step == .asset })
-        XCTAssertEqual(steps.first?.step, .sector, "a kind that was not ignored twice still comes")
+        sent(.asset, at(2, 12))                                             // ignored
+        sent(.sector, at(3, 12), sector: "semis"); opened(.sector, at(3, 14), sector: "semis")
+        sent(.asset, at(4, 14))                                             // ignored again
+        ask("AAPL", at(5, 12))
+        let steps = plan(at(5, 12, 1))
+        XCTAssertFalse(steps.contains { $0.step == .asset }, "two asset follow-ups in a row went unanswered")
+        XCTAssertEqual(steps.first?.step, .sector, "a kind they do answer still comes")
         XCTAssertEqual(steps.first?.sector, "bigtech")
+    }
+
+    func testAnOlderAnswerDoesNotKeepAKindAlive() {
+        ask("NVDA", at(1, 12))
+        sent(.asset, at(2, 12)); opened(.asset, at(2, 13))                  // answered once, long before
+        sent(.sector, at(3, 13), sector: "semis"); opened(.sector, at(3, 14), sector: "semis")
+        sent(.asset, at(4, 14))                                             // ignored
+        sent(.week, at(5, 14)); opened(.week, at(5, 15), symbol: nil)
+        sent(.asset, at(6, 15))                                             // ignored
+        ask("AAPL", at(7, 12))
+        XCTAssertFalse(plan(at(7, 12, 1)).contains { $0.step == .asset }, "the last two were ignored, whatever happened before them")
+    }
+
+    func testThreeInARowUnansweredAndNothingComesForTwoWeeksWhateverIsAsked() {
+        ask("NVDA", at(1, 12))
+        sent(.asset, at(2, 12))
+        ask("TSLA", at(2, 19))
+        sent(.asset, at(3, 19), symbol: "TSLA")
+        ask("SOL", at(3, 20), equity: false)
+        sent(.sector, at(5, 20), symbol: "SOL", sector: "layer1")
+        XCTAssertEqual(plan(at(5, 21)), [], "three shown, none answered: the week that was coming is dropped")
+        ask("AAPL", at(9, 12))
+        XCTAssertEqual(plan(at(9, 12, 1)), [], "a new question does not restart it inside the two weeks")
+        ask("AAPL", at(20, 12))
+        XCTAssertFalse(plan(at(20, 12, 1)).isEmpty, "two weeks after the last one, a question may be followed up again")
     }
 
     func testNeverMoreThanFourInAWeek() {
@@ -183,6 +207,42 @@ final class HarnessPlannerTests: XCTestCase {
         XCTAssertEqual(profile.hour, 8, "four answers at eight, three at nine in the evening")
         ask("TSLA", at(8, 23))
         XCTAssertEqual(plan(at(8, 23, 1)).first?.fireAt, at(10, 9), "their hour, inside waking hours, and never sooner than 18 hours")
+    }
+
+    // MARK: Spacing against what was really shown
+
+    func testTheWeekIsNeverSoonerThanEighteenHoursAfterTheQuestion() {
+        // Their hour is nine in the morning; assets rest; GME has no sector: only the week is left.
+        ask("NVDA", at(1, 12))
+        for day in [2, 3, 5] { sent(.sector, at(day, 9), sector: "semis"); opened(.sector, at(day, 9, 5), sector: "semis") }
+        sent(.asset, at(6, 9)); sent(.asset, at(7, 9))
+        opened(.week, at(8, 9, 10), symbol: nil)
+        ask("GME", at(11, 23))                         // Sunday night
+        let steps = plan(at(11, 23, 1))
+        XCTAssertEqual(steps.map(\.step), [.week])
+        XCTAssertEqual(steps.first?.fireAt, at(19, 9), "Monday at nine is ten hours away: the Monday after")
+    }
+
+    func testAChangeOfTimeZoneNeverPutsTwoOnTheSameDay() {
+        var london = Calendar(identifier: .gregorian)
+        london.timeZone = TimeZone(identifier: "Europe/London")!
+        var newYork = Calendar(identifier: .gregorian)
+        newYork.timeZone = TimeZone(identifier: "America/New_York")!
+        let asked = london.date(from: DateComponents(year: 2026, month: 10, day: 7, hour: 1))!
+        ledger.note(HarnessEvent(kind: .ask, at: asked, symbol: "NVDA", name: "NVDA", isEquity: true, price: 100))
+        // Planned and shown in London: Thursday at nine, which is four in the morning in New York.
+        let shown = london.date(from: DateComponents(year: 2026, month: 10, day: 8, hour: 9))!
+        ledger.note(HarnessEvent(kind: .sent, at: shown, symbol: "NVDA", step: .asset))
+        let now = newYork.date(from: DateComponents(year: 2026, month: 10, day: 8, hour: 11))!
+        let steps = HarnessPlanner.plan(ledger: ledger, now: now, calendar: newYork)
+        let sector = steps.first { $0.step == .sector }
+        XCTAssertNotNil(sector)
+        XCTAssertFalse(newYork.isDate(sector!.fireAt, inSameDayAs: shown), "not on the day one already arrived")
+        XCTAssertGreaterThanOrEqual(sector!.fireAt.timeIntervalSince(shown), 18 * 3_600)
+        for (a, b) in zip(steps, steps.dropFirst()) {
+            XCTAssertFalse(newYork.isDate(a.fireAt, inSameDayAs: b.fireAt))
+            XCTAssertGreaterThanOrEqual(b.fireAt.timeIntervalSince(a.fireAt), 18 * 3_600)
+        }
     }
 
     // MARK: Limits

@@ -54,6 +54,8 @@ struct HarnessEvent: Codable, Equatable {
     var step: HarnessStep? = nil
     /// `sent`, `opened`, `returned` of a sector follow-up: the sector's id.
     var sector: String? = nil
+    /// `opened`, `returned`: the moment of the follow-up they answer (its `sent` has that `at`).
+    var ref: Date? = nil
 
     /// Kinds that say "this person answers Bobby": the next follow-ups start from here.
     var isEngagement: Bool { kind == .opened || kind == .returned }
@@ -128,6 +130,13 @@ struct HarnessLedger: Codable, Equatable {
         events.filter { event in event.kind == kind && (since.map { event.at > $0 } ?? true) }
     }
 
+    /// Follow-ups shown since the person last answered one, and when the latest of them was.
+    func unansweredStreak(before now: Date) -> (count: Int, last: Date?) {
+        let lastAnswer = events.last { $0.at <= now && $0.isEngagement }?.at
+        let shown = events.filter { event in event.kind == .sent && event.at <= now && (lastAnswer.map { event.at > $0 } ?? true) }
+        return (shown.count, shown.last?.at)
+    }
+
     /// The latest event that the next follow-ups start from: a question, or an answered follow-up.
     func anchor(before now: Date) -> HarnessEvent? {
         events.last { $0.at <= now && ($0.kind == .ask || $0.isEngagement) }
@@ -167,11 +176,13 @@ struct HarnessProfile: Equatable {
     var sent: [HarnessStep: Int]
     /// Of those, the ones they opened or came back for.
     var engaged: [HarnessStep: Int]
+    /// Per kind: how many of the latest ones in a row went unanswered.
+    var ignored: [HarnessStep: Int]
 
     /// Interest halves every this many days.
     static let halfLifeDays = 7.0
     static let statsDays = 30.0
-    /// A kind shown this often with no answer rests until those showings leave the window.
+    /// A kind whose last showings, this many in a row, went unanswered rests until they leave the window.
     static let ignoredLimit = 2
     /// Answers needed before the hour they come at is trusted over the hour they asked at.
     static let hourSamples = 3
@@ -182,6 +193,7 @@ struct HarnessProfile: Equatable {
         var interest: [String: Double] = [:]
         var sent: [HarnessStep: Int] = [:]
         var engaged: [HarnessStep: Int] = [:]
+        var ignored: [HarnessStep: Int] = [:]
         var hours: [Int: (count: Int, latest: Date)] = [:]
         let statsFrom = now.addingTimeInterval(-statsDays * 86_400)
         for event in ledger.events where event.at <= now {
@@ -190,9 +202,10 @@ struct HarnessProfile: Equatable {
                 interest[symbol, default: 0] += weight * pow(0.5, ageDays / halfLifeDays)
             }
             guard event.at >= statsFrom, let step = event.step else { continue }
-            if event.kind == .sent { sent[step, default: 0] += 1 }
+            if event.kind == .sent { sent[step, default: 0] += 1; ignored[step, default: 0] += 1 }
             if event.isEngagement {
                 engaged[step, default: 0] += 1
+                ignored[step] = 0
                 let hour = calendar.component(.hour, from: event.at)
                 let seen = hours[hour]
                 hours[hour] = ((seen?.count ?? 0) + 1, max(seen?.latest ?? event.at, event.at))
@@ -200,12 +213,13 @@ struct HarnessProfile: Equatable {
         }
         let samples = hours.values.reduce(0) { $0 + $1.count }
         let best = hours.max { a, b in a.value.count == b.value.count ? a.value.latest < b.value.latest : a.value.count < b.value.count }
-        return HarnessProfile(interest: interest, hour: samples >= hourSamples ? best?.key : nil, sent: sent, engaged: engaged)
+        return HarnessProfile(interest: interest, hour: samples >= hourSamples ? best?.key : nil, sent: sent, engaged: engaged, ignored: ignored)
     }
 
-    /// Shown `ignoredLimit` times lately and never answered: Bobby stops sending that kind for now.
+    /// Its last `ignoredLimit` showings went unanswered: Bobby stops sending that kind for now. An
+    /// answer from before those showings does not count for them.
     func rests(_ step: HarnessStep) -> Bool {
-        (sent[step] ?? 0) >= Self.ignoredLimit && (engaged[step] ?? 0) == 0
+        (ignored[step] ?? 0) >= Self.ignoredLimit
     }
 
     /// The asset that matters most among `symbols`; ties go to the order given.

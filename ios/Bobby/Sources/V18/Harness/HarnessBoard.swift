@@ -80,6 +80,8 @@ struct HarnessBoardSheet: View {
         return (market.price, market.changePct)
     }
     @State private var board: HarnessBoard?
+    /// Whose assets the board shows: it closes the moment someone else is using the phone.
+    @State private var generation = AccountSession.shared.generation
 
     var body: some View {
         Group {
@@ -107,9 +109,16 @@ struct HarnessBoardSheet: View {
                     }
                 }
                 for await (symbol, change) in group {
+                    guard generation == AccountSession.shared.generation else { continue }
                     withAnimation(.easeOut(duration: 0.2)) { board?.set(change, for: symbol) }
                 }
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: AccountSession.didChange).receive(on: DispatchQueue.main)) { _ in
+            guard fixed == nil, generation != AccountSession.shared.generation else { return }
+            // Another reader: what the previous one asked about is not theirs to see.
+            board = HarnessBoard(kind: .week, title: HarnessCopy.weekTitle, basis: HarnessCopy.sinceAsked, rows: [])
+            onClose()
         }
     }
 }

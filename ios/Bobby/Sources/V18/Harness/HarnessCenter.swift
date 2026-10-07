@@ -13,7 +13,13 @@
 //    direction. The number is read when they open it.
 //  - A follow-up whose moment has passed is written to the ledger as `sent` exactly once; whether
 //    it was opened is what the next plan learns from.
+//  - A notification carries a tag of the reader it was planned for and the moment it was planned
+//    for. A tap whose tag is not the current reader's does nothing, and what was already delivered
+//    is taken off the lock screen when the reader changes.
+//  - Every change of the plan ends in `sync`, and syncs run one after another: whatever an older
+//    sync was still writing, the last one leaves iOS holding exactly the newest plan.
 import Combine
+import CryptoKit
 import Foundation
 import UIKit
 import UserNotifications
@@ -23,6 +29,11 @@ struct HarnessTap: Equatable {
     let step: HarnessStep
     let symbol: String?
     let sector: String?
+    /// The tag of the reader the notification was planned for (`HarnessCenter.ownerTag`). Nil only
+    /// for a tap the app builds itself.
+    var owner: String? = nil
+    /// The moment the notification was planned for: which follow-up this is.
+    var stamp: Date? = nil
 
     /// Reads `["kind": "follow-up", "step": …]`. Anything else is not a follow-up.
     static func tap(from userInfo: [AnyHashable: Any]) -> HarnessTap? {
@@ -32,7 +43,10 @@ struct HarnessTap: Equatable {
         let sector = (userInfo["sector"] as? String).flatMap { id in HarnessSectors.all.contains { $0.id == id } ? id : nil }
         if step != .week, symbol == nil { return nil }
         if step == .sector, sector == nil { return nil }
-        return HarnessTap(step: step, symbol: symbol, sector: sector)
+        // A notification this app planned always says whose it is and when it was for.
+        guard let owner = userInfo["owner"] as? String, owner.count <= 32, !owner.isEmpty,
+              let at = (userInfo["at"] as? NSNumber)?.doubleValue, at.isFinite, at > 0 else { return nil }
+        return HarnessTap(step: step, symbol: symbol, sector: sector, owner: owner, stamp: Date(timeIntervalSince1970: at))
     }
 }
 
@@ -47,10 +61,13 @@ struct HarnessNotice: Equatable {
     let step: HarnessStep
     let symbol: String?
     let sector: String?
+    /// Whose follow-up this is (a tag, never the account id).
+    let owner: String
     let calendar: Calendar
 
     var userInfo: [String: Any] {
-        var info: [String: Any] = ["kind": HarnessCenter.kind, "step": step.rawValue]
+        var info: [String: Any] = ["kind": HarnessCenter.kind, "step": step.rawValue, "owner": owner,
+                                   "at": fireAt.timeIntervalSince1970.rounded()]
         if let symbol { info["symbol"] = symbol }
         if let sector { info["sector"] = sector }
         return info
@@ -80,6 +97,8 @@ protocol HarnessNotifying: AnyObject {
     func requestPermission() async -> Bool
     func add(_ notice: HarnessNotice) async -> Bool
     func remove(_ ids: [String])
+    /// Takes already delivered notifications off the lock screen and the notification centre.
+    func removeDelivered(_ ids: [String])
     func pendingIds() async -> Set<String>
 }
 
@@ -112,6 +131,10 @@ final class SystemHarnessNotifier: HarnessNotifying {
         center.removePendingNotificationRequests(withIdentifiers: ids)
     }
 
+    func removeDelivered(_ ids: [String]) {
+        center.removeDeliveredNotifications(withIdentifiers: ids)
+    }
+
     func pendingIds() async -> Set<String> {
         Set(await center.pendingNotificationRequests().map(\.identifier))
     }
@@ -124,6 +147,7 @@ final class SilentHarnessNotifier: HarnessNotifying {
     func requestPermission() async -> Bool { false }
     func add(_ notice: HarnessNotice) async -> Bool { false }
     func remove(_ ids: [String]) {}
+    func removeDelivered(_ ids: [String]) {}
     func pendingIds() async -> Set<String> { [] }
 }
 
@@ -209,8 +233,24 @@ final class HarnessCenter: ObservableObject {
     private var focus: (symbol: String, at: Date)?
     private var quotes: [String: (price: Double, at: Date)] = [:]
     private var syncTail: Task<Void, Never>?
+    /// Grows whenever the plan or the reader changes: a sync that started before does not finish its writes.
+    private var revision = 0
     private var cancellables = Set<AnyCancellable>()
     private var started = false
+
+    /// Every identifier the harness ever hands to iOS (one per step).
+    static let identifiers = HarnessStep.allCases.map { HarnessPlanner.identifierPrefix + $0.rawValue }
+
+    /// What a notification says about whose it is: `local` signed out, else a digest of the account id.
+    nonisolated static func ownerTag(_ owner: String?) -> String {
+        guard let owner else { return "local" }
+        return SHA256.hash(data: Data(owner.utf8)).prefix(8).map { String(format: "%02x", $0) }.joined()
+    }
+
+    /// A tap (or a delivery) belongs to whoever uses the phone now.
+    func accepts(_ tap: HarnessTap) -> Bool {
+        tap.owner == nil || tap.owner == Self.ownerTag(owner)
+    }
 
     init(notifier: HarnessNotifying, defaults: UserDefaults = .standard) {
         self.notifier = notifier
@@ -265,13 +305,14 @@ final class HarnessCenter: ObservableObject {
     /// The store was emptied for this reader: what is in memory and what iOS holds follow it.
     func reloadAfterErase() async {
         load(owner: owner)
-        issued = [:]
+        purge()
         await replan()
         changed()
     }
 
     /// Reads one reader's ledger, switch and plan from the phone.
     func load(owner: String?) {
+        revision += 1
         self.owner = owner
         ledger = store.ledger(owner: owner)
         mode = store.mode(owner: owner)
@@ -335,14 +376,20 @@ final class HarnessCenter: ObservableObject {
 
     /// A follow-up notification was tapped.
     func opened(_ tap: HarnessTap) async {
-        guard recording else { return }
+        guard recording, accepts(tap) else { return }
         // A tapped notification was shown: iOS lets Bobby show them.
         status = .allowed
         settle()
         let clock = now()
-        // Coming back and tapping are one answer, not two.
-        ledger.remove { $0.kind == .returned && $0.step == tap.step && clock.timeIntervalSince($0.at) < 600 }
-        note(HarnessEvent(kind: .opened, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector))
+        let ref = tap.stamp ?? ledger.events(.sent).last { $0.step == tap.step }?.at
+        // Coming back and tapping are one answer, not two, however long the tap waited to be honoured.
+        ledger.remove { event in
+            guard event.kind == .returned, event.step == tap.step else { return false }
+            if let ref, let answered = event.ref { return answered == ref }
+            return clock.timeIntervalSince(event.at) < 600
+        }
+        guard !ledger.events.contains(where: { $0.kind == .opened && $0.step == tap.step && $0.ref != nil && $0.ref == ref }) else { return }
+        note(HarnessEvent(kind: .opened, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector, ref: ref))
         if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, clock) }
         await replan()
         await refreshMove()
@@ -350,10 +397,10 @@ final class HarnessCenter: ObservableObject {
 
     /// A follow-up fired while the person was in the app: it counts as answered, without a banner.
     func firedInForeground(_ tap: HarnessTap) async {
-        guard recording else { return }
+        guard recording, accepts(tap) else { return }
         settle()
         let clock = now()
-        note(HarnessEvent(kind: .returned, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector))
+        note(HarnessEvent(kind: .returned, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector, ref: tap.stamp))
         if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, clock) }
         await replan()
         await refreshMove()
@@ -372,8 +419,8 @@ final class HarnessCenter: ObservableObject {
         let clock = now()
         // Back soon after a follow-up they did not tap: they came back for it.
         if let last = ledger.events(.sent).last, clock.timeIntervalSince(last.at) <= Self.returnWindow,
-           !ledger.events.contains(where: { $0.isEngagement && $0.at >= last.at }) {
-            note(HarnessEvent(kind: .returned, at: clock, symbol: last.symbol, step: last.step, sector: last.sector))
+           !ledger.events.contains(where: { $0.isEngagement && ($0.ref == last.at || $0.at >= last.at) }) {
+            note(HarnessEvent(kind: .returned, at: clock, symbol: last.symbol, step: last.step, sector: last.sector, ref: last.at))
         }
         let lastOpen = ledger.events(.appOpen).last?.at
         if lastOpen.map({ clock.timeIntervalSince($0) >= Self.openGap }) ?? true { note(HarnessEvent(kind: .appOpen, at: clock)) }
@@ -382,14 +429,17 @@ final class HarnessCenter: ObservableObject {
     }
 
     /// Another account, or none. A signed-out reader who signs in keeps what the phone learned.
+    /// The switch itself never waits for anything: by the time this suspends, the centre already
+    /// holds the reader who is using the phone, so two changes in a row cannot cross.
     func accountChanged() async {
         let user = currentUser()
         guard user != owner else { return }
         let wasLocal = owner == nil
-        // The previous reader's follow-ups never reach the next one.
-        let stale = await notifier.pendingIds().filter { $0.hasPrefix(HarnessPlanner.identifierPrefix) }
-        if !stale.isEmpty { notifier.remove(stale.sorted()) }
-        issued = [:]
+        // What the reader who is leaving was already shown is written into their own ledger first.
+        if consent() == .accepted { settle() }
+        // The previous reader's follow-ups never reach the next one: not the ones still to come,
+        // and not the ones already on the lock screen.
+        purge()
         if wasLocal, user != nil, consent() == .accepted {
             let local = store.ledger(owner: nil), localMode = store.mode(owner: nil)
             var theirs = store.ledger(owner: user)
@@ -404,6 +454,14 @@ final class HarnessCenter: ObservableObject {
         await replan()
         await refreshMove()
         changed()
+    }
+
+    /// Nothing of the harness stays in iOS: pending or delivered.
+    private func purge() {
+        revision += 1
+        issued = [:]
+        notifier.remove(Self.identifiers)
+        notifier.removeDelivered(Self.identifiers)
     }
 
     // MARK: The glass
@@ -454,8 +512,9 @@ final class HarnessCenter: ObservableObject {
         let clock = now()
         let passed = planned.filter { $0.followUp.fireAt <= clock }
         guard !passed.isEmpty else { return }
-        // Handed to iOS and iOS could show it: it was shown.
-        for item in passed where item.handed && status == .allowed {
+        // iOS accepted it while it could show notifications: it counts as shown, even if the
+        // permission was taken away afterwards (counting too many only makes Bobby quieter).
+        for item in passed where item.handed {
             let followUp = item.followUp
             ledger.note(HarnessEvent(kind: .sent, at: followUp.fireAt, symbol: followUp.symbol, step: followUp.step, sector: followUp.sector))
         }
@@ -467,6 +526,7 @@ final class HarnessCenter: ObservableObject {
     /// Asks the planner what comes next and brings iOS in line with it.
     func replan() async {
         settle()
+        revision += 1
         var wanted: [HarnessFollowUp] = []
         if mode == .on, consent() == .accepted {
             var options = HarnessPlanner.Options()
@@ -494,24 +554,37 @@ final class HarnessCenter: ObservableObject {
 
     private func notice(_ followUp: HarnessFollowUp) -> HarnessNotice {
         HarnessNotice(id: followUp.id, title: HarnessCopy.notificationTitle, body: HarnessCopy.body(followUp), fireAt: followUp.fireAt,
-                      step: followUp.step, symbol: followUp.symbol, sector: followUp.sector, calendar: calendar())
+                      step: followUp.step, symbol: followUp.symbol, sector: followUp.sector, owner: Self.ownerTag(owner), calendar: calendar())
     }
 
     private func apply() async {
+        // The plan as it is when this sync starts. If it changes while iOS is being asked, this
+        // sync stops writing: the change queued its own sync behind this one.
+        let started = revision
         let clock = now()
         let wanted = planned.map(\.followUp).filter { $0.fireAt > clock }.map(notice)
         let wantedIds = Set(wanted.map(\.id))
         let existing = await notifier.pendingIds().filter { $0.hasPrefix(HarnessPlanner.identifierPrefix) }
+        guard started == revision else { return }
         let stale = existing.subtracting(wantedIds)
         if !stale.isEmpty { notifier.remove(stale.sorted()) }
         for id in Array(issued.keys) where !wantedIds.contains(id) { issued[id] = nil }
-        status = await notifier.status()
-        guard status == .allowed else { return }
+        let permission = await notifier.status()
+        guard started == revision else { return }
+        status = permission
+        guard permission == .allowed else { return }
         var changedPlan = false
         for wantedNotice in wanted {
             if issued[wantedNotice.id] == wantedNotice, existing.contains(wantedNotice.id) { continue }
+            // About to fire: whatever iOS already holds under this id stays as it is.
             guard wantedNotice.fireAt.timeIntervalSince(now()) >= ReminderSchedule.handOffMargin else { continue }
             let handed = await notifier.add(wantedNotice)
+            guard started == revision else {
+                // The plan moved while iOS was writing: this request may no longer be wanted. The sync
+                // queued behind this one decides; here it is only forgotten, so it is written again or removed.
+                issued[wantedNotice.id] = nil
+                return
+            }
             issued[wantedNotice.id] = handed ? wantedNotice : nil
             if let index = planned.firstIndex(where: { $0.followUp.id == wantedNotice.id }), planned[index].handed != handed {
                 planned[index].handed = handed
@@ -531,10 +604,10 @@ final class HarnessCenter: ObservableObject {
         mode = next
         focus = nil
         quotes = [:]
-        issued = [:]
         if move != nil { move = nil }
-        let stale = await notifier.pendingIds().filter { $0.hasPrefix(HarnessPlanner.identifierPrefix) }
-        if !stale.isEmpty { notifier.remove(stale.sorted()) }
+        purge()
+        // Behind any sync still writing: the last word is an empty plan.
+        await sync()
         changed()
     }
 
