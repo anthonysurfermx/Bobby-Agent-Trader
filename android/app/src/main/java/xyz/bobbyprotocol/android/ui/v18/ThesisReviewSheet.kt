@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
@@ -167,7 +168,7 @@ private fun Before(host: V18Host, copy: ThesisCopy, thesis: SavedThesis, r: () -
 @Composable
 private fun WordsPart(label: String?, text: String) {
     Column(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        if (label != null) Text(label, color = QuietColors.dim, fontSize = 13.sp)
+        if (label != null) Text(label, color = QuietColors.dim, fontSize = 13.sp, lineHeight = 18.sp)
         Text(text, color = QuietColors.cream, fontSize = 15.sp, lineHeight = 21.sp)
     }
 }
@@ -238,6 +239,18 @@ private fun ThenAndNow(host: V18Host, copy: ThesisCopy, numbers: ThesisThenNow) 
 @Composable
 private fun Figure(label: String, value: String, change: String?) {
     val digits = LocalTextStyle.current.copy(fontFeatureSettings = "tnum")
+    if (LocalDensity.current.fontScale >= 1.5f) {
+        // At the large font sizes the label takes the width and the figures follow on a line of their
+        // own (beside them it broke into three short lines). The same rule as the consent's two answers.
+        Column(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(label, color = QuietColors.muted, fontSize = 14.sp, lineHeight = 19.sp)
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.End)) {
+                if (change != null) Text(change, color = QuietColors.muted, fontSize = 14.sp, style = digits)
+                Text(value, color = QuietColors.cream, fontSize = 16.sp, fontWeight = FontWeight.Medium, style = digits)
+            }
+        }
+        return
+    }
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp).semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(label, Modifier.weight(1f), color = QuietColors.muted, fontSize = 14.sp, lineHeight = 19.sp)

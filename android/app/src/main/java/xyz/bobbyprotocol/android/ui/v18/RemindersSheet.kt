@@ -1,5 +1,6 @@
 package xyz.bobbyprotocol.android.ui.v18
 
+import android.content.res.Configuration
 import android.text.format.DateFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -27,6 +28,7 @@ import androidx.compose.material3.TimeInput
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -39,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -224,7 +227,8 @@ fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable (
 
     when (face.dialog) {
         PickerDialog.DAY -> DayDialog(
-            copy = copy, zone = center.zone(), range = ReminderSchedule.pickRange(host.now(), center.zone()), pickedMs = face.picked,
+            copy = copy, zone = center.zone(), locale = Locale.forLanguageTag(host.locale),
+            range = ReminderSchedule.pickRange(host.now(), center.zone()), pickedMs = face.picked,
             onPick = { day ->
                 face.picked = ReminderSchedule.onDay(face.picked, day, center.zone())
                 face.dialog = null
@@ -232,7 +236,7 @@ fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable (
             onCancel = { face.dialog = null },
         )
         PickerDialog.TIME -> TimeDialog(
-            copy = copy, zone = center.zone(), pickedMs = face.picked,
+            copy = copy, zone = center.zone(), locale = Locale.forLanguageTag(host.locale), pickedMs = face.picked,
             onPick = { hour, minute ->
                 face.picked = ReminderSchedule.atTime(face.picked, hour, minute, center.zone())
                 face.dialog = null
@@ -424,37 +428,58 @@ private fun utcDay(utcMillis: Long): LocalDate = Instant.ofEpochMilli(utcMillis)
 
 private fun utcMidnight(day: LocalDate): Long = day.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
 
+/**
+ * Material's pickers take their words (the month, the weekdays, "Hour", "Minute", AM and PM) from
+ * the phone's language. A person may have chosen another language for Bobby in the profile: inside
+ * this they take them from the app's. Where the two are the same language nothing is changed.
+ * A dialog is a window of its own and asks the phone again, so what it shows is wrapped inside it too.
+ */
+@Composable
+private fun InAppLanguage(locale: Locale, content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val phone = LocalConfiguration.current
+    if (phone.locales.get(0).language == locale.language) {
+        content()
+        return
+    }
+    val configuration = remember(phone, locale) { Configuration(phone).apply { setLocale(locale) } }
+    val localized = remember(context, configuration) { context.createConfigurationContext(configuration) }
+    CompositionLocalProvider(LocalConfiguration provides configuration, LocalContext provides localized, content = content)
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DayDialog(copy: ReminderCopy, zone: ZoneId, range: LongRange, pickedMs: Long, onPick: (LocalDate) -> Unit, onCancel: () -> Unit) {
+private fun DayDialog(copy: ReminderCopy, zone: ZoneId, locale: Locale, range: LongRange, pickedMs: Long, onPick: (LocalDate) -> Unit, onCancel: () -> Unit) {
     val first = ReminderSchedule.day(range.first, zone)
     val last = ReminderSchedule.day(range.last, zone)
     val chosen = ReminderSchedule.day(pickedMs, zone)
     val start = if (chosen.isBefore(first)) first else if (chosen.isAfter(last)) last else chosen
-    val state = rememberDatePickerState(
-        initialSelectedDateMillis = utcMidnight(start),
-        yearRange = first.year..last.year,
-        selectableDates = remember(first, last) { DaysBetween(first, last) },
-    )
-    QuietPickerTheme {
-        DatePickerDialog(
-            onDismissRequest = onCancel,
-            confirmButton = {
-                QuietChip(copy.confirmPick, "reminders-day-confirm", selected = true) {
-                    val selected = state.selectedDateMillis
-                    if (selected != null) onPick(utcDay(selected)) else onCancel()
-                }
-            },
-            dismissButton = { QuietChip(copy.cancel, "reminders-day-cancel", onClick = onCancel) },
-        ) {
-            DatePicker(state = state, title = null, showModeToggle = false)
+    InAppLanguage(locale) {
+        val state = rememberDatePickerState(
+            initialSelectedDateMillis = utcMidnight(start),
+            yearRange = first.year..last.year,
+            selectableDates = remember(first, last) { DaysBetween(first, last) },
+        )
+        QuietPickerTheme {
+            DatePickerDialog(
+                onDismissRequest = onCancel,
+                confirmButton = {
+                    QuietChip(copy.confirmPick, "reminders-day-confirm", selected = true) {
+                        val selected = state.selectedDateMillis
+                        if (selected != null) onPick(utcDay(selected)) else onCancel()
+                    }
+                },
+                dismissButton = { QuietChip(copy.cancel, "reminders-day-cancel", onClick = onCancel) },
+            ) {
+                InAppLanguage(locale) { DatePicker(state = state, title = null, showModeToggle = false) }
+            }
         }
     }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TimeDialog(copy: ReminderCopy, zone: ZoneId, pickedMs: Long, onPick: (Int, Int) -> Unit, onCancel: () -> Unit) {
+private fun TimeDialog(copy: ReminderCopy, zone: ZoneId, locale: Locale, pickedMs: Long, onPick: (Int, Int) -> Unit, onCancel: () -> Unit) {
     val time = remember(pickedMs, zone) { Instant.ofEpochMilli(pickedMs).atZone(zone).toLocalTime() }
     val state = rememberTimePickerState(initialHour = time.hour, initialMinute = time.minute)
     QuietPickerTheme {
@@ -462,7 +487,7 @@ private fun TimeDialog(copy: ReminderCopy, zone: ZoneId, pickedMs: Long, onPick:
             onDismissRequest = onCancel,
             confirmButton = { QuietChip(copy.confirmPick, "reminders-time-confirm", selected = true) { onPick(state.hour, state.minute) } },
             dismissButton = { QuietChip(copy.cancel, "reminders-time-cancel", onClick = onCancel) },
-            text = { TimeInput(state = state) },
+            text = { InAppLanguage(locale) { TimeInput(state = state) } },
         )
     }
 }

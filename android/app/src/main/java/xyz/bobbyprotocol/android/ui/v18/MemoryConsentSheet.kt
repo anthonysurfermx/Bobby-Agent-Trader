@@ -125,7 +125,8 @@ internal fun MemoryExplanationRows(items: List<MemoryExplanation.Item>) {
             ) {
                 val label = item.label
                 if (label != null) {
-                    Text(label, color = QuietColors.dim, fontSize = 13.sp)
+                    // Its own line height: when it takes two lines (large type) Material's default spreads them apart.
+                    Text(label, color = QuietColors.dim, fontSize = 13.sp, lineHeight = 18.sp)
                     Text(item.text, color = QuietColors.cream, fontSize = 15.sp, lineHeight = 22.sp)
                     val note = item.note
                     if (note != null) Text(note, color = QuietColors.muted, fontSize = 13.sp, lineHeight = 18.sp)
