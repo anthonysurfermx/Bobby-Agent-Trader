@@ -16,7 +16,7 @@ import { issueTranscriptReceipt } from './_lib/transcript-receipt.js';
 import { walletSessionFromRequest } from './_lib/wallet-session.js';
 import { callLlm, streamText } from './_lib/llm.js';
 import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
-import { resolveAppWalletTier } from './_lib/app-model-access.js';
+import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
 /** Language-only contract shared by every chat/debate path; structured markers remain unchanged. */
 export function chatLanguageRule(language: unknown, locale?: unknown): string {
@@ -874,7 +874,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const resolved = resolveDebateMode(message);
   // Wallet session (optional for chatting, REQUIRED to get a publishable receipt).
   const sessionWallet = walletSessionFromRequest(req)?.wallet ?? null;
-  const tier = await resolveAppWalletTier(sessionWallet);
+  const tier = await resolveAppRequestTier(req);
 
   if (
     hasXMLContext &&

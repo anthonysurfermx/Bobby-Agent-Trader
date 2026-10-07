@@ -8,6 +8,8 @@ process.env.BOBBY_SUPABASE_ANON_KEY = 'test-anon';
 process.env.BOBBY_AUTH_URL = 'https://model-access.test';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.RATE_LIMIT_SALT = 'test-model-access-salt';
+process.env.INTERNAL_API_SECRET = 'test-model-access-internal';
+process.env.BOBBY_SESSION_SECRET = 'test-model-access-wallet-session-secret';
 delete process.env.BOBBY_LLM_PRIMARY;
 delete process.env.BOBBY_APP_TEXT_MODEL;
 delete process.env.BOBBY_PRO_TEXT_MODEL;
@@ -15,6 +17,9 @@ delete process.env.BOBBY_PRO_TEXT_MODEL;
 const { resolveAppRequestTier, resolveAppWalletTier } = await import('../api/_lib/app-model-access.ts');
 const { default: explain } = await import('../api/explain.ts');
 const { default: router } = await import('../api/bobby-router.ts');
+const { default: internalChat } = await import('../api/openclaw-chat.ts');
+const { resolveAgentRunTier, multiAgentDebate } = await import('../api/agent-run.ts');
+const { issueWalletSession } = await import('../api/_lib/wallet-session.ts');
 const originalFetch = globalThis.fetch;
 const proId = '11111111-1111-4111-8111-111111111111';
 const freeId = '22222222-2222-4222-8222-222222222222';
@@ -39,7 +44,7 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     return json({ id: token === 'Bearer verified-pro' ? proId : freeId, app_metadata: { provider: 'apple' } });
   }
   if (url.includes('/rest/v1/bobby_identities?')) {
-    if (init?.method === 'POST') return json([{ id: body.auth_user_id, auth_user_id: body.auth_user_id, wallet_address: null }]);
+    if (init?.method === 'POST') return json([{ id: body.auth_user_id ?? (body.wallet_address === verifiedWallet ? proId : freeId), auth_user_id: body.auth_user_id ?? null, wallet_address: body.wallet_address ?? null }]);
     return json(url.includes(verifiedWallet) ? [{ id: proId }] : []);
   }
   if (url.endsWith('/rpc/bobby_read_access')) {
@@ -59,9 +64,11 @@ globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
     return new Response(events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join(''));
   }
   const classification = { intent: 'trade_chat', confidence: 0.9, language: 'es', reason: 'Fixture classification.' };
-  return body.output_config?.format?.type === 'json_schema'
-    ? json({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(classification) }], usage: { input_tokens: 8, output_tokens: 4 } })
-    : json({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: 'classify_intent', input: classification }], usage: { input_tokens: 8, output_tokens: 4 } });
+  const schema = body.output_config?.format?.schema ?? body.tools?.[0]?.input_schema;
+  const toolInput = schema?.properties?.trades ? { reasoning: 'Fixture reasoning.', trades: [] } : classification;
+  if (body.output_config?.format?.type === 'json_schema') return json({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify(toolInput) }], usage: { input_tokens: 8, output_tokens: 4 } });
+  if (body.tools?.length) return json({ stop_reason: 'tool_use', content: [{ type: 'tool_use', name: body.tools[0].name, input: toolInput }], usage: { input_tokens: 8, output_tokens: 4 } });
+  return json({ stop_reason: 'end_turn', content: [{ type: 'text', text: 'Fixture risk assessment.' }], usage: { input_tokens: 8, output_tokens: 4 } });
 }) as typeof fetch;
 
 let requestNumber = 0;
@@ -136,6 +143,50 @@ try {
       noMeterWrites();
     }
   }
+  // Internal routing authorizes the surface; only the verified customer account selects Pro.
+  for (const token of ['verified-pro', 'verified-free', undefined]) {
+    requests = [];
+    const req = request(token, { message: 'Hola', tier: 'pro', model: 'claude-opus-5-5' });
+    req.headers['x-internal-secret'] = process.env.INTERNAL_API_SECRET;
+    const res = response();
+    await internalChat(req, res as unknown as VercelResponse);
+    eq(res.statusCode, 200, 'authorized internal chat completes');
+    const calls = requests.filter(r => r.url === 'https://api.anthropic.com/v1/messages');
+    eq(calls.length, 1, 'internal chat makes one provider call');
+    eq(calls[0].body.model, token === 'verified-pro' ? 'claude-opus-5-5' : 'claude-haiku-5-5', 'Pro accounts without a wallet retain their model; an internal secret alone never upgrades');
+    eq(res.output.endsWith('data: [DONE]\n\n'), true, 'internal chat preserves its completed stream');
+    noMeterWrites();
+  }
+  requests = [];
+  const publicRes = response();
+  await internalChat(request('verified-pro', { message: 'Hola' }), publicRes as unknown as VercelResponse);
+  eq(publicRes.statusCode, 403, 'Pro authentication never bypasses the internal-only chat gate');
+  eq(requests.length, 0, 'rejected public chat makes no entitlement or model calls');
+
+  requests = [];
+  eq(await resolveAgentRunTier(request('verified-pro'), true), 'pro', 'manual analysis respects the verified Pro account');
+  const freeManual = request('verified-free', { tier: 'pro', isPro: true });
+  freeManual.query = { manual: 'true', wallet: verifiedWallet };
+  eq(await resolveAgentRunTier(freeManual, true), 'free', 'naming a Pro wallet never promotes a free manual caller');
+  const operatorManual = request(process.env.INTERNAL_API_SECRET, { tier: 'pro' });
+  operatorManual.query = { manual: 'true', wallet: verifiedWallet };
+  eq(await resolveAgentRunTier(operatorManual, true), 'free', 'operator secret and wallet query alone never grant the Pro model');
+  eq(await resolveAgentRunTier(request(issueWalletSession(verifiedWallet).token), true), 'pro', 'a verified wallet session can use its server Pro entitlement');
+  requests = [];
+  eq(await resolveAgentRunTier(request('verified-pro'), false), 'free', 'shared scheduled cycles keep the free model');
+  eq(requests.length, 0, 'shared cycles never resolve a customer account');
+  noMeterWrites();
+  for (const tier of ['pro', 'free'] as const) {
+    requests = [];
+    const debate = await multiAgentDebate([], undefined, undefined, { tier });
+    const calls = requests.filter(r => r.url === 'https://api.anthropic.com/v1/messages');
+    eq(calls.length, 3, 'manual analysis preserves all three debate roles');
+    eq(calls.map(call => call.body.model), Array(3).fill(tier === 'pro' ? 'claude-opus-5-5' : 'claude-haiku-5-5'), 'every manual debate role preserves the account tier');
+    eq(debate.decisions, [], 'fixture debate builds no trade decisions or execution requests');
+    eq(debate.judgeVerdict, 'Fixture reasoning.', 'manual debate preserves its structured decision contract');
+    noMeterWrites();
+  }
+
   console.log(`App model access: ${checks} checks passed`);
 } finally {
   globalThis.fetch = originalFetch;
