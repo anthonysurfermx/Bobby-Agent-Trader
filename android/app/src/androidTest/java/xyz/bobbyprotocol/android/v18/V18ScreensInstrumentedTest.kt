@@ -61,6 +61,8 @@ class V18ScreensInstrumentedTest(private val language: String) {
     private var staged: V18Stage? = null
     /** The system's font size as it was, when a test changed it. */
     private var fontScaleBefore: String? = null
+    /** Controls that answered to less than 48 dp in a picture of this test. */
+    private val smallTargets = ArrayList<String>()
 
     @Before fun requireEmulator() {
         assumeTrue(Build.FINGERPRINT.startsWith("generic") || Build.FINGERPRINT.contains("emulator") || Build.MODEL.contains("sdk_gphone") ||
@@ -71,12 +73,15 @@ class V18ScreensInstrumentedTest(private val language: String) {
         val before = fontScaleBefore
         fontScaleBefore = null
         if (before != null) V18Shots.shell("settings put system font_scale " + (before.toFloatOrNull() ?: 1f))
-        val made = staged ?: return
+        val made = staged
         staged = null
-        compose.runOnUiThread {
-            made.bench.closeSheet()
-            made.close()
+        if (made != null) {
+            compose.runOnUiThread {
+                made.bench.closeSheet()
+                made.close()
+            }
         }
+        assertTrue("Controls a finger cannot reach with 48 dp: $smallTargets", smallTargets.isEmpty())
     }
 
     // ---- Credits ----
@@ -208,9 +213,9 @@ class V18ScreensInstrumentedTest(private val language: String) {
         assertTrue(JSONObject(sent.single().body ?: "{}").optJSONObject("thesis")?.optString("hypothesis").orEmpty().isNotEmpty())
         for (tag in listOf("thesis-review-verdict", "thesis-review-headline", "thesis-review-then-now", "thesis-review-not-checked",
                            "thesis-review-supports", "thesis-review-challenges", "thesis-review-unknowns")) assertShown(tag)
+        assertShown("thesis-review-keep")
+        assertShown("thesis-review-footer")
         shot("review-after")
-        compose.onNodeWithTag("thesis-review-footer", useUnmergedTree = true).performScrollTo()
-        shot("review-after-end")
     }
 
     // ---- Memory ----
@@ -299,8 +304,6 @@ class V18ScreensInstrumentedTest(private val language: String) {
         tap("thesis-review-start")
         await("thesis-review-keep", 40_000)
         shot("review-after-200")
-        compose.onNodeWithTag("thesis-review-not-checked", useUnmergedTree = true).performScrollTo()
-        shot("review-after-200-middle")
         compose.onNodeWithTag("thesis-review-footer", useUnmergedTree = true).performScrollTo()
         shot("review-after-200-end")
     }
@@ -442,8 +445,8 @@ class V18ScreensInstrumentedTest(private val language: String) {
 
     /**
      * What a finger can reach of every control on the screen, measured: a control answers to 48 dp
-     * in both directions, or it is written to logcat (`V18Targets`) with its size. A control cut by
-     * the edge of the scroll is measured when it is in full view, in another picture.
+     * in both directions, or the test fails when it ends (after its pictures are saved) and names it.
+     * A control cut by the edge of the scroll is measured when it is in full view, in another picture.
      */
     private fun measureTouchTargets(picture: String) {
         val density = compose.density.density
@@ -461,6 +464,7 @@ class V18ScreensInstrumentedTest(private val language: String) {
                 ?: node.config.getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
                 ?: node.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: "unnamed"
             Log.w("V18Targets", "$picture: $label answers to ${width.roundToInt()}x${height.roundToInt()} dp")
+            smallTargets.add("$label in $picture (${width.roundToInt()}x${height.roundToInt()} dp)")
         }
         Log.i("V18Targets", "$picture: ${controls.size} controls, $small under 48 dp")
     }

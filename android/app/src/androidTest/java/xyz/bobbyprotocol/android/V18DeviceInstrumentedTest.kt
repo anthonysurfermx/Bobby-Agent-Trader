@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
@@ -156,6 +157,7 @@ class V18DeviceInstrumentedTest {
         // The four doors of 1.8, each a row of the profile.
         for (tag in listOf("account-credits", "account-theses", "account-reminders", "account-memory")) compose.onNodeWithTag(tag).assertExists()
         compose.onNodeWithTag("account-memory").performScrollTo()
+        compose.waitUntil(20_000) { runCatching { compose.onNodeWithTag("account-credits").assertIsDisplayed() }.isSuccess }
         shot("profile-rows-$language")
 
         compose.onNodeWithTag("account-credits").performScrollTo().performClick()
@@ -409,8 +411,9 @@ class V18DeviceInstrumentedTest {
 
     private fun shot(name: String) {
         compose.waitForIdle()
-        // The frame that was just composed has to reach the display before it is captured.
-        Thread.sleep(500)
+        // The frame that was just composed has to reach the display before it is captured, and the
+        // page behind the sheet is drawn in software here.
+        Thread.sleep(1_200)
         V18Shots.save(name)
     }
 

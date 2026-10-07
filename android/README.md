@@ -42,7 +42,7 @@ WorkManager is inexact. An idle phone can run planned work hours after its momen
 - A **thesis reminder** is shown whenever the phone gets to it, however late: the person chose the day.
 - A notice is shown only to the reader it was planned for, only while the risk notice stands, and not at all while the app is in front and the glass already says it.
 
-The decision is a pure function with unit tests. That WorkManager carries it out (the wait, the re-queue, the drop) was never seen on a device. No copy promises a minute.
+The decision is a pure function with unit tests. On CI's emulator a due notice is posted by WorkManager and its tap opens the right sheet (`V18DeviceInstrumentedTest`); the wait, the re-queue and the drop were never seen on a device. No copy promises a minute.
 
 ### What the owner still owes: App Links
 
@@ -58,15 +58,22 @@ Also open and the owner's call: `GET /api/bobby-access` reports no Google paymen
 
 ### What is verified, and what is not
 
-**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 105 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` (the instrumented tests are compiled, **not run**) and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
+**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 105 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
 
-**Never run on a phone or an emulator**, so unverified:
+**Run on an emulator by CI** (GitHub Actions `Android emulator`: API 34 with Google APIs, a 360x800 dp screen, animations off, no GPU). `android/tools/run-emulator-tests.sh` runs `:app:connectedDebugAndroidTest` in three parts and keeps each part's report, logcat and every screenshot (the `android-emulator` artifact):
 
-- How any 1.8 screen draws: layout at half height, the keyboard with a pinned action, 200% font scale, TalkBack order, the Material date and time pickers in the sheet's inks, one sheet handing over to another.
-- The notification permission prompt, WorkManager delivery, the two channels, the tap reaching the right screen, the waiting and dropping of a late follow-up, "Open Settings".
-- Sign-in from a 1.8 sheet: the activity closes the open sheet when the account arrives and the sheet is presented again (`SignInReturn`). Read and unit-tested, never seen.
-- Restore against the real RevenueCat SDK and Google Play; a purchase; the claim of an invitation against the server; the memory opt-in header on a real request.
-- App Links (see above).
+- `screens`: `V18ScreensInstrumentedTest` draws every 1.8 screen in English and in Spanish through the real composables, sheet, host, centres, repository and catalogs: Credits (a free account mid-week, a guest, an unknown balance) and its details, Invite (as the server answers today, and once Google Play sells Bobby Pro), My theses, the thesis editor (empty, with Bobby's draft, with a word selected and the keyboard up), the thesis review (before and after), Memory and its consent, Reminders with the follow-up rows, its choices and Material's day and time pickers, and the follow-up board; the review and the consent also at the system's 200% font size. The account, the clock and the network's answers are staged (`V18Stage`, `V18Fixtures`); nothing leaves the emulator. Each case also measures that every control answers to 48 dp.
+- `device`: `V18DeviceInstrumentedTest` runs the real `MainActivity` with its page for a guest, in airplane mode: the profile shows the 1.8 rows and opens Credits, its details and closes; the system's notification question appears only after the person sets a reminder (and is answered through UiAutomator); a due notice is posted by WorkManager on the `thesis-reminders` channel with the fixed text and private visibility, and tapping it in the shade opens the review of its thesis; a notice planned for another reader is not shown and its tap opens nothing; a rotation with a sheet open is survived (the sheet does not come back: the activity keeps it in memory only).
+- `others`: every older instrumented test. `MainActivityAcceptanceInstrumentedTest` (8 cases) is skipped there: it drives the page by script while the page draws its WebGL scene, which a runner without a GPU draws too slowly, and the emulator itself stopped under it once. One Trader Land case is skipped because it needs the system's animations on.
+
+**Still not exercised, even on the emulator**, so unverified:
+
+- Google Play: a purchase, and restore against the real RevenueCat SDK and Play. The emulator has no store account and the debug build no store key.
+- App Links: the invitation link opening the app (see above), and the claim of an invitation against the server.
+- Anything with a real account: sign-in from a 1.8 sheet and the sheet coming back (`SignInReturn`), the memory opt-in header on a real request, a review against the real desk. The staged network answers with bodies shaped like production's.
+- A phone that runs late: a follow-up that waits for 09:00 or is dropped after a day, Doze overnight, a restart, a force-stopped app. The notice the test posts is due in two seconds on an awake emulator.
+- The follow-up notices themselves (their channel, their tap landing on the glass), "Open Settings", a denied permission.
+- TalkBack order and speech; French, Portuguese, Italian and German on a screen; a tablet; any real phone's own fonts and system skin.
 
 **Never built:** a release. CI builds debug only, so R8 and resource shrinking never ran on the 1.8 classes. No signed APK or AAB of 1.2.0 exists, and nothing was uploaded to Play.
 
