@@ -61,6 +61,9 @@ object Harness {
         // From the first delivered read. Never the question: a symbol, a name, a price.
         host.onReadDelivered { read -> center.noteAsk(read.symbol, read.name, read.isEquity, read.price) }
         host.onReadSaved { _, symbol -> center.noteSaved(symbol) }
+        // The person tapped the question Bobby's CIO wrote after a read: that is acting on what Bobby put
+        // in front of them, counted by asset (only while the centre may record). The words are not kept.
+        host.onNextQuestionPicked { symbol -> center.notePicked(symbol) }
         // Everything up to a price read runs inside the hook, so the centre never holds the
         // previous reader while the next one is already on the glass.
         host.onAppActive { host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.appActive() } }

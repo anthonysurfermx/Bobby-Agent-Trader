@@ -22,6 +22,7 @@ import xyz.bobbyprotocol.android.data.BobbyRepository
 import xyz.bobbyprotocol.android.data.VoicePreference
 import xyz.bobbyprotocol.android.platform.AndroidLocalNotifier
 import xyz.bobbyprotocol.android.v18.NucleoNudge
+import xyz.bobbyprotocol.android.v18.ReadOrigin
 import xyz.bobbyprotocol.android.v18.RiskNotice
 import xyz.bobbyprotocol.android.v18.V18Desk
 import xyz.bobbyprotocol.android.v18.V18Process
@@ -63,7 +64,7 @@ class NucleoSession(
     private var rendererForeground = false
     private val syncMutex = Mutex()
     private val syncReceipts = linkedMapOf<String, JSONObject>()
-    private val tokens = mutableMapOf<String, ConfirmToken>()
+    private val tokens = ReadTokens()
     private val reads = mutableListOf<Read>()
     private val identityCurrent: Boolean get() = accountEpoch == repository.epoch.value && owner == repository.session.value?.userId
     var onPageChanged: ((String) -> Unit)? = null
@@ -116,13 +117,13 @@ class NucleoSession(
         override fun text(en: String, es: String): String = this@NucleoSession.text(en, es)
         override fun emit(name: String, payload: JSONObject) = this@NucleoSession.emit(name, payload)
         override fun sessionChanged() = this@NucleoSession.emit("session.changed", snapshot())
-        override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = issueToken(
-            json("symbol" to symbol, "name" to name, "isEquity" to isEquity, "assetClass" to if (isEquity) "equity" else "crypto", "currency" to null, "exchange" to null),
-            question, this@NucleoSession.analysisLevel)
-        override fun tokenWaiting(token: String): Boolean {
-            val waiting = tokens[token] ?: return false
-            return waiting.expiresAt > System.currentTimeMillis() && waiting.epoch == this@NucleoSession.accountEpoch && waiting.consent == consentEpoch
+        // Bobby wrote this question (a follow-up's button, a board row): the read is not the person's own,
+        // and it runs at Quick whatever level is saved, without changing the saved one (iOS `token(for:question:)`).
+        override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = AskStart.native().let { start ->
+            issueToken(json("symbol" to symbol, "name" to name, "isEquity" to isEquity, "assetClass" to if (isEquity) "equity" else "crypto", "currency" to null, "exchange" to null),
+                question, start.level, origin = start.origin)
         }
+        override fun tokenWaiting(token: String): Boolean = tokens.waiting(token, this@NucleoSession.accountEpoch, consentEpoch)
         override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
             this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
         override val shortcuts: List<String> get() = store.keptQuickAccess(this@NucleoSession.owner)
@@ -138,8 +139,8 @@ class NucleoSession(
     private suspend fun askForNotifications(): Boolean = v18.shell?.requestNotificationPermission() ?: false
     private val accountDeleted: (String) -> Unit = { deleted -> v18.accountDeleted(deleted) }
 
-    private data class ConfirmToken(val asset: JSONObject, val question: String, val level: String, var epoch: Long, val consent: Long, val expiresAt: Long, val guestSignInRetry: Boolean = false, val persistLevel: Boolean = false)
-    private data class Read(val result: JSONObject, val epoch: Long, val consent: Long, val savedAt: Long, var saved: JSONObject? = null)
+    /** `origin`: who started it (the harness follows up only the person's own questions). */
+    private data class Read(val result: JSONObject, val epoch: Long, val consent: Long, val savedAt: Long, val origin: ReadOrigin, var saved: JSONObject? = null)
 
     init {
         store.bindOwner(owner)
@@ -208,7 +209,12 @@ class NucleoSession(
             "reducedMotion" to reducedMotion, "mic" to json("state" to speechState, "onDevice" to onDevice), "hints" to store.hints(),
             "pendingRead" to if (riskAccepted) pending else null, "fixtures" to false, "platform" to "android", "appVersion" to appVersion(), "analysisLevel" to analysisLevelJSON(),
             // 1.8: one native-written line and one button, or null. Every session carries it (the page keeps the whole object).
-            "nudge" to v18.nudgeJson())
+            "nudge" to v18.nudgeJson()).also { session ->
+            // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the home
+            // offers no chip that asks by itself. Not knowing changes nothing, and without the key the session
+            // is what it always was.
+            if (!v18.offersOneTapOnHome()) session.put("oneTap", false)
+        }
     }
 
     @Suppress("DEPRECATION")
@@ -299,10 +305,8 @@ class NucleoSession(
         recoverCompletedOnboarding()
         // 1.8: before anything below suspends, showings, taps and reads belong to the new reader.
         v18.accountChanged()
-        if (oldOwner == null && newOwner != null) {
-            tokens.entries.removeAll { !it.value.guestSignInRetry || it.value.expiresAt < System.currentTimeMillis() }
-            tokens.values.forEach { it.epoch = newEpoch }
-        } else tokens.clear()
+        // The question that waited behind a sign-in goes with the reader into the account, with who started it.
+        if (oldOwner == null && newOwner != null) tokens.signedIn(newEpoch) else tokens.clear()
         emit("account.changed", json("wasSignedIn" to (oldOwner != null), "signedIn" to (newOwner != null)))
         emit("session.changed", snapshot())
         if (riskAccepted && newOwner != null) {
@@ -322,47 +326,59 @@ class NucleoSession(
     }
 
     private suspend fun suggestions(): JSONObject {
+        // `own` tells an asset the person asked about from a starter that only pads the row: a read Bobby
+        // started offers their own assets only (the page's followUps()).
         val quick = JSONArray()
-        val symbols = store.quickAccess(owner)
-        for (i in 0 until symbols.length()) quick.put(json("symbol" to symbols.getString(i)))
+        for ((symbol, own) in store.quickAccessEntries(owner)) quick.put(json("symbol" to symbol, "own" to own))
         if (!riskAccepted) return json("quickAccess" to quick, "movers" to JSONArray())
         val started = accountEpoch
         val movers = runCatching { repository.request("api/bobby-asset-search?browse=1").optJSONArray("movers") }.getOrNull() ?: JSONArray()
         return json("quickAccess" to quick, "movers" to if (started == accountEpoch && riskAccepted) movers else JSONArray())
     }
 
-    private fun issueToken(asset: JSONObject, question: String, level: String, signInRetry: Boolean = false, persist: Boolean = false): String {
-        tokens.entries.removeAll { it.value.expiresAt < System.currentTimeMillis() || it.value.epoch != accountEpoch }
-        val id = UUID.randomUUID().toString()
-        tokens[id] = ConfirmToken(asset, question, level, accountEpoch, consentEpoch, System.currentTimeMillis() + NucleoPolicy.TOKEN_LIFETIME_MS, owner == null && signInRetry, persist)
-        return id
-    }
+    /** `origin`: a token that carries a read on (a retry, a confirmation, a sign-in) keeps who started it. */
+    private fun issueToken(asset: JSONObject, question: String, level: String, signInRetry: Boolean = false, persist: Boolean = false, origin: ReadOrigin = ReadOrigin.PERSON): String =
+        tokens.issue(asset, question, level, accountEpoch, consentEpoch, guest = owner == null, signInRetry = signInRetry, persist = persist, origin = origin)
 
     private suspend fun ask(params: JSONObject): JSONObject {
         if (activeAsk != null) throw NucleoFault("busy", "a read is in progress")
         if (!riskAccepted) return error("risk_not_accepted")
         val start = System.currentTimeMillis()
-        var asset: JSONObject? = null
-        var level = analysisLevel
+        val asset: JSONObject?
         val question: String
-        if (params.has("token")) {
-            if (params.has("question") || params.has("followUpOf")) throw NucleoFault("invalid_params", "token takes no question")
-            val token = tokens.remove(params.requiredString("token", 128)) ?: throw NucleoFault("invalid_params", "unknown token")
-            if (token.expiresAt <= start || token.epoch != accountEpoch || token.consent != consentEpoch) throw NucleoFault("invalid_params", "expired token")
-            question = token.question; asset = token.asset; level = token.level
-            if (token.persistLevel) setAnalysisLevel(level)
-        } else {
-            question = params.requiredString("question", 16_384).trim()
-            if (question.isEmpty()) throw NucleoFault("invalid_params", "question is empty")
-            if (NucleoPolicy.questionLength(question) > NucleoPolicy.QUESTION_LIMIT) return json("v" to 1, "status" to "too_long", "maxLength" to NucleoPolicy.QUESTION_LIMIT)
-            if (params.has("followUpOf")) {
-                val previous = params.requiredString("followUpOf", 36)
-                asset = reads.firstOrNull { it.result.optString("requestId") == previous && it.epoch == accountEpoch && it.consent == consentEpoch }?.result?.getJSONObject("asset")
+        // Who started this read and at which level it runs (NucleoAsk.kt). A token keeps what it was issued with.
+        val begun: AskStart = when (val request = AskRequest.parse(params)) {
+            is AskRequest.Token -> {
+                val token = tokens.take(request.token) ?: throw NucleoFault("invalid_params", "unknown token")
+                if (!tokens.good(token, accountEpoch, consentEpoch, start)) throw NucleoFault("invalid_params", "expired token")
+                question = token.question
+                asset = token.asset
+                if (token.persistLevel) setAnalysisLevel(token.level)
+                AskStart(token.origin, token.level)
+            }
+            is AskRequest.FollowUp -> {
+                question = request.question
+                if (NucleoPolicy.questionLength(question) > NucleoPolicy.QUESTION_LIMIT) return json("v" to 1, "status" to "too_long", "maxLength" to NucleoPolicy.QUESTION_LIMIT)
+                val previous = reads.firstOrNull { it.result.optString("requestId") == request.previous && it.epoch == accountEpoch && it.consent == consentEpoch }?.result
                     ?: throw NucleoFault("invalid_params", "unknown followUpOf")
+                val about = previous.getJSONObject("asset")
+                asset = about
+                // The question may be the one Bobby's CIO wrote for that read: the person picked it instead of typing
+                // their own. Only the asset is passed on; the words are compared here and kept nowhere.
+                val followUp = AskStart.followUp(NextQuestion.offered(previous), question, analysisLevel)
+                if (followUp.picked) v18.nextQuestionPicked(about.optString("symbol"))
+                followUp
+            }
+            is AskRequest.Question -> {
+                question = request.question
+                if (NucleoPolicy.questionLength(question) > NucleoPolicy.QUESTION_LIMIT) return json("v" to 1, "status" to "too_long", "maxLength" to NucleoPolicy.QUESTION_LIMIT)
+                asset = null
+                AskStart.question(request.chip, analysisLevel)
             }
         }
+        val level = begun.level; val origin = begun.origin
         val epoch = accountEpoch; val consent = consentEpoch; val requestId = UUID.randomUUID().toString()
-        val job = scope.async(start = CoroutineStart.LAZY) { runRead(requestId, question, asset, level, epoch, consent, start) }
+        val job = scope.async(start = CoroutineStart.LAZY) { runRead(requestId, question, asset, level, origin, epoch, consent, start) }
         presentation.begin(requestId, ReadPresentationPolicy.Identity(epoch, consent, owner))
         activeAsk = job; activeRequestId = requestId
         emit("ask.stage", json("requestId" to requestId, "stage" to "resolving"))
@@ -384,7 +400,7 @@ class NucleoSession(
         return json("symbol" to symbol, "name" to name, "isEquity" to (assetClass == "equity"), "assetClass" to assetClass, "currency" to raw.nullableString("currency"), "exchange" to raw.nullableString("exchange"))
     }
 
-    private suspend fun runRead(requestId: String, question: String, knownAsset: JSONObject?, level: String, epoch: Long, consent: Long, started: Long): JSONObject {
+    private suspend fun runRead(requestId: String, question: String, knownAsset: JSONObject?, level: String, origin: ReadOrigin, epoch: Long, consent: Long, started: Long): JSONObject {
         var asset = knownAsset
         try {
             assertCurrent(epoch, consent)
@@ -396,12 +412,12 @@ class NucleoSession(
                     val suggestions = JSONArray(); val results = search.optJSONArray("results") ?: JSONArray()
                     for (i in 0 until minOf(3, results.length())) {
                         val hit = results.optJSONObject(i)?.let(::parseAsset) ?: continue
-                        suggestions.put(JSONObject(hit.toString()).put("token", issueToken(hit, question, level)))
+                        suggestions.put(JSONObject(hit.toString()).put("token", issueToken(hit, question, level, origin = origin)))
                     }
                     return json("v" to 1, "status" to "unknown_asset", "query" to question, "suggestions" to suggestions)
                 }
                 val resolution = search.optJSONObject("resolution")
-                if (resolution?.optBoolean("needsConfirmation") == true) return json("v" to 1, "status" to "confirm", "asset" to asset, "token" to issueToken(asset, question, level), "matchKind" to resolution.nullableString("matchKind"), "proxyNote" to resolution.nullableString("proxyNote"))
+                if (resolution?.optBoolean("needsConfirmation") == true) return json("v" to 1, "status" to "confirm", "asset" to asset, "token" to issueToken(asset, question, level, origin = origin), "matchKind" to resolution.nullableString("matchKind"), "proxyNote" to resolution.nullableString("proxyNote"))
             }
             val selected = requireNotNull(asset)
             val symbol = selected.getString("symbol"); val isEquity = selected.optBoolean("isEquity")
@@ -427,13 +443,15 @@ class NucleoSession(
                 }
                 assertCurrent(epoch, consent)
                 if (!NucleoReadModel.validDebate(debate)) return error("bad_response")
-                val result = NucleoReadModel.read(requestId, question, selected, market, candles, debate, language, locale, started, level)
-                reads.add(Read(result, epoch, consent, System.currentTimeMillis())); while (reads.size > 5) reads.removeAt(0)
-                // 1.8: what a line on the glass may talk about (symbol and verdict, never the question).
-                v18.readDelivered(result)
-                val oldQuick = store.quickAccess(owner); val quick = JSONArray().put(symbol)
-                for (i in 0 until oldQuick.length()) if (oldQuick.optString(i) != symbol && quick.length() < 6) quick.put(oldQuick.optString(i))
-                store.setQuickAccess(owner, quick)
+                // The next question rides in the synthesis only when it is one the page could show, and only when
+                // Bobby may offer a one-tap question after this read (asked once, with this read's access receipt).
+                val result = NucleoReadModel.read(requestId, question, selected, market, candles, debate, language, locale, started, level) { access -> v18.offersOneTapAfterRead(access) }
+                reads.add(Read(result, epoch, consent, System.currentTimeMillis(), origin)); while (reads.size > 5) reads.removeAt(0)
+                // 1.8: what a line on the glass may talk about (symbol and verdict, never the question), and who
+                // started the read: only the person's own question is followed up.
+                v18.readDelivered(result, origin)
+                // The asset leads the quick-access row and is one of the reader's own from now on (QuickAccess.asked).
+                store.noteAsked(owner, symbol)
                 return result
             } finally { marketTask.cancel() }
         } catch (cancelled: CancellationException) { throw cancelled }
@@ -450,21 +468,21 @@ class NucleoSession(
             }
             val result = json("v" to 1, "status" to status, "code" to api.code, "message" to api.payload?.nullableString("error"), "access" to api.payload?.optJSONObject("access"), "retryAfterSec" to api.retryAfterSeconds)
             if (status == "too_long") result.put("maxLength", NucleoPolicy.QUESTION_LIMIT)
-            if (asset != null && status in setOf("signin_required", "subscription_required")) result.put("token", issueToken(asset, question, level, status == "signin_required"))
+            if (asset != null && status in setOf("signin_required", "subscription_required")) result.put("token", issueToken(asset, question, level, status == "signin_required", origin = origin))
             if (asset != null && status == "subscription_required" && level != "rapido") {
                 val lower = if (level == "maximo") "profundo" else "rapido"
-                result.put("fallback", json("label" to if (lower == "profundo") text("Continue with Deep", "Seguir con Profundo") else text("Continue with Quick", "Seguir con Rápido"), "token" to issueToken(asset, question, lower, persist = true)))
+                result.put("fallback", json("label" to if (lower == "profundo") text("Continue with Deep", "Seguir con Profundo") else text("Continue with Quick", "Seguir con Rápido"), "token" to issueToken(asset, question, lower, persist = true, origin = origin)))
             }
             if (asset != null && status == "level_notice") {
                 val lower = if (api.payload?.optBoolean("quickAvailable", true) == false) level else "rapido"
                 result.put("caption", api.payload?.nullableString("error") ?: text("Analysis is paused for now.", "El análisis está en pausa por ahora."))
-                    .put("cta", if (lower == level) text("Try again", "Reintentar") else text("Continue with Quick", "Seguir con Rápido")).put("level", lower).put("token", issueToken(asset, question, lower, persist = lower != level))
+                    .put("cta", if (lower == level) text("Try again", "Reintentar") else text("Continue with Quick", "Seguir con Rápido")).put("level", lower).put("token", issueToken(asset, question, lower, persist = lower != level, origin = origin))
             }
-            if (asset != null && status == "error") result.put("retry", issueToken(asset, question, level))
+            if (asset != null && status == "error") result.put("retry", issueToken(asset, question, level, origin = origin))
             return result
         } catch (_: Exception) {
             assertCurrent(epoch, consent)
-            return error("network").also { if (asset != null) it.put("retry", issueToken(asset, question, level)) }
+            return error("network").also { if (asset != null) it.put("retry", issueToken(asset, question, level, origin = origin)) }
         }
     }
 

@@ -32,6 +32,38 @@ class V18Fence internal constructor(private val check: () -> Boolean) {
     val isCurrent: Boolean get() = check()
 }
 
+/**
+ * May Bobby put a question that asks by itself in front of the reader: the next question its CIO
+ * wrote, an asset chip of the home, an asset or a mover of the row after a read? Bobby never leads
+ * into a sign-in or a paywall, so the answer is no when the next read would be refused (iOS:
+ * `NucleoDesk.offersNextQuestion` and `HarnessWall`, ARCHITECTURE.md §3.5). The session asks; the
+ * feature that knows the read meter answers (`V18Host.oneTap`). Both are asked often and on the
+ * main thread: answer from what is already known, never from the network.
+ */
+interface OneTapRule {
+    /**
+     * A read was just answered. `access` is that read's own receipt from the server, as it came
+     * (null when the server sent none). Asked once per read. On a no the CIO's question does not
+     * reach the page and the reply says `oneTap: false`: the row keeps "Another question" alone.
+     */
+    fun afterRead(access: JSONObject?): Boolean
+
+    /**
+     * The idle home, from what the phone knows now. Not knowing is a yes: the home keeps its chips
+     * on a first launch and without network. On a no the session says `oneTap: false`; call
+     * `V18Host.sessionChanged()` when the answer flips, so the row is drawn again at once.
+     */
+    fun onHome(): Boolean
+
+    companion object {
+        /** Until a rule is set: every read and the home offer their one-tap questions, as before the rule existed. */
+        val ALWAYS: OneTapRule = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean = true
+            override fun onHome(): Boolean = true
+        }
+    }
+}
+
 interface V18Host {
     // ---- Words ----
 
@@ -101,6 +133,8 @@ interface V18Host {
      * `repository.streamDebate(body, thesis) { }` and reads the reply with `DeskAnswer(reply)`.
      */
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String = analysisLevel): JSONObject
+    /** Whether Bobby may offer a one-tap question now. `OneTapRule.ALWAYS` until a feature sets its rule. */
+    var oneTap: OneTapRule
 
     // ---- What this phone keeps besides the theses ----
 
@@ -128,8 +162,13 @@ interface V18Host {
 
     // ---- What happened (each returns the way to stop listening) ----
 
-    /** A read was delivered: its summary (symbol, verdict, price), never the question. */
+    /** A read was delivered: its summary (symbol, verdict, price, who started it), never the question. */
     fun onReadDelivered(listener: (ReadSummary) -> Unit): () -> Unit
+    /**
+     * The person tapped the question Bobby's CIO wrote for a read, instead of typing their own. The
+     * symbol of that read; never the words. Told at the tap, before the read it starts is answered.
+     */
+    fun onNextQuestionPicked(listener: (String) -> Unit): () -> Unit
     /** The person saved a read (`requestId`, `symbol`). */
     fun onReadSaved(listener: (String, String) -> Unit): () -> Unit
     /** The app came to the front. */

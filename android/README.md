@@ -67,6 +67,54 @@ WorkManager is inexact. An idle phone can run planned work hours after its momen
 
 The decision is a pure function with unit tests. On CI's emulator a due notice is posted by WorkManager and its tap opens the right sheet (`V18DeviceInstrumentedTest`); the wait, the re-queue and the drop were never seen on a device. No copy promises a minute.
 
+### The next question, and who wrote the words (follow-ups slice 1, step 1 of 3)
+
+Ported from the iPhone (`ios/Bobby/Nucleo/ARCHITECTURE.md` §3.5, commits `630e01b3`, `37155fe0` and the native half of `cb784a0d`). This step is the page and the bridge. The planner (one follow-up chain per question the person asked, then stop) and the surface (lock screen, Stop, the wall, the notes on Memory) are steps 2 and 3 and are **not in this step**. Nothing below was seen on a phone: the page cases run in Node over the Android transport, the Kotlin cases on the JVM.
+
+**What a person sees.** One second after Bobby's voice ends, the last spoken line gives way to a row of at most three chips, with no save needed (before, chips came only after a save):
+
+1. The next question Bobby's CIO wrote for this read (`synthesis.followUp`), on one line or two, when it passes every check on the phone.
+2. "Another question about NVDA": opens the keyboard for the person's own words.
+3. One asset of theirs ("How is BTC looking?"); two when there is no CIO question.
+
+The same row comes back behind the nudge after a save. A CIO question that fails a check is silently replaced by the fixed row; nothing says why.
+
+**The checks** live in the page's read model (`android/nucleo/src/shared/20-read-model.js`, `nextQuestion(text, symbol, lang, asked)`): `missing`, `long` (90 code points), `number` (any digit outside the asset's own ticker, a currency sign, a percent, a price in words), `shape` (one sentence ending in its question mark), `opener` (what / why / which in the reply's language), `act` (whether or when to act, dressed as a what or a why), `word` (the one forbidden list in six languages, with the claims Bobby never makes about itself) and `same` (the question the read just answered). `fitNext()` drops a question that would need a third line. A page test pins this block and `followUps()` to the iPhone's copy, character for character, so the list is never forked.
+
+**Whose words** (`nucleo/NucleoAsk.kt`, `v18/V18Wire.kt` `ReadOrigin`). The page asks in four ways and native tells them apart:
+
+| The page sends | Who wrote the words | `ReadOrigin` | Level |
+|---|---|---|---|
+| `ask {question}` (typed or spoken) | the person | `PERSON` | the one they saved |
+| `ask {question, chip: true}` (an asset chip of the home, an asset or a mover of the row, an example of the first question) | Bobby; the person picked the asset | `CHIP` | the one they saved |
+| `ask {followUpOf, question}` with the words that read offered | Bobby's CIO | `FOLLOW_UP` | Quick, whatever is saved |
+| `ask {followUpOf, question}` with any other words | the person, about the read on screen | `THREAD` | the one they saved |
+| `ask {token}` after `ask.start` (a follow-up's button, a board row) | Bobby | `FOLLOW_UP` | Quick, whatever is saved |
+
+The origin rides every token that carries a read on (a confirmation, a retry, a level fallback, the question waiting behind a sign-in: `nucleo/ReadTokens.kt`) and reaches the features in `ReadSummary.origin` (`V18Host.onReadDelivered`). A pick of the CIO's question is recognised by native comparing the tapped words with what it sent for that read (white space apart) and is told by asset through `V18Host.onNextQuestionPicked`; the words are kept nowhere. Today the follow-ups still treat every delivered read alike: step 2 uses the origin.
+
+**Whose assets.** `suggestions().quickAccess[]` entries carry `own`: true for an asset the person asked about, false for a default ticker that only pads the row. A read Bobby started (a follow-up, a board row, a restored page) ends on their own question and their own assets only: no mover, no starter. iOS reads this from its watchlist; Android's stored row has always carried the default tickers along, so a new key beside it, `quickAccessAsked` in the reader's blob of `bobby.nucleo`, keeps the symbols really asked about. It leaves with the row ("Clear the shortcuts", "Delete everything", Forget). A row stored by 1.1.4 or 1.2.0 has no such key: there a symbol that is not a default ticker counts as theirs, and a default ticker does not until it is asked about again. One visible consequence: a person whose first question is about BTC now sees the row (BTC, NVDA, ETH) under Memory › On this phone, because the phone noted that they asked.
+
+**At the wall.** One seam, `V18Host.oneTap` (`OneTapRule`): "may Bobby offer a question that asks by itself?", asked once per read with that read's access receipt (`afterRead`) and for the idle home (`onHome`). On a no after a read the CIO's question does not travel and the reply says `oneTap: false` (the row is "Another question" alone); on a no at home the session says `oneTap: false` and the home draws no asset chip. **The rule answers yes for now** (`OneTapRule.ALWAYS`): step 3 sets it from the read meter. Until then a tap on a one-tap chip can still end on the sign-in or the paywall, as it could before.
+
+**Old servers and old replies.** `synthesis.followUp` travels only when it is text of at most 160 code points; anything else is dropped whole and the read is served. A reply without the field produces the read model it produced before, key for key.
+
+**Where the Android page differs from the iPhone page**, file by file (everything else under `android/nucleo/src` is identical to `ios/Bobby/Nucleo/src`):
+
+| File | Difference | Why |
+|---|---|---|
+| `shared/10-bridge.js` | `window.BobbyNucleo` transport: one JSON string per call, replies by id through `receive`, 180 s timeout; a dev transport cannot replace it | the WebView bridge |
+| `shared/20-read-model.js` | "Sign in" without a brand, "Google Play" in the pending-purchase line (six languages) | platform words |
+| `shared/20-read-model.js` | no `candlesTimeframe`: the chart takes its timeframe and date from `provenance` | not ported from iOS 1.7 (native sends no `candlesTimeframe`); a gap, not a platform reason |
+| `shared/90-dev-mock-bridge.js` | absent | the Android builder bundles no mock |
+| `app/20-gl.js` | without WebGL the companion art is not put inside the sphere | the approved Android fallback |
+| `app/40-strings.js`, `onboarding/40-strings.js` | the microphone sentence names Android and on-device dictation; "Sign in" | platform words |
+| `app/55-read.js` | `read.rendered` only when the bridge lists it, visible-frame count reset in the background | Android's presentation contract |
+| `app/55-read.js` | no two-line chart subtitle (`chartSubtitle`) | not ported from iOS 1.7; a gap |
+| `app/55-read.js`, `onboarding/82-render-dom.js`, `onboarding/template.html` | the sign-in chip shows a neutral mark, not the Apple logo | platform |
+| `app/60-fsm.js`, `onboarding/60-fsm.js` | `askNativeSpeechConsent` and its comments (the Android recogniser never answers `consent`) | platform |
+| `contract/10-contract.js` | the dev contract page lacks iOS's nudge, locale and `candlesTimeframe` checks | dev only, never bundled |
+
 ### What the owner still owes: App Links
 
 The manifest declares an App Links filter (`autoVerify`) for `https://bobbyprotocol.xyz/i/*` and `www.bobbyprotocol.xyz/i/*`. Android 12 and later hand those links to the app by themselves only once the site vouches for it, and today it does not: `public/.well-known/assetlinks.json` names the old TWA package `xyz.bobbyprotocol.app` with the placeholder `REPLACE_WITH_PLAY_APP_SIGNING_SHA256`.
@@ -90,7 +138,7 @@ Also open and the owner's call: `GET /api/bobby-access` reports no Google paymen
 
 ### What is verified, and what is not
 
-**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 105 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
+**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 143 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
 
 **Run on an emulator by CI** (GitHub Actions `Android emulator`: API 34 with Google APIs, a 360x800 dp screen, animations off, no GPU). `android/tools/run-emulator-tests.sh` runs `:app:connectedDebugAndroidTest` in three parts and keeps each part's report, logcat and every screenshot (the `android-emulator` artifact):
 

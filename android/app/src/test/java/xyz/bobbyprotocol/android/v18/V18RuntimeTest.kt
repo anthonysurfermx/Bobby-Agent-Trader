@@ -263,6 +263,72 @@ class V18RuntimeTest {
         assertNotNull(bench.host.readSummary("r9"))
     }
 
+    // Who wrote the words (slice 1 of the follow-ups)
+
+    @Test fun aDeliveredReadSaysWhoStartedItAndNothingSaysItForARestoredOne() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val heard = ArrayList<ReadSummary>()
+        bench.host.onReadDelivered { heard.add(it) }
+        bench.deliver(requestId = "r1")
+        assertEquals("a read nobody marked is the person's own question", ReadOrigin.PERSON, heard.last().origin)
+        for ((index, origin) in ReadOrigin.entries.withIndex()) {
+            bench.host.readDelivered(bench.read(requestId = "o$index"), origin)
+            assertEquals(origin, heard.last().origin)
+            assertEquals("kept with the read, for a feature that asks later", origin, bench.host.readSummary("o$index")?.origin)
+        }
+        assertFalse("who started it is not the question: nothing of the words is kept", heard.joinToString().contains("own words"))
+        bench.host.readDelivered(JSONObject().put("status", "quota"), ReadOrigin.FOLLOW_UP)
+        assertEquals("only a delivered read counts", 1 + ReadOrigin.entries.size, heard.size)
+    }
+
+    @Test fun pickingTheQuestionBobbyWroteIsToldByItsAssetAndNeverAfterTheHostIsGone() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val picked = ArrayList<String>()
+        val stop = bench.host.onNextQuestionPicked { picked.add(it) }
+        bench.host.onNextQuestionPicked { throw IllegalStateException("one listener failing never stops the others or the read") }
+        bench.host.nextQuestionPicked("NVDA")
+        assertEquals(listOf("NVDA"), picked)
+        stop()
+        bench.host.nextQuestionPicked("BTC")
+        assertEquals("a listener that left hears nothing", listOf("NVDA"), picked)
+        val late = ArrayList<String>()
+        bench.host.onNextQuestionPicked { late.add(it) }
+        bench.host.close()
+        bench.host.nextQuestionPicked("ETH")
+        assertTrue(late.isEmpty())
+    }
+
+    @Test fun bobbyOffersItsOneTapQuestionsUntilARuleSaysTheNextReadWouldBeRefused() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val receipt = JSONObject().put("tier", "free").put("remaining", 0).put("paywall", true)
+        assertSame(OneTapRule.ALWAYS, bench.host.oneTap)
+        assertTrue("until a rule is set, a read hands back its question", bench.host.offersOneTapAfterRead(receipt))
+        assertTrue("and a reply without a receipt too", bench.host.offersOneTapAfterRead(null))
+        assertTrue(bench.host.offersOneTapOnHome())
+
+        val asked = ArrayList<JSONObject?>()
+        var homeOpen = true
+        bench.host.oneTap = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean { asked.add(access); return access != null && access.optInt("remaining") > 0 }
+            override fun onHome(): Boolean = homeOpen
+        }
+        assertFalse(bench.host.offersOneTapAfterRead(receipt))
+        assertFalse(bench.host.offersOneTapAfterRead(null))
+        assertTrue(bench.host.offersOneTapAfterRead(JSONObject().put("remaining", 3)))
+        assertEquals("the rule sees the read's own receipt, as it came", listOf(receipt, null), asked.take(2))
+        assertTrue(bench.host.offersOneTapOnHome())
+        homeOpen = false
+        assertFalse(bench.host.offersOneTapOnHome())
+
+        // A rule that fails: after a read nothing is offered (only a chip is lost); the home stays as it was.
+        bench.host.oneTap = object : OneTapRule {
+            override fun afterRead(access: JSONObject?): Boolean = throw IllegalStateException("no meter")
+            override fun onHome(): Boolean = throw IllegalStateException("no meter")
+        }
+        assertFalse(bench.host.offersOneTapAfterRead(receipt))
+        assertTrue(bench.host.offersOneTapOnHome())
+    }
+
     // Accounts and consent
 
     @Test fun anotherReaderStartsWithNothingOfThePreviousOne() = runTest {

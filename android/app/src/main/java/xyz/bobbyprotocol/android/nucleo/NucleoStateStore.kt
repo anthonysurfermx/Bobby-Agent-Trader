@@ -70,6 +70,10 @@ internal class NucleoStateStore(context: Context) {
     fun keptQuickAccess(owner: String?): List<String> = QuickAccess.kept(state(owner))
     /** Keeps these symbols. None removes the stored row (as iOS does), so the glass falls back to its default tickers. */
     fun setQuickAccess(owner: String?, symbols: JSONArray) { val s = state(owner); QuickAccess.keep(s, QuickAccess.symbols(symbols)); write(owner, s) }
+    /** A read about `symbol` was delivered: it leads the row, and it is one of the reader's own assets (not a starter). */
+    fun noteAsked(owner: String?, symbol: String) { val s = state(owner); QuickAccess.asked(s, symbol); write(owner, s) }
+    /** The row as the page gets it: each symbol, and whether the reader asked about it (`own`) or it only pads the row. */
+    fun quickAccessEntries(owner: String?): List<Pair<String, Boolean>> = QuickAccess.entries(state(owner))
     fun ledger(owner: String?): JSONArray = state(owner).optJSONArray("theses") ?: JSONArray()
     fun saveThesis(owner: String?, thesis: JSONObject) {
         val list = ledger(owner)

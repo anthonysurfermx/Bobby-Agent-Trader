@@ -328,6 +328,26 @@ class HarnessGlassTest {
         assertEquals(listOf(HarnessStep.ASSET, HarnessStep.SECTOR), center.ledger.events(HarnessEvent.Kind.OPENED).map { it.step })
     }
 
+    @Test fun pickingTheQuestionBobbyWroteAfterAReadIsCountedForItsAssetWhileTheCentreMayRecord() = runTest {
+        // The page shows the CIO's question as the first chip after a read; a tap is told to the host by
+        // the session (the words are compared there and kept nowhere), and the centre counts it by asset.
+        val bench = V18TestBench(backgroundScope)
+        HarnessNudges.register(bench.host)
+        val center = Harness.center(bench.host)
+        runCurrent()
+        bench.deliver(requestId = "r1", symbol = "NVDA")
+        center.accept()
+        bench.host.nextQuestionPicked("NVDA")
+        val picked = center.ledger.events(HarnessEvent.Kind.PICKED)
+        assertEquals(listOf<String?>("NVDA"), picked.map { it.symbol })
+        assertNull("an asset and a moment: nothing else", picked.single().name)
+        assertFalse("no question text in what the phone keeps", center.ledger.events.joinToString().contains("own words"))
+        // Follow-ups turned off: nothing is kept, and the read itself is served as always.
+        center.turnOff()
+        bench.host.nextQuestionPicked("NVDA")
+        assertTrue(center.ledger.events(HarnessEvent.Kind.PICKED).isEmpty())
+    }
+
     @Test fun aReadStartedFromABoardWaitsForItsSheetToClose() = runTest {
         val bench = V18TestBench(backgroundScope)
         HarnessNudges.register(bench.host)

@@ -27,7 +27,14 @@ object NucleoReadModel {
         return listOf("alpha", "red", "cio").all { (agents.opt(it) as? String)?.isNotBlank() == true } && agents.optString("verdict") in setOf("wait", "review")
     }
 
-    fun read(requestId: String, question: String, asset: JSONObject, market: JSONObject, candles: JSONArray, debate: JSONObject, language: String, locale: String, started: Long, requestedLevel: String = "rapido"): JSONObject {
+    /**
+     * `offersOneTap`: may Bobby put a question that asks by itself after this read? Asked once, with
+     * the read's own access receipt as the server sent it (null when it sent none). On a no the reply
+     * says `oneTap: false` and the CIO's next question does not travel (the page then shows "Another
+     * question" alone). Without a no, the reply carries no such key: it is what it always was.
+     */
+    fun read(requestId: String, question: String, asset: JSONObject, market: JSONObject, candles: JSONArray, debate: JSONObject, language: String, locale: String, started: Long, requestedLevel: String = "rapido",
+             offersOneTap: (JSONObject?) -> Boolean = { true }): JSONObject {
         require(validDebate(debate)) { "Incomplete analysis" }
         val technicals = JSONObject()
         val rawTechnicals = debate.optJSONObject("technicals") ?: JSONObject()
@@ -46,7 +53,19 @@ object NucleoReadModel {
             "provenance" to (debate.optJSONObject("provenance") ?: JSONObject()), "candles" to candles, "receivedAt" to now, "elapsedMs" to (now - started).coerceAtLeast(0), "fixture" to false,
             "level" to debate.optString("level").takeIf { it in setOf("rapido", "profundo", "maximo") }.orEmpty().ifEmpty { requestedLevel })
         for (key in listOf("access", "sufficiency", "evidenceUsed")) debate.optJSONObject(key)?.let { out.put(key, it) }
-        (agents.optJSONObject("synthesis") ?: debate.optJSONObject("synthesis"))?.let { out.put("synthesis", it) }
+        // Bobby never invites someone into a wall: when the next read would be refused, this read hands
+        // back no question that asks by itself.
+        val offers = offersOneTap(debate.optJSONObject("access"))
+        if (!offers) out.put("oneTap", false)
+        // The synthesis goes to the page as the desk wrote it, except for the CIO's next question
+        // (`followUp`): it travels only when it is a question the page could show (text, 160 characters
+        // at most, trimmed) and Bobby may offer it. The key is absent otherwise, so a reply from a
+        // server that never sent one is exactly what it was. The page decides whether it is shown.
+        (agents.optJSONObject("synthesis") ?: debate.optJSONObject("synthesis")?.let { JSONObject(it.toString()) })?.let { synthesis ->
+            val next = if (offers) NextQuestion.usable(synthesis.opt("followUp")) else null
+            if (next != null) synthesis.put("followUp", next) else synthesis.remove("followUp")
+            out.put("synthesis", synthesis)
+        }
         // 1.8: the memory receipt rides the read for native (the page ignores keys it does not know).
         // Facts only, and only a complete receipt: an unknown count never becomes a zero.
         MemoryReceipts.fromJson(debate.optJSONObject("memory"))?.let { out.put("memory", MemoryReceipts.toJson(it)) }

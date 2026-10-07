@@ -129,6 +129,7 @@ class V18Runtime(
     }
 
     private val deliveredListeners = Listeners<(ReadSummary) -> Unit>()
+    private val pickedListeners = Listeners<(String) -> Unit>()
     private val savedListeners = Listeners<(String, String) -> Unit>()
     private val activeListeners = Listeners<() -> Unit>()
     private val accountListeners = Listeners<() -> Unit>()
@@ -308,9 +309,12 @@ class V18Runtime(
         }
     }
 
-    /** A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question. */
-    fun readDelivered(read: JSONObject) {
-        val summary = ReadSummary.from(read) ?: return
+    /**
+     * A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question.
+     * `origin` is who started it, as the session decided when it was asked.
+     */
+    fun readDelivered(read: JSONObject, origin: ReadOrigin = ReadOrigin.PERSON) {
+        val summary = ReadSummary.from(read)?.copy(origin = origin) ?: return
         shelf.put(summary)
         nudges.noteRead(NudgeRead(summary.requestId, summary.symbol, summary.name, summary.isEquity, summary.verdict, false, clock(),
                                   MemoryReceipts.fromJson(read.optJSONObject("memory"))))
@@ -322,6 +326,25 @@ class V18Runtime(
     fun readFinished() {
         drainSoon()
     }
+
+    /** The person tapped the question Bobby's CIO wrote for a read about `symbol`. Never the words. */
+    fun nextQuestionPicked(symbol: String) {
+        if (closed) return
+        pickedListeners.each { it(symbol) }
+    }
+
+    // ---- One-tap questions (what the session asks) ----
+
+    override var oneTap: OneTapRule = OneTapRule.ALWAYS
+
+    /**
+     * After a read with this access receipt: may its row carry a question that asks by itself?
+     * A rule that fails is a no. Nothing is lost but a chip, and Bobby never leads into a wall.
+     */
+    fun offersOneTapAfterRead(access: JSONObject?): Boolean = try { oneTap.afterRead(access) } catch (_: Exception) { false }
+
+    /** On the idle home. A rule that fails changes nothing, as not knowing changes nothing. */
+    fun offersOneTapOnHome(): Boolean = try { oneTap.onHome() } catch (_: Exception) { true }
 
     /** The person saved a read. The session tells the page afterwards. */
     fun readSaved(requestId: String, symbol: String) {
@@ -610,6 +633,7 @@ class V18Runtime(
     }
 
     override fun onReadDelivered(listener: (ReadSummary) -> Unit): () -> Unit = deliveredListeners.add(listener)
+    override fun onNextQuestionPicked(listener: (String) -> Unit): () -> Unit = pickedListeners.add(listener)
     override fun onReadSaved(listener: (String, String) -> Unit): () -> Unit = savedListeners.add(listener)
     override fun onAppActive(listener: () -> Unit): () -> Unit = activeListeners.add(listener)
     override fun onAccountChanged(listener: () -> Unit): () -> Unit = accountListeners.add(listener)
