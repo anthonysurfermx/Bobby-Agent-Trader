@@ -126,6 +126,8 @@ targets:
       properties:
         com.apple.developer.applesignin: [Default]
         com.apple.security.application-groups: [group.xyz.bobbyprotocol.bobby]
+        # Invitation links (https://bobbyprotocol.xyz/i/CODE) open the app; the site publishes the association file.
+        com.apple.developer.associated-domains: [applinks:bobbyprotocol.xyz]
         # Market briefing pushes use the APNs environment of the signing configuration.
         aps-environment: $(APS_ENVIRONMENT)
     settings:
