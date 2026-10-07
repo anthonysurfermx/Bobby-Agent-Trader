@@ -45,11 +45,11 @@ enum NucleoPage: Equatable {
 /// open from a nudge tap or the profile, never from a page call.
 enum NucleoRoute: String, Identifiable, CaseIterable {
     case squad, locker, isla, account, riskNotice, paywall, levels, invite, briefing
-    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp
+    case credits, theses, thesisEditor, thesisReview, memory, memoryConsent, reminders, briefingSettings, followUp, languageSettings
     var id: String { rawValue }
 
     static let nativeOnly: Set<NucleoRoute> = [.paywall, .invite, .briefing, .credits, .theses, .thesisEditor, .thesisReview,
-                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp]
+                                               .memory, .memoryConsent, .reminders, .briefingSettings, .followUp, .languageSettings]
     static let openable: Set<String> = Set(allCases.filter { !nativeOnly.contains($0) }.map(\.rawValue))
 }
 
@@ -99,6 +99,7 @@ final class NucleoSession: ObservableObject {
     @Published private(set) var selectedBriefId: String?
     /// Briefing notification taps (BobbyAppDelegate stores them; this session drains them once).
     let briefingIntent: BriefingIntent
+    let newsIntent: NewsPushIntent
     /// Thesis reminder taps (1.8), drained through the same gate (Reminders/ReminderIntent.swift).
     let reminderIntent: ReminderIntent
     /// Follow-up taps (1.8, V18/Harness), drained through the same gate.
@@ -131,11 +132,13 @@ final class NucleoSession: ObservableObject {
          ledger: NucleoLedger = NucleoLedger(),
          defaults: UserDefaults = .standard,
          briefingIntent: BriefingIntent? = nil,
+         newsIntent: NewsPushIntent? = nil,
          reminderIntent: ReminderIntent? = nil,
          harnessIntent: HarnessIntent? = nil,
          harness: HarnessCenter? = nil) {
         self.fixtures = fixtures
         self.briefingIntent = briefingIntent ?? .shared
+        self.newsIntent = newsIntent ?? .shared
         self.reminderIntent = reminderIntent ?? .shared
         self.harnessIntent = harnessIntent ?? .shared
         self.harness = harness ?? (fixtures || BobbyApp.isUnitTestHost ? nil : .shared)
@@ -919,6 +922,7 @@ final class NucleoSession: ObservableObject {
                 self?.drainBriefingIntent()
                 self?.drainReminderIntent()
                 self?.drainHarnessIntent()
+                self?.drainNewsIntent()
             }
             return
         }
@@ -929,7 +933,20 @@ final class NucleoSession: ObservableObject {
             self?.drainBriefingIntent()
             self?.drainReminderIntent()
             self?.drainHarnessIntent()
+            self?.drainNewsIntent()
         }
+    }
+
+    /// Opens only the language picker after a valid news tap. App language is never overwritten.
+    @discardableResult
+    func drainNewsIntent() -> Bool {
+        guard !tornDown, let gate = briefingGate, newsIntent.pending != nil,
+              currentPage == NucleoPage.app.name, gate.appActive(),
+              profile.acceptedRiskNotice, onboarded, sheet == nil, openSheet == nil, !speechPromptOpen,
+              !gate.listening(), !gate.deskBusy(), !gate.narrating() else { return false }
+        guard openNative(.languageSettings) else { return false }
+        _ = newsIntent.take()
+        return true
     }
 
     /// A report's narrator: the page's line stops before it starts; the mic or a running read refuses it.
@@ -1071,6 +1088,10 @@ final class NucleoSession: ObservableObject {
                 // signed out opens now (re-authorized against this account).
                 if self.signedIn { self.scheduleBriefingDrain() } else { self.heldBriefId = nil; self.briefingIntent.clear() }
             }
+            .store(in: &cancellables)
+        newsIntent.$pending
+            .compactMap { $0 }
+            .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
         // A briefing notification was tapped (cold launch, warm, or while busy): try now; it waits otherwise.
         briefingIntent.$pending

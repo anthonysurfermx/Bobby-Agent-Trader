@@ -56,6 +56,7 @@ jobs:
       - run: npm run test:client-telemetry
       - run: npm run test:llm-ledger
       - run: npm run test:briefings
+      - run: npm run test:push-news
       - run: npm run test:revenuecat-store-guard
       - run: npm run build
       - run: npm run lint -- --quiet
@@ -140,10 +141,11 @@ jobs:
       - run: npm run test:admin-compass-pg
       - run: npm run test:free-reads-pg
       - run: |
-          psql "$DATABASE_URL" -c 'create database briefings_pg' -c 'create database briefings_api' -c 'create database briefings_worker'
+          psql "$DATABASE_URL" -c 'create database briefings_pg' -c 'create database briefings_api' -c 'create database briefings_worker' -c 'create database news_push'
       - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_pg npm run test:briefings-pg
       - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_api npm run test:briefings-api
       - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/briefings_worker npm run test:briefings-worker
+      - run: DATABASE_URL=postgres://postgres@127.0.0.1:54392/news_push npm run test:push-news-pg
 
   contracts:
     runs-on: ubuntu-latest

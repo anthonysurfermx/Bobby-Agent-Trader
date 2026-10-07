@@ -186,6 +186,11 @@ private struct NucleoStage: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
+        case .languageSettings:
+            LanguageSettingsView { session.sheet = nil }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         case .briefingSettings:
             BriefingsSettingsView(riskAccepted: session.profile.acceptedRiskNotice,
                                   onShowPro: { session.switchSheet(to: .paywall) }) { session.sheet = nil }

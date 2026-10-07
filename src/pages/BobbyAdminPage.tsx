@@ -20,6 +20,7 @@ import MembershipsTab from '@/components/admin/bobby/MembershipsTab';
 import CouponsTab from '@/components/admin/bobby/CouponsTab';
 import LlmTab from '@/components/admin/bobby/LlmTab';
 import IntegrationsTab from '@/components/admin/bobby/IntegrationsTab';
+import NewsPushTab from '@/components/admin/bobby/NewsPushTab';
 import OperationalPanel from '@/components/admin/bobby/OperationalPanel';
 import SourceFreshness from '@/components/admin/bobby/SourceFreshness';
 import { composeOverview, CORE_REFRESH_MS, LIVE_REFRESH_MS, CORE_STALE_MS, mergeProviderSnapshots, PROVIDER_REFRESH_MS, sourceMetaForError } from '@/components/admin/bobby/live';
@@ -134,6 +135,7 @@ function headerCount(tab: TabId, d: OverviewResponse | null, period: number): st
     case 'audiencia': return null;
     case 'membresias': return `${isMissing(o.missing, 'subscriptions.paidVerified') ? DASH : fmtInt(o.subscriptions.paidVerified)} pagando (verificado)`;
     case 'cupones': return `${fmtInt(o.coupons.active)} activos`;
+    case 'notificaciones': return 'Novedades de Bobby · iOS';
     case 'ia': return `${fmtUsd(o.llm.providers.anthropic.period + o.llm.providers.openai.period, true)} · ${period}d`;
     case 'integraciones': { if (!d.providersLoaded) return 'fuentes pendientes de consulta'; const n = integrationProblems(d.integrations, d.searchConsole, o).length; return n ? `${n} pendientes` : 'estado de fuentes'; }
   }
@@ -199,7 +201,7 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
   const onSearchFocused = useCallback(() => setFocusSearch(false), []);
   const doSignOut = useCallback(async () => { await signOut(); onSignedOut(); }, [onSignedOut]);
 
-  const needsOverview = tab !== 'usuarios' && tab !== 'cupones';
+  const needsOverview = tab !== 'usuarios' && tab !== 'cupones' && tab !== 'notificaciones';
   // Never mix modes either: data loaded with the team included is not shown under "sin equipo".
   const providerData = providers.dataKey === `providers|${period}` ? providers.data : null;
   const o = overview.data && overview.dataKey === `${period}|${internal ? 'all' : 'ext'}` ? composeOverview(
@@ -297,6 +299,7 @@ function Dashboard({ me, onAuthLost, onSignedOut }: { me: AdminMe; onAuthLost: (
               {tab === 'usuarios' && <UsersTab me={me} refreshKey={refreshKey} notify={notify} onChanged={onChanged} focusSearch={focusSearch} onSearchFocused={onSearchFocused} />}
               {tab === 'membresias' && o && <MembershipsTab data={o} period={period} refreshKey={refreshKey} cmp={cmp} internal={internal} notify={notify} onChanged={onChanged} markFailed={markFailed} />}
               {tab === 'cupones' && <CouponsTab refreshKey={refreshKey} notify={notify} onChanged={onChanged} />}
+              {tab === 'notificaciones' && <NewsPushTab me={me} refreshKey={refreshKey} />}
               {tab === 'ia' && o && <LlmTab data={o} period={period} cmp={cmp} notify={notify} onChanged={onChanged} />}
               {tab === 'integraciones' && o && <IntegrationsTab data={o} period={period} refreshKey={refreshKey} />}
             </>
