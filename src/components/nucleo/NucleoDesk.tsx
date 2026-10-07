@@ -13,7 +13,8 @@ import { ArrowRight, Mic, MicOff, X } from 'lucide-react';
 import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFor, petArt, petFor, petUnlocked, PET_UNLOCK_XP, toolArt, toolHasArt, toolSlot, wornGear, type CompanionLevel, type CompanionTool } from '@/lib/companions/data';
 import { pick, speechLocale, t } from '@/lib/companions/i18n';
 import { clientLanguagePath } from '@/lib/client-language';
-import { progressStore, quickAccessName, quickAccessRow, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
+import { RISK_NOTICE_VERSION, progressStore, quickAccessName, quickAccessRow, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
+import { consentCurrent, heldQuestion, parseDeskLink, type HeldStep } from '@/lib/desk-entry';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
@@ -68,6 +69,8 @@ function greeting(name?: string | null): string {
   const tail = name ? `, ${name}.` : '.';
   return t(en, es, pt) + tail;
 }
+/** The question a starter chip asks, and the one /desk?ask=SYMBOL starts. */
+const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
 const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toLocaleString(speechLocale(), { minimumFractionDigits: v >= 10 || v <= -10 ? 1 : 2, maximumFractionDigits: v >= 10 || v <= -10 ? 1 : 2 })}%`;
 
 /** The spoken read as karaoke: one sentence at a time, the current word lit, on the reading clock. */
@@ -121,7 +124,6 @@ function Voice({ k, line, active, align }: { k: AgentKey; line: string | null; a
 }
 
 export default function NucleoDesk() {
-  useEffect(() => { track('desk_entered', 'desk'); }, []);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const location = useLocation();
@@ -132,6 +134,20 @@ export default function NucleoDesk() {
   const returned = location.state as { voiceFallback?: boolean; transcript?: Array<{ role: string; text: string }> } | null;
   const [voiceNotice, setVoiceNotice] = useState(returned?.voiceFallback ? t('Live paused · free voice ready', 'Live en pausa · voz gratis lista', 'Live pausado · voz grátis pronta') : '');
   const progress = useProgress();
+  // Value before consent, as on the iPhone: the desk is on screen at once, and nothing the person writes or says
+  // leaves this browser until they accept the notice. Whatever they asked waits in `held` and runs once after.
+  const consented = consentCurrent(progress, RISK_NOTICE_VERSION);
+  const consentNow = useCallback(() => consentCurrent(progressStore.get(), RISK_NOTICE_VERSION), []);
+  // A link that asks (/desk?ask=NVDA) opens a new visitor straight on the notice, with the question above it.
+  const [held, setHeld] = useState<HeldStep | null>(() => {
+    const link = parseDeskLink(window.location.search);
+    return link.ask && !consentCurrent(progressStore.get(), RISK_NOTICE_VERSION) ? { kind: 'ask', q: link.ask, spoken: howLooks(link.ask) } : null;
+  });
+  const heldRef = useRef<HeldStep | null>(held);
+  const holdFor = useCallback((step: HeldStep) => { heldRef.current = step; setHeld(step); window.scrollTo({ top: 0 }); }, []);
+  // "This person saw the desk": once, when the desk itself is on screen, which is now before consent.
+  const entered = useRef(false);
+  useEffect(() => { if (held || entered.current) return; entered.current = true; track('desk_entered', 'desk'); }, [held]);
   const voice = useCompanionVoice();
   const companion = getCompanion(progress.companionId) ?? COMPANIONS[1];
   const vibe = getVibe(progress.vibeId);
@@ -173,7 +189,7 @@ export default function NucleoDesk() {
   accessRef.current = accessState;
   const [movers, setMovers] = useState<Mover[]>([]);
   const [readSeq, setReadSeq] = useState(0);
-  useEffect(() => { if (shouldPromptNow(getSyncStatus() === 'synced')) setSignInPrompt(true); }, []);
+  useEffect(() => { if (consented && shouldPromptNow(getSyncStatus() === 'synced')) setSignInPrompt(true); }, [consented]);
   const stageRef = useRef<HTMLDivElement | null>(null);
   const [equip, setEquip] = useState<{ url: string; token: number }>({ url: '', token: 0 });
   const [muted, setMuted] = useState(sfxMuted());
@@ -193,6 +209,8 @@ export default function NucleoDesk() {
     requestRef.current?.abort();
   }, []);
   const refreshAccess = useCallback(async (): Promise<AccessState | null> => {
+    // The meter is asked with the install id and the account: not before the notice is accepted.
+    if (!consentNow()) return null;
     const epoch = accessGate.current.revision;
     const before = await accessHeaders();
     if (!accessGate.current.sameEpoch(epoch)) return null;
@@ -202,7 +220,7 @@ export default function NucleoDesk() {
     if (!fresh || !accessGate.current.accept(ticket, accessOwner(after))) return null;
     setAccessState((previous) => accessGate.current.isCurrent(ticket) ? fresh : previous);
     return fresh;
-  }, []);
+  }, [consentNow]);
   const [deskError, setDeskError] = useState<string | null>(null);
   const [agents, setAgents] = useState<Agents | null>(null);
   // The live desk: each argument as it arrives; a debate that did not finish; what "Retry" re-runs.
@@ -218,7 +236,8 @@ export default function NucleoDesk() {
     void voice.speak(text, { voice: companion.voicePersona, vibe: vibe.server, essential, mode: 'free' });
   }, [voice, companion.voicePersona, vibe.server]);
 
-  // Today's real movers under the greeting, once.
+  // Today's real movers under the greeting, once. Public market data: the request carries the interface language
+  // and market only, so it does not wait for consent.
   useEffect(() => {
     if (booted.current) return;
     booted.current = true;
@@ -228,14 +247,14 @@ export default function NucleoDesk() {
   // A grant from /admin can arrive while the desk stays open. Re-read when Profile opens.
   // All access responses, including this one, pass through the same owner and order gate.
   useEffect(() => {
-    if (sheet !== 'profile') return;
+    if (sheet !== 'profile' || !consented) return;
     void refreshAccess();
-  }, [sheet, refreshAccess]);
+  }, [sheet, refreshAccess, consented]);
 
   const analyze = useCallback(async (snap: Snapshot, controller?: AbortController) => {
     if (!controller) { requestRef.current?.abort(); controller = new AbortController(); requestRef.current = controller; }
     const { signal } = controller;
-    if (signal.aborted) return;
+    if (signal.aborted || !consentNow()) return;
     const readEpoch = accessGate.current.revision;
     if (revealRef.current) clearTimeout(revealRef.current);
     setDeskError(null);
@@ -367,11 +386,13 @@ export default function NucleoDesk() {
     // history. The visible row (quickAccessRow) adds them back, with the local stock anchored.
     const asked = progress.quickAccessCustomized ? progress.quickAccess : [];
     progressStore.setQuickAccess([snap.symbol, ...asked.filter((s) => s !== snap.symbol)].slice(0, 6));
-  }, [say, progress.quickAccess, progress.quickAccessCustomized, refreshAccess]);
+  }, [say, progress.quickAccess, progress.quickAccessCustomized, refreshAccess, consentNow]);
 
   const ask = useCallback(async (query: string, spoken?: string) => {
     const q = query.trim();
     if (!q) return;
+    // Typed, dictated, a chip or a link: before the notice is accepted the question waits here and nothing is sent.
+    if (!consentNow()) { holdFor({ kind: 'ask', q, ...(spoken ? { spoken } : {}) }); return; }
     const lv = deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
@@ -411,7 +432,7 @@ export default function NucleoDesk() {
     }
     if (r.needsConfirmation) { setPending(r); setPhase('confirm'); return; }
     await analyze(r.snapshot, controller);
-  }, [analyze, voice]);
+  }, [analyze, voice, consentNow, holdFor]);
 
   // The meter: on load, whenever the account changes, and after a Stripe checkout (the webhook can
   // lag a few seconds, so a welcome polls until the subscription shows up). A question the gate held
@@ -420,6 +441,9 @@ export default function NucleoDesk() {
   useEffect(() => {
     let alive = true;
     captureReferral();
+    // Until the notice is accepted the desk asks the server nothing about this person: no meter, no invitation
+    // claim, no question held from a sign-in. All of it starts the moment they agree.
+    if (!consented) return;
     const load = async (attempt = 0) => {
       const epoch = accessGate.current.revision;
       let st = await refreshAccess();
@@ -462,7 +486,23 @@ export default function NucleoDesk() {
     } catch { unsub = null; }
     return () => { alive = false; accessGate.current.invalidate(); unsub?.(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invalidateAccess, refreshAccess]);
+  }, [invalidateAccess, refreshAccess, consented]);
+  // An invitation kept in this browser is announced from what the browser already knows; the claim waits for consent.
+  useEffect(() => {
+    if (consented || !pendingReferral()) return;
+    setInviteNotice(account ? null : t('A friend invited you. Create your free account to accept.', 'Un amigo te invitó. Crea tu cuenta gratis para aceptar.', 'Um amigo te convidou. Crie sua conta grátis para aceitar.'));
+  }, [consented, account]);
+
+  // A link into the desk: ?ask=SYMBOL starts that starter question (a new visitor already has it waiting behind the
+  // notice), ?q=text only fills the pill. Both leave the address bar at once, so neither survives a reload.
+  useEffect(() => {
+    const link = parseDeskLink(window.location.search);
+    if (!link.present) return;
+    window.history.replaceState(window.history.state, '', window.location.pathname + link.search + window.location.hash);
+    if (link.q) { setInput(link.q); inputRef.current?.focus({ preventScroll: true }); }
+    else if (link.ask && consentNow()) void ask(link.ask, howLooks(link.ask));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const reset = () => {
     requestRef.current?.abort();
@@ -523,6 +563,40 @@ export default function NucleoDesk() {
     if (recognition) { recognition.onend = null; recognition.onresult = null; recognition.onerror = null; recognition.abort(); }
   }, []);
   const closeRecognition = () => { const recognition = recognitionRef.current as BrowserRecognition | null; if (recognition) { recognition.onend = null; recognition.abort(); recognitionRef.current = null; setListening(false); } };
+
+  // The notice, accepted: what waited runs once, inside the tap that agreed.
+  const agreed = () => {
+    const step = heldRef.current;
+    heldRef.current = null; setHeld(null);
+    if (!step) return;
+    if (step.kind === 'ask') void ask(step.q, step.spoken);
+    else if (step.kind === 'mic') toggleDictation();
+    else { sfxTock(); setSheet(step.kind); }
+  };
+  // The notice, left: back to the idle desk with the question kept in the pill. Nothing was sent.
+  const leaveConsent = () => {
+    const question = heldQuestion(heldRef.current);
+    heldRef.current = null; setHeld(null);
+    sfxTock();
+    if (question) setInput(question);
+  };
+  // Consent withdrawn (the notice in the profile): requests stop, sheets close, and the desk is the idle desk again.
+  const wasConsented = useRef(consented);
+  useEffect(() => {
+    const before = wasConsented.current;
+    wasConsented.current = consented;
+    if (consented || !before) return;
+    requestRef.current?.abort();
+    if (revealRef.current) clearTimeout(revealRef.current);
+    voice.stop(); closeRecognition();
+    setSheet('none'); setLimit(null); setSignInPrompt(false); setInviteOpen(false); setInspected(null);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]);
+    setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
+    invalidateAccess();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [consented]);
+  // Sheets belong to a desk that may talk to the server; before the notice only the desk itself is shown.
+  const shown: Sheet = consented ? sheet : 'none';
 
   /** Share my avatar: the live WebGL frame plus worn gear and pet on a 1080×1350 card. */
   const shareSkin = async () => {
@@ -615,9 +689,9 @@ export default function NucleoDesk() {
         )}
       </div>
       <div className="flex min-w-[44px] items-center justify-end gap-2 sm:min-w-[92px]">
-        {desktop && <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />}
+        {desktop && consented && <WalletBalancePill onClick={() => { sfxTock(); setSheet('swap'); }} />}
         <LangMenu />
-        <button type="button" className="n-face-btn" onClick={() => { sfxTock(); setSheet('profile'); }} aria-label={t(`Your profile · ${displayName}, level ${level.number}`, `Tu perfil · ${displayName}, nivel ${level.number}`, `Seu perfil · ${displayName}, nível ${level.number}`)} title={displayName}>
+        <button type="button" className="n-face-btn" onClick={() => { sfxTock(); if (consented) setSheet('profile'); else holdFor({ kind: 'profile' }); }} aria-label={t(`Your profile · ${displayName}, level ${level.number}`, `Tu perfil · ${displayName}, nivel ${level.number}`, `Seu perfil · ${displayName}, nível ${level.number}`)} title={displayName}>
           <svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="20" fill="none" stroke="rgba(242,237,228,.12)" strokeWidth="2" /><circle cx="22" cy="22" r="20" fill="none" stroke="#FFF8EC" strokeWidth="2" strokeLinecap="round" strokeDasharray={2 * Math.PI * 20} strokeDashoffset={2 * Math.PI * 20 * (1 - xpArc)} transform="rotate(-90 22 22)" /></svg>
           <img src={`/mascots/${companion.id}.webp`} alt="" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
         </button>
@@ -871,7 +945,6 @@ export default function NucleoDesk() {
   // After a read: the CIO's own follow-up question first (it runs as a new question on the same asset),
   // then another question of the reader's, then their other assets.
   const followUp = done && snapshot && !agentsFailed ? agents?.synthesis?.followUp ?? null : null;
-  const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
   const suggestions: Array<{ label: string; ariaLabel?: string; go: () => void }> = done && snapshot
     ? [
       // The follow-up carries the asset only when it writes the ticker itself, in capitals and as a whole word: "near
@@ -890,7 +963,7 @@ export default function NucleoDesk() {
         {suggestions.map((c, i) => (
           <button key={c.label} type="button" aria-label={c.ariaLabel} className={`n-chip ${i === 0 ? '' : 'dim'}`} onClick={() => { sfxTock(); c.go(); }}>{c.label}</button>
         ))}
-        <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); setSheet('board'); }}>{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</button>
+        <button type="button" className="n-chip ghost" onClick={() => { sfxTock(); if (consented) setSheet('board'); else holdFor({ kind: 'board' }); }}>{t('Explore markets', 'Explorar mercados', 'Explorar mercados')}</button>
       </div>
     </div>
   ) : null;
@@ -902,16 +975,26 @@ export default function NucleoDesk() {
         <LevelControl level={deskLevel} onChange={setDeskLevel} state={accessState} disabled={working}
           onSignIn={() => { setSigninNote(null); setSignInPrompt(true); }} onInvite={() => { setInviteOpen(true); void refreshAccess(); }} />
         {input.trim() && !working && <button type="submit" className="n-send" aria-label={t('Ask', 'Preguntar', 'Perguntar')}><ArrowRight size={16} /></button>}
-        <span className={`n-mic-wrap ${listening ? 'on' : ''}`}><span className="n-mic-glow" aria-hidden="true"><i /></span><button type="button" onClick={toggleDictation} aria-label={listening ? t('Stop listening', 'Dejar de escuchar', 'Parar de ouvir') : t('Talk to Bobby', 'Hablar con Bobby', 'Falar com o Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button></span>
+        <span className={`n-mic-wrap ${listening ? 'on' : ''}`}><span className="n-mic-glow" aria-hidden="true"><i /></span><button type="button" onClick={consented ? toggleDictation : () => holdFor({ kind: 'mic' })} aria-label={listening ? t('Stop listening', 'Dejar de escuchar', 'Parar de ouvir') : t('Talk to Bobby', 'Hablar con Bobby', 'Falar com o Bobby')} className={`n-mic ${listening ? 'on' : ''}`}>{listening ? <MicOff size={18} /> : <Mic size={18} />}</button></span>
       </form>
     </div>
   );
 
+  // The notice stands where the answer would: the question above it, the same four statements, the same agree
+  // control. Agreeing continues what waited; the X returns to the idle desk.
+  if (held) {
+    return (
+      <motion.div key="consent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
+        <NucleoRisk question={heldQuestion(held)} onAccepted={agreed} onClose={leaveConsent} />
+      </motion.div>
+    );
+  }
+
   return (
     <div className="n-desk">
       {header}
-      {/* keeps progress sync (and the wallet credential) configured even while the profile is closed */}
-      <div hidden><ProgressSync /></div>
+      {/* keeps progress sync (and the wallet credential) configured even while the profile is closed; it syncs with the account, so it waits for consent */}
+      {consented && <div hidden><ProgressSync /></div>}
       <main className="n-stage">
         {proNotice && (
           <div className="n-notice" role="status">
@@ -939,7 +1022,7 @@ export default function NucleoDesk() {
       {dock}
 
       <AnimatePresence>
-        {sheet === 'profile' && (
+        {shown === 'profile' && (
           <NucleoProfile
             companion={companion} displayName={displayName} level={level} xp={progress.xp}
             mascotState={listening ? 'listening' : voice.speaking ? 'speaking' : reading ? 'thinking' : 'idle'}
@@ -994,11 +1077,11 @@ export default function NucleoDesk() {
             onReset={() => { if (window.confirm(t('Reset XP, gear and avatar on this browser?', '¿Reiniciar XP, equipo y avatar en este navegador?', 'Zerar XP, equipamento e avatar neste navegador?'))) progressStore.reset(); }}
           />
         )}
-        {sheet === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
-        {signInPrompt && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} note={signinNote ?? undefined} onClose={() => { setSignInPrompt(false); setSigninNote(null); }} />}
-        {sheet === 'catalog' && <GearCatalog key="catalog" current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('profile')} />}
-        {sheet === 'swap' && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
-        {sheet === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
+        {shown === 'board' && <BoardSheet key="board" onPick={(s) => { setSheet('none'); void ask(s); }} onClose={() => setSheet('none')} />}
+        {signInPrompt && consented && !evolution && !drops[0] && sheet === 'none' && <SignInPrompt key="signin-prompt" xp={progress.xp} note={signinNote ?? undefined} onClose={() => { setSignInPrompt(false); setSigninNote(null); }} />}
+        {shown === 'catalog' && <GearCatalog key="catalog" current={companion} xp={progress.xp} level={level.number} onClose={() => setSheet('profile')} />}
+        {shown === 'swap' && <SwapSheet key="swap" initialSymbol={snapshot?.symbol ?? null} onClose={() => setSheet('none')} />}
+        {shown === 'pet' && (() => { const pet = petFor(companion.id); const has = petUnlocked(progress.xp); return pet ? (
           <motion.div key="pet" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 md:items-center" onClick={() => setSheet('profile')}>
             <div className="n-card w-full max-w-md space-y-3 rounded-b-none p-6 text-center md:rounded-[28px]" onClick={(e) => e.stopPropagation()}>
               <div className="text-7xl" style={{ filter: has ? 'none' : 'grayscale(1)' }}>{pet.emoji}</div>
@@ -1007,7 +1090,7 @@ export default function NucleoDesk() {
             </div>
           </motion.div>) : null; })()}
         {sheet === 'risk' && (
-          <motion.div key="risk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#0B0A09' }}><NucleoRisk readOnly onClose={() => setSheet('profile')} /></motion.div>
+          <motion.div key="risk" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-50 overflow-y-auto" style={{ background: '#0B0A09' }}><NucleoRisk readOnly onClose={() => setSheet(consentNow() ? 'profile' : 'none')} /></motion.div>
         )}
         {inspected && <ToolDetail key="tool" companion={companion} tool={inspected} xp={progress.xp} onClose={() => setInspected(null)} />}
         {evolution && <EvolutionOverlay key="evo" companion={companion} level={evolution} onDone={() => { const name = companionName(companion, evolution.number); say(t(`I evolved. Call me ${name} now.`, `Evolucioné. Ahora dime ${name}.`, `Evoluí. Agora me chame de ${name}.`), false); setEvolution(null); }} />}

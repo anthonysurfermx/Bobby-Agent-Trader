@@ -201,6 +201,9 @@ body.nucleo-ui .n-ask input:focus-visible { outline: none; }
 
 /* the risk notice and the profile */
 .n-risk { min-height: 100vh; background: radial-gradient(60% 40% at 50% 18%, #15121C 0%, rgba(21, 18, 28, 0) 72%), #0B0A09; }
+/* the question waiting behind the notice: the person's own words, quiet, two lines at most */
+.n-risk-q { max-width: 100%; text-align: center; font: 400 14px/1.4 var(--n-sans); color: var(--n-ink2); overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
 .n-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(0, 0, 0, .5); border: 1px solid var(--n-line); }
 .n-seg button { height: 30px; padding: 0 12px; border-radius: 999px; font: 500 11px/1 var(--n-mono); letter-spacing: .12em; color: var(--n-ink3); }
 .n-seg button[aria-pressed="true"] { background: var(--n-ink); color: #0B0A09; }
