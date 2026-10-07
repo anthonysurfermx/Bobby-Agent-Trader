@@ -177,7 +177,7 @@ private struct NucleoStage: View {
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .memoryConsent:
-            MemoryConsentSheet(session: session) { session.sheet = nil }
+            MemoryConsentSheet { session.sheet = nil }
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
