@@ -467,7 +467,7 @@ final class ThesisListTests: XCTestCase {
             XCTAssertTrue(question.contains("2"), "\(language): \(question)")
             XCTAssertFalse(question.contains("{"), language)
             questions.insert(question)
-            buttons.insert(L.t("Keep them", "Conservarlas") + " / " + L.t("Not mine", "No es mío"))
+            buttons.insert(L.t("Keep them", "Conservarlas") + " / " + L.t("Not mine", "No son mías"))
         }
         UserDefaults.standard.set("en", forKey: L.preferenceKey)
         XCTAssertEqual(questions.count, 6)

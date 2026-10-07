@@ -269,7 +269,7 @@ struct ThesisListView: View {
         ThesisButton(title: model.guestCount == 1 ? L.t("Keep it", "Mantenerla") : L.t("Keep them", "Conservarlas"), id: "theses-guest-keep") {
             withAnimation(.easeOut(duration: 0.2)) { _ = model.keepGuestTheses() }
         }
-        ThesisLink(title: L.t("Not mine", "No es mío"), id: "theses-guest-decline") {
+        ThesisLink(title: model.guestCount == 1 ? L.t("Not mine", "No es mía") : L.t("Not mine", "No son mías"), id: "theses-guest-decline") {
             withAnimation(.easeOut(duration: 0.2)) { model.declineGuestTheses() }
         }
     }
