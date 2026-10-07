@@ -52,9 +52,12 @@ import xyz.bobbyprotocol.android.v18.theses.V18HostWords
 // decides: keep it, or edit or archive it from the menu. Closing records no decision.
 // The route opens it through the host's focus (a thesis id).
 
-/** Wait / Review in the verdict's own colour (amber / green), exactly as a read shows it. Nothing else on these screens is coloured. */
-private val VerdictReview = Color(0xFF34D399)
-private val VerdictWait = Color(0xFFFAC72E)
+/**
+ * Wait / Review in the verdict's own colour (amber / green), exactly as a read shows it on the glass
+ * (the page's `--cio` and `--alpha`). No new colour, and nothing else on these screens is coloured.
+ */
+private val VerdictReview = Color(0xFF3FE0B5)
+private val VerdictWait = Color(0xFFF6B94E)
 
 @Composable
 fun ThesisReviewSheet(host: V18Host, onClose: () -> Unit) {

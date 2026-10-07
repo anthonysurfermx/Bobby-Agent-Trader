@@ -404,40 +404,48 @@ class ThesisReviewer(
         fun live(
             host: V18Host,
             transport: suspend (JSONObject, ThesisContext) -> JSONObject = { body, thesis -> host.repository.streamDebate(body, thesis) { } },
-        ): Environment = Environment(
-            book = host.theses,
-            words = V18HostWords(host),
-            owner = { host.owner },
-            epoch = { host.accountEpoch },
-            riskAccepted = { host.riskAccepted },
-            level = { host.analysisLevel },
-            now = { host.now() },
-            send = { request ->
-                try {
-                    DeskOutcome.of(200, transport(host.deskBody(request.symbol, request.question, request.isEquity, request.level), request.thesis))
-                } catch (cancelled: CancellationException) {
-                    throw cancelled
-                } catch (error: Exception) {
-                    DeskOutcome.of(error)
-                }
-            },
-            // The server counted a read (or refused one): the credits the app shows are read again.
-            // That request costs no read; the repository does not guard it, so the consent is checked here.
-            accessChanged = {
-                val fence = host.fence()
-                host.scope.launch {
-                    if (!fence.isCurrent || !host.riskAccepted) return@launch
-                    try {
-                        host.repository.access()
-                    } catch (cancelled: CancellationException) {
-                        throw cancelled
-                    } catch (_: Exception) {
-                        // The balance stays as it was; the Credits screen reads it again when it opens.
+        ): Environment {
+            // The server counted a read, or refused one at a premium level: the balances the app shows
+            // (reads left, the level meters) are read again. That request costs no read; the repository
+            // does not guard it, so the consent is checked here. One at a time.
+            var refreshing: Job? = null
+            val refreshBalance = {
+                if (refreshing?.isActive != true) {
+                    val fence = host.fence()
+                    refreshing = host.scope.launch {
+                        if (!fence.isCurrent || !host.riskAccepted) return@launch
+                        try {
+                            host.repository.access()
+                        } catch (cancelled: CancellationException) {
+                            throw cancelled
+                        } catch (_: Exception) {
+                            // The balance stays as it was; the Credits screen reads it again when it opens.
+                        }
                     }
                 }
-            },
-            events = ThesisEvents.of(host),
-        )
+            }
+            return Environment(
+                book = host.theses,
+                words = V18HostWords(host),
+                owner = { host.owner },
+                epoch = { host.accountEpoch },
+                riskAccepted = { host.riskAccepted },
+                level = { host.analysisLevel },
+                now = { host.now() },
+                send = { request ->
+                    try {
+                        DeskOutcome.of(200, transport(host.deskBody(request.symbol, request.question, request.isEquity, request.level), request.thesis))
+                    } catch (cancelled: CancellationException) {
+                        throw cancelled
+                    } catch (error: Exception) {
+                        DeskOutcome.of(error)
+                    }
+                },
+                accessChanged = { refreshBalance() },
+                meterChanged = { refreshBalance() },
+                events = ThesisEvents.of(host),
+            )
+        }
     }
 }
 
