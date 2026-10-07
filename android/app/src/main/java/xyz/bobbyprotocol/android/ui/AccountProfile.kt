@@ -45,6 +45,7 @@ import xyz.bobbyprotocol.android.nucleo.NucleoSession
 import xyz.bobbyprotocol.android.nucleo.ProfileProgressPolicy
 import xyz.bobbyprotocol.android.platform.AvatarShareSpec
 import xyz.bobbyprotocol.android.platform.AvatarShareGear
+import xyz.bobbyprotocol.android.v18.V18Routes
 
 internal object ProfilePalette {
     val background = Color(0xFF040306)
@@ -181,6 +182,13 @@ internal fun AccountProfile(
         ProfileRow("Trader Land", t("Every read plants something"), ProfileSymbol.ISLAND, tag = "account-trader-land") { onOpen("isla") }
 
         ProfileSection(t("Account"))
+        // 1.8: what you have, what you are looking at and why, and the reminders you set. Each opens its own sheet.
+        ProfileRow(session.text("Credits", "Créditos"), session.text("What you have and how to get more", "Lo que tienes y cómo conseguir más"),
+            ProfileSymbol.CREDITS, tag = "account-credits") { onOpen(V18Routes.CREDITS) }
+        ProfileRow(session.text("My theses", "Mis tesis"), session.text("What you are looking at, and why", "Lo que estás viendo, y por qué"),
+            ProfileSymbol.THESES, tag = "account-theses") { onOpen(V18Routes.THESES) }
+        ProfileRow(session.text("Reminders", "Recordatorios"), session.text("Review reminders you set", "Recordatorios de revisión que tú pusiste"),
+            ProfileSymbol.REMINDERS, tag = "account-reminders") { onOpen(V18Routes.REMINDERS) }
         val remaining = access?.remaining
         ProfileRow(if (confirmedPro) "Bobby Pro" else t("Reads left this week"), if (confirmedPro) t("Your account confirms Pro access") else remaining?.toString() ?: "—", ProfileSymbol.READS,
             trailing = if (confirmedPro && billing.managementUri() != null) t("Manage") else null, tag = "account-reads") {
@@ -301,7 +309,7 @@ private fun voiceName(preference: VoicePreference, t: (String) -> String): Strin
         Canvas(Modifier.size(12.dp)) { drawLine(ProfilePalette.dim, Offset(size.width*.3f,size.height*.2f),Offset(size.width*.7f,size.height*.5f),2f); drawLine(ProfilePalette.dim,Offset(size.width*.7f,size.height*.5f),Offset(size.width*.3f,size.height*.8f),2f) }
     }
 }
-private enum class ProfileSymbol { AVATAR, SHARE, GEAR, ISLAND, READS, PRO, SYNC, INVITE, GIFT, BRIEFING, SETTINGS, VOICE, LANGUAGE, MEMORY, RISK }
+private enum class ProfileSymbol { AVATAR, SHARE, GEAR, ISLAND, READS, PRO, SYNC, INVITE, GIFT, BRIEFING, SETTINGS, VOICE, LANGUAGE, MEMORY, RISK, CREDITS, THESES, REMINDERS }
 @Composable private fun ProfileIcon(symbol: ProfileSymbol) {
     Canvas(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(ProfilePalette.fill)) {
         val stroke=Stroke(1.4.dp.toPx()); val ink=ProfilePalette.muted; val mid=Offset(size.width/2,size.height/2); val r=size.width*.22f
@@ -316,6 +324,8 @@ private enum class ProfileSymbol { AVATAR, SHARE, GEAR, ISLAND, READS, PRO, SYNC
             ProfileSymbol.RISK -> { val p=Path().apply { moveTo(mid.x,size.height*.25f);lineTo(size.width*.73f,size.height*.35f);lineTo(size.width*.68f,size.height*.62f);lineTo(mid.x,size.height*.77f);lineTo(size.width*.32f,size.height*.62f);lineTo(size.width*.27f,size.height*.35f);close() };drawPath(p,ink,style=stroke);line(.5f,.37f,.5f,.56f);drawCircle(ink,stroke.width*.7f,Offset(mid.x,size.height*.65f)) }
             ProfileSymbol.MEMORY -> { drawCircle(ink,r,mid,style=stroke);line(.5f,.28f,.5f,.72f);line(.37f,.36f,.44f,.45f);line(.63f,.36f,.56f,.45f);line(.37f,.62f,.44f,.55f);line(.63f,.62f,.56f,.55f) }
             ProfileSymbol.ISLAND -> { val p=Path().apply {moveTo(size.width*.27f,size.height*.45f);lineTo(mid.x,size.height*.3f);lineTo(size.width*.73f,size.height*.45f);lineTo(mid.x,size.height*.67f);close()};drawPath(p,ink,style=stroke);line(.27f,.58f,.5f,.78f);line(.5f,.78f,.73f,.58f) }
+            ProfileSymbol.CREDITS -> { drawRoundRect(ink,Offset(size.width*.25f,size.height*.34f),Size(size.width*.5f,size.height*.32f),style=stroke);line(.56f,.4f,.56f,.6f) }
+            ProfileSymbol.REMINDERS -> { drawArc(ink,180f,180f,false,Offset(mid.x-r,size.height*.28f),Size(r*2,r*2),style=stroke);line(.28f,.5f,.28f,.62f);line(.72f,.5f,.72f,.62f);line(.24f,.62f,.76f,.62f);drawCircle(ink,stroke.width*.8f,Offset(mid.x,size.height*.72f)) }
             ProfileSymbol.GEAR, ProfileSymbol.SETTINGS -> { for(x in listOf(.29f,.55f)) for(y in listOf(.29f,.55f)) drawRoundRect(ink,Offset(size.width*x,size.height*y),Size(size.width*.16f,size.height*.16f),style=stroke) }
             else -> { drawRoundRect(ink,Offset(size.width*.29f,size.height*.29f),Size(size.width*.42f,size.height*.42f),style=stroke);line(.37f,.44f,.63f,.44f);line(.37f,.57f,.58f,.57f) }
         }

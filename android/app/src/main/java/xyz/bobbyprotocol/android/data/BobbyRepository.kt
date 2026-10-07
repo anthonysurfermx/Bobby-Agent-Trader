@@ -28,6 +28,7 @@ import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
 import xyz.bobbyprotocol.android.BuildConfig
+import xyz.bobbyprotocol.android.v18.ThesisContext
 import java.io.IOException
 import java.security.MessageDigest
 import java.util.Locale
@@ -120,13 +121,19 @@ class BobbyRepository(context: Context) {
         return result
     }
 
-    /** Production sends NDJSON; JSON quota/refusal replies retain their real HTTP status and payload. */
-    suspend fun streamDebate(body: JSONObject, onEvent: suspend (JSONObject) -> Unit): JSONObject {
+    /**
+     * Production sends NDJSON; JSON quota/refusal replies retain their real HTTP status and payload.
+     * 1.8: a review the person started carries their own `thesis` (sent inside this one request, never
+     * stored by the server); a plain question never has the key, and its request is exactly as before.
+     * The reply may carry `memory` and, for a thesis, `review`: read them with `DeskAnswer(reply)`.
+     */
+    suspend fun streamDebate(body: JSONObject, thesis: ThesisContext? = null, onEvent: suspend (JSONObject) -> Unit): JSONObject {
         val question = body.optString("question").trim()
         if (BobbyParsers.questionLength(question) > BobbyParsers.MAX_QUESTION_CODE_POINTS) {
             throw ApiException(400, "question_too_long", JSONObject().put("code", "question_too_long").put("maxLength", 1200))
         }
         val requestBody = JSONObject(body.toString()).put("question", question)
+        if (thesis != null) requestBody.put("thesis", thesis.toJson())
         addLocale(requestBody)
         val owner = epoch.value
         val token = tokenForRequest(false)

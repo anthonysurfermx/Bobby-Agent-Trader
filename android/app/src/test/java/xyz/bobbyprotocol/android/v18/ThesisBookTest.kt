@@ -155,6 +155,55 @@ class ThesisBookTest {
         assertEquals("a deleted account's answer leaves with it", 0, book.pendingLocalCount("u1"))
     }
 
+    @Test fun idsAreLowercaseSoTheyCanTravelInANudgeId() {
+        val real = ThesisBook(MemoryKeyValueStore())
+        val saved = real.create(draft("NVDA"), null, t0)
+        assertEquals(saved.id, saved.id.lowercase())
+        assertEquals(36, saved.id.length)
+        assertEquals(saved.revisions.first().id, saved.revisions.first().id.lowercase())
+        assertTrue(NucleoNudge.ID_PATTERN.matches("theses.due." + saved.id.take(8)))
+    }
+
+    @Test fun adoptedThesesRespectTheAccountsOwnLimitsAndTheNewestTakesTheFreeSlot() {
+        book.create(draft("NVDA", why = "mine"), "u1", t0)
+        book.create(draft("BTC", why = "mine"), "u1", t0)
+        listOf("NVDA", "ETH", "SAP.DE").forEachIndexed { i, symbol -> book.create(draft(symbol, why = "guest"), null, t0 + i + 1) }
+        assertEquals(3, book.adoptLocal("u1", t0 + 60))
+        val active = book.active("u1")
+        assertEquals(ThesisBook.ACTIVE_LIMIT, active.size)
+        assertEquals("the account's own thesis on an asset stays the active one", listOf("mine"), active.filter { it.symbol == "NVDA" }.map { it.hypothesis })
+        assertEquals("the newest guest thesis took the free slot", setOf("NVDA", "BTC", "SAP.DE"), active.map { it.symbol }.toSet())
+        val archived = book.archived("u1")
+        assertEquals("the rest arrive archived, never dropped", setOf("NVDA", "ETH"), archived.map { it.symbol }.toSet())
+        assertTrue(archived.all { it.revisions.last().kind == ThesisRevision.Kind.ARCHIVED })
+    }
+
+    @Test fun deletingIsCompleteAndScopedToItsOwner() {
+        val mine = book.create(draft("NVDA"), "u1", t0)
+        book.create(draft("BTC"), "u1", t0)
+        book.create(draft("NVDA"), "u2", t0)
+        book.create(draft("ETH"), null, t0)
+        book.delete(mine.id, "u1")
+        assertEquals(listOf("BTC"), book.all("u1").map { it.symbol })
+        book.deleteAll("u1")
+        assertTrue(book.all("u1").isEmpty())
+        assertEquals("another account's theses are untouched", 1, book.all("u2").size)
+        assertEquals("the guest book is untouched", 1, book.all(null).size)
+        ThesisBook.forgetOwner("u2", store)
+        assertTrue("account deletion removes that account's book", book.all("u2").isEmpty())
+        assertNull("nothing of a deleted book remains in the store", store.getString(ThesisBook.key("u1")))
+        assertNull(store.getString(ThesisBook.key("u2")))
+        assertEquals(1, book.all(null).size)
+    }
+
+    @Test fun aThesisWrittenWithoutAPriceNeverSendsOneAsItsOrigin() {
+        val saved = book.create(draft("NVDA", price = null), null, t0)
+        val reviewed = book.recordReview(saved.id, null, 130.0, "2026-10-20T12:00:00Z", "wait", emptyList(), emptyList(), emptyList(), t0 + day)
+        assertNull("a review's price is today's price, not where the thesis started", reviewed.startingPoint)
+        assertFalse(ThesisContext(reviewed).toJson().has("priceAtSave"))
+        assertEquals(130.0, reviewed.lastReview?.price ?: 0.0, 0.0)
+    }
+
     @Test fun listenersHearEveryChangeWithTheOwnerThatChanged() {
         val heard = ArrayList<String>()
         val stop = book.addListener { heard.add(it) }

@@ -68,19 +68,30 @@ data class NudgeMoment(
  * [act] is the tap; the nudge is already retired when it runs.
  */
 class NudgeSource(
-    /** `credits`, `memory`, `theses`, `reminders`, `invite`. One source per key; registering again replaces it. */
+    /** `credits`, `memory`, `theses`, `reminders`, `invite`, `harness.move`, `harness.offer`. One source per key; registering again replaces it. */
     val key: String,
     /** Higher speaks first. */
     val priority: Int,
     val candidate: (NudgeMoment) -> NucleoNudge?,
+    /** The tap. A source captures its `V18Host` when it registers; the nudge is already retired when this runs. */
     val act: suspend (NucleoNudge) -> Unit,
 )
 
+/** Priorities of the nudge sources, in one place so two features never fight over the glass. */
 object NudgePriority {
+    /** Coming back to an asset they asked about (a tapped follow-up lands here): it is why they opened the app. */
+    const val FOLLOW_UP = 95
+    /** An invitation that is waiting for an account: it expires, so it speaks first. */
     const val INVITE = 90
+    /** The offer to come back tomorrow, after a read, until the person decides. */
+    const val FOLLOW_UP_OFFER = 80
+    /** The thesis a person just saved or came back to. */
     const val THESES = 70
+    /** The offer to remember, once, after a useful read. */
     const val MEMORY = 60
+    /** A reminder offer after a thesis exists. */
     const val REMINDERS = 50
+    /** Credits running low. */
     const val CREDITS = 40
 }
 

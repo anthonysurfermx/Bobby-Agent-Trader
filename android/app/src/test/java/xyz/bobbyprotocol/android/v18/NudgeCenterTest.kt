@@ -165,6 +165,120 @@ class NudgeCenterTest {
         assertNull(c.show())
     }
 
+    @Test fun theHighestPriorityEligibleSourceSpeaksAloneAndASilentOneNeverBlocksTheNext() {
+        val c = center()
+        c.register(source("credits", NudgePriority.CREDITS, "credits.one"))
+        c.register(source("invite", NudgePriority.INVITE, "invite.one"))
+        c.register(source("memory", NudgePriority.MEMORY, null))
+        assertEquals(listOf("invite", "memory", "credits"), c.sourceKeys)
+        assertEquals("invite.one", c.show()?.id)
+        c.retire("invite.one")
+        assertEquals("a silent source never blocks the next one", "credits.one", c.show()?.id)
+    }
+
+    @Test fun etiquetteSurvivesARelaunch() {
+        val first = center()
+        first.register(source("memory", NudgePriority.MEMORY, "memory.one"))
+        first.show()
+        first.seen("memory.one")
+        clock += 60 * minute
+        first.show()
+        first.seen("memory.one")
+        clock += 11 * minute
+        val relaunched = center()
+        relaunched.register(source("memory", NudgePriority.MEMORY, "memory.one"))
+        assertEquals(2, relaunched.showings("memory.one"))
+        assertNull("two unanswered showings rest across a relaunch too", relaunched.show())
+        assertEquals("a stale page drawing it while it rests is not a showing", 2, relaunched.seen("memory.one"))
+    }
+
+    @Test fun theQuietAfterATapSurvivesARelaunchAndAnAccountChange() = runTest {
+        val first = center()
+        first.register(source("theses", NudgePriority.THESES, "theses.one"))
+        first.register(source("credits", NudgePriority.CREDITS, "credits.one"))
+        first.show()
+        assertEquals("done", first.act("theses.one"))
+        val relaunched = center()
+        relaunched.register(source("credits", NudgePriority.CREDITS, "credits.one"))
+        clock += minute
+        assertNull("a relaunch does not open the floor to the next nudge", relaunched.show())
+        relaunched.owner = "someone-else"
+        relaunched.forgetMoment()
+        assertNull("nor does an account change", relaunched.show())
+        clock += 15 * minute
+        assertEquals("credits.one", relaunched.show()?.id)
+    }
+
+    @Test fun retiredNudgesStayRetiredHoweverOldWhileUnansweredOnesAreForgotten() {
+        val c = center()
+        c.register(source("credits", NudgePriority.CREDITS, "credits.one"))
+        c.register(source("memory", NudgePriority.MEMORY, "memory.one"))
+        c.show()
+        c.seen("memory.one")
+        c.retire("credits.one")
+        clock += 400 * day
+        c.retire("something.else") // any later write prunes the store
+        assertTrue("never again survives pruning", c.isRetired("credits.one"))
+        assertEquals("an unanswered nudge from over half a year ago starts over", 0, c.showings("memory.one"))
+    }
+
+    @Test fun anIdTheCentreNeverHandedOutIsGoneAndRunsNothing() = runTest {
+        val acted = ArrayList<String>()
+        val c = center()
+        c.register(source("credits", NudgePriority.CREDITS, "credits.one", acted))
+        assertEquals("a real id that was never served cannot trigger its source", "gone", c.act("credits.one"))
+        assertTrue(acted.isEmpty())
+        assertFalse(c.isRetired("credits.one"))
+    }
+
+    @Test fun aNudgeServedEarlierButNoLongerOnScreenCannotBeTapped() = runTest {
+        val acted = ArrayList<String>()
+        val c = center()
+        var thesesSpeak = false
+        c.register(NudgeSource("theses", NudgePriority.THESES, { if (thesesSpeak) NucleoNudge("theses.one", "A line", "Open") else null }, { acted.add(it.id) }))
+        c.register(source("credits", NudgePriority.CREDITS, "credits.one", acted))
+        assertEquals("credits.one", c.show()?.id)
+        thesesSpeak = true
+        assertEquals("theses.one", c.show()?.id)
+        assertEquals("replaced on the glass: the old one cannot be tapped", "gone", c.act("credits.one"))
+        assertTrue(acted.isEmpty())
+        assertEquals("done", c.act("theses.one"))
+        assertEquals(listOf("theses.one"), acted)
+    }
+
+    @Test fun sourcesSeeTheLastReadAndTheSaveButNeverAQuestion() {
+        val c = center()
+        var seen: NudgeMoment? = null
+        c.register(NudgeSource("theses", NudgePriority.THESES, { moment -> seen = moment; if (moment.lastRead?.saved == true) NucleoNudge("theses.one", "A line", "Open") else null }, {}))
+        assertNull(c.show())
+        c.noteRead(NudgeRead("r1", "NVDA", "NVIDIA", true, "wait", false, clock))
+        assertNull(c.show())
+        assertEquals(1, seen?.readsThisLaunch)
+        assertEquals(true, seen?.signedIn)
+        assertEquals(clock, seen?.nowMillis)
+        c.noteSaved("other")
+        assertNull("another read's save does not mark this one", c.show())
+        c.noteSaved("r1")
+        assertEquals("theses.one", c.show()?.id)
+        c.forgetMoment()
+        assertNull("a new account starts with no read to talk about", c.show())
+        assertEquals(0, c.readsThisLaunch)
+        assertFalse("what a source may look at has no room for a question", NudgeRead::class.java.declaredFields.any { it.name.contains("question", ignoreCase = true) })
+    }
+
+    @Test fun theFeatureSourcesRegisterThroughOneEntryPointAndNeverShareAPriority() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        V18.registerNudges(bench.host)
+        // A placeholder registers nothing; a landed feature registers exactly its own keys (the harness
+        // has two voices: coming back to an asset, and the offer to do so).
+        val known = setOf("invite", "memory", "theses", "reminders", "credits", "harness.move", "harness.offer")
+        assertTrue(bench.nudges.sourceKeys.toString(), known.containsAll(bench.nudges.sourceKeys))
+        val priorities = listOf(NudgePriority.FOLLOW_UP, NudgePriority.INVITE, NudgePriority.FOLLOW_UP_OFFER, NudgePriority.THESES,
+                                NudgePriority.MEMORY, NudgePriority.REMINDERS, NudgePriority.CREDITS)
+        assertEquals("two features never share a priority", 7, priorities.toSet().size)
+        assertEquals("coming back to what they asked about speaks first, credits last", listOf(95, 90, 80, 70, 60, 50, 40), priorities)
+    }
+
     @Test fun theNudgeTravelsAsThreeStrings() {
         val json = NucleoNudge("Theses.Write.ABC", "Why are you looking at NVDA?", "Write my thesis").toJson()
         assertEquals("theses.write.abc", json.getString("id"))

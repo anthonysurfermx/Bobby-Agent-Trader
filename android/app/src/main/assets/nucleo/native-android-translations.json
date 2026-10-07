@@ -1,59 +1,125 @@
 {
-  "Squad": {
-    "fr": "Équipe",
-    "pt": "Equipa",
-    "it": "Squadra",
-    "de": "Team"
+  "1 credit = 1 read": {
+    "fr": "1 crédit = 1 analyse",
+    "pt": "1 crédito = 1 análise",
+    "it": "1 credito = 1 analisi",
+    "de": "1 Credit = 1 Analyse"
   },
-  "Sign-in is unavailable. Try again.": {
-    "fr": "La connexion est indisponible. Réessaie.",
-    "pt": "Não foi possível iniciar sessão. Tenta novamente.",
-    "it": "L'accesso non è disponibile. Riprova.",
-    "de": "Die Anmeldung ist nicht verfügbar. Versuche es erneut."
+  "1 day ago": {
+    "fr": "il y a 1 jour",
+    "pt": "há 1 dia",
+    "it": "1 giorno fa",
+    "de": "vor 1 Tag"
   },
-  "Sign-in did not complete.": {
-    "fr": "La connexion n'a pas abouti.",
-    "pt": "O início de sessão não foi concluído.",
-    "it": "L'accesso non è stato completato.",
-    "de": "Die Anmeldung wurde nicht abgeschlossen."
+  "1 gifted": {
+    "fr": "1 offerte",
+    "pt": "1 oferecida",
+    "it": "1 in regalo",
+    "de": "1 geschenkt"
   },
-  "Share": {
-    "en": "Share",
-    "es": "Compartir",
-    "fr": "Partager",
-    "pt": "Partilhar",
-    "it": "Condividi",
-    "de": "Teilen"
+  "1 guest thesis": {
+    "fr": "1 thèse sans compte",
+    "pt": "1 tese sem conta",
+    "it": "1 tesi senza account",
+    "de": "1 These ohne Konto"
   },
-  "Sign in to continue.": {
-    "fr": "Connecte-toi pour continuer.",
-    "pt": "Inicia sessão para continuar.",
-    "it": "Accedi per continuare.",
-    "de": "Melde dich an, um fortzufahren."
+  "1 month": {
+    "fr": "1 mois",
+    "pt": "1 mês",
+    "it": "1 mese",
+    "de": "1 Monat"
   },
-  "Bobby Pro is required for this feature.": {
-    "fr": "Bobby Pro est requis pour cette fonction.",
-    "pt": "Precisas do Bobby Pro para esta função.",
-    "it": "Per questa funzione serve Bobby Pro.",
-    "de": "Für diese Funktion brauchst du Bobby Pro."
+  "1 read left this week": {
+    "fr": "Il te reste 1 analyse cette semaine",
+    "pt": "Resta-te 1 análise esta semana",
+    "it": "Ti resta 1 analisi questa settimana",
+    "de": "Noch 1 Analyse diese Woche"
   },
-  "Your account changed. Refresh and try again.": {
-    "fr": "Ton compte a changé. Actualise et réessaie.",
-    "pt": "A tua conta mudou. Atualiza e tenta novamente.",
-    "it": "Il tuo account è cambiato. Aggiorna e riprova.",
-    "de": "Dein Konto hat sich geändert. Aktualisiere und versuche es erneut."
+  "1 week": {
+    "fr": "1 semaine",
+    "pt": "1 semana",
+    "it": "1 settimana",
+    "de": "1 Woche"
   },
-  "Could not load or save this information. Try again.": {
-    "fr": "Impossible de charger ou d'enregistrer ces informations. Réessaie.",
-    "pt": "Não foi possível carregar ou guardar esta informação. Tenta novamente.",
-    "it": "Impossibile caricare o salvare queste informazioni. Riprova.",
-    "de": "Diese Informationen konnten nicht geladen oder gespeichert werden. Versuche es erneut."
+  "3 active theses. Archive one first.": {
+    "fr": "3 thèses actives. Archive-en une d'abord.",
+    "pt": "3 teses ativas. Arquiva uma primeiro.",
+    "it": "3 tesi attive. Archiviane una prima.",
+    "de": "3 aktive Thesen. Archiviere zuerst eine."
   },
-  "This information is unavailable. Try again.": {
-    "fr": "Ces informations sont indisponibles. Réessaie.",
-    "pt": "Esta informação não está disponível. Tenta novamente.",
-    "it": "Queste informazioni non sono disponibili. Riprova.",
-    "de": "Diese Informationen sind nicht verfügbar. Versuche es erneut."
+  "3 days": {
+    "fr": "3 jours",
+    "pt": "3 dias",
+    "it": "3 giorni",
+    "de": "3 Tage"
+  },
+  "A card with your companion, level and gear": {
+    "en": "A card with your companion, level and gear",
+    "es": "Una tarjeta con tu compañero, nivel y equipo",
+    "fr": "Une carte avec ton compagnon, ton niveau et ton équipement",
+    "pt": "Um cartão com o teu companheiro, nível e equipamento",
+    "it": "Una scheda con il tuo compagno, livello ed equipaggiamento",
+    "de": "Eine Karte mit deinem Begleiter, deiner Stufe und Ausrüstung"
+  },
+  "A few months": {
+    "fr": "Quelques mois",
+    "pt": "Alguns meses",
+    "it": "Qualche mese",
+    "de": "Ein paar Monate"
+  },
+  "A few weeks": {
+    "fr": "Quelques semaines",
+    "pt": "Algumas semanas",
+    "it": "Qualche settimana",
+    "de": "Ein paar Wochen"
+  },
+  "A friend invited you to Bobby": {
+    "fr": "Un ami t'a invité sur Bobby",
+    "pt": "Um amigo convidou-te para o Bobby",
+    "it": "Un amico ti ha invitato su Bobby",
+    "de": "Ein Freund hat dich zu Bobby eingeladen"
+  },
+  "A gift from Bobby.": {
+    "fr": "Un cadeau de Bobby.",
+    "pt": "Uma oferta do Bobby.",
+    "it": "Un regalo di Bobby.",
+    "de": "Ein Geschenk von Bobby."
+  },
+  "AI tokens": {
+    "fr": "Tokens IA",
+    "pt": "Tokens de IA",
+    "it": "Token IA",
+    "de": "KI-Token"
+  },
+  "About a year": {
+    "fr": "Environ un an",
+    "pt": "Cerca de um ano",
+    "it": "Circa un anno",
+    "de": "Etwa ein Jahr"
+  },
+  "Accept": {
+    "fr": "Accepter",
+    "pt": "Aceitar",
+    "it": "Accetta",
+    "de": "Annehmen"
+  },
+  "Accept invitation": {
+    "fr": "Accepter l'invitation",
+    "pt": "Aceitar convite",
+    "it": "Accetta invito",
+    "de": "Einladung annehmen"
+  },
+  "Accept rules and publish": {
+    "fr": "Accepter les règles et publier",
+    "pt": "Aceitar regras e publicar",
+    "it": "Accetta le regole e pubblica",
+    "de": "Regeln akzeptieren und veröffentlichen"
+  },
+  "Accept the risk notice before opening Trader Land.": {
+    "fr": "Accepte l'avis de risque avant d'ouvrir Trader Land.",
+    "pt": "Aceita o aviso de risco antes de abrir o Trader Land.",
+    "it": "Accetta l'avviso sui rischi prima di aprire Trader Land.",
+    "de": "Akzeptiere den Risikohinweis, bevor du Trader Land öffnest."
   },
   "Accept the risk notice before using Bobby.": {
     "fr": "Accepte l'avis de risque avant d'utiliser Bobby.",
@@ -61,155 +127,31 @@
     "it": "Accetta l'avviso sui rischi prima di usare Bobby.",
     "de": "Akzeptiere den Risikohinweis, bevor du Bobby nutzt."
   },
-  "Your Bobby": {
-    "fr": "Ton Bobby",
-    "pt": "O teu Bobby",
-    "it": "Il tuo Bobby",
-    "de": "Dein Bobby"
+  "Accept the risk notice first.": {
+    "fr": "Accepte d'abord l'avis de risque.",
+    "pt": "Aceita primeiro o aviso de risco.",
+    "it": "Accetta prima l'avviso sui rischi.",
+    "de": "Akzeptiere zuerst den Risikohinweis."
   },
-  "Sign in to sync your progress across devices.": {
-    "fr": "Connecte-toi pour synchroniser ta progression entre tes appareils.",
-    "pt": "Inicia sessão para sincronizar o progresso entre dispositivos.",
-    "it": "Accedi per sincronizzare i progressi tra i dispositivi.",
-    "de": "Melde dich an, um deinen Fortschritt zwischen Geräten zu synchronisieren."
+  "Account": {
+    "en": "Account",
+    "es": "Cuenta",
+    "fr": "Compte",
+    "pt": "Conta",
+    "it": "Account",
+    "de": "Konto"
   },
-  "Continue with Google": {
-    "en": "Continue with Google",
-    "es": "Continuar con Google",
-    "fr": "Continuer avec Google",
-    "pt": "Continuar com Google",
-    "it": "Continua con Google",
-    "de": "Mit Google fortfahren"
+  "Account changed. Reopen your theses.": {
+    "fr": "Compte modifié. Rouvre tes thèses.",
+    "pt": "A conta mudou. Abre as tuas teses de novo.",
+    "it": "Account cambiato. Riapri le tue tesi.",
+    "de": "Konto gewechselt. Öffne deine Thesen erneut."
   },
-  "Continue with Apple": {
-    "en": "Continue with Apple",
-    "es": "Continuar con Apple",
-    "fr": "Continuer avec Apple",
-    "pt": "Continuar com Apple",
-    "it": "Continua con Apple",
-    "de": "Mit Apple fortfahren"
-  },
-  "Sign-in will be available in a configured build.": {
-    "fr": "La connexion sera disponible dans une version configurée.",
-    "pt": "O início de sessão estará disponível numa versão configurada.",
-    "it": "L'accesso sarà disponibile in una versione configurata.",
-    "de": "Die Anmeldung wird in einer konfigurierten App-Version verfügbar sein."
-  },
-  "Bobby account": {
-    "fr": "Compte Bobby",
-    "pt": "Conta Bobby",
-    "it": "Account Bobby",
-    "de": "Bobby-Konto"
-  },
-  "Market briefings": {
-    "en": "Market briefings",
-    "es": "Informes de mercado",
-    "fr": "Rapports de marché",
-    "pt": "Relatórios de mercado",
-    "it": "Rapporti di mercato",
-    "de": "Marktberichte"
-  },
-  "Briefing settings": {
-    "en": "Briefing settings",
-    "es": "Configuración de informes",
-    "fr": "Réglages des rapports",
-    "pt": "Definições dos relatórios",
-    "it": "Impostazioni dei rapporti",
-    "de": "Berichtseinstellungen"
-  },
-  "Sync progress": {
-    "fr": "Synchroniser la progression",
-    "pt": "Sincronizar progresso",
-    "it": "Sincronizza progressi",
-    "de": "Fortschritt synchronisieren"
-  },
-  "Redeem a code": {
-    "en": "Redeem a code",
-    "es": "Canjear un código",
-    "fr": "Utiliser un code",
-    "pt": "Resgatar um código",
-    "it": "Riscatta un codice",
-    "de": "Code einlösen"
-  },
-  "Device language": {
-    "en": "Device language",
-    "es": "Idioma del dispositivo",
-    "fr": "Langue de ton appareil",
-    "pt": "Idioma do teu dispositivo",
-    "it": "Lingua del dispositivo",
-    "de": "Gerätesprache"
-  },
-  "Voice": {
-    "fr": "Voix",
-    "pt": "Voz",
-    "it": "Voce",
-    "de": "Stimme"
-  },
-  "Privacy policy": {
-    "en": "Privacy policy",
-    "es": "Política de privacidad",
-    "fr": "Politique de confidentialité",
-    "pt": "Política de privacidade",
-    "it": "Informativa sulla privacy",
-    "de": "Datenschutzrichtlinie"
-  },
-  "Help": {
-    "fr": "Aide",
-    "pt": "Ajuda",
-    "it": "Aiuto",
-    "de": "Hilfe"
-  },
-  "Your three-agent market desk.": {
-    "fr": "Ton espace d'analyse du marché avec trois agents.",
-    "pt": "A tua mesa de análise do mercado com três agentes.",
-    "it": "Il tuo spazio di analisi del mercato con tre agenti.",
-    "de": "Dein Bereich für Marktanalysen mit drei Agenten."
-  },
-  "Read every plan, period and introductory offer below before subscribing.": {
-    "fr": "Lis chaque formule, période et offre de découverte ci-dessous avant de t'abonner.",
-    "pt": "Revê cada plano, período e oferta introdutória abaixo antes de subscrever.",
-    "it": "Leggi ogni piano, periodo e offerta introduttiva qui sotto prima di abbonarti.",
-    "de": "Lies vor dem Abonnieren alle unten aufgeführten Tarife, Laufzeiten und Einstiegsangebote."
-  },
-  "Sign in": {
-    "fr": "Se connecter",
-    "pt": "Iniciar sessão",
-    "it": "Accedi",
-    "de": "Anmelden"
-  },
-  "Plans are currently unavailable.": {
-    "fr": "Les formules sont actuellement indisponibles.",
-    "pt": "Os planos não estão disponíveis neste momento.",
-    "it": "I piani non sono disponibili al momento.",
-    "de": "Tarife sind derzeit nicht verfügbar."
-  },
-  "Restore purchases": {
-    "en": "Restore purchases",
-    "es": "Restaurar compras",
-    "fr": "Restaurer les achats",
-    "pt": "Restaurar compras",
-    "it": "Ripristina acquisti",
-    "de": "Käufe wiederherstellen"
-  },
-  "Subscriptions renew automatically unless cancelled through your store. Access is confirmed by Bobby after purchase.": {
-    "fr": "Les abonnements se renouvellent automatiquement sauf annulation dans ta boutique. Bobby confirme l'accès après l'achat.",
-    "pt": "As subscrições renovam-se automaticamente, salvo cancelamento na tua loja. O Bobby confirma o acesso após a compra.",
-    "it": "Gli abbonamenti si rinnovano automaticamente salvo annullamento nel tuo store. Bobby conferma l'accesso dopo l'acquisto.",
-    "de": "Abonnements verlängern sich automatisch, sofern du sie nicht über deinen Store kündigst. Bobby bestätigt den Zugang nach dem Kauf."
-  },
-  "Google Play terms": {
-    "fr": "Conditions de Google Play",
-    "pt": "Termos do Google Play",
-    "it": "Termini di Google Play",
-    "de": "Google Play-Nutzungsbedingungen"
-  },
-  "Level": {
-    "en": "Level",
-    "es": "Nivel",
-    "fr": "Niveau",
-    "pt": "Nível",
-    "it": "Livello",
-    "de": "Stufe"
+  "Account deleted": {
+    "fr": "Compte supprimé",
+    "pt": "Conta eliminada",
+    "it": "Account eliminato",
+    "de": "Konto gelöscht"
   },
   "Account memory": {
     "fr": "Mémoire du compte",
@@ -217,71 +159,35 @@
     "it": "Memoria dell'account",
     "de": "Kontogedächtnis"
   },
-  "Remember questions from this device": {
-    "fr": "Mémoriser les questions de cet appareil",
-    "pt": "Guardar perguntas deste dispositivo",
-    "it": "Ricorda le domande di questo dispositivo",
-    "de": "Fragen von diesem Gerät speichern"
+  "Active": {
+    "fr": "Actif",
+    "pt": "Ativo",
+    "it": "Attivo",
+    "de": "Aktiv"
   },
-  "This device only contributes questions when you enable it here.": {
-    "fr": "Cet appareil ne contribue des questions que si tu l'actives ici.",
-    "pt": "Este dispositivo só contribui com perguntas quando o ativares aqui.",
-    "it": "Questo dispositivo contribuisce con le domande solo quando lo abiliti qui.",
-    "de": "Dieses Gerät trägt nur Fragen bei, wenn du das hier aktivierst."
+  "Active until {0}": {
+    "fr": "Actif jusqu'au {0}",
+    "pt": "Ativo até {0}",
+    "it": "Attivo fino al {0}",
+    "de": "Aktiv bis {0}"
   },
-  "Clear preference": {
-    "fr": "Effacer la préférence",
-    "pt": "Apagar preferência",
-    "it": "Cancella preferenza",
-    "de": "Präferenz löschen"
+  "Active · ends {0}": {
+    "fr": "Actif · se termine le {0}",
+    "pt": "Ativo · termina a {0}",
+    "it": "Attivo · termina il {0}",
+    "de": "Aktiv · endet am {0}"
   },
-  "Delete all memory": {
-    "fr": "Supprimer toute la mémoire",
-    "pt": "Apagar toda a memória",
-    "it": "Elimina tutta la memoria",
-    "de": "Gesamtes Gedächtnis löschen"
+  "Active · renews {0}": {
+    "fr": "Actif · renouvellement le {0}",
+    "pt": "Ativo · renova a {0}",
+    "it": "Attivo · si rinnova il {0}",
+    "de": "Aktiv · verlängert sich am {0}"
   },
-  "Stop audio": {
-    "fr": "Arrêter l'audio",
-    "pt": "Parar áudio",
-    "it": "Interrompi audio",
-    "de": "Audio stoppen"
-  },
-  "Listen": {
-    "fr": "Écouter",
-    "pt": "Ouvir",
-    "it": "Ascolta",
-    "de": "Anhören"
-  },
-  "Audio is unavailable. Your report is ready to read.": {
-    "fr": "L'audio est indisponible. Tu peux lire ton rapport.",
-    "pt": "O áudio não está disponível. Podes ler o relatório.",
-    "it": "L'audio non è disponibile. Puoi leggere il rapporto.",
-    "de": "Audio ist nicht verfügbar. Dein Bericht ist zum Lesen bereit."
-  },
-  "Back to inbox": {
-    "fr": "Retour à la boîte de réception",
-    "pt": "Voltar à caixa de entrada",
-    "it": "Torna alla posta in arrivo",
-    "de": "Zurück zum Posteingang"
-  },
-  "No reports are ready yet.": {
-    "fr": "Aucun rapport n'est encore disponible.",
-    "pt": "Ainda não há relatórios disponíveis.",
-    "it": "Non ci sono ancora rapporti disponibili.",
-    "de": "Es sind noch keine Berichte verfügbar."
-  },
-  "Load more": {
-    "fr": "Charger plus",
-    "pt": "Carregar mais",
-    "it": "Carica altri",
-    "de": "Mehr laden"
-  },
-  "Configure your briefing consent and selected assets before enabling delivery.": {
-    "fr": "Configure ton consentement et les actifs choisis avant d'activer l'envoi des rapports.",
-    "pt": "Configura o consentimento dos relatórios e os ativos selecionados antes de ativar a entrega.",
-    "it": "Configura il consenso ai rapporti e gli asset selezionati prima di attivare la consegna.",
-    "de": "Lege deine Einwilligung und die ausgewählten Vermögenswerte fest, bevor du die Zustellung aktivierst."
+  "Add detail": {
+    "fr": "Ajouter un détail",
+    "pt": "Adicionar detalhe",
+    "it": "Aggiungi dettagli",
+    "de": "Details hinzufügen"
   },
   "Allow AI analysis for briefings": {
     "fr": "Autoriser l'analyse par IA des rapports",
@@ -295,11 +201,11 @@
     "it": "Consenti l'audio per i rapporti",
     "de": "Audio für Berichte erlauben"
   },
-  "Notify me when reports are ready": {
-    "fr": "Me prévenir lorsque des rapports sont disponibles",
-    "pt": "Avisar-me quando houver relatórios disponíveis",
-    "it": "Avvisami quando i rapporti sono pronti",
-    "de": "Benachrichtige mich, wenn Berichte bereit sind"
+  "Analysis level": {
+    "fr": "Niveau d'analyse",
+    "pt": "Nível de análise",
+    "it": "Livello di analisi",
+    "de": "Analysestufe"
   },
   "Android checks for ready reports in the background. Delivery time depends on your device settings.": {
     "fr": "Android recherche les rapports disponibles en arrière-plan. L'heure de livraison dépend des réglages de ton appareil.",
@@ -307,35 +213,85 @@
     "it": "Android controlla in background se ci sono rapporti pronti. L'orario di consegna dipende dalle impostazioni del dispositivo.",
     "de": "Android prüft im Hintergrund, ob Berichte bereit sind. Der Zustellzeitpunkt hängt von deinen Geräteeinstellungen ab."
   },
+  "Apple instructions": {
+    "fr": "Instructions d’Apple",
+    "pt": "Instruções da Apple",
+    "it": "Istruzioni di Apple",
+    "de": "Apples Anleitung"
+  },
+  "Apple sign-in access requires a separate manual step. After Bobby confirms deletion, follow Apple's instructions to stop using Sign in with Apple for Bobby.": {
+    "fr": "L’accès via Apple nécessite une étape manuelle supplémentaire. Une fois la suppression confirmée par Bobby, suis les instructions d’Apple pour ne plus utiliser Se connecter avec Apple pour Bobby.",
+    "pt": "O acesso através da Apple requer um passo manual adicional. Depois de o Bobby confirmar a eliminação, segue as instruções da Apple para deixar de usar Iniciar sessão com Apple para o Bobby.",
+    "it": "L’accesso tramite Apple richiede un passaggio manuale aggiuntivo. Dopo che Bobby conferma l’eliminazione, segui le istruzioni di Apple per smettere di usare Accedi con Apple per Bobby.",
+    "de": "Der Zugriff über Apple erfordert einen zusätzlichen manuellen Schritt. Nachdem Bobby die Löschung bestätigt hat, folge Apples Anleitung, um Mit Apple anmelden für Bobby nicht mehr zu verwenden."
+  },
+  "Apply": {
+    "fr": "Appliquer",
+    "pt": "Aplicar",
+    "it": "Applica",
+    "de": "Anwenden"
+  },
+  "Applying…": {
+    "fr": "Vérification…",
+    "pt": "A aplicar…",
+    "it": "Verifica in corso…",
+    "de": "Wird angewendet…"
+  },
+  "Archive": {
+    "fr": "Archiver",
+    "pt": "Arquivar",
+    "it": "Archivia",
+    "de": "Archivieren"
+  },
+  "Archive {0}": {
+    "fr": "Archiver {0}",
+    "pt": "Arquivar {0}",
+    "it": "Archivia {0}",
+    "de": "{0} archivieren"
+  },
+  "Archived": {
+    "fr": "Archivées",
+    "pt": "Arquivadas",
+    "it": "Archiviate",
+    "de": "Archiviert"
+  },
+  "Ask about an asset first.": {
+    "fr": "Pose d'abord une question sur un actif.",
+    "pt": "Pergunta primeiro por um ativo.",
+    "it": "Chiedi prima di un asset.",
+    "de": "Frag zuerst nach einem Wert."
+  },
+  "Asset · date · stated time frame · price that day": {
+    "fr": "Actif · date · horizon indiqué · prix ce jour-là",
+    "pt": "Ativo · data · prazo indicado · preço nesse dia",
+    "it": "Asset · data · orizzonte indicato · prezzo di quel giorno",
+    "de": "Wert · Datum · genannter Zeitraum · Kurs an diesem Tag"
+  },
   "Assets (comma separated)": {
     "fr": "Actifs (séparés par des virgules)",
     "pt": "Ativos (separados por vírgulas)",
     "it": "Asset (separati da virgole)",
     "de": "Vermögenswerte (durch Kommas getrennt)"
   },
-  "Save": {
-    "fr": "Enregistrer",
-    "pt": "Guardar",
-    "it": "Salva",
-    "de": "Speichern"
+  "Assets (up to six, comma separated)": {
+    "fr": "Actifs (six maximum, séparés par des virgules)",
+    "pt": "Ativos (até seis, separados por vírgulas)",
+    "it": "Asset (massimo sei, separati da virgole)",
+    "de": "Assets (bis zu sechs, durch Kommas getrennt)"
   },
-  "Redeem a Bobby code for the benefits confirmed by your account.": {
-    "fr": "Utilise un code Bobby pour obtenir les avantages confirmés par ton compte.",
-    "pt": "Resgata um código Bobby para obter os benefícios confirmados pela tua conta.",
-    "it": "Riscatta un codice Bobby per i benefici confermati dal tuo account.",
-    "de": "Löse einen Bobby-Code für die von deinem Konto bestätigten Vorteile ein."
+  "Audio is unavailable. Your report is ready to read.": {
+    "fr": "L'audio est indisponible. Tu peux lire ton rapport.",
+    "pt": "O áudio não está disponível. Podes ler o relatório.",
+    "it": "L'audio non è disponibile. Puoi leggere il rapporto.",
+    "de": "Audio ist nicht verfügbar. Dein Bericht ist zum Lesen bereit."
   },
-  "Code": {
-    "fr": "Code",
-    "pt": "Código",
-    "it": "Codice",
-    "de": "Code"
-  },
-  "Redeem": {
-    "fr": "Utiliser",
-    "pt": "Resgatar",
-    "it": "Riscatta",
-    "de": "Einlösen"
+  "Aura": {
+    "en": "Aura",
+    "es": "Aura",
+    "fr": "Aura",
+    "pt": "Aura",
+    "it": "Aura",
+    "de": "Aura"
   },
   "Available reads": {
     "fr": "Lectures disponibles",
@@ -343,47 +299,335 @@
     "it": "Analisi disponibili",
     "de": "Verfügbare Analysen"
   },
-  "friends joined": {
-    "fr": "amis inscrits",
-    "pt": "amigos aderiram",
-    "it": "amici iscritti",
-    "de": "Freunde sind beigetreten"
+  "Awaiting Google Play confirmation.": {
+    "fr": "En attente de confirmation de Google Play.",
+    "pt": "A aguardar confirmação do Google Play.",
+    "it": "In attesa di conferma di Google Play.",
+    "de": "Bestätigung von Google Play steht aus."
   },
-  "days of Pro per eligible invitation": {
-    "fr": "jours de Pro par invitation admissible",
-    "pt": "dias de Pro por convite elegível",
-    "it": "giorni di Pro per invito idoneo",
-    "de": "Pro-Tage pro berechtigter Einladung"
+  "Awards waiting to sync": {
+    "en": "Awards waiting to sync",
+    "es": "Premios por sincronizar",
+    "fr": "Récompenses à synchroniser",
+    "pt": "Prémios por sincronizar",
+    "it": "Premi da sincronizzare",
+    "de": "Auszeichnungen warten auf Synchronisierung"
   },
-  "Share invite": {
-    "fr": "Partager l'invitation",
-    "pt": "Partilhar convite",
-    "it": "Condividi invito",
-    "de": "Einladung teilen"
+  "Back to inbox": {
+    "fr": "Retour à la boîte de réception",
+    "pt": "Voltar à caixa de entrada",
+    "it": "Torna alla posta in arrivo",
+    "de": "Zurück zum Posteingang"
   },
-  "Joined": {
-    "fr": "Inscrit",
-    "pt": "Aderiu",
-    "it": "Iscritto",
-    "de": "Beigetreten"
+  "Back to my words": {
+    "fr": "Revenir à mes mots",
+    "pt": "Voltar às minhas palavras",
+    "it": "Torna alle mie parole",
+    "de": "Zurück zu meinen Worten"
   },
-  "Invitations are currently unavailable.": {
-    "fr": "Les invitations sont actuellement indisponibles.",
-    "pt": "Os convites não estão disponíveis neste momento.",
-    "it": "Gli inviti non sono disponibili al momento.",
-    "de": "Einladungen sind derzeit nicht verfügbar."
+  "Back to neighbors": {
+    "fr": "Retour aux voisins",
+    "pt": "Voltar aos vizinhos",
+    "it": "Torna ai vicini",
+    "de": "Zurück zu den Nachbarn"
   },
-  "Friend's invitation code": {
-    "fr": "Code d'invitation d'un ami",
-    "pt": "Código de convite de um amigo",
-    "it": "Codice d'invito di un amico",
-    "de": "Einladungscode eines Freundes"
+  "Balance unavailable.": {
+    "fr": "Solde indisponible.",
+    "pt": "Saldo indisponível.",
+    "it": "Saldo non disponibile.",
+    "de": "Guthaben nicht verfügbar."
   },
-  "Accept invitation": {
-    "fr": "Accepter l'invitation",
-    "pt": "Aceitar convite",
-    "it": "Accetta invito",
-    "de": "Einladung annehmen"
+  "Big tech": {
+    "fr": "Géants de la tech",
+    "pt": "Grandes tecnológicas",
+    "it": "Big tech",
+    "de": "Big Tech"
+  },
+  "Bitcoin and Ethereum": {
+    "fr": "Bitcoin et Ethereum",
+    "pt": "Bitcoin e Ethereum",
+    "it": "Bitcoin ed Ethereum",
+    "de": "Bitcoin und Ethereum"
+  },
+  "Blocking hides this creator on this device, even if the island is renamed. You can unblock them here.": {
+    "fr": "Le blocage masque ce créateur sur cet appareil, même si l'île change de nom. Tu peux le débloquer ici.",
+    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Podes desbloqueá-lo aqui.",
+    "it": "Il blocco nasconde questo creatore su questo dispositivo, anche se l'isola cambia nome. Puoi sbloccarlo qui.",
+    "de": "Blockieren blendet diesen Ersteller auf diesem Gerät aus, auch wenn die Insel umbenannt wird. Du kannst die Blockierung hier aufheben."
+  },
+  "Bobby Pro active": {
+    "fr": "Bobby Pro actif",
+    "pt": "Bobby Pro ativo",
+    "it": "Bobby Pro attivo",
+    "de": "Bobby Pro aktiv"
+  },
+  "Bobby Pro is active.": {
+    "fr": "Bobby Pro est actif.",
+    "pt": "O Bobby Pro está ativo.",
+    "it": "Bobby Pro è attivo.",
+    "de": "Bobby Pro ist aktiv."
+  },
+  "Bobby Pro is required for this feature.": {
+    "fr": "Bobby Pro est requis pour cette fonction.",
+    "pt": "Precisas do Bobby Pro para esta função.",
+    "it": "Per questa funzione serve Bobby Pro.",
+    "de": "Für diese Funktion brauchst du Bobby Pro."
+  },
+  "Bobby Pro remains active. No additional Google Play purchase found.": {
+    "fr": "Bobby Pro reste actif. Aucun autre achat Google Play trouvé.",
+    "pt": "O Bobby Pro continua ativo. Sem outra compra do Google Play.",
+    "it": "Bobby Pro resta attivo. Nessun altro acquisto Google Play trovato.",
+    "de": "Bobby Pro bleibt aktiv. Kein weiterer Google Play-Kauf gefunden."
+  },
+  "Bobby Pro until {0}": {
+    "fr": "Bobby Pro jusqu'au {0}",
+    "pt": "Bobby Pro até {0}",
+    "it": "Bobby Pro fino al {0}",
+    "de": "Bobby Pro bis {0}"
+  },
+  "Bobby account": {
+    "fr": "Compte Bobby",
+    "pt": "Conta Bobby",
+    "it": "Account Bobby",
+    "de": "Bobby-Konto"
+  },
+  "Bobby comes back to what you asked.": {
+    "fr": "Bobby revient sur ce que tu as demandé.",
+    "pt": "O Bobby volta ao que perguntaste.",
+    "it": "Bobby torna su ciò che hai chiesto.",
+    "de": "Bobby kommt auf deine Fragen zurück."
+  },
+  "Bobby confirms your access after purchase.": {
+    "fr": "Bobby confirme votre accès après l’achat.",
+    "pt": "O Bobby confirma o teu acesso após a compra.",
+    "it": "Bobby conferma il tuo accesso dopo l’acquisto.",
+    "de": "Bobby bestätigt deinen Zugang nach dem Kauf."
+  },
+  "Bobby could not check that code right now. It is saved and will be tried again.": {
+    "fr": "Bobby n'a pas pu vérifier ce code pour l'instant. Il est enregistré et sera réessayé.",
+    "pt": "O Bobby não conseguiu verificar esse código agora. Fica guardado e será tentado de novo.",
+    "it": "Bobby non è riuscito a verificare questo codice ora. È salvato e verrà riprovato.",
+    "de": "Bobby konnte diesen Code gerade nicht prüfen. Er ist gespeichert und wird erneut versucht."
+  },
+  "Bobby draft · editable": {
+    "fr": "Brouillon de Bobby · modifiable",
+    "pt": "Rascunho do Bobby · editável",
+    "it": "Bozza di Bobby · modificabile",
+    "de": "Bobbys Entwurf · änderbar"
+  },
+  "Bobby gave you 1 read": {
+    "fr": "Bobby t'a offert 1 analyse",
+    "pt": "O Bobby ofereceu-te 1 análise",
+    "it": "Bobby ti ha regalato 1 analisi",
+    "de": "Bobby hat dir 1 Analyse geschenkt"
+  },
+  "Bobby gave you {0} reads": {
+    "fr": "Bobby t'a offert {0} analyses",
+    "pt": "O Bobby ofereceu-te {0} análises",
+    "it": "Bobby ti ha regalato {0} analisi",
+    "de": "Bobby hat dir {0} Analysen geschenkt"
+  },
+  "Bobby keeps these on this phone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer.": {
+    "fr": "Bobby garde ces éléments sur ce téléphone, pas sur ses serveurs. Le texte d'une thèse est envoyé, avec cette question, seulement quand tu lances une révision : à Bobby et aux fournisseurs d'IA qui rédigent la réponse.",
+    "pt": "O Bobby guarda isto neste telemóvel, não nos seus servidores. O texto de uma tese é enviado, com essa pergunta, apenas quando inicias uma revisão: ao Bobby e aos fornecedores de IA que escrevem a resposta.",
+    "it": "Bobby conserva questi dati su questo telefono, non sui suoi server. Il testo di una tesi viene inviato, con quella domanda, solo quando avvii una revisione: a Bobby e ai fornitori di IA che scrivono la risposta.",
+    "de": "Bobby speichert das auf diesem Gerät, nicht auf seinen Servern. Der Text einer These wird nur gesendet, wenn du eine Überprüfung startest, zusammen mit dieser Frage: an Bobby und an die KI-Anbieter, die die Antwort schreiben."
+  },
+  "Bobby notifications are off.": {
+    "fr": "Les notifications de Bobby sont désactivées.",
+    "pt": "As notificações do Bobby estão desligadas.",
+    "it": "Le notifiche di Bobby sono disattivate.",
+    "de": "Mitteilungen für Bobby sind aus."
+  },
+  "Bobby reached today’s analysis limit, so this review did not run.": {
+    "fr": "Bobby a atteint la limite d’analyses du jour : ce réexamen n’a donc pas été lancé.",
+    "pt": "O Bobby atingiu o limite de análises de hoje, por isso esta revisão não foi feita.",
+    "it": "Bobby ha raggiunto il limite di analisi di oggi, quindi questo riesame non è partito.",
+    "de": "Bobby hat das heutige Analyselimit erreicht, daher wurde diese Überprüfung nicht gestartet."
+  },
+  "Bobby read price evidence only. This is not a view on the company itself.": {
+    "fr": "Bobby a lu uniquement des données de prix. Ce n’est pas un avis sur l’entreprise elle-même.",
+    "pt": "O Bobby leu apenas dados de preço. Não é uma opinião sobre a empresa em si.",
+    "it": "Bobby ha letto solo dati di prezzo. Non è un giudizio sull’azienda in sé.",
+    "de": "Bobby hat nur Kursdaten gelesen. Das ist keine Einschätzung des Unternehmens selbst."
+  },
+  "Bobby read price evidence only. This is not a view on the project itself.": {
+    "fr": "Bobby a lu uniquement des données de prix. Ce n’est pas un avis sur le projet lui-même.",
+    "pt": "O Bobby leu apenas dados de preço. Não é uma opinião sobre o projeto em si.",
+    "it": "Bobby ha letto solo dati di prezzo. Non è un giudizio sul progetto in sé.",
+    "de": "Bobby hat nur Kursdaten gelesen. Das ist keine Einschätzung des Projekts selbst."
+  },
+  "Bobby's voice": {
+    "en": "Bobby's voice",
+    "es": "Voz de Bobby",
+    "fr": "Voix de Bobby",
+    "pt": "Voz do Bobby",
+    "it": "Voce di Bobby",
+    "de": "Bobbys Stimme"
+  },
+  "Bobby’s answer could not be read.": {
+    "fr": "La réponse de Bobby n’a pas pu être lue.",
+    "pt": "Não foi possível ler a resposta do Bobby.",
+    "it": "Non è stato possibile leggere la risposta di Bobby.",
+    "de": "Bobbys Antwort konnte nicht gelesen werden."
+  },
+  "Briefing settings": {
+    "en": "Briefing settings",
+    "es": "Configuración de informes",
+    "fr": "Réglages des rapports",
+    "pt": "Definições dos relatórios",
+    "it": "Impostazioni dei rapporti",
+    "de": "Berichtseinstellungen"
+  },
+  "Build with this piece": {
+    "fr": "Construire avec cette pièce",
+    "pt": "Construir com esta peça",
+    "it": "Costruisci con questo pezzo",
+    "de": "Mit diesem Teil bauen"
+  },
+  "Buy prepaid access": {
+    "fr": "Acheter un accès prépayé",
+    "pt": "Comprar acesso pré-pago",
+    "it": "Acquista accesso prepagato",
+    "de": "Prepaid-Zugang kaufen"
+  },
+  "Cancel": {
+    "en": "Cancel",
+    "es": "Cancelar",
+    "fr": "Annuler",
+    "pt": "Cancelar",
+    "it": "Annulla",
+    "de": "Abbrechen"
+  },
+  "Cell": {
+    "fr": "Cellule",
+    "pt": "Célula",
+    "it": "Cella",
+    "de": "Zelle"
+  },
+  "Challenges": {
+    "fr": "Remet en question",
+    "pt": "Questiona",
+    "it": "Contro",
+    "de": "Stellt infrage"
+  },
+  "Change": {
+    "en": "Change",
+    "es": "Cambiar",
+    "fr": "Changer",
+    "pt": "Alterar",
+    "it": "Cambia",
+    "de": "Ändern"
+  },
+  "Check your existing Pro access before starting another purchase.": {
+    "fr": "Vérifiez votre accès Pro existant avant un nouvel achat.",
+    "pt": "Verifica o teu acesso Pro atual antes de iniciar outra compra.",
+    "it": "Verifica il tuo accesso Pro esistente prima di avviare un altro acquisto.",
+    "de": "Prüfe deinen bestehenden Pro-Zugang, bevor du einen weiteren Kauf beginnst."
+  },
+  "Checking…": {
+    "fr": "Vérification…",
+    "pt": "A verificar…",
+    "it": "Verifica…",
+    "de": "Wird geprüft…"
+  },
+  "Choose a destination on the grid, then confirm.": {
+    "fr": "Choisis une destination sur la grille, puis confirme.",
+    "pt": "Escolhe um destino na grelha e confirma.",
+    "it": "Scegli una destinazione sulla griglia, poi conferma.",
+    "de": "Wähle ein Ziel auf dem Raster und bestätige."
+  },
+  "Choose assets, language and scheduled consent": {
+    "en": "Choose assets, language and scheduled consent",
+    "es": "Elige activos, idioma y consentimiento programado",
+    "fr": "Choisis les actifs, la langue et le consentement des rapports programmés",
+    "pt": "Escolhe ativos, idioma e consentimento dos relatórios agendados",
+    "it": "Scegli gli asset, la lingua e il consenso dei rapporti programmati",
+    "de": "Wähle Anlagen, Sprache und Einwilligung für geplante Berichte"
+  },
+  "Choose date": {
+    "fr": "Choisir une date",
+    "pt": "Escolher data",
+    "it": "Scegli la data",
+    "de": "Datum wählen"
+  },
+  "Choose who lives in your Bobby": {
+    "en": "Choose who lives in your Bobby",
+    "es": "Elige quién vive en tu Bobby",
+    "fr": "Choisis qui vit dans ton Bobby",
+    "pt": "Escolhe quem vive no teu Bobby",
+    "it": "Scegli chi vive nel tuo Bobby",
+    "de": "Wähle, wer in deinem Bobby lebt"
+  },
+  "Clear": {
+    "fr": "Effacer",
+    "pt": "Limpar",
+    "it": "Cancella",
+    "de": "Leeren"
+  },
+  "Clear preference": {
+    "fr": "Effacer la préférence",
+    "pt": "Apagar preferência",
+    "it": "Cancella preferenza",
+    "de": "Präferenz löschen"
+  },
+  "Clear the shortcuts on this phone": {
+    "fr": "Effacer les raccourcis de ce téléphone",
+    "pt": "Limpar os atalhos deste telemóvel",
+    "it": "Cancella le scorciatoie su questo telefono",
+    "de": "Schnellzugriffe auf diesem Gerät leeren"
+  },
+  "Close": {
+    "en": "Close",
+    "es": "Cerrar",
+    "fr": "Fermer",
+    "pt": "Fechar",
+    "it": "Chiudi",
+    "de": "Schließen"
+  },
+  "Code": {
+    "fr": "Code",
+    "pt": "Código",
+    "it": "Codice",
+    "de": "Code"
+  },
+  "Collapsed": {
+    "fr": "Replié",
+    "pt": "Recolhido",
+    "it": "Compresso",
+    "de": "Eingeklappt"
+  },
+  "Collection": {
+    "fr": "Collection",
+    "pt": "Coleção",
+    "it": "Collezione",
+    "de": "Sammlung"
+  },
+  "Companion's voice": {
+    "en": "Companion's voice",
+    "es": "Voz de tu compañero",
+    "fr": "Voix de ton compagnon",
+    "pt": "Voz do teu companheiro",
+    "it": "Voce del tuo compagno",
+    "de": "Stimme deines Begleiters"
+  },
+  "Company filings": {
+    "fr": "Documents réglementaires de l’entreprise",
+    "pt": "Documentos regulamentares da empresa",
+    "it": "Documenti societari depositati",
+    "de": "Pflichtmitteilungen des Unternehmens"
+  },
+  "Company fundamentals": {
+    "fr": "Fondamentaux de l’entreprise",
+    "pt": "Fundamentos da empresa",
+    "it": "Fondamentali dell’azienda",
+    "de": "Fundamentaldaten des Unternehmens"
+  },
+  "Configure your briefing consent and selected assets before enabling delivery.": {
+    "fr": "Configure ton consentement et les actifs choisis avant d'activer l'envoi des rapports.",
+    "pt": "Configura o consentimento dos relatórios e os ativos selecionados antes de ativar a entrega.",
+    "it": "Configura il consenso ai rapporti e gli asset selezionati prima di attivare la consegna.",
+    "de": "Lege deine Einwilligung und die ausgewählten Vermögenswerte fest, bevor du die Zustellung aktivierst."
   },
   "Confirm": {
     "fr": "Confirmer",
@@ -391,11 +635,125 @@
     "it": "Conferma",
     "de": "Bestätigen"
   },
-  "Delete your Bobby account and synced personal data? Public blockchain records and your store subscription may remain. Manage your subscription separately.": {
-    "fr": "Supprimer ton compte Bobby et les données personnelles synchronisées ? Les données publiques de la blockchain et ton abonnement peuvent subsister. Gère ton abonnement séparément.",
-    "pt": "Eliminar a tua conta Bobby e os dados pessoais sincronizados? Os registos públicos na blockchain e a subscrição da loja podem permanecer. Gere a subscrição separadamente.",
-    "it": "Eliminare il tuo account Bobby e i dati personali sincronizzati? I dati pubblici sulla blockchain e l'abbonamento dello store possono rimanere. Gestisci l'abbonamento separatamente.",
-    "de": "Dein Bobby-Konto und synchronisierte persönliche Daten löschen? Öffentliche Blockchain-Einträge und dein Store-Abonnement können bestehen bleiben. Verwalte dein Abonnement separat."
+  "Confirm position": {
+    "fr": "Confirmer la position",
+    "pt": "Confirmar posição",
+    "it": "Conferma posizione",
+    "de": "Position bestätigen"
+  },
+  "Connection interrupted. Reload to check the saved island before repeating the action.": {
+    "fr": "Connexion interrompue. Recharge pour vérifier l'île enregistrée avant de répéter l'action.",
+    "pt": "Ligação interrompida. Recarrega para verificar a ilha guardada antes de repetir a ação.",
+    "it": "Connessione interrotta. Ricarica per controllare l'isola salvata prima di ripetere l'azione.",
+    "de": "Verbindung unterbrochen. Lade die gespeicherte Insel neu, bevor du die Aktion wiederholst."
+  },
+  "Continue with Apple": {
+    "en": "Continue with Apple",
+    "es": "Continuar con Apple",
+    "fr": "Continuer avec Apple",
+    "pt": "Continuar com Apple",
+    "it": "Continua con Apple",
+    "de": "Mit Apple fortfahren"
+  },
+  "Continue with Deep": {
+    "fr": "Continuer avec Analyse approfondie",
+    "pt": "Continuar com Análise profunda",
+    "it": "Continua con Analisi approfondita",
+    "de": "Mit Tiefenanalyse fortfahren"
+  },
+  "Continue with Google": {
+    "en": "Continue with Google",
+    "es": "Continuar con Google",
+    "fr": "Continuer avec Google",
+    "pt": "Continuar com Google",
+    "it": "Continua con Google",
+    "de": "Mit Google fortfahren"
+  },
+  "Copy code": {
+    "fr": "Copier le code",
+    "pt": "Copiar código",
+    "it": "Copia codice",
+    "de": "Code kopieren"
+  },
+  "Could not enable memory.": {
+    "fr": "Impossible d'activer la mémoire.",
+    "pt": "Não foi possível ativar a memória.",
+    "it": "Impossibile attivare la memoria.",
+    "de": "Gedächtnis konnte nicht aktiviert werden."
+  },
+  "Could not load or save this information. Try again.": {
+    "fr": "Impossible de charger ou d'enregistrer ces informations. Réessaie.",
+    "pt": "Não foi possível carregar ou guardar esta informação. Tenta novamente.",
+    "it": "Impossibile caricare o salvare queste informazioni. Riprova.",
+    "de": "Diese Informationen konnten nicht geladen oder gespeichert werden. Versuche es erneut."
+  },
+  "Could not save the blocked creators. Try again.": {
+    "fr": "Impossible d'enregistrer les créateurs bloqués. Réessaie.",
+    "pt": "Não foi possível guardar os criadores bloqueados. Tenta novamente.",
+    "it": "Impossibile salvare i creatori bloccati. Riprova.",
+    "de": "Blockierte Ersteller konnten nicht gespeichert werden. Versuche es erneut."
+  },
+  "Create your free account to get {0} every week": {
+    "fr": "Crée ton compte gratuit pour en avoir {0} chaque semaine",
+    "pt": "Cria a tua conta gratuita para teres {0} todas as semanas",
+    "it": "Crea il tuo account gratuito per averne {0} ogni settimana",
+    "de": "Erstelle dein kostenloses Konto und erhalte jede Woche {0}"
+  },
+  "Create your free account to keep reading": {
+    "fr": "Crée ton compte gratuit pour continuer",
+    "pt": "Cria a tua conta gratuita para continuares",
+    "it": "Crea il tuo account gratuito per continuare",
+    "de": "Erstelle dein kostenloses Konto, um weiterzulesen"
+  },
+  "Credits": {
+    "fr": "Crédits",
+    "pt": "Créditos",
+    "it": "Crediti",
+    "de": "Credits"
+  },
+  "Crypto stocks": {
+    "fr": "Actions crypto",
+    "pt": "Ações cripto",
+    "it": "Azioni cripto",
+    "de": "Krypto-Aktien"
+  },
+  "Day and time": {
+    "fr": "Jour et heure",
+    "pt": "Dia e hora",
+    "it": "Giorno e ora",
+    "de": "Tag und Uhrzeit"
+  },
+  "DeFi": {
+    "fr": "DeFi",
+    "pt": "DeFi",
+    "it": "DeFi",
+    "de": "DeFi"
+  },
+  "Deep reads": {
+    "fr": "Analyses Approfondies",
+    "pt": "Análises Profundas",
+    "it": "Analisi Approfondite",
+    "de": "Vertiefte Analysen"
+  },
+  "Delete": {
+    "fr": "Supprimer",
+    "pt": "Eliminar",
+    "it": "Elimina",
+    "de": "Löschen"
+  },
+  "Delete account": {
+    "en": "Delete account",
+    "es": "Eliminar cuenta",
+    "fr": "Supprimer le compte",
+    "pt": "Eliminar conta",
+    "it": "Elimina account",
+    "de": "Konto löschen"
+  },
+  "Delete all memory": {
+    "fr": "Supprimer toute la mémoire",
+    "pt": "Apagar toda a memória",
+    "it": "Elimina tutta la memoria",
+    "de": "Gesamtes Gedächtnis löschen"
   },
   "Delete all of Bobby's saved account memory?": {
     "fr": "Supprimer toute la mémoire de compte enregistrée par Bobby ?",
@@ -403,17 +761,581 @@
     "it": "Eliminare tutta la memoria dell'account salvata da Bobby?",
     "de": "Das gesamte von Bobby gespeicherte Kontogedächtnis löschen?"
   },
-  "Stop sending new questions to AI and return to the risk notice?": {
-    "fr": "Arrêter d'envoyer de nouvelles questions à l'IA et revenir à l'avis de risque ?",
-    "pt": "Deixar de enviar novas perguntas à IA e voltar ao aviso de risco?",
-    "it": "Smettere di inviare nuove domande all'IA e tornare all'avviso sui rischi?",
-    "de": "Keine neuen Fragen mehr an die KI senden und zum Risikohinweis zurückkehren?"
+  "Delete this thesis? It is removed from this phone for good.": {
+    "fr": "Supprimer cette thèse ? Elle est effacée de ce téléphone définitivement.",
+    "pt": "Eliminar esta tese? É apagada deste telemóvel de vez.",
+    "it": "Eliminare questa tesi? Viene rimossa da questo telefono per sempre.",
+    "de": "Diese These löschen? Sie wird endgültig von diesem Gerät entfernt."
   },
-  "Sign in to open this feature.": {
-    "fr": "Connecte-toi pour ouvrir cette fonction.",
-    "pt": "Inicia sessão para abrir esta função.",
-    "it": "Accedi per aprire questa funzione.",
-    "de": "Melde dich an, um diese Funktion zu öffnen."
+  "Delete your Bobby account and synced personal data? Public blockchain records and your store subscription may remain. Manage your subscription separately.": {
+    "fr": "Supprimer ton compte Bobby et les données personnelles synchronisées ? Les données publiques de la blockchain et ton abonnement peuvent subsister. Gère ton abonnement séparément.",
+    "pt": "Eliminar a tua conta Bobby e os dados pessoais sincronizados? Os registos públicos na blockchain e a subscrição da loja podem permanecer. Gere a subscrição separadamente.",
+    "it": "Eliminare il tuo account Bobby e i dati personali sincronizzati? I dati pubblici sulla blockchain e l'abbonamento dello store possono rimanere. Gestisci l'abbonamento separatamente.",
+    "de": "Dein Bobby-Konto und synchronisierte persönliche Daten löschen? Öffentliche Blockchain-Einträge und dein Store-Abonnement können bestehen bleiben. Verwalte dein Abonnement separat."
+  },
+  "Deleted on this phone. Bobby's servers did not confirm, so what they remember is still there. Try again.": {
+    "fr": "Supprimé sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ce qu'ils retiennent est toujours là. Réessaie.",
+    "pt": "Eliminado neste telemóvel. Os servidores do Bobby não confirmaram, por isso o que recordam continua lá. Tenta novamente.",
+    "it": "Eliminato su questo telefono. I server di Bobby non hanno confermato, quindi ciò che ricordano è ancora lì. Riprova.",
+    "de": "Auf diesem Gerät gelöscht. Bobbys Server haben nicht bestätigt, daher ist dort noch vorhanden, was sie gespeichert haben. Versuch es noch einmal."
+  },
+  "Deleted: what Bobby's servers remembered, the shortcuts on this phone and the theses you wrote here.": {
+    "fr": "Supprimé : ce que les serveurs de Bobby retenaient, les raccourcis de ce téléphone et les thèses que tu as écrites ici.",
+    "pt": "Eliminado: o que os servidores do Bobby recordavam, os atalhos deste telemóvel e as teses que escreveste aqui.",
+    "it": "Eliminato: ciò che i server di Bobby ricordavano, le scorciatoie su questo telefono e le tesi che hai scritto qui.",
+    "de": "Gelöscht: was Bobbys Server gespeichert hatten, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast."
+  },
+  "Details": {
+    "fr": "Détails",
+    "pt": "Detalhes",
+    "it": "Dettagli",
+    "de": "Details"
+  },
+  "Device language": {
+    "en": "Device language",
+    "es": "Idioma del dispositivo",
+    "fr": "Langue de ton appareil",
+    "pt": "Idioma do teu dispositivo",
+    "it": "Lingua del dispositivo",
+    "de": "Gerätesprache"
+  },
+  "Discard": {
+    "fr": "Abandonner",
+    "pt": "Descartar",
+    "it": "Scarta",
+    "de": "Verwerfen"
+  },
+  "Discard your text?": {
+    "fr": "Abandonner ton texte ?",
+    "pt": "Descartar o teu texto?",
+    "it": "Eliminare il tuo testo?",
+    "de": "Deinen Text verwerfen?"
+  },
+  "Done": {
+    "fr": "Terminé",
+    "pt": "Concluído",
+    "it": "Fine",
+    "de": "Fertig"
+  },
+  "Earned": {
+    "en": "Earned",
+    "es": "Ganados",
+    "fr": "Gagnés",
+    "pt": "Ganhos",
+    "it": "Guadagnati",
+    "de": "Verdient"
+  },
+  "Earned with discipline, never volume.": {
+    "en": "Earned with discipline, never volume.",
+    "es": "Se gana con disciplina, nunca con volumen.",
+    "fr": "Tu progresses par la discipline, jamais par le volume.",
+    "pt": "Ganhas com disciplina, nunca com volume.",
+    "it": "Si guadagna con disciplina, mai con volume.",
+    "de": "Verdient durch Disziplin, nie durch Handelsvolumen."
+  },
+  "Earnings reports": {
+    "fr": "Publications de résultats",
+    "pt": "Relatórios de resultados",
+    "it": "Relazioni sugli utili",
+    "de": "Quartalsberichte"
+  },
+  "Edit": {
+    "fr": "Modifier",
+    "pt": "Editar",
+    "it": "Modifica",
+    "de": "Bearbeiten"
+  },
+  "Edit or delete in Memory.": {
+    "fr": "Modifie ou supprime dans Mémoire.",
+    "pt": "Edita ou apaga em Memória.",
+    "it": "Modifica o elimina in Memoria.",
+    "de": "Bearbeite oder lösche es unter Gedächtnis."
+  },
+  "Edit thesis": {
+    "fr": "Modifier la thèse",
+    "pt": "Editar tese",
+    "it": "Modifica tesi",
+    "de": "These bearbeiten"
+  },
+  "Educational reading.": {
+    "fr": "Lecture éducative.",
+    "pt": "Leitura educativa.",
+    "it": "Lettura educativa.",
+    "de": "Analyse zu Lernzwecken."
+  },
+  "Electric vehicles": {
+    "fr": "Véhicules électriques",
+    "pt": "Veículos elétricos",
+    "it": "Veicoli elettrici",
+    "de": "Elektroautos"
+  },
+  "Enter the island's 10-character code.": {
+    "fr": "Saisis le code à 10 caractères de l'île.",
+    "pt": "Introduz o código da ilha com 10 caracteres.",
+    "it": "Inserisci il codice di 10 caratteri dell'isola.",
+    "de": "Gib den 10-stelligen Inselcode ein."
+  },
+  "Equipped on this companion": {
+    "fr": "Accessoires équipés sur ce compagnon",
+    "pt": "Equipamento deste companheiro",
+    "it": "Equipaggiamento di questo compagno",
+    "de": "Ausrüstung dieses Begleiters"
+  },
+  "Every read plants something": {
+    "en": "Every read plants something",
+    "es": "Cada lectura planta algo",
+    "fr": "Chaque lecture plante quelque chose",
+    "pt": "Cada leitura planta algo",
+    "it": "Ogni lettura pianta qualcosa",
+    "de": "Jede Analyse pflanzt etwas"
+  },
+  "Every {0} days": {
+    "fr": "Tous les {0} jours",
+    "pt": "A cada {0} dias",
+    "it": "Ogni {0} giorni",
+    "de": "Alle {0} Tage"
+  },
+  "Every {0} days · next read back {1}": {
+    "fr": "Tous les {0} jours · prochaine analyse le {1}",
+    "pt": "A cada {0} dias · a próxima volta a {1}",
+    "it": "Ogni {0} giorni · la prossima torna il {1}",
+    "de": "Alle {0} Tage · nächste Analyse am {1}"
+  },
+  "Evidence": {
+    "fr": "Données",
+    "pt": "Evidência",
+    "it": "Dati",
+    "de": "Daten"
+  },
+  "Evidence lists unavailable.": {
+    "fr": "Listes de données indisponibles.",
+    "pt": "Listas de evidência indisponíveis.",
+    "it": "Elenchi dei dati non disponibili.",
+    "de": "Listen nicht verfügbar."
+  },
+  "Expanded": {
+    "fr": "Déplié",
+    "pt": "Expandido",
+    "it": "Espanso",
+    "de": "Ausgeklappt"
+  },
+  "Explore the plans available for your account": {
+    "en": "Explore the plans available for your account",
+    "es": "Consulta los planes disponibles para tu cuenta",
+    "fr": "Découvre les formules disponibles pour ton compte",
+    "pt": "Consulta os planos disponíveis para a tua conta",
+    "it": "Scopri i piani disponibili per il tuo account",
+    "de": "Sieh dir die verfügbaren Tarife für dein Konto an"
+  },
+  "Extend horizon": {
+    "fr": "Prolonger l'horizon",
+    "pt": "Prolongar horizonte",
+    "it": "Estendi orizzonte",
+    "de": "Horizont verlängern"
+  },
+  "Feminine": {
+    "en": "Feminine",
+    "es": "Femenina",
+    "fr": "Féminine",
+    "pt": "Feminina",
+    "it": "Femminile",
+    "de": "Weiblich"
+  },
+  "Follow-ups": {
+    "fr": "Suivis",
+    "pt": "Seguimento",
+    "it": "Aggiornamenti",
+    "de": "Follow-ups"
+  },
+  "Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.": {
+    "fr": "Oublier retire le raccourci d'un actif. Tout supprimer efface les raccourcis et les thèses que tu as écrites.",
+    "pt": "Esquecer remove o atalho de um ativo. Eliminar tudo apaga os atalhos e as teses que escreveste.",
+    "it": "Dimentica rimuove la scorciatoia di un asset. Elimina tutto cancella le scorciatoie e le tesi che hai scritto.",
+    "de": "Vergessen entfernt den Schnellzugriff eines Werts. Alles löschen entfernt die Schnellzugriffe und die Thesen, die du geschrieben hast."
+  },
+  "Forgotten on this phone. Bobby's servers did not confirm, so they still remember {0}. Try again.": {
+    "fr": "Oublié sur ce téléphone. Les serveurs de Bobby n'ont pas confirmé : ils retiennent encore {0}. Réessaie.",
+    "pt": "Esquecido neste telemóvel. Os servidores do Bobby não confirmaram, por isso ainda recordam {0}. Tenta novamente.",
+    "it": "Dimenticato su questo telefono. I server di Bobby non hanno confermato, quindi ricordano ancora {0}. Riprova.",
+    "de": "Auf diesem Gerät vergessen. Bobbys Server haben nicht bestätigt, daher merken sie sich {0} noch. Versuch es noch einmal."
+  },
+  "Free account: {0} Quick reads weekly.": {
+    "fr": "Compte gratuit : {0} analyses Rapides par semaine.",
+    "pt": "Conta grátis: {0} análises Rápidas por semana.",
+    "it": "Account gratuito: {0} analisi Rapide a settimana.",
+    "de": "Kostenloses Konto: {0} Schnelle Analysen pro Woche."
+  },
+  "Free reads come back on {0}.": {
+    "fr": "Les analyses gratuites reviennent le {0}.",
+    "pt": "As análises gratuitas voltam a {0}.",
+    "it": "Le analisi gratuite tornano il giorno {0}.",
+    "de": "Kostenlose Analysen gibt es wieder am {0}."
+  },
+  "Friend's invitation code": {
+    "fr": "Code d'invitation d'un ami",
+    "pt": "Código de convite de um amigo",
+    "it": "Codice d'invito di un amico",
+    "de": "Einladungscode eines Freundes"
+  },
+  "From your invitations.": {
+    "fr": "Grâce à tes invitations.",
+    "pt": "Pelos teus convites.",
+    "it": "Grazie ai tuoi inviti.",
+    "de": "Durch deine Einladungen."
+  },
+  "Gear": {
+    "en": "Gear",
+    "es": "Equipo",
+    "fr": "Équipement",
+    "pt": "Equipamento",
+    "it": "Equipaggiamento",
+    "de": "Ausrüstung"
+  },
+  "Getting your link…": {
+    "fr": "Récupération de ton lien…",
+    "pt": "A obter o teu link…",
+    "it": "Recupero del tuo link…",
+    "de": "Dein Link wird geladen…"
+  },
+  "Gifted": {
+    "fr": "Offertes",
+    "pt": "De oferta",
+    "it": "In regalo",
+    "de": "Geschenkt"
+  },
+  "Gifted Deep reads": {
+    "fr": "Analyses Approfondies offertes",
+    "pt": "Análises Profundas oferecidas",
+    "it": "Analisi Approfondite in regalo",
+    "de": "Geschenkte Vertiefte Analysen"
+  },
+  "Gifted Max reads": {
+    "fr": "Analyses Maximales offertes",
+    "pt": "Análises Máximas oferecidas",
+    "it": "Analisi Massime in regalo",
+    "de": "Geschenkte Maximale Analysen"
+  },
+  "Gifted Quick reads": {
+    "fr": "Analyses Rapides offertes",
+    "pt": "Análises Rápidas oferecidas",
+    "it": "Analisi Rapide in regalo",
+    "de": "Geschenkte Schnelle Analysen"
+  },
+  "Gifted until {0}": {
+    "fr": "Offert jusqu'au {0}",
+    "pt": "Oferecido até {0}",
+    "it": "In regalo fino al {0}",
+    "de": "Geschenkt bis {0}"
+  },
+  "Google Play subscriptions are not available yet.": {
+    "fr": "Les abonnements Google Play ne sont pas encore disponibles.",
+    "pt": "As subscrições do Google Play ainda não estão disponíveis.",
+    "it": "Gli abbonamenti Google Play non sono ancora disponibili.",
+    "de": "Google Play-Abonnements sind noch nicht verfügbar."
+  },
+  "Google Play terms": {
+    "fr": "Conditions de Google Play",
+    "pt": "Termos do Google Play",
+    "it": "Termini di Google Play",
+    "de": "Google Play-Nutzungsbedingungen"
+  },
+  "Growing": {
+    "fr": "En croissance",
+    "pt": "A crescer",
+    "it": "In crescita",
+    "de": "Wächst"
+  },
+  "Growth": {
+    "fr": "Croissance",
+    "pt": "Crescimento",
+    "it": "Crescita",
+    "de": "Wachstum"
+  },
+  "Have a code?": {
+    "fr": "Tu as un code ?",
+    "pt": "Tens um código?",
+    "it": "Hai un codice?",
+    "de": "Hast du einen Code?"
+  },
+  "Health care": {
+    "fr": "Santé",
+    "pt": "Saúde",
+    "it": "Sanità",
+    "de": "Gesundheit"
+  },
+  "Help": {
+    "fr": "Aide",
+    "pt": "Ajuda",
+    "it": "Aiuto",
+    "de": "Hilfe"
+  },
+  "Help and support": {
+    "en": "Help and support",
+    "es": "Ayuda y soporte",
+    "fr": "Aide et assistance",
+    "pt": "Ajuda e apoio",
+    "it": "Aiuto e assistenza",
+    "de": "Hilfe und Support"
+  },
+  "Hi": {
+    "en": "Hi",
+    "es": "Hola",
+    "fr": "Salut",
+    "pt": "Olá",
+    "it": "Ciao",
+    "de": "Hallo"
+  },
+  "History": {
+    "fr": "Historique",
+    "pt": "Histórico",
+    "it": "Cronologia",
+    "de": "Verlauf"
+  },
+  "How does {0} look today?": {
+    "fr": "Comment se présente {0} aujourd’hui ?",
+    "pt": "Como está {0} hoje?",
+    "it": "Come si presenta {0} oggi?",
+    "de": "Wie sieht {0} heute aus?"
+  },
+  "How it works": {
+    "fr": "Comment ça marche",
+    "pt": "Como funciona",
+    "it": "Come funziona",
+    "de": "So funktioniert es"
+  },
+  "I accept these community rules before publishing.": {
+    "fr": "J’accepte ces règles de la communauté avant de publier.",
+    "pt": "Aceito estas regras da comunidade antes de publicar.",
+    "it": "Accetto queste regole della comunità prima di pubblicare.",
+    "de": "Ich akzeptiere diese Community-Regeln vor der Veröffentlichung."
+  },
+  "I can pick this up next time": {
+    "fr": "Je peux reprendre ça la prochaine fois",
+    "pt": "Posso retomar isto da próxima vez",
+    "it": "Posso riprenderlo la prossima volta",
+    "de": "Ich kann das nächstes Mal aufgreifen"
+  },
+  "Include this payment reference when contacting Help.": {
+    "fr": "Indiquez cette référence de paiement lorsque vous contactez l’assistance.",
+    "pt": "Inclua esta referência de pagamento ao contactar a Ajuda.",
+    "it": "Includi questo riferimento di pagamento quando contatti l’assistenza.",
+    "de": "Gib diese Zahlungsreferenz an, wenn du den Support kontaktierst."
+  },
+  "Included with Bobby Pro. It is off for now.": {
+    "fr": "Inclus avec Bobby Pro. Il est désactivé pour l’instant.",
+    "pt": "Incluído no Bobby Pro. Por agora está desligado.",
+    "it": "Incluso in Bobby Pro. Per ora è disattivato.",
+    "de": "In Bobby Pro enthalten. Im Moment ist er aus."
+  },
+  "Intraday": {
+    "fr": "Intrajournalier",
+    "pt": "Intradiário",
+    "it": "Infragiornaliero",
+    "de": "Untertägig"
+  },
+  "Invalid island code": {
+    "fr": "Code d'île invalide",
+    "pt": "Código de ilha inválido",
+    "it": "Codice dell'isola non valido",
+    "de": "Ungültiger Inselcode"
+  },
+  "Invitation accepted. It counts for the friend who invited you.": {
+    "fr": "Invitation acceptée. Elle compte pour l'ami qui t'a invité.",
+    "pt": "Convite aceite. Conta para o amigo que te convidou.",
+    "it": "Invito accettato. Vale per l'amico che ti ha invitato.",
+    "de": "Einladung angenommen. Sie zählt für den Freund, der dich eingeladen hat."
+  },
+  "Invitation code": {
+    "fr": "Code d'invitation",
+    "pt": "Código de convite",
+    "it": "Codice d'invito",
+    "de": "Einladungscode"
+  },
+  "Invitation ready": {
+    "fr": "Invitation en attente",
+    "pt": "Convite pendente",
+    "it": "Invito in attesa",
+    "de": "Einladung wartet"
+  },
+  "Invitations are currently unavailable.": {
+    "fr": "Les invitations sont actuellement indisponibles.",
+    "pt": "Os convites não estão disponíveis neste momento.",
+    "it": "Gli inviti non sono disponibili al momento.",
+    "de": "Einladungen sind derzeit nicht verfügbar."
+  },
+  "Invitations work for new accounts, during their first week.": {
+    "fr": "Les invitations fonctionnent pour les nouveaux comptes, pendant leur première semaine.",
+    "pt": "Os convites funcionam para contas novas, durante a primeira semana.",
+    "it": "Gli inviti valgono per i nuovi account, durante la prima settimana.",
+    "de": "Einladungen gelten für neue Konten in ihrer ersten Woche."
+  },
+  "Invite": {
+    "fr": "Inviter",
+    "pt": "Convidar",
+    "it": "Invita",
+    "de": "Einladen"
+  },
+  "Invite friends": {
+    "en": "Invite friends",
+    "es": "Invita amigos",
+    "fr": "Invite tes amis",
+    "pt": "Convida amigos",
+    "it": "Invita amici",
+    "de": "Freunde einladen"
+  },
+  "Invite link unavailable.": {
+    "fr": "Lien d'invitation indisponible.",
+    "pt": "Link de convite indisponível.",
+    "it": "Link di invito non disponibile.",
+    "de": "Einladungslink nicht verfügbar."
+  },
+  "Island code": {
+    "fr": "Code de l'île",
+    "pt": "Código da ilha",
+    "it": "Codice dell'isola",
+    "de": "Inselcode"
+  },
+  "Island grew": {
+    "fr": "L'île s'est agrandie",
+    "pt": "A ilha cresceu",
+    "it": "L'isola è cresciuta",
+    "de": "Insel vergrößert"
+  },
+  "Island name": {
+    "fr": "Nom de l'île",
+    "pt": "Nome da ilha",
+    "it": "Nome dell'isola",
+    "de": "Inselname"
+  },
+  "Islands are unavailable.": {
+    "fr": "Les îles sont indisponibles.",
+    "pt": "As ilhas não estão disponíveis.",
+    "it": "Le isole non sono disponibili.",
+    "de": "Inseln sind nicht verfügbar."
+  },
+  "It may have used a read; check your credits.": {
+    "fr": "Il a peut-être utilisé une analyse ; vérifie tes crédits.",
+    "pt": "Pode ter usado uma análise; verifica os teus créditos.",
+    "it": "Potrebbe aver usato un’analisi; controlla i tuoi crediti.",
+    "de": "Möglicherweise wurde eine Analyse verbraucht; prüfe dein Guthaben."
+  },
+  "It may not have counted; check your credits.": {
+    "fr": "Il n’a peut-être pas été compté ; vérifie tes crédits.",
+    "pt": "Pode não ter contado; verifica os teus créditos.",
+    "it": "Potrebbe non essere stato conteggiato; controlla i tuoi crediti.",
+    "de": "Möglicherweise wurde sie nicht gezählt; prüfe dein Guthaben."
+  },
+  "Joined": {
+    "fr": "Inscrit",
+    "pt": "Aderiu",
+    "it": "Iscritto",
+    "de": "Beigetreten"
+  },
+  "Keep it": {
+    "fr": "La garder",
+    "pt": "Mantê-la",
+    "it": "Tienila",
+    "de": "Behalten"
+  },
+  "Keep it in this account?": {
+    "fr": "La garder dans ce compte ?",
+    "pt": "Mantê-la nesta conta?",
+    "it": "Tenerla in questo account?",
+    "de": "In diesem Konto behalten?"
+  },
+  "Keep them": {
+    "fr": "Les garder",
+    "pt": "Mantê-las",
+    "it": "Tienile",
+    "de": "Behalten"
+  },
+  "Keep them in this account?": {
+    "fr": "Les garder dans ce compte ?",
+    "pt": "Mantê-las nesta conta?",
+    "it": "Tenerle in questo account?",
+    "de": "In diesem Konto behalten?"
+  },
+  "Keep thesis": {
+    "fr": "Garder la thèse",
+    "pt": "Manter a tese",
+    "it": "Mantieni la tesi",
+    "de": "These behalten"
+  },
+  "Keep this day": {
+    "fr": "Garder ce jour",
+    "pt": "Manter este dia",
+    "it": "Tieni questo giorno",
+    "de": "Diesen Tag behalten"
+  },
+  "Keep writing": {
+    "fr": "Continuer à écrire",
+    "pt": "Continuar a escrever",
+    "it": "Continua a scrivere",
+    "de": "Weiterschreiben"
+  },
+  "Kept by Bobby": {
+    "fr": "Bobby garde",
+    "pt": "O Bobby guarda",
+    "it": "Bobby conserva",
+    "de": "Bobby speichert"
+  },
+  "Kept for when Quick reads have a weekly limit.": {
+    "fr": "Gardées pour quand les analyses Rapides auront une limite hebdomadaire.",
+    "pt": "Guardadas para quando as análises Rápidas tiverem um limite semanal.",
+    "it": "Conservate per quando le analisi Rapide avranno un limite settimanale.",
+    "de": "Aufgehoben für die Zeit, in der Schnelle Analysen ein Wochenlimit haben."
+  },
+  "Kept for when you are not on Bobby Pro.": {
+    "fr": "Gardées pour quand tu n'auras plus Bobby Pro.",
+    "pt": "Guardadas para quando não tiveres Bobby Pro.",
+    "it": "Conservate per quando non avrai Bobby Pro.",
+    "de": "Aufgehoben für die Zeit, in der du kein Bobby Pro hast."
+  },
+  "Language": {
+    "en": "Language",
+    "es": "Idioma",
+    "fr": "Langue",
+    "pt": "Idioma",
+    "it": "Lingua",
+    "de": "Sprache"
+  },
+  "Last 24 hours": {
+    "fr": "Dernières 24 heures",
+    "pt": "Últimas 24 horas",
+    "it": "Ultime 24 ore",
+    "de": "Letzte 24 Stunden"
+  },
+  "Layer 1 networks": {
+    "fr": "Réseaux de couche 1",
+    "pt": "Redes de camada 1",
+    "it": "Reti layer 1",
+    "de": "Layer-1-Netzwerke"
+  },
+  "Layer 2 networks": {
+    "fr": "Réseaux de couche 2",
+    "pt": "Redes de camada 2",
+    "it": "Reti layer 2",
+    "de": "Layer-2-Netzwerke"
+  },
+  "Level": {
+    "en": "Level",
+    "es": "Nivel",
+    "fr": "Niveau",
+    "pt": "Nível",
+    "it": "Livello",
+    "de": "Stufe"
+  },
+  "Listen": {
+    "fr": "Écouter",
+    "pt": "Ouvir",
+    "it": "Ascolta",
+    "de": "Anhören"
+  },
+  "Load more": {
+    "fr": "Charger plus",
+    "pt": "Carregar mais",
+    "it": "Carica altri",
+    "de": "Mehr laden"
   },
   "Locker": {
     "en": "Locker",
@@ -423,41 +1345,73 @@
     "it": "Equipaggiamento",
     "de": "Ausrüstung"
   },
-  "Analysis level": {
-    "fr": "Niveau d'analyse",
-    "pt": "Nível de análise",
-    "it": "Livello di analisi",
-    "de": "Analysestufe"
+  "Long term": {
+    "fr": "Long terme",
+    "pt": "Longo prazo",
+    "it": "Lungo termine",
+    "de": "Langfristig"
   },
-  "period shown by your store": {
-    "fr": "période indiquée par ta boutique",
-    "pt": "período indicado pela tua loja",
-    "it": "periodo indicato dal tuo store",
-    "de": "von deinem Store angezeigte Laufzeit"
+  "Manage": {
+    "en": "Manage",
+    "es": "Administrar",
+    "fr": "Gérer",
+    "pt": "Gerir",
+    "it": "Gestisci",
+    "de": "Verwalten"
   },
-  "Time horizon": {
-    "fr": "Horizon temporel",
-    "pt": "Horizonte temporal",
-    "it": "Orizzonte temporale",
-    "de": "Zeithorizont"
+  "Managed on the web.": {
+    "fr": "Géré sur le web.",
+    "pt": "Gerido na web.",
+    "it": "Gestito sul web.",
+    "de": "Wird im Web verwaltet."
   },
-  "Risk tolerance": {
-    "fr": "Tolérance au risque",
-    "pt": "Tolerância ao risco",
-    "it": "Tolleranza al rischio",
-    "de": "Risikotoleranz"
+  "Market briefings": {
+    "en": "Market briefings",
+    "es": "Informes de mercado",
+    "fr": "Rapports de marché",
+    "pt": "Relatórios de mercado",
+    "it": "Rapporti di mercato",
+    "de": "Marktberichte"
   },
-  "Intraday": {
-    "fr": "Intrajournalier",
-    "pt": "Intradiário",
-    "it": "Infragiornaliero",
-    "de": "Untertägig"
+  "Masculine": {
+    "en": "Masculine",
+    "es": "Masculina",
+    "fr": "Masculine",
+    "pt": "Masculina",
+    "it": "Maschile",
+    "de": "Männlich"
   },
-  "Week": {
-    "fr": "Semaine",
-    "pt": "Semana",
-    "it": "Settimana",
-    "de": "Woche"
+  "Max reads": {
+    "fr": "Analyses Maximales",
+    "pt": "Análises Máximas",
+    "it": "Analisi Massime",
+    "de": "Maximale Analysen"
+  },
+  "Memecoins": {
+    "fr": "Memecoins",
+    "pt": "Memecoins",
+    "it": "Memecoin",
+    "de": "Memecoins"
+  },
+  "Memory": {
+    "en": "Memory",
+    "es": "Memoria",
+    "fr": "Mémoire",
+    "pt": "Memória",
+    "it": "Memoria",
+    "de": "Gedächtnis"
+  },
+  "Memory stays on. Your next question restarts it.": {
+    "fr": "La mémoire reste active. Ta prochaine question la relance.",
+    "pt": "A memória continua ativa. A tua próxima pergunta reinicia-a.",
+    "it": "La memoria resta attiva. La tua prossima domanda la riavvia.",
+    "de": "Das Gedächtnis bleibt aktiv. Deine nächste Frage startet es neu."
+  },
+  "Monday briefing": {
+    "fr": "Bilan du lundi",
+    "pt": "Resumo de segunda",
+    "it": "Riepilogo del lunedì",
+    "de": "Montagsbericht"
   },
   "Month": {
     "fr": "Mois",
@@ -465,329 +1419,11 @@
     "it": "Mese",
     "de": "Monat"
   },
-  "Long term": {
-    "fr": "Long terme",
-    "pt": "Longo prazo",
-    "it": "Lungo termine",
-    "de": "Langfristig"
-  },
-  "New": {
-    "fr": "Débutant",
-    "pt": "Principiante",
-    "it": "Principiante",
-    "de": "Anfänger"
-  },
-  "Some experience": {
-    "fr": "Un peu d'expérience",
-    "pt": "Alguma experiência",
-    "it": "Un po' di esperienza",
-    "de": "Etwas Erfahrung"
-  },
-  "Google Play subscriptions are not available yet.": {
-    "fr": "Les abonnements Google Play ne sont pas encore disponibles.",
-    "pt": "As subscrições do Google Play ainda não estão disponíveis.",
-    "it": "Gli abbonamenti Google Play non sono ancora disponibili.",
-    "de": "Google Play-Abonnements sind noch nicht verfügbar."
-  },
-  "Sign in before subscribing.": {
-    "fr": "Connecte-toi avant de t'abonner.",
-    "pt": "Inicia sessão antes de subscrever.",
-    "it": "Accedi prima di abbonarti.",
-    "de": "Melde dich vor dem Abonnieren an."
-  },
-  "You already have an active subscription.": {
-    "fr": "Tu as déjà un abonnement actif.",
-    "pt": "Já tens uma subscrição ativa.",
-    "it": "Hai già un abbonamento attivo.",
-    "de": "Du hast bereits ein aktives Abonnement."
-  },
-  "Your purchase is awaiting confirmation.": {
-    "fr": "Ton achat attend une confirmation.",
-    "pt": "A tua compra aguarda confirmação.",
-    "it": "Il tuo acquisto è in attesa di conferma.",
-    "de": "Dein Kauf wartet auf Bestätigung."
-  },
-  "No purchases were found to restore.": {
-    "fr": "Aucun achat à restaurer n'a été trouvé.",
-    "pt": "Não foram encontradas compras para restaurar.",
-    "it": "Non sono stati trovati acquisti da ripristinare.",
-    "de": "Es wurden keine Käufe zum Wiederherstellen gefunden."
-  },
-  "Bobby Pro is active.": {
-    "fr": "Bobby Pro est actif.",
-    "pt": "O Bobby Pro está ativo.",
-    "it": "Bobby Pro è attivo.",
-    "de": "Bobby Pro ist aktiv."
-  },
-  "The purchase could not complete. Try again.": {
-    "fr": "L'achat n'a pas abouti. Réessaie.",
-    "pt": "Não foi possível concluir a compra. Tenta novamente.",
-    "it": "Impossibile completare l'acquisto. Riprova.",
-    "de": "Der Kauf konnte nicht abgeschlossen werden. Versuche es erneut."
-  },
-  "Your account confirmed the benefit.": {
-    "fr": "Ton compte a confirmé l'avantage.",
-    "pt": "A tua conta confirmou o benefício.",
-    "it": "Il tuo account ha confermato il beneficio.",
-    "de": "Dein Konto hat den Vorteil bestätigt."
-  },
-  "This account already redeemed a benefit from this code.": {
-    "fr": "Ce compte a déjà utilisé ce code pour obtenir un avantage.",
-    "pt": "Esta conta já resgatou um benefício com este código.",
-    "it": "Questo account ha già riscattato un beneficio con questo codice.",
-    "de": "Dieses Konto hat mit diesem Code bereits einen Vorteil eingelöst."
-  },
-  "Use an invitation from a different account.": {
-    "fr": "Utilise une invitation d'un autre compte.",
-    "pt": "Usa um convite de outra conta.",
-    "it": "Usa un invito di un altro account.",
-    "de": "Verwende eine Einladung von einem anderen Konto."
-  },
-  "This invitation is available to eligible new accounts.": {
-    "fr": "Cette invitation est proposée aux nouveaux comptes admissibles.",
-    "pt": "Este convite está disponível para novas contas elegíveis.",
-    "it": "Questo invito è disponibile per i nuovi account idonei.",
-    "de": "Diese Einladung ist für berechtigte neue Konten verfügbar."
-  },
-  "This code reached its redemption limit.": {
-    "fr": "Ce code a atteint sa limite d'utilisation.",
-    "pt": "Este código atingiu o limite de resgates.",
-    "it": "Questo codice ha raggiunto il limite di utilizzi.",
-    "de": "Dieser Code hat sein Einlösungslimit erreicht."
-  },
-  "This code expired.": {
-    "fr": "Ce code a expiré.",
-    "pt": "Este código expirou.",
-    "it": "Questo codice è scaduto.",
-    "de": "Dieser Code ist abgelaufen."
-  },
-  "This code did not grant a benefit. Check it and try again.": {
-    "fr": "Ce code n'a accordé aucun avantage. Vérifie-le et réessaie.",
-    "pt": "Este código não concedeu um benefício. Confirma-o e tenta novamente.",
-    "it": "Questo codice non ha concesso un beneficio. Controllalo e riprova.",
-    "de": "Dieser Code hat keinen Vorteil gewährt. Prüfe ihn und versuche es erneut."
-  },
-  "Equipped on this companion": {
-    "fr": "Accessoires équipés sur ce compagnon",
-    "pt": "Equipamento deste companheiro",
-    "it": "Equipaggiamento di questo compagno",
-    "de": "Ausrüstung dieses Begleiters"
-  },
-  "Yours": {
-    "fr": "À toi",
-    "pt": "Teu",
-    "it": "Tuo",
-    "de": "Deins"
-  },
-  "The example island could not be loaded.": {
-    "fr": "Impossible de charger l'île d'exemple.",
-    "pt": "Não foi possível carregar a ilha de exemplo.",
-    "it": "Impossibile caricare l'isola di esempio.",
-    "de": "Die Beispielinsel konnte nicht geladen werden."
-  },
-  "Accept the risk notice before opening Trader Land.": {
-    "fr": "Accepte l'avis de risque avant d'ouvrir Trader Land.",
-    "pt": "Aceita o aviso de risco antes de abrir o Trader Land.",
-    "it": "Accetta l'avviso sui rischi prima di aprire Trader Land.",
-    "de": "Akzeptiere den Risikohinweis, bevor du Trader Land öffnest."
-  },
-  "Sign in to open your island.": {
-    "fr": "Connecte-toi pour ouvrir ton île.",
-    "pt": "Inicia sessão para abrir a tua ilha.",
-    "it": "Accedi per aprire la tua isola.",
-    "de": "Melde dich an, um deine Insel zu öffnen."
-  },
-  "Request failed": {
-    "fr": "La demande a échoué",
-    "pt": "O pedido falhou",
-    "it": "Richiesta non riuscita",
-    "de": "Anfrage fehlgeschlagen"
-  },
-  "Connection interrupted. Reload to check the saved island before repeating the action.": {
-    "fr": "Connexion interrompue. Recharge pour vérifier l'île enregistrée avant de répéter l'action.",
-    "pt": "Ligação interrompida. Recarrega para verificar a ilha guardada antes de repetir a ação.",
-    "it": "Connessione interrotta. Ricarica per controllare l'isola salvata prima di ripetere l'azione.",
-    "de": "Verbindung unterbrochen. Lade die gespeicherte Insel neu, bevor du die Aktion wiederholst."
-  },
-  "Islands are unavailable.": {
-    "fr": "Les îles sont indisponibles.",
-    "pt": "As ilhas não estão disponíveis.",
-    "it": "Le isole non sono disponibili.",
-    "de": "Inseln sind nicht verfügbar."
-  },
-  "Thesis reviewed": {
-    "fr": "Thèse revue",
-    "pt": "Tese revista",
-    "it": "Tesi riesaminata",
-    "de": "These überprüft"
-  },
-  "Island grew": {
-    "fr": "L'île s'est agrandie",
-    "pt": "A ilha cresceu",
-    "it": "L'isola è cresciuta",
-    "de": "Insel vergrößert"
-  },
-  "Saved": {
-    "fr": "Enregistré",
-    "pt": "Guardado",
-    "it": "Salvato",
-    "de": "Gespeichert"
-  },
-  "Reload progress to refresh XP.": {
-    "fr": "Recharge la progression pour actualiser les XP.",
-    "pt": "Recarrega o progresso para atualizar os XP.",
-    "it": "Ricarica i progressi per aggiornare gli XP.",
-    "de": "Lade den Fortschritt neu, um die XP zu aktualisieren."
-  },
-  "Enter the island's 10-character code.": {
-    "fr": "Saisis le code à 10 caractères de l'île.",
-    "pt": "Introduz o código da ilha com 10 caracteres.",
-    "it": "Inserisci il codice di 10 caratteri dell'isola.",
-    "de": "Gib den 10-stelligen Inselcode ein."
-  },
-  "This creator is blocked on this device. Unblock them in community safety.": {
-    "fr": "Ce créateur est bloqué sur cet appareil. Débloque-le dans la sécurité de la communauté.",
-    "pt": "Este criador está bloqueado neste dispositivo. Desbloqueia-o na segurança da comunidade.",
-    "it": "Questo creatore è bloccato su questo dispositivo. Sbloccalo nella sicurezza della comunità.",
-    "de": "Dieser Ersteller ist auf diesem Gerät blockiert. Hebe die Blockierung unter Community-Sicherheit auf."
-  },
-  "This island is unavailable.": {
-    "fr": "Cette île est indisponible.",
-    "pt": "Esta ilha não está disponível.",
-    "it": "Quest'isola non è disponibile.",
-    "de": "Diese Insel ist nicht verfügbar."
-  },
-  "Could not save the blocked creators. Try again.": {
-    "fr": "Impossible d'enregistrer les créateurs bloqués. Réessaie.",
-    "pt": "Não foi possível guardar os criadores bloqueados. Tenta novamente.",
-    "it": "Impossibile salvare i creatori bloccati. Riprova.",
-    "de": "Blockierte Ersteller konnten nicht gespeichert werden. Versuche es erneut."
-  },
-  "Read, wait, review your thesis, then build with earned pieces.": {
-    "fr": "Lis, attends, révise ta thèse, puis construis avec les pièces gagnées.",
-    "pt": "Lê, espera, revê a tua tese e constrói com as peças conquistadas.",
-    "it": "Leggi, attendi, riesamina la tua tesi e costruisci con i pezzi guadagnati.",
-    "de": "Lies, warte, überprüfe deine These und baue dann mit verdienten Teilen."
-  },
-  "My island": {
-    "fr": "Mon île",
-    "pt": "A minha ilha",
-    "it": "La mia isola",
-    "de": "Meine Insel"
-  },
-  "Neighbors": {
-    "fr": "Voisins",
-    "pt": "Vizinhos",
-    "it": "Vicini",
-    "de": "Nachbarn"
-  },
-  "Sign in to open your island. Public islands are available in Neighbors.": {
-    "fr": "Connecte-toi pour ouvrir ton île. Les îles publiques sont disponibles dans Voisins.",
-    "pt": "Inicia sessão para abrir a tua ilha. As ilhas públicas estão disponíveis em Vizinhos.",
-    "it": "Accedi per aprire la tua isola. Le isole pubbliche sono disponibili in Vicini.",
-    "de": "Melde dich an, um deine Insel zu öffnen. Öffentliche Inseln findest du unter Nachbarn."
-  },
-  "Reload your saved island before another change.": {
-    "fr": "Recharge ton île enregistrée avant toute autre modification.",
-    "pt": "Recarrega a tua ilha guardada antes de outra alteração.",
-    "it": "Ricarica la tua isola salvata prima di un'altra modifica.",
-    "de": "Lade deine gespeicherte Insel vor einer weiteren Änderung neu."
-  },
-  "Growth": {
-    "fr": "Croissance",
-    "pt": "Crescimento",
-    "it": "Crescita",
-    "de": "Wachstum"
-  },
   "Move Aura Core": {
     "fr": "Déplacer Aura Core",
     "pt": "Mover Aura Core",
     "it": "Sposta Aura Core",
     "de": "Aura Core verschieben"
-  },
-  "Choose a destination on the grid, then confirm.": {
-    "fr": "Choisis une destination sur la grille, puis confirme.",
-    "pt": "Escolhe um destino na grelha e confirma.",
-    "it": "Scegli una destinazione sulla griglia, poi conferma.",
-    "de": "Wähle ein Ziel auf dem Raster und bestätige."
-  },
-  "Rotate": {
-    "fr": "Tourner",
-    "pt": "Rodar",
-    "it": "Ruota",
-    "de": "Drehen"
-  },
-  "This footprint overlaps another piece, the core or the island edge.": {
-    "fr": "Cette empreinte chevauche une autre pièce, le noyau ou le bord de l'île.",
-    "pt": "Esta área sobrepõe-se a outra peça, ao núcleo ou à borda da ilha.",
-    "it": "Questo ingombro si sovrappone a un altro pezzo, al nucleo o al bordo dell'isola.",
-    "de": "Diese Fläche überschneidet sich mit einem anderen Teil, dem Kern oder dem Inselrand."
-  },
-  "Confirm position": {
-    "fr": "Confirmer la position",
-    "pt": "Confirmar posição",
-    "it": "Conferma posizione",
-    "de": "Position bestätigen"
-  },
-  "Next piece": {
-    "fr": "Prochaine pièce",
-    "pt": "Próxima peça",
-    "it": "Prossimo pezzo",
-    "de": "Nächstes Teil"
-  },
-  "Collection": {
-    "fr": "Collection",
-    "pt": "Coleção",
-    "it": "Collezione",
-    "de": "Sammlung"
-  },
-  "Your earned pieces will appear here. Complete a read and return to review its thesis.": {
-    "fr": "Tes pièces gagnées apparaîtront ici. Termine une lecture et reviens pour revoir sa thèse.",
-    "pt": "As tuas peças conquistadas aparecerão aqui. Conclui uma leitura e volta para rever a tese.",
-    "it": "I pezzi guadagnati appariranno qui. Completa un'analisi e torna per riesaminarne la tesi.",
-    "de": "Deine verdienten Teile erscheinen hier. Schließe eine Analyse ab und komme zurück, um ihre These zu überprüfen."
-  },
-  "Ready to review": {
-    "fr": "Prête à réviser",
-    "pt": "Pronta para rever",
-    "it": "Pronta da riesaminare",
-    "de": "Bereit zur Überprüfung"
-  },
-  "Growing": {
-    "fr": "En croissance",
-    "pt": "A crescer",
-    "it": "In crescita",
-    "de": "Wächst"
-  },
-  "Review thesis": {
-    "fr": "Réviser la thèse",
-    "pt": "Rever tese",
-    "it": "Riesamina tesi",
-    "de": "These überprüfen"
-  },
-  "Extend horizon": {
-    "fr": "Prolonger l'horizon",
-    "pt": "Prolongar horizonte",
-    "it": "Estendi orizzonte",
-    "de": "Horizont verlängern"
-  },
-  "days": {
-    "fr": "jours",
-    "pt": "dias",
-    "it": "giorni",
-    "de": "Tage"
-  },
-  "Build with this piece": {
-    "fr": "Construire avec cette pièce",
-    "pt": "Construir com esta peça",
-    "it": "Costruisci con questo pezzo",
-    "de": "Mit diesem Teil bauen"
-  },
-  "Placed": {
-    "fr": "Placée",
-    "pt": "Colocada",
-    "it": "Posizionato",
-    "de": "Platziert"
   },
   "Move piece": {
     "fr": "Déplacer la pièce",
@@ -795,89 +1431,83 @@
     "it": "Sposta pezzo",
     "de": "Teil verschieben"
   },
-  "Return to collection": {
-    "fr": "Remettre dans la collection",
-    "pt": "Devolver à coleção",
-    "it": "Riporta nella collezione",
-    "de": "Zurück in die Sammlung"
+  "My invitation code: {0}": {
+    "fr": "Mon code d'invitation : {0}",
+    "pt": "O meu código de convite: {0}",
+    "it": "Il mio codice d'invito: {0}",
+    "de": "Mein Einladungscode: {0}"
   },
-  "Island name": {
-    "fr": "Nom de l'île",
-    "pt": "Nome da ilha",
-    "it": "Nome dell'isola",
-    "de": "Inselname"
+  "My island": {
+    "fr": "Mon île",
+    "pt": "A minha ilha",
+    "it": "La mia isola",
+    "de": "Meine Insel"
   },
-  "Open public link": {
-    "fr": "Ouvrir le lien public",
-    "pt": "Abrir ligação pública",
-    "it": "Apri link pubblico",
-    "de": "Öffentlichen Link öffnen"
+  "My theses": {
+    "fr": "Mes thèses",
+    "pt": "As minhas teses",
+    "it": "Le mie tesi",
+    "de": "Meine Thesen"
   },
-  "Publishing shares your island name and layout. Your account identity is not included in the public island.": {
-    "fr": "La publication partage le nom et la disposition de ton île. Ton identité de compte n'est pas incluse dans l'île publique.",
-    "pt": "Publicar partilha o nome e a disposição da tua ilha. A ilha pública não inclui a identidade da tua conta.",
-    "it": "La pubblicazione condivide il nome e la disposizione della tua isola. L'isola pubblica non include l'identità del tuo account.",
-    "de": "Die Veröffentlichung teilt den Namen und die Anordnung deiner Insel. Deine Kontoidentität ist nicht Teil der öffentlichen Insel."
+  "Neighbors": {
+    "fr": "Voisins",
+    "pt": "Vizinhos",
+    "it": "Vicini",
+    "de": "Nachbarn"
   },
-  "Back to neighbors": {
-    "fr": "Retour aux voisins",
-    "pt": "Voltar aos vizinhos",
-    "it": "Torna ai vicini",
-    "de": "Zurück zu den Nachbarn"
+  "New": {
+    "fr": "Débutant",
+    "pt": "Principiante",
+    "it": "Principiante",
+    "de": "Anfänger"
   },
-  "Shared island": {
-    "fr": "Île partagée",
-    "pt": "Ilha partilhada",
-    "it": "Isola condivisa",
-    "de": "Geteilte Insel"
+  "New accounts only, within their first week.": {
+    "fr": "Nouveaux comptes uniquement, pendant leur première semaine.",
+    "pt": "Só contas novas, durante a primeira semana.",
+    "it": "Solo nuovi account, durante la prima settimana.",
+    "de": "Nur neue Konten, in ihrer ersten Woche."
   },
-  "Read-only app example. These pieces do not belong to your inventory.": {
-    "fr": "Exemple de l'app en lecture seule. Ces pièces ne font pas partie de ton inventaire.",
-    "pt": "Exemplo da app apenas para explorar. Estas peças não pertencem ao teu inventário.",
-    "it": "Esempio dell'app di sola lettura. Questi pezzi non appartengono al tuo inventario.",
-    "de": "App-Beispiel zum Anschauen. Diese Teile gehören nicht zu deinem Inventar."
+  "News": {
+    "fr": "Actualités",
+    "pt": "Notícias",
+    "it": "Notizie",
+    "de": "Nachrichten"
   },
-  "You are visiting a public island. Changes stay with its builder.": {
-    "fr": "Tu visites une île publique. Les modifications restent réservées à son créateur.",
-    "pt": "Estás a visitar uma ilha pública. As alterações ficam com quem a construiu.",
-    "it": "Stai visitando un'isola pubblica. Le modifiche spettano al suo creatore.",
-    "de": "Du besuchst eine öffentliche Insel. Änderungen bleiben ihrem Erbauer vorbehalten."
+  "Next piece": {
+    "fr": "Prochaine pièce",
+    "pt": "Próxima peça",
+    "it": "Prossimo pezzo",
+    "de": "Nächstes Teil"
   },
-  "pieces": {
-    "fr": "pièces",
-    "pt": "peças",
-    "it": "pezzi",
-    "de": "Teile"
+  "Next read back on {0}": {
+    "fr": "Prochaine analyse de retour {0}",
+    "pt": "A próxima volta: {0}",
+    "it": "La prossima torna: {0}",
+    "de": "Nächste Analyse zurück: {0}"
   },
-  "Reload neighbors": {
-    "fr": "Recharger les voisins",
-    "pt": "Recarregar vizinhos",
-    "it": "Ricarica vicini",
-    "de": "Nachbarn neu laden"
+  "Next read back today": {
+    "fr": "Prochaine analyse de retour aujourd'hui",
+    "pt": "A próxima volta hoje",
+    "it": "La prossima torna oggi",
+    "de": "Nächste Analyse heute zurück"
   },
-  "Island code": {
-    "fr": "Code de l'île",
-    "pt": "Código da ilha",
-    "it": "Codice dell'isola",
-    "de": "Inselcode"
+  "Next read back {0}": {
+    "fr": "Prochaine analyse de retour le {0}",
+    "pt": "A próxima volta a {0}",
+    "it": "La prossima torna il {0}",
+    "de": "Nächste Analyse zurück am {0}"
   },
-  "Visit island": {
-    "fr": "Visiter l'île",
-    "pt": "Visitar ilha",
-    "it": "Visita isola",
-    "de": "Insel besuchen"
+  "No Bobby Pro purchase on this Google Play account.": {
+    "fr": "Aucun achat Bobby Pro sur ce compte Google Play.",
+    "pt": "Sem compra do Bobby Pro nesta conta Google Play.",
+    "it": "Nessun acquisto Bobby Pro su questo account Google Play.",
+    "de": "Kein Bobby-Pro-Kauf in diesem Google Play-Konto."
   },
-  "Read-only app example": {
-    "fr": "Exemple de l'app en lecture seule",
-    "pt": "Exemplo da app apenas para explorar",
-    "it": "Esempio dell'app di sola lettura",
-    "de": "App-Beispiel zum Anschauen"
-  },
-  "Visit": {
-    "fr": "Visiter",
-    "pt": "Visitar",
-    "it": "Visita",
-    "de": "Besuchen"
+  "No lists were kept for this review.": {
+    "fr": "Aucune liste n’a été conservée pour ce réexamen.",
+    "pt": "Não ficaram listas guardadas desta revisão.",
+    "it": "Per questo riesame non sono state salvate liste.",
+    "de": "Zu dieser Überprüfung wurden keine Listen gespeichert."
   },
   "No public neighbors are available right now.": {
     "fr": "Aucun voisin public n'est disponible pour le moment.",
@@ -885,11 +1515,247 @@
     "it": "Non ci sono vicini pubblici disponibili al momento.",
     "de": "Derzeit sind keine öffentlichen Nachbarn verfügbar."
   },
-  "Share this name and layout with visitors? You can make it private again here.": {
-    "fr": "Partager ce nom et cette disposition avec les visiteurs ? Tu peux la rendre privée ici à tout moment.",
-    "pt": "Partilhar este nome e disposição com visitantes? Podes torná-la privada novamente aqui.",
-    "it": "Condividere questo nome e questa disposizione con i visitatori? Puoi renderla nuovamente privata qui.",
-    "de": "Diesen Namen und diese Anordnung mit Besuchern teilen? Du kannst die Insel hier wieder privat machen."
+  "No purchases were found to restore.": {
+    "fr": "Aucun achat à restaurer n'a été trouvé.",
+    "pt": "Não foram encontradas compras para restaurar.",
+    "it": "Non sono stati trovati acquisti da ripristinare.",
+    "de": "Es wurden keine Käufe zum Wiederherstellen gefunden."
+  },
+  "No reads left this week": {
+    "fr": "Plus aucune analyse cette semaine",
+    "pt": "Sem análises esta semana",
+    "it": "Nessuna analisi rimasta questa settimana",
+    "de": "Keine Analysen mehr diese Woche"
+  },
+  "No remembered assets.": {
+    "fr": "Aucun actif mémorisé.",
+    "pt": "Sem ativos memorizados.",
+    "it": "Nessun asset ricordato.",
+    "de": "Keine gemerkten Werte."
+  },
+  "No reports are ready yet.": {
+    "fr": "Aucun rapport n'est encore disponible.",
+    "pt": "Ainda não há relatórios disponíveis.",
+    "it": "Non ci sono ancora rapporti disponibili.",
+    "de": "Es sind noch keine Berichte verfügbar."
+  },
+  "No shortcuts": {
+    "fr": "Aucun raccourci",
+    "pt": "Sem atalhos",
+    "it": "Nessuna scorciatoia",
+    "de": "Keine Schnellzugriffe"
+  },
+  "No starting price was saved with this thesis.": {
+    "fr": "Aucun prix de départ n’a été enregistré avec cette thèse.",
+    "pt": "Não foi guardado um preço inicial com esta tese.",
+    "it": "Con questa tesi non è stato salvato un prezzo di partenza.",
+    "de": "Mit dieser These wurde kein Ausgangspreis gespeichert."
+  },
+  "No theses": {
+    "fr": "Aucune thèse",
+    "pt": "Sem teses",
+    "it": "Nessuna tesi",
+    "de": "Keine Thesen"
+  },
+  "No theses yet.": {
+    "fr": "Pas encore de thèse.",
+    "pt": "Ainda não há teses.",
+    "it": "Ancora nessuna tesi.",
+    "de": "Noch keine Thesen."
+  },
+  "None in this evidence.": {
+    "fr": "Rien dans ces données.",
+    "pt": "Nada nesta evidência.",
+    "it": "Niente in questi dati.",
+    "de": "Nichts in diesen Daten."
+  },
+  "Not active": {
+    "fr": "Inactif",
+    "pt": "Não ativo",
+    "it": "Non attivo",
+    "de": "Nicht aktiv"
+  },
+  "Not checked": {
+    "fr": "Non vérifié",
+    "pt": "Não verificado",
+    "it": "Non verificato",
+    "de": "Nicht geprüft"
+  },
+  "Not mine": {
+    "fr": "Pas à moi",
+    "pt": "Não é meu",
+    "it": "Non è mio",
+    "de": "Nicht von mir"
+  },
+  "Not now": {
+    "fr": "Pas maintenant",
+    "pt": "Agora não",
+    "it": "Non ora",
+    "de": "Nicht jetzt"
+  },
+  "Not reviewed": {
+    "fr": "Non revue",
+    "pt": "Por rever",
+    "it": "Non rivista",
+    "de": "Nicht überprüft"
+  },
+  "Not reviewed yet": {
+    "fr": "Pas encore réexaminée",
+    "pt": "Ainda não revista",
+    "it": "Non ancora riesaminata",
+    "de": "Noch nicht geprüft"
+  },
+  "Not synced yet": {
+    "en": "Not synced yet",
+    "es": "Aún sin sincronizar",
+    "fr": "Pas encore synchronisé",
+    "pt": "Ainda não sincronizado",
+    "it": "Non ancora sincronizzato",
+    "de": "Noch nicht synchronisiert"
+  },
+  "Notes to yourself to review a thesis": {
+    "fr": "Des notes pour toi pour revoir une thèse",
+    "pt": "Notas para ti para rever uma tese",
+    "it": "Note per te per rivedere una tesi",
+    "de": "Notizen an dich, um eine These zu überprüfen"
+  },
+  "Nothing to show yet.": {
+    "fr": "Rien à montrer pour l’instant.",
+    "pt": "Ainda nada para mostrar.",
+    "it": "Ancora niente da mostrare.",
+    "de": "Noch nichts zu zeigen."
+  },
+  "Notify me when reports are ready": {
+    "fr": "Me prévenir lorsque des rapports sont disponibles",
+    "pt": "Avisar-me quando houver relatórios disponíveis",
+    "it": "Avvisami quando i rapporti sono pronti",
+    "de": "Benachrichtige mich, wenn Berichte bereit sind"
+  },
+  "Off · Bobby reads in silence": {
+    "en": "Off · Bobby reads in silence",
+    "es": "Apagada · Bobby lee en silencio",
+    "fr": "Désactivée · Bobby lit en silence",
+    "pt": "Desligada · O Bobby lê em silêncio",
+    "it": "Disattivata · Bobby legge in silenzio",
+    "de": "Aus · Bobby liest lautlos"
+  },
+  "On from your next question.": {
+    "fr": "Active dès ta prochaine question.",
+    "pt": "Ativa a partir da tua próxima pergunta.",
+    "it": "Attiva dalla tua prossima domanda.",
+    "de": "Aktiv ab deiner nächsten Frage."
+  },
+  "On this phone": {
+    "fr": "Sur ce téléphone",
+    "pt": "Neste telemóvel",
+    "it": "Su questo telefono",
+    "de": "Auf diesem Gerät"
+  },
+  "On · Bobby speaks his reads": {
+    "en": "On · Bobby speaks his reads",
+    "es": "Encendida · Bobby narra sus lecturas",
+    "fr": "Activée · Bobby raconte ses lectures",
+    "pt": "Ligada · O Bobby narra as suas leituras",
+    "it": "Attivata · Bobby narra le sue letture",
+    "de": "An · Bobby spricht seine Analysen"
+  },
+  "Only on this phone.": {
+    "fr": "Uniquement sur ce téléphone.",
+    "pt": "Só neste telemóvel.",
+    "it": "Solo su questo telefono.",
+    "de": "Nur auf diesem Gerät."
+  },
+  "Open My theses to keep it in this account.": {
+    "fr": "Ouvre Mes thèses pour la garder sur ce compte.",
+    "pt": "Abre As minhas teses para a manteres nesta conta.",
+    "it": "Apri Le mie tesi per tenerla in questo account.",
+    "de": "Öffne Meine Thesen, um sie in diesem Konto zu behalten."
+  },
+  "Open it": {
+    "fr": "L’ouvrir",
+    "pt": "Abrir",
+    "it": "Aprila",
+    "de": "Öffnen"
+  },
+  "Open public link": {
+    "fr": "Ouvrir le lien public",
+    "pt": "Abrir ligação pública",
+    "it": "Apri link pubblico",
+    "de": "Öffentlichen Link öffnen"
+  },
+  "Opens the full explanation before anything is turned on.": {
+    "fr": "Ouvre l'explication complète avant toute activation.",
+    "pt": "Abre a explicação completa antes de ativar seja o que for.",
+    "it": "Apre la spiegazione completa prima di attivare qualsiasi cosa.",
+    "de": "Öffnet die vollständige Erklärung, bevor etwas eingeschaltet wird."
+  },
+  "Optional": {
+    "fr": "Facultatif",
+    "pt": "Opcional",
+    "it": "Facoltativo",
+    "de": "Optional"
+  },
+  "Payment coins": {
+    "fr": "Cryptos de paiement",
+    "pt": "Moedas de pagamento",
+    "it": "Monete di pagamento",
+    "de": "Zahlungscoins"
+  },
+  "Pet": {
+    "en": "Pet",
+    "es": "Mascota",
+    "fr": "Compagnon animal",
+    "pt": "Mascote",
+    "it": "Animaletto",
+    "de": "Begleiter"
+  },
+  "Pieces": {
+    "en": "Pieces",
+    "es": "Piezas",
+    "fr": "Pièces",
+    "pt": "Peças",
+    "it": "Pezzi",
+    "de": "Teile"
+  },
+  "Placed": {
+    "fr": "Placée",
+    "pt": "Colocada",
+    "it": "Posizionato",
+    "de": "Platziert"
+  },
+  "Plans are currently unavailable.": {
+    "fr": "Les formules sont actuellement indisponibles.",
+    "pt": "Os planos não estão disponíveis neste momento.",
+    "it": "I piani non sono disponibili al momento.",
+    "de": "Tarife sind derzeit nicht verfügbar."
+  },
+  "Price evidence only.": {
+    "fr": "Données de prix uniquement.",
+    "pt": "Só evidência de preço.",
+    "it": "Solo dati di prezzo.",
+    "de": "Nur Kursdaten."
+  },
+  "Privacy policy": {
+    "en": "Privacy policy",
+    "es": "Política de privacidad",
+    "fr": "Politique de confidentialité",
+    "pt": "Política de privacidade",
+    "it": "Informativa sulla privacy",
+    "de": "Datenschutzrichtlinie"
+  },
+  "Profile": {
+    "en": "Profile",
+    "es": "Perfil",
+    "fr": "Profil",
+    "pt": "Perfil",
+    "it": "Profilo",
+    "de": "Profil"
+  },
+  "Project fundamentals": {
+    "fr": "Fondamentaux du projet",
+    "pt": "Fundamentos do projeto",
+    "it": "Fondamentali del progetto",
+    "de": "Fundamentaldaten des Projekts"
   },
   "Publish": {
     "fr": "Publier",
@@ -897,11 +1763,781 @@
     "it": "Pubblica",
     "de": "Veröffentlichen"
   },
-  "Invalid island code": {
-    "fr": "Code d'île invalide",
-    "pt": "Código de ilha inválido",
-    "it": "Codice dell'isola non valido",
-    "de": "Ungültiger Inselcode"
+  "Publishing shares your island name and layout. Your account identity is not included in the public island.": {
+    "fr": "La publication partage le nom et la disposition de ton île. Ton identité de compte n'est pas incluse dans l'île publique.",
+    "pt": "Publicar partilha o nome e a disposição da tua ilha. A ilha pública não inclui a identidade da tua conta.",
+    "it": "La pubblicazione condivide il nome e la disposizione della tua isola. L'isola pubblica non include l'identità del tuo account.",
+    "de": "Die Veröffentlichung teilt den Namen und die Anordnung deiner Insel. Deine Kontoidentität ist nicht Teil der öffentlichen Insel."
+  },
+  "Questions from this phone are not added to account memory.": {
+    "fr": "Les questions de ce téléphone ne s'ajoutent pas à la mémoire du compte.",
+    "pt": "As perguntas deste telemóvel não entram na memória da conta.",
+    "it": "Le domande di questo telefono non entrano nella memoria dell'account.",
+    "de": "Fragen von diesem Gerät kommen nicht ins Konto-Gedächtnis."
+  },
+  "Quick reads": {
+    "fr": "Analyses Rapides",
+    "pt": "Análises Rápidas",
+    "it": "Analisi Rapide",
+    "de": "Schnelle Analysen"
+  },
+  "Read every plan, period and introductory offer below before subscribing.": {
+    "fr": "Lis chaque formule, période et offre de découverte ci-dessous avant de t'abonner.",
+    "pt": "Revê cada plano, período e oferta introdutória abaixo antes de subscrever.",
+    "it": "Leggi ogni piano, periodo e offerta introduttiva qui sotto prima di abbonarti.",
+    "de": "Lies vor dem Abonnieren alle unten aufgeführten Tarife, Laufzeiten und Einstiegsangebote."
+  },
+  "Read, wait, review your thesis, then build with earned pieces.": {
+    "fr": "Lis, attends, révise ta thèse, puis construis avec les pièces gagnées.",
+    "pt": "Lê, espera, revê a tua tese e constrói com as peças conquistadas.",
+    "it": "Leggi, attendi, riesamina la tua tesi e costruisci con i pezzi guadagnati.",
+    "de": "Lies, warte, überprüfe deine These und baue dann mit verdienten Teilen."
+  },
+  "Read-only app example": {
+    "fr": "Exemple de l'app en lecture seule",
+    "pt": "Exemplo da app apenas para explorar",
+    "it": "Esempio dell'app di sola lettura",
+    "de": "App-Beispiel zum Anschauen"
+  },
+  "Read-only app example. These pieces do not belong to your inventory.": {
+    "fr": "Exemple de l'app en lecture seule. Ces pièces ne font pas partie de ton inventaire.",
+    "pt": "Exemplo da app apenas para explorar. Estas peças não pertencem ao teu inventário.",
+    "it": "Esempio dell'app di sola lettura. Questi pezzi non appartengono al tuo inventario.",
+    "de": "App-Beispiel zum Anschauen. Diese Teile gehören nicht zu deinem Inventar."
+  },
+  "Reading price evidence…": {
+    "fr": "Lecture des données de prix…",
+    "pt": "A ler a evidência de preço…",
+    "it": "Lettura dei dati di prezzo…",
+    "de": "Kursdaten werden gelesen…"
+  },
+  "Reads left this week": {
+    "en": "Reads left this week",
+    "es": "Lecturas restantes esta semana",
+    "fr": "Lectures restantes cette semaine",
+    "pt": "Leituras restantes esta semana",
+    "it": "Letture rimaste questa settimana",
+    "de": "Verbleibende Analysen diese Woche"
+  },
+  "Ready to review": {
+    "fr": "Prête à réviser",
+    "pt": "Pronta para rever",
+    "it": "Pronta da riesaminare",
+    "de": "Bereit zur Überprüfung"
+  },
+  "Recent assets shown as shortcuts": {
+    "fr": "Actifs récents affichés comme raccourcis",
+    "pt": "Ativos recentes mostrados como atalhos",
+    "it": "Asset recenti mostrati come scorciatoie",
+    "de": "Zuletzt gefragte Werte als Schnellzugriffe"
+  },
+  "Recover access confirmed by Google Play": {
+    "en": "Recover access confirmed by Google Play",
+    "es": "Recupera el acceso confirmado por Google Play",
+    "fr": "Récupère l’accès confirmé par Google Play",
+    "pt": "Recupera o acesso confirmado pelo Google Play",
+    "it": "Recupera l’accesso confermato da Google Play",
+    "de": "Stelle den von Google Play bestätigten Zugang wieder her"
+  },
+  "Redeem": {
+    "fr": "Utiliser",
+    "pt": "Resgatar",
+    "it": "Riscatta",
+    "de": "Einlösen"
+  },
+  "Redeem a Bobby code for the benefits confirmed by your account.": {
+    "fr": "Utilise un code Bobby pour obtenir les avantages confirmés par ton compte.",
+    "pt": "Resgata um código Bobby para obter os benefícios confirmados pela tua conta.",
+    "it": "Riscatta un codice Bobby per i benefici confermati dal tuo account.",
+    "de": "Löse einen Bobby-Code für die von deinem Konto bestätigten Vorteile ein."
+  },
+  "Redeem a code": {
+    "en": "Redeem a code",
+    "es": "Canjear un código",
+    "fr": "Utiliser un code",
+    "pt": "Resgatar um código",
+    "it": "Riscatta un codice",
+    "de": "Code einlösen"
+  },
+  "Reload neighbors": {
+    "fr": "Recharger les voisins",
+    "pt": "Recarregar vizinhos",
+    "it": "Ricarica vicini",
+    "de": "Nachbarn neu laden"
+  },
+  "Reload progress to refresh XP.": {
+    "fr": "Recharge la progression pour actualiser les XP.",
+    "pt": "Recarrega o progresso para atualizar os XP.",
+    "it": "Ricarica i progressi per aggiornare gli XP.",
+    "de": "Lade den Fortschritt neu, um die XP zu aktualisieren."
+  },
+  "Reload your saved island before another change.": {
+    "fr": "Recharge ton île enregistrée avant toute autre modification.",
+    "pt": "Recarrega a tua ilha guardada antes de outra alteração.",
+    "it": "Ricarica la tua isola salvata prima di un'altra modifica.",
+    "de": "Lade deine gespeicherte Insel vor einer weiteren Änderung neu."
+  },
+  "Remember": {
+    "fr": "Retenir",
+    "pt": "Lembrar",
+    "it": "Ricorda",
+    "de": "Merken"
+  },
+  "Remember questions from this device": {
+    "fr": "Mémoriser les questions de cet appareil",
+    "pt": "Guardar perguntas deste dispositivo",
+    "it": "Ricorda le domande di questo dispositivo",
+    "de": "Fragen von diesem Gerät speichern"
+  },
+  "Remember this?": {
+    "fr": "Je m'en souviens ?",
+    "pt": "Lembro-me disto?",
+    "it": "Lo ricordo?",
+    "de": "Soll ich mir das merken?"
+  },
+  "Remind me": {
+    "fr": "Rappelle-le-moi",
+    "pt": "Lembra-me",
+    "it": "Ricordamelo",
+    "de": "Erinnere mich"
+  },
+  "Reminder not set.": {
+    "fr": "Rappel non enregistré.",
+    "pt": "Lembrete não guardado.",
+    "it": "Promemoria non salvato.",
+    "de": "Erinnerung nicht gespeichert."
+  },
+  "Reminder on {0}": {
+    "fr": "Rappel le {0}",
+    "pt": "Lembrete a {0}",
+    "it": "Promemoria il {0}",
+    "de": "Erinnerung am {0}"
+  },
+  "Reminders": {
+    "fr": "Rappels",
+    "pt": "Lembretes",
+    "it": "Promemoria",
+    "de": "Erinnerungen"
+  },
+  "Remove": {
+    "fr": "Retirer",
+    "pt": "Remover",
+    "it": "Rimuovi",
+    "de": "Entfernen"
+  },
+  "Remove the saved invitation": {
+    "fr": "Retirer l'invitation enregistrée",
+    "pt": "Remover o convite guardado",
+    "it": "Rimuovi l'invito salvato",
+    "de": "Gespeicherte Einladung entfernen"
+  },
+  "Reopen": {
+    "fr": "Rouvrir",
+    "pt": "Reabrir",
+    "it": "Riapri",
+    "de": "Wieder öffnen"
+  },
+  "Report language": {
+    "fr": "Langue du rapport",
+    "pt": "Idioma do relatório",
+    "it": "Lingua del rapporto",
+    "de": "Berichtssprache"
+  },
+  "Request failed": {
+    "fr": "La demande a échoué",
+    "pt": "O pedido falhou",
+    "it": "Richiesta non riuscita",
+    "de": "Anfrage fehlgeschlagen"
+  },
+  "Restore cancelled.": {
+    "fr": "Restauration annulée.",
+    "pt": "Restauro cancelado.",
+    "it": "Ripristino annullato.",
+    "de": "Wiederherstellung abgebrochen."
+  },
+  "Restore purchases": {
+    "en": "Restore purchases",
+    "es": "Restaurar compras",
+    "fr": "Restaurer les achats",
+    "pt": "Restaurar compras",
+    "it": "Ripristina acquisti",
+    "de": "Käufe wiederherstellen"
+  },
+  "Restored. Bobby Pro is active.": {
+    "fr": "Restauré. Bobby Pro est actif.",
+    "pt": "Restaurado. O Bobby Pro está ativo.",
+    "it": "Ripristinato. Bobby Pro è attivo.",
+    "de": "Wiederhergestellt. Bobby Pro ist aktiv."
+  },
+  "Return to collection": {
+    "fr": "Remettre dans la collection",
+    "pt": "Devolver à coleção",
+    "it": "Riporta nella collezione",
+    "de": "Zurück in die Sammlung"
+  },
+  "Review my thesis on {0}: what does the latest evidence support, what does it challenge, and what is still unknown?": {
+    "fr": "Réexamine ma thèse sur {0} : que soutiennent les données les plus récentes, que remettent-elles en question et que reste-t-il d’inconnu ?",
+    "pt": "Revê a minha tese sobre {0}: o que os dados mais recentes apoiam, o que põem em causa e o que continua por saber?",
+    "it": "Riesamina la mia tesi su {0}: che cosa sostengono i dati più recenti, che cosa mettono in dubbio e che cosa resta sconosciuto?",
+    "de": "Prüfe meine These zu {0}: Was stützen die neuesten Daten, was stellen sie infrage und was ist weiter unbekannt?"
+  },
+  "Review now": {
+    "fr": "Réexaminer maintenant",
+    "pt": "Rever agora",
+    "it": "Riesamina ora",
+    "de": "Jetzt prüfen"
+  },
+  "Review reminders you set": {
+    "fr": "Les rappels de révision que tu as créés",
+    "pt": "Lembretes de revisão que definiste",
+    "it": "Promemoria di revisione che hai impostato",
+    "de": "Erinnerungen zur Überprüfung, die du gesetzt hast"
+  },
+  "Review thesis": {
+    "fr": "Réviser la thèse",
+    "pt": "Rever tese",
+    "it": "Riesamina tesi",
+    "de": "These überprüfen"
+  },
+  "Review with {0}": {
+    "fr": "Réexaminer avec le niveau {0}",
+    "pt": "Rever com o nível {0}",
+    "it": "Riesamina con il livello {0}",
+    "de": "Mit Stufe {0} prüfen"
+  },
+  "Review your AI and voice consent": {
+    "en": "Review your AI and voice consent",
+    "es": "Revisa tu consentimiento de IA y voz",
+    "fr": "Vérifie ton consentement pour l’IA et la voix",
+    "pt": "Revê o teu consentimento de IA e voz",
+    "it": "Rivedi il tuo consenso per l’IA e la voce",
+    "de": "Prüfe deine Einwilligung für KI und Sprache"
+  },
+  "Review {0}": {
+    "fr": "Réexaminer {0}",
+    "pt": "Rever {0}",
+    "it": "Riesamina {0}",
+    "de": "{0} prüfen"
+  },
+  "Reviewed today": {
+    "fr": "Réexaminée aujourd’hui",
+    "pt": "Revista hoje",
+    "it": "Riesaminata oggi",
+    "de": "Heute geprüft"
+  },
+  "Reviewed {0}": {
+    "fr": "Réexaminée {0}",
+    "pt": "Revista {0}",
+    "it": "Riesaminata {0}",
+    "de": "Zuletzt geprüft {0}"
+  },
+  "Risk notice": {
+    "en": "Risk notice",
+    "es": "Aviso de riesgo",
+    "fr": "Avis de risque",
+    "pt": "Aviso de risco",
+    "it": "Avviso sui rischi",
+    "de": "Risikohinweis"
+  },
+  "Risk tolerance": {
+    "fr": "Tolérance au risque",
+    "pt": "Tolerância ao risco",
+    "it": "Tolleranza al rischio",
+    "de": "Risikotoleranz"
+  },
+  "Rotate": {
+    "fr": "Tourner",
+    "pt": "Rodar",
+    "it": "Ruota",
+    "de": "Drehen"
+  },
+  "Save": {
+    "fr": "Enregistrer",
+    "pt": "Guardar",
+    "it": "Salva",
+    "de": "Speichern"
+  },
+  "Saved": {
+    "fr": "Enregistré",
+    "pt": "Guardado",
+    "it": "Salvato",
+    "de": "Gespeichert"
+  },
+  "Saved in memory": {
+    "fr": "Enregistré en mémoire",
+    "pt": "Guardado na memória",
+    "it": "Salvato in memoria",
+    "de": "Im Gedächtnis gespeichert"
+  },
+  "Saved on this phone only. When you ask for a review, your words are sent to Bobby and to the AI providers that write the review. They are not stored there.": {
+    "fr": "Enregistrée sur ce téléphone uniquement. Quand tu demandes un réexamen, tes mots sont envoyés à Bobby et aux fournisseurs d’IA qui rédigent le réexamen. Ils n’y sont pas conservés.",
+    "pt": "Guardada apenas neste telemóvel. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
+    "it": "Salvata solo su questo telefono. Quando chiedi un riesame, le tue parole vengono inviate a Bobby e ai fornitori di IA che scrivono il riesame. Lì non vengono conservate.",
+    "de": "Nur auf diesem Gerät gespeichert. Wenn du eine Überprüfung anforderst, werden deine Worte an Bobby und an die KI-Anbieter gesendet, die die Überprüfung schreiben. Dort werden sie nicht gespeichert."
+  },
+  "Saved on this phone.": {
+    "fr": "Enregistrée sur ce téléphone.",
+    "pt": "Guardado neste telemóvel.",
+    "it": "Salvato su questo telefono.",
+    "de": "Auf diesem Gerät gespeichert."
+  },
+  "Saved: {0} is now in memory": {
+    "fr": "Enregistré : {0} est en mémoire",
+    "pt": "Guardado: {0} já está na memória",
+    "it": "Salvato: {0} è ora in memoria",
+    "de": "Gespeichert: {0} ist jetzt im Gedächtnis"
+  },
+  "Saving applies your current companion's voice to future reports.": {
+    "fr": "L’enregistrement applique la voix de votre compagnon actuel aux futurs rapports.",
+    "pt": "Guardar aplica a voz do teu companheiro atual aos relatórios futuros.",
+    "it": "Il salvataggio applica la voce del tuo compagno attuale ai rapporti futuri.",
+    "de": "Beim Speichern wird die Stimme deines aktuellen Begleiters für künftige Berichte übernommen."
+  },
+  "Scheduled reports are available in English and Spanish. This setting is separate from the app language.": {
+    "fr": "Les rapports programmés sont disponibles en anglais et en espagnol. Ce réglage est indépendant de la langue de l’app.",
+    "pt": "Os relatórios agendados estão disponíveis em inglês e espanhol. Esta definição é independente do idioma da app.",
+    "it": "I rapporti programmati sono disponibili in inglese e spagnolo. Questa impostazione è separata dalla lingua dell’app.",
+    "de": "Geplante Berichte sind auf Englisch und Spanisch verfügbar. Diese Einstellung ist von der App-Sprache unabhängig."
+  },
+  "See credits": {
+    "fr": "Voir mes crédits",
+    "pt": "Ver créditos",
+    "it": "Vedi crediti",
+    "de": "Credits ansehen"
+  },
+  "See details": {
+    "fr": "Voir les détails",
+    "pt": "Ver detalhes",
+    "it": "Vedi i dettagli",
+    "de": "Details ansehen"
+  },
+  "See memory": {
+    "fr": "Voir la mémoire",
+    "pt": "Ver memória",
+    "it": "Vedi memoria",
+    "de": "Gedächtnis ansehen"
+  },
+  "See why": {
+    "fr": "Voir pourquoi",
+    "pt": "Ver porquê",
+    "it": "Vedi perché",
+    "de": "Grund ansehen"
+  },
+  "Semiconductors": {
+    "fr": "Semi-conducteurs",
+    "pt": "Semicondutores",
+    "it": "Semiconduttori",
+    "de": "Halbleiter"
+  },
+  "Sent to the AI that answers": {
+    "fr": "Envoyé à l'IA qui répond",
+    "pt": "Enviado à IA que responde",
+    "it": "Inviato all'IA che risponde",
+    "de": "An die antwortende KI gesendet"
+  },
+  "Set": {
+    "fr": "Enregistrer",
+    "pt": "Guardar",
+    "it": "Salva",
+    "de": "Speichern"
+  },
+  "Set reminder": {
+    "fr": "Créer un rappel",
+    "pt": "Criar lembrete",
+    "it": "Imposta promemoria",
+    "de": "Erinnerung setzen"
+  },
+  "Several years": {
+    "fr": "Plusieurs années",
+    "pt": "Vários anos",
+    "it": "Diversi anni",
+    "de": "Mehrere Jahre"
+  },
+  "Shall I keep you posted on this?": {
+    "fr": "Je te tiens au courant ?",
+    "pt": "Vou-te contando como vai?",
+    "it": "Ti tengo aggiornato?",
+    "de": "Halte ich dich auf dem Laufenden?"
+  },
+  "Shall I keep you posted on {0}?": {
+    "fr": "Je te tiens au courant pour {0} ?",
+    "pt": "Vou-te contando como vai a {0}?",
+    "it": "Ti tengo aggiornato su {0}?",
+    "de": "Halte ich dich zu {0} auf dem Laufenden?"
+  },
+  "Share": {
+    "en": "Share",
+    "es": "Compartir",
+    "fr": "Partager",
+    "pt": "Partilhar",
+    "it": "Condividi",
+    "de": "Teilen"
+  },
+  "Share Bobby with someone you know": {
+    "en": "Share Bobby with someone you know",
+    "es": "Comparte Bobby con alguien que conoces",
+    "fr": "Partage Bobby avec quelqu’un que tu connais",
+    "pt": "Partilha o Bobby com alguém que conheces",
+    "it": "Condividi Bobby con qualcuno che conosci",
+    "de": "Teile Bobby mit jemandem, den du kennst"
+  },
+  "Share a text summary of your companion, level and earned gear": {
+    "en": "Share a text summary of your companion, level and earned gear",
+    "es": "Comparte un resumen de texto de tu compañero, nivel y equipo ganado",
+    "fr": "Partage un résumé texte de ton compagnon, de ton niveau et de ton équipement gagné",
+    "pt": "Partilha um resumo em texto do teu companheiro, nível e equipamento ganho",
+    "it": "Condividi un riepilogo testuale del tuo compagno, del livello e dell’equipaggiamento guadagnato",
+    "de": "Teile eine Textübersicht deines Begleiters, deiner Stufe und deiner verdienten Ausrüstung"
+  },
+  "Share invite": {
+    "fr": "Partager l'invitation",
+    "pt": "Partilhar convite",
+    "it": "Condividi invito",
+    "de": "Einladung teilen"
+  },
+  "Share my avatar": {
+    "en": "Share my avatar",
+    "es": "Compartir mi avatar",
+    "fr": "Partager mon avatar",
+    "pt": "Partilhar o meu avatar",
+    "it": "Condividi il mio avatar",
+    "de": "Meinen Avatar teilen"
+  },
+  "Share this name and layout with visitors? You can make it private again here.": {
+    "fr": "Partager ce nom et cette disposition avec les visiteurs ? Tu peux la rendre privée ici à tout moment.",
+    "pt": "Partilhar este nome e disposição com visitantes? Podes torná-la privada novamente aqui.",
+    "it": "Condividere questo nome e questa disposizione con i visitatori? Puoi renderla nuovamente privata qui.",
+    "de": "Diesen Namen und diese Anordnung mit Besuchern teilen? Du kannst die Insel hier wieder privat machen."
+  },
+  "Share your companion, level and earned gear": {
+    "en": "Share your companion, level and earned gear",
+    "es": "Comparte tu compañero, nivel y equipo ganado",
+    "fr": "Partage ton compagnon, ton niveau et ton équipement gagné",
+    "pt": "Partilha o teu companheiro, nível e equipamento ganho",
+    "it": "Condividi il tuo compagno, il livello e l’equipaggiamento guadagnato",
+    "de": "Teile deinen Begleiter, deine Stufe und deine verdiente Ausrüstung"
+  },
+  "Shared island": {
+    "fr": "Île partagée",
+    "pt": "Ilha partilhada",
+    "it": "Isola condivisa",
+    "de": "Geteilte Insel"
+  },
+  "Sharing is unavailable. Try again.": {
+    "en": "Sharing is unavailable. Try again.",
+    "es": "No se pudo compartir. Intenta de nuevo.",
+    "fr": "Le partage est indisponible. Réessaie.",
+    "pt": "Não foi possível partilhar. Tenta novamente.",
+    "it": "La condivisione non è disponibile. Riprova.",
+    "de": "Das Teilen ist nicht verfügbar. Versuche es erneut."
+  },
+  "Sign in": {
+    "fr": "Se connecter",
+    "pt": "Iniciar sessão",
+    "it": "Accedi",
+    "de": "Anmelden"
+  },
+  "Sign in before subscribing.": {
+    "fr": "Connecte-toi avant de t'abonner.",
+    "pt": "Inicia sessão antes de subscrever.",
+    "it": "Accedi prima di abbonarti.",
+    "de": "Melde dich vor dem Abonnieren an."
+  },
+  "Sign in for your link.": {
+    "fr": "Connecte-toi pour obtenir ton lien.",
+    "pt": "Inicia sessão para teres o teu link.",
+    "it": "Accedi per avere il tuo link.",
+    "de": "Melde dich an, um deinen Link zu erhalten."
+  },
+  "Sign in so your XP, streak, gear and island follow you": {
+    "en": "Sign in so your XP, streak, gear and island follow you",
+    "es": "Inicia sesión para llevar contigo tu XP, racha, equipo e isla",
+    "fr": "Connecte-toi pour retrouver ton XP, ta série, ton équipement et ton île",
+    "pt": "Inicia sessão para levares contigo o teu XP, sequência, equipamento e ilha",
+    "it": "Accedi per portare con te XP, serie, equipaggiamento e isola",
+    "de": "Melde dich an, damit XP, Serie, Ausrüstung und Insel dir folgen"
+  },
+  "Sign in to accept an invitation.": {
+    "fr": "Connecte-toi pour accepter une invitation.",
+    "pt": "Inicia sessão para aceitar um convite.",
+    "it": "Accedi per accettare un invito.",
+    "de": "Melde dich an, um eine Einladung anzunehmen."
+  },
+  "Sign in to continue.": {
+    "fr": "Connecte-toi pour continuer.",
+    "pt": "Inicia sessão para continuar.",
+    "it": "Accedi per continuare.",
+    "de": "Melde dich an, um fortzufahren."
+  },
+  "Sign in to open this feature.": {
+    "fr": "Connecte-toi pour ouvrir cette fonction.",
+    "pt": "Inicia sessão para abrir esta função.",
+    "it": "Accedi per aprire questa funzione.",
+    "de": "Melde dich an, um diese Funktion zu öffnen."
+  },
+  "Sign in to open your island.": {
+    "fr": "Connecte-toi pour ouvrir ton île.",
+    "pt": "Inicia sessão para abrir a tua ilha.",
+    "it": "Accedi per aprire la tua isola.",
+    "de": "Melde dich an, um deine Insel zu öffnen."
+  },
+  "Sign in to open your island. Public islands are available in Neighbors.": {
+    "fr": "Connecte-toi pour ouvrir ton île. Les îles publiques sont disponibles dans Voisins.",
+    "pt": "Inicia sessão para abrir a tua ilha. As ilhas públicas estão disponíveis em Vizinhos.",
+    "it": "Accedi per aprire la tua isola. Le isole pubbliche sono disponibili in Vicini.",
+    "de": "Melde dich an, um deine Insel zu öffnen. Öffentliche Inseln findest du unter Nachbarn."
+  },
+  "Sign in to restore.": {
+    "fr": "Connecte-toi pour restaurer.",
+    "pt": "Inicia sessão para restaurar.",
+    "it": "Accedi per ripristinare.",
+    "de": "Melde dich an, um wiederherzustellen."
+  },
+  "Sign in to sync your progress across devices.": {
+    "fr": "Connecte-toi pour synchroniser ta progression entre tes appareils.",
+    "pt": "Inicia sessão para sincronizar o progresso entre dispositivos.",
+    "it": "Accedi per sincronizzare i progressi tra i dispositivi.",
+    "de": "Melde dich an, um deinen Fortschritt zwischen Geräten zu synchronisieren."
+  },
+  "Sign in with a free account and review it again.": {
+    "fr": "Connecte-toi avec un compte gratuit et réexamine-la.",
+    "pt": "Inicia sessão com uma conta gratuita e revê-a de novo.",
+    "it": "Accedi con un account gratuito e riesaminala.",
+    "de": "Melde dich mit einem kostenlosen Konto an und prüfe sie erneut."
+  },
+  "Sign out": {
+    "en": "Sign out",
+    "es": "Cerrar sesión",
+    "fr": "Se déconnecter",
+    "pt": "Terminar sessão",
+    "it": "Esci",
+    "de": "Abmelden"
+  },
+  "Sign-in did not complete.": {
+    "fr": "La connexion n'a pas abouti.",
+    "pt": "O início de sessão não foi concluído.",
+    "it": "L'accesso non è stato completato.",
+    "de": "Die Anmeldung wurde nicht abgeschlossen."
+  },
+  "Sign-in did not finish. Try again.": {
+    "fr": "La connexion n’a pas abouti. Réessaie.",
+    "pt": "O início de sessão não terminou. Tenta de novo.",
+    "it": "L’accesso non è stato completato. Riprova.",
+    "de": "Die Anmeldung wurde nicht abgeschlossen. Versuch es noch einmal."
+  },
+  "Sign-in is currently unavailable. Try again later.": {
+    "en": "Sign-in is currently unavailable. Try again later.",
+    "es": "El inicio de sesión no está disponible. Intenta más tarde.",
+    "fr": "La connexion est indisponible. Réessaie plus tard.",
+    "pt": "O início de sessão não está disponível. Tenta mais tarde.",
+    "it": "L’accesso non è disponibile. Riprova più tardi.",
+    "de": "Die Anmeldung ist derzeit nicht verfügbar. Versuche es später erneut."
+  },
+  "Sign-in is unavailable. Try again.": {
+    "fr": "La connexion est indisponible. Réessaie.",
+    "pt": "Não foi possível iniciar sessão. Tenta novamente.",
+    "it": "L'accesso non è disponibile. Riprova.",
+    "de": "Die Anmeldung ist nicht verfügbar. Versuche es erneut."
+  },
+  "Sign-in will be available in a configured build.": {
+    "fr": "La connexion sera disponible dans une version configurée.",
+    "pt": "O início de sessão estará disponível numa versão configurada.",
+    "it": "L'accesso sarà disponibile in una versione configurata.",
+    "de": "Die Anmeldung wird in einer konfigurierten App-Version verfügbar sein."
+  },
+  "Signed in": {
+    "en": "Signed in",
+    "es": "Sesión iniciada",
+    "fr": "Connecté",
+    "pt": "Sessão iniciada",
+    "it": "Accesso effettuato",
+    "de": "Angemeldet"
+  },
+  "Signed in with Apple": {
+    "en": "Signed in with Apple",
+    "es": "Sesión con Apple",
+    "fr": "Connecté avec Apple",
+    "pt": "Sessão iniciada com Apple",
+    "it": "Accesso con Apple",
+    "de": "Mit Apple angemeldet"
+  },
+  "Signed in with Google": {
+    "en": "Signed in with Google",
+    "es": "Sesión con Google",
+    "fr": "Connecté avec Google",
+    "pt": "Sessão iniciada com Google",
+    "it": "Accesso con Google",
+    "de": "Mit Google angemeldet"
+  },
+  "Since you asked": {
+    "fr": "Depuis ta question",
+    "pt": "Desde que perguntaste",
+    "it": "Da quando hai chiesto",
+    "de": "Seit deiner Frage"
+  },
+  "Since {0}": {
+    "fr": "Depuis le {0}",
+    "pt": "Desde {0}",
+    "it": "Dal giorno {0}",
+    "de": "Seit {0}"
+  },
+  "Since {0} · started at {1}": {
+    "fr": "Depuis le {0} · départ à {1}",
+    "pt": "Desde {0} · começou em {1}",
+    "it": "Dal giorno {0} · partita da {1}",
+    "de": "Seit {0} · gestartet bei {1}"
+  },
+  "Software": {
+    "fr": "Logiciels",
+    "pt": "Software",
+    "it": "Software",
+    "de": "Software"
+  },
+  "Some experience": {
+    "fr": "Un peu d'expérience",
+    "pt": "Alguma experiência",
+    "it": "Un po' di esperienza",
+    "de": "Etwas Erfahrung"
+  },
+  "Squad": {
+    "fr": "Équipe",
+    "pt": "Equipa",
+    "it": "Squadra",
+    "de": "Team"
+  },
+  "Start with a saved read.": {
+    "fr": "Commence par une analyse enregistrée.",
+    "pt": "Começa com uma análise guardada.",
+    "it": "Inizia da un'analisi salvata.",
+    "de": "Beginne mit einer gespeicherten Analyse."
+  },
+  "Starting price": {
+    "fr": "Prix de départ",
+    "pt": "Preço inicial",
+    "it": "Prezzo iniziale",
+    "de": "Startkurs"
+  },
+  "Stop AI questions on this Android": {
+    "fr": "Arrêter les questions à l’IA sur cet Android",
+    "pt": "Parar perguntas à IA neste Android",
+    "it": "Interrompi le domande all’IA su questo Android",
+    "de": "KI-Fragen auf diesem Android stoppen"
+  },
+  "Stop audio": {
+    "fr": "Arrêter l'audio",
+    "pt": "Parar áudio",
+    "it": "Interrompi audio",
+    "de": "Audio stoppen"
+  },
+  "Stop new questions and generated voice on this Android and return to the risk notice? Scheduled briefing analysis and audio have separate account consent. Turn those off in Briefing settings; this action does not change them.": {
+    "fr": "Arrêter les nouvelles questions et la voix générée sur cet Android et revenir à l’avis de risque ? L’analyse et l’audio des rapports programmés ont un consentement de compte distinct. Désactivez-les dans les réglages des rapports ; cette action ne les modifie pas.",
+    "pt": "Parar novas perguntas e voz gerada neste Android e voltar ao aviso de risco? A análise e o áudio dos relatórios agendados têm um consentimento de conta separado. Desativa-os nas definições dos relatórios; esta ação não os altera.",
+    "it": "Interrompere nuove domande e voce generata su questo Android e tornare all’avviso sui rischi? Analisi e audio dei rapporti programmati hanno un consenso dell’account separato. Disattivali nelle impostazioni dei rapporti; questa azione non li modifica.",
+    "de": "Neue Fragen und erzeugte Stimme auf diesem Android stoppen und zum Risikohinweis zurückkehren? Analyse und Audio geplanter Berichte haben eine separate Kontoeinwilligung. Deaktiviere sie in den Berichtseinstellungen; diese Aktion ändert sie nicht."
+  },
+  "Stop sending new questions to AI and return to the risk notice?": {
+    "fr": "Arrêter d'envoyer de nouvelles questions à l'IA et revenir à l'avis de risque ?",
+    "pt": "Deixar de enviar novas perguntas à IA e voltar ao aviso de risco?",
+    "it": "Smettere di inviare nuove domande all'IA e tornare all'avviso sui rischi?",
+    "de": "Keine neuen Fragen mehr an die KI senden und zum Risikohinweis zurückkehren?"
+  },
+  "Streak": {
+    "en": "Streak",
+    "es": "Racha",
+    "fr": "Série",
+    "pt": "Sequência",
+    "it": "Serie",
+    "de": "Serie"
+  },
+  "Subscriptions renew automatically unless cancelled through your store. Access is confirmed by Bobby after purchase.": {
+    "fr": "Les abonnements se renouvellent automatiquement sauf annulation dans ta boutique. Bobby confirme l'accès après l'achat.",
+    "pt": "As subscrições renovam-se automaticamente, salvo cancelamento na tua loja. O Bobby confirma o acesso após a compra.",
+    "it": "Gli abbonamenti si rinnovano automaticamente salvo annullamento nel tuo store. Bobby conferma l'accesso dopo l'acquisto.",
+    "de": "Abonnements verlängern sich automatisch, sofern du sie nicht über deinen Store kündigst. Bobby bestätigt den Zugang nach dem Kauf."
+  },
+  "Supports": {
+    "fr": "Soutient",
+    "pt": "Apoia",
+    "it": "A favore",
+    "de": "Stützt"
+  },
+  "Sync progress": {
+    "fr": "Synchroniser la progression",
+    "pt": "Sincronizar progresso",
+    "it": "Sincronizza progressi",
+    "de": "Fortschritt synchronisieren"
+  },
+  "Synced": {
+    "en": "Synced",
+    "es": "Sincronizado",
+    "fr": "Synchronisé",
+    "pt": "Sincronizado",
+    "it": "Sincronizzato",
+    "de": "Synchronisiert"
+  },
+  "Syncing…": {
+    "en": "Syncing…",
+    "es": "Sincronizando…",
+    "fr": "Synchronisation…",
+    "pt": "A sincronizar…",
+    "it": "Sincronizzazione…",
+    "de": "Synchronisierung…"
+  },
+  "Tap one to ask Bobby.": {
+    "fr": "Touche-en un pour demander à Bobby.",
+    "pt": "Toca num para perguntar ao Bobby.",
+    "it": "Toccane uno per chiedere a Bobby.",
+    "de": "Tippe auf eins, um Bobby zu fragen."
+  },
+  "Tell us about an unsafe response": {
+    "en": "Tell us about an unsafe response",
+    "es": "Cuéntanos sobre una respuesta insegura",
+    "fr": "Signale-nous une réponse dangereuse",
+    "pt": "Diz-nos se recebeste uma resposta insegura",
+    "it": "Segnalaci una risposta non sicura",
+    "de": "Melde uns eine unsichere Antwort"
+  },
+  "That invitation code is not valid.": {
+    "fr": "Ce code d'invitation n'est pas valide.",
+    "pt": "Esse código de convite não é válido.",
+    "it": "Questo codice d'invito non è valido.",
+    "de": "Dieser Einladungscode ist nicht gültig."
+  },
+  "That invitation could not be applied.": {
+    "fr": "Cette invitation n'a pas pu être appliquée.",
+    "pt": "Não foi possível aplicar esse convite.",
+    "it": "Non è stato possibile applicare questo invito.",
+    "de": "Diese Einladung konnte nicht angewendet werden."
+  },
+  "That is your own invitation.": {
+    "fr": "C'est ta propre invitation.",
+    "pt": "Esse é o teu próprio convite.",
+    "it": "Questo è il tuo stesso invito.",
+    "de": "Das ist deine eigene Einladung."
+  },
+  "The example island could not be loaded.": {
+    "fr": "Impossible de charger l'île d'exemple.",
+    "pt": "Não foi possível carregar a ilha de exemplo.",
+    "it": "Impossibile caricare l'isola di esempio.",
+    "de": "Die Beispielinsel konnte nicht geladen werden."
+  },
+  "The invitation you received was accepted": {
+    "fr": "L'invitation reçue a été acceptée",
+    "pt": "O convite que recebeste foi aceite",
+    "it": "L'invito ricevuto è stato accettato",
+    "de": "Die erhaltene Einladung wurde angenommen"
+  },
+  "The invitation you received was not accepted": {
+    "fr": "L'invitation reçue n'a pas été acceptée",
+    "pt": "O convite que recebeste não foi aceite",
+    "it": "L'invito ricevuto non è stato accettato",
+    "de": "Die erhaltene Einladung wurde nicht angenommen"
+  },
+  "The purchase could not complete. Try again.": {
+    "fr": "L'achat n'a pas abouti. Réessaie.",
+    "pt": "Não foi possível concluir a compra. Tenta novamente.",
+    "it": "Impossibile completare l'acquisto. Riprova.",
+    "de": "Der Kauf konnte nicht abgeschlossen werden. Versuche es erneut."
   },
   "The report is in Bobby's review queue.": {
     "fr": "Le signalement est dans la file d'examen de Bobby.",
@@ -909,53 +2545,125 @@
     "it": "La segnalazione è nella coda di revisione di Bobby.",
     "de": "Die Meldung ist in Bobbys Prüfwarteschlange."
   },
-  "Blocking hides this creator on this device, even if the island is renamed. You can unblock them here.": {
-    "fr": "Le blocage masque ce créateur sur cet appareil, même si l'île change de nom. Tu peux le débloquer ici.",
-    "pt": "Bloquear oculta este criador neste dispositivo, mesmo que o nome da ilha mude. Podes desbloqueá-lo aqui.",
-    "it": "Il blocco nasconde questo creatore su questo dispositivo, anche se l'isola cambia nome. Puoi sbloccarlo qui.",
-    "de": "Blockieren blendet diesen Ersteller auf diesem Gerät aus, auch wenn die Insel umbenannt wird. Du kannst die Blockierung hier aufheben."
+  "The review did not finish.": {
+    "fr": "Le réexamen n’a pas abouti.",
+    "pt": "A revisão não terminou.",
+    "it": "Il riesame non è stato completato.",
+    "de": "Die Überprüfung wurde nicht abgeschlossen."
   },
-  "Cell": {
-    "fr": "Cellule",
-    "pt": "Célula",
-    "it": "Cella",
-    "de": "Zelle"
+  "The review did not finish. Nothing was used.": {
+    "fr": "Le réexamen n’a pas abouti. Rien n’a été utilisé.",
+    "pt": "A revisão não terminou. Nada foi usado.",
+    "it": "Il riesame non è stato completato. Non è stato usato nulla.",
+    "de": "Die Überprüfung wurde nicht abgeschlossen. Es wurde nichts verbraucht."
   },
-  "Continue with Deep": {
-    "fr": "Continuer avec Analyse approfondie",
-    "pt": "Continuar com Análise profunda",
-    "it": "Continua con Analisi approfondita",
-    "de": "Mit Tiefenanalyse fortfahren"
+  "The wider economy": {
+    "fr": "L’économie en général",
+    "pt": "A economia em geral",
+    "it": "L’economia in generale",
+    "de": "Die Gesamtwirtschaft"
   },
-  "Apple sign-in access requires a separate manual step. After Bobby confirms deletion, follow Apple's instructions to stop using Sign in with Apple for Bobby.": {
-    "fr": "L’accès via Apple nécessite une étape manuelle supplémentaire. Une fois la suppression confirmée par Bobby, suis les instructions d’Apple pour ne plus utiliser Se connecter avec Apple pour Bobby.",
-    "pt": "O acesso através da Apple requer um passo manual adicional. Depois de o Bobby confirmar a eliminação, segue as instruções da Apple para deixar de usar Iniciar sessão com Apple para o Bobby.",
-    "it": "L’accesso tramite Apple richiede un passaggio manuale aggiuntivo. Dopo che Bobby conferma l’eliminazione, segui le istruzioni di Apple per smettere di usare Accedi con Apple per Bobby.",
-    "de": "Der Zugriff über Apple erfordert einen zusätzlichen manuellen Schritt. Nachdem Bobby die Löschung bestätigt hat, folge Apples Anleitung, um Mit Apple anmelden für Bobby nicht mehr zu verwenden."
+  "Then": {
+    "fr": "Avant",
+    "pt": "Antes",
+    "it": "Prima",
+    "de": "Damals"
   },
-  "Account deleted": {
-    "fr": "Compte supprimé",
-    "pt": "Conta eliminada",
-    "it": "Account eliminato",
-    "de": "Konto gelöscht"
+  "Theses you wrote": {
+    "fr": "Thèses que tu as écrites",
+    "pt": "Teses que escreveste",
+    "it": "Tesi che hai scritto",
+    "de": "Thesen, die du geschrieben hast"
   },
-  "Your Bobby account was deleted. To remove Bobby's access to your Apple account, open Apple's instructions, select Bobby in your Sign in with Apple settings, and stop using Sign in with Apple.": {
-    "fr": "Ton compte Bobby a été supprimé. Pour retirer l’accès de Bobby à ton compte Apple, ouvre les instructions d’Apple, sélectionne Bobby dans les réglages de Se connecter avec Apple et cesse d’utiliser ce mode de connexion.",
-    "pt": "A tua conta Bobby foi eliminada. Para remover o acesso do Bobby à tua conta Apple, abre as instruções da Apple, seleciona o Bobby nas definições de Iniciar sessão com Apple e deixa de usar esse acesso.",
-    "it": "Il tuo account Bobby è stato eliminato. Per rimuovere l’accesso di Bobby al tuo account Apple, apri le istruzioni di Apple, seleziona Bobby nelle impostazioni di Accedi con Apple e smetti di usare questo accesso.",
-    "de": "Dein Bobby-Konto wurde gelöscht. Um Bobbys Zugriff auf dein Apple-Konto zu entfernen, öffne Apples Anleitung, wähle Bobby in den Einstellungen für Mit Apple anmelden und beende diese Nutzung."
+  "Thesis review": {
+    "fr": "Réexamen de thèse",
+    "pt": "Revisão de tese",
+    "it": "Riesame della tesi",
+    "de": "Thesenprüfung"
   },
-  "Apple instructions": {
-    "fr": "Instructions d’Apple",
-    "pt": "Instruções da Apple",
-    "it": "Istruzioni di Apple",
-    "de": "Apples Anleitung"
+  "Thesis reviewed": {
+    "fr": "Thèse revue",
+    "pt": "Tese revista",
+    "it": "Tesi riesaminata",
+    "de": "These überprüft"
   },
-  "Done": {
-    "fr": "Terminé",
-    "pt": "Concluído",
-    "it": "Fine",
-    "de": "Fertig"
+  "This Android's question and voice consent is separate from your account's scheduled briefing consent. Manage scheduled analysis and audio in Briefing settings.": {
+    "fr": "Le consentement aux questions et à la voix sur cet Android est distinct du consentement aux rapports programmés du compte. Gérez l’analyse et l’audio programmés dans les réglages des rapports.",
+    "pt": "O consentimento para perguntas e voz neste Android é separado do consentimento para relatórios agendados da conta. Gere a análise e o áudio agendados nas definições dos relatórios.",
+    "it": "Il consenso per domande e voce su questo Android è separato dal consenso per i rapporti programmati dell’account. Gestisci analisi e audio programmati nelle impostazioni dei rapporti.",
+    "de": "Die Einwilligung für Fragen und Stimme auf diesem Android ist von der Einwilligung für geplante Kontoberichte getrennt. Verwalte geplante Analysen und Audio in den Berichtseinstellungen."
+  },
+  "This account already accepted an invitation.": {
+    "fr": "Ce compte a déjà accepté une invitation.",
+    "pt": "Esta conta já aceitou um convite.",
+    "it": "Questo account ha già accettato un invito.",
+    "de": "Dieses Konto hat bereits eine Einladung angenommen."
+  },
+  "This account already redeemed a benefit from this code.": {
+    "fr": "Ce compte a déjà utilisé ce code pour obtenir un avantage.",
+    "pt": "Esta conta já resgatou um benefício com este código.",
+    "it": "Questo account ha già riscattato un beneficio con questo codice.",
+    "de": "Dieses Konto hat mit diesem Code bereits einen Vorteil eingelöst."
+  },
+  "This code did not grant a benefit. Check it and try again.": {
+    "fr": "Ce code n'a accordé aucun avantage. Vérifie-le et réessaie.",
+    "pt": "Este código não concedeu um benefício. Confirma-o e tenta novamente.",
+    "it": "Questo codice non ha concesso un beneficio. Controllalo e riprova.",
+    "de": "Dieser Code hat keinen Vorteil gewährt. Prüfe ihn und versuche es erneut."
+  },
+  "This code expired.": {
+    "fr": "Ce code a expiré.",
+    "pt": "Este código expirou.",
+    "it": "Questo codice è scaduto.",
+    "de": "Dieser Code ist abgelaufen."
+  },
+  "This code reached its redemption limit.": {
+    "fr": "Ce code a atteint sa limite d'utilisation.",
+    "pt": "Este código atingiu o limite de resgates.",
+    "it": "Questo codice ha raggiunto il limite di utilizzi.",
+    "de": "Dieser Code hat sein Einlösungslimit erreicht."
+  },
+  "This creator is blocked on this device. Unblock them in community safety.": {
+    "fr": "Ce créateur est bloqué sur cet appareil. Débloque-le dans la sécurité de la communauté.",
+    "pt": "Este criador está bloqueado neste dispositivo. Desbloqueia-o na segurança da comunidade.",
+    "it": "Questo creatore è bloccato su questo dispositivo. Sbloccalo nella sicurezza della comunità.",
+    "de": "Dieser Ersteller ist auf diesem Gerät blockiert. Hebe die Blockierung unter Community-Sicherheit auf."
+  },
+  "This deletes what Bobby's servers remember about your account, the shortcuts on this phone and the theses you wrote here. It cannot be undone.": {
+    "fr": "Cela supprime ce que les serveurs de Bobby retiennent sur ton compte, les raccourcis de ce téléphone et les thèses que tu as écrites ici. C'est irréversible.",
+    "pt": "Isto elimina o que os servidores do Bobby recordam sobre a tua conta, os atalhos deste telemóvel e as teses que escreveste aqui. Não pode ser anulado.",
+    "it": "Questo elimina ciò che i server di Bobby ricordano del tuo account, le scorciatoie su questo telefono e le tesi che hai scritto qui. Non si può annullare.",
+    "de": "Das löscht, was Bobbys Server über dein Konto gespeichert haben, die Schnellzugriffe auf diesem Gerät und die Thesen, die du hier geschrieben hast. Das lässt sich nicht rückgängig machen."
+  },
+  "This device only contributes questions when you enable it here.": {
+    "fr": "Cet appareil ne contribue des questions que si tu l'actives ici.",
+    "pt": "Este dispositivo só contribui com perguntas quando o ativares aqui.",
+    "it": "Questo dispositivo contribuisce con le domande solo quando lo abiliti qui.",
+    "de": "Dieses Gerät trägt nur Fragen bei, wenn du das hier aktivierst."
+  },
+  "This footprint overlaps another piece, the core or the island edge.": {
+    "fr": "Cette empreinte chevauche une autre pièce, le noyau ou le bord de l'île.",
+    "pt": "Esta área sobrepõe-se a outra peça, ao núcleo ou à borda da ilha.",
+    "it": "Questo ingombro si sovrappone a un altro pezzo, al nucleo o al bordo dell'isola.",
+    "de": "Diese Fläche überschneidet sich mit einem anderen Teil, dem Kern oder dem Inselrand."
+  },
+  "This information is unavailable. Try again.": {
+    "fr": "Ces informations sont indisponibles. Réessaie.",
+    "pt": "Esta informação não está disponível. Tenta novamente.",
+    "it": "Queste informazioni non sono disponibili. Riprova.",
+    "de": "Diese Informationen sind nicht verfügbar. Versuche es erneut."
+  },
+  "This invitation is available to eligible new accounts.": {
+    "fr": "Cette invitation est proposée aux nouveaux comptes admissibles.",
+    "pt": "Este convite está disponível para novas contas elegíveis.",
+    "it": "Questo invito è disponibile per i nuovi account idonei.",
+    "de": "Diese Einladung ist für berechtigte neue Konten verfügbar."
+  },
+  "This island is unavailable.": {
+    "fr": "Cette île est indisponible.",
+    "pt": "Esta ilha não está disponível.",
+    "it": "Quest'isola non è disponibile.",
+    "de": "Diese Insel ist nicht verfügbar."
   },
   "This plan renews automatically unless cancelled in Google Play.": {
     "fr": "Ce forfait se renouvelle automatiquement sauf annulation dans Google Play.",
@@ -969,289 +2677,89 @@
     "it": "Questo piano prepagato non si rinnova automaticamente.",
     "de": "Dieser Prepaid-Tarif verlängert sich nicht automatisch."
   },
-  "Buy prepaid access": {
-    "fr": "Acheter un accès prépayé",
-    "pt": "Comprar acesso pré-pago",
-    "it": "Acquista accesso prepagato",
-    "de": "Prepaid-Zugang kaufen"
+  "This review did not run.": {
+    "fr": "Ce réexamen n’a pas été lancé.",
+    "pt": "Esta revisão não foi feita.",
+    "it": "Questo riesame non è partito.",
+    "de": "Diese Überprüfung wurde nicht gestartet."
   },
-  "Bobby confirms your access after purchase.": {
-    "fr": "Bobby confirme votre accès après l’achat.",
-    "pt": "O Bobby confirma o teu acesso após a compra.",
-    "it": "Bobby conferma il tuo accesso dopo l’acquisto.",
-    "de": "Bobby bestätigt deinen Zugang nach dem Kauf."
+  "This thesis is archived. Reopen it to review it.": {
+    "fr": "Cette thèse est archivée. Rouvre-la pour la réexaminer.",
+    "pt": "Esta tese está arquivada. Reabre-a para a rever.",
+    "it": "Questa tesi è archiviata. Riaprila per riesaminarla.",
+    "de": "Diese These ist archiviert. Öffne sie wieder, um sie zu prüfen."
   },
-  "Check your existing Pro access before starting another purchase.": {
-    "fr": "Vérifiez votre accès Pro existant avant un nouvel achat.",
-    "pt": "Verifica o teu acesso Pro atual antes de iniciar outra compra.",
-    "it": "Verifica il tuo accesso Pro esistente prima di avviare un altro acquisto.",
-    "de": "Prüfe deinen bestehenden Pro-Zugang, bevor du einen weiteren Kauf beginnst."
+  "This thesis is not available in this account.": {
+    "fr": "Cette thèse n’est pas disponible sur ce compte.",
+    "pt": "Esta tese não está disponível nesta conta.",
+    "it": "Questa tesi non è disponibile in questo account.",
+    "de": "Diese These ist in diesem Konto nicht verfügbar."
   },
-  "Use respectful names and layouts. Hate, harassment, threats, sexual or illegal content, scams, impersonation and false or manipulated personal information are prohibited. Do not publish contact details, wallet information or private financial data.": {
-    "fr": "Utilise des noms et des aménagements respectueux. La haine, le harcèlement, les menaces, les contenus sexuels ou illégaux, les arnaques, l’usurpation d’identité et les informations personnelles fausses ou manipulées sont interdits. Ne publie pas de coordonnées, d’informations de portefeuille ni de données financières privées.",
-    "pt": "Usa nomes e disposições respeitosos. São proibidos o ódio, o assédio, as ameaças, o conteúdo sexual ou ilegal, as burlas, a usurpação de identidade e informações pessoais falsas ou manipuladas. Não publiques contactos, informações de carteiras nem dados financeiros privados.",
-    "it": "Usa nomi e disposizioni rispettosi. Sono vietati odio, molestie, minacce, contenuti sessuali o illegali, truffe, impersonificazione e informazioni personali false o manipolate. Non pubblicare contatti, informazioni sui wallet o dati finanziari privati.",
-    "de": "Verwende respektvolle Namen und Gestaltungen. Hass, Belästigung, Drohungen, sexuelle oder illegale Inhalte, Betrug, Identitätsdiebstahl sowie falsche oder manipulierte persönliche Angaben sind verboten. Veröffentliche keine Kontaktdaten, Wallet-Informationen oder privaten Finanzdaten."
+  "This thesis is unavailable in this account.": {
+    "fr": "Cette thèse n'est pas disponible dans ce compte.",
+    "pt": "Esta tese não está disponível nesta conta.",
+    "it": "Questa tesi non è disponibile in questo account.",
+    "de": "Diese These ist in diesem Konto nicht verfügbar."
   },
-  "I accept these community rules before publishing.": {
-    "fr": "J’accepte ces règles de la communauté avant de publier.",
-    "pt": "Aceito estas regras da comunidade antes de publicar.",
-    "it": "Accetto queste regole della comunità prima di pubblicare.",
-    "de": "Ich akzeptiere diese Community-Regeln vor der Veröffentlichung."
+  "Three theses are active already. Archive one first.": {
+    "fr": "Trois thèses sont déjà actives. Archives-en une d’abord.",
+    "pt": "Já há três teses ativas. Arquiva uma primeiro.",
+    "it": "Ci sono già tre tesi attive. Archiviane una prima.",
+    "de": "Es sind schon drei Thesen aktiv. Archiviere zuerst eine."
   },
-  "Accept rules and publish": {
-    "fr": "Accepter les règles et publier",
-    "pt": "Aceitar regras e publicar",
-    "it": "Accetta le regole e pubblica",
-    "de": "Regeln akzeptieren und veröffentlichen"
+  "Time frame": {
+    "fr": "Horizon",
+    "pt": "Prazo",
+    "it": "Orizzonte",
+    "de": "Zeitraum"
   },
-  "Stop AI questions on this Android": {
-    "fr": "Arrêter les questions à l’IA sur cet Android",
-    "pt": "Parar perguntas à IA neste Android",
-    "it": "Interrompi le domande all’IA su questo Android",
-    "de": "KI-Fragen auf diesem Android stoppen"
+  "Time horizon": {
+    "fr": "Horizon temporel",
+    "pt": "Horizonte temporal",
+    "it": "Orizzonte temporale",
+    "de": "Zeithorizont"
   },
-  "This Android's question and voice consent is separate from your account's scheduled briefing consent. Manage scheduled analysis and audio in Briefing settings.": {
-    "fr": "Le consentement aux questions et à la voix sur cet Android est distinct du consentement aux rapports programmés du compte. Gérez l’analyse et l’audio programmés dans les réglages des rapports.",
-    "pt": "O consentimento para perguntas e voz neste Android é separado do consentimento para relatórios agendados da conta. Gere a análise e o áudio agendados nas definições dos relatórios.",
-    "it": "Il consenso per domande e voce su questo Android è separato dal consenso per i rapporti programmati dell’account. Gestisci analisi e audio programmati nelle impostazioni dei rapporti.",
-    "de": "Die Einwilligung für Fragen und Stimme auf diesem Android ist von der Einwilligung für geplante Kontoberichte getrennt. Verwalte geplante Analysen und Audio in den Berichtseinstellungen."
+  "Turn it on": {
+    "fr": "L’activer",
+    "pt": "Ativar",
+    "it": "Attivalo",
+    "de": "Einschalten"
   },
-  "Report language": {
-    "fr": "Langue du rapport",
-    "pt": "Idioma do relatório",
-    "it": "Lingua del rapporto",
-    "de": "Berichtssprache"
+  "Turn on": {
+    "fr": "Activer",
+    "pt": "Ativar",
+    "it": "Attiva",
+    "de": "Einschalten"
   },
-  "Scheduled reports are available in English and Spanish. This setting is separate from the app language.": {
-    "fr": "Les rapports programmés sont disponibles en anglais et en espagnol. Ce réglage est indépendant de la langue de l’app.",
-    "pt": "Os relatórios agendados estão disponíveis em inglês e espanhol. Esta definição é independente do idioma da app.",
-    "it": "I rapporti programmati sono disponibili in inglese e spagnolo. Questa impostazione è separata dalla lingua dell’app.",
-    "de": "Geplante Berichte sind auf Englisch und Spanisch verfügbar. Diese Einstellung ist von der App-Sprache unabhängig."
+  "Unknown": {
+    "fr": "Sans réponse",
+    "pt": "Por esclarecer",
+    "it": "Da chiarire",
+    "de": "Offen"
   },
-  "Stop new questions and generated voice on this Android and return to the risk notice? Scheduled briefing analysis and audio have separate account consent. Turn those off in Briefing settings; this action does not change them.": {
-    "fr": "Arrêter les nouvelles questions et la voix générée sur cet Android et revenir à l’avis de risque ? L’analyse et l’audio des rapports programmés ont un consentement de compte distinct. Désactivez-les dans les réglages des rapports ; cette action ne les modifie pas.",
-    "pt": "Parar novas perguntas e voz gerada neste Android e voltar ao aviso de risco? A análise e o áudio dos relatórios agendados têm um consentimento de conta separado. Desativa-os nas definições dos relatórios; esta ação não os altera.",
-    "it": "Interrompere nuove domande e voce generata su questo Android e tornare all’avviso sui rischi? Analisi e audio dei rapporti programmati hanno un consenso dell’account separato. Disattivali nelle impostazioni dei rapporti; questa azione non li modifica.",
-    "de": "Neue Fragen und erzeugte Stimme auf diesem Android stoppen und zum Risikohinweis zurückkehren? Analyse und Audio geplanter Berichte haben eine separate Kontoeinwilligung. Deaktiviere sie in den Berichtseinstellungen; diese Aktion ändert sie nicht."
+  "Unlimited": {
+    "fr": "Illimitées",
+    "pt": "Ilimitadas",
+    "it": "Illimitate",
+    "de": "Unbegrenzt"
   },
-  "Assets (up to six, comma separated)": {
-    "fr": "Actifs (six maximum, séparés par des virgules)",
-    "pt": "Ativos (até seis, separados por vírgulas)",
-    "it": "Asset (massimo sei, separati da virgole)",
-    "de": "Assets (bis zu sechs, durch Kommas getrennt)"
+  "Unlimited reads": {
+    "fr": "Analyses illimitées",
+    "pt": "Análises ilimitadas",
+    "it": "Analisi illimitate",
+    "de": "Unbegrenzte Analysen"
   },
-  "Saving applies your current companion's voice to future reports.": {
-    "fr": "L’enregistrement applique la voix de votre compagnon actuel aux futurs rapports.",
-    "pt": "Guardar aplica a voz do teu companheiro atual aos relatórios futuros.",
-    "it": "Il salvataggio applica la voce del tuo compagno attuale ai rapporti futuri.",
-    "de": "Beim Speichern wird die Stimme deines aktuellen Begleiters für künftige Berichte übernommen."
+  "Unlimited · fair use": {
+    "fr": "Illimitées · usage raisonnable",
+    "pt": "Ilimitadas · uso justo",
+    "it": "Illimitate · uso corretto",
+    "de": "Unbegrenzt · faire Nutzung"
   },
-  "Include this payment reference when contacting Help.": {
-    "fr": "Indiquez cette référence de paiement lorsque vous contactez l’assistance.",
-    "pt": "Inclua esta referência de pagamento ao contactar a Ajuda.",
-    "it": "Includi questo riferimento di pagamento quando contatti l’assistenza.",
-    "de": "Gib diese Zahlungsreferenz an, wenn du den Support kontaktierst."
-  },
-  "Hi": {
-    "en": "Hi",
-    "es": "Hola",
-    "fr": "Salut",
-    "pt": "Olá",
-    "it": "Ciao",
-    "de": "Hallo"
-  },
-  "Profile": {
-    "en": "Profile",
-    "es": "Perfil",
-    "fr": "Profil",
-    "pt": "Perfil",
-    "it": "Profilo",
-    "de": "Profil"
-  },
-  "Close": {
-    "en": "Close",
-    "es": "Cerrar",
-    "fr": "Fermer",
-    "pt": "Fechar",
-    "it": "Chiudi",
-    "de": "Schließen"
-  },
-  "Earned with discipline, never volume.": {
-    "en": "Earned with discipline, never volume.",
-    "es": "Se gana con disciplina, nunca con volumen.",
-    "fr": "Tu progresses par la discipline, jamais par le volume.",
-    "pt": "Ganhas com disciplina, nunca com volume.",
-    "it": "Si guadagna con disciplina, mai con volume.",
-    "de": "Verdient durch Disziplin, nie durch Handelsvolumen."
-  },
-  "Streak": {
-    "en": "Streak",
-    "es": "Racha",
-    "fr": "Série",
-    "pt": "Sequência",
-    "it": "Serie",
-    "de": "Serie"
-  },
-  "Aura": {
-    "en": "Aura",
-    "es": "Aura",
-    "fr": "Aura",
-    "pt": "Aura",
-    "it": "Aura",
-    "de": "Aura"
-  },
-  "Pieces": {
-    "en": "Pieces",
-    "es": "Piezas",
-    "fr": "Pièces",
-    "pt": "Peças",
-    "it": "Pezzi",
-    "de": "Teile"
-  },
-  "Pet": {
-    "en": "Pet",
-    "es": "Mascota",
-    "fr": "Compagnon animal",
-    "pt": "Mascote",
-    "it": "Animaletto",
-    "de": "Begleiter"
-  },
-  "Gear": {
-    "en": "Gear",
-    "es": "Equipo",
-    "fr": "Équipement",
-    "pt": "Equipamento",
-    "it": "Equipaggiamento",
-    "de": "Ausrüstung"
-  },
-  "Your avatar": {
-    "en": "Your avatar",
-    "es": "Tu avatar",
-    "fr": "Ton avatar",
-    "pt": "O teu avatar",
-    "it": "Il tuo avatar",
-    "de": "Dein Avatar"
-  },
-  "Choose who lives in your Bobby": {
-    "en": "Choose who lives in your Bobby",
-    "es": "Elige quién vive en tu Bobby",
-    "fr": "Choisis qui vit dans ton Bobby",
-    "pt": "Escolhe quem vive no teu Bobby",
-    "it": "Scegli chi vive nel tuo Bobby",
-    "de": "Wähle, wer in deinem Bobby lebt"
-  },
-  "Change": {
-    "en": "Change",
-    "es": "Cambiar",
-    "fr": "Changer",
-    "pt": "Alterar",
-    "it": "Cambia",
-    "de": "Ändern"
-  },
-  "Share my avatar": {
-    "en": "Share my avatar",
-    "es": "Compartir mi avatar",
-    "fr": "Partager mon avatar",
-    "pt": "Partilhar o meu avatar",
-    "it": "Condividi il mio avatar",
-    "de": "Meinen Avatar teilen"
-  },
-  "Share your companion, level and earned gear": {
-    "en": "Share your companion, level and earned gear",
-    "es": "Comparte tu compañero, nivel y equipo ganado",
-    "fr": "Partage ton compagnon, ton niveau et ton équipement gagné",
-    "pt": "Partilha o teu companheiro, nível e equipamento ganho",
-    "it": "Condividi il tuo compagno, il livello e l’equipaggiamento guadagnato",
-    "de": "Teile deinen Begleiter, deine Stufe und deine verdiente Ausrüstung"
-  },
-  "Share a text summary of your companion, level and earned gear": {
-    "en": "Share a text summary of your companion, level and earned gear",
-    "es": "Comparte un resumen de texto de tu compañero, nivel y equipo ganado",
-    "fr": "Partage un résumé texte de ton compagnon, de ton niveau et de ton équipement gagné",
-    "pt": "Partilha um resumo em texto do teu companheiro, nível e equipamento ganho",
-    "it": "Condividi un riepilogo testuale del tuo compagno, del livello e dell’equipaggiamento guadagnato",
-    "de": "Teile eine Textübersicht deines Begleiters, deiner Stufe und deiner verdienten Ausrüstung"
-  },
-  "Earned": {
-    "en": "Earned",
-    "es": "Ganados",
-    "fr": "Gagnés",
-    "pt": "Ganhos",
-    "it": "Guadagnati",
-    "de": "Verdient"
-  },
-  "Every read plants something": {
-    "en": "Every read plants something",
-    "es": "Cada lectura planta algo",
-    "fr": "Chaque lecture plante quelque chose",
-    "pt": "Cada leitura planta algo",
-    "it": "Ogni lettura pianta qualcosa",
-    "de": "Jede Analyse pflanzt etwas"
-  },
-  "Account": {
-    "en": "Account",
-    "es": "Cuenta",
-    "fr": "Compte",
-    "pt": "Conta",
-    "it": "Account",
-    "de": "Konto"
-  },
-  "Reads left this week": {
-    "en": "Reads left this week",
-    "es": "Lecturas restantes esta semana",
-    "fr": "Lectures restantes cette semaine",
-    "pt": "Leituras restantes esta semana",
-    "it": "Letture rimaste questa settimana",
-    "de": "Verbleibende Analysen diese Woche"
-  },
-  "Your account confirms Pro access": {
-    "en": "Your account confirms Pro access",
-    "es": "Tu cuenta confirma el acceso Pro",
-    "fr": "Ton compte confirme l’accès Pro",
-    "pt": "A tua conta confirma o acesso Pro",
-    "it": "Il tuo account conferma l’accesso Pro",
-    "de": "Dein Konto bestätigt den Pro-Zugang"
-  },
-  "Manage": {
-    "en": "Manage",
-    "es": "Administrar",
-    "fr": "Gérer",
-    "pt": "Gerir",
-    "it": "Gestisci",
-    "de": "Verwalten"
-  },
-  "Explore the plans available for your account": {
-    "en": "Explore the plans available for your account",
-    "es": "Consulta los planes disponibles para tu cuenta",
-    "fr": "Découvre les formules disponibles pour ton compte",
-    "pt": "Consulta os planos disponíveis para a tua conta",
-    "it": "Scopri i piani disponibili per il tuo account",
-    "de": "Sieh dir die verfügbaren Tarife für dein Konto an"
-  },
-  "Recover access confirmed by Google Play": {
-    "en": "Recover access confirmed by Google Play",
-    "es": "Recupera el acceso confirmado por Google Play",
-    "fr": "Récupère l’accès confirmé par Google Play",
-    "pt": "Recupera o acesso confirmado pelo Google Play",
-    "it": "Recupera l’accesso confermato da Google Play",
-    "de": "Stelle den von Google Play bestätigten Zugang wieder her"
-  },
-  "Invite friends": {
-    "en": "Invite friends",
-    "es": "Invita amigos",
-    "fr": "Invite tes amis",
-    "pt": "Convida amigos",
-    "it": "Invita amici",
-    "de": "Freunde einladen"
-  },
-  "Share Bobby with someone you know": {
-    "en": "Share Bobby with someone you know",
-    "es": "Comparte Bobby con alguien que conoces",
-    "fr": "Partage Bobby avec quelqu’un que tu connais",
-    "pt": "Partilha o Bobby com alguém que conheces",
-    "it": "Condividi Bobby con qualcuno che conosci",
-    "de": "Teile Bobby mit jemandem, den du kennst"
+  "Unused after {0} days without a question.": {
+    "fr": "N'est plus utilisé après {0} jours sans question.",
+    "pt": "Deixa de ser usado após {0} dias sem perguntas.",
+    "it": "Non viene più usato dopo {0} giorni senza domande.",
+    "de": "Wird nach {0} Tagen ohne Frage nicht mehr verwendet."
   },
   "Use a benefit confirmed by your account": {
     "en": "Use a benefit confirmed by your account",
@@ -1261,229 +2769,59 @@
     "it": "Usa un vantaggio confermato dal tuo account",
     "de": "Nutze einen von deinem Konto bestätigten Vorteil"
   },
-  "Your reports and delivery settings": {
-    "en": "Your reports and delivery settings",
-    "es": "Tus informes y configuración de entrega",
-    "fr": "Tes rapports et tes réglages de réception",
-    "pt": "Os teus relatórios e definições de entrega",
-    "it": "I tuoi rapporti e le impostazioni di consegna",
-    "de": "Deine Berichte und Zustelleinstellungen"
+  "Use an invitation from a different account.": {
+    "fr": "Utilise une invitation d'un autre compte.",
+    "pt": "Usa um convite de outra conta.",
+    "it": "Usa un invito di un altro account.",
+    "de": "Verwende eine Einladung von einem anderen Konto."
   },
-  "Choose assets, language and scheduled consent": {
-    "en": "Choose assets, language and scheduled consent",
-    "es": "Elige activos, idioma y consentimiento programado",
-    "fr": "Choisis les actifs, la langue et le consentement des rapports programmés",
-    "pt": "Escolhe ativos, idioma e consentimento dos relatórios agendados",
-    "it": "Scegli gli asset, la lingua e il consenso dei rapporti programmati",
-    "de": "Wähle Anlagen, Sprache und Einwilligung für geplante Berichte"
+  "Use respectful names and layouts. Hate, harassment, threats, sexual or illegal content, scams, impersonation and false or manipulated personal information are prohibited. Do not publish contact details, wallet information or private financial data.": {
+    "fr": "Utilise des noms et des aménagements respectueux. La haine, le harcèlement, les menaces, les contenus sexuels ou illégaux, les arnaques, l’usurpation d’identité et les informations personnelles fausses ou manipulées sont interdits. Ne publie pas de coordonnées, d’informations de portefeuille ni de données financières privées.",
+    "pt": "Usa nomes e disposições respeitosos. São proibidos o ódio, o assédio, as ameaças, o conteúdo sexual ou ilegal, as burlas, a usurpação de identidade e informações pessoais falsas ou manipuladas. Não publiques contactos, informações de carteiras nem dados financeiros privados.",
+    "it": "Usa nomi e disposizioni rispettosi. Sono vietati odio, molestie, minacce, contenuti sessuali o illegali, truffe, impersonificazione e informazioni personali false o manipolate. Non pubblicare contatti, informazioni sui wallet o dati finanziari privati.",
+    "de": "Verwende respektvolle Namen und Gestaltungen. Hass, Belästigung, Drohungen, sexuelle oder illegale Inhalte, Betrug, Identitätsdiebstahl sowie falsche oder manipulierte persönliche Angaben sind verboten. Veröffentliche keine Kontaktdaten, Wallet-Informationen oder privaten Finanzdaten."
   },
-  "Bobby's voice": {
-    "en": "Bobby's voice",
-    "es": "Voz de Bobby",
-    "fr": "Voix de Bobby",
-    "pt": "Voz do Bobby",
-    "it": "Voce di Bobby",
-    "de": "Bobbys Stimme"
+  "Use that Google Play account on this phone; retry.": {
+    "fr": "Utilise ce compte Google Play sur ce téléphone, puis réessaie.",
+    "pt": "Usa essa conta Google Play neste telemóvel e tenta outra vez.",
+    "it": "Usa quell'account Google Play su questo telefono e riprova.",
+    "de": "Nutze dieses Google Play-Konto auf diesem Gerät und versuch es erneut."
   },
-  "Off · Bobby reads in silence": {
-    "en": "Off · Bobby reads in silence",
-    "es": "Apagada · Bobby lee en silencio",
-    "fr": "Désactivée · Bobby lit en silence",
-    "pt": "Desligada · O Bobby lê em silêncio",
-    "it": "Disattivata · Bobby legge in silenzio",
-    "de": "Aus · Bobby liest lautlos"
+  "Use this if you paid for Bobby Pro with your Google Play account on another phone or after reinstalling. Codes and gifts never need restoring.": {
+    "fr": "À utiliser si tu as payé Bobby Pro avec ton compte Google Play sur un autre téléphone ou après une réinstallation. Les codes et les cadeaux n'ont jamais besoin d'être restaurés.",
+    "pt": "Usa isto se pagaste Bobby Pro com a tua conta Google Play noutro telemóvel ou depois de reinstalares. Códigos e ofertas nunca precisam de ser restaurados.",
+    "it": "Usalo se hai pagato Bobby Pro con il tuo account Google Play su un altro telefono o dopo una reinstallazione. Codici e regali non vanno mai ripristinati.",
+    "de": "Nutze das, wenn du Bobby Pro mit deinem Google Play-Konto auf einem anderen Gerät bezahlt hast oder nach einer Neuinstallation. Codes und Geschenke müssen nie wiederhergestellt werden."
   },
-  "On · Bobby speaks his reads": {
-    "en": "On · Bobby speaks his reads",
-    "es": "Encendida · Bobby narra sus lecturas",
-    "fr": "Activée · Bobby raconte ses lectures",
-    "pt": "Ligada · O Bobby narra as suas leituras",
-    "it": "Attivata · Bobby narra le sue letture",
-    "de": "An · Bobby spricht seine Analysen"
+  "Used after your plan's reads run out.": {
+    "fr": "Utilisées quand les analyses de ton forfait sont épuisées.",
+    "pt": "Usadas quando as análises do teu plano acabam.",
+    "it": "Usate quando finiscono le analisi del tuo piano.",
+    "de": "Werden genutzt, wenn die Analysen deines Plans aufgebraucht sind."
   },
-  "Voice type": {
-    "en": "Voice type",
-    "es": "Tipo de voz",
-    "fr": "Type de voix",
-    "pt": "Tipo de voz",
-    "it": "Tipo di voce",
-    "de": "Stimmtyp"
+  "Used another Google Play account?": {
+    "fr": "Tu as utilisé un autre compte Google Play ?",
+    "pt": "Usaste outra conta Google Play?",
+    "it": "Hai usato un altro account Google Play?",
+    "de": "Anderes Google Play-Konto genutzt?"
   },
-  "Companion's voice": {
-    "en": "Companion's voice",
-    "es": "Voz de tu compañero",
-    "fr": "Voix de ton compagnon",
-    "pt": "Voz do teu companheiro",
-    "it": "Voce del tuo compagno",
-    "de": "Stimme deines Begleiters"
+  "Visit": {
+    "fr": "Visiter",
+    "pt": "Visitar",
+    "it": "Visita",
+    "de": "Besuchen"
   },
-  "Feminine": {
-    "en": "Feminine",
-    "es": "Femenina",
-    "fr": "Féminine",
-    "pt": "Feminina",
-    "it": "Femminile",
-    "de": "Weiblich"
+  "Visit island": {
+    "fr": "Visiter l'île",
+    "pt": "Visitar ilha",
+    "it": "Visita isola",
+    "de": "Insel besuchen"
   },
-  "Masculine": {
-    "en": "Masculine",
-    "es": "Masculina",
-    "fr": "Masculine",
-    "pt": "Masculina",
-    "it": "Maschile",
-    "de": "Männlich"
-  },
-  "Language": {
-    "en": "Language",
-    "es": "Idioma",
-    "fr": "Langue",
-    "pt": "Idioma",
-    "it": "Lingua",
-    "de": "Sprache"
-  },
-  "Memory": {
-    "en": "Memory",
-    "es": "Memoria",
-    "fr": "Mémoire",
-    "pt": "Memória",
-    "it": "Memoria",
-    "de": "Gedächtnis"
-  },
-  "What Bobby remembers about your assets and preferences": {
-    "en": "What Bobby remembers about your assets and preferences",
-    "es": "Lo que Bobby recuerda de tus activos y preferencias",
-    "fr": "Ce que Bobby retient de tes actifs et préférences",
-    "pt": "O que o Bobby recorda dos teus ativos e preferências",
-    "it": "Ciò che Bobby ricorda dei tuoi asset e preferenze",
-    "de": "Was Bobby über deine Anlagen und Vorlieben speichert"
-  },
-  "Risk notice": {
-    "en": "Risk notice",
-    "es": "Aviso de riesgo",
-    "fr": "Avis de risque",
-    "pt": "Aviso de risco",
-    "it": "Avviso sui rischi",
-    "de": "Risikohinweis"
-  },
-  "Review your AI and voice consent": {
-    "en": "Review your AI and voice consent",
-    "es": "Revisa tu consentimiento de IA y voz",
-    "fr": "Vérifie ton consentement pour l’IA et la voix",
-    "pt": "Revê o teu consentimento de IA e voz",
-    "it": "Rivedi il tuo consenso per l’IA e la voce",
-    "de": "Prüfe deine Einwilligung für KI und Sprache"
-  },
-  "Tell us about an unsafe response": {
-    "en": "Tell us about an unsafe response",
-    "es": "Cuéntanos sobre una respuesta insegura",
-    "fr": "Signale-nous une réponse dangereuse",
-    "pt": "Diz-nos se recebeste uma resposta insegura",
-    "it": "Segnalaci una risposta non sicura",
-    "de": "Melde uns eine unsichere Antwort"
-  },
-  "Syncing…": {
-    "en": "Syncing…",
-    "es": "Sincronizando…",
-    "fr": "Synchronisation…",
-    "pt": "A sincronizar…",
-    "it": "Sincronizzazione…",
-    "de": "Synchronisierung…"
-  },
-  "Awards waiting to sync": {
-    "en": "Awards waiting to sync",
-    "es": "Premios por sincronizar",
-    "fr": "Récompenses à synchroniser",
-    "pt": "Prémios por sincronizar",
-    "it": "Premi da sincronizzare",
-    "de": "Auszeichnungen warten auf Synchronisierung"
-  },
-  "Not synced yet": {
-    "en": "Not synced yet",
-    "es": "Aún sin sincronizar",
-    "fr": "Pas encore synchronisé",
-    "pt": "Ainda não sincronizado",
-    "it": "Non ancora sincronizzato",
-    "de": "Noch nicht synchronisiert"
-  },
-  "Synced": {
-    "en": "Synced",
-    "es": "Sincronizado",
-    "fr": "Synchronisé",
-    "pt": "Sincronizado",
-    "it": "Sincronizzato",
-    "de": "Synchronisiert"
-  },
-  "Signed in with Google": {
-    "en": "Signed in with Google",
-    "es": "Sesión con Google",
-    "fr": "Connecté avec Google",
-    "pt": "Sessão iniciada com Google",
-    "it": "Accesso con Google",
-    "de": "Mit Google angemeldet"
-  },
-  "Signed in with Apple": {
-    "en": "Signed in with Apple",
-    "es": "Sesión con Apple",
-    "fr": "Connecté avec Apple",
-    "pt": "Sessão iniciada com Apple",
-    "it": "Accesso con Apple",
-    "de": "Mit Apple angemeldet"
-  },
-  "Signed in": {
-    "en": "Signed in",
-    "es": "Sesión iniciada",
-    "fr": "Connecté",
-    "pt": "Sessão iniciada",
-    "it": "Accesso effettuato",
-    "de": "Angemeldet"
-  },
-  "Sign out": {
-    "en": "Sign out",
-    "es": "Cerrar sesión",
-    "fr": "Se déconnecter",
-    "pt": "Terminar sessão",
-    "it": "Esci",
-    "de": "Abmelden"
-  },
-  "Delete account": {
-    "en": "Delete account",
-    "es": "Eliminar cuenta",
-    "fr": "Supprimer le compte",
-    "pt": "Eliminar conta",
-    "it": "Elimina account",
-    "de": "Konto löschen"
-  },
-  "Sign in so your XP, streak, gear and island follow you": {
-    "en": "Sign in so your XP, streak, gear and island follow you",
-    "es": "Inicia sesión para llevar contigo tu XP, racha, equipo e isla",
-    "fr": "Connecte-toi pour retrouver ton XP, ta série, ton équipement et ton île",
-    "pt": "Inicia sessão para levares contigo o teu XP, sequência, equipamento e ilha",
-    "it": "Accedi per portare con te XP, serie, equipaggiamento e isola",
-    "de": "Melde dich an, damit XP, Serie, Ausrüstung und Insel dir folgen"
-  },
-  "Sign-in is currently unavailable. Try again later.": {
-    "en": "Sign-in is currently unavailable. Try again later.",
-    "es": "El inicio de sesión no está disponible. Intenta más tarde.",
-    "fr": "La connexion est indisponible. Réessaie plus tard.",
-    "pt": "O início de sessão não está disponível. Tenta mais tarde.",
-    "it": "L’accesso non è disponibile. Riprova più tardi.",
-    "de": "Die Anmeldung ist derzeit nicht verfügbar. Versuche es später erneut."
-  },
-  "Help and support": {
-    "en": "Help and support",
-    "es": "Ayuda y soporte",
-    "fr": "Aide et assistance",
-    "pt": "Ajuda e apoio",
-    "it": "Aiuto e assistenza",
-    "de": "Hilfe und Support"
-  },
-  "Cancel": {
-    "en": "Cancel",
-    "es": "Cancelar",
-    "fr": "Annuler",
-    "pt": "Cancelar",
-    "it": "Annulla",
-    "de": "Abbrechen"
+  "Voice": {
+    "fr": "Voix",
+    "pt": "Voz",
+    "it": "Voce",
+    "de": "Stimme"
   },
   "Voice is off. Turn it on in your profile.": {
     "en": "Voice is off. Turn it on in your profile.",
@@ -1493,20 +2831,632 @@
     "it": "La voce è disattivata. Attivala nel tuo profilo.",
     "de": "Die Stimme ist ausgeschaltet. Aktiviere sie in deinem Profil."
   },
-  "A card with your companion, level and gear": {
-    "en": "A card with your companion, level and gear",
-    "es": "Una tarjeta con tu compañero, nivel y equipo",
-    "fr": "Une carte avec ton compagnon, ton niveau et ton équipement",
-    "pt": "Um cartão com o teu companheiro, nível e equipamento",
-    "it": "Una scheda con il tuo compagno, livello ed equipaggiamento",
-    "de": "Eine Karte mit deinem Begleiter, deiner Stufe und Ausrüstung"
+  "Voice type": {
+    "en": "Voice type",
+    "es": "Tipo de voz",
+    "fr": "Type de voix",
+    "pt": "Tipo de voz",
+    "it": "Tipo di voce",
+    "de": "Stimmtyp"
   },
-  "Sharing is unavailable. Try again.": {
-    "en": "Sharing is unavailable. Try again.",
-    "es": "No se pudo compartir. Intenta de nuevo.",
-    "fr": "Le partage est indisponible. Réessaie.",
-    "pt": "Não foi possível partilhar. Tenta novamente.",
-    "it": "La condivisione non è disponibile. Riprova.",
-    "de": "Das Teilen ist nicht verfügbar. Versuche es erneut."
+  "Wait": {
+    "fr": "Attendre",
+    "pt": "Esperar",
+    "it": "Aspetta",
+    "de": "Abwarten"
+  },
+  "Want a reminder to review it?": {
+    "fr": "Tu veux un rappel pour la revoir ?",
+    "pt": "Queres um lembrete para a rever?",
+    "it": "Vuoi un promemoria per rivederla?",
+    "de": "Soll ich dich ans Überprüfen erinnern?"
+  },
+  "Week": {
+    "fr": "Semaine",
+    "pt": "Semana",
+    "it": "Settimana",
+    "de": "Woche"
+  },
+  "What Bobby remembers about your assets and preferences": {
+    "en": "What Bobby remembers about your assets and preferences",
+    "es": "Lo que Bobby recuerda de tus activos y preferencias",
+    "fr": "Ce que Bobby retient de tes actifs et préférences",
+    "pt": "O que o Bobby recorda dos teus ativos e preferências",
+    "it": "Ciò che Bobby ricorda dei tuoi asset e preferenze",
+    "de": "Was Bobby über deine Anlagen und Vorlieben speichert"
+  },
+  "What changed in {0} since I asked?": {
+    "fr": "Qu’est-ce qui a changé pour {0} depuis ma question ?",
+    "pt": "O que mudou em {0} desde que perguntei?",
+    "it": "Cosa è cambiato in {0} da quando ho chiesto?",
+    "de": "Was hat sich bei {0} getan, seit ich gefragt habe?"
+  },
+  "What changed?": {
+    "fr": "Quoi de neuf ?",
+    "pt": "O que mudou?",
+    "it": "Cosa è cambiato?",
+    "de": "Was hat sich getan?"
+  },
+  "What changes your mind?": {
+    "fr": "Qu'est-ce qui te ferait changer d'avis ?",
+    "pt": "O que te faria mudar de ideias?",
+    "it": "Cosa ti farebbe cambiare idea?",
+    "de": "Was würde deine Meinung ändern?"
+  },
+  "What worries me": {
+    "fr": "Ce qui m’inquiète",
+    "pt": "O que me preocupa",
+    "it": "Cosa mi preoccupa",
+    "de": "Was mir Sorgen macht"
+  },
+  "What worries you?": {
+    "fr": "Qu'est-ce qui t'inquiète ?",
+    "pt": "O que te preocupa?",
+    "it": "Cosa ti preoccupa?",
+    "de": "Was beunruhigt dich?"
+  },
+  "What would change my mind": {
+    "fr": "Ce qui me ferait changer d’avis",
+    "pt": "O que me faria mudar de opinião",
+    "it": "Cosa mi farebbe cambiare idea",
+    "de": "Was meine Meinung ändern würde"
+  },
+  "What you are looking at, and why": {
+    "fr": "Ce que tu regardes, et pourquoi",
+    "pt": "O que estás a ver, e porquê",
+    "it": "Cosa stai guardando, e perché",
+    "de": "Was du dir ansiehst und warum"
+  },
+  "What you have and how to get more": {
+    "fr": "Ce que tu as et comment en obtenir plus",
+    "pt": "O que tens e como obter mais",
+    "it": "Cosa hai e come averne di più",
+    "de": "Was du hast und wie du mehr bekommst"
+  },
+  "Why I am looking at this": {
+    "fr": "Pourquoi je regarde cet actif",
+    "pt": "Porque estou a olhar para isto",
+    "it": "Perché lo sto guardando",
+    "de": "Warum ich mir das anschaue"
+  },
+  "Why this asset?": {
+    "fr": "Pourquoi cet actif ?",
+    "pt": "Porquê este ativo?",
+    "it": "Perché questo asset?",
+    "de": "Warum dieser Wert?"
+  },
+  "With Bobby Pro, within fair use.": {
+    "fr": "Avec Bobby Pro, dans la limite d'un usage raisonnable.",
+    "pt": "Com Bobby Pro, dentro de uma utilização razoável.",
+    "it": "Con Bobby Pro, entro un uso corretto.",
+    "de": "Mit Bobby Pro, im Rahmen fairer Nutzung."
+  },
+  "Write a thesis first.": {
+    "fr": "Écris d'abord une thèse.",
+    "pt": "Escreve primeiro uma tese.",
+    "it": "Scrivi prima una tesi.",
+    "de": "Schreib zuerst eine These."
+  },
+  "Write down why, for next time": {
+    "fr": "Note pourquoi, pour la prochaine fois",
+    "pt": "Escreve o porquê, para a próxima",
+    "it": "Scrivi il perché, per la prossima volta",
+    "de": "Schreib auf, warum – fürs nächste Mal"
+  },
+  "Write my thesis": {
+    "fr": "Écrire ma thèse",
+    "pt": "Escrever a minha tese",
+    "it": "Scrivo la mia tesi",
+    "de": "Meine These schreiben"
+  },
+  "Write thesis": {
+    "fr": "Écrire une thèse",
+    "pt": "Escrever tese",
+    "it": "Scrivi la tesi",
+    "de": "These schreiben"
+  },
+  "Write why this asset interests you.": {
+    "fr": "Écris pourquoi cet actif t'intéresse.",
+    "pt": "Escreve porque te interessa este ativo.",
+    "it": "Scrivi perché questo asset ti interessa.",
+    "de": "Schreib, warum dich dieser Wert interessiert."
+  },
+  "Yes, tell me": {
+    "fr": "Oui, dis-moi",
+    "pt": "Sim, conta-me",
+    "it": "Sì, dimmelo",
+    "de": "Ja, sag es mir"
+  },
+  "You already have a thesis for {0}.": {
+    "fr": "Tu as déjà une thèse sur {0}.",
+    "pt": "Já tens uma tese sobre {0}.",
+    "it": "Hai già una tesi su {0}.",
+    "de": "Du hast schon eine These zu {0}."
+  },
+  "You already have a thesis on {0}.": {
+    "fr": "Tu as déjà une thèse sur {0}.",
+    "pt": "Já tens uma tese sobre {0}.",
+    "it": "Hai già una tesi su {0}.",
+    "de": "Du hast schon eine These zu {0}."
+  },
+  "You already have an active subscription.": {
+    "fr": "Tu as déjà un abonnement actif.",
+    "pt": "Já tens uma subscrição ativa.",
+    "it": "Hai già un abbonamento attivo.",
+    "de": "Du hast bereits ein aktives Abonnement."
+  },
+  "You are visiting a public island. Changes stay with its builder.": {
+    "fr": "Tu visites une île publique. Les modifications restent réservées à son créateur.",
+    "pt": "Estás a visitar uma ilha pública. As alterações ficam com quem a construiu.",
+    "it": "Stai visitando un'isola pubblica. Le modifiche spettano al suo creatore.",
+    "de": "Du besuchst eine öffentliche Insel. Änderungen bleiben ihrem Erbauer vorbehalten."
+  },
+  "You get {0} Pro days per new account.": {
+    "fr": "Tu reçois {0} jours Pro par nouveau compte.",
+    "pt": "Recebes {0} dias Pro por cada conta nova.",
+    "it": "Ricevi {0} giorni Pro per ogni nuovo account.",
+    "de": "Du erhältst {0} Pro-Tage pro neuem Konto."
+  },
+  "You get {0} days of Bobby Pro for each friend who creates an account with your invitation, up to {1} friends.": {
+    "fr": "Tu reçois {0} jours de Bobby Pro pour chaque ami qui crée un compte avec ton invitation, jusqu'à {1} amis.",
+    "pt": "Recebes {0} dias de Bobby Pro por cada amigo que cria conta com o teu convite, até {1} amigos.",
+    "it": "Ricevi {0} giorni di Bobby Pro per ogni amico che crea un account con il tuo invito, fino a {1} amici.",
+    "de": "Du bekommst {0} Tage Bobby Pro für jeden Freund, der mit deiner Einladung ein Konto erstellt, für bis zu {1} Freunde."
+  },
+  "You get {0} days of Bobby Pro for each friend who joins with your link, up to {1} friends.": {
+    "fr": "Tu reçois {0} jours de Bobby Pro pour chaque ami qui s'inscrit avec ton lien, jusqu'à {1} amis.",
+    "pt": "Recebes {0} dias de Bobby Pro por cada amigo que se junta com a tua ligação, até {1} amigos.",
+    "it": "Ricevi {0} giorni di Bobby Pro per ogni amico che si iscrive con il tuo link, fino a {1} amici.",
+    "de": "Du bekommst {0} Tage Bobby Pro für jeden Freund, der über deinen Link beitritt, bis zu {1} Freunde."
+  },
+  "You used the reads available without an account, so this review did not run.": {
+    "fr": "Tu as utilisé les analyses disponibles sans compte : ce réexamen n’a donc pas été lancé.",
+    "pt": "Usaste as análises disponíveis sem conta, por isso esta revisão não foi feita.",
+    "it": "Hai usato le analisi disponibili senza account, quindi questo riesame non è partito.",
+    "de": "Du hast die ohne Konto verfügbaren Analysen verbraucht, daher wurde diese Überprüfung nicht gestartet."
+  },
+  "You used your free reads, so this review did not run.": {
+    "fr": "Tu as utilisé tes analyses gratuites : ce réexamen n’a donc pas été lancé.",
+    "pt": "Usaste as tuas análises gratuitas, por isso esta revisão não foi feita.",
+    "it": "Hai usato le tue analisi gratuite, quindi questo riesame non è partito.",
+    "de": "Du hast deine kostenlosen Analysen verbraucht, daher wurde diese Überprüfung nicht gestartet."
+  },
+  "You wrote 1 thesis before signing in. Keep it in this account?": {
+    "fr": "Tu as écrit 1 thèse avant de te connecter. La garder sur ce compte ?",
+    "pt": "Escreveste 1 tese antes de iniciares sessão. Queres mantê-la nesta conta?",
+    "it": "Hai scritto 1 tesi prima di accedere. Vuoi tenerla in questo account?",
+    "de": "Du hast 1 These vor der Anmeldung geschrieben. In diesem Konto behalten?"
+  },
+  "You wrote this thesis before signing in.": {
+    "fr": "Tu as écrit cette thèse avant de te connecter.",
+    "pt": "Escreveste esta tese antes de iniciares sessão.",
+    "it": "Hai scritto questa tesi prima di accedere.",
+    "de": "Du hast diese These vor der Anmeldung geschrieben."
+  },
+  "You wrote {0} theses before signing in. Keep them in this account?": {
+    "fr": "Tu as écrit {0} thèses avant de te connecter. Les garder sur ce compte ?",
+    "pt": "Escreveste {0} teses antes de iniciares sessão. Queres mantê-las nesta conta?",
+    "it": "Hai scritto {0} tesi prima di accedere. Vuoi tenerle in questo account?",
+    "de": "Du hast {0} Thesen vor der Anmeldung geschrieben. In diesem Konto behalten?"
+  },
+  "Your Bobby": {
+    "fr": "Ton Bobby",
+    "pt": "O teu Bobby",
+    "it": "Il tuo Bobby",
+    "de": "Dein Bobby"
+  },
+  "Your Bobby account was deleted. To remove Bobby's access to your Apple account, open Apple's instructions, select Bobby in your Sign in with Apple settings, and stop using Sign in with Apple.": {
+    "fr": "Ton compte Bobby a été supprimé. Pour retirer l’accès de Bobby à ton compte Apple, ouvre les instructions d’Apple, sélectionne Bobby dans les réglages de Se connecter avec Apple et cesse d’utiliser ce mode de connexion.",
+    "pt": "A tua conta Bobby foi eliminada. Para remover o acesso do Bobby à tua conta Apple, abre as instruções da Apple, seleciona o Bobby nas definições de Iniciar sessão com Apple e deixa de usar esse acesso.",
+    "it": "Il tuo account Bobby è stato eliminato. Per rimuovere l’accesso di Bobby al tuo account Apple, apri le istruzioni di Apple, seleziona Bobby nelle impostazioni di Accedi con Apple e smetti di usare questo accesso.",
+    "de": "Dein Bobby-Konto wurde gelöscht. Um Bobbys Zugriff auf dein Apple-Konto zu entfernen, öffne Apples Anleitung, wähle Bobby in den Einstellungen für Mit Apple anmelden und beende diese Nutzung."
+  },
+  "Your Monday briefing is included": {
+    "fr": "Ton bilan du lundi est inclus",
+    "pt": "O teu resumo de segunda está incluído",
+    "it": "Il tuo riepilogo del lunedì è incluso",
+    "de": "Dein Montagsbericht ist inklusive"
+  },
+  "Your account changed. Refresh and try again.": {
+    "fr": "Ton compte a changé. Actualise et réessaie.",
+    "pt": "A tua conta mudou. Atualiza e tenta novamente.",
+    "it": "Il tuo account è cambiato. Aggiorna e riprova.",
+    "de": "Dein Konto hat sich geändert. Aktualisiere und versuche es erneut."
+  },
+  "Your account confirmed the benefit.": {
+    "fr": "Ton compte a confirmé l'avantage.",
+    "pt": "A tua conta confirmou o benefício.",
+    "it": "Il tuo account ha confermato il beneficio.",
+    "de": "Dein Konto hat den Vorteil bestätigt."
+  },
+  "Your account confirms Pro access": {
+    "en": "Your account confirms Pro access",
+    "es": "Tu cuenta confirma el acceso Pro",
+    "fr": "Ton compte confirme l’accès Pro",
+    "pt": "A tua conta confirma o acesso Pro",
+    "it": "Il tuo account conferma l’accesso Pro",
+    "de": "Dein Konto bestätigt den Pro-Zugang"
+  },
+  "Your avatar": {
+    "en": "Your avatar",
+    "es": "Tu avatar",
+    "fr": "Ton avatar",
+    "pt": "O teu avatar",
+    "it": "Il tuo avatar",
+    "de": "Dein Avatar"
+  },
+  "Your chosen date. Bobby does not monitor markets.": {
+    "fr": "Tu choisis la date. Bobby ne surveille pas les marchés.",
+    "pt": "Tu escolhes a data. O Bobby não vigia os mercados.",
+    "it": "Scegli tu la data. Bobby non sorveglia i mercati.",
+    "de": "Du wählst das Datum. Bobby beobachtet die Märkte nicht."
+  },
+  "Your earned pieces will appear here. Complete a read and return to review its thesis.": {
+    "fr": "Tes pièces gagnées apparaîtront ici. Termine une lecture et reviens pour revoir sa thèse.",
+    "pt": "As tuas peças conquistadas aparecerão aqui. Conclui uma leitura e volta para rever a tese.",
+    "it": "I pezzi guadagnati appariranno qui. Completa un'analisi e torna per riesaminarne la tesi.",
+    "de": "Deine verdienten Teile erscheinen hier. Schließe eine Analyse ab und komme zurück, um ihre These zu überprüfen."
+  },
+  "Your first name · how often and when you asked about this asset · the time frame you named · its price that day and the change since · your preferences · your most-asked assets": {
+    "fr": "Ton prénom · combien de fois et quand tu as posé une question sur cet actif · l'horizon que tu as indiqué · son prix ce jour-là et la variation depuis · tes préférences · les actifs sur lesquels tu poses le plus de questions",
+    "pt": "O teu primeiro nome · quantas vezes e quando perguntaste por este ativo · o prazo que indicaste · o preço nesse dia e a variação desde então · as tuas preferências · os ativos sobre os quais mais perguntas",
+    "it": "Il tuo nome · quante volte e quando hai chiesto di questo asset · l'orizzonte che hai indicato · il suo prezzo quel giorno e la variazione da allora · le tue preferenze · gli asset su cui chiedi più spesso",
+    "de": "Dein Vorname · wie oft und wann du nach diesem Wert gefragt hast · der Zeitraum, den du genannt hast · sein Kurs an diesem Tag und die Änderung seitdem · deine Einstellungen · die Werte, nach denen du am häufigsten fragst"
+  },
+  "Your friend already invited all the friends allowed.": {
+    "fr": "Ton ami a déjà invité tous les amis autorisés.",
+    "pt": "O teu amigo já convidou todos os amigos permitidos.",
+    "it": "Il tuo amico ha già invitato tutti gli amici consentiti.",
+    "de": "Dein Freund hat bereits alle erlaubten Freunde eingeladen."
+  },
+  "Your gifted days run until {0}.": {
+    "fr": "Tes jours offerts vont jusqu'au {0}.",
+    "pt": "Os teus dias oferecidos vão até {0}.",
+    "it": "I tuoi giorni in regalo arrivano fino al {0}.",
+    "de": "Deine geschenkten Tage laufen bis {0}."
+  },
+  "Your invitation code": {
+    "fr": "Ton code d'invitation",
+    "pt": "O teu código de convite",
+    "it": "Il tuo codice d'invito",
+    "de": "Dein Einladungscode"
+  },
+  "Your preferences": {
+    "fr": "Tes préférences",
+    "pt": "As tuas preferências",
+    "it": "Le tue preferenze",
+    "de": "Deine Einstellungen"
+  },
+  "Your purchase is awaiting confirmation.": {
+    "fr": "Ton achat attend une confirmation.",
+    "pt": "A tua compra aguarda confirmação.",
+    "it": "Il tuo acquisto è in attesa di conferma.",
+    "de": "Dein Kauf wartet auf Bestätigung."
+  },
+  "Your question text is not kept.": {
+    "fr": "Le texte de ta question n'est pas gardé.",
+    "pt": "O texto da tua pergunta não é guardado.",
+    "it": "Il testo della tua domanda non viene conservato.",
+    "de": "Der Text deiner Frage wird nicht gespeichert."
+  },
+  "Your reminder to review a thesis.": {
+    "fr": "Ton rappel pour revoir une thèse.",
+    "pt": "O teu lembrete para rever uma tese.",
+    "it": "Il tuo promemoria per rivedere una tesi.",
+    "de": "Deine Erinnerung, eine These zu überprüfen."
+  },
+  "Your reports and delivery settings": {
+    "en": "Your reports and delivery settings",
+    "es": "Tus informes y configuración de entrega",
+    "fr": "Tes rapports et tes réglages de réception",
+    "pt": "Os teus relatórios e definições de entrega",
+    "it": "I tuoi rapporti e le impostazioni di consegna",
+    "de": "Deine Berichte und Zustelleinstellungen"
+  },
+  "Your thesis": {
+    "fr": "Ta thèse",
+    "pt": "A tua tese",
+    "it": "La tua tesi",
+    "de": "Deine These"
+  },
+  "Your thesis text goes to Bobby’s AI providers. Only for this review.": {
+    "fr": "Ton texte est envoyé aux fournisseurs d’IA de Bobby. Uniquement pour cette revue.",
+    "pt": "O teu texto vai para os fornecedores de IA do Bobby. Só para esta revisão.",
+    "it": "Il tuo testo va ai fornitori di IA di Bobby. Solo per questa revisione.",
+    "de": "Dein Text geht an Bobbys KI-Anbieter. Nur für diese Überprüfung."
+  },
+  "Your thesis: {0} days since review": {
+    "fr": "Ta thèse : {0} jours sans réexamen",
+    "pt": "A tua tese: {0} dias sem revisão",
+    "it": "La tua tesi: {0} giorni senza riesame",
+    "de": "Deine These: {0} Tage ohne Prüfung"
+  },
+  "Your thesis: {0} days, not reviewed yet": {
+    "fr": "Ta thèse : {0} jours, jamais réexaminée",
+    "pt": "A tua tese: {0} dias, ainda sem revisão",
+    "it": "La tua tesi: {0} giorni, mai riesaminata",
+    "de": "Deine These: {0} Tage, noch nie geprüft"
+  },
+  "Your three-agent market desk.": {
+    "fr": "Ton espace d'analyse du marché avec trois agents.",
+    "pt": "A tua mesa de análise do mercado com três agentes.",
+    "it": "Il tuo spazio di analisi del mercato con tre agenti.",
+    "de": "Dein Bereich für Marktanalysen mit drei Agenten."
+  },
+  "Your week": {
+    "fr": "Ta semaine",
+    "pt": "A tua semana",
+    "it": "La tua settimana",
+    "de": "Deine Woche"
+  },
+  "Your week with {0}.": {
+    "fr": "Ta semaine avec {0}.",
+    "pt": "A tua semana com {0}.",
+    "it": "La tua settimana con {0}.",
+    "de": "Deine Woche mit {0}."
+  },
+  "Your week: {0} and {1} more.": {
+    "fr": "Ta semaine : {0} et {1} de plus.",
+    "pt": "A tua semana: {0} e mais {1}.",
+    "it": "La tua settimana: {0} e altri {1}.",
+    "de": "Deine Woche: {0} und {1} weitere."
+  },
+  "Your words": {
+    "fr": "Tes mots",
+    "pt": "As tuas palavras",
+    "it": "Le tue parole",
+    "de": "Deine Worte"
+  },
+  "Your {0} thesis: {1} days since review": {
+    "fr": "Ta thèse {0} : {1} jours sans réexamen",
+    "pt": "A tua tese de {0}: {1} dias sem revisão",
+    "it": "Tesi su {0}: {1} giorni senza riesame",
+    "de": "Deine {0}-These: {1} Tage ohne Prüfung"
+  },
+  "Your {0} thesis: {1} days, not reviewed yet": {
+    "fr": "Ta thèse {0} : {1} jours, jamais réexaminée",
+    "pt": "Tese de {0}: {1} dias, ainda sem revisão",
+    "it": "Tesi su {0}: {1} giorni, mai riesaminata",
+    "de": "Deine {0}-These: {1} Tage, noch nie geprüft"
+  },
+  "Yours": {
+    "fr": "À toi",
+    "pt": "Teu",
+    "it": "Tuo",
+    "de": "Deins"
+  },
+  "asked 1 day ago": {
+    "fr": "demandé il y a 1 jour",
+    "pt": "perguntaste há 1 dia",
+    "it": "chiesto 1 giorno fa",
+    "de": "vor 1 Tag gefragt"
+  },
+  "asked less than a day ago": {
+    "fr": "demandé il y a moins d'un jour",
+    "pt": "perguntaste há menos de um dia",
+    "it": "chiesto meno di un giorno fa",
+    "de": "vor weniger als einem Tag gefragt"
+  },
+  "asked {0} days ago": {
+    "fr": "demandé il y a {0} jours",
+    "pt": "perguntaste há {0} dias",
+    "it": "chiesto {0} giorni fa",
+    "de": "vor {0} Tagen gefragt"
+  },
+  "days": {
+    "fr": "jours",
+    "pt": "dias",
+    "it": "giorni",
+    "de": "Tage"
+  },
+  "days of Pro per eligible invitation": {
+    "fr": "jours de Pro par invitation admissible",
+    "pt": "dias de Pro por convite elegível",
+    "it": "giorni di Pro per invito idoneo",
+    "de": "Pro-Tage pro berechtigter Einladung"
+  },
+  "down {0}% since": {
+    "fr": "−{0} % depuis",
+    "pt": "desceu {0}%",
+    "it": "in calo del {0}%",
+    "de": "seitdem −{0} %"
+  },
+  "earnings": {
+    "fr": "résultats",
+    "pt": "resultados",
+    "it": "risultati",
+    "de": "Quartalszahlen"
+  },
+  "economy": {
+    "fr": "économie",
+    "pt": "economia",
+    "it": "economia",
+    "de": "Konjunktur"
+  },
+  "filings": {
+    "fr": "documents réglementaires",
+    "pt": "documentos regulatórios",
+    "it": "documenti societari",
+    "de": "Pflichtmitteilungen"
+  },
+  "flat since": {
+    "fr": "stable depuis",
+    "pt": "sem alteração",
+    "it": "invariato",
+    "de": "seitdem unverändert"
+  },
+  "friends joined": {
+    "fr": "amis inscrits",
+    "pt": "amigos aderiram",
+    "it": "amici iscritti",
+    "de": "Freunde sind beigetreten"
+  },
+  "fundamentals": {
+    "fr": "fondamentaux",
+    "pt": "fundamentais",
+    "it": "fondamentali",
+    "de": "Fundamentaldaten"
+  },
+  "less than a day ago": {
+    "fr": "il y a moins d'un jour",
+    "pt": "há menos de um dia",
+    "it": "meno di un giorno fa",
+    "de": "vor weniger als einem Tag"
+  },
+  "news": {
+    "fr": "actualités",
+    "pt": "notícias",
+    "it": "notizie",
+    "de": "Nachrichten"
+  },
+  "period shown by your store": {
+    "fr": "période indiquée par ta boutique",
+    "pt": "período indicado pela tua loja",
+    "it": "periodo indicato dal tuo store",
+    "de": "von deinem Store angezeigte Laufzeit"
+  },
+  "pieces": {
+    "fr": "pièces",
+    "pt": "peças",
+    "it": "pezzi",
+    "de": "Teile"
+  },
+  "project fundamentals": {
+    "fr": "fondamentaux du projet",
+    "pt": "fundamentais do projeto",
+    "it": "fondamentali del progetto",
+    "de": "Fundamentaldaten des Projekts"
+  },
+  "up {0}% since": {
+    "fr": "+{0} % depuis",
+    "pt": "subiu {0}%",
+    "it": "in rialzo del {0}%",
+    "de": "seitdem +{0} %"
+  },
+  "{0} days ago": {
+    "fr": "il y a {0} jours",
+    "pt": "há {0} dias",
+    "it": "{0} giorni fa",
+    "de": "vor {0} Tagen"
+  },
+  "{0} gifted": {
+    "fr": "{0} offertes",
+    "pt": "{0} oferecidas",
+    "it": "{0} in regalo",
+    "de": "{0} geschenkt"
+  },
+  "{0} guest theses": {
+    "fr": "{0} thèses sans compte",
+    "pt": "{0} teses sem conta",
+    "it": "{0} tesi senza account",
+    "de": "{0} Thesen ohne Konto"
+  },
+  "{0} is where you left it": {
+    "fr": "{0} est là où tu l’as laissé",
+    "pt": "{0} está onde o deixaste",
+    "it": "{0} è dove l’hai lasciato",
+    "de": "{0} steht, wo du es gelassen hast"
+  },
+  "{0} needs a free account, so this review did not run.": {
+    "fr": "Le niveau {0} nécessite un compte gratuit : ce réexamen n’a donc pas été lancé.",
+    "pt": "O nível {0} precisa de uma conta gratuita, por isso esta revisão não foi feita.",
+    "it": "Il livello {0} richiede un account gratuito, quindi questo riesame non è partito.",
+    "de": "Die Stufe {0} braucht ein kostenloses Konto, daher wurde diese Überprüfung nicht gestartet."
+  },
+  "{0} of {1} active": {
+    "fr": "{0} sur {1} actives",
+    "pt": "{0} de {1} ativas",
+    "it": "{0} su {1} attive",
+    "de": "{0} von {1} aktiv"
+  },
+  "{0} of {1} characters": {
+    "fr": "{0} caractères sur {1}",
+    "pt": "{0} de {1} caracteres",
+    "it": "{0} caratteri su {1}",
+    "de": "{0} von {1} Zeichen"
+  },
+  "{0} of {1} left": {
+    "fr": "{0} sur {1} restantes",
+    "pt": "{0} de {1} restantes",
+    "it": "{0} su {1} rimaste",
+    "de": "{0} von {1} übrig"
+  },
+  "{0} of {1} left this week": {
+    "fr": "{0} sur {1} restantes cette semaine",
+    "pt": "{0} de {1} restantes esta semana",
+    "it": "{0} su {1} rimaste questa settimana",
+    "de": "{0} von {1} diese Woche übrig"
+  },
+  "{0} of {1} reads": {
+    "fr": "{0} analyses sur {1}",
+    "pt": "{0} de {1} análises",
+    "it": "{0} analisi su {1}",
+    "de": "{0} von {1} Analysen"
+  },
+  "{0} reads left this week": {
+    "fr": "Il te reste {0} analyses cette semaine",
+    "pt": "Restam-te {0} análises esta semana",
+    "it": "Ti restano {0} analisi questa settimana",
+    "de": "Noch {0} Analysen diese Woche"
+  },
+  "{0} today. {1} is part of it.": {
+    "fr": "{0} aujourd’hui. {1} en fait partie.",
+    "pt": "{0} hoje. {1} faz parte.",
+    "it": "{0} oggi. {1} ne fa parte.",
+    "de": "{0} heute. {1} gehört dazu."
+  },
+  "{0} {1} since you asked": {
+    "fr": "{0} {1} depuis ta question",
+    "pt": "{0} {1} desde que perguntaste",
+    "it": "{0} {1} da quando hai chiesto",
+    "de": "{0} {1} seit deiner Frage"
+  },
+  "{0} · 1 read": {
+    "fr": "{0} · 1 analyse",
+    "pt": "{0} · 1 análise",
+    "it": "{0} · 1 analisi",
+    "de": "{0} · 1 Analyse"
+  },
+  "{0}, a day later": {
+    "fr": "{0}, un jour plus tard",
+    "pt": "{0}, um dia depois",
+    "it": "{0}, un giorno dopo",
+    "de": "{0}, einen Tag später"
+  },
+  "{0}, a day later. See how it moved.": {
+    "fr": "{0}, un jour plus tard. Regarde comment ça a bougé.",
+    "pt": "{0}, um dia depois. Vê como se moveu.",
+    "it": "{0}, un giorno dopo. Guarda come si è mosso.",
+    "de": "{0}, einen Tag später. Schau, wie es lief."
+  },
+  "{0}, {1} days later": {
+    "fr": "{0}, {1} jours plus tard",
+    "pt": "{0}, {1} dias depois",
+    "it": "{0}, {1} giorni dopo",
+    "de": "{0}, {1} Tage später"
+  },
+  "{0}, {1} days later. See how it moved.": {
+    "fr": "{0}, {1} jours plus tard. Regarde comment ça a bougé.",
+    "pt": "{0}, {1} dias depois. Vê como se moveu.",
+    "it": "{0}, {1} giorni dopo. Guarda come si è mosso.",
+    "de": "{0}, {1} Tage später. Schau, wie es lief."
+  },
+  "{0}: asked {1}× so far": {
+    "fr": "{0} : {1} questions jusqu'ici",
+    "pt": "{0}: {1} perguntas até agora",
+    "it": "{0}: {1} domande finora",
+    "de": "{0}: bisher {1}-mal gefragt"
+  },
+  "{0}: saved in memory": {
+    "fr": "{0} : enregistré en mémoire",
+    "pt": "{0}: guardado na memória",
+    "it": "{0}: salvato in memoria",
+    "de": "{0}: im Gedächtnis gespeichert"
+  },
+  "{0}: {1}": {
+    "fr": "{0} : {1}",
+    "pt": "{0}: {1}",
+    "it": "{0}: {1}",
+    "de": "{0}: {1}"
   }
 }

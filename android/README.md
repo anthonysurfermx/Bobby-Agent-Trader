@@ -2,6 +2,18 @@
 
 The Android candidate is **1.1.1 (version code 6)**, on `codex/bobby-android-parity-ios17`, with [draft Android PR #141](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/141), stacked on `claude/feedback-build61` and based on canonical iOS **1.7 (61)** source / [PR #140](https://github.com/anthonysurfermx/Bobby-Agent-Trader/pull/140), commit `bfdc16dfe9ce947f11bbcbd4f447ffc62d0f1e92`. PR #140 is still open; this is a source reference, not proof of an iOS release. Kotlin owns accounts, consent, market data, billing, voice and persistence; the approved bundled HTML/WebGL Núcleo and native Compose sheets present the product. Authentication tokens never enter the web page. Application ID: `xyz.bobbyprotocol.bobby`.
 
+## In progress: Bobby 1.8, version 1.2.0 (code 10)
+
+`app/build.gradle.kts` is at **1.2.0 (10)**: Bobby 1.8 for Android, a port of iOS 1.8 (`ios/Bobby/Sources/V18/`, design law `ios/Bobby/V18-DESIGN.md`). The sections below describe earlier candidates and stay as they were. Nothing of 1.2.0 has been built for release, installed or published yet.
+
+What the 1.8 foundation adds, and where:
+
+- `v18/V18Host.kt` is the one interface a feature uses to reach the app; `v18/V18Runtime.kt` implements it over the session (`V18Desk`) and the activity (`V18Shell`). Unit tests build the same runtime over the fakes in `app/src/test/java/…/v18/V18TestKit.kt`.
+- The page's nudge: `session.nudge` in every session state, the bridge methods `nudge.seen` and `nudge.act`, and the event `ask.start`. The page side was already bundled.
+- Seven native-only sheets (`credits`, `theses`, `thesisEditor`, `thesisReview`, `memoryConsent`, `reminders`, `followUp`) drawn by `ui/v18/V18Sheets.kt`, each from its own file, built with `ui/v18/QuietKit.kt`. The page can open exactly what 1.1.4 could (`V18Routes.PAGE_OPENABLE`).
+- Local notices (`v18/notify/LocalNotifier.kt`, `platform/AndroidLocalNotifier.kt`): WorkManager one-time work, inexact by design, two channels (`thesis-reminders`, `follow-ups`). The notification permission is asked only from a person's own tap.
+- Words: `python3 android/tools/build-v18-translations.py` merges every iOS 1.8 translation row into `assets/nucleo/native-android-translations.json`, sorted. Rows that name an iPhone, an Apple Account or the App Store are replaced by the Android wording in `android/tools/v18-android-wording.json`. To add a string iOS does not have, add its row to the JSON and run the script.
+
 ## Latest candidate: Trader Land correction, code 6
 
 A physical Seeker user reported that Trader Land in code 5 looked like coordinates and many dots, with the island dimension missing. The cause was native `LandMap`: a Cartesian table of 48 dp boxes, with each sprite drawn only in its first cell and `·` in the remaining footprint. Canonical iOS 1.7 (61) uses an isometric Canvas and sprites; this is a rendering defect, not a different 3D library.

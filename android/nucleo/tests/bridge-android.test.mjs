@@ -85,3 +85,25 @@ test('visible-read request carries only its UUID and accepts an honest negative 
   api.receive('1', { v: 1, ok: true, result: { accepted: false } });
   assert.deepEqual(await result, { accepted: false });
 });
+
+test('the nudge crosses the Android transport as two reports and native starts a read with one event', async () => {
+  const { api, requests } = bridge();
+  const seen = api.call('nudge.seen', { id: 'credits.low.2026-w41' });
+  const tapped = api.call('nudge.act', { id: 'credits.low.2026-w41' });
+  assert.deepEqual(requests.map(request => [request.method, request.params]), [
+    ['nudge.seen', { id: 'credits.low.2026-w41' }],
+    ['nudge.act', { id: 'credits.low.2026-w41' }],
+  ]);
+  // Native answers what it counted and whether the nudge is still its own; the page never decides either.
+  api.receive(requests[0].id, { v: 1, ok: true, result: { count: 2, active: true } });
+  api.receive(requests[1].id, { v: 1, ok: true, result: { status: 'done' } });
+  assert.deepEqual(await seen, { count: 2, active: true });
+  assert.deepEqual(await tapped, { status: 'done' });
+  const starts = [];
+  api.on('ask.start', payload => starts.push(payload));
+  api.emit('ask.start', { token: 'single-use', question: 'What changed in NVDA since I asked?' });
+  assert.deepEqual(starts, [{ token: 'single-use', question: 'What changed in NVDA since I asked?' }]);
+  // The page has no method to open a 1.8 screen by itself: only openNative, which native checks.
+  await assert.rejects(api.call('present', { route: 'credits' }), { code: 'unknown_method' });
+  assert.equal(requests.length, 2);
+});
