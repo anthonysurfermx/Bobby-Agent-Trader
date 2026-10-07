@@ -52,9 +52,10 @@ final class InviteLinkCenterTests: XCTestCase {
         try await super.tearDown()
     }
 
-    private func center(_ world: World) -> InviteLinkCenter {
+    /// `observe: true` is the app's own centre: it listens for sign-ins and activations and tries once at launch.
+    private func center(_ world: World, observe: Bool = false) -> InviteLinkCenter {
         InviteLinkCenter(defaults: defaults, now: { world.now }, riskAccepted: { world.risk }, auth: .none,
-                         currentUser: { world.user }, currentGeneration: { world.generation }, observe: false,
+                         currentUser: { world.user }, currentGeneration: { world.generation }, observe: observe,
                          send: { path, method, body, _, generation in
                              world.sent.append((path, method, body, generation))
                              return try await world.answer()
@@ -65,6 +66,7 @@ final class InviteLinkCenterTests: XCTestCase {
     private func link(_ code: String) -> URL { URL(string: "https://bobbyprotocol.xyz/i/\(code)")! }
     private func reply(_ result: String, status: Int = 200) -> InviteLinkCenter.Reply { .init(json: ["result": result], status: status) }
     private var stored: [String: Any]? { defaults.dictionary(forKey: InviteLinkCenter.storeKey) }
+    private var storedAnswer: [String: Any]? { defaults.dictionary(forKey: InviteLinkCenter.answerKey) }
 
     // MARK: Storage
 
@@ -153,17 +155,91 @@ final class InviteLinkCenterTests: XCTestCase {
         let step = await center.claimIfPossible()
         XCTAssertNil(step)
         let typed = await center.submit(code: "WXYZ6789")
-        XCTAssertNil(typed)
+        XCTAssertEqual(typed, .consentNeeded, "a typed code is told why nothing happened")
         XCTAssertTrue(world.sent.isEmpty, "signed in with an invitation waiting, and still nothing leaves before consent")
         XCTAssertEqual(center.pendingCode, "WXYZ6789", "the code waits for the consent")
-        XCTAssertNil(center.notice)
+        XCTAssertEqual(center.notice, .consentNeeded)
+        XCTAssertEqual(center.notice?.text, L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
+                                                "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores."),
+                       "the sentence the memory and briefing screens already use")
+        XCTAssertNil(storedAnswer, "it is not an answer from the server")
         XCTAssertEqual(world.refreshed, 0)
+
+        world.user = nil
+        let signedOut = await center.submit(code: "WXYZ6789")
+        XCTAssertEqual(signedOut, .consentNeeded, "signed out it is still the consent that is missing first")
+        XCTAssertTrue(world.sent.isEmpty)
+        world.user = "account-a"
 
         world.risk = true
         center.appBecameActive()
         await center.idle()
         XCTAssertEqual(world.codes, ["WXYZ6789"])
         XCTAssertNil(center.pendingCode)
+        XCTAssertEqual(center.notice, .accepted, "the consent line is gone once the consent is there")
+    }
+
+    func testTheConsentLineDoesNotOutliveTheConsentWhenTheServerCannotBeReached() async {
+        let world = World()
+        world.risk = false
+        world.answer = { throw URLError(.timedOut) }
+        let center = center(world)
+        let typed = await center.submit(code: "ABCD2345")
+        XCTAssertEqual(typed, .consentNeeded)
+        world.risk = true
+        center.appBecameActive()
+        await center.idle()
+        XCTAssertEqual(world.sent.count, 1)
+        XCTAssertEqual(center.pendingCode, "ABCD2345")
+        XCTAssertNil(center.notice, "an out-of-date reason is not left on the sheet")
+    }
+
+    // MARK: A launch
+
+    func testAKeptInvitationIsTriedAgainAtLaunchWithoutAnyOtherEvent() async {
+        let world = World()
+        world.answer = { self.reply("server_error", status: 502) }
+        let first = center(world)
+        let typed = await first.submit(code: "ABCD2345")
+        XCTAssertEqual(typed, .savedForLater, "the person was told it will be tried again")
+        XCTAssertEqual(world.sent.count, 1)
+        XCTAssertEqual(stored?["code"] as? String, "ABCD2345")
+
+        // The app is quit and opened again: no link, no sign-in, no return from the background.
+        world.answer = { self.reply("claimed") }
+        let relaunched = center(world, observe: true)
+        await relaunched.idle()
+        XCTAssertEqual(world.codes, ["ABCD2345", "ABCD2345"], "the launch itself is the next try")
+        XCTAssertEqual(world.sent.last?.generation, world.generation)
+        XCTAssertNil(relaunched.pendingCode)
+        XCTAssertNil(stored)
+        XCTAssertEqual(relaunched.notice, .accepted)
+        XCTAssertEqual(world.refreshed, 1)
+
+        let again = center(world, observe: true)
+        await again.idle()
+        XCTAssertEqual(world.sent.count, 2, "nothing waits any more: a later launch sends nothing")
+    }
+
+    func testALaunchSendsNothingWithoutTheConsentOrAnAccount() async {
+        let world = World()
+        world.user = nil
+        center(world).receive(link("ABCD2345"))
+        let signedOut = center(world, observe: true)
+        await signedOut.idle()
+        XCTAssertTrue(world.sent.isEmpty, "nobody is signed in")
+
+        world.switchTo("account-a")
+        world.risk = false
+        let noConsent = center(world, observe: true)
+        await noConsent.idle()
+        XCTAssertTrue(world.sent.isEmpty, "the risk notice is not accepted")
+        XCTAssertEqual(noConsent.pendingCode, "ABCD2345")
+
+        let suites = center(world)
+        world.risk = true
+        await suites.idle()
+        XCTAssertTrue(world.sent.isEmpty, "a centre that observes nothing (the unit-test host's) starts nothing by itself")
     }
 
     func testNothingIsSentWithoutAnAccountAndASignInClaims() async {
@@ -325,6 +401,43 @@ final class InviteLinkCenterTests: XCTestCase {
         XCTAssertEqual(world.sent.count, 3)
         XCTAssertNil(center.pendingCode)
         XCTAssertEqual(center.notice, .accepted)
+    }
+
+    func testTheBackOffBelongsToTheAccountThatFailed() async {
+        let world = World()
+        world.answer = { .init(json: ["error": "Sign in"], status: 401) }
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        await center.idle()
+        XCTAssertEqual(world.sent.count, 1, "account A's session was refused")
+
+        // Twenty seconds later another account signs in: it has not been refused anything.
+        world.now.addTimeInterval(20)
+        world.answer = { self.reply("claimed") }
+        world.switchTo("account-b")
+        center.accountDidChange()
+        await center.idle()
+        XCTAssertEqual(world.sent.count, 2, "account B's sign-in sends its own attempt inside A's minute")
+        XCTAssertEqual(world.sent.last?.generation, world.generation)
+        XCTAssertEqual(center.notice, .accepted)
+        XCTAssertNil(center.pendingCode)
+    }
+
+    func testATypedCodeIsTriedForTheAccountThatSignedInAfterAnotherOnesFailure() async {
+        let world = World()
+        world.answer = { self.reply("server_error", status: 500) }
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        await center.idle()
+        XCTAssertEqual(world.sent.count, 1)
+
+        world.now.addTimeInterval(5)
+        world.switchTo("account-b")
+        world.answer = { self.reply("not_new") }
+        // No notification yet: the typed code itself notices the new account.
+        let typed = await center.submit(code: "ABCD2345")
+        XCTAssertEqual(typed, .notNew, "never \"could not check\" for an account nothing was tried for")
+        XCTAssertEqual(world.sent.count, 2)
     }
 
     func testAClockSetBackCannotHoldAnInvitationForLongerThanOneBackOff() async {
@@ -585,18 +698,24 @@ final class InviteLinkCenterTests: XCTestCase {
 
         center.receive(link("ABCD2345"))
         let first = glass.current(glass.moment(signedIn: false))
-        XCTAssertEqual(first?.id, "invite.abcd2345")
+        let firstId = "invite.abcd2345.\(InviteNudges.stamp(world.now))"
+        XCTAssertEqual(first?.id, firstId, "the code in lowercase, then when it arrived")
         XCTAssertEqual(first?.text, L.t("A friend invited you to Bobby", "Un amigo te invitó a Bobby"))
         XCTAssertEqual(first?.cta, L.t("Accept", "Aceptar"))
         XCTAssertNotNil(first?.id.range(of: NucleoNudge.idPattern, options: .regularExpression))
         XCTAssertNil(glass.current(glass.moment(signedIn: true)), "with an account the claim just happens")
-        XCTAssertNil(InviteNudges.nudge(signedIn: true, pendingCode: "ABCD2345"))
-        XCTAssertNil(InviteNudges.nudge(signedIn: false, pendingCode: nil))
+        let waiting = InvitePending(code: "ABCD2345", at: world.now)
+        XCTAssertNil(InviteNudges.nudge(signedIn: true, waiting: waiting, answer: nil))
+        XCTAssertNil(InviteNudges.nudge(signedIn: false, waiting: nil, answer: nil))
+        XCTAssertNil(InviteNudges.nudge(signedIn: false, waiting: nil, answer: InviteAnswer(code: "ABCD2345", notice: .notNew, at: world.now)),
+                     "an answer is only for the account it was given to")
 
-        glass.retire("invite.abcd2345")
+        glass.retire(firstId)
         XCTAssertNil(glass.current(glass.moment(signedIn: false)), "an invitation the person already answered stays quiet")
+        world.now.addTimeInterval(60)
         center.receive(link("WXYZ6789"))
-        XCTAssertEqual(glass.current(glass.moment(signedIn: false))?.id, "invite.wxyz6789", "a new invitation is a new nudge")
+        XCTAssertEqual(glass.current(glass.moment(signedIn: false))?.id, "invite.wxyz6789.\(InviteNudges.stamp(world.now))",
+                       "a new invitation is a new nudge")
 
         world.now.addTimeInterval(31 * 86_400)
         XCTAssertNil(glass.current(glass.moment(signedIn: false)), "an expired invitation says nothing")
@@ -605,23 +724,25 @@ final class InviteLinkCenterTests: XCTestCase {
     }
 
     func testTheNudgeFitsTheGlassInEveryLanguage() {
-        let line = "A friend invited you to Bobby", button = "Accept"
-        XCTAssertLessThanOrEqual(line.count, NucleoNudge.textLimit)
-        XCTAssertLessThanOrEqual("Un amigo te invitó a Bobby".count, NucleoNudge.textLimit)
-        XCTAssertLessThanOrEqual(button.count, 22)
-        XCTAssertLessThanOrEqual("Aceptar".count, 22)
-        for language in ["fr", "pt", "it", "de"] {
-            let text = NativeTranslations.rows[line]?[language] ?? ""
-            let cta = NativeTranslations.rows[button]?[language] ?? ""
-            XCTAssertFalse(text.isEmpty, language)
-            XCTAssertFalse(cta.isEmpty, language)
-            XCTAssertLessThanOrEqual(text.count, NucleoNudge.textLimit, "\(language): \(text)")
-            XCTAssertLessThanOrEqual(cta.count, 22, "\(language): \(cta)")
+        let lines = [("A friend invited you to Bobby", "Un amigo te invitó a Bobby"),
+                     ("The invitation you received was accepted", "La invitación que recibiste fue aceptada"),
+                     ("The invitation you received was not accepted", "La invitación que recibiste no fue aceptada")]
+        let buttons = [("Accept", "Aceptar"), ("See details", "Ver detalles"), ("See why", "Ver por qué")]
+        for (texts, limit) in [(lines, NucleoNudge.textLimit), (buttons, 22)] {
+            for (english, spanish) in texts {
+                XCTAssertLessThanOrEqual(english.count, limit, english)
+                XCTAssertLessThanOrEqual(spanish.count, limit, spanish)
+                for language in ["fr", "pt", "it", "de"] {
+                    let text = NativeTranslations.rows[english]?[language] ?? ""
+                    XCTAssertFalse(text.isEmpty, "\(language): \(english)")
+                    XCTAssertLessThanOrEqual(text.count, limit, "\(language): \(text)")
+                }
+            }
         }
         XCTAssertEqual(NudgePriority.invite, 90)
     }
 
-    func testAcceptOnTheGlassOpensTheInviteSheetWhenSignInCannotStartAndKeepsTheInvitation() async {
+    func testAcceptOnTheGlassOpensTheInviteSheetWhenSignInCannotStartAndKeepsTheInvitation() async throws {
         NucleoFixtures.activate(scenario: "default", timeScale: 0.01)
         defer { NucleoFixtures.deactivate() }
         let world = World()
@@ -634,14 +755,253 @@ final class InviteLinkCenterTests: XCTestCase {
         let session = NucleoSession(fixtures: true, defaults: defaults)
         defer { session.teardown() }
         let nudge = glass.current(glass.moment(signedIn: false))
-        XCTAssertEqual(nudge?.id, "invite.abcd2345")
-        let status = await glass.act("invite.abcd2345", session: session)
+        let id = try XCTUnwrap(nudge?.id)
+        XCTAssertTrue(id.hasPrefix("invite.abcd2345."), id)
+        let status = await glass.act(id, session: session)
         XCTAssertEqual(status, "done")
         XCTAssertEqual(session.sheet, .invite, "the sheet shows the saved invitation and its own way to sign in")
         XCTAssertEqual(center.pendingCode, "ABCD2345")
-        XCTAssertTrue(glass.isRetired("invite.abcd2345"))
+        XCTAssertTrue(glass.isRetired(id))
         await center.idle()
         XCTAssertTrue(world.sent.isEmpty)
+    }
+
+    func testClosingApplesSheetAfterAcceptStillShowsTheSavedInvitationAndOpeningTheLinkAgainBringsTheLineBack() async throws {
+        NucleoFixtures.activate(scenario: "default", timeScale: 0.01)
+        defer { NucleoFixtures.deactivate() }
+        let world = World()
+        world.user = nil
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        let glass = NudgeCenter(defaults: defaults)
+        glass.now = { world.now }
+        var cancelled = false
+        // The app's own source, with Apple's sheet answered by hand: the person closes it.
+        let own = InviteNudges.source(invites: { center })
+        glass.register(NudgeSource(key: own.key, priority: own.priority, candidate: own.candidate, act: { _, session in
+            cancelled = true
+            await InviteNudges.finish(signIn: "cancelled", invites: center) { session.present(.invite) }
+        }))
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        let id = try XCTUnwrap(glass.current(glass.moment(signedIn: false))?.id)
+        let status = await glass.act(id, session: session)
+        XCTAssertEqual(status, "done")
+        XCTAssertTrue(cancelled)
+        XCTAssertTrue(glass.isRetired(id), "the tap retired the line on the glass")
+        XCTAssertEqual(session.sheet, .invite, "so the sheet with the saved invitation, its sign-in and Remove is what is left to show")
+        XCTAssertEqual(center.pendingCode, "ABCD2345", "the invitation keeps waiting")
+        XCTAssertNil(center.notice)
+
+        // Later the person opens the same friend's link again.
+        session.sheet = nil
+        world.now.addTimeInterval(3_600)
+        XCTAssertNil(glass.current(glass.moment(signedIn: false)), "until then the retired line stays quiet")
+        XCTAssertTrue(center.receive(link("ABCD2345")))
+        let again = try XCTUnwrap(glass.current(glass.moment(signedIn: false)))
+        XCTAssertNotEqual(again.id, id, "opening the link again is the person's own act: the line comes back")
+        XCTAssertTrue(again.id.hasPrefix("invite.abcd2345."))
+        XCTAssertFalse(glass.isRetired(again.id))
+        await center.idle()
+        XCTAssertTrue(world.sent.isEmpty)
+    }
+
+    func testEverySignInAnswerExceptSignedInOpensTheSheetAndSignedInClaimsFirst() async {
+        for status in ["cancelled", "failed", "unavailable"] {
+            defaults.removeObject(forKey: InviteLinkCenter.storeKey)
+            let world = World()
+            world.user = nil
+            let center = center(world)
+            center.receive(link("ABCD2345"))
+            var presented = 0
+            await InviteNudges.finish(signIn: status, invites: center) { presented += 1 }
+            XCTAssertEqual(presented, 1, status)
+            XCTAssertEqual(center.pendingCode, "ABCD2345", status)
+            XCTAssertTrue(world.sent.isEmpty, status)
+        }
+        defaults.removeObject(forKey: InviteLinkCenter.storeKey)
+        let world = World()
+        world.user = nil
+        world.answer = { self.reply("not_new") }
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        world.switchTo("account-a")
+        var presented = 0
+        await InviteNudges.finish(signIn: "signedIn", invites: center) { presented += 1 }
+        XCTAssertEqual(world.codes, ["ABCD2345"])
+        XCTAssertEqual(center.notice, .notNew)
+        XCTAssertEqual(presented, 1, "the sheet says in words what the server answered")
+    }
+
+    // MARK: The answer, for a person who already has an account
+
+    func testALinkOpenedWithAnAccountLeavesItsAnswerForTheGlassUntilTheSheetHasShownIt() async throws {
+        NucleoFixtures.activate(scenario: "default", timeScale: 0.01)
+        defer { NucleoFixtures.deactivate() }
+        let world = World()
+        world.answer = { self.reply("not_new") }
+        let center = center(world)
+        let glass = NudgeCenter(defaults: defaults)
+        glass.now = { world.now }
+        glass.register(InviteNudges.source(invites: { center }))
+        XCTAssertNil(glass.current(glass.moment(signedIn: true)), "nothing to report yet")
+
+        XCTAssertTrue(center.receive(link("ABCD2345")))
+        await center.idle()
+        XCTAssertEqual(center.notice, .notNew)
+        XCTAssertEqual(center.answer, InviteAnswer(code: "ABCD2345", notice: .notNew, at: world.now))
+        XCTAssertEqual(center.unreadAnswer, center.answer)
+        XCTAssertEqual(storedAnswer?["code"] as? String, "ABCD2345")
+        XCTAssertEqual(storedAnswer?["result"] as? String, "notNew")
+        XCTAssertEqual(storedAnswer?["user"] as? String, "account-a")
+        XCTAssertEqual(storedAnswer?["at"] as? Double, world.now.timeIntervalSince1970)
+        XCTAssertEqual(storedAnswer?.count, 4, "the code, the answer, when, and whose it is: nothing else is kept")
+
+        let nudge = try XCTUnwrap(glass.current(glass.moment(signedIn: true)))
+        XCTAssertEqual(nudge.id, "invite.result.abcd2345.\(InviteNudges.stamp(world.now))")
+        XCTAssertNotNil(nudge.id.range(of: NucleoNudge.idPattern, options: .regularExpression))
+        XCTAssertEqual(nudge.text, L.t("The invitation you received was not accepted", "La invitación que recibiste no fue aceptada"))
+        XCTAssertEqual(nudge.cta, L.t("See why", "Ver por qué"))
+        XCTAssertNil(glass.current(glass.moment(signedIn: false)), "never for someone who is not that account")
+
+        // The tap opens the invite sheet, where the reason is in words; closing it is "read".
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        let status = await glass.act(nudge.id, session: session)
+        XCTAssertEqual(status, "done")
+        XCTAssertEqual(session.sheet, .invite)
+        XCTAssertEqual(center.notice?.text, InviteNotice.notNew.text)
+        XCTAssertEqual(world.sent.count, 1, "the tap sends nothing")
+        center.acknowledgeNotice()
+        XCTAssertNil(center.answer)
+        XCTAssertNil(center.notice)
+        XCTAssertNil(storedAnswer, "read once, then gone from the phone")
+        world.now.addTimeInterval(3_600)
+        XCTAssertNil(glass.current(glass.moment(signedIn: true)))
+    }
+
+    func testAnAcceptedInvitationIsReportedOnTheGlassInItsOwnWords() async throws {
+        let world = World()
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        await center.idle()
+        let nudge = try XCTUnwrap(InviteNudges.nudge(signedIn: true, waiting: center.waiting, answer: center.unreadAnswer))
+        XCTAssertTrue(nudge.id.hasPrefix(InviteNudges.resultPrefix))
+        XCTAssertEqual(nudge.text, L.t("The invitation you received was accepted", "La invitación que recibiste fue aceptada"))
+        XCTAssertEqual(nudge.cta, L.t("See details", "Ver detalles"))
+    }
+
+    func testTheUnreadAnswerSurvivesARelaunchForItsAccountOnly() async {
+        let world = World()
+        world.answer = { self.reply("inviter_full") }
+        let first = center(world)
+        first.receive(link("ABCD2345"))
+        await first.idle()
+        XCTAssertEqual(first.answer?.notice, .inviterFull)
+
+        // Quit before anything was read; the same account opens the app the next day.
+        world.now.addTimeInterval(86_400)
+        let relaunched = center(world, observe: true)
+        await relaunched.idle()
+        XCTAssertEqual(relaunched.unreadAnswer?.notice, .inviterFull, "the person is still owed the answer")
+        XCTAssertEqual(relaunched.unreadAnswer?.code, "ABCD2345")
+        XCTAssertEqual(relaunched.notice, .inviterFull, "and the invite sheet shows it in words")
+        XCTAssertEqual(world.sent.count, 1, "a settled invitation is not sent again")
+
+        // A week after the answer it is not news any more.
+        world.now.addTimeInterval(6 * 86_400)
+        XCTAssertNil(relaunched.unreadAnswer)
+        relaunched.appBecameActive()
+        await relaunched.idle()
+        XCTAssertNil(relaunched.answer)
+        XCTAssertNil(relaunched.notice)
+        XCTAssertNil(storedAnswer)
+    }
+
+    func testAnAnswerNeverReachesAnotherAccountOrASignedOutPhone() async {
+        let world = World()
+        world.answer = { self.reply("already_claimed") }
+        let first = center(world)
+        first.receive(link("ABCD2345"))
+        await first.idle()
+        XCTAssertNotNil(storedAnswer)
+
+        // Another account on a relaunch: the record is removed, not shown.
+        world.switchTo("account-b")
+        let other = center(world)
+        XCTAssertNil(other.answer)
+        XCTAssertNil(other.notice)
+        XCTAssertNil(storedAnswer)
+
+        // Signing out (or deleting the account) in a running app.
+        world.switchTo("account-a")
+        let running = center(world)
+        running.receive(link("WXYZ6789"))
+        await running.idle()
+        XCTAssertEqual(running.unreadAnswer?.code, "WXYZ6789")
+        world.switchTo(nil)
+        XCTAssertNil(running.unreadAnswer, "not even before the centre hears of the account change")
+        running.accountDidChange()
+        await running.idle()
+        XCTAssertNil(running.answer)
+        XCTAssertNil(storedAnswer, "the answer belonged to the account that left")
+
+        // A record that is broken, or that carries a line the server never gives as final, is not an answer.
+        world.switchTo("account-a")
+        for record: [String: Any] in [["code": "ABCD2345", "result": "savedForLater", "at": world.now.timeIntervalSince1970, "user": "account-a"],
+                                       ["code": "ABCDI345", "result": "notNew", "at": world.now.timeIntervalSince1970, "user": "account-a"],
+                                       ["code": "ABCD2345", "result": "notNew", "at": Double.infinity, "user": "account-a"],
+                                       ["code": "ABCD2345", "result": "notNew", "at": world.now.timeIntervalSince1970, "user": ""],
+                                       ["code": "ABCD2345", "result": "notNew", "at": world.now.timeIntervalSince1970]] {
+            defaults.set(record, forKey: InviteLinkCenter.answerKey)
+            let center = center(world)
+            XCTAssertNil(center.answer, "\(record)")
+            XCTAssertNil(center.notice, "\(record)")
+            XCTAssertNil(storedAnswer, "\(record)")
+        }
+    }
+
+    func testANewerInvitationOrRemoveDropsTheOlderAnswer() async {
+        let world = World()
+        world.answer = { self.reply("not_new") }
+        let center = center(world)
+        center.receive(link("ABCD2345"))
+        await center.idle()
+        XCTAssertEqual(center.answer?.code, "ABCD2345")
+        world.answer = { throw URLError(.timedOut) }
+        center.receive(link("WXYZ6789"))
+        XCTAssertNil(center.answer, "the new invitation gets its own answer")
+        XCTAssertNil(storedAnswer)
+        await center.idle()
+        XCTAssertNil(center.answer, "an attempt that could not be settled is not an answer")
+
+        world.now.addTimeInterval(61)
+        world.answer = { self.reply("self") }
+        center.appBecameActive()
+        await center.idle()
+        XCTAssertEqual(center.answer?.notice, .ownInvitation)
+        center.forget()
+        XCTAssertNil(center.answer)
+        XCTAssertNil(storedAnswer)
+    }
+
+    func testEveryIdTheSourceCanProduceFitsTheBridge() {
+        let alphabet = Array("ABCDEFGHJKLMNPQRSTUVWXYZ23456789")
+        let dates = [Date(timeIntervalSince1970: 0), Date(timeIntervalSince1970: -5), Date(timeIntervalSince1970: 1_800_000_000),
+                     Date(timeIntervalSince1970: 1e300), Date(timeIntervalSince1970: .infinity), Date(timeIntervalSince1970: .nan)]
+        for start in stride(from: 0, to: alphabet.count, by: 8) {
+            let code = String(alphabet[start..<start + 8])
+            for date in dates {
+                let waiting = InviteNudges.nudge(signedIn: false, waiting: InvitePending(code: code, at: date), answer: nil)
+                XCTAssertNotNil(waiting?.id.range(of: NucleoNudge.idPattern, options: .regularExpression), waiting?.id ?? "nil")
+                for notice in InviteNotice.final {
+                    let result = InviteNudges.nudge(signedIn: true, waiting: nil, answer: InviteAnswer(code: code, notice: notice, at: date))
+                    XCTAssertNotNil(result?.id.range(of: NucleoNudge.idPattern, options: .regularExpression), result?.id ?? "nil")
+                    XCTAssertLessThanOrEqual(result?.id.count ?? 99, 48)
+                }
+            }
+        }
+        XCTAssertNotEqual(InviteNudges.stamp(Date(timeIntervalSince1970: 1_800_000_000)), InviteNudges.stamp(Date(timeIntervalSince1970: 1_800_000_001)))
     }
 
     // MARK: The sheet's words
@@ -674,17 +1034,40 @@ final class InviteLinkCenterTests: XCTestCase {
             let lower = text.lowercased()
             for word in banned { XCTAssertFalse(lower.contains(word), "\(word) in: \(text)") }
         }
-        XCTAssertEqual(NativeTranslations18.invite.count, 24)
         for (key, row) in NativeTranslations18.invite {
             XCTAssertEqual(Set(row.keys), ["fr", "pt", "it", "de"], key)
             XCTAssertEqual(NativeTranslations.rows[key], row, "an older row with the same key would win: \(key)")
         }
+        // Every sentence the feature says exists in the four languages, whichever table holds its row
+        // (a row another feature also needs, such as "Remove", may move to the shared table).
+        let said = ["A friend invited you to Bobby", "Accept", "The invitation you received was accepted",
+                    "The invitation you received was not accepted", "See details", "See why",
+                    "Invitation accepted. It counts for the friend who invited you.", "That is your own invitation.",
+                    "Invitations work for new accounts, during their first week.", "This account already accepted an invitation.",
+                    "Your friend already invited all the friends allowed.", "That invitation code is not valid.",
+                    "That invitation could not be applied.", "Sign in to accept an invitation.",
+                    "Bobby could not check that code right now. It is saved and will be tried again.",
+                    "Accept the risk notice first: until then Bobby sends nothing to its servers.",
+                    "DID A FRIEND INVITE YOU?", "Invitation code", "Apply", "Applying…", "Invitation {0} is saved on this phone.",
+                    "Remove", "Remove the saved invitation", "YOUR CODE", "Your invitation code", "Copy code", "Copy link",
+                    "You get {0} days of Bobby Pro for each friend who creates an account with your invitation, up to {1} friends.",
+                    "My invitation code: {0}"]
+        for english in said {
+            let row = NativeTranslations.rows[english] ?? [:]
+            for language in ["fr", "pt", "it", "de"] {
+                XCTAssertFalse((row[language] ?? "").isEmpty, "\(language): \(english)")
+            }
+        }
+        // The button's "in progress" label reads as an action, not as the noun "app".
+        XCTAssertEqual(NativeTranslations.rows["Applying…"]?["fr"], "Vérification…")
+        XCTAssertEqual(NativeTranslations.rows["Applying…"]?["it"], "Verifica in corso…")
     }
 
 #if DEBUG
     func testEveryScreenStateHasAReviewFixture() {
         let names = Set(V18QA.fixtures.keys)
-        for name in ["invite-sheet", "invite-sheet-plain", "invite-signed-out", "invite-pending", "invite-result-saved"] {
+        for name in ["invite-sheet", "invite-sheet-plain", "invite-signed-out", "invite-pending", "invite-result-saved",
+                     "invite-consent-needed"] {
             XCTAssertTrue(names.contains(name), name)
         }
         for result in InviteQA.results { XCTAssertTrue(names.contains("invite-result-\(result.name)"), result.name) }

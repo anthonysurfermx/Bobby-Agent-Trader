@@ -175,6 +175,74 @@ final class InviteLinkTests: XCTestCase {
     }
 
     @MainActor
+    func testAPastedShareMessageBecomesItsCodeInEveryLanguage() {
+        // What a friend copies from the chat bubble: the pitch, the code line, and the link.
+        let message = InviteCopy.shareMessage(code: "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: message), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: message + "\nhttps://bobbyprotocol.xyz/i/ABCD2345"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "https://bobbyprotocol.xyz/i/ABCD2345 " + message), "ABCD2345")
+        XCTAssertEqual(InviteAcceptSection.tidy(message), "ABCD2345", "the field shows the code, not the first eight letters of the pitch")
+        XCTAssertEqual(InviteAcceptSection.tidy(message + "\nhttps://bobbyprotocol.xyz/i/ABCD2345"), "ABCD2345")
+
+        let pitch = "Bobby: three AI agents debate any stock or crypto before you decide.", line = "My invitation code: {0}"
+        var messages = [pitch + "\n" + line.replacingOccurrences(of: "{0}", with: "ABCD2345"),
+                        "Bobby: tres agentes de IA debaten cualquier acción o cripto antes de que decidas.\nMi código de invitación: ABCD2345"]
+        for language in ["fr", "pt", "it", "de"] {
+            let translatedPitch = NativeTranslations.rows[pitch]?[language] ?? ""
+            let translatedLine = NativeTranslations.rows[line]?[language] ?? ""
+            XCTAssertFalse(translatedPitch.isEmpty, language)
+            XCTAssertFalse(translatedLine.isEmpty, language)
+            messages.append(translatedPitch + "\n" + translatedLine.replacingOccurrences(of: "{0}", with: "ABCD2345"))
+        }
+        XCTAssertEqual(messages.count, 6)
+        for text in messages {
+            XCTAssertEqual(InviteLink.code(fromEntry: text), "ABCD2345", text)
+            XCTAssertEqual(InviteLink.code(fromEntry: text + "\nhttps://bobbyprotocol.xyz/i/ABCD2345"), "ABCD2345", text)
+            XCTAssertEqual(InviteAcceptSection.tidy(text), "ABCD2345", text)
+            // The code line on its own (the second line of the bubble).
+            let second = String(text.split(separator: "\n").last ?? "")
+            XCTAssertEqual(InviteLink.code(fromEntry: second), "ABCD2345", second)
+            XCTAssertEqual(InviteAcceptSection.tidy(second), "ABCD2345", second)
+        }
+    }
+
+    func testALinkWithoutItsSchemeAndALinkInsideASentenceCarryTheCode() {
+        // The invite sheet prints the link without "https://".
+        XCTAssertEqual(InviteLink.code(fromEntry: "bobbyprotocol.xyz/i/ABCD2345"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "www.bobbyprotocol.xyz/i/abcd2345"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "BobbyProtocol.xyz/i/ABCD2345/"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "bobbyprotocol.xyz/desk?ref=ABCD2345&v=2"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "Try Bobby (https://bobbyprotocol.xyz/i/ABCD2345)."), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "use bobbyprotocol.xyz/i/ABCD2345, it is nice"), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "my code is \"ABCD2345\"."), "ABCD2345")
+        XCTAssertEqual(InviteLink.code(fromEntry: "my code is abcd2345"), "ABCD2345", "a digit in it: not an ordinary word")
+        XCTAssertEqual(InviteLink.code(fromEntry: "ABCD2345 ABCD2345"), "ABCD2345", "the same invitation twice is one invitation")
+        XCTAssertEqual(InviteAcceptSection.tidy("bobbyprotocol.xyz/i/abcd2345"), "ABCD2345")
+    }
+
+    func testATextWithNoInvitationOrWithTwoIsNotACode() {
+        let refused = [
+            "ABCD2345 WXYZ6789",                                                     // two codes
+            "https://bobbyprotocol.xyz/i/ABCD2345 https://bobbyprotocol.xyz/i/WXYZ6789",
+            "please research standard purchase",                                     // eight-letter words are words
+            "see you thursday",
+            "bobbyprotocol.xyz.evil.com/i/ABCD2345",
+            "evil.com/i/ABCD2345",
+            "evil.com/bobbyprotocol.xyz/i/ABCD2345",
+            "go to https://evil.com/i/ABCD2345 now",
+            "https://evil.com/?next=https://bobbyprotocol.xyz/i/ABCD2345",
+            "bobbyprotocol.xyz/i/ABCDI345",
+            "bobbyprotocol.xyz/@evil.com/i/ABCD2345",
+            "code:ABCD234",
+        ]
+        for text in refused { XCTAssertNil(InviteLink.code(fromEntry: text), text) }
+        // A link says which invitation is meant, even next to a word that could pass for a code.
+        XCTAssertEqual(InviteLink.code(fromEntry: "PURCHASE https://bobbyprotocol.xyz/i/ABCD2345"), "ABCD2345")
+        // An ordinary word next to the code does not hide it.
+        XCTAssertEqual(InviteLink.code(fromEntry: "standard ABCD2345"), "ABCD2345")
+    }
+
+    @MainActor
     func testTheFieldKeepsCapitalsAndEightCharactersAndTurnsAPastedLinkIntoItsCode() {
         XCTAssertEqual(InviteAcceptSection.tidy("abcd2345"), "ABCD2345")
         XCTAssertEqual(InviteAcceptSection.tidy("ab cd-23"), "ABCD23")
