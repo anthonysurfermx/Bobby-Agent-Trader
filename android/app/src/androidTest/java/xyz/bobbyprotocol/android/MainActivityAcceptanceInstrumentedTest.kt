@@ -451,11 +451,12 @@ class MainActivityAcceptanceInstrumentedTest {
         instrumentation.runOnMainSync { web.evaluateJavascript(script) { result ->
             value.set(runCatching { JSONArray("[$result]").get(0).takeUnless { it == JSONObject.NULL } }.getOrNull()); done.countDown()
         } }
-        assertTrue("JavaScript evaluation timed out", done.await(5, TimeUnit.SECONDS))
+        // A hosted CI emulator draws the page's WebGL scene in software: one frame can take seconds there.
+        assertTrue("JavaScript evaluation timed out", done.await(30, TimeUnit.SECONDS))
         return value.get()
     }
     private fun waitUntil(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(20)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(90)
         while (System.nanoTime() < deadline) {
             // Pump Compose's test clock before reading focus/route; Dialog transitions recompose here.
             compose.waitForIdle()

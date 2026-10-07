@@ -107,7 +107,9 @@ class CouponRedemptionInstrumentedTest {
     /** The runner must explicitly pin the owned emulator before any temporary setting write. */
     @Test fun systemMotionChangeWhileOpenUpdatesPolicyAndNeverReplaysReceipt() {
         assertTrue("Only the isolated AOSP emulator may run this check", Build.HARDWARE in setOf("ranchu", "goldfish"))
-        assertEquals("Bobby_Parity_API35/5556", InstrumentationRegistry.getArguments().getString("bobbyOwnedEmulator"))
+        // The developer's parity emulator, or the one CI boots and throws away (.github/workflows/android-emulator.yml declares it).
+        val owned = InstrumentationRegistry.getArguments().getString("bobbyOwnedEmulator")
+        assertTrue("Only an emulator declared as Bobby's own may have its settings changed: $owned", owned in setOf("Bobby_Parity_API35/5556", "ci-throwaway"))
         val automation = InstrumentationRegistry.getInstrumentation().uiAutomation
         fun shell(command: String): String = ParcelFileDescriptor.AutoCloseInputStream(automation.executeShellCommand(command))
             .bufferedReader().use { it.readText().trim() }

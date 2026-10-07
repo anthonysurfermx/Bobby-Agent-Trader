@@ -66,7 +66,11 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -camera-back none
           working-directory: android
-          script: bash tools/run-emulator-tests.sh
+          # A hosted runner has no GPU: the page's WebGL scene is drawn in software, and its cost grows
+          # with every pixel. 720x1600 at 320 dpi is a 360x800 dp phone, the most common Android size.
+          pre-emulator-launch-script: bash tools/emulator-screen.sh 720 1600 320
+          # This emulator exists for this run only: a test that changes a system setting may use it.
+          script: bash tools/run-emulator-tests.sh -Pandroid.testInstrumentationRunnerArguments.bobbyOwnedEmulator=ci-throwaway
       - name: Keep the report, the log and the screenshots
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

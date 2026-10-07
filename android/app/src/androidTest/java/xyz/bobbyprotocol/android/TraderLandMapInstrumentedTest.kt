@@ -107,6 +107,9 @@ class TraderLandMapInstrumentedTest {
     }
 
     @Test fun liveCoreChangesActualCanvasPixelsWhileTheCameraAndPublicLayoutStayStill() {
+        // With the system's animations switched off (as CI's emulator has them) nothing may move, by design.
+        assumeTrue("This case needs the system's animations on", android.provider.Settings.Global.getFloat(
+            InstrumentationRegistry.getInstrumentation().targetContext.contentResolver, android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) != 0f)
         compose.mainClock.autoAdvance = false
         val fixture = fixture()
         val original = fixture.snapshot.toString()
