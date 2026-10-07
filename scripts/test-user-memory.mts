@@ -153,6 +153,22 @@ try {
     const older = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-17T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 0, lastPrice: 200 } });
     eq([readerContext(older, 'NVDA', now, null, 230, 'en')?.thisAsset?.sinceLastAsk, readerContext(older, 'NVDA', now, null, 230, 'es')?.thisAsset?.sinceLastAsk?.since, readerContext(older, 'NVDA', now, null, 230, 'de')?.thisAsset?.sinceLastAsk?.since],
       [{ change: '+15%', since: '12 days ago' }, 'hace 12 días', 'vor 12 Tagen'], 'twelve days later: "12 days ago", never a weekday that could be any week');
+    // A weekday names a day only while it cannot be today's: an ask six days and 23 hours old fell on the weekday
+    // it is now, and "since Wednesday" said on a Wednesday reads as today. Then the days are counted instead.
+    const at = (lastAskedAt: string, at: string, lang: 'en' | 'es' = 'en') => readerForModel(readerContext(summary({ thisAsset: { asks: 2, lastAskedAt, lastHorizon: 'week', asksThisWeek: 0, lastPrice: 200 } }), 'NVDA', Date.parse(at), null, 206.4, lang)!).thisAsset as any;
+    const weekOld = at('2026-09-30T13:00:00.000Z', '2026-10-07T12:00:00.000Z');
+    eq([weekOld.lastAskedDaysAgo, weekOld.lastAskedOn, weekOld.sinceLastAsk], [6, undefined, { change: '+3.2%', since: '6 days ago' }], 'Wednesday 13:00 to the next Wednesday 12:00: six whole days, no weekday, "6 days ago"');
+    eq(at('2026-09-30T13:00:00.000Z', '2026-10-07T12:00:00.000Z', 'es').sinceLastAsk.since, 'hace 6 días', '…in the answer\'s language');
+    const sixDays = at('2026-10-01T11:00:00.000Z', '2026-10-07T12:00:00.000Z');
+    eq([sixDays.lastAskedDaysAgo, sixDays.lastAskedOn, sixDays.sinceLastAsk.since], [6, 'Thursday', 'Thursday'], 'six calendar days back is another weekday than today\'s: it is named');
+    const yesterday = at('2026-10-06T10:00:00.000Z', '2026-10-07T12:00:00.000Z');
+    eq([yesterday.lastAskedDaysAgo, yesterday.lastAskedOn, yesterday.sinceLastAsk.since], [1, 'Tuesday', 'Tuesday'], 'yesterday is named by its weekday');
+    for (let hours = 24; hours <= 24 * 9; hours += 5) {
+      const now2 = Date.parse('2026-10-07T12:00:00.000Z'), then = new Date(now2 - hours * 3600_000);
+      const seen = at(then.toISOString(), '2026-10-07T12:00:00.000Z');
+      ok(seen.lastAskedOn !== 'Wednesday' && seen.sinceLastAsk.since !== 'Wednesday', `${hours} hours before a Wednesday noon: the day handed to the CIO is never "Wednesday"`);
+      ok(seen.lastAskedOn === undefined ? /^\d+ days ago$/.test(seen.sinceLastAsk.since) : seen.sinceLastAsk.since === seen.lastAskedOn, `${hours} hours: a weekday or a count of days, and the same day in both fields`);
+    }
     eq(readerContext(withPrice, 'NVDA', now, null, null, 'en')?.thisAsset?.sinceLastAsk, undefined, 'no price now: no callback');
     const sameDay = summary({ thisAsset: { asks: 2, lastAskedAt: '2026-09-29T09:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
     eq([readerContext(sameDay, 'NVDA', now, null, 230, 'en')?.thisAsset?.sinceLastAsk, readerContext(sameDay, 'NVDA', now, null, 230, 'en')?.thisAsset?.changeSinceLastAskPct], [undefined, undefined], 'same day: no callback, the chart already shows it');

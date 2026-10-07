@@ -41,6 +41,8 @@ const original = globalThis.fetch;
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };
+/** A percentage as a reply in that language writes it, sign included: the expectation is built by the platform, not typed here. */
+const signed = (pct: number, locale: string) => new Intl.NumberFormat(locale, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format(pct / 100);
 const ok = (v: unknown, what: string) => { assert.ok(v, what); checks++; };
 const hostOf = (url: string) => { try { return new URL(url).hostname; } catch { return ''; } };
 const H = 3600_000, DAY = 86_400_000;
@@ -81,7 +83,8 @@ const WORRY = 'QUOKKAFEAR export limits cut the China revenue';
 const CHANGE_MIND = 'NARWHALFLIP two quarters of falling data-center orders';
 const MARKERS = /ZEBRAFINCH|QUOKKAFEAR|NARWHALFLIP|capex cycle|export limits|falling data-center/;
 const savedAt = (daysAgo: number) => new Date(Date.now() - daysAgo * DAY - H).toISOString().replace(/\.\d{3}Z$/, 'Z');
-const THESIS = () => ({ hypothesis: HYPOTHESIS, worry: WORRY, changeMind: CHANGE_MIND, horizon: 'years', savedAt: savedAt(40), priceAtSave: 160, lastReviewedAt: savedAt(12) });
+// 178 then, 200 now: +12.4%, a move a stock makes (a move at or beyond the class bound is given no figure).
+const THESIS = () => ({ hypothesis: HYPOTHESIS, worry: WORRY, changeMind: CHANGE_MIND, horizon: 'years', savedAt: savedAt(40), priceAtSave: 178, lastReviewedAt: savedAt(12) });
 
 const ALPHA = 'The recent structure supports a conditional long if the range breaks.';
 const RED = 'The break has not happened and the higher timeframes are still flat.';
@@ -200,9 +203,10 @@ try {
   eq(reviewerInput.desk, { verdict: 'wait', direction: 'none', synthesis: { headline: SYN.headline, why: SYN.why, risk: SYN.risk, watch: SYN.watch } }, '…the finished verdict and synthesis, as facts');
   eq(reviewerInput.thesis, {
     note: { hypothesis: HYPOTHESIS, worry: WORRY, changeMind: CHANGE_MIND, horizon: 'years' },
-    sinceSaved: { days: 40, priceThen: 160, priceNow: 200, changePct: 25 },
+    sinceSaved: { days: 40, change: '+12.4%' },
     lastReviewedDaysAgo: 12,
-  }, '…and the note under `note`, with the server-computed sinceSaved and days since the last review');
+  }, '…and the note under `note`, with the finished sinceSaved (days and the change as it is quoted) and days since the last review');
+  ok(!/priceThen|priceNow|changePct|"178"|178\b/.test(JSON.stringify(reviewerInput.thesis)), 'neither price reaches the reviewer inside the thesis: it has no operands to compute another figure from');
   ok(!/\d{4}-\d{2}-\d{2}/.test(JSON.stringify(reviewerInput.thesis)), 'no calendar date of the note is sent: only whole days, which are exact in every time zone');
   ok(systemOf(reviewer).includes(THESIS_RULE), 'with the rule');
   ok(!MARKERS.test(systemOf(reviewer)), 'nothing of the note is copied into the system prompt: it travels as input data only');
@@ -219,7 +223,8 @@ try {
     ['Do not judge whether the investment suits the person, do not size positions and do not tell them what to do', 'no suitability, no sizing, no instruction'],
     ['Never invent news, earnings, filings or fundamentals', 'no invented news, earnings, filings or fundamentals'],
     ['Compare only the supplied evidence against the note', 'compare only the supplied evidence'],
-    ['never compute or correct them', 'the model does no arithmetic'],
+    ['quote it exactly as written, with its sign, its digits and its decimal mark, or leave it out; never compute, round, convert or correct it', 'the model does no arithmetic: the figure is quoted as written or left out'],
+    ['when change is absent the desk has no such figure and you give none', 'no figure of the model\'s own when the desk gave none'],
     ['never say it watched, monitored or tracked anything', 'no claim of having watched the asset'],
     ['speak of it as saved that many days ago, never on a named day or date', 'the note has no calendar date to cite'],
     ["names its timeframe (provenance.timeframe or a key of evidence.timeframes) or the evidence's own date (provenance.asOf)", 'each item names its timeframe or the evidence date'],
@@ -251,11 +256,11 @@ try {
 
   // A thesis with only what is required: optional parts are simply absent, never empty or zero.
   await run({ thesis: { hypothesis: `  ${HYPOTHESIS}  `, worry: '   ', savedAt: savedAt(3) } });
-  eq(inputOf(roleCall('reviewer')).thesis, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 3, priceNow: 200 } }, 'no price at save: no priceThen and no change; a blank worry is no worry; the text is trimmed');
+  eq(inputOf(roleCall('reviewer')).thesis, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 3 } }, 'no price at save: no change; a blank worry is no worry; the text is trimmed');
   // An optional field sent as null is an absent field, as `thesis: null` is an absent thesis (a client that
   // fills what it does not have with null is not refused).
   const nulls = await run({ thesis: { hypothesis: HYPOTHESIS, savedAt: savedAt(3), worry: null, changeMind: null, horizon: null, priceAtSave: null, lastReviewedAt: null } });
-  eq([nulls.statusCode, inputOf(roleCall('reviewer')).thesis], [200, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 3, priceNow: 200 } }], 'null worry, changeMind, horizon, priceAtSave and lastReviewedAt: served, each read as absent');
+  eq([nulls.statusCode, inputOf(roleCall('reviewer')).thesis], [200, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 3 } }], 'null worry, changeMind, horizon, priceAtSave and lastReviewedAt: served, each read as absent');
   // `thesis: null` is a client saying "none": a plain read.
   const none = await run({ thesis: null });
   eq([none.statusCode, 'review' in none.body, bodies(models())], [200, false, bodies(plainModels)], 'thesis: null is no thesis: the plain calls, no reviewer, no review');
@@ -264,26 +269,41 @@ try {
   {
     const now = Date.parse('2026-10-06T15:00:00Z');
     const at = (iso: string, priceAtSave?: number) => ({ savedAt: iso, priceAtSave });
-    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 110, now), { days: 10, priceThen: 100, priceNow: 110, changePct: 10 }, 'ten days, +10%');
-    eq(sinceSavedOf(at('2026-08-01T10:00:00Z', 200), 170, now), { days: 66, priceThen: 200, priceNow: 170, changePct: -15 }, 'a fall keeps its sign; 66 whole days across two month ends');
-    eq(sinceSavedOf(at('2026-10-05T15:00:01Z', 3), 3.1, now)!, { days: 0, priceThen: 3, priceNow: 3.1, changePct: 3.3 }, 'under 24 hours is day 0; the change is rounded to one decimal');
-    eq(sinceSavedOf(at('2026-10-05T15:00:00Z', 0.00002), 0.000025, now), { days: 1, priceThen: 0.00002, priceNow: 0.000025, changePct: 25 }, 'exactly 24 hours is day 1; tiny prices work');
-    eq(sinceSavedOf(at('2026-10-01T00:00:00+02:00', 100), 100, now), { days: 5, priceThen: 100, priceNow: 100, changePct: 0 }, 'an offset date is read as the instant it names; an unchanged price is a true 0');
-    eq(sinceSavedOf(at('2026-09-26T15:00:00Z'), 110, now), { days: 10, priceNow: 110 }, 'no price at save: no priceThen, no change');
-    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), null, now), { days: 10, priceThen: 100 }, 'no price now: no priceNow, no change');
-    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 0, now), { days: 10, priceThen: 100 }, 'a zero price is no price');
-    eq(sinceSavedOf(at('2026-10-06T17:00:00Z', 100), 110, now), { days: 0, priceThen: 100, priceNow: 110, changePct: 10 }, 'a phone clock two hours ahead: day 0, not a negative');
-    eq(sinceSavedOf(at('2026-10-09T15:00:01Z', 100), 110, now), { priceThen: 100, priceNow: 110, changePct: 10 }, 'a date days in the future says nothing about elapsed time: no days');
+    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 110, now), { days: 10, change: '+10%' }, 'ten days, +10%: the figure is finished, with its sign');
+    eq(sinceSavedOf(at('2026-08-01T10:00:00Z', 200), 170, now), { days: 66, change: '-15%' }, 'a fall keeps its sign; 66 whole days across two month ends');
+    eq(sinceSavedOf(at('2026-10-05T15:00:01Z', 3), 3.1, now)!, { days: 0, change: '+3.3%' }, 'under 24 hours is day 0; the change is rounded to one decimal');
+    eq(sinceSavedOf(at('2026-10-05T15:00:00Z', 0.00002), 0.000024, now), { days: 1, change: '+20%' }, 'exactly 24 hours is day 1; tiny prices work');
+    eq(sinceSavedOf(at('2026-10-01T00:00:00+02:00', 100), 100, now), { days: 5, change: '0%' }, 'an offset date is read as the instant it names; an unchanged price is a true 0');
+    eq(sinceSavedOf(at('2026-09-26T15:00:00Z'), 110, now), { days: 10 }, 'no price at save: no change');
+    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), null, now), { days: 10 }, 'no price now: no change');
+    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 0, now), { days: 10 }, 'a zero price is no price');
+    eq(sinceSavedOf(at('2026-10-06T17:00:00Z', 100), 110, now), { days: 0, change: '+10%' }, 'a phone clock two hours ahead: day 0, not a negative');
+    eq(sinceSavedOf(at('2026-10-09T15:00:01Z', 100), 110, now), { change: '+10%' }, 'a date days in the future says nothing about elapsed time: no days');
     eq(sinceSavedOf(at('not a date'), undefined, now), null, 'nothing computable: null');
-    eq(sinceSavedOf({ savedAt: '2026-09-26T15:00:00Z', priceAtSave: null }, 110, now), { days: 10, priceNow: 110 }, 'a null price at save is no price');
+    eq(sinceSavedOf({ savedAt: '2026-09-26T15:00:00Z', priceAtSave: null }, 110, now), { days: 10 }, 'a null price at save is no price');
+    // The figure is written in the reply's locale, as the reader's callback is.
+    eq([sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 103.2, now, 'equity', 'es')!.change, sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 103.2, now, 'equity', 'de')!.change, sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 96.8, now, 'equity', 'fr')!.change],
+      [signed(3.2, 'es'), signed(3.2, 'de'), signed(-3.2, 'fr')], 'the change is spelled as the reply spells a percentage');
+    // A stored price and today's may not be prices of the same thing: a stock that split 10-for-1 after the note
+    // was saved reads as -90%. At or beyond the class bound there is no figure, and nothing to compute one from.
+    const split = thesisForReviewer(DeskThesisSchema.parse({ hypothesis: 'x', savedAt: '2026-09-20T12:00:00Z', priceAtSave: 1000 }), 100, Date.parse('2026-10-07T12:00:00Z'), 'equity');
+    eq(split, { note: { hypothesis: 'x' }, sinceSaved: { days: 17 } }, 'a 10-for-1 split since the note was saved: the days, and no change');
+    ok(!/1000|-90|90/.test(JSON.stringify(split)), '…neither the stored price nor the false -90% is anywhere in what the reviewer is handed');
+    for (const [then, price, cls, want, what] of [
+      [100, 50, 'equity', undefined, 'a 2-for-1 split'], [150, 100, 'equity', undefined, 'a 3-for-2 split'], [100, 200, 'equity', undefined, 'a 1-for-2 reverse split'],
+      [100, 75, 'equity', undefined, 'exactly the bound'], [100, 124.9, 'equity', '+24.9%', 'just inside the bound'], [100, 75.1, 'equity', '-24.9%', 'just inside it, down'],
+      [100, 45, 'crypto', '-55%', 'a crypto asset has no splits: a wider bound'], [100, 240, 'crypto', '+140%', '…either way'], [100, 10, 'crypto', undefined, 'a change of unit'], [1, 1000, 'crypto', undefined, 'another instrument'],
+      [1e-9, 100, 'equity', undefined, 'a nonsense price from the client'], [1e15, 100, 'equity', undefined, 'an absurd one'],
+    ] as const) eq(sinceSavedOf(at('2026-09-26T15:00:00Z', then), price, now, cls)?.change, want, `${what}: ${want ?? 'no figure'}`);
+    eq(sinceSavedOf(at('2026-09-26T15:00:00Z', 100), 50, now, 'nonsense' as never), { days: 10 }, 'an unknown class is held to the stricter bound');
     // What the reviewer is given about time: whole days only. A person in Mexico City who saves a note on
     // 6 October at 19:30 saved it on 7 October in UTC: no calendar day the server could name would be theirs.
     const note = (over: Record<string, unknown>) => DeskThesisSchema.parse({ hypothesis: 'x', savedAt: '2026-10-06T19:30:00-06:00', ...over });
     const evening = thesisForReviewer(note({ priceAtSave: 100, lastReviewedAt: '2026-10-08T09:00:00-06:00' }), 110, Date.parse('2026-10-10T15:00:00Z'));
-    eq(evening, { note: { hypothesis: 'x' }, sinceSaved: { days: 3, priceThen: 100, priceNow: 110, changePct: 10 }, lastReviewedDaysAgo: 2 }, 'saved in the evening in Mexico City: three whole days, reviewed two days ago');
+    eq(evening, { note: { hypothesis: 'x' }, sinceSaved: { days: 3, change: '+10%' }, lastReviewedDaysAgo: 2 }, 'saved in the evening in Mexico City: three whole days, reviewed two days ago');
     ok(!/2026|savedOn|lastReviewedOn|savedAt|lastReviewedAt/.test(JSON.stringify(evening)), '…and no date, in UTC or otherwise, for the model to cite');
     const ahead = thesisForReviewer(note({ savedAt: '2026-10-20T10:00:00Z', lastReviewedAt: '2026-10-21T10:00:00Z', priceAtSave: 100 }), 110, Date.parse('2026-10-10T15:00:00Z'));
-    eq(ahead, { note: { hypothesis: 'x' }, sinceSaved: { priceThen: 100, priceNow: 110, changePct: 10 } }, 'a savedAt or lastReviewedAt days in the future (a wrong phone clock): no elapsed days and no date at all');
+    eq(ahead, { note: { hypothesis: 'x' }, sinceSaved: { change: '+10%' } }, 'a savedAt or lastReviewedAt days in the future (a wrong phone clock): no elapsed days and no date at all');
     eq(thesisForReviewer(note({ lastReviewedAt: null }), null, Date.parse('2026-10-10T15:00:00Z')), { note: { hypothesis: 'x' }, sinceSaved: { days: 3 } }, 'never reviewed: no lastReviewedDaysAgo');
   }
 
@@ -559,7 +579,7 @@ try {
     deskMock();
     const reviewed = await runDeskDebate('Is my BTC thesis still standing?', evidence, 'en', { thesis, now: Date.parse('2026-10-06T15:00:00Z') });
     const withThesis = bodies(debate());
-    eq(inputOf(roleCall('reviewer')).thesis, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 66, priceThen: 100, priceNow: 120, changePct: 20 } }, 'the figures are computed against the evidence price at the given instant');
+    eq(inputOf(roleCall('reviewer')).thesis, { note: { hypothesis: HYPOTHESIS }, sinceSaved: { days: 66, change: '+20%' } }, 'the figure is computed against the evidence price at the given instant, under the bound of the evidence\'s own asset class');
     eq(reviewed.review, { ...REVIEW, notChecked: ['news', 'fundamentals', 'macro'] }, 'the debate returns the review');
     deskMock();
     const unreviewed = await runDeskDebate('Is my BTC thesis still standing?', evidence, 'en', { thesis: null });

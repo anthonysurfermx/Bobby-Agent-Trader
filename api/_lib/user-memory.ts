@@ -211,12 +211,13 @@ export interface ReaderContext {
   /** The asset asked about now, when asked before. `timesThisWeek` counts this question too (2 = "second time this week"). */
   thisAsset?: {
     asks: number; lastAskedDaysAgo: number; lastHorizon: AskedHorizon; timesThisWeek: number;
-    /** The weekday of the last ask (UTC), in the answer's language, when it was 1–6 days ago. */
+    /** The weekday of the last ask (UTC), in the answer's language, when that was one to six calendar days back: never today's weekday. */
     lastAskedOn?: string;
     /**
      * The price change since the last ask, finished here so no model does arithmetic on a reader's history:
      * `change` is the figure as it is to be quoted, written out in the answer's locale with its sign ("+3.2%"),
-     * and `since` the day it counts from (that weekday, or "12 days ago" from a week on). Present only when
+     * and `since` the day it counts from (that weekday, or the whole days counted, "12 days ago", once the weekday
+     * would be today's or older). Present only when
      * changeSinceLastAsk trusts both prices. The stored price itself is never handed to a model.
      */
     sinceLastAsk?: { change: string; since: string };
@@ -264,7 +265,7 @@ export function changeSinceLastAsk(priceThen: unknown, priceNow: unknown, assetC
 }
 
 /** The figure as the answer quotes it: its sign, at most one decimal, the percent sign, in the answer's locale. */
-const signedPercent = (pct: number, locale: string) => new Intl.NumberFormat(locale, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format(pct / 100);
+export const signedPercent = (pct: number, locale: string) => new Intl.NumberFormat(locale, { style: 'percent', signDisplay: 'exceptZero', maximumFractionDigits: 1 }).format(pct / 100);
 
 /** Compact the summary for the model; null when memory is off or holds nothing useful. */
 export function readerContext(summary: MemorySummary | null, symbol: string, now = Date.now(), firstName?: string | null, priceNow?: number | null, language: AppLanguage = 'en', locale?: string, assetClass: AssetClass = 'equity'): ReaderContext | null {
@@ -280,7 +281,11 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
     const days = Math.max(0, Math.floor((now - Date.parse(summary.thisAsset.lastAskedAt)) / 86_400_000));
     ctx.thisAsset = { asks: summary.thisAsset.asks, lastAskedDaysAgo: Number.isFinite(days) ? days : 0, lastHorizon: summary.thisAsset.lastHorizon, timesThisWeek: (Number.isFinite(summary.thisAsset.asksThisWeek) ? summary.thisAsset.asksThisWeek : 0) + 1 };
     const spoken = appLocale(language, locale);
-    if (days >= 1 && days <= 6) {
+    // A weekday names a day only while it cannot be today's: one to six calendar days back (UTC, as the weekday
+    // itself is). Counted in elapsed days alone, an ask six days and 23 hours old fell on the weekday it is now,
+    // and "since Wednesday" said on a Wednesday reads as today.
+    const calendarDays = Math.floor(now / 86_400_000) - Math.floor(Date.parse(summary.thisAsset.lastAskedAt) / 86_400_000);
+    if (days >= 1 && calendarDays >= 1 && calendarDays <= 6) {
       ctx.thisAsset.lastAskedOn = new Intl.DateTimeFormat(spoken, { weekday: 'long', timeZone: 'UTC' }).format(new Date(summary.thisAsset.lastAskedAt));
     }
     // A callback only across days (the same-day move is just the chart), and only with a figure that can be
