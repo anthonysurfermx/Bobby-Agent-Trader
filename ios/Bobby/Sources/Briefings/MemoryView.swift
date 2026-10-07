@@ -1,8 +1,9 @@
-// Profile › Memory: what Bobby remembers about the account, and what this iPhone alone keeps.
-// The screen shows the same explanation as the consent sheet; when iPhone questions are not in
-// memory its "Turn on" opens that sheet (one consent path, MemoryConsentSheet). Corrections,
-// remembered assets, the phone-only section and confirmed deletion follow; MemoryCenter owns
-// account isolation and makes deletion complete (server, shortcuts, theses).
+// Profile › Memory: what Bobby remembers about the account, and what this iPhone keeps.
+// The screen shows the same explanation as the consent sheet (what is kept, what is sent to the AI
+// provider, for how long); when iPhone questions are not in memory its "Turn on" opens that sheet
+// (one consent path, MemoryConsentSheet). Corrections, remembered assets, the on-phone section and
+// confirmed deletion follow; MemoryCenter owns account isolation and makes deletion complete
+// (server, shortcuts, theses). What the phone keeps shows to everyone, signed in or not.
 import SwiftUI
 
 struct MemoryView: View {
@@ -68,10 +69,13 @@ struct MemoryView: View {
     @ViewBuilder private var content: some View {
         if !signedIn {
             BriefingNote(text: MemoryError.signedOut.message).accessibilityIdentifier("memory-signed-out")
+            // Nobody signed in: the phone still keeps a shortcut row and theses of its own. No server call.
+            onThisPhone(mentionsDeletion: false)
         } else if !riskAccepted {
             BriefingNote(text: L.t("Accept the risk notice first: until then Bobby sends nothing to its servers.",
                                    "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores."))
                 .accessibilityIdentifier("memory-risk-required")
+            onThisPhone(mentionsDeletion: false)
         } else if let s = center.snapshot {
             loaded(s)
         } else if center.loading {
@@ -87,7 +91,7 @@ struct MemoryView: View {
                     .accessibilityIdentifier("memory-retry")
             }
             .padding(.top, 24)
-            onThisPhone
+            onThisPhone(mentionsDeletion: true)
             deleteEverything(showsError: false)
         }
     }
@@ -129,7 +133,7 @@ struct MemoryView: View {
         } else {
             ForEach(s.assets) { asset in assetRow(asset) }
         }
-        onThisPhone
+        onThisPhone(mentionsDeletion: true)
         deleteEverything(showsError: true)
         if center.notice == .erasedEverything, s.enabled, center.nativeOptedIn {
             Text(L.t("Memory is still on: your next question starts it again. You can pause it above.",
@@ -143,8 +147,9 @@ struct MemoryView: View {
     /// iPhone questions are not in memory: one line that says so and one button to the consent sheet.
     private var turnOn: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(L.t("Off on this iPhone: what you ask here is not saved.",
-                     "Desactivada en este iPhone: lo que preguntas aquí no se guarda."))
+            // "Not added to memory", not "not saved": the phone does keep the asset as a shortcut (below).
+            Text(L.t("Off on this iPhone: what you ask here is not added to memory.",
+                     "Desactivada en este iPhone: lo que preguntas aquí no se agrega a la memoria."))
                 .font(.system(size: 14)).foregroundStyle(Theme.cream).fixedSize(horizontal: false, vertical: true)
             Button { showingConsent = true } label: {
                 Text(L.t("Turn on", "Activar")).font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.bg)
@@ -165,13 +170,26 @@ struct MemoryView: View {
         .accessibilityIdentifier("memory-off")
     }
 
-    /// What never leaves the phone: the shortcut row and the theses written here (count only).
-    @ViewBuilder private var onThisPhone: some View {
-        BriefingSectionLabel(text: L.t("On this iPhone only", "Solo en este iPhone"))
-        Text(L.t("These never leave this iPhone. Forget and Delete everything clear them here too.",
-                 "Esto nunca sale de este iPhone. Olvidar y Borrar todo también lo quitan de aquí."))
+    /// Where the phone's two lists live, and the one case in which a thesis's text leaves it.
+    static var onThisPhoneNote: String {
+        L.t("Bobby keeps these on this iPhone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer.",
+            "Bobby guarda esto en este iPhone, no en sus servidores. El texto de una tesis se envía, junto con esa pregunta, solo cuando inicias una revisión: a Bobby y a los proveedores de IA que escriben la respuesta.")
+    }
+
+    /// What each deletion on this screen removes from the phone, no more than the code does.
+    static var onThisPhoneDeletionNote: String {
+        L.t("Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.",
+            "Olvidar quita el acceso rápido de un activo. Borrar todo quita los accesos rápidos y las tesis que escribiste.")
+    }
+
+    /// What the phone keeps with no copy on Bobby's servers: the shortcut row and the theses written
+    /// here (count only). `mentionsDeletion` is false where Forget and Delete everything are not on screen.
+    @ViewBuilder private func onThisPhone(mentionsDeletion: Bool) -> some View {
+        BriefingSectionLabel(text: L.t("Kept on this iPhone", "Guardado en este iPhone"))
+        Text(mentionsDeletion ? Self.onThisPhoneNote + " " + Self.onThisPhoneDeletionNote : Self.onThisPhoneNote)
             .font(.system(size: 12)).foregroundStyle(Theme.warmDim).fixedSize(horizontal: false, vertical: true)
             .padding(.bottom, 8)
+            .accessibilityIdentifier("memory-local-note")
         HStack(alignment: .center, spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(L.t("Recent assets shown as shortcuts", "Activos recientes que ves como accesos rápidos"))

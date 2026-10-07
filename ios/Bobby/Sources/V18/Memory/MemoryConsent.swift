@@ -6,9 +6,12 @@
 // never carries one account's answer to another, and a deleted account's key can never be asked
 // for again. A decline is remembered so the offer does not nag; a new consent version asks again.
 //
-// The record is not what sends the header. `MemoryCenter.allowsNativeCapture` still decides that on
-// every desk request: "Remember" only reaches it through `setNativeCapture(true)`, after the
-// server confirmed that account memory is on.
+// The record gates capture. `MemoryCenter.allowsNativeCapture` decides on every desk request and
+// affirms the opt-in only when this account's stored switch is on AND its record says "accepted"
+// for the consent as it reads today. A switch without that record (the 1.7 switch, or an answer to
+// an older version of the text) is revoked, and the person is asked again through the sheet.
+// "Remember" reaches the switch through `setNativeCapture(true)`, after the server confirmed that
+// account memory is on, and writes the record in the same step.
 import Combine
 import CryptoKit
 import Foundation
@@ -25,11 +28,19 @@ struct MemoryConsent {
     static let keyPrefix = "v18.memoryConsent."
 
     let defaults: UserDefaults
+    /// The consent as it reads today. Tests pass a later one to stand for a reworded sheet.
+    let version: Int
 
-    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+    init(defaults: UserDefaults = .standard, version: Int = currentVersion) {
+        self.defaults = defaults
+        self.version = version
+    }
 
-    static func key(user: String) -> String {
-        keyPrefix + SHA256.hash(data: Data(user.utf8)).map { String(format: "%02x", $0) }.joined()
+    static func key(user: String) -> String { keyPrefix + digest(user: user) }
+
+    /// The SHA-256 of the user id in lowercase hex: what every per-account memory key on this phone is built from.
+    static func digest(user: String) -> String {
+        SHA256.hash(data: Data(user.utf8)).map { String(format: "%02x", $0) }.joined()
     }
 
     /// The last answer this account gave on this device, whatever its version.
@@ -39,16 +50,17 @@ struct MemoryConsent {
     }
 
     /// True once the account answered the consent as it reads today (yes or no).
-    func hasDecided(user: String, version: Int = currentVersion) -> Bool {
+    func hasDecided(user: String) -> Bool {
         record(user: user)?.version == version
     }
 
-    func hasAccepted(user: String, version: Int = currentVersion) -> Bool {
+    /// True only for a yes to the consent as it reads today. This is what capture is gated on.
+    func hasAccepted(user: String) -> Bool {
         guard let record = record(user: user) else { return false }
         return record.version == version && record.accepted
     }
 
-    func set(accepted: Bool, user: String, at date: Date = Date(), version: Int = currentVersion) {
+    func set(accepted: Bool, user: String, at date: Date = Date()) {
         let record = MemoryConsentRecord(version: version, decidedAt: date, accepted: accepted)
         if let data = try? Self.encoder.encode(record) { defaults.set(data, forKey: Self.key(user: user)) }
     }
@@ -75,13 +87,11 @@ final class MemoryConsentModel: ObservableObject {
     @Published private(set) var phase: Phase = .asking
 
     let center: MemoryCenter
-    let consent: MemoryConsent
+    /// The center's own store and version: the record written here is the one its gate reads.
+    var consent: MemoryConsent { center.consent }
     var now: () -> Date = { Date() }
 
-    init(center: MemoryCenter = .shared, consent: MemoryConsent = MemoryConsent()) {
-        self.center = center
-        self.consent = consent
-    }
+    init(center: MemoryCenter = .shared) { self.center = center }
 
     var signedIn: Bool { center.currentUser() != nil }
     /// The server's own number when the memory screen already loaded it; its documented default otherwise.

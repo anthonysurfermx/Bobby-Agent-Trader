@@ -8,6 +8,7 @@
 //   memory-on               the memory screen with memory on
 //   memory-deleted          the memory screen right after "Delete everything"
 //   memory-offline          the memory screen when the server does not answer (the phone's part still shows)
+//   memory-signed-out       the memory screen with nobody signed in (what this iPhone keeps still shows)
 #if DEBUG
 import SwiftUI
 
@@ -22,6 +23,7 @@ enum MemoryQA {
             "memory-on": { AnyView(MemoryScreenFixture(state: .on)) },
             "memory-deleted": { AnyView(MemoryScreenFixture(state: .deleted)) },
             "memory-offline": { AnyView(MemoryScreenFixture(state: .offline)) },
+            "memory-signed-out": { AnyView(MemoryScreenFixture(state: .signedOut)) },
         ]
     }
 
@@ -39,10 +41,12 @@ enum MemoryQA {
                 "assets": rows, "retentionDays": 90]
     }
 
-    /// A center on its own suite: a recorded account, a canned server, two shortcuts and one thesis on "this phone".
-    static func center(suite: String, online: Bool = true, seedLocal: Bool = true) -> MemoryCenter {
+    /// A center on its own suite: a recorded account (or nobody, `signedIn: false`), a canned server,
+    /// two shortcuts and one thesis on "this phone".
+    static func center(suite: String, online: Bool = true, seedLocal: Bool = true, signedIn: Bool = true) -> MemoryCenter {
         let defaults = UserDefaults(suiteName: suite) ?? .standard
         defaults.removePersistentDomain(forName: suite)
+        let user: String? = signedIn ? Self.user : nil
         if seedLocal {
             DeskMemory.setOwner(user, defaults: defaults)
             let desk = DeskMemory(defaults: defaults)
@@ -76,8 +80,7 @@ private struct MemoryConsentFixture: View {
         self.outcome = outcome
         // "failed": the canned server does not answer, so "Remember" stops at its first step.
         let center = MemoryQA.center(suite: "qa.v18.memory.consent", online: outcome != .failed, seedLocal: false)
-        let consent = MemoryConsent(defaults: UserDefaults(suiteName: "qa.v18.memory.consent") ?? .standard)
-        _model = StateObject(wrappedValue: MemoryConsentModel(center: center, consent: consent))
+        _model = StateObject(wrappedValue: MemoryConsentModel(center: center))
     }
 
     var body: some View {
@@ -91,27 +94,27 @@ private struct MemoryConsentFixture: View {
 }
 
 private struct MemoryScreenFixture: View {
-    enum Screen { case off, on, deleted, offline }
+    enum Screen { case off, on, deleted, offline, signedOut }
     let state: Screen
     @StateObject private var center: MemoryCenter
 
     init(state: Screen) {
         self.state = state
-        _center = StateObject(wrappedValue: MemoryQA.center(suite: "qa.v18.memory.screen", online: state != .offline))
+        _center = StateObject(wrappedValue: MemoryQA.center(suite: "qa.v18.memory.screen", online: state != .offline,
+                                                            signedIn: state != .signedOut))
     }
 
     var body: some View {
         MemoryView(center: center, riskAccepted: true, onClose: {})
             .task {
                 switch state {
-                case .off, .offline:
+                case .off, .offline, .signedOut:
                     break
                 case .on:
-                    await center.refresh()
-                    _ = center.setNativeCapture(true)
+                    // The one way memory turns on: the consent's "Remember" (it also writes the record the gate reads).
+                    await MemoryConsentModel(center: center).remember()
                 case .deleted:
-                    await center.refresh()
-                    _ = center.setNativeCapture(true)
+                    await MemoryConsentModel(center: center).remember()
                     center.requestForgetAll()
                     await center.confirmForgetAll()
                 }

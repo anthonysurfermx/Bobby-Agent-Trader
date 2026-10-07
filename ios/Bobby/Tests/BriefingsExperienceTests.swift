@@ -464,6 +464,8 @@ final class BriefingsExperienceTests: XCTestCase {
     func testMemoryAccountSwitchDropsTheLateAnswerFromA() async {
         let c = memoryCenter()
         await c.refresh()
+        // 1.8: the switch counts only under this account's accepted consent (MemoryConsent).
+        c.consent.set(accepted: true, user: "a")
         XCTAssertTrue(c.setNativeCapture(true))
         let started = expectation(description: "A's read is suspended")
         var pending: CheckedContinuation<(json: Any?, status: Int), Error>?
@@ -490,6 +492,9 @@ final class BriefingsExperienceTests: XCTestCase {
         XCTAssertTrue(c.snapshot?.enabled == true)
         XCTAssertFalse(c.nativeOptedIn)
         XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
+        // 1.8: the switch alone affirms nothing; it counts under this account's accepted consent,
+        // which the consent sheet records (Memory18ConsentTests covers the switch without it).
+        c.consent.set(accepted: true, user: "a")
         XCTAssertTrue(c.setNativeCapture(true))
         XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
         XCTAssertFalse(c.allowsNativeCapture(user: "b", generation: memoryGeneration))
@@ -514,7 +519,9 @@ final class BriefingsExperienceTests: XCTestCase {
         let c = memoryCenter()
         let loaded = await c.refresh()
         XCTAssertTrue(loaded)
+        c.consent.set(accepted: true, user: "a")
         XCTAssertTrue(c.setNativeCapture(true))
+        XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: memoryGeneration))
         let started = expectation(description: "pause PATCH is suspended")
         var pending: CheckedContinuation<(json: Any?, status: Int), Error>?
         c.send = { _, _, _ in try await withCheckedThrowingContinuation { pending = $0; started.fulfill() } }
@@ -543,6 +550,7 @@ final class BriefingsExperienceTests: XCTestCase {
         let c = memoryCenter()
         let loaded = await c.refresh()
         XCTAssertTrue(loaded)
+        c.consent.set(accepted: true, user: "a")
         XCTAssertTrue(c.setNativeCapture(true))
         let started = expectation(description: "A's pause PATCH is suspended")
         var pending: CheckedContinuation<(json: Any?, status: Int), Error>?

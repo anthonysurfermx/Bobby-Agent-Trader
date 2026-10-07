@@ -1,8 +1,10 @@
 // The memory consent sheet (1.8): the one place where memory is turned on for iPhone questions.
 // It opens from the offer on the glass ("How it works") and from Memory › "Turn on".
 //
-// It is the consent, so it says everything before asking: what is kept, what is not, where and for
-// how long, who receives it, and how to undo it. Two buttons of equal weight, nothing pre-selected.
+// It is the consent, so it says everything before asking, and only what the code does: what is
+// kept, what is sent to the AI provider when Bobby answers (the server's reader context: first
+// name, the asset's history, the preferences, the assets asked about most), for how long it is
+// used, and how to undo it. Two buttons of equal weight, nothing pre-selected.
 // Closing the sheet is "not now" without recording anything; only the "Not now" button records a
 // decline (MemoryConsent). Nothing reaches the network until "Remember" is tapped.
 import SwiftUI
@@ -13,8 +15,8 @@ struct MemoryConsentSheet: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @AppStorage(L.preferenceKey) private var languageSelection = "system"
 
-    init(center: MemoryCenter = .shared, consent: MemoryConsent = MemoryConsent(), onClose: @escaping () -> Void) {
-        _model = StateObject(wrappedValue: MemoryConsentModel(center: center, consent: consent))
+    init(center: MemoryCenter = .shared, onClose: @escaping () -> Void) {
+        _model = StateObject(wrappedValue: MemoryConsentModel(center: center))
         self.onClose = onClose
     }
 
@@ -158,12 +160,17 @@ struct MemoryConsentSheet: View {
     }
 }
 
-/// What memory is, in five short answers. The consent sheet shows all of it; the memory screen
-/// shows the same words when memory is off, so there is one explanation and one consent.
+/// What memory is, in four short answers. The consent sheet shows all of it; the memory screen
+/// shows the same words, so there is one explanation and one consent.
+///
+/// The "sent" answer mirrors `readerContext` in api/_lib/user-memory.ts, which hands the model that
+/// writes the answer: the first name, the three preferences, this asset's count, dates and price
+/// change, and up to five other assets asked about often. If that function sends something new,
+/// this text changes with it and `MemoryConsent.currentVersion` goes up.
 struct MemoryExplanation: View {
     let retentionDays: Int
-    /// The memory screen's compact form leaves out who receives it and where control lives:
-    /// "Turn on" opens the sheet, which says all five.
+    /// The memory screen's compact form leaves out only where control lives (it is that screen).
+    /// What is sent to the AI provider is said in both.
     var compact = false
 
     struct Item: Identifiable, Equatable {
@@ -175,19 +182,17 @@ struct MemoryExplanation: View {
     static func items(retentionDays: Int, compact: Bool = false) -> [Item] {
         var all = [
             Item(id: "keep", label: L.t("What I keep", "Lo que guardo"),
-                 text: L.t("The asset, the date, the time frame you mention and its price that day.",
-                           "El activo, la fecha, el plazo que mencionas y su precio de ese día.")),
-            Item(id: "never", label: L.t("What I do not keep", "Lo que no guardo"),
-                 text: L.t("Never your full question, never your name, nothing about your money.",
-                           "Nunca tu pregunta completa, nunca tu nombre, nada sobre tu dinero.")),
-            Item(id: "where", label: L.t("Where and how long", "Dónde y por cuánto tiempo"),
-                 text: L.t("On Bobby's servers, linked to your account, for \(retentionDays) days after you last ask about it.",
-                           "En los servidores de Bobby, vinculado a tu cuenta, durante \(retentionDays) días desde la última vez que preguntas por él.")),
+                 text: L.t("The asset, the date, the time frame you mention and its price that day. Not the text of your question.",
+                           "El activo, la fecha, el plazo que mencionas y su precio de ese día. No el texto de tu pregunta.")),
+            Item(id: "sent", label: L.t("What is sent when I answer", "Lo que se envía cuando respondo"),
+                 text: L.t("A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the change in its price since then, the preferences you set here, and the assets you ask about most.",
+                           "Un resumen breve va al proveedor de IA que escribe la respuesta de Bobby: tu nombre de pila, cuántas veces y cuándo preguntaste por el activo, el cambio de su precio desde entonces, las preferencias que defines aquí y los activos por los que más preguntas.")),
+            // What the code guarantees (the server stops reading the row), not a deletion date.
+            Item(id: "howlong", label: L.t("For how long", "Por cuánto tiempo"),
+                 text: L.t("Bobby stops using an asset \(retentionDays) days after you last asked about it.",
+                           "Bobby deja de usar un activo \(retentionDays) días después de la última vez que preguntaste por él.")),
         ]
         guard !compact else { return all }
-        all.append(Item(id: "who", label: L.t("Who receives it", "Quién lo recibe"),
-                        text: L.t("A short summary (for example: third time this week, up 4% since) reaches the AI provider that writes Bobby's answer, so the answer can pick up where you left off.",
-                                  "Un resumen breve (por ejemplo: tercera vez esta semana, subió 4% desde entonces) llega al proveedor de IA que escribe la respuesta de Bobby, para que retome donde lo dejaste.")))
         all.append(Item(id: "control", label: L.t("Your control", "Tu control"),
                         text: L.t("See it, correct it, pause it or delete it any time in Memory.",
                                   "Míralo, corrígelo, ponlo en pausa o bórralo cuando quieras en Memoria.")))

@@ -4,7 +4,9 @@ import XCTest
 
 /// Memory consent (1.8): the answer is a record per account and per device, a decline is
 /// remembered, "Remember" turns memory on step by step and stops honestly when a step fails, and
-/// the opt-in header leaves the phone only after "Remember". No request leaves the process: the
+/// the opt-in header leaves the phone only after "Remember" to the consent as it reads today (a
+/// switch without that record, or a yes to an older wording, affirms nothing). The sheet says what
+/// the server really sends to the AI provider. No request leaves the process: the
 /// memory center's transport is an injected closure and the one wire-level test runs on a URL stub.
 @MainActor
 final class Memory18ConsentTests: XCTestCase {
@@ -56,7 +58,8 @@ final class Memory18ConsentTests: XCTestCase {
     }
 
     private func model(_ center: MemoryCenter) -> MemoryConsentModel {
-        let m = MemoryConsentModel(center: center, consent: MemoryConsent(defaults: defaults))
+        // The model writes to the center's own store (this suite): the record its gate reads.
+        let m = MemoryConsentModel(center: center)
         m.now = { [unowned self] in self.clock }
         return m
     }
@@ -73,8 +76,10 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertTrue(consent.hasAccepted(user: "a"))
         XCTAssertNil(consent.record(user: "b"), "one account's answer is never another's")
         XCTAssertFalse(consent.hasDecided(user: "b"))
-        XCTAssertFalse(consent.hasDecided(user: "a", version: MemoryConsent.currentVersion + 1), "a new consent version asks again")
-        XCTAssertFalse(consent.hasAccepted(user: "a", version: MemoryConsent.currentVersion + 1))
+        let reworded = MemoryConsent(defaults: defaults, version: MemoryConsent.currentVersion + 1)
+        XCTAssertEqual(reworded.record(user: "a")?.version, MemoryConsent.currentVersion, "the old answer is still readable")
+        XCTAssertFalse(reworded.hasDecided(user: "a"), "a new consent version asks again")
+        XCTAssertFalse(reworded.hasAccepted(user: "a"), "and a yes to the old wording is not a yes to the new one")
         XCTAssertEqual(MemoryConsent.currentVersion, 1)
 
         let key = MemoryConsent.key(user: "a")
@@ -110,6 +115,7 @@ final class Memory18ConsentTests: XCTestCase {
         let c = center { [unowned self] _, _ in (self.memoryJSON(), 200) }
         await c.refresh()
         XCTAssertTrue(c.setNativeCapture(true), "the 1.7 switch had been on")
+        XCTAssertTrue(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults))
         model(c).decline()
         XCTAssertFalse(c.nativeOptedIn, "no means this iPhone stays out of memory")
         XCTAssertFalse(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults))
@@ -255,15 +261,168 @@ final class Memory18ConsentTests: XCTestCase {
 
     // MARK: What the sheet says
 
-    func testTheConsentSaysAllFiveThingsAndTheScreenTheFirstThree() {
+    /// LEAD UPDATE 1: the consent says what the server's reader context really sends
+    /// (api/_lib/user-memory.ts, readerContext): the first name, the asset's history, the preferences
+    /// and the assets asked about most. It never denies the name, and never promises a deletion date.
+    func testTheConsentSaysWhatIsKeptWhatIsSentForHowLongAndHowToUndoIt() {
         let full = MemoryExplanation.items(retentionDays: 90)
-        XCTAssertEqual(full.map(\.id), ["keep", "never", "where", "who", "control"])
-        XCTAssertEqual(MemoryExplanation.items(retentionDays: 90, compact: true).map(\.id), ["keep", "never", "where"])
-        XCTAssertTrue(full[2].text.contains("90 days"), "the retention is the server's number")
-        XCTAssertTrue(MemoryExplanation.items(retentionDays: 30)[2].text.contains("30 days"))
-        XCTAssertTrue(full[3].text.contains("AI provider"), "who receives it is named")
+        XCTAssertEqual(full.map(\.id), ["keep", "sent", "howlong", "control"])
+        let compact = MemoryExplanation.items(retentionDays: 90, compact: true)
+        XCTAssertEqual(compact.map(\.id), ["keep", "sent", "howlong"], "the memory screen also says what reaches the AI provider")
+        XCTAssertEqual(Array(full.prefix(3)), compact, "one explanation, the same words")
+
+        XCTAssertEqual(full[0].label, "What I keep")
+        XCTAssertEqual(full[0].text, "The asset, the date, the time frame you mention and its price that day. Not the text of your question.")
+        XCTAssertEqual(full[1].label, "What is sent when I answer")
+        XCTAssertEqual(full[1].text, "A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the change in its price since then, the preferences you set here, and the assets you ask about most.")
+        XCTAssertEqual(full[2].label, "For how long")
+        XCTAssertEqual(full[2].text, "Bobby stops using an asset 90 days after you last asked about it.")
+        XCTAssertEqual(MemoryExplanation.items(retentionDays: 30)[2].text, "Bobby stops using an asset 30 days after you last asked about it.",
+                       "the retention is the server's number")
+        XCTAssertEqual(full[3].text, "See it, correct it, pause it or delete it any time in Memory.")
+
+        let sent = full[1].text
+        for fact in ["AI provider", "first name", "how often and when", "change in its price", "preferences", "assets you ask about most"] {
+            XCTAssertTrue(sent.contains(fact), "the sent line names: \(fact)")
+        }
+        for item in full {
+            let text = (item.label + " " + item.text).lowercased()
+            if item.id != "sent" { XCTAssertFalse(text.contains("name"), "\(item.id) must not speak about the name: only the sent line does") }
+            XCTAssertFalse(text.contains("never"), "\(item.id): nothing is denied that the server sends")
+            XCTAssertFalse(text.contains("deleted after") || text.contains("for 90 days"), "\(item.id): no retention worded as a deletion guarantee")
+        }
+        XCTAssertTrue(full[2].text.contains("stops using"))
+
+        // The same structure in six languages: every row is translated, and the sent line names the first name.
+        let firstName = ["en": "first name", "es": "nombre de pila", "fr": "prénom", "pt": "primeiro nome", "it": "il tuo nome", "de": "Vorname"]
+        let provider = ["en": "AI provider", "es": "proveedor de IA", "fr": "fournisseur d'IA", "pt": "fornecedor de IA", "it": "fornitore di IA", "de": "KI-Anbieter"]
+        let english = full
+        for (language, word) in firstName {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            let items = MemoryExplanation.items(retentionDays: 90)
+            XCTAssertEqual(items.map(\.id), ["keep", "sent", "howlong", "control"], language)
+            XCTAssertTrue(items[1].text.contains(word), "\(language): \(items[1].text)")
+            XCTAssertTrue(items[1].text.contains(provider[language] ?? "?"), "\(language): \(items[1].text)")
+            XCTAssertTrue(items[2].text.contains("90"), language)
+            for item in items {
+                XCTAssertFalse(item.text.contains("{"), "\(language): an unfilled placeholder in \(item.text)")
+                if item.id != "sent" {
+                    for word in firstName.values { XCTAssertFalse(item.text.contains(word), "\(language) \(item.id): \(item.text)") }
+                }
+                if language != "en" {
+                    XCTAssertNotEqual(item.text, english.first { $0.id == item.id }?.text, "\(language) \(item.id) is translated")
+                    XCTAssertNotEqual(item.label, english.first { $0.id == item.id }?.label, "\(language) \(item.id) label is translated")
+                }
+            }
+        }
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
         XCTAssertTrue(MemoryView.deleteEverythingWarning.contains("the shortcuts on this iPhone and the theses you wrote here"))
         XCTAssertTrue(MemoryView.deleteEverythingWarning.hasSuffix("It cannot be undone."))
+    }
+
+    /// The memory screen says what the code does with what the phone keeps: a thesis's text does
+    /// leave the phone inside a review (NucleoDesk.debate puts it in the desk request), and Forget
+    /// removes a shortcut, not a thesis.
+    func testTheMemoryScreenDoesNotOverstateWhatStaysOnThePhoneOrWhatForgetRemoves() {
+        let note = MemoryView.onThisPhoneNote
+        XCTAssertEqual(note, "Bobby keeps these on this iPhone, not on its servers. The text of a thesis is sent, with that question, only when you start a review: to Bobby and to the AI providers that write the answer.")
+        XCTAssertFalse(note.lowercased().contains("never leave"))
+        XCTAssertTrue(note.contains("AI providers"), "what reaches an AI provider is said where it happens")
+        let deletion = MemoryView.onThisPhoneDeletionNote
+        XCTAssertEqual(deletion, "Forget removes an asset's shortcut. Delete everything clears the shortcuts and the theses you wrote.")
+        // What that sentence promises is what the code does: Memory18EraseTests covers both deletions end to end.
+        for language in ["es", "fr", "pt", "it", "de"] {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            XCTAssertNotEqual(MemoryView.onThisPhoneNote, note, language)
+            XCTAssertNotEqual(MemoryView.onThisPhoneDeletionNote, deletion, language)
+        }
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
+    }
+
+    // MARK: The consent gates capture
+
+    /// iOS 1.7 had a plain switch and no consent record. In 1.8 that switch alone affirms nothing:
+    /// it is revoked when read, the header stops, and the account is asked through the sheet.
+    func testASwitchWithoutAnAcceptedConsentIsRevokedAndTheAccountIsAskedAgain() async {
+        let c = center { [unowned self] _, _ in (self.memoryJSON(), 200) }
+        await c.refresh()
+        XCTAssertTrue(c.setNativeCapture(true), "the state a 1.7 install left behind: the switch on, no record")
+        XCTAssertNil(MemoryConsent(defaults: defaults).record(user: "a"))
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: generation), "the header is not sent")
+        XCTAssertFalse(c.nativeOptedIn, "and the screen shows \"Turn on\", not a switch that is on")
+        XCTAssertFalse(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults), "the switch is revoked, not just ignored")
+
+        // The same on a fresh launch: a new center over the stored switch.
+        defaults.set(true, forKey: "agent.nativeMemoryOptIn.v1." + MemoryConsent.digest(user: "a"))
+        XCTAssertTrue(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults), "this is the key the 1.7 switch wrote")
+        let relaunched = MemoryCenter(observeAccount: false, defaults: defaults)
+        relaunched.currentUser = { [unowned self] in self.user }
+        relaunched.currentGeneration = { [unowned self] in self.generation }
+        relaunched.riskAccepted = { true }
+        relaunched.accountChanged(force: true)
+        XCTAssertFalse(relaunched.nativeOptedIn)
+        XCTAssertFalse(relaunched.allowsNativeCapture(user: "a", generation: generation))
+        XCTAssertFalse(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults))
+
+        // A declined record does not count either.
+        defaults.set(true, forKey: "agent.nativeMemoryOptIn.v1." + MemoryConsent.digest(user: "a"))
+        MemoryConsent(defaults: defaults).set(accepted: false, user: "a", at: clock)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: generation))
+        MemoryConsent(defaults: defaults).clear(user: "a")
+
+        // The account is offered memory again on the glass, and "Remember" turns it on properly.
+        let live = MemoryNudges.liveState(user: "a", defaults: defaults, erased: { _, _ in false })
+        XCTAssertFalse(live.captureOn)
+        XCTAssertFalse(live.decided)
+        let read = NudgeRead(requestId: "r", symbol: "NVDA", name: "NVDA", isEquity: true, verdict: "wait", saved: false, at: clock)
+        let moment = NudgeMoment(signedIn: true, now: clock, lastRead: read, readsThisLaunch: 1)
+        XCTAssertEqual(MemoryNudges.candidate(moment, state: live)?.id, MemoryNudges.offerId(user: "a", now: clock))
+        let ok = await model(c).remember()
+        XCTAssertTrue(ok)
+        XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: generation))
+        XCTAssertTrue(c.nativeOptedIn)
+        XCTAssertNil(MemoryNudges.candidate(moment, state: MemoryNudges.liveState(user: "a", defaults: defaults, erased: { _, _ in false })))
+    }
+
+    /// The consent text changed (version 2): an account that said yes to version 1 stops sending the
+    /// header and is offered the new consent; saying yes to it turns capture back on.
+    func testAcceptedVersionOneUnderVersionTwoSendsNoHeaderAndTheOfferReturns() async {
+        let c = center { [unowned self] _, _ in (self.memoryJSON(), 200) }
+        let accepted = await model(c).remember()
+        XCTAssertTrue(accepted)
+        XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: generation))
+        XCTAssertEqual(MemoryConsent(defaults: defaults).record(user: "a")?.version, 1)
+        let read = NudgeRead(requestId: "r", symbol: "NVDA", name: "NVDA", isEquity: true, verdict: "wait", saved: false, at: clock)
+        let moment = NudgeMoment(signedIn: true, now: clock, lastRead: read, readsThisLaunch: 1)
+        func live(_ version: Int) -> MemoryNudges.State { MemoryNudges.liveState(user: "a", defaults: defaults, version: version, erased: { _, _ in false }) }
+        XCTAssertNil(MemoryNudges.candidate(moment, state: live(1)), "under version 1 it is on and answered")
+
+        c.consentVersion = 2
+        XCTAssertEqual(c.consent.version, 2)
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: generation), "the header is not sent under a consent the person never saw")
+        XCTAssertFalse(c.nativeOptedIn)
+        XCTAssertFalse(MemoryCenter.storedNativeOptIn(user: "a", defaults: defaults))
+        XCTAssertFalse(live(2).captureOn)
+        XCTAssertFalse(live(2).decided)
+        let offer = MemoryNudges.candidate(moment, state: live(2))
+        XCTAssertEqual(offer?.id, "memory.offer.v2." + MemoryNudges.fragment(user: "a"), "the offer returns, under an id of its own")
+        XCTAssertNotNil(offer?.id.range(of: NucleoNudge.idPattern, options: .regularExpression))
+        // Going back to the old wording does not quietly restore what was revoked.
+        c.consentVersion = 1
+        XCTAssertFalse(c.allowsNativeCapture(user: "a", generation: generation))
+
+        c.consentVersion = 2
+        let again = await model(c).remember()
+        XCTAssertTrue(again)
+        XCTAssertEqual(MemoryConsent(defaults: defaults).record(user: "a")?.version, 2)
+        XCTAssertTrue(c.allowsNativeCapture(user: "a", generation: generation))
+        XCTAssertNil(MemoryNudges.candidate(moment, state: live(2)))
+
+        // The memory screen's own read (it calls reloadLocal when it appears) applies the same gate.
+        c.consentVersion = 3
+        XCTAssertTrue(c.nativeOptedIn, "not yet re-read")
+        c.reloadLocal()
+        XCTAssertFalse(c.nativeOptedIn, "the screen shows \"Turn on\" as soon as it appears")
     }
 
     func testMemoryCopyAvoidsTheWordsBobbyNeverUses() {
@@ -290,6 +449,8 @@ final class Memory18ConsentTests: XCTestCase {
         let token = "memory18-wire-token"
         defer {
             if account.session?.userId == wireUser { _ = center.setNativeCapture(false) }
+            center.consentVersion = MemoryConsent.currentVersion
+            MemoryConsent().clear(user: wireUser)
             center.send = previousSend
             center.riskAccepted = previousRisk
             if let previousSession { account.accept(previousSession) } else { account.signOut() }
@@ -312,9 +473,15 @@ final class Memory18ConsentTests: XCTestCase {
             return sent?.request.value(forHTTPHeaderField: MemoryCenter.nativeOptInHeader)
         }
 
-        let m = MemoryConsentModel(center: center, consent: MemoryConsent(defaults: defaults))
+        let m = MemoryConsentModel(center: center)
         var header = try await deskHeader()
         XCTAssertNil(header, "before any answer the header is not sent, even when a caller supplies it")
+        // The switch as iOS 1.7 left it (on, with no consent record) affirms nothing in 1.8.
+        await center.refresh()
+        XCTAssertTrue(center.setNativeCapture(true))
+        header = try await deskHeader()
+        XCTAssertNil(header, "a switch without an accepted consent sends no opt-in")
+        XCTAssertFalse(MemoryCenter.storedNativeOptIn(user: wireUser), "and is revoked")
         m.decline()
         header = try await deskHeader()
         XCTAssertNil(header, "\"Not now\" sends no consent")
@@ -331,7 +498,18 @@ final class Memory18ConsentTests: XCTestCase {
         _ = center.setNativeCapture(false)
         header = try await deskHeader()
         XCTAssertNil(header, "switching it off in Memory stops it at once")
-        let again = await MemoryConsentModel(center: center, consent: MemoryConsent(defaults: defaults)).remember()
+        var again = await MemoryConsentModel(center: center).remember()
+        XCTAssertTrue(again)
+        header = try await deskHeader()
+        XCTAssertEqual(header, "1")
+        // The consent is reworded (version 2): the yes to version 1 no longer sends anything.
+        center.consentVersion = MemoryConsent.currentVersion + 1
+        header = try await deskHeader()
+        XCTAssertNil(header, "accepted v1 under version 2: the header is not sent")
+        center.consentVersion = MemoryConsent.currentVersion
+        header = try await deskHeader()
+        XCTAssertNil(header, "and it does not come back by itself")
+        again = await MemoryConsentModel(center: center).remember()
         XCTAssertTrue(again)
         account.signOut()
         header = try await deskHeader()

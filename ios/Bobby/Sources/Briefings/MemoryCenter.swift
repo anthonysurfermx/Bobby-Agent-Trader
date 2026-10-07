@@ -5,6 +5,10 @@
 //   DELETE ?symbol=X → forget one asset; DELETE (no symbol) → forget everything. Both answer the same body.
 // Invariants (the BriefingsCenter pattern):
 //  - Only the native opt-in bit is kept on the phone, keyed by account; memory data stays on the server.
+//  - 1.8: the bit alone affirms nothing. It counts only under this account's accepted record for the
+//    consent as it reads today (`MemoryConsent`). A bit without that record (the 1.7 switch, or a yes
+//    to an older wording) is revoked the moment it is read, so the opt-in header stops and the
+//    person is asked again through the consent sheet.
 //    The snapshot is cleared at once on an account change. Every answer is checked against the account
 //    it was asked for (user id + generation + this center's epoch) and late answers are dropped.
 //  - Writes are explicit corrections, one at a time, shown only after the server answers.
@@ -87,8 +91,9 @@ enum MemoryPref: String, CaseIterable, Identifiable, Sendable {
     }
 }
 
-/// What stays on this iPhone only for the signed-in account (never sent to Bobby's servers): the
-/// recent assets shown as shortcuts and how many theses the person wrote here.
+/// What this iPhone keeps for whoever is using it (the signed-in account, or the signed-out phone)
+/// with no copy on Bobby's servers: the recent assets shown as shortcuts and how many theses the
+/// person wrote here. A thesis's text does leave the phone inside a review the person starts.
 struct LocalMemory: Equatable, Sendable {
     var shortcuts: [String] = []
     var theses = 0
@@ -162,6 +167,10 @@ final class MemoryCenter: ObservableObject {
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
     var now: () -> Date = { Date() }
+    /// The consent text this build shows. Tests raise it to stand for a reworded sheet.
+    var consentVersion = MemoryConsent.currentVersion
+    /// This center's consent store: the record the capture gate reads and the sheet writes.
+    var consent: MemoryConsent { MemoryConsent(defaults: defaults, version: consentVersion) }
 
     private var owner: String?
     private var ownerGeneration: UUID?
@@ -176,7 +185,7 @@ final class MemoryCenter: ObservableObject {
         self.defaults = defaults
         owner = currentUser()
         ownerGeneration = currentGeneration()
-        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
+        nativeOptedIn = owner.map { consentedOptIn($0) } ?? false
         local = readLocal()
         guard observeAccount else { return }
         NotificationCenter.default.publisher(for: AccountSession.didChange, object: AccountSession.shared)
@@ -190,7 +199,7 @@ final class MemoryCenter: ObservableObject {
         owner = currentUser()
         ownerGeneration = currentGeneration()
         epoch = UUID()
-        nativeOptedIn = owner.map { defaults.bool(forKey: Self.nativeOptInKey($0)) } ?? false
+        nativeOptedIn = owner.map { consentedOptIn($0) } ?? false
         snapshot = nil
         loading = false
         saving = false
@@ -215,10 +224,30 @@ final class MemoryCenter: ObservableObject {
         return "agent.nativeMemoryOptIn.v1.\(digest)"
     }
 
-    /// The stored choice of one account on this device, for code that only reads it (the nudge on the
-    /// glass). Being on here does not send the header by itself: `allowsNativeCapture` decides that.
+    /// The stored switch of one account on this device, for code that only reads it (the nudge on the
+    /// glass). Being on here does not send the header by itself: `allowsNativeCapture` decides that,
+    /// and it also needs the account's accepted consent.
     nonisolated static func storedNativeOptIn(user: String, defaults: UserDefaults = .standard) -> Bool {
         defaults.bool(forKey: nativeOptInKey(user))
+    }
+
+    /// The switch counts only under a yes to the consent as it reads today. A switch found without
+    /// one is removed here: nothing keeps affirming an opt-in the person never gave to this text.
+    private func consentedOptIn(_ user: String) -> Bool {
+        let key = Self.nativeOptInKey(user)
+        guard defaults.bool(forKey: key) else { return false }
+        guard consent.hasAccepted(user: user) else {
+            defaults.removeObject(forKey: key)
+            return false
+        }
+        return true
+    }
+
+    /// Reads the switch and the consent again for the current account (a desk request is leaving, the
+    /// memory screen appeared), so a stale or missing consent turns capture off before anything is sent.
+    private func reconcileConsent() {
+        let on = currentUser().map { consentedOptIn($0) } ?? false
+        if on != nativeOptedIn { nativeOptedIn = on }
     }
 
     private func revokeNativeCapture() {
@@ -227,9 +256,11 @@ final class MemoryCenter: ObservableObject {
     }
 
     /// Called only while constructing an authenticated desk POST. A late request from another account or
-    /// generation cannot borrow this account's consent. The server still checks its own memory preference.
+    /// generation cannot borrow this account's consent, and the switch without this account's accepted
+    /// consent affirms nothing. The server still checks its own memory preference.
     func allowsNativeCapture(user: String, generation: UUID) -> Bool {
         accountChanged()
+        reconcileConsent()
         return nativeOptedIn && riskAccepted() && owner == user && ownerGeneration == generation
             && currentUser() == user && currentGeneration() == generation
     }
@@ -239,6 +270,7 @@ final class MemoryCenter: ObservableObject {
     @discardableResult
     func refresh() async -> Bool {
         accountChanged()
+        reconcileConsent()
         guard canCallServer else {
             if currentUser() == nil { lastError = .signedOut }
             return false
@@ -339,15 +371,16 @@ final class MemoryCenter: ObservableObject {
     /// Reads the phone's own caches again (the screen appeared, a thesis was written elsewhere).
     func reloadLocal() {
         accountChanged()
+        reconcileConsent()
         let fresh = readLocal()
         if fresh != local { local = fresh }
     }
 
-    /// Clears the shortcut row of this account on this phone. Nothing is sent anywhere.
+    /// Clears the shortcut row of whoever is using this phone (the account, or the signed-out phone's
+    /// own row). Nothing is sent anywhere, so it needs neither an account nor the network.
     func clearShortcuts() {
         accountChanged()
-        guard let user = currentUser() else { return }
-        DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
+        DeskMemory.forgetWatchlist(owner: currentUser(), defaults: defaults)
         local = readLocal()
     }
 
@@ -360,8 +393,9 @@ final class MemoryCenter: ObservableObject {
         return false
     }
 
+    /// Signed out, the phone still keeps a row and theses of its own (owner nil): they show too.
     private func readLocal() -> LocalMemory {
-        guard let user = currentUser() else { return LocalMemory() }
+        let user = currentUser()
         return LocalMemory(shortcuts: DeskMemory.watchlist(owner: user, defaults: defaults).map(\.symbol),
                            theses: ThesisBook(defaults: defaults).all(owner: user).count)
     }

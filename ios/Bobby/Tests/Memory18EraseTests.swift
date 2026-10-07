@@ -230,6 +230,38 @@ final class Memory18EraseTests: XCTestCase {
         XCTAssertEqual(shortcuts(nil), ["NVDA", "BTC"])
     }
 
+    /// A guest asks before having an account: the phone keeps their shortcuts and theses under its own
+    /// owner. The memory screen shows them and "Clear" removes the shortcuts, with no account and no call.
+    func testSignedOutThePhonesOwnShortcutsShowAndCanBeCleared() async throws {
+        try seed()
+        user = nil; generation = UUID()
+        DeskMemory.setOwner(nil, defaults: defaults)
+        let c = online()
+        XCTAssertEqual(c.local, LocalMemory(shortcuts: ["NVDA", "BTC"], theses: 1), "what the phone keeps for a guest is visible")
+        c.reloadLocal()
+        XCTAssertEqual(c.local.shortcuts, ["NVDA", "BTC"])
+        c.clearShortcuts()
+        XCTAssertTrue(shortcuts(nil).isEmpty, "the guest's row is gone")
+        XCTAssertEqual(c.local, LocalMemory(shortcuts: [], theses: 1), "the theses are not shortcuts")
+        XCTAssertTrue(calls.isEmpty, "nothing is sent: there is no account and nothing to tell a server")
+        XCTAssertEqual(shortcuts("a"), ["NVDA", "BTC"], "an account's row on the same phone stays")
+        XCTAssertEqual(shortcuts("b"), ["NVDA", "BTC"])
+        XCTAssertEqual(theses("a"), 1)
+        let refreshed = await c.refresh()
+        XCTAssertFalse(refreshed)
+        XCTAssertEqual(c.lastError, .signedOut)
+        XCTAssertTrue(calls.isEmpty)
+        let forgot = await c.forget("NVDA")
+        XCTAssertFalse(forgot, "Forget is the account's: signed out it does nothing")
+        // Signing in shows that account's own, not the guest's.
+        user = "a"; generation = UUID()
+        c.accountChanged()
+        XCTAssertEqual(c.local, LocalMemory(shortcuts: ["NVDA", "BTC"], theses: 1))
+        user = nil; generation = UUID()
+        c.accountChanged()
+        XCTAssertEqual(c.local, LocalMemory(shortcuts: [], theses: 1), "and signing out shows the guest's again")
+    }
+
     func testALateDeleteReplyAfterAnAccountSwitchTouchesNothingOfTheNewAccount() async throws {
         try seed()
         let c = online()
