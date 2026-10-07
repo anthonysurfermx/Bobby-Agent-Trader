@@ -5,8 +5,10 @@
 //  - iOS permission is asked ONLY inside `schedule`, which only a reminder button calls. Never at
 //    launch, never from a nudge, never from housekeeping.
 //  - Nothing is scheduled before the risk notice is accepted, and withdrawing it cancels everything.
-//  - One pending reminder per thesis and at most one notification per calendar day: a second
-//    reminder landing on a day that already has one takes that notification's time.
+//    A notice that only has a newer version to read cancels nothing: it stops new reminders until
+//    the person has read it.
+//  - One pending reminder per thesis, each its own notification carrying its own thesis id, at the
+//    time the person chose. Nothing is merged: two set for the same minute are two notifications.
 //  - The lock-screen text is fixed and generic. No asset, no figure, no thesis text ever reaches it.
 //  - A reminder lives exactly as long as its thesis is active for the person using the phone: an
 //    archived or deleted thesis, another account, a deleted account or a withdrawn consent cancel it.
@@ -41,6 +43,10 @@ enum ReminderSchedule {
     static let hour = 18
     /// A reminder closer than this is treated as already passed.
     static let minimumLead: TimeInterval = 60
+    /// A request is never written (or written again) this close to its moment. iOS resolves a
+    /// calendar trigger whose moment has just passed to some later date the person never chose
+    /// (ReminderRequestTests), so a request already in place is left alone for its last seconds.
+    static let handOffMargin: TimeInterval = 5
 
     static func date(for preset: ReminderPreset, now: Date, calendar: Calendar) -> Date {
         let today = calendar.startOfDay(for: now)
@@ -60,23 +66,38 @@ enum ReminderSchedule {
         return evening(of: tomorrow, calendar: calendar)
     }
 
-    /// The earliest and latest the picker offers.
+    /// The earliest and latest the picker offers. The earliest is a whole minute, so the time the
+    /// picker shows is the time that gets scheduled.
     static func pickRange(now: Date, calendar: Calendar) -> ClosedRange<Date> {
-        let first = now.addingTimeInterval(minimumLead)
+        let first = earliest(now: now, calendar: calendar)
         let last = calendar.date(byAdding: .year, value: 1, to: now) ?? now.addingTimeInterval(365 * 86_400)
         return first...max(first, last)
     }
 
-    /// A picked moment, to the minute and never in the past: a time that already passed is kept as a
-    /// time of day and moved to today, or to tomorrow when today's has passed too.
+    /// The first whole minute that is at least `minimumLead` away.
+    static func earliest(now: Date, calendar: Calendar) -> Date {
+        let soonest = now.addingTimeInterval(minimumLead)
+        let minute = wholeMinute(soonest, calendar: calendar)
+        return minute < soonest ? minute.addingTimeInterval(60) : minute
+    }
+
+    /// A picked moment, to the minute and never in the past. A time still ahead but too close to
+    /// hand to iOS becomes the first minute that is far enough (the same day, not the next one). A
+    /// time that already passed is kept as a time of day and moved to today, or to tomorrow when
+    /// today's has passed too.
     static func normalized(_ picked: Date, now: Date, calendar: Calendar) -> Date {
-        let whole = calendar.date(from: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: picked)) ?? picked
-        if whole.timeIntervalSince(now) >= minimumLead { return whole }
+        let whole = wholeMinute(picked, calendar: calendar)
         let time = calendar.dateComponents([.hour, .minute], from: whole)
         let today = calendar.startOfDay(for: now)
         let sameTimeToday = calendar.date(bySettingHour: time.hour ?? hour, minute: time.minute ?? 0, second: 0, of: today) ?? whole
-        if sameTimeToday.timeIntervalSince(now) >= minimumLead { return sameTimeToday }
+        for moment in [whole, sameTimeToday] where moment > now {
+            return moment.timeIntervalSince(now) >= minimumLead ? moment : earliest(now: now, calendar: calendar)
+        }
         return calendar.date(byAdding: .day, value: 1, to: sameTimeToday) ?? sameTimeToday.addingTimeInterval(86_400)
+    }
+
+    private static func wholeMinute(_ date: Date, calendar: Calendar) -> Date {
+        calendar.date(from: calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)) ?? date
     }
 
     static func evening(of day: Date, calendar: Calendar) -> Date {
@@ -84,20 +105,52 @@ enum ReminderSchedule {
     }
 }
 
+/// Where the person stands with the risk notice, as reminders read it.
+enum ReminderConsent: Equatable {
+    case accepted
+    /// Accepted before, and the notice now has a newer version the person has not read yet (an app
+    /// update). Nothing was withdrawn: what they set stays, and nothing new is set until they read it.
+    case outdated
+    /// Never accepted, or withdrawn: nothing is scheduled and nothing is kept.
+    case withdrawn
+
+    static func stored(version: Int, current: Int = RiskNotice.currentVersion) -> ReminderConsent {
+        if version >= current { return .accepted }
+        return version > 0 ? .outdated : .withdrawn
+    }
+}
+
 /// One local notification as the centre wants it: what the phone shows and what a tap carries.
 struct ReminderNotice: Equatable {
+    static let thread = "bobby-thesis-reminders"
+
     let id: String
     let title: String
     let body: String
     let fireAt: Date
-    /// The thesis the notification is filed under.
+    /// The thesis this reminder is for. Nothing else about it travels with the notification.
     let thesisId: String
-    /// Every thesis that shares this day's notification (the first is `thesisId`).
-    let thesisIds: [String]
     let calendar: Calendar
 
     var userInfo: [String: Any] {
-        ["kind": ReminderCenter.kind, "thesisId": thesisId, "thesisIds": thesisIds]
+        ["kind": ReminderCenter.kind, "thesisId": thesisId]
+    }
+
+    /// The request iOS is handed. Pure, so the tests pin every field without the phone's
+    /// notification centre: one line, the default sound, no badge, once, at the instant the person
+    /// saw when they chose it, wherever the phone is that day.
+    func request() -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        content.threadIdentifier = Self.thread
+        content.userInfo = userInfo
+        var parts = calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: fireAt)
+        parts.calendar = calendar
+        parts.timeZone = calendar.timeZone
+        return UNNotificationRequest(identifier: id, content: content,
+                                     trigger: UNCalendarNotificationTrigger(dateMatching: parts, repeats: false))
     }
 }
 
@@ -131,19 +184,8 @@ final class SystemReminderNotifier: ReminderNotifying {
     }
 
     func add(_ notice: ReminderNotice) async -> Bool {
-        let content = UNMutableNotificationContent()
-        content.title = notice.title
-        content.body = notice.body
-        content.sound = .default
-        content.threadIdentifier = "bobby-thesis-reminders"
-        content.userInfo = notice.userInfo
-        // The instant the person saw when they chose it, wherever the phone is that day.
-        var parts = notice.calendar.dateComponents([.year, .month, .day, .hour, .minute, .second], from: notice.fireAt)
-        parts.calendar = notice.calendar
-        parts.timeZone = notice.calendar.timeZone
-        let trigger = UNCalendarNotificationTrigger(dateMatching: parts, repeats: false)
         do {
-            try await center.add(UNNotificationRequest(identifier: notice.id, content: content, trigger: trigger))
+            try await center.add(notice.request())
             return true
         } catch {
             return false
@@ -200,7 +242,8 @@ final class ReminderCenter: ObservableObject {
     var calendar: () -> Calendar = { .autoupdatingCurrent }
     /// The app's language when a notification is written.
     var language: () -> String = { L.language }
-    var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
+    /// The risk notice as the person left it (the same stored version every other centre reads).
+    var consent: () -> ReminderConsent = { .stored(version: UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion")) }
     var currentUser: () -> String? = { AccountSession.shared.session?.userId }
     var currentGeneration: () -> UUID = { AccountSession.shared.generation }
     /// The active theses of whoever uses the phone now (signed out is the local book).
@@ -242,7 +285,7 @@ final class ReminderCenter: ObservableObject {
     /// only when it never answered before.
     @discardableResult
     func schedule(thesisId: String, symbol: String, at date: Date) async -> Outcome {
-        guard riskAccepted() else { return .consentRequired }
+        guard consent() == .accepted else { return .consentRequired }
         let user = currentUser()
         let generation = currentGeneration()
         guard let thesis = activeThesis(thesisId, owner: user) else { return .unknownThesis }
@@ -259,22 +302,23 @@ final class ReminderCenter: ObservableObject {
         guard permission == .allowed else { return .denied }
         // iOS may have asked for a while: the answer belongs to whoever tapped, with their consent
         // and their thesis still in place.
-        guard currentUser() == user, currentGeneration() == generation, riskAccepted(),
+        guard currentUser() == user, currentGeneration() == generation, consent() == .accepted,
               activeThesis(thesis.id, owner: user) != nil else { return .failed }
 
         let clock = now()
-        let calendar = calendar()
-        var fireAt = ReminderSchedule.normalized(date, now: clock, calendar: calendar)
-        let before = pending
+        // The time the person chose, whatever the other theses have set.
+        let fireAt = ReminderSchedule.normalized(date, now: clock, calendar: calendar())
+        let previous = pending.firstIndex { $0.thesisId == thesis.id }.map { (index: $0, entry: pending[$0]) }
         var list = pending.filter { $0.thesisId != thesis.id && $0.fireAt > clock }
-        // One notification a day: a day that already has a reminder keeps its time.
-        if let sameDay = list.first(where: { calendar.isDate($0.fireAt, inSameDayAs: fireAt) }) { fireAt = sameDay.fireAt }
         list.append(PendingReminder(thesisId: thesis.id, symbol: symbol.uppercased(), fireAt: fireAt))
         write(list)
         await sync()
-        guard covered(thesis.id) else {
-            // iOS refused the request: what the list says must be what the phone will deliver.
-            write(before)
+        guard covered(thesis.id, at: fireAt) else {
+            // iOS refused the request: what the list says must be what the phone will deliver. Only
+            // this thesis goes back to what it had; a reminder set for another one meanwhile stays.
+            var restored = pending.filter { $0.thesisId != thesis.id }
+            if let previous, previous.entry.fireAt > now() { restored.insert(previous.entry, at: min(previous.index, restored.count)) }
+            write(restored)
             await sync()
             return .failed
         }
@@ -309,7 +353,7 @@ final class ReminderCenter: ObservableObject {
         NotificationCenter.default.publisher(for: UserDefaults.didChangeNotification)
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in
-                guard let self, !self.pending.isEmpty, !self.riskAccepted() else { return }
+                guard let self, !self.pending.isEmpty, self.consent() == .withdrawn else { return }
                 self.reconcile()
             }
             .store(in: &cancellables)
@@ -341,12 +385,14 @@ final class ReminderCenter: ObservableObject {
     @discardableResult
     private func prune() -> Bool {
         let kept: [PendingReminder]
-        if riskAccepted() {
+        // Only a withdrawal erases the list. A notice with a newer version to read (an app update)
+        // withdrew nothing: the reminders the person set stay.
+        if consent() == .withdrawn {
+            kept = []
+        } else {
             let clock = now()
             let active = Set(activeTheses(currentUser()).map(\.id))
             kept = pending.filter { $0.fireAt > clock && active.contains($0.thesisId) }
-        } else {
-            kept = []
         }
         guard kept != pending else { return false }
         write(kept)
@@ -355,21 +401,12 @@ final class ReminderCenter: ObservableObject {
 
     // MARK: The phone
 
-    /// The notifications the list asks for: one per calendar day, filed under the day's first thesis.
+    /// The notifications the list asks for: one per reminder, each under its own thesis id.
     static func plan(_ pending: [PendingReminder], calendar: Calendar, language: String) -> [ReminderNotice] {
-        var days: [[PendingReminder]] = []
-        for entry in pending {
-            if let index = days.firstIndex(where: { calendar.isDate($0[0].fireAt, inSameDayAs: entry.fireAt) }) {
-                days[index].append(entry)
-            } else {
-                days.append([entry])
-            }
-        }
-        return days.map { group in
-            ReminderNotice(id: identifier(group[0].thesisId), title: ReminderCopy.notificationTitle,
+        pending.map { entry in
+            ReminderNotice(id: identifier(entry.thesisId), title: ReminderCopy.notificationTitle,
                            body: ReminderCopy.notificationBody(language: language),
-                           fireAt: group.map(\.fireAt).min() ?? group[0].fireAt,
-                           thesisId: group[0].thesisId, thesisIds: group.map(\.thesisId), calendar: calendar)
+                           fireAt: entry.fireAt, thesisId: entry.thesisId, calendar: calendar)
         }
     }
 
@@ -396,15 +433,16 @@ final class ReminderCenter: ObservableObject {
         // Without permission nothing is written; the list stays and the screen says why.
         guard await notifier.status() == .allowed else { return }
         for notice in wanted {
-            if let done = issued[notice.id], done.fireAt == notice.fireAt, done.thesisIds == notice.thesisIds,
-               existing.contains(notice.id) { continue }
+            if let done = issued[notice.id], done.fireAt == notice.fireAt, existing.contains(notice.id) { continue }
+            // About to fire: whatever iOS already holds under this id stays as it is.
+            guard notice.fireAt.timeIntervalSince(now()) >= ReminderSchedule.handOffMargin else { continue }
             if await notifier.add(notice) { issued[notice.id] = notice } else { issued[notice.id] = nil }
         }
     }
 
-    /// The thesis is inside a notification iOS accepted during this launch.
-    private func covered(_ thesisId: String) -> Bool {
-        issued.values.contains { $0.thesisIds.contains(thesisId) }
+    /// iOS accepted this thesis's notification, for that moment, during this launch.
+    private func covered(_ thesisId: String, at fireAt: Date) -> Bool {
+        issued[Self.identifier(thesisId)]?.fireAt == fireAt
     }
 
     private func activeThesis(_ thesisId: String, owner: String?) -> SavedThesis? {

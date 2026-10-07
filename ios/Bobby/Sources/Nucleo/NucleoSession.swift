@@ -101,6 +101,8 @@ final class NucleoSession: ObservableObject {
     let briefingIntent: BriefingIntent
     /// Thesis reminder taps (1.8), drained through the same gate (Reminders/ReminderIntent.swift).
     let reminderIntent: ReminderIntent
+    /// Whose thesis book a reminder tap is read against; tests stand in for the signed-in account.
+    var reminderOwner: (() -> String?)?
     var briefingGate: BriefingTapGate!
     /// Pause between a sheet going away and the next one presenting (SwiftUI dismissal animation).
     var briefingSheetDelay: TimeInterval = 0.4
@@ -896,14 +898,15 @@ final class NucleoSession: ObservableObject {
               !gate.listening(), !gate.deskBusy(), !gate.narrating(),
               let tap = reminderIntent.take()
         else { return false }
-        let owner = signedIn ? AccountSession.shared.session?.userId : nil
+        // The book of whoever uses the phone now: their account's, or the local one when signed out.
+        let owner = reminderOwner.map { $0() } ?? (signedIn ? AccountSession.shared.session?.userId : nil)
         switch ReminderIntent.destination(for: tap, active: ThesisBook(defaults: defaults).active(owner: owner)) {
         case .review(let thesisId):
             V18Focus.thesisId = thesisId
             guard openNative(.thesisReview) else { return false }
             reminderIntent.markOpen(thesisId)
         case .list:
-            // The thesis is gone, or more than one was due that day: the person picks from the list.
+            // The thesis no longer exists or is archived: the list, never an empty review.
             V18Focus.thesisId = nil
             guard openNative(.theses) else { return false }
         }

@@ -111,7 +111,7 @@ final class ReminderIntentTests: XCTestCase {
     // MARK: The payload
 
     func testOnlyAThesisReminderPayloadIsATap() {
-        XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA)), ReminderTap(thesisId: Self.idA, thesisIds: [Self.idA]))
+        XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA)), ReminderTap(thesisId: Self.idA))
         XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA.lowercased()))?.thesisId, Self.idA, "the id as the book writes it")
         XCTAssertNil(ReminderIntent.tap(from: payload(Self.idA, kind: nil)), "no kind: not ours")
         XCTAssertNil(ReminderIntent.tap(from: payload(Self.idA, kind: "briefing")))
@@ -128,20 +128,23 @@ final class ReminderIntentTests: XCTestCase {
         XCTAssertNil(BriefingIntent.briefId(from: payload(Self.idA)))
     }
 
-    func testThePayloadListsTheThesesThatSharedTheDay() {
-        let tap = ReminderIntent.tap(from: payload(Self.idA, others: [Self.idA, Self.idB.lowercased(), "garbage", 9, Self.idB]))
-        XCTAssertEqual(tap, ReminderTap(thesisId: Self.idA, thesisIds: [Self.idA, Self.idB]), "valid ids, once each, the carrier first")
-        let flood = (0..<50).map { _ in UUID().uuidString }
-        XCTAssertLessThanOrEqual(ReminderIntent.tap(from: payload(Self.idA, others: flood))?.thesisIds.count ?? 99, ThesisBook.activeLimit + 2)
+    func testATapCarriesOnlyItsOwnThesis() {
+        // Whatever else sits in a payload, a tap is about one thesis: the one under "thesisId".
+        let tap = ReminderIntent.tap(from: payload(Self.idA, others: [Self.idB, "garbage", 9]))
+        XCTAssertEqual(tap, ReminderTap(thesisId: Self.idA))
+        XCTAssertNil(ReminderIntent.tap(from: payload(nil, others: [Self.idB])), "a list is never read in its place")
     }
 
-    func testTheNotificationTheCentreWritesIsATapItsIntentReads() {
+    func testEveryNotificationTheCentreWritesIsATapForItsOwnThesis() {
         let calendar = Calendar(identifier: .gregorian)
+        // Two reminders for the same minute: two notifications, each opening its own review.
         let plan = ReminderCenter.plan([PendingReminder(thesisId: Self.idA, symbol: "NVDA", fireAt: t0),
                                         PendingReminder(thesisId: Self.idB, symbol: "BTC", fireAt: t0)], calendar: calendar, language: "en")
-        XCTAssertEqual(plan.count, 1)
-        XCTAssertEqual(ReminderIntent.tap(from: plan[0].userInfo), ReminderTap(thesisId: Self.idA, thesisIds: [Self.idA, Self.idB]))
-        XCTAssertEqual(plan[0].id, "v18.thesis.\(Self.idA)")
+        XCTAssertEqual(plan.map(\.id), ["v18.thesis.\(Self.idA)", "v18.thesis.\(Self.idB)"])
+        XCTAssertEqual(plan.map { ReminderIntent.tap(from: $0.userInfo) }, [ReminderTap(thesisId: Self.idA), ReminderTap(thesisId: Self.idB)])
+        // What iOS hands back on a tap is the request's own payload.
+        XCTAssertEqual(plan.map { ReminderIntent.tap(from: $0.request().content.userInfo) },
+                       [ReminderTap(thesisId: Self.idA), ReminderTap(thesisId: Self.idB)])
     }
 
     // MARK: The store
@@ -210,16 +213,16 @@ final class ReminderIntentTests: XCTestCase {
         let nvda = try thesis("NVDA")
         let btc = try thesis("BTC")
         let all = book.active(owner: nil)
-        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id, thesisIds: [nvda.id]), active: all), .review(nvda.id))
-        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: Self.idA, thesisIds: [Self.idA]), active: all), .list,
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id), active: all), .review(nvda.id))
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: btc.id.lowercased()), active: all), .review(btc.id),
+                       "the id as the book holds it")
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: Self.idA), active: all), .list,
                        "the thesis no longer exists")
-        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id, thesisIds: [nvda.id, btc.id]), active: all), .list,
-                       "two were due that day: the person picks")
-        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: Self.idA, thesisIds: [Self.idA, btc.id]), active: all),
-                       .review(btc.id), "the one that is left")
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id), active: []), .list)
         try book.archive(id: nvda.id, owner: nil, now: t0)
-        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id, thesisIds: [nvda.id]), active: book.active(owner: nil)),
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: nvda.id), active: book.active(owner: nil)),
                        .list, "an archived thesis is not reviewed from a reminder")
+        XCTAssertEqual(ReminderIntent.destination(for: ReminderTap(thesisId: btc.id), active: book.active(owner: nil)), .review(btc.id))
     }
 
     // MARK: The Núcleo drains it
@@ -279,15 +282,103 @@ final class ReminderIntentTests: XCTestCase {
         XCTAssertTrue(recorder.sheetStates("thesisReview").isEmpty)
     }
 
-    func testTwoThesesDueTheSameDayOpenTheList() async throws {
+    func testAnArchivedThesisOpensTheListNeverAnEmptyReview() async throws {
         let nvda = try thesis("NVDA")
-        let btc = try thesis("BTC")
-        let (session, bridge, _, intent) = make()
+        try thesis("BTC")
+        let (session, bridge, recorder, intent) = make()
         defer { session.teardown() }
         await startApp(bridge)
-        intent.store(payload(nvda.id, others: [nvda.id, btc.id]))
+        try book.archive(id: nvda.id, owner: nil, now: t0)
+        intent.store(payload(nvda.id))
         await settle()
         XCTAssertEqual(session.sheet, .theses)
+        XCTAssertNil(V18Focus.thesisId)
+        XCTAssertTrue(recorder.sheetStates("thesisReview").isEmpty)
+    }
+
+    func testTwoRemindersDueTheSameMinuteEachOpenTheirOwnReview() async throws {
+        let nvda = try thesis("NVDA")
+        let btc = try thesis("BTC")
+        let (session, bridge, recorder, intent) = make()
+        defer { session.teardown() }
+        await startApp(bridge)
+        // Two notifications on the lock screen; the person taps one, then the other.
+        intent.store(payload(nvda.id))
+        await settle()
+        XCTAssertEqual(session.sheet, .thesisReview)
+        XCTAssertEqual(V18Focus.takeThesisId(), nvda.id)
+        XCTAssertEqual(intent.openThesisId, nvda.id)
+        session.sheetDismissed()
+        await settle()
+        intent.store(payload(btc.id))
+        await settle()
+        XCTAssertEqual(session.sheet, .thesisReview)
+        XCTAssertEqual(V18Focus.takeThesisId(), btc.id)
+        XCTAssertEqual(intent.openThesisId, btc.id)
+        XCTAssertEqual(recorder.sheetStates("thesisReview"), ["open", "closed", "open"])
+        XCTAssertTrue(recorder.sheetStates("theses").isEmpty, "never the list while the thesis exists")
+    }
+
+    func testASignedInTapIsReadAgainstTheAccountsOwnTheses() async throws {
+        // The account's thesis, and one left in the phone's local book that is not theirs to open.
+        let mine = try book.create(ThesisDraft(symbol: "NVDA", name: "NVDA", isEquity: true, horizon: .months,
+                                               hypothesis: "Why I am looking at NVDA"), owner: "u1", now: t0)
+        let local = try thesis("BTC")
+        let (session, bridge, recorder, intent) = make()
+        defer { session.teardown() }
+        session.reminderOwner = { "u1" }
+        await startApp(bridge)
+        intent.store(payload(mine.id))
+        await settle()
+        XCTAssertEqual(session.sheet, .thesisReview, "the signed-in book is the one read")
+        XCTAssertEqual(V18Focus.takeThesisId(), mine.id)
+        session.sheetDismissed()
+        await settle()
+        intent.store(payload(local.id))
+        await settle()
+        XCTAssertEqual(session.sheet, .theses, "a thesis outside this account's book is never opened for it")
+        XCTAssertEqual(recorder.sheetStates("thesisReview"), ["open", "closed"])
+        // Signed out again (the default in this host): the local book is the one read.
+        session.sheetDismissed()
+        await settle()
+        session.reminderOwner = nil
+        intent.store(payload(local.id))
+        await settle()
+        XCTAssertEqual(session.sheet, .thesisReview)
+        XCTAssertEqual(V18Focus.takeThesisId(), local.id)
+    }
+
+    // MARK: The ways into the Reminders screen
+
+    func testTheRemindersScreenOpensFromTheProfileAndFromAThesis() async throws {
+        let nvda = try thesis("NVDA")
+        let (session, bridge, recorder, _) = make()
+        defer { session.teardown() }
+        await startApp(bridge)
+        // The profile's "Reminders" row: the profile hands over to the screen, on no thesis in particular.
+        XCTAssertTrue(session.openNative(.account))
+        V18Focus.thesisId = "left-over"
+        session.openReminders()
+        XCTAssertNil(session.sheet, "the profile goes away first")
+        session.sheetDismissed()   // SwiftUI reports the profile gone
+        await settle()
+        XCTAssertEqual(session.sheet, .reminders)
+        XCTAssertNil(V18Focus.thesisId, "an older focus is never inherited")
+        XCTAssertEqual(recorder.sheetStates("account"), ["open", "closed"])
+        session.sheetDismissed()
+        await settle()
+        // A thesis screen's reminder button: that thesis comes first.
+        XCTAssertTrue(session.openNative(.thesisReview))
+        session.openReminders(thesisId: nvda.id)
+        session.sheetDismissed()
+        await settle()
+        XCTAssertEqual(session.sheet, .reminders)
+        XCTAssertEqual(V18Focus.takeThesisId(), nvda.id)
+        session.sheetDismissed()
+        await settle()
+        // With nothing open it presents at once.
+        session.openReminders()
+        XCTAssertEqual(session.sheet, .reminders)
     }
 
     func testTheTapWaitsForTheMicTheDeskTheVoiceASheetAndTheApp() async throws {

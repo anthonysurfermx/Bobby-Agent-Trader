@@ -61,10 +61,41 @@ final class ReminderSheetTests: XCTestCase {
         XCTAssertTrue(empty.showsBriefingRow)
     }
 
+    func testChangeNeverLeavesTheReminderInPlaceOutOfReach() {
+        let nvda = thesis("NVDA"), btc = thesis("BTC")
+        let fire = t0.addingTimeInterval(7 * 86_400)
+        let model = RemindersModel.make(theses: [nvda, btc], pending: [PendingReminder(thesisId: nvda.id, symbol: "NVDA", fireAt: fire)],
+                                        permission: .allowed)
+        let set = model.rows[0], unset = model.rows[1]
+        // At rest: the date with Change and Remove, or "Set a reminder".
+        XCTAssertEqual(set.step(openId: nil, pickingId: nil), .pending)
+        XCTAssertEqual(unset.step(openId: nil, pickingId: nil), .set)
+        // "Change" opens the other days. The reminder in place keeps a way back (to itself and to Remove).
+        let changing = set.step(openId: set.id, pickingId: nil)
+        XCTAssertEqual(changing, .choosing)
+        XCTAssertTrue(set.offersWayBack(changing), "after Change there is a way back to Remove")
+        // Going back is the row at rest again.
+        XCTAssertEqual(set.step(openId: nil, pickingId: nil), .pending)
+        XCTAssertFalse(set.offersWayBack(.pending))
+        // A thesis without a reminder has nothing to go back to.
+        let choosing = unset.step(openId: unset.id, pickingId: nil)
+        XCTAssertEqual(choosing, .choosing)
+        XCTAssertFalse(unset.offersWayBack(choosing))
+        // The day picker has its own Cancel, which returns to the choices (and their way back).
+        XCTAssertEqual(set.step(openId: set.id, pickingId: set.id), .picking)
+        XCTAssertFalse(set.offersWayBack(.picking))
+        // Another row's step never changes this one.
+        XCTAssertEqual(set.step(openId: unset.id, pickingId: unset.id), .pending)
+        // While iOS is asking nothing else is offered.
+        let busy = RemindersModel.make(theses: [nvda], pending: [PendingReminder(thesisId: nvda.id, symbol: "NVDA", fireAt: fire)],
+                                       scheduling: [nvda.id], permission: .allowed).rows[0]
+        XCTAssertEqual(busy.step(openId: nvda.id, pickingId: nvda.id), .busy)
+    }
+
     func testEveryStateHasAReviewFixture() {
 #if DEBUG
         let names = Set(RemindersQA.fixtures.keys)
-        XCTAssertTrue(names.isSuperset(of: ["reminders-empty", "reminders-three", "reminders-denied", "reminders-briefing"]), "\(names)")
+        XCTAssertTrue(names.isSuperset(of: ["reminders-empty", "reminders-three", "reminders-change", "reminders-pick", "reminders-denied", "reminders-briefing"]), "\(names)")
         for name in names {
             XCTAssertTrue(name.hasPrefix("reminders-"), name)
             XCTAssertNotNil(V18QA.fixtures[name], "\(name) is reachable with -qa-v18")

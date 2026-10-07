@@ -72,6 +72,40 @@ final class ReminderScheduleTests: XCTestCase {
         XCTAssertEqual(parts(range.upperBound), [2027, 10, 7, 9, 0, 0])
     }
 
+    func testThePickerStartsOnAWholeMinuteThatCanBeScheduledAsShown() {
+        // 12:00:30: the picker shows minutes, so its first choice must be a minute that is kept as shown.
+        let now = at(2026, 10, 7, 12, 0, 30)
+        let first = ReminderSchedule.pickRange(now: now, calendar: calendar).lowerBound
+        XCTAssertEqual(parts(first), [2026, 10, 7, 12, 2, 0], "the first whole minute at least a minute away")
+        XCTAssertEqual(ReminderSchedule.normalized(first, now: now, calendar: calendar), first, "what the picker shows is what is set")
+        // On the minute exactly, one minute ahead is enough.
+        XCTAssertEqual(parts(ReminderSchedule.earliest(now: at(2026, 10, 7, 12), calendar: calendar)), [2026, 10, 7, 12, 1, 0])
+        XCTAssertEqual(parts(ReminderSchedule.earliest(now: at(2026, 10, 7, 12, 0, 1), calendar: calendar)), [2026, 10, 7, 12, 2, 0])
+        // The last minute of a day rolls into the next one.
+        XCTAssertEqual(parts(ReminderSchedule.earliest(now: at(2026, 10, 31, 23, 59, 30), calendar: calendar)), [2026, 11, 1, 0, 1, 0])
+        for second in stride(from: 0, through: 59, by: 7) {
+            let now = at(2026, 10, 7, 12, 0, second)
+            let first = ReminderSchedule.pickRange(now: now, calendar: calendar).lowerBound
+            XCTAssertEqual(parts(first)[5], 0, "a whole minute")
+            XCTAssertGreaterThanOrEqual(first.timeIntervalSince(now), ReminderSchedule.minimumLead)
+            XCTAssertLessThan(first.timeIntervalSince(now), ReminderSchedule.minimumLead + 60)
+        }
+    }
+
+    func testATimeStillAheadButTooCloseStaysTodayNotTomorrow() {
+        // 12:00:30, the person picks today 12:01: thirty seconds ahead is too close to hand to iOS,
+        // but it has not passed. The reminder is for today, a minute later, never tomorrow.
+        let now = at(2026, 10, 7, 12, 0, 30)
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 12, 1), now: now, calendar: calendar)), [2026, 10, 7, 12, 2, 0])
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 12, 1, 29), now: now, calendar: calendar)), [2026, 10, 7, 12, 2, 0])
+        // Far enough: kept as picked.
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 12, 2), now: now, calendar: calendar)), [2026, 10, 7, 12, 2, 0])
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 12, 3), now: now, calendar: calendar)), [2026, 10, 7, 12, 3, 0])
+        // A time that did pass today still goes to tomorrow.
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 12, 0), now: now, calendar: calendar)), [2026, 10, 8, 12, 0, 0])
+        XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 11, 59), now: now, calendar: calendar)), [2026, 10, 8, 11, 59, 0])
+    }
+
     func testAPickedMomentInTheFutureIsKeptToTheMinute() {
         let now = at(2026, 10, 7, 17)
         XCTAssertEqual(parts(ReminderSchedule.normalized(at(2026, 10, 7, 18, 0, 42), now: now, calendar: calendar)), [2026, 10, 7, 18, 0, 0])

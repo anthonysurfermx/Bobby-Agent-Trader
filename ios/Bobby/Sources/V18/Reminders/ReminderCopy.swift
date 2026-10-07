@@ -51,6 +51,8 @@ enum ReminderCopy {
     static var confirmPick: String { L.t("Remind me then", "Recuérdamelo ese día") }
     static var dayAndTime: String { L.t("Day and time", "Día y hora") }
     static var change: String { L.t("Change", "Cambiar") }
+    /// Leaves "Change" without changing anything.
+    static var keepDay: String { L.t("Keep this day", "Dejar este día") }
     static var remove: String { L.t("Remove", "Quitar") }
     static var cancel: String { L.t("Cancel", "Cancelar") }
     static var close: String { L.t("Close", "Cerrar") }
@@ -58,6 +60,11 @@ enum ReminderCopy {
 
     /// VoiceOver, and the announcement after a reminder is set.
     static func reminderOn(_ when: String) -> String { L.t("Reminder on \(when)", "Recordatorio el \(when)") }
+
+    /// The profile's row that opens this screen (the lead places it in AccountSheet; see ReminderEntry.swift).
+    static var profileRowDetail: String {
+        L.t("Notes to yourself to review a thesis", "Notas para ti para revisar una tesis")
+    }
 
     static var briefingRow: String { L.t("Monday briefing", "Resumen del lunes") }
     static var briefingRowDetail: String {

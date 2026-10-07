@@ -9,6 +9,10 @@ final class FakeReminderNotifier: ReminderNotifying {
     /// What the person answers when iOS asks.
     var grantsWhenAsked = true
     var addSucceeds = true
+    /// Requests iOS refuses whatever `addSucceeds` says (by identifier).
+    var refusedIds: Set<String> = []
+    /// Runs while "iOS is writing" a request, before it answers.
+    var whileAdding: ((ReminderNotice) async -> Void)?
     private(set) var permissionRequests = 0
     private(set) var added: [ReminderNotice] = []
     private(set) var removed: [String] = []
@@ -26,7 +30,8 @@ final class FakeReminderNotifier: ReminderNotifying {
     }
 
     func add(_ notice: ReminderNotice) async -> Bool {
-        guard addSucceeds else { return false }
+        await whileAdding?(notice)
+        guard addSucceeds, !refusedIds.contains(notice.id) else { return false }
         added.append(notice)
         requests[notice.id] = notice
         return true
@@ -43,8 +48,9 @@ final class FakeReminderNotifier: ReminderNotifying {
     func forgetHistory() { added = []; removed = [] }
 }
 
-/// Thesis reminders (1.8): scheduled on the phone, one per thesis, one notification a day, permission
-/// asked only when the person taps a reminder button, and gone with the thesis, the account or the consent.
+/// Thesis reminders (1.8): scheduled on the phone, one per thesis and each its own notification at the
+/// time the person chose, permission asked only when the person taps a reminder button, and gone with
+/// the thesis, the account or the consent.
 @MainActor
 final class ReminderCenterTests: XCTestCase {
     private var suiteName = ""
@@ -58,7 +64,7 @@ final class ReminderCenterTests: XCTestCase {
     }()
     private var clock = Date()
     private var language = "en"
-    private var risk = true
+    private var consent: ReminderConsent = .accepted
     private var user: String? = "u1"
     private var generation = UUID()
 
@@ -69,7 +75,7 @@ final class ReminderCenterTests: XCTestCase {
         book = ThesisBook(defaults: defaults)
         fake = FakeReminderNotifier()
         clock = at(2026, 10, 7, 12)
-        language = "en"; risk = true; user = "u1"; generation = UUID()
+        language = "en"; consent = .accepted; user = "u1"; generation = UUID()
     }
 
     override func tearDown() async throws {
@@ -88,7 +94,7 @@ final class ReminderCenterTests: XCTestCase {
         c.now = { [unowned self] in self.clock }
         c.calendar = { [unowned self] in self.calendar }
         c.language = { [unowned self] in self.language }
-        c.riskAccepted = { [unowned self] in self.risk }
+        c.consent = { [unowned self] in self.consent }
         c.currentUser = { [unowned self] in self.user }
         c.currentGeneration = { [unowned self] in self.generation }
         c.activeTheses = { [unowned self] owner in self.book.active(owner: owner) }
@@ -122,8 +128,7 @@ final class ReminderCenterTests: XCTestCase {
         XCTAssertEqual(notice.fireAt, at(2026, 10, 14, 18))
         XCTAssertEqual(notice.userInfo["kind"] as? String, "thesis-review")
         XCTAssertEqual(notice.userInfo["thesisId"] as? String, nvda.id)
-        XCTAssertEqual(notice.userInfo["thesisIds"] as? [String], [nvda.id])
-        XCTAssertEqual(Set(notice.userInfo.keys), ["kind", "thesisId", "thesisIds"], "nothing else travels with the notification")
+        XCTAssertEqual(Set(notice.userInfo.keys), ["kind", "thesisId"], "nothing else travels with the notification")
         XCTAssertEqual(notice.calendar.timeZone.identifier, "America/Mexico_City", "the person's own time zone")
     }
 
@@ -148,29 +153,38 @@ final class ReminderCenterTests: XCTestCase {
         XCTAssertGreaterThan(try XCTUnwrap(fake.requests.values.first).fireAt, clock)
     }
 
-    func testASecondReminderOnTheSameDayJoinsThatDaysNotification() async throws {
+    func testTwoRemindersOnTheSameDayAreTwoNotificationsAtTheirOwnTimes() async throws {
         let nvda = try thesis("NVDA")
         let btc = try thesis("BTC")
         let spy = try thesis("SPY")
         let c = center()
         await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
-        let merged = await c.schedule(thesisId: btc.id, symbol: "BTC", at: at(2026, 10, 14, 9))
-        XCTAssertEqual(merged, .scheduled(at(2026, 10, 14, 18)), "the day already has a notification: its time is kept")
-        await c.schedule(thesisId: spy.id, symbol: "SPY", at: at(2026, 10, 15, 9))
-        XCTAssertEqual(c.pending.map(\.thesisId), [nvda.id, btc.id, spy.id], "every thesis stays listed")
-        XCTAssertEqual(c.pending.map(\.fireAt), [at(2026, 10, 14, 18), at(2026, 10, 14, 18), at(2026, 10, 15, 9)])
-        XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(nvda.id), ReminderCenter.identifier(spy.id)],
-                       "one notification per calendar day")
-        let shared = try XCTUnwrap(fake.requests[ReminderCenter.identifier(nvda.id)])
-        XCTAssertEqual(shared.thesisIds, [nvda.id, btc.id])
-        XCTAssertEqual(shared.fireAt, at(2026, 10, 14, 18))
+        let morning = await c.schedule(thesisId: btc.id, symbol: "BTC", at: at(2026, 10, 14, 9))
+        XCTAssertEqual(morning, .scheduled(at(2026, 10, 14, 9)), "the time the person picked, whatever another thesis has that day")
+        // The same preset twice lands on the same minute: still one notification each.
+        let evening = await c.schedule(thesisId: spy.id, symbol: "SPY", preset: .week)
+        XCTAssertEqual(evening, .scheduled(at(2026, 10, 14, 18)))
+        XCTAssertEqual(c.pending.map(\.thesisId), [nvda.id, btc.id, spy.id])
+        XCTAssertEqual(c.pending.map(\.fireAt), [at(2026, 10, 14, 18), at(2026, 10, 14, 9), at(2026, 10, 14, 18)])
+        XCTAssertEqual(Set(fake.requests.keys),
+                       [ReminderCenter.identifier(nvda.id), ReminderCenter.identifier(btc.id), ReminderCenter.identifier(spy.id)],
+                       "one notification per thesis, nothing merged")
+        for (thesis, fireAt) in [(nvda, at(2026, 10, 14, 18)), (btc, at(2026, 10, 14, 9)), (spy, at(2026, 10, 14, 18))] {
+            let notice = try XCTUnwrap(fake.requests[ReminderCenter.identifier(thesis.id)], thesis.symbol)
+            XCTAssertEqual(notice.fireAt, fireAt, thesis.symbol)
+            XCTAssertEqual(notice.thesisId, thesis.id, "each carries its own thesis")
+            XCTAssertEqual(Set(notice.userInfo.keys), ["kind", "thesisId"], thesis.symbol)
+            XCTAssertEqual(ReminderIntent.tap(from: notice.userInfo), ReminderTap(thesisId: thesis.id), "a tap opens that thesis's review")
+        }
 
-        // The thesis the day was filed under loses its reminder: the day's notification stays for the other.
+        // Removing one leaves the others exactly as they were.
+        fake.forgetHistory()
         await c.cancel(thesisId: nvda.id)
         XCTAssertEqual(c.pending.map(\.thesisId), [btc.id, spy.id])
-        XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(btc.id), ReminderCenter.identifier(spy.id)])
-        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.fireAt, at(2026, 10, 14, 18))
-        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.thesisIds, [btc.id])
+        XCTAssertEqual(fake.removed, [ReminderCenter.identifier(nvda.id)])
+        XCTAssertTrue(fake.added.isEmpty, "the others are not written again")
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.fireAt, at(2026, 10, 14, 9))
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(spy.id)]?.fireAt, at(2026, 10, 14, 18))
 
         await c.cancel(thesisId: btc.id)
         await c.cancel(thesisId: spy.id)
@@ -179,20 +193,24 @@ final class ReminderCenterTests: XCTestCase {
         XCTAssertNil(defaults.object(forKey: ReminderCenter.storeKey), "nothing is kept once nothing is pending")
     }
 
-    func testMovingAReminderOntoABusyDayAndAwayAgain() async throws {
+    func testAReminderCanMoveOntoADayAnotherThesisAlreadyHas() async throws {
         let nvda = try thesis("NVDA")
         let btc = try thesis("BTC")
         let c = center()
-        await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .threeDays)
-        await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .week)
+        await c.schedule(thesisId: nvda.id, symbol: "NVDA", at: at(2026, 10, 14, 18))
+        await c.schedule(thesisId: btc.id, symbol: "BTC", at: at(2026, 10, 14, 9))
+        // "Change": NVDA to 20:00 the same day BTC is set for.
+        let moved = await c.schedule(thesisId: nvda.id, symbol: "NVDA", at: at(2026, 10, 14, 20))
+        XCTAssertEqual(moved, .scheduled(at(2026, 10, 14, 20)))
+        XCTAssertEqual(c.reminder(for: nvda.id)?.fireAt, at(2026, 10, 14, 20))
+        XCTAssertEqual(c.reminder(for: btc.id)?.fireAt, at(2026, 10, 14, 9), "the other thesis keeps its own time")
         XCTAssertEqual(fake.requests.count, 2)
-        await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .threeDays)
-        XCTAssertEqual(fake.requests.count, 1)
-        XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.thesisIds, [nvda.id, btc.id])
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.fireAt, at(2026, 10, 14, 20))
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.fireAt, at(2026, 10, 14, 9))
+        // And away again.
         await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .month)
-        XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(btc.id), ReminderCenter.identifier(nvda.id)])
-        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.fireAt, at(2026, 10, 10, 18))
         XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.fireAt, at(2026, 11, 7, 18))
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(btc.id)]?.fireAt, at(2026, 10, 14, 9))
     }
 
     // MARK: Permission
@@ -260,10 +278,13 @@ final class ReminderCenterTests: XCTestCase {
 
     func testNothingIsScheduledOrAskedBeforeTheRiskNotice() async throws {
         let nvda = try thesis("NVDA")
-        risk = false
+        consent = .withdrawn
         let c = center()
         let outcome = await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
         XCTAssertEqual(outcome, .consentRequired)
+        consent = .outdated
+        let afterAnUpdate = await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
+        XCTAssertEqual(afterAnUpdate, .consentRequired, "a newer notice is read first")
         XCTAssertEqual(fake.permissionRequests, 0)
         XCTAssertTrue(fake.added.isEmpty)
         XCTAssertTrue(c.pending.isEmpty)
@@ -304,6 +325,44 @@ final class ReminderCenterTests: XCTestCase {
         XCTAssertEqual(outcome, .failed)
         XCTAssertEqual(c.pending.map(\.thesisId), [nvda.id], "what is listed is what the phone will deliver")
         XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(nvda.id)])
+    }
+
+    func testAMoveIosRefusesLeavesTheReminderWhereItWas() async throws {
+        let nvda = try thesis("NVDA")
+        let btc = try thesis("BTC")
+        let c = center()
+        await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
+        await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .month)
+        fake.refusedIds = [ReminderCenter.identifier(nvda.id)]
+        let outcome = await c.schedule(thesisId: nvda.id, symbol: "NVDA", at: at(2026, 10, 20, 9))
+        XCTAssertEqual(outcome, .failed)
+        XCTAssertEqual(c.pending, [PendingReminder(thesisId: nvda.id, symbol: "NVDA", fireAt: at(2026, 10, 14, 18)),
+                                   PendingReminder(thesisId: btc.id, symbol: "BTC", fireAt: at(2026, 11, 7, 18))],
+                       "the list, and its order, as before the move")
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.fireAt, at(2026, 10, 14, 18), "the phone still holds the old one")
+    }
+
+    func testARefusedRequestNeverTakesAnotherThesisReminderWithIt() async throws {
+        let nvda = try thesis("NVDA")
+        let btc = try thesis("BTC")
+        let c = center()
+        fake.permission = .allowed
+        fake.refusedIds = [ReminderCenter.identifier(nvda.id)]
+        // While iOS is still answering for NVDA, the person sets BTC (another row of the same screen).
+        var other: Task<ReminderCenter.Outcome, Never>?
+        fake.whileAdding = { notice in
+            guard notice.thesisId == nvda.id, other == nil else { return }
+            other = Task { @MainActor in await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .month) }
+            for _ in 0..<200 where !c.hasReminder(for: btc.id) { await Task.yield() }
+            XCTAssertTrue(c.hasReminder(for: btc.id), "BTC was listed while NVDA's request was still out")
+        }
+        let first = await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
+        let second = await other?.value
+        XCTAssertEqual(first, .failed, "iOS refused NVDA's")
+        XCTAssertEqual(second, .scheduled(at(2026, 11, 7, 18)), "BTC's own request went through")
+        XCTAssertEqual(c.pending, [PendingReminder(thesisId: btc.id, symbol: "BTC", fireAt: at(2026, 11, 7, 18))],
+                       "undoing NVDA's undoes only NVDA's")
+        XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(btc.id)])
     }
 
     // MARK: The lock screen
@@ -402,13 +461,13 @@ final class ReminderCenterTests: XCTestCase {
         let nvda = try thesis("NVDA")
         let c = center()
         await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
-        risk = false
+        consent = .withdrawn
         await c.reconcileNow()
         XCTAssertTrue(c.pending.isEmpty)
         XCTAssertTrue(fake.requests.isEmpty)
         XCTAssertTrue(fake.removed.contains(ReminderCenter.identifier(nvda.id)))
         // Accepting again does not bring them back: the person sets a new one.
-        risk = true
+        consent = .accepted
         await c.refresh()
         XCTAssertTrue(c.pending.isEmpty)
         XCTAssertTrue(fake.requests.isEmpty)
@@ -419,12 +478,54 @@ final class ReminderCenterTests: XCTestCase {
         let c = center()
         c.start()
         await c.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
-        risk = false
+        consent = .withdrawn
         // The risk notice lives in the defaults: any write there makes the centre look.
         NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
         await settle()
         XCTAssertTrue(c.pending.isEmpty)
         XCTAssertTrue(fake.requests.isEmpty)
+    }
+
+    func testANewerRiskNoticeKeepsWhatThePersonSetAndOnlyHoldsNewReminders() async throws {
+        let nvda = try thesis("NVDA")
+        let btc = try thesis("BTC")
+        let first = center()
+        await first.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .week)
+        // An app update raises the notice's version: the first launch reads an acceptance that is
+        // older than the current notice. The person withdrew nothing.
+        consent = .outdated
+        fake.forgetHistory()
+        let c = center()
+        c.start()
+        await c.refresh()
+        NotificationCenter.default.post(name: UserDefaults.didChangeNotification, object: UserDefaults.standard)
+        await settle()
+        XCTAssertEqual(c.pending, [PendingReminder(thesisId: nvda.id, symbol: "NVDA", fireAt: at(2026, 10, 14, 18))],
+                       "the reminder is still listed")
+        XCTAssertEqual(Set(fake.requests.keys), [ReminderCenter.identifier(nvda.id)], "and the phone still holds it")
+        XCTAssertTrue(fake.removed.isEmpty)
+        let held = await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .month)
+        XCTAssertEqual(held, .consentRequired, "nothing new until the notice is read")
+        XCTAssertEqual(c.pending.count, 1)
+        // The thesis it belongs to still decides: archiving it removes the reminder as always.
+        try book.archive(id: nvda.id, owner: "u1", now: clock)
+        await settle()
+        XCTAssertTrue(c.pending.isEmpty)
+        XCTAssertTrue(fake.requests.isEmpty)
+        // Read and accepted: the button works again.
+        consent = .accepted
+        let after = await c.schedule(thesisId: btc.id, symbol: "BTC", preset: .month)
+        XCTAssertEqual(after, .scheduled(at(2026, 11, 7, 18)))
+    }
+
+    func testTheStoredNoticeVersionSaysAcceptedOutdatedOrWithdrawn() {
+        XCTAssertEqual(ReminderConsent.stored(version: 6, current: 6), .accepted)
+        XCTAssertEqual(ReminderConsent.stored(version: 7, current: 6), .accepted)
+        XCTAssertEqual(ReminderConsent.stored(version: 5, current: 6), .outdated, "accepted before the notice changed")
+        XCTAssertEqual(ReminderConsent.stored(version: 1, current: 6), .outdated)
+        XCTAssertEqual(ReminderConsent.stored(version: 0, current: 6), .withdrawn, "never accepted, or withdrawn (the app stores 0)")
+        XCTAssertEqual(ReminderConsent.stored(version: -3, current: 6), .withdrawn)
+        XCTAssertEqual(ReminderConsent.stored(version: RiskNotice.currentVersion), .accepted)
     }
 
     func testADeliveredReminderIsNoLongerPending() async throws {
@@ -469,6 +570,27 @@ final class ReminderCenterTests: XCTestCase {
         XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.fireAt, at(2026, 10, 14, 18))
     }
 
+    func testARequestInItsLastSecondsIsLeftAlone() async throws {
+        let nvda = try thesis("NVDA")
+        let first = center()
+        await first.schedule(thesisId: nvda.id, symbol: "NVDA", preset: .threeDays)
+        // The app is opened two seconds before the reminder fires. Writing the request again now
+        // could reach iOS after its moment, and iOS would move it to a date nobody chose.
+        clock = at(2026, 10, 10, 17, 59).addingTimeInterval(58)
+        fake.forgetHistory()
+        let relaunched = center()
+        await relaunched.refresh()
+        XCTAssertTrue(fake.added.isEmpty, "the request iOS holds is not replaced")
+        XCTAssertTrue(fake.removed.isEmpty, "and not removed: it is about to fire")
+        XCTAssertEqual(fake.requests[ReminderCenter.identifier(nvda.id)]?.fireAt, at(2026, 10, 10, 18))
+        XCTAssertEqual(relaunched.pending.map(\.thesisId), [nvda.id])
+        // With time to spare a relaunch does bring the phone in line (same id: iOS replaces it).
+        clock = at(2026, 10, 10, 17, 59)
+        let earlier = center()
+        await earlier.refresh()
+        XCTAssertEqual(fake.added.map(\.id), [ReminderCenter.identifier(nvda.id)])
+    }
+
     func testARequestThePhoneLostIsWrittenAgainOnlyWhileAllowed() async throws {
         let nvda = try thesis("NVDA")
         let c = center()
@@ -490,7 +612,7 @@ final class ReminderCenterTests: XCTestCase {
     func testANotificationOfAnotherKindIsNeverTouched() async throws {
         let nvda = try thesis("NVDA")
         let foreign = ReminderNotice(id: "brief-123", title: "Bobby", body: "x", fireAt: at(2026, 10, 9, 8), thesisId: "x",
-                                     thesisIds: ["x"], calendar: calendar)
+                                     calendar: calendar)
         fake.permission = .allowed
         _ = await fake.add(foreign)
         let c = center()
@@ -502,15 +624,21 @@ final class ReminderCenterTests: XCTestCase {
 
     // MARK: The plan
 
-    func testThePlanFilesEachDayUnderItsFirstThesis() {
+    func testThePlanIsOneNotificationPerReminderUnderItsOwnThesis() {
         let a = "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA", b = "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", d = "DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD"
         let plan = ReminderCenter.plan([
             PendingReminder(thesisId: a, symbol: "NVDA", fireAt: at(2026, 10, 14, 18)),
             PendingReminder(thesisId: d, symbol: "SPY", fireAt: at(2026, 10, 15, 0, 5)),
             PendingReminder(thesisId: b, symbol: "BTC", fireAt: at(2026, 10, 14, 18)),
         ], calendar: calendar, language: "en")
-        XCTAssertEqual(plan.map(\.id), ["v18.thesis.\(a)", "v18.thesis.\(d)"])
-        XCTAssertEqual(plan.map(\.thesisIds), [[a, b], [d]])
+        XCTAssertEqual(plan.map(\.id), ["v18.thesis.\(a)", "v18.thesis.\(d)", "v18.thesis.\(b)"], "the id as the book stores it")
+        XCTAssertEqual(plan.map(\.thesisId), [a, d, b])
+        XCTAssertEqual(plan.map(\.fireAt), [at(2026, 10, 14, 18), at(2026, 10, 15, 0, 5), at(2026, 10, 14, 18)],
+                       "two on the same minute stay two")
+        for notice in plan {
+            XCTAssertEqual(Set(notice.userInfo.keys), ["kind", "thesisId"])
+            XCTAssertEqual(notice.userInfo["thesisId"] as? String, notice.thesisId)
+        }
         XCTAssertTrue(ReminderCenter.plan([], calendar: calendar, language: "en").isEmpty)
     }
 }

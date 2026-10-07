@@ -14,6 +14,11 @@ enum RemindersQA {
                 screen(.make(theses: theses, pending: [PendingReminder(thesisId: ids[1], symbol: "BTC", fireAt: sampleDate)],
                              focus: ids[0], permission: .allowed))
             },
+            // "Change" tapped on a thesis that has a reminder: the other days, and the way back.
+            "reminders-change": {
+                screen(.make(theses: Array(theses.prefix(2)), pending: [PendingReminder(thesisId: ids[0], symbol: "NVDA", fireAt: sampleDate)],
+                             permission: .allowed), changing: ids[0])
+            },
             // "Pick a day" open on a thesis that already has a reminder.
             "reminders-pick": {
                 screen(.make(theses: Array(theses.prefix(2)), pending: [PendingReminder(thesisId: ids[0], symbol: "NVDA", fireAt: sampleDate)],
@@ -53,10 +58,11 @@ enum RemindersQA {
         ]
     }
 
-    private static func screen(_ model: RemindersModel, outcome: ReminderCenter.Outcome = .failed, picking: String? = nil) -> AnyView {
+    private static func screen(_ model: RemindersModel, outcome: ReminderCenter.Outcome = .failed, picking: String? = nil,
+                               changing: String? = nil) -> AnyView {
         AnyView(RemindersContent(model: model, actions: RemindersActions(
             preset: { _, _ in outcome }, pick: { _, _ in outcome }, remove: { _ in },
-            openSettings: {}, openBriefing: {}, close: {}), startsPicking: picking))
+            openSettings: {}, openBriefing: {}, close: {}), startsPicking: picking, startsChanging: changing))
     }
 }
 #endif

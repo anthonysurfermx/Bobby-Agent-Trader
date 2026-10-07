@@ -7,11 +7,9 @@ import Combine
 import Foundation
 import UserNotifications
 
-/// What a tapped reminder carries: the thesis it was filed under and every thesis due that day.
+/// What a tapped reminder carries: the one thesis it was set for.
 struct ReminderTap: Equatable {
     let thesisId: String
-    /// `thesisId` first, then the theses that shared the day's notification. Never empty.
-    let thesisIds: [String]
 }
 
 @MainActor
@@ -74,11 +72,7 @@ final class ReminderIntent: ObservableObject {
     /// payload, a malformed id) is not a reminder.
     nonisolated static func tap(from userInfo: [AnyHashable: Any]) -> ReminderTap? {
         guard userInfo["kind"] as? String == ReminderCenter.kind, let id = thesisId(userInfo["thesisId"]) else { return nil }
-        var all = [id]
-        for other in (userInfo["thesisIds"] as? [Any] ?? []).prefix(ThesisBook.activeLimit + 1) {
-            if let other = thesisId(other), !all.contains(other) { all.append(other) }
-        }
-        return ReminderTap(thesisId: id, thesisIds: all)
+        return ReminderTap(thesisId: id)
     }
 
     /// A reminder that fires while the app is open shows as a banner, unless that thesis's review is
@@ -100,12 +94,12 @@ final class ReminderIntent: ObservableObject {
     enum Destination: Equatable {
         /// The review of this thesis (the id as the book holds it).
         case review(String)
-        /// The list: the thesis is gone, or more than one was due that day.
+        /// The list: the thesis no longer exists or is archived (never an empty review).
         case list
     }
 
     static func destination(for tap: ReminderTap, active: [SavedThesis]) -> Destination {
-        let due = tap.thesisIds.compactMap { id in active.first { $0.id.caseInsensitiveCompare(id) == .orderedSame }?.id }
-        return due.count == 1 ? .review(due[0]) : .list
+        guard let thesis = active.first(where: { $0.id.caseInsensitiveCompare(tap.thesisId) == .orderedSame }) else { return .list }
+        return .review(thesis.id)
     }
 }

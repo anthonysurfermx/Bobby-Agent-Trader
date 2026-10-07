@@ -19,6 +19,30 @@ struct RemindersModel: Equatable {
         let fireAt: Date?
         /// iOS is being asked, or the request is being written.
         let busy: Bool
+
+        /// What the row shows for the step the person is on.
+        enum Step: Equatable {
+            case busy
+            /// No reminder: "Set a reminder".
+            case set
+            /// A reminder in place: its date with Change and Remove.
+            case pending
+            /// The three presets and "Pick a day".
+            case choosing
+            /// The day picker.
+            case picking
+        }
+
+        func step(openId: String?, pickingId: String?) -> Step {
+            if busy { return .busy }
+            if pickingId == id { return .picking }
+            if openId == id { return .choosing }
+            return fireAt == nil ? .set : .pending
+        }
+
+        /// A reminder in place is never left behind by "Change": while the other days are on screen
+        /// one button goes back to it, and to Remove, without changing anything.
+        func offersWayBack(_ step: Step) -> Bool { fireAt != nil && step == .choosing }
     }
 
     var rows: [Row]
@@ -119,6 +143,8 @@ struct RemindersContent: View {
     let actions: RemindersActions
     /// A row that opens on the day picker (the review fixtures show that state).
     var startsPicking: String? = nil
+    /// A row that opens on its choices although it has a reminder ("Change" was tapped).
+    var startsChanging: String? = nil
     /// The row showing its choices.
     @State private var openId: String?
     /// The row showing the day picker.
@@ -171,7 +197,7 @@ struct RemindersContent: View {
         .onAppear {
             guard !appeared else { return }
             appeared = true
-            openId = model.initiallyOpen
+            openId = startsChanging ?? model.initiallyOpen
             if let startsPicking {
                 picked = ReminderSchedule.defaultPick(now: Date(), calendar: .autoupdatingCurrent)
                 pickingId = startsPicking
@@ -216,22 +242,24 @@ struct RemindersContent: View {
             .accessibilityElement(children: .combine)
             .accessibilityIdentifier("reminders-thesis-\(row.symbol)")
 
-            if row.busy {
+            let step = row.step(openId: openId, pickingId: pickingId)
+            switch step {
+            case .busy:
                 ProgressView().controlSize(.small).tint(Theme.warmMuted).frame(minHeight: 44)
-            } else {
-                let choosing = openId == row.id || pickingId == row.id
+            case .set:
+                ReminderPill(title: ReminderCopy.setReminder) { open(row) }
+                    .accessibilityIdentifier("reminders-set-\(row.symbol)")
+            case .pending:
+                if let fireAt = row.fireAt { pendingLine(row, fireAt: fireAt) }
+            case .choosing:
                 // The reminder in place stays in view while the person looks at other days.
                 if let fireAt = row.fireAt {
-                    if choosing { whenLabel(fireAt).frame(minHeight: 34) } else { pendingLine(row, fireAt: fireAt) }
+                    if row.offersWayBack(step) { changingLine(row, fireAt: fireAt) } else { whenLabel(fireAt).frame(minHeight: 34) }
                 }
-                if pickingId == row.id {
-                    picker(row)
-                } else if openId == row.id {
-                    choices(row)
-                } else if row.fireAt == nil {
-                    ReminderPill(title: ReminderCopy.setReminder) { open(row) }
-                        .accessibilityIdentifier("reminders-set-\(row.symbol)")
-                }
+                choices(row)
+            case .picking:
+                if let fireAt = row.fireAt { whenLabel(fireAt).frame(minHeight: 34) }
+                picker(row)
             }
             if failedId == row.id {
                 Text(ReminderCopy.failed).font(.system(size: 12)).foregroundStyle(Theme.warmMuted)
@@ -257,6 +285,30 @@ struct RemindersContent: View {
                 HStack(spacing: 8) { pendingButtons(row) }
             }
         }
+    }
+
+    /// The date in place next to the way back to it (and to Change / Remove).
+    private func changingLine(_ row: RemindersModel.Row, fireAt: Date) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                whenLabel(fireAt)
+                Spacer(minLength: 8)
+                keepPill(row)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                whenLabel(fireAt).frame(minHeight: 34)
+                keepPill(row)
+            }
+        }
+    }
+
+    private func keepPill(_ row: RemindersModel.Row) -> some View {
+        ReminderPill(title: ReminderCopy.keepDay) {
+            failedId = nil
+            pickingId = nil
+            openId = nil
+        }
+        .accessibilityIdentifier("reminders-keep-\(row.symbol)")
     }
 
     private func whenLabel(_ fireAt: Date) -> some View {
