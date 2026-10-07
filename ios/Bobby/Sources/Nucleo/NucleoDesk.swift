@@ -501,6 +501,16 @@ extension CompanionStore {
     }
 }
 
+/// Who started a read. Follow-ups belong to a question the person asked by themselves (V18/Harness).
+enum NucleoReadOrigin: Equatable, Sendable {
+    /// The person: typed, spoken, or a chip that only names an asset.
+    case person
+    /// The person again: their own second question about the read on screen.
+    case thread
+    /// Bobby: the question it wrote after a read, the button of a follow-up, a row of a board.
+    case followUp
+}
+
 @MainActor
 final class NucleoDesk {
     /// Fixture mode reads the capture's clock; live mode reads the wall clock.
@@ -562,6 +572,7 @@ final class NucleoDesk {
         var anonymousSignInRetry: Bool
         var level: NucleoAnalysisLevel? = nil
         var persistLevel = false
+        var origin: NucleoReadOrigin = .person
     }
     private final class Read {
         let requestId: String
@@ -577,14 +588,17 @@ final class NucleoDesk {
         let asOf: String
         let provider: String
         var saved: [String: Any]?
+        let origin: NucleoReadOrigin
         /// The next question the page received with this read (§3.5), if any.
         var nextQuestion: String? { (result["synthesis"] as? [String: Any])?["followUp"] as? String }
 
-        init(requestId: String, result: [String: Any], asset: NucleoAsset, generation: UUID, debate: NucleoDeskIO.Debate, price: Double?) {
+        init(requestId: String, result: [String: Any], asset: NucleoAsset, generation: UUID, debate: NucleoDeskIO.Debate, price: Double?,
+             origin: NucleoReadOrigin) {
             self.requestId = requestId
             self.result = result
             self.asset = asset
             self.generation = generation
+            self.origin = origin
             self.storedAt = Date()
             self.verdict = debate.verdict
             self.direction = debate.direction
@@ -607,6 +621,7 @@ final class NucleoDesk {
         let generation: UUID
         let startedAt: Date
         var level: NucleoAnalysisLevel = .rapido
+        var origin: NucleoReadOrigin = .person
     }
 
     private var tokens: [String: TokenEntry] = [:]
@@ -639,7 +654,7 @@ final class NucleoDesk {
     /// the same asset once the user has signed in or subscribed (single use, 10 min, like a confirm token).
     private func gated(_ status: String, message: String?, access: BobbyReadAccess?, job: Job, asset: NucleoAsset) -> [String: Any] {
         if let access { accessChanged(access) }
-        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question, level: job.level, signInRetry: status == "signin_required"),
+        return ["v": 1, "status": status, "token": issueToken(asset, question: job.question, level: job.level, signInRetry: status == "signin_required", origin: job.origin),
                 "message": NucleoDeskIO.orNull(message), "access": access.map { $0.json as Any } ?? NSNull()]
     }
 
@@ -647,7 +662,7 @@ final class NucleoDesk {
     private func levelNotice(caption: String, sub: String?, cta: String, level: NucleoAnalysisLevel, persist: Bool,
                              job: Job, asset: NucleoAsset) -> [String: Any] {
         ["v": 1, "status": "level_notice", "caption": caption, "sub": NucleoDeskIO.orNull(sub), "cta": cta,
-         "token": issueToken(asset, question: job.question, level: level, persist: persist), "level": level.rawValue]
+         "token": issueToken(asset, question: job.question, level: level, persist: persist, origin: job.origin), "level": level.rawValue]
     }
 
     /// A read that failed after its asset was known (network, timeout, analysis_failed, desk_unavailable):
@@ -655,7 +670,7 @@ final class NucleoDesk {
     /// offers "Try again" in one tap. The server refunds a read that failed (api/desk-debate.ts).
     private func retryable(_ result: [String: Any], job: Job, asset: NucleoAsset) -> [String: Any] {
         var out = result
-        out["retry"] = issueToken(asset, question: job.question, level: job.level)
+        out["retry"] = issueToken(asset, question: job.question, level: job.level, origin: job.origin)
         return out
     }
 
@@ -665,7 +680,7 @@ final class NucleoDesk {
         switch code {
         case "signin_required":
             inviteGate = nil
-            return ["v": 1, "status": "signin_required", "token": issueToken(asset, question: job.question, level: level, signInRetry: true),
+            return ["v": 1, "status": "signin_required", "token": issueToken(asset, question: job.question, level: level, signInRetry: true, origin: job.origin),
                     "message": NSNull(), "caption": L.t("\(level.name) needs a free account. Your question runs as soon as you’re in.",
                                    "\(level.name) necesita tu cuenta gratis. Tu pregunta corre en cuanto entres."),
                     "access": NSNull()]
@@ -673,11 +688,11 @@ final class NucleoDesk {
             let caption = L.t("You used this week’s \(level.name).", "Ya usaste tu \(level.name) de esta semana.")
             inviteGate = caption
             let lower = level.lower
-            return ["v": 1, "status": "subscription_required", "token": issueToken(asset, question: job.question, level: level),
+            return ["v": 1, "status": "subscription_required", "token": issueToken(asset, question: job.question, level: level, origin: job.origin),
                     "caption": caption, "sub": L.t("Invite a friend to unlock more.", "Invita a un amigo para tener más."),
                     "cta": L.t("Invite a friend", "Invita a un amigo"),
                     "fallback": ["label": L.t("Continue with \(lower.name)", "Seguir con \(lower.name)"),
-                                 "token": issueToken(asset, question: job.question, level: lower, persist: true)],
+                                 "token": issueToken(asset, question: job.question, level: lower, persist: true, origin: job.origin)],
                     "message": NSNull(), "access": NSNull()]
         default:
             let day = meter?.resetsDate.map { BobbyAccessAPI.day($0) }
@@ -734,17 +749,16 @@ final class NucleoDesk {
             // A fallback chip ("Continue with Quick") is the user's own choice of level: keep it.
             if let level = entry.level, entry.persistLevel { setLevel(level) }
             job = Job(requestId: requestId, question: entry.question, asset: entry.asset, generation: generation, startedAt: Date(),
-                      level: entry.level ?? currentLevel())
+                      level: entry.level ?? currentLevel(), origin: entry.origin)
         case let .followUp(previous, q):
             guard let read = reads.first(where: { $0.requestId == previous && $0.generation == generation })
             else { throw NucleoFault.invalid("unknown followUpOf") }
             // The question is the one Bobby's CIO wrote for that read: the person picked it instead of typing their own.
             // Only the asset is passed on; the words are compared here and kept nowhere.
-            if let offered = read.nextQuestion, NucleoDeskIO.sameQuestion(offered, q) {
-                nextQuestionPicked(read.asset.symbol)
-            }
+            let picked = read.nextQuestion.map { NucleoDeskIO.sameQuestion($0, q) } ?? false
+            if picked { nextQuestionPicked(read.asset.symbol) }
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: read.asset,
-                      generation: generation, startedAt: Date(), level: currentLevel())
+                      generation: generation, startedAt: Date(), level: currentLevel(), origin: picked ? .followUp : .thread)
         case let .question(q):
             job = Job(requestId: requestId, question: q.trimmingCharacters(in: .whitespacesAndNewlines), asset: nil,
                       generation: generation, startedAt: Date(), level: currentLevel())
@@ -785,19 +799,21 @@ final class NucleoDesk {
         current.continuation.resume(returning: result)
     }
 
-    private func issueToken(_ asset: NucleoAsset, question: String, level: NucleoAnalysisLevel? = nil, persist: Bool = false, signInRetry: Bool = false) -> String {
+    /// `origin`: a token that carries a read on (a retry, a confirmation, a sign-in) keeps who started it.
+    private func issueToken(_ asset: NucleoAsset, question: String, level: NucleoAnalysisLevel? = nil, persist: Bool = false, signInRetry: Bool = false,
+                            origin: NucleoReadOrigin = .person) -> String {
         purgeTokens()
         let token = UUID().uuidString.lowercased()
         tokens[token] = TokenEntry(asset: asset, question: question, expires: Date().addingTimeInterval(Self.tokenLifetime),
                                    generation: generation(), owner: userID(), anonymousSignInRetry: signInRetry && userID() == nil,
-                                   level: level, persistLevel: persist)
+                                   level: level, persistLevel: persist, origin: origin)
         return token
     }
 
     /// 1.8: a single-use token for a question native writes on the person's tap about an asset it
     /// already knows (a follow-up, a board row). Same lifetime and owner rules as every other token.
     func token(for asset: NucleoAsset, question: String) -> String {
-        issueToken(asset, question: question)
+        issueToken(asset, question: question, origin: .followUp)
     }
 
     private func purgeTokens(now: Date = Date()) {
@@ -825,13 +841,13 @@ final class NucleoDesk {
                 guard isCurrent(job) else { return Self.cancelledResult }
                 let suggestions: [[String: Any]] = hits.map { hit in
                     let a = NucleoAsset(symbol: hit.symbol, name: hit.name, isEquity: hit.assetClass == "equity", assetClass: hit.assetClass)
-                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question, level: job.level)]
+                    return ["symbol": hit.symbol, "name": hit.name, "assetClass": hit.assetClass, "token": issueToken(a, question: job.question, level: job.level, origin: job.origin)]
                 }
                 return ["v": 1, "status": "unknown_asset", "query": job.question, "suggestions": suggestions]
             case let .resolved(resolved, needsConfirmation, matchKind, proxyNote):
                 if needsConfirmation {
                     // Never analyze an unconfirmed guess: the human confirms with this token.
-                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level),
+                    return ["v": 1, "status": "confirm", "token": issueToken(resolved, question: job.question, level: job.level, origin: job.origin),
                             "asset": resolved.jsonWithClass, "matchKind": NucleoDeskIO.orNull(matchKind),
                             "proxyNote": NucleoDeskIO.orNull(proxyNote)]
                 }
@@ -1005,7 +1021,7 @@ final class NucleoDesk {
             // 9. Remember it (the last 5); it becomes `pendingRead` until saved. No XP here (R4).
             recordQuery(symbol, isEquity)
             reads.append(Read(requestId: job.requestId, result: result, asset: asset, generation: job.generation,
-                              debate: debate, price: market.price ?? debate.technicals.price))
+                              debate: debate, price: market.price ?? debate.technicals.price, origin: job.origin))
             if reads.count > Self.readsKept { reads.removeFirst(reads.count - Self.readsKept) }
             return result
         }
@@ -1140,6 +1156,11 @@ final class NucleoDesk {
         return NucleoReadSummary(requestId: requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity,
                                  verdict: read.verdict, price: read.price, asOf: read.asOf,
                                  headline: text("headline"), why: text("why"), risk: text("risk"), watch: text("watch"))
+    }
+
+    /// 1.8: who started a recent read of the CURRENT account (the harness follows up only the person's own questions).
+    func readOrigin(requestId: String) -> NucleoReadOrigin? {
+        reads.last { $0.requestId == requestId && $0.generation == generation() }?.origin
     }
 
     func theses() -> [String: Any] {

@@ -42,12 +42,16 @@ struct HarnessBoard: Equatable {
                      rows: assets.prefix(weekRows).map { Row(symbol: $0.symbol, name: $0.name, isEquity: $0.isEquity, priceThen: $0.firstPrice) })
     }
 
-    /// What a tap (or the profile's row, with none) opens: its sector, else the week.
-    static func make(for tap: HarnessTap?, ledger: HarnessLedger, now: Date) -> HarnessBoard {
+    /// What a tap (or the profile's row, with none) opens: its sector, else the week. A tapped week
+    /// follow-up opens the week it was planned for (HarnessPlanner.weekStart), however late the tap:
+    /// what the notification named is on the board.
+    static func make(for tap: HarnessTap?, ledger: HarnessLedger, now: Date, calendar: Calendar = .autoupdatingCurrent) -> HarnessBoard {
         if let tap, tap.step == .sector, let sector = tap.sector.flatMap(HarnessSectors.sector(id:)) {
             return .sector(sector, around: tap.symbol)
         }
-        return .week(ledger.assets(since: now.addingTimeInterval(-7 * 86_400), now: now))
+        let rolling = now.addingTimeInterval(-7 * 86_400)
+        let planned = tap.flatMap { $0.step == .week ? $0.stamp : nil }.map { HarnessPlanner.weekStart(of: $0, calendar: calendar) }
+        return .week(ledger.assets(since: min(planned ?? rolling, rolling), now: now))
     }
 
     /// One row's number from a fresh quote. A sector reads the day's change; a week compares with

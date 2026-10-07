@@ -328,16 +328,139 @@ Surfaces, each one line and one action:
 | Where | Line | Action |
 | --- | --- | --- |
 | Glass, after a read, until they decide | Shall I keep you posted on NVDA? | Yes, tell me |
-| Lock screen, next day | NVDA, a day later. See how it moved. | tap |
-| Lock screen, day after (not opened) | Semiconductors today. NVDA is part of it. | tap |
-| Lock screen, next Monday (not opened) | Your week: NVDA and 2 more. | tap |
+| Lock screen, when they said (next day at the soonest) | NVDA, a day later. See how it moved. | tap |
+| Lock screen, the Monday after | Your week: NVDA and 2 more. | tap |
 | Glass, when they come back | NVDA +2.3% since you asked | What changed? |
-| Board (a sector, the week) | title + "Last 24 hours" / "Since you asked" | a row asks Bobby |
+| Board (the week) | title + "Since you asked" | a row asks Bobby |
 | Reminders | Follow-ups · Bobby comes back to what you asked. | switch |
 
 Spanish: ¿Te voy contando cómo sigue NVDA? · Sí, cuéntame · NVDA, un día después. Mira cómo se
-movió. · Semiconductores hoy. NVDA es parte. · Tu semana: NVDA y 2 más. · NVDA +2.3% desde que
-preguntaste · ¿Qué cambió? · Seguimiento · Bobby vuelve a lo que preguntaste.
+movió. · Tu semana: NVDA y 2 más. · NVDA +2.3% desde que preguntaste · ¿Qué cambió? ·
+Seguimiento · Bobby vuelve a lo que preguntaste.
+
+The sector follow-up ("Semiconductors today. NVDA is part of it." and its board) is in the tree
+and is not sent by the chain that ships: see "The owner's choice" below.
+
+#### The chain, as built (`HarnessPlanner.swift`, `HarnessLedger.swift`)
+
+Follow-ups belong to **a question the person asked by themselves**. That question gets, in order:
+
+1. **the asset**, when they said they would look again;
+2. **the week**, the Monday after: the assets they asked about since the Monday before it.
+
+Two at most per question, whatever they do with them, and then silence until they ask again.
+
+- **Only a real answer is an answer.** An answer is `returned`: within a day of a follow-up they
+  asked about its asset, saved a read of it, or acted on its line in the app. A tap on the
+  notification (`opened`) is written down and answers nothing: it does not end the unanswered
+  streak, does not keep a kind from resting, and starts nothing. A pick in the app (`picked`:
+  "What changed?", a board row, the question Bobby wrote after a read) is an answer only when it
+  answers a follow-up that way; alone it only says the asset matters.
+- **An answer never starts a chain.** It ends the unanswered streak, keeps that kind from resting
+  and teaches the hour. The question still has what was left of its two, no more.
+- **A read Bobby started is not a question.** The button of a follow-up, a board row and the
+  question Bobby wrote after a read are written with `origin: followUp`. They can answer a
+  follow-up; they never start one, and never move the chain of the question before them. The
+  person's own second question about the same read is a question (`thread`), like any other.
+- **When the first one comes**, from what the person said, strongest first, and never sooner than
+  the next day:
+
+  | They said | The asset follow-up comes |
+  | --- | --- |
+  | A thesis about the asset: weeks | 7 days after the question |
+  | A thesis about the asset: months, a year, years | never; the week only |
+  | "Review in 3 days" / "in a week" on the save (72 / 168 hours) | 3 / 7 days after |
+  | The question named a week ("this week", "next days") | 3 days after |
+  | The question named a month ("this month", "weeks") | 7 days after |
+  | The question named months or years | never; the week only |
+  | Today, right now, or nothing | the next day |
+
+  A save left at 24 hours says nothing (it is where the picker starts). The horizon the question
+  named is the one the server already returns in `sufficiency.horizon`. The hour is the hour of
+  the question inside 09:00–21:00, or the hour they answer at once they have answered three.
+- **A week is their week.** It holds what they asked about since the Monday before it, names the
+  asset that matters most to them among those (a thesis 2, a question 1, their own second question
+  about a read 1 more, a save 1, a pick 1, an answer 1, a tap 0.5; all but the thesis halve every
+  seven days) and is not sent when it would hold nothing: a question on a Sunday, or one whose
+  asset follow-up waited seven days, has no week. A tapped week opens the week it was planned for.
+- **The limits, unchanged, always win:** one a day, four in seven days, 18 hours apart, 09:00 to
+  21:00; a kind whose last two went unanswered rests; three unanswered in a row and Bobby says
+  nothing for two weeks, whatever is asked; nothing for a question older than 14 days.
+- **What is kept, and when.** Asset, price, moment, and fixed values only (a horizon out of five,
+  24/72/168 hours, a pointer to a thesis with its horizon): never a word the person wrote. The
+  horizon of a question, the review chosen on a save and thesis pointers are written only once the
+  person said yes to follow-ups; until then they wait in memory for the last five reads, thirty
+  minutes at most, and the yes completes those entries. A thesis pointer lasts as long as its
+  thesis and goes when it is archived.
+
+#### The owner's choice (one line)
+
+`HarnessChain.shipped` in `HarnessPlanner.swift` is the chain every question gets:
+
+| Value | A question gets | Status |
+| --- | --- | --- |
+| `.assetThenWeek` | the asset, then the week; two at most | **ships** |
+| `.withSector` | the asset, its sector the day after, then the week; three at most | built and tested, not shipped |
+
+The sector follow-up lands on a list of assets the person did not ask about, with their last 24
+hours; that is why it is not the default. Its code, board and translations stay in the tree.
+
+Changing that line is the whole change in the app. What states "this is what ships" then has to
+say the same, and fails until it does: `defaults.chain` and `defaults.maxPerQuestion` in the
+golden file (with the `options` of its two families of cases swapped: the cases and their plans
+do not change), `HarnessPlannerTests.testTheChainIsData`, and the assertions of
+`HarnessCenterTests` that count what the phone hands to iOS. The golden cases whose name starts
+with "With the sector" describe exactly what the other chain does.
+
+One person, one question about NVDA on a Tuesday at 14:10, and a yes:
+
+| They… | Ships: asset, week | With the sector |
+| --- | --- | --- |
+| never open anything | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| tap each one, nothing else | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| answer the first | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| saved with "review in a week" | next Tue 14:10 | next Tue 14:10 · next Wed 14:10 |
+| asked about years | Mon 14:10 | Mon 14:10 |
+
+(`HarnessPlannerTests.testWhatOnePersonGetsFromOneQuestionOnATuesday`.)
+
+#### The contract for other platforms (`shared/harness/planner-golden.json`)
+
+Ledger in, plan out: every rule above is a case, and a port of the planner must reproduce all of
+them. The iPhone suite runs the file from the repository (`HarnessGoldenTests`), so it cannot
+drift from what the phone does.
+
+```
+{
+  "version": 1,
+  "defaults":  { chain, maxPerQuestion, weeklyCovered, earliestHour, latestHour, minimumGapHours,
+                 anchorDays, sectorFreshDays, weekFreshDays, weekWindowDays, maxPerWeek,
+                 quietAfter, quietDays },
+  "constants": { waitDays, saveWaitDays, thesisHorizon, interestWeights, threadWeight,
+                 thesisWeight, interestHalfLifeDays, statsDays, ignoredLimit, hourSamples,
+                 retentionDays, maxEvents },
+  "sectors":   { "NVDA": "semis", …, "GME": null },
+  "cases": [ {
+      "name":         "A question that named the week waits three days.",
+      "now":          "2026-10-06T14:12:00-06:00",
+      "timeZone":     "America/Mexico_City",
+      "options":      { only what differs from defaults },
+      "events":       [ { "kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week" } ],
+      "expectedPlan": [ { "step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3 },
+                        { "step": "week",  "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0 } ]
+  } ]
+}
+```
+
+- Times are ISO 8601 with an offset (instants); `timeZone` is the calendar the plan is made in.
+- An event: `kind` (ask, saved, appOpen, sent, opened, returned, picked, thesis), `at`, and where
+  they apply `symbol`, `price`, `step`, `sector`, `ref`, `origin` (`followUp`; absent: the person),
+  `thread`, `horizon` (intraday, week, month, long, unspecified), `horizonHours` (24, 72, 168).
+  Events are written into the ledger in file order: the ledger sorts them, upper-cases symbols,
+  drops what is not a symbol, and the planner ignores what is dated after `now`.
+- A planned follow-up: `step`, `fireAt`, `symbol`, and `days` (asset), `sector` (sector), `others`
+  (week). A field that is absent is not compared.
+- A port also checks its own defaults and constants against the file, as the iPhone suite does.
 
 Rules that are not folded away:
 
@@ -347,9 +470,6 @@ Rules that are not folded away:
   without it).
 - Numbers are cream, never green or red: colour means a verdict only.
 - iOS permission is asked only on "Yes, tell me" or the switch.
-- Three follow-ups in a row that nobody answered and Bobby says nothing for two weeks, whatever is
-  asked; a kind whose last two went unanswered rests; never more than four in seven days, never
-  two on the same day, never sooner than 18 hours after the last one.
 - A follow-up belongs to the reader it was planned for: another account never sees it, on the
   lock screen or in the app.
 

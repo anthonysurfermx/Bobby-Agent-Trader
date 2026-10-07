@@ -12,7 +12,14 @@
 //  - A follow-up names the asset the person asked about and nothing else: no price, no figure, no
 //    direction. The number is read when they open it.
 //  - A follow-up whose moment has passed is written to the ledger as `sent` exactly once; whether
-//    it was opened is what the next plan learns from.
+//    the person did something with it within a day (`returned`) is what the next plan learns from.
+//    A tap alone (`opened`) is written down and changes nothing.
+//  - Only a question the person asked by themselves is followed up. A read Bobby started (the
+//    button of a follow-up, a board row, the question Bobby wrote after a read) is written with
+//    its origin and starts nothing.
+//  - What the person said about how long they are looking (the horizon their question named, the
+//    one chosen on a save, a thesis) is written only once they said yes to follow-ups. Until then
+//    it is held in memory for the last few reads, and the yes writes it for those.
 //  - A notification carries a tag of the reader it was planned for and the moment it was planned
 //    for. A tap whose tag is not the current reader's does nothing, and what was already delivered
 //    is taken off the lock screen when the reader changes.
@@ -189,6 +196,10 @@ final class HarnessCenter: ObservableObject {
     static let quoteTimeout: Double = 8
     /// One `appOpen` per this long.
     static let openGap: TimeInterval = 30 * 60
+    /// What is held in memory about recent reads until the person says yes: this many, this long
+    /// (the desk keeps its own reads the same way: NucleoDesk.readsKept, pendingReadWindow).
+    static let heldEvents = 5
+    static let heldWindow: TimeInterval = 30 * 60
 
     enum Outcome: Equatable {
         /// Follow-ups are on and iOS lets Bobby show them.
@@ -222,6 +233,8 @@ final class HarnessCenter: ObservableObject {
     }
     /// The glass has something new to draw (the session listens).
     var changed: () -> Void = {}
+    /// The reader's active theses: the asset and the horizon they set, never the words.
+    var theses: (_ owner: String?) -> [(symbol: String, horizon: HarnessHorizon?, since: Date)]
 
     private let notifier: HarnessNotifying
     private let store: HarnessStore
@@ -231,6 +244,9 @@ final class HarnessCenter: ObservableObject {
     /// What this launch handed to iOS (id → what it said and when), so nothing is written twice.
     private var issued: [String: HarnessNotice] = [:]
     private var focus: (symbol: String, at: Date)?
+    /// Events written without what the person said about their horizon, kept whole here until they
+    /// say yes. In memory only: it never outlives the launch or the reader.
+    private var held: [HarnessEvent] = []
     private var quotes: [String: (price: Double, at: Date)] = [:]
     private var syncTail: Task<Void, Never>?
     /// Grows whenever the plan or the reader changes: a sync that started before does not finish its writes.
@@ -255,6 +271,9 @@ final class HarnessCenter: ObservableObject {
     init(notifier: HarnessNotifying, defaults: UserDefaults = .standard) {
         self.notifier = notifier
         store = HarnessStore(defaults: defaults)
+        theses = { owner in
+            ThesisBook(defaults: defaults).active(owner: owner).map { ($0.symbol, $0.horizon.map(HarnessHorizon.init(thesis:)), $0.createdAt) }
+        }
     }
 
     // MARK: Reading
@@ -292,6 +311,11 @@ final class HarnessCenter: ObservableObject {
             .receive(on: DispatchQueue.main)
             .sink { [weak self] _ in Task { @MainActor in await self?.reloadAfterErase() } }
             .store(in: &cancellables)
+        // A thesis was written, changed or archived: its horizon times the next follow-up.
+        NotificationCenter.default.publisher(for: ThesisBook.didChange)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in Task { @MainActor in await self?.replan() } }
+            .store(in: &cancellables)
         Task { await appActive() }
     }
 
@@ -319,30 +343,41 @@ final class HarnessCenter: ObservableObject {
         planned = store.plan(owner: owner)
         upcoming = planned.map(\.followUp)
         focus = nil
+        held = []
         quotes = [:]
         move = nil
     }
 
     // MARK: What the person does
 
-    /// A read was delivered. The first one starts everything.
-    func noteAsk(symbol: String, name: String, isEquity: Bool, price: Double?) {
+    /// A read was delivered. Only one the person asked for by themselves is followed up: `origin`
+    /// says when Bobby started it, and then it is at most an answer to a follow-up.
+    func noteAsk(symbol: String, name: String, isEquity: Bool, price: Double?, origin: HarnessEvent.Origin? = nil,
+                 thread: Bool = false, horizon: HarnessHorizon? = nil) {
         guard recording else { return }
         let clock = now()
         // The answer comes first in time: what follows starts from the question itself.
         answerIfUseful(symbol: symbol, at: clock.addingTimeInterval(-0.001))
-        note(HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: name, isEquity: isEquity, price: price))
+        var said = HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: name, isEquity: isEquity, price: price, origin: origin)
+        said.thread = thread && origin == nil ? true : nil
+        said.horizon = horizon
+        note(said, holding: ["thread", "horizon"])
         // They are looking at it now: the line about "since you asked" has nothing to say yet.
         if move?.symbol == symbol.uppercased() { move = nil }
         Task { await replan() }
     }
 
-    func noteSaved(symbol: String) {
+    /// They saved a read. `horizonHours` is the review they chose on the save, when they were offered one.
+    func noteSaved(symbol: String, horizonHours: Int? = nil) {
         guard recording else { return }
-        note(HarnessEvent(kind: .saved, at: now(), symbol: symbol))
+        let clock = now()
+        note(HarnessEvent(kind: .saved, at: clock, symbol: symbol, horizonHours: horizonHours), holding: ["horizonHours"])
+        answerIfUseful(symbol: symbol, at: clock)
+        // The horizon they chose may move the follow-up that was coming.
+        Task { await replan() }
     }
 
-    /// They acted on a follow-up inside the app.
+    /// They acted on something Bobby put in front of them inside the app.
     func notePicked(symbol: String) {
         guard recording else { return }
         let clock = now()
@@ -352,13 +387,14 @@ final class HarnessCenter: ObservableObject {
         if answerIfUseful(symbol: symbol, at: clock) { Task { await replan() } }
     }
 
-    /// A follow-up shown in the last day that nobody answered yet is answered by something useful
-    /// about it: its asset (or an asset of its sector; anything, for the week). True when it was.
+    /// The one writer of an answer. A follow-up shown in the last day that nobody answered yet is
+    /// answered by something useful about it: its asset (or an asset of its sector; anything, for
+    /// the week). Having tapped it does not answer it, and does not stop this from doing so. True when it was.
     @discardableResult
     private func answerIfUseful(symbol: String, at clock: Date) -> Bool {
         guard let symbol = HarnessLedger.validSymbol(symbol),
               let shown = ledger.events(.sent).last(where: { clock.timeIntervalSince($0.at) <= Self.usefulWindow && $0.at <= clock }),
-              !ledger.events.contains(where: { $0.isEngagement && $0.ref == shown.at }) else { return false }
+              !ledger.events.contains(where: { $0.isAnswer && $0.ref == shown.at }) else { return false }
         let about: Bool
         switch shown.step {
         case .asset: about = shown.symbol == symbol
@@ -389,6 +425,14 @@ final class HarnessCenter: ObservableObject {
         if owner != user { load(owner: user) }
         mode = .on
         store.write(mode, owner: owner)
+        // They said yes: the reads still in memory become whole entries, the one that prompted it first.
+        let clock = now()
+        var completed = false
+        for full in held where clock.timeIntervalSince(full.at) <= Self.heldWindow {
+            if ledger.complete(full) { completed = true }
+        }
+        held = []
+        if completed { store.write(ledger, owner: owner) }
         await replan()
         return permission == .allowed ? .on : .denied
     }
@@ -398,7 +442,8 @@ final class HarnessCenter: ObservableObject {
         await erase(keeping: .off)
     }
 
-    /// A follow-up notification was tapped.
+    /// A follow-up notification was tapped. It is written down, once, and answers nothing: only what
+    /// they do next with it can (`answerIfUseful`), tapped or not.
     func opened(_ tap: HarnessTap) async {
         guard recording, accepts(tap) else { return }
         // A tapped notification was shown: iOS lets Bobby show them.
@@ -406,12 +451,6 @@ final class HarnessCenter: ObservableObject {
         settle()
         let clock = now()
         let ref = tap.stamp ?? ledger.events(.sent).last { $0.step == tap.step }?.at
-        // Coming back and tapping are one answer, not two, however long the tap waited to be honoured.
-        ledger.remove { event in
-            guard event.kind == .returned, event.step == tap.step else { return false }
-            if let ref, let answered = event.ref { return answered == ref }
-            return clock.timeIntervalSince(event.at) < 600
-        }
         guard !ledger.events.contains(where: { $0.kind == .opened && $0.step == tap.step && $0.ref != nil && $0.ref == ref }) else { return }
         note(HarnessEvent(kind: .opened, at: clock, symbol: tap.symbol, step: tap.step, sector: tap.sector, ref: ref))
         if tap.step == .asset, let symbol = tap.symbol { focus = (symbol, clock) }
@@ -520,8 +559,44 @@ final class HarnessCenter: ObservableObject {
 
     private var recording: Bool { mode != .off && consent() == .accepted }
 
-    private func note(_ event: HarnessEvent) {
-        ledger.note(event)
+    /// Writes one event. `holding` names what the person said about their horizon: written only
+    /// once follow-ups are on. Before that the event goes in without it and the whole of it waits
+    /// in memory for the yes.
+    private func note(_ event: HarnessEvent, holding: Set<String> = []) {
+        var written = event
+        if mode != .on, !holding.isEmpty {
+            if holding.contains("thread") { written.thread = nil }
+            if holding.contains("horizon") { written.horizon = nil }
+            if holding.contains("horizonHours") { written.horizonHours = nil }
+            if written != event {
+                held.append(event)
+                if held.count > Self.heldEvents { held.removeFirst(held.count - Self.heldEvents) }
+            }
+        }
+        ledger.note(written)
+        store.write(ledger, owner: owner)
+    }
+
+    /// The ledger points at the theses that are active now, and at no other: one pointer per asset,
+    /// with the horizon set on it. Only once follow-ups are on.
+    private func syncTheses() {
+        guard mode == .on, consent() == .accepted else { return }
+        var wanted: [String: (horizon: HarnessHorizon?, since: Date)] = [:]
+        for thesis in theses(owner) {
+            guard let symbol = HarnessLedger.validSymbol(thesis.symbol) else { continue }
+            wanted[symbol] = (thesis.horizon, thesis.since)
+        }
+        let pointers = ledger.events(.thesis)
+        let current = Dictionary(grouping: pointers, by: { $0.symbol ?? "" })
+        let inStep = current.count == wanted.count && wanted.allSatisfy { symbol, thesis in
+            current[symbol]?.count == 1 && current[symbol]?.first?.horizon == thesis.horizon
+        }
+        guard !inStep else { return }
+        ledger.remove { $0.kind == .thesis }
+        let clock = now()
+        for (symbol, thesis) in wanted {
+            ledger.note(HarnessEvent(kind: .thesis, at: min(thesis.since, clock), symbol: symbol, horizon: thesis.horizon))
+        }
         store.write(ledger, owner: owner)
     }
 
@@ -544,6 +619,7 @@ final class HarnessCenter: ObservableObject {
     /// Asks the planner what comes next and brings iOS in line with it.
     func replan() async {
         settle()
+        syncTheses()
         revision += 1
         var wanted: [HarnessFollowUp] = []
         if mode == .on, consent() == .accepted {
@@ -621,6 +697,7 @@ final class HarnessCenter: ObservableObject {
         upcoming = []
         mode = next
         focus = nil
+        held = []
         quotes = [:]
         if move != nil { move = nil }
         purge()

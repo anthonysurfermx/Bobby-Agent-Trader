@@ -262,7 +262,9 @@ final class NucleoSession: ObservableObject {
             let saved = try await desk.saveThesis(p)
             if saved["status"] as? String == "saved", let requestId = try p.string("requestId", required: false) {
                 NudgeCenter.shared.noteSaved(requestId: requestId)
-                if let symbol = desk.readSummary(requestId: requestId)?.symbol { harness?.noteSaved(symbol: symbol) }
+                if let symbol = desk.readSummary(requestId: requestId)?.symbol {
+                    harness?.noteSaved(symbol: symbol, horizonHours: Self.chosenHorizon(saved: saved, asked: try p.int("horizonHours", required: false)))
+                }
                 sessionChanged()
             }
             return saved
@@ -408,10 +410,20 @@ final class NucleoSession: ObservableObject {
                                               isEquity: asset["isEquity"] as? Bool ?? false,
                                               verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
                                               memory: MemoryReceipt(json: result["memory"])))
-        // 1.8: from the first question, the harness knows what to come back to (on this phone only).
+        // 1.8: from the first question, the harness knows what to come back to (on this phone only). A read
+        // Bobby started is told apart here: only the person's own question is followed up.
+        let origin = desk.readOrigin(requestId: requestId) ?? .person
         harness?.noteAsk(symbol: symbol, name: asset["name"] as? String ?? symbol, isEquity: asset["isEquity"] as? Bool ?? false,
-                         price: desk.readSummary(requestId: requestId)?.price)
+                         price: desk.readSummary(requestId: requestId)?.price, origin: origin == .followUp ? .followUp : nil,
+                         thread: origin == .thread, horizon: HarnessHorizon(named: (result["sufficiency"] as? [String: Any])?["horizon"]))
         sessionChanged()
+    }
+
+    /// The review horizon the person chose on a save, for the harness: only when the page sent one and
+    /// the desk kept it (a read Bobby said to wait on has none, and a save without a choice says nothing).
+    static func chosenHorizon(saved: [String: Any], asked: Int?) -> Int? {
+        guard let asked, (saved["thesis"] as? [String: Any])?["horizonHours"] as? Int == asked else { return nil }
+        return asked
     }
 
     // MARK: - Reads native starts (1.8)
