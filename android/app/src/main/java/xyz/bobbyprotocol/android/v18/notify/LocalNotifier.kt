@@ -109,9 +109,10 @@ data class LocalNotice(
  */
 object NoticeTiming {
     /**
-     * The phone is never exact, and the last allowed moment is itself a moment follow-ups are planned
-     * for (someone who asks late in the evening is answered at 21:00). A notice may run this far past
-     * the end of its allowed hours and still be shown; later than that it waits for the morning.
+     * No phone runs work on the dot. A notice that runs within this long of its own moment is on
+     * time, and one that is on time for a moment inside its allowed hours is shown even when the
+     * clock has just passed their end: the last allowed moment (21:00 sharp) is itself a moment
+     * follow-ups are planned for, for someone who asks late in the evening.
      */
     const val GRACE_MS = 15 * 60_000L
 
@@ -134,16 +135,24 @@ object NoticeTiming {
         val from = delivery.fromHour
         val until = delivery.untilHour
         if (from == null || until == null || !delivery.isValid) return Decision.Post
-        val day = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
-        fun at(hour: Int, daysAhead: Long): Long = ZonedDateTime.of(day.plusDays(daysAhead), LocalTime.of(hour, 0), zone).toInstant().toEpochMilli()
-        val opens = at(from, 0)
-        if (nowMs >= opens && nowMs <= at(until, 0) + GRACE_MS) return Decision.Post
+        if (allowed(nowMs, from, until, zone)) return Decision.Post
+        // Outside the hours, but on time for a moment that was inside them.
+        val late = nowMs - fireAtMs
+        if (late >= 0 && late <= GRACE_MS && allowed(fireAtMs, from, until, zone)) return Decision.Post
         // Before the day's first allowed hour it waits for it; after the last, for tomorrow's.
-        val next = if (nowMs < opens) opens else at(from, 1)
+        val today = hourOn(nowMs, from, 0, zone)
+        val next = if (nowMs < today) today else hourOn(nowMs, from, 1, zone)
         // Waiting would carry it past its expiry: dropped now, so nothing stays listed that will never be shown.
         if (expires != null && next - fireAtMs > expires) return Decision.Drop
         return Decision.Wait(next)
     }
+
+    /** From `from`:00 to `until`:00, both included, on the local day `ms` falls on. */
+    private fun allowed(ms: Long, from: Int, until: Int, zone: ZoneId): Boolean = ms >= hourOn(ms, from, 0, zone) && ms <= hourOn(ms, until, 0, zone)
+
+    /** `hour`:00 on the local day `ms` falls on, or `daysAhead` days after it. */
+    private fun hourOn(ms: Long, hour: Int, daysAhead: Long, zone: ZoneId): Long =
+        ZonedDateTime.of(Instant.ofEpochMilli(ms).atZone(zone).toLocalDate().plusDays(daysAhead), LocalTime.of(hour, 0), zone).toInstant().toEpochMilli()
 }
 
 interface LocalNotifier {

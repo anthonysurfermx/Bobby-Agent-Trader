@@ -45,9 +45,10 @@ import java.util.concurrent.TimeUnit
 // cancelled or replaced notice can never be shown by work that was already queued.
 //
 // Because the phone can run late, the worker asks `NoticeTiming` before it shows anything: a
-// follow-up that comes due at night waits for 09:00 (it stays pending and the same work is queued
-// again), one that is more than a day late is dropped unseen, and a thesis reminder is shown however
-// late. The decision is tested on the JVM; that WorkManager carries it out was never seen on a device.
+// follow-up that runs late and outside 09:00-21:00 waits for the next 09:00 (it stays pending and
+// the same work is queued again), one that is more than a day late is dropped unseen, and a thesis
+// reminder is shown however late. The decision is tested on the JVM; that WorkManager carries it
+// out was never seen on a device.
 
 /** Plans, lists and clears Bobby's own local notices. `ask` is the activity's permission launcher. */
 class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Boolean) : LocalNotifier {

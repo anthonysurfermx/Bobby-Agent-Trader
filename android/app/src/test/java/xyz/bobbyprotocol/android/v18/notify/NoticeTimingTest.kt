@@ -57,13 +57,24 @@ class NoticeTimingTest {
         assertEquals(post, decide(at(8, 20, 59), at(8, 20, 59)))
     }
 
-    @Test fun theLastAllowedMomentIsStillAMomentToBeShownAt() {
-        // Someone who asked at 22:40 is answered at 21:00 the next day: the phone runs that a little after.
+    @Test fun onTimeForTheLastAllowedMomentIsShownAFewMinutesPastTheHour() {
+        // Someone who asked at 22:40 is answered at 21:00 the next day, and no phone runs work on the dot.
         assertEquals(post, decide(at(8, 21), at(8, 21)))
         assertEquals(post, decide(at(8, 21), at(8, 21, 4)))
-        assertEquals("the phone may run this far past the hour", post, decide(at(8, 21), at(8, 21) + NoticeTiming.GRACE_MS))
-        assertEquals("and no further: it waits for the morning", wait(at(9, 9)), decide(at(8, 21), at(8, 21) + NoticeTiming.GRACE_MS + 1))
+        assertEquals("on time means within this long of its own moment", post, decide(at(8, 21), at(8, 21) + NoticeTiming.GRACE_MS))
+        assertEquals("and no longer: it waits for the morning", wait(at(9, 9)), decide(at(8, 21), at(8, 21) + NoticeTiming.GRACE_MS + 1))
+        assertEquals(post, decide(at(8, 20, 55), at(8, 21, 5)))
         assertEquals(15 * minute, NoticeTiming.GRACE_MS)
+    }
+
+    @Test fun onlyBeingOnTimeExcusesTheHour() {
+        // Planned for 20:00 and run at 21:10: seventy minutes late and past the hour. It waits.
+        assertEquals(wait(at(9, 9)), decide(at(8, 20), at(8, 21, 10)))
+        assertEquals("the hour itself is still allowed, however late it is for its moment", post, decide(at(8, 20), at(8, 21)))
+        // A moment that was never inside the hours is not excused by being on time for it.
+        assertEquals(wait(at(8, 9)), decide(at(8, 3), at(8, 3)))
+        assertEquals(wait(at(8, 9)), decide(at(8, 8, 50), at(8, 8, 58)))
+        assertEquals(post, decide(at(8, 8, 50), at(8, 9)))
     }
 
     // Late, outside the allowed hours

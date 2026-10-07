@@ -38,7 +38,7 @@ The source is at **1.2.0 (code 10)**, Bobby 1.8, described in the next section. 
 
 WorkManager is inexact. An idle phone can run planned work hours after its moment, and a phone that was off runs what it missed when it comes back. So a notice says what it asks of a late phone (`LocalNotice.Delivery`), and the worker asks `NoticeTiming` before showing anything:
 
-- A **follow-up** is shown only between 09:00 and 21:00 on the phone's clock, with 15 minutes of grace after 21:00 because 21:00 is itself a moment follow-ups are planned for. Outside those hours it stays pending and the same work is queued again for the next 09:00. More than 24 hours late it is dropped unseen; the same line already waits on the glass.
+- A **follow-up** is shown only between 09:00 and 21:00 on the phone's clock. Outside those hours it stays pending and the same work is queued again for the next 09:00. One exception: a follow-up that runs on time (within 15 minutes of its own moment) is shown even if the clock has just passed 21:00, because 21:00 sharp is itself a moment follow-ups are planned for and no phone runs work on the dot. More than 24 hours late it is dropped unseen; the same line already waits on the glass.
 - A **thesis reminder** is shown whenever the phone gets to it, however late: the person chose the day.
 - A notice is shown only to the reader it was planned for, only while the risk notice stands, and not at all while the app is in front and the glass already says it.
 
