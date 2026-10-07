@@ -383,13 +383,29 @@ const NUMBER_WORDS_IN: Record<AppLanguage, ReadonlySet<string>> = {
 // Numbers a language writes as one word: "veinticinco", "doscientos", "duzentos", "centocinquanta",
 // "fünfundneunzig", "hunderttausend". From four letters on, so the pieces that are also an article or "and"
 // ("ein", "uno", "und") are never a number by themselves.
-const NUMBER_COMPOUND: Record<AppLanguage, RegExp | null> = {
+const madeOf = (pieces: string) => {
+  const list = wordsOf(pieces);
+  // reach[n]: the first n letters are whole pieces. One pass over the word, so a long made-up word costs nothing
+  // (the pattern this replaces could be made to backtrack: "undiciotto" is "un·diciotto" and "undici·otto").
+  return (word: string): boolean => {
+    if (word.length < 4) return false;
+    const reach = [true];
+    for (let end = 1; end <= word.length; end++) {
+      reach[end] = list.some(piece => end >= piece.length && reach[end - piece.length] && word.startsWith(piece, end - piece.length));
+    }
+    return reach[word.length];
+  };
+};
+const NUMBER_COMPOUND: Record<AppLanguage, ((word: string) => boolean) | null> = {
   en: null,
-  es: /^(?:(?:dieci|veinti)(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)|(?:dos|tres|cuatro|seis|ocho)cient[oa]s|(?:quinient|setecient|novecient)[oa]s)$/,
+  es: word => /^(?:(?:dieci|veinti)(?:un|uno|una|dos|tres|cuatro|cinco|seis|siete|ocho|nueve)|(?:dos|tres|cuatro|seis|ocho)cient[oa]s|(?:quinient|setecient|novecient)[oa]s)$/.test(word),
   fr: null,
-  pt: /^(?:duzent|trezent|quatrocent|quinhent|seiscent|setecent|oitocent|novecent)[oa]s$/,
-  it: /^(?=[a-z]{4})(?:un|uno|due|tre|quattro|cinque|sei|sette|otto|nove|dieci|undici|dodici|tredici|quattordici|quindici|sedici|diciassette|diciotto|diciannove|venti?|trenta?|quaranta?|cinquanta?|sessanta?|settanta?|ottanta?|novanta?|cento|mille|mila)+$/,
-  de: /^(?=[a-z]{4})(?:ein|eins|zwei|drei|vier|funf|sechs|sech|sieben|sieb|acht|neun|zehn|elf|zwolf|zwanzig|dreissig|vierzig|funfzig|sechzig|siebzig|achtzig|neunzig|hundert|tausend|und)+$/,
+  pt: word => /^(?:duzent|trezent|quatrocent|quinhent|seiscent|setecent|oitocent|novecent)[oa]s$/.test(word),
+  it: madeOf(`un uno due tre quattro cinque sei sette otto nove dieci undici dodici tredici quattordici quindici sedici
+    diciassette diciotto diciannove vent venti trent trenta quarant quaranta cinquant cinquanta sessant sessanta
+    settant settanta ottant ottanta novant novanta cento mille mila`),
+  de: madeOf(`ein eins zwei drei vier funf sechs sech sieben sieb acht neun zehn elf zwolf zwanzig dreissig vierzig
+    funfzig sechzig siebzig achtzig neunzig hundert tausend und`),
 };
 
 // The commonest function words of each language, folded. A question is read as written in the reply's language
@@ -519,7 +535,7 @@ export function nextQuestionViolation(raw: unknown, language: AppLanguage, symbo
     // Letters set apart spell a word like any other: the glued run is searched for one, whole or with an ending.
     || gluedLetters(words).some(glued => [...FORBIDDEN_WORDS, ...ACT_WORDS].some(word => word.length >= 3 && glued.includes(word)))) return 'word';
   if (/[\p{N}\p{Sc}%‰]/u.test(plain)
-    || words.some(word => NUMBER_WORDS.has(word) || NUMBER_WORDS_IN[language].has(word) || NUMBER_COMPOUND[language]?.test(word) === true)) return 'number';
+    || words.some(word => NUMBER_WORDS.has(word) || NUMBER_WORDS_IN[language].has(word) || NUMBER_COMPOUND[language]?.(word) === true)) return 'number';
   if (!ONE_QUESTION.test(plain) || SPELLED_OUT.test(plain) || words.length < 3 || SECOND_CLAUSE[language].test(plain) || EXCLAIMS[language]?.test(run)) return 'shape';
   if (!OPENERS[language].test(words.join(' '))) return 'opener';
   // The opening ¿ is Spanish; an accented letter belongs to the alphabet of the reply's language; and no other

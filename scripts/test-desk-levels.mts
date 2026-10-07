@@ -381,6 +381,9 @@ try {
       ['O que acontece se BTC romper duzentos?', 'pt', 'number', 'a Portuguese hundred'],
       ['Cosa succede se BTC rompe duecento?', 'it', 'number', 'an Italian hundred'],
       ['Cosa succede se BTC rompe centocinquanta?', 'it', 'number', 'an Italian compound'],
+      ['Cosa succede se BTC rompe ventuno?', 'it', 'number', 'an Italian compound with the tens elided'],
+      ['Cosa succede se BTC rompe trentotto?', 'it', 'number', 'an Italian compound read piece by piece'],
+      ['Was passiert, wenn BTC einundzwanzig bricht?', 'de', 'number', 'a German compound read piece by piece'],
       ['Why do the two BTC charts disagree?', 'en', 'number', 'any number, as the CIO is told'],
       ['Was würde ein Ausbruch bei BTC bestätigen?', 'de', null, 'the German article "ein" is not a number'],
       ['Pourquoi BTC est très volatil ?', 'fr', null, '"très" is not the Spanish three'],
@@ -469,7 +472,7 @@ try {
     ] as const) eq(nextQuestionViolation(question, lang, 'BTC'), want, `${what}: ${want ?? 'passes'}`);
     eq([nextQuestionViolation(42, 'en', 'BTC'), nextQuestionViolation(null, 'en', 'BTC'), nextQuestionViolation(undefined, 'en', 'BTC'), nextQuestionViolation({ text: 'What?' }, 'en', 'BTC')], ['shape', 'shape', 'shape', 'shape'], 'anything but a string is refused');
     // The longest text the wire allows, built to make a pattern try every split of it, is still read at once.
-    for (const [lang, unit] of [['de', 'einsein'], ['de', 'sechsech'], ['de', 'siebsieben'], ['it', 'ununo'], ['it', 'trentatre'], ['es', 'veintidieci'], ['en', 'a-b-'], ['en', 'a b '], ['es', 'y si por que no '], ['it', 'e se perche non ']] as const) {
+    for (const [lang, unit] of [['de', 'einsein'], ['de', 'sechsech'], ['de', 'siebsieben'], ['it', 'ununo'], ['it', 'trentatre'], ['it', 'undiciotto'], ['it', 'unodue'], ['es', 'veintidieci'], ['en', 'a-b-'], ['en', 'a b '], ['es', 'y si por que no '], ['it', 'e se perche non ']] as const) {
       const longest = `Was ${unit.repeat(Math.floor((FOLLOW_UP_MAX - 6) / unit.length))}x?`;
       const started = performance.now();
       nextQuestionViolation(longest, lang, 'BTC');
