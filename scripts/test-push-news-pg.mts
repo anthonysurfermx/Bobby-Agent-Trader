@@ -23,9 +23,14 @@ assertLocalUrl(url);
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const migration = join(root, 'supabase/bobby-protocol/supabase/migrations/20261007171622_ios_news_push.sql');
 const localeMigration = join(root, 'supabase/bobby-protocol/supabase/migrations/20261007172958_ios_news_push_locale.sql');
+const countryConsentMigration = join(root, 'supabase/bobby-protocol/supabase/migrations/20261007180413_ios_news_push_country_consent.sql');
 const pool: pg.Pool = await bootstrapBriefingsDb(url);
 const q = async (sql: string, args: unknown[] = []) => (await pool.query(sql, args)).rows;
 const one = async (sql: string, args: unknown[] = []) => (await q(sql, args))[0];
+const countryMetadata = async (identity: string) => {
+  const row = await one('select country,country_source,country_observed_at from bobby_news_settings where identity_id=$1', [identity]);
+  return [row.country, row.country_source, row.country_observed_at];
+};
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
 let checks = 0;
 const eq = (got: unknown, want: unknown, label: string) => { assert.deepEqual(got, want, label); checks++; };
@@ -69,7 +74,7 @@ async function applyMigration() {
   try {
     // Recreate the prior feature shape only in this disposable localhost database, so the forward migration's
     // backfill is exercised on every run. The already-deployed original SQL file stays immutable.
-    await q('alter table if exists public.bobby_news_settings drop column if exists locale');
+    await q('drop table if exists public.bobby_news_deliveries, public.bobby_news_campaigns, public.bobby_news_settings cascade');
     await pool.query(readFileSync(migration, 'utf8'));
     await pool.query(readFileSync(migration, 'utf8'));
     const legacyRows: Array<{ identity: string; language: string; locale: string }> = [];
@@ -86,6 +91,32 @@ async function applyMigration() {
       const upgraded = await one('select revision,language,locale,consent_at from bobby_news_settings where identity_id=$1', [legacy.identity]);
       eq([upgraded.revision, upgraded.language, upgraded.locale, upgraded.consent_at.toISOString()], [7, legacy.language, legacy.locale, '2026-10-01T12:00:00.000Z'], `${legacy.language} backfills canonical locale without changing revision or consent timestamp`);
     }
+    const legacyOffRows: string[] = [];
+    for (const metadata of [
+      ['DE', 'vercel-ip', '2026-10-01T13:00:00Z', null],
+      [null, 'vercel-ip', '2026-10-01T13:00:00Z', null],
+      ['FR', null, null, null],
+      ['IT', 'vercel-ip', '2026-10-01T13:00:00Z', 1],
+    ]) {
+      const identity = await makeIdentity(pool);
+      await q(`insert into bobby_news_settings(identity_id,revision,news_enabled,language,locale,consent_version,consent_at,
+        withdrawn_at,country,country_source,country_observed_at,updated_at)
+        values($1,9,false,'es','es-ES',$5,'2026-10-01T12:00:00Z','2026-10-02T12:00:00Z',$2,$3,$4,'2026-10-02T12:00:00Z')`, [identity, ...metadata]);
+      legacyOffRows.push(identity);
+    }
+    const legacyOn = legacyRows[0].identity;
+    await q(`update bobby_news_settings set country='DE',country_source='vercel-ip',country_observed_at='2026-10-01T13:00:00Z'
+      where identity_id=$1`, [legacyOn]);
+    const onBefore = await one('select * from bobby_news_settings where identity_id=$1', [legacyOn]);
+    await pool.query(readFileSync(countryConsentMigration, 'utf8'));
+    await pool.query(readFileSync(countryConsentMigration, 'utf8'));
+    for (const identity of legacyOffRows) {
+      const cleaned = await one('select * from bobby_news_settings where identity_id=$1', [identity]);
+      eq([cleaned.country, cleaned.country_source, cleaned.country_observed_at], [null, null, null], 'forward migration clears every legacy off-country field, including partial metadata and stale consent version');
+      eq([cleaned.revision, cleaned.language, cleaned.locale, cleaned.consent_at.toISOString(), cleaned.withdrawn_at.toISOString()],
+        [9, 'es', 'es-ES', '2026-10-01T12:00:00.000Z', '2026-10-02T12:00:00.000Z'], 'country cleanup preserves settings revision, locale and historical consent timestamps');
+    }
+    eq(await one('select * from bobby_news_settings where identity_id=$1', [legacyOn]), onBefore, 'forward country migration preserves enabled consent and its existing metadata');
     checks += 4;
   } finally {
     await q(`alter default privileges in schema public revoke all on tables from anon, authenticated;
@@ -161,11 +192,13 @@ try {
   ok(country.country_observed_at && country.consent_at, 'consent and country have timestamps');
   await newsDb.patchSettings(id, 1, { newsEnabled: false }, null);
   eq(await newsDb.getSettings(id), { revision: 2, newsEnabled: false, language: 'de', locale: 'de-DE', consentVersion: null }, 'withdrawal clears current consent version');
+  eq(await countryMetadata(id), [null, null, null], 'withdrawal clears country, its source and its observation timestamp');
   ok((await one('select withdrawn_at from bobby_news_settings where identity_id=$1', [id])).withdrawn_at, 'withdrawal is timestamped');
   const concurrent = await makeIdentity(pool);
   const saves = await Promise.all(Array.from({ length: 12 }, () => newsDb.patchSettings(concurrent, 0, { language: 'fr' }, 'FR')));
   eq(saves.filter((result) => result.ok).length, 1, 'concurrent settings updates admit exactly one revision');
   eq((await newsDb.getSettings(concurrent)).revision, 1, 'concurrent settings do not overwrite revisions');
+  eq(await countryMetadata(concurrent), [null, null, null], 'language-only concurrent writes while off never capture the observed country');
 
   const allFilters = (identityId: string | null = null): NewsFilters => ({ languages: [...NEWS_LANGUAGES], countries: [], minAppBuild: 66, identityId });
   async function subscribe(language = 'de', country: string | null = 'DE') {
@@ -199,6 +232,72 @@ try {
     return { ...setup, row: row as newsDb.NewsClaim };
   }
   const delivery = (deliveryId: string) => one('select * from bobby_news_deliveries where id=$1', [deliveryId]);
+
+  // The database uses the locked final consent state, including for old clients that still supply a country
+  // with every foreground/language write. Withdrawal must erase all three geographic fields atomically.
+  const privacy = await makeIdentity(pool);
+  await device(privacy);
+  const off = await newsDb.patchSettings(privacy, 0, { newsEnabled: false }, 'DE');
+  eq(off, { ok: true, settings: defaults }, 'explicit default-off synchronization remains a revision-zero no-op');
+  eq(await countryMetadata(privacy), [null, null, null], 'default-off write ignores an observed country');
+  const languageOff = await newsDb.patchSettings(privacy, 0, { language: 'es', locale: 'es-ES' }, 'ES');
+  eq((languageOff as { settings: newsDb.NewsSettings }).settings, { ...defaults, revision: 1, language: 'es', locale: 'es-ES' }, 'regional locale may change independently while news is off');
+  eq(await countryMetadata(privacy), [null, null, null], 'language/locale write while off captures no country metadata');
+  for (const patch of [{ newsEnabled: false }, { language: 'es', locale: 'es-ES' }]) {
+    const repeatedOff = await newsDb.patchSettings(privacy, 1, patch, 'FR');
+    eq((repeatedOff as { settings: newsDb.NewsSettings }).settings.revision, 1, 'repeated off synchronization preserves the effective revision');
+    eq(await countryMetadata(privacy), [null, null, null], 'repeated off synchronization cannot recapture a country');
+  }
+  for (const update of [
+    "country='DE'", "country_source='vercel-ip'", "country_observed_at=now()",
+    "country='DE',country_source='vercel-ip',country_observed_at=now()",
+    "consent_version=1,country='DE',country_source='vercel-ip',country_observed_at=now()",
+  ]) await rejects(q(`update bobby_news_settings set ${update} where identity_id=$1`, [privacy]), 'schema constraint prevents disabled settings from retaining any geographic field', /check constraint/);
+  const insertOff = await makeIdentity(pool);
+  await rejects(q("insert into bobby_news_settings(identity_id,country) values($1,'DE')", [insertOff]), 'schema constraint rejects default-off insertion with geographic metadata', /check constraint/);
+  eq((await newsDb.audience(allFilters(privacy))).eligible, 0, 'registered device with language-only settings remains outside the news audience');
+  eq(await newsDb.patchSettings(privacy, 0, { newsEnabled: true, consentVersion: 1 }, 'DE'), { ok: false, revision: 1 }, 'stale enable CAS cannot capture country or grant consent');
+  eq(await countryMetadata(privacy), [null, null, null], 'failed enable CAS leaves geographic metadata empty');
+  const privacyOn = await newsDb.patchSettings(privacy, 1, { newsEnabled: true, consentVersion: 1 }, 'ES');
+  eq((privacyOn as { settings: newsDb.NewsSettings }).settings.revision, 2, 'current consent enables news with one revision change');
+  const firstCountry = await countryMetadata(privacy);
+  eq(firstCountry.slice(0, 2), ['ES', 'vercel-ip'], 'enable captures the latest observed country and its provenance');
+  ok(firstCountry[2] instanceof Date, 'enable dates the country observation');
+  const consentOn = (await one('select consent_at from bobby_news_settings where identity_id=$1', [privacy])).consent_at;
+  const privacyFilters = { ...allFilters(privacy), countries: ['ES'] };
+  eq((await newsDb.audience(privacyFilters)).eligible, 1, 'enabled news is eligible for its observed country');
+  eq((await newsDb.audience({ ...privacyFilters, countries: ['FR'] })).eligible, 0, 'enabled news is not inferred into another country');
+  const privacyCampaign = await campaign(privacy, { countries: ['ES'] });
+  const onNoop = await newsDb.patchSettings(privacy, 2, { language: 'es', locale: 'es-ES' }, 'ES');
+  eq((onNoop as { settings: newsDb.NewsSettings }).settings.revision, 2, 'enabled locale no-op preserves the frozen delivery revision');
+  eq((await one('select consent_at from bobby_news_settings where identity_id=$1', [privacy])).consent_at, consentOn, 'enabled locale no-op keeps the accepted-consent timestamp');
+  eq((await newsDb.audience(privacyFilters, privacyCampaign.campaignId)).eligible, 1, 'enabled no-op keeps the frozen country recipient eligible');
+  const privacyClaim = await newsDb.claim(privacyCampaign.campaignId) as newsDb.NewsClaim;
+  ok((await newsDb.authorize(privacyClaim.id, privacyClaim.fence)).ok, 'enabled unchanged country authorizes the reserved delivery');
+  eq(await newsDb.patchSettings(privacy, 1, { newsEnabled: false }, 'FR'), { ok: false, revision: 2 }, 'stale withdrawal CAS cannot change consent or geographic metadata');
+  eq((await countryMetadata(privacy))[0], 'ES', 'failed withdrawal CAS preserves the enabled country');
+  await newsDb.patchSettings(privacy, 2, { newsEnabled: false }, 'FR');
+  eq((await newsDb.getSettings(privacy)).revision, 3, 'withdrawal advances revision once');
+  eq(await countryMetadata(privacy), [null, null, null], 'withdrawal clears all metadata despite a fresh country argument');
+  eq((await newsDb.audience(allFilters(privacy))).eligible, 0, 'withdrawn consent removes the installation from all news audiences');
+  eq(await newsDb.authorize(privacyClaim.id, privacyClaim.fence), { ok: false }, 'withdrawal immediately blocks a delivery reserved while enabled');
+  eq((await delivery(privacyClaim.id)).state, 'cancelled', 'withdrawn delivery is cancelled without network transport');
+  const withdrawn = await one('select consent_at,withdrawn_at from bobby_news_settings where identity_id=$1', [privacy]);
+  for (const patch of [{ newsEnabled: false }, { language: 'es', locale: 'es-ES' }]) {
+    const repeatedWithdrawal = await newsDb.patchSettings(privacy, 3, patch, 'IT');
+    eq((repeatedWithdrawal as { settings: newsDb.NewsSettings }).settings.revision, 3, 'withdrawn no-op preserves its revision');
+    eq(await countryMetadata(privacy), [null, null, null], 'withdrawn no-op cannot recapture connection country');
+    eq(await one('select consent_at,withdrawn_at from bobby_news_settings where identity_id=$1', [privacy]), withdrawn, 'withdrawn no-op preserves consent and withdrawal timestamps');
+  }
+  await newsDb.patchSettings(privacy, 3, { language: 'fr', locale: 'fr-FR' }, 'DE');
+  eq(await countryMetadata(privacy), [null, null, null], 'real language change while withdrawn still captures no connection country');
+  await newsDb.patchSettings(privacy, 4, { newsEnabled: true, consentVersion: 1 }, 'FR');
+  eq((await newsDb.getSettings(privacy)).revision, 5, 'explicit reenable after an off-language change receives a new revision');
+  eq((await countryMetadata(privacy)).slice(0, 2), ['FR', 'vercel-ip'], 'reenable uses the current country rather than any discarded off-country');
+  eq((await newsDb.audience({ ...allFilters(privacy), countries: ['FR'], languages: ['fr'] })).eligible, 1, 'reenabled audience matches the latest country and chosen language');
+  eq((await newsDb.audience({ ...allFilters(privacy), countries: ['ES'] })).eligible, 0, 'reenable never revives the old observed country segment');
+  eq(await newsDb.authorize(privacyClaim.id, privacyClaim.fence), { ok: false }, 'reenable cannot revive an earlier cancelled delivery');
+  await newsDb.patchSettings(privacy, 5, { newsEnabled: false }, null);
 
   // Native foreground synchronization repeats the complete chosen locale. It must preserve exact wording,
   // the original consent timestamp and the frozen delivery revision when nothing effectively changed.
@@ -392,6 +491,32 @@ try {
   eq((await newsDb.prepare(germanCohort, campaignDigest(germanFilters), germanFilters, id)).created, false, 'same country group replays its stable frozen recipients');
   const testOne = await campaign(german), testTwo = await campaign(german);
   eq((await one('select count(*)::int as n from bobby_news_deliveries where campaign_id=any($1::text[]) and installation_id=$2', [[testOne.campaignId, testTwo.campaignId], germanDevice.installation])).n, 2, 'different authorized test UUIDs remain independent from each other and launch dedupe');
+
+  // A later observed country cannot bypass a reservation, cancellation or reconsent within the launch family.
+  const movedCountry = await subscribe('en', 'IS'); const movedDevice = await device(movedCountry);
+  const icelandFilters = { ...allFilters(), countries: ['IS'] };
+  const irelandFilters = { ...allFilters(), countries: ['IE'] };
+  const icelandCohort = campaignCohortId(LANGUAGE_CAMPAIGN_ID, icelandFilters);
+  const irelandCohort = campaignCohortId(LANGUAGE_CAMPAIGN_ID, irelandFilters);
+  eq((await newsDb.prepare(icelandCohort, campaignDigest(icelandFilters), icelandFilters, id)).created, true, 'current enabled country may reserve a launch recipient');
+  const movingClaim = await newsDb.claim(icelandCohort) as newsDb.NewsClaim;
+  ok((await newsDb.authorize(movingClaim.id, movingClaim.fence)).ok, 'original country authorizes before its next observation');
+  const movedPatch = await newsDb.patchSettings(movedCountry, 1, { language: 'en', locale: 'en-US' }, 'IE');
+  eq((movedPatch as { settings: newsDb.NewsSettings }).settings.revision, 1, 'enabled country-only refresh preserves consent settings revision');
+  eq((await countryMetadata(movedCountry)).slice(0, 2), ['IE', 'vercel-ip'], 'enabled country-only refresh uses the latest observation');
+  eq((await newsDb.audience({ ...allFilters(movedCountry), countries: ['IS'] })).eligible, 0, 'old country segment no longer matches an opted-in device');
+  eq((await newsDb.audience({ ...allFilters(movedCountry), countries: ['IE'] })).eligible, 1, 'latest country segment matches the opted-in device');
+  eq(await newsDb.authorize(movingClaim.id, movingClaim.fence), { ok: false }, 'country-filter mismatch blocks transport even when revision was unchanged');
+  eq((await delivery(movingClaim.id)).state, 'cancelled', 'country-filter mismatch cancels the reserved delivery without sending');
+  eq((await newsDb.audience(irelandFilters, irelandCohort)).eligible, 0, 'same announcement cannot reserve the installation again under its new country');
+  eq(await newsDb.prepare(irelandCohort, campaignDigest(irelandFilters), irelandFilters, id), { ok: true, created: true, recipients: 0 }, 'country movement creates no new recipient after launch-family cancellation');
+  eq((await one('select count(*)::int as n from bobby_news_deliveries where campaign_id=$1', [irelandCohort])).n, 0, 'new-country cohort contains no duplicate delivery');
+  await newsDb.patchSettings(movedCountry, 1, { newsEnabled: false }, 'DE');
+  eq(await countryMetadata(movedCountry), [null, null, null], 'country movement followed by withdrawal erases all geographic metadata');
+  await newsDb.patchSettings(movedCountry, 2, { newsEnabled: true, consentVersion: 1 }, 'IE');
+  eq((await newsDb.audience(irelandFilters, irelandCohort)).eligible, 0, 'withdrawal and explicit reenable do not bypass announcement-family dedupe');
+  eq((await one('select count(*)::int as n from bobby_news_deliveries where family_id=$1 and installation_id=$2', [LANGUAGE_CAMPAIGN_ID, movedDevice.installation])).n, 1, 'only one family delivery survives country updates and reconsent');
+  await newsDb.patchSettings(movedCountry, 3, { newsEnabled: false }, null);
 
   const deleted = await subscribe(); await device(deleted); await campaign(deleted);
   await q('delete from bobby_identities where id=$1', [deleted]);

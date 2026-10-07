@@ -1,7 +1,7 @@
 // Privacy policy for the Bobby iPhone app and bobbyprotocol.xyz.
 // Linked from App Store Connect and from the app — every claim here must stay
 // true to the code. The per-data-type mapping lives in
-// docs/app-store/build-35/APP-PRIVACY-ANSWERS.md; keep both in step.
+// docs/app-store/build-66/APP-PRIVACY-ANSWERS.md; keep both in step.
 // Scope: iOS supports typed or dictated analysis, optional narration and public islands. From 1.7 dictation is
 // recognized on the iPhone when the language is installed, otherwise by Apple's speech service (NucleoSpeech.swift);
 // previews without a bundled clip use the device voice before AI consent and the network voice after it (NeuralVoice.swift).
@@ -22,11 +22,12 @@ import { useNucleoPages } from '@/hooks/useNucleoPages';
 import { lang, LANGS, LANG_NAME, htmlLang, translateText, type Lang } from '@/lib/companions/i18n';
 import { appLanguage, isAppLanguage } from '@/lib/app-language';
 import { clientLanguagePath } from '@/lib/client-language';
+import { NEWS_PRIVACY_COPY } from '@/lib/news-privacy-copy';
 
 type PolicyLang = Lang;
 const EFFECTIVE_DATE: Record<PolicyLang, string> = {
-  en: 'October 3, 2026', es: '3 de octubre de 2026', fr: '3 octobre 2026',
-  pt: '3 de outubro de 2026', it: '3 ottobre 2026', de: '3. Oktober 2026',
+  en: 'October 7, 2026', es: '7 de octubre de 2026', fr: '7 octobre 2026',
+  pt: '7 de outubro de 2026', it: '7 ottobre 2026', de: '7. Oktober 2026',
 };
 const APPLE_STOP_USING_URL = 'https://support.apple.com/en-us/102571';
 
@@ -56,6 +57,7 @@ const linkClass = 'text-white underline decoration-white/30 underline-offset-4 h
 export default function PrivacyPage() {
   useNucleoPages();
   const language = policyLang();
+  const news = NEWS_PRIVACY_COPY[language];
   const tr = (en: string, es: string) => (language === 'es' ? es : translateText(language, en));
   const strong = (text: string) => <span className="text-white">{text}</span>;
 
@@ -67,10 +69,7 @@ export default function PrivacyPage() {
         <title>{tr('Privacy Policy | Bobby', 'Aviso de privacidad | Bobby')}</title>
         <meta
           name="description"
-          content={tr(
-            'Privacy policy for the Bobby iPhone app and bobbyprotocol.xyz: market analysis and optional narration on iPhone, an optional Sign in with Apple account that syncs progress and Trader Land, no ads and no tracking.',
-            'Aviso de privacidad de la app Bobby para iPhone y de bobbyprotocol.xyz: análisis de mercado y narración opcional en iPhone, cuenta opcional con Iniciar sesión con Apple para sincronizar tu progreso y Trader Land, sin anuncios y sin rastreo.',
-          )}
+          content={news.metaDescription}
         />
       </Helmet>
 
@@ -92,10 +91,7 @@ export default function PrivacyPage() {
 
         <Section title={tr('The short version', 'En resumen')}>
           <p>
-            {tr(
-              'Bobby has no ads and does not track you across apps or websites. We do not sell personal data.',
-              'Bobby no tiene anuncios y no te rastrea entre apps ni sitios web. No vendemos datos personales.',
-            )}
+            {news.summary}
           </p>
           <p>
             {tr(
@@ -233,6 +229,13 @@ export default function PrivacyPage() {
         <Section title={tr('Dictation and your AI choice', 'Dictado y tu elección sobre la IA')}>
           <p>{tr('Dictation is optional and typing is always available. Bobby listens only while you hold the button, for at most 60 seconds, once you have allowed the microphone and speech recognition in iOS. From iPhone version 1.7, your speech is transcribed on the iPhone when Apple’s recognition for the app language is installed on it; otherwise, and only after you have allowed speech recognition, the audio goes to Apple’s speech service, which transcribes it in the same language and handles it under its own terms. Bobby does not store the audio and does not receive it on its servers. In versions 1.5 and 1.6, dictation ran only on the iPhone. If recognition is unavailable or you decline the permission, use the keyboard. The resulting question text is processed like a typed question. On the website, dictation uses your browser’s speech recognition, as before; the browser may send audio to its own speech service.', 'El dictado es opcional y siempre puedes escribir. Bobby escucha solo mientras mantienes pulsado el botón, durante un máximo de 60 segundos, una vez que permites el micrófono y el reconocimiento de voz en iOS. Desde la versión 1.7 para iPhone, tu voz se transcribe en el iPhone si el reconocimiento de Apple para el idioma de la app está instalado en él; si no, y solo después de que hayas permitido el reconocimiento de voz, el audio va al servicio de voz de Apple, que lo transcribe en ese mismo idioma y lo trata según sus propios términos. Bobby no guarda el audio ni lo recibe en sus servidores. En las versiones 1.5 y 1.6, el dictado funcionaba solo en el iPhone. Si el reconocimiento no está disponible o rechazas el permiso, usa el teclado. El texto resultante se procesa como una pregunta escrita. En el sitio web, el dictado usa el reconocimiento de voz de tu navegador, como antes; el navegador puede enviar audio a su propio servicio de voz.')}</p>
           <p>{tr('You can withdraw AI consent from Profile → Risk notice → Withdraw AI consent. This stops future AI analysis and generated-speech requests in the app until you agree again; it does not erase requests already processed by providers. Withdrawal does not delete your account or locally saved content. The full notice includes privacy and support links. To disable microphone access separately, use iOS Settings → Bobby; to silence replies, turn narration off in Profile or Squad.', 'Puedes retirar el consentimiento de IA en Perfil → Aviso de riesgo → Retirar consentimiento de IA. Esto detiene nuevas solicitudes de análisis y voz generada en la app hasta que vuelvas a aceptar; no borra las solicitudes ya procesadas por los proveedores. Retirarlo no borra tu cuenta ni el contenido guardado localmente. El aviso completo incluye enlaces de privacidad y soporte. Para desactivar el micrófono por separado, usa Configuración de iOS → Bobby; para silenciar respuestas, desactiva la narración en Perfil o Squad.')}</p>
+        </Section>
+
+        <Section title={news.title}>
+          <p>{news.choice}</p>
+          <p>{news.selection}</p>
+          <p>{news.delivery}</p>
+          <p>{news.withdrawal}</p>
         </Section>
 
         <Section title={tr('Market briefings and notifications (Bobby Pro)', 'Resúmenes de mercado y notificaciones (Bobby Pro)')}>
@@ -431,7 +434,7 @@ export default function PrivacyPage() {
           <p>{tr('These processors act on our behalf, only to deliver the product:', 'Estos proveedores procesan datos en nuestro nombre, solo para prestar el servicio:')}</p>
           <ul className="list-disc space-y-1 pl-5">
             <li>{strong('Apple')} — {tr('Sign in with Apple; speech recognition for dictation on iPhone (from version 1.7: on the device when the language is installed, otherwise Apple’s speech service receives the audio to transcribe it); and the Bobby Pro App Store subscription (Apple processes the payment; we never see your card).', 'Iniciar sesión con Apple; el reconocimiento de voz del dictado en iPhone (desde la versión 1.7: en el dispositivo si el idioma está instalado; si no, el servicio de voz de Apple recibe el audio para transcribirlo); y la suscripción Bobby Pro del App Store (Apple procesa el pago; nunca vemos tu tarjeta).')}</li>
-            <li>{strong(tr('Apple Push Notification service', 'Servicio de notificaciones push de Apple (APNs)'))} — {tr('delivers Bobby Pro briefing notifications to your iPhone; it receives the device push token and the generic notification text, never your name, assets or report content.', 'entrega en tu iPhone las notificaciones de los resúmenes de Bobby Pro; recibe el token de notificaciones del dispositivo y el texto genérico de la notificación, nunca tu nombre, tus activos ni el contenido del reporte.')}</li>
+            <li>{strong(tr('Apple Push Notification service', 'Servicio de notificaciones push de Apple (APNs)'))} — {news.apns}</li>
             <li>{strong('Supabase')} — {tr('authentication, synced progress, Trader Land, market briefings (including private storage of briefing audio), and product records.', 'autenticación, progreso sincronizado, Trader Land, resúmenes de mercado (incluido el almacenamiento privado del audio de los resúmenes) y registros del producto.')}</li>
             <li>{strong('OpenAI')} — {tr('fallback text analysis when Anthropic is unavailable, optional speech generation (including Bobby Pro briefing narration from shared report text), shared briefing text when Anthropic is unavailable, and public-name moderation; on the website, also live voice.', 'análisis de texto de respaldo cuando Anthropic no está disponible, narración opcional (incluida la de los resúmenes de Bobby Pro a partir del texto compartido del reporte), texto compartido de los resúmenes cuando Anthropic no está disponible y moderación de nombres públicos; en el sitio web, también la voz en vivo.')}</li>
             <li>{strong('Anthropic')} — {tr('primary text analysis for the desk, including the short memory summary described above, and the shared text of Bobby Pro market briefings (which carries no account data).', 'análisis de texto principal del desk, incluido el resumen breve de memoria descrito arriba, y el texto compartido de los resúmenes de mercado de Bobby Pro (que no lleva datos de tu cuenta).')}</li>
