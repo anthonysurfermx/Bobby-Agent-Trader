@@ -531,11 +531,27 @@ final class HarnessCenter: ObservableObject {
         Task { await replan() }
     }
 
+    /// They tapped something of Bobby's that asks Bobby a question through the page: the button of
+    /// the line on the glass, a row of a board. The line they acted on leaves the glass now, whatever
+    /// they said about follow-ups, and nothing is written yet. The tap counts once the page asks the
+    /// question (`notePicked(symbol:at:)`, with the moment this returns): a tap whose question never
+    /// reached Bobby was not an answer to anything. Nil when nothing is kept for this reader.
+    @discardableResult
+    func noteTapped(symbol: String) -> Date? {
+        guard keeping else { return nil }
+        if focus?.symbol == symbol.uppercased() { focus = nil }
+        if move?.symbol == symbol.uppercased() { move = nil }
+        return now()
+    }
+
     /// They acted on something Bobby put in front of them inside the app. The line they acted on
     /// leaves the glass whatever they said about follow-ups; the act is written only with them on.
-    func notePicked(symbol: String) {
+    /// `tapped`: when they tapped, for an act that is only known now (the page has just asked the
+    /// question native offered it). It is written with that moment, so what answers a follow-up is
+    /// decided as it would have been at the tap.
+    func notePicked(symbol: String, at tapped: Date? = nil) {
         guard keeping else { return }
-        let clock = now()
+        let clock = tapped ?? now()
         if focus?.symbol == symbol.uppercased() { focus = nil }
         if move?.symbol == symbol.uppercased() { move = nil }
         guard recording else { return }

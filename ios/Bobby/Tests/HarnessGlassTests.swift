@@ -284,6 +284,8 @@ final class HarnessGlassTests: XCTestCase {
         profile.onboarded = true
         session.companions.companionId = "orb"
         session.briefingSheetDelay = 0
+        // This suite does not test the wait for a page that is waking (NucleoReadStartTests does).
+        session.wakeTick = 0
         session.briefingGate = BriefingTapGate(appActive: { true }, signedIn: { false }, deskBusy: { false }, listening: { false }, narrating: { false })
         let recorder = Recorder()
         session.emitter = recorder

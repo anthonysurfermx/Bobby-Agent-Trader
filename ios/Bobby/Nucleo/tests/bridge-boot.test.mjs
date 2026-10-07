@@ -57,7 +57,7 @@ class Element {
 }
 
 function harness({ legacyEvents = false, language = 'en', rejectCollections = false, nudgeActive = true,
-  suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null } = {}) {
+  suggestions = { v: 1, quickAccess: [] }, holdAsks = false, measure = null, stallCollections = false } = {}) {
   const nodes = new Map(), calls = [], errors = [], pending = [];
   const made = () => Object.assign(new Element(), { measure });
   for (const match of template.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)) {
@@ -90,6 +90,8 @@ function harness({ legacyEvents = false, language = 'en', rejectCollections = fa
     webkit: { messageHandlers: { nucleo: { postMessage(envelope) {
       calls.push(JSON.parse(JSON.stringify(envelope)));
       if (rejectCollections && ['theses', 'roster', 'island', 'suggestions'].includes(envelope.method)) return Promise.reject(new Error('offline'));
+      // Native never answers the two collections the page waits for before it starts: the page starts on its own clock.
+      if (stallCollections && ['theses', 'roster'].includes(envelope.method)) return new Promise(() => {});
       // A read the test answers itself (answer()), read silently so the page's own clock runs it.
       if (holdAsks && envelope.method === 'ask') return new Promise((resolve) => pending.push((result) => resolve({ v: 1, ok: true, result })));
       if (holdAsks && envelope.method === 'speak') return Promise.resolve({ v: 1, ok: true, result: { status: 'muted' } });
@@ -532,4 +534,112 @@ test('the onboarding page marks a first question picked on a chip the same way, 
   assert.equal(sources.length, 3);
   assert.deepEqual(sources.filter((src) => src === 'chip'), ['chip']);
   assert.ok(sources.includes('voice'));
+});
+
+// ---- PINNED FACTS native works around (2026-10-08). The page is not changed here: the Android copy is pinned to it.
+// The page takes `ask.start` only from IDLE or FOLLOWUPS, says nothing when it does not and remembers nothing, and its
+// own clock stands still under a native sheet. So a board opened the moment the page asks for its session freezes it
+// in WAKE, and the question a row of that board asks is dropped: the sheet closes onto the home and nothing is asked.
+// NucleoSession makes up for both (Sources/Nucleo/NucleoSession.swift, "The page wakes up" and "Reads native starts"):
+// a stored follow-up tap opens its board only once the page has had `wakeTick` x `wakeTicks` in front with nothing
+// over it, and a question the page did not take is offered again with the same single-use token, `readOfferRepeats`
+// times, `readOfferSpacing` apart. If a test below changes, those numbers and Tests/NucleoReadStartTests.swift (which
+// drives the real session against a stand-in for this page) change with it. ----
+test('cold start: a board opened right after the session reply freezes the wake, and the question its row asks is dropped', async () => {
+  const app = harness({ holdAsks: true });
+  const emit = (name, payload) => app.context.nucleoBridge.emit(name, payload);
+  const question = 'How does NVDA look today?';
+  app.boot(); await flush();
+  assert.equal(app.calls[0].method, 'session');
+  assert.equal(app.context.nucleo.state(), 'WAKE', 'the session reply came: the page starts to wake');
+  // What native did until 2026-10-08: the stored week tap opened its board on the turn after that reply.
+  emit('native.sheet', { route: 'followUp', state: 'open' });
+  const frozen = app.context.nucleo.time();
+  app.advance(5); await flush();
+  assert.equal(app.context.nucleo.time(), frozen, 'under a sheet the page does not run: five seconds pass and its clock has not moved');
+  assert.equal(app.context.nucleo.state(), 'WAKE', 'so it never reaches the idle home while the board is up');
+  // The person taps NVDA: the sheet closes and the question follows it.
+  emit('native.sheet', { route: 'followUp', state: 'closed' });
+  emit('ask.start', { token: 'tok-week', question });
+  await flush();
+  assert.equal(app.context.nucleo.state(), 'WAKE', 'the page is still waking: it stays out of SENDING');
+  assert.deepEqual(asksOf(app), [], 'and asks nothing');
+  // It does not keep the question for later either.
+  app.advance(1.2); await flush();
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.deepEqual(asksOf(app), [], 'the home is idle and the question is gone: only native can offer it again');
+  // What native does now: the same token, offered again, is taken from the idle home at once.
+  emit('ask.start', { token: 'tok-week', question });
+  assert.equal(app.context.nucleo.state(), 'SENDING');
+  assert.deepEqual(asksOf(app), [{ token: 'tok-week' }], 'the page takes a question by calling ask with its token, in the same turn');
+  assert.deepEqual(app.errors, []);
+});
+
+test('a page in front, with nothing over it, is at its idle home 1.4 s after the session reply at the latest', async () => {
+  // The fast road: native answers theses and roster at once, the page starts with them and wakes for 0.9 s.
+  const fast = harness();
+  fast.boot(); await flush();
+  assert.equal(fast.context.nucleo.state(), 'WAKE');
+  fast.advance(0.85); await flush();
+  assert.equal(fast.context.nucleo.state(), 'WAKE');
+  fast.advance(0.1); await flush();
+  assert.equal(fast.context.nucleo.state(), 'IDLE', '0.9 s of its own clock');
+  // The slow road: the two collections never answer, the page starts by itself after 0.5 s and then wakes.
+  const slow = harness({ stallCollections: true });
+  slow.boot(); await flush();
+  assert.equal(slow.context.nucleo.state(), 'BOOT');
+  slow.advance(0.45); await flush();
+  assert.equal(slow.context.nucleo.state(), 'BOOT');
+  slow.advance(0.1); await flush();
+  assert.equal(slow.context.nucleo.state(), 'WAKE', 'it starts without them after 0.5 s');
+  slow.advance(0.8); await flush();
+  assert.equal(slow.context.nucleo.state(), 'WAKE');
+  slow.advance(0.1); await flush();
+  assert.equal(slow.context.nucleo.state(), 'IDLE', '0.5 s + 0.9 s: native waits 1.6 s before a board may cover it');
+  assert.ok(slow.context.nucleo.time() <= 1.6);
+  assert.deepEqual(fast.errors.concat(slow.errors), []);
+});
+
+test('one token offered several times is asked once: taken from the idle home, ignored while that read is on its way', async () => {
+  const app = await idle();
+  const offer = () => app.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question: 'How does NVDA look today?' });
+  offer();
+  assert.equal(app.context.nucleo.state(), 'SENDING');
+  offer(); offer();
+  await flush(); app.advance(1.2); await flush();
+  offer();
+  assert.deepEqual(asksOf(app), [{ token: 'tok-1' }], 'a second offer of a token the page already took changes nothing');
+  assert.deepEqual(app.errors, []);
+});
+
+test('a page that is coming home takes a question offered again once it is there; a finished read and an open keyboard never do', async () => {
+  const question = 'How does NVDA look today?';
+  // RETURNING (a read was closed): 0.8 s for the cards + 0.9 s. An offer during it is dropped, the next one is taken.
+  const home = await idle();
+  await personRead(home, okRead());
+  tap(home, home.nodes.get('close'));
+  assert.equal(home.context.nucleo.state(), 'RETURNING');
+  home.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question });
+  assert.equal(asksOf(home).length, 1, 'only their own read was asked');
+  home.advance(1.8); await flush();
+  assert.equal(home.context.nucleo.state(), 'IDLE', 'home within the 4 s native keeps offering for');
+  home.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question });
+  assert.deepEqual(asksOf(home).slice(1), [{ token: 'tok-1' }]);
+  // HANDBACK (a read just delivered, its row showing) stays for 90 s: no offer made in a few seconds is taken.
+  const read = await idle();
+  await personRead(read, okRead());
+  assert.equal(read.context.nucleo.state(), 'HANDBACK');
+  for (let second = 0; second < 5; second++) {
+    read.context.nucleoBridge.emit('ask.start', { token: 'tok-2', question });
+    read.advance(1); await flush();
+  }
+  assert.equal(read.context.nucleo.state(), 'HANDBACK');
+  assert.equal(asksOf(read).length, 1, 'a board row tapped over a finished read asks nothing: only a page change can fix that');
+  // TYPING ("Another question"): the same, for as long as the keyboard is open.
+  tap(read, chipsOf(read)[0]);
+  assert.equal(read.context.nucleo.state(), 'TYPING');
+  read.context.nucleoBridge.emit('ask.start', { token: 'tok-3', question });
+  assert.equal(read.context.nucleo.state(), 'TYPING');
+  assert.equal(asksOf(read).length, 1);
+  assert.deepEqual(home.errors.concat(read.errors), []);
 });
