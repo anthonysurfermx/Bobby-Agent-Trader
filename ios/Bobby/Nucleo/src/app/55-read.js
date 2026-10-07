@@ -371,6 +371,7 @@ function setHorizon(hrs){
 
 /* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
 var DYING = [];
+function oneTapOff(){ return !!SES && SES.oneTap === false; }
 function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
@@ -378,7 +379,9 @@ function showIdleSuggestions(){
   var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
     'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
-  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+  /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
+     session) the home offers no chip that asks by itself. The pill still takes their own question. */
+  ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
     var sym = String(item && item.symbol || '').toUpperCase();
     if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;

@@ -1215,23 +1215,66 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     de: /^(?:was|warum|wieso|weshalb|weswegen|welche[rsnm]?|wor(?:an|auf|in|um|uber)|wo(?:durch|von|mit|fur))(?![a-z])/
   };
   /* THE list: the words product copy never uses (buy, sell, profit, guaranteed, returns, advice, signal, alert)
-     with their conjugations and compounds in the six languages. Each pattern is tried on every folded word
+     with their conjugations and compounds in the six languages, and the claims Bobby never makes about itself
+     (that it watched, monitored, noticed or detected something). Each pattern is tried on every folded word
      (lowercase, accents removed). Unanchored patterns match inside a word, so "Kaufsignal" and "unprofitable"
      are caught; the anchored ones keep innocent neighbours out (comprendre, involucra, Gesellschaft, Vertrag,
-     arsenal). What still over-matches (vendredi, a consejo that is a board) only costs a chip. */
+     arsenal). What still over-matches (vendredi, a consejo that is a board, a "watch" that is the reader's own)
+     only costs a chip. */
   var NEXT_FORBIDDEN = [
     /* buy */ /buy|bought|purchas|kauf|acquist/, /^r?ach[ea]t/,
-    /^compr(?:a|as|an|am|ar|o|e|es|en|em|ei|ou|i|amos|ais|emos|eis|iamo|ate|ano|ando|ad[oa]s?|at[oaie]|ador[a-z]*|ator[ei]|ar[a-z]{1,4}|er[oae]i?|al[oa]s?|aba[a-z]*|aste|aron)$/,
+    /* comprar, in every ending (comprase, comprándolo, compraríamos, comprerebbe, comprava): the stem, minus the
+       families that only look like it (comprender, comprensión, compreender, comprobar, comprueba, comprovar,
+       compromiso, comprimir, compris, compreso, compresso) */
+    /^compr(?!end|ens|eend|eens|ehen|ob|ov|ueb|om|im|is|ess|es[oaie]$)[a-z]/,
     /* sell */ /^(?:re)?sell|vend/, /^(?:sold|ventas?|ventes?)$/,
-    /* profit */ /profit|gananci|benefic|guadagn|gew[aio]nn/, /^lucr/,
+    /* profit */ /profit|gananci|benefic|guadagn|gew[aio]nn/, /^lucr/, /^gain/, /^gagn/, /^ganh/,
     /* guaranteed */ /guarant|garant|garanz/,
-    /* returns */ /^returns$/, /rendim|rendem|rentab|rendit|retorn/, /^ertrag/,
+    /* returns */ /^return/, /rendim|rendem|rentab|rendit|retorn/, /^ritorn/, /^ertrag/,
     /* advice */ /^advi[cs]/, /recommend|recomi?end|recommand|raccomand|consej|asesor|assessor|conseil|conselh|consigl|consulenz|ratschl|berat|empf(?:ie|e|a|o)hl/,
+    /^(?:rat|rats|ratst|raten|ratet|riet|rietst|rieten|geraten|abraten|anraten|zuraten)$/,
     /* signal */ /signal|signaux|segnal/, /^(?:senal|sinal|sinais)/,
-    /* alert */ /alert|allert|allarm|alarm/
+    /* alert */ /alert|allert|allarm|alarm|warn/,
+    /* watched, monitored, noticed, detected */ /^watch/, /monitor/, /^notic/, /detect|detet/, /observ|osserv/,
+    /^vigi/, /surveill/, /remarqu/, /sorvegli/, /rilev/, /beobacht/, /uberwach/, /bemerk/, /entdeck/, /auff[ae]ll|aufgefall/,
+    /^not(?:o|ou|ei|aste|aron|aram|ado|ato|ata|ando|amos|ar|are|ava|avo)$/
   ];
+  /* Whether or when to act, dressed as a what or a why ("Why not get in now?", "What is the best moment to…?").
+     Phrases, so each is tried on the folded text of the reply's language, not word by word. A verb that also means
+     "to expect" (esperar, attendre, aspettare) only counts in the turns that mean waiting, "moment" does not count
+     where it only means "now" (NEXT_NOW is taken out first: "en ce moment", "at the moment"), and in English a verb
+     the market itself does ("NVDA entered a correction", "the market is waiting for…") counts only as the reader's. */
+  var NEXT_NOW = {
+    en: /(?:^| )(?:at|for) the moment(?![a-z])/g,
+    es: /(?:^| )(?:en este|en ese|por el|de) momento(?![a-z])/g,
+    fr: /(?:^| )(?:en ce|pour le|a ce) moment(?![a-z])/g,
+    pt: /(?:^| )(?:neste|nesse|no|de|por) momento(?![a-z])/g,
+    it: /(?:^| )(?:in questo|in quel|al|per il) momento(?![a-z])/g,
+    de: /(?:^| )im moment(?![a-z])/g
+  };
+  var NEXT_ACTS = {
+    en: /(?:^| )(?:(?:to|not|i|we|you|should|could|would|can) (?:get into|enter|exit|wait)|(?:get|gets|getting|got) (?:in|out)|jump(?:s|ing)? in|(?:enter|exit)(?:ing)? (?:now|today|here|early|late)|entry|entries|why wait|wait (?:on|until|before|longer|and see)|moment|time to|too (?:late|early|soon))(?![a-z])/,
+    es: /(?:^| )(?:entrar|entrada|entradas|salir|momento|momentos|hora de|por que (?:no )?esperar|esperar (?:a|para|antes|mas|todavia|un poco|con)|demasiado (?:tarde|pronto))(?![a-z])/,
+    fr: /(?:^| )(?:entrer|entree|entrees|sortir|moment|moments|temps de|heure de|pourquoi (?:ne pas )?attendre|attendre (?:avant|encore|plus|un peu|davantage)|patienter|trop (?:tard|tot))(?![a-z])/,
+    pt: /(?:^| )(?:entrar|entrada|entradas|sair|momento|momentos|hora de|altura de|por ?que (?:nao )?esperar|esperar (?:a|para|antes|mais|ainda|um pouco|pela|pelo)|demasiado (?:tarde|cedo)|tarde demais|cedo demais)(?![a-z])/,
+    it: /(?:^| )(?:entrare|entrata|entrate|ingresso|ingressi|uscire|momento|momenti|ora di|tempo di|perche (?:non )?(?:aspettare|attendere)|(?:aspettare|attendere) (?:ancora|prima|a|di piu|un po)|troppo (?:tardi|presto))(?![a-z])/,
+    de: /(?:^| )(?:[a-z]*einst(?:ieg|eig)[a-z]*|einzusteigen|aussteigen|auszusteigen|ausstieg|moment|moments|momente|zeitpunkt|zeitpunkte|zeit (?:zu|fur)|warten|abwarten|abzuwarten|zu (?:spat|fruh))(?![a-z])/
+  };
+  /* A price said in words is still a price: a number word right before a money or percent word ("two hundred
+     dollars", "diez por ciento", "zehn Prozent"). One table for the six languages. Articles that double as "one"
+     (a, un, ein) are left out, so the dollar or a point can still be the subject of a question. */
+  var NEXT_NUMBER_WORDS = 'one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million|billion|half|dozen'
+    + '|uno|dos|tres|cuatro|cinco|seis|siete|ocho|nueve|diez|once|doce|quince|veinte|treinta|cuarenta|cincuenta|sesenta|setenta|ochenta|noventa|cien|ciento|cientos|doscientos|trescientos|quinientos|mil|millon|millones|medio'
+    + '|deux|trois|quatre|cinq|sept|huit|neuf|dix|onze|douze|quinze|vingt|trente|quarante|cinquante|soixante|cent|cents|mille|millions|demi'
+    + '|dois|duas|quatro|sete|oito|nove|dez|doze|vinte|trinta|quarenta|cinquenta|sessenta|oitenta|cem|cento|duzentos|trezentos|quinhentos|milhao|milhoes|meio'
+    + '|due|tre|quattro|cinque|sei|sette|otto|dieci|undici|dodici|quindici|venti|trenta|quaranta|cinquanta|sessanta|settanta|ottanta|novanta|duecento|mila|milione|milioni|mezzo'
+    + '|zwei|drei|vier|funf|sechs|sieben|acht|neun|zehn|elf|zwolf|funfzehn|zwanzig|dreissig|dreißig|vierzig|funfzig|sechzig|siebzig|achtzig|neunzig|hundert|zweihundert|tausend|millionen|halb';
+  var NEXT_UNIT_WORDS = 'dollars?|bucks?|usd|euros?|eur|cents?|pounds?|pesos?|dolar(?:es)?|reais|centavos?|centimos?|dollari|centesimi|yen'
+    + '|percent|per cent|por ciento|pour cent|por cento|per cento|prozent|points?|puntos?|pontos?|punti|punkten?';
+  var NEXT_SPELLED = new RegExp('(?:^| )(?:' + NEXT_NUMBER_WORDS + ')(?: (?:of|de|di|d))? (?:' + NEXT_UNIT_WORDS + ')(?![a-zß])');
+  function escapeRx(s) { return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function fold(s) { return String(s).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
-  /** The checked question, or why it is not shown: missing · long · number · shape · opener · word · same.
+  /** The checked question, or why it is not shown: missing · long · number · shape · opener · act · word · same.
    *  `asked` is the question this read answered: Bobby never offers the same one again (a tap would loop). */
   function nextQuestion(raw, symbol, lang, asked) {
     if (typeof raw !== 'string') return { text: null, reason: 'missing' };
@@ -1239,16 +1282,24 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     if (!text) return { text: null, reason: 'missing' };
     var n = Array.from(text).length;
     if (n > NEXT_MAX) return { text: null, reason: 'long' };
-    /* No price, no level, no figure of any kind: the only digits allowed are the asset's own ticker (PETR4.SA). */
-    var sym = String(symbol || '').toUpperCase(), bare = text;
-    [sym, sym.split('.')[0]].forEach(function (s) { if (s) bare = bare.split(s).join(' '); });
+    /* No price, no level, no figure of any kind: the only digits allowed are the asset's own ticker, where it stands
+       as a word of its own (PETR4.SA, and its short form PETR4). A short form that is all digits is not taken out:
+       "2330" beside 2330.TW is a number like any other. */
+    var sym = String(symbol || '').toUpperCase(), base = sym.split('.')[0], bare = text;
+    [sym].concat(/[A-Z]/.test(base) ? [base] : []).forEach(function (s) {
+      if (s) bare = bare.replace(new RegExp('(^|[^A-Za-z0-9.])' + escapeRx(s) + '(?![A-Za-z0-9])', 'g'), '$1 ');
+    });
     if (/\d/.test(bare) || /[$€£¥₿₽₹%‰]/.test(text)) return { text: null, reason: 'number' };
     /* One sentence that ends in its question mark: never a statement, never a statement with a question after it. */
     if (n < NEXT_MIN || !NEXT_CHARS.test(text) || !/^¿?[^?¿]+\?$/.test(text) || sentences(text).length !== 1) return { text: null, reason: 'shape' };
     var folded = fold(text.replace(/^¿\s*/, ''));
+    var spoken = folded.replace(/[^a-zßœæ0-9]+/g, ' ').trim();
+    if (NEXT_SPELLED.test(spoken)) return { text: null, reason: 'number' };
     var opens = NEXT_OPENS[lang2(lang)];
     if (!opens || !opens.test(folded)) return { text: null, reason: 'opener' };
-    var words = folded.split(/[^a-zßœæ0-9]+/).filter(Boolean);
+    var acts = NEXT_ACTS[lang2(lang)], now = NEXT_NOW[lang2(lang)];
+    if (acts && acts.test(now ? spoken.replace(now, ' ') : spoken)) return { text: null, reason: 'act' };
+    var words = spoken.split(' ').filter(Boolean);
     for (var i = 0; i < words.length; i++) {
       for (var k = 0; k < NEXT_FORBIDDEN.length; k++) if (NEXT_FORBIDDEN[k].test(words[i])) return { text: null, reason: 'word' };
     }
@@ -1491,6 +1542,8 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
       next: nextQuestion(syn && syn.followUp, sym, r.language || lang, r.question).text,
       /* who started this read: 'person' (they asked), 'followUp' (native started it from a follow-up), 'restored' */
       origin: typeof opts.origin === 'string' && opts.origin ? opts.origin : 'person',
+      /* false only when native says the next read would be refused: then no one-tap question is shown (§3.5) */
+      oneTap: r.oneTap !== false,
       verdict: { key: v, word: word, hue: VERDICT[v].hue, color: VERDICT[v].color, core: VERDICT[v].core, amb: VERDICT[v].amb,
         direction: r.agents.direction },
       ring: ring,
@@ -1631,14 +1684,17 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
    *  model carries one (asked, on a tap, as a follow-up of this read), "Another question about {SYM}" (the person types
    *  it), then REAL symbols from suggestions(): the person's quick access first, the day's movers only in a slot quick
    *  access left empty, never the current symbol. A read the person did not start by themselves (a follow-up, a restored
-   *  page) never gets a mover or a starter asset: its chips are about their own question and their own assets. */
+   *  page) never gets a mover or a starter asset: its chips are about their own question and their own assets.
+   *  When native says the next read would be refused (`oneTap: false`) every one-tap question goes: what is left is
+   *  "Another question", which asks nothing until the person has typed it. */
   function followUps(model, sugg, lang, opts) {
     lang = lang2(lang); opts = opts || {};
-    var sym = String(model.symbol || '').toUpperCase(), out = [];
-    if (typeof model.next === 'string' && model.next && model.requestId) {
+    var sym = String(model.symbol || '').toUpperCase(), out = [], oneTap = model.oneTap !== false;
+    if (oneTap && typeof model.next === 'string' && model.next && model.requestId) {
       out.push({ label: nextLabel(model.next), style: 'ask', action: { followUpOf: model.requestId, question: model.next, symbol: sym, next: true } });
     }
     out.push({ label: t(lang, 'follow.another', { symbol: sym }), action: { followUpOf: model.requestId, symbol: sym } });
+    if (!oneTap) return out;
     var seen = {}; seen[sym] = 1;
     var own = model.origin != null && model.origin !== 'person';
     var qa = (sugg && sugg.quickAccess) || [], mv = own ? [] : ((sugg && sugg.movers) || []);
@@ -1694,7 +1750,7 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     sentences: sentences, firstSentence: firstSentence, clipWords: clipWords,
     syllables: syllables, wordTimes: wordTimes,
     build: build, failure: failure, resetDay: resetDay, xpChip: xpChip, followUps: followUps, thesisView: thesisView,
-    nextQuestion: nextQuestion, NEXT: { min: NEXT_MIN, max: NEXT_MAX, opens: NEXT_OPENS, forbidden: NEXT_FORBIDDEN },
+    nextQuestion: nextQuestion, NEXT: { min: NEXT_MIN, max: NEXT_MAX, opens: NEXT_OPENS, forbidden: NEXT_FORBIDDEN, acts: NEXT_ACTS, spelled: NEXT_SPELLED },
     _internal: { pulseAgrees: pulseAgrees, planOf: planOf, closedVolumeRatio: closedVolumeRatio, niceStep: niceStep }
   };
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -3319,6 +3375,7 @@ function setHorizon(hrs){
 
 /* ---- chips: born from the pill, one row from x=20 bleeding off the right edge ---- */
 var DYING = [];
+function oneTapOff(){ return !!SES && SES.oneTap === false; }
 function showIdleSuggestions(){
   if (ST.name !== 'IDLE') return;
   /* A starter chip reads as the company; its action keeps the exchange symbol the server resolves
@@ -3326,7 +3383,9 @@ function showIdleSuggestions(){
   var CHIP_NAMES = { 'NVDA':'NVIDIA', 'MC.PA':'LVMH', 'OR.PA':'L’Oréal', 'EDP.LS':'EDP', 'GALP.LS':'Galp',
     'PETR4.SA':'Petrobras', 'VALE3.SA':'Vale', 'ISP.MI':'Intesa Sanpaolo', 'ENEL.MI':'Enel', 'SAP.DE':'SAP', 'SIE.DE':'Siemens' };
   var list = [], seen = {};
-  ((SUGG && SUGG.quickAccess) || []).forEach(function(item){
+  /* Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false` in the
+     session) the home offers no chip that asks by itself. The pill still takes their own question. */
+  ((oneTapOff() ? [] : (SUGG && SUGG.quickAccess)) || []).forEach(function(item){
     var sym = String(item && item.symbol || '').toUpperCase();
     if (list.length >= 3 || seen[sym] || !/^[A-Z0-9.^=-]{1,20}$/.test(sym)) return;
     seen[sym] = 1;
@@ -4344,7 +4403,10 @@ function chipAct(c){
   if (a.followUpOf && a.question){ go('SENDING', { params: { followUpOf: a.followUpOf, question: a.question }, question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: true }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
-  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
+  /* what is left is a chip whose question Bobby wrote (an asset of the idle home, an asset or a mover of a read's row).
+     `chip` tells native so: the person picked the asset, the words were not theirs, and the harness never takes such a
+     read for a question they asked by themselves (§3.5). */
+  if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
   enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
@@ -5763,7 +5825,13 @@ function consentWithdrawn(){
 }
 function wire(){
   if (!BR) return;
-  BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); nudgeSync(); });
+  BR.on('session.changed', function(s){
+    var walled = oneTapOff();
+    applySession(s, false);
+    if (ST.name === 'IDLE') pillMode(idleMode());
+    /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
+    if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
+  });
   BR.on('account.changed', accountChanged);
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });

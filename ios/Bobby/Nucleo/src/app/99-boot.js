@@ -90,7 +90,13 @@ function consentWithdrawn(){
 }
 function wire(){
   if (!BR) return;
-  BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); nudgeSync(); });
+  BR.on('session.changed', function(s){
+    var walled = oneTapOff();
+    applySession(s, false);
+    if (ST.name === 'IDLE') pillMode(idleMode());
+    /* the last read was spent, or reads came back: the idle row loses or regains its one-tap chips at once */
+    if (oneTapOff() !== walled && ST.name === 'IDLE') showIdleSuggestions(); else nudgeSync();
+  });
   BR.on('account.changed', accountChanged);
   BR.on('consent.withdrawn', consentWithdrawn);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });

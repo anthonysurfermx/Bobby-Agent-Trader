@@ -452,3 +452,84 @@ test('a restored read stands at the hand-back with its row at once, and never wi
   assert.deepEqual(rowOf(app), [NEXT.en.question, 'Another question about NVDA']);
   assert.deepEqual(app.errors, []);
 });
+
+// ---- a chip whose question Bobby wrote says so when it asks (review of 2026-10-07): native then never takes it
+// for a question the person asked by themselves, so it starts no chain of follow-ups (ARCHITECTURE.md §3.5) ----
+test('a one-tap chip tells native the words were Bobby’s; a typed question and “another question” do not', async () => {
+  const app = await idle();
+  assert.deepEqual(rowOf(app), ['NVIDIA', 'BTC', 'ETH']);
+  tap(app, chipsOf(app)[1]);
+  assert.deepEqual(asksOf(app), [{ question: 'How is BTC looking?', chip: true }], 'an asset of the idle home');
+  await handBack(app, okRead({ synthesis: synthesis(NEXT.en.question) }));
+  assert.deepEqual(rowOf(app), [NEXT.en.question, 'Another question about NVDA', 'How is BTC looking?']);
+  tap(app, chipsOf(app)[2]);
+  assert.deepEqual(asksOf(app)[1], { question: 'How is BTC looking?', chip: true }, 'an asset of the row after a read');
+  await handBack(app, okRead({ requestId: '22222222-2222-4222-8222-222222222222' }));
+  // A mover asked from the row is Bobby's question too.
+  const movers = await idle({ suggestions: { v: 1, quickAccess: [{ symbol: 'NVDA' }], movers: [{ symbol: 'TSLA', name: 'Tesla', changePct: 4.1 }] } });
+  await personRead(movers, okRead());
+  tap(movers, chipsOf(movers)[1]);
+  assert.deepEqual(asksOf(movers)[1], { question: 'How is TSLA looking?', chip: true });
+  // Their own words carry no mark: the keyboard after “another question”, and the CIO's question (native knows it).
+  const own = await idle();
+  await personRead(own, okRead({ synthesis: synthesis(NEXT.en.question) }));
+  tap(own, chipsOf(own)[0]);
+  assert.deepEqual(asksOf(own)[1], { followUpOf: READ_ID, question: NEXT.en.question });
+  assert.deepEqual(app.errors.concat(movers.errors, own.errors), []);
+});
+
+// ---- Bobby never invites someone into a wall: no one-tap question when native says the next read would be refused ----
+test('with no read left the hand-back row is “another question” alone, whoever started the read', async () => {
+  for (const language of ['en', 'es']) {
+    const another = NEXT[language].another;
+    const own = await idle({ language });
+    await personRead(own, okRead({ language, synthesis: synthesis(NEXT[language].question), oneTap: false }));
+    assert.deepEqual(rowOf(own), [another], 'their own read');
+    const started = await idle({ language });
+    started.context.nucleoBridge.emit('ask.start', { token: 'tok-1', question: 'q' });
+    await handBack(started, okRead({ language, oneTap: false }));
+    assert.deepEqual(rowOf(started), [another], 'a read Bobby started');
+    tap(started, chipsOf(started)[0]);
+    assert.equal(started.context.nucleo.state(), 'TYPING', 'the one chip left asks nothing by itself');
+    assert.deepEqual(own.errors.concat(started.errors), []);
+  }
+});
+
+test('with no read left the idle home shows no asset chip; they come back when a read does', async () => {
+  const app = harness({ holdAsks: true, suggestions: OWN });
+  app.session.oneTap = false;
+  app.boot(); await flush(); app.advance(1.2); await flush();
+  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.deepEqual(rowOf(app), [], 'nothing to tap that would end on the sign-in or the paywall');
+  // A nudge is native's own line and stays (it never starts a read by itself).
+  app.context.nucleoBridge.emit('session.changed', { ...app.session, nudge: { id: 'memory.offer', text: 'I can pick this up next time', cta: 'Remember it' } });
+  await flush();
+  assert.deepEqual(rowOf(app), ['Remember it']);
+  // Reads are back (a new week, a gift, Bobby Pro): native stops saying no and the row returns.
+  const open = { ...app.session }; delete open.oneTap;
+  app.context.nucleoBridge.emit('session.changed', open);
+  await flush(); app.advance(1.0); await flush();
+  assert.deepEqual(rowOf(app), ['NVIDIA', 'BTC', 'ETH']);
+  // And the other way: the last read was spent while the home was showing.
+  app.context.nucleoBridge.emit('session.changed', { ...open, oneTap: false });
+  await flush(); app.advance(1.0); await flush();
+  assert.deepEqual(rowOf(app), []);
+  assert.equal(asksOf(app).length, 0);
+  assert.deepEqual(app.errors, []);
+});
+
+test('the onboarding page marks a first question picked on a chip the same way, and no other', () => {
+  const source = read('../src/onboarding/60-fsm.js');
+  const body = source.match(/function firstAsk\(\)\{[^\n]+\}/);
+  assert.ok(body, 'firstAsk() is one line of the onboarding engine');
+  const firstAsk = (W) => JSON.parse(JSON.stringify(vm.runInNewContext('(' + body[0].replace('function firstAsk', 'function') + ')()', { W })));
+  assert.deepEqual(firstAsk({ qSrc: 'chip', question: 'How is NVDA looking?' }), { question: 'How is NVDA looking?', chip: true });
+  for (const qSrc of ['voice', 'type', '']) assert.deepEqual(firstAsk({ qSrc, question: 'Is NVDA expensive?' }), { question: 'Is NVDA expensive?' }, qSrc);
+  assert.equal(source.split('startAsk(firstAsk())').length, 3, 'both places the first question is asked from');
+  assert.doesNotMatch(source, /startAsk\(\{ ?question:/, 'no ask of a first question goes round it');
+  // A first question has three sources, and one of them is a chip.
+  const sources = [...source.matchAll(/commitQuestion\([^,()]+, '(\w+)'\)/g)].map((match) => match[1]).sort();
+  assert.equal(sources.length, 3);
+  assert.deepEqual(sources.filter((src) => src === 'chip'), ['chip']);
+  assert.ok(sources.includes('voice'));
+});

@@ -221,3 +221,91 @@ test('a read the person did not start never ends on a mover: only their own ques
     assert.ok(!labels.some((label) => /TSLA|AAPL/.test(label)));
   }
 });
+
+// ---- What the phone's own check let through (review of 2026-10-07). One line per form: each must stop the chip. ----
+const STOPPED = {
+  // A price said in words is still a price: a number word before a money or percent word.
+  number: {
+    en: ['What happens if NVDA loses two hundred dollars?', 'Why did NVDA fall ten percent this week?', 'Why did NVDA drop twenty points today?', 'What would five per cent more mean for NVDA?'],
+    es: ['¿Qué pasa si NVDA pierde doscientos dólares?', '¿Por qué cayó NVDA diez por ciento esta semana?', '¿Qué pasa si NVDA baja veinte puntos?'],
+    fr: ['Pourquoi NVDA a perdu dix pour cent cette semaine ?', 'Que se passe-t-il si NVDA perd cent dollars ?'],
+    pt: ['Por que a NVDA caiu dez por cento esta semana?', 'O que acontece se a NVDA perder cem dólares?'],
+    it: ['Perché NVDA ha perso dieci per cento questa settimana?', 'Cosa succede se NVDA perde cento dollari?'],
+    de: ['Warum fiel NVDA diese Woche um zehn Prozent?', 'Was passiert, wenn NVDA hundert Dollar verliert?'],
+  },
+  // The eight words, in the forms the list missed, and a claim that Bobby noticed, watched or detected.
+  word: {
+    en: ['What return does NVDA offer here?', 'Why did the returning buyers lift NVDA?', 'What gains are left in NVDA?', 'What did Bobby notice in NVDA this week?',
+      'What is Bobby watching in NVDA?', 'What did the desk detect in NVDA?', 'What is being monitored in NVDA?', 'Why is there a warning on NVDA?'],
+    es: ['¿Qué pasaría si comprase NVDA hoy mismo?', '¿Qué pasa comprándolo ahora en NVDA?', '¿Qué compraríamos en NVDA esta semana?', '¿Qué notó Bobby en NVDA esta semana?',
+      '¿Qué detectó Bobby en NVDA?', '¿Qué vigila Bobby en NVDA?'],
+    fr: ['Quels gains attendre de NVDA ce mois-ci ?', 'Qu’est-ce que Bobby a remarqué sur NVDA ?', 'Que surveille Bobby sur NVDA ?', 'Que gagner avec NVDA cette semaine ?'],
+    pt: ['O que explica os ganhos de NVDA esta semana?', 'O que comprariam os fundos em NVDA?', 'O que notou o Bobby em NVDA?', 'O que vigia o Bobby em NVDA?'],
+    it: ['Cosa comprerebbe chi segue NVDA oggi?', 'Perché chi comprava NVDA ora esita?', 'Quali ritorni offre NVDA questo mese?', 'Cosa ha rilevato Bobby su NVDA?',
+      'Cosa sorveglia Bobby su NVDA?'],
+    de: ['Was spricht für eine Warnung bei NVDA?', 'Was rätst du mir bei NVDA?', 'Was hat Bobby bei NVDA bemerkt?', 'Was beobachtet Bobby bei NVDA?', 'Was hat Bobby bei NVDA entdeckt?'],
+  },
+  // Whether or when to act, dressed as a what or a why.
+  act: {
+    en: ['Why not get in now on NVDA?', 'Why wait on NVDA when it is cheap?', 'What is the best moment to get into NVDA?', 'What is the right entry for NVDA?',
+      'Why not enter NVDA today?', 'Why is it time to look at NVDA?', 'Why is it too late for NVDA?', 'What would make me wait longer on NVDA?',
+      'Why should I wait with NVDA?', 'What happens to those entering now in NVDA?', 'Why are traders getting out of NVDA?'],
+    es: ['¿Por qué no entrar ya en NVDA?', '¿Cuál es el mejor momento para NVDA?', '¿Por qué esperar con NVDA si está barata?', '¿Qué entrada tiene sentido en NVDA?', '¿Por qué es hora de mirar NVDA?'],
+    fr: ['Pourquoi ne pas entrer sur NVDA maintenant ?', 'Quel est le meilleur moment pour NVDA ?', 'Pourquoi attendre encore sur NVDA ?', 'Quelle entrée a du sens sur NVDA ?'],
+    pt: ['Por que não entrar já na NVDA?', 'Qual é o melhor momento para a NVDA?', 'Por que esperar mais pela NVDA?', 'Que entrada faz sentido na NVDA?'],
+    it: ['Perché non entrare ora su NVDA?', 'Qual è il momento migliore per NVDA?', 'Perché aspettare ancora con NVDA?', 'Quale ingresso ha senso su NVDA?'],
+    de: ['Warum nicht jetzt bei NVDA einsteigen?', 'Was ist der beste Zeitpunkt für NVDA?', 'Warum bei NVDA noch warten?', 'Welcher Einstieg ergibt bei NVDA Sinn?', 'Was ist der richtige Moment bei NVDA?'],
+  },
+};
+// What must still be asked: neighbours of the new forms, and the money or the percent as a subject, with no figure.
+const STILL_ASKED = {
+  en: ['What is weighing on NVDA at the moment?', 'Why did NVDA enter a correction this week?', 'What is the market waiting for from NVDA?',
+    'What does the latest analyst note say about NVDA?', 'Why did NVDA get into trouble this week?', 'What does a stronger dollar mean for NVDA?', 'What are the two risks in this read of NVDA?', 'What is driving the momentum in NVDA?', 'Why does the enterprise demand matter for NVDA?',
+    'What is the point of support that matters for NVDA?', 'What does the rate decision mean for NVDA?'],
+  es: ['¿Qué pesa sobre NVDA en este momento?', '¿Qué significa un dólar fuerte para NVDA?', '¿Qué diferencia hay entre NVDA y el resto del sector?', '¿Qué hay que comprobar en el volumen de NVDA?', '¿Qué compromete la tendencia de NVDA?',
+    '¿Qué cabe esperar de NVDA esta semana?'],
+  fr: ['Que dit la dernière note des analystes sur NVDA ?', 'Que signifie un dollar fort pour NVDA ?', 'Qu’est-ce qui est compris dans cette lecture de NVDA ?', 'À quoi s’attendre pour NVDA cette semaine ?',
+    'Que dirait le baissier sur NVDA en ce moment ?'],
+  pt: ['O que pesa sobre a NVDA neste momento?', 'O que significa um dólar forte para a NVDA?', 'O que compromete a tendência da NVDA?', 'O que esperar da NVDA esta semana?'],
+  it: ['Cosa significa un dollaro forte per NVDA?', 'Cosa è compreso in questa lettura di NVDA?', 'Cosa aspettarsi da NVDA questa settimana?',
+    'Cosa ci si può aspettare da NVDA questa settimana?', 'Cosa pesa su NVDA in questo momento?'],
+  de: ['Was belastet NVDA im Moment?', 'Was bedeutet ein starker Dollar für NVDA?', 'Was bedeutet das Momentum für NVDA?', 'Was ist bei NVDA diese Woche zu erwarten?'],
+};
+for (const lang of LANGS) {
+  test(lang + ': a price in words, a missed form of a forbidden word and an act question shaped as a why are not shown', () => {
+    for (const reason of Object.keys(STOPPED)) {
+      for (const text of STOPPED[reason][lang]) assert.deepEqual(check(text, lang), { text: null, reason }, text);
+    }
+    for (const text of STILL_ASKED[lang]) assert.equal(shown(text, lang), text.replace(/\s+/g, ' '), text);
+  });
+}
+
+test('the ticker is taken out as a word of its own: a price that equals a numeric ticker is still a number', () => {
+  assert.equal(shown('What changed in 2330.TW this week?', 'en', '2330.TW'), 'What changed in 2330.TW this week?');
+  assert.equal(check('What happens if 2330.TW breaks 2330?', 'en', '2330.TW').reason, 'number');
+  assert.equal(check('What happens if 2330.TW loses 2330.TW0?', 'en', '2330.TW').reason, 'number', 'a longer token is not the ticker');
+  assert.equal(check('What does 7203 mean for 7203.T?', 'en', '7203.T').reason, 'number');
+  // A short form with a letter is still the ticker (PETR4 of PETR4.SA), and only as a whole word.
+  assert.equal(shown('Por que a PETR4 continua acima do suporte?', 'pt', 'PETR4.SA'), 'Por que a PETR4 continua acima do suporte?');
+  assert.equal(check('Por que a PETR45 continua acima do suporte?', 'pt', 'PETR4.SA').reason, 'number');
+});
+
+// ---- Bobby never invites someone into a wall: when native says the next read would be refused (`oneTap: false`),
+// the row keeps only the chip that asks nothing by itself. ----
+test('with no read left the row offers no one-tap question: only “another question”, which the person types', () => {
+  for (const lang of ['en', 'es']) {
+    const another = RM.t(lang, 'follow.another', { symbol: 'NVDA' });
+    for (const origin of [undefined, 'followUp', 'restored']) {
+      const walled = RM.build(withNext(CLEAN[lang], { language: lang, oneTap: false }), { lang, origin });
+      assert.equal(walled.oneTap, false);
+      assert.deepEqual(row(walled, SUGG, lang).map((chip) => chip.label), [another], String(origin));
+      assert.deepEqual(row(walled, SUGG, lang)[0].action, { followUpOf: walled.requestId, symbol: 'NVDA' });
+    }
+    // Anything but an explicit no is the row of before (an older native sends no key).
+    for (const value of [undefined, true, null, 'false', 0]) {
+      const open = RM.build(reply({ language: lang, oneTap: value }), { lang });
+      assert.equal(open.oneTap, true);
+      assert.equal(row(open, SUGG, lang).length, 3, String(value));
+    }
+  }
+});

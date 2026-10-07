@@ -857,7 +857,10 @@ function chipAct(c){
   if (a.followUpOf && a.question){ go('SENDING', { params: { followUpOf: a.followUpOf, question: a.question }, question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: true }); return; }
   if (a.followUpOf){ openTyping({ followUpOf: a.followUpOf, fromRead: true }); return; }
   if (a.token){ go('SENDING', { params: { token: a.token }, question: READ ? READ.question : '', origin: 'chip', cx: cx, cy: cy }); return; }
-  if (a.question){ go('SENDING', { question: a.question, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
+  /* what is left is a chip whose question Bobby wrote (an asset of the idle home, an asset or a mover of a read's row).
+     `chip` tells native so: the person picked the asset, the words were not theirs, and the harness never takes such a
+     read for a question they asked by themselves (§3.5). */
+  if (a.question){ go('SENDING', { question: a.question, params: { question: a.question, chip: true }, origin: 'chip', cx: cx, cy: cy, fromRead: !a.starter }); }
 }
 STATES.FOLLOWUPS = {
   enter: function(){ chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow()); },
