@@ -6,14 +6,14 @@ import { deskErrorCopy } from './_lib/desk-localization.js';
 import { requestOriginHost } from './_lib/origins.js';
 import { bobbyRest, bobbyServiceHeaders } from './_lib/bobby-db.js';
 import { getClientQuotaKeys, saltedKey } from './_lib/rate-limit.js';
-import { DESK_QUESTION_MAX, DeskOutputRejected, horizonOf, loadDeskEvidenceFor, runDeskDebate, timeframeRequestOf } from './_lib/desk-debate.js';
+import { DESK_QUESTION_MAX, DeskOutputRejected, DeskThesisSchema, horizonOf, loadDeskEvidenceFor, runDeskDebate, timeframeRequestOf } from './_lib/desk-debate.js';
 import { levelPlan } from './_lib/desk-levels.js';
 import { clientPlatform, consumeRead, refundRead, consumeLevel, refundLevel, recordOutcome, resolveCaller, type Access, type DeskOutcome } from './_lib/access.js';
 import { llmBudget, logLlmUsage } from './_lib/llm-usage.js';
 import { LlmHttpError, type LlmUsage } from './_lib/llm.js';
 import type { Identity } from './_lib/user-identity.js';
 import { clientBinding, issueClientReadReceipt } from './_lib/client-telemetry.js';
-import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
+import { memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS, memoryIdentity, memoryReceipt, memorySummary, readerContext, recordAsk, type MemorySummary } from './_lib/user-memory.js';
 
 // Máximo runs four Sonnet calls inside a 160 s budget (api/_lib/desk-levels.ts).
 export const config = { maxDuration: 180 };
@@ -25,8 +25,17 @@ export const config = { maxDuration: 180 };
 const QUOTA_CEILING = { global: 600, network: 60, caller: 30 } as const;
 const quotaCeiling = (key: string) => key === 'global' ? QUOTA_CEILING.global : key.startsWith('net:') ? QUOTA_CEILING.network : QUOTA_CEILING.caller;
 
-const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), requestId: z.string().uuid().optional() })
+// `thesis` (1.8) is the only field a 1.5-1.7 client never sends. The outer body stays tolerant (unknown keys are
+// dropped, as before); the thesis object itself is strict, and an invalid one is a 400 like any other field.
+const Body = z.object({ symbol: z.string().regex(/^[A-Z0-9.^=-]{1,20}$/), assetType: z.enum(['equity','crypto']).optional(), question: z.string().trim().min(1), language: z.enum(APP_LANGUAGES).default('en'), locale: z.enum(APP_LOCALES).optional(), level: z.enum(['rapido','profundo','maximo']).default('rapido'), requestId: z.string().uuid().optional(), thesis: DeskThesisSchema.nullish() })
   .refine(body => body.locale === undefined || isAppLocale(body.locale, body.language), { path: ['locale'], message: 'Locale must match language' });
+
+/**
+ * Kill switch for the thesis review: with BOBBY_THESIS_REVIEW exactly 'off' a valid `thesis` is ignored and the
+ * request is answered as a plain read (no `review` key, the CIO never sees the note). Unset or anything else = on.
+ * Read per request, never cached.
+ */
+const thesisReviewOn = (env: NodeJS.ProcessEnv = process.env) => env.BOBBY_THESIS_REVIEW !== 'off';
 
 type Lang = AppLanguage;
 const copy = deskErrorCopy;
@@ -49,7 +58,20 @@ const copy = deskErrorCopy;
  * depend on the question and the evidence alone. The reader never reaches the client: the body only says
  * `personalized: true`. Everything here is off unless BOBBY_MEMORY === 'on'; iOS also requires an explicit opt-in on this request. The ask is
  * recorded after the answer was delivered, never on a refusal or a failure. Anonymous and wallet requests
- * make no memory call; the iPhone app also needs its per-request memory opt-in.
+ * make no memory call; the iPhone and Android apps also need their per-request memory opt-in. When memory was
+ * read for the request, the body also carries `memory: { recorded, asks, lastAskedDaysAgo,
+ * changeSinceLastAskPct }`: what memory holds about this asset and whether this question is being added to it.
+ * Numbers only, from the summary the CIO's reader was built from; no key at all when memory does not apply or
+ * could not be read.
+ *
+ * Thesis review (1.8): a request may carry `thesis`, the person's own note (hypothesis, what worries them, what
+ * would change their mind, a horizon, when they saved it and at what price). The read is the same read at the
+ * requested level, with the same meters, quotas, refunds and ledger; Alpha and Red Team never see the note. The
+ * CIO gets it as untrusted data with the server-computed change since it was saved, and the body gains
+ * `review: { supports, challenges, unknowns, notChecked }` (the NDJSON `final` line carries the same body).
+ * `notChecked` is written by the server: the evidence kinds the desk does not load. A request without `thesis`
+ * is answered exactly as before, with no `review` key; so is every request while BOBBY_THESIS_REVIEW is 'off'.
+ * The note is used for that one answer: it is never stored, logged, or written to the ledger or the funnel.
  *
  * Chart timeframe: a question that names one ("en diario", "weekly chart", "4H") is analysed on it at every level.
  * Its candles are loaded beside the level's evidence and its block becomes `technicals`, with `provenance.timeframe`
@@ -103,6 +125,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
   const { symbol, question, language, assetType, level, requestId } = parsed.data;
   const locale = appLocale(language, parsed.data.locale);
+  // Validated above even when the review is switched off; from here on it only ever travels to the CIO call.
+  const thesis = thesisReviewOn() ? parsed.data.thesis ?? null : null;
   // A code point is at most two UTF-16 units: the first test bounds Array.from's work.
   if (question.length > DESK_QUESTION_MAX * 2 || Array.from(question).length > DESK_QUESTION_MAX) {
     return refuse(res, 400, 'question_too_long', copy(language, 'Your question is too long. Keep it to 1,200 characters or fewer.', 'Tu pregunta es demasiado larga. Usa 1,200 caracteres o menos.'), { maxLength: DESK_QUESTION_MAX });
@@ -219,11 +243,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const summary: MemorySummary | null = await within(summaryTask, MEMORY_SUMMARY_TIMEOUT_MS);
     const reader = readerContext(summary, symbol, Date.now(), summary?.enabled ? (await memoryOwner.catch(() => null))?.firstName : null, evidence.technicals.price, language, locale);
     const asked = horizonOf(question, language);
-    const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader });
+    const result = await runDeskDebate(question, evidence, language, { locale, level, usage, signal: left.signal, onEvent: live ? send : undefined, reader, ...(thesis ? { thesis } : {}) });
     // The reader left while the last call was already in flight.
     if (left.signal.aborted) { await abandon(); return; }
     const telemetry = issueClientReadReceipt(clientBinding(req, knownIdentity), requestId);
-    const body = { ...result, access, ...(reader ? { personalized: true } : {}), ...(telemetry ? { telemetry } : {}) };
+    // What memory kept, when it was read for this request: the same summary the reader came from, no second query.
+    const memory = memoryReceipt(summary, reader);
+    const body = { ...result, access, ...(reader ? { personalized: true } : {}), ...(memory ? { memory } : {}), ...(telemetry ? { telemetry } : {}) };
     // Only a delivered answer is remembered. A memory the summary showed paused is not even asked; when the
     // summary was unavailable the database decides (it skips paused memories and non-accounts).
     const remember = () => {

@@ -42,6 +42,8 @@ jobs:
       - run: npm run test:trader-land-api
       - run: npm run test:desk-audit
       - run: npm run test:desk-levels
+      # 1.8: the thesis review, and the proof that a question without a thesis is answered byte for byte as before.
+      - run: npm run test:desk-thesis
       - run: npm run test:user-memory
       - run: npm run test:stock-ticker-routing
       - run: npm run test:remediation-r2

@@ -27,11 +27,12 @@ export const MEMORY_SYMBOL = /^[A-Z0-9.^=-]{1,20}$/;
 export const MEMORY_RETENTION_DAYS = 90;
 export const MEMORY_MAX_ASSETS = 50;
 /**
- * Platforms whose desk reads can use memory. iOS additionally requires an explicit per-account opt-in
- * affirmation on each desk request; a web preference alone never opts the phone in. /api/memory remains
- * available on every platform so an account can always inspect, correct and erase what is stored.
+ * Platforms whose desk reads can use memory. The native apps (iOS and, since 1.8, Android) additionally require
+ * an explicit per-account opt-in affirmation on each desk request; a web preference alone never opts a phone
+ * in. /api/memory remains available on every platform so an account can always inspect, correct and erase what
+ * is stored.
  */
-export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web', 'ios']);
+export const MEMORY_PLATFORMS: ReadonlySet<string> = new Set(['web', 'ios', 'android']);
 export const NATIVE_MEMORY_OPT_IN_HEADER = 'x-bobby-memory-opt-in';
 /**
  * Kill switch: the desk personalizes with memory and records asks only when BOBBY_MEMORY is exactly 'on'.
@@ -42,10 +43,14 @@ export function memoryPersonalizationOn(env: NodeJS.ProcessEnv = process.env): b
   return env.BOBBY_MEMORY === 'on';
 }
 
-/** Fail closed for every iOS desk path unless this request explicitly affirms native consent. */
+/**
+ * Fail closed for every native desk path (iOS, Android) unless this request explicitly affirms native consent.
+ * Only the web needs no header; a platform added to MEMORY_PLATFORMS later is treated as native until it says
+ * otherwise here.
+ */
 export function memoryDeskAllowed(req: VercelRequest, platform: string, env: NodeJS.ProcessEnv = process.env): boolean {
   if (!memoryPersonalizationOn(env) || !MEMORY_PLATFORMS.has(platform)) return false;
-  if (platform !== 'ios') return true;
+  if (platform === 'web') return true;
   const raw = req.headers[NATIVE_MEMORY_OPT_IN_HEADER];
   return !Array.isArray(raw) && raw === '1';
 }
@@ -242,4 +247,25 @@ export function readerContext(summary: MemorySummary | null, symbol: string, now
   const often = summary.top.filter((a) => a.asks >= OFTEN_MIN_ASKS && a.symbol !== symbol).slice(0, 5).map(({ symbol: s, asks }) => ({ symbol: s, asks }));
   if (often.length) ctx.oftenAsks = often;
   return Object.keys(ctx).length ? ctx : null;
+}
+
+/**
+ * `memory` in the desk's reply (1.8): what memory holds about the asked asset and whether this question is being
+ * added to it, so an app can show a receipt. Facts only: counts, days and a percentage, never text or a symbol
+ * list.
+ *   · `recorded`: this request records the ask (the same condition as the desk's `remember()`: memory was read
+ *     and is not paused). The write itself runs after the answer is delivered; the database has the last word.
+ *   · `asks`: how often this account asked about the asset, this question included when it is recorded.
+ *   · `lastAskedDaysAgo`, `changeSinceLastAskPct`: about the ask before this one; null when there was none or it
+ *     cannot be computed. They are the numbers the CIO's reader carried, not a second reading.
+ * A paused memory is not read (the summary returns no counts for it): `recorded` is false, `asks` is 0 and
+ * both facts are null. Null when memory does not apply to the request or the summary could not be read: then
+ * the reply carries no `memory` key at all, because nothing true can be said.
+ */
+export interface MemoryReceipt { recorded: boolean; asks: number; lastAskedDaysAgo: number | null; changeSinceLastAskPct: number | null }
+export function memoryReceipt(summary: MemorySummary | null, reader: ReaderContext | null): MemoryReceipt | null {
+  if (!summary) return null;
+  if (!summary.enabled) return { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null };
+  const before = reader?.thisAsset;
+  return { recorded: true, asks: (before?.asks ?? 0) + 1, lastAskedDaysAgo: before?.lastAskedDaysAgo ?? null, changeSinceLastAskPct: before?.changeSinceLastAskPct ?? null };
 }

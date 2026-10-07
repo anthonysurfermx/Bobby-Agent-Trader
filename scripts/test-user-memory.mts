@@ -7,7 +7,10 @@
 //     (only `personalized: true`); a stored horizon never changes sufficiency (nor the verdict); the stored
 //     "risk" reaches the CIO only as explainRiskDepth, under a rule that forbids suitability and sizing; the ask is
 //     recorded only after a delivered answer, never on a refusal, an outage or a guard rejection; anonymous
-//     and wallet requests make no memory call at all; iPhone asks need a separate per-request opt-in;
+//     and wallet requests make no memory call at all; iPhone and Android asks need a separate per-request opt-in;
+//   · the reply says what memory kept (1.8): `memory: { recorded, asks, lastAskedDaysAgo, changeSinceLastAskPct }`
+//     with the numbers the CIO's reader carried, `recorded` false for a paused memory, and no key at all when
+//     memory does not apply or could not be read;
 //   · kill switch: without BOBBY_MEMORY=on the desk makes no memory call at all, while /api/memory still works.
 import assert from 'node:assert/strict';
 
@@ -27,7 +30,7 @@ const deferred: Promise<unknown>[] = [];
 (globalThis as Record<symbol, unknown>)[Symbol.for('@vercel/request-context')] = { get: () => ({ waitUntil: (p: Promise<unknown>) => { deferred.push(p); } }) };
 const settle = async () => { await Promise.all(deferred.splice(0)); };
 
-const { readerContext, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
+const { readerContext, memoryReceipt, memoryPersonalizationOn, memoryDeskAllowed, MEMORY_PLATFORMS, MEMORY_SUMMARY_TIMEOUT_MS } = await import('../api/_lib/user-memory.ts');
 const { READER_RULE, horizonOf } = await import('../api/_lib/desk-debate.ts');
 const { resetLlmSpendCache } = await import('../api/_lib/llm-usage.ts');
 const { default: memoryHandler } = await import('../api/memory.ts');
@@ -149,6 +152,33 @@ try {
       memoryDeskAllowed({ headers: {} } as never, 'ios', { BOBBY_MEMORY: 'on' } as never),
       memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'ios', {} as never)],
      [true, false, false, false], 'iOS needs exact affirmation and the global kill switch');
+  // Android (1.8) follows the iPhone's rule; the web needs no header; an unknown platform has no memory.
+  eq([...MEMORY_PLATFORMS].sort(), ['android', 'ios', 'web'], 'memory platforms: the web and both native apps');
+  eq([memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': 'true' } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': ['1', '1'] } } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: {} } as never, 'android', { BOBBY_MEMORY: 'on' } as never),
+      memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'android', {} as never)],
+     [true, false, false, false, false], 'Android needs the same exact affirmation and the global kill switch');
+  eq([memoryDeskAllowed({ headers: {} } as never, 'web', { BOBBY_MEMORY: 'on' } as never), memoryDeskAllowed({ headers: { 'x-bobby-memory-opt-in': '1' } } as never, 'tvos', { BOBBY_MEMORY: 'on' } as never)],
+     [true, false], 'the web needs no header; a platform that is not listed has no memory even with one');
+
+  // ---------- the receipt: what memory kept, from the summary and the reader built from it ----------
+  {
+    const priced = summary({ thisAsset: { asks: 7, lastAskedAt: '2026-09-26T12:00:00.000Z', lastHorizon: 'week', asksThisWeek: 1, lastPrice: 200 } });
+    const reader = readerContext(priced, 'NVDA', now, null, 230, 'en');
+    eq(memoryReceipt(priced, reader), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: 15 }, 'asked 7 times before: this is the 8th, 3 days after the last, up 15%');
+    eq([memoryReceipt(priced, reader)!.lastAskedDaysAgo, memoryReceipt(priced, reader)!.changeSinceLastAskPct], [reader!.thisAsset!.lastAskedDaysAgo, reader!.thisAsset!.changeSinceLastAskPct], '…the very numbers the CIO was given');
+    eq(memoryReceipt(summary(), readerContext(summary(), 'NVDA', now)), { recorded: true, asks: 8, lastAskedDaysAgo: 3, changeSinceLastAskPct: null }, 'no stored price: no change, never a zero');
+    const first = summary({ top: [], thisAsset: null });
+    eq(memoryReceipt(first, readerContext(first, 'NVDA', now)), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a first ask counts itself and has no last time');
+    const empty = summary({ prefs: { horizon: null, experience: null, risk: null }, top: [], thisAsset: null });
+    eq(memoryReceipt(empty, readerContext(empty, 'NVDA', now)), { recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'an empty memory has no reader and still records this first ask');
+    const paused = summary({ enabled: false, top: [], thisAsset: null });
+    eq(memoryReceipt(paused, readerContext(paused, 'NVDA', now)), { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 'a paused memory records nothing and tells nothing');
+    eq(memoryReceipt(null, null), null, 'no summary (memory does not apply, or could not be read): no receipt');
+    eq(Object.keys(memoryReceipt(priced, reader)!), ['recorded', 'asks', 'lastAskedDaysAgo', 'changeSinceLastAskPct'], 'four facts: no text, no symbol list');
+  }
 
   // ---------- /api/memory ----------
   const memReq = (method: string, headers: Record<string, string> = {}, extra: Record<string, unknown> = {}) =>
@@ -330,8 +360,13 @@ try {
   ok(/explainRiskDepth/.test(READER_RULE) && /how much the answer explains risk/.test(READER_RULE) && /never sets suitability, position sizing or a recommendation/.test(READER_RULE), 'the rule says explainRiskDepth sets only how much risk is explained, never suitability, sizing or recommendations');
   ok(!('reader' in inputOf(byRoleCalls.alpha)) && !('reader' in inputOf(byRoleCalls.red)), 'Alpha and Red Team never see the reader');
   ok(!systemOf(byRoleCalls.alpha).includes('reader is this reader') && !systemOf(byRoleCalls.red).includes('reader is this reader'), '…nor its rule');
-  const wire = JSON.stringify(served.body);
+  // 1.8: the reply also says what memory kept. Its four numbers are the only memory-derived values on the wire;
+  // `lastAskedDaysAgo` is one of them, so the reader check below looks at the body without the receipt.
+  eq(served.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the receipt: recorded, the 8th ask, 2 days after the last, no stored price to compare');
+  const { memory: _receipt, ...withoutReceipt } = served.body;
+  const wire = JSON.stringify(withoutReceipt);
   ok(!/"reader"|oftenAsks|thisAsset|lastAskedDaysAgo|"experience"/.test(wire), 'the reader never reaches the client');
+  ok(!/"reader"|oftenAsks|thisAsset|"experience"|"prefs"|explainRiskDepth|lastHorizon|timesThisWeek|lastAskedOn|priceThen|firstName|BTC/.test(JSON.stringify(served.body)), '…and the receipt carries none of it: no preferences, no name, no other asset');
   eq(served.body.sufficiency.horizon, 'unspecified', 'a stored horizon preference never changes sufficiency');
   eq([inputOf(byRoleCalls.alpha).sufficiency.horizon, inputOf(byRoleCalls.red).sufficiency.horizon, inputOf(byRoleCalls.cio).sufficiency.horizon], ['unspecified', 'unspecified', 'unspecified'], '…for any role');
   eq([inputOf(byRoleCalls.alpha).reader, inputOf(byRoleCalls.red).reader], [undefined, undefined], 'alpha and red inputs carry no reader');
@@ -352,6 +387,25 @@ try {
   const plainAlpha = models().find((c) => byRole(c) === 'alpha')!;
   eq(plain.body.sufficiency, served.body.sufficiency, 'sufficiency is identical with and without a reader');
   eq([inputOf(plainAlpha).question, inputOf(plainAlpha).sufficiency, systemOf(plainAlpha)], [servedAlpha.question, servedAlpha.sufficiency, servedAlphaSystem], 'Alpha gets the same question, sufficiency and prompt with and without a reader');
+  eq(['memory' in plain.body, 'personalized' in plain.body], [false, false], 'memory does not apply to a guest: no receipt key at all');
+  // Without the receipt, the personalized body has exactly the keys a 1.7 reply had.
+  eq(Object.keys(withoutReceipt).sort(), [...Object.keys(plain.body), 'personalized'].sort(), 'the receipt is the only key memory adds beside `personalized`');
+
+  // A stored price and a change since: the receipt quotes what the CIO's reader carried, computed once.
+  summaryReply = { ...REMEMBERED, thisAsset: { ...REMEMBERED.thisAsset, lastPrice: 160 } };
+  const priced = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  const pricedReader = inputOf(models().find((c) => byRole(c) === 'cio')!).reader.thisAsset;
+  eq(priced.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: 25 }, 'from 160 to 200 since the last ask: +25%');
+  eq([priced.body.memory.changeSinceLastAskPct, priced.body.memory.lastAskedDaysAgo, priced.body.memory.asks], [pricedReader.changeSinceLastAskPct, pricedReader.lastAskedDaysAgo, pricedReader.asks + 1], '…the reader\'s own numbers, with this ask counted');
+  eq(calls.filter((c) => c.url.includes('rpc/bobby_memory_summary')).length, 1, '…from one summary read, not a second query');
+  eq(recorded().length, 1, '…and `recorded: true` is a request that records');
+  // A first ask about an asset: it counts itself, and there is no last time to speak of.
+  summaryReply = { ...REMEMBERED, thisAsset: null };
+  const firstAsk = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  eq([firstAsk.body.memory, recorded().length], [{ recorded: true, asks: 1, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, 1], 'a first ask: asks 1, nulls for what does not exist');
+  summaryReply = REMEMBERED;
 
   // A question that names its horizon keeps it.
   const today = await run({ question: '¿Cómo ves NVDA para hoy?', language: 'es' }, SIGNED_IN);
@@ -366,13 +420,19 @@ try {
   eq([off.statusCode, 'personalized' in off.body, off.body.sufficiency.horizon], [200, false, 'unspecified'], 'memory paused: a plain answer, the preference unused');
   ok(!models().some((c) => 'reader' in inputOf(c)), '…no reader for any role');
   eq(recorded().length, 0, '…and nothing recorded');
+  eq(off.body.memory, { recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, '…and the receipt says so: memory was read, is paused, kept nothing');
+  // A paused memory tells nothing even if the database were to return counts with it.
+  summaryReply = { ...REMEMBERED, enabled: false };
+  const pausedWithRows = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
+  await settle();
+  eq([pausedWithRows.body.memory, 'personalized' in pausedWithRows.body, recorded().length], [{ recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'paused: no stored count leaves the server, nothing recorded');
   summaryReply = REMEMBERED;
 
   // Anonymous and wallet readers: not a single memory or identity call.
   for (const [who, headers] of [['anonymous', {}], ['wallet session', { 'x-bobby-session': 'bws.wallet-session-token' }], ['wallet bearer', { authorization: 'Bearer bws.wallet-session-token' }]] as const) {
     const res = await run({}, headers);
     await settle();
-    eq([res.statusCode, 'personalized' in res.body], [200, false], `${who}: a plain answer`);
+    eq([res.statusCode, 'personalized' in res.body, 'memory' in res.body], [200, false, false], `${who}: a plain answer, no receipt`);
     eq([memoryCalls().length, authCalls().length, calls.some((c) => c.url.includes('bobby_identities'))], [0, 0, false], `${who}: no memory, auth or identity call`);
     ok(!models().some((c) => 'reader' in inputOf(c)), `${who}: no reader`);
   }
@@ -381,12 +441,14 @@ try {
   const ios = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios' });
   await settle();
   eq([ios.statusCode, 'personalized' in ios.body, memoryCalls().length, authCalls().length], [200, false, 0, 1], 'iPhone default off: no memory call or personalization; only the read meter resolves the account');
+  eq('memory' in ios.body, false, '…and no receipt: memory does not apply without the opt-in');
   const invalidIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': 'true' });
   await settle();
   eq([invalidIos.statusCode, memoryCalls().length, recorded().length], [200, 0, 0], 'non-exact iPhone affirmation records nothing');
   const optedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
   eq([optedIos.body.personalized, recorded().length, authCalls().length], [true, 1, 1], 'opted-in iPhone: personalized and recorded for its verified account');
+  eq(optedIos.body.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, '…with the receipt');
   eq(recorded()[0].body.p_identity, IDENT, 'native record belongs to the bearer account');
   const secondIos = await run({}, { ...SIGNED_IN_B, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
@@ -395,6 +457,30 @@ try {
   const pausedIos = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
   eq([pausedIos.statusCode, 'personalized' in pausedIos.body, recorded().length], [200, false, 0], 'server-side pause blocks iPhone personalization and recording even with a header');
+  eq(pausedIos.body.memory.recorded, false, '…and the receipt says nothing was recorded');
+  summaryReply = REMEMBERED;
+
+  // Android (1.8) may use memory under the iPhone's rule: only with the per-request opt-in its app sends after
+  // its own consent. Without the header, or with any other value, the desk makes no memory call at all.
+  const android = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android' });
+  await settle();
+  eq([android.statusCode, 'personalized' in android.body, 'memory' in android.body, memoryCalls().length, authCalls().length], [200, false, false, 0, 1], 'Android without the opt-in header: no memory call, no personalization, no receipt');
+  ok(!models().some((c) => 'reader' in inputOf(c)), '…and no reader for any role');
+  const invalidAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': 'yes' });
+  await settle();
+  eq([invalidAndroid.statusCode, memoryCalls().length, recorded().length, 'memory' in invalidAndroid.body], [200, 0, 0, false], 'a non-exact Android affirmation fails closed');
+  const optedAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([optedAndroid.body.personalized, optedAndroid.body.memory, authCalls().length], [true, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 1], 'opted-in Android: personalized, with the receipt, for its verified account');
+  eq([calls.filter((c) => c.url.includes('rpc/bobby_memory_summary')).length, recorded().length, recorded()[0].body.p_identity], [1, 1, IDENT], '…one summary read and one record, for the bearer account');
+  ok('reader' in inputOf(models().find((c) => byRole(c) === 'cio')!) && !models().filter((c) => byRole(c) !== 'cio').some((c) => 'reader' in inputOf(c)), '…and the reader reaches the CIO only, as on the other platforms');
+  const guestAndroid = await run({}, { 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([guestAndroid.statusCode, memoryCalls().length, recorded().length, 'memory' in guestAndroid.body], [200, 0, 0, false], 'an Android guest cannot opt in by sending a header');
+  summaryReply = { ...REMEMBERED, enabled: false };
+  const pausedAndroid = await run({}, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+  await settle();
+  eq([pausedAndroid.body.memory, 'personalized' in pausedAndroid.body, recorded().length], [{ recorded: false, asks: 0, lastAskedDaysAgo: null, changeSinceLastAskPct: null }, false, 0], 'a server-side pause holds on Android too');
   summaryReply = REMEMBERED;
   const guestIos = await run({}, { 'x-bobby-platform': 'ios', 'x-bobby-memory-opt-in': '1' });
   await settle();
@@ -408,10 +494,13 @@ try {
     if (value === undefined) delete process.env.BOBBY_MEMORY; else process.env.BOBBY_MEMORY = value;
     const killed = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'web' });
     await settle();
-    eq([killed.statusCode, 'personalized' in killed.body], [200, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer`);
+    eq([killed.statusCode, 'personalized' in killed.body, 'memory' in killed.body], [200, false, false], `BOBBY_MEMORY=${value ?? 'unset'}: a plain answer, no receipt`);
     // The single auth lookup is the account's read meter; memory adds none.
     eq([memoryCalls().length, authCalls().length, recorded().length], [0, 1, 0], `BOBBY_MEMORY=${value ?? 'unset'}: no memory read, only the meter's identity lookup, nothing recorded`);
     ok(!models().some((c) => 'reader' in inputOf(c)), `BOBBY_MEMORY=${value ?? 'unset'}: no reader for any role`);
+    const killedAndroid = await run({ question: 'Is NVDA worth a look?' }, { ...SIGNED_IN, 'x-bobby-platform': 'android', 'x-bobby-memory-opt-in': '1' });
+    await settle();
+    eq([killedAndroid.statusCode, 'memory' in killedAndroid.body, memoryCalls().length], [200, false, 0], `BOBBY_MEMORY=${value ?? 'unset'}: the Android opt-in changes nothing`);
   }
   process.env.BOBBY_MEMORY = 'on';
   const backOn = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
@@ -433,12 +522,13 @@ try {
   await settle();
   eq([down.statusCode, 'personalized' in down.body], [200, false], 'memory storage down: the answer is served without memory');
   eq(recorded().length, 1, '…and the database still decides whether to record the delivered answer');
+  eq('memory' in down.body, false, '…with no receipt: what memory holds could not be read, so nothing is claimed');
   summaryDelayMs = MEMORY_SUMMARY_TIMEOUT_MS + 1200;
   const started = Date.now();
   const slow = await run({ question: 'Is NVDA worth a look?' }, SIGNED_IN);
   const took = Date.now() - started;
   summaryDelayMs = 0;
-  eq([slow.statusCode, 'personalized' in slow.body], [200, false], 'a slow summary is skipped');
+  eq([slow.statusCode, 'personalized' in slow.body, 'memory' in slow.body], [200, false, false], 'a slow summary is skipped, and so is the receipt');
   ok(took < MEMORY_SUMMARY_TIMEOUT_MS + 1000, `…the answer is not held for it (${took} ms)`);
   await settle();
 
@@ -476,6 +566,8 @@ try {
   const lines = live.lines();
   eq([lines.at(-1).type, lines.at(-1).data.personalized], ['final', true], 'the final line says personalized');
   ok(lines.every((l: any) => !/"reader"|oftenAsks|thisAsset/.test(JSON.stringify(l))), 'no streamed line carries the reader');
+  eq(lines.at(-1).data.memory, { recorded: true, asks: 8, lastAskedDaysAgo: 2, changeSinceLastAskPct: null }, 'the final line carries the receipt');
+  ok(lines.slice(0, -1).every((l: any) => !('memory' in l) && !/"memory"|lastAskedDaysAgo/.test(JSON.stringify(l))), '…and no earlier line does');
   eq(recorded().length, 1, 'the streamed answer is recorded after the final line');
 
   console.log(`user-memory: ${checks} checks passed`);
