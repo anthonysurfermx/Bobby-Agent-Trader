@@ -125,7 +125,7 @@ class NucleoSession(
             val stored = store.state(this@NucleoSession.owner).optJSONArray("quickAccess") ?: return emptyList()
             return (0 until stored.length()).mapNotNull { index -> (stored.opt(index) as? String)?.takeIf { it.isNotEmpty() } }
         }
-        override fun setShortcuts(symbols: List<String>) {
+        override fun keepShortcuts(symbols: List<String>) {
             store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(6)))
             // An account's quick access is part of its synced profile: its other devices follow.
             if (riskAccepted && this@NucleoSession.signedIn) scope.launch { syncProgress() }

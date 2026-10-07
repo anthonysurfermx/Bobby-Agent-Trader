@@ -51,7 +51,7 @@ class FakeDesk : V18Desk {
         .put("symbol", symbol).put("question", question).put("language", language).put("locale", locale).put("country", JSONObject.NULL)
         .put("assetType", if (isEquity) "equity" else "crypto").put("level", level)
     override var shortcuts: List<String> = emptyList()
-    override fun setShortcuts(symbols: List<String>) { shortcuts = symbols }
+    override fun keepShortcuts(symbols: List<String>) { shortcuts = symbols }
     override val repository: BobbyRepository
         get() = throw IllegalStateException("No network in unit tests: put a small interface in front of the repository and fake it")
 

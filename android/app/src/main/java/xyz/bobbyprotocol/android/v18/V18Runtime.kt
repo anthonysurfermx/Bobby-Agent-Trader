@@ -44,7 +44,7 @@ interface V18Desk {
     /** The quick-access symbols stored for the current owner (never the defaults shown when none are stored). */
     val shortcuts: List<String>
     /** Replaces them. An empty list is kept as "none", and an account's change reaches its other devices. */
-    fun setShortcuts(symbols: List<String>)
+    fun keepShortcuts(symbols: List<String>)
     val repository: BobbyRepository
 }
 
@@ -481,12 +481,12 @@ class V18Runtime(
         val kept = desk.shortcuts
         val left = kept.filterNot { it.equals(symbol, ignoreCase = true) }
         if (left.size == kept.size) return false
-        desk.setShortcuts(left)
+        desk.keepShortcuts(left)
         return true
     }
 
     override fun clearShortcuts() {
-        if (desk.shortcuts.isNotEmpty()) desk.setShortcuts(emptyList())
+        if (desk.shortcuts.isNotEmpty()) desk.keepShortcuts(emptyList())
     }
 
     override val repository: BobbyRepository get() = desk.repository
