@@ -85,6 +85,7 @@ final class ThesisReviewerTests: XCTestCase {
         let identity = identity!
         var env = ThesisReviewer.Environment()
         env.book = book
+        env.guestDefaults = defaults
         env.owner = { identity.user }
         env.generation = { identity.generation }
         env.riskAccepted = { identity.riskAccepted }
@@ -458,18 +459,153 @@ final class ThesisReviewerTests: XCTestCase {
         identity.generation = UUID()
         reviewer.accountChanged()
         XCTAssertEqual(reviewer.phase, .refused(.notFound), "a finished review of the previous account does not stay on screen")
-        // Theses written signed out follow the person into a new account: the screen picks the thesis up again.
+    }
+
+    func testAThesisWrittenBeforeSigningInLeadsToMyThesesAndIsNeverMovedByTheScreen() async throws {
+        identity.user = nil
         let local = try seed("BTC", owner: nil)
-        let adopted = self.reviewer(local.id) { [unowned self] _ in self.reply() }
-        XCTAssertEqual(adopted.phase, .ready)
+        let reviewer = reviewer(local.id) { [unowned self] _ in self.refusal(401, ["code": "signin_required", "error": "x"]) }
+        XCTAssertEqual(reviewer.phase, .ready)
+        await reviewer.review()
+        XCTAssertEqual(reviewer.phase, .refused(.signIn(level: nil)), "a guest out of reads is asked to sign in")
+        // The person signs in on this screen. Nothing adopts the guest book by itself.
         identity.user = "account-c"
         identity.generation = UUID()
-        adopted.accountChanged()
-        XCTAssertEqual(adopted.phase, .refused(.notFound))
-        XCTAssertEqual(book.adoptLocal(into: "account-c"), 1)
-        adopted.reload()
-        XCTAssertEqual(adopted.phase, .ready)
-        XCTAssertEqual(adopted.thesis?.id, local.id)
+        reviewer.accountChanged()
+        XCTAssertEqual(reviewer.phase, .refused(.writtenSignedOut), "not 'unavailable': the thesis waits in the guest book")
+        XCTAssertNil(reviewer.thesis)
+        XCTAssertTrue(book.all(owner: "account-c").isEmpty, "the review screen moves nothing")
+        XCTAssertEqual(book.all(owner: nil).map(\.id), [local.id])
+        let copy = ThesisRefusalCopy(.writtenSignedOut)
+        XCTAssertEqual(copy.text, "You wrote this thesis before signing in.")
+        XCTAssertEqual(copy.detail, "Open My theses to keep it in this account.")
+        XCTAssertEqual(copy.actions, [.myTheses], "My theses holds the row that asks")
+        await reviewer.review()
+        XCTAssertEqual(requests.count, 1, "nothing is sent for a thesis that is not in this account's book")
+
+        // "Keep them" in My theses: the screen picks the thesis up again.
+        let guests = ThesisGuestBook(book: book, defaults: defaults)
+        XCTAssertEqual(guests.adoptLocal(into: "account-c"), 1)
+        reviewer.reload()
+        XCTAssertEqual(reviewer.phase, .ready)
+        XCTAssertEqual(reviewer.thesis?.id, local.id)
+
+        // "Not mine" for another account: it is simply not available there.
+        let other = try seed("ETH", owner: nil, isEquity: false)
+        identity.user = "account-d"
+        identity.generation = UUID()
+        let declined = self.reviewer(other.id) { [unowned self] _ in self.reply() }
+        XCTAssertEqual(declined.phase, .refused(.writtenSignedOut))
+        guests.declineLocal(for: "account-d")
+        declined.reload()
+        XCTAssertEqual(declined.phase, .refused(.notFound))
+        XCTAssertEqual(book.all(owner: nil).map(\.id), [other.id], "declined theses stay in the guest book")
+    }
+
+    // MARK: Where the thesis started
+
+    func testAThesisWrittenWithoutAPriceNeverBorrowsAReviewsPriceAsItsStart() async throws {
+        let thesis = try seed(price: nil)
+        var prices: [Double] = [126.1, 131.2]
+        let reviewer = reviewer(thesis.id) { [unowned self] _ in self.reply(price: prices.removeFirst()) }
+
+        await reviewer.review()
+        let first = try XCTUnwrap(result(reviewer))
+        XCTAssertNil(first.thenNow.thenPrice)
+        XCTAssertTrue(first.thenNow.missingStart, "the screen says no starting price was saved")
+        XCTAssertEqual(first.thenNow.nowPrice, 126.1, "today's price is still shown")
+        XCTAssertNil(first.thenNow.changePct)
+
+        await reviewer.review()
+        let second = try XCTUnwrap(result(reviewer))
+        XCTAssertEqual(second.thesis.revisions.map(\.kind), [.created, .reviewed, .reviewed])
+        XCTAssertNil(second.thenNow.thenPrice, "the first review's 126.10 is not where the thesis started")
+        XCTAssertNil(second.thenNow.thenDate)
+        XCTAssertTrue(second.thenNow.missingStart)
+        XCTAssertEqual(second.thenNow.nowPrice, 131.2)
+        XCTAssertNil(second.thenNow.changePct, "no change is computed from a review's price")
+        XCTAssertNil(ThesisCopy.startingPoint(second.thesis))
+        XCTAssertFalse(ThesisCopy.sinceLine(second.thesis, now: now).contains("126"), "nor shown as 'started at' in the list")
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertNil(requests[1].thesis.priceAtSave, "nor sent to the desk as the price at save")
+        XCTAssertNil(requests[1].thesis.json["priceAtSave"])
+
+        // A thesis that has its own starting price keeps it through any number of reviews.
+        let priced = try seed("BTC", isEquity: false, price: 100)
+        let other = self.reviewer(priced.id) { [unowned self] _ in self.reply(price: 110.0) }
+        await other.review()
+        await other.review()
+        let again = try XCTUnwrap(result(other))
+        XCTAssertEqual(again.thenNow.thenPrice, 100)
+        XCTAssertEqual(again.thenNow.thenDate, t0)
+        XCTAssertFalse(again.thenNow.missingStart)
+        XCTAssertEqual(again.thenNow.changePct ?? 0, 10, accuracy: 1e-9)
+        XCTAssertEqual(requests.last?.thesis.priceAtSave, 100)
+    }
+
+    // MARK: The production wiring
+
+    func testTheLiveEnvironmentIsBoundToTheSessionsConsentItsAccountFenceAndItsBearer() async throws {
+        let key = "agent.riskNoticeVersion"
+        let savedVersion = UserDefaults.standard.object(forKey: key)
+        defer { if let savedVersion { UserDefaults.standard.set(savedVersion, forKey: key) } else { UserDefaults.standard.removeObject(forKey: key) } }
+        NucleoFixtures.activate(scenario: "default", timeScale: 0.01)
+        defer { NucleoFixtures.deactivate() }
+
+        // The session's profile has NOT accepted the notice, while the stored value a default gate would read says it has.
+        UserDefaults.standard.removeObject(forKey: key)
+        let profile = AgentProfile()
+        UserDefaults.standard.set(RiskNotice.currentVersion, forKey: key)
+        XCTAssertFalse(profile.acceptedRiskNotice)
+        let session = NucleoSession(fixtures: true, profile: profile, defaults: defaults)
+        defer { session.teardown() }
+        var deskGeneration = UUID()
+        session.desk.generation = { deskGeneration }
+        session.desk.meterAuth = BobbyMeterAuth(bearer: { "the-desk-bearer" }, refresh: { _ in nil })
+
+        var sent: [ThesisReviewRequest] = []
+        var bearers: [String?] = []
+        let pending = Deferred()
+        var holds = false
+        var env = ThesisReviewer.Environment.live(session) { [unowned self] request, auth in
+            sent.append(request)
+            bearers.append(await auth.bearer())
+            return holds ? await pending.wait() : self.reply()
+        }
+        env.book = book
+        env.guestDefaults = defaults
+        env.now = { [unowned self] in self.now }
+        env.accessChanged = { _ in }
+        env.meterChanged = { _, _ in }
+        XCTAssertEqual(env.owner(), session.desk.thesisOwner)
+        XCTAssertEqual(env.generation(), deskGeneration, "the desk's account fence, not a default")
+
+        let thesis = try seed(owner: session.desk.thesisOwner)
+        let reviewer = ThesisReviewer(thesisId: thesis.id, environment: env, observeAccount: false)
+        XCTAssertEqual(reviewer.phase, .refused(.riskNotice), "the session's own consent gates the review")
+        await reviewer.review()
+        XCTAssertTrue(sent.isEmpty, "nothing reaches the network before the risk notice is accepted")
+
+        profile.riskNoticeVersion = RiskNotice.currentVersion
+        reviewer.reload()
+        XCTAssertEqual(reviewer.phase, .ready)
+        await reviewer.review()
+        XCTAssertEqual(sent.count, 1)
+        XCTAssertEqual(sent.first?.thesis.hypothesis, "Margins recover as supply eases")
+        XCTAssertEqual(bearers, ["the-desk-bearer"], "the read carries the bearer the desk's reads carry")
+        XCTAssertNotNil(result(reviewer))
+        XCTAssertEqual(book.thesis(id: thesis.id, owner: session.desk.thesisOwner)?.revisions.map(\.kind), [.created, .reviewed],
+                       "recorded in the book of the desk's owner")
+
+        // The desk's account epoch moves while a second review is in flight: its reply is dropped.
+        reviewer.accountChanged()
+        holds = true
+        let task = Task { await reviewer.review() }
+        await pending.waitForStart()
+        deskGeneration = UUID()
+        pending.complete(reply())
+        await task.value
+        XCTAssertEqual(book.thesis(id: thesis.id, owner: session.desk.thesisOwner)?.revisions.filter { $0.kind == .reviewed }.count, 1)
     }
 
     // MARK: The decision
@@ -507,5 +643,19 @@ final class ThesisReviewerTests: XCTestCase {
         let result = try XCTUnwrap(result(reviewer))
         XCTAssertEqual(reviewer.pastReviews().map(\.price), [108.9, 104, 101])
         XCTAssertEqual(reviewer.pastReviews(excluding: result.thesis.lastReview).map(\.price), [104, 101])
+    }
+
+    func testWhatAPastReviewKeptCanBeReadAgain() async throws {
+        let thesis = try seed()
+        let reviewer = reviewer(thesis.id) { [unowned self] _ in
+            self.reply(["review": ["supports": ["Above the 50-day average."], "challenges": [], "unknowns": ["Whether demand holds."], "notChecked": ["news"]]])
+        }
+        await reviewer.review()
+        let kept = try XCTUnwrap(reviewer.pastReviews().first)
+        XCTAssertEqual(ThesisReviewer.storedLists(kept),
+                       [.init(kind: .supports, items: ["Above the 50-day average."]), .init(kind: .unknowns, items: ["Whether demand holds."])],
+                       "the lists the review stored, without the one that held nothing")
+        let plain = ThesisRevision(at: t0, kind: .reviewed, price: 101, verdict: "wait")
+        XCTAssertTrue(ThesisReviewer.storedLists(plain).isEmpty, "a review that kept no lists says so instead of showing empty ones")
     }
 }

@@ -1,7 +1,9 @@
 // My theses (1.8). The active ones first (three at most), each with its two actions: review it
 // with Bobby, or edit the words. Archived ones wait folded underneath and can be reopened or
-// deleted. Everything on this screen is read from the thesis book on this phone; nothing here
-// touches the network.
+// deleted. Two quiet rows may sit on top: theses written before signing in ("Keep them" /
+// "Not mine"), and a way to write a thesis from the read the person last saved, so the offer on
+// the glass is not the only door. Everything on this screen is read from the thesis book on this
+// phone; nothing here touches the network.
 import Combine
 import SwiftUI
 
@@ -18,16 +20,26 @@ final class ThesisListModel: ObservableObject {
     @Published private(set) var problem: Problem?
     /// The thesis a reminder or a row handed over: the list scrolls to it and marks it.
     @Published private(set) var highlight: String?
+    /// Theses written before signing in that this account has not answered for yet (0: no row).
+    @Published private(set) var guestCount = 0
+    /// The read the person last saved, when the desk still holds it and its asset has no active thesis.
+    @Published private(set) var writable: NucleoReadSummary?
 
     private let book: ThesisBook
+    private let guests: ThesisGuestBook
     private let owner: @MainActor () -> String?
+    private let lastSavedRead: @MainActor () -> NucleoReadSummary?
     private let now: () -> Date
     private var cancellables = Set<AnyCancellable>()
 
-    init(book: ThesisBook = .shared, owner: @escaping @MainActor () -> String? = { AccountSession.shared.session?.userId },
-         highlight: String? = nil, now: @escaping () -> Date = { Date() }, observe: Bool = true) {
+    init(book: ThesisBook = .shared, guests: ThesisGuestBook? = nil,
+         owner: @escaping @MainActor () -> String? = { AccountSession.shared.session?.userId },
+         highlight: String? = nil, lastSavedRead: @escaping @MainActor () -> NucleoReadSummary? = { nil },
+         now: @escaping () -> Date = { Date() }, observe: Bool = true) {
         self.book = book
+        self.guests = guests ?? ThesisGuestBook(book: book)
         self.owner = owner
+        self.lastSavedRead = lastSavedRead
         self.now = now
         self.highlight = highlight
         reload()
@@ -50,6 +62,36 @@ final class ThesisListModel: ObservableObject {
         active = book.active(owner: owner)
         archived = book.archived(owner: owner)
         if let highlight, book.thesis(id: highlight, owner: owner) == nil { self.highlight = nil }
+        guestCount = owner.map { guests.pendingLocalCount(for: $0) } ?? 0
+        writable = lastSavedRead().flatMap { read in book.activeThesis(symbol: read.symbol, owner: owner) == nil ? read : nil }
+    }
+
+    // MARK: Theses written before signing in
+
+    /// "You wrote 2 theses before signing in. Keep them in this account?"
+    var guestQuestion: String? {
+        guard guestCount > 0 else { return nil }
+        return guestCount == 1
+            ? L.t("You wrote 1 thesis before signing in. Keep it in this account?",
+                  "Escribiste 1 tesis antes de iniciar sesión. ¿La conservas en esta cuenta?")
+            : L.t("You wrote \(guestCount) theses before signing in. Keep them in this account?",
+                  "Escribiste \(guestCount) tesis antes de iniciar sesión. ¿Las conservas en esta cuenta?")
+    }
+
+    /// "Keep them": the guest theses move into this account's book. Signed out there is no account to move them to.
+    @discardableResult
+    func keepGuestTheses() -> Int {
+        guard let owner = owner() else { return 0 }
+        let moved = guests.adoptLocal(into: owner)
+        reload()
+        return moved
+    }
+
+    /// "Not mine": they stay in the guest book, and this account is not asked again.
+    func declineGuestTheses() {
+        guard let owner = owner() else { return }
+        guests.declineLocal(for: owner)
+        reload()
     }
 
     /// The highlighted thesis sits in the folded section: the section opens for it.
@@ -114,7 +156,15 @@ struct ThesisListSheet: View {
         self.onClose = onClose
         // Evaluated once, when the sheet appears: a reminder tap's thesis is consumed here.
         _model = StateObject(wrappedValue: ThesisListModel(owner: { [weak session] in session?.desk.thesisOwner },
-                                                           highlight: V18Focus.takeThesisId()))
+                                                           highlight: V18Focus.takeThesisId(),
+                                                           lastSavedRead: { [weak session] in Self.lastSavedRead(session) }))
+    }
+
+    /// The read the person last saved in this launch, while the desk still holds it for this account.
+    @MainActor
+    static func lastSavedRead(_ session: NucleoSession?, center: NudgeCenter? = nil) -> NucleoReadSummary? {
+        guard let session, let read = (center ?? .shared).lastRead, read.saved else { return nil }
+        return session.desk.readSummary(requestId: read.requestId)
     }
 
     var body: some View {
@@ -127,6 +177,11 @@ struct ThesisListSheet: View {
                            V18Focus.thesisId = id
                            session.switchSheet(to: .thesisEditor)
                        },
+                       onWrite: { requestId in
+                           V18Focus.clear()
+                           V18Focus.draftRequestId = requestId
+                           session.switchSheet(to: .thesisEditor)
+                       },
                        onClose: onClose)
     }
 }
@@ -136,6 +191,8 @@ struct ThesisListView: View {
     @ObservedObject var model: ThesisListModel
     let onReview: (String) -> Void
     let onEdit: (String) -> Void
+    /// Opens the editor on a draft from the read with this request id.
+    var onWrite: (String) -> Void = { _ in }
     let onClose: () -> Void
     @State private var showsArchived = false
     @State private var deleting: SavedThesis?
@@ -144,12 +201,15 @@ struct ThesisListView: View {
         ScrollViewReader { proxy in
             ThesisScreen(title: L.t("Theses", "Tesis"), closeId: "theses-close", onClose: onClose) {
                 ThesisTitle(text: L.t("My theses", "Mis tesis"))
+                if let question = model.guestQuestion { guestRow(question) }
                 if model.isEmpty {
                     empty
+                    if let read = model.writable { writeRow(read) }
                 } else {
                     Text(model.counter).thesisFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted)
                         .padding(.top, 6)
                         .accessibilityIdentifier("theses-counter")
+                    if let read = model.writable { writeRow(read) }
                     ForEach(model.active) { thesis in activeBlock(thesis).id(thesis.id) }
                     if !model.archived.isEmpty { archivedSection }
                     Text(ThesisCopy.localOnly).thesisFont(12, relativeTo: .caption).foregroundStyle(Theme.warmDim).thesisWraps()
@@ -183,6 +243,49 @@ struct ThesisListView: View {
             .thesisFont(15).foregroundStyle(Theme.warmMuted).lineSpacing(4).thesisWraps()
             .padding(.top, 16)
             .accessibilityIdentifier("theses-empty")
+    }
+
+    // MARK: The two quiet rows
+
+    /// Theses written before signing in: asked once, answered by the person.
+    private func guestRow(_ question: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(question).thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
+                .accessibilityIdentifier("theses-guest-question")
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) { guestActions; Spacer(minLength: 0) }
+                VStack(alignment: .leading, spacing: 4) { guestActions }
+            }
+        }
+        .padding(.horizontal, 14).padding(.top, 14).padding(.bottom, 8)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.nucleoGlass))
+        .padding(.top, 14)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("theses-guest")
+    }
+
+    @ViewBuilder private var guestActions: some View {
+        ThesisButton(title: model.guestCount == 1 ? L.t("Keep it", "Mantenerla") : L.t("Keep them", "Conservarlas"), id: "theses-guest-keep") {
+            withAnimation(.easeOut(duration: 0.2)) { _ = model.keepGuestTheses() }
+        }
+        ThesisLink(title: L.t("Not mine", "No es mío"), id: "theses-guest-decline") {
+            withAnimation(.easeOut(duration: 0.2)) { model.declineGuestTheses() }
+        }
+    }
+
+    /// The read the person last saved has no thesis yet: the editor opens on a draft from it.
+    private func writeRow(_ read: NucleoReadSummary) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L.t("You saved a read on \(read.symbol). Write down why you are looking at it.",
+                     "Guardaste una lectura de \(read.symbol). Escribe por qué lo estás mirando."))
+                .thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
+            ThesisButton(title: L.t("Write my \(read.symbol) thesis", "Escribir mi tesis de \(read.symbol)"),
+                         prominent: model.isEmpty, id: "theses-write") { onWrite(read.requestId) }
+        }
+        .padding(.top, 16).padding(.bottom, model.isEmpty ? 0 : 12)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("theses-write-row")
     }
 
     // MARK: Active

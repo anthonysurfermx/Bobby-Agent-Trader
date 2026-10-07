@@ -287,6 +287,56 @@ final class ThesisEditorTests: XCTestCase {
         XCTAssertEqual(ThesisEditorModel.open(thesisId: nil, draftRequestId: nil, book: book, owner: "account-a", readSummary: lookup), .missing)
     }
 
+    // MARK: Leaving with words that are not saved
+
+    func testWordsThatAreNotSavedAreNeverDroppedWithoutAsking() throws {
+        // Bobby's untouched draft is not the person's words: closing asks nothing.
+        let draft = model(.read(read()))
+        XCTAssertFalse(draft.hasUnsavedWords)
+        draft.hypothesis = "I rewrote this in my own words"
+        XCTAssertTrue(draft.hasUnsavedWords, "the X asks once and a pull on the sheet does not dismiss")
+        draft.hypothesis = "Price holds above its 50-day average."
+        XCTAssertFalse(draft.hasUnsavedWords, "back to what the editor opened with: nothing would be lost")
+        draft.horizon = .year
+        XCTAssertTrue(draft.hasUnsavedWords, "the horizon is the person's pick too")
+        draft.horizon = nil
+        draft.worry = ""
+        XCTAssertTrue(draft.hasUnsavedWords, "clearing a suggestion is an edit")
+        guard case .created = draft.save() else { return XCTFail("expected a new thesis") }
+        XCTAssertFalse(draft.hasUnsavedWords, "saved words are not at risk")
+
+        // A blank editor: the first character typed is already something to lose.
+        let blank = model(.read(read("AAPL", why: nil, risk: nil, watch: nil)))
+        XCTAssertFalse(blank.hasUnsavedWords)
+        blank.changeMind = "x"
+        XCTAssertTrue(blank.hasUnsavedWords)
+
+        // Editing an existing thesis.
+        let existing = try seed("BTC")
+        let editor = model(.existing(existing))
+        XCTAssertFalse(editor.hasUnsavedWords)
+        editor.worry = "A different worry"
+        XCTAssertTrue(editor.hasUnsavedWords)
+        guard case .edited = editor.save() else { return XCTFail("expected an edit") }
+        XCTAssertFalse(editor.hasUnsavedWords)
+
+        // The limit state still holds the words the person wrote.
+        try seed("TSLA")
+        XCTAssertEqual(book.active(owner: "account-a").count, ThesisBook.activeLimit)
+        let fourth = model(.read(read("AMZN")))
+        fourth.hypothesis = "My own reason"
+        XCTAssertEqual(fourth.save(), .blocked(.limitReached))
+        XCTAssertTrue(fourth.hasUnsavedWords)
+
+        // With nothing to write on, or in another account, there is nothing to ask about.
+        XCTAssertFalse(model(.missing).hasUnsavedWords)
+        let stale = model(.read(read("GOOG")))
+        stale.hypothesis = "Words for the previous account"
+        identity.generation = UUID()
+        XCTAssertEqual(stale.save(), .blocked(.stale))
+        XCTAssertFalse(stale.hasUnsavedWords)
+    }
+
     func testTheHandOffIsConsumedOnce() {
         V18Focus.clear()
         V18Focus.draftRequestId = "read-1"
@@ -328,8 +378,100 @@ final class ThesisListTests: XCTestCase {
                         owner: owner, now: now.addingTimeInterval(-daysAgo * 86_400))
     }
 
-    private func model(highlight: String? = nil, owner: String? = "u1") -> ThesisListModel {
-        ThesisListModel(book: book, owner: { owner }, highlight: highlight, now: { [now] in now }, observe: false)
+    private func model(highlight: String? = nil, owner: String? = "u1", lastSavedRead: NucleoReadSummary? = nil) -> ThesisListModel {
+        ThesisListModel(book: book, guests: ThesisGuestBook(book: book, defaults: defaults), owner: { owner }, highlight: highlight,
+                        lastSavedRead: { lastSavedRead }, now: { [now] in now }, observe: false)
+    }
+
+    // MARK: Another door into the editor
+
+    func testTheListOffersToWriteFromTheLastSavedReadWhileItsAssetHasNoThesis() throws {
+        let read = NucleoReadSummary(requestId: "0a1b2c3d-1111-4222-8333-444455556666", symbol: "NVDA", name: "NVIDIA", isEquity: true, verdict: "wait",
+                                     price: 120.5, asOf: "2026-10-07T12:00:00Z", headline: nil, why: "Why", risk: nil, watch: nil)
+        let empty = model(lastSavedRead: read)
+        XCTAssertTrue(empty.isEmpty)
+        XCTAssertEqual(empty.writable, read, "the empty list is a door too, not only the offer on the glass")
+        XCTAssertNil(model().writable, "no saved read in this launch: nothing is offered")
+
+        try seed("BTC", daysAgo: 2)
+        XCTAssertEqual(model(lastSavedRead: read).writable, read)
+        let nvda = try seed("nvda", daysAgo: 1)
+        let list = model(lastSavedRead: read)
+        XCTAssertNil(list.writable, "one thesis per asset: the list shows that thesis instead")
+        list.archive(nvda.id)
+        XCTAssertEqual(list.writable, read, "an archived thesis is not in the way")
+        try seed("NVDA", daysAgo: 0, owner: "u2")
+        XCTAssertEqual(model(lastSavedRead: read).writable, read, "another account's thesis is not this reader's")
+    }
+
+    func testTheLastSavedReadIsTheOneOfThisLaunchThatTheDeskStillHolds() {
+        let center = NudgeCenter(defaults: defaults)
+        NucleoFixtures.activate(scenario: "default", timeScale: 0.01)
+        defer { NucleoFixtures.deactivate() }
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        XCTAssertNil(ThesisListSheet.lastSavedRead(session, center: center), "no read in this launch")
+        center.noteRead(NudgeRead(requestId: "0A1B2C3D-1111-4222-8333-444455556666", symbol: "AAPL", name: "Apple", isEquity: true, verdict: "wait",
+                                  saved: false, at: now))
+        XCTAssertNil(ThesisListSheet.lastSavedRead(session, center: center), "a read that was not saved is not offered")
+        center.noteSaved(requestId: "0A1B2C3D-1111-4222-8333-444455556666")
+        XCTAssertNil(ThesisListSheet.lastSavedRead(session, center: center), "saved, but the desk no longer holds it: nothing to draft from")
+        XCTAssertNil(ThesisListSheet.lastSavedRead(nil, center: center))
+    }
+
+    // MARK: Theses written before signing in
+
+    func testThesesWrittenBeforeSigningInAreKeptOnlyWhenThePersonSaysSo() throws {
+        try seed("NVDA", daysAgo: 4, owner: nil)
+        try seed("BTC", daysAgo: 2, owner: nil)
+        XCTAssertEqual(model(owner: nil).guestCount, 0, "signed out there is no account to ask for")
+        XCTAssertNil(model(owner: nil).guestQuestion)
+        XCTAssertEqual(model(owner: nil).keepGuestTheses(), 0)
+
+        let list = model(owner: "u1")
+        XCTAssertTrue(list.isEmpty, "nothing was moved by signing in")
+        XCTAssertEqual(list.guestCount, 2)
+        XCTAssertEqual(list.guestQuestion, "You wrote 2 theses before signing in. Keep them in this account?")
+        XCTAssertEqual(list.keepGuestTheses(), 2)
+        XCTAssertEqual(Set(list.active.map(\.symbol)), ["NVDA", "BTC"], "\"Keep them\" moves them into this account's book")
+        XCTAssertEqual(list.guestCount, 0)
+        XCTAssertNil(list.guestQuestion)
+        XCTAssertTrue(book.all(owner: nil).isEmpty)
+    }
+
+    func testNotMineLeavesThemInTheGuestBookAndDoesNotAskThisAccountAgain() throws {
+        let local = try seed("NVDA", daysAgo: 4, owner: nil)
+        let list = model(owner: "u1")
+        XCTAssertEqual(list.guestQuestion, "You wrote 1 thesis before signing in. Keep it in this account?")
+        list.declineGuestTheses()
+        XCTAssertEqual(list.guestCount, 0)
+        XCTAssertTrue(list.isEmpty, "hidden from this account")
+        XCTAssertEqual(book.all(owner: nil).map(\.id), [local.id], "still in the guest book, where signed out sees them")
+        XCTAssertEqual(model(owner: "u1").guestCount, 0, "not asked again")
+        XCTAssertEqual(model(owner: nil).active.map(\.id), [local.id])
+        XCTAssertEqual(model(owner: "u2").guestCount, 1, "the answer was this account's, not the phone's")
+
+        // An account that already has theses is never asked: books are not merged.
+        try seed("BTC", daysAgo: 1, owner: "u3")
+        XCTAssertEqual(model(owner: "u3").guestCount, 0)
+        XCTAssertEqual(ThesisGuestBook.declinedKey("u1"), "v18.theses.guestDeclined.u1")
+    }
+
+    func testTheGuestRowFitsItsWordsInSixLanguages() throws {
+        try seed("NVDA", daysAgo: 4, owner: nil)
+        try seed("BTC", daysAgo: 2, owner: nil)
+        var questions = Set<String>(), buttons = Set<String>()
+        for language in ["en", "es", "fr", "pt", "it", "de"] {
+            UserDefaults.standard.set(language, forKey: L.preferenceKey)
+            let question = try XCTUnwrap(model(owner: "u1").guestQuestion)
+            XCTAssertTrue(question.contains("2"), "\(language): \(question)")
+            XCTAssertFalse(question.contains("{"), language)
+            questions.insert(question)
+            buttons.insert(L.t("Keep them", "Conservarlas") + " / " + L.t("Not mine", "No es mío"))
+        }
+        UserDefaults.standard.set("en", forKey: L.preferenceKey)
+        XCTAssertEqual(questions.count, 6)
+        XCTAssertEqual(buttons.count, 6, "both answers are worded in each language")
     }
 
     func testActiveThesesComeFirstWithACounterAndArchivedOnesApart() throws {

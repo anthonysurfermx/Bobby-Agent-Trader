@@ -37,8 +37,10 @@ struct ThesisThenNow: Equatable {
         self.asOf = asOf.flatMap { $0.isEmpty ? nil : $0 }
     }
 
+    /// "Then" is the price the thesis was written at and nothing else: a thesis written from a read
+    /// without a price has no "then", and a later review's price is never borrowed as its origin.
     init(thesis: SavedThesis, nowPrice: Double?, asOf: String?) {
-        let start = thesis.startingPoint
+        let start = ThesisCopy.startingPoint(thesis)
         self.init(thenPrice: start?.price, thenDate: start?.at, nowPrice: nowPrice, asOf: asOf)
     }
 
@@ -51,6 +53,8 @@ struct ThesisThenNow: Equatable {
 
     var asOfDate: Date? { asOf.flatMap(BobbyAccessAPI.date) }
     var isEmpty: Bool { thenPrice == nil && nowPrice == nil }
+    /// No price was kept when the thesis was written: the screen says so instead of showing a change.
+    var missingStart: Bool { thenPrice == nil }
 
     private static func usable(_ price: Double?) -> Double? {
         guard let price, price.isFinite, price > 0 else { return nil }
@@ -140,9 +144,32 @@ enum ThesisCopy {
         L.t("Educational read · not financial advice", "Lectura educativa · no es asesoría financiera")
     }
 
+    // MARK: Where the words go (consent-relevant: shown without scrolling, in the same words everywhere)
+
+    /// Above Save in the editor and under the list.
     static var localOnly: String {
-        L.t("Saved on this iPhone only. Its text is sent to Bobby only when you ask for a review.",
-            "Se guarda solo en este iPhone. Su texto se envía a Bobby solo cuando pides una revisión.")
+        L.t("Saved on this iPhone only. When you ask for a review, your words are sent to Bobby and to the AI providers that write the review. They are not stored there.",
+            "Se guarda solo en este iPhone. Cuando pides una revisión, tus palabras se envían a Bobby y a los proveedores de IA que escriben la revisión. No se guardan allí.")
+    }
+
+    /// Directly above "Review now", pinned with it.
+    static var sentToProviders: String {
+        L.t("Your thesis is sent to Bobby’s AI providers for this review only.",
+            "Tu tesis se envía a los proveedores de IA de Bobby solo para esta revisión.")
+    }
+
+    // MARK: Where a thesis started
+
+    /// The price and date a thesis was written at: its `.created` entry and no other. A thesis
+    /// written from a read without a price has none, however many reviews followed.
+    static func startingPoint(_ thesis: SavedThesis) -> (price: Double, at: Date)? {
+        guard let created = thesis.revisions.first(where: { $0.kind == .created }),
+              let price = created.price, price.isFinite, price > 0 else { return nil }
+        return (price, created.at)
+    }
+
+    static var noStartingPrice: String {
+        L.t("No starting price was saved with this thesis.", "No se guardó un precio inicial con esta tesis.")
     }
 
     // MARK: Numbers and dates
@@ -218,7 +245,7 @@ enum ThesisCopy {
     /// "Since Oct 7 · started at 120.50", or only the date when the read carried no price.
     static func sinceLine(_ thesis: SavedThesis, now: Date = Date()) -> String {
         let since = day(thesis.createdAt, now: now)
-        guard let start = thesis.startingPoint, start.price.isFinite, start.price > 0 else {
+        guard let start = startingPoint(thesis) else {
             return L.t("Since \(since)", "Desde el \(since)")
         }
         let price = price(start.price)

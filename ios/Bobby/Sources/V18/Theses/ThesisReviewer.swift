@@ -44,6 +44,8 @@ final class ThesisReviewer: ObservableObject {
         case riskNotice
         /// Deleted, or written in another account's book.
         case notFound
+        /// Written before signing in: it waits in the guest book until the person keeps it in this account (My theses).
+        case writtenSignedOut
         case archived
         /// 401, or a premium level refused for a guest (`level` is that level).
         case signIn(level: NucleoAnalysisLevel?)
@@ -74,6 +76,8 @@ final class ThesisReviewer: ObservableObject {
     @MainActor
     struct Environment {
         var book: ThesisBook = .shared
+        /// Where "Not mine" is remembered for theses written before signing in (`ThesisGuestBook`).
+        var guestDefaults: UserDefaults = .standard
         var owner: () -> String? = { AccountSession.shared.session?.userId }
         var generation: () -> UUID = { AccountSession.shared.generation }
         var riskAccepted: () -> Bool = { UserDefaults.standard.integer(forKey: "agent.riskNoticeVersion") >= RiskNotice.currentVersion }
@@ -131,7 +135,7 @@ final class ThesisReviewer: ObservableObject {
         thesis = thesisId.flatMap { env.book.thesis(id: $0, owner: env.owner()) }
         // A review in flight, a finished one and a server's refusal stay on screen as they are.
         switch phase {
-        case .ready, .refused(.notFound), .refused(.archived), .refused(.riskNotice):
+        case .ready, .refused(.notFound), .refused(.writtenSignedOut), .refused(.archived), .refused(.riskNotice):
             phase = precondition().map(Phase.refused) ?? .ready
         default:
             break
@@ -146,10 +150,17 @@ final class ThesisReviewer: ObservableObject {
     }
 
     private func precondition() -> Refusal? {
-        guard let thesis else { return .notFound }
+        guard let thesis else { return waitsInGuestBook ? .writtenSignedOut : .notFound }
         if thesis.status == .archived { return .archived }
         if !env.riskAccepted() { return .riskNotice }
         return nil
+    }
+
+    /// The person signed in on this screen (or elsewhere) and the thesis is one they wrote before:
+    /// it is still in the guest book, and My theses asks whether to keep it in this account.
+    private var waitsInGuestBook: Bool {
+        guard let thesisId, let owner = env.owner(), env.book.thesis(id: thesisId, owner: nil) != nil else { return false }
+        return ThesisGuestBook(book: env.book, defaults: env.guestDefaults).pendingLocalCount(for: owner) > 0
     }
 
     // MARK: One review
@@ -176,9 +187,11 @@ final class ThesisReviewer: ObservableObject {
         run = token
         let generation = env.generation(), owner = env.owner()
         phase = .running
+        var words = ThesisContext(thesis)
+        // The price the thesis was written at, or none: a later review's price is never sent as its origin.
+        words.priceAtSave = ThesisCopy.startingPoint(thesis)?.price
         let request = ThesisReviewRequest(symbol: thesis.symbol, question: ThesisCopy.reviewQuestion(symbol: thesis.symbol),
-                                          isEquity: thesis.isEquity, level: level, requestId: env.requestId(),
-                                          thesis: ThesisContext(thesis))
+                                          isEquity: thesis.isEquity, level: level, requestId: env.requestId(), thesis: words)
         let outcome = await env.send(request)
         // Cancelled, superseded, or the account changed while the desk worked: the reply is dropped.
         guard run == token else { return }
@@ -272,6 +285,21 @@ final class ThesisReviewer: ObservableObject {
         (thesis?.revisions ?? []).filter { $0.kind == .reviewed && $0.id != current?.id }.reversed()
     }
 
+    /// One of the three lists a past review kept on this phone.
+    struct StoredList: Equatable, Identifiable {
+        enum Kind: String { case supports, challenges, unknowns }
+        let kind: Kind
+        let items: [String]
+        var id: String { kind.rawValue }
+    }
+
+    /// What a past review kept, so everything stored can be read again. Lists that held nothing are
+    /// left out; an empty result means the review kept no lists at all (the screen says so).
+    static func storedLists(_ revision: ThesisRevision) -> [StoredList] {
+        [StoredList(kind: .supports, items: revision.supports), StoredList(kind: .challenges, items: revision.challenges),
+         StoredList(kind: .unknowns, items: revision.unknowns)].filter { !$0.items.isEmpty }
+    }
+
 #if DEBUG
     /// Review fixtures only: a recorded state, no request.
     func show(_ phase: Phase) { self.phase = phase }
@@ -296,6 +324,10 @@ struct ThesisRefusalCopy: Equatable {
                        "Primero acepta el aviso de riesgo: hasta entonces Bobby no envía nada a sus servidores.")
         case .notFound:
             text = L.t("This thesis is not available in this account.", "Esta tesis no está disponible en esta cuenta.")
+            actions = [.myTheses]
+        case .writtenSignedOut:
+            text = L.t("You wrote this thesis before signing in.", "Escribiste esta tesis antes de iniciar sesión.")
+            detail = L.t("Open My theses to keep it in this account.", "Abre Mis tesis para conservarla en esta cuenta.")
             actions = [.myTheses]
         case .archived:
             text = L.t("This thesis is archived. Reopen it to review it.", "Esta tesis está archivada. Reábrela para revisarla.")

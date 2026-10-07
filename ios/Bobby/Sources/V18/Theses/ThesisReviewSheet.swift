@@ -3,22 +3,27 @@
 // verdict for today, what the evidence supports, challenges and leaves unknown, and, every
 // time, what Bobby did not check. Then the person decides: keep it, edit it or archive it.
 // The route opens it through `V18Focus.thesisId`.
+import AuthenticationServices
 import SwiftUI
 
 extension ThesisReviewer.Environment {
-    /// The app's real stores, through the session that owns the desk.
+    /// The desk request itself, with the bearer it carries (tests replace it and look at both).
+    typealias Transport = @MainActor (ThesisReviewRequest, BobbyMeterAuth) async -> NucleoDeskIO.DebateOutcome
+
+    /// The app's real stores, through the session that owns the desk: its consent, its account
+    /// fence, its thesis book owner and the bearer its reads carry.
     @MainActor
-    static func live(_ session: NucleoSession) -> ThesisReviewer.Environment {
+    static func live(_ session: NucleoSession, transport: @escaping Transport = { request, auth in
+        await NucleoDeskIO.debate(symbol: request.symbol, question: request.question, isEquity: request.isEquity,
+                                  level: request.level, auth: auth, requestId: request.requestId, thesis: request.thesis)
+    }) -> ThesisReviewer.Environment {
         var env = ThesisReviewer.Environment()
         // Whose bearer the read carries is the desk's own rule (signed out and fixture mode included).
         let auth = session.desk.meterAuth
         env.owner = { [weak session] in session?.desk.thesisOwner }
         env.generation = { [weak session] in session?.desk.generation() ?? UUID() }
         env.riskAccepted = { [weak session] in session?.profile.acceptedRiskNotice ?? false }
-        env.send = { request in
-            await NucleoDeskIO.debate(symbol: request.symbol, question: request.question, isEquity: request.isEquity,
-                                      level: request.level, auth: auth, requestId: request.requestId, thesis: request.thesis)
-        }
+        env.send = { request in await transport(request, auth) }
         return env
     }
 }
@@ -37,7 +42,9 @@ struct ThesisReviewSheet: View {
 
     var body: some View {
         ThesisReviewView(reviewer: reviewer, actions: ThesisReviewView.Actions(
-            signIn: { await session.signIn() },
+            canSignIn: !session.fixtures,
+            prepareApple: { AccountSession.shared.prepareAppleRequest($0) },
+            completeApple: { result in await Self.completeApple(result, session: session) },
             showPro: { session.switchSheet(to: .paywall) },
             showCredits: { session.switchSheet(to: .credits) },
             showTheses: { session.switchSheet(to: .theses) },
@@ -49,13 +56,35 @@ struct ThesisReviewSheet: View {
             // Closing the sheet cancels a review in flight; its reply, if one still comes, is ignored.
             .onDisappear { reviewer.cancel() }
     }
+
+    /// The system Sign in with Apple button finished: `signedIn` | `cancelled` | `failed` | `unavailable`.
+    /// Same rules as `NucleoSession.signIn`: never in fixture mode, never before the risk notice.
+    @MainActor
+    static func completeApple(_ result: Result<ASAuthorization, Error>, session: NucleoSession) async -> String {
+        guard !session.fixtures, session.profile.acceptedRiskNotice else { return "unavailable" }
+        let account = AccountSession.shared
+        await account.completeApple(result)
+        if account.isSignedIn {
+            await session.signedInFromSheet()
+            return "signedIn"
+        }
+        if case let .failure(error) = result, (error as? ASAuthorizationError)?.code == .canceled {
+            account.lastError = nil
+            return "cancelled"
+        }
+        return "failed"
+    }
 }
 
 /// The review itself, on a reviewer: the sheet above and the review fixtures both show this.
 struct ThesisReviewView: View {
     struct Actions {
-        /// `signedIn` | `cancelled` | `failed` | `unavailable` (NucleoSession.signIn).
-        var signIn: () async -> String = { "unavailable" }
+        /// False where there is no Apple to sign in with (fixture mode, review fixtures): the button is shown disabled.
+        var canSignIn = false
+        /// The system button's request (the app's nonce and scopes).
+        var prepareApple: (ASAuthorizationAppleIDRequest) -> Void = { _ in }
+        /// `signedIn` | `cancelled` | `failed` | `unavailable`.
+        var completeApple: (Result<ASAuthorization, Error>) async -> String = { _ in "unavailable" }
         var showPro: () -> Void = {}
         var showCredits: () -> Void = {}
         var showTheses: () -> Void = {}
@@ -68,9 +97,11 @@ struct ThesisReviewView: View {
     @State private var signingIn = false
     @State private var signInFailed = false
     @State private var showsHistory = false
+    /// The past review whose stored lists are open.
+    @State private var openReview: String?
 
     var body: some View {
-        ThesisScreen(title: L.t("Thesis review", "Revisión de tesis"), closeId: "thesis-review-close", onClose: actions.close) {
+        ThesisScreen(title: L.t("Thesis review", "Revisión de tesis"), closeId: "thesis-review-close", onClose: actions.close, bottom: startBar) {
             if let thesis = reviewer.thesis {
                 ThesisTitle(text: L.t("Your \(thesis.symbol) thesis", "Tu tesis sobre \(thesis.symbol)"))
                 if thesis.name.caseInsensitiveCompare(thesis.symbol) != .orderedSame, !thesis.name.isEmpty {
@@ -94,26 +125,37 @@ struct ThesisReviewView: View {
 
     // MARK: Before
 
+    /// What a review does and costs comes first, above the person's words, so it is read before
+    /// anything is scrolled; where the words go is pinned with the button (`startBar`).
     @ViewBuilder private var before: some View {
         if let thesis = reviewer.thesis {
-            ThesisWordsView(thesis: thesis)
-            Text(ThesisCopy.reviewedLine(thesis)).thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmDim).thesisWraps()
-                .padding(.top, 18)
-                .accessibilityIdentifier("thesis-review-last")
             Text(L.t("Bobby will read today’s price evidence against your words. A review uses one read.",
                      "Bobby leerá la evidencia de precio de hoy frente a tus palabras. Una revisión usa una lectura."))
                 .thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
                 .padding(.top, 10)
                 .accessibilityIdentifier("thesis-review-cost")
-            ThesisButton(title: L.t("Review now", "Revisar ahora"), prominent: true, wide: true, id: "thesis-review-start") { reviewer.start() }
-                .padding(.top, 16)
             Text(L.t("It runs at your current level: \(reviewer.currentLevel.name).", "Corre en tu nivel actual: \(reviewer.currentLevel.name)."))
                 .thesisFont(12, relativeTo: .caption).foregroundStyle(Theme.warmDim).thesisWraps()
-                .frame(maxWidth: .infinity, alignment: .center)
-                .padding(.top, 8)
+                .padding(.top, 4)
                 .accessibilityIdentifier("thesis-review-level")
+            ThesisWordsView(thesis: thesis)
+            Text(ThesisCopy.reviewedLine(thesis)).thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmDim).thesisWraps()
+                .padding(.top, 18)
+                .accessibilityIdentifier("thesis-review-last")
             history(excluding: nil)
         }
+    }
+
+    /// Pinned under the scroll while the review has not started: the sentence that says where the
+    /// person's words go, directly above the button that sends them. Never below the fold.
+    private var startBar: AnyView? {
+        guard !signingIn, reviewer.phase == .ready, reviewer.thesis != nil else { return nil }
+        return AnyView(VStack(alignment: .leading, spacing: 10) {
+            Text(ThesisCopy.sentToProviders)
+                .thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineSpacing(2).thesisWraps()
+                .accessibilityIdentifier("thesis-review-providers")
+            ThesisButton(title: L.t("Review now", "Revisar ahora"), prominent: true, wide: true, id: "thesis-review-start") { reviewer.start() }
+        })
     }
 
     // MARK: During
@@ -166,26 +208,32 @@ struct ThesisReviewView: View {
             .accessibilityIdentifier("thesis-review-footer")
     }
 
+    /// Always shown: a thesis written without a price says so and shows today's price only; the
+    /// change appears only when the thesis has its own starting price.
     @ViewBuilder private func thenAndNow(_ numbers: ThesisThenNow) -> some View {
-        if !numbers.isEmpty {
-            VStack(alignment: .leading, spacing: 0) {
-                ThesisLabel(text: L.t("Then and now", "Antes y ahora"))
-                if let price = numbers.thenPrice {
-                    let day = numbers.thenDate.map { ThesisCopy.day($0) }
-                    figure(day.map { L.t("Started \($0)", "Empezó el \($0)") } ?? L.t("Starting point", "Punto de partida"), ThesisCopy.price(price))
-                }
-                if let price = numbers.nowPrice {
-                    let moment = numbers.asOfDate.map { ThesisCopy.moment($0) }
-                    figure(moment.map { L.t("Evidence dated \($0)", "Evidencia con fecha \($0)") } ?? L.t("Latest evidence", "Evidencia más reciente"),
-                           ThesisCopy.price(price))
-                }
-                // Computed on this phone from the two prices above; left out when either is missing.
-                if let change = numbers.changePct {
-                    figure(L.t("Change since then", "Cambio desde entonces"), ThesisCopy.percent(change))
-                }
+        VStack(alignment: .leading, spacing: 0) {
+            ThesisLabel(text: L.t("Then and now", "Antes y ahora"))
+            if let price = numbers.thenPrice {
+                let day = numbers.thenDate.map { ThesisCopy.day($0) }
+                figure(day.map { L.t("Started \($0)", "Empezó el \($0)") } ?? L.t("Starting point", "Punto de partida"), ThesisCopy.price(price))
             }
-            .accessibilityIdentifier("thesis-review-then-now")
+            if let price = numbers.nowPrice {
+                let moment = numbers.asOfDate.map { ThesisCopy.moment($0) }
+                figure(moment.map { L.t("Evidence dated \($0)", "Evidencia con fecha \($0)") } ?? L.t("Latest evidence", "Evidencia más reciente"),
+                       ThesisCopy.price(price))
+            }
+            // Computed on this phone from the two prices above; left out when either is missing.
+            if let change = numbers.changePct {
+                figure(L.t("Change since then", "Cambio desde entonces"), ThesisCopy.percent(change))
+            }
+            if numbers.missingStart {
+                Text(ThesisCopy.noStartingPrice)
+                    .thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
+                    .padding(.top, 4)
+                    .accessibilityIdentifier("thesis-review-no-start")
+            }
         }
+        .accessibilityIdentifier("thesis-review-then-now")
     }
 
     private func figure(_ label: String, _ value: String) -> some View {
@@ -286,17 +334,56 @@ struct ThesisReviewView: View {
             .accessibilityValue(showsHistory ? L.t("Expanded", "Desplegado") : L.t("Collapsed", "Plegado"))
             .accessibilityIdentifier("thesis-review-history-toggle")
             if showsHistory {
-                ForEach(past) { revision in
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        Text(pastLine(revision)).thesisFont(13.5, design: .monospaced, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
-                        if let verdict = revision.verdict { ThesisVerdictWord(verdict: verdict, size: 13.5) }
-                        Spacer(minLength: 0)
-                    }
-                    .frame(minHeight: 36)
-                    .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-                    .accessibilityElement(children: .combine)
+                ForEach(past) { revision in pastRow(revision) }
+            }
+        }
+    }
+
+    /// One past review: its date, price and verdict; a tap opens the three lists it kept, so
+    /// everything stored on this phone about a review can be read again.
+    @ViewBuilder private func pastRow(_ revision: ThesisRevision) -> some View {
+        let open = openReview == revision.id
+        Button {
+            withAnimation(.easeOut(duration: 0.2)) { openReview = open ? nil : revision.id }
+        } label: {
+            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                Text(pastLine(revision)).thesisFont(13.5, design: .monospaced, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
+                if let verdict = revision.verdict { ThesisVerdictWord(verdict: verdict, size: 13.5) }
+                Spacer(minLength: 8)
+                Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.warmDim)
+                    .accessibilityHidden(true)
+            }
+            .frame(minHeight: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
+        .accessibilityElement(children: .combine)
+        .accessibilityValue(open ? L.t("Expanded", "Desplegado") : L.t("Collapsed", "Plegado"))
+        .accessibilityIdentifier("thesis-review-past-\(revision.id)")
+        if open {
+            let lists = ThesisReviewer.storedLists(revision)
+            VStack(alignment: .leading, spacing: 0) {
+                if lists.isEmpty {
+                    Text(L.t("No lists were kept for this review.", "No se guardaron listas de esta revisión."))
+                        .thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmDim).thesisWraps()
+                }
+                ForEach(lists) { list in
+                    ThesisLabel(text: storedTitle(list.kind), top: list.id == lists.first?.id ? 0 : 12)
+                    ForEach(Array(list.items.enumerated()), id: \.offset) { _, item in bullet(item, ink: Theme.warmMuted) }
                 }
             }
+            .padding(.bottom, 12)
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("thesis-review-past-lists")
+        }
+    }
+
+    private func storedTitle(_ kind: ThesisReviewer.StoredList.Kind) -> String {
+        switch kind {
+        case .supports: return L.t("Supports your thesis", "Respalda tu tesis")
+        case .challenges: return L.t("Challenges it", "La cuestiona")
+        case .unknowns: return L.t("Still unknown", "Sigue sin saberse")
         }
     }
 
@@ -340,8 +427,17 @@ struct ThesisReviewView: View {
     @ViewBuilder private func refusalButton(_ action: ThesisRefusalCopy.Action, prominent: Bool) -> some View {
         switch action {
         case .signIn:
-            ThesisButton(title: L.t("Sign in with Apple", "Iniciar sesión con Apple"), prominent: prominent, wide: true, systemImage: "apple.logo",
-                         id: "thesis-review-signin") { signIn() }
+            // The system button, in one of Apple's own styles, as on every other sign-in surface of the app.
+            SignInWithAppleButton(.signIn) { request in
+                actions.prepareApple(request)
+            } onCompletion: { result in
+                signedIn(result)
+            }
+            .signInWithAppleButtonStyle(.white)
+            .frame(height: 48)
+            .clipShape(Capsule())
+            .disabled(!actions.canSignIn)
+            .accessibilityIdentifier("thesis-review-signin")
         case .pro:
             ThesisButton(title: L.t("See Bobby Pro", "Ver Bobby Pro"), prominent: prominent, wide: true, id: "thesis-review-pro", action: actions.showPro)
         case .quick:
@@ -359,12 +455,12 @@ struct ThesisReviewView: View {
         }
     }
 
-    private func signIn() {
+    private func signedIn(_ result: Result<ASAuthorization, Error>) {
         guard !signingIn else { return }
         signingIn = true
         signInFailed = false
         Task {
-            let status = await actions.signIn()
+            let status = await actions.completeApple(result)
             signingIn = false
             // The account is new: the thesis is read again from that account's book before anything is sent.
             if status == "signedIn" { reviewer.accountChanged() } else { signInFailed = status != "cancelled" }

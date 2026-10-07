@@ -42,9 +42,25 @@ struct ThesisEditorView: View {
 
     private enum Field: Hashable { case hypothesis, worry, changeMind }
     @FocusState private var focus: Field?
+    @State private var asksToDiscard = false
+
+    /// The X: words that are not saved are never dropped without asking once.
+    private func close() {
+        if model.hasUnsavedWords { focus = nil; asksToDiscard = true } else { onClose() }
+    }
 
     var body: some View {
-        ThesisScreen(title: L.t("Thesis", "Tesis"), closeId: "thesis-editor-close", onClose: onClose, bottom: bottomBar) {
+        screen
+            // A pull on the sheet cannot throw the words away either; the X asks.
+            .interactiveDismissDisabled(model.hasUnsavedWords)
+            .confirmationDialog(L.t("Discard what you wrote?", "¿Descartar lo que escribiste?"), isPresented: $asksToDiscard, titleVisibility: .visible) {
+                Button(L.t("Discard", "Descartar"), role: .destructive) { onClose() }
+                Button(L.t("Keep writing", "Seguir escribiendo"), role: .cancel) {}
+            }
+    }
+
+    private var screen: some View {
+        ThesisScreen(title: L.t("Thesis", "Tesis"), closeId: "thesis-editor-close", onClose: close, bottom: bottomBar) {
             switch (model.source, model.problem) {
             case (.missing, _), (_, .notFound?):
                 missing

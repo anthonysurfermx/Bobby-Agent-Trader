@@ -19,6 +19,11 @@ enum ThesesQA {
             "theses-empty": { list(seeded: false) },
             "theses-three": { list(seeded: true) },
             "theses-three-focus": { list(seeded: true, highlight: "BTC") },
+            // Signed in, with theses written before signing in waiting in the guest book.
+            "theses-guest": { list(seeded: true, owner: "qa-account") },
+            // The read the person last saved has no thesis yet: another door into the editor.
+            "theses-write": { list(seeded: true, lastSavedRead: read("AAPL", "Apple")) },
+            "theses-empty-write": { list(seeded: false, lastSavedRead: read("AAPL", "Apple")) },
             // The editor.
             "theses-editor-draft": { editor(.read(read("AAPL", "Apple"))) },
             "theses-editor-blank": { editor(.read(read("AAPL", "Apple", synthesis: false))) },
@@ -32,6 +37,8 @@ enum ThesesQA {
             "theses-review-after": { review(.after(notes: true)) },
             "theses-review-after-plain": { review(.after(notes: false)) },
             "theses-review-after-crypto": { review(.after(notes: false), symbol: "BTC") },
+            // Written from a read without a price, reviewed twice since: today's price only, and it says so.
+            "theses-review-after-no-start": { review(.after(notes: true), startPrice: nil) },
             "theses-review-archived": { review(.before, symbol: "TSLA") },
             "theses-review-missing": { review(.before, symbol: "NONE") },
         ]
@@ -39,6 +46,7 @@ enum ThesesQA {
         let soon = Date().addingTimeInterval(3 * 86_400)
         let refusals: [String: ThesisReviewer.Refusal] = [
             "risk": .riskNotice,
+            "guest": .writtenSignedOut,
             "signin": .signIn(level: nil),
             "signin-level": .signIn(level: .profundo),
             "pro": .subscription(resets: soon),
@@ -61,15 +69,17 @@ enum ThesesQA {
 
     /// A fresh book every time a fixture is shown. Seeded: three active theses (NVDA a fortnight
     /// without a review after two reviews, BTC and SAP.DE never reviewed) and one archived (TSLA).
-    private static func book(seeded: Bool) -> ThesisBook {
-        let suite = "qa.v18.theses"
+    private static let suite = "qa.v18.theses"
+    private static var store: UserDefaults { UserDefaults(suiteName: suite) ?? .standard }
+
+    private static func book(seeded: Bool, nvdaStart: Double? = 120.5) -> ThesisBook {
         UserDefaults.standard.removePersistentDomain(forName: suite)
-        let book = ThesisBook(defaults: UserDefaults(suiteName: suite) ?? .standard)
+        let book = ThesisBook(defaults: store)
         guard seeded else { return book }
         let now = Date()
         func day(_ ago: Double) -> Date { now.addingTimeInterval(-ago * 86_400) }
         func add(_ symbol: String, _ name: String, equity: Bool = true, horizon: ThesisHorizon?, why: String, worry: String = "",
-                 changeMind: String = "", price: Double, verdict: String = "wait", daysAgo: Double) -> SavedThesis? {
+                 changeMind: String = "", price: Double?, verdict: String = "wait", daysAgo: Double) -> SavedThesis? {
             try? book.create(ThesisDraft(symbol: symbol, name: name, isEquity: equity, horizon: horizon, hypothesis: why, worry: worry,
                                          changeMind: changeMind, sourceRequestId: nil, price: price, asOf: iso(day(daysAgo)), verdict: verdict),
                              owner: nil, now: day(daysAgo))
@@ -80,7 +90,7 @@ enum ThesesQA {
         if let nvda = add("NVDA", "NVIDIA", horizon: .year,
                           why: "Data center demand keeps growing faster than supply, and margins hold while that lasts.",
                           worry: "A pause in spending by the largest customers.",
-                          changeMind: "Two quarters in a row of falling data center revenue.", price: 120.5, daysAgo: 30) {
+                          changeMind: "Two quarters in a row of falling data center revenue.", price: nvdaStart, daysAgo: 30) {
             _ = try? book.recordReview(id: nvda.id, owner: nil, price: 126.1, asOf: iso(day(21)), verdict: "wait",
                                        supports: ["Price held above its 50-day average."], challenges: [], unknowns: [], now: day(21))
             _ = try? book.recordReview(id: nvda.id, owner: nil, price: 124.3, asOf: iso(day(14)), verdict: "review",
@@ -105,10 +115,13 @@ enum ThesesQA {
 
     // MARK: Screens
 
-    private static func list(seeded: Bool, highlight symbol: String? = nil) -> AnyView {
+    /// `owner`: the account looking at the list (the seeded theses are always the guest book's).
+    private static func list(seeded: Bool, highlight symbol: String? = nil, owner: String? = nil,
+                             lastSavedRead: NucleoReadSummary? = nil) -> AnyView {
         let book = book(seeded: seeded)
-        let model = ThesisListModel(book: book, owner: { nil },
-                                    highlight: symbol.flatMap { book.activeThesis(symbol: $0, owner: nil)?.id })
+        let model = ThesisListModel(book: book, guests: ThesisGuestBook(book: book, defaults: store), owner: { owner },
+                                    highlight: symbol.flatMap { book.activeThesis(symbol: $0, owner: nil)?.id },
+                                    lastSavedRead: { lastSavedRead })
         return AnyView(ThesisListView(model: model, onReview: { _ in }, onEdit: { _ in }, onClose: {}))
     }
 
@@ -121,8 +134,8 @@ enum ThesesQA {
         return AnyView(ThesisEditorView(model: model, onSaved: { _ in }, onOpenExisting: { _ in }, onClose: {}))
     }
 
-    private static func review(_ state: ReviewState, symbol: String = "NVDA") -> AnyView {
-        let book = book(seeded: true)
+    private static func review(_ state: ReviewState, symbol: String = "NVDA", startPrice: Double? = 120.5) -> AnyView {
+        let book = book(seeded: true, nvdaStart: startPrice)
         var result: ThesisReviewResult?
         if case let .after(notes) = state, let thesis = book.activeThesis(symbol: symbol, owner: nil) {
             result = recorded(thesis, notes: notes, in: book)
@@ -131,6 +144,7 @@ enum ThesesQA {
         if case .refused(.riskNotice) = state { riskAccepted = false }
         var env = ThesisReviewer.Environment()
         env.book = book
+        env.guestDefaults = store
         env.owner = { nil }
         env.generation = { generation }
         env.riskAccepted = { riskAccepted }
@@ -157,7 +171,8 @@ enum ThesesQA {
         let nowPrice = thesis.isEquity ? 131.2 : 61_900.0
         let asOf = iso(Date().addingTimeInterval(-1_800))
         let notes = withNotes ? ThesisReviewNotes(
-            supports: ["Price is above where you started and above its 50-day average.",
+            supports: [ThesisCopy.startingPoint(thesis) == nil ? "Price is above its 50-day average."
+                                                               : "Price is above where you started and above its 50-day average.",
                        "The daily trend has stayed up since your last review."],
             challenges: ["Momentum cooled this week: the daily RSI fell from 68 to 55."],
             unknowns: ["Whether data center revenue is still growing: there is no earnings evidence here."],

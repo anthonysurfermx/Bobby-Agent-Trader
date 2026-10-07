@@ -176,6 +176,50 @@ final class ThesisNudgeTests: XCTestCase {
         XCTAssertEqual(center.current(center.moment(signedIn: false))?.id, "theses.write.0a1b2c3d")
     }
 
+    func testAWriteOfferTheCentreWouldRefuseDoesNotStandInFrontOfAThesisThatIsDue() async throws {
+        let center = NudgeCenter(defaults: defaults)
+        var clock = now
+        center.now = { clock }
+        let book = book!
+        // As `register` wires it: the centre's own rule decides whether the write offer may still speak.
+        center.register(ThesisNudges.source(book: book, owner: { nil }, eligible: { [unowned center] id, date in center.eligible(id, at: date) }))
+        let session = NucleoSession(fixtures: true, defaults: defaults)
+        defer { session.teardown() }
+        let overdue = try seed("NVDA", daysAgo: 12, reviewedDaysAgo: 12)
+        center.noteRead(read("AAPL", saved: true, minutesAgo: 1))
+
+        let offer = try XCTUnwrap(center.current(center.moment(signedIn: false)))
+        XCTAssertEqual(offer.id, "theses.write.0a1b2c3d", "the fresh read speaks first")
+        // The person taps it (the editor would open) and closes it: the offer is retired for good.
+        _ = await center.act(offer.id, session: session)
+        XCTAssertTrue(center.isRetired(offer.id))
+        session.sheetDismissed()
+        V18Focus.clear()
+
+        clock = now.addingTimeInterval(20 * 60)   // past the quiet quarter of an hour, still inside the six-hour window
+        XCTAssertEqual(ThesisNudges.write(center.moment(signedIn: false), book: book, owner: nil)?.id, offer.id, "the read is still fresh")
+        let next = try XCTUnwrap(center.current(center.moment(signedIn: false)), "the retired offer must not silence the source")
+        XCTAssertEqual(next.id, ThesisNudges.dueId(thesisId: overdue.id, now: clock))
+        XCTAssertEqual(next.text, "Your NVDA thesis: 12 days since review")
+
+        // The same when the offer was only shown twice and is resting, on a centre of its own.
+        let resting = NudgeCenter(defaults: UserDefaults(suiteName: suiteName + ".resting")!)
+        defer { UserDefaults().removePersistentDomain(forName: suiteName + ".resting") }
+        var later = now
+        resting.now = { later }
+        resting.register(ThesisNudges.source(book: book, owner: { nil }, eligible: { [unowned resting] id, date in resting.eligible(id, at: date) }))
+        resting.noteRead(read("AAPL", saved: true, minutesAgo: 1))
+        XCTAssertEqual(resting.current(resting.moment(signedIn: false))?.id, offer.id)
+        resting.seen(offer.id)
+        later = now.addingTimeInterval(11 * 60)
+        resting.seen(offer.id)
+        XCTAssertFalse(resting.eligible(offer.id, at: later))
+        XCTAssertTrue(resting.current(resting.moment(signedIn: false))?.id.hasPrefix("theses.due.") == true)
+
+        // Without the centre's rule (the default), writing still comes first.
+        XCTAssertEqual(candidate(moment(read("AAPL")))?.id, offer.id)
+    }
+
     func testATapOnADueThesisOpensItsReviewAndATapOnAReadThatIsGoneOpensTheList() async throws {
         let center = NudgeCenter(defaults: defaults)
         center.now = { [now] in now }

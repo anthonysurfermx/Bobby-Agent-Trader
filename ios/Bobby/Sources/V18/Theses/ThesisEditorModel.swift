@@ -52,6 +52,16 @@ final class ThesisEditorModel: ObservableObject {
     private let generation: @MainActor () -> UUID
     private let openedGeneration: UUID
     private let now: () -> Date
+    /// What the fields held when the editor opened (Bobby's draft, the saved thesis, or nothing).
+    private var opened: Words = Words()
+    private var isSaved = false
+
+    private struct Words: Equatable {
+        var horizon: ThesisHorizon?
+        var hypothesis = ""
+        var worry = ""
+        var changeMind = ""
+    }
 
     init(source: Source, book: ThesisBook = .shared,
          owner: @escaping @MainActor () -> String? = { AccountSession.shared.session?.userId },
@@ -82,6 +92,7 @@ final class ThesisEditorModel: ObservableObject {
             horizon = nil
             draftedByBobby = false
         }
+        opened = Words(horizon: horizon, hypothesis: hypothesis, worry: worry, changeMind: changeMind)
         // One thesis per asset: say so before the person writes a second one in vain.
         if case let .read(read) = source, let existing = book.activeThesis(symbol: read.symbol, owner: owner()) {
             problem = .alreadyActive(id: existing.id)
@@ -126,6 +137,13 @@ final class ThesisEditorModel: ObservableObject {
 
     var canSave: Bool { source != .missing && !ThesisBook.clean(hypothesis).isEmpty }
 
+    /// The person changed something that is not saved yet: closing the editor now would lose it, so
+    /// the screen asks first. An untouched draft from Bobby is not the person's words and asks nothing.
+    var hasUnsavedWords: Bool {
+        guard source != .missing, !isSaved, problem != .stale, problem != .notFound else { return false }
+        return Words(horizon: horizon, hypothesis: hypothesis, worry: worry, changeMind: changeMind) != opened
+    }
+
     static func remaining(_ text: String) -> Int { ThesisBook.textLimit - text.count }
 
     // MARK: Saving
@@ -142,6 +160,7 @@ final class ThesisEditorModel: ObservableObject {
                 let saved = try book.edit(id: thesis.id, owner: owner(), horizon: horizon, hypothesis: hypothesis,
                                           worry: worry, changeMind: changeMind, now: now())
                 problem = nil
+                isSaved = true
                 return .edited(saved)
             case let .read(read):
                 let draft = ThesisDraft(symbol: read.symbol, name: read.name, isEquity: read.isEquity, horizon: horizon,
@@ -152,6 +171,7 @@ final class ThesisEditorModel: ObservableObject {
                 let saved = try book.create(draft, owner: owner(), now: now())
                 problem = nil
                 active = []
+                isSaved = true
                 ThesisEvents.post(ThesisEvents.saved, thesisId: saved.id)
                 return .created(saved)
             }

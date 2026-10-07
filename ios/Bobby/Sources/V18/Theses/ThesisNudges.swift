@@ -16,21 +16,29 @@ enum ThesisNudges {
     /// What a served nudge opens (nudge id → read or thesis id), so a tap finds it even if the moment moved on.
     private static var targets: [String: String] = [:]
 
+    /// Whether the centre would still show a nudge with this id at this moment (not retired, not resting).
+    typealias Eligible = @MainActor (_ id: String, _ at: Date) -> Bool
+
     static func register(_ center: NudgeCenter) {
-        center.register(source())
+        center.register(source(eligible: { [weak center] id, date in center?.eligible(id, at: date) ?? true }))
     }
 
+    /// `eligible` is the centre's own rule: a source gives ONE candidate, so an offer the centre
+    /// would refuse (tapped already, or resting) must not stand in front of the next thing to say.
     static func source(book: ThesisBook = .shared,
-                       owner: @escaping @MainActor () -> String? = { AccountSession.shared.session?.userId }) -> NudgeSource {
+                       owner: @escaping @MainActor () -> String? = { AccountSession.shared.session?.userId },
+                       eligible: @escaping Eligible = { _, _ in true }) -> NudgeSource {
         NudgeSource(key: key, priority: NudgePriority.theses,
-                    candidate: { moment in candidate(moment, book: book, owner: owner()) },
+                    candidate: { moment in candidate(moment, book: book, owner: owner(), eligible: eligible) },
                     act: { nudge, session in act(nudge, session: session) })
     }
 
     // MARK: Candidates
 
-    static func candidate(_ moment: NudgeMoment, book: ThesisBook, owner: String?) -> NucleoNudge? {
-        write(moment, book: book, owner: owner) ?? due(moment, book: book, owner: owner)
+    /// Writing comes first, while its offer can still be shown; otherwise the most overdue thesis speaks.
+    static func candidate(_ moment: NudgeMoment, book: ThesisBook, owner: String?, eligible: Eligible = { _, _ in true }) -> NucleoNudge? {
+        if let offer = write(moment, book: book, owner: owner), eligible(offer.id, moment.now) { return offer }
+        return due(moment, book: book, owner: owner)
     }
 
     /// a. The person saved a read and has no active thesis on that asset.

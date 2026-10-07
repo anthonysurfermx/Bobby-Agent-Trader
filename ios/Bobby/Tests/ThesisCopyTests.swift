@@ -77,6 +77,73 @@ final class ThesisCopyTests: XCTestCase {
         XCTAssertNil(ThesisThenNow(thesis: thesis, nowPrice: 132.55, asOf: nil).changePct, "a thesis written from a read without a price has no change")
     }
 
+    func testThenIsOnlyEverThePriceTheThesisWasWrittenAt() {
+        // Written from a read without a price, then reviewed twice.
+        let thesis = SavedThesis(id: "t2", symbol: "NVDA", name: "NVIDIA", isEquity: true, status: .active, horizon: nil, hypothesis: "Why",
+                                 worry: "", changeMind: "", createdAt: t0, updatedAt: t0, lastReviewedAt: t0.addingTimeInterval(8 * 86_400),
+                                 sourceRequestId: nil,
+                                 revisions: [ThesisRevision(at: t0, kind: .created),
+                                             ThesisRevision(at: t0.addingTimeInterval(86_400), kind: .reviewed, price: 126.1),
+                                             ThesisRevision(at: t0.addingTimeInterval(8 * 86_400), kind: .reviewed, price: 124.3)])
+        XCTAssertNil(ThesisCopy.startingPoint(thesis), "a review's price is not where the thesis started")
+        let numbers = ThesisThenNow(thesis: thesis, nowPrice: 131.2, asOf: "2026-10-16T14:30:00Z")
+        XCTAssertNil(numbers.thenPrice)
+        XCTAssertNil(numbers.thenDate)
+        XCTAssertNil(numbers.changePct)
+        XCTAssertEqual(numbers.nowPrice, 131.2, "today's price is shown on its own")
+        XCTAssertTrue(numbers.missingStart)
+        XCTAssertEqual(ThesisCopy.sinceLine(thesis, now: t0.addingTimeInterval(9 * 86_400)), "Since \(ThesisCopy.day(t0, now: t0))",
+                       "the list shows the date and no 'started at'")
+        XCTAssertFalse(ThesisThenNow(thenPrice: 100, thenDate: t0, nowPrice: nil, asOf: nil).missingStart)
+        XCTAssertEqual(ThesisCopy.noStartingPrice, "No starting price was saved with this thesis.")
+        var sentences = Set<String>()
+        inEveryLanguage { _ in sentences.insert(ThesisCopy.noStartingPrice) }
+        XCTAssertEqual(sentences.count, 6, "said in each of the six languages")
+    }
+
+    // MARK: Where the words go
+
+    func testBothScreensSayTheWordsGoToTheAIProvidersInSixLanguages() {
+        let saved = [
+            "en": "Saved on this iPhone only. When you ask for a review, your words are sent to Bobby and to the AI providers that write the review. They are not stored there.",
+            "es": "Se guarda solo en este iPhone. Cuando pides una revisión, tus palabras se envían a Bobby y a los proveedores de IA que escriben la revisión. No se guardan allí.",
+            "fr": "Enregistrée sur cet iPhone uniquement. Quand tu demandes un réexamen, tes mots sont envoyés à Bobby et aux fournisseurs d’IA qui rédigent le réexamen. Ils n’y sont pas conservés.",
+            "pt": "Guardada apenas neste iPhone. Quando pedes uma revisão, as tuas palavras são enviadas ao Bobby e aos fornecedores de IA que escrevem a revisão. Não ficam guardadas lá.",
+            "it": "Salvata solo su questo iPhone. Quando chiedi un riesame, le tue parole vengono inviate a Bobby e ai fornitori di IA che scrivono il riesame. Lì non vengono conservate.",
+            "de": "Nur auf diesem iPhone gespeichert. Wenn du eine Überprüfung anforderst, werden deine Worte an Bobby und an die KI-Anbieter gesendet, die die Überprüfung schreiben. Dort werden sie nicht gespeichert.",
+        ]
+        let sent = [
+            "en": "Your thesis is sent to Bobby’s AI providers for this review only.",
+            "es": "Tu tesis se envía a los proveedores de IA de Bobby solo para esta revisión.",
+            "fr": "Ta thèse est envoyée aux fournisseurs d’IA de Bobby pour ce réexamen uniquement.",
+            "pt": "A tua tese é enviada aos fornecedores de IA do Bobby apenas para esta revisão.",
+            "it": "La tua tesi viene inviata ai fornitori di IA di Bobby solo per questo riesame.",
+            "de": "Deine These wird nur für diese Überprüfung an Bobbys KI-Anbieter gesendet.",
+        ]
+        let providers = ["en": "AI providers", "es": "proveedores de IA", "fr": "fournisseurs d’IA", "pt": "fornecedores de IA", "it": "fornitori di IA", "de": "KI-Anbieter"]
+        inEveryLanguage { language in
+            XCTAssertEqual(ThesisCopy.localOnly, saved[language], "\(language): the line above Save and under the list")
+            XCTAssertEqual(ThesisCopy.sentToProviders, sent[language], "\(language): the line above Review now")
+            for line in [ThesisCopy.localOnly, ThesisCopy.sentToProviders] {
+                XCTAssertTrue(line.contains(providers[language] ?? "?"), "\(language): names the AI providers, not only Bobby: \(line)")
+                XCTAssertTrue(line.contains("Bobby"), language)
+            }
+        }
+    }
+
+    func testItalianNeverPutsAnArticleInFrontOfADayNumberAndThePersonWritesTheirOwnThesis() {
+        UserDefaults.standard.set("it", forKey: L.preferenceKey)
+        let price = "120,50"
+        for day in ["1 ott", "8 ott", "11 ott"] {
+            XCTAssertEqual(L.t("Since \(day)", "Desde el \(day)"), "Dal giorno \(day)")
+            XCTAssertEqual(L.t("Since \(day) · started at \(price)", "Desde el \(day) · empezó en \(price)"), "Dal giorno \(day) · partita da 120,50")
+            XCTAssertEqual(L.t("Started \(day)", "Empezó el \(day)"), "Partita il giorno \(day)")
+            XCTAssertEqual(L.t("Evidence dated \(day)", "Evidencia con fecha \(day)"), "Dati del giorno \(day)")
+            XCTAssertEqual(L.t("Free reads come back on \(day).", "Las lecturas gratis vuelven el \(day)."), "Le analisi gratuite tornano il giorno \(day).")
+        }
+        XCTAssertEqual(L.t("Write my thesis", "Escribir mi tesis"), "Scrivo la mia tesi", "the person writes it; Bobby is not told to")
+    }
+
     func testNumbersAreWrittenForPeople() {
         XCTAssertEqual(ThesisCopy.percent(8.94), "+8.9%")
         XCTAssertEqual(ThesisCopy.percent(-3.06), "-3.1%")
@@ -182,7 +249,8 @@ final class ThesisCopyTests: XCTestCase {
 #if DEBUG
     func testEveryReviewFixtureBuildsAndLaysOutWithoutAnAccountOrANetwork() {
         let fixtures = ThesesQA.fixtures
-        let required = ["theses-empty", "theses-three", "theses-editor-draft", "theses-editor-limit", "theses-review-before", "theses-review-running",
+        let required = ["theses-guest", "theses-write", "theses-empty-write", "theses-review-guest", "theses-review-after-no-start",
+                        "theses-empty", "theses-three", "theses-editor-draft", "theses-editor-limit", "theses-review-before", "theses-review-running",
                         "theses-review-after", "theses-review-after-plain", "theses-review-signin", "theses-review-signin-level", "theses-review-pro",
                         "theses-review-level", "theses-review-paused", "theses-review-paused-all", "theses-review-quota", "theses-review-failed",
                         "theses-review-timeout", "theses-review-unreadable", "theses-review-risk"]
