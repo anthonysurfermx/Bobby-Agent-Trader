@@ -22,6 +22,21 @@ export function requestGeo(req: Pick<VercelRequest, 'headers'>): Geo {
   return { country, region: country && /^[A-Z0-9]{1,3}$/.test(region) ? region : null };
 }
 
+// Hosting providers' networks (cloud and VPS): a browser arriving from one is automation, not a person at home or
+// on a phone. Vercel passes the ASN of the request IP; only the yes/no is kept (bobby_devices.datacenter).
+const DATACENTER_ASNS = new Set([
+  15169, 396982, 19527, // Google
+  16509, 14618, 8987, // Amazon
+  8075, 8068, // Microsoft
+  14061, 63949, 20473, 16276, 24940, 51167, 31898, // DigitalOcean, Linode, Vultr, OVH, Hetzner, Contabo, Oracle (not Cloudflare: iCloud Private Relay exits there)
+  45102, 37963, 45090, 132203, 136907, 55990, // Alibaba, Tencent, Huawei Cloud
+  9009, 60068, 212238, 36352, 53667, 62240, 46606, 29802, 54825, 8100, 32934, // M247, Datacamp, ColoCrossing, FranTech, Clouvider, Unified Layer, HIVELOCITY, Packet, QuadraNet, Meta
+]);
+export function fromDatacenter(req: Pick<VercelRequest, 'headers'>): boolean {
+  const asn = Number(header(req, 'x-vercel-ip-as-number').trim());
+  return Number.isInteger(asn) && DATACENTER_ASNS.has(asn);
+}
+
 // Search Console reports ISO 3166-1 alpha-3; the dashboard speaks alpha-2. Unlisted codes pass through upper-cased.
 const ALPHA3: Record<string, string> = {
   MEX: 'MX', GTM: 'GT', BLZ: 'BZ', SLV: 'SV', HND: 'HN', NIC: 'NI', CRI: 'CR', PAN: 'PA', COL: 'CO', VEN: 'VE', ECU: 'EC',

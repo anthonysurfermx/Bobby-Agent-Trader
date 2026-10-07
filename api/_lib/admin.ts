@@ -843,11 +843,14 @@ export function adminDays(days: number): string[] {
 
 /** Shared diagnosis inputs for the panel, digest and plan. GET coreOnly avoids delayed external providers. */
 export async function overviewBundle(days: number, internal: boolean, apple: AppleLoad = {}) {
-  const [overview, growth, networks] = await Promise.all([
+  const [overview, growth, networks, traffic] = await Promise.all([
     observeAdminSource('overview', () => rpc<{ days: string[] } & Record<string, unknown>>('bobby_admin_overview', { p_days: days, p_internal: internal }), true),
     observeAdminSource('growth', () => rpc<Record<string, unknown>>('bobby_admin_growth', { p_days: days, p_internal: internal })),
     observeAdminSource('networks', () => rpc<unknown[]>('bobby_admin_internal_networks', {})),
+    // The signal split of people.active7d; without it the panel shows the plain count.
+    rpc<Record<string, unknown>>('bobby_admin_traffic', { p_internal: internal }).catch(() => null),
   ]);
+  if (growth && typeof growth.people === 'object' && growth.people && traffic && typeof traffic === 'object' && !Array.isArray(traffic)) (growth.people as Record<string, unknown>).traffic = traffic;
   let integ: Awaited<ReturnType<typeof integrations>> | null = null;
   let search: unknown = null;
   if (apple.coreOnly) deferAdminSources('appStore', 'revenuecat', 'searchConsole', 'health');

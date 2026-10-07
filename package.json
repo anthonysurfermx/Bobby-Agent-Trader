@@ -80,7 +80,8 @@
     "test:client-telemetry": "node scripts/build-client-telemetry.mjs && node --import tsx scripts/test-client-telemetry-api.mts && node --import tsx scripts/test-client-telemetry-ui.mts && node --test ios/Bobby/Nucleo/tests/presentation-telemetry.test.mjs",
     "test:client-telemetry-pg": "node --import tsx scripts/test-client-telemetry-pg.mts",
     "test:dashboard-payments": "tsx scripts/test-dashboard-payments.mts",
-    "test:admin-compass-pg": "node --import tsx scripts/test-admin-compass-pg.mts"
+    "test:admin-compass-pg": "node --import tsx scripts/test-admin-compass-pg.mts",
+    "test:traffic-signal-pg": "node --import tsx scripts/test-traffic-signal-pg.mts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.75.0",
