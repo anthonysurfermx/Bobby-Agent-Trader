@@ -164,7 +164,7 @@ object HarnessPlanner {
         // 2. Its sector, the day after.
         if (HarnessStep.SECTOR in done) {
             lastSlot = day
-        } else if (sectorId != null && sectorSubject != null && !profile.rests(HarnessStep.SECTOR)) {
+        } else if (sectorSubject != null && sectorId != null && !profile.rests(HarnessStep.SECTOR)) {
             val fireAt = moment(day, time, zone)
             val fresh = everSent.none { it.step == HarnessStep.SECTOR && it.sector == sectorId && fireAt - it.at < options.sectorFreshDays * HARNESS_DAY_MS }
             if (fresh) {

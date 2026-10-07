@@ -163,6 +163,8 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     private class Quoted(val price: Double, val at: Long)
 
     private var planned: List<HarnessPlanned> = emptyList()
+    /** The plan as the store holds it, so an unchanged plan is not written again on every launch and every question. */
+    private var storedPlan: List<HarnessPlanned> = emptyList()
     /** What this launch handed to the phone (id → what it said and when), so nothing is written twice. */
     private val issued = HashMap<String, LocalNotice>()
     private var focus: Focus? = null
@@ -199,6 +201,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         ledger = store.ledger(owner)
         mode = store.mode(owner)
         planned = store.plan(owner)
+        storedPlan = planned
         upcoming = planned.map { it.followUp }
         focus = null
         quotes.clear()
@@ -425,6 +428,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         erasures += 1
         ledger = HarnessLedger()
         planned = emptyList()
+        storedPlan = emptyList()
         upcoming = emptyList()
         mode = HarnessMode.UNDECIDED
         focus = null
@@ -540,7 +544,13 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         }
         planned = planned.filter { it.followUp.fireAt > clock }
         store.write(ledger, owner)
+        keepPlan()
+    }
+
+    private fun keepPlan() {
+        if (planned == storedPlan) return
         store.write(planned, owner)
+        storedPlan = planned
     }
 
     /** Asks the planner what comes next and brings the phone in line with it. */
@@ -552,7 +562,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         }
         val before = planned
         planned = wanted.map { followUp -> HarnessPlanned(followUp, before.firstOrNull { it.followUp == followUp }?.handed ?: false) }
-        store.write(planned, owner)
+        keepPlan()
         upcoming = wanted
         apply()
         publish()
@@ -608,7 +618,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         }
         if (changedPlan) {
             planned = next
-            store.write(planned, owner)
+            keepPlan()
         }
     }
 
@@ -619,6 +629,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         store.write(next, owner)
         ledger = HarnessLedger()
         planned = emptyList()
+        storedPlan = emptyList()
         upcoming = emptyList()
         mode = next
         focus = null
