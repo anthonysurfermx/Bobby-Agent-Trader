@@ -49,7 +49,7 @@ export default function OverviewTab({ data, period, cmp, onOpenTab, notify, mark
       <KpiStrip compact items={[
         tf
           ? { label: 'Activos con señal de persona · 7d', value: fmtInt(tf.verified7d),
-            caption: `De ${fmtInt(g!.people.active7d)} activos: ${fmtInt(tf.datacenter7d)} de centro de datos · ${fmtInt(tf.unverified7d)} sin señal` }
+            caption: `No son personas únicas · de ${fmtInt(g!.people.active7d)} activos: ${fmtInt(tf.datacenter7d)} de centro de datos · ${fmtInt(tf.unverified7d)} sin señal` }
           : { label: 'Cuentas e instalaciones activas · 7d', value: g ? fmtInt(g.people.active7d) : DASH,
             caption: 'No son personas únicas' },
         { label: `Lecturas consumidas · ${period}d`, value: show('activity.reads', fmtInt(o.activity.reads)), delta: delta('activity.readsDaily', cmp?.reads, READS_HISTORY_DAYS),
