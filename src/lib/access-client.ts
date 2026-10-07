@@ -74,16 +74,29 @@ export async function startBilling(action: 'checkout' | 'portal', market?: { sym
   } catch { return billingFailure(); }
 }
 
-// ---- invite a friend: the link carries ?ref=CODE; the code waits here until the friend has an account ----
+// ---- invite a friend: the link is /i/CODE (older links carry ?ref=CODE on the desk); the code waits here
+// until the friend has an account ----
 const REF_KEY = 'bobby:ref:v1';
 const isCode = (v: unknown): v is string => typeof v === 'string' && /^[A-HJ-NP-Z2-9]{8}$/.test(v);
+
+/**
+ * Keep a friend's invite code in this browser until it has an account. The only writer of the stored code:
+ * the invitation page (/i/CODE) and the desk (?ref=CODE) both come through here.
+ * Returns the code as stored, or null when it is not a code or the browser refuses storage.
+ */
+export function storeReferral(code: unknown): string | null {
+  const normalized = typeof code === 'string' ? code.trim().toUpperCase() : '';
+  if (!isCode(normalized)) return null;
+  try { localStorage.setItem(REF_KEY, normalized); return normalized; } catch { return null; }
+}
 
 /** Keep an invite code from the URL (?ref=) and clean the address bar. Returns the stored code, if any. */
 export function captureReferral(): string | null {
   try {
     const url = new URL(window.location.href);
     const fromUrl = url.searchParams.get('ref')?.trim().toUpperCase();
-    if (isCode(fromUrl)) localStorage.setItem(REF_KEY, fromUrl);
+    // Storage refused a valid code: leave the address as it is, as before.
+    if (isCode(fromUrl) && !storeReferral(fromUrl)) return null;
     if (url.searchParams.has('ref')) {
       url.searchParams.delete('ref');
       if (url.searchParams.get('v') === '2') url.searchParams.delete('v');

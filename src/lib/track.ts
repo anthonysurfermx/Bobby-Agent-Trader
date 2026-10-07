@@ -9,6 +9,8 @@ const SURFACES: Array<[RegExp, string]> = [
   [/^\/desk/, 'desk'], [/^\/redeem/, 'redeem'], [/^\/signin/, 'signin'], [/^\/protocol/, 'protocol'],
   [/^\/support/, 'support'], [/^\/privacy/, 'privacy'], [/^\/terms/, 'terms'], [/^\/app(-[ab])?(\/|$)/, 'app'],
   [/^\/agentic-world\/bobby/, 'bobby'], [/^\/nucleo/, 'nucleo'], [/^\/auth\/callback/, 'auth'],
+  // The invitation page (/i/CODE). Only the surface name is sent, never the code.
+  [/^\/i(\/|$)/, 'invite'],
 ];
 export const surfaceOf = (path: string): string | null => {
   if (path.startsWith('/admin')) return null; // the dashboard does not count itself

@@ -46,6 +46,7 @@ const BobbyAppLandingB = lazyWithRetry(() => import('@/pages/BobbyAppLandingB'),
 const BobbyAppLandingWorld = lazyWithRetry(() => import('@/pages/BobbyAppLandingWorld'), 'app-landing-world');
 const BobbySupportPage = lazy(() => import('@/pages/BobbySupportPage'));
 const BobbyRedeemPage = lazy(() => import('@/pages/BobbyRedeemPage'));
+const BobbyInvitePage = lazy(() => import('@/pages/BobbyInvitePage'));
 const PrivacyPage = lazy(() => import('@/pages/PrivacyPage'));
 const HomePage = lazy(() => import('@/pages/HomePage'));
 const StartupsPage = lazy(() => import('@/pages/StartupsPage'));
@@ -356,6 +357,16 @@ const router = createBrowserRouter(
         {
           path: 'redeem',
           element: (<Suspense fallback={<PageLoader />}><BobbyRedeemPage /></Suspense>),
+        },
+        // Invitations: the link a friend receives (api/_lib/referrals.ts) lands here; it keeps the code and
+        // sends a phone to the app or the store. /i without a code shows the "not valid" message.
+        {
+          path: 'i/:code',
+          element: (<Suspense fallback={<PageLoader />}><BobbyInvitePage /></Suspense>),
+        },
+        {
+          path: 'i',
+          element: (<Suspense fallback={<PageLoader />}><BobbyInvitePage /></Suspense>),
         },
         {
           path: 'privacy',
