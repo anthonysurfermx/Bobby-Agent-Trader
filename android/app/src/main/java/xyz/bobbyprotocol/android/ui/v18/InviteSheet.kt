@@ -29,6 +29,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
@@ -174,7 +175,12 @@ private fun InviteOwnCode(host: V18Host, code: String, copied: Boolean, onCopied
             }
             .testTag("invite-copy-code").clearAndSetSemantics { contentDescription = spoken },
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(code, color = QuietColors.cream, fontSize = 26.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace, letterSpacing = 3.sp, maxLines = 1)
+        // Eight large characters on one line. At the system's largest font sizes they would run past a narrow
+        // screen and lose their last character, so this one line stops growing at 1.3 times its size.
+        val scale = LocalDensity.current.fontScale
+        val fit = if (scale > 1.3f) 1.3f / scale else 1f
+        Text(code, color = QuietColors.cream, fontSize = (26f * fit).sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace,
+             letterSpacing = (3f * fit).sp, maxLines = 1)
         if (copied) Text(host.text("Copied", "Copiado"), color = QuietColors.muted, fontSize = 13.sp)
         else QuietGlyphMark(QuietGlyph.COPY, tint = QuietColors.dim)
     }

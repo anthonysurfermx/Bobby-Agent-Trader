@@ -361,6 +361,13 @@ internal class BillingCoordinator(
         if (pro) {
             confirmedSync = owner to info.expiryMillis
             if (showSuccess && !BillingPolicy.googleSubscriptionConfirmed(body, nowMillis())) {
+                // Pro for another reason (gifted days, a plan that is ending, another store) and Google
+                // Play holds nothing for this account: that is an answer, not a confirmation still to come.
+                // Asking again would say the same, so it must not read as "try again in a moment".
+                if (!info.active) {
+                    message(owner, BillingMessage.NOTHING_TO_RESTORE)
+                    return BillingOutcome.NOTHING_TO_RESTORE
+                }
                 message(owner, BillingMessage.SERVER_CONFIRMATION_PENDING)
                 return BillingOutcome.FAILED
             }

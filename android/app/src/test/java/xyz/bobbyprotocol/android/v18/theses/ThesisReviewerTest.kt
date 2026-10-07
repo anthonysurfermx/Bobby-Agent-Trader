@@ -326,7 +326,7 @@ class ThesisReviewerTest {
     }
 
     @Test fun eachRefusalOffersTheRightNextStepAndOnlyAFailedAnalysisSaysNothingWasUsed() {
-        fun said(refusal: Refusal) = ThesisRefusalCopy(refusal, words)
+        fun said(refusal: Refusal) = ThesisRefusalCopy(refusal, words, proPurchasable = true)
         assertEquals(listOf(Action.SIGN_IN), said(Refusal.SignIn(null)).actions)
         assertEquals("a premium level a guest cannot use: sign in, or review with Quick", listOf(Action.SIGN_IN, Action.QUICK), said(Refusal.SignIn("profundo")).actions)
         assertTrue(said(Refusal.SignIn("profundo")).text.contains("Deep"))
@@ -335,6 +335,15 @@ class ThesisReviewerTest {
         assertEquals(listOf(Action.PRO), said(Refusal.Subscription(date)).actions)
         assertEquals("Free reads come back on ${copy.longDay(date)}.", said(Refusal.Subscription(date)).detail)
         assertNull("no date from the server, no date on screen", said(Refusal.Subscription(null)).detail)
+        // Where Bobby Pro cannot be bought in this build (Google Play does not sell it yet), the paywall is
+        // a dead end: its one button is switched off. The next step is Credits, and the day still shows.
+        val cannotBuy = ThesisRefusalCopy(Refusal.Subscription(date), words, proPurchasable = false)
+        assertEquals(listOf(Action.CREDITS), cannotBuy.actions)
+        assertFalse("no door to a paywall that cannot sell", Action.PRO in cannotBuy.actions)
+        assertEquals(said(Refusal.Subscription(date)).text, cannotBuy.text)
+        assertEquals("Free reads come back on ${copy.longDay(date)}.", cannotBuy.detail)
+        assertEquals("every other refusal is the same either way", said(Refusal.LevelUsed("maximo", date)).actions,
+                     ThesisRefusalCopy(Refusal.LevelUsed("maximo", date), words, proPurchasable = false).actions)
         assertEquals(listOf(Action.QUICK), said(Refusal.LevelUsed("maximo", date)).actions)
         assertTrue(said(Refusal.LevelUsed("maximo", date)).text.contains(copy.longDay(date)))
         assertEquals("You used your Max for now.", said(Refusal.LevelUsed("maximo", null)).text)
@@ -509,7 +518,7 @@ class ThesisReviewerTest {
         assertNull(reviewer.thesis)
         assertTrue("the review screen moves nothing", book.all("account-c").isEmpty())
         assertEquals(listOf(local.id), book.all(null).map { it.id })
-        val said = ThesisRefusalCopy(Refusal.WrittenSignedOut, words)
+        val said = ThesisRefusalCopy(Refusal.WrittenSignedOut, words, proPurchasable = true)
         assertEquals("You wrote this thesis before signing in.", said.text)
         assertEquals("Open My theses to keep it in this account.", said.detail)
         assertEquals("My theses holds the row that asks", listOf(Action.MY_THESES), said.actions)
@@ -684,5 +693,25 @@ class ThesisReviewerTest {
                      ThesisReviewer.storedLists(kept))
         val plain = ThesisRevision("r", t0, ThesisRevision.Kind.REVIEWED, 101.0, null, "wait")
         assertTrue("a review that kept no lists says so instead of showing empty ones", ThesisReviewer.storedLists(plain).isEmpty())
+    }
+
+    @Test fun aLevelThatIsUsedUpIsSaidInAWholeSentenceInEveryLanguage() {
+        // The level's name is an adjective in four languages ("Approfondie", "Vertieft"). The rows these
+        // lines used were written for a plural noun and gave "Tes Approfondie reviennent", "Deine Vertieft sind".
+        val expected = mapOf(
+            "en" to "You used your Deep for now.", "es" to "Ya usaste tu Profundo por ahora.",
+            "fr" to "Tu as utilisé ton analyse Approfondie pour le moment.", "pt" to "Já usaste a tua análise Profunda por agora.",
+            "it" to "Per ora hai usato la tua analisi Approfondita.", "de" to "Du hast deine Analyse „Vertieft“ vorerst aufgebraucht.")
+        val broken = Regex("\\b(Tes|Os teus|I tuoi|Deine) (Rapide|Approfondie|Maximale|Rápida|Profunda|Máxima|Rapida|Approfondita|Massima|Schnell|Vertieft|Maximal)\\b")
+        words.inEveryLanguage { language ->
+            assertEquals(language, expected[language], ThesisRefusalCopy(Refusal.LevelUsed("profundo", null), words, proPurchasable = true).text)
+            for (level in listOf("rapido", "profundo", "maximo")) {
+                val dated = ThesisRefusalCopy(Refusal.LevelUsed(level, t0), words, proPurchasable = true).text
+                assertTrue("$language: $dated", dated.contains(ThesisCopy(words).longDay(t0)))
+                assertTrue("$language: $dated", dated.contains(ThesisCopy(words).levelName(level)))
+                assertFalse("$language: $dated", broken.containsMatchIn(dated))
+                assertFalse("$language", broken.containsMatchIn(ThesisRefusalCopy(Refusal.LevelUsed(level, null), words, proPurchasable = true).text))
+            }
+        }
     }
 }

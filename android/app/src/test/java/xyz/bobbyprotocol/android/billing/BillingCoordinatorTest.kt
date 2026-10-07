@@ -70,6 +70,38 @@ class BillingCoordinatorTest {
         assertTrue(fixture.coordinator.state.value.isPro)
     }
 
+    @Test fun aProAccountWithNoGooglePurchaseIsToldThereIsNothingToRestoreNotToTryAgain() = runTest {
+        // Bobby Pro by invitations or a gift: the server says Pro, there is no subscription, and
+        // Google Play holds nothing for this Google account. Every retry would say the same.
+        val gifted = fixture()
+        gifted.ready()
+        gifted.accounts.syncTier = "pro"
+        gifted.accounts.syncProvider = null
+        gifted.client.customer = BillingCustomer(false, null, null)
+        assertEquals(BillingOutcome.NOTHING_TO_RESTORE, gifted.coordinator.restore())
+        assertEquals(1, gifted.client.restoreCalls)
+        assertTrue(gifted.coordinator.state.value.isPro)
+        assertEquals(BillingMessage.NOTHING_TO_RESTORE, gifted.coordinator.state.value.message)
+        assertEquals("and asking again answers the same", BillingOutcome.NOTHING_TO_RESTORE, gifted.coordinator.restore())
+
+        // A card plan that was cancelled and is still inside its paid period: the same answer.
+        val ending = fixture()
+        ending.accounts.subscription = JSONObject().put("provider", "stripe").put("status", "canceled").put("currentPeriodEnd", "1970-01-01T00:00:02Z")
+        ending.ready()
+        ending.accounts.syncTier = "pro"
+        ending.accounts.syncProvider = "stripe"
+        ending.client.customer = BillingCustomer(false, null, null)
+        assertEquals(BillingOutcome.NOTHING_TO_RESTORE, ending.coordinator.restore())
+        assertTrue(ending.coordinator.state.value.isPro)
+
+        // The server could not be asked at all: that is still a failure, and worth another try.
+        val offline = fixture()
+        offline.ready()
+        offline.accounts.failSync = true
+        offline.client.customer = BillingCustomer(false, null, null)
+        assertEquals(BillingOutcome.FAILED, offline.coordinator.restore())
+    }
+
     @Test fun expiredGoogleMirrorCannotConfirmPurchaseEvenWhenGrantStillGivesPro() = runTest {
         val fixture = fixture()
         fixture.ready()

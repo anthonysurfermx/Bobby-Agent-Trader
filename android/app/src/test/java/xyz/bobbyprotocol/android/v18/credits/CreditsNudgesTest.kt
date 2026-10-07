@@ -62,6 +62,9 @@ class CreditsNudgesTest {
         val fallback = CreditsNudges.low(moment(), free(remaining = null, used = 9), english)!!
         assertEquals("remaining falls back to limit − used", "1 read left this week", fallback.text)
 
+        val unknown = ReadAccess.fromJson(org.json.JSONObject("""{"tier":"free","limit":10,"paywall":true,"bonus":0}"""))
+        assertNull("a balance the server left half said is not a low balance", CreditsNudges.low(moment(), unknown, english))
+
         val noReset = CreditsNudges.low(moment(), free(remaining = 2, resetsAt = null), english)!!
         assertEquals("without a reset moment the week still names it", two.id, noReset.id)
     }

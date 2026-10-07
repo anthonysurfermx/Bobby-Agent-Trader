@@ -195,7 +195,8 @@ object CreditsNudges {
         // and these numbers are old. Say nothing until the server speaks again.
         val resets = access.resetsMillis
         if (resets != null && resets <= moment.nowMillis) return null
-        val left = access.remaining ?: maxOf(0, limit - access.used)
+        // A balance the server left half said is not a low balance: nothing is said.
+        val left = CreditsBalance.readsLeft(access.remaining, limit, access.used) ?: return null
         if (left > LOW_THRESHOLD) return null
         val text = when (left) {
             0 -> words.text("No reads left this week", "Sin lecturas esta semana")

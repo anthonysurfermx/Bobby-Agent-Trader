@@ -151,6 +151,86 @@ class CreditsCenterTest {
         assertEquals(4, set.center.snapshot().access?.remaining)
     }
 
+    @Test fun aGuestsBalanceIsNeverShownAsASignedInAccountsBalance() = runTest {
+        // The server could not check this account's session for one request. It does not refuse: it
+        // answers as it would a guest, with a guest phone's meter.
+        val set = fixture(register = false)
+        val asGuest = JSONObject().put("signedIn", false)
+            .put("access", JSONObject().put("tier", "anon").put("used", 2).put("limit", 6).put("remaining", 4).put("resetsAt", JSONObject.NULL).put("paywall", true).put("bonus", 0))
+            .put("levels", JSONObject().put("tier", "anon").put("levels", JSONObject()
+                .put("profundo", JSONObject().put("used", 0).put("limit", 2).put("remaining", 2).put("bonus", 0).put("windowDays", 30))
+                .put("maximo", JSONObject().put("used", 0).put("limit", 0).put("remaining", 0).put("bonus", 0).put("windowDays", 30))))
+            .put("plans", JSONObject().put("freeReadsPerWeek", 20).put("referral", JSONObject().put("rewardDays", 30).put("maxFriends", 5)))
+            .put("referral", JSONObject.NULL).put("subscription", JSONObject.NULL)
+        set.backend.reply = asGuest
+        assertFalse("that is not this account's balance", set.center.load())
+        assertFalse(set.center.loaded)
+        assertNull("a subscriber is never drawn as a guest with 4 of 6 reads", set.center.snapshot().access)
+        assertNull(set.center.summary())
+        assertTrue(set.center.refreshFailed)
+        set.center.flow.refresh()
+        assertTrue("the screen says the balance is unavailable and offers to ask again", set.center.flow.loadFailed)
+        assertEquals("the terms are the same for everyone", 20, set.center.snapshot().freeReadsPerWeek)
+
+        // The same when only the tier says so, and when the server's open fallback comes back.
+        set.backend.reply = JSONObject(asGuest.toString()).put("signedIn", true)
+        assertFalse(set.center.load())
+        set.backend.reply = JSONObject().put("signedIn", false)
+            .put("access", JSONObject().put("tier", "anon").put("used", JSONObject.NULL).put("limit", JSONObject.NULL).put("remaining", JSONObject.NULL)
+                .put("resetsAt", JSONObject.NULL).put("paywall", false).put("bonus", 0))
+        assertFalse(set.center.load())
+        assertNull(set.center.snapshot().access)
+
+        // The next reply that is about the account is taken as before.
+        set.backend.reply = FakeCreditsBackend.reply(remaining = 7)
+        assertTrue(set.center.load())
+        assertFalse(set.center.refreshFailed)
+        assertEquals(7, set.center.snapshot().access?.remaining)
+
+        // A guest is a guest: the same reply is theirs to see.
+        val guest = fixture(owner = null, register = false)
+        guest.backend.reply = asGuest
+        assertTrue(guest.center.load())
+        assertEquals("anon", guest.center.snapshot().access?.tier)
+        assertEquals("4 of 6 reads", guest.center.summary())
+        // But a reply that describes no balance at all is not one, for anybody.
+        guest.backend.reply = JSONObject().put("signedIn", false)
+            .put("access", JSONObject().put("tier", "anon").put("used", JSONObject.NULL).put("limit", JSONObject.NULL).put("remaining", JSONObject.NULL)
+                .put("resetsAt", JSONObject.NULL).put("paywall", false).put("bonus", 0))
+        val empty = fixture(owner = null, register = false)
+        empty.backend.reply = guest.backend.reply
+        assertFalse("nothing to show is said as unavailable, never an empty place", empty.center.load())
+    }
+
+    @Test fun aRefreshThatFailsOverAHeldBalanceIsSaid() = runTest {
+        val set = fixture(register = false)
+        set.backend.reply = FakeCreditsBackend.reply(remaining = 1)
+        assertTrue(set.center.load())
+        assertFalse(set.center.refreshFailed)
+        val before = set.center.revision.value
+
+        // The read was delivered; the request that asks what is left now fails on a weak connection.
+        set.backend.reply = null
+        assertTrue("there is still something to show: what the phone already had", set.center.load())
+        assertTrue("and the screen is told it is not fresh", set.center.refreshFailed)
+        assertTrue("so it redraws", set.center.revision.value > before)
+        assertEquals(1, set.center.snapshot().access?.remaining)
+        set.center.flow.refresh()
+        assertFalse("not \"unavailable\": a balance is on screen", set.center.flow.loadFailed)
+
+        set.backend.reply = FakeCreditsBackend.reply(remaining = 0)
+        assertTrue(set.center.load())
+        assertFalse(set.center.refreshFailed)
+        assertEquals(0, set.center.snapshot().access?.remaining)
+
+        // Another reader: the failure was about the previous one's balance.
+        set.backend.reply = null
+        set.center.load()
+        assertTrue(set.center.refreshFailed)
+        set.bench.changeAccount("u2")
+        assertFalse(set.center.refreshFailed)
+    }
+
     @Test fun aReplyForAReaderWhoLeftIsDropped() = runTest {
         val set = fixture(register = false)
         set.backend.reply = FakeCreditsBackend.reply(remaining = 7)

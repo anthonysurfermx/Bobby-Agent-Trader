@@ -13,8 +13,9 @@ import java.util.Locale
 // A value the server did not send is left out; it is never shown as zero.
 //
 // What the server's numbers mean:
-//   · Quick reads   guest 3 per install; a free account's weekly reads while the weekly cap is on;
-//                   unlimited on Bobby Pro or while the cap is off.
+//   · Quick reads   a guest's reads per install (they do not come back); a free account's weekly reads
+//                   while the weekly cap is on; unlimited on Bobby Pro or while the cap is off. How many
+//                   is the server's to say (`access.limit`, `plans.freeReadsPerWeek`): no number is written here.
 //   · Deep / Max    the plan's allowance per window (7 days free, 30 days Pro), from the level meters.
 //   · Gifted reads  a separate balance per level. Spent only after the plan's reads run out; a Pro
 //                   account never spends gifted Quick reads.
@@ -269,6 +270,8 @@ class CreditsBalance(
             // Quick reads.
             val unlimited = access.isPro || (access.tier == "free" && !access.paywall)
             val limit = access.limit
+            // What is left of the Quick reads, or null when the server left it half said: then there is no line.
+            val quickLeft = if (limit == null) null else readsLeft(access.remaining, limit, access.used)
             if (unlimited) {
                 val plain = words.text("Unlimited", "Ilimitadas")
                 lines.add(Line(Line.Kind.QUICK, copy.title(CreditsLevel.RAPIDO), plain,
@@ -276,8 +279,8 @@ class CreditsBalance(
                                copy.label(CreditsLevel.RAPIDO),
                                if (access.isPro) words.text("Unlimited · fair use", "Ilimitadas · uso justo") else plain))
                 if (!access.isPro) summary.add(words.text("Unlimited reads", "Lecturas ilimitadas"))
-            } else if (limit != null) {
-                val left = access.remaining ?: maxOf(0, limit - access.used)
+            } else if (limit != null && quickLeft != null) {
+                val left: Int = quickLeft
                 if (access.tier == "anon") {
                     val weekly = snapshot.freeReadsPerWeek
                     val detail = if (snapshot.signedIn) null
@@ -305,8 +308,10 @@ class CreditsBalance(
                     }
                     continue
                 }
-                val left = meter.remaining ?: maxOf(0, meterLimit - meter.used)
-                val weekly = (meter.windowDays ?: 7) == 7
+                // A meter the server left half said has no line: what is left is never worked out from a number it did not send.
+                val left = readsLeft(meter.remaining, meterLimit, meter.used) ?: continue
+                // "This week" only when the server said the window is a week.
+                val weekly = meter.windowDays == 7
                 lines.add(Line(kind, copy.title(level), copy.left(left, meterLimit, weekly),
                                if (weekly) copy.resets(meter.resetsMillis) else copy.window(meter.windowDays, meter.resetsMillis),
                                copy.label(level), "$left/$meterLimit", copy.renewal(meter.resetsMillis)))
@@ -345,6 +350,13 @@ class CreditsBalance(
 
             return CreditsBalance(lines, if (summary.isEmpty()) null else summary.joinToString(" · "), pro, gifts)
         }
+
+        /**
+         * What is left of an allowance: the server's own `remaining`, or the limit less what was used
+         * when it sent both of those. Null when it sent neither: an unknown `used` is not zero, so
+         * the whole allowance is never shown for a balance the app does not know.
+         */
+        fun readsLeft(remaining: Int?, limit: Int, used: Int?): Int? = remaining ?: used?.let { maxOf(0, limit - it) }
 
         /**
          * "Invite friends": who gets what, from the server's own terms. The Bobby Pro reward is

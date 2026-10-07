@@ -279,6 +279,12 @@
     "it": "Asset (massimo sei, separati da virgole)",
     "de": "Assets (bis zu sechs, durch Kommas getrennt)"
   },
+  "Assets you asked about, kept for follow-ups": {
+    "fr": "Actifs sur lesquels tu as posé une question, gardés pour les suivis",
+    "pt": "Ativos sobre os quais perguntaste, guardados para o seguimento",
+    "it": "Asset su cui hai fatto domande, conservati per gli aggiornamenti",
+    "de": "Werte, nach denen du gefragt hast, für Follow-ups gespeichert"
+  },
   "Audio is unavailable. Your report is ready to read.": {
     "fr": "L'audio est indisponible. Tu peux lire ton rapport.",
     "pt": "O áudio não está disponível. Podes ler o relatório.",
@@ -2193,6 +2199,12 @@
     "it": "Condividi Bobby con qualcuno che conosci",
     "de": "Teile Bobby mit jemandem, den du kennst"
   },
+  "Share Bobby with someone you know.": {
+    "fr": "Partage Bobby avec une personne que tu connais.",
+    "pt": "Partilha o Bobby com alguém que conheces.",
+    "it": "Condividi Bobby con qualcuno che conosci.",
+    "de": "Teile Bobby mit jemandem, den du kennst."
+  },
   "Share a text summary of your companion, level and earned gear": {
     "en": "Share a text summary of your companion, level and earned gear",
     "es": "Comparte un resumen de texto de tu compañero, nivel y equipo ganado",
@@ -3039,6 +3051,12 @@
     "it": "Hai usato le tue analisi gratuite, quindi questo riesame non è partito.",
     "de": "Du hast deine kostenlosen Analysen verbraucht, daher wurde diese Überprüfung nicht gestartet."
   },
+  "You used your {0} for now.": {
+    "fr": "Tu as utilisé ton analyse {0} pour le moment.",
+    "pt": "Já usaste a tua análise {0} por agora.",
+    "it": "Per ora hai usato la tua analisi {0}.",
+    "de": "Du hast deine Analyse „{0}“ vorerst aufgebraucht."
+  },
   "You wrote 1 thesis before signing in. Keep it in this account?": {
     "fr": "Tu as écrit 1 thèse avant de te connecter. La garder sur ce compte ?",
     "pt": "Escreveste 1 tese antes de iniciares sessão. Queres mantê-la nesta conta?",
@@ -3224,6 +3242,12 @@
     "pt": "As tuas palavras",
     "it": "Le tue parole",
     "de": "Deine Worte"
+  },
+  "Your {0} comes back on {1}.": {
+    "fr": "L’analyse {0} revient le {1}.",
+    "pt": "A tua análise {0} volta a {1}.",
+    "it": "La tua analisi {0} torna il {1}.",
+    "de": "Deine Analyse „{0}“ ist am {1} wieder verfügbar."
   },
   "Your {0} thesis: {1} days since review": {
     "fr": "Ta thèse {0} : {1} jours sans réexamen",

@@ -37,6 +37,7 @@ import xyz.bobbyprotocol.android.v18.SavedThesis
 import xyz.bobbyprotocol.android.v18.ThesisRevision
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.credits.CreditsCenter
 import xyz.bobbyprotocol.android.v18.reminders.ReminderCopy
 import xyz.bobbyprotocol.android.v18.reminders.ReminderEntry
 import xyz.bobbyprotocol.android.v18.reminders.ReminderIntent
@@ -140,7 +141,8 @@ fun ThesisReviewSheet(host: V18Host, onClose: () -> Unit) {
             is ThesisReviewer.Phase.Done -> After(host, copy, current.result, r) {
                 if (reviewer.decide(ThesisEvents.KEEP)) onClose()
             }
-            is ThesisReviewer.Phase.Refused -> Refused(host, copy, ThesisRefusalCopy(current.refusal, words), reviewer)
+            is ThesisReviewer.Phase.Refused ->
+                Refused(host, copy, ThesisRefusalCopy(current.refusal, words, proPurchasable = CreditsCenter.of(host).snapshot().proPurchasable), reviewer)
         }
     }
 }

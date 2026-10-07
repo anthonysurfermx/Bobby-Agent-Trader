@@ -449,8 +449,12 @@ class ThesisReviewer(
     }
 }
 
-/** One refusal as the screen says it: what happened, what was (not) used, and the next step. */
-class ThesisRefusalCopy(refusal: ThesisReviewer.Refusal, words: HostWords) {
+/**
+ * One refusal as the screen says it: what happened, what was (not) used, and the next step.
+ * `proPurchasable`: Bobby Pro can be bought in this build, from this store, right now (the Credits
+ * snapshot's own gate). Where it cannot, Bobby Pro is not offered as the way forward.
+ */
+class ThesisRefusalCopy(refusal: ThesisReviewer.Refusal, words: HostWords, proPurchasable: Boolean) {
     enum class Action { SIGN_IN, PRO, QUICK, RETRY, CREDITS, MY_THESES }
 
     val text: String
@@ -496,7 +500,9 @@ class ThesisRefusalCopy(refusal: ThesisReviewer.Refusal, words: HostWords) {
                 line = words.text("You used your free reads, so this review did not run.",
                                   "Ya usaste tus lecturas gratis, así que esta revisión no corrió.")
                 more = refusal.resetsAtMillis?.let { words.text("Free reads come back on {0}.", "Las lecturas gratis vuelven el {0}.", copy.longDay(it)) }
-                next = listOf(Action.PRO)
+                // Android only (on iPhone Bobby Pro can always be bought): a paywall whose one button is
+                // switched off is not a next step. Credits is, with its invitation and its code.
+                next = listOf(if (proPurchasable) Action.PRO else Action.CREDITS)
             }
             is ThesisReviewer.Refusal.LevelUsed -> {
                 val name = copy.levelName(refusal.level)

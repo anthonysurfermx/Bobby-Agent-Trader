@@ -57,7 +57,7 @@ class RepositoryCreditsBackend(private val host: V18Host) : CreditsBackend {
 
     private fun convert(state: BobbyQuotaState): HeldMeters? {
         val owner = state.owner ?: return null
-        val quick = state.access?.let { ReadAccess(it.tier, it.used ?: 0, it.limit, it.remaining, it.resetsAt, it.paywall, it.bonus) }
+        val quick = state.access?.let { ReadAccess(it.tier, it.used, it.limit, it.remaining, it.resetsAt, it.paywall, it.bonus) }
         val meters = LinkedHashMap<CreditsLevel, LevelMeter>()
         state.levels?.let { levels ->
             meters[CreditsLevel.PROFUNDO] = meter(levels.profundo)
@@ -106,11 +106,14 @@ class SignInReturn(private val host: V18Host, private val route: String) {
         returning = host.scope.launch {
             prepare()
             var waited = 0L
-            while (host.sheetRoute != null && waited < WAIT_LIMIT) {
+            // Nobody tapped anything to bring this sheet up, so it waits like a tapped notification does:
+            // for the first sheet to go, and for Bobby to finish listening, speaking or answering
+            // (opening it would close the mic, stop the voice and cover the read).
+            while ((host.sheetRoute != null || host.glassBusy) && waited < WAIT_LIMIT) {
                 delay(STEP)
                 waited += STEP
             }
-            if (fence.isCurrent && host.sheetRoute == null) host.present(route)
+            if (fence.isCurrent && host.sheetRoute == null && !host.glassBusy) host.present(route)
         }
         return true
     }
@@ -118,8 +121,9 @@ class SignInReturn(private val host: V18Host, private val route: String) {
     companion object {
         const val STEP = 250L
         /**
-         * Past this the sheet is not brought back: whatever is open stays. The activity closes the
-         * first sheet as soon as it has synced the account that arrived (a second or two).
+         * Past this the sheet is not brought back: whatever is open stays, and a read that is still
+         * running is not covered. The activity closes the first sheet as soon as it has synced the
+         * account that arrived (a second or two).
          */
         const val WAIT_LIMIT = 20_000L
     }
@@ -142,6 +146,17 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
     private var started = false
     private var restoreAfterSignIn = false
     private var refreshJob: Job? = null
+
+    /** The last asking gave nothing usable, and for whom it was asked. */
+    private var failed = false
+    private var failedOwner: String? = null
+    private var failedEpoch = 0L
+
+    /**
+     * The last time the balances were asked for, the server gave nothing usable for the reader who
+     * is here now. What a screen shows then is what the app already held: it says so and offers to ask again.
+     */
+    val refreshFailed: Boolean get() = failed && failedOwner == host.owner && failedEpoch == host.accountEpoch
 
     val flow = CreditsFlow(
         CreditsFlow.Environment(
@@ -231,13 +246,16 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
 
     // What the screens ask for
 
-    /** GET the balances. False when nothing was read and nothing is known. Never before the risk notice. */
+    /**
+     * GET the balances. False when there is nothing to show: nothing was read and nothing is known,
+     * or what was read describes no balance at all. Never before the risk notice.
+     */
     suspend fun load(): Boolean {
         if (!host.riskAccepted) return false
         val fence = host.fence()
         val owner = host.owner
         val epoch = host.accountEpoch
-        val reply = try {
+        val answered = try {
             backend.access()
         } catch (cancelled: CancellationException) {
             throw cancelled
@@ -246,17 +264,39 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
         }
         // An answer for a reader who has left is dropped.
         if (!fence.isCurrent) return false
+        // The terms are the same for everyone, whoever the server took the caller for.
+        if (answered != null) plans.note(answered)
+        val reply = answered?.takeIf { describesReader(it) }
         if (reply != null) {
             body = reply
             bodyOwner = owner
             bodyEpoch = epoch
             bodyAt = host.now()
-            plans.note(reply)
             record()
-            changed()
         }
-        return reply != null || access() != null
+        val wasFailed = refreshFailed
+        failed = reply == null
+        failedOwner = owner
+        failedEpoch = epoch
+        if (reply != null || failed != wasFailed) changed()
+        // A reply that yields no line (the server's open fallback) is not a balance: the screen says
+        // "unavailable" and offers to ask again, instead of an empty place with no way forward.
+        return hasSomethingToShow()
     }
+
+    /**
+     * Whether a reply is about whoever is reading. When the server cannot check an account's
+     * session for one request it does not refuse: it answers as it would a guest (`signedIn: false`,
+     * tier `anon`, a guest phone's meter). Shown to an account, that is someone else's balance.
+     */
+    private fun describesReader(reply: JSONObject): Boolean {
+        if (!host.signedIn) return true
+        if (reply.opt("signedIn") == false) return false
+        return reply.optJSONObject("access")?.opt("tier") != "anon"
+    }
+
+    private fun hasSomethingToShow(): Boolean =
+        CreditsBalance.make(snapshot(), CreditsCopy(HostWords(host), host.now(), Locale.forLanguageTag(host.locale))).isKnown
 
     /** Reads the balances in the background, and tells the page when a line on the glass may have changed. */
     fun refreshSoon() {
@@ -297,8 +337,9 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
     private fun accountChanged() {
         flow.accountChanged()
         book.accountChanged(host.owner)
-        // The last reply was about someone else.
+        // The last reply was about someone else, and so was the last failure.
         body = null
+        failed = false
         val thenRestore = restoreAfterSignIn
         restoreAfterSignIn = false
         if (back.accountChanged()) {

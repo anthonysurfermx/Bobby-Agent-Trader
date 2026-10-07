@@ -67,6 +67,7 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
     // Read here, where a new revision redraws: what is drawn below always follows the flow.
     val loading = center.flow.loading
     val loadFailed = center.flow.loadFailed
+    val refreshFailed = center.refreshFailed
     val restoreState = center.flow.restore
     val restoreAvailable = center.restoreAvailable
 
@@ -100,12 +101,22 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
                     QuietRow(host.text("Gifted", "De regalo"), "credits-line-gifts", value = gifts, spoken = balance.giftSpoken)
                 }
                 val pro = balance.line(CreditsBalance.Line.Kind.PRO)
+                // The plan's state is the row; the row is a door only where Bobby Pro can be had in this
+                // build, from this store. Where it cannot, the door led to a screen whose one button is
+                // switched off: the row then says the state and leads nowhere.
+                val proDoor = balance.pro.offersPro && snapshot.proPurchasable
                 if (pro != null) {
-                    // The plan's state is the row; where there is something to offer, the row is the door.
-                    QuietRow(pro.label, if (balance.pro.offersPro) "credits-pro" else "credits-line-pro", value = pro.face, note = pro.faceNote,
-                             chevron = balance.pro.offersPro, spoken = pro.spoken, onClick = if (balance.pro.offersPro) openPro else null)
-                } else if (balance.pro.offersPro) {
+                    QuietRow(pro.label, if (proDoor) "credits-pro" else "credits-line-pro", value = pro.face, note = pro.faceNote,
+                             chevron = proDoor, spoken = pro.spoken, onClick = if (proDoor) openPro else null)
+                } else if (proDoor) {
                     QuietRow("Bobby Pro", "credits-pro", chevron = true, onClick = openPro)
+                }
+                if (refreshFailed && !loading) {
+                    // The server did not answer this time: the numbers above are the ones the phone already had.
+                    Column(Modifier.padding(top = 12.dp).testTag("credits-stale"), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        QuietNote(host.text("Could not reach Bobby — try again in a moment", "No se pudo conectar con Bobby — inténtalo en un momento"))
+                        QuietChip(host.text("Try again", "Reintentar"), "credits-refresh-retry") { host.scope.launch { center.flow.refresh() } }
+                    }
                 }
                 if (!snapshot.signedIn) {
                     val weekly = snapshot.freeReadsPerWeek

@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
@@ -202,12 +203,21 @@ fun RemindersSheet(host: V18Host, onClose: () -> Unit, followUps: (@Composable (
                 QuietNote(copy.riskRequired, Modifier.padding(top = 14.dp), tag = "reminders-risk-required")
             }
             if (model.permission == LocalNotifier.Permission.DENIED) {
-                Row(
-                    Modifier.fillMaxWidth().padding(top = 10.dp).testTag("reminders-denied"),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    QuietNote(copy.denied, Modifier.weight(1f))
-                    QuietLink(copy.openSettings, "reminders-open-settings") { host.openNotificationSettings() }
+                if (LocalDensity.current.fontScale >= 1.5f) {
+                    // At the largest font sizes the link alone takes most of the width, and the sentence that
+                    // says why no reminder will arrive would be squeezed to a few letters a line: they stack.
+                    Column(Modifier.fillMaxWidth().padding(top = 10.dp).testTag("reminders-denied")) {
+                        QuietNote(copy.denied)
+                        QuietLink(copy.openSettings, "reminders-open-settings") { host.openNotificationSettings() }
+                    }
+                } else {
+                    Row(
+                        Modifier.fillMaxWidth().padding(top = 10.dp).testTag("reminders-denied"),
+                        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        QuietNote(copy.denied, Modifier.weight(1f))
+                        QuietLink(copy.openSettings, "reminders-open-settings") { host.openNotificationSettings() }
+                    }
                 }
             }
             if (model.showsBriefingRow) {

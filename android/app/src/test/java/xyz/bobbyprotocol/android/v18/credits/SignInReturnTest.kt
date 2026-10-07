@@ -123,4 +123,50 @@ class SignInReturnTest {
         runCurrent()
         assertEquals(3, bench.shell.opened.size)
     }
+
+    @Test fun theSheetThatComesBackWaitsWhileBobbyIsListeningSpeakingOrAnswering() = runTest {
+        // Nobody tapped anything to bring this sheet up. Opening it closes the mic, stops the voice and
+        // covers the read, so it waits for them, as a tapped notification does.
+        val bench = V18TestBench(backgroundScope)
+        val back = SignInReturn(bench.host, V18Routes.CREDITS)
+        bench.host.present(V18Routes.CREDITS)
+        back.arm()
+        bench.changeAccount("a")
+        assertTrue(back.accountChanged())
+        runCurrent()
+        // The activity closes the first sheet; the person holds the mic before the claim has returned.
+        bench.closeSheet()
+        bench.shell.voiceBusy = true
+        advanceTimeBy(SignInReturn.STEP * 4)
+        runCurrent()
+        assertEquals("not over a question being spoken", listOf(V18Routes.CREDITS), bench.shell.opened)
+        assertEquals(0, bench.shell.quieted)
+        bench.shell.voiceBusy = false
+        bench.desk.busy = true
+        advanceTimeBy(SignInReturn.STEP * 4)
+        runCurrent()
+        assertEquals("not over a read in progress", listOf(V18Routes.CREDITS), bench.shell.opened)
+        assertTrue(back.isPending)
+        bench.desk.busy = false
+        advanceTimeBy(SignInReturn.STEP)
+        runCurrent()
+        assertEquals("once the glass is free, the sheet is back", listOf(V18Routes.CREDITS, V18Routes.CREDITS), bench.shell.opened)
+
+        // A read that outlasts the wait is not covered afterwards either.
+        bench.closeSheet()
+        bench.host.present("account")
+        back.arm()
+        bench.changeAccount("b")
+        assertTrue(back.accountChanged())
+        runCurrent()
+        bench.closeSheet()
+        bench.desk.busy = true
+        advanceTimeBy(SignInReturn.WAIT_LIMIT + SignInReturn.STEP)
+        runCurrent()
+        assertFalse(back.isPending)
+        bench.desk.busy = false
+        advanceTimeBy(5_000L)
+        runCurrent()
+        assertEquals("it gave up rather than pop up later", 3, bench.shell.opened.size)
+    }
 }

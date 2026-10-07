@@ -52,7 +52,8 @@ internal object CreditsJson {
 data class ReadAccess(
     /** `anon` | `free` | `pro`. */
     val tier: String,
-    val used: Int,
+    /** null = the server did not say (it is never taken for zero). */
+    val used: Int?,
     /** null = no limit (Bobby Pro). */
     val limit: Int?,
     val remaining: Int?,
@@ -73,7 +74,7 @@ data class ReadAccess(
             if (json == null) return null
             val tier = (json.opt("tier") as? String)?.takeIf { it in TIERS } ?: return null
             return ReadAccess(
-                tier = tier, used = CreditsJson.count(json, "used") ?: 0, limit = CreditsJson.count(json, "limit"),
+                tier = tier, used = CreditsJson.count(json, "used"), limit = CreditsJson.count(json, "limit"),
                 remaining = CreditsJson.count(json, "remaining"), resetsAt = CreditsJson.text(json, "resetsAt"),
                 paywall = json.opt("paywall") == true, bonus = CreditsJson.count(json, "bonus") ?: 0,
             )
@@ -83,7 +84,8 @@ data class ReadAccess(
 
 /** `{used, limit, remaining, bonus, windowDays, resetsAt}` for Deep or Max. */
 data class LevelMeter(
-    val used: Int,
+    /** null = the server did not say (it is never taken for zero). */
+    val used: Int?,
     val limit: Int?,
     val remaining: Int?,
     val bonus: Int,
@@ -96,7 +98,7 @@ data class LevelMeter(
         fun fromJson(json: JSONObject?): LevelMeter? {
             if (json == null) return null
             return LevelMeter(
-                used = CreditsJson.count(json, "used") ?: 0, limit = CreditsJson.count(json, "limit"),
+                used = CreditsJson.count(json, "used"), limit = CreditsJson.count(json, "limit"),
                 remaining = CreditsJson.count(json, "remaining"), bonus = CreditsJson.count(json, "bonus") ?: 0,
                 windowDays = CreditsJson.count(json, "windowDays"), resetsAt = CreditsJson.text(json, "resetsAt"),
             )
@@ -119,6 +121,7 @@ data class Referral(
     val shareUrl: String? get() = url.takeIf { link -> SITES.any { link.startsWith(it) } }
 
     companion object {
+        /** What `max` reads as when a reply leaves it out (the server has always sent it), as on iOS. */
         const val DEFAULT_FRIENDS = 5
         private val SITES = listOf("https://bobbyprotocol.xyz/", "https://www.bobbyprotocol.xyz/")
 

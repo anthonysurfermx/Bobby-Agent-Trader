@@ -186,11 +186,46 @@ class CreditsBalanceTest {
         assertNull("and no gifted row on the face", unknownQuick.giftFace)
     }
 
+    @Test fun aBalanceTheServerLeftHalfSaidIsNotShownAsAFullAllowance() {
+        // `limit` without `used` or `remaining`: the server's own shape sends `remaining: null`
+        // whenever `used` is not a number. The phone does not work the balance out from a zero it made up.
+        val half = ReadAccess.fromJson(JSONObject("""{"tier":"free","limit":20,"paywall":true}"""))!!
+        assertNull(half.used)
+        assertEquals(20, half.limit)
+        val account = balance(CreditsSnapshot(access = half, signedIn = true))
+        assertNull("no Quick line, never 20/20", account.line(Kind.QUICK))
+        assertNull("and no number in the profile row", account.summary)
+        assertEquals("Bobby Pro is still said: it does not depend on the meter", listOf(Kind.PRO), account.lines.map { it.kind })
+        assertNull(CreditsBalance.readsLeft(null, 20, null))
+        assertEquals("the server's own word comes first", 4, CreditsBalance.readsLeft(4, 20, 3))
+        assertEquals("both numbers came from the server: the difference is theirs", 17, CreditsBalance.readsLeft(null, 20, 3))
+        assertEquals("never below zero", 0, CreditsBalance.readsLeft(null, 20, 25))
+
+        val guest = ReadAccess.fromJson(JSONObject("""{"tier":"anon","limit":6,"paywall":true}"""))!!
+        assertNull(balance(CreditsSnapshot(access = guest, signedIn = false)).line(Kind.QUICK))
+
+        // The same for Deep and Max.
+        val meters = mapOf(CreditsLevel.PROFUNDO to meter("""{"limit":6,"windowDays":7}"""), CreditsLevel.MAXIMO to meter("""{"used":1,"limit":2,"windowDays":7}"""))
+        assertNull(meters[CreditsLevel.PROFUNDO]?.used)
+        val partial = balance(CreditsSnapshot(access = free(), meters = meters, signedIn = true))
+        assertNull("a Deep meter without what was used says nothing, never 6/6", partial.line(Kind.DEEP))
+        assertEquals("1/2", partial.line(Kind.MAX)?.face)
+    }
+
+    @Test fun aMeterIsCalledWeeklyOnlyWhenTheServerSaidItsWindowIsAWeek() {
+        val unknownWindow = mapOf(CreditsLevel.PROFUNDO to meter("""{"used":10,"limit":60,"remaining":50,"resetsAt":"2026-10-25T09:00:00Z"}"""))
+        val deep = balance(CreditsSnapshot(access = pro, meters = unknownWindow, signedIn = true)).line(Kind.DEEP)!!
+        assertEquals("no window from the server, no \"this week\" from the phone", "50 of 60 left", deep.value)
+        assertEquals("Next read back October 25", deep.detail)
+        assertEquals("50/60", deep.face)
+        assertEquals("Te quedan 50 de 60", balance(CreditsSnapshot(access = pro, meters = unknownWindow, signedIn = true), spanish = true).line(Kind.DEEP)?.value)
+    }
+
     @Test fun theServersReplyIsReadLenientlyAndNeverCoerced() {
         assertNull("a tier this build does not know is no access at all", ReadAccess.fromJson(JSONObject("""{"tier":"gold","used":1,"limit":3}""")))
         assertNull(ReadAccess.fromJson(null))
         val access = ReadAccess.fromJson(JSONObject("""{"tier":"free","used":true,"limit":"10","remaining":null,"paywall":"yes","bonus":2.5,"resetsAt":""}"""))!!
-        assertEquals("a boolean is not a count", 0, access.used)
+        assertNull("a boolean is not a count, and an unknown count is not zero", access.used)
         assertNull("a text is not a count", access.limit)
         assertNull(access.remaining)
         assertFalse("only a literal true turns the weekly cap on", access.paywall)
@@ -451,5 +486,16 @@ class CreditsBalanceTest {
                 assertFalse("Android never names an iPhone or its store here: $key [$language]", Regex("iPhone|App Store|Apple Account").containsMatchIn(text))
             }
         }
+    }
+
+    @Test fun theInviteLineSpeaksToThePersonInformallyInEveryLanguage() {
+        // Bobby says tu, never vous. This row once came from the older catalog, where it was formal in
+        // French and Portuguese; it is the line every Android account reads today under Credits › Details.
+        val row = V18Catalog.row("Share Bobby with someone you know.")
+        assertEquals("Partage Bobby avec une personne que tu connais.", row["fr"])
+        assertEquals("Partilha o Bobby com alguém que conheces.", row["pt"])
+        assertEquals("Condividi Bobby con qualcuno che conosci.", row["it"])
+        assertEquals("Teile Bobby mit jemandem, den du kennst.", row["de"])
+        assertFalse(Regex("\\b(vous|votre|vos)\\b", RegexOption.IGNORE_CASE).containsMatchIn(row["fr"] ?: "vous"))
     }
 }
