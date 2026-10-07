@@ -390,8 +390,11 @@ class HarnessGlassTest {
         runCurrent()
         bench.deliver(symbol = "NVDA", price = 100.0)
         bench.clock += 26 * hour
+        val told = bench.desk.sessionChanges
         bench.host.appBecameActive()
+        assertEquals("the page is not told from inside the app's own hook", told, bench.desk.sessionChanges)
         runCurrent()
+        assertEquals("but once, right after it", told + 1, bench.desk.sessionChanges)
         assertEquals("one price, no read spent", listOf("NVDA"), quoted)
         val nudge = bench.host.nudgeJson()!!
         assertTrue(nudge.getString("id").startsWith("harness.move.nvda."))

@@ -169,7 +169,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     private val issued = HashMap<String, LocalNotice>()
     private var focus: Focus? = null
     private val quotes = HashMap<String, Quoted>()
-    /** Prices being read right now: two requests for the same line are one. */
+    /** Prices being read right now (`reader/symbol`): two requests for the same line are one. */
     private val reading = HashSet<String>()
     /** Grows whenever this reader is erased: a yes that was waiting for the system's answer does not undo it. */
     private var erasures = 0
@@ -483,9 +483,11 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         val epoch = currentEpoch()
         var price = quotes[asset.symbol]?.takeIf { now() - it.at <= QUOTE_LIFETIME_MS }?.price
         if (price == null) {
-            // The app comes to the front twice in a row at launch: the read already under way draws the line.
-            if (!reading.add(asset.symbol)) return
-            val quote = try { market(asset.symbol) } finally { reading.remove(asset.symbol) }
+            // The app comes to the front twice in a row at launch: the read already under way draws
+            // the line. Per reader: one that is still on its way for whoever left holds nobody else back.
+            val flight = (user ?: "local") + "/" + asset.symbol
+            if (!reading.add(flight)) return
+            val quote = try { market(asset.symbol) } finally { reading.remove(flight) }
             if (owner != user || currentEpoch() != epoch || consent() != RiskNotice.ACCEPTED) return
             price = quote?.price?.takeIf { it.isFinite() && it > 0 }
             if (price != null) quotes[asset.symbol] = Quoted(price, now())

@@ -41,7 +41,18 @@ object Harness {
         // briefing reminder checks it with the server): Pro with that switch on has its Monday.
         center.weeklyCovered = { host.signedIn && host.briefingNotifications && host.billing.value.isPro }
         center.market = { symbol -> quote(host, symbol) }
-        center.changed = { host.sessionChanged() }
+        // The page is told once, after the turn that changed the line: several changes in one turn
+        // are one redraw, and nothing is sent from inside a hook the session is still running.
+        var redrawQueued = false
+        center.changed = {
+            if (!redrawQueued) {
+                redrawQueued = true
+                host.scope.launch {
+                    try { yield() } finally { redrawQueued = false }
+                    host.sessionChanged()
+                }
+            }
+        }
         center.load(host.owner)
 
         // From the first delivered read. Never the question: a symbol, a name, a price.

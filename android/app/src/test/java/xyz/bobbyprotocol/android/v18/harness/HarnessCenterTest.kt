@@ -606,6 +606,9 @@ class HarnessCenterTest {
     // Android: fences, a slow phone, a relaunch, another language, the board, the switch
 
     @Test fun aPriceThatArrivesForThePreviousReaderDrawsNothing() = runTest {
+        // The second reader asked about the same asset a day ago too, at another price.
+        val theirs = HarnessLedger().also { it.note(HarnessEvent(HarnessEvent.Kind.ASK, at(7, 10), symbol = "NVDA", name = "NVDA", isEquity = true, price = 60.0)) }
+        HarnessStore(raw).write(theirs, "u2")
         user = "u1"
         val center = make()
         ask(center, "NVDA", price = 100.0)
@@ -621,13 +624,17 @@ class HarnessCenterTest {
         val again = launch(start = CoroutineStart.UNDISPATCHED) { center.refreshMove() }
         assertEquals(listOf("NVDA"), quoted)
         switchTo("u2")
-        center.accountChanged()
+        val next = launch(start = CoroutineStart.UNDISPATCHED) { center.accountChanged() }
+        assertEquals("u2", center.owner)
+        assertNull("the first reader's line is gone at once", center.move)
+        assertEquals("the second reader's own read is not held back by the first one's", listOf("NVDA", "NVDA"), quoted)
         gate.complete(Unit)
         coming.join()
         again.join()
-        assertEquals("u2", center.owner)
-        assertNull("the first reader's line never reaches the second", center.move)
-        assertNull(center.moveOnGlass())
+        next.join()
+        assertEquals("their own question, their own price: the first reader's 100 never reaches them", 60.0, center.move?.priceThen)
+        assertEquals(100.0, center.move?.pct ?: 0.0, 0.001)
+        assertEquals(center.move, center.moveOnGlass())
     }
 
     @Test fun openingTheAppBeforeThePhoneDeliversALateNoticeLeavesItToTheGlass() = runTest {
