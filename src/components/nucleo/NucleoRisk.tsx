@@ -1,5 +1,8 @@
 // Four explicit browser acknowledgements, including AI processing and external dictation services.
-import { useState } from 'react';
+// On the desk the notice comes after the person asked (`onAccepted`): it says a question is waiting, can be left
+// (`onClose`), and agreeing hands control back once. The statements, the version and the agree control are the
+// same in every mode.
+import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, X } from 'lucide-react';
 import { t } from '@/lib/companions/i18n';
 import { clientLanguagePath } from '@/lib/client-language';
@@ -8,11 +11,23 @@ import { sfxSuccess, sfxTock } from '@/lib/companions/sfx';
 import NucleoSphere from '@/components/companion/NucleoSphere';
 import LangMenu from './LangMenu';
 
-interface Props { readOnly?: boolean; onClose?: () => void }
+interface Props {
+  readOnly?: boolean;
+  onClose?: () => void;
+  /** The question waiting behind the notice, in the person's own words. Shown above the title, never sent from here. */
+  question?: string | null;
+  /** Runs once, right after the notice is accepted, inside the same tap. */
+  onAccepted?: () => void;
+}
 
-export default function NucleoRisk({ readOnly = false, onClose }: Props) {
+export default function NucleoRisk({ readOnly = false, onClose, question = null, onAccepted }: Props) {
   const [checks, setChecks] = useState([false, false, false, false]);
   const [full, setFull] = useState(readOnly);
+  // On the desk the notice replaces what the person was looking at: a screen reader and the keyboard start at its title.
+  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  // Once, when it appears: the desk re-rendering behind it must not pull focus back from the statements.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (onAccepted) titleRef.current?.focus({ preventScroll: true }); }, []);
   const done = readOnly ? 4 : checks.filter(Boolean).length;
   const all = done === 4;
   const statements = [
@@ -31,6 +46,7 @@ export default function NucleoRisk({ readOnly = false, onClose }: Props) {
     progressStore.acceptRiskNotice();
     // The characters left first run: whoever reaches the desk is onboarded, with the default avatar.
     progressStore.finishOnboarding();
+    onAccepted?.();
   };
 
   return (
@@ -39,7 +55,7 @@ export default function NucleoRisk({ readOnly = false, onClose }: Props) {
         <a href={clientLanguagePath('/')} className="n-wordmark">Bobby</a>
         <div className="flex items-center gap-2">
           <LangMenu />
-          {readOnly && <button type="button" onClick={onClose} className="n-iconbtn" aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={16} /></button>}
+          {(readOnly || (onAccepted && onClose)) && <button type="button" onClick={onClose} className="n-iconbtn" data-risk-close aria-label={t('Close', 'Cerrar', 'Fechar')}><X size={16} /></button>}
         </div>
       </header>
       <div className="mx-auto flex min-h-[calc(100dvh-64px)] w-full max-w-[520px] flex-col items-center justify-center px-5 pb-16 pt-0">
@@ -52,7 +68,10 @@ export default function NucleoRisk({ readOnly = false, onClose }: Props) {
               style={{ transition: 'stroke-dashoffset .7s cubic-bezier(.2,.8,.2,1)', filter: 'drop-shadow(0 0 6px rgba(63,224,181,.6))' }} />
           </svg>
         </div>
-        <h1 className="n-display mt-3 text-center text-[30px] leading-[1.1] sm:text-[36px]">{t('One thing before we start.', 'Una cosa antes de empezar.', 'Uma coisa antes de começar.')}</h1>
+        {question && <p className="n-risk-q mt-3" data-risk-question>{question}</p>}
+        <h1 ref={titleRef} tabIndex={-1} className="n-display mt-3 text-center text-[30px] leading-[1.1] outline-none sm:text-[36px]">{question
+          ? t('Before I answer, one thing.', 'Antes de responder, una cosa.')
+          : t('One thing before we start.', 'Una cosa antes de empezar.', 'Uma coisa antes de começar.')}</h1>
         <div className="mt-6 w-full">
           {statements.map((s, i) => {
             const on = readOnly || checks[i];

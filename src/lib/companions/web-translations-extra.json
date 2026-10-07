@@ -10810,5 +10810,17 @@
     "pt": "Masculina",
     "it": "Maschile",
     "de": "Männlich"
+  },
+  "Before I answer, one thing.": {
+    "fr": "Avant de répondre, une précision.",
+    "pt": "Antes de responder, uma coisa.",
+    "it": "Prima di rispondere, una cosa.",
+    "de": "Vor meiner Antwort noch eines."
+  },
+  "AI consent withdrawn. Bobby will ask again before your next question.": {
+    "fr": "Consentement à l’IA retiré. Bobby te le redemandera avant ta prochaine question.",
+    "pt": "Consentimento de IA retirado. O Bobby volta a pedir antes da tua próxima pergunta.",
+    "it": "Consenso all’IA revocato. Bobby te lo chiederà di nuovo prima della tua prossima domanda.",
+    "de": "KI-Einwilligung widerrufen. Bobby fragt vor deiner nächsten Frage noch einmal."
   }
 }

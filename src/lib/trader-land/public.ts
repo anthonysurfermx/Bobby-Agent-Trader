@@ -7,7 +7,8 @@ import { landPieceLabel } from './piece-labels';
 export const STUDIO_PATH = '/trader-land';
 export const WORLDS_PATH = '/agentic-world/bobby/trader-land/worlds';
 export const visitorPath = (code: string) => `${STUDIO_PATH}/w/${code}`;
-export const shareUrl = (code: string) => `${window.location.origin}${visitorPath(code)}`;
+/** The link a builder copies to share an island outside Bobby. `utm_source` is what /api/track stores with the visit. */
+export const shareUrl = (code: string) => `${window.location.origin}${visitorPath(code)}?utm_source=island_share`;
 
 export type District = 'crypto_bay' | 'evidence_mines' | 'thesis_citadel' | 'risk_reef' | 'axiom_archive';
 export const DISTRICTS: District[] = ['crypto_bay', 'evidence_mines', 'thesis_citadel', 'risk_reef', 'axiom_archive'];

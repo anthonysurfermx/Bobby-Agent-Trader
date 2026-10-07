@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { motion, useInView, useReducedMotion, useScroll, useTransform, type Easing, type MotionValue } from 'framer-motion';
 import { LANGS, LANG_NAME, lang, locale as currentLocale, type Lang, t } from '@/lib/companions/i18n';
-import { APP_STORE_URL } from '@/lib/app-store';
+import { APP_STORE_ID, APP_STORE_URL } from '@/lib/app-store';
 import BobbyWorld from '@/components/app-landing/BobbyWorld';
 import LedgeByte from '@/components/app-landing/LedgeByte';
 import SquadLineup from '@/components/app-landing/SquadLineup';
@@ -574,6 +574,7 @@ export default function BobbyAppLandingWorld() {
         <meta name="twitter:title" content={pageTitle} />
         <meta name="twitter:description" content={pageDescription} />
         <meta name="twitter:image" content="https://bobbyprotocol.xyz/bobby-share-orb-en-2026-09-30.png" />
+        <meta name="apple-itunes-app" content={`app-id=${APP_STORE_ID}`} />
       </Helmet>
 
       {/* ============ 01 · HERO ============ */}

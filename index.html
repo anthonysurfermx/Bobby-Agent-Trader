@@ -46,6 +46,13 @@
     <meta name="twitter:site" content="@anthonysurfermx" />
     <meta name="twitter:creator" content="@anthonysurfermx" />
 
+    <!-- Smart App Banner (iPhone Safari) on the desk only. This shell serves every app route, and the banner must not
+         show on the invitation page (/i/CODE opens the app with the code itself), the sign-in return or the dashboard,
+         so the tag is added while the head is parsed and only for /desk. /app gets its own tag from the page
+         (prerendered); the static home has it in its markup. The id is the number in APP_STORE_URL
+         (src/lib/app-store.ts): scripts/test-web-activation.mjs fails if they differ. -->
+    <script>(function () { if (!/^\/desk\/?$/.test(location.pathname)) return; var m = document.createElement('meta'); m.name = 'apple-itunes-app'; m.content = 'app-id=6804460489'; document.head.appendChild(m); })();</script>
+
     <!-- Theme Color -->
     <meta name="theme-color" content="#090711" />
     <meta name="msapplication-TileColor" content="#090711" />
