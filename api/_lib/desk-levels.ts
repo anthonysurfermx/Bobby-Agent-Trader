@@ -18,10 +18,17 @@ export type PremiumLevel = Exclude<DeskLevel, 'rapido'>;
 export const DESK_LEVELS: readonly DeskLevel[] = ['rapido', 'profundo', 'maximo'];
 export const isDeskLevel = (v: unknown): v is DeskLevel => typeof v === 'string' && (DESK_LEVELS as readonly string[]).includes(v);
 
-/** [uses, window in days] per plan for the premium levels. Conservative until the real cost is measured. */
+/** The Rápido reads a person gets without paying: a guest per 30 days, a free account per rolling 7 days.
+ *  Doubled on 2026-10-07 (owner's decision: see more of Bobby before deciding to pay). The meter itself is SQL
+ *  (bobby_consume_read / bobby_read_access, 20261007190000) and states the same two numbers;
+ *  scripts/test-free-reads-pg.mts fails if the two places disagree. */
+export const FREE_READS = { guest: 6, weekly: 20 } as const;
+
+/** [uses, window in days] per plan for the premium levels. Profundo for guests and free accounts doubled with
+ *  the reads (2026-10-07); Máximo did not: two a week would be 8–9 a month against Bobby Pro's 10. */
 export const LEVEL_LIMITS = {
-  anon: { profundo: [1, 30], maximo: [0, 30] },
-  free: { profundo: [3, 7], maximo: [1, 7] },
+  anon: { profundo: [2, 30], maximo: [0, 30] },
+  free: { profundo: [6, 7], maximo: [1, 7] },
   pro: { profundo: [60, 30], maximo: [10, 30] },
 } as const;
 

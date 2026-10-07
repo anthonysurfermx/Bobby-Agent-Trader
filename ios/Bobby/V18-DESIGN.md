@@ -38,7 +38,7 @@ Restaurar compras
 - Deleted: the credit definition, "Lo que tienes", "Consigue más", "¿Ya pagaste?", the sentence under every row, the Pro benefits text, the restore explanation.
 - A level row is `QuietRow(label, value: "7/10", note: "+1 sáb")`: the server's window rolls, so on that day the oldest read comes back, not all of them (never "resets"). The day shows only when the server gave one. `↻` is kept for a subscription's real renewal date. Pro shows its real state or source (`Activo`, `De regalo hasta el 16 oct`, `Plan web`, `Plan App Store`). Unlimited Quick reads on Pro: `Ilimitadas · uso justo`. Gifts are one row, omitted when confirmed empty.
 - `ⓘ` holds: `1 crédito = 1 lectura`, when gifted reads are used, the Pro allowances from server data, the free-account line.
-- Signed out: the guest balances, one line `Cuenta gratis: 10 lecturas Rápidas semanales.` (server number only), the system Continue with Apple button. Zero: `0/10` with its real day. Unknown: `Saldo no disponible.` + `Reintentar`, never 0.
+- Signed out: the guest balances, one line `Cuenta gratis: 20 lecturas Rápidas semanales.` (server number only), the system Continue with Apple button. Zero: `0/20` with its real day. Unknown: `Saldo no disponible.` + `Reintentar`, never 0.
 - Restore: the link becomes `Comprobando…`, then ONE result line that stays under it (scrolled into view, announced): `Restaurado. Bobby Pro está activo.` · `Sin compra de Bobby Pro en esta cuenta Apple.` (with a quiet `¿Usaste otra cuenta Apple?` that unfolds `Usa esa cuenta Apple en este iPhone; reintenta.`) · `Pendiente de confirmación de App Store.` · `Restauración cancelada.` · `No se pudieron restaurar las compras.` + `Reintentar` · `Bobby Pro sigue activo. Sin otra compra de App Store.` · `Inicia sesión para restaurar.`
 
 | EN | ES |
@@ -55,7 +55,7 @@ Restaurar compras
 | Restore purchases | Restaurar compras |
 | 1 credit = 1 read | 1 crédito = 1 lectura |
 | Used after your plan runs out. | Se usan al agotar tu plan. |
-| Free account: 10 Quick reads weekly. | Cuenta gratis: 10 lecturas Rápidas semanales. |
+| Free account: 20 Quick reads weekly. | Cuenta gratis: 20 lecturas Rápidas semanales. |
 | Checking… | Comprobando… |
 | Restored. Bobby Pro is active. | Restaurado. Bobby Pro está activo. |
 | No Bobby Pro purchase on this Apple Account. | Sin compra de Bobby Pro en esta cuenta Apple. |

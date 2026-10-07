@@ -63,25 +63,25 @@ enum CreditsQA {
         return NucleoReferral(json: json)
     }
 
-    /// Nobody signed in: two of the three trial reads left.
+    /// Nobody signed in: five of the six trial reads left.
     static var guest: CreditsSnapshot {
-        CreditsSnapshot(access: BobbyReadAccess(tier: "anon", used: 1, limit: 3, remaining: 2, resetsAt: nil, paywall: true),
-                        meters: meters(meter(used: 0, limit: 1, windowDays: 30), meter(used: 0, limit: 0, windowDays: 30)),
-                        proPurchasable: true, signedIn: false, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+        CreditsSnapshot(access: BobbyReadAccess(tier: "anon", used: 1, limit: 6, remaining: 5, resetsAt: nil, paywall: true),
+                        meters: meters(meter(used: 0, limit: 2, windowDays: 30), meter(used: 0, limit: 0, windowDays: 30)),
+                        proPurchasable: true, signedIn: false, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// A free account mid-week, with gifted reads on two levels.
     static var free: CreditsSnapshot {
-        CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 3, limit: 10, remaining: 7, resetsAt: iso(daysFromNow: 3), paywall: true, bonus: 3),
-                        meters: meters(meter(used: 1, limit: 3, bonus: 2, windowDays: 7, resetsInDays: 4), meter(used: 0, limit: 1, windowDays: 7)),
-                        referral: referral(accepted: 1), proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+        CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 3, limit: 20, remaining: 17, resetsAt: iso(daysFromNow: 3), paywall: true, bonus: 3),
+                        meters: meters(meter(used: 1, limit: 6, bonus: 2, windowDays: 7, resetsInDays: 4), meter(used: 0, limit: 1, windowDays: 7)),
+                        referral: referral(accepted: 1), proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// A free account with nothing left this week and no gifts.
     static var zero: CreditsSnapshot {
-        CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 10, limit: 10, remaining: 0, resetsAt: iso(daysFromNow: 2), paywall: true),
-                        meters: meters(meter(used: 3, limit: 3, windowDays: 7, resetsInDays: 2), meter(used: 1, limit: 1, windowDays: 7, resetsInDays: 5)),
-                        referral: referral(), proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+        CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 20, limit: 20, remaining: 0, resetsAt: iso(daysFromNow: 2), paywall: true),
+                        meters: meters(meter(used: 6, limit: 6, windowDays: 7, resetsInDays: 2), meter(used: 1, limit: 1, windowDays: 7, resetsInDays: 5)),
+                        referral: referral(), proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     private static var proAccess: BobbyReadAccess {
@@ -96,19 +96,19 @@ enum CreditsQA {
     static var paidPro: CreditsSnapshot {
         CreditsSnapshot(access: proAccess, meters: proMeters, referral: referral(accepted: 2),
                         subscription: BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: iso(daysFromNow: 20)),
-                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// Bobby Pro paid by card on the web.
     static var cardPro: CreditsSnapshot {
         CreditsSnapshot(access: proAccess, meters: proMeters, referral: referral(),
                         subscription: BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: iso(daysFromNow: 12)),
-                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// Bobby Pro, and the subscription has not reached the app yet (the first moment after launch).
     static var unknownPro: CreditsSnapshot {
-        CreditsSnapshot(access: proAccess, meters: proMeters, proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+        CreditsSnapshot(access: proAccess, meters: proMeters, proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// Bobby Pro from invitations: no subscription anywhere.
@@ -116,7 +116,7 @@ enum CreditsQA {
         CreditsSnapshot(access: BobbyReadAccess(tier: "pro", used: 9, limit: nil, remaining: nil, resetsAt: nil, paywall: true),
                         meters: meters(meter(used: 4, limit: 60, windowDays: 30, resetsInDays: 25), meter(used: 0, limit: 10, windowDays: 30)),
                         referral: referral(accepted: 2, proUntilDays: 36, source: "referral"),
-                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 10, rewardDays: 30, maxFriends: 5)
+                        proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 }
 #endif

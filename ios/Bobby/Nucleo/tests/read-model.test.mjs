@@ -138,8 +138,8 @@ test('signin_required -> the sign-in beat: the exact line, the Apple chip holdin
   const r = load('signin-required');
   const en = RM.failure(r, 'en'), es = RM.failure(r, 'es');
   assert.equal(en.kind, 'signin');
-  assert.equal(en.caption, 'Create your free account to keep reading — 10 free reads a week.');
-  assert.equal(es.caption, 'Crea tu cuenta gratis para seguir leyendo: 10 lecturas gratis a la semana.');
+  assert.equal(en.caption, 'Create your free account to keep reading — 20 free reads a week.');
+  assert.equal(es.caption, 'Crea tu cuenta gratis para seguir leyendo: 20 lecturas gratis a la semana.');
   assert.deepEqual(en.chips[0].action, { signIn: true, retry: r.token });
   assert.equal(en.chips[0].style, 'apple');
   assert.equal(en.chips[0].label, 'Sign in with Apple');

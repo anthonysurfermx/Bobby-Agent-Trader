@@ -1,8 +1,8 @@
 // ============================================================
-// Metered access to the desk read, shared by the web and iOS (bobby_consume_read,
-// migration 20260927120000):
-//   · anonymous device (sends x-bobby-device): 3 reads → then sign-in is required;
-//   · signed in: 10 reads per rolling 7 days → then Bobby Pro, while BOBBY_PAYWALL=on;
+// Metered access to the desk read, shared by the web, iOS and Android (bobby_consume_read,
+// migration 20260927120000; the numbers are FREE_READS in desk-levels.ts, doubled by 20261007190000):
+//   · anonymous device (sends x-bobby-device): 6 reads per 30 days → then sign-in is required;
+//   · signed in: 20 reads per rolling 7 days → then Bobby Pro, while BOBBY_PAYWALL=on;
 //   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.
 //   · coupon gifts (bobby_usage_bonus, 20261001160000): extra reads / Profundo / Máximo spent after the
 //     regular allowance runs out and never counted toward it (api/_lib/coupons.ts).
