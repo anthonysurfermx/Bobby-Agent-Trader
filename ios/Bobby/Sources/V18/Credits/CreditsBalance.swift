@@ -99,6 +99,11 @@ struct CreditsBalance: Equatable {
         let title: String
         let value: String
         let detail: String?
+        /// The row's face (V18-DESIGN.md): a short name, a number or a state, and when it comes back.
+        /// `title`, `value` and `detail` stay as the full sentence for VoiceOver and for the details.
+        var label = ""
+        var face = ""
+        var faceNote: String? = nil
 
         var id: String { kind.rawValue }
         var isGift: Bool { [.giftQuick, .giftDeep, .giftMax].contains(kind) }
@@ -120,6 +125,14 @@ struct CreditsBalance: Equatable {
 
     func line(_ kind: Line.Kind) -> Line? { lines.first { $0.kind == kind } }
 
+    /// The gifted reads as one row's value ("Quick 3 · Deep 2"); nil when there are none.
+    var giftFace: String? {
+        let gifts = lines.filter(\.isGift)
+        return gifts.isEmpty ? nil : gifts.map { $0.label + " " + $0.face }.joined(separator: " · ")
+    }
+    /// The same row for VoiceOver: each gifted line in full.
+    var giftSpoken: String { lines.filter(\.isGift).map(\.spoken).joined(separator: ". ") }
+
     static func make(_ snapshot: CreditsSnapshot, now: Date = .now, spanish: Bool? = nil,
                      timeZone: TimeZone = .current) -> CreditsBalance {
         let pro = CreditsProStatus.make(snapshot, now: now)
@@ -134,7 +147,10 @@ struct CreditsBalance: Equatable {
         let unlimited = access.isPro || (access.tier == "free" && !access.paywall)
         if unlimited {
             lines.append(Line(kind: .quick, title: copy.title(.rapido), value: L.t("Unlimited", "Ilimitadas", spanish: spanish),
-                              detail: access.isPro ? L.t("With Bobby Pro, within fair use.", "Con Bobby Pro, dentro del uso justo.", spanish: spanish) : nil))
+                              detail: access.isPro ? L.t("With Bobby Pro, within fair use.", "Con Bobby Pro, dentro del uso justo.", spanish: spanish) : nil,
+                              label: copy.label(.rapido),
+                              face: access.isPro ? L.t("Unlimited · fair use", "Ilimitadas · uso justo", spanish: spanish)
+                                                 : L.t("Unlimited", "Ilimitadas", spanish: spanish)))
             if !access.isPro { summary.append(L.t("Unlimited reads", "Lecturas ilimitadas", spanish: spanish)) }
         } else if let limit = access.limit {
             let left = access.remaining ?? max(0, limit - access.used)
@@ -142,10 +158,12 @@ struct CreditsBalance: Equatable {
                 let detail: String? = snapshot.signedIn ? nil
                     : snapshot.freeReadsPerWeek.map { L.t("Create your free account to get \($0) every week", "Crea tu cuenta gratis para tener \($0) cada semana", spanish: spanish) }
                         ?? L.t("Create your free account to keep reading", "Crea tu cuenta gratis para seguir leyendo", spanish: spanish)
-                lines.append(Line(kind: .quick, title: copy.title(.rapido), value: copy.left(left, of: limit, weekly: false), detail: detail))
+                lines.append(Line(kind: .quick, title: copy.title(.rapido), value: copy.left(left, of: limit, weekly: false), detail: detail,
+                                  label: copy.label(.rapido), face: "\(left)/\(limit)"))
             } else {
                 lines.append(Line(kind: .quick, title: copy.title(.rapido), value: copy.left(left, of: limit, weekly: true),
-                                  detail: copy.resets(access.resetsDate)))
+                                  detail: copy.resets(access.resetsDate),
+                                  label: copy.label(.rapido), face: "\(left)/\(limit)", faceNote: copy.renewal(access.resetsDate)))
             }
             summary.append(L.t("\(left) of \(limit) reads", "\(left) de \(limit) lecturas", spanish: spanish))
         }
@@ -158,14 +176,16 @@ struct CreditsBalance: Equatable {
                 // A guest has no Max reads: say where they are, never "0 of 0".
                 if access.tier == "anon" {
                     lines.append(Line(kind: kind, title: copy.title(level),
-                                      value: L.t("With your free account", "Con tu cuenta gratis", spanish: spanish), detail: nil))
+                                      value: L.t("With your free account", "Con tu cuenta gratis", spanish: spanish), detail: nil,
+                                      label: copy.label(level), face: L.t("With your free account", "Con tu cuenta gratis", spanish: spanish)))
                 }
                 continue
             }
             let left = meter.remaining ?? max(0, limit - meter.used)
             let weekly = (meter.windowDays ?? 7) == 7
             lines.append(Line(kind: kind, title: copy.title(level), value: copy.left(left, of: limit, weekly: weekly),
-                              detail: weekly ? copy.resets(meter.resetsDate) : copy.window(meter.windowDays, resets: meter.resetsDate)))
+                              detail: weekly ? copy.resets(meter.resetsDate) : copy.window(meter.windowDays, resets: meter.resetsDate),
+                              label: copy.label(level), face: "\(left)/\(limit)", faceNote: copy.renewal(meter.resetsDate)))
         }
 
         // Gifted reads: per level, only what exists.
@@ -177,12 +197,14 @@ struct CreditsBalance: Equatable {
                 : unlimited
                     ? L.t("Kept for when Quick reads have a weekly limit.", "Se guardan para cuando las lecturas Rápidas tengan límite semanal.", spanish: spanish)
                     : copy.afterPlan
-            lines.append(Line(kind: .giftQuick, title: copy.giftTitle(.rapido), value: "\(access.bonus)", detail: when))
+            lines.append(Line(kind: .giftQuick, title: copy.giftTitle(.rapido), value: "\(access.bonus)", detail: when,
+                              label: copy.label(.rapido), face: "\(access.bonus)"))
         }
         for level in [NucleoAnalysisLevel.profundo, .maximo] {
             guard let bonus = snapshot.meters[level]?.bonus, bonus > 0 else { continue }
             gifts += bonus
-            lines.append(Line(kind: level == .profundo ? .giftDeep : .giftMax, title: copy.giftTitle(level), value: "\(bonus)", detail: copy.afterPlan))
+            lines.append(Line(kind: level == .profundo ? .giftDeep : .giftMax, title: copy.giftTitle(level), value: "\(bonus)", detail: copy.afterPlan,
+                              label: copy.label(level), face: "\(bonus)"))
         }
         if gifts > 0 {
             summary.append(gifts == 1 ? L.t("1 gifted", "1 de regalo", spanish: spanish) : L.t("\(gifts) gifted", "\(gifts) de regalo", spanish: spanish))
@@ -190,7 +212,9 @@ struct CreditsBalance: Equatable {
 
         // Bobby Pro. A guest has no account for it to belong to, so the line waits for one.
         if pro.isPro || access.tier == "free" {
-            lines.append(Line(kind: .pro, title: "Bobby Pro", value: copy.proValue(pro), detail: copy.proDetail(pro)))
+            let face = copy.proFace(pro)
+            lines.append(Line(kind: .pro, title: "Bobby Pro", value: copy.proValue(pro), detail: copy.proDetail(pro),
+                              label: "Bobby Pro", face: face.state, faceNote: face.note))
         }
         if pro.isPro {
             let until = pro.plan == .gifted ? pro.giftUntil : (pro.pays && !pro.renews ? pro.periodEnd : nil)
@@ -233,6 +257,18 @@ struct CreditsBalance: Equatable {
             case .profundo: return L.t("Deep reads", "Lecturas Profundas", spanish: spanish)
             case .maximo: return L.t("Max reads", "Lecturas Máximas", spanish: spanish)
             }
+        }
+
+        /// The level as the level pill names it.
+        func label(_ level: NucleoAnalysisLevel) -> String { level.name }
+
+        /// "↻ Sat" inside the coming week, "↻ Nov 2" beyond it; nil when there is nothing to wait for.
+        func renewal(_ date: Date?) -> String? {
+            guard let date, date > now else { return nil }
+            let when = date.timeIntervalSince(now) < 6 * 86_400
+                ? Self.format(date, "EEE", spanish: spanish, timeZone: timeZone, template: false)
+                : short(date)
+            return "↻ " + when
         }
 
         func giftTitle(_ level: NucleoAnalysisLevel) -> String {
@@ -285,6 +321,21 @@ struct CreditsBalance: Equatable {
                 guard let end = pro.periodEnd else { return L.t("Active", "Activo", spanish: spanish) }
                 return pro.renews ? L.t("Active · renews \(day(end))", "Activo · se renueva el \(day(end))", spanish: spanish)
                                   : L.t("Active · ends \(day(end))", "Activo · termina el \(day(end))", spanish: spanish)
+            }
+        }
+
+        /// The Bobby Pro row's face: a state, and the day it renews or ends when the app knows it.
+        func proFace(_ pro: CreditsProStatus) -> (state: String, note: String?) {
+            switch pro.plan {
+            case .none:
+                return (L.t("Not active", "No activo", spanish: spanish), nil)
+            case .gifted:
+                guard let until = pro.giftUntil else { return (L.t("Active", "Activo", spanish: spanish), nil) }
+                return (L.t("Gifted until \(short(until))", "De regalo hasta el \(short(until))", spanish: spanish), nil)
+            case .appStore, .card, .active:
+                guard let end = pro.periodEnd else { return (L.t("Active", "Activo", spanish: spanish), nil) }
+                return pro.renews ? (L.t("Active", "Activo", spanish: spanish), "↻ " + short(end))
+                                  : (L.t("Active until \(short(end))", "Activo hasta el \(short(end))", spanish: spanish), nil)
             }
         }
 

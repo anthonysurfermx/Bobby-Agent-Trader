@@ -163,12 +163,12 @@ private struct NucleoStage: View {
                 .presentationBackground(Theme.bg)
         case .credits:
             CreditsSheet(session: session) { session.sheet = nil }
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .theses:
             ThesisListSheet(session: session) { session.sheet = nil }
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .thesisEditor:

@@ -9,6 +9,9 @@ enum NativeTranslations18 {
     /// Rows more than one feature uses.
     static let shared: [String: [String: String]] = {
         var result: [String: [String: String]] = [:]
+        result["Collapsed"] = ["fr": "Replié", "pt": "Recolhido", "it": "Compresso", "de": "Eingeklappt"]
+        result["Details"] = ["fr": "Détails", "pt": "Detalhes", "it": "Dettagli", "de": "Details"]
+        result["Expanded"] = ["fr": "Déplié", "pt": "Expandido", "it": "Espanso", "de": "Ausgeklappt"]
         result["My theses"] = ["fr": "Mes thèses", "pt": "As minhas teses", "it": "Le mie tesi", "de": "Meine Thesen"]
         result["Reminders"] = ["fr": "Rappels", "pt": "Lembretes", "it": "Promemoria", "de": "Erinnerungen"]
         result["Remove"] = ["fr": "Retirer", "pt": "Remover", "it": "Rimuovi", "de": "Entfernen"]

@@ -25,66 +25,48 @@ final class CreditsRestoreTests: XCTestCase {
         let account = CreditsSnapshot(access: freeAccess, proPurchasable: true, signedIn: true)
         let en = try XCTUnwrap(notice(.done(.nothingToRestore), account))
         XCTAssertEqual(en.kind, .nothingToRestore)
-        XCTAssertEqual(en.text, "No Bobby Pro purchase was found on this Apple Account. If you paid with a different Apple Account, sign in to it on this iPhone and try again.")
-        XCTAssertEqual(en.action, .seePro)
+        XCTAssertEqual(en.text, "No Bobby Pro purchase on this Apple Account.")
+        XCTAssertNil(en.action, "the result is not a place to sell")
+        XCTAssertEqual(en.more, .init(title: "Used another Apple Account?", text: "Use that Apple Account on this iPhone; retry."),
+                       "the next step is one tap under the result")
         let es = try XCTUnwrap(notice(.done(.nothingToRestore), account, spanish: true))
-        XCTAssertEqual(es.text, "No se encontró una compra de Bobby Pro en esta cuenta de Apple. Si pagaste con otra cuenta de Apple, inicia sesión con ella en este iPhone e inténtalo de nuevo.")
-
-        let closed = CreditsSnapshot(access: freeAccess, proPurchasable: false, signedIn: true)
-        XCTAssertNil(notice(.done(.nothingToRestore), closed)?.action, "no Bobby Pro offer where it cannot be had")
+        XCTAssertEqual(es.text, "Sin compra de Bobby Pro en esta cuenta Apple.")
+        XCTAssertEqual(es.more?.title, "¿Usaste otra cuenta Apple?")
+        XCTAssertEqual(es.more?.text, "Usa esa cuenta Apple en este iPhone; reintenta.")
     }
 
-    func testAnAccountThatIsProByGiftIsToldSoInsteadOfNoSubscription() throws {
+    func testAnAccountThatIsProForAnyReasonIsToldItStillIsNeverThatItHasNothing() throws {
         let invited = CreditsSnapshot(access: proAccess, referral: try referral(proUntil: "2026-11-12T12:00:00Z", source: "referral"),
                                       proPurchasable: true, signedIn: true)
-        let en = try XCTUnwrap(notice(.done(.nothingToRestore), invited))
-        XCTAssertEqual(en.kind, .alreadyPro)
-        XCTAssertEqual(en.text, "Your account already has Bobby Pro until Nov 12, from an invitation. There is no App Store purchase to restore.")
-        XCTAssertNil(en.action)
-        let es = try XCTUnwrap(notice(.done(.nothingToRestore), invited, spanish: true))
-        XCTAssertTrue(es.text.hasPrefix("Tu cuenta ya tiene Bobby Pro hasta el 12 nov"), es.text)
-        XCTAssertTrue(es.text.hasSuffix(", por una invitación. No hay una compra de la App Store que restaurar."), es.text)
-
         let fromBobby = CreditsSnapshot(access: proAccess, referral: try referral(proUntil: "2026-11-12T12:00:00Z", source: "admin"), signedIn: true)
-        XCTAssertEqual(notice(.done(.nothingToRestore), fromBobby)?.text,
-                       "Your account already has Bobby Pro until Nov 12, as a gift from Bobby. There is no App Store purchase to restore.")
-        XCTAssertTrue(notice(.done(.nothingToRestore), fromBobby, spanish: true)?.text.contains("como regalo de Bobby") == true)
-    }
-
-    func testAnAccountThatIsProByCardIsToldSo() throws {
         let card = CreditsSnapshot(access: proAccess, subscription: BobbySubscription(provider: "stripe", status: "active", currentPeriodEnd: nil),
                                    proPurchasable: true, signedIn: true)
-        let en = try XCTUnwrap(notice(.done(.nothingToRestore), card))
-        XCTAssertEqual(en.kind, .alreadyPro)
-        XCTAssertEqual(en.text, "Your account already has Bobby Pro, paid by card on the web. There is no App Store purchase to restore.")
-        XCTAssertNil(en.action)
-        XCTAssertEqual(notice(.done(.nothingToRestore), card, spanish: true)?.text,
-                       "Tu cuenta ya tiene Bobby Pro, pagado con tarjeta en la web. No hay una compra de la App Store que restaurar.")
-    }
-
-    func testAnAccountThatIsAlreadyProForAnotherReasonIsNotOfferedBobbyPro() throws {
         let apple = CreditsSnapshot(access: proAccess, subscription: BobbySubscription(provider: "apple", status: "active", currentPeriodEnd: "2026-10-27T12:00:00Z"),
                                     proPurchasable: true, signedIn: true)
-        let en = try XCTUnwrap(notice(.done(.nothingToRestore), apple))
-        XCTAssertEqual(en.kind, .alreadyPro)
-        XCTAssertEqual(en.text, "Your account already has Bobby Pro. There is no other App Store purchase to restore.")
-        XCTAssertNil(en.action)
         let unknownReason = CreditsSnapshot(access: proAccess, proPurchasable: true, signedIn: true)
-        XCTAssertEqual(notice(.done(.nothingToRestore), unknownReason, spanish: true)?.text,
-                       "Tu cuenta ya tiene Bobby Pro. No hay otra compra de la App Store que restaurar.")
+        for account in [invited, fromBobby, card, apple, unknownReason] {
+            let en = try XCTUnwrap(notice(.done(.nothingToRestore), account))
+            XCTAssertEqual(en.kind, .alreadyPro)
+            XCTAssertEqual(en.text, "Bobby Pro remains active. No additional App Store purchase found.")
+            XCTAssertNil(en.action)
+            XCTAssertNil(en.more)
+            XCTAssertEqual(notice(.done(.nothingToRestore), account, spanish: true)?.text, "Bobby Pro sigue activo. Sin otra compra de App Store.")
+        }
+        // Where the plan comes from is on the Bobby Pro row, not repeated in the result.
+        XCTAssertEqual(CreditsBalance.make(invited, now: now, spanish: false, timeZone: utc).line(.pro)?.face, "Gifted until Nov 12")
     }
 
-    func testEveryOtherOutcomeHasItsSentenceAndItsNextStep() throws {
+    func testEveryEndingHasItsLineAndItsNextStep() throws {
         let account = CreditsSnapshot(access: freeAccess, proPurchasable: true, signedIn: true)
         let restored = try XCTUnwrap(notice(.done(.subscribed), account))
         XCTAssertEqual(restored.kind, .restored)
-        XCTAssertEqual(restored.text, "Restored. Bobby Pro is active on your account.")
+        XCTAssertEqual(restored.text, "Restored. Bobby Pro is active.")
         XCTAssertNil(restored.action)
-        XCTAssertEqual(notice(.done(.subscribed), account, spanish: true)?.text, "Restaurado. Bobby Pro está activo en tu cuenta.")
+        XCTAssertEqual(notice(.done(.subscribed), account, spanish: true)?.text, "Restaurado. Bobby Pro está activo.")
 
         let pending = try XCTUnwrap(notice(.done(.pending), account))
         XCTAssertEqual(pending.kind, .pending)
-        XCTAssertEqual(pending.text, "Waiting for approval. Bobby Pro starts as soon as the App Store confirms it.")
+        XCTAssertEqual(pending.text, "Awaiting App Store confirmation.")
         XCTAssertNil(pending.action)
 
         let failed = try XCTUnwrap(notice(.done(.failed("Bobby couldn’t confirm your subscription right now. Tap Restore Purchases in a moment.")), account))
@@ -95,21 +77,33 @@ final class CreditsRestoreTests: XCTestCase {
         for state in [CreditsRestoreState.signedOut, .done(.needsSignIn)] {
             let signIn = try XCTUnwrap(notice(state, CreditsSnapshot(access: nil, signedIn: false)))
             XCTAssertEqual(signIn.kind, .needsSignIn)
-            XCTAssertEqual(signIn.text, "Sign in with Apple first: Bobby Pro belongs to your Bobby account. Bobby then checks this Apple Account for a purchase.")
-            XCTAssertEqual(signIn.action, .signIn, "the explanation comes with the button, before any Apple sheet")
+            XCTAssertEqual(signIn.text, "Sign in to restore.")
+            XCTAssertEqual(signIn.action, .signIn, "the line comes with the button, before any Apple sheet")
         }
-        XCTAssertEqual(notice(.signedOut, CreditsSnapshot(access: nil), spanish: true)?.text,
-                       "Primero inicia sesión con Apple: Bobby Pro queda en tu cuenta de Bobby. Después Bobby revisa si esta cuenta de Apple tiene una compra.")
+        XCTAssertEqual(notice(.signedOut, CreditsSnapshot(access: nil), spanish: true)?.text, "Inicia sesión para restaurar.")
+
+        let cancelled = try XCTUnwrap(notice(.done(.cancelled), account), "a cancelled restore is an ending too")
+        XCTAssertEqual(cancelled.kind, .cancelled)
+        XCTAssertEqual(cancelled.text, "Restore cancelled.")
+        XCTAssertEqual(notice(.done(.cancelled), account, spanish: true)?.text, "Restauración cancelada.")
 
         XCTAssertNil(notice(.idle, account))
         XCTAssertNil(notice(.running, account))
-        XCTAssertNil(notice(.done(.cancelled), account), "a cancelled Apple sheet says nothing")
     }
 
-    func testBeforeTheRiskNoticeTheRowSaysWhyAndThatRestoreWorksAfterwards() throws {
-        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: false), "Accept the risk notice first; then you can restore here.")
-        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: true), "Primero acepta el aviso de riesgo; después podrás restaurar aquí.")
-        let row = try XCTUnwrap(NativeTranslations18.credits["Accept the risk notice first; then you can restore here."])
-        XCTAssertEqual(Set(row.keys), ["fr", "pt", "it", "de"])
+    func testEveryResultIsOneShortLineInSixLanguages() throws {
+        let fixed = ["Sign in to restore.", "Restored. Bobby Pro is active.", "Awaiting App Store confirmation.", "Restore cancelled.",
+                     "Bobby Pro remains active. No additional App Store purchase found.", "No Bobby Pro purchase on this Apple Account.",
+                     "Used another Apple Account?", "Use that Apple Account on this iPhone; retry.", "Accept the risk notice first."]
+        for key in fixed {
+            let row = try XCTUnwrap(NativeTranslations18.credits[key], key)
+            XCTAssertEqual(Set(row.keys), ["fr", "pt", "it", "de"], key)
+            for (language, text) in row { XCTAssertLessThanOrEqual(text.count, 70, "\(language): \(text)") }
+        }
+    }
+
+    func testBeforeTheRiskNoticeTheScreenSaysWhatComesFirst() {
+        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: false), "Accept the risk notice first.")
+        XCTAssertEqual(CreditsRestoreNotice.beforeRiskNotice(spanish: true), "Acepta primero el aviso de riesgo.")
     }
 }

@@ -147,6 +147,8 @@ enum CreditsPlans {
 
 // MARK: - The screen (pure: the live sheet and the review fixtures draw the same view)
 
+/// V18-DESIGN.md, "Credits": rows of state, two quiet doors, restore with its answer under it.
+/// The sentences that used to sit under every row are one tap away, behind ⓘ.
 struct CreditsScreen: View {
     struct Actions {
         var close: () -> Void = {}
@@ -172,60 +174,36 @@ struct CreditsScreen: View {
     var accountError: String? = nil
     var now = Date()
     var actions = Actions()
+    @State private var showsDetails = false
+    @State private var showsOtherAccount = false
 
     private var balance: CreditsBalance { CreditsBalance.make(snapshot, now: now) }
 
     var body: some View {
         let balance = self.balance
         ScrollViewReader { proxy in
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                topBar
-                Text(L.t("Your credits", "Tus créditos"))
-                    .font(.system(size: 26, weight: .light, design: .rounded)).foregroundStyle(Theme.cream)
-                    .padding(.top, 14)
-                    .accessibilityAddTraits(.isHeader)
-                Text(L.t("A credit is one read: Bobby's three agents debate your question.",
-                         "Un crédito es una lectura: los tres agentes de Bobby debaten tu pregunta."))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.top, 8)
-                    .accessibilityIdentifier("credits-intro")
-
-                label(L.t("What you have", "Lo que tienes"))
-                have(balance)
-
-                if riskAccepted {
-                    label(L.t("Get more", "Consigue más"))
-                    more(balance)
-                }
-
-                label(L.t("Already paid?", "¿Ya pagaste?"))
-                restoreBlock(balance)
-
-                if balance.manage {
-                    Button(action: actions.manage) {
-                        Text(L.t("Manage subscription", "Administrar suscripción"))
-                            .font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.warmMuted)
-                            .frame(minHeight: 44)
-                            .contentShape(Rectangle())
+            QuietSheet(title: L.t("Credits", "Créditos"), closeId: "credits-close", onClose: actions.close,
+                       onInfo: riskAccepted && balance.isKnown ? { showsDetails = true } : nil) {
+                VStack(alignment: .leading, spacing: 0) {
+                    have(balance).padding(.top, 14)
+                    if riskAccepted { doors }
+                    restoreBlock(balance)
+                    if balance.manage {
+                        QuietLink(title: L.t("Manage subscription", "Gestionar suscripción"), id: "credits-manage-subscription",
+                                  action: actions.manage)
                     }
-                    .buttonStyle(.plain)
-                    .padding(.top, 14)
-                    .accessibilityIdentifier("credits-manage-subscription")
                 }
             }
-            .padding(.horizontal, 22)
-            .padding(.top, 16)
-            .padding(.bottom, 32)
+            // The answer to a restore lands under the row: bring it into view, never below the fold.
+            .onAppear { reveal(proxy, animated: false) }
+            .onChange(of: restore) { _, _ in reveal(proxy, animated: true) }
         }
-        .scrollIndicators(.hidden)
-        // The answer to a restore lands under the row: bring it into view, never below the fold.
-        .onAppear { reveal(proxy, animated: false) }
-        .onChange(of: restore) { _, _ in reveal(proxy, animated: true) }
+        .sheet(isPresented: $showsDetails) {
+            CreditsDetails(balance: balance, snapshot: snapshot) { showsDetails = false }
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(Theme.nucleoSurface)
         }
-        .background(Theme.nucleoSurface.ignoresSafeArea())
-        .environment(\.colorScheme, .dark)
         .accessibilityIdentifier("credits")
     }
 
@@ -240,65 +218,39 @@ struct CreditsScreen: View {
         }
     }
 
-    // MARK: Frame
-
-    private var topBar: some View {
-        HStack {
-            Text(L.t("Credits", "Créditos").uppercased()).font(.mono(11, .medium)).tracking(1.6).foregroundStyle(Theme.warmDim)
-            Spacer()
-            Button(action: actions.close) {
-                // 30 pt to the eye, 44 pt to the finger (the bar keeps its 30 pt height).
-                Image(systemName: "xmark").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmMuted)
-                    .frame(width: 30, height: 30).background(Circle().fill(Theme.warmFill))
-                    .frame(width: 44, height: 44, alignment: .trailing)
-                    .contentShape(Rectangle())
-            }
-            .padding(.vertical, -7)
-            .accessibilityLabel(L.t("Close", "Cerrar"))
-            .accessibilityIdentifier("credits-close")
-        }
-        .frame(minHeight: 30)
-    }
-
-    private func label(_ text: String) -> some View {
-        Text(text.uppercased()).font(.mono(11, .medium)).tracking(1.6).foregroundStyle(Theme.warmDim)
-            .padding(.top, 28).padding(.bottom, 8)
-            .accessibilityAddTraits(.isHeader)
-    }
-
-    private func note(_ text: String) -> some View {
-        Text(text).font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .padding(.vertical, 8)
-            .overlay(alignment: .top) { CreditsHairline() }
-    }
-
     // MARK: What you have
 
     @ViewBuilder private func have(_ balance: CreditsBalance) -> some View {
         if !riskAccepted {
             VStack(alignment: .leading, spacing: 10) {
-                Text(L.t("Accept the risk notice to see your credits.", "Acepta el aviso de riesgo para ver tus créditos."))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("credits-risk-required")
+                QuietNote(text: CreditsRestoreNotice.beforeRiskNotice(), id: "credits-risk-required")
                 if let open = actions.riskNotice {
-                    CreditsPill(title: L.t("Risk notice", "Aviso de riesgo"), action: open)
-                        .accessibilityIdentifier("credits-risk-open")
+                    QuietChip(title: L.t("Risk notice", "Aviso de riesgo"), id: "credits-risk-open", action: open)
                 }
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-            .padding(.vertical, 8)
-            .overlay(alignment: .top) { CreditsHairline() }
+            .padding(.bottom, 8)
         } else if balance.isKnown {
-            let lines = balance.lines
-            ForEach(Array(lines.enumerated()), id: \.element.id) { index, line in
-                // Gifted lines that share a sentence say it once, under the last of them.
-                let repeats = line.isGift && index + 1 < lines.count && lines[index + 1].isGift && lines[index + 1].detail == line.detail
-                CreditsLineRow(line: line, showsDetail: !repeats)
+            ForEach(balance.lines.filter { !$0.isGift && $0.kind != .pro }) { line in
+                QuietRow(label: line.label, value: line.face, note: line.faceNote, spoken: line.spoken,
+                         id: "credits-line-\(line.kind.rawValue)")
+            }
+            if let gifts = balance.giftFace {
+                QuietRow(label: L.t("Gifted", "De regalo"), value: gifts, spoken: balance.giftSpoken, id: "credits-line-gifts")
+            }
+            if let pro = balance.line(.pro) {
+                // The plan's state is the row; where there is something to offer, the row is the door.
+                QuietRow(label: pro.label, value: pro.face, note: pro.faceNote, chevron: balance.pro.offersPro, spoken: pro.spoken,
+                         id: balance.pro.offersPro ? "credits-pro" : "credits-line-pro",
+                         action: balance.pro.offersPro ? actions.pro : nil)
+            } else if balance.pro.offersPro {
+                QuietRow(label: "Bobby Pro", chevron: true, id: "credits-pro", action: actions.pro)
             }
             if !snapshot.signedIn {
+                if let weekly = snapshot.freeReadsPerWeek {
+                    QuietNote(text: L.t("Free account: \(weekly) Quick reads weekly.", "Cuenta gratis: \(weekly) lecturas Rápidas semanales."),
+                              id: "credits-free-account")
+                        .padding(.top, 14)
+                }
                 signInButton(thenRestore: false)
                     .padding(.top, 12)
                     .accessibilityIdentifier("credits-apple-sign-in")
@@ -310,15 +262,11 @@ struct CreditsScreen: View {
                 .accessibilityIdentifier("credits-loading")
         } else if loadFailed {
             VStack(alignment: .leading, spacing: 10) {
-                Text(L.t("Bobby could not read your credits right now.", "Bobby no pudo leer tus créditos en este momento."))
-                    .font(.system(size: 13)).foregroundStyle(Theme.warmMuted)
-                    .fixedSize(horizontal: false, vertical: true)
-                CreditsPill(title: L.t("Try again", "Reintentar"), action: actions.reload)
-                    .accessibilityIdentifier("credits-retry")
+                QuietNote(text: L.t("Balance unavailable.", "Saldo no disponible."))
+                QuietChip(title: L.t("Try again", "Reintentar"), id: "credits-retry", action: actions.reload)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.vertical, 8)
-            .overlay(alignment: .top) { CreditsHairline() }
+            .padding(.bottom, 8)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("credits-unavailable")
         } else {
             // Nothing asked yet (the first read is about to start): keep the place, show no number.
@@ -328,64 +276,44 @@ struct CreditsScreen: View {
 
     // MARK: Get more
 
-    @ViewBuilder private func more(_ balance: CreditsBalance) -> some View {
-        CreditsActionRow(symbol: "person.2", label: L.t("Invite friends", "Invita amigos"),
-                         detail: CreditsBalance.inviteDetail(snapshot), action: actions.invite)
-            .accessibilityIdentifier("credits-invite")
-        CreditsActionRow(symbol: "gift", label: CouponCopy.text("title"),
-                         detail: L.t("Got a code from Bobby? Your reads are added to your account at once.",
-                                     "¿Tienes un código de Bobby? Tus lecturas se agregan a tu cuenta al instante."),
-                         action: actions.coupon)
-            .accessibilityIdentifier("credits-coupon")
-        // An account on Bobby Pro has nothing to be offered, whether or not the reason has reached the
-        // app yet; gifted days can still become a plan.
-        if balance.pro.offersPro {
-            CreditsActionRow(symbol: "infinity", label: "Bobby Pro", detail: BobbyStore.Copy.benefits, action: actions.pro)
-                .accessibilityIdentifier("credits-pro")
+    private var doors: some View {
+        HStack(spacing: 26) {
+            QuietLink(title: L.t("Invite", "Invitar"), systemImage: "person.2", id: "credits-invite", action: actions.invite)
+            QuietLink(title: L.t("Code", "Código"), systemImage: "gift", id: "credits-coupon", action: actions.coupon)
         }
+        .padding(.top, 10)
     }
 
-    // MARK: Already paid?
+    // MARK: Restore
 
     @ViewBuilder private func restoreBlock(_ balance: CreditsBalance) -> some View {
-        CreditsActionRow(symbol: "arrow.clockwise", label: L.t("Restore Purchases", "Restaurar compras"),
-                         detail: L.t("Use this if you paid for Bobby Pro with your Apple Account on another iPhone or after reinstalling. Codes and gifts never need restoring.",
-                                     "Úsalo si pagaste Bobby Pro con tu cuenta de Apple en otro iPhone o después de reinstalar. Los códigos y regalos nunca necesitan restaurarse."),
-                         trailing: restore == .running ? .working(L.t("Restoring…", "Restaurando…")) : .none,
-                         action: actions.restore)
-            .disabled(restore == .running || !riskAccepted)
-            .accessibilityIdentifier("account-restore")
-        if !riskAccepted {
-            // The reason is on the screen from the start, not behind a tap (the store starts after the notice).
-            Text(CreditsRestoreNotice.beforeRiskNotice())
-                .font(.system(size: 13)).foregroundStyle(Theme.cream)
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 44).padding(.top, 2).padding(.bottom, 8)
-                .accessibilityIdentifier("credits-restore-risk")
-        } else if let notice = restoreNotice(balance) {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(notice.text).font(.system(size: 13)).foregroundStyle(Theme.cream)
-                    .fixedSize(horizontal: false, vertical: true)
+        HStack(spacing: 8) {
+            QuietLink(title: restore == .running ? L.t("Checking…", "Comprobando…") : L.t("Restore Purchases", "Restaurar compras"),
+                      systemImage: "arrow.clockwise", id: "account-restore", action: actions.restore)
+                .disabled(restore == .running || !riskAccepted)
+            if restore == .running { ProgressView().controlSize(.small).tint(Theme.warmMuted) }
+        }
+        if let notice = restoreNotice(balance) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(notice.text).quietFont(14, relativeTo: .callout).foregroundStyle(Theme.cream).quietWraps()
                     .accessibilityIdentifier("credits-restore-text")
+                if let more = notice.more {
+                    QuietLink(title: more.title, id: "credits-restore-more") {
+                        withAnimation(.easeOut(duration: 0.2)) { showsOtherAccount.toggle() }
+                    }
+                    if showsOtherAccount { QuietNote(text: more.text, id: "credits-restore-more-text") }
+                }
                 switch notice.action {
                 case .signIn:
                     signInButton(thenRestore: true).accessibilityIdentifier("credits-restore-sign-in")
                     if let accountError { errorLine(accountError) }
                 case .tryAgain:
-                    CreditsPill(title: L.t("Try again", "Reintentar"), action: actions.restore)
-                        .accessibilityIdentifier("credits-restore-retry")
-                case .seePro:
-                    CreditsPill(title: L.t("See Bobby Pro", "Ver Bobby Pro"), action: actions.pro)
-                        .accessibilityIdentifier("credits-restore-pro")
+                    QuietChip(title: L.t("Try again", "Reintentar"), id: "credits-restore-retry", action: actions.restore)
                 case nil:
                     EmptyView()
                 }
             }
-            .padding(14)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(Theme.nucleoGlass))
-            .padding(.top, 4)
+            .padding(.bottom, 6)
             .id(Self.noticeID)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier(Self.noticeID)
@@ -406,155 +334,39 @@ struct CreditsScreen: View {
     // MARK: Sign in
 
     private func signInButton(thenRestore: Bool) -> some View {
-        SignInWithAppleButton(.signIn) { request in
+        SignInWithAppleButton(.continue) { request in
             actions.prepareApple(request)
         } onCompletion: { result in
             actions.completeApple(result, thenRestore)
         }
         .signInWithAppleButtonStyle(.white)
-        .frame(height: 48)
+        .frame(height: 50)
         .clipShape(Capsule())
     }
 
     private func errorLine(_ text: String) -> some View {
-        Text(text).font(.footnote).foregroundStyle(Theme.cream)
-            .fixedSize(horizontal: false, vertical: true)
-            .padding(.top, 8)
-            .accessibilityIdentifier("credits-error")
+        QuietNote(text: text, id: "credits-error").padding(.top, 8)
     }
 }
 
-// MARK: - Row kit (the profile's `n-row`, with a value column)
+// MARK: - Details (ⓘ): the sentences that used to sit under every row
 
-private struct CreditsHairline: View {
-    var body: some View { Rectangle().fill(Theme.warmHair).frame(height: 1) }
-}
-
-/// One balance: its name, what is left, and when that changes. Not a control.
-private struct CreditsLineRow: View {
-    let line: CreditsBalance.Line
-    let showsDetail: Bool
+struct CreditsDetails: View {
+    let balance: CreditsBalance
+    let snapshot: CreditsSnapshot
+    let onClose: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 3) {
-            // Side by side when it fits; the value drops under its name in a long language.
-            ViewThatFits(in: .horizontal) {
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    title.lineLimit(1)
-                    Spacer(minLength: 8)
-                    value.lineLimit(1)
-                }
-                VStack(alignment: .leading, spacing: 2) {
-                    title
-                    value
-                }
+        QuietSheet(title: L.t("Details", "Detalles"), closeId: "credits-details-close", onClose: onClose) {
+            VStack(alignment: .leading, spacing: 12) {
+                QuietNote(text: L.t("1 credit = 1 read", "1 crédito = 1 lectura"))
+                ForEach(balance.lines) { line in QuietNote(text: line.spoken) }
+                QuietNote(text: CreditsBalance.inviteDetail(snapshot))
+                QuietNote(text: L.t("Use this if you paid for Bobby Pro with your Apple Account on another iPhone or after reinstalling. Codes and gifts never need restoring.",
+                                    "Úsalo si pagaste Bobby Pro con tu cuenta de Apple en otro iPhone o después de reinstalar. Los códigos y regalos nunca necesitan restaurarse."))
             }
-            if showsDetail, let detail = line.detail {
-                Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            .padding(.top, 16)
         }
-        // Not a control: a reading line, kept compact so the whole balance fits on one screen.
-        .frame(maxWidth: .infinity, minHeight: 34, alignment: .leading)
-        .padding(.vertical, 8)
-        .overlay(alignment: .top) { CreditsHairline() }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(line.spoken)
-        .accessibilityIdentifier("credits-line-\(line.kind.rawValue)")
-    }
-
-    private var title: some View {
-        Text(line.title).font(.system(size: 15)).foregroundStyle(Theme.warmMuted)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-
-    private var value: some View {
-        Text(line.value).font(.system(size: 15, weight: .medium, design: .rounded)).monospacedDigit().foregroundStyle(Theme.cream)
-            .fixedSize(horizontal: false, vertical: true)
-    }
-}
-
-/// A way to get more (or to restore): icon well, label, one sentence, and where the tap leads.
-private struct CreditsActionRow: View {
-    enum Trailing: Equatable {
-        case chevron
-        case none
-        /// A spinner, read aloud as this.
-        case working(String)
-    }
-
-    let symbol: String
-    let label: String
-    let detail: String
-    var trailing: Trailing = .chevron
-    let action: () -> Void
-
-    var body: some View {
-        Button {
-            UIImpactFeedbackGenerator(style: .light).impactOccurred()
-            action()
-        } label: {
-            HStack(alignment: .top, spacing: 12) {
-                Image(systemName: symbol)
-                    .font(.system(size: 14, weight: .medium)).foregroundStyle(Theme.warmMuted)
-                    .frame(width: 32, height: 32).background(Theme.warmFill)
-                    .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(label).font(.system(size: 15)).foregroundStyle(Theme.cream)
-                        .fixedSize(horizontal: false, vertical: true)
-                    Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim)
-                        .multilineTextAlignment(.leading)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-                switch trailing {
-                case .chevron:
-                    Image(systemName: "chevron.right").font(.system(size: 12, weight: .semibold)).foregroundStyle(Theme.warmDim)
-                        .frame(height: 32)
-                case .working:
-                    ProgressView().controlSize(.small).tint(Theme.warmMuted).frame(height: 32)
-                case .none:
-                    EmptyView()
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
-            .padding(.vertical, 8)
-            .overlay(alignment: .top) { CreditsHairline() }
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(CreditsRowButtonStyle())
-        // The button stays the element (its tap is VoiceOver's activation): name, state, then the sentence.
-        .accessibilityLabel(label)
-        .accessibilityValue(working ?? "")
-        .accessibilityHint(detail)
-    }
-
-    private var working: String? {
-        if case let .working(text) = trailing { return text }
-        return nil
-    }
-}
-
-private struct CreditsRowButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label.background(Theme.cream.opacity(configuration.isPressed ? 0.04 : 0))
-    }
-}
-
-/// A capsule button: 34 pt to the eye, 44 pt to the finger.
-private struct CreditsPill: View {
-    let title: String
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Text(title).font(.system(size: 13, weight: .medium)).foregroundStyle(Theme.cream)
-                .padding(.horizontal, 14).frame(minHeight: 34)
-                .background(Capsule().fill(Theme.warmFill))
-                .overlay(Capsule().stroke(Theme.nucleoStroke, lineWidth: 1))
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+        .accessibilityIdentifier("credits-details")
     }
 }

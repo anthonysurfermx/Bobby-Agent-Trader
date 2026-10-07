@@ -73,6 +73,24 @@ extension NativeTranslations18 {
         // The detail lines of the profile rows for the theses and reminders tracks
         result["What you are looking at, and why"] = ["fr": "Ce que tu regardes, et pourquoi", "pt": "O que estás a ver, e porquê", "it": "Cosa stai guardando, e perché", "de": "Was du dir ansiehst und warum"]
         result["Review reminders you set"] = ["fr": "Les rappels de révision que tu as créés", "pt": "Lembretes de revisão que definiste", "it": "Promemoria di revisione che hai impostato", "de": "Erinnerungen zur Überprüfung, die du gesetzt hast"]
+        result["Unlimited · fair use"] = ["fr": "Illimitées · usage raisonnable", "pt": "Ilimitadas · uso justo", "it": "Illimitate · uso corretto", "de": "Unbegrenzt · faire Nutzung"]
+        result["Gifted"] = ["fr": "Offertes", "pt": "De oferta", "it": "In regalo", "de": "Geschenkt"]
+        result["Free account: {0} Quick reads weekly."] = ["fr": "Compte gratuit : {0} analyses Rapides par semaine.", "pt": "Conta grátis: {0} análises Rápidas por semana.", "it": "Account gratuito: {0} analisi Rapide a settimana.", "de": "Kostenloses Konto: {0} Schnelle Analysen pro Woche."]
+        result["Balance unavailable."] = ["fr": "Solde indisponible.", "pt": "Saldo indisponível.", "it": "Saldo non disponibile.", "de": "Guthaben nicht verfügbar."]
+        result["Invite"] = ["fr": "Inviter", "pt": "Convidar", "it": "Invita", "de": "Einladen"]
+        result["Code"] = ["fr": "Code", "pt": "Código", "it": "Codice", "de": "Code"]
+        result["Checking…"] = ["fr": "Vérification…", "pt": "A verificar…", "it": "Verifica…", "de": "Wird geprüft…"]
+        result["1 credit = 1 read"] = ["fr": "1 crédit = 1 analyse", "pt": "1 crédito = 1 análise", "it": "1 credito = 1 analisi", "de": "1 Credit = 1 Analyse"]
+        result["Accept the risk notice first."] = ["fr": "Accepte d'abord l'avis de risque.", "pt": "Aceita primeiro o aviso de risco.", "it": "Accetta prima l'avviso sui rischi.", "de": "Akzeptiere zuerst den Risikohinweis."]
+        result["Sign in to restore."] = ["fr": "Connecte-toi pour restaurer.", "pt": "Inicia sessão para restaurar.", "it": "Accedi per ripristinare.", "de": "Melde dich an, um wiederherzustellen."]
+        result["Restored. Bobby Pro is active."] = ["fr": "Restauré. Bobby Pro est actif.", "pt": "Restaurado. O Bobby Pro está ativo.", "it": "Ripristinato. Bobby Pro è attivo.", "de": "Wiederhergestellt. Bobby Pro ist aktiv."]
+        result["Awaiting App Store confirmation."] = ["fr": "En attente de confirmation de l'App Store.", "pt": "A aguardar confirmação da App Store.", "it": "In attesa di conferma dell'App Store.", "de": "Bestätigung des App Store steht aus."]
+        result["Restore cancelled."] = ["fr": "Restauration annulée.", "pt": "Restauro cancelado.", "it": "Ripristino annullato.", "de": "Wiederherstellung abgebrochen."]
+        result["Bobby Pro remains active. No additional App Store purchase found."] = ["fr": "Bobby Pro reste actif. Aucun autre achat App Store trouvé.", "pt": "O Bobby Pro continua ativo. Sem outra compra da App Store.", "it": "Bobby Pro resta attivo. Nessun altro acquisto App Store trovato.", "de": "Bobby Pro bleibt aktiv. Kein weiterer App-Store-Kauf gefunden."]
+        result["No Bobby Pro purchase on this Apple Account."] = ["fr": "Aucun achat Bobby Pro sur ce compte Apple.", "pt": "Sem compra do Bobby Pro nesta conta Apple.", "it": "Nessun acquisto Bobby Pro su questo account Apple.", "de": "Kein Bobby-Pro-Kauf in diesem Apple-Account."]
+        result["Used another Apple Account?"] = ["fr": "Tu as utilisé un autre compte Apple ?", "pt": "Usaste outra conta Apple?", "it": "Hai usato un altro account Apple?", "de": "Anderen Apple-Account genutzt?"]
+        result["Use that Apple Account on this iPhone; retry."] = ["fr": "Utilise ce compte Apple sur cet iPhone, puis réessaie.", "pt": "Usa essa conta Apple neste iPhone e tenta outra vez.", "it": "Usa quell'account Apple su questo iPhone e riprova.", "de": "Nutze diesen Apple-Account auf diesem iPhone und versuch es erneut."]
+        result["Active until {0}"] = ["fr": "Actif jusqu'au {0}", "pt": "Ativo até {0}", "it": "Attivo fino al {0}", "de": "Aktiv bis {0}"]
         return result
     }()
 }

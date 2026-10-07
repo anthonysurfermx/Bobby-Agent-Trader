@@ -59,8 +59,6 @@ extension NativeTranslations18 {
         result["Edit"] = ["fr": "Modifier", "pt": "Editar", "it": "Modifica", "de": "Bearbeiten"]
         result["Edit {0}"] = ["fr": "Modifier {0}", "pt": "Editar {0}", "it": "Modifica {0}", "de": "{0} bearbeiten"]
         result["Archived"] = ["fr": "Archivées", "pt": "Arquivadas", "it": "Archiviate", "de": "Archiviert"]
-        result["Expanded"] = ["fr": "Déplié", "pt": "Expandido", "it": "Espanso", "de": "Ausgeklappt"]
-        result["Collapsed"] = ["fr": "Replié", "pt": "Recolhido", "it": "Compresso", "de": "Eingeklappt"]
         result["Reopen"] = ["fr": "Rouvrir", "pt": "Reabrir", "it": "Riapri", "de": "Wieder öffnen"]
         result["Reopen {0}"] = ["fr": "Rouvrir {0}", "pt": "Reabrir {0}", "it": "Riapri {0}", "de": "{0} wieder öffnen"]
         result["Delete"] = ["fr": "Supprimer", "pt": "Eliminar", "it": "Elimina", "de": "Löschen"]
