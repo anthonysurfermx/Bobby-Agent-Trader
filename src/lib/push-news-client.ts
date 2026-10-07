@@ -44,7 +44,7 @@ async function request(op: string, method: 'GET' | 'POST', params?: URLSearchPar
   }
   const data = await response.json().catch(() => null) as Record<string, unknown> | null;
   if (!response.ok) {
-    const code = typeof data?.error === 'string' ? data.error : '';
+    const code = typeof data?.code === 'string' ? data.code : typeof data?.error === 'string' ? data.error : '';
     throw new Error(ERRORS[code] ?? (response.status === 401 ? 'Inicia sesión de nuevo.' : response.status === 503
       ? 'El servicio de notificaciones todavía no está disponible para enviar.' : 'No se pudo completar la operación de notificaciones.'));
   }

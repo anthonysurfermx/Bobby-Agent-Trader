@@ -10,6 +10,7 @@ import * as briefDb from '../api/_lib/briefings/db.js';
 import * as newsDb from '../api/_lib/push-news/db.js';
 import { LANGUAGE_CAMPAIGN_ID, NEWS_LANGUAGES, type NewsFilters } from '../api/_lib/push-news/config.js';
 import { campaignCohortId, campaignDigest } from '../api/_lib/push-news/worker.js';
+import { APP_LOCALES, appLanguage, appLocale } from '../src/lib/app-language.js';
 import { assertLocalUrl, bootstrapBriefingsDb, makeIdentity, pgRpcTransport } from './briefings-pg-harness.mjs';
 
 const url = process.env.DATABASE_URL;
@@ -21,6 +22,7 @@ if (!url) {
 assertLocalUrl(url);
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const migration = join(root, 'supabase/bobby-protocol/supabase/migrations/20261007171622_ios_news_push.sql');
+const localeMigration = join(root, 'supabase/bobby-protocol/supabase/migrations/20261007172958_ios_news_push_locale.sql');
 const pool: pg.Pool = await bootstrapBriefingsDb(url);
 const q = async (sql: string, args: unknown[] = []) => (await pool.query(sql, args)).rows;
 const one = async (sql: string, args: unknown[] = []) => (await q(sql, args))[0];
@@ -65,9 +67,26 @@ async function applyMigration() {
     alter default privileges in schema public grant all on functions to anon, authenticated;
     alter default privileges in schema public grant all on sequences to anon, authenticated;`);
   try {
+    // Recreate the prior feature shape only in this disposable localhost database, so the forward migration's
+    // backfill is exercised on every run. The already-deployed original SQL file stays immutable.
+    await q('alter table if exists public.bobby_news_settings drop column if exists locale');
     await pool.query(readFileSync(migration, 'utf8'));
     await pool.query(readFileSync(migration, 'utf8'));
-    checks += 2;
+    const legacyRows: Array<{ identity: string; language: string; locale: string }> = [];
+    for (const legacy of [{ language: 'en', locale: 'en-US' }, { language: 'es', locale: 'es-MX' }, { language: 'pt', locale: 'pt-PT' }, { language: 'pt-BR', locale: 'pt-BR' }]) {
+      const identity = await makeIdentity(pool);
+      await q(`insert into bobby_news_settings(identity_id,revision,news_enabled,language,consent_version,consent_at)
+        values($1,7,true,$2,1,'2026-10-01T12:00:00Z')`, [identity, legacy.language]);
+      legacyRows.push({ identity, ...legacy });
+    }
+    eq((await one("select count(*)::int as n from information_schema.columns where table_schema='public' and table_name='bobby_news_settings' and column_name='locale'")).n, 0, 'forward upgrade fixtures start before locale exists');
+    await pool.query(readFileSync(localeMigration, 'utf8'));
+    await pool.query(readFileSync(localeMigration, 'utf8'));
+    for (const legacy of legacyRows) {
+      const upgraded = await one('select revision,language,locale,consent_at from bobby_news_settings where identity_id=$1', [legacy.identity]);
+      eq([upgraded.revision, upgraded.language, upgraded.locale, upgraded.consent_at.toISOString()], [7, legacy.language, legacy.locale, '2026-10-01T12:00:00.000Z'], `${legacy.language} backfills canonical locale without changing revision or consent timestamp`);
+    }
+    checks += 4;
   } finally {
     await q(`alter default privileges in schema public revoke all on tables from anon, authenticated;
       alter default privileges in schema public revoke all on functions from anon, authenticated;
@@ -118,7 +137,7 @@ try {
     } finally { await second.query('rollback'); second.release(); }
   }
 
-  const defaults = { revision: 0, newsEnabled: false, language: 'en', consentVersion: null };
+  const defaults = { revision: 0, newsEnabled: false, language: 'en', locale: 'en-US', consentVersion: null };
   const id = await makeIdentity(pool);
   eq(await newsDb.getSettings(id), defaults, 'new free account starts with product news off');
   eq(await newsDb.patchSettings(id, 99, { language: 'de' }, null), { ok: false, revision: 0 }, 'settings compare-and-swap rejects a stale revision');
@@ -129,17 +148,19 @@ try {
     { newsEnabled: null }, { newsEnabled: 'true' }, { newsEnabled: 1 },
     { consentVersion: 1 }, { newsEnabled: false, consentVersion: 1 },
     { language: null }, { language: 'ja' }, { language: 7 }, { country: 'DE' }, { identityId: randomUUID() },
+    { locale: null }, { locale: 'es-ES' }, { language: 'en', locale: null }, { language: 'en', locale: 'es-ES' },
+    { language: 'en', locale: 'en-NZ' }, { language: 'pt-BR', locale: 'pt-PT' }, { language: 'pt', locale: 'pt-BR' },
   ]) await rejects(newsDb.patchSettings(id, 0, patch, null), `direct RPC rejects invalid settings ${JSON.stringify(patch)}`);
   eq(await newsDb.getSettings(id), defaults, 'rejected consent payloads leave defaults intact');
   await rejects(newsDb.patchSettings(id, 0, { language: 'de' }, 'Germany'), 'country must be an observed ISO code');
   const enabled = await newsDb.patchSettings(id, 0, { newsEnabled: true, consentVersion: 1, language: 'de' }, 'DE');
-  eq(enabled, { ok: true, settings: { revision: 1, newsEnabled: true, language: 'de', consentVersion: 1 } }, 'free account accepts current explicit consent');
+  eq(enabled, { ok: true, settings: { revision: 1, newsEnabled: true, language: 'de', locale: 'de-DE', consentVersion: 1 } }, 'free account accepts current explicit consent');
   await rejects(q('update bobby_news_settings set consent_version=null where identity_id=$1', [id]), 'table constraints reject enabled news with NULL consent version');
   const country = await one('select country, country_source, country_observed_at, consent_at from bobby_news_settings where identity_id=$1', [id]);
   eq([country.country, country.country_source], ['DE', 'vercel-ip'], 'observed country retains its provenance');
   ok(country.country_observed_at && country.consent_at, 'consent and country have timestamps');
   await newsDb.patchSettings(id, 1, { newsEnabled: false }, null);
-  eq(await newsDb.getSettings(id), { revision: 2, newsEnabled: false, language: 'de', consentVersion: null }, 'withdrawal clears current consent version');
+  eq(await newsDb.getSettings(id), { revision: 2, newsEnabled: false, language: 'de', locale: 'de-DE', consentVersion: null }, 'withdrawal clears current consent version');
   ok((await one('select withdrawn_at from bobby_news_settings where identity_id=$1', [id])).withdrawn_at, 'withdrawal is timestamped');
   const concurrent = await makeIdentity(pool);
   const saves = await Promise.all(Array.from({ length: 12 }, () => newsDb.patchSettings(concurrent, 0, { language: 'fr' }, 'FR')));
@@ -149,7 +170,7 @@ try {
   const allFilters = (identityId: string | null = null): NewsFilters => ({ languages: [...NEWS_LANGUAGES], countries: [], minAppBuild: 66, identityId });
   async function subscribe(language = 'de', country: string | null = 'DE') {
     const identity = await makeIdentity(pool);
-    const saved = await newsDb.patchSettings(identity, 0, { newsEnabled: true, consentVersion: 1, language }, country);
+    const saved = await newsDb.patchSettings(identity, 0, { newsEnabled: true, consentVersion: 1, language, locale: appLocale(appLanguage(language), language) }, country);
     assert.ok(saved.ok);
     return identity;
   }
@@ -178,6 +199,30 @@ try {
     return { ...setup, row: row as newsDb.NewsClaim };
   }
   const delivery = (deliveryId: string) => one('select * from bobby_news_deliveries where id=$1', [deliveryId]);
+
+  // Native foreground synchronization repeats the complete chosen locale. It must preserve exact wording,
+  // the original consent timestamp and the frozen delivery revision when nothing effectively changed.
+  for (const locale of APP_LOCALES) {
+    const regional = { language: locale === 'pt-BR' ? 'pt-BR' : appLanguage(locale), locale, country: locale.split('-')[1] };
+    const account = await makeIdentity(pool);
+    const selectedPatch = { newsEnabled: true, consentVersion: 1, language: regional.language, locale: regional.locale };
+    const saved = await newsDb.patchSettings(account, 0, selectedPatch, regional.country);
+    eq(saved, { ok: true, settings: { revision: 1, newsEnabled: true, language: regional.language, locale: regional.locale, consentVersion: 1 } }, `${regional.locale} persists exactly through PATCH`);
+    eq((await newsDb.getSettings(account)).locale, regional.locale, `${regional.locale} round trips through GET`);
+    await device(account);
+    const prepared = await campaign(account);
+    const consentBefore = (await one('select consent_at from bobby_news_settings where identity_id=$1', [account])).consent_at;
+    const noop = await newsDb.patchSettings(account, 1, selectedPatch, regional.country);
+    eq((noop as { settings: newsDb.NewsSettings }).settings.revision, 1, `${regional.locale} repeated accepted-consent synchronization does not increment revision`);
+    eq((await one('select consent_at from bobby_news_settings where identity_id=$1', [account])).consent_at, consentBefore, `${regional.locale} no-op preserves original consent timestamp`);
+    const metadataOnly = await newsDb.patchSettings(account, 1, { language: regional.language, locale: regional.locale }, 'DE');
+    eq((metadataOnly as { settings: newsDb.NewsSettings }).settings.revision, 1, `${regional.locale} observed-country metadata update does not invalidate settings revision`);
+    eq((await one('select country from bobby_news_settings where identity_id=$1', [account])).country, 'DE', `${regional.locale} country metadata still refreshes`);
+    eq((await newsDb.audience(prepared.selected, prepared.campaignId)).eligible, 1, `${regional.locale} no-op preserves the pending recipient preview`);
+    const row = await newsDb.claim(prepared.campaignId) as newsDb.NewsClaim;
+    ok((await newsDb.authorize(row.id, row.fence)).ok, `${regional.locale} repeated foreground synchronization leaves prepared delivery authorized`);
+    await newsDb.result(row.id, row.fence, 'accepted', 200, null);
+  }
 
   // OS permission, subscriptions and briefing preferences are separate from product-news consent.
   const noOptIn = await makeIdentity(pool);
@@ -233,9 +278,9 @@ try {
   await newsDb.result(reserved.id, reserved.fence, 'accepted', 200, null);
   eq(await newsDb.claim(frozen.campaignId), { state: 'empty' }, 'accepted delivery is never resent');
   eq(await newsDb.result(reserved.id, reserved.fence, 'retry', 500, 'late'), { ok: false }, 'late result cannot reopen accepted delivery');
-  const changedPreviewAccount = await subscribe(); await device(changedPreviewAccount);
+  const changedPreviewAccount = await subscribe('en', 'GB'); await device(changedPreviewAccount);
   const changedPreview = await campaign(changedPreviewAccount);
-  await newsDb.patchSettings(changedPreviewAccount, 1, { language: 'de' }, null);
+  await newsDb.patchSettings(changedPreviewAccount, 1, { language: 'en', locale: 'en-GB' }, null);
   eq((await newsDb.audience(changedPreview.selected)).eligible, 1, 'raw eligible count may remain after a settings revision changes');
   eq((await newsDb.audience(changedPreview.selected, changedPreview.campaignId)).eligible, 0, 'frozen preview excludes stale settings revision before claim');
   const reboundPreviewAccount = await subscribe(); const previewBinding = await device(reboundPreviewAccount);
@@ -252,7 +297,10 @@ try {
     const row = await newsDb.claim(setup.campaignId) as newsDb.NewsClaim;
     if (mutation === 'withdraw') await newsDb.patchSettings(account, 1, { newsEnabled: false }, null);
     if (mutation === 'language') await newsDb.patchSettings(account, 1, { language: 'fr' }, null);
-    if (mutation === 'revision') await newsDb.patchSettings(account, 1, { language: 'de' }, null);
+    if (mutation === 'revision') {
+      await newsDb.patchSettings(account, 1, { language: 'fr' }, null);
+      await newsDb.patchSettings(account, 2, { language: 'de' }, null);
+    }
     if (mutation === 'country') await q("update bobby_news_settings set country='FR' where identity_id=$1", [account]);
     if (mutation === 'permission') await q("update bobby_push_devices set permission='denied' where id=$1", [binding.id]);
     if (mutation === 'build') await q('update bobby_push_devices set app_build=65 where id=$1', [binding.id]);

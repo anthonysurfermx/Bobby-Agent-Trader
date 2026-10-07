@@ -13,14 +13,18 @@ const LANGUAGES: Array<{ id: NewsLanguage; label: string }> = [
 ];
 const COUNTRIES = [['DE', 'Alemania'], ['FR', 'Francia'], ['IT', 'Italia'], ['PT', 'Portugal'], ['BR', 'Brasil'], ['ES', 'España']];
 const inputClass = 'h-9 w-full rounded-lg border border-white/[0.08] bg-[#0F0F10] px-3 text-[13px] text-[#EDEDED] [color-scheme:dark]';
+const testIds = new Map<string, string>();
 
 function testIdentifier(identityId: string, fresh = false): string {
   const key = `bobby:news-push-test:${identityId}`;
+  let previous = testIds.get(identityId);
   try {
-    const previous = sessionStorage.getItem(key);
-    if (!fresh && previous) return previous;
-    const next = crypto.randomUUID(); sessionStorage.setItem(key, next); return next;
-  } catch { return crypto.randomUUID(); }
+    previous ??= sessionStorage.getItem(key) ?? undefined;
+  } catch { /* Keep the in-memory identifier when browser storage is unavailable. */ }
+  if (!fresh && previous) { testIds.set(identityId, previous); return previous; }
+  const next = crypto.randomUUID(); testIds.set(identityId, next);
+  try { sessionStorage.setItem(key, next); } catch { /* In-memory retries still use the same test. */ }
+  return next;
 }
 
 export default function NewsPushTab({ me, refreshKey }: { me: AdminMe; refreshKey: number }) {
@@ -38,7 +42,7 @@ export default function NewsPushTab({ me, refreshKey }: { me: AdminMe; refreshKe
   useEffect(() => { setConfirm(false); setMessage(null); setSendError(null); }, [filters]);
   const data = preview.data;
   const configured = !!data && data.config.enabled && data.config.apnsConfigured && data.config.tokenKeyConfigured;
-  const ready = configured && !preview.loading && !preview.error && languages.length > 0;
+  const ready = configured && !preview.loading && !preview.stale && !preview.error && languages.length > 0;
   const eligible = data?.eligible;
   const pending = data?.delivery.pending ?? 0;
   const canDispatch = ready && ((eligible ?? 0) > 0 || pending > 0);

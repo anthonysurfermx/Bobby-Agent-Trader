@@ -66,7 +66,7 @@ function observedCountry(req: VercelRequest): string | null {
 }
 function settingsBody(settings: db.NewsSettings, d: PushNewsDeps) {
   const cfg = d.configuration();
-  return { ...settings, language: appLanguage(settings.language), locale: appLocale(appLanguage(settings.language), settings.language),
+  return { ...settings, language: appLanguage(settings.language),
     options: { consentVersion: NEWS_CONSENT_VERSION }, deliveryAvailable: cfg.enabled && cfg.apnsConfigured && cfg.tokenKeyConfigured };
 }
 async function preview(campaignId: string, selected: NewsFilters, d: PushNewsDeps) {
@@ -109,7 +109,10 @@ export function createPushNewsHandler(over: Partial<PushNewsDeps> = {}) {
         const patch: Record<string, unknown> = {};
         if (body.newsEnabled !== undefined) patch.newsEnabled = body.newsEnabled;
         if (body.newsEnabled === true) patch.consentVersion = NEWS_CONSENT_VERSION;
-        if (body.language) patch.language = body.language === 'pt' && appLocale('pt', body.locale) === 'pt-BR' ? 'pt-BR' : body.language;
+        if (body.language) {
+          patch.locale = appLocale(body.language, body.locale);
+          patch.language = body.language === 'pt' && patch.locale === 'pt-BR' ? 'pt-BR' : body.language;
+        }
         const saved = await d.patchSettings(account.id, expected, patch, observedCountry(req));
         if (!saved.ok) fail(409, 'revision_conflict', { revision: (saved as { revision: number }).revision });
         const settings = (saved as { settings: db.NewsSettings }).settings;

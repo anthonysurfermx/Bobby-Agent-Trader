@@ -1,6 +1,7 @@
 import { postgrestRpc, BriefingStorageError, type RpcFn } from '../briefings/db.js';
 import type { BriefLanguage, DeviceEnvironment } from '../briefings/types.js';
 import { NEWS_LANGUAGES, type NewsFilters } from './config.js';
+import { appLanguage, isAppLocale, type AppLocale } from '../../../src/lib/app-language.js';
 
 let transport: RpcFn = postgrestRpc;
 export function setPushNewsRpc(fn: RpcFn | null): void { transport = fn ?? postgrestRpc; }
@@ -15,13 +16,14 @@ const integer = (v: unknown) => Number.isSafeInteger(v) && (v as number) >= 0;
 const invalid = (name: string): never => { throw new BriefingStorageError(name, 200); };
 function settings(value: NewsSettings, name: string): NewsSettings {
   if (!integer(value.revision) || typeof value.newsEnabled !== 'boolean' || !NEWS_LANGUAGES.includes(value.language)
+    || !isAppLocale(value.locale, appLanguage(value.language)) || (value.language === 'pt-BR') !== (value.locale === 'pt-BR')
     || (value.consentVersion !== null && value.consentVersion !== 1) || (value.newsEnabled && value.consentVersion !== 1)) invalid(name);
   return value;
 }
 const filterArgs = (f: NewsFilters) => ({ p_languages: f.languages, p_countries: f.countries, p_min_build: f.minAppBuild, p_identity: f.identityId });
 
 export interface NewsSettings {
-  revision: number; newsEnabled: boolean; language: BriefLanguage; consentVersion: number | null;
+  revision: number; newsEnabled: boolean; language: BriefLanguage; locale: AppLocale; consentVersion: number | null;
 }
 export const getSettings = async (identityId: string) => settings(await rpc<NewsSettings>('bobby_news_settings_get', { p_identity: identityId }), 'bobby_news_settings_get');
 export const patchSettings = async (identityId: string, revision: number, patch: Record<string, unknown>, country: string | null) => {

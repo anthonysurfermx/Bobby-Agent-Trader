@@ -12,7 +12,7 @@ Tests target one selected account, using a persistent UUID. Retrying the same UU
 
 ## Activation and verification
 
-Apply `supabase/bobby-protocol/supabase/migrations/20261007171622_ios_news_push.sql` before deploying the API from main. New tables and RPCs are available only to `service_role`; client identity comes from verified Apple/Google authentication. Settings updates use revision checks and explicit consent version 1.
+Apply `supabase/bobby-protocol/supabase/migrations/20261007171622_ios_news_push.sql`, then `20261007172958_ios_news_push_locale.sql`, before deploying the API from main. New tables and RPCs are available only to `service_role`; client identity comes from verified Apple/Google authentication. Settings updates use revision checks and explicit consent version 1. The exact regional locale is retained, and repeating an unchanged preference preserves its revision and consent timestamp.
 
 Production needs `BOBBY_APNS_KEY_ID`, `BOBBY_APNS_TEAM_ID`, `BOBBY_APNS_PRIVATE_KEY` and `BOBBY_PUSH_TOKEN_KEY` (base64-encoded 32-byte encryption key). Keep private values in the platform's secret storage, never in source or logs. The APNs topic defaults to `xyz.bobbyprotocol.bobby`; allowed environments default to production. Use a dedicated Apple Push credential restricted to Bobby's topic and production environment.
 

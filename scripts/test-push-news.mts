@@ -7,6 +7,7 @@ import { BriefingStorageError } from '../api/_lib/briefings/db.js';
 import { createPushNewsHandler, type PushNewsDeps } from '../api/push-news.js';
 import { campaignCohortId, campaignDigest, runNewsCampaign, type NewsWorkerDeps } from '../api/_lib/push-news/worker.js';
 import { encryptToken } from '../api/_lib/briefings/push-crypto.js';
+import { APP_LOCALES, appLanguage } from '../src/lib/app-language.js';
 
 let checks = 0;
 const eq = (got: unknown, want: unknown, label: string) => { assert.deepEqual(got, want, label); checks++; };
@@ -70,13 +71,13 @@ try {
   const rpcCalls: Array<{ name: string; body: Record<string, unknown> }> = [];
   const A = randomUUID(), actor = randomUUID();
   const filters = { languages: ['de' as const], countries: ['DE'], minAppBuild: NEWS_MIN_BUILD, identityId: null };
-  let returned: unknown = { revision: 0, newsEnabled: false, language: 'en', consentVersion: null };
+  let returned: unknown = { revision: 0, newsEnabled: false, language: 'en', locale: 'en-US', consentVersion: null };
   db.setPushNewsRpc(async (name, body) => { rpcCalls.push({ name, body }); return returned; });
   eq(await db.getSettings(A), returned, 'default-off settings returned intact');
   eq(rpcCalls.at(-1), { name: 'bobby_news_settings_get', body: { p_identity: A } }, 'settings bound to authenticated identity');
-  returned = { ok: true, settings: { revision: 1, newsEnabled: true, language: 'de', consentVersion: 1 } };
-  await db.patchSettings(A, 0, { newsEnabled: true, consentVersion: 1, language: 'de' }, 'DE');
-  eq(rpcCalls.at(-1)?.body, { p_identity: A, p_expected_revision: 0, p_patch: { newsEnabled: true, consentVersion: 1, language: 'de' }, p_country: 'DE' }, 'settings use CAS and explicit consent');
+  returned = { ok: true, settings: { revision: 1, newsEnabled: true, language: 'de', locale: 'de-DE', consentVersion: 1 } };
+  await db.patchSettings(A, 0, { newsEnabled: true, consentVersion: 1, language: 'de', locale: 'de-DE' }, 'DE');
+  eq(rpcCalls.at(-1)?.body, { p_identity: A, p_expected_revision: 0, p_patch: { newsEnabled: true, consentVersion: 1, language: 'de', locale: 'de-DE' }, p_country: 'DE' }, 'settings use CAS and explicit consent');
   returned = { eligible: 0, registeredDevices: 0, optInAccounts: 0, byLanguage: {}, byCountry: {} };
   eq(await db.audience(filters), returned, 'zero counts are valid verified storage data');
   eq(rpcCalls.at(-1)?.body, { p_languages: ['de'], p_countries: ['DE'], p_min_build: NEWS_MIN_BUILD, p_identity: null, p_campaign: null }, 'country and language filters are separate explicit arguments');
@@ -94,8 +95,18 @@ try {
     db.setPushNewsRpc(async () => malformed);
     await rejects(db.audience(filters), 'malformed source counts never become verified audience');
   }
-  db.setPushNewsRpc(async () => ({ revision: 0, newsEnabled: true, language: 'de', consentVersion: null }));
+  db.setPushNewsRpc(async () => ({ revision: 0, newsEnabled: true, language: 'de', locale: 'de-DE', consentVersion: null }));
   await rejects(db.getSettings(A), 'enabled source with NULL consent is invalid');
+  for (const malformed of [
+    { revision: 0, newsEnabled: false, language: 'en', consentVersion: null },
+    { revision: 0, newsEnabled: false, language: 'en', locale: null, consentVersion: null },
+    { revision: 0, newsEnabled: false, language: 'en', locale: 'es-ES', consentVersion: null },
+    { revision: 0, newsEnabled: false, language: 'en', locale: 'en-NZ', consentVersion: null },
+    { revision: 0, newsEnabled: false, language: 'pt-BR', locale: 'pt-PT', consentVersion: null },
+  ]) {
+    db.setPushNewsRpc(async () => malformed);
+    await rejects(db.getSettings(A), 'missing or mismatched source locale is unavailable, never silently reconstructed');
+  }
   db.setPushNewsRpc(async () => ({ pending: 0 }));
   await rejects(db.status(LANGUAGE_CAMPAIGN_ID), 'partial delivery counts are unavailable, never fabricated zero');
   ok(rpcCalls.every((c) => !/pro|subscription/.test(c.name)), 'product-news wrappers make no Pro checks');
@@ -125,7 +136,7 @@ try {
     throw new Error(`Unexpected mocked request ${url.split('?')[0]}`);
   }) as typeof fetch;
   const delivery = { pending: 0, sending: 0, sent: 0, unknown: 0, failed: 0, cancelled: 0, expired: 0 };
-  let state: db.NewsSettings = { revision: 0, newsEnabled: false, language: 'en', consentVersion: null };
+  let state: db.NewsSettings = { revision: 0, newsEnabled: false, language: 'en', locale: 'en-US', consentVersion: null };
   let patchCalls: Array<{ identity: string; revision: number; patch: Record<string, unknown>; country: string | null }> = [];
   let selected: any = null, previewCohort: string | null = null, cfg = { enabled: false, apnsConfigured: false, tokenKeyConfigured: false };
   let adminAllowed = true, auditDown = false, runThrows = false, runs = 0;
@@ -136,8 +147,10 @@ try {
     patchSettings: async (identity, revision, patch, country) => {
       patchCalls.push({ identity, revision, patch, country });
       if (revision !== state.revision) return { ok: false, revision: state.revision };
-      state = { ...state, ...patch, revision: state.revision + 1 } as db.NewsSettings;
-      if (patch.newsEnabled === false) state.consentVersion = null;
+      const candidate = { ...state, ...patch } as db.NewsSettings;
+      if (patch.newsEnabled === false) candidate.consentVersion = null;
+      const changed = ['newsEnabled', 'consentVersion', 'language', 'locale'].some((key) => candidate[key] !== state[key]);
+      state = { ...candidate, revision: state.revision + (changed ? 1 : 0) };
       return { ok: true, settings: state };
     },
     requireAdmin: async (_req, res) => {
@@ -190,6 +203,7 @@ try {
     { newsEnabled: true, acceptedConsentVersion: 2 }, { newsEnabled: true, acceptedConsentVersion: '1' },
     { acceptedConsentVersion: 1 }, { newsEnabled: false, acceptedConsentVersion: 1 },
     { language: 'ja' }, { language: 'pt-BR' }, { locale: 'pt-BR' }, { language: 'de', locale: 'fr-FR' },
+    { locale: null }, { language: 'en', locale: null }, { language: 'en', locale: 'en-NZ' },
     { country: 'DE' }, { identityId: A }, { token: bearer },
   ]) eq((await call(router, 'settings', { ...patchOptions, body })).statusCode, 400, `strict settings payload ${JSON.stringify(body)}`);
   eq(patchCalls.length, 0, 'invalid settings never reach storage');
@@ -197,10 +211,22 @@ try {
   eq((await call(router, 'settings', { ...patchOptions, rawBody: ' '.repeat(2049) })).statusCode, 413, 'settings body size bounded before parsing');
   const saved = await call(router, 'settings', { ...patchOptions, headers: { 'if-match': '"0"', 'x-vercel-ip-country': 'br' }, body: { newsEnabled: true, acceptedConsentVersion: 1, language: 'pt', locale: 'pt-BR' } });
   eq([saved.statusCode, saved.body.language, saved.body.locale, saved.headers.etag], [200, 'pt', 'pt-BR', '"1"'], 'regional Portuguese returned as selected base/locale');
-  eq(patchCalls.at(-1), { identity: A, revision: 0, patch: { newsEnabled: true, consentVersion: 1, language: 'pt-BR' }, country: 'BR' }, 'server derives owner/country and stores regional variant');
+  eq(patchCalls.at(-1), { identity: A, revision: 0, patch: { newsEnabled: true, consentVersion: 1, language: 'pt-BR', locale: 'pt-BR' }, country: 'BR' }, 'server derives owner/country and stores regional variant');
   eq((await call(router, 'settings', { ...patchOptions, body: { newsEnabled: false } })).statusCode, 409, 'stale revision is a conflict');
   await call(router, 'settings', { ...patchOptions, headers: { 'if-match': '"1"', 'x-vercel-ip-country': 'XX' }, body: { newsEnabled: false } });
   eq(patchCalls.at(-1)?.country, null, 'unknown country does not become a fabricated geographic segment');
+  for (const locale of APP_LOCALES) {
+    const regional = { language: appLanguage(locale), locale };
+    const current = state.revision;
+    const roundTrip = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': `"${current}"` }, body: regional });
+    eq([roundTrip.statusCode, roundTrip.body.language, roundTrip.body.locale], [200, regional.language, regional.locale], 'PATCH preserves the exact requested regional locale');
+    const readBack = await call(router, 'settings', { token: bearer });
+    eq([readBack.body.language, readBack.body.locale, readBack.headers.etag], [regional.language, regional.locale, roundTrip.headers.etag], 'GET preserves the stored regional locale');
+    const repeat = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': roundTrip.headers.etag, 'x-vercel-ip-country': 'GB' }, body: regional });
+    eq([repeat.body.revision, repeat.headers.etag, repeat.body.locale], [roundTrip.body.revision, roundTrip.headers.etag, regional.locale], 'identical foreground locale synchronization keeps revision stable');
+  }
+  const canonical = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': `"${state.revision}"` }, body: { language: 'de' } });
+  eq([canonical.body.language, canonical.body.locale, patchCalls.at(-1)?.patch.locale], ['de', 'de-DE', 'de-DE'], 'language-only client request receives an explicit canonical locale');
   const storageRouter = createPushNewsHandler({ ...deps, getSettings: async () => { throw new BriefingStorageError('bobby_news_settings_get', 500); } });
   eq((await call(storageRouter, 'settings', { token: bearer })).statusCode, 503, 'storage failure never becomes a default-off success');
 
