@@ -86,4 +86,26 @@ class LocalNotifierTest {
         assertFalse(LocalNotice.valid(notice(id = "")))
         assertTrue(LocalNotice.valid(notice(id = "v18.follow.week:2026-W41")))
     }
+
+    // The rule the phone's own notifier applies (platform/AndroidLocalNotifier.kt reads the three facts).
+
+    @Test fun whereThePersonStandsWithNotificationsIsReadFromThreeFacts() {
+        val allowed = LocalNotifier.Permission.ALLOWED
+        val denied = LocalNotifier.Permission.DENIED
+        val undetermined = LocalNotifier.Permission.NOT_DETERMINED
+        assertEquals("never asked on Android 13 or later", undetermined, NoticePermission.status(notificationsOn = false, runtimeGranted = false, asked = false))
+        assertEquals("asked, and the person said no", denied, NoticePermission.status(notificationsOn = false, runtimeGranted = false, asked = true))
+        assertEquals(allowed, NoticePermission.status(notificationsOn = true, runtimeGranted = true, asked = true))
+        assertEquals("granted from the system's settings without Bobby ever asking", allowed, NoticePermission.status(notificationsOn = true, runtimeGranted = true, asked = false))
+        assertEquals("the permission is there but Bobby's notifications are switched off in the system (always the case before Android 13)",
+                     denied, NoticePermission.status(notificationsOn = false, runtimeGranted = true, asked = false))
+        assertEquals(denied, NoticePermission.status(notificationsOn = false, runtimeGranted = true, asked = true))
+    }
+
+    @Test fun theSystemsQuestionIsOnlyPutWhenItCanStillChangeSomething() {
+        assertTrue("never asked, or asked once: the system decides whether it shows", NoticePermission.canAsk(notificationsOn = false, runtimeGranted = false))
+        assertFalse("already allowed", NoticePermission.canAsk(notificationsOn = true, runtimeGranted = true))
+        assertFalse("switched off in the system's settings: only the settings switch it back on",
+                    NoticePermission.canAsk(notificationsOn = false, runtimeGranted = true))
+    }
 }

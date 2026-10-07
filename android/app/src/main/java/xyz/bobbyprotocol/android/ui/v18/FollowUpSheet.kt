@@ -1,9 +1,14 @@
 package xyz.bobbyprotocol.android.ui.v18
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -14,8 +19,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
@@ -106,5 +114,30 @@ fun FollowUpsRows(host: V18Host, onConsentRequired: () -> Unit = {}) {
             center.focusBoard(null)
             host.switchSheet(V18Routes.FOLLOW_UP)
         }
+    }
+}
+
+/**
+ * Android only: what the follow-ups keep on this phone, for "On this phone" in Memory. From the
+ * first question Bobby notes the assets a person asked about (a symbol, a name, a price and when;
+ * never the question), before any yes, so that it can offer to come back to them. The row says
+ * which, and "Clear" removes them with whatever was planned from them, for whoever is using the
+ * phone, signed in or not. The Follow-ups switch stays as it was. Nothing shows while nothing is kept.
+ */
+@Composable
+fun FollowUpsKept(host: V18Host) {
+    val center = remember(host) { Harness.center(host) }
+    val kept by center.kept.collectAsState()
+    if (kept.isEmpty()) return
+    Box(Modifier.fillMaxWidth().height(1.dp).background(QuietColors.hairline))
+    Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(host.text("Assets you asked about, kept for follow-ups", "Activos por los que preguntaste, guardados para el seguimiento"),
+                 color = QuietColors.muted, fontSize = 13.sp, lineHeight = 18.sp)
+            Text(kept.joinToString(" · "), Modifier.testTag("memory-local-follow-ups"), color = QuietColors.cream, fontSize = 12.sp,
+                 fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium)
+        }
+        QuietLink(host.text("Clear", "Quitar"), "memory-clear-follow-ups") { center.forgetLedger() }
     }
 }

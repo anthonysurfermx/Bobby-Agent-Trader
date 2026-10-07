@@ -12,6 +12,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import xyz.bobbyprotocol.android.v18.NudgeCenter
 import xyz.bobbyprotocol.android.v18.RiskNotice
 import xyz.bobbyprotocol.android.v18.ThesisDraft
 import xyz.bobbyprotocol.android.v18.V18TestBench
@@ -362,5 +363,27 @@ class Memory18EraseTest {
         assertNotNull(MemoryOfferLog(store).entry("b"))
         assertEquals("its theses went with it (the host), and nobody else's", 0, phone.theses("a"))
         assertEquals(1, phone.theses("b"))
+    }
+
+    @Test fun deleteEverythingAlsoTakesTheReceiptsOutOfTheHistoryOfWhatTheGlassSaid() = runTest {
+        // A receipt's id carries the asset ("memory.kept.<account>.nvda"). The history of what the glass
+        // said is kept for months so that "never again" holds: after "Delete everything" it must not be
+        // the one place on the phone that still names what the person asked about.
+        val phone = Phone(this)
+        MemoryNudges.register(phone.bench.host)
+        val nudges = phone.bench.nudges
+        val receipt = MemoryNudges.receiptId("NVDA", "a")!!
+        val offer = MemoryNudges.offerId("a", now = phone.bench.clock)!!
+        nudges.retire(receipt)
+        nudges.retire(offer)
+        val key = NudgeCenter.storeKey("a")
+        assertTrue((phone.bench.store.getString(key) ?: "").contains("nvda"))
+
+        val center = phone.center()
+        center.requestForgetAll()
+        assertTrue(center.confirmForgetAll())
+        assertFalse("no remembered asset is named in the nudge history", (phone.bench.store.getString(key) ?: "").contains("nvda"))
+        assertFalse(nudges.isRetired(receipt))
+        assertTrue("the answer to the offer names nothing and stays", nudges.isRetired(offer))
     }
 }

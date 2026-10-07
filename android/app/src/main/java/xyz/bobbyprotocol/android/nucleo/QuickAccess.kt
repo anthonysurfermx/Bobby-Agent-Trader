@@ -12,10 +12,12 @@ import org.json.JSONObject
  *   - `kept`: what the reader kept. The Memory screen lists these and "Clear" removes them.
  *
  * Clearing REMOVES the stored row; it never stores an empty one. The glass then falls back to the
- * default tickers, and an account's next profile sync carries that default row (the server keeps
- * one row per account and hands it back on every sync, so the old shortcuts would return unless it
- * is told). The default row is therefore never reported as something the reader kept: it is what
- * every profile starts from, on this phone and on the server alike.
+ * default tickers. The default row is never reported as something the reader kept: it is what
+ * every profile starts from.
+ *
+ * The row lives on this phone only, as on iOS: the profile sync neither sends it nor takes the
+ * row the server keeps for the web (NucleoSession.syncProgress). Memory says so to the person
+ * ("Bobby keeps these on this phone, not on its servers"), and this is what makes it true.
  */
 internal object QuickAccess {
     private const val FIELD = "quickAccess"
@@ -33,17 +35,18 @@ internal object QuickAccess {
     /** The stored row, or null when there is none. */
     private fun stored(state: JSONObject): List<String>? = state.optJSONArray(FIELD)?.let { symbols(it) }
 
-    /** What the glass offers, and what an account's profile sync sends: never an empty row. */
+    /** What the glass offers: never an empty row. */
     fun shown(state: JSONObject): List<String> = stored(state)?.takeIf { it.isNotEmpty() } ?: DEFAULTS
 
     /** What the reader kept, newest first. Empty when there is no row, or only the default one. */
     fun kept(state: JSONObject): List<String> = stored(state)?.takeIf { it != DEFAULTS } ?: emptyList()
 
     /**
-     * True when two rows hold the same symbols in the same order. The sync asks it before taking the
-     * server's echo: a row that changed while the request was in the air is newer than the echo.
+     * What the phone takes from a profile sync's reply: everything but the row. The server keeps
+     * one for the web and hands it back with every reply; taking it would put assets on this
+     * phone that the person never asked about here, under a sentence that says the list is the phone's own.
      */
-    fun sameRow(first: JSONArray?, second: JSONArray?): Boolean = symbols(first) == symbols(second)
+    fun withoutRow(progress: JSONObject): JSONObject = JSONObject(progress.toString()).apply { remove(FIELD) }
 
     /** Keeps these symbols as the row. None removes the row, so the glass falls back to the defaults. */
     fun keep(state: JSONObject, symbols: List<String>) {

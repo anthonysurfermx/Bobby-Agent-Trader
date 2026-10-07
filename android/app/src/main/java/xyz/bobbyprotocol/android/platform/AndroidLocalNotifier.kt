@@ -29,6 +29,7 @@ import xyz.bobbyprotocol.android.v18.V18Process
 import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
+import xyz.bobbyprotocol.android.v18.notify.NoticePermission
 import xyz.bobbyprotocol.android.v18.notify.NoticeTiming
 import java.time.ZoneId
 import java.util.Locale
@@ -59,9 +60,11 @@ class AndroidLocalNotifier(context: Context, private val ask: suspend () -> Bool
     override fun status(): LocalNotifier.Permission = LocalNotices.status(app)
 
     override suspend fun requestPermission(): Boolean {
-        if (status() == LocalNotifier.Permission.ALLOWED) return true
-        // Before Android 13 there is nothing to ask: notifications were switched off in the system.
-        if (LocalNotices.runtimeGranted(app)) return false
+        val on = BriefingReminders.permissionGranted(app)
+        if (on) return true
+        // Before Android 13 there is nothing to ask, and a granted permission with notifications off
+        // means they were switched off in the system: the question would change nothing.
+        if (!NoticePermission.canAsk(on, LocalNotices.runtimeGranted(app))) return false
         LocalNotices.markAsked(app)
         ask()
         return status() == LocalNotifier.Permission.ALLOWED
@@ -145,11 +148,8 @@ object LocalNotices {
         WorkManager.getInstance(context).enqueueUniqueWork(workName(notice.id), ExistingWorkPolicy.REPLACE, work)
     }
 
-    fun status(context: Context): LocalNotifier.Permission = when {
-        BriefingReminders.permissionGranted(context) -> LocalNotifier.Permission.ALLOWED
-        !runtimeGranted(context) && !asked(context) -> LocalNotifier.Permission.NOT_DETERMINED
-        else -> LocalNotifier.Permission.DENIED
-    }
+    fun status(context: Context): LocalNotifier.Permission =
+        NoticePermission.status(BriefingReminders.permissionGranted(context), runtimeGranted(context), asked(context))
 
     /** Always true before Android 13, where there is no runtime question to ask. */
     internal fun runtimeGranted(context: Context): Boolean = Build.VERSION.SDK_INT < 33 ||

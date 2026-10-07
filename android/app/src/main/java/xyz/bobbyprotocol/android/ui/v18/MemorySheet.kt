@@ -235,8 +235,9 @@ private fun PrefPicker(host: V18Host, copy: MemoryCopy, center: MemoryCenter, fi
 }
 
 /**
- * What the phone keeps with no copy on Bobby's servers: the shortcut row and the theses written
- * here (count only). `mentionsDeletion` is false where Forget and Delete everything are not on screen.
+ * What the phone keeps with no copy on Bobby's servers: the shortcut row, the theses written
+ * here (count only) and, once something was asked, the assets the follow-ups noted.
+ * `mentionsDeletion` is false where Forget and Delete everything are not on screen.
  */
 @Composable
 private fun OnThisPhone(host: V18Host, copy: MemoryCopy, center: MemoryCenter, c: () -> MemoryCenter, mentionsDeletion: Boolean) {
@@ -260,6 +261,8 @@ private fun OnThisPhone(host: V18Host, copy: MemoryCopy, center: MemoryCenter, c
         Text(if (local.theses == 0) host.text("No theses", "Sin tesis") else local.theses.toString(), Modifier.testTag("memory-local-theses"),
              color = QuietColors.cream, fontSize = 12.sp, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium)
     }
+    // Android only: the assets the follow-ups noted on this phone, with the way to clear them (signed in or not).
+    FollowUpsKept(host)
 }
 
 /** The one way to erase it all, asked once more before it runs, and how the last deletion ended. */

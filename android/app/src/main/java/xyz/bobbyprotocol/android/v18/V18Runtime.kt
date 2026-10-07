@@ -26,7 +26,11 @@ interface V18Desk {
     val signedIn: Boolean
     val accountEpoch: Long
     val riskNotice: RiskNotice
-    /** The app page (not onboarding) asked for its session: it can draw a nudge and take `ask.start`. */
+    /**
+     * The app page (not onboarding) asked for its session: it can draw a nudge. It is not yet a page
+     * that takes `ask.start`: it asks for its session first and wakes up afterwards, and only its
+     * idle home or a finished read starts a question (the host waits for that, see `pageReady`).
+     */
     val onGlass: Boolean
     /** A read is running. */
     val busy: Boolean
@@ -40,10 +44,12 @@ interface V18Desk {
     fun sessionChanged()
     /** A single-use token for a question native writes about an asset it already knows. */
     fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String
+    /** The page has not asked with this token yet, and it is still good (not expired, same reader, same consent). */
+    fun tokenWaiting(token: String): Boolean
     fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject
     /** The quick-access symbols the current owner kept (never the default tickers shown when they keep none). */
     val shortcuts: List<String>
-    /** Replaces them. None removes the stored row, so the glass falls back to its default tickers; an account's change reaches its other devices. */
+    /** Replaces them, on this phone only. None removes the stored row, so the glass falls back to its default tickers. */
     fun keepShortcuts(symbols: List<String>)
     val repository: BobbyRepository
 }
@@ -127,6 +133,7 @@ class V18Runtime(
     private val activeListeners = Listeners<() -> Unit>()
     private val accountListeners = Listeners<() -> Unit>()
     private val consentListeners = Listeners<() -> Unit>()
+    private val languageListeners = Listeners<() -> Unit>()
     private val deletedListeners = Listeners<(String) -> Unit>()
     private val eraseListeners = Listeners<(String?) -> Unit>()
     private val tapHandlers = HashMap<String, (Map<String, String>) -> Unit>()
@@ -142,6 +149,13 @@ class V18Runtime(
     private var nudgeRefreshJob: Job? = null
     private var drainQueued = false
     private var closed = false
+    /**
+     * The page on the glass has woken up: it takes `ask.start`, and a sheet over it no longer
+     * freezes it half-drawn. True until a page says it is loading (`pageReady`).
+     */
+    private var glassSettled = true
+    private var settleJob: Job? = null
+    private var askWatch: Job? = null
 
     private data class SheetHandoff(val route: String, val epoch: Long, val owner: String?)
     private data class ReadHandoff(val symbol: String, val name: String, val isEquity: Boolean, val question: String, val epoch: Long, val owner: String?)
@@ -150,6 +164,8 @@ class V18Runtime(
 
     /** Once, when the session is built: whose showings and taps are counted, and whose reads are kept. */
     fun start() {
+        // The centre is the process's: sources registered by a previous activity go with it.
+        nudges.claim(this)
         nudges.owner = desk.owner
         if (!shelf.bind(shelfKey())) nudges.forgetMoment()
     }
@@ -164,13 +180,18 @@ class V18Runtime(
         shell = null
         nudgeRefreshJob?.cancel()
         nudgeRefreshJob = null
+        settleJob?.cancel()
+        settleJob = null
+        askWatch?.cancel()
+        askWatch = null
         sheetHandoff = null
         readHandoff = null
         tapHandlers.clear()
         tapChecks.clear()
         dueHandlers.clear()
         linkHandlers.clear()
-        nudges.withhold()
+        // Its lines leave the glass with it; a newer host's lines are not this one's to touch.
+        nudges.release(this)
     }
 
     private fun shelfKey(): String = (desk.owner ?: "local") + "#" + desk.accountEpoch
@@ -246,9 +267,45 @@ class V18Runtime(
 
     // ---- What the session reports ----
 
-    /** The page's first call after a load: it is ready for events. A stored tap may open now, after this reply reaches the page. */
+    /**
+     * The page's first call after a load: it hears events from here on, and it is still waking up.
+     * It takes `ask.start` only from its idle home or a finished read, which it reaches about a
+     * second later on its own clock, and that clock stands still under a sheet. So a stored tap does
+     * not open over it yet: a board opened now would sit over a glass that never drew, and the
+     * question its row asks would be dropped by a page that is not listening. The tap opens once
+     * the page has had `SETTLE_MS` in front with nothing over it.
+     */
     fun pageReady() {
+        glassSettled = false
+        settleJob?.cancel()
+        settleJob = null
         drainSoon()
+    }
+
+    /** The page's own clock runs: the app page, in front, nothing over it. */
+    private val pageRuns: Boolean
+        get() {
+            val shell = shell ?: return false
+            return !closed && desk.onGlass && shell.active && shell.sheetRoute == null && !shell.covered
+        }
+
+    /**
+     * Counts the page's time on the glass. It stops as soon as the page stops running (a sheet, the
+     * app behind) and starts over on the next thing that happens, so nothing ticks while nobody looks.
+     */
+    private fun settleSoon() {
+        if (glassSettled || closed || settleJob?.isActive == true || !pageRuns) return
+        settleJob = scope.launch {
+            var ticks = 0
+            while (ticks < SETTLE_TICKS) {
+                delay(SETTLE_TICK_MS)
+                if (!pageRuns) return@launch
+                ticks += 1
+            }
+            if (closed) return@launch
+            glassSettled = true
+            drain()
+        }
     }
 
     /** A delivered read (`status: "ok"`): what the sources and the hooks may look at. Never the question. */
@@ -283,6 +340,12 @@ class V18Runtime(
         readHandoff = null
         taps.clear()
         accountListeners.each { it() }
+    }
+
+    /** The app speaks another language now. */
+    fun languageChanged() {
+        if (closed) return
+        languageListeners.each { it() }
     }
 
     /** The risk notice was withdrawn: nothing of this reader's session remains. */
@@ -388,7 +451,9 @@ class V18Runtime(
     // ---- Taps and links ----
 
     private fun drainSoon() {
-        if (drainQueued || closed) return
+        if (closed) return
+        settleSoon()
+        if (drainQueued) return
         drainQueued = true
         scope.launch {
             try { yield() } finally { drainQueued = false }
@@ -403,7 +468,7 @@ class V18Runtime(
     fun drain(): Boolean {
         val tap = taps.tap ?: return false
         val shell = shell ?: return false
-        if (closed || !desk.onGlass || !shell.active || desk.riskNotice != RiskNotice.ACCEPTED || shell.sheetRoute != null ||
+        if (closed || !desk.onGlass || !glassSettled || !shell.active || desk.riskNotice != RiskNotice.ACCEPTED || shell.sheetRoute != null ||
             shell.covered || shell.voiceBusy || desk.busy) return false
         val kind = tap[LocalNotice.KIND]
         if (kind == null) {
@@ -422,8 +487,31 @@ class V18Runtime(
 
     private fun keeps(handler: (String) -> Boolean, url: String): Boolean = try { handler(url) } catch (_: Exception) { false }
 
+    /**
+     * Hands a question to the page. The page takes `ask.start` only from its idle home or a
+     * finished read, and says nothing when it does not (it is still waking up after a load, or a
+     * sheet has only just left). So the host checks: while the token is still unused it offers the
+     * same question again, a few times, and then lets it go. The token is single use, so a
+     * question is never asked twice.
+     */
     private fun emitAskStart(symbol: String, name: String, isEquity: Boolean, question: String) {
-        desk.emit("ask.start", JSONObject().put("token", desk.readToken(symbol, name, isEquity, question)).put("question", question))
+        val token = desk.readToken(symbol, name, isEquity, question)
+        val epoch = desk.accountEpoch
+        val owner = desk.owner
+        desk.emit("ask.start", JSONObject().put("token", token).put("question", question))
+        askWatch?.cancel()
+        askWatch = scope.launch {
+            var offers = 0
+            while (offers < ASK_OFFERS) {
+                delay(ASK_OFFER_MS)
+                offers += 1
+                val shell = shell
+                if (closed || shell == null || epoch != desk.accountEpoch || owner != desk.owner || !desk.tokenWaiting(token)) return@launch
+                // Not at this moment (a sheet is up, the app is behind, another read began): the next turn looks again.
+                if (desk.riskNotice != RiskNotice.ACCEPTED || !desk.onGlass || desk.busy || !shell.active || shell.sheetRoute != null || shell.covered) continue
+                desk.emit("ask.start", JSONObject().put("token", token).put("question", question))
+            }
+        }
     }
 
     // ---- V18Host ----
@@ -489,6 +577,8 @@ class V18Runtime(
         if (!closed) desk.sessionChanged()
     }
 
+    override val glassBusy: Boolean get() = shell?.voiceBusy == true || desk.busy
+
     override fun haptic(kind: String) {
         shell?.haptic(kind)
     }
@@ -524,6 +614,7 @@ class V18Runtime(
     override fun onAppActive(listener: () -> Unit): () -> Unit = activeListeners.add(listener)
     override fun onAccountChanged(listener: () -> Unit): () -> Unit = accountListeners.add(listener)
     override fun onConsentWithdrawn(listener: () -> Unit): () -> Unit = consentListeners.add(listener)
+    override fun onLanguageChanged(listener: () -> Unit): () -> Unit = languageListeners.add(listener)
     override fun onAccountDeleted(listener: (String) -> Unit): () -> Unit = deletedListeners.add(listener)
     override fun onEraseEverything(listener: (String?) -> Unit): () -> Unit = eraseListeners.add(listener)
 
@@ -580,5 +671,19 @@ class V18Runtime(
 
     override fun switchBriefingNotifications(enabled: Boolean) {
         shell?.switchBriefingNotifications(enabled)
+    }
+
+    companion object {
+        /**
+         * How long a freshly loaded page needs in front, with nothing over it, before a stored tap
+         * opens over it: its start (half a second at most) and its wake (nine tenths), with room for
+         * a slow phone. Counted in ticks, so a sheet or a trip to the background starts it over.
+         */
+        const val SETTLE_TICK_MS = 400L
+        const val SETTLE_TICKS = 4
+        const val SETTLE_MS = SETTLE_TICK_MS * SETTLE_TICKS
+        /** A question the page did not take is offered again this often, this many times. */
+        const val ASK_OFFER_MS = 800L
+        const val ASK_OFFERS = 5
     }
 }

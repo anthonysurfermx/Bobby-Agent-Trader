@@ -39,17 +39,20 @@ class QuickAccessTest {
         assertEquals("nothing else of the reader's state is touched", 40, state.getInt("xp"))
     }
 
-    @Test fun anAccountsSyncAfterAClearCarriesTheDefaultRowNeverAnEmptyOne() {
+    @Test fun theRowStaysOnThisPhoneASyncReplyNeverBringsOneIn() {
+        // Memory tells the person their shortcuts are kept "on this phone, not on its servers": the
+        // profile sync sends no row (NucleoSession.syncProgress) and takes none from the reply.
         val state = state("TSLA", "SOL")
-        QuickAccess.keep(state, emptyList())
-        // What NucleoSession.syncProgress puts in `profile.quickAccess`.
-        val sent = JSONArray(QuickAccess.shown(state))
-        assertEquals(3, sent.length())
-        assertEquals("BTC", sent.getString(0))
-        // The server answers with the row it now holds, and the sync stores it (NucleoStateStore.applySync).
-        state.put("quickAccess", sent)
-        assertTrue("the default row coming back is not something the reader kept", QuickAccess.kept(state).isEmpty())
-        assertEquals(defaults, QuickAccess.shown(state))
+        val reply = JSONObject().put("xp", 55).put("streak", 2).put("quickAccess", JSONArray(listOf("DOGE", "PEPE")))
+        val taken = QuickAccess.withoutRow(reply)
+        assertFalse("the row the server keeps for the web is not taken", taken.has("quickAccess"))
+        assertEquals("everything else of the reply is", 55, taken.getInt("xp"))
+        assertEquals(2, taken.getInt("streak"))
+        assertTrue("the reply itself is left as it came", reply.has("quickAccess"))
+        // What NucleoStateStore.applySync does with it: only fields that are there are written.
+        for (field in listOf("xp", "streak", "quickAccess")) if (taken.has(field)) state.put(field, taken.get(field))
+        assertEquals("the phone's own row is untouched", listOf("TSLA", "SOL"), QuickAccess.kept(state))
+        assertEquals(55, state.getInt("xp"))
     }
 
     @Test fun forgettingTheLastAssetAskedAboutLeavesNothingKept() {
@@ -75,16 +78,5 @@ class QuickAccessTest {
         QuickAccess.keep(state, listOf("A", "B", "C", "D", "E", "F", "G", "H"))
         assertEquals(listOf("A", "B", "C", "D", "E", "F"), QuickAccess.kept(state))
         assertEquals(6, QuickAccess.LIMIT)
-    }
-
-    @Test fun aRowThatChangedWhileASyncWasInTheAirIsNewerThanTheEcho() {
-        val state = state("TSLA", "SOL")
-        val sent = JSONArray(QuickAccess.shown(state))
-        assertTrue("nothing changed: the server's row is taken", QuickAccess.sameRow(sent, JSONArray(QuickAccess.shown(state))))
-        // The person clears their shortcuts while the request is still out.
-        QuickAccess.keep(state, emptyList())
-        assertFalse("the echo of the old row must not bring the shortcuts back", QuickAccess.sameRow(sent, JSONArray(QuickAccess.shown(state))))
-        assertFalse("order matters: the newest question comes first", QuickAccess.sameRow(JSONArray(listOf("A", "B")), JSONArray(listOf("B", "A"))))
-        assertTrue(QuickAccess.sameRow(null, JSONArray()))
     }
 }

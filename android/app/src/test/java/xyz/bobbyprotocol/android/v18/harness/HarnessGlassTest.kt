@@ -11,6 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.bobbyprotocol.android.v18.NucleoNudge
+import xyz.bobbyprotocol.android.v18.NudgeCenter
 import xyz.bobbyprotocol.android.v18.NudgeMoment
 import xyz.bobbyprotocol.android.v18.NudgePriority
 import xyz.bobbyprotocol.android.v18.NudgeRead
@@ -514,5 +515,42 @@ class HarnessGlassTest {
         }
         assertTrue(bench.notifier.pendingIds().isEmpty())
         assertTrue(center.ledger.isEmpty)
+    }
+
+    @Test fun turningFollowUpsOffTakesTheMoveLinesOutOfTheHistoryOfWhatTheGlassSaid() = runTest {
+        // A move line's id carries the asset and the day it was asked about. Once the ledger is
+        // erased, that history must not be what still names them.
+        val bench = V18TestBench(backgroundScope)
+        HarnessNudges.register(bench.host)
+        runCurrent()
+        val center = Harness.center(bench.host)
+        bench.deliver(symbol = "NVDA")
+        runCurrent()
+        assertEquals(listOf("NVDA"), center.kept.value)
+        bench.nudges.retire("harness.move.nvda.20261005")
+        bench.nudges.retire(HarnessNudges.OFFER_ID)
+        val key = NudgeCenter.storeKey(null)
+        assertTrue((bench.store.getString(key) ?: "").contains("nvda"))
+
+        center.turnOff()
+        runCurrent()
+        assertFalse("the asset and the day are gone from the history too", (bench.store.getString(key) ?: "").contains("nvda"))
+        assertTrue("the answered offer names nothing and stays answered", bench.nudges.isRetired(HarnessNudges.OFFER_ID))
+        assertTrue(center.kept.value.isEmpty())
+
+        // The app speaking another language is heard at once, not the next time the glass draws.
+        val spoken = V18TestBench(backgroundScope)
+        spoken.notifier.permission = xyz.bobbyprotocol.android.v18.notify.LocalNotifier.Permission.ALLOWED
+        HarnessNudges.register(spoken.host)
+        runCurrent()
+        val harness = Harness.center(spoken.host)
+        spoken.deliver(symbol = "NVDA")
+        assertEquals(HarnessCenter.Outcome.ON, harness.accept())
+        assertEquals("en", harness.wordsIn)
+        spoken.desk.language = "es"
+        assertTrue(harness.wordsAreStale)
+        spoken.host.languageChanged()
+        assertEquals("the lines the phone holds are written again in the new language", "es", harness.wordsIn)
+        assertFalse(harness.wordsAreStale)
     }
 }

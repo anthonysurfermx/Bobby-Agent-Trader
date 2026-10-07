@@ -288,4 +288,52 @@ class NudgeCenterTest {
         assertEquals(46, NucleoNudge.TEXT_LIMIT)
         assertEquals(22, NucleoNudge.CTA_LIMIT)
     }
+
+    @Test fun aHostThatLeavesTakesItsLinesWithItUnlessANewerHostAlreadyHoldsTheGlass() {
+        val c = center()
+        val first = Any()
+        val second = Any()
+        c.claim(first)
+        c.register(source("credits", NudgePriority.CREDITS, "credits.gift.5"))
+        assertEquals("credits.gift.5", c.show()?.id)
+        c.claim(second)
+        assertTrue("a new host starts from a clean centre", c.sourceKeys.isEmpty())
+        assertNull(c.show())
+        assertFalse("what the first one served cannot be tapped", c.isCurrent("credits.gift.5"))
+        c.register(source("memory", NudgePriority.MEMORY, "memory.offer.v1"))
+        c.release(first)
+        assertEquals("the first host leaving does not take the second one's lines", listOf("memory"), c.sourceKeys)
+        c.release(second)
+        assertTrue(c.sourceKeys.isEmpty())
+        assertNull(c.show())
+    }
+
+    @Test fun whatWasErasedIsNoLongerNamedInTheHistoryOfWhatTheGlassSaid() = runTest {
+        val c = center()
+        c.owner = "account-a"
+        c.register(source("memory", NudgePriority.MEMORY, "memory.kept.3fa85f64.nvda"))
+        assertEquals("memory.kept.3fa85f64.nvda", c.show()?.id)
+        assertEquals(1, c.seen("memory.kept.3fa85f64.nvda"))
+        c.retire("harness.move.btc.20261007")
+        c.retire("harness.offer.v1")
+        c.retire("memory.offer.v2.3fa85f64")
+        val before = store.getString(NudgeCenter.storeKey("account-a")) ?: ""
+        assertTrue(before.contains("nvda") && before.contains("btc"))
+
+        c.forgetIds(listOf("memory.kept.", "harness.move."))
+        val after = store.getString(NudgeCenter.storeKey("account-a")) ?: ""
+        assertFalse("no asset the person asked about is left in the history", after.contains("nvda") || after.contains("btc"))
+        assertTrue("an answered offer names nothing and stays answered", c.isRetired("harness.offer.v1") && c.isRetired("memory.offer.v2.3fa85f64"))
+        assertEquals(0, c.showings("memory.kept.3fa85f64.nvda"))
+        assertFalse("and the line that was on the glass cannot be tapped any more", c.isCurrent("memory.kept.3fa85f64.nvda"))
+        assertEquals("gone", c.act("memory.kept.3fa85f64.nvda"))
+
+        // Another reader's history is theirs, and an empty history leaves no key behind.
+        c.owner = "account-b"
+        c.retire("harness.move.eth.20261007")
+        c.forgetIds(listOf("harness.move."))
+        assertNull(store.getString(NudgeCenter.storeKey("account-b")))
+        c.owner = "account-a"
+        assertTrue(c.isRetired("harness.offer.v1"))
+    }
 }

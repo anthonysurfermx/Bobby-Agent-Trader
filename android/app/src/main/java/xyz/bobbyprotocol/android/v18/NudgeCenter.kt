@@ -146,6 +146,29 @@ class NudgeCenter(private val store: KeyValueStore, var now: () -> Long = { Syst
         currentId = null
     }
 
+    /** The host whose features registered the sources (the activity on screen). */
+    private var holder: Any? = null
+
+    /**
+     * A new host takes the glass. The centre is the process's and outlives an activity: the
+     * sources the host before it registered are bound to that host's screen, and go with it.
+     */
+    fun claim(by: Any) {
+        unregisterAll()
+        holder = by
+    }
+
+    /**
+     * A host is going away. While the sources are still its own, none of them may speak or be
+     * tapped again: a line written by a host without a screen would be retired by a tap that opens
+     * nothing. A host that already lost the glass to a newer one changes nothing.
+     */
+    fun release(by: Any) {
+        if (holder !== by) return
+        unregisterAll()
+        holder = null
+    }
+
     val sourceKeys: List<String> get() = sources.map { it.key }
 
     // The moment
@@ -262,6 +285,23 @@ class NudgeCenter(private val store: KeyValueStore, var now: () -> Long = { Syst
         write(all)
         served.remove(id)
         if (currentId == id) currentId = null
+    }
+
+    /**
+     * What was erased is no longer named here either: the current owner's history of every nudge
+     * whose id starts with one of `prefixes` leaves the phone (an id carries the asset, and for a
+     * follow-up the day it was asked about). Retired offers that name nothing are not touched.
+     */
+    fun forgetIds(prefixes: Collection<String>) {
+        fun named(id: String): Boolean = prefixes.any { id.startsWith(it) }
+        val all = records()
+        val kept = all.filterKeys { !named(it) }
+        if (kept.size != all.size) {
+            if (kept.isEmpty()) store.remove(storeKey(owner)) else write(kept)
+        }
+        served.keys.removeAll { named(it) }
+        val current = currentId
+        if (current != null && named(current)) currentId = null
     }
 
     fun showings(id: String): Int = records()[id.lowercase(Locale.ROOT)]?.shown ?: 0

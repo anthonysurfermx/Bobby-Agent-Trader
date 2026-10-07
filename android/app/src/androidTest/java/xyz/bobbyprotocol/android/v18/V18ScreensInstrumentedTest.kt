@@ -237,6 +237,19 @@ class V18ScreensInstrumentedTest(private val language: String) {
         await("memory-local-shortcuts")
         compose.onNodeWithTag("memory-forget-all", useUnmergedTree = true).performScrollTo()
         shot("memory-unfolded")
+
+        // Nothing was asked about on this phone yet, so the follow-ups keep nothing and say nothing.
+        assertAbsent("memory-local-follow-ups")
+        // Three questions later (no yes to follow-ups was ever given): what the phone noted is listed with
+        // the rest of what it keeps, and "Clear" removes it.
+        compose.runOnUiThread { V18Fixtures.askedThisWeek(stage) }
+        await("memory-local-follow-ups")
+        assertTrue(compose.onAllNodes(hasTestTag("memory-local-follow-ups") and hasText("NVDA", substring = true), useUnmergedTree = true).fetchSemanticsNodes().isNotEmpty())
+        compose.onNodeWithTag("memory-clear-follow-ups", useUnmergedTree = true).performScrollTo()
+        shot("memory-follow-ups-kept")
+        tap("memory-clear-follow-ups")
+        compose.waitUntil(10_000) { compose.onAllNodesWithTag("memory-local-follow-ups", useUnmergedTree = true).fetchSemanticsNodes().isEmpty() }
+        assertTrue(compose.runOnUiThread<Boolean> { Harness.center(stage.host).ledger.isEmpty })
     }
 
     @Test fun memoryConsent() {

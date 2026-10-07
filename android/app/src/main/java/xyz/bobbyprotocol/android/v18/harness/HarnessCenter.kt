@@ -135,6 +135,8 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     var language: () -> String = { "" }
     /** The glass has something new to draw (the session listens). */
     var changed: () -> Unit = {}
+    /** This reader's ledger was just erased: whatever else names what it held follows (the app wires the nudge history). */
+    var onErased: () -> Unit = {}
 
     var mode: HarnessMode = HarnessMode.UNDECIDED
         private set
@@ -158,6 +160,14 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     private val shown = MutableStateFlow(HarnessView())
     /** For the switch in Reminders. */
     val view: StateFlow<HarnessView> get() = shown
+
+    private val keptSymbols = MutableStateFlow<List<String>>(emptyList())
+    /**
+     * The assets the ledger names, newest first. From the first question the phone notes what was
+     * asked about (before any yes to follow-ups), so the Memory screen lists it with what else the
+     * phone keeps, and `forgetLedger` removes it.
+     */
+    val kept: StateFlow<List<String>> get() = keptSymbols
 
     private class Focus(val symbol: String, val at: Long)
     private class Quoted(val price: Double, val at: Long)
@@ -409,6 +419,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         purge()
         replan()
         changed()
+        onErased()
     }
 
     /** Memory's "Delete everything" for `user`: the ledger, the switch and the plan go, with the follow-ups planned. */
@@ -642,11 +653,13 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         status = notifier.status()
         publish()
         changed()
+        onErased()
     }
 
     private fun publish() {
         val clock = now()
         shown.value = HarnessView(mode, saving, status, ledger.assets(since = clock - 7 * HARNESS_DAY_MS, now = clock).isNotEmpty())
+        keptSymbols.value = ledger.assets(since = Long.MIN_VALUE, now = Long.MAX_VALUE).map { it.symbol }
     }
 
     companion object {

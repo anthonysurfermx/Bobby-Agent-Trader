@@ -119,15 +119,17 @@ class NucleoSession(
         override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = issueToken(
             json("symbol" to symbol, "name" to name, "isEquity" to isEquity, "assetClass" to if (isEquity) "equity" else "crypto", "currency" to null, "exchange" to null),
             question, this@NucleoSession.analysisLevel)
+        override fun tokenWaiting(token: String): Boolean {
+            val waiting = tokens[token] ?: return false
+            return waiting.expiresAt > System.currentTimeMillis() && waiting.epoch == this@NucleoSession.accountEpoch && waiting.consent == consentEpoch
+        }
         override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
             this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
         override val shortcuts: List<String> get() = store.keptQuickAccess(this@NucleoSession.owner)
         override fun keepShortcuts(symbols: List<String>) {
             // None removes the stored row: the glass falls back to its default tickers, as on iOS.
+            // The row lives on this phone only (see `syncProgress`): nothing is sent when it changes.
             store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(QuickAccess.LIMIT)))
-            // An account's quick access is part of its synced profile: its other devices follow
-            // (after a clear the sync carries the default row, never an empty one).
-            if (riskAccepted && this@NucleoSession.signedIn) scope.launch { syncProgress() }
         }
         override val repository: BobbyRepository get() = this@NucleoSession.repository
     }
@@ -144,8 +146,7 @@ class NucleoSession(
         recoverCompletedOnboarding()
         repository.language = language
         repository.locale = locale
-        // The centre is the process's: sources registered by a previous activity go with it.
-        v18.nudges.unregisterAll()
+        // The nudge centre is the process's: this host claims it, and the sources a previous activity registered go with that activity.
         v18.start()
         repository.addAccountDeletedListener(accountDeleted)
         scope.launch {
@@ -235,7 +236,7 @@ class NucleoSession(
         store.voicePreference = selected.value; onVoiceSettingsChanged?.invoke(); emit("session.changed", snapshot())
     }
     fun setAnalysisLevel(value: String) { if (value !in ANALYSIS_LEVELS) throw NucleoFault("invalid_params", "invalid level"); store.analysisLevel = value; emit("analysis.level", analysisLevelJSON()); emit("session.changed", snapshot()) }
-    fun setLanguage(value: String) { if (value != "system" && value !in SUPPORTED_LANGUAGES) throw NucleoFault("invalid_params", "invalid language"); cancel(); reads.clear(); tokens.clear(); store.language = value; repository.language = language; repository.locale = locale; emit("session.changed", snapshot()); onPageChanged?.invoke(page) }
+    fun setLanguage(value: String) { if (value != "system" && value !in SUPPORTED_LANGUAGES) throw NucleoFault("invalid_params", "invalid language"); cancel(); reads.clear(); tokens.clear(); store.language = value; repository.language = language; repository.locale = locale; v18.languageChanged(); emit("session.changed", snapshot()); onPageChanged?.invoke(page) }
     fun selectLanguage(value: String) = setLanguage(value)
     fun selectAnalysisLevel(value: String) = setAnalysisLevel(value)
 
@@ -545,8 +546,9 @@ class NucleoSession(
                     val allPending = store.pending(startedOwner)
                     if (latest != null && allPending.length() == 0) break
                     val pending = JSONArray(); for (i in 0 until minOf(50, allPending.length())) pending.put(allPending.getJSONObject(i))
-                    val sentQuick = store.quickAccess(startedOwner)
-                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion, "quickAccess" to sentQuick)
+                    // The shortcut row stays on this phone, as on iOS: Memory tells the person it is kept "on this
+                    // phone, not on its servers", so it is neither sent with the profile nor taken from the reply.
+                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion)
                     val response = repository.request("api/progress", "POST", json("platform" to "android", "events" to pending, "profile" to profile), true)
                     assertCurrent(epoch, consent)
                     val progress = response.optJSONObject("progress") ?: break
@@ -556,10 +558,7 @@ class NucleoSession(
                         receipt.nullableString("id")?.let { syncReceipts[it] = JSONObject(receipt.toString()) }
                     }
                     while (syncReceipts.size > 100) syncReceipts.remove(syncReceipts.keys.first())
-                    // The row changed while the request was in the air (a read arrived, the shortcuts were cleared): what the
-                    // phone holds now is newer than the server's echo of what was sent, and the next sync sends it.
-                    val rowIsCurrent = QuickAccess.sameRow(sentQuick, store.quickAccess(startedOwner))
-                    store.applySync(startedOwner, if (rowIsCurrent) progress else JSONObject(progress.toString()).apply { remove("quickAccess") }, results)
+                    store.applySync(startedOwner, QuickAccess.withoutRow(progress), results)
                     latest = response
                     emit("session.changed", snapshot())
                     // Drain durable offline events in the endpoint's supported batches. A missing ACK

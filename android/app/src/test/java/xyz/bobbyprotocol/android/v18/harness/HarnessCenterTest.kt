@@ -741,4 +741,41 @@ class HarnessCenterTest {
         assertEquals(HarnessView(HarnessMode.OFF, false, LocalNotifier.Permission.ALLOWED, false), center.view.value)
         assertFalse(center.isOn)
     }
+
+    @Test fun whatThePhoneKeepsForFollowUpsIsListedAndCanBeClearedWithoutAnAccountOrAYes() = runTest {
+        // From the first question, before any yes, the phone notes what was asked about. Whatever is kept
+        // about a person is something they can see and remove: signed out, and without deciding anything.
+        val center = make()
+        assertTrue(center.kept.value.isEmpty())
+        ask(center, "NVDA")
+        clock += 3_600_000L
+        ask(center, "BTC", equity = false)
+        assertEquals("what the ledger names, newest first", listOf("BTC", "NVDA"), center.kept.value)
+        assertEquals(HarnessMode.UNDECIDED, center.mode)
+        assertNull("nobody is signed in", center.owner)
+        var told = 0
+        center.onErased = { told += 1 }
+
+        center.forgetLedger()
+        assertTrue(center.kept.value.isEmpty())
+        assertTrue(center.ledger.isEmpty)
+        assertTrue("nothing of it stays on the phone", HarnessStore(raw).ledger(null).isEmpty)
+        assertEquals("the switch stays where the person left it", HarnessMode.UNDECIDED, center.mode)
+        assertEquals("and whatever else named those assets is told", 1, told)
+        assertNull("nothing to come back to, so no price is read", center.dueAsset())
+
+        // With follow-ups on: the switch stays on, and what was planned from the ledger goes with it.
+        ask(center, "NVDA")
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
+        assertTrue(pending().isNotEmpty())
+        assertEquals(listOf("NVDA"), center.kept.value)
+        center.forgetLedger()
+        assertEquals(HarnessMode.ON, center.mode)
+        assertTrue("no follow-up is left on the phone for an asset it no longer keeps", pending().isEmpty())
+        assertTrue(center.kept.value.isEmpty())
+        assertEquals(2, told)
+        // The next question starts again from nothing.
+        ask(center, "ETH", equity = false)
+        assertEquals(listOf("ETH"), center.kept.value)
+    }
 }

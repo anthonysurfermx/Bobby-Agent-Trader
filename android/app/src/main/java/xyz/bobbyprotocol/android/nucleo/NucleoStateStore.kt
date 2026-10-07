@@ -64,7 +64,7 @@ internal class NucleoStateStore(context: Context) {
     }
     fun pending(owner: String?): JSONArray = state(owner).optJSONArray("pending") ?: JSONArray()
     fun setPending(owner: String?, pending: JSONArray) { val s = state(owner); s.put("pending", pending); write(owner, s) }
-    /** What the glass offers and what an account's sync sends: the reader's row, or the default tickers when they keep none (QuickAccess.kt). */
+    /** What the glass offers: the reader's row, or the default tickers when they keep none (QuickAccess.kt). It stays on this phone. */
     fun quickAccess(owner: String?): JSONArray = JSONArray(QuickAccess.shown(state(owner)))
     /** What the reader kept, newest first: never the default row standing in for nothing. */
     fun keptQuickAccess(owner: String?): List<String> = QuickAccess.kept(state(owner))

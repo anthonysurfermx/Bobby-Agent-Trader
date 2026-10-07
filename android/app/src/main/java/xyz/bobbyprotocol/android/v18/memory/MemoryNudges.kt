@@ -68,6 +68,8 @@ object MemoryNudges {
                  offerOpened = { user, at -> log().noteOpened(user, at) })
         host.onAccountChanged { center.accountChanged() }
         host.onAppActive { center.reloadLocal() }
+        // "Delete everything" removed what the receipts were about: their history, which names each asset, goes too.
+        host.onEraseEverything { host.nudges.forgetIds(listOf(RECEIPT_ID_PREFIX)) }
         host.onAccountDeleted { deleted ->
             // The switch itself goes with the account in the repository; this is the rest of what the phone kept for it.
             MemoryConsent(host.store).clear(deleted)

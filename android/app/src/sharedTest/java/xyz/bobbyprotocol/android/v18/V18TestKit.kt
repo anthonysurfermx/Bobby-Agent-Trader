@@ -58,7 +58,18 @@ class FakeDesk(
     override fun text(en: String, es: String): String = words?.invoke(language, en, es) ?: if (language == "es") es else en
     override fun emit(name: String, payload: JSONObject) { events.add(name to payload) }
     override fun sessionChanged() { sessionChanges += 1 }
-    override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = "token-${++tokens}-$symbol"
+    /**
+     * The page takes `ask.start` at once, as a page on its idle home does. A test that stages a page
+     * still waking up sets this to false: the token then waits until `pageAsks` uses it.
+     */
+    var pageTakesAskStart = true
+    private val unusedTokens = HashSet<String>()
+
+    override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String =
+        "token-${++tokens}-$symbol".also { if (!pageTakesAskStart) unusedTokens.add(it) }
+    override fun tokenWaiting(token: String): Boolean = token in unusedTokens
+    /** The page asked with this token (its `ask` reached the session): it is used. */
+    fun pageAsks(token: String) { unusedTokens.remove(token) }
     override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject = JSONObject()
         .put("symbol", symbol).put("question", question).put("language", language).put("locale", locale).put("country", JSONObject.NULL)
         .put("assetType", if (isEquity) "equity" else "crypto").put("level", level)

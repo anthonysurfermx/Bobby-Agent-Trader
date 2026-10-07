@@ -189,72 +189,26 @@ interface LocalNotifier {
     fun pendingIds(): Set<String>
 }
 
-/** The notifier for tests: nothing leaves memory, and time is whatever the test says it is. */
-class MemoryLocalNotifier(var now: () -> Long = { System.currentTimeMillis() }) : LocalNotifier {
-    /**
-     * The phone's time zone. With one set, `deliverDue` asks `NoticeTiming` what the phone's worker
-     * asks (allowed hours, expiry); without one every due notice is shown, as a punctual phone would.
-     */
-    var zone: ZoneId? = null
-    var permission = LocalNotifier.Permission.NOT_DETERMINED
-    /** What the person answers when asked. */
-    var grantsWhenAsked = true
-    /** How many times the system's question was shown. */
-    var asked = 0
-        private set
-    private val pending = LinkedHashMap<String, LocalNotice>()
-    /** Shown and not cleared, oldest first. */
-    val delivered = ArrayList<LocalNotice>()
-
-    val scheduled: List<LocalNotice> get() = pending.values.toList()
-    fun notice(id: String): LocalNotice? = pending[id]
-
-    override fun status(): LocalNotifier.Permission = permission
-
-    override suspend fun requestPermission(): Boolean {
-        if (permission == LocalNotifier.Permission.NOT_DETERMINED) {
-            asked += 1
-            permission = if (grantsWhenAsked) LocalNotifier.Permission.ALLOWED else LocalNotifier.Permission.DENIED
-        }
-        return permission == LocalNotifier.Permission.ALLOWED
+/**
+ * Where the person stands with Bobby's notifications, from what the phone can say. Pure, so the
+ * rule is a unit test; platform/AndroidLocalNotifier.kt reads the three facts and asks here.
+ *  - `notificationsOn`: the system lets Bobby post right now (the permission, and Bobby's
+ *    notifications not switched off in the system).
+ *  - `runtimeGranted`: the notification permission itself is granted. Always true before
+ *    Android 13, where there is no question to ask.
+ *  - `asked`: Bobby has put the system's question to the person once (the system shows it once).
+ */
+object NoticePermission {
+    fun status(notificationsOn: Boolean, runtimeGranted: Boolean, asked: Boolean): LocalNotifier.Permission = when {
+        notificationsOn -> LocalNotifier.Permission.ALLOWED
+        !runtimeGranted && !asked -> LocalNotifier.Permission.NOT_DETERMINED
+        else -> LocalNotifier.Permission.DENIED
     }
-
-    override fun schedule(notice: LocalNotice): Boolean {
-        if (permission != LocalNotifier.Permission.ALLOWED || !LocalNotice.valid(notice) || notice.fireAtEpochMs <= now()) return false
-        pending[notice.id] = notice
-        return true
-    }
-
-    override fun cancel(ids: Collection<String>) {
-        for (id in ids) pending.remove(id)
-    }
-
-    override fun clearDelivered(ids: Collection<String>) {
-        delivered.removeAll { it.id in ids }
-    }
-
-    override fun pendingIds(): Set<String> = pending.keys.toSet()
 
     /**
-     * Time passed: every notice due by now is shown (when still allowed) and is no longer pending.
-     * With a `zone`, a notice outside its allowed hours stays pending and an expired one is dropped
-     * unseen, as on the phone. Returns what was shown.
+     * Whether the system's question can still change anything. Not once notifications are on, and
+     * not while the permission is granted but notifications are off: then they were switched off
+     * in the system's settings, and only the settings can switch them back on.
      */
-    fun deliverDue(): List<LocalNotice> {
-        val clock = now()
-        val phone = zone
-        val shown = ArrayList<LocalNotice>()
-        for (notice in pending.values.filter { it.fireAtEpochMs <= clock }.sortedBy { it.fireAtEpochMs }) {
-            when (if (phone == null) NoticeTiming.Decision.Post else NoticeTiming.decide(notice, clock, phone)) {
-                is NoticeTiming.Decision.Wait -> Unit
-                NoticeTiming.Decision.Drop -> pending.remove(notice.id)
-                NoticeTiming.Decision.Post -> {
-                    pending.remove(notice.id)
-                    if (permission == LocalNotifier.Permission.ALLOWED) shown.add(notice)
-                }
-            }
-        }
-        delivered.addAll(shown)
-        return shown
-    }
+    fun canAsk(notificationsOn: Boolean, runtimeGranted: Boolean): Boolean = !notificationsOn && !runtimeGranted
 }

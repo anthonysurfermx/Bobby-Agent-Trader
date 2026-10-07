@@ -193,6 +193,9 @@ class ReminderCenter(private val notifier: LocalNotifier, private val store: Key
         host.onAccountDeleted { quietly { reconcile() } }
         host.onEraseEverything { quietly { reconcile() } }
         host.onAppActive { quietly { refresh() } }
+        // The app speaks another language: a reminder already handed to the phone is written again in it
+        // (the line is the same for every thesis; only its language was fixed when it was planned).
+        host.onLanguageChanged { quietly { refresh() } }
         host.scope.launch {
             yield()
             quietly { refresh() }

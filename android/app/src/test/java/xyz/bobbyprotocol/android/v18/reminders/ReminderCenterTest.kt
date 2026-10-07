@@ -733,4 +733,34 @@ class ReminderCenterTest {
         assertTrue(c.pending.isEmpty())
         assertTrue(bench.notifier.pendingIds().isEmpty())
     }
+
+    @Test fun aReminderAlreadyOnThePhoneIsWrittenAgainWhenTheAppChangesLanguage() = runTest {
+        // The line is fixed when the reminder is handed to the phone. Set in Spanish, it would be shown
+        // in Spanish a week later by an app that speaks English since.
+        language = "es"
+        val nvda = thesis("NVDA")
+        val c = center()
+        assertEquals(scheduled(at(2026, 10, 14, 18)), c.schedule(nvda.id, nvda.symbol, ReminderPreset.WEEK))
+        assertEquals("Tu recordatorio para revisar una tesis.", fake.requests[id(nvda)]?.body)
+        language = "en"
+        c.refresh()
+        assertEquals("Your reminder to review a thesis.", fake.requests[id(nvda)]?.body)
+        assertEquals("the same reminder, at the same moment", at(2026, 10, 14, 18), fake.requests[id(nvda)]?.fireAtEpochMs)
+        assertEquals(1, c.pending.size)
+
+        // And the app tells the centre: a language change reaches it through the host, without waiting
+        // for the app to come to the front again.
+        val bench = V18TestBench(backgroundScope)
+        bench.notifier.permission = LocalNotifier.Permission.ALLOWED
+        bench.desk.language = "es"
+        val btc = bench.host.theses.create(draft("BTC"), null, bench.clock)
+        val live = ReminderCenter.of(bench.host)
+        runCurrent()
+        assertTrue(live.schedule(btc.id, btc.symbol, bench.clock + 3 * 86_400_000L) is ReminderCenter.Outcome.Scheduled)
+        assertEquals("Tu recordatorio para revisar una tesis.", bench.notifier.notice(id(btc))?.body)
+        bench.desk.language = "en"
+        bench.host.languageChanged()
+        assertEquals("Your reminder to review a thesis.", bench.notifier.notice(id(btc))?.body)
+        assertEquals(setOf(id(btc)), bench.notifier.pendingIds())
+    }
 }

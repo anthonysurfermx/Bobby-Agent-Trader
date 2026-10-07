@@ -1,6 +1,7 @@
 package xyz.bobbyprotocol.android.v18.reminders
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -17,6 +18,7 @@ import xyz.bobbyprotocol.android.v18.ThesisDraft
 import xyz.bobbyprotocol.android.v18.ThesisHorizon
 import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.V18Routes
+import xyz.bobbyprotocol.android.v18.V18Runtime
 import xyz.bobbyprotocol.android.v18.V18TestBench
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
 
@@ -242,6 +244,9 @@ class ReminderIntentTest {
         assertNull("before the page is ready the tap stays stored", bench.shell.sheetRoute)
         bench.desk.onGlass = true
         bench.host.pageReady()
+        runCurrent()
+        assertNull("the page asked for its session and is still waking up: a sheet now would sit over a glass that never drew", bench.shell.sheetRoute)
+        advanceTimeBy(V18Runtime.SETTLE_MS)
         runCurrent()
         assertEquals(V18Routes.THESIS_REVIEW, bench.shell.sheetRoute)
         assertEquals("the review opens on that thesis", nvda.id, bench.host.focus.thesisId)

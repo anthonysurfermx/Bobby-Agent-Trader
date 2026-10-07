@@ -79,6 +79,12 @@ interface V18Host {
     fun startRead(symbol: String, name: String, isEquity: Boolean, question: String): Boolean
     /** Tells the page its state changed (a nudge appeared, went away or was reworded). */
     fun sessionChanged()
+    /**
+     * Bobby is listening, speaking or answering on the glass. A sheet the person did not just ask
+     * for (one that comes back by itself after a sign-in) waits while this is true: opening it
+     * would close the mic, stop the voice and cover the read.
+     */
+    val glassBusy: Boolean
     /** `light`, `soft`, `medium`, `rigid`, `heavy`, `selection`, `success`, `warning`, `error`. */
     fun haptic(kind: String)
 
@@ -132,6 +138,8 @@ interface V18Host {
     fun onAccountChanged(listener: () -> Unit): () -> Unit
     /** The risk notice was withdrawn: cancel what was planned, keep nothing new. */
     fun onConsentWithdrawn(listener: () -> Unit): () -> Unit
+    /** The app speaks another language now (`language` is already the new one): lines the phone holds for later are written again in it. */
+    fun onLanguageChanged(listener: () -> Unit): () -> Unit
     /**
      * The account `owner` was deleted: remove everything this phone keeps for it. Runs on the main
      * thread while the repository still holds its lock: local removals only, no network, no suspension.

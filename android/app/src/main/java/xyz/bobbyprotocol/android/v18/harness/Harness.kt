@@ -53,6 +53,9 @@ object Harness {
                 }
             }
         }
+        // What was erased is no longer named in the history of what the glass said: a move line's id
+        // carries the asset and the day it was asked about.
+        center.onErased = { if (center.owner == host.owner) host.nudges.forgetIds(listOf(HarnessNudges.MOVE_KEY + ".")) }
         center.load(host.owner)
 
         // From the first delivered read. Never the question: a symbol, a name, a price.
@@ -63,6 +66,9 @@ object Harness {
         host.onAppActive { host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.appActive() } }
         host.onAccountChanged { host.scope.launch(start = CoroutineStart.UNDISPATCHED) { center.accountChanged() } }
         host.onConsentWithdrawn { center.consentChanged() }
+        // The app speaks another language: the lines the phone holds for later are written again in it now,
+        // not the next time the glass happens to draw.
+        host.onLanguageChanged { center.rewriteWords() }
         host.onAccountDeleted { owner -> center.accountDeleted(owner) }
         host.onEraseEverything { owner -> center.erasedEverything(owner) }
 

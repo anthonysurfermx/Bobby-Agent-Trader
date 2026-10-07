@@ -14,6 +14,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import xyz.bobbyprotocol.android.billing.BillingOutcome
 import xyz.bobbyprotocol.android.v18.notify.LocalNotice
+import xyz.bobbyprotocol.android.v18.notify.MemoryLocalNotifier
 
 /**
  * The host every 1.8 feature builds on. The nudge cases are the session and bridge cases of
@@ -373,10 +374,170 @@ class V18RuntimeTest {
         assertTrue("not before the current notice is accepted", opened.isEmpty())
         bench.desk.riskNotice = RiskNotice.ACCEPTED
         bench.host.readFinished(); runCurrent()
+        assertTrue("and not before the page that just loaded has woken up", opened.isEmpty())
+        advanceTimeBy(V18Runtime.SETTLE_MS); runCurrent()
         assertEquals(listOf(tap), opened)
         bench.host.appBecameActive(); runCurrent()
         assertEquals("consumed once: a later foreground never replays it", 1, opened.size)
         assertNull(bench.host.takeNotificationTap())
+    }
+
+    @Test fun aTapOpensOverAPageThatHasWokenUpNotOverOneThatOnlyAskedForItsSession() = runTest {
+        // A cold start from a notification. The page asks for its session first and wakes up after;
+        // a sheet over it stops its clock, so a board opened at once would sit over a glass that
+        // never drew, and the question its row asks would reach a page that is not listening yet.
+        val bench = V18TestBench(backgroundScope)
+        val opened = ArrayList<Map<String, String>>()
+        bench.host.onNotificationTap("follow-up") { opened.add(it); bench.host.present(V18Routes.FOLLOW_UP) }
+        val tap = mapOf(LocalNotice.KIND to "follow-up", "step" to "week")
+        bench.desk.onGlass = false
+        bench.host.noteTap(tap)
+        bench.desk.onGlass = true
+        bench.host.pageReady(); runCurrent()
+        assertTrue("the page only just asked for its session", opened.isEmpty())
+        advanceTimeBy(V18Runtime.SETTLE_MS - 1); runCurrent()
+        assertTrue("it is still waking up", opened.isEmpty())
+
+        // The person opens the profile meanwhile: the page stands still under it, so its time starts over.
+        bench.host.present("account")
+        advanceTimeBy(10_000L); runCurrent()
+        assertTrue("a page under a sheet does not wake up, however long it waits", opened.isEmpty())
+        bench.closeSheet(); runCurrent()
+        advanceTimeBy(V18Runtime.SETTLE_MS - 1); runCurrent()
+        assertTrue(opened.isEmpty())
+        advanceTimeBy(1); runCurrent()
+        assertEquals("once it has had its time in front, the tap opens", listOf(tap), opened)
+        assertEquals(V18Routes.FOLLOW_UP, bench.shell.sheetRoute)
+
+        // The app going behind starts the wait over too, and coming back resumes it.
+        bench.closeSheet(); runCurrent()
+        bench.host.pageReady()
+        bench.host.noteTap(tap); runCurrent()
+        bench.shell.active = false
+        advanceTimeBy(V18Runtime.SETTLE_MS * 3); runCurrent()
+        assertEquals("nothing opens behind", 1, opened.size)
+        bench.shell.active = true
+        bench.host.appBecameActive(); runCurrent()
+        advanceTimeBy(V18Runtime.SETTLE_MS); runCurrent()
+        assertEquals(2, opened.size)
+
+        // A page that has been on the glass all along is not made to wait again.
+        bench.closeSheet(); runCurrent()
+        bench.host.noteTap(tap); runCurrent()
+        assertEquals("a warm tap opens at once", 3, opened.size)
+    }
+
+    @Test fun aQuestionThePageDidNotTakeIsOfferedAgainUntilItAsksAndNeverTwice() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        // The page is not on its idle home yet (it is waking up, or the sheet has only just left):
+        // it lets `ask.start` pass without a word, and the token stays unused.
+        bench.desk.pageTakesAskStart = false
+        bench.host.present(V18Routes.FOLLOW_UP)
+        assertTrue(bench.host.startRead("NVDA", "NVIDIA", true, "How does NVDA look today?"))
+        runCurrent()
+        val first = bench.desk.events("ask.start").single()
+        val token = first.getString("token")
+        assertTrue(bench.desk.tokenWaiting(token))
+
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS); runCurrent()
+        val offers = bench.desk.events("ask.start")
+        assertEquals("the page did not ask: the same question is offered again", 2, offers.size)
+        assertEquals("with the same single-use token, so it can only ever be asked once", token, offers[1].getString("token"))
+        assertEquals("How does NVDA look today?", offers[1].getString("question"))
+
+        // Not while something is over the glass: the offer waits for the next turn.
+        bench.host.present("account")
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS); runCurrent()
+        assertEquals(2, bench.desk.events("ask.start").size)
+        bench.closeSheet(); runCurrent()
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS); runCurrent()
+        assertEquals(3, bench.desk.events("ask.start").size)
+
+        // The page asks: its `ask` used the token, and nothing more is sent.
+        bench.desk.pageAsks(token)
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS * 10); runCurrent()
+        assertEquals("a question that was taken is never offered again", 3, bench.desk.events("ask.start").size)
+
+        // A page that never takes it is not asked for ever.
+        assertTrue(bench.host.startRead("BTC", "Bitcoin", false, "How does BTC look today?"))
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS * 60); runCurrent()
+        assertEquals("the first offer and five more, then it lets go", 3 + 1 + V18Runtime.ASK_OFFERS, bench.desk.events("ask.start").size)
+
+        // Another reader takes the phone: the previous one's question is not offered to them.
+        assertTrue(bench.host.startRead("ETH", "Ethereum", false, "How does ETH look today?"))
+        val before = bench.desk.events("ask.start").size
+        bench.changeAccount("account-b")
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS * 10); runCurrent()
+        assertEquals(before, bench.desk.events("ask.start").size)
+
+        // A page on its idle home takes it at once: one event, as before.
+        val idle = V18TestBench(backgroundScope)
+        assertTrue(idle.host.startRead("NVDA", "NVIDIA", true, "What changed in NVDA since I asked?"))
+        advanceTimeBy(V18Runtime.ASK_OFFER_MS * 10); runCurrent()
+        assertEquals(1, idle.desk.events("ask.start").size)
+    }
+
+    @Test fun aSecondHostTakesTheGlassAndTheFirstNeverSpeaksWithItsLines() = runTest {
+        // The nudge centre is the process's. If a second activity is ever built while the first is
+        // alive, its features register on the same centre; when it goes away its lines must go with
+        // it, or the first glass would show a line whose tap retires it and opens nothing.
+        val store = MemoryKeyValueStore()
+        val nudges = NudgeCenter(store) { 1_800_000_000_000L }
+        val deskA = FakeDesk(); val shellA = FakeShell()
+        val hostA = V18Runtime(deskA, store, nudges, MemoryLocalNotifier { 1_800_000_000_000L }, backgroundScope, ReadShelf(), V18Taps()) { 1_800_000_000_000L }
+        hostA.start(); hostA.attach(shellA)
+        var actedByA = 0
+        hostA.nudges.register(source("credits", NudgePriority.CREDITS, act = { actedByA += 1; hostA.present(V18Routes.CREDITS) }))
+        assertEquals("credits.one", hostA.currentNudge()?.id)
+
+        val deskB = FakeDesk(); val shellB = FakeShell()
+        val hostB = V18Runtime(deskB, store, nudges, MemoryLocalNotifier { 1_800_000_000_000L }, backgroundScope, ReadShelf(), V18Taps()) { 1_800_000_000_000L }
+        hostB.start(); hostB.attach(shellB)
+        assertTrue("the newer host starts from a clean centre", nudges.sourceKeys.isEmpty())
+        var actedByB = 0
+        hostB.nudges.register(source("credits", NudgePriority.CREDITS, act = { actedByB += 1; hostB.present(V18Routes.CREDITS) }))
+        assertEquals("credits.one", hostB.currentNudge()?.id)
+
+        // The second activity goes away (Back).
+        hostB.close()
+        assertTrue("its lines go with it", nudges.sourceKeys.isEmpty())
+        assertNull("the first glass says nothing rather than something it cannot honour", hostA.currentNudge())
+        assertEquals("gone", hostA.nudgeAct("credits.one").getString("status"))
+        assertFalse("a tap on nothing retires nothing", nudges.isRetired("credits.one"))
+        assertEquals(0, actedByA + actedByB)
+        assertTrue(shellA.opened.isEmpty() && shellB.opened.isEmpty())
+
+        // The other order: the older host closing does not take the newer one's lines.
+        val hostC = V18Runtime(FakeDesk(), store, nudges, MemoryLocalNotifier { 1_800_000_000_000L }, backgroundScope, ReadShelf(), V18Taps()) { 1_800_000_000_000L }
+        hostC.start(); hostC.attach(FakeShell())
+        hostC.nudges.register(source("credits", NudgePriority.CREDITS))
+        hostA.close()
+        assertEquals("credits.one", hostC.currentNudge()?.id)
+    }
+
+    @Test fun theGlassIsBusyWhileBobbyListensSpeaksOrAnswers() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        assertFalse(bench.host.glassBusy)
+        bench.shell.voiceBusy = true
+        assertTrue(bench.host.glassBusy)
+        bench.shell.voiceBusy = false
+        bench.desk.busy = true
+        assertTrue(bench.host.glassBusy)
+        bench.desk.busy = false
+        assertFalse(bench.host.glassBusy)
+    }
+
+    @Test fun aLanguageChangeIsHeardByWhoeverListensUntilTheHostCloses() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        var heard = 0
+        val stop = bench.host.onLanguageChanged { heard += 1 }
+        bench.host.onLanguageChanged { throw IllegalStateException("one listener failing never stops the others") }
+        bench.desk.language = "es"
+        bench.host.languageChanged()
+        assertEquals(1, heard)
+        stop()
+        bench.host.languageChanged()
+        assertEquals(1, heard)
     }
 
     @Test fun aNotificationPlannedForAnotherReaderOpensNothing() = runTest {
