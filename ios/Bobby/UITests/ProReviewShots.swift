@@ -1,7 +1,8 @@
 import XCTest
 
 /// App Review captures for the Bobby Pro subscription (Debug build; nothing is ever bought):
-///   · the profile's Bobby Pro and Restore Purchases rows, in the real Núcleo (live server, signed out);
+///   · the Bobby Pro and Restore Purchases rows on the Credits screen (profile › Credits since 1.8),
+///     in the real Núcleo (live server, signed out);
 ///   · the Bobby Pro sheet with a live RevenueCat Test Store offering: its price and period,
 ///     renewal terms, enabled Subscribe, Restore Purchases and legal links. This is Test Store
 ///     evidence; it does not verify Apple sandbox purchases or an App Store product price.
@@ -32,8 +33,9 @@ final class ProReviewShots: XCTestCase {
         let avatar = app.webViews.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Account and progress")).firstMatch
         hittable(avatar, timeout: 30)
         avatar.tap()
+        openCredits()
         scrollTo(app.buttons["account-restore"])
-        hittable(app.buttons["account-pro"])
+        hittable(app.buttons["credits-pro"])
         Thread.sleep(forTimeInterval: 1)
         save("bobby-profile-pro-rows")
     }
@@ -41,9 +43,11 @@ final class ProReviewShots: XCTestCase {
     func testPaywallPurchasable() {
         app.launchArguments = ["-qa-profile", "signed-in", "-qa-pieces", "12", "-qa-sales-open"] + common
         app.launch()
-        let pro = app.buttons["account-pro"]
-        scrollTo(pro)
+        XCTAssertTrue(app.buttons["account-credits"].waitForExistence(timeout: 30), "Missing the profile's Credits row")
         XCTAssertTrue(app.buttons["account-sign-out"].exists, "The isolated QA profile must remain signed in")
+        openCredits()
+        let pro = app.buttons["credits-pro"]
+        scrollTo(pro)
         pro.tap()
         XCTAssertTrue(app.staticTexts["paywall-price"].waitForExistence(timeout: 30), "The RevenueCat Test Store price never loaded")
         let subscribe = app.buttons["paywall-subscribe"]
@@ -59,9 +63,19 @@ final class ProReviewShots: XCTestCase {
         save("bobby-paywall-review")
     }
 
+    /// Since 1.8 Bobby Pro and Restore Purchases live on the Credits screen, one row into the profile.
+    private func openCredits() {
+        let credits = app.buttons["account-credits"]
+        scrollTo(credits)
+        credits.tap()
+        XCTAssertTrue(app.buttons["account-restore"].waitForExistence(timeout: 20), "The Credits screen did not open")
+    }
+
     private func scrollTo(_ element: XCUIElement) {
         XCTAssertTrue(element.waitForExistence(timeout: 30), "Missing \(element)")
-        let scroll = app.scrollViews.firstMatch
+        // The sheet on top is the last scroll view (Credits opens over the profile).
+        let scrolls = app.scrollViews
+        let scroll = scrolls.element(boundBy: max(0, scrolls.count - 1))
         for _ in 0..<8 where !element.isHittable { scroll.swipeUp() }
         hittable(element)
     }
