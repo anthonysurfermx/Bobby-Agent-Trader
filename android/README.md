@@ -27,7 +27,7 @@ The source is at **1.2.0 (code 10)**, Bobby 1.8, described in the next section. 
 
 ### Where it lives
 
-- `v18/V18Host.kt` is the one interface a feature uses to reach the app; `v18/V18Runtime.kt` implements it over the session (`V18Desk`) and the activity (`V18Shell`), with no Android classes. Unit tests build the same runtime over the fakes in `app/src/test/java/…/v18/V18TestKit.kt`.
+- `v18/V18Host.kt` is the one interface a feature uses to reach the app; `v18/V18Runtime.kt` implements it over the session (`V18Desk`) and the activity (`V18Shell`), with no Android classes. Unit tests build the same runtime over the fakes in `app/src/sharedTest/java/…/v18/V18TestKit.kt`, and the instrumented tests draw the real screens over them.
 - One package per feature under `v18/`: `credits`, `invite`, `theses`, `memory`, `reminders`, `harness` (the follow-ups). `v18/V18.kt` registers them and holds the few lines where one feature tells another something.
 - The page's side: `session.nudge` in every session state, the bridge methods `nudge.seen` and `nudge.act`, and the event `ask.start`. The page may open exactly what 1.1.4 could (`V18Routes.PAGE_OPENABLE`); the seven 1.8 routes are native-only.
 - Screens: `ui/v18/V18Sheets.kt` draws each route from its own file, built with `ui/v18/QuietKit.kt` (nothing green: a colour means a verdict only). The 1.1.4 routes `memory` and `invite` are drawn by the 1.8 screens; `ui/BobbySheet.kt` no longer has them.

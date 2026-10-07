@@ -11,7 +11,7 @@ import xyz.bobbyprotocol.android.v18.notify.LocalNotifier
 // Bobby 1.8 on Android: the ONE interface a feature (credits, invitations, theses, memory,
 // reminders, follow-ups) uses to reach the app. A feature never touches NucleoSession or
 // MainActivity. The app's implementation is V18Runtime; unit tests build the same V18Runtime over
-// the fakes in app/src/test/…/v18/V18TestKit.kt, so what a test exercises is what ships.
+// the fakes in app/src/sharedTest/…/v18/V18TestKit.kt, so what a test exercises is what ships.
 // Everything here is called on the main thread.
 
 /** Where the person stands with the risk notice. */

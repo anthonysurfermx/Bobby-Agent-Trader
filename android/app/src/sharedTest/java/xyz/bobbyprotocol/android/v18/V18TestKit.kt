@@ -24,9 +24,21 @@ import xyz.bobbyprotocol.android.v18.notify.MemoryLocalNotifier
 // Time is `bench.clock` (the centre, the notifier and `host.now()` all read it). Work the host
 // posts for "the next turn" (a sheet handing over, a tapped notification, `ask.start` after a
 // sheet) runs on `runCurrent()`.
+//
+// This file is in `src/sharedTest`: the JVM tests and the instrumented tests both compile it. On
+// an emulator the same bench stands under the real screens (androidTest/…/v18/V18Stage.kt), with
+// the app's own words and a repository whose transport the test owns.
 
-/** The session's side, in memory. */
-class FakeDesk : V18Desk {
+/**
+ * The session's side, in memory.
+ * `words` is the app's own lookup for a language (an instrumented test reads the bundled
+ * catalogs); without it, English and Spanish as written at the call site. `network` is a
+ * repository whose transport the test owns; without it, any use of the network fails the test.
+ */
+class FakeDesk(
+    private val words: ((language: String, en: String, es: String) -> String)? = null,
+    private val network: BobbyRepository? = null,
+) : V18Desk {
     override var owner: String? = null
     override val signedIn: Boolean get() = owner != null
     override var accountEpoch = 1L
@@ -43,7 +55,7 @@ class FakeDesk : V18Desk {
     var sessionChanges = 0
     private var tokens = 0
 
-    override fun text(en: String, es: String): String = if (language == "es") es else en
+    override fun text(en: String, es: String): String = words?.invoke(language, en, es) ?: if (language == "es") es else en
     override fun emit(name: String, payload: JSONObject) { events.add(name to payload) }
     override fun sessionChanged() { sessionChanges += 1 }
     override fun readToken(symbol: String, name: String, isEquity: Boolean, question: String): String = "token-${++tokens}-$symbol"
@@ -53,7 +65,7 @@ class FakeDesk : V18Desk {
     override var shortcuts: List<String> = emptyList()
     override fun keepShortcuts(symbols: List<String>) { shortcuts = symbols }
     override val repository: BobbyRepository
-        get() = throw IllegalStateException("No network in unit tests: put a small interface in front of the repository and fake it")
+        get() = network ?: throw IllegalStateException("No network in unit tests: put a small interface in front of the repository and fake it")
 
     fun events(name: String): List<JSONObject> = events.filter { it.first == name }.map { it.second }
 }
@@ -81,16 +93,20 @@ class FakeShell : V18Shell {
     var restores = 0
     var managementUrl: String? = null
     internal var onClosed: () -> Unit = {}
+    /** For a test that draws the sheets: the route that is up now, or null. */
+    var onSheetChanged: (String?) -> Unit = {}
 
     override fun openSheet(route: String) {
         check(sheetRoute == null) { "two sheets at once: $sheetRoute and $route" }
         sheetRoute = route
         opened.add(route)
+        onSheetChanged(route)
     }
 
     override fun dismissSheet() {
         if (sheetRoute == null) return
         sheetRoute = null
+        onSheetChanged(null)
         onClosed()
     }
 
@@ -111,9 +127,9 @@ class FakeShell : V18Shell {
 }
 
 /** The real host with everything around it in memory. Pass `backgroundScope` from `runTest`. */
-class V18TestBench(scope: CoroutineScope, val store: MemoryKeyValueStore = MemoryKeyValueStore(), withScreen: Boolean = true) {
+class V18TestBench(scope: CoroutineScope, val store: MemoryKeyValueStore = MemoryKeyValueStore(), withScreen: Boolean = true,
+                   val desk: FakeDesk = FakeDesk()) {
     var clock = 1_800_000_000_000L
-    val desk = FakeDesk()
     val shell = FakeShell()
     val notifier = MemoryLocalNotifier { clock }
     val nudges = NudgeCenter(store) { clock }
