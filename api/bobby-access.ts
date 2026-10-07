@@ -132,7 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       access, levels, referral,
       // The terms the app shows (single source: api/_lib/desk-levels.ts).
-      // freeReadsPerWeek mirrors bobby_consume_read (20261007190000): null while the free weekly cap is off.
+      // freeReadsPerWeek mirrors bobby_consume_read (20261007161949): null while the free weekly cap is off.
       plans: { limits: LEVEL_LIMITS, referral: { maxFriends: REFERRAL.maxFriends, rewardDays: REFERRAL.rewardDays }, freeReadsPerWeek: paywallOn() ? FREE_READS.weekly : null },
       signedIn: Boolean(identity),
       subscription: publicSubscription(subscription),

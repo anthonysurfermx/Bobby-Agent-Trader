@@ -1,4 +1,4 @@
-// Actual PostgreSQL regressions for 20261007190000_double_free_reads.sql: a guest gets 6 reads per 30 days
+// Actual PostgreSQL regressions for 20261007161949_double_free_reads.sql: a guest gets 6 reads per 30 days
 // (was 3), a free account 20 per rolling 7 days (was 10), the guest pool of one network is 200 per 7 days
 // (was 100), and everything around those three numbers is as before: gifted reads spent only at the cap and
 // never counted toward it, Bobby Pro without a cap, the legacy caller without an install, atomic last slots,
@@ -28,7 +28,7 @@ const BASE = [
   '20260930121932_serialize_guest_network_quota.sql',
   '20261001160000_coupons_bonus_usage.sql',
 ];
-const MIGRATION = readFileSync(`${DIR}/20261007190000_double_free_reads.sql`, 'utf8');
+const MIGRATION = readFileSync(`${DIR}/20261007161949_double_free_reads.sql`, 'utf8');
 const pool = new pg.Pool({ connectionString: url, max: 24 });
 let checks = 0;
 const eq = (got: unknown, want: unknown, what: string) => { assert.deepEqual(got, want, what); checks++; };

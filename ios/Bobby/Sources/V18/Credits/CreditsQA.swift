@@ -73,14 +73,14 @@ enum CreditsQA {
     /// A free account mid-week, with gifted reads on two levels.
     static var free: CreditsSnapshot {
         CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 3, limit: 20, remaining: 17, resetsAt: iso(daysFromNow: 3), paywall: true, bonus: 3),
-                        meters: meters(meter(used: 1, limit: 6, bonus: 2, windowDays: 7, resetsInDays: 4), meter(used: 0, limit: 1, windowDays: 7)),
+                        meters: meters(meter(used: 1, limit: 6, bonus: 2, windowDays: 7, resetsInDays: 4), meter(used: 0, limit: 2, windowDays: 7)),
                         referral: referral(accepted: 1), proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 
     /// A free account with nothing left this week and no gifts.
     static var zero: CreditsSnapshot {
         CreditsSnapshot(access: BobbyReadAccess(tier: "free", used: 20, limit: 20, remaining: 0, resetsAt: iso(daysFromNow: 2), paywall: true),
-                        meters: meters(meter(used: 6, limit: 6, windowDays: 7, resetsInDays: 2), meter(used: 1, limit: 1, windowDays: 7, resetsInDays: 5)),
+                        meters: meters(meter(used: 6, limit: 6, windowDays: 7, resetsInDays: 2), meter(used: 2, limit: 2, windowDays: 7, resetsInDays: 5)),
                         referral: referral(), proPurchasable: true, signedIn: true, freeReadsPerWeek: 20, rewardDays: 30, maxFriends: 5)
     }
 

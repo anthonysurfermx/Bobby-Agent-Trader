@@ -1,6 +1,6 @@
 // ============================================================
 // Metered access to the desk read, shared by the web, iOS and Android (bobby_consume_read,
-// migration 20260927120000; the numbers are FREE_READS in desk-levels.ts, doubled by 20261007190000):
+// migration 20260927120000; the numbers are FREE_READS in desk-levels.ts, doubled by 20261007161949):
 //   · anonymous device (sends x-bobby-device): 6 reads per 30 days → then sign-in is required;
 //   · signed in: 20 reads per rolling 7 days → then Bobby Pro, while BOBBY_PAYWALL=on;
 //   · Bobby Pro (Stripe on the web, Apple on iOS): no cap.

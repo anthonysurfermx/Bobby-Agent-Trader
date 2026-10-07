@@ -20,15 +20,16 @@ export const isDeskLevel = (v: unknown): v is DeskLevel => typeof v === 'string'
 
 /** The Rápido reads a person gets without paying: a guest per 30 days, a free account per rolling 7 days.
  *  Doubled on 2026-10-07 (owner's decision: see more of Bobby before deciding to pay). The meter itself is SQL
- *  (bobby_consume_read / bobby_read_access, 20261007190000) and states the same two numbers;
+ *  (bobby_consume_read / bobby_read_access, 20261007161949) and states the same two numbers;
  *  scripts/test-free-reads-pg.mts fails if the two places disagree. */
 export const FREE_READS = { guest: 6, weekly: 20 } as const;
 
-/** [uses, window in days] per plan for the premium levels. Profundo for guests and free accounts doubled with
- *  the reads (2026-10-07); Máximo did not: two a week would be 8–9 a month against Bobby Pro's 10. */
+/** [uses, window in days] per plan for the premium levels. What a guest and a free account get doubled with the
+ *  reads (2026-10-07, owner's decision, Máximo included: a free account's two a week come to 8–9 a month, close
+ *  to the 10 of Bobby Pro, whose advantage is Quick without a cap and 60 Profundo). */
 export const LEVEL_LIMITS = {
   anon: { profundo: [2, 30], maximo: [0, 30] },
-  free: { profundo: [6, 7], maximo: [1, 7] },
+  free: { profundo: [6, 7], maximo: [2, 7] },
   pro: { profundo: [60, 30], maximo: [10, 30] },
 } as const;
 

@@ -239,10 +239,10 @@ enum NucleoFixtures {
                 let reset = ISO8601DateFormatter().string(from: Date().addingTimeInterval(4 * 86_400))
                 reply["levels"] = ["tier": "free", "levels": [
                     "profundo": ["used": 1, "limit": 6, "remaining": 5, "windowDays": 7, "resetsAt": reset],
-                    "maximo": ["used": 0, "limit": 1, "remaining": 1, "windowDays": 7, "resetsAt": reset]]]
+                    "maximo": ["used": 0, "limit": 2, "remaining": 2, "windowDays": 7, "resetsAt": reset]]]
                 reply["referral"] = ["code": "BQ7K2MXP", "url": "https://bobbyprotocol.xyz/desk?ref=BQ7K2MXP", "accepted": 2, "max": 5,
                                      "rewardDays": 30, "proUntil": NSNull()]
-                reply["plans"] = ["limits": ["anon": ["profundo": [2, 30], "maximo": [0, 30]], "free": ["profundo": [6, 7], "maximo": [1, 7]],
+                reply["plans"] = ["limits": ["anon": ["profundo": [2, 30], "maximo": [0, 30]], "free": ["profundo": [6, 7], "maximo": [2, 7]],
                                              "pro": ["profundo": [60, 30], "maximo": [10, 30]]],
                                   "referral": ["maxFriends": 5, "rewardDays": 30], "freeReadsPerWeek": NSNull()]
             }
