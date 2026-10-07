@@ -357,7 +357,37 @@ function showIdleSuggestions(){
     var question = RMOD.t(LANG, 'follow.how', { symbol:sym });
     list.push({ label:CHIP_NAMES.hasOwnProperty(sym) ? CHIP_NAMES[sym] : sym, ariaLabel:question, action:{ question:question, symbol:sym, starter:true } });
   });
-  if (list.length) chipsShow(list, true); else chipsHide();
+  list = withNudge(list);
+  if (list.length) chipsShow(list, nudgeEyebrow()); else chipsHide();
+}
+/* ---- the nudge: ONE line and ONE chip that native writes (credits, memory, theses, reminders, invites).
+   Native owns the copy, what the tap does and how often it may show; the page draws it first in the chip
+   row, reports that it was seen and reports the tap. Nothing here names a feature. ---- */
+var NUDGE_SEEN = {}, NUDGE_SHOWN = null, NUDGE_BUSY = false;
+function nudgeNow(){
+  var n = SES && SES.nudge;
+  return n && typeof n.id === 'string' && n.id && typeof n.cta === 'string' && n.cta ? n : null;
+}
+function withNudge(list){
+  var n = nudgeNow();
+  NUDGE_SHOWN = n ? n.id : null;
+  if (!n) return list;
+  if (!NUDGE_SEEN[n.id]){ NUDGE_SEEN[n.id] = 1; bcall('nudge.seen', { id: n.id }).catch(noop); }
+  var text = typeof n.text === 'string' ? n.text : '';
+  return [{ label: n.cta, ariaLabel: text ? text + '. ' + n.cta : n.cta, style: 'nudge', action: { nudge: n.id } }].concat(list);
+}
+function nudgeEyebrow(){ var n = nudgeNow(); return n && typeof n.text === 'string' && n.text ? n.text : true; }
+function nudgeAct(id){
+  if (NUDGE_BUSY) return;
+  NUDGE_BUSY = true;
+  bcall('nudge.act', { id: id }).catch(noop).then(function(){ NUDGE_BUSY = false; });
+}
+/* the session changed: a nudge that came, went or was replaced redraws the row it lives in */
+function nudgeSync(){
+  var n = nudgeNow(), id = n ? n.id : null;
+  if (id === NUDGE_SHOWN || !ST) return;
+  if (ST.name === 'IDLE') showIdleSuggestions();
+  else if (ST.name === 'FOLLOWUPS' && READ && READ.model) chipsShow(withNudge(RMOD.followUps(READ.model, SUGG || {}, LANG)), nudgeEyebrow());
 }
 function receiveSuggestions(reply){
   SUGG = reply;
@@ -369,7 +399,7 @@ function chipsShow(list, eyebrow){
   var x = 20;
   list.forEach(function(c, i){
     /* `apple`: the Sign in chip (white, the Android neutral account mark); `pro`: the Bobby Pro chip */
-    var style = c.style === 'apple' || c.style === 'pro' ? ' ' + c.style : '';
+    var style = c.style === 'apple' || c.style === 'pro' || c.style === 'nudge' ? ' ' + c.style : '';
     var b = mk('button', 'chip' + (i === 0 ? ' first' : '') + style, c.style === 'apple' ? null : c.label); b.type = 'button'; b.setAttribute('data-hit', 'chip'); b.setAttribute('data-i', String(i));
     if (c.style === 'apple'){ var lg = mk('span', 'lg', '◉'); lg.setAttribute('aria-hidden', 'true'); b.appendChild(lg); b.appendChild(D.createTextNode(c.label)); b.setAttribute('aria-label', c.label); }
     else if (c.ariaLabel) b.setAttribute('aria-label', c.ariaLabel);
@@ -379,7 +409,8 @@ function chipsShow(list, eyebrow){
     ch.p.to(1, 'emit', null, i * 0.07); ch.o.tween(1, 0.2, E.fade, i * 0.07);
   });
   A.chipMax = Math.max(0, x - 8 - 370);
-  if (eyebrow){ el.eyebrow.textContent = tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
+  /* `eyebrow` true: the usual line; a string: the nudge's own line (native-localized) */
+  if (eyebrow){ el.eyebrow.textContent = typeof eyebrow === 'string' ? eyebrow : tt('chips.eyebrow'); A.eyebrowO.tween(1, 0.24, E.fade); A.eyebrowY.set(6); A.eyebrowY.to(0, 'emit'); }
 }
 function chipsHide(instant){
   var dead = A.chips, n = dead.length; A.chips = [];
