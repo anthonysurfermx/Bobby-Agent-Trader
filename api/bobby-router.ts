@@ -1,7 +1,7 @@
 // ============================================================
 // POST /api/bobby-router — Hybrid intent classifier
 // Layer 1: deterministic regex (free, instant)
-// Layer 2: Haiku classifier (cheap, only for ambiguous)
+// Layer 2: plan-selected classifier (only for ambiguous)
 // Returns: { intent, confidence, language, reason }
 // ============================================================
 
@@ -11,7 +11,8 @@ import { callLlm } from './_lib/llm.js';
 import { hasAppTextBackend } from './_lib/app-model.js';
 import { resolveAppRequestTier } from './_lib/app-model-access.js';
 
-export const config = { maxDuration: 10 };
+// Allow plan verification before the separately bounded classifier call.
+export const config = { maxDuration: 30 };
 
 
 const VALID_INTENTS = [
