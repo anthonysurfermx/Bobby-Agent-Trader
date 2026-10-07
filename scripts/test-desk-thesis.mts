@@ -24,7 +24,7 @@ process.env.OPENAI_API_KEY = 'test-openai';
 process.env.ANTHROPIC_API_KEY = 'test-anthropic';
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://bobby.test';
 process.env.RATE_LIMIT_SALT = 'test-salt';
-for (const key of ['BOBBY_APP_TEXT_MODEL', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_LLM_PRIMARY', 'BOBBY_THESIS_REVIEW', 'BOBBY_MEMORY']) delete process.env[key];
+for (const key of ['BOBBY_APP_TEXT_MODEL', 'BOBBY_PRO_TEXT_MODEL', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_LLM_PRIMARY', 'BOBBY_THESIS_REVIEW', 'BOBBY_MEMORY']) delete process.env[key];
 
 // waitUntil (@vercel/functions) reads the request context from this symbol: capture what the handler defers.
 const deferred: Promise<unknown>[] = [];
@@ -108,12 +108,13 @@ const defaultReviewer = reviewerReply;
 /** Lets one test answer a model call itself (an outage, a cut-off answer); null falls through to the default. */
 let intercept: (c: Call) => Response | null = () => null;
 let levelGate: Record<string, unknown> = { allowed: true, code: null, useId: 91 };
+let accountTier: 'free' | 'pro' = 'free';
 const deskMock = () => mock((c) => {
   if (c.url.includes('rpc/bobby_consume_desk_quota')) return json(true);
-  if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, code: null, readId: 1, tier: 'free', used: 1, limit: 10 });
+  if (c.url.includes('rpc/bobby_consume_read')) return json({ allowed: true, code: null, readId: 1, tier: accountTier, used: 1, limit: 10 });
   if (c.url.includes('bobby_reads?id=eq.') && c.method === 'DELETE') return json([]);
   if (c.url.includes('rpc/bobby_llm_spend')) return json({ day: 0, month: 0 });
-  if (c.url.includes('rpc/bobby_consume_level')) return json({ ...levelGate, tier: 'free', used: 1, limit: 3, resetsAt: null });
+  if (c.url.includes('rpc/bobby_consume_level')) return json({ ...levelGate, tier: accountTier, used: 1, limit: 3, resetsAt: null });
   if (c.url.includes('bobby_level_uses?id=eq.') && c.method === 'DELETE') return json([]);
   if (c.url.includes('rpc/bobby_record_outcome')) return json(null);
   if (c.url.includes('bobby_llm_usage')) return json(null, 201);
@@ -414,6 +415,37 @@ try {
     eq(calls.find((c) => c.url.includes('bobby_llm_usage'))!.body.map((row: any) => [row.surface, row.level, row.role]), [...names, 'reviewer'].map((name) => ['desk', level, name]), `${level}: the reviewer's cost is logged on the desk surface at that level`);
     ok(calls.some((c) => c.url.includes('rpc/bobby_consume_level')), `${level}: a premium review spends the premium allowance, as a premium read does`);
   }
+  // Account model selection reaches the reviewer too; a thesis still cannot alter any debate call.
+  for (const tier of ['free', 'pro'] as const) {
+    accountTier = tier;
+    for (const level of ['rapido', 'profundo', 'maximo'] as const) {
+      const headers = { authorization: 'Bearer good-apple-token', 'x-bobby-tier': tier === 'free' ? 'pro' : 'free' };
+      const body = { level, tier: tier === 'free' ? 'pro' : 'free', model: 'claude-opus-5-5' };
+      const plainTier = await run(body, headers);
+      const plainTierModels = bodies(models());
+      const reviewedTier = await run({ ...body, thesis: THESIS() }, headers);
+      const plan = levelPlan(level, tier);
+      const names = level === 'maximo' ? ['alpha', 'red', 'rebuttal', 'cio', 'reviewer'] : ['alpha', 'red', 'cio', 'reviewer'];
+      const family = tier === 'pro' ? 'claude-opus-5-5' : 'claude-haiku-5-5';
+      eq([reviewedTier.statusCode, models().map(c => [byRole(c), hostOf(c.url), c.body.model])], [200, names.map(name => [name, 'api.anthropic.com', family])], `${tier} ${level}: every role and reviewer uses the server-confirmed account model`);
+      eq(bodies(debate()), plainTierModels, `${tier} ${level}: adding a thesis leaves every debate request byte-identical`);
+      const { review, ...rest } = reviewedTier.body;
+      eq([rest, review], [plainTier.body, { ...REVIEW, notChecked: EMPTY.notChecked }], `${tier} ${level}: the plain response gains only the bounded review`);
+      const call = roleCall('reviewer'), spec = reviewerSpec(plan);
+      eq([call.body.model, effortOf(call), ceilingOf(call), spec.timeoutMs], [family, 'low', REVIEWER_MAX_TOKENS, REVIEWER_TIMEOUT_MS], `${tier} ${level}: the reviewer inherits the family with its own small ceiling and timeout`);
+      eq(calls.find(c => c.url.includes('bobby_llm_usage'))!.body.map((row: any) => [row.level, row.role, row.model]), names.map(name => [level, name, family]), `${tier} ${level}: all actual models are recorded in the same level ledger`);
+      eq(calls.filter(c => c.url.includes('rpc/bobby_consume_read')).length, 1, `${tier} ${level}: the review consumes no extra read`);
+      eq(calls.filter(c => c.url.includes('rpc/bobby_consume_level')).length, level === 'rapido' ? 0 : 1, `${tier} ${level}: the review consumes no extra level allowance`);
+    }
+  }
+  // A reviewer returning from the emergency OpenAI provider must retain the Pro account model.
+  accountTier = 'pro'; process.env.BOBBY_LLM_PRIMARY = 'openai';
+  intercept = c => byRole(c) === 'reviewer' && hostOf(c.url) === 'api.openai.com' ? json({ error: { code: 'insufficient_quota' } }, 429) : null;
+  const reviewedFailover = await run({ thesis: THESIS() }, { authorization: 'Bearer good-apple-token' });
+  const reviewerCalls = models().filter(c => byRole(c) === 'reviewer');
+  eq([reviewedFailover.statusCode, reviewerCalls.map(c => [hostOf(c.url), c.body.model, ceilingOf(c)])], [200, [['api.openai.com', 'gpt-6-luna', REVIEWER_MAX_TOKENS], ['api.anthropic.com', 'claude-opus-5-5', REVIEWER_MAX_TOKENS]]], 'Pro reviewer retains Opus and its 2000-token ceiling when a provider fallback returns to Anthropic');
+  eq(reviewedFailover.body.review.supports, REVIEW.supports, 'the Pro reviewer fallback is still parsed and guarded');
+  intercept = () => null; delete process.env.BOBBY_LLM_PRIMARY; accountTier = 'free';
   { const max = await run({ thesis: THESIS(), level: 'maximo' }); eq([max.body.agents.scenarios, max.body.agents.rebuttal, inputOf(roleCall('reviewer')).desk.verdict], [SCEN, REBUTTAL, 'wait'], 'Máximo: scenarios and the second round reach the reply as always; the reviewer is told the verdict'); }
   // A refused level is refused before anything of the thesis is used.
   levelGate = { allowed: false, code: 'upgrade_required', useId: null };

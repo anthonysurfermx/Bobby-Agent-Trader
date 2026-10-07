@@ -10,7 +10,7 @@
 //
 // Notes:
 //   - Reuses the global market snapshot from /api/bobby-intel
-//   - Uses one Claude Haiku call to generate Alpha + Red Team + CIO
+//   - Uses the profile owner's account model to generate Alpha + Red Team + CIO
 //   - Writes private threads into forum_threads/forum_posts
 //   - Never executes real trades
 // ============================================================
@@ -23,7 +23,8 @@ import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { getBobbyControl, requireWritesOpen } from './_lib/control.js';
 import { externalEffectsAllowed, noteSuppressedEffect } from './_lib/effects.js';
 import { callLlm } from './_lib/llm.js';
-import { hasAppTextBackend } from './_lib/app-model.js';
+import { hasAppTextBackend, type AppTextTier } from './_lib/app-model.js';
+import { resolveAppWalletTier } from './_lib/app-model-access.js';
 
 export const config = { maxDuration: 120 };
 
@@ -235,8 +236,8 @@ async function fetchIntel(): Promise<IntelSnapshot | null> {
   return null;
 }
 
-async function callHaiku(system: string, userMsg: string, maxTokens = 1200): Promise<string> {
-  const { text } = await callLlm({ endpoint: 'user-cycle', system, user: userMsg, maxTokens });
+async function callProfileText(system: string, userMsg: string, maxTokens = 1200, tier: AppTextTier = 'free'): Promise<string> {
+  const { text } = await callLlm({ endpoint: 'user-cycle', system, user: userMsg, maxTokens, tier });
   return text;
 }
 
@@ -548,7 +549,8 @@ async function runSingleProfile(
   const now = new Date();
 
   const prompts = buildDebatePrompts(profile, intel);
-  const raw = await callHaiku(prompts.system, prompts.user, 1200);
+  const tier = await resolveAppWalletTier(profile.wallet_address);
+  const raw = await callProfileText(prompts.system, prompts.user, 1200, tier);
   const parsed = extractJsonPayload(raw);
   const debate = normalizeDebate(parsed, profile);
   const thread = await persistDebate(supabase, profile, intel, debate);
