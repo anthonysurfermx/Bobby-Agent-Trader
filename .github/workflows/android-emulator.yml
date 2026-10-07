@@ -6,7 +6,8 @@ name: Android emulator
 
 on:
   pull_request:
-    paths: ['android/**', '.github/workflows/android-emulator.yml']
+    # shared/harness holds the golden file every platform's follow-up planner must pass.
+    paths: ['android/**', 'shared/harness/**', '.github/workflows/android-emulator.yml']
   workflow_dispatch:
 
 permissions:
