@@ -16,6 +16,7 @@ import {
 } from './_lib/protocol-constants.js';
 import { BASE_SEPOLIA, DEFAULT_CHAIN, XLAYER } from './_lib/chains.js';
 import { readMcpCallFee } from './_lib/protocol-payments.js';
+import { appTextModel } from './_lib/app-model.js';
 
 export const config = { maxDuration: 10 };
 
@@ -29,7 +30,7 @@ const AGENTS = [
     id: 'alpha',
     name: 'Alpha Hunter',
     role: 'opportunity_scout',
-    model: 'gpt-4o-mini',
+    model: appTextModel(),
     description: 'Proposes long/short theses from on-chain and market data',
     capabilities: ['market_analysis', 'signal_detection', 'thesis_generation'],
     biasRisk: ['recency_bias', 'confirmation_bias', 'anchoring'],
@@ -38,7 +39,7 @@ const AGENTS = [
     id: 'redteam',
     name: 'Red Team',
     role: 'adversarial_critic',
-    model: 'gpt-4o',
+    model: appTextModel(),
     description: 'Attacks every thesis before capital is committed',
     capabilities: ['risk_assessment', 'counterargument', 'stress_testing'],
     biasRisk: ['negativity_bias', 'loss_aversion', 'status_quo_bias'],
@@ -47,7 +48,7 @@ const AGENTS = [
     id: 'cio',
     name: 'Bobby CIO',
     role: 'final_decision',
-    model: 'gpt-4o',
+    model: appTextModel(),
     description: 'Weighs both sides and emits the final conviction score',
     capabilities: ['portfolio_management', 'conviction_scoring', 'execution_decision'],
     biasRisk: ['authority_bias', 'overconfidence', 'sunk_cost'],

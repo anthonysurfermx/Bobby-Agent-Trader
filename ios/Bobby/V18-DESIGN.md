@@ -261,7 +261,7 @@ En este iPhone                               ›
 Cómo funciona                                ›
 ```
 - Deleted: the three explanation paragraphs, the sentence under each switch, fifteen preference chips, the local-storage text.
-- Preferences move to their own pane (one field at a time; `Sin definir` is a real value). `Cómo funciona` shows the two inventories of the consent screen. `En este iPhone`: Accesos rápidos, Tesis, `Quitar accesos`. Asset `…`: `Olvidar activo`. Sheet `…`: `Borrar todo`, confirmed with the one sentence that names everything it removes.
+- Preferences move to their own pane (one field at a time; `Sin definir` is a real value). `Cómo funciona` shows the two inventories of the consent screen. `En este iPhone`: Accesos rápidos, Tesis, `Quitar accesos`, and the notes the phone keeps for follow-ups ("Follow-ups", below). Asset `…`: `Olvidar activo`. Sheet `…`: `Borrar todo`, confirmed with the one sentence that names everything it removes.
 - Paused: `En pausa` + `Sin memoria nueva ni personalización en web o iPhone.` Capture off: `Las preguntas del iPhone no añaden memoria de cuenta.` The second switch, when there is no consent yet, is `Activar` and opens the consent screen.
 
 | EN | ES |
@@ -328,30 +328,324 @@ Surfaces, each one line and one action:
 | Where | Line | Action |
 | --- | --- | --- |
 | Glass, after a read, until they decide | Shall I keep you posted on NVDA? | Yes, tell me |
-| Lock screen, next day | NVDA, a day later. See how it moved. | tap |
-| Lock screen, day after (not opened) | Semiconductors today. NVDA is part of it. | tap |
-| Lock screen, next Monday (not opened) | Your week: NVDA and 2 more. | tap |
+| Lock screen, when they said (next day at the soonest) | NVDA: back to your question. | tap · Stop |
+| Lock screen, the Monday after | Your week: NVDA and 2 more. | tap · Stop |
+| The same two, on a phone that hides previews while locked | Back to your question. · Your week. | (unlock) |
 | Glass, when they come back | NVDA +2.3% since you asked | What changed? |
-| Board (a sector, the week) | title + "Last 24 hours" / "Since you asked" | a row asks Bobby |
+| Glass, when the phone should say no number | NVDA, 2 days later | What changed? |
+| Glass, when the next read would be refused | the same line | Got it |
+| The row after a read, and the home, when the next read would be refused | no chip that asks by itself | "Another question about NVDA" (they type it) · the pill |
+| Board (the week) | title + "Since you asked" | a row asks Bobby (a plain row at the wall) |
 | Reminders | Follow-ups · Bobby comes back to what you asked. | switch |
+| Memory, "On this iPhone" | the notes, in sentences (below) | Erase · Erase notes |
 
-Spanish: ¿Te voy contando cómo sigue NVDA? · Sí, cuéntame · NVDA, un día después. Mira cómo se
-movió. · Semiconductores hoy. NVDA es parte. · Tu semana: NVDA y 2 más. · NVDA +2.3% desde que
-preguntaste · ¿Qué cambió? · Seguimiento · Bobby vuelve a lo que preguntaste.
+Spanish: ¿Te voy contando cómo sigue NVDA? · Sí, cuéntame · NVDA: de vuelta a tu pregunta. ·
+Tu semana: NVDA y 2 más. · De vuelta a tu pregunta. · Tu semana. · Ya no · NVDA +2.3% desde que
+preguntaste · NVDA, 2 días después · ¿Qué cambió? · Entendido · Seguimiento · Bobby vuelve a lo
+que preguntaste.
+
+The sector follow-up ("Semiconductors today. NVDA is part of it." and its board) is in the tree
+and is not sent by the chain that ships: see "The owner's choice" below.
+
+#### The chain, as built (`HarnessPlanner.swift`, `HarnessLedger.swift`)
+
+Follow-ups belong to **a question the person asked by themselves**, in their own words: typed or
+spoken. That question gets, in order:
+
+1. **the asset**, when they said they would look again;
+2. **the week**, the Monday after: the assets they asked about since the Monday before it.
+
+Two at most per question, whatever they do with them, and then silence until they ask again.
+
+- **Only a real answer is an answer.** An answer is `returned`: within a day of a follow-up they
+  asked about its asset, saved a read of it, or acted on its line in the app. A tap on the
+  notification (`opened`) is written down and answers nothing: it does not end the unanswered
+  streak, does not keep a kind from resting, and starts nothing. A pick in the app (`picked`:
+  "What changed?", a board row, the question Bobby wrote after a read) is an answer only when it
+  answers a follow-up that way; alone it only says the asset matters.
+- **An answer never starts a chain.** It ends the unanswered streak, keeps that kind from resting
+  and teaches the hour. The question still has what was left of its two, no more.
+- **A read Bobby started is not a question.** The button of a follow-up, a board row, the
+  question Bobby wrote after a read and **every chip whose question Bobby wrote** (an asset of the
+  home, an asset or a mover of the row after a read) are written with `origin: followUp`. They can
+  answer a follow-up; they never start one, and never move the chain of the question before them:
+  one tap on something Bobby put there never earns another chain. The page says which asks came
+  from such a chip (`ask {question, chip: true}`, Nucleo/ARCHITECTURE.md §3.5). The person's own
+  second question about the same read is a question (`thread`), like any other.
+  The one exception is the yes itself. Before it there is no chain to protect, so a chip is kept
+  the way a question is (the asset, its price, the moment): the glass can say how the asset moved
+  since, and a yes to "Shall I keep you posted on NVDA?" follows the read that prompted it. From
+  the yes on, only their own words start a chain.
+- **When the first one comes**, from what the person said, strongest first, and never sooner than
+  the next day:
+
+  | They said | The asset follow-up comes |
+  | --- | --- |
+  | A thesis about the asset: weeks | 7 days after the question |
+  | A thesis about the asset: months, a year, years | never; the week only |
+  | "Review in 3 days" / "in a week" on the save (72 / 168 hours) | 3 / 7 days after |
+  | The question named a week ("this week", "next days") | 3 days after |
+  | The question named a month ("this month", "weeks") | 7 days after |
+  | The question named months or years | never; the week only |
+  | Today, right now, or nothing | the next day |
+
+  A save left at 24 hours says nothing (it is where the picker starts). The horizon the question
+  named is the one the server already returns in `sufficiency.horizon`. The hour is the hour of
+  the question inside 09:00–21:00, or the hour they answer at once they have answered three.
+  What they say times the first follow-up and nothing else. Once a step was shown, a save "to
+  review in a week" or a thesis of weeks written afterwards cannot push what follows further than
+  the day it was shown allows: the week stays the Monday after that day (it used to move to the
+  Monday after the new wait, where the question was no longer part of it, and nothing came).
+- **A week is their week.** It holds what they asked about since the Monday before it, names the
+  asset that matters most to them among those (a thesis 2, a question 1, their own second question
+  about a read 1 more, a save 1, a pick 1, an answer 1, a tap 0.5; all but the thesis halve every
+  seven days) and is not sent when it would hold nothing: a question on a Sunday, or one whose
+  asset follow-up waited seven days, has no week. A tapped week opens the week it was planned for.
+- **The limits, unchanged, always win:** one a day, four in seven days, 18 hours apart, 09:00 to
+  21:00; a kind whose last two went unanswered rests; three unanswered in a row and Bobby says
+  nothing for two weeks, whatever is asked; nothing for a question older than 14 days.
+  The plan is what arrives if the person does nothing, so the three in a row are counted over
+  the plan too: with two unanswered behind them a new question is handed one follow-up, not two
+  (a fourth, or with the sector a fifth, used to be handed to iOS and arrive unopened). If they
+  answer that one, the plan is made again and the week comes.
+- **A follow-up is an instant, on purpose.** It is handed to iOS as the moment the plan chose, in
+  the time zone the plan was made in. Someone who changes time zone and does not open the app
+  gets it at that instant, which can be outside 09:00–21:00 where they are now. An hour on the
+  clock instead would arrive at a moment the phone never learns, and everything that keeps Bobby
+  quiet (what was shown, 18 hours apart, one a day, two per question) counts from those moments:
+  a follow-up could then arrive twice, or uncounted. Opening the app plans again on the new clock.
+- **What is kept, and when.** Asset, price, moment, and fixed values only (a horizon out of five,
+  24/72/168 hours, a pointer to a thesis with its horizon): never a word the person wrote. How
+  much of that is written depends on what they said about follow-ups ("What the phone writes",
+  below): before the yes, the question alone. What a question or a save carried beyond that waits
+  in memory for the last five reads, thirty minutes at most, and the yes writes it: the question
+  gains what it named, the save goes in whole. A thesis pointer lasts as long as its thesis and
+  goes when it is archived.
+
+#### The owner's choice (one line)
+
+`HarnessChain.shipped` in `HarnessPlanner.swift` is the chain every question gets:
+
+| Value | A question gets | Status |
+| --- | --- | --- |
+| `.assetThenWeek` | the asset, then the week; two at most | **ships** |
+| `.withSector` | the asset, its sector the day after, then the week; three at most | built and tested, not shipped |
+
+The sector follow-up lands on a list of assets the person did not ask about, with their last 24
+hours; that is why it is not the default. Its code, board and translations stay in the tree.
+
+Changing that line is the whole change in the app. What states "this is what ships" then has to
+say the same, and fails until it does: `defaults.chain` and `defaults.maxPerQuestion` in the
+golden file (with the `options` of its two families of cases swapped: the cases and their plans
+do not change), `HarnessPlannerTests.testTheChainIsData`, and the assertions of
+`HarnessCenterTests` that count what the phone hands to iOS. The golden cases whose name starts
+with "With the sector" describe exactly what the other chain does.
+
+One person, one question about NVDA on a Tuesday at 14:10, and a yes:
+
+| They… | Ships: asset, week | With the sector |
+| --- | --- | --- |
+| never open anything | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| tap each one, nothing else | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| answer the first | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| answer the first, and save that read with "review in a week" | Wed 14:10 · Mon 14:10 | Wed 14:10 · Thu 14:10 · Mon 14:10 |
+| saved with "review in a week" | next Tue 14:10 | next Tue 14:10 · next Wed 14:10 |
+| asked about years | Mon 14:10 | Mon 14:10 |
+
+(`HarnessPlannerTests.testWhatOnePersonGetsFromOneQuestionOnATuesday`.)
+
+#### The contract for other platforms (`shared/harness/planner-golden.json`)
+
+Ledger in, plan out: every rule above is a case, and a port of the planner must reproduce all of
+them. The iPhone suite runs the file from the repository (`HarnessGoldenTests`), so it cannot
+drift from what the phone does.
+
+```
+{
+  "version": 1,
+  "defaults":  { chain, maxPerQuestion, weeklyCovered, earliestHour, latestHour, minimumGapHours,
+                 anchorDays, sectorFreshDays, weekFreshDays, weekWindowDays, maxPerWeek,
+                 quietAfter, quietDays },
+  "constants": { waitDays, saveWaitDays, thesisHorizon, interestWeights, threadWeight,
+                 thesisWeight, interestHalfLifeDays, statsDays, ignoredLimit, hourSamples,
+                 retentionDays, maxEvents },
+  "sectors":   { "NVDA": "semis", …, "GME": null },
+  "cases": [ {
+      "name":         "A question that named the week waits three days.",
+      "now":          "2026-10-06T14:12:00-06:00",
+      "timeZone":     "America/Mexico_City",
+      "options":      { only what differs from defaults },
+      "events":       [ { "kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week" } ],
+      "expectedPlan": [ { "step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3 },
+                        { "step": "week",  "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0 } ]
+  } ]
+}
+```
+
+- Times are ISO 8601 with an offset (instants); `timeZone` is the calendar the plan is made in.
+- An event: `kind` (ask, saved, sent, opened, returned, picked, thesis; `appOpen` is read from an
+  older ledger and dropped: opening the app is never written), `at`, and where
+  they apply `symbol`, `price`, `step`, `sector`, `ref`, `origin` (`followUp`: Bobby wrote the
+  question, a chip included; absent: the person, in their own words),
+  `thread`, `horizon` (intraday, week, month, long, unspecified), `horizonHours` (24, 72, 168).
+  Events are written into the ledger in file order: the ledger sorts them, upper-cases symbols,
+  drops what is not a symbol, and the planner ignores what is dated after `now`.
+- A planned follow-up: `step`, `fireAt`, `symbol`, and `days` (asset), `sector` (sector), `others`
+  (week). A field that is absent is not compared.
+- A port also checks its own defaults and constants against the file, as the iPhone suite does.
+- 95 cases. Each rule is pinned by itself: a planner without the local-day rule, without the
+  18 hours after the last one shown, that plans a step twice, that sets the hour as seconds after
+  local midnight (an hour off on the day the clocks change: Madrid, New York and Sydney are in the
+  file), that lets "today" mean the same day, that counts what is dated after now, or that does
+  not count the plan's own follow-ups as unanswered, fails at least one case.
 
 Rules that are not folded away:
 
-- The lock screen names the asset and never a figure or a direction. "See how it moved", never
-  "see how it rose": the number is read when the person opens it.
-- A number the phone does not have is not shown ("NVDA, a day later" without it; a board row
-  without it).
+- The lock screen names the asset and never a figure, a direction, a day count or an instruction:
+  it says where the notification came from ("back to your question") and nothing else. The number
+  is read when the person opens it.
+- A number the phone does not have, or should not say, is not shown ("NVDA, a day later" without
+  it; a board row without it).
 - Numbers are cream, never green or red: colour means a verdict only.
 - iOS permission is asked only on "Yes, tell me" or the switch.
-- Three follow-ups in a row that nobody answered and Bobby says nothing for two weeks, whatever is
-  asked; a kind whose last two went unanswered rests; never more than four in seven days, never
-  two on the same day, never sooner than 18 hours after the last one.
 - A follow-up belongs to the reader it was planned for: another account never sees it, on the
   lock screen or in the app.
+
+#### What the person sees, and what stays on the phone (`HarnessCenter`, `HarnessCopy`, `HarnessNotes`)
+
+**What the phone writes**, by what the person said about follow-ups, and by nothing else:
+
+| State | In the ledger | Elsewhere on the phone |
+| --- | --- | --- |
+| Undecided (never asked, or not answered) | One entry per read they asked for (typed, spoken, or an asset picked on a chip): the asset (symbol, name, stock or crypto), its price, the moment. | How often the glass drew the offer and the line about an asset, and whether it was tapped (the nudge history every line of the glass has). The lines about assets are counted on the Memory screen, go with Erase and Erase notes, and are kept sixty days like the ledger. |
+| On | Everything the planner reads, from the yes on: every read with who started it, saves, taps on Bobby's lines, follow-ups shown, tapped and answered, the horizon a question named, the review chosen on a save, a pointer to each active thesis. | The switch, the plan (two follow-ups at most), the same nudge history. |
+| Off | Nothing. What was there is erased when it is turned off. | The switch itself (the no), and nothing about any asset: the history of the lines goes too. |
+
+Undecided, nothing else is written: no app opening, no save, no tap, no horizon, no thesis
+pointer, and nothing of a read started from a follow-up's own button. The question is kept so the
+glass can say "NVDA +2.3% since you asked" the next time the app is opened. Bounded as before: 300
+events, 60 days.
+
+That number costs one request the person did not tap for. When the app comes to the front with an
+asset asked about a day ago or more (before the yes too), the phone asks the quote endpoint for
+that symbol; the week's board asks once per row. The request carries the symbol and nothing else
+(no account, no device, nothing more of the ledger), and the server already saw the question.
+
+**The number can be wrong; then there is no number.** The glass and the week's board say a
+percentage only when both prices are positive and finite and the price now is inside a bound for
+that kind of asset, measured against the price at the question:
+
+| Asset | Shown between | Why |
+| --- | --- | --- |
+| Stock | 0.7× and 1.4× (-30% to +40%) | The top of the band is twice its bottom, so a 2-for-1 split or any larger one, forward or reverse, on top of any move the band itself would print lands outside it: 100 → 62 (2-for-1 and +24%) is 0.62, no number. An earnings day (about a quarter either way) is inside, on the first day as on the fourteenth: the band is not narrowed with the days, because the largest ordinary day is as large as an ordinary fortnight. A 3-for-2 split (0.67×) with a rise of 5% or more on top still reads as a fall of up to 30%: by size alone it cannot be told from one. A split-adjusted reference from the quote endpoint would close it. |
+| Crypto | 0.2× and 5× (-80% to +400%) | No splits. Stops a ticker that now names another coin, a redenomination, a bad tick; lets a small coin's wildest ordinary week through. |
+
+Outside the bound the line is the one without a number ("NVDA, 2 days later"), never a corrected
+one. The line is drawn like every other line of the glass (one size, one ink): the same up and
+down, no colour, no arrow.
+
+**The lock screen says where it came from.** Title "Bobby". Each follow-up is filed under a
+category whose hidden-preview placeholder is the same sentence without the asset, so a phone that
+hides previews while locked (the default with Face ID) never shows the ticker on a locked screen.
+
+| | Asset | Asset, previews hidden | Week | Week, previews hidden | Action |
+| --- | --- | --- | --- | --- | --- |
+| en | NVDA: back to your question. | Back to your question. | Your week: NVDA and 2 more. | Your week. | Stop |
+| es | NVDA: de vuelta a tu pregunta. | De vuelta a tu pregunta. | Tu semana: NVDA y 2 más. | Tu semana. | Ya no |
+| fr | NVDA : on revient à ta question. | On revient à ta question. | Ta semaine : NVDA et 2 de plus. | Ta semaine. | Arrêter |
+| pt | NVDA: de volta à tua pergunta. | De volta à tua pergunta. | A tua semana: NVDA e mais 2. | A tua semana. | Parar |
+| it | NVDA: torniamo alla tua domanda. | Torniamo alla tua domanda. | La tua settimana: NVDA e altri 2. | La tua settimana. | Interrompi |
+| de | NVDA: zurück zu deiner Frage. | Zurück zu deiner Frage. | Deine Woche: NVDA und 2 weitere. | Deine Woche. | Stoppen |
+
+**Stopping is one tap.** "Stop" on the notification does what the Follow-ups switch does when it
+is turned off (the same call): follow-ups off, what iOS holds removed, the ledger erased. It runs
+without opening the app and without unlocking the phone, and the offer is not made again: only
+someone undecided is offered, and **a no stays a no**. Said signed out, it goes with the person
+into their account and also stays on the phone, so it is still a no when they sign out again.
+"Delete everything" on the Memory screen erases the notes and the plan and keeps the no. An
+account that said no takes nothing from a signed-out reader either: what that reader asked is
+dropped at sign-in, not merged. (Withdrawing the risk notice still starts over: it erases
+everything, the no included.)
+
+**Bobby never invites someone into a wall.** A read Bobby starts (the "What changed?" button, a
+row of the board, the question Bobby wrote after a read) is offered and launched only when the
+phone knows the next read is answered, from the receipt the server sends with every reply: Bobby
+Pro, reads or gifted reads left, or nothing behind the limit. Not knowing is a no (the phone then
+asks, at no cost, when it has a line to draw). At the wall the person still sees the line, with
+"Got it" in place of the question, and the board, with plain rows. Such a read runs at the Quick
+level whatever level is saved, and does not change the saved one.
+The same holds one tap later. The read that spends the last one is delivered with `oneTap:
+false`, and its row keeps only "Another question about NVDA", which asks nothing until the
+person has typed it: no question of the CIO, no "How is BTC looking?". The home loses its asset
+chips the same way once the phone knows the next read is refused (`oneTap: false` in the
+session), and gets them back when a read does. There, not knowing changes nothing: a first
+launch or a phone without network keeps its chips.
+
+**What Bobby keeps is on the Memory screen**, under "On this iPhone", after the shortcuts and the
+theses. No second screen. A header, one row per asset with its own Erase, one muted paragraph
+about what Bobby does, and Erase notes. With nothing kept the section is one line.
+
+```
+Notas que Bobby guarda en este iPhone para elegir cuándo volver. No se envían a la IA.
+NVDA   Preguntaste 3 veces, la última el 5 oct. Tu pregunta era sobre       [Borrar]
+       esta semana. Guardaste una lectura, para revisar en una semana.
+       Bobby vuelve el 12 oct.
+BTC    Preguntaste una vez, el 3 oct.                                        [Borrar]
+TSLA   Preguntaste 2 veces, la última el 30 sept. Tu tesis mira a semanas.   [Borrar]
+Borrar notas
+```
+
+| When | EN | ES |
+| --- | --- | --- |
+| Header | Notes Bobby keeps on this iPhone to choose when to come back. They are not sent to the AI. | Notas que Bobby guarda en este iPhone para elegir cuándo volver. No se envían a la IA. |
+| Asked, in their own words | Asked once, on Oct 5. / Asked 3 times, last on Oct 5. | Preguntaste una vez, el 5 oct. / Preguntaste 3 veces, la última el 5 oct. |
+| Reads whose question Bobby wrote | One read from a question Bobby wrote. / 2 reads from questions Bobby wrote. | Una lectura desde una pregunta que escribió Bobby. / 2 lecturas desde preguntas que escribió Bobby. |
+| The question named a horizon | Your question was about today. / this week. / this month. / months or years. | Tu pregunta era sobre hoy. / esta semana. / este mes. / meses o años. |
+| A save | You saved a read. / You saved a read, to review in a day. / in 3 days. / in a week. | Guardaste una lectura. / Guardaste una lectura, para revisar en un día. / en 3 días. / en una semana. |
+| A thesis | You wrote a thesis about it. / Your thesis looks weeks ahead. / months or more ahead. | Escribiste una tesis sobre este activo. / Tu tesis mira a semanas. / a meses o más. |
+| A follow-up is coming | Bobby comes back on Oct 12. | Bobby vuelve el 12 oct. |
+| The week is coming | Your week arrives on Oct 19. | Tu semana llega el 19 oct. |
+| The planner uses a learned hour | Follow-ups arrive around 7:00 PM. | El seguimiento llega hacia las 19:00. |
+| Three in a row unanswered | Quiet until Oct 21. | En silencio hasta el 21 oct. |
+| A kind is resting | Fewer follow-ups for now. | Menos seguimiento por ahora. |
+| Follow-ups were shown | Follow-ups: 3 shown, 2 tapped, 1 answered. | Seguimientos: 3 mostrados, 2 tocados, 1 respondidos. |
+| The glass drew lines about their assets | “Since you asked” lines shown: 2. | Líneas “desde que preguntaste” mostradas: 2. |
+| Nothing kept | No follow-up notes. | Sin notas de seguimiento. |
+| Follow-ups off | Follow-ups are off. | El seguimiento está apagado. |
+| Buttons | Erase · Erase notes | Borrar · Borrar notas |
+
+- The sentences are computed from the ledger the planner plans from and by the profile function it
+  calls. Every kind of event, every field an event carries and every field of the profile goes
+  through an exhaustive `switch`: a new one does not compile until it has a sentence or is marked
+  internal with the reason (`HarnessNotes.told` for the fields of an event; a test checks that
+  list against the struct). Marked internal today: the weight per asset (it only picks which asset
+  the week names), the thirty-day counts (the same events are said in full), a tap on one of
+  Bobby's lines (the read it started is counted with the reads Bobby's questions started), and of
+  an event: the display name, stock or crypto, the price, the sector, which follow-up an answer
+  belongs to, and the mark of a second question about the same read (it is one of "Asked N
+  times"; the mark only makes that asset weigh more when the week picks the one it names).
+- "Asked" counts the questions the planner follows up: their own. A read whose question Bobby
+  wrote is counted apart, and the day and the horizon said are those of their own question.
+- Facts and what Bobby does, never what the person "is". What they said is said as theirs. The
+  header states how the app is built; no sentence promises anything about a verdict.
+- Erase removes what was asked, saved and tapped about one asset, the follow-up that was coming
+  about it and what the glass kept about its line. Follow-ups already shown stay counted, without
+  the asset: erasing never makes Bobby come back more. A thesis is erased in My theses; an asset
+  with nothing but a thesis has no Erase. Erase notes removes all of it and keeps the switch.
+  "Delete everything" removes it too, and its confirmation says so.
+- What is read from the ledger and leaves the phone is an asset's symbol, in two ways only: inside
+  a question the person sees and sends by their own tap ("What changed in NVDA since I asked?",
+  "How does NVDA look today?"), and, with no tap, in the request for that asset's price that draws
+  the number on the glass and on the week's board (above). `HarnessSurfaceTests` audits the
+  harness folder for both and fails on a third.
+
+**A gate on words.** `HarnessSurfaceTests.testNoHarnessStringSaysAForbiddenWordInAnyLanguage` runs
+every string above, in six languages, against the words of rule 5 and against claims of having
+watched, monitored, noticed or detected, and fails on any hit.
+
+Review fixtures: `-qa-v18 memory-notes-three | memory-notes-full | memory-notes-empty |
+memory-notes-off | follow-week-wall`, and `-nucleo-fixtures -qa-v18-nudge follow-move |
+follow-move-plain | follow-move-wall`.
 
 ### Invite — about 20 words (was about 60)
 

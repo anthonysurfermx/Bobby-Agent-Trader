@@ -1,0 +1,1386 @@
+{
+  "version": 1,
+  "about": "Follow-up planner (the harness, layer 1): ledger in, plan out. Every platform's planner must reproduce every case. The iPhone suite runs this file (ios/Bobby/Tests/HarnessGoldenTests.swift); the rules are in ios/Bobby/Sources/V18/Harness/HarnessPlanner.swift and HarnessLedger.swift.",
+  "format": {
+    "case": "name, now, timeZone, options (only what differs from `defaults`), events, expectedPlan",
+    "times": "ISO 8601 with an offset: an instant. `timeZone` (IANA) is the calendar the plan is made in.",
+    "events": "Given in file order and written into the ledger one by one: it sorts them by time, upper-cases a symbol, drops an event whose symbol is not one, drops every `appOpen` (a kind the first build kept and nothing read: a port must accept it in a stored ledger and keep none), and ignores what is dated after `now`. Fields: kind (ask, saved, appOpen, sent, opened, returned, picked, thesis), at, symbol, price (ask), step and sector (sent, opened, returned), ref (opened, returned: the `at` of the follow-up answered), origin (ask: `followUp` when Bobby wrote the question: the button of a follow-up, a board row, the question after a read, a chip that asks about an asset; absent when the person asked in their own words), thread (ask: their own second question about the same read), horizon (ask: what the question named; thesis: what they set), horizonHours (saved: 24, 72 or 168).",
+    "expectedPlan": "Earliest first. step, fireAt, symbol; days for an asset (whole local days from the question); sector for a sector; others for a week (how many other assets it holds). A field that is absent is not compared.",
+    "sectors": "The sector of each symbol the cases use (null: none). The 'With the sector' cases need nothing else from the sector table.",
+    "constants": "What the cases rest on besides the options. waitDays: whole days from a question to its first follow-up, by the horizon it named (null: no follow-up about the asset, the week only). saveWaitDays: the same for the review chosen on a save; 24 hours is where the picker starts, says nothing and is not listed. thesisHorizon: how the horizon set on a thesis is written into the ledger. Interest halves every interestHalfLifeDays, except a thesis, which counts whole while its pointer is there."
+  },
+  "defaults": {
+    "chain": [
+      "asset",
+      "week"
+    ],
+    "maxPerQuestion": 2,
+    "weeklyCovered": false,
+    "earliestHour": 9,
+    "latestHour": 21,
+    "minimumGapHours": 18,
+    "anchorDays": 14,
+    "sectorFreshDays": 7,
+    "weekFreshDays": 6,
+    "weekWindowDays": 7,
+    "maxPerWeek": 4,
+    "quietAfter": 3,
+    "quietDays": 14
+  },
+  "constants": {
+    "waitDays": {
+      "intraday": 1,
+      "unspecified": 1,
+      "week": 3,
+      "month": 7,
+      "long": null
+    },
+    "saveWaitDays": {
+      "72": 3,
+      "168": 7
+    },
+    "thesisHorizon": {
+      "weeks": "month",
+      "months": "long",
+      "year": "long",
+      "years": "long"
+    },
+    "interestWeights": {
+      "ask": 1,
+      "saved": 1,
+      "picked": 1,
+      "opened": 0.5,
+      "returned": 1
+    },
+    "threadWeight": 1,
+    "thesisWeight": 2,
+    "interestHalfLifeDays": 7,
+    "statsDays": 30,
+    "ignoredLimit": 2,
+    "hourSamples": 3,
+    "retentionDays": 60,
+    "maxEvents": 300
+  },
+  "sectors": {
+    "NVDA": "semis",
+    "AMD": "semis",
+    "AAPL": "bigtech",
+    "TSLA": "ev",
+    "BTC": "majors",
+    "SOL": "layer1",
+    "GME": null
+  },
+  "cases": [
+    {
+      "name": "Nothing is planned before any question: opening the app is not one.",
+      "now": "2026-10-07T13:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "appOpen", "at": "2026-10-07T12:00:00-06:00"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "One question: the asset the next day at the time they asked, then the week on Monday.",
+      "now": "2026-10-07T16:41:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A late question is followed up at nine in the evening.",
+      "now": "2026-10-07T23:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T23:30:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T21:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T21:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A night question is followed up at nine in the morning.",
+      "now": "2026-10-07T02:11:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T02:10:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T09:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "The week counts every asset asked about since the Monday before it, and names the latest when each was asked once.",
+      "now": "2026-10-07T10:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T10:00:00-06:00", "symbol": "BTC"},
+        {"kind": "ask", "at": "2026-10-06T10:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "ask", "at": "2026-10-07T10:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "NVDA", "others": 2}
+      ]
+    },
+    {
+      "name": "An asset asked about before the Monday before the week is not part of it.",
+      "now": "2026-10-07T10:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-04T10:00:00-06:00", "symbol": "AAPL"},
+        {"kind": "ask", "at": "2026-10-07T10:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A question on Monday is part of the week that arrives seven days later, whatever the hour.",
+      "now": "2026-10-05T08:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T08:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-06T09:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A question on Sunday: the asset on Monday, and no week (the Monday after is not their week any more).",
+      "now": "2026-10-11T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-11T12:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "NVDA", "days": 1}
+      ]
+    },
+    {
+      "name": "A paying account with the Monday briefing gets no second week.",
+      "now": "2026-10-07T16:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"weeklyCovered": true},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "days": 1}
+      ]
+    },
+    {
+      "name": "A question older than fourteen days is not followed up.",
+      "now": "2026-10-20T12:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "Nothing is ever planned in the past: a day that passed unseen is not sent late.",
+      "now": "2026-10-09T18:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Events may arrive in any order: the plan reads them in time.",
+      "now": "2026-10-08T20:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "sent", "at": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A symbol in lower case is the same asset, and something that is not a symbol is not kept.",
+      "now": "2026-10-07T17:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "nvda"},
+        {"kind": "ask", "at": "2026-10-07T16:50:00-06:00", "symbol": "NVDA; drop table"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "What is dated after now has not happened yet.",
+      "now": "2026-10-07T17:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"},
+        {"kind": "ask", "at": "2026-10-08T10:00:00-06:00", "symbol": "TSLA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Follow-ups turned off, the risk notice withdrawn, everything erased: an empty ledger plans nothing.",
+      "now": "2026-10-07T13:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [],
+      "expectedPlan": []
+    },
+    {
+      "name": "The phone was not allowed to show notifications: nothing is written as shown, and the days that passed are not made up for.",
+      "now": "2026-10-09T10:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"},
+        {"kind": "appOpen", "at": "2026-10-09T10:00:00-06:00"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Permission taken away after one was shown: it was shown, and it counts.",
+      "now": "2026-10-08T16:46:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "appOpen", "at": "2026-10-08T16:46:00-06:00"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "An ignored asset is followed by the week.",
+      "now": "2026-10-08T20:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "After the asset and the week there is nothing, however long they wait.",
+      "now": "2026-10-20T09:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "step": "week"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "A tap on the notification changes nothing: no new chain, the same week at the same hour.",
+      "now": "2026-10-08T18:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-08T18:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:00:00-06:00"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "An answer does not start the chain again: the week, and that is all.",
+      "now": "2026-10-08T19:02:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "picked", "at": "2026-10-08T19:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "returned", "at": "2026-10-08T19:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T19:01:00-06:00", "symbol": "NVDA", "origin": "followUp"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Both answered, and still nothing more until they ask again.",
+      "now": "2026-10-13T09:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-08T17:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-12T16:30:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-12T16:00:00-06:00"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "A read Bobby started is not a question: nothing is planned from it alone.",
+      "now": "2026-10-07T16:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA", "origin": "followUp"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "A read Bobby started does not take the chain from the question before it: same asset, same clock.",
+      "now": "2026-10-07T18:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "ask", "at": "2026-10-07T18:00:00-06:00", "symbol": "NVDA", "origin": "followUp"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A new question of their own takes the chain: that asset, from that moment.",
+      "now": "2026-10-08T20:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-08T20:00:00-06:00", "symbol": "SOL"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T20:00:00-06:00", "symbol": "SOL", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T20:00:00-06:00", "symbol": "SOL", "others": 1}
+      ]
+    },
+    {
+      "name": "A second question of their own about the same read is a question.",
+      "now": "2026-10-07T16:21:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "ask", "at": "2026-10-07T16:20:00-06:00", "symbol": "NVDA", "thread": true}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:20:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:20:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "maxPerQuestion is the most one question gets, whatever the chain holds.",
+      "now": "2026-10-07T16:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"maxPerQuestion": 1},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "days": 1}
+      ]
+    },
+    {
+      "name": "maxPerQuestion counts what was already shown for the question.",
+      "now": "2026-10-08T17:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"maxPerQuestion": 1},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "The chain is data: it may be the week alone.",
+      "now": "2026-10-07T16:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["week"], "maxPerQuestion": 1},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Three in a row that nobody answered: the rest is dropped.",
+      "now": "2026-10-05T21:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-02T19:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-03T19:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T20:00:00-06:00", "symbol": "TSLA", "step": "week"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "Inside the two weeks of quiet a new question is not followed up.",
+      "now": "2026-10-09T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-02T19:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-03T19:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T20:00:00-06:00", "symbol": "TSLA", "step": "week"},
+        {"kind": "ask", "at": "2026-10-09T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "Two weeks after the last one a question may be followed up again; the asset kind still rests, the week comes.",
+      "now": "2026-10-20T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-02T19:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-03T19:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T20:00:00-06:00", "symbol": "TSLA", "step": "week"},
+        {"kind": "ask", "at": "2026-10-09T12:00:00-06:00", "symbol": "AAPL"},
+        {"kind": "ask", "at": "2026-10-20T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-26T12:00:00-06:00", "symbol": "AAPL", "others": 0}
+      ]
+    },
+    {
+      "name": "A tap does not end the unanswered streak: three tapped and never answered is quiet.",
+      "now": "2026-10-08T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-02T12:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "opened", "at": "2026-10-05T12:10:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-07T12:01:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "An answer ends the streak, and the week names the asset they answered about.",
+      "now": "2026-10-08T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-02T12:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "opened", "at": "2026-10-05T12:10:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-07T12:01:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "returned", "at": "2026-10-07T13:00:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T12:00:00-06:00", "symbol": "AAPL", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "TSLA", "others": 1}
+      ]
+    },
+    {
+      "name": "A kind whose last two showings went unanswered rests; another kind still comes.",
+      "now": "2026-10-08T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-05T14:00:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AAPL", "others": 1}
+      ]
+    },
+    {
+      "name": "A tap does not keep a kind from resting.",
+      "now": "2026-10-08T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-02T12:10:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-05T13:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-06T13:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-06T13:10:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-10-06T13:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "TSLA", "others": 1}
+      ]
+    },
+    {
+      "name": "An older answer does not keep a kind alive: the last two were ignored, whatever came before.",
+      "now": "2026-10-07T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-02T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-04T14:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T14:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-05T15:00:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T14:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-06T15:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-07T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AAPL", "others": 0}
+      ]
+    },
+    {
+      "name": "The hour they answer at is learned from three answers, never from taps; it stays inside 09:00-21:00 and 18 hours after the question.",
+      "now": "2026-10-08T23:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T22:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T21:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-03T08:15:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T21:00:00-06:00"},
+        {"kind": "opened", "at": "2026-10-03T13:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T21:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T21:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-06T08:40:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T21:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-06T08:41:00-06:00", "symbol": "AAPL"},
+        {"kind": "opened", "at": "2026-10-06T13:10:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-05T21:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-07T21:00:00-06:00", "symbol": "AAPL", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-08T08:05:00-06:00", "symbol": "AAPL", "step": "asset", "ref": "2026-10-07T21:00:00-06:00"},
+        {"kind": "opened", "at": "2026-10-08T13:20:00-06:00", "symbol": "AAPL", "step": "asset", "ref": "2026-10-07T21:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T23:00:00-06:00", "symbol": "TSLA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-10T09:00:00-06:00", "symbol": "TSLA", "days": 2},
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "AAPL", "others": 1}
+      ]
+    },
+    {
+      "name": "Never more than four in seven days: with four shown, a new question gets nothing inside them.",
+      "now": "2026-10-09T13:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-06T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-06T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-06T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-08T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-08T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-09T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-09T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-09T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-09T13:30:00-06:00", "symbol": "TSLA"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "Once one of the four has left the seven days, the next question is followed up, at the hour they answer.",
+      "now": "2026-10-12T13:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-06T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-06T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-06T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-08T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-08T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-09T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-09T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-09T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-12T13:30:00-06:00", "symbol": "TSLA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-13T13:00:00-06:00", "symbol": "TSLA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-19T13:00:00-06:00", "symbol": "TSLA", "others": 0}
+      ]
+    },
+    {
+      "name": "A week is not repeated within six days.",
+      "now": "2026-10-08T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T12:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-07T12:30:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-07T12:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T12:00:00-06:00", "symbol": "TSLA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T12:00:00-06:00", "symbol": "TSLA", "days": 1}
+      ]
+    },
+    {
+      "name": "The week is never sooner than 18 hours after the question: Monday at nine is ten hours away, and the Monday after is not their week.",
+      "now": "2026-10-11T23:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-02T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-03T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-03T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-03T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-05T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-05T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-06T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-07T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-11T23:00:00-06:00", "symbol": "GME"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "With 18 hours to spare the same week comes.",
+      "now": "2026-10-11T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-02T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-02T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-03T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-03T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-03T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-05T09:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-05T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-06T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-07T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-11T12:00:00-06:00", "symbol": "GME"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "GME", "others": 0}
+      ]
+    },
+    {
+      "name": "After a change of time zone everything is planned on the local clock of now.",
+      "now": "2026-10-08T11:00:00-04:00",
+      "timeZone": "America/New_York",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T01:00:00+01:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T09:00:00+01:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T20:00:00-04:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Intraday maps to the next day: a horizon never brings a follow-up sooner than the next day.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "intraday"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "An unspecified horizon is the next day.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "unspecified"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A question that named the week waits three days.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A question that named the month waits seven days, and by then it has no week.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "month"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-13T14:10:00-06:00", "symbol": "NVDA", "days": 7}
+      ]
+    },
+    {
+      "name": "A question about years gets no follow-up about the asset at all: the week only.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "long"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "The hour stays the hour of the question inside 09:00-21:00, however long the wait.",
+      "now": "2026-10-06T23:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T23:30:00-06:00", "symbol": "NVDA", "horizon": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T21:00:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "week", "fireAt": "2026-10-12T21:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "The review they chose on the save outranks what the question named: 168 hours waits seven days.",
+      "now": "2026-10-06T14:16:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"},
+        {"kind": "saved", "at": "2026-10-06T14:15:00-06:00", "symbol": "NVDA", "horizonHours": 168}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-13T14:10:00-06:00", "symbol": "NVDA", "days": 7}
+      ]
+    },
+    {
+      "name": "A save at 72 hours waits three days.",
+      "now": "2026-10-06T14:16:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "saved", "at": "2026-10-06T14:15:00-06:00", "symbol": "NVDA", "horizonHours": 72}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A save left at 24 hours says nothing: it does not shorten what the question named.",
+      "now": "2026-10-06T14:16:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "month"},
+        {"kind": "saved", "at": "2026-10-06T14:15:00-06:00", "symbol": "NVDA", "horizonHours": 24}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-13T14:10:00-06:00", "symbol": "NVDA", "days": 7}
+      ]
+    },
+    {
+      "name": "A save without a horizon is only a save.",
+      "now": "2026-10-06T14:16:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "saved", "at": "2026-10-06T14:15:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A save from before the question belongs to another read.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T09:55:00-06:00", "symbol": "NVDA"},
+        {"kind": "saved", "at": "2026-10-05T10:00:00-06:00", "symbol": "NVDA", "horizonHours": 168},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis they wrote about the asset outranks the save and the question: a thesis of weeks waits seven days.",
+      "now": "2026-10-06T14:16:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-10-01T10:00:00-06:00", "symbol": "NVDA", "horizon": "month"},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "intraday"},
+        {"kind": "saved", "at": "2026-10-06T14:15:00-06:00", "symbol": "NVDA", "horizonHours": 72}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-13T14:10:00-06:00", "symbol": "NVDA", "days": 7}
+      ]
+    },
+    {
+      "name": "A thesis of months or years: no follow-up about the asset, the week only.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-10-01T10:00:00-06:00", "symbol": "NVDA", "horizon": "long"},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "intraday"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis with no horizon set leaves the question's horizon in charge.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-10-01T10:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis about another asset does not time this one, and is not a question about that asset.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-10-01T10:00:00-06:00", "symbol": "TSLA", "horizon": "long"},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis pointer is not forgotten after sixty days: it lasts as long as its thesis.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-07-01T10:00:00-06:00", "symbol": "NVDA", "horizon": "long"},
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Once the asset arrived at its horizon, the week.",
+      "now": "2026-10-09T15:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"},
+        {"kind": "sent", "at": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "The horizon is the one of the question the chain belongs to, not of a read Bobby started later.",
+      "now": "2026-10-06T14:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"},
+        {"kind": "ask", "at": "2026-10-06T14:30:00-06:00", "symbol": "NVDA", "origin": "followUp", "horizon": "intraday"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A later question of their own brings its own horizon.",
+      "now": "2026-10-06T15:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "long"},
+        {"kind": "ask", "at": "2026-10-06T15:00:00-06:00", "symbol": "NVDA", "thread": true, "horizon": "unspecified"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T15:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T15:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis makes its asset the one that matters most.",
+      "now": "2026-10-07T10:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "thesis", "at": "2026-10-01T10:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "ask", "at": "2026-10-06T10:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "ask", "at": "2026-10-07T10:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "TSLA", "others": 1}
+      ]
+    },
+    {
+      "name": "A second question about the same read counts twice; a read Bobby started counts once.",
+      "now": "2026-10-07T10:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T10:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "ask", "at": "2026-10-06T10:05:00-06:00", "symbol": "TSLA", "thread": true},
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "BTC"},
+        {"kind": "ask", "at": "2026-10-06T12:05:00-06:00", "symbol": "BTC", "origin": "followUp"},
+        {"kind": "ask", "at": "2026-10-07T10:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "TSLA", "others": 2}
+      ]
+    },
+    {
+      "name": "A tap weighs less than an answer: the week names the asset they answered about, not the one they only tapped.",
+      "now": "2026-10-07T10:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-05T10:30:00-06:00", "symbol": "BTC"},
+        {"kind": "ask", "at": "2026-10-05T12:30:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-10-06T10:30:00-06:00", "symbol": "BTC", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-06T11:00:00-06:00", "symbol": "BTC", "step": "asset", "ref": "2026-10-06T10:30:00-06:00"},
+        {"kind": "sent", "at": "2026-10-07T09:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-07T09:30:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-10-07T09:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T10:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T10:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T10:00:00-06:00", "symbol": "BTC", "others": 2}
+      ]
+    },
+    {
+      "name": "With the sector: the asset, its sector the day after, the week on Monday.",
+      "now": "2026-10-07T16:41:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "sector", "fireAt": "2026-10-09T16:40:00-06:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: an asset that has none skips that step.",
+      "now": "2026-10-07T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T12:00:00-06:00", "symbol": "GME"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T12:00:00-06:00", "symbol": "GME", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "GME", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: an ignored asset is followed by its sector, then the week.",
+      "now": "2026-10-08T20:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "sector", "fireAt": "2026-10-09T16:00:00-06:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: after the sector, the week.",
+      "now": "2026-10-10T09:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-09T16:00:00-06:00", "symbol": "NVDA", "step": "sector", "sector": "semis"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: after the three, silence.",
+      "now": "2026-10-12T17:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-09T16:00:00-06:00", "symbol": "NVDA", "step": "sector", "sector": "semis"},
+        {"kind": "sent", "at": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "step": "week"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "With the sector: three answered is still three, and then nothing.",
+      "now": "2026-10-12T18:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-08T17:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-09T16:00:00-06:00", "symbol": "NVDA", "step": "sector", "sector": "semis"},
+        {"kind": "returned", "at": "2026-10-09T17:00:00-06:00", "symbol": "NVDA", "step": "sector", "ref": "2026-10-09T16:00:00-06:00", "sector": "semis"},
+        {"kind": "sent", "at": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-10-12T17:00:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-10-12T16:00:00-06:00"}
+      ],
+      "expectedPlan": []
+    },
+    {
+      "name": "With the sector: a tap changes nothing either.",
+      "now": "2026-10-08T18:31:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "opened", "at": "2026-10-08T18:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:00:00-06:00"}
+      ],
+      "expectedPlan": [
+        {"step": "sector", "fireAt": "2026-10-09T16:00:00-06:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: a sector is not repeated within a week.",
+      "now": "2026-10-06T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-03T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-04T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-04T13:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-04T12:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T12:00:00-06:00", "symbol": "NVDA", "step": "sector", "sector": "semis"},
+        {"kind": "returned", "at": "2026-10-05T14:00:00-06:00", "symbol": "NVDA", "step": "sector", "ref": "2026-10-05T12:00:00-06:00", "sector": "semis"},
+        {"kind": "ask", "at": "2026-10-06T12:00:00-06:00", "symbol": "AMD"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T12:00:00-06:00", "symbol": "AMD", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AMD", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: a kind whose last two went unanswered rests, and the sector takes its day.",
+      "now": "2026-10-05T12:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T12:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T12:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-03T12:00:00-06:00", "symbol": "NVDA", "step": "sector", "sector": "semis"},
+        {"kind": "returned", "at": "2026-10-03T14:00:00-06:00", "symbol": "NVDA", "step": "sector", "ref": "2026-10-03T12:00:00-06:00", "sector": "semis"},
+        {"kind": "sent", "at": "2026-10-04T14:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "ask", "at": "2026-10-05T12:00:00-06:00", "symbol": "AAPL"}
+      ],
+      "expectedPlan": [
+        {"step": "sector", "fireAt": "2026-10-06T12:00:00-06:00", "symbol": "AAPL", "sector": "bigtech"},
+        {"step": "week", "fireAt": "2026-10-12T12:00:00-06:00", "symbol": "AAPL", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: the sector follows the asset by a day when the asset waits for its horizon.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-09T14:10:00-06:00", "symbol": "NVDA", "days": 3},
+        {"step": "sector", "fireAt": "2026-10-10T14:10:00-06:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: a question about years gets neither the asset nor its sector.",
+      "now": "2026-10-06T14:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA", "horizon": "long"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: after a change of time zone a follow-up never lands on the local day one was already shown, nor within 18 hours of it.",
+      "now": "2026-10-08T11:00:00-04:00",
+      "timeZone": "America/New_York",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T01:00:00+01:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T09:00:00+01:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "sector", "fireAt": "2026-10-09T20:00:00-04:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T20:00:00-04:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A save with a week's review after the asset was shown does not move the week: it stays the Monday after the day the asset was shown.",
+      "now": "2026-10-07T15:05:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T14:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T14:10:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T14:31:00-06:00", "symbol": "NVDA", "origin": "followUp"},
+        {"kind": "saved", "at": "2026-10-07T15:02:00-06:00", "symbol": "NVDA", "horizonHours": 168}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A thesis of weeks written after the asset was shown does not move the week either.",
+      "now": "2026-10-07T15:05:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "thesis", "at": "2026-10-07T15:03:00-06:00", "symbol": "NVDA", "horizon": "month"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: what they say after the asset was shown moves neither the sector (the day after it) nor the week.",
+      "now": "2026-10-07T15:05:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T14:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T14:10:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T14:31:00-06:00", "symbol": "NVDA", "origin": "followUp"},
+        {"kind": "saved", "at": "2026-10-07T15:02:00-06:00", "symbol": "NVDA", "horizonHours": 168}
+      ],
+      "expectedPlan": [
+        {"step": "sector", "fireAt": "2026-10-08T14:10:00-06:00", "symbol": "NVDA", "sector": "semis"},
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A step is given once to a question, even with room for more: the asset already shown is not planned again at the longer wait.",
+      "now": "2026-10-07T15:05:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-06T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T14:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T14:10:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T14:31:00-06:00", "symbol": "NVDA", "origin": "followUp"},
+        {"kind": "saved", "at": "2026-10-07T15:02:00-06:00", "symbol": "NVDA", "horizonHours": 168}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T14:10:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A chain that names a step twice still gives it once.",
+      "now": "2026-10-07T16:41:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "asset", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With two in a row unanswered a new question gets one follow-up: a fourth unanswered in a row is never handed over.",
+      "now": "2026-10-06T15:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T14:10:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "ask", "at": "2026-10-06T15:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T15:00:00-06:00", "symbol": "NVDA", "days": 1}
+      ]
+    },
+    {
+      "name": "Once they answer that third one, the week comes.",
+      "now": "2026-10-07T16:05:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T14:10:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "ask", "at": "2026-10-06T15:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-07T15:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-07T15:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T16:01:00-06:00", "symbol": "NVDA", "origin": "followUp"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T15:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "With the sector: with two in a row unanswered a new question gets the asset and nothing after it.",
+      "now": "2026-10-06T15:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "options": {"chain": ["asset", "sector", "week"], "maxPerQuestion": 3},
+      "events": [
+        {"kind": "ask", "at": "2026-10-01T14:10:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-02T14:10:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "sent", "at": "2026-10-05T14:10:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "ask", "at": "2026-10-06T15:00:00-06:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-07T15:00:00-06:00", "symbol": "NVDA", "days": 1}
+      ]
+    },
+    {
+      "name": "A chip Bobby wrote starts no chain: tapped after an answered follow-up, about another asset, it is a read Bobby started.",
+      "now": "2026-10-08T17:12:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:40:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:40:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "picked", "at": "2026-10-08T17:05:00-06:00", "symbol": "NVDA"},
+        {"kind": "returned", "at": "2026-10-08T17:05:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-08T16:40:00-06:00"},
+        {"kind": "ask", "at": "2026-10-08T17:06:00-06:00", "symbol": "NVDA", "origin": "followUp"},
+        {"kind": "ask", "at": "2026-10-08T17:10:00-06:00", "symbol": "BTC", "origin": "followUp"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T16:40:00-06:00", "symbol": "NVDA", "others": 1}
+      ]
+    },
+    {
+      "name": "Never two on one local day, even more than 18 hours apart: one shown at two in the morning (the phone was in another time zone) moves the next to the day after.",
+      "now": "2026-10-05T09:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-04T20:30:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-05T02:00:00-06:00", "symbol": "NVDA", "step": "week"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-06T20:30:00-06:00", "symbol": "NVDA", "days": 2}
+      ]
+    },
+    {
+      "name": "Never sooner than 18 hours after the last one shown, even on another local day: the hour they answer at would put the week at nine the next morning, so it waits for the Monday after.",
+      "now": "2026-10-05T08:15:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-09-21T08:40:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-09-22T09:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-09-23T08:30:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-09-22T09:00:00-06:00"},
+        {"kind": "sent", "at": "2026-09-28T09:00:00-06:00", "symbol": "NVDA", "step": "week"},
+        {"kind": "returned", "at": "2026-09-29T08:45:00-06:00", "symbol": "NVDA", "step": "week", "ref": "2026-09-28T09:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-03T21:30:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-04T21:00:00-06:00", "symbol": "NVDA", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-05T08:10:00-06:00", "symbol": "NVDA", "step": "asset", "ref": "2026-10-04T21:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-05T08:11:00-06:00", "symbol": "NVDA", "origin": "followUp"}
+      ],
+      "expectedPlan": [
+        {"step": "week", "fireAt": "2026-10-12T09:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Clocks go back (Europe/Madrid, 25 October): the follow-up keeps the hour on the clock, 25 hours after the question.",
+      "now": "2026-10-24T14:11:00+02:00",
+      "timeZone": "Europe/Madrid",
+      "events": [
+        {"kind": "ask", "at": "2026-10-24T14:10:00+02:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-25T14:10:00+01:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-26T14:10:00+01:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Clocks go back (Europe/Madrid): a late question the night before still lands at nine in the evening.",
+      "now": "2026-10-24T23:31:00+02:00",
+      "timeZone": "Europe/Madrid",
+      "events": [
+        {"kind": "ask", "at": "2026-10-24T23:30:00+02:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-25T21:00:00+01:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-26T21:00:00+01:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Clocks go back (America/New_York, 1 November): the same hour on the clock.",
+      "now": "2026-10-31T14:11:00-04:00",
+      "timeZone": "America/New_York",
+      "events": [
+        {"kind": "ask", "at": "2026-10-31T14:10:00-04:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-11-01T14:10:00-05:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-11-02T14:10:00-05:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "Clocks go forward (Australia/Sydney, 4 October): the same hour on the clock, 23 hours after the question.",
+      "now": "2026-10-03T14:11:00+10:00",
+      "timeZone": "Australia/Sydney",
+      "events": [
+        {"kind": "ask", "at": "2026-10-03T14:10:00+10:00", "symbol": "NVDA"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-04T14:10:00+11:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-05T14:10:00+11:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A question at one in the morning about today, from someone who answers in the evening: the next day at that hour, never that same evening.",
+      "now": "2026-10-07T01:01:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-09-28T19:00:00-06:00", "symbol": "TSLA"},
+        {"kind": "sent", "at": "2026-09-29T19:00:00-06:00", "symbol": "TSLA", "step": "asset"},
+        {"kind": "returned", "at": "2026-09-29T19:30:00-06:00", "symbol": "TSLA", "step": "asset", "ref": "2026-09-29T19:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-01T19:00:00-06:00", "symbol": "AAPL"},
+        {"kind": "sent", "at": "2026-10-02T19:00:00-06:00", "symbol": "AAPL", "step": "asset"},
+        {"kind": "returned", "at": "2026-10-02T19:20:00-06:00", "symbol": "AAPL", "step": "asset", "ref": "2026-10-02T19:00:00-06:00"},
+        {"kind": "sent", "at": "2026-10-05T19:00:00-06:00", "symbol": "AAPL", "step": "week"},
+        {"kind": "returned", "at": "2026-10-05T19:45:00-06:00", "symbol": "AAPL", "step": "week", "ref": "2026-10-05T19:00:00-06:00"},
+        {"kind": "ask", "at": "2026-10-07T01:00:00-06:00", "symbol": "NVDA", "horizon": "intraday"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T19:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T19:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    },
+    {
+      "name": "A follow-up dated after now has not been shown: it takes nothing from the question.",
+      "now": "2026-10-07T17:00:00-06:00",
+      "timeZone": "America/Mexico_City",
+      "events": [
+        {"kind": "ask", "at": "2026-10-07T16:00:00-06:00", "symbol": "NVDA"},
+        {"kind": "sent", "at": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "step": "asset"}
+      ],
+      "expectedPlan": [
+        {"step": "asset", "fireAt": "2026-10-08T16:00:00-06:00", "symbol": "NVDA", "days": 1},
+        {"step": "week", "fireAt": "2026-10-12T16:00:00-06:00", "symbol": "NVDA", "others": 0}
+      ]
+    }
+  ]
+}

@@ -168,6 +168,11 @@ final class NucleoSession: ObservableObject {
             self?.readDelivered(result)
         }
         desk.debateEvent = { [weak self] event in self?.notch.live(event) }
+        // A Bobby-authored question was picked: the harness counts it (only while it may record), by asset.
+        desk.nextQuestionPicked = { [weak self] symbol in self?.harness?.notePicked(symbol: symbol) }
+        // Bobby's own question is put after a read only when the receipt of that read says the next
+        // one is answered: it never leads into the sign-in or the paywall. (Fixture replies carry no receipt.)
+        if !fixtures { desk.offersNextQuestion = { HarnessWall.open($0) } }
         desk.sessionChanged = { [weak self] in self?.sessionChanged() }
         speech.emit = { [weak self] name, payload in
             self?.emit(name, payload)
@@ -263,7 +268,9 @@ final class NucleoSession: ObservableObject {
             let saved = try await desk.saveThesis(p)
             if saved["status"] as? String == "saved", let requestId = try p.string("requestId", required: false) {
                 NudgeCenter.shared.noteSaved(requestId: requestId)
-                if let symbol = desk.readSummary(requestId: requestId)?.symbol { harness?.noteSaved(symbol: symbol) }
+                if let symbol = desk.readSummary(requestId: requestId)?.symbol {
+                    harness?.noteSaved(symbol: symbol, horizonHours: Self.chosenHorizon(saved: saved, asked: try p.int("horizonHours", required: false)))
+                }
                 sessionChanged()
             }
             return saved
@@ -344,7 +351,7 @@ final class NucleoSession: ObservableObject {
             ["id": c.id, "webId": Self.webId(c.id), "label": c.label, "palette": Self.palette(webId: Self.webId(c.id)),
              "voicePersona": c.voicePersona]
         } ?? NSNull()
-        return [
+        var json: [String: Any] = [
             "v": 1, "page": NucleoDeskIO.orNull(currentPage), "firstRun": !onboarded, "onboarded": onboarded,
             "language": L.ttsLang, "locale": L.localeIdentifier, "country": L.country ?? NSNull() as Any, "localHour": Calendar.current.component(.hour, from: Date()),
             "companion": companion, "xp": companions.disciplineXP, "level": companions.nucleoLevel,
@@ -356,6 +363,11 @@ final class NucleoSession: ObservableObject {
             "analysisLevel": NucleoLevelCenter.shared.level.pageJSON,
             "nudge": currentNudge().map { $0.json as Any } ?? NSNull(),
         ]
+        // Bobby never invites someone into a wall: when the phone KNOWS the next read is refused, the
+        // home offers no chip that asks by itself. Not knowing (a first launch, no network) changes
+        // nothing, and without the key the session is what it always was.
+        if let harness, HarnessWall.closed(harness.access()) { json["oneTap"] = false }
+        return json
     }
 
     // MARK: - The nudge (1.8)
@@ -409,10 +421,22 @@ final class NucleoSession: ObservableObject {
                                               isEquity: asset["isEquity"] as? Bool ?? false,
                                               verdict: agents?["verdict"] as? String ?? "wait", saved: false, at: Date(),
                                               memory: MemoryReceipt(json: result["memory"])))
-        // 1.8: from the first question, the harness knows what to come back to (on this phone only).
+        // 1.8: from the first question, the harness knows what to come back to (on this phone only). A read
+        // Bobby started is told apart here: only the person's own question is followed up, and a chip
+        // whose words Bobby wrote is not one (`chip` lets the centre keep it before the yes).
+        let origin = desk.readOrigin(requestId: requestId) ?? .person
         harness?.noteAsk(symbol: symbol, name: asset["name"] as? String ?? symbol, isEquity: asset["isEquity"] as? Bool ?? false,
-                         price: desk.readSummary(requestId: requestId)?.price)
+                         price: desk.readSummary(requestId: requestId)?.price,
+                         origin: origin == .followUp || origin == .chip ? .followUp : nil, chip: origin == .chip,
+                         thread: origin == .thread, horizon: HarnessHorizon(named: (result["sufficiency"] as? [String: Any])?["horizon"]))
         sessionChanged()
+    }
+
+    /// The review horizon the person chose on a save, for the harness: only when the page sent one and
+    /// the desk kept it (a read Bobby said to wait on has none, and a save without a choice says nothing).
+    static func chosenHorizon(saved: [String: Any], asked: Int?) -> Int? {
+        guard let asked, (saved["thesis"] as? [String: Any])?["horizonHours"] as? Int == asked else { return nil }
+        return asked
     }
 
     // MARK: - Reads native starts (1.8)
@@ -565,9 +589,16 @@ final class NucleoSession: ObservableObject {
 
     // MARK: - Suggestions
 
+    /// The quick-access row as the page gets it. `own` tells an asset the person asked about from a starter that
+    /// only pads the row: a read Bobby started offers their own assets only (ARCHITECTURE.md §3.5).
+    static func quickAccess(_ memory: DeskMemory, fallback: [String]) -> [[String: Any]] {
+        let asked = Set(memory.watchlist.map(\.symbol))
+        return memory.quickAccess(fallback: fallback).map { ["symbol": $0, "own": asked.contains($0)] }
+    }
+
     func suggestions() async -> [String: Any] {
         let consent = consentGeneration
-        let quick = DeskMemory().quickAccess(fallback: BobbyViewModel.defaultQuickAccess).map { ["symbol": $0] }
+        let quick = Self.quickAccess(DeskMemory(), fallback: BobbyViewModel.defaultQuickAccess)
         // R11: before consent nothing reaches the network; the local row is all there is.
         guard profile.acceptedRiskNotice else { return ["quickAccess": quick, "movers": [Any]()] }
         if let cache = suggestionsCache, Date().timeIntervalSince(cache.at) < Self.suggestionsCacheSeconds {
@@ -1108,6 +1139,17 @@ final class NucleoSession: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] _ in self?.scheduleBriefingDrain() }
             .store(in: &cancellables)
+        // 1.8: the phone heard how many reads are left (a receipt, the meter read at launch, a purchase).
+        // When that flips whether the next read is refused, the home loses or regains its one-tap chips.
+        if let harness {
+            Publishers.Merge(BobbyAccessCenter.shared.$access.map { _ in () }, NucleoLevelCenter.shared.$quickAccess.map { _ in () })
+                .receive(on: DispatchQueue.main)
+                .map { [weak harness] in HarnessWall.closed(harness?.access()) }
+                .removeDuplicates()
+                .dropFirst()
+                .sink { [weak self] _ in self?.sessionChanged() }
+                .store(in: &cancellables)
+        }
         // 1.8: an invitation was answered (accepted, already used, not new): the glass says so now.
         InviteLinkCenter.shared.$answer
             .map { $0 != nil }

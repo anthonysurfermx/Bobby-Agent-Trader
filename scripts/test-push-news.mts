@@ -213,8 +213,9 @@ try {
   eq([saved.statusCode, saved.body.language, saved.body.locale, saved.headers.etag], [200, 'pt', 'pt-BR', '"1"'], 'regional Portuguese returned as selected base/locale');
   eq(patchCalls.at(-1), { identity: A, revision: 0, patch: { newsEnabled: true, consentVersion: 1, language: 'pt-BR', locale: 'pt-BR' }, country: 'BR' }, 'server derives owner/country and stores regional variant');
   eq((await call(router, 'settings', { ...patchOptions, body: { newsEnabled: false } })).statusCode, 409, 'stale revision is a conflict');
-  await call(router, 'settings', { ...patchOptions, headers: { 'if-match': '"1"', 'x-vercel-ip-country': 'XX' }, body: { newsEnabled: false } });
-  eq(patchCalls.at(-1)?.country, null, 'unknown country does not become a fabricated geographic segment');
+  await call(router, 'settings', { ...patchOptions, headers: { 'if-match': '"1"', 'x-vercel-ip-country': 'FR' }, body: { newsEnabled: false } });
+  eq(patchCalls.at(-1)?.country, null, 'explicit withdrawal never forwards a fresh country observation to storage');
+  eq(state.newsEnabled, false, 'explicit withdrawal leaves account news consent disabled');
   for (const locale of APP_LOCALES) {
     const regional = { language: appLanguage(locale), locale };
     const current = state.revision;
@@ -225,8 +226,9 @@ try {
     const repeat = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': roundTrip.headers.etag, 'x-vercel-ip-country': 'GB' }, body: regional });
     eq([repeat.body.revision, repeat.headers.etag, repeat.body.locale], [roundTrip.body.revision, roundTrip.headers.etag, regional.locale], 'identical foreground locale synchronization keeps revision stable');
   }
-  const canonical = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': `"${state.revision}"` }, body: { language: 'de' } });
+  const canonical = await call(router, 'settings', { method: 'PATCH', token: bearer, headers: { 'if-match': `"${state.revision}"`, 'x-vercel-ip-country': 'XX' }, body: { language: 'de' } });
   eq([canonical.body.language, canonical.body.locale, patchCalls.at(-1)?.patch.locale], ['de', 'de-DE', 'de-DE'], 'language-only client request receives an explicit canonical locale');
+  eq(patchCalls.at(-1)?.country, null, 'unknown country does not become a fabricated geographic segment');
   const storageRouter = createPushNewsHandler({ ...deps, getSettings: async () => { throw new BriefingStorageError('bobby_news_settings_get', 500); } });
   eq((await call(storageRouter, 'settings', { token: bearer })).statusCode, 503, 'storage failure never becomes a default-off success');
 

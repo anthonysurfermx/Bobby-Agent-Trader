@@ -44,7 +44,17 @@
         <string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string>
         <string>NSPrivacyCollectedDataTypePurposeProductPersonalization</string>
         <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string>
       </array>
+    </dict>
+    <dict>
+      <!-- Product news keeps the connection's approximate country with the opted-in account
+           to select announcements. Turning news off removes the saved country. -->
+      <key>NSPrivacyCollectedDataType</key><string>NSPrivacyCollectedDataTypeCoarseLocation</string>
+      <key>NSPrivacyCollectedDataTypeLinked</key><true/>
+      <key>NSPrivacyCollectedDataTypeTracking</key><false/>
+      <key>NSPrivacyCollectedDataTypePurposes</key>
+      <array><string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string></array>
     </dict>
     <dict>
       <key>NSPrivacyCollectedDataType</key>
@@ -80,7 +90,8 @@
       <key>NSPrivacyCollectedDataTypeLinked</key><true/>
       <key>NSPrivacyCollectedDataTypeTracking</key><false/>
       <key>NSPrivacyCollectedDataTypePurposes</key>
-      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeAnalytics</string></array>
+      <array><string>NSPrivacyCollectedDataTypePurposeAppFunctionality</string><string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+        <string>NSPrivacyCollectedDataTypePurposeDeveloperAdvertising</string></array>
     </dict>
     <dict>
       <!-- Only WebKit content-process termination reports with install/account/build context;

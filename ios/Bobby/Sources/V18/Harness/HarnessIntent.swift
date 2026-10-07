@@ -2,7 +2,8 @@
 // can arrive at cold launch, before the page is ready or while the mic or a read is busy, so the
 // tap is only STORED here and the Núcleo drains it once when it can honour it.
 // In memory only (never replayed on a later launch), consumed once, newest wins, and an account
-// change clears it.
+// change clears it. The notification's "Stop" action is not a tap to open: it is acted on at once
+// (`respond`) and stores nothing.
 import Combine
 import Foundation
 import UserNotifications
@@ -38,6 +39,23 @@ final class HarnessIntent: ObservableObject {
     static func foregroundPresentation(_ tap: HarnessTap) -> UNNotificationPresentationOptions {
         Task { await HarnessCenter.shared.firedInForeground(tap) }
         return []
+    }
+
+    /// What the person did with a follow-up notification, as the notification delegate hears it.
+    ///  - "Stop": follow-ups go off now, as the switch does, and nothing waits to be opened: iOS
+    ///    runs it without bringing the app up.
+    ///  - A tap on the notification itself: stored, for the Núcleo to drain.
+    ///  - Anything else (it was swiped away): nothing.
+    func respond(action: String, tap: HarnessTap, center: HarnessCenter) async {
+        switch action {
+        case HarnessCategory.stopAction:
+            clear()
+            await center.stop(tap)
+        case UNNotificationDefaultActionIdentifier:
+            store(tap)
+        default:
+            break
+        }
     }
 }
 

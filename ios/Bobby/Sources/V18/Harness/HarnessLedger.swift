@@ -1,27 +1,62 @@
 // The harness (1.8): Bobby picks the thread back up. From the first question the phone keeps a
-// small ledger of what the person did (which asset they asked about, whether a follow-up was
-// opened, at what hour they come back), and everything Bobby does next is derived from it: which
-// asset to come back to, when, and when to stop.
+// small ledger of what the person did (which asset they asked about, whether they did something
+// with a follow-up, what they said about how long they are looking), and everything Bobby does
+// next is derived from it: which asset to come back to, when, and when to stop.
 //   HarnessLedger    what happened (this file)
 //   HarnessProfile   what that says about the person (this file, pure)
 //   HarnessPlanner   the follow-ups that come next (pure)
 //   HarnessCenter    the phone: permission, local notifications, the line on the glass
 // Invariants:
 //  - It lives on this phone, per reader (an account, or `local` signed out). Nothing here is sent
-//    anywhere, and no question text is ever kept: a symbol, a price, a moment.
-//  - Bounded: `maxEvents` events and `retentionDays` days. Older ones go on every write.
+//    anywhere, and no text the person wrote is ever kept: a symbol, a price, a moment, and fixed
+//    values (a horizon out of five, 24/72/168 hours).
+//  - Bounded: `maxEvents` events and `retentionDays` days. Older ones go on every write. The one
+//    exception is the pointer to a thesis, which lives exactly as long as its thesis (three at most).
 //  - Erasable: `forget` removes a reader's ledger. Turning follow-ups off, withdrawing the risk
 //    notice and deleting the account all call it.
+//  - Only a real answer is an answer: `returned` (they asked about, saved or acted on what a
+//    follow-up was about, within a day of it). A tap on a notification (`opened`) is kept and
+//    answers nothing.
+// The planner's rules are pinned for every platform in shared/harness/planner-golden.json.
 import Foundation
 
-/// The three follow-ups Bobby can come back with.
+/// The follow-ups Bobby can come back with. Which of them a question gets, and in what order, is
+/// `HarnessChain` (HarnessPlanner.swift).
 enum HarnessStep: String, Codable, CaseIterable {
     /// How the asset they asked about has moved.
     case asset
-    /// The sector that asset belongs to.
+    /// The sector that asset belongs to. In the tree, and in no chain that ships.
     case sector
     /// Their week: the assets they asked about.
     case week
+}
+
+/// How long the person is looking, in the desk's own five values (`Horizon` in
+/// api/_lib/desk-debate.ts, returned in every reply's `sufficiency` block).
+enum HarnessHorizon: String, Codable, CaseIterable {
+    case intraday, week, month, long, unspecified
+
+    /// Whole days between a question and its first follow-up. A horizon only ever lengthens the
+    /// wait: "today" is still the next day. Nil: no follow-up about the asset at all, the week only.
+    var waitDays: Int? {
+        switch self {
+        case .intraday, .unspecified: return 1
+        case .week: return 3
+        case .month: return 7
+        case .long: return nil
+        }
+    }
+
+    /// What the desk's reply says. Anything else is no horizon.
+    init?(named raw: Any?) {
+        guard let raw = raw as? String, let value = HarnessHorizon(rawValue: raw) else { return nil }
+        self = value
+    }
+
+    /// A thesis is at least weeks long: "weeks" waits like a month, anything longer is long.
+    init(thesis: ThesisHorizon) {
+        self = thesis == .weeks ? .month : .long
+    }
 }
 
 /// One thing the person did, or one follow-up the phone showed them.
@@ -31,17 +66,27 @@ struct HarnessEvent: Codable, Equatable {
         case ask
         /// They saved that read.
         case saved
-        /// The app came to the front.
+        /// The app came to the front. Never written any more: the first 1.8 build kept one per half
+        /// hour and nothing read them, so the ledger refuses them and drops the ones it finds.
         case appOpen
         /// A follow-up's moment passed with the notification handed to iOS.
         case sent
-        /// They tapped a follow-up notification.
+        /// They tapped a follow-up notification. Kept, and an answer to nothing.
         case opened
-        /// They did something useful with a follow-up without tapping it: within a day they asked
-        /// about it, or acted on its line in the app. Opening the app is not an answer.
+        /// They did something useful with a follow-up: within a day they asked about it, saved a
+        /// read of it or acted on its line in the app. The only answer there is.
         case returned
-        /// They acted on a follow-up inside the app (the line on the glass, a row of a board).
+        /// They acted on something Bobby put in front of them inside the app (the line on the glass,
+        /// a row of a board, the question Bobby wrote after a read).
         case picked
+        /// A thesis they wrote about this asset is active. A pointer: the words stay in the thesis book.
+        case thesis
+    }
+
+    /// Who started a read. The person's own question has none.
+    enum Origin: String, Codable {
+        /// Bobby did: the button of a follow-up, a row of a board, the question Bobby wrote after a read.
+        case followUp
     }
 
     var kind: Kind
@@ -57,9 +102,19 @@ struct HarnessEvent: Codable, Equatable {
     var sector: String? = nil
     /// `opened`, `returned`: the moment of the follow-up they answer (its `sent` has that `at`).
     var ref: Date? = nil
+    /// `ask`: who started it, when it was not the person.
+    var origin: Origin? = nil
+    /// `ask`: a second question of their own about the read on screen.
+    var thread: Bool? = nil
+    /// `ask`: the horizon the question named. `thesis`: the one they set on it.
+    var horizon: HarnessHorizon? = nil
+    /// `saved`: the review horizon they chose, 24, 72 or 168.
+    var horizonHours: Int? = nil
 
-    /// Kinds that say "this person answers Bobby": the next follow-ups start from here.
-    var isEngagement: Bool { kind == .opened || kind == .returned }
+    /// The one kind that says "this person answers Bobby".
+    var isAnswer: Bool { kind == .returned }
+    /// A question the person asked by themselves: the only thing follow-ups start from.
+    var isQuestion: Bool { kind == .ask && origin == nil }
 }
 
 /// An asset the person asked about, as the ledger knows it.
@@ -94,28 +149,51 @@ struct HarnessLedger: Codable, Equatable {
         return symbol
     }
 
+    static let saveHorizons: Set<Int> = [24, 72, 168]
+
     /// Adds one event in its place in time and drops what is too old or too much.
     mutating func note(_ event: HarnessEvent) {
+        guard event.kind != .appOpen else { return }
         var event = event
         if let symbol = event.symbol {
             guard let valid = Self.validSymbol(symbol) else { return }
             event.symbol = valid
         }
         if let price = event.price, !(price.isFinite && price > 0) { event.price = nil }
+        if let hours = event.horizonHours, !Self.saveHorizons.contains(hours) { event.horizonHours = nil }
         let index = events.lastIndex { $0.at <= event.at }.map { $0 + 1 } ?? 0
         events.insert(event, at: index)
         prune(now: events.last?.at ?? event.at)
     }
 
+    /// A thesis pointer is not pruned: it goes when its thesis does (HarnessCenter keeps them in step).
     mutating func prune(now: Date) {
         let cutoff = now.addingTimeInterval(-Double(Self.retentionDays) * 86_400)
-        events.removeAll { $0.at < cutoff }
-        if events.count > Self.maxEvents { events.removeFirst(events.count - Self.maxEvents) }
+        events.removeAll { $0.kind == .appOpen || ($0.at < cutoff && $0.kind != .thesis) }
+        var extra = events.count - Self.maxEvents
+        if extra > 0 {
+            events.removeAll { event in
+                guard extra > 0, event.kind != .thesis else { return false }
+                extra -= 1
+                return true
+            }
+        }
     }
 
-    /// Removes events matching `drop` (a `returned` that turned out to be a tap, for instance).
+    /// Removes events matching `drop` (the pointer of a thesis that was archived, for instance).
     mutating func remove(where drop: (HarnessEvent) -> Bool) {
         events.removeAll(where: drop)
+    }
+
+    /// What was written about a read before the person said yes gains what was held back until
+    /// then (the horizon the question named, the one chosen on the save). True when it was there.
+    @discardableResult
+    mutating func complete(_ full: HarnessEvent) -> Bool {
+        guard let index = events.firstIndex(where: { $0.kind == full.kind && $0.at == full.at && $0.symbol == full.symbol?.uppercased() }) else { return false }
+        events[index].thread = full.thread
+        events[index].horizon = full.horizon
+        events[index].horizonHours = full.horizonHours.flatMap { Self.saveHorizons.contains($0) ? $0 : nil }
+        return true
     }
 
     /// Another ledger's events join this one (a signed-out reader signs in on the same phone).
@@ -127,20 +205,29 @@ struct HarnessLedger: Codable, Equatable {
 
     // MARK: Reading
 
+    /// The ledger as it was at `now`: what is dated later has not happened yet.
+    func upTo(_ now: Date) -> HarnessLedger {
+        guard let last = events.last, last.at > now else { return self }
+        var past = HarnessLedger()
+        past.events = events.filter { $0.at <= now }
+        return past
+    }
+
     func events(_ kind: HarnessEvent.Kind, since: Date? = nil) -> [HarnessEvent] {
         events.filter { event in event.kind == kind && (since.map { event.at > $0 } ?? true) }
     }
 
     /// Follow-ups shown since the person last answered one, and when the latest of them was.
     func unansweredStreak(before now: Date) -> (count: Int, last: Date?) {
-        let lastAnswer = events.last { $0.at <= now && $0.isEngagement }?.at
+        let lastAnswer = events.last { $0.at <= now && $0.isAnswer }?.at
         let shown = events.filter { event in event.kind == .sent && event.at <= now && (lastAnswer.map { event.at > $0 } ?? true) }
         return (shown.count, shown.last?.at)
     }
 
-    /// The latest event that the next follow-ups start from: a question, or an answered follow-up.
-    func anchor(before now: Date) -> HarnessEvent? {
-        events.last { $0.at <= now && ($0.kind == .ask || $0.isEngagement) }
+    /// The question follow-ups belong to: the latest one the person asked by themselves. A tap, an
+    /// answer or a read Bobby started never takes its place.
+    func question(before now: Date) -> HarnessEvent? {
+        events.last { $0.at <= now && $0.isQuestion }
     }
 
     /// The assets asked about since `since`, most recently asked first.
@@ -175,8 +262,8 @@ struct HarnessProfile: Equatable {
     var hour: Int?
     /// Follow-ups shown in the last `statsDays`, per kind.
     var sent: [HarnessStep: Int]
-    /// Of those, the ones they opened or came back for.
-    var engaged: [HarnessStep: Int]
+    /// Of those, the ones they answered (`returned`). A tap is not one.
+    var answered: [HarnessStep: Int]
     /// Per kind: how many of the latest ones in a row went unanswered.
     var ignored: [HarnessStep: Int]
 
@@ -188,24 +275,36 @@ struct HarnessProfile: Equatable {
     /// Answers needed before the hour they come at is trusted over the hour they asked at.
     static let hourSamples = 3
 
-    static let weights: [HarnessEvent.Kind: Double] = [.ask: 1, .saved: 1, .picked: 1, .opened: 1.5, .returned: 0.5]
+    /// What each thing they did says about how much the asset matters. An answered follow-up weighs
+    /// as much as a question, on top of the question, save or pick that answered it. A tap alone
+    /// weighs half a question: they looked, and did nothing with it.
+    static let weights: [HarnessEvent.Kind: Double] = [.ask: 1, .saved: 1, .picked: 1, .opened: 0.5, .returned: 1]
+    /// A second question of their own about the same read, on top of the question itself.
+    static let threadWeight = 1.0
+    /// A thesis they wrote and keep active. It does not fade: it counts until the thesis is archived.
+    static let thesisWeight = 2.0
 
     static func make(_ ledger: HarnessLedger, now: Date, calendar: Calendar) -> HarnessProfile {
         var interest: [String: Double] = [:]
         var sent: [HarnessStep: Int] = [:]
-        var engaged: [HarnessStep: Int] = [:]
+        var answered: [HarnessStep: Int] = [:]
         var ignored: [HarnessStep: Int] = [:]
         var hours: [Int: (count: Int, latest: Date)] = [:]
         let statsFrom = now.addingTimeInterval(-statsDays * 86_400)
+        var theses = Set<String>()
         for event in ledger.events where event.at <= now {
-            if let symbol = event.symbol, let weight = weights[event.kind] {
-                let ageDays = now.timeIntervalSince(event.at) / 86_400
-                interest[symbol, default: 0] += weight * pow(0.5, ageDays / halfLifeDays)
+            if let symbol = event.symbol {
+                if event.kind == .thesis {
+                    if theses.insert(symbol).inserted { interest[symbol, default: 0] += thesisWeight }
+                } else if let weight = weights[event.kind] {
+                    let ageDays = now.timeIntervalSince(event.at) / 86_400
+                    interest[symbol, default: 0] += (weight + (event.thread == true ? threadWeight : 0)) * pow(0.5, ageDays / halfLifeDays)
+                }
             }
             guard event.at >= statsFrom, let step = event.step else { continue }
             if event.kind == .sent { sent[step, default: 0] += 1; ignored[step, default: 0] += 1 }
-            if event.isEngagement {
-                engaged[step, default: 0] += 1
+            if event.isAnswer {
+                answered[step, default: 0] += 1
                 ignored[step] = 0
                 let hour = calendar.component(.hour, from: event.at)
                 let seen = hours[hour]
@@ -214,7 +313,7 @@ struct HarnessProfile: Equatable {
         }
         let samples = hours.values.reduce(0) { $0 + $1.count }
         let best = hours.max { a, b in a.value.count == b.value.count ? a.value.latest < b.value.latest : a.value.count < b.value.count }
-        return HarnessProfile(interest: interest, hour: samples >= hourSamples ? best?.key : nil, sent: sent, engaged: engaged, ignored: ignored)
+        return HarnessProfile(interest: interest, hour: samples >= hourSamples ? best?.key : nil, sent: sent, answered: answered, ignored: ignored)
     }
 
     /// Its last `ignoredLimit` showings went unanswered: Bobby stops sending that kind for now. An
@@ -288,6 +387,15 @@ struct HarnessStore {
     /// Everything the harness keeps about one reader.
     func forget(owner: String?) {
         for prefix in [Self.prefix, Self.modePrefix, Self.planPrefix] { defaults.removeObject(forKey: Self.key(prefix, owner: owner)) }
+    }
+
+    /// What was kept and what was planned go; a no stays (the Memory screen's "Delete everything").
+    /// Erasing notes is not a way to be asked again: a reader who turned follow-ups off stays off.
+    /// Any other answer goes with the notes, so a yes is asked for again before anything is kept.
+    func forgetNotes(owner: String?) {
+        let refused = mode(owner: owner) == .off
+        forget(owner: owner)
+        if refused { write(.off, owner: owner) }
     }
 
     /// Account deletion (AccountSession): nothing of that account stays on the phone.
