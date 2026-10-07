@@ -65,9 +65,9 @@ final class Memory18NudgeTests: XCTestCase {
         XCTAssertNil(line(MemoryReceipt(recorded: true, asks: 0)), "no count sent: the app does not write \"first time\" over a zero it filled in")
         XCTAssertTrue(MemoryReceiptLine.candidates(symbol: "NVDA", receipt: MemoryReceipt(recorded: true, asks: 0)).isEmpty)
         XCTAssertNil(line(MemoryReceipt(recorded: true, asks: 0, lastAskedDaysAgo: 5, changeSinceLastAskPct: 4.2)), "nor anything else")
-        // The wire type fills a missing or null count with zero: that is exactly the case that stays silent.
-        XCTAssertEqual(MemoryReceipt(json: ["recorded": true])?.asks, 0)
-        XCTAssertEqual(MemoryReceipt(json: ["recorded": true, "asks": NSNull()])?.asks, 0)
+        // The wire type refuses a recorded ask that came without its count: there is no receipt to word.
+        XCTAssertNil(MemoryReceipt(json: ["recorded": true]))
+        XCTAssertNil(MemoryReceipt(json: ["recorded": true, "asks": NSNull()]))
         XCTAssertEqual(line(MemoryReceipt(recorded: true, asks: 3, lastAskedDaysAgo: 5, changeSinceLastAskPct: 4.2)),
                        "NVDA: asked 5 days ago · up 4.2% since")
         XCTAssertEqual(line(MemoryReceipt(recorded: true, asks: 3, lastAskedDaysAgo: 5, changeSinceLastAskPct: -3.1)),

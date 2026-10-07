@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global NucleoReadModel -- a global of the Núcleo page, read inside page.evaluate */
 // Measures the real shipping SVG and buildChart in Chrome; all browser requests are blocked.
 // PLAYWRIGHT_MODULE=/absolute/playwright/index.mjs node scripts/qa/test-ios17-support-subtitle.mjs
 // --source-ref=<commit> reproduces clipping before the fix. --font-file=<local Geist .woff2> adds that real face.

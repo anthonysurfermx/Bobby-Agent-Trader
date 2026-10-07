@@ -213,6 +213,8 @@ final class ThesisNudgeTests: XCTestCase {
         resting.seen(offer.id)
         later = now.addingTimeInterval(11 * 60)
         resting.seen(offer.id)
+        // The second showing keeps its time on the glass; after it, the offer rests.
+        later = later.addingTimeInterval(resting.policy.showingGap + 1)
         XCTAssertFalse(resting.eligible(offer.id, at: later))
         XCTAssertTrue(resting.current(resting.moment(signedIn: false))?.id.hasPrefix("theses.due.") == true)
 

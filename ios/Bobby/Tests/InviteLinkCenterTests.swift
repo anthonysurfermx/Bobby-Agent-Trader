@@ -863,6 +863,7 @@ final class InviteLinkCenterTests: XCTestCase {
         XCTAssertEqual(nudge.text, L.t("The invitation you received was not accepted", "La invitación que recibiste no fue aceptada"))
         XCTAssertEqual(nudge.cta, L.t("See why", "Ver por qué"))
         XCTAssertNil(glass.current(glass.moment(signedIn: false)), "never for someone who is not that account")
+        XCTAssertEqual(glass.current(glass.moment(signedIn: true)), nudge, "and still on the glass for the account it belongs to")
 
         // The tap opens the invite sheet, where the reason is in words; closing it is "read".
         let session = NucleoSession(fixtures: true, defaults: defaults)

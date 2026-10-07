@@ -274,7 +274,7 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertEqual(full[0].label, "What I keep")
         XCTAssertEqual(full[0].text, "The asset, the date, the time frame you mention and its price that day. Not the text of your question.")
         XCTAssertEqual(full[1].label, "What is sent when I answer")
-        XCTAssertEqual(full[1].text, "A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the change in its price since then, the preferences you set here, and the assets you ask about most.")
+        XCTAssertEqual(full[1].text, "A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the time frame you named, its price that day and the change since, the preferences you set in Memory, and the assets you ask about most.")
         XCTAssertEqual(full[2].label, "For how long")
         XCTAssertEqual(full[2].text, "Bobby stops using an asset 90 days after you last asked about it.")
         XCTAssertEqual(MemoryExplanation.items(retentionDays: 30)[2].text, "Bobby stops using an asset 30 days after you last asked about it.",
@@ -282,7 +282,7 @@ final class Memory18ConsentTests: XCTestCase {
         XCTAssertEqual(full[3].text, "See it, correct it, pause it or delete it any time in Memory.")
 
         let sent = full[1].text
-        for fact in ["AI provider", "first name", "how often and when", "change in its price", "preferences", "assets you ask about most"] {
+        for fact in ["AI provider", "first name", "how often and when", "time frame you named", "its price that day", "the change since", "preferences", "assets you ask about most"] {
             XCTAssertTrue(sent.contains(fact), "the sent line names: \(fact)")
         }
         for item in full {

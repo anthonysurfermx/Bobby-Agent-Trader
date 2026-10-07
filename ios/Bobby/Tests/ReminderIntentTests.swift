@@ -18,8 +18,8 @@ final class ReminderIntentTests: XCTestCase {
     }
 
     private static let profileKeys = ["agent.riskNoticeVersion", "agent.onboarded", "agent.voice", "agent.auraText"]
-    private nonisolated static let idA = "3F2504E0-4F89-41D3-9A0C-0305E82C3301"
-    private nonisolated static let idB = "9B2C1A7E-0D3F-4C55-8F1E-2A6B4C8D0E12"
+    private nonisolated static let idA = "3f2504e0-4f89-41d3-9a0c-0305e82c3301"
+    private nonisolated static let idB = "9b2c1a7e-0d3f-4c55-8f1e-2a6b4c8d0e12"
     private nonisolated static let briefA = "3f2b8c1e-5a4d-4e6f-9b7a-1c2d3e4f5a6b"
 
     private var suiteName = ""
@@ -112,7 +112,7 @@ final class ReminderIntentTests: XCTestCase {
 
     func testOnlyAThesisReminderPayloadIsATap() {
         XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA)), ReminderTap(thesisId: Self.idA))
-        XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA.lowercased()))?.thesisId, Self.idA, "the id as the book writes it")
+        XCTAssertEqual(ReminderIntent.tap(from: payload(Self.idA.uppercased()))?.thesisId, Self.idA, "the id as the book writes it")
         XCTAssertNil(ReminderIntent.tap(from: payload(Self.idA, kind: nil)), "no kind: not ours")
         XCTAssertNil(ReminderIntent.tap(from: payload(Self.idA, kind: "briefing")))
         XCTAssertNil(ReminderIntent.tap(from: payload(Self.idA, kind: 7)))

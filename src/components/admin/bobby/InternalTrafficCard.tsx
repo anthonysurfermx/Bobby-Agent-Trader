@@ -23,7 +23,8 @@ const sameList = (a: string[], b: string[]) => a.length === b.length && a.every(
 // Surface names as src/lib/track.ts sends them, shown as the page they stand for.
 const SURFACE_ES: Record<string, string> = {
   home: '/ (inicio)', app: '/app', desk: '/desk', redeem: '/redeem', signin: '/signin', protocol: '/protocol', support: '/support',
-  privacy: '/privacy', terms: '/terms', bobby: '/agentic-world/bobby', nucleo: '/nucleo', auth: '/auth/callback', other: 'otra página',
+  privacy: '/privacy', terms: '/terms', bobby: '/agentic-world/bobby', nucleo: '/nucleo', auth: '/auth/callback', invite: '/i (invitación)',
+  other: 'otra página',
 };
 const surface = (s: string | null) => (s ? SURFACE_ES[s] ?? s : DASH);
 

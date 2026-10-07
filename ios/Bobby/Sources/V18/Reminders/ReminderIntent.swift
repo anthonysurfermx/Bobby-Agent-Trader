@@ -62,10 +62,10 @@ final class ReminderIntent: ObservableObject {
 
     // MARK: The payload
 
-    /// A thesis id as the book writes it (an uppercase UUID string), or nil.
+    /// A thesis id as the book writes it (a lowercase UUID string), or nil.
     nonisolated static func thesisId(_ raw: Any?) -> String? {
         guard let text = raw as? String, text.count == 36, let uuid = UUID(uuidString: text) else { return nil }
-        return uuid.uuidString
+        return uuid.uuidString.lowercased()
     }
 
     /// Reads `["kind": "thesis-review", "thesisId": …]`. Anything else (a briefing push, a foreign

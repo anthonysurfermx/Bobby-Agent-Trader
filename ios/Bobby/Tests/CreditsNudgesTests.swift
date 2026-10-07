@@ -434,6 +434,8 @@ final class CreditsNudgesTests: XCTestCase {
         center.seen(low.id)
         clock.addTimeInterval(700)
         center.seen(low.id)
+        XCTAssertTrue(center.eligible(low.id, at: clock), "the showing in progress is not pulled from under the reader")
+        clock.addTimeInterval(center.policy.showingGap + 1)
         XCTAssertFalse(center.eligible(low.id, at: clock))
         let gift = try XCTUnwrap(center.current(center.moment(signedIn: true)))
         XCTAssertEqual(gift.id, "credits.gift.5")

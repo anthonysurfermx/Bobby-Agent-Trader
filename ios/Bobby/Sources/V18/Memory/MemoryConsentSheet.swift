@@ -185,8 +185,8 @@ struct MemoryExplanation: View {
                  text: L.t("The asset, the date, the time frame you mention and its price that day. Not the text of your question.",
                            "El activo, la fecha, el plazo que mencionas y su precio de ese día. No el texto de tu pregunta.")),
             Item(id: "sent", label: L.t("What is sent when I answer", "Lo que se envía cuando respondo"),
-                 text: L.t("A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the change in its price since then, the preferences you set here, and the assets you ask about most.",
-                           "Un resumen breve va al proveedor de IA que escribe la respuesta de Bobby: tu nombre de pila, cuántas veces y cuándo preguntaste por el activo, el cambio de su precio desde entonces, las preferencias que defines aquí y los activos por los que más preguntas.")),
+                 text: L.t("A short summary goes to the AI provider that writes Bobby's answer: your first name, how often and when you asked about the asset, the time frame you named, its price that day and the change since, the preferences you set in Memory, and the assets you ask about most.",
+                           "Un resumen breve va al proveedor de IA que escribe la respuesta de Bobby: tu nombre de pila, cuántas veces y cuándo preguntaste por el activo, el plazo que mencionaste, su precio de ese día y el cambio desde entonces, las preferencias que defines en Memoria y los activos por los que más preguntas.")),
             // What the code guarantees (the server stops reading the row), not a deletion date.
             Item(id: "howlong", label: L.t("For how long", "Por cuánto tiempo"),
                  text: L.t("Bobby stops using an asset \(retentionDays) days after you last asked about it.",
