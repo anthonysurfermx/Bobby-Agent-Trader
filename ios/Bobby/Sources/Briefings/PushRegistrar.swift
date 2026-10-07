@@ -504,18 +504,17 @@ final class BobbyAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificatio
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
                                             withCompletionHandler completionHandler: @escaping () -> Void) {
         let action = response.actionIdentifier
-        let userInfo = response.notification.request.content.userInfo
-        let briefId = BriefingIntent.briefId(from: userInfo)
-        let reminder = ReminderIntent.tap(from: userInfo)
-        let followUp = HarnessTap.tap(from: userInfo)
+        let tapped = response.actionIdentifier == UNNotificationDefaultActionIdentifier
+        let briefId = BriefingIntent.briefId(from: response.notification.request.content.userInfo)
+        let reminder = ReminderIntent.tap(from: response.notification.request.content.userInfo)
+        let followUp = HarnessTap.tap(from: response.notification.request.content.userInfo)
         Task { @MainActor in
-            let tapped = action == UNNotificationDefaultActionIdentifier
             // Stored only: the experience drains it once the page, account and consent are ready.
             if tapped, let briefId { BriefingIntent.shared.store(briefId) }
             // 1.8: a tapped thesis reminder waits the same way (Reminders/ReminderIntent.swift).
             if tapped, let reminder { ReminderIntent.shared.store(reminder) }
-            // 1.8: a follow-up (V18/Harness). iOS is told it is done only once "Stop" has stopped.
-            await Self.followUpResponse(action: action, tap: followUp)
+            // 1.8: so does a tapped follow-up (Harness/HarnessIntent.swift).
+            await Self.followUpResponse(action: action, tap: followUp)   // and its "Stop" has stopped before iOS is told it is done
             completionHandler()
         }
     }
