@@ -735,3 +735,38 @@ After the preflight (so nothing unreadable is ever metered) and **before the des
 
 One subtle line from the server's access: "7 of 10 free reads left this week · Resets October 3", or for anonymous reads "2 of 3 free reads left", or "Bobby Pro · Unlimited reads · renews {date}" with **Manage** (Apple's `manageSubscriptionsSheet`, only for an App Store subscription). It refreshes with `GET api/bobby-access` when it opens (after consent only).
 
+
+---
+
+## 9. The nudge and the 1.8 screens (iOS 1.8 (64), 2026-10-07)
+
+1.8 makes credits, memory, theses, reminders and invitations reachable from the conversation. The glass stays the glass: the page gains ONE generic element and no feature code.
+
+### 9.1 The nudge (page side)
+
+- `session.nudge` is `{id S, text S, cta S}` or `null`. Native writes all three, already localized. The page never composes nudge copy (`tests/bridge-boot.test.mjs` pins this).
+- The page draws it as the FIRST chip of the chip row (class `chip nudge`) in `IDLE` and in `FOLLOWUPS`, and puts `text` in the eyebrow line above the row (one line, ellipsized past 350 px; native keeps it to 46 characters).
+- Two methods, both `{id S(^[a-z][a-z0-9_.-]{0,47}$)}`:
+  - `nudge.seen` → `{count I}`. Sent once per id per page life, when the chip is drawn.
+  - `nudge.act` → `{status: "done"|"gone"}`. Sent on tap. The page does not navigate: native decides what opens. `gone` means native no longer has that nudge; never a fault.
+- `session.changed` with a different nudge id (or none) redraws the row the nudge lives in.
+
+### 9.2 The nudge (native side, `Sources/Nucleo/NucleoNudge.swift`)
+
+- Each feature registers one `NudgeSource` (`V18.registerNudges`). `NudgeCenter` serves at most one, by priority (`NudgePriority`).
+- Etiquette, enforced in one place and persisted (`nucleo.nudges.v1`): two showings, then a week of rest, four showings ever; retired for good on tap; 15 minutes of quiet after any tap; redraws within 10 minutes count as one showing.
+- `NucleoSession.currentNudge()` returns nil before consent, during onboarding, under any sheet or system prompt, and in fixture mode (store shots and UI suites read a fixed page).
+- Sources read stored state only (no network in `candidate`) and may look at the last delivered read of this launch (`NudgeRead`: symbol, verdict, saved, the memory receipt; never the question).
+
+### 9.3 Screens
+
+`credits`, `theses`, `thesisEditor`, `thesisReview`, `memory`, `memoryConsent`, `reminders`, `briefingSettings` are native sheets (`NucleoRoute.nativeOnly`). The page cannot open them: `openNative` accepts exactly the routes 1.7 accepted. They open from a nudge tap, from the profile (`switchSheet(to:)`) or from a drained notification tap.
+
+### 9.4 What travels (additive to §2.4)
+
+- Request: a review the person starts adds `thesis` (`ThesisContext`: their words, the date and price it started from). A plain question never has the key.
+- Reply: `memory` (`MemoryReceipt`: recorded, asks, days since the last ask, percent change since) and, for a question that carried a thesis, `review` (`ThesisReviewNotes`: supports, challenges, unknowns, and `notChecked` codes for the evidence the desk does not load).
+- A server that sends none of it is read exactly as in 1.7 (`Tests/V18WireTests.swift`).
+
+Supersedes R9 only where stated here: there is still no notification prompt at launch or on the glass by itself; a reminder is requested from a native sheet after an explicit tap.
+
