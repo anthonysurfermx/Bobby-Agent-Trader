@@ -121,13 +121,12 @@ class NucleoSession(
             question, this@NucleoSession.analysisLevel)
         override fun deskBody(symbol: String, question: String, isEquity: Boolean, level: String): JSONObject =
             this@NucleoSession.deskBody(symbol, question, if (isEquity) "equity" else "crypto", level)
-        override val shortcuts: List<String> get() {
-            val stored = store.state(this@NucleoSession.owner).optJSONArray("quickAccess") ?: return emptyList()
-            return (0 until stored.length()).mapNotNull { index -> (stored.opt(index) as? String)?.takeIf { it.isNotEmpty() } }
-        }
+        override val shortcuts: List<String> get() = store.keptQuickAccess(this@NucleoSession.owner)
         override fun keepShortcuts(symbols: List<String>) {
-            store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(6)))
-            // An account's quick access is part of its synced profile: its other devices follow.
+            // None removes the stored row: the glass falls back to its default tickers, as on iOS.
+            store.setQuickAccess(this@NucleoSession.owner, JSONArray(symbols.take(QuickAccess.LIMIT)))
+            // An account's quick access is part of its synced profile: its other devices follow
+            // (after a clear the sync carries the default row, never an empty one).
             if (riskAccepted && this@NucleoSession.signedIn) scope.launch { syncProgress() }
         }
         override val repository: BobbyRepository get() = this@NucleoSession.repository
@@ -546,7 +545,8 @@ class NucleoSession(
                     val allPending = store.pending(startedOwner)
                     if (latest != null && allPending.length() == 0) break
                     val pending = JSONArray(); for (i in 0 until minOf(50, allPending.length())) pending.put(allPending.getJSONObject(i))
-                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion, "quickAccess" to store.quickAccess(startedOwner))
+                    val sentQuick = store.quickAccess(startedOwner)
+                    val profile = json("companionId" to companionId, "vibeId" to "directo", "onboarded" to store.onboarded, "riskNoticeVersion" to store.riskVersion, "quickAccess" to sentQuick)
                     val response = repository.request("api/progress", "POST", json("platform" to "android", "events" to pending, "profile" to profile), true)
                     assertCurrent(epoch, consent)
                     val progress = response.optJSONObject("progress") ?: break
@@ -556,7 +556,10 @@ class NucleoSession(
                         receipt.nullableString("id")?.let { syncReceipts[it] = JSONObject(receipt.toString()) }
                     }
                     while (syncReceipts.size > 100) syncReceipts.remove(syncReceipts.keys.first())
-                    store.applySync(startedOwner, progress, results)
+                    // The row changed while the request was in the air (a read arrived, the shortcuts were cleared): what the
+                    // phone holds now is newer than the server's echo of what was sent, and the next sync sends it.
+                    val rowIsCurrent = QuickAccess.sameRow(sentQuick, store.quickAccess(startedOwner))
+                    store.applySync(startedOwner, if (rowIsCurrent) progress else JSONObject(progress.toString()).apply { remove("quickAccess") }, results)
                     latest = response
                     emit("session.changed", snapshot())
                     // Drain durable offline events in the endpoint's supported batches. A missing ACK
