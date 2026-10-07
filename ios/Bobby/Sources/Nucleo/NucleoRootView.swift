@@ -135,7 +135,8 @@ private struct NucleoStage: View {
             // Full height: deletion must never hide below a half-height detent (App Review 5.1.1(v)).
             AccountSheet(store: session.companions, profile: session.profile, detents: [.large], showsLinks: true, voice: session.voice,
                          onVoiceMutedChange: { session.sessionChanged() },
-                         onAIConsentWithdraw: { session.revokeRiskNoticeConsent() }) { session.sheet = nil }
+                         onAIConsentWithdraw: { session.revokeRiskNoticeConsent() },
+                         onOpenRoute: { session.switchSheet(to: $0) }) { session.sheet = nil }
         case .riskNotice:
             // Opened from onboarding before consent: no withdraw (RiskNoticeView shows neutral marks too).
             RiskNoticeView(profile: session.profile, readOnly: true,

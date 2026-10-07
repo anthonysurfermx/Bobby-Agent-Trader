@@ -4,9 +4,10 @@
 // display face, the level bar, the gear belt, then quiet rows under mono section labels, and
 // the account actions kept deliberately small at the foot (sync, sign out, delete).
 // Deletion stays one tap away from the foot on every detent (App Review 5.1.1(v)).
-// The reads the server meters (Nucleo/ARCHITECTURE.md §8.5): what is left this week, or
-// Bobby Pro with Manage subscription (Apple's own sheet). Every non-Pro profile can open Bobby Pro
-// on its own, and Restore Purchases is always here, signed in or not (App Review 3.1.1).
+// The reads the server meters (Nucleo/ARCHITECTURE.md §8.5) live behind ONE row, "Credits" (1.8):
+// what is left, the gifted reads, Bobby Pro with Manage subscription, redeem a code, invite friends
+// and Restore Purchases are all on that screen (V18/Credits/CreditsSheet.swift), reachable signed
+// in or not (App Review 3.1.1).
 import AuthenticationServices
 import StoreKit
 import SwiftUI
@@ -27,11 +28,12 @@ struct AccountSheet: View {
     var onVoiceMutedChange: (() -> Void)? = nil
     /// Stops future external AI requests while keeping account controls available.
     var onAIConsentWithdraw: (() -> Void)? = nil
+    /// Opens a 1.8 screen of the Núcleo over the glass (My theses, Reminders); nil hides those rows (the classic desk).
+    var onOpenRoute: ((NucleoRoute) -> Void)? = nil
     let onClose: () -> Void
     @ObservedObject private var account = AccountSession.shared
     @ObservedObject private var reads = BobbyAccessCenter.shared
     @ObservedObject private var invites = NucleoLevelCenter.shared
-    @ObservedObject private var purchases = BobbyStore.shared
     /// The account's market briefing choices (the row detail); nil until read.
     @ObservedObject private var briefings = BriefingsCenter.shared
     /// The island read when the caller has none (the Núcleo): signed in and past the risk notice only.
@@ -40,8 +42,6 @@ struct AccountSheet: View {
     @State private var manageSubscription = false
     @State private var busy = false
     @State private var showDeleteConfirmation = false
-    @State private var restoring = false
-    @State private var restoreResult: String?
     @State private var accountDeleted = false
     @State private var route: ProfileRoute?
     @State private var heroLoading = true
@@ -95,7 +95,7 @@ struct AccountSheet: View {
         .sheet(item: $route, onDismiss: {
             // A thesis closed on the island or a piece planted: bring the pieces up to date.
             if pieces == nil, account.isSignedIn, profile.acceptedRiskNotice { Task { await land.refresh() } }
-            // Back from Bobby Pro (a purchase, a restore or a sign in): the reads line and the levels follow.
+            // Back from Credits or Bobby Pro (a purchase, a restore, a code or a sign in): the credits line follows.
             if profile.acceptedRiskNotice { Task { await reads.refresh(); await NucleoLevelCenter.shared.refresh() } }
             // Back from the briefing settings (or Bobby Pro): the row detail follows the account's choices.
             if profile.acceptedRiskNotice, account.isSignedIn { Task { await briefings.refresh() } }
@@ -125,12 +125,6 @@ struct AccountSheet: View {
             Button(L.t("Cancel", "Cancelar"), role: .cancel) {}
         } message: {
             Text(AccountDeletionCopy.confirmation(activeAppleSubscription: activeAppleSubscription))
-        }
-        .alert(L.t("Restore Purchases", "Restaurar compras"),
-               isPresented: Binding(get: { restoreResult != nil }, set: { if !$0 { restoreResult = nil } })) {
-            Button("OK", role: .cancel) { restoreResult = nil }
-        } message: {
-            Text(restoreResult ?? "")
         }
         .alert(L.t("Account deleted", "Cuenta eliminada"), isPresented: $accountDeleted) {
             if account.manualAppleRevocationRequired {
@@ -342,50 +336,21 @@ struct AccountSheet: View {
     }
 
     @ViewBuilder private var accountRows: some View {
-        if let row = ReadsRow.content(access: reads.access, subscription: reads.subscription, signedIn: account.isSignedIn,
-                                      grantUntil: invites.referral?.proUntil, grantSource: invites.referral?.proSource) {
-            readsRow(row)
-        }
-        if let row = GiftedReadsRow.content(access: reads.access, meters: invites.meters) {
-            HStack(spacing: 12) {
-                ProfileIcon(symbol: "gift")
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(row.title).font(.system(size: 15)).foregroundStyle(Theme.cream)
-                    Text(row.detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                Spacer(minLength: 8)
-            }
-            .profileRowFrame()
-            .accessibilityElement(children: .combine)
-            .accessibilityIdentifier("account-gifted-reads")
-        }
-        // Bobby Pro on the user's own initiative, not only after a refused read (signed out, the sheet asks to sign in).
-        if reads.access?.isPro != true {
-            ProfileRow(label: "Bobby Pro", detail: BobbyStore.Copy.benefits, detailLineLimit: nil, action: { route = .pro }) {
-                ProfileIcon(symbol: "infinity", tint: Theme.cream)
-            }
-            .accessibilityIdentifier("account-pro")
-        }
-        ProfileRow(label: CouponCopy.text("title"), detail: CouponCopy.text("intro"),
-                   detailLineLimit: nil, action: { route = .coupon }) { ProfileIcon(symbol: "gift") }
-            .accessibilityIdentifier("account-coupon")
-        ProfileRow(label: L.t("Restore Purchases", "Restaurar compras"),
-                   detail: CouponCopy.text("restoreDetail"),
-                   trailing: restoring ? L.t("Restoring…", "Restaurando…") : nil, detailLineLimit: nil,
-                   action: restorePurchases) { ProfileIcon(symbol: "arrow.clockwise") }
-            .disabled(restoring)
-            .accessibilityIdentifier("account-restore")
-        if showsLinks {
-            // Invite a friend: the Bobby Pro reward is promised only where Bobby Pro can be had (as the invite sheet).
-            let days = invites.referral?.rewardDays ?? invites.rewardDays
-            ProfileRow(label: L.t("Invite friends", "Invita amigos"),
-                       detail: !purchases.proPurchasable
-                           ? L.t("Share Bobby with someone you know.", "Comparte Bobby con alguien que conoces.")
-                           : days.map { L.t("\($0) days of Bobby Pro for each friend who joins", "\($0) días de Bobby Pro por cada amigo que se una") }
-                               ?? L.t("Bobby Pro for each friend who joins", "Bobby Pro por cada amigo que se una"),
-                       action: { route = .invite }) { ProfileIcon(symbol: "person.2") }
-                .accessibilityIdentifier("account-invite")
+        // Credits (1.8): what is left, gifted reads, Bobby Pro, redeem a code, invite friends and
+        // Restore Purchases live on one screen; this row says the balance in one line.
+        ProfileRow(label: L.t("Credits", "Créditos"), detail: creditsSummary, detailLineLimit: nil,
+                   action: { route = .credits }) { ProfileIcon(symbol: "ticket", tint: Theme.cream) }
+            .accessibilityIdentifier("account-credits")
+        if let onOpenRoute {
+            // The Núcleo's own screens open over the glass once this sheet is gone.
+            ProfileRow(label: L.t("My theses", "Mis tesis"),
+                       detail: L.t("What you are looking at, and why", "Lo que estás viendo, y por qué"),
+                       action: { onOpenRoute(.theses) }) { ProfileIcon(symbol: "text.book.closed") }
+                .accessibilityIdentifier("account-theses")
+            ProfileRow(label: L.t("Reminders", "Recordatorios"),
+                       detail: L.t("Review reminders you set", "Recordatorios de revisión que tú pusiste"),
+                       action: { onOpenRoute(.reminders) }) { ProfileIcon(symbol: "bell") }
+                .accessibilityIdentifier("account-reminders")
         }
         // Bobby Pro weekly briefing: the account's Monday schedule, its consents and its inbox.
         ProfileRow(label: L.t("Weekly briefing", "Resumen semanal"),
@@ -427,55 +392,15 @@ struct AccountSheet: View {
             .accessibilityIdentifier("account-risk")
     }
 
-    /// "7 of 10 free reads left this week", or Bobby Pro and Manage subscription. Subtle on purpose.
-    private func readsRow(_ row: ReadsRow) -> some View {
-        HStack(spacing: 12) {
-            ProfileIcon(symbol: row.pro ? "infinity" : "text.bubble", tint: row.pro ? Theme.cream : Theme.warmMuted)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(row.title).font(.system(size: 15)).foregroundStyle(Theme.cream)
-                if let detail = row.detail {
-                    Text(detail).font(.system(size: 12)).foregroundStyle(Theme.warmDim).fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            Spacer(minLength: 8)
-            if row.manage {
-                Button(L.t("Manage", "Administrar")) { manageSubscription = true }
-                    .font(.mono(11, .medium)).tracking(0.8)
-                    .foregroundStyle(Theme.warmMuted)
-                    .padding(.horizontal, 10).frame(height: 26)
-                    .background(Capsule().fill(Theme.cream.opacity(0.06)))
-                    .accessibilityLabel(L.t("Manage subscription", "Administrar suscripción"))
-                    .accessibilityIdentifier("account-manage-subscription")
-            }
-        }
-        .profileRowFrame()
-        .accessibilityElement(children: .combine)
-        .accessibilityIdentifier("account-reads")
+    /// "7 of 10 reads · 3 gifted", from the server's word only; a plain description until it answers.
+    private var creditsSummary: String {
+        CreditsBalance.make(CreditsSnapshot(access: reads.access ?? invites.quickAccess, meters: invites.meters, referral: invites.referral,
+                                            subscription: reads.subscription, signedIn: account.isSignedIn)).summary
+            ?? L.t("What you have and how to get more", "Lo que tienes y cómo conseguir más")
     }
 
     /// An App Store subscription Apple keeps billing until it is cancelled in Settings.
     private var activeAppleSubscription: Bool { reads.subscription?.activeOnApple == true }
-
-    /// Restore Purchases: signs in with Apple first when nobody is, then says what came back.
-    private func restorePurchases() {
-        guard !restoring else { return }
-        restoring = true
-        Task {
-            let outcome = await BobbyProRestore.run(afterSignIn: {
-                await ProgressSync.shared.sync(store: store, profile: profile)
-            })
-            restoring = false
-            if profile.acceptedRiskNotice { await reads.refresh() }
-            switch outcome {
-            case .subscribed: restoreResult = BobbyStore.Copy.restored
-            case .nothingToRestore: restoreResult = BobbyStore.Copy.nothingToRestore
-            case .pending: restoreResult = BobbyStore.Copy.pending
-            case .needsSignIn: restoreResult = BobbyStore.Copy.signInFirst
-            case let .failed(message): restoreResult = message
-            case .cancelled: break
-            }
-        }
-    }
 
     /// Share my avatar: the live 3D pose when the model is on stage, the portrait otherwise.
     private func shareAvatar() {
@@ -636,23 +561,16 @@ struct AccountSheet: View {
         switch destination {
         case .avatar:
             MascotGalleryView(store: store, voice: voice, voiceId: profile.voiceId)
-        case .invite:
-            NucleoInviteSheet(center: NucleoLevelCenter.shared, proPurchasable: purchases.proPurchasable, reason: nil,
-                              onPro: {
-                                  // The invite sheet's Bobby Pro card: the paywall follows once it is gone.
-                                  route = nil
-                                  DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { route = .pro }
-                              }) { route = nil }
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Theme.nucleoSurface)
-        case .coupon:
-            CouponRedemptionSheet(afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
-                                  onRead: { route = nil; onClose() }) { route = nil }
+        case .credits:
+            // Credits opens its own sheets (invite, redeem a code, Bobby Pro) over itself.
+            CreditsSheet(profile: profile,
+                         afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
+                         onRead: { route = nil; onClose() }) { route = nil }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.nucleoSurface)
         case .pro:
+            // From the weekly briefing settings only; the profile's own Bobby Pro offer is inside Credits.
             NucleoPaywallSheet(store: BobbyStore.shared, center: BobbyAccessCenter.shared,
                                afterSignIn: { await ProgressSync.shared.sync(store: store, profile: profile) },
                                onOutcome: { _ in }) { route = nil }
@@ -702,14 +620,14 @@ struct AccountSheet: View {
 
 /// Where the profile's rows lead; one sheet at a time over the profile.
 enum ProfileRoute: Identifiable {
-    case avatar, invite, locker, land, risk, pet, pro, briefings, memory, coupon
+    case avatar, credits, locker, land, risk, pet, pro, briefings, memory
     case share(UIImage)
     case tool(CompanionTool)
 
     var id: String {
         switch self {
         case .avatar: return "avatar"
-        case .invite: return "invite"
+        case .credits: return "credits"
         case .locker: return "locker"
         case .land: return "land"
         case .risk: return "risk"
@@ -717,7 +635,6 @@ enum ProfileRoute: Identifiable {
         case .pro: return "pro"
         case .briefings: return "briefings"
         case .memory: return "memory"
-        case .coupon: return "coupon"
         case .share(let image): return "share-\(ObjectIdentifier(image).hashValue)"
         case .tool(let tool): return "tool-\(tool.id)"
         }
@@ -796,7 +713,9 @@ private extension View {
     }
 }
 
-/// The account sheet's reads line, from the server's access object (never a number of the app's own).
+/// The reads line the profile showed through 1.7, from the server's access object (never a number
+/// of the app's own). Since 1.8 the profile and the Credits screen read `CreditsBalance`
+/// (V18/Credits); this builder and `GiftedReadsRow` stay for the suites that pin their wording.
 struct ReadsRow: Equatable {
     let title: String
     let detail: String?
