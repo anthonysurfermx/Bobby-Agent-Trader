@@ -49,6 +49,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.launch
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.credits.CreditsCenter
+import xyz.bobbyprotocol.android.v18.credits.CreditsRestoreNotice
 import xyz.bobbyprotocol.android.v18.credits.HostWords
 import xyz.bobbyprotocol.android.v18.credits.Words
 import xyz.bobbyprotocol.android.v18.invite.InviteCopy
@@ -133,7 +134,7 @@ fun InviteSheet(host: V18Host, onClose: () -> Unit) {
             } else if (!riskAccepted) {
                 // Nothing is asked of the server before the risk notice, so there is no link to wait for:
                 // the line says what comes first (the section above already says it when it is open).
-                if (!acceptFirst) QuietNote(InviteNotice.CONSENT_NEEDED.text(words), Modifier.padding(top = 16.dp), tag = "invite-consent-first")
+                if (!acceptFirst) QuietNote(CreditsRestoreNotice.beforeRiskNotice(words), Modifier.padding(top = 16.dp), tag = "invite-consent-first")
             } else if (snapshot.signedIn) {
                 QuietNote(if (linkKnown) host.text("Invite link unavailable.", "Link de invitación no disponible.") else host.text("Getting your link…", "Obteniendo tu link…"),
                           Modifier.padding(top = 16.dp))

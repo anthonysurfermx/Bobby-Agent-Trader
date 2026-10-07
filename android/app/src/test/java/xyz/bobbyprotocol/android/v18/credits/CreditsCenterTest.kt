@@ -216,6 +216,36 @@ class CreditsCenterTest {
         assertNull("the glass has no reason to announce it again", set.bench.host.currentNudge())
     }
 
+    @Test fun aPlanIsManagedWhereItIsBilled() = runTest {
+        val set = fixture(register = false)
+        set.bench.shell.managementUrl = "https://play.google.com/store/account/subscriptions"
+        fun pro(provider: String?): CreditsProStatus = CreditsProStatus.make(
+            CreditsSnapshot(access = ReadAccess("pro", 0, null, null, null, true), subscription = Subscription(provider, "active", null), signedIn = true), now)
+        assertEquals("https://play.google.com/store/account/subscriptions", set.center.manageUrl(pro("google")))
+        assertEquals("a plan Apple bills is Apple's to manage", CreditsCenter.APPLE_SUBSCRIPTIONS, set.center.manageUrl(pro("apple")))
+        assertNull("a card plan has no store page", set.center.manageUrl(pro("stripe")))
+        assertNull(set.center.manageUrl(CreditsProStatus()))
+        set.bench.shell.managementUrl = null
+        assertNull("no page the store did not give", set.center.manageUrl(pro("google")))
+    }
+
+    @Test fun aCodeThePersonJustRedeemedIsNotAnnouncedAgainOnTheGlass() = runTest {
+        val set = fixture()
+        assertTrue(set.bench.host.present(CreditsCenter.COUPON_ROUTE))
+        set.backend.publish(FakeCreditsBackend.held("u1", set.bench.desk.accountEpoch, quick = 5))
+        runCurrent()
+        assertEquals(5, set.center.book.ledger.last)
+        assertNull("the code's own screen is showing what it gave", set.center.book.ledger.announce)
+        set.bench.closeSheet()
+        assertNull(set.bench.host.currentNudge())
+
+        // A gift that arrives while nobody is looking at it is news.
+        set.backend.publish(FakeCreditsBackend.held("u1", set.bench.desk.accountEpoch, quick = 15))
+        runCurrent()
+        assertEquals("credits.gift.15", set.bench.host.currentNudge()?.id)
+        assertEquals("Bobby gave you 10 reads", set.bench.host.currentNudge()?.text)
+    }
+
     // Restore
 
     @Test fun signedInRestoreAsksTheStoreAndKeepsItsAnswerUntilTheScreenIsClosed() = runTest {

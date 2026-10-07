@@ -132,7 +132,7 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
             if (riskAccepted) {
                 Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(26.dp)) {
                     QuietLink(host.text("Invite", "Invitar"), "credits-invite") { host.switchSheet("invite") }
-                    QuietLink(host.text("Code", "Código"), "credits-coupon") { host.switchSheet("coupon") }
+                    QuietLink(host.text("Code", "Código"), "credits-coupon") { host.switchSheet(CreditsCenter.COUPON_ROUTE) }
                 }
             }
 
@@ -151,7 +151,7 @@ fun CreditsSheet(host: V18Host, onClose: () -> Unit) {
                 }
             }
 
-            val manageUrl = if (balance.manage) host.manageSubscriptionUrl() else null
+            val manageUrl = if (balance.manage) center.manageUrl(balance.pro) else null
             if (manageUrl != null) {
                 QuietLink(host.text("Manage subscription", "Gestionar suscripción"), "credits-manage-subscription") { host.openExternal(manageUrl) }
             }

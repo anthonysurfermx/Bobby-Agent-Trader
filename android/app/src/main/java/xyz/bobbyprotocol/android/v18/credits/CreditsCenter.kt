@@ -187,6 +187,16 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
             return CreditsWire.storeSyncReady(reply)
         }
 
+    /**
+     * Where the plan the server describes is managed, or null. A plan bought on an iPhone is
+     * Apple's to manage whatever this phone's store last heard; a card plan has no store page.
+     */
+    fun manageUrl(pro: CreditsProStatus): String? = when (pro.plan) {
+        CreditsProStatus.Plan.APP_STORE -> APPLE_SUBSCRIPTIONS
+        CreditsProStatus.Plan.GOOGLE_PLAY -> host.manageSubscriptionUrl()
+        else -> null
+    }
+
     /** The freshest word on Quick reads for the reader who is here now, or null. */
     fun access(): ReadAccess? = heldNow()?.access ?: mine()?.let { ReadAccess.fromJson(it.optJSONObject("access")) }
 
@@ -293,6 +303,9 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
     private fun heldChanged() {
         val before = book.ledger
         record()
+        // A code the person has just redeemed is on screen with what it gave (on iOS that screen sits
+        // over Credits, which acknowledges it): the glass does not announce the same gift again.
+        if (host.sheetRoute == COUPON_ROUTE) acknowledgeGifts()
         changed()
         if (book.ledger != before) host.sessionChanged()
     }
@@ -331,6 +344,10 @@ class CreditsCenter(private val host: V18Host, private val backend: CreditsBacke
 
     companion object {
         const val SERVICE = "v18.credits"
+        /** Apple's own subscriptions page, the one BillingPolicy opens for a plan Apple bills. */
+        const val APPLE_SUBSCRIPTIONS = "https://apps.apple.com/account/subscriptions"
+        /** The 1.1.4 sheet where a code is redeemed. */
+        const val COUPON_ROUTE = "coupon"
         /** A reading older than this is read again when the app comes to the front. */
         const val FRESH_FOR = 900_000L
         const val BUSY_WAIT = 750L
