@@ -53,7 +53,7 @@ function cards(tree, model, { note = 18, header = 14, rows = 900 } = {}) {
 
 for (const tree of Object.keys(TREES)) {
   const RM = readModel(tree), template = read(tree, 'onboarding/template.html');
-  const rule = (selector) => new RegExp('^' + selector.replace(/[.#]/g, '\\$&') + '\\{([^}]*)\\}', 'm').exec(template)?.[1];
+  const rule = (selector) => new RegExp('^' + selector.replace(/[.*+?^${}()|[\]\\#]/g, '\\$&') + '\\{([^}]*)\\}', 'm').exec(template)?.[1];
 
   test(`${tree}: the thesis note is measured; the button comes after it and stays inside the card`, () => {
     for (const lang of LANGS) {
