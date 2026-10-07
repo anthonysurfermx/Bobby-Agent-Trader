@@ -1,8 +1,12 @@
 package xyz.bobbyprotocol.android.v18
 
 import android.os.Build
+import android.util.Log
 import androidx.compose.ui.semantics.SemanticsActions
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.assertContentDescriptionContains
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
@@ -34,6 +38,8 @@ import xyz.bobbyprotocol.android.v18.harness.HarnessCenter
 import xyz.bobbyprotocol.android.v18.memory.MemoryCenter
 import xyz.bobbyprotocol.android.v18.memory.MemoryConsentModel
 import xyz.bobbyprotocol.android.v18.reminders.ReminderCenter
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
  * Every 1.8 screen drawn on an emulator with a believable state, in English and in Spanish, and a
@@ -381,6 +387,32 @@ class V18ScreensInstrumentedTest(private val language: String) {
         // The frame that was just composed has to reach the display before it is captured.
         Thread.sleep(400)
         V18Shots.save("$name-$language")
+        measureTouchTargets("$name-$language")
+    }
+
+    /**
+     * What a finger can reach of every control on the screen, measured: a control answers to 48 dp
+     * in both directions, or it is written to logcat (`V18Targets`) with its size. A control cut by
+     * the edge of the scroll is measured when it is in full view, in another picture.
+     */
+    private fun measureTouchTargets(picture: String) {
+        val density = compose.density.density
+        val controls = compose.onAllNodes(hasClickAction(), useUnmergedTree = true).fetchSemanticsNodes()
+        var small = 0
+        for (node in controls) {
+            val drawn = node.boundsInRoot
+            if (abs(drawn.width - node.size.width) > 1f || abs(drawn.height - node.size.height) > 1f) continue
+            val touch = node.touchBoundsInRoot
+            val width = touch.width / density
+            val height = touch.height / density
+            if (width >= 47.5f && height >= 47.5f) continue
+            small += 1
+            val label = node.config.getOrNull(SemanticsProperties.TestTag)
+                ?: node.config.getOrNull(SemanticsProperties.ContentDescription)?.joinToString()
+                ?: node.config.getOrNull(SemanticsProperties.Text)?.joinToString { it.text } ?: "unnamed"
+            Log.w("V18Targets", "$picture: $label answers to ${width.roundToInt()}x${height.roundToInt()} dp")
+        }
+        Log.i("V18Targets", "$picture: ${controls.size} controls, $small under 48 dp")
     }
 
     private val storeReady = BillingState(configured = true, identityReady = true, offeringsStatus = BillingOfferingsStatus.READY, restoreAllowed = true)
