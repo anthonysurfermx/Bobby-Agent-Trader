@@ -10,10 +10,11 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { enforcePublicRateLimit, requireInternalAuth } from './_lib/request-security.js';
 import { bobbyDbUrl, bobbyServiceKey } from './_lib/bobby-db.js';
 import { requireWritesOpen } from './_lib/control.js';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend } from './_lib/app-model.js';
 
 export const config = { maxDuration: 60, memory: 512 };
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 const SB_URL = bobbyDbUrl() || '';
 const SB_KEY = bobbyServiceKey();
 
@@ -166,7 +167,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  // Codex round-2 #3 / round-3 P2: a public POST here ran gpt-4o for free and
+  // Codex round-2 #3 / round-3 P2: a public POST here ran the model for free and
   // bypassed the MCP fee on bobby_judge. Internal callers only — and checked
   // BEFORE the dynamic control source, so an anonymous caller triggers no
   // Supabase read and learns nothing about the control record.
@@ -174,8 +175,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!(await requireWritesOpen(res))) return;
   if (!await enforcePublicRateLimit(req, res, 'judge-mode', 10, 600)) return;
 
-  if (!OPENAI_API_KEY) {
-    return res.status(503).json({ error: 'OPENAI_API_KEY not configured' });
+  if (!hasAppTextBackend()) {
+    return res.status(503).json({ error: 'AI backend not configured' });
   }
 
   const { thread_id, language = 'en' } = req.body as { thread_id?: string; language?: string };
@@ -204,41 +205,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(422).json({ error: 'Debate incomplete — need at least Alpha + Red Team posts' });
     }
 
-    // Build prompt and call OpenAI
+    // Build the same JSON judge prompt through the shared app model adapter.
     const prompt = buildJudgePrompt(thread, posts, calibration);
     const langNote = language === 'es'
       ? ' Write the rationale and red_flags in Spanish.'
       : '';
     const systemMsg = `You are an independent AI judge auditing trading debates for Bobby Protocol. You are RUTHLESSLY honest. You evaluate debate quality, not market predictions. Output valid JSON only.${langNote}`;
 
-    let raw = '';
-
-    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        max_tokens: 600,
-        messages: [
-          { role: 'system', content: systemMsg },
-          { role: 'user', content: prompt },
-        ],
-      }),
+    const { text: raw } = await callLlm({
+      endpoint: 'judge-mode',
+      system: systemMsg,
+      user: prompt,
+      maxTokens: 600,
     });
-    if (!openaiRes.ok) {
-      const err = await openaiRes.text().catch(() => '');
-      console.error('[JudgeMode] OpenAI error:', openaiRes.status, err);
-      return res.status(502).json({ error: `OpenAI ${openaiRes.status}`, detail: err.slice(0, 300) });
-    }
-    const data = await openaiRes.json() as { choices: Array<{ message: { content: string } }> };
-    raw = data.choices[0]?.message?.content || '';
-    console.log('[JudgeMode] Used OpenAI gpt-4o');
 
     if (!raw) {
-      return res.status(503).json({ error: 'OpenAI returned empty response' });
+      return res.status(503).json({ error: 'AI returned empty response' });
     }
 
     // Parse JSON from response (strip markdown fences if any)

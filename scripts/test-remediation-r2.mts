@@ -12,6 +12,9 @@ process.env.BOBBY_SUPABASE_URL = 'https://dummy.supabase.co';
 process.env.BOBBY_SUPABASE_SERVICE_ROLE_KEY = 'dummy-service-key';
 process.env.BOBBY_SUPABASE_ANON_KEY = 'dummy-anon-key';
 process.env.OPENAI_API_KEY = 'dummy-openai';
+process.env.ANTHROPIC_API_KEY = 'dummy-anthropic';
+process.env.BOBBY_APP_TEXT_MODEL = 'claude-haiku-5-5';
+delete process.env.BOBBY_LLM_PRIMARY;
 process.env.INTERNAL_API_SECRET = 'test-internal-secret';
 process.env.XLAYER_RECORD_SECRET = 'test-record-secret'; // forum-resolve is guarded by requireRecordAuth
 process.env.BOBBY_PROTOCOL_BASE_URL = 'https://dummy.bobby';
@@ -26,7 +29,9 @@ const thread = { id: THREAD_ID, scope: 'public', symbol: 'NVDAc', direction: 'lo
 let threadRows: () => unknown[] = () => [thread];
 let historyCandles: string[][] = [];
 const posts = ['alpha', 'redteam', 'cio'].map((agent, i) => ({ id: `p${i}`, thread_id: THREAD_ID, agent, agent_type: agent, agent_name: agent, role: agent, content: `${agent} says something`, body: `${agent} says something`, created_at: new Date().toISOString() }));
-const openai = { choices: [{ message: { content: JSON.stringify({ dimensions: { data_integrity: 3, adversarial_quality: 3, decision_logic: 3, risk_management: 3, calibration_alignment: 3, novelty: 3 }, biases_detected: [], conviction_assessment: 'reasonable', recommendation: 'pass', rationale: 'fine', red_flags: [] }) } }] };
+const judgeText = JSON.stringify({ dimensions: { data_integrity: 3, adversarial_quality: 3, decision_logic: 3, risk_management: 3, calibration_alignment: 3, novelty: 3 }, biases_detected: [], conviction_assessment: 'reasonable', recommendation: 'pass', rationale: 'fine', red_flags: [] });
+const openai = { choices: [{ finish_reason: 'stop', message: { content: judgeText } }], usage: { prompt_tokens: 10, completion_tokens: 20 } };
+const anthropic = { content: [{ type: 'text', text: judgeText }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 20 } };
 const AUTH_USER_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee';
 const AUTH_IDENTITY_ID = '99999999-8888-4777-8666-555555555555';
 let identityDeleteStatus = 200;
@@ -42,6 +47,7 @@ globalThis.fetch = (async (input: any, init?: any) => {
   calls.push({ url, method, body: typeof init?.body === 'string' ? init.body : undefined });
   const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
   if (isHost(url, 'api.openai.com')) return json(openai);
+  if (isHost(url, 'api.anthropic.com')) return json(anthropic);
   if (url.includes('okx.com/api/v5/market/ticker')) return json({ code: '0', data: [{ last: '125' }] }); // long from 100 → target 120 hit
   // forum-resolve grades on the 1H candle path since 44bffc1 (api/_lib/path-resolution.ts): OKX shape, newest first.
   if (url.includes('okx.com/api/v5/market/history-candles')) return json({ code: '0', data: historyCandles });
@@ -208,6 +214,10 @@ await check('P1-3 internal judge-mode persists, and only to a public thread', as
   const n = since(); const { res, state } = recorder();
   await judgeMode.default(req('POST', {}, { thread_id: THREAD_ID }, { 'x-internal-secret': 'test-internal-secret' }), res);
   assert.equal(state.status, 200, JSON.stringify(state.body));
+  const models = calls.slice(n).filter((c) => isHost(c.url, 'api.anthropic.com'));
+  assert.equal(models.length, 1, 'judge uses the selected Anthropic app model');
+  assert.equal(JSON.parse(models[0].body!).model, 'claude-haiku-5-5');
+  assert.equal(calls.slice(n).filter((c) => isHost(c.url, 'api.openai.com')).length, 0);
   const patches = calls.slice(n).filter((c) => c.method === 'PATCH');
   assert.equal(patches.length, 1);
   assert.ok(patches[0].url.includes('forum_threads') && patches[0].url.includes('scope=eq.public'), patches[0].url);
@@ -644,14 +654,17 @@ await check('BP-10 register: storage read failure → 502 and no write; owner ch
     globalThis.fetch = (async (input: any, init?: any) => {
       const url = typeof input === 'string' ? input : input.url; const method = (init?.method || 'GET').toUpperCase();
       const json = (v: unknown, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
-      if (isHost(url, 'api.openai.com')) {
-        const system = String(JSON.parse(String(init?.body)).messages[0].content);
+      if (isHost(url, 'api.openai.com') || isHost(url, 'api.anthropic.com')) {
+        const body = JSON.parse(String(init?.body));
+        const system = String(body.system ?? body.messages[0].content);
         let out: unknown;
         if (system.includes('Alpha Hunter')) out = { thesis: 'bullish structure', evidence: ['e1'], catalyst: 'c', conviction: 8 };
         else if (system.includes('Red Team')) out = { counterpoints: ['x'], biases_detected: ['recency'], failure_modes: ['gap'] };
         else if (system.includes('Bobby CIO')) out = opts.cio ?? { recommendation: 'execute', conviction: 8, rationale: 'ok', adjusted_entry: 100, adjusted_stop: 90 };
         else out = { dimensions: opts.judge ?? ALL5, biases_detected: [], recommendation: 'execute', rationale: 'r', red_flags: [] };
-        return json({ choices: [{ message: { content: JSON.stringify(out) } }] });
+        return isHost(url, 'api.anthropic.com')
+          ? json({ content: [{ type: 'text', text: JSON.stringify(out) }], stop_reason: 'end_turn', usage: { input_tokens: 10, output_tokens: 20 } })
+          : json({ choices: [{ finish_reason: 'stop', message: { content: JSON.stringify(out) } }], usage: { prompt_tokens: 10, completion_tokens: 20 } });
       }
       if (url.includes('/rest/v1/hardness_agents') && method === 'GET') return json(opts.agent ? [opts.agent] : []);
       if (url.includes('/rest/v1/hardness_agent_sessions') && method === 'PATCH') { patches.push(JSON.parse(String(init?.body))); return json([]); }
