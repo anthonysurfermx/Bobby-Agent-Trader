@@ -77,6 +77,8 @@
     "test:briefings-api": "tsx scripts/test-briefings-api.mts",
     "test:briefings-worker": "tsx scripts/test-briefings-worker.mts",
     "test:briefings-pg": "tsx scripts/test-briefings-pg.mts",
+    "test:push-news": "node --import tsx scripts/test-push-news.mts",
+    "test:push-news-pg": "node --import tsx scripts/test-push-news-pg.mts",
     "test:admin-live": "node --import tsx scripts/test-admin-live-api.mts && node --import tsx scripts/test-admin-live-ui.mts && node --import tsx scripts/test-admin-r2-desk.mts && node --import tsx scripts/test-admin-r2-insights.mts && node --import tsx scripts/test-admin-stripe-truth.mts && node --import tsx scripts/test-admin-compass-refresh.mts && node --import tsx scripts/test-admin-compass-ui.mts",
     "test:admin-live-pg": "node --import tsx scripts/test-admin-r2-pg.mts",
     "check:admin": "tsc -p tsconfig.admin.json",

@@ -1,5 +1,5 @@
 // The dashboard's sections, in sidebar order.
-import { BadgeCheck, Filter, LayoutGrid, MapPin, Plug, Sparkles, Ticket, Users } from 'lucide-react';
+import { BadgeCheck, Bell, Filter, LayoutGrid, MapPin, Plug, Sparkles, Ticket, Users } from 'lucide-react';
 
 export const TABS = [
   { id: 'resumen', label: 'Resumen', icon: LayoutGrid },
@@ -8,6 +8,7 @@ export const TABS = [
   { id: 'usuarios', label: 'Usuarios', icon: Users },
   { id: 'membresias', label: 'Membresías', icon: BadgeCheck },
   { id: 'cupones', label: 'Cupones', icon: Ticket },
+  { id: 'notificaciones', label: 'Notificaciones', icon: Bell },
   { id: 'ia', label: 'IA', icon: Sparkles },
   { id: 'integraciones', label: 'Integraciones', icon: Plug },
 ] as const;
