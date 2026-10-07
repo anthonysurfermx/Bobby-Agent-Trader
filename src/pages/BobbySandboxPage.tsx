@@ -10,6 +10,7 @@ import { Helmet } from 'react-helmet-async';
 import { motion, AnimatePresence } from 'framer-motion';
 import KineticShell from '@/components/kinetic/KineticShell';
 import { PLAYBOOKS } from '@/data/playbooks';
+import { accessHeaders } from '@/lib/access-client';
 
 // ── Types ──────────────────────────────────────────────────
 type AgentPhase = 'alpha_hunter' | 'red_team' | 'cio' | 'judge' | 'guardrails';
@@ -212,7 +213,7 @@ export default function BobbySandboxPage() {
     try {
       const res = await fetch('/api/sandbox-run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) },
         body: JSON.stringify({ playbookSlug, ticker: ticker.trim() || 'BTC' }),
         signal: ctrl.signal,
       });

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { lang, locale } from '@/lib/companions/i18n';
 import { kineticText as text } from '@/lib/companions/kinetic-copy';
 import { progressStore, RISK_NOTICE_VERSION } from '@/lib/companions/progress';
+import { accessHeaders } from '@/lib/access-client';
 
 interface AIInsightsTerminalProps {
   context: string;
@@ -102,7 +103,7 @@ export function AIInsightsTerminal({
     try {
       const res = await fetch('/api/explain', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await accessHeaders()) },
         body: JSON.stringify({ context, data, language, locale: outputLocale }),
         signal: abortRef.current.signal,
       });
