@@ -13,13 +13,16 @@
 //   the review they chose on the save     72 hours → 3 days; 168 hours → 7 days
 //   the horizon their question named      week → 3 days; month → 7 days; long → no asset follow-up
 //   otherwise                             the next day
-// A horizon only lengthens the wait: nothing ever arrives sooner than the next day.
+// A horizon only lengthens the wait: nothing ever arrives sooner than the next day. It times the
+// first follow-up and nothing else: once a step was shown, what the person says later (a save, a
+// thesis) cannot push what follows it further away than the day it was shown allows.
 //
 // What it learns, all of it readable from the ledger (HarnessProfile):
 //  - the hour: follow-ups arrive at the time of day the person asked, and once they have answered
 //    a few, at the hour they answer;
 //  - when to stop: three follow-ups in a row that nobody answered and Bobby says nothing for two
-//    weeks, whatever is asked; a kind whose last two showings went unanswered rests; a sector is
+//    weeks, whatever is asked, and the plan itself never holds what would be a fourth (it is what
+//    arrives if they do nothing); a kind whose last two showings went unanswered rests; a sector is
 //    not repeated within a week; never more than `maxPerWeek` follow-ups in seven days, never two
 //    on the same day, never sooner than 18 hours after the last one.
 // Nothing here says the market did anything: a follow-up is a moment in time, the numbers are
@@ -154,8 +157,14 @@ enum HarnessPlanner {
         for step in options.chain where walked.insert(step).inserted {
             switch step {
             case .asset, .sector:
-                guard let slot = day else { continue }
-                if !done.contains(step) {
+                guard var slot = day else { continue }
+                if done.contains(step) {
+                    // Already shown for this question. What follows is counted from the day it was
+                    // shown whenever that is earlier than where the wait would put it today: what the
+                    // person says after seeing it (a save "to review in a week", a thesis of weeks)
+                    // times nothing any more, and never pushes the week past the question it belongs to.
+                    if let shown = sentSince.last(where: { $0.step == step }) { slot = min(slot, calendar.startOfDay(for: shown.at)) }
+                } else {
                     guard !profile.rests(step), let fireAt = moment(on: slot, time: time, calendar: calendar) else { continue }
                     if step == .asset {
                         result.append(HarnessFollowUp(step: .asset, fireAt: fireAt, symbol: subject.symbol, name: subject.name, isEquity: subject.isEquity))
@@ -181,8 +190,11 @@ enum HarnessPlanner {
 
         // Never in the past; never the same local day as, or sooner than `minimumGap` after, what the
         // person was really shown before (the clock, the time zone or the plan may have moved since);
-        // never too many in a week, nor for one question.
+        // never too many in a week, nor for one question; and never what would be one more unanswered
+        // in a row than `quietAfter` inside the quiet that follows it. The plan is what arrives if they
+        // do nothing, so each follow-up it keeps counts as unanswered for the ones behind it.
         var previous = ledger.events(.sent).last?.at
+        var unanswered = streak.count, lastUnanswered = streak.last
         var kept: [HarnessFollowUp] = []
         for candidate in result.sorted(by: { $0.fireAt < $1.fireAt }) where candidate.fireAt > now {
             guard kept.count < room else { break }
@@ -202,6 +214,7 @@ enum HarnessPlanner {
             let weekBefore = fireAt.addingTimeInterval(-7 * 86_400)
             let shown = ledger.events(.sent, since: weekBefore).count + kept.filter { $0.fireAt > weekBefore }.count
             guard shown < options.maxPerWeek else { continue }
+            if unanswered >= options.quietAfter, let last = lastUnanswered, fireAt.timeIntervalSince(last) < options.quietDays * 86_400 { continue }
             var followUp = HarnessFollowUp(step: candidate.step, fireAt: fireAt, symbol: candidate.symbol, name: candidate.name,
                                            isEquity: candidate.isEquity, sector: candidate.sector)
             switch candidate.step {
@@ -223,6 +236,8 @@ enum HarnessPlanner {
             }
             kept.append(followUp)
             previous = fireAt
+            unanswered += 1
+            lastUnanswered = fireAt
         }
         return kept
     }

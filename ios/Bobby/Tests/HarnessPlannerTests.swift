@@ -292,7 +292,10 @@ final class HarnessPlannerTests: XCTestCase {
         XCTAssertEqual(steps.map(\.step), [.asset, .week])
         XCTAssertEqual(steps[0].symbol, "SOL")
         XCTAssertEqual(steps[0].fireAt, at(9, 20))
-        XCTAssertEqual(plan(at(8, 20, 1), withSector).map(\.sector), [nil, "layer1", nil])
+        // One follow-up already went unanswered: with the sector the new question gets the asset and its
+        // sector, and not the week, which would be a fourth in a row that nobody answered.
+        XCTAssertEqual(plan(at(8, 20, 1), withSector).map(\.sector), [nil, "layer1"])
+        XCTAssertEqual(plan(at(8, 20, 1), withSector).map(\.step), [.asset, .sector])
     }
 
     func testASecondQuestionOfTheirOwnAboutTheSameReadIsAQuestion() {
@@ -544,6 +547,74 @@ final class HarnessPlannerTests: XCTestCase {
         XCTAssertEqual(plan(at(7, 17)).map(\.step), [.asset, .week])
     }
 
+    // MARK: After the first follow-up was shown, and three in a row (review of 2026-10-07)
+
+    func testWhatTheySayAfterTheAssetWasShownDoesNotCancelTheWeek() {
+        // Tuesday 6 at 14:10; the asset was shown on Wednesday 7 at 14:10, tapped, and read.
+        ask("NVDA", at(6, 14, 10))
+        sent(.asset, at(7, 14, 10))
+        answered(.asset, at(7, 14, 30))
+        ask("NVDA", at(7, 14, 31), origin: .followUp)
+        let shown = ledger
+        func steps(_ options: HarnessPlanner.Options? = nil) -> [String] {
+            plan(at(7, 15, 5), options).map { "\($0.step.rawValue) \(Int($0.fireAt.timeIntervalSince(at(6, 0)) / 60))" }
+        }
+        func minutes(_ step: HarnessStep, _ date: Date) -> String { "\(step.rawValue) \(Int(date.timeIntervalSince(at(6, 0)) / 60))" }
+        let week = [minutes(.week, at(12, 14, 10))]
+        XCTAssertEqual(steps(), week, "answered by reading only")
+        // Saved with each review the page offers: the save times the first follow-up, and that one was shown.
+        for hours in [24, 72, 168] {
+            ledger = shown
+            ledger.note(HarnessEvent(kind: .saved, at: at(7, 15, 2), symbol: "NVDA", horizonHours: hours))
+            XCTAssertEqual(steps(), week, "saved with a review in \(hours) hours")
+        }
+        // A thesis written after it: weeks, or longer.
+        for horizon in [HarnessHorizon.month, .long] {
+            ledger = shown
+            ledger.note(HarnessEvent(kind: .thesis, at: at(7, 15, 3), symbol: "NVDA", horizon: horizon))
+            XCTAssertEqual(steps(), week, "a thesis of \(horizon.rawValue)")
+        }
+        // With the sector: it follows the asset that was shown by a day, whatever was said since; the week is the same Monday.
+        ledger = shown
+        ledger.note(HarnessEvent(kind: .saved, at: at(7, 15, 2), symbol: "NVDA", horizonHours: 168))
+        XCTAssertEqual(steps(withSector), [minutes(.sector, at(8, 14, 10))] + week)
+        // And the asset is never planned a second time at the longer wait, even with room for it.
+        var roomy = assetThenWeek
+        roomy.maxPerQuestion = 3
+        XCTAssertEqual(steps(roomy), week)
+        // Said before the asset was shown, a week's review still moves it, as before.
+        ledger = HarnessLedger()
+        ask("NVDA", at(6, 14, 10))
+        ledger.note(HarnessEvent(kind: .saved, at: at(6, 14, 11), symbol: "NVDA", horizonHours: 168))
+        XCTAssertEqual(plan(at(6, 14, 12)).map(\.fireAt), [at(13, 14, 10)])
+    }
+
+    func testThePlanNeverHoldsAFourthUnansweredInARow() {
+        // Thursday 1 at 14:10: the asset (Friday 2) and the week (Monday 5) arrive and nobody opens them.
+        ask("NVDA", at(1, 14, 10))
+        sent(.asset, at(2, 14, 10))
+        sent(.week, at(5, 14, 10))
+        ask("NVDA", at(6, 15, 0))
+        // Two in a row went unanswered: the plan is "what happens if they do nothing", so it holds one more.
+        XCTAssertEqual(plan(at(6, 15, 1)).map(\.step), [.asset])
+        XCTAssertEqual(plan(at(6, 15, 1)).first?.fireAt, at(7, 15, 0))
+        XCTAssertEqual(plan(at(6, 15, 1), withSector).map(\.step), [.asset], "with three steps it would have been five in a row")
+        // Shown and still not answered: quiet.
+        sent(.asset, at(7, 15, 0))
+        XCTAssertEqual(plan(at(7, 15, 1)), [])
+        // Answered: the week of that question comes.
+        answered(.asset, at(7, 16, 0))
+        ask("NVDA", at(7, 16, 1), origin: .followUp)
+        XCTAssertEqual(plan(at(7, 16, 5)).map(\.step), [.week])
+        XCTAssertEqual(plan(at(7, 16, 5)).first?.fireAt, at(12, 15, 0))
+        // One unanswered before a question still leaves room for both.
+        ledger = HarnessLedger()
+        ask("NVDA", at(1, 14, 10))
+        sent(.asset, at(2, 14, 10))
+        ask("NVDA", at(6, 15, 0))
+        XCTAssertEqual(plan(at(6, 15, 1)).map(\.step), [.asset, .week])
+    }
+
     // MARK: One person, one question (the answers the owner asked for)
 
     /// Lives one question forward: every follow-up the planner holds is shown when its moment comes,
@@ -594,6 +665,12 @@ final class HarnessPlannerTests: XCTestCase {
         fresh(); expect(live(shipped) { followUp, _ in self.tap(followUp) }, [(.asset, wednesday), (.week, monday)], "b")
         // (c) they answer the first
         fresh(); expect(live(shipped) { followUp, index in if index == 0 { self.answer(followUp) } }, [(.asset, wednesday), (.week, monday)], "c")
+        // (c, said aloud) they answer the first and save that read with "review in a week": the week still comes
+        fresh(); expect(live(shipped) { followUp, index in
+            guard index == 0 else { return }
+            self.answer(followUp)
+            self.ledger.note(HarnessEvent(kind: .saved, at: followUp.fireAt.addingTimeInterval(30 * 60), symbol: "NVDA", horizonHours: 168))
+        }, [(.asset, wednesday), (.week, monday)], "c, saved for a week")
         // (d) they saved the read with "review in a week"
         fresh(); ledger.note(HarnessEvent(kind: .saved, at: at(6, 14, 11), symbol: "NVDA", horizonHours: 168))
         expect(live(shipped), [(.asset, nextTuesday)], "d")
@@ -707,6 +784,16 @@ final class HarnessPlannerTests: XCTestCase {
                 // Quiet, and resting kinds.
                 let streak = ledger.unansweredStreak(before: now)
                 if streak.count >= 3, let last = streak.last, now.timeIntervalSince(last) < 14 * 86_400 { XCTAssertEqual(plan, [], "\(label): quiet") }
+                // And over the plan itself, which is what arrives if they do nothing: never a fourth unanswered
+                // in a row inside the fourteen days after the third.
+                var unanswered = streak.count, lastUnanswered = streak.last
+                for followUp in plan {
+                    if unanswered >= 3, let last = lastUnanswered {
+                        XCTAssertGreaterThanOrEqual(followUp.fireAt.timeIntervalSince(last), 14 * 86_400, "\(label): \(unanswered + 1) unanswered in a row")
+                    }
+                    unanswered += 1
+                    lastUnanswered = followUp.fireAt
+                }
                 let profile = HarnessProfile.make(ledger, now: now, calendar: zone)
                 for followUp in plan { XCTAssertFalse(profile.rests(followUp.step), "\(label): \(followUp.step.rawValue) rests") }
                 var previous = sents.last?.at
