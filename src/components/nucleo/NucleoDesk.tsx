@@ -14,7 +14,7 @@ import { COMPANIONS, companionName, getCompanion, getVibe, levelFor, nextLevelFo
 import { pick, speechLocale, t } from '@/lib/companions/i18n';
 import { clientLanguagePath } from '@/lib/client-language';
 import { RISK_NOTICE_VERSION, progressStore, quickAccessName, quickAccessRow, useProgress, type ThesisSnapshot } from '@/lib/companions/progress';
-import { consentCurrent, heldQuestion, parseDeskLink, type HeldStep } from '@/lib/desk-entry';
+import { consentCurrent, heldQuestion, packWaiting, parseDeskLink, unpackWaiting, type HeldStep } from '@/lib/desk-entry';
 import { sfxMuted, sfxShield, sfxSuccess, sfxTock, setSfxMuted } from '@/lib/companions/sfx';
 import { voiceScreenState } from '@/lib/realtime-context';
 import { useCompanionVoice } from '@/hooks/useCompanionVoice';
@@ -55,6 +55,12 @@ type LiveArgs = { alpha?: string; red?: string; rebuttal?: string };
 /** The first sentence, for the voices around the glass; the whole text stays in the debate card. */
 const firstSentence = (text: string, max = 170) => { const m = text.match(/^.*?[.!?](?=\s|$)/); const one = (m ? m[0] : text).trim(); return one.length > max ? `${one.slice(0, max).replace(/\s+\S*$/, '')}…` : one; };
 const PENDING_ASK = 'bobby:pending-ask';
+// A question waiting behind the notice when the page itself reloads (a language change does). This tab only, unsent.
+const WAITING_ASK = 'bobby:waiting-ask';
+// The notice takes one step of the browser's history, so Back returns to the desk instead of leaving it.
+const NOTICE_STEP = 'bobbyNotice';
+const onNoticeStep = () => { try { return (window.history.state as Record<string, unknown> | null)?.[NOTICE_STEP] === true; } catch { return false; } };
+const takeNoticeStep = () => { try { if (!onNoticeStep()) window.history.pushState({ ...((window.history.state as object | null) ?? {}), [NOTICE_STEP]: true }, ''); } catch { /* no history: the X still leaves */ } };
 type Sheet = 'none' | 'profile' | 'board' | 'risk' | 'catalog' | 'pet' | 'swap';
 interface Msg { from: 'bobby' | 'you'; text: string }
 
@@ -71,6 +77,14 @@ function greeting(name?: string | null): string {
 }
 /** The question a starter chip asks, and the one /desk?ask=SYMBOL starts. */
 const howLooks = (sym: string) => t(`How does ${sym} look?`, `¿Cómo se ve ${sym}?`, `Como está ${sym}?`);
+/** What this page was holding behind the notice when it reloaded, in the language it reloaded into. Reads only. */
+function waitingAtLoad(): HeldStep | null {
+  let raw: string | null = null;
+  try { raw = sessionStorage.getItem(WAITING_ASK); } catch { raw = null; }
+  const kept = unpackWaiting(raw, Date.now());
+  if (!kept) return null;
+  return kept.starter ? { kind: 'ask', q: kept.q, spoken: howLooks(kept.q), starter: true } : { kind: 'ask', q: kept.q, ...(kept.spoken ? { spoken: kept.spoken } : {}) };
+}
 const signedPct = (v: number) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toLocaleString(speechLocale(), { minimumFractionDigits: v >= 10 || v <= -10 ? 1 : 2, maximumFractionDigits: v >= 10 || v <= -10 ? 1 : 2 })}%`;
 
 /** The spoken read as karaoke: one sentence at a time, the current word lit, on the reading clock. */
@@ -138,13 +152,23 @@ export default function NucleoDesk() {
   // leaves this browser until they accept the notice. Whatever they asked waits in `held` and runs once after.
   const consented = consentCurrent(progress, RISK_NOTICE_VERSION);
   const consentNow = useCallback(() => consentCurrent(progressStore.get(), RISK_NOTICE_VERSION), []);
-  // A link that asks (/desk?ask=NVDA) opens a new visitor straight on the notice, with the question above it.
-  const [held, setHeld] = useState<HeldStep | null>(() => {
+  // A link that asks (/desk?ask=NVDA) opens a new visitor straight on the notice, with the question above it. So does
+  // a question that was already waiting there when the page reloaded; a link in the address comes first.
+  const [arrival] = useState<{ held: HeldStep | null; pill: string }>(() => {
+    const agreedNow = consentCurrent(progressStore.get(), RISK_NOTICE_VERSION);
     const link = parseDeskLink(window.location.search);
-    return link.ask && !consentCurrent(progressStore.get(), RISK_NOTICE_VERSION) ? { kind: 'ask', q: link.ask, spoken: howLooks(link.ask) } : null;
+    if (link.present) return { held: link.ask && !agreedNow ? { kind: 'ask', q: link.ask, spoken: howLooks(link.ask), starter: true } : null, pill: '' };
+    const kept = waitingAtLoad();
+    // Agreed meanwhile (another tab): nothing is sent from a reload, the question waits in the pill.
+    return kept && agreedNow ? { held: null, pill: heldQuestion(kept) ?? '' } : { held: kept, pill: '' };
   });
+  const [held, setHeld] = useState<HeldStep | null>(arrival.held);
   const heldRef = useRef<HeldStep | null>(held);
-  const holdFor = useCallback((step: HeldStep) => { heldRef.current = step; setHeld(step); window.scrollTo({ top: 0 }); }, []);
+  const holdFor = useCallback((step: HeldStep) => {
+    heldRef.current = step; setHeld(step);
+    takeNoticeStep();
+    window.scrollTo({ top: 0 });
+  }, []);
   // "This person saw the desk": once, when the desk itself is on screen, which is now before consent.
   const entered = useRef(false);
   useEffect(() => { if (held || entered.current) return; entered.current = true; track('desk_entered', 'desk'); }, [held]);
@@ -156,7 +180,7 @@ export default function NucleoDesk() {
 
   const [phase, setPhase] = useState<Phase>('idle');
   const [messages, setMessages] = useState<Msg[]>(() => (returned?.transcript ?? []).map(line => ({ from: line.role === 'user' ? 'you' : 'bobby', text: line.text })));
-  const [input, setInput] = useState(() => returned?.transcript?.at(-1)?.role === 'user' ? returned.transcript.at(-1)!.text : '');
+  const [input, setInput] = useState(() => returned?.transcript?.at(-1)?.role === 'user' ? returned.transcript.at(-1)!.text : arrival.pill);
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [answer, setAnswer] = useState<Answer | null>(null);
   const [readReceipt, setReadReceipt] = useState<TelemetryReceipt | null>(null);
@@ -202,12 +226,6 @@ export default function NucleoDesk() {
   const booted = useRef(false);
   const requestRef = useRef<AbortController | null>(null);
   const revealRef = useRef<number | null>(null);
-  const invalidateAccess = useCallback(() => {
-    accessGate.current.invalidate();
-    accessRef.current = null;
-    setAccessState(null);
-    requestRef.current?.abort();
-  }, []);
   const refreshAccess = useCallback(async (): Promise<AccessState | null> => {
     // The meter is asked with the install id and the account: not before the notice is accepted.
     if (!consentNow()) return null;
@@ -228,7 +246,21 @@ export default function NucleoDesk() {
   const [agentsFailed, setAgentsFailed] = useState<{ level: DeskLevel; symbol: string; refunded: boolean } | null>(null);
   const [deskRetry, setDeskRetry] = useState<{ symbol: string; level: DeskLevel } | null>(null);
   const [showDebate, setShowDebate] = useState(false);
+  const phaseRef = useRef<Phase>(phase);
+  phaseRef.current = phase;
   const questionRef = useRef<string>('');
+  // The account changed (signed in, signed out, consent withdrawn): what the desk knew about access is dropped, and
+  // a question in flight stops, because it was asked as someone else. The desk then returns to idle with the
+  // question back in the pill; it is never left waiting for an answer that will not come.
+  const invalidateAccess = useCallback(() => {
+    accessGate.current.invalidate();
+    accessRef.current = null;
+    setAccessState(null);
+    requestRef.current?.abort();
+    if (!WORKING.includes(phaseRef.current) && phaseRef.current !== 'reveal') return;
+    if (revealRef.current) clearTimeout(revealRef.current);
+    setPhase('idle'); setSnapshot(null); setAnswer(null); setLive({}); setInput(questionRef.current);
+  }, []);
   useEffect(() => () => { requestRef.current?.abort(); recognitionRef.current?.stop(); if (revealRef.current) clearTimeout(revealRef.current); }, []);
 
   const say = useCallback((text: string, essential = true) => {
@@ -392,7 +424,7 @@ export default function NucleoDesk() {
     const q = query.trim();
     if (!q) return;
     // Typed, dictated, a chip or a link: before the notice is accepted the question waits here and nothing is sent.
-    if (!consentNow()) { holdFor({ kind: 'ask', q, ...(spoken ? { spoken } : {}) }); return; }
+    if (!consentNow()) { holdFor({ kind: 'ask', q, ...(spoken ? { spoken, starter: spoken === howLooks(q) } : {}) }); return; }
     const lv = deskLevelRef.current;
     const allowance = lv === 'rapido' ? null : allowanceFor(lv, accessRef.current);
     if (allowance && allowance.state !== 'open') {
@@ -440,6 +472,8 @@ export default function NucleoDesk() {
   const retried = useRef(false);
   useEffect(() => {
     let alive = true;
+    // The account the auth client last reported to this subscription; undefined until it has reported one.
+    let owner: string | null | undefined;
     captureReferral();
     // Until the notice is accepted the desk asks the server nothing about this person: no meter, no invitation
     // claim, no question held from a sign-in. All of it starts the moment they agree.
@@ -475,10 +509,16 @@ export default function NucleoDesk() {
     void load();
     let unsub: (() => void) | null = null;
     try {
-      const { data } = bobbySupabase().auth.onAuthStateChange((event) => {
+      const { data } = bobbySupabase().auth.onAuthStateChange((event, session) => {
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          // The client answers every subscribe with INITIAL_SESSION, repeats SIGNED_IN when the tab is looked at again
+          // and refreshes the token by itself: none of those is a new person. Only a different account drops what
+          // the desk knew and stops a question in flight; the same account just has its meter read again.
+          const next = session?.user?.id ?? null;
+          const changed = owner !== undefined && owner !== next;
+          owner = next;
           retried.current = false;
-          invalidateAccess();
+          if (changed) invalidateAccess();
           void load();
         }
       });
@@ -496,9 +536,13 @@ export default function NucleoDesk() {
   // A link into the desk: ?ask=SYMBOL starts that starter question (a new visitor already has it waiting behind the
   // notice), ?q=text only fills the pill. Both leave the address bar at once, so neither survives a reload.
   useEffect(() => {
+    // What was kept from the page before this one has been read (or is stale): it is used once.
+    try { sessionStorage.removeItem(WAITING_ASK); } catch { /* private mode */ }
     const link = parseDeskLink(window.location.search);
-    if (!link.present) return;
-    window.history.replaceState(window.history.state, '', window.location.pathname + link.search + window.location.hash);
+    if (link.present) window.history.replaceState(window.history.state, '', window.location.pathname + link.search + window.location.hash);
+    // A question that arrived already waiting (the link, or the reload) takes its step of history like any other,
+    // after the address was cleaned, so Back never lands on the link again.
+    if (heldRef.current) holdFor(heldRef.current);
     if (link.q) { setInput(link.q); inputRef.current?.focus({ preventScroll: true }); }
     else if (link.ask && consentNow()) void ask(link.ask, howLooks(link.ask));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -564,23 +608,60 @@ export default function NucleoDesk() {
   }, []);
   const closeRecognition = () => { const recognition = recognitionRef.current as BrowserRecognition | null; if (recognition) { recognition.onend = null; recognition.abort(); recognitionRef.current = null; setListening(false); } };
 
+  // The notice is closing by a control on the page: its step of history goes with it. (Back already took it.)
+  // The browser takes the step back a moment later; until then it is not taken back twice.
+  const stepLeaving = useRef(false);
+  const dropNoticeStep = () => { try { if (onNoticeStep() && !stepLeaving.current) { stepLeaving.current = true; window.history.back(); } } catch { /* no history */ } };
   // The notice, accepted: what waited runs once, inside the tap that agreed.
   const agreed = () => {
     const step = heldRef.current;
     heldRef.current = null; setHeld(null);
     if (!step) return;
+    dropNoticeStep();
     if (step.kind === 'ask') void ask(step.q, step.spoken);
     else if (step.kind === 'mic') toggleDictation();
     else { sfxTock(); setSheet(step.kind); }
   };
-  // The notice, left: back to the idle desk with the question kept in the pill. Nothing was sent.
-  const leaveConsent = () => {
+  // The notice, left (the X, Escape or Back): the idle desk again, the question kept in the pill and the keyboard
+  // on the pill. Nothing was sent.
+  const refocusPill = useRef(false);
+  const leaveConsent = (viaBack = false) => {
+    if (!heldRef.current) return;
     const question = heldQuestion(heldRef.current);
     heldRef.current = null; setHeld(null);
+    if (!viaBack) dropNoticeStep();
     sfxTock();
     if (question) setInput(question);
+    refocusPill.current = true;
   };
-  // Consent withdrawn (the notice in the profile): requests stop, sheets close, and the desk is the idle desk again.
+  const leaveRef = useRef(leaveConsent);
+  leaveRef.current = leaveConsent;
+  useEffect(() => {
+    if (held || !refocusPill.current) return;
+    refocusPill.current = false;
+    // Not on a touch screen: there the keyboard would open over the desk they just came back to.
+    if (!window.matchMedia?.('(pointer: coarse)').matches) inputRef.current?.focus({ preventScroll: true });
+  }, [held]);
+  useEffect(() => {
+    // Back while the notice is up (the natural gesture on Android): the desk, not the page before it. When a control
+    // on the page closed the notice, this is its own step going away; a notice opened again in that moment keeps one.
+    const onPop = () => {
+      if (stepLeaving.current) { stepLeaving.current = false; if (heldRef.current) takeNoticeStep(); return; }
+      if (heldRef.current) leaveRef.current(true);
+    };
+    // Escape leaves the notice too, unless the language menu is what it is closing.
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented && heldRef.current && !document.querySelector?.('.n-lang-menu.open')) leaveRef.current(); };
+    // The page is going away with a question still waiting (a language change reloads it): it is kept in this tab,
+    // unsent, and waits behind the notice again when the page is back.
+    const onHide = () => { try { const kept = packWaiting(heldRef.current, Date.now()); if (kept) sessionStorage.setItem(WAITING_ASK, kept); } catch { /* private mode */ } };
+    window.addEventListener('popstate', onPop);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pagehide', onHide);
+    return () => { window.removeEventListener('popstate', onPop); window.removeEventListener('keydown', onKey); window.removeEventListener('pagehide', onHide); };
+  }, []);
+  // Consent withdrawn (the notice in the profile): requests stop, sheets close, and the desk is the idle desk again,
+  // with one line saying so, because that desk looks the same as the one they just left.
+  const [withdrawn, setWithdrawn] = useState(false);
   const wasConsented = useRef(consented);
   useEffect(() => {
     const before = wasConsented.current;
@@ -593,6 +674,7 @@ export default function NucleoDesk() {
     setPhase('idle'); setSnapshot(null); setAnswer(null); setPending(null); setDeskError(null); setAward(null); setLandEvent(null); setSeries([]);
     setLive({}); setAgentsFailed(null); setDeskRetry(null); setShowDebate(false);
     invalidateAccess();
+    setWithdrawn(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [consented]);
   // Sheets belong to a desk that may talk to the server; before the notice only the desk itself is shown.
@@ -985,7 +1067,7 @@ export default function NucleoDesk() {
   if (held) {
     return (
       <motion.div key="consent" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }}>
-        <NucleoRisk question={heldQuestion(held)} onAccepted={agreed} onClose={leaveConsent} />
+        <NucleoRisk question={heldQuestion(held)} onAccepted={agreed} onClose={() => leaveConsent()} />
       </motion.div>
     );
   }
@@ -1008,6 +1090,12 @@ export default function NucleoDesk() {
           <div className="n-notice" role="status">
             <span>{inviteNotice}</span>
             <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setInviteNotice(null)}><X size={14} /></button>
+          </div>
+        )}
+        {withdrawn && !consented && (
+          <div className="n-notice" role="status" data-consent-withdrawn>
+            <span>{t('AI consent withdrawn. Bobby will ask again before your next question.', 'Consentimiento de IA retirado. Bobby te lo pedirá de nuevo antes de tu próxima pregunta.')}</span>
+            <button type="button" aria-label={t('Close', 'Cerrar', 'Fechar')} onClick={() => setWithdrawn(false)}><X size={14} /></button>
           </div>
         )}
         <AnimatePresence mode="wait">

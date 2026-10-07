@@ -4,7 +4,9 @@
 //   /desk?ask=SYMBOL  starts the same question as tapping that starter chip. Only a symbol fits through it.
 //   /desk?q=text      only fills the ask pill. It never sends by itself, so a link cannot spend anyone's read.
 //
-// Both are read once and then leave the address bar, so neither survives a reload or a copied link.
+// Both are read once and then leave the address bar, so neither survives a copied link, and a reload never asks
+// anything by itself. The one thing kept across a reload is a question still waiting behind the notice (changing
+// the language reloads the page): it stays in this tab for a moment, unsent, and comes back waiting.
 
 /** The desk's own limit for a question: api/_lib/desk-debate.ts DESK_QUESTION_MAX, and the cut in deskData.runAgents. */
 export const DESK_QUESTION_MAX = 1200;
@@ -48,10 +50,33 @@ export function consentCurrent(progress: { aiConsentGranted: boolean; riskNotice
 
 /** What waits behind the notice: the question itself, or the control the person tapped. It runs once after they agree. */
 export type HeldStep =
-  | { kind: 'ask'; q: string; spoken?: string }
+  /** `starter`: the words shown are a starter chip's own sentence, so they are written again after a language change. */
+  | { kind: 'ask'; q: string; spoken?: string; starter?: boolean }
   | { kind: 'mic' }
   | { kind: 'profile' }
   | { kind: 'board' };
 
 /** The words shown above the notice and put back in the pill when the person leaves it. */
 export const heldQuestion = (step: HeldStep | null): string | null => (step?.kind === 'ask' ? step.spoken ?? step.q : null);
+
+/** How long a waiting question outlives the page that held it: long enough for a reload, not for a later visit. */
+export const WAITING_FRESH_MS = 10_000;
+
+/** A question waiting behind the notice, as kept in this tab when the page goes away. Only a question is ever kept. */
+export function packWaiting(step: HeldStep | null, at: number): string | null {
+  if (step?.kind !== 'ask') return null;
+  return JSON.stringify({ q: step.q, ...(step.starter ? { starter: true } : step.spoken ? { spoken: step.spoken } : {}), at });
+}
+
+/** Read it back: null unless it is a question, within the desk's limit, left moments ago. */
+export function unpackWaiting(raw: string | null, now: number): { q: string; spoken: string | null; starter: boolean } | null {
+  if (!raw) return null;
+  let kept: unknown;
+  try { kept = JSON.parse(raw); } catch { return null; }
+  if (!kept || typeof kept !== 'object') return null;
+  const { q, spoken, starter, at } = kept as Record<string, unknown>;
+  if (typeof at !== 'number' || !(now - at >= 0 && now - at < WAITING_FRESH_MS)) return null;
+  if (typeof q !== 'string' || !q.trim() || Array.from(q).length > DESK_QUESTION_MAX) return null;
+  const words = typeof spoken === 'string' && spoken.trim() && Array.from(spoken).length <= DESK_QUESTION_MAX ? spoken : null;
+  return { q, spoken: words, starter: starter === true && SYMBOL.test(q) };
+}

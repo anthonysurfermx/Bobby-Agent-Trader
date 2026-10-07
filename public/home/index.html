@@ -198,12 +198,21 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   background:rgba(34,30,27,.9); border:1px solid var(--hair); color:var(--ink2); font:400 14px/1 var(--sans); transition:border-color .2s ease, color .2s ease}
 .eg-chip::after{content:""; position:absolute; inset:-4px 0}
 .eg-chip:hover{border-color:rgba(242,237,228,.28); color:var(--ink)}
-/* the iPhone app, smaller: a quiet chip at the end of the row (the glyph alone where the row is narrow) */
-.eg-ios{background:rgba(0,0,0,.35); font-size:13px}
-.eg-ios .ico{width:13px; height:13px; margin-top:-2px}
-@media (max-width: 1040px){
-  .eg-chip.eg-ios{padding:0; aspect-ratio:1; justify-content:center}
-  .eg-ios span:last-child{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+/* the iPhone app, smaller and always in words: a quiet text link apart from the examples, never one of their chips
+   (the same glyph orbits the glass as AAPL). It has a place of its own, so a long company name cannot move it. */
+.start-more{flex:none; display:flex; justify-content:center; min-width:0}
+.start-ios{position:relative; display:inline-flex; align-items:center; gap:6px; height:20px; padding:0 2px; white-space:nowrap; text-decoration:none;
+  color:var(--ink2); font:400 13px/1 var(--sans); letter-spacing:0; text-shadow:0 1px 14px rgba(11,10,9,.95), 0 0 4px rgba(11,10,9,.8); transition:color .2s ease}
+.start-ios::after{content:""; position:absolute; inset:-9px -8px}
+.start-ios:hover{color:var(--ink)}
+.start-ios:focus-visible{outline:2px solid var(--listen); outline-offset:4px; border-radius:4px}
+.start-ios .ico{width:12px; height:12px; margin-top:-2px}
+.start-ios span:last-child{text-decoration:underline; text-decoration-color:rgba(242,237,228,.28); text-underline-offset:3px}
+/* between a phone and a wide window the row stays one line (the band above the glass can be one row tall):
+   the pill gives way, the examples and the link keep their words */
+@media (min-width: 761px) and (max-width: 1040px){
+  .start{flex-wrap:nowrap}
+  .ask{flex:1 1 160px; max-width:350px}
 }
 /* a short, wide window leaves a thin band above the glass: the row gets smaller instead of touching it */
 @media (max-height: 680px) and (min-width: 761px){
@@ -301,9 +310,20 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
   .start{gap:7px}
   .ask{flex-basis:100%; max-width:420px; height:44px}
   .ask-send{width:36px; height:36px}
-  .eg{gap:7px}
+  .eg{gap:7px; flex-basis:100%}
   .eg-chip{height:34px; padding:0 13px}
+  /* the iPhone link takes a line of its own under the examples */
+  .start-more{flex-basis:100%}
+  .start-ios{height:18px; font-size:12.5px}
 }
+/* a short phone leaves a thin band above the glass: three smaller lines instead of touching it, and on the shortest
+   the iPhone link steps aside (it is also at the end of the story) so nothing lands on the glass */
+@media (max-width: 760px) and (max-height: 700px){
+  .start{gap:5px}
+  .ask{height:40px} .ask-send{width:32px; height:32px}
+  .eg-chip{height:30px}
+}
+@media (max-width: 760px) and (max-height: 610px){ .start-more{display:none} }
 @media (max-width: 420px){ .s0 h1{font-size:calc(28px * var(--dscale))} .fail{font-size:calc(20px * var(--dscale))} .voice p{font-size:14px} }
 
 /* ---------- try (after the story): no account to start, the app asks later ---------- */
@@ -409,7 +429,7 @@ body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--sans); 
           <a class="eg-chip" id="eg-local" href="/desk?ask=ETH&amp;utm_source=home_example">Ethereum</a>
         </div>
         <!-- APP_STORE_URL in src/lib/app-store.ts -->
-        <a class="eg-chip eg-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489"><span class="ico" style="--logo:url(/home/assets/logos/apple.svg)"></span><span data-i18n="t.ios">Get the iPhone app</span></a>
+        <div class="start-more"><a class="start-ios" id="start-ios" href="https://apps.apple.com/app/bobby-the-market-argues-back/id6804460489"><span class="ico" aria-hidden="true" style="--logo:url(/home/assets/logos/apple.svg)"></span><span data-i18n="t.ios">Get the iPhone app</span></a></div>
       </div>
     </section>
 
