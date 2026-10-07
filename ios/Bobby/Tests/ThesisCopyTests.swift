@@ -113,12 +113,12 @@ final class ThesisCopyTests: XCTestCase {
             "de": "Nur auf diesem iPhone gespeichert. Wenn du eine Überprüfung anforderst, werden deine Worte an Bobby und an die KI-Anbieter gesendet, die die Überprüfung schreiben. Dort werden sie nicht gespeichert.",
         ]
         let sent = [
-            "en": "Your thesis is sent to Bobby’s AI providers for this review only.",
-            "es": "Tu tesis se envía a los proveedores de IA de Bobby solo para esta revisión.",
-            "fr": "Ta thèse est envoyée aux fournisseurs d’IA de Bobby pour ce réexamen uniquement.",
-            "pt": "A tua tese é enviada aos fornecedores de IA do Bobby apenas para esta revisão.",
-            "it": "La tua tesi viene inviata ai fornitori di IA di Bobby solo per questo riesame.",
-            "de": "Deine These wird nur für diese Überprüfung an Bobbys KI-Anbieter gesendet.",
+            "en": "Your thesis text goes to Bobby’s AI providers. Only for this review.",
+            "es": "Tu texto va a proveedores de IA de Bobby. Solo para esta revisión.",
+            "fr": "Ton texte est envoyé aux fournisseurs d’IA de Bobby. Uniquement pour cette revue.",
+            "pt": "O teu texto vai para os fornecedores de IA do Bobby. Só para esta revisão.",
+            "it": "Il tuo testo va ai fornitori di IA di Bobby. Solo per questa revisione.",
+            "de": "Dein Text geht an Bobbys KI-Anbieter. Nur für diese Überprüfung.",
         ]
         let providers = ["en": "AI providers", "es": "proveedores de IA", "fr": "fournisseurs d’IA", "pt": "fornecedores de IA", "it": "fornitori di IA", "de": "KI-Anbieter"]
         inEveryLanguage { language in
@@ -190,7 +190,7 @@ final class ThesisCopyTests: XCTestCase {
         }
         XCTAssertEqual(sentences.count, 18, "two price-only sentences and the footer, translated in each language")
         XCTAssertEqual(ThesisCopy.priceOnlyLine(isEquity: true), "Bobby read price evidence only. This is not a view on the company itself.")
-        XCTAssertEqual(ThesisCopy.footer, "Educational read · not financial advice")
+        XCTAssertEqual(ThesisCopy.footer, "Educational reading.")
     }
 
     // MARK: Verdict and horizon

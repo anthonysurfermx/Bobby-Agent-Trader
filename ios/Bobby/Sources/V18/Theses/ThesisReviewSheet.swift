@@ -83,6 +83,9 @@ struct ThesisReviewSheet: View {
 }
 
 /// The review itself, on a reviewer: the sheet above and the review fixtures both show this.
+/// V18-DESIGN.md, "Review, before" and "Review, after": the person's words as a short excerpt, one
+/// button, and the two lines that say where the words go pinned beside it; afterwards a verdict
+/// word, two prices, what was not checked, and three lists that unfold.
 struct ThesisReviewView: View {
     struct Actions {
         /// False where there is no Apple to sign in with (fixture mode, review fixtures): the button is shown disabled.
@@ -104,20 +107,29 @@ struct ThesisReviewView: View {
     let actions: Actions
     @State private var signingIn = false
     @State private var signInFailed = false
-    @State private var showsHistory = false
     /// The past review whose stored lists are open.
     @State private var openReview: String?
 
+    private var result: ThesisReviewResult? {
+        if case let .done(result) = reviewer.phase { return result }
+        return nil
+    }
+
+    private var title: String {
+        guard let thesis = reviewer.thesis else { return L.t("Thesis review", "Revisión de tesis") }
+        return result == nil ? L.t("Review \(thesis.symbol)", "Revisar \(thesis.symbol)") : thesis.symbol
+    }
+
+    /// What a review costs, before it starts: the level it runs at and the one read it uses.
+    private var subtitle: String? {
+        guard !signingIn, reviewer.phase == .ready, reviewer.thesis != nil else { return nil }
+        let level = reviewer.currentLevel.name
+        return L.t("\(level) · 1 read", "\(level) · 1 lectura")
+    }
+
     var body: some View {
-        ThesisScreen(title: L.t("Thesis review", "Revisión de tesis"), closeId: "thesis-review-close", onClose: actions.close, bottom: startBar) {
-            if let thesis = reviewer.thesis {
-                ThesisTitle(text: L.t("Your \(thesis.symbol) thesis", "Tu tesis sobre \(thesis.symbol)"))
-                if thesis.name.caseInsensitiveCompare(thesis.symbol) != .orderedSame, !thesis.name.isEmpty {
-                    Text(thesis.name).thesisFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps().padding(.top, 2)
-                }
-            } else {
-                ThesisTitle(text: L.t("Thesis review", "Revisión de tesis"))
-            }
+        QuietSheet(title: title, subtitle: subtitle, closeId: "thesis-review-close", onClose: actions.close,
+                   trailing: menu, bottom: startBar) {
             if signingIn {
                 ProgressView().tint(Theme.warmMuted).frame(maxWidth: .infinity).padding(.top, 48)
             } else {
@@ -131,38 +143,66 @@ struct ThesisReviewView: View {
         }
     }
 
+    /// Everything that is not the one main action: edit, archive, the reminder.
+    private var menu: AnyView? {
+        guard !signingIn, let thesis = reviewer.thesis else { return nil }
+        let done = result != nil
+        guard done || reviewer.phase == .ready else { return nil }
+        return AnyView(Menu {
+            Button(L.t("Edit", "Editar")) {
+                if done { if reviewer.decide(.edit) { actions.edit(thesis.id) } } else { actions.edit(thesis.id) }
+            }
+            if done {
+                Button(L.t("Archive", "Archivar")) { if reviewer.decide(.archive) { actions.close() } }
+            }
+            if let remind = actions.remind {
+                Button(ReminderCopy.setReminder) { remind(thesis.id) }
+            }
+        } label: {
+            QuietGlyph(systemImage: "ellipsis")
+        }
+        .accessibilityLabel(L.t("More options", "Más opciones"))
+        .accessibilityIdentifier("thesis-review-menu"))
+    }
+
     // MARK: Before
 
-    /// What a review does and costs comes first, above the person's words, so it is read before
-    /// anything is scrolled; where the words go is pinned with the button (`startBar`).
     @ViewBuilder private var before: some View {
         if let thesis = reviewer.thesis {
-            Text(L.t("Bobby will read today’s price evidence against your words. A review uses one read.",
-                     "Bobby leerá la evidencia de precio de hoy frente a tus palabras. Una revisión usa una lectura."))
-                .thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-                .padding(.top, 10)
-                .accessibilityIdentifier("thesis-review-cost")
-            Text(L.t("It runs at your current level: \(reviewer.currentLevel.name).", "Corre en tu nivel actual: \(reviewer.currentLevel.name)."))
-                .thesisFont(12, relativeTo: .caption).foregroundStyle(Theme.warmDim).thesisWraps()
-                .padding(.top, 4)
-                .accessibilityIdentifier("thesis-review-level")
-            ThesisWordsView(thesis: thesis)
-            Text(ThesisCopy.reviewedLine(thesis)).thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmDim).thesisWraps()
-                .padding(.top, 18)
-                .accessibilityIdentifier("thesis-review-last")
+            // The person's own words, never rewritten: two lines here, all of them one tap below.
+            Text(thesis.hypothesis).quietFont(17).foregroundStyle(Theme.cream).lineSpacing(4).lineLimit(2)
+                .padding(.top, 22).padding(.bottom, 10)
+                .accessibilityIdentifier("thesis-review-excerpt")
+            QuietDisclosure(label: L.t("Your thesis", "Tu tesis"), id: "thesis-review-words") { words(thesis) }
             history(excluding: nil)
         }
     }
 
-    /// Pinned under the scroll while the review has not started: the sentence that says where the
-    /// person's words go, directly above the button that sends them. Never below the fold.
+    private func words(_ thesis: SavedThesis) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            wordsPart(nil, thesis.hypothesis)
+            if !thesis.worry.isEmpty { wordsPart(L.t("What worries you?", "¿Qué te preocupa?"), thesis.worry) }
+            if !thesis.changeMind.isEmpty { wordsPart(L.t("What changes your mind?", "¿Qué te haría cambiar?"), thesis.changeMind) }
+            if let horizon = thesis.horizon { wordsPart(L.t("Time frame", "Plazo"), ThesisCopy.horizon(horizon)) }
+            QuietNote(text: ThesisCopy.reviewedLine(thesis), id: "thesis-review-last")
+        }
+    }
+
+    private func wordsPart(_ label: String?, _ text: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let label { Text(label).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmDim) }
+            Text(text).quietFont(15).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+        }
+        .accessibilityElement(children: .combine)
+    }
+
+    /// Pinned under the scroll while the review has not started: where the person's words go,
+    /// directly above the button that sends them. Never below the fold, never behind a tap.
     private var startBar: AnyView? {
         guard !signingIn, reviewer.phase == .ready, reviewer.thesis != nil else { return nil }
         return AnyView(VStack(alignment: .leading, spacing: 10) {
-            Text(ThesisCopy.sentToProviders)
-                .thesisFont(12.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineSpacing(2).thesisWraps()
-                .accessibilityIdentifier("thesis-review-providers")
-            ThesisButton(title: L.t("Review now", "Revisar ahora"), prominent: true, wide: true, id: "thesis-review-start") { reviewer.start() }
+            QuietNote(text: ThesisCopy.sentToProviders, id: "thesis-review-providers")
+            QuietPrimary(title: L.t("Review now", "Revisar ahora"), id: "thesis-review-start") { reviewer.start() }
         })
     }
 
@@ -171,9 +211,9 @@ struct ThesisReviewView: View {
     private var during: some View {
         VStack(spacing: 14) {
             ProgressView().tint(Theme.warmMuted)
-            Text(L.t("Reading today’s evidence…", "Leyendo la evidencia de hoy…"))
-                .thesisFont(15).foregroundStyle(Theme.warmMuted).multilineTextAlignment(.center).thesisWraps()
-            ThesisButton(title: L.t("Cancel", "Cancelar"), id: "thesis-review-cancel") { reviewer.cancel() }
+            Text(L.t("Reading price evidence…", "Leyendo evidencia de precio…"))
+                .quietFont(15).foregroundStyle(Theme.warmMuted).multilineTextAlignment(.center).quietWraps()
+            QuietChip(title: L.t("Cancel", "Cancelar"), id: "thesis-review-cancel") { reviewer.cancel() }
                 .padding(.top, 6)
         }
         .frame(maxWidth: .infinity)
@@ -185,143 +225,88 @@ struct ThesisReviewView: View {
     // MARK: After
 
     @ViewBuilder private func after(_ result: ThesisReviewResult) -> some View {
-        Text(result.thesis.hypothesis).thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).lineLimit(3)
-            .padding(.top, 10)
-            .accessibilityLabel(L.t("Why I am looking at this", "Por qué lo estoy mirando") + ": " + result.thesis.hypothesis)
-        thenAndNow(result.thenNow)
-        ThesisLabel(text: L.t("Bobby’s read today", "La lectura de Bobby hoy"))
-        ThesisVerdictWord(verdict: result.verdict, size: 20)
+        ThesisVerdictWord(verdict: result.verdict, size: 22)
+            .padding(.top, 18)
             .accessibilityIdentifier("thesis-review-verdict")
         if let headline = result.headline {
-            Text(headline).thesisFont(15).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
+            Text(headline).quietFont(16).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
                 .padding(.top, 6)
                 .accessibilityIdentifier("thesis-review-headline")
         }
-        if result.notes == nil {
-            ThesisNote(text: L.t("Bobby could not sort today’s evidence into these three lists this time. Its read for today is above.",
-                                 "Esta vez Bobby no pudo ordenar la evidencia de hoy en estas tres listas. Su lectura de hoy está arriba."))
-                .padding(.top, 20)
-                .accessibilityIdentifier("thesis-review-lists-unavailable")
+        thenAndNow(result.thenNow).padding(.top, 20)
+        // What this review is, and what it did not look at: on the face, every time, in full.
+        QuietNote(text: scope(result), id: "thesis-review-not-checked")
+            .padding(.top, 16).padding(.bottom, 8)
+        if let notes = result.notes {
+            evidence(L.t("Supports", "Respalda"), notes.supports, id: "thesis-review-supports")
+            evidence(L.t("Challenges", "Cuestiona"), notes.challenges, id: "thesis-review-challenges")
+            evidence(L.t("Unknown", "Sin resolver"), notes.unknowns, id: "thesis-review-unknowns")
+        } else {
+            QuietNote(text: L.t("Evidence lists unavailable.", "Listas de evidencia no disponibles."), id: "thesis-review-lists-unavailable")
+                .padding(.vertical, 8)
         }
-        list(L.t("Supports your thesis", "Respalda tu tesis"), result.notes?.supports, id: "thesis-review-supports")
-        list(L.t("Challenges it", "La cuestiona"), result.notes?.challenges, id: "thesis-review-challenges")
-        list(L.t("Still unknown", "Sigue sin saberse"), result.notes?.unknowns, id: "thesis-review-unknowns")
-        notChecked(result)
-        decide(result)
         history(excluding: result.thesis.lastReview)
-        Text(ThesisCopy.footer.uppercased()).thesisFont(10.5, design: .monospaced, relativeTo: .caption2).tracking(0.8)
-            .foregroundStyle(Theme.warmDim).multilineTextAlignment(.center).thesisWraps()
+        QuietPrimary(title: L.t("Keep thesis", "Mantener tesis"), id: "thesis-review-keep") {
+            if reviewer.decide(.keep) { actions.close() }
+        }
+        .padding(.top, 22)
+        Text(ThesisCopy.footer).quietFont(12, relativeTo: .caption).foregroundStyle(Theme.warmDim)
             .frame(maxWidth: .infinity, alignment: .center)
-            .padding(.top, 26)
+            .padding(.top, 14)
             .accessibilityIdentifier("thesis-review-footer")
     }
 
-    /// Always shown: a thesis written without a price says so and shows today's price only; the
-    /// change appears only when the thesis has its own starting price.
+    /// "Price evidence only. Not checked: news · earnings · …" with every category, never truncated.
+    private func scope(_ result: ThesisReviewResult) -> String {
+        let words = result.notChecked.compactMap { ThesisCopy.notCheckedShort($0, isEquity: result.thesis.isEquity) }
+        let only = L.t("Price evidence only.", "Solo evidencia de precio.")
+        guard !words.isEmpty else { return only }
+        return only + " " + L.t("Not checked", "No revisado") + ": " + words.joined(separator: " · ")
+    }
+
+    /// Two neutral prices with their dates; the change is arithmetic on the phone and appears only
+    /// when the thesis has its own starting price.
     @ViewBuilder private func thenAndNow(_ numbers: ThesisThenNow) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            ThesisLabel(text: L.t("Then and now", "Antes y ahora"))
             if let price = numbers.thenPrice {
-                let day = numbers.thenDate.map { ThesisCopy.day($0) }
-                figure(day.map { L.t("Started \($0)", "Empezó el \($0)") } ?? L.t("Starting point", "Punto de partida"), ThesisCopy.price(price))
+                figure([L.t("Then", "Antes"), numbers.thenDate.map { ThesisCopy.day($0) }].compactMap { $0 }.joined(separator: " · "),
+                       ThesisCopy.price(price), change: nil)
             }
             if let price = numbers.nowPrice {
-                let moment = numbers.asOfDate.map { ThesisCopy.moment($0) }
-                figure(moment.map { L.t("Evidence dated \($0)", "Evidencia con fecha \($0)") } ?? L.t("Latest evidence", "Evidencia más reciente"),
-                       ThesisCopy.price(price))
-            }
-            // Computed on this phone from the two prices above; left out when either is missing.
-            if let change = numbers.changePct {
-                figure(L.t("Change since then", "Cambio desde entonces"), ThesisCopy.percent(change))
+                figure([L.t("Evidence", "Evidencia"), numbers.asOfDate.map { ThesisCopy.moment($0) }].compactMap { $0 }.joined(separator: " · "),
+                       ThesisCopy.price(price), change: numbers.changePct.map { ThesisCopy.percent($0) })
             }
             if numbers.missingStart {
-                Text(ThesisCopy.noStartingPrice)
-                    .thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-                    .padding(.top, 4)
-                    .accessibilityIdentifier("thesis-review-no-start")
+                QuietNote(text: ThesisCopy.noStartingPrice, id: "thesis-review-no-start").padding(.top, 4)
             }
         }
         .accessibilityIdentifier("thesis-review-then-now")
     }
 
-    private func figure(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 12) {
-            Text(label).thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
+    private func figure(_ label: String, _ value: String, change: String?) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label).quietFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).quietWraps()
             Spacer(minLength: 8)
-            Text(value).thesisFont(15, .medium, design: .monospaced).foregroundStyle(Theme.cream).layoutPriority(1)
+            if let change {
+                Text(change).quietFont(14, relativeTo: .callout).monospacedDigit().foregroundStyle(Theme.warmMuted)
+            }
+            Text(value).quietFont(16, .medium).monospacedDigit().foregroundStyle(Theme.cream).layoutPriority(1)
         }
         .padding(.vertical, 5)
         .accessibilityElement(children: .combine)
     }
 
-    /// One of the three lists. `nil` means the server did not sort the evidence: the list is labelled
-    /// unavailable, never filled in.
-    private func list(_ title: String, _ items: [String]?, id: String) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ThesisLabel(text: title)
-            if let items, !items.isEmpty {
-                ForEach(Array(items.enumerated()), id: \.offset) { _, item in bullet(item, ink: Theme.cream) }
-            } else {
-                Text(items == nil ? L.t("Not available this time", "No disponible esta vez")
-                                  : L.t("Nothing in today’s evidence.", "Nada en la evidencia de hoy."))
-                    .thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmDim).thesisWraps()
+    /// One of the three lists, folded, with its real count. An empty one says so when opened.
+    private func evidence(_ title: String, _ items: [String], id: String) -> some View {
+        QuietDisclosure(label: title, count: items.count, id: id) {
+            VStack(alignment: .leading, spacing: 8) {
+                if items.isEmpty {
+                    QuietNote(text: L.t("None in this evidence.", "Nada en esta evidencia."))
+                }
+                ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                    Text(item).quietFont(15).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+                }
             }
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier(id)
-    }
-
-    private func bullet(_ text: String, ink: Color) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text("·").thesisFont(15, .bold).foregroundStyle(Theme.warmDim).accessibilityHidden(true)
-            Text(text).thesisFont(14.5, relativeTo: .callout).foregroundStyle(ink).lineSpacing(3).thesisWraps()
-        }
-        .padding(.vertical, 3)
-    }
-
-    private func notChecked(_ result: ThesisReviewResult) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ThesisLabel(text: L.t("Not checked", "No revisado"))
-            ForEach(result.notChecked.compactMap { ThesisCopy.notCheckedWord($0, isEquity: result.thesis.isEquity) }, id: \.self) { word in
-                bullet(word, ink: Theme.warmMuted)
-            }
-            Text(ThesisCopy.priceOnlyLine(isEquity: result.thesis.isEquity))
-                .thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
-                .padding(.top, 8)
-                .accessibilityIdentifier("thesis-review-price-only")
-        }
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("thesis-review-not-checked")
-    }
-
-    // MARK: Decide
-
-    private func decide(_ result: ThesisReviewResult) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            ThesisLabel(text: L.t("What do you want to do with it?", "¿Qué quieres hacer con ella?"), top: 28)
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) { decisions(result); Spacer(minLength: 0) }
-                VStack(alignment: .leading, spacing: 6) { decisions(result) }
-            }
-            .padding(.top, 4)
-            if let remind = actions.remind {
-                ThesisLink(title: ReminderCenter.shared.hasReminder(for: result.thesis.id)
-                               ? L.t("Reminders", "Recordatorios") : ReminderCopy.setReminder,
-                           id: "thesis-review-remind") { remind(result.thesis.id) }
-                    .padding(.top, 2)
-            }
-        }
-    }
-
-    @ViewBuilder private func decisions(_ result: ThesisReviewResult) -> some View {
-        ThesisButton(title: L.t("Keep it", "Mantenerla"), prominent: true, id: "thesis-review-keep") {
-            if reviewer.decide(.keep) { actions.close() }
-        }
-        ThesisButton(title: L.t("Edit it", "Editarla"), id: "thesis-review-edit") {
-            if reviewer.decide(.edit) { actions.edit(result.thesis.id) }
-        }
-        ThesisButton(title: L.t("Archive it", "Archivarla"), id: "thesis-review-archive") {
-            if reviewer.decide(.archive) { actions.close() }
         }
     }
 
@@ -330,25 +315,10 @@ struct ThesisReviewView: View {
     @ViewBuilder private func history(excluding current: ThesisRevision?) -> some View {
         let past = reviewer.pastReviews(excluding: current)
         if !past.isEmpty {
-            Button {
-                withAnimation(.easeOut(duration: 0.2)) { showsHistory.toggle() }
-            } label: {
-                HStack(spacing: 8) {
-                    Text((L.t("Past reviews", "Revisiones anteriores") + " · \(past.count)").uppercased())
-                        .thesisFont(11, .medium, design: .monospaced, relativeTo: .caption).tracking(1.4).foregroundStyle(Theme.warmDim)
-                    Image(systemName: showsHistory ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.warmDim)
-                    Spacer(minLength: 0)
+            QuietDisclosure(label: L.t("History", "Historial"), count: past.count, id: "thesis-review-history-toggle") {
+                VStack(alignment: .leading, spacing: 0) {
+                    ForEach(past) { revision in pastRow(revision) }
                 }
-                .frame(minHeight: 44)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .padding(.top, 18)
-            .accessibilityLabel(L.t("Past reviews", "Revisiones anteriores") + ", \(past.count)")
-            .accessibilityValue(showsHistory ? L.t("Expanded", "Desplegado") : L.t("Collapsed", "Plegado"))
-            .accessibilityIdentifier("thesis-review-history-toggle")
-            if showsHistory {
-                ForEach(past) { revision in pastRow(revision) }
             }
         }
     }
@@ -361,8 +331,7 @@ struct ThesisReviewView: View {
             withAnimation(.easeOut(duration: 0.2)) { openReview = open ? nil : revision.id }
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: 6) {
-                Text(pastLine(revision)).thesisFont(13.5, design: .monospaced, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
-                if let verdict = revision.verdict { ThesisVerdictWord(verdict: verdict, size: 13.5) }
+                Text(pastLine(revision)).quietFont(14, relativeTo: .callout).monospacedDigit().foregroundStyle(Theme.warmMuted).quietWraps()
                 Spacer(minLength: 8)
                 Image(systemName: open ? "chevron.up" : "chevron.down").font(.system(size: 10, weight: .semibold)).foregroundStyle(Theme.warmDim)
                     .accessibilityHidden(true)
@@ -371,23 +340,23 @@ struct ThesisReviewView: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .overlay(alignment: .top) { Rectangle().fill(Theme.warmHair).frame(height: 1) }
         .accessibilityElement(children: .combine)
-        .accessibilityValue(open ? L.t("Expanded", "Desplegado") : L.t("Collapsed", "Plegado"))
+        .accessibilityValue(open ? L.t("Expanded", "Abierto") : L.t("Collapsed", "Cerrado"))
         .accessibilityIdentifier("thesis-review-past-\(revision.id)")
         if open {
             let lists = ThesisReviewer.storedLists(revision)
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 6) {
                 if lists.isEmpty {
-                    Text(L.t("No lists were kept for this review.", "No se guardaron listas de esta revisión."))
-                        .thesisFont(13.5, relativeTo: .footnote).foregroundStyle(Theme.warmDim).thesisWraps()
+                    QuietNote(text: L.t("No lists were kept for this review.", "No se guardaron listas de esta revisión."))
                 }
                 ForEach(lists) { list in
-                    ThesisLabel(text: storedTitle(list.kind), top: list.id == lists.first?.id ? 0 : 12)
-                    ForEach(Array(list.items.enumerated()), id: \.offset) { _, item in bullet(item, ink: Theme.warmMuted) }
+                    Text(storedTitle(list.kind)).quietFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmDim).padding(.top, 4)
+                    ForEach(Array(list.items.enumerated()), id: \.offset) { _, item in
+                        Text(item).quietFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).quietWraps()
+                    }
                 }
             }
-            .padding(.bottom, 12)
+            .padding(.bottom, 10)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("thesis-review-past-lists")
         }
@@ -395,36 +364,30 @@ struct ThesisReviewView: View {
 
     private func storedTitle(_ kind: ThesisReviewer.StoredList.Kind) -> String {
         switch kind {
-        case .supports: return L.t("Supports your thesis", "Respalda tu tesis")
-        case .challenges: return L.t("Challenges it", "La cuestiona")
-        case .unknowns: return L.t("Still unknown", "Sigue sin saberse")
+        case .supports: return L.t("Supports", "Respalda")
+        case .challenges: return L.t("Challenges", "Cuestiona")
+        case .unknowns: return L.t("Unknown", "Sin resolver")
         }
     }
 
-    /// The date and the price; the verdict follows in its own colour.
+    /// The date, the price and the verdict of a past review, in plain ink (it is history, not today's reading).
     private func pastLine(_ revision: ThesisRevision) -> String {
         var parts = [ThesisCopy.day(revision.at)]
         if let price = revision.price, price.isFinite, price > 0 { parts.append(ThesisCopy.price(price)) }
-        return parts.joined(separator: " · ") + (ThesisCopy.verdictWord(revision.verdict) == nil ? "" : " ·")
+        if let word = ThesisCopy.verdictWord(revision.verdict) { parts.append(word) }
+        return parts.joined(separator: " · ")
     }
 
     // MARK: Refused
 
     @ViewBuilder private func refused(_ refusal: ThesisReviewer.Refusal) -> some View {
         let copy = ThesisRefusalCopy(refusal)
-        if let thesis = reviewer.thesis, refusal != .archived {
-            Text(thesis.hypothesis).thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).lineLimit(3)
-                .padding(.top, 10)
-        }
         VStack(alignment: .leading, spacing: 6) {
-            Text(copy.text).thesisFont(15, .medium).foregroundStyle(Theme.cream).lineSpacing(3).thesisWraps()
-            if let detail = copy.detail {
-                Text(detail).thesisFont(14, relativeTo: .callout).foregroundStyle(Theme.warmMuted).lineSpacing(3).thesisWraps()
-            }
+            Text(copy.text).quietFont(16).foregroundStyle(Theme.cream).lineSpacing(3).quietWraps()
+            if let detail = copy.detail { QuietNote(text: detail) }
             if signInFailed {
-                Text(L.t("Sign-in did not finish. Try again.", "El inicio de sesión no terminó. Inténtalo de nuevo."))
-                    .thesisFont(13, relativeTo: .footnote).foregroundStyle(Theme.warmMuted).thesisWraps()
-                    .accessibilityIdentifier("thesis-review-signin-failed")
+                QuietNote(text: L.t("Sign-in did not finish. Try again.", "El inicio de sesión no terminó. Inténtalo de nuevo."),
+                          id: "thesis-review-signin-failed")
             }
         }
         .padding(.top, 22)
@@ -442,31 +405,33 @@ struct ThesisReviewView: View {
         switch action {
         case .signIn:
             // The system button, in one of Apple's own styles, as on every other sign-in surface of the app.
-            SignInWithAppleButton(.signIn) { request in
+            SignInWithAppleButton(.continue) { request in
                 actions.prepareApple(request)
             } onCompletion: { result in
                 signedIn(result)
             }
             .signInWithAppleButtonStyle(.white)
-            .frame(height: 48)
+            .frame(height: 50)
             .clipShape(Capsule())
             .disabled(!actions.canSignIn)
             .accessibilityIdentifier("thesis-review-signin")
         case .pro:
-            ThesisButton(title: L.t("See Bobby Pro", "Ver Bobby Pro"), prominent: prominent, wide: true, id: "thesis-review-pro", action: actions.showPro)
+            choice(L.t("See Bobby Pro", "Ver Bobby Pro"), prominent, "thesis-review-pro", actions.showPro)
         case .quick:
             let quick = NucleoAnalysisLevel.rapido.name
-            ThesisButton(title: L.t("Review with \(quick)", "Revisar con \(quick)"), prominent: prominent, wide: true, id: "thesis-review-quick") {
-                reviewer.start(level: .rapido)
-            }
+            choice(L.t("Review with \(quick)", "Revisar con \(quick)"), prominent, "thesis-review-quick") { reviewer.start(level: .rapido) }
         case .retry:
-            ThesisButton(title: L.t("Try again", "Reintentar"), prominent: prominent, wide: true, id: "thesis-review-retry") { reviewer.start() }
+            choice(L.t("Try again", "Reintentar"), prominent, "thesis-review-retry") { reviewer.start() }
         case .credits:
-            ThesisButton(title: L.t("Check my credits", "Ver mis créditos"), prominent: prominent, wide: true, id: "thesis-review-credits",
-                         action: actions.showCredits)
+            choice(L.t("See credits", "Ver créditos"), prominent, "thesis-review-credits", actions.showCredits)
         case .myTheses:
-            ThesisButton(title: L.t("My theses", "Mis tesis"), prominent: prominent, wide: true, id: "thesis-review-list", action: actions.showTheses)
+            choice(L.t("My theses", "Mis tesis"), prominent, "thesis-review-list", actions.showTheses)
         }
+    }
+
+    @ViewBuilder private func choice(_ title: String, _ prominent: Bool, _ id: String, _ action: @escaping () -> Void) -> some View {
+        if prominent { QuietPrimary(title: title, id: id, action: action) }
+        else { QuietChip(title: title, wide: true, id: id, action: action) }
     }
 
     private func signedIn(_ result: Result<ASAuthorization, Error>) {

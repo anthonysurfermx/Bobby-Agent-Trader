@@ -129,6 +129,18 @@ enum ThesisCopy {
         }
     }
 
+    /// The same categories as one short word each, for the scope line on a finished review.
+    static func notCheckedShort(_ code: String, isEquity: Bool) -> String? {
+        switch code {
+        case "news": return L.t("news", "noticias")
+        case "earnings": return L.t("earnings", "resultados")
+        case "filings": return L.t("filings", "documentos regulatorios")
+        case "fundamentals": return isEquity ? L.t("fundamentals", "fundamentales") : L.t("project fundamentals", "fundamentales del proyecto")
+        case "macro": return L.t("economy", "economía")
+        default: return nil
+        }
+    }
+
     static func notCheckedWords(_ sent: [String]?, isEquity: Bool) -> [String] {
         notCheckedCodes(sent, isEquity: isEquity).compactMap { notCheckedWord($0, isEquity: isEquity) }
     }
@@ -141,7 +153,7 @@ enum ThesisCopy {
     }
 
     static var footer: String {
-        L.t("Educational read · not financial advice", "Lectura educativa · no es asesoría financiera")
+        L.t("Educational reading.", "Lectura educativa.")
     }
 
     // MARK: Where the words go (consent-relevant: shown without scrolling, in the same words everywhere)
@@ -154,8 +166,8 @@ enum ThesisCopy {
 
     /// Directly above "Review now", pinned with it.
     static var sentToProviders: String {
-        L.t("Your thesis is sent to Bobby’s AI providers for this review only.",
-            "Tu tesis se envía a los proveedores de IA de Bobby solo para esta revisión.")
+        L.t("Your thesis text goes to Bobby’s AI providers. Only for this review.",
+            "Tu texto va a proveedores de IA de Bobby. Solo para esta revisión.")
     }
 
     // MARK: Where a thesis started
