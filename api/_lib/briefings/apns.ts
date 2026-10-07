@@ -181,7 +181,10 @@ function retryAfter(headers: Record<string, string>, fallback: number, now: Date
   return Math.min(RETRY_AFTER_MAX_S, Math.max(RETRY_AFTER_MIN_S, Number.isFinite(s) ? s : fallback));
 }
 
-export async function sendApns(cfg: ApnsConfig, n: ApnsNotification, transport: ApnsTransport = http2Transport, now: Date = new Date()): Promise<ApnsOutcome> {
+export type ApnsDelivery = Pick<ApnsNotification, 'token' | 'environment' | 'topic' | 'apnsId' | 'collapseId' | 'expiresAt'>;
+
+/** Shared delivery transport. Callers construct a fixed product payload and authorize their own audience. */
+export async function sendApnsPayload(cfg: ApnsConfig, n: ApnsDelivery, payload: Record<string, unknown>, transport: ApnsTransport = http2Transport, now: Date = new Date()): Promise<ApnsOutcome> {
   if (!(n.expiresAt instanceof Date) || !Number.isFinite(n.expiresAt.getTime()) || n.expiresAt.getTime() <= now.getTime()) {
     return { outcome: 'retry', status: null, reason: 'expired' };
   }
@@ -210,7 +213,7 @@ export async function sendApns(cfg: ApnsConfig, n: ApnsNotification, transport: 
     'apns-id': n.apnsId,
     'content-type': 'application/json',
   };
-  const body = JSON.stringify(apnsPayload(n));
+  const body = JSON.stringify(payload);
 
   let res: { status: number; headers: Record<string, string>; body: string };
   try {
@@ -242,4 +245,9 @@ export async function sendApns(cfg: ApnsConfig, n: ApnsNotification, transport: 
   if (status >= 500) return { outcome: 'retry', status, reason, retryAfterSeconds: retryAfter(lowerHeaders, DEFAULT_RETRY_5XX_S, now) };
   // Any other 4xx is a malformed request on our side: retry is bounded by the outbox attempt cap.
   return { outcome: 'retry', status, reason };
+}
+
+/** Briefing payload and public signature remain unchanged. */
+export function sendApns(cfg: ApnsConfig, n: ApnsNotification, transport: ApnsTransport = http2Transport, now: Date = new Date()): Promise<ApnsOutcome> {
+  return sendApnsPayload(cfg, n, apnsPayload(n), transport, now);
 }

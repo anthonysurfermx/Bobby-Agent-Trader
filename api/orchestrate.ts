@@ -14,10 +14,11 @@ import { z } from 'zod';
 import { DEFAULT_CHAIN } from './_lib/chains.js';
 import { BOBBY_HARDNESS_REGISTRY } from './_lib/protocol-constants.js';
 import { rpcErrorMessage } from './_lib/rpc-redact.js';
+import { callLlm } from './_lib/llm.js';
+import { hasAppTextBackend } from './_lib/app-model.js';
 
 export const config = { maxDuration: 120 };
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
 
 interface OrchestrateBody {
   agent?: string;
@@ -50,23 +51,8 @@ interface OrchestrateBody {
 
 // Isolated LLM call — each agent role gets ONLY what it should see
 async function callRole(system: string, context: string, maxTokens = 500): Promise<string> {
-  if (!OPENAI_API_KEY) throw new Error('LLM not configured');
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${OPENAI_API_KEY}` },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      max_tokens: maxTokens,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: system },
-        { role: 'user', content: context },
-      ],
-    }),
-  });
-  if (!res.ok) throw new Error(`LLM ${res.status}`);
-  const data = await res.json() as { choices: Array<{ message: { content: string } }> };
-  return data.choices[0]?.message?.content || '{}';
+  const { text } = await callLlm({ endpoint: 'orchestrate', system, user: context, maxTokens });
+  return text;
 }
 
 type OrchestrateAction =
@@ -291,7 +277,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (sized.ok === false) return res.status(400).json({ error: sized.error });
   const sizing = sized.sizing;
 
-  if (!OPENAI_API_KEY) {
+  if (!hasAppTextBackend()) {
     return res.status(503).json({ error: 'LLM not configured' });
   }
 

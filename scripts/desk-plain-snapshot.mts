@@ -2,7 +2,7 @@
 // the real handler with the clock frozen and every network call stubbed. The capture is compared with
 // scripts/fixtures/desk-plain-snapshot.json, which was written from the code before the 1.8 thesis review
 // existed (commit 5ee241a9): a request from a shipped client (iOS 1.5-1.7, Android, the web) must keep producing
-// the same model calls, the same prompts and the same reply, byte for byte.
+// the same prompts and reply, byte for byte. Model ids alone were adopted to Haiku 5.5 on 2026-10-07.
 //
 //   npx tsx scripts/desk-plain-snapshot.mts            compare (exit 1 on any difference)
 //   npx tsx scripts/desk-plain-snapshot.mts --write    rewrite the fixture (only when a change to the plain
@@ -28,7 +28,7 @@ const ENV: Record<string, string> = {
  * Every switch the desk path reads from the environment (api/desk-debate.ts and what it imports). A scenario may
  * set some; every other run has them unset, whatever the shell that runs the capture carries.
  */
-const SWITCHES = ['BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
+const SWITCHES = ['BOBBY_APP_TEXT_MODEL', 'BOBBY_LLM_PRIMARY', 'BOBBY_MEMORY', 'BOBBY_THESIS_REVIEW', 'BOBBY_DESK_MODEL', 'BOBBY_AUTH_URL', 'BOBBY_AUTH_ANON_KEY', 'BOBBY_PAYWALL',
   'BOBBY_CLIENT_TELEMETRY', 'BOBBY_LLM_DAILY_CAP_USD', 'BOBBY_LLM_MONTHLY_CAP_USD', 'BOBBY_LLM_ALERT_USD', 'VERCEL_ENV'] as const;
 
 interface Scenario {

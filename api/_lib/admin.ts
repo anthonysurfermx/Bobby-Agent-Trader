@@ -12,6 +12,7 @@ import { gunzipSync } from 'node:zlib';
 import { bobbyDbUrl, bobbyRest, bobbyServiceHeaders, bobbyServiceKey } from './bobby-db.js';
 import { requireIdentity, type Identity } from './user-identity.js';
 import { llmCaps, llmSpend } from './llm-usage.js';
+import { appTextModel } from './app-model.js';
 import { callerHash, deviceHash, getSubscription, paywallOn } from './access.js';
 import { stopBillingFor } from './stripe-api.js';
 import { blockCheckoutForDeletion } from './checkout-attempt.js';
@@ -359,7 +360,7 @@ export async function probeProvider(provider: unknown) {
     res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST', signal: AbortSignal.timeout(15000),
       headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'ok' }] }),
+      body: JSON.stringify({ model: appTextModel(), max_tokens: 1, thinking: { type: 'disabled' }, messages: [{ role: 'user', content: 'ok' }] }),
     });
   } else if (provider === 'openai') {
     const key = process.env.OPENAI_API_KEY;
@@ -377,7 +378,7 @@ export async function probeProvider(provider: unknown) {
     await Promise.all([
       rest(`api_cache?cache_key=eq.${encodeURIComponent(`provider-credit-alert:${provider}`)}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => null),
       rest('bobby_llm_usage', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-        surface: 'probe', provider, model: provider === 'anthropic' ? 'claude-haiku-4-5-20251001' : 'gpt-4o-mini', role: 'probe',
+        surface: 'probe', provider, model: provider === 'anthropic' ? appTextModel() : 'gpt-4o-mini', role: 'probe',
         tokens_in: 1, tokens_out: 1, tokens_cached: 0, tokens_reasoning: 0, usd: 0, latency_ms: 0, stop: 'ok', ok: true }) }).catch(() => null),
     ]);
     return { status: 'ok' as const, httpStatus: res.status };

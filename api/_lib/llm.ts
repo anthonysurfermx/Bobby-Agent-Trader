@@ -1,22 +1,13 @@
-// ============================================================
-// llm — single OpenAI chat-completions wrapper for all agents.
-// Replaces the per-endpoint copies of callClaude(): one place for
-// timeout/abort, retry with backoff, and llm-health reporting.
-//
-// Retry policy: 429 and 5xx are transient (backoff and retry), other
-// 4xx are permanent (fail immediately). Network errors and timeouts
-// retry like 5xx.
-//
-// This module is also the reunification point if we ever move debates
-// back to Anthropic: swap the provider here, not in every endpoint.
-// ============================================================
-
+// Shared app text transport. Anthropic Haiku is the default; an explicit provider switch and
+// credit/rate fallback retain availability without changing safety gates or leaking prompts.
 import { recordLlmFailure, classifyHttpStatus } from './llm-health.js';
 import { alertProviderCredit } from './provider-alert.js';
 import { waitUntil } from '@vercel/functions';
 import { logLlmUsage } from './llm-usage.js';
+import { appPrimaryProvider, appTextModel } from './app-model.js';
 
 const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
 const BACKOFF_MS = [500, 1500];
 
 export interface LlmToolSchema {
@@ -24,160 +15,260 @@ export interface LlmToolSchema {
   description: string;
   parameters: Record<string, unknown>;
 }
-
 export interface LlmCallOptions {
-  /** Caller name for llm-health logs, e.g. 'agent-run', 'bobby-cycle'. */
   endpoint: string;
   system: string;
   user: string;
+  /** Kept for caller compatibility; the central app model setting selects Anthropic. */
   model?: string;
+  effort?: 'low' | 'medium' | 'high';
   maxTokens?: number;
   timeoutMs?: number;
-  /** When set, forces a function call and parses its arguments. */
+  signal?: AbortSignal;
   tool?: LlmToolSchema;
 }
-
 export interface LlmResult {
-  text: string;
-  toolInput: Record<string, unknown> | null;
+  text: string; toolInput: Record<string, unknown> | null;
+  provider?: ModelSpec['provider']; model?: string;
 }
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+export interface TextMessage { role: 'user' | 'assistant'; content: string }
+export interface StreamTextOptions extends Omit<LlmCallOptions, 'user' | 'tool'> {
+  messages: TextMessage[];
+  onDelta?: (text: string) => void | Promise<void>;
 }
+function sleep(ms: number): Promise<void> { return new Promise(resolve => setTimeout(resolve, ms)); }
 
-/** Call OpenAI with retry/backoff. Throws after the last failed attempt. */
-export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY not configured');
-
-  const model = opts.model || 'gpt-4o';
-  const timeoutMs = opts.timeoutMs ?? 30000;
-
-  const body: Record<string, unknown> = {
-    model,
-    max_tokens: opts.maxTokens ?? 1024,
-    messages: [
-      { role: 'system', content: opts.system },
-      { role: 'user', content: opts.user },
-    ],
-  };
-  if (opts.tool) {
-    body.tools = [{
-      type: 'function',
-      function: {
-        name: opts.tool.name,
-        description: opts.tool.description,
-        parameters: opts.tool.parameters,
-      },
-    }];
-    body.tool_choice = { type: 'function', function: { name: opts.tool.name } };
-  }
-
-  let lastError: Error = new Error('LLM call failed');
-  // The cost ledger (bobby_llm_usage) sees every attempt of the cycle and agent-run calls too, under their
-  // endpoint as the surface; the desk's spend guard only sums surface 'desk'.
-  const started = Date.now();
-  const ledger: LlmUsage[] = [];
-  const row = (u: Partial<LlmUsage>) => ledger.push({ provider: 'openai', model, role: null, tokensIn: 0, tokensOut: 0, tokensCached: 0,
-    tokensReasoning: 0, usd: 0, latencyMs: Date.now() - started, stop: null, ok: false, ...u });
-  try {
-  for (let attempt = 0; attempt <= BACKOFF_MS.length; attempt++) {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(OPENAI_URL, {
-        method: 'POST',
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        row({ stop: `http_${res.status}` });
-        const errBody = await res.text().catch(() => '');
-        recordLlmFailure({
-          endpoint: opts.endpoint,
-          provider: 'openai',
-          model,
-          kind: classifyHttpStatus(res.status),
-          httpStatus: res.status,
-          message: `http_${res.status}`,
-        });
-        // Exhausted credit never recovers through a retry: alert the owner and stop.
-        const refusal = refusalCode((() => { try { return JSON.parse(errBody); } catch { return null; } })());
-        // Status and refusal class only: provider bodies can echo the reader's question.
-        console.error('[llm] provider error', 'openai', model, res.status, refusal ?? '');
-        if (refusal === 'insufficient_quota' || refusal === 'billing_hard_limit_reached') {
-          alertProviderCredit('openai', refusal, opts.endpoint);
-          throw new LlmHttpError(res.status, `OpenAI ${model}: ${res.status} ${refusal}`, refusal);
-        }
-        const retriable = res.status === 429 || res.status >= 500;
-        lastError = new Error(`OpenAI ${model}: ${res.status} ${errBody.slice(0, 200)}`);
-        if (!retriable || attempt === BACKOFF_MS.length) throw lastError;
-        await sleep(BACKOFF_MS[attempt]);
-        continue;
-      }
-
-      const data = await res.json() as {
-        choices: Array<{
-          message: {
-            content: string | null;
-            tool_calls?: Array<{ function: { name: string; arguments: string } }>;
-          };
-        }>;
-      };
-      const usage = (data as { usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number } } }).usage;
-      const inTok = usage?.prompt_tokens ?? 0, cachedTok = usage?.prompt_tokens_details?.cached_tokens ?? 0, outTok = usage?.completion_tokens ?? 0;
-      row({ tokensIn: inTok, tokensCached: cachedTok, tokensOut: outTok, usd: modelCost(model, inTok - cachedTok, cachedTok, outTok), stop: 'stop', ok: true });
-      const message = data.choices?.[0]?.message;
-      const text = message?.content || '';
-      let toolInput: Record<string, unknown> | null = null;
-      const args = message?.tool_calls?.[0]?.function?.arguments;
-      if (args) {
-        try {
-          toolInput = JSON.parse(args);
-        } catch {
-          const last = ledger.at(-1);
-          if (last) { last.ok = false; last.stop = 'invalid_json'; }
-          recordLlmFailure({
-            endpoint: opts.endpoint,
-            provider: 'openai',
-            model,
-            kind: 'parse_error',
-            message: `tool_call args not valid JSON: ${args.slice(0, 200)}`,
-          });
-        }
-      }
-      return { text, toolInput };
-    } catch (e: unknown) {
-      const err = e as Error;
-      if (err === lastError || err instanceof LlmHttpError) throw err; // non-retriable HTTP error re-thrown above
-      const isTimeout = err.name === 'AbortError';
-      row({ stop: isTimeout ? 'timeout' : 'network' });
-      lastError = isTimeout
-        ? new Error(`LLM call timed out after ${timeoutMs}ms (${model})`)
-        : err;
-      recordLlmFailure({
-        endpoint: opts.endpoint,
-        provider: 'openai',
-        model,
-        kind: isTimeout ? 'timeout' : 'unknown',
-        message: lastError.message.slice(0, 300),
-      });
-      if (attempt === BACKOFF_MS.length) throw lastError;
-      await sleep(BACKOFF_MS[attempt]);
-    } finally {
-      clearTimeout(timer);
+function textSpecs(opts: Pick<LlmCallOptions, 'model' | 'effort' | 'maxTokens' | 'timeoutMs'>): ModelSpec[] {
+  const size = { maxTokens: opts.maxTokens ?? 4096, timeoutMs: opts.timeoutMs ?? 30_000 };
+  const claude: ModelSpec = { ...size, provider: 'anthropic', model: appTextModel(), effort: opts.effort ?? 'low' };
+  const openai: ModelSpec = { ...size, provider: 'openai', model: process.env.BOBBY_DESK_MODEL || 'gpt-6-luna' };
+  return appPrimaryProvider() === 'openai' ? [openai, claude] : [claude, openai];
+}
+const keyFor = (provider: ModelSpec['provider']) => process.env[provider === 'anthropic' ? 'ANTHROPIC_API_KEY' : 'OPENAI_API_KEY'];
+const limited = (error: unknown) => error instanceof LlmHttpError && (error.status === 429
+  || error.providerCode === 'insufficient_quota' || error.providerCode === 'billing_hard_limit_reached');
+function stopped(signal?: AbortSignal) { if (signal?.aborted) throw new Error('App text request cancelled'); }
+function requestSignal(timeoutMs: number, signal?: AbortSignal): AbortSignal {
+  return signal ? AbortSignal.any([signal, AbortSignal.timeout(timeoutMs)]) : AbortSignal.timeout(timeoutMs);
+}
+function textRequest(spec: ModelSpec, system: string, messages: TextMessage[], stream: boolean, tool?: LlmToolSchema) {
+  const key = keyFor(spec.provider);
+  if (!key) throw new Error('App text provider not configured');
+  if (spec.provider === 'anthropic') {
+    const body: Record<string, unknown> = { model: spec.model, max_tokens: spec.maxTokens, system, messages,
+      output_config: { effort: spec.effort ?? 'low' }, ...(stream ? { stream: true } : {}) };
+    // Small text/tool ceilings belong to the answer; keep adaptive thinking for the desk adapter.
+    if ((spec.effort ?? 'low') === 'low' || tool) body.thinking = { type: 'disabled' };
+    if (tool) {
+      body.tools = [{ name: tool.name, description: tool.description, input_schema: tool.parameters }];
+      body.tool_choice = { type: 'tool', name: tool.name };
     }
+    return { url: ANTHROPIC_URL, headers: { 'Content-Type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body };
   }
-  throw lastError;
-  } finally {
-    if (ledger.length) waitUntil(logLlmUsage(ledger.splice(0), { surface: opts.endpoint }));
+  const body: Record<string, unknown> = { model: spec.model, messages: [{ role: 'system', content: system }, ...messages] };
+  body[legacyOpenAi(spec.model) ? 'max_tokens' : 'max_completion_tokens'] = spec.maxTokens;
+  if (stream) { body.stream = true; body.stream_options = { include_usage: true }; }
+  if (tool) {
+    body.tools = [{ type: 'function', function: { name: tool.name, description: tool.description, parameters: tool.parameters } }];
+    body.tool_choice = { type: 'function', function: { name: tool.name } };
   }
+  return { url: OPENAI_URL, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` }, body };
+}
+function usageRow(spec: ModelSpec, started: number, data: any, stop: string | null, ok: boolean): LlmUsage {
+  const u = data?.usage;
+  const cached = spec.provider === 'anthropic' ? u?.cache_read_input_tokens ?? 0 : u?.prompt_tokens_details?.cached_tokens ?? 0;
+  const input = spec.provider === 'anthropic' ? (u?.input_tokens ?? 0) + (u?.cache_creation_input_tokens ?? 0) : (u?.prompt_tokens ?? 0) - cached;
+  const output = spec.provider === 'anthropic' ? u?.output_tokens ?? 0 : u?.completion_tokens ?? 0;
+  return { provider: spec.provider, model: spec.model, role: null, tokensIn: input + cached, tokensCached: cached,
+    tokensOut: output, tokensReasoning: spec.provider === 'anthropic' ? u?.output_tokens_details?.thinking_tokens ?? 0 : u?.completion_tokens_details?.reasoning_tokens ?? 0,
+    usd: modelCost(spec.model, input, cached, output), latencyMs: Date.now() - started, stop, ok };
+}
+function flushUsage(rows: LlmUsage[], endpoint: string): void {
+  if (!rows.length) return;
+  const pending = logLlmUsage(rows.splice(0), { surface: endpoint });
+  try { waitUntil(pending); } catch { /* tests and internal workers still run the best-effort write */ }
+}
+function failure(endpoint: string, spec: ModelSpec, kind: 'parse_error' | 'timeout' | 'unknown', code: string): void {
+  recordLlmFailure({ endpoint, provider: spec.provider, model: spec.model, kind, message: code });
+}
+function providerHttpError(status: number, code: ProviderRefusal | null, endpoint: string, spec: ModelSpec): LlmHttpError {
+  if (code === 'insufficient_quota' || code === 'billing_hard_limit_reached') alertProviderCredit(spec.provider, code, endpoint);
+  console.error('[llm] provider error', spec.provider, spec.model, status, code ?? '');
+  recordLlmFailure({ endpoint, provider: spec.provider, model: spec.model, kind: classifyHttpStatus(status), httpStatus: status, message: code ?? `http_${status}` });
+  return new LlmHttpError(status, `${spec.model}: ${status}`, code);
+}
+async function throwHttp(res: Response, endpoint: string, spec: ModelSpec): Promise<never> {
+  throw providerHttpError(res.status, refusalCode(await res.json().catch(() => null)), endpoint, spec);
+}
+function streamProviderError(event: any, endpoint: string, spec: ModelSpec): LlmHttpError {
+  const code = refusalCode(event), type = event?.error?.type;
+  const status = type === 'overloaded_error' ? 529 : type === 'rate_limit_error' || code === 'rate_limit_exceeded' ? 429
+    : type === 'invalid_request_error' ? 400 : 502;
+  return providerHttpError(status, code, endpoint, spec);
+}
+function resultOf(data: any, spec: ModelSpec, tool?: LlmToolSchema): LlmResult {
+  if (spec.provider === 'anthropic') {
+    const stop = data?.stop_reason;
+    if (stop !== (tool ? 'tool_use' : 'end_turn')) throw new LlmIncompleteError('App text response incomplete or refused');
+    const blocks = Array.isArray(data.content) ? data.content : [];
+    const text = blocks.filter((b: any) => b.type === 'text' && typeof b.text === 'string').map((b: any) => b.text).join('');
+    const calls = blocks.filter((b: any) => b.type === 'tool_use');
+    const call = calls[0];
+    if (tool && (calls.length !== 1 || call?.name !== tool.name || !call.input || typeof call.input !== 'object' || Array.isArray(call.input))) throw new Error('Invalid app text tool response');
+    if (!tool && !text.trim()) throw new Error('Empty app text response');
+    return { text, toolInput: tool ? call.input : null, provider: spec.provider, model: spec.model };
+  }
+  const choice = data?.choices?.[0];
+  if (choice?.message?.refusal || choice?.finish_reason !== (tool ? 'tool_calls' : 'stop')) throw new LlmIncompleteError('App text response incomplete or refused');
+  const call = choice?.message?.tool_calls?.[0]?.function;
+  let toolInput: Record<string, unknown> | null = null;
+  if (tool) {
+    if (choice.message.tool_calls.length !== 1 || call?.name !== tool.name || typeof call.arguments !== 'string') throw new Error('Invalid app text tool response');
+    let input: unknown;
+    try { input = JSON.parse(call.arguments); } catch { throw new Error('Invalid app text tool response'); }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Invalid app text tool response');
+    toolInput = input as Record<string, unknown>;
+  }
+  const text = choice?.message?.content ?? '';
+  if (typeof text !== 'string' || (!tool && !text.trim())) throw new Error('Empty app text response');
+  return { text, toolInput, provider: spec.provider, model: spec.model };
+}
+
+/** Text and named tools use the app model; provider refusals and incomplete answers never fail over. */
+export async function callLlm(opts: LlmCallOptions): Promise<LlmResult> {
+  stopped(opts.signal);
+  const started = Date.now(), deadline = started + (opts.timeoutMs ?? 30_000), rows: LlmUsage[] = [];
+  const specs = textSpecs(opts);
+  try {
+    for (const spec of specs) {
+      stopped(opts.signal);
+      if (!keyFor(spec.provider)) continue;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        stopped(opts.signal);
+        const left = deadline - Date.now();
+        if (left < 1) throw new Error('App text request deadline reached');
+        const req = textRequest(spec, opts.system, [{ role: 'user', content: opts.user }], false, opts.tool);
+        let data: any;
+        try {
+          const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: requestSignal(left, opts.signal) });
+          if (!res.ok) {
+            rows.push(usageRow(spec, started, null, `http_${res.status}`, false));
+            await throwHttp(res, opts.endpoint, spec);
+          }
+          try { data = await res.json(); } catch { throw new Error('Invalid app text provider response'); }
+          const stop = spec.provider === 'anthropic' ? data?.stop_reason : data?.choices?.[0]?.finish_reason;
+          const row = usageRow(spec, started, data, stop ?? null, false); rows.push(row);
+          if (opts.signal?.aborted) row.stop = 'cancelled';
+          stopped(opts.signal);
+          let result: LlmResult;
+          try { result = resultOf(data, spec, opts.tool); }
+          catch (error) { failure(opts.endpoint, spec, 'parse_error', 'invalid_or_incomplete_response'); throw error; }
+          row.ok = true;
+          return result;
+        } catch (error) {
+          stopped(opts.signal);
+          if (limited(error)) break;
+          if (error instanceof LlmHttpError && (error.status >= 500 || error.status === 529) && attempt === 0) {
+            await sleep(BACKOFF_MS[0]); continue;
+          }
+          if (error instanceof LlmHttpError || error instanceof LlmIncompleteError || data !== undefined) throw error;
+          const timeout = error instanceof Error && (error.name === 'AbortError' || error.name === 'TimeoutError');
+          rows.push(usageRow(spec, started, null, timeout ? 'timeout' : 'network', false));
+          failure(opts.endpoint, spec, timeout ? 'timeout' : 'unknown', timeout ? 'timeout' : 'transport_error');
+          const safe = new Error(timeout ? 'App text provider timed out' : 'App text provider unavailable');
+          if (timeout) safe.name = error instanceof Error ? error.name : 'TimeoutError';
+          throw safe;
+        }
+      }
+    }
+    throw new Error('App text providers unavailable');
+  } finally { flushUsage(rows, opts.endpoint); }
+}
+
+/** Provider SSE becomes text deltas only. No retry/failover after text is visible to the caller. */
+export async function streamText(opts: StreamTextOptions): Promise<LlmResult> {
+  stopped(opts.signal);
+  if (!opts.messages.length || opts.messages.at(-1)?.role !== 'user') throw new Error('App text conversation must end with a user');
+  const started = Date.now(), deadline = started + (opts.timeoutMs ?? 30_000), rows: LlmUsage[] = [];
+  let emitted = false;
+  try {
+    for (const spec of textSpecs(opts)) {
+      stopped(opts.signal);
+      if (!keyFor(spec.provider)) continue;
+      const left = deadline - Date.now();
+      if (left < 1) throw new Error('App text request deadline reached');
+      const req = textRequest(spec, opts.system, opts.messages, true);
+      let row = usageRow(spec, started, null, null, false), recorded = false;
+      const record = () => { if (!recorded) { rows.push(row); recorded = true; } };
+      try {
+        const res = await fetch(req.url, { method: 'POST', headers: req.headers, body: JSON.stringify(req.body), signal: requestSignal(left, opts.signal) });
+        if (!res.ok) { row.stop = `http_${res.status}`; record(); await throwHttp(res, opts.endpoint, spec); }
+        if (!res.body) throw new Error('Missing app text stream');
+        let text = '', stop: string | null = null, ended = false;
+        const data: any = { usage: {} };
+        const reader = res.body.getReader(), decoder = new TextDecoder();
+        let buffer = '';
+        const accept = async (payload: string) => {
+          stopped(opts.signal);
+          if (payload === '[DONE]') { ended = true; return; }
+          let event: any;
+          try { event = JSON.parse(payload); } catch { throw new Error('Invalid app text stream event'); }
+          let delta: string | undefined;
+          if (spec.provider === 'anthropic') {
+            if (event.type === 'error') throw streamProviderError(event, opts.endpoint, spec);
+            if (event.type === 'message_start') Object.assign(data.usage, event.message?.usage ?? {});
+            if (event.type === 'message_delta') { Object.assign(data.usage, event.usage ?? {}); stop = event.delta?.stop_reason ?? stop; }
+            if (event.type === 'message_stop') ended = true;
+            if (event.type === 'content_block_start' && event.content_block?.type === 'text') delta = event.content_block.text;
+            if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') delta = event.delta.text;
+          } else {
+            if (event.error) throw streamProviderError(event, opts.endpoint, spec);
+            Object.assign(data.usage, event.usage ?? {});
+            if (event.choices?.[0]?.delta?.refusal) throw new LlmIncompleteError('App text provider refused');
+            stop = event.choices?.[0]?.finish_reason ?? stop;
+            delta = event.choices?.[0]?.delta?.content;
+          }
+          row = usageRow(spec, started, data, stop, false);
+          if (typeof delta === 'string' && delta) {
+            emitted = true; text += delta; await opts.onDelta?.(delta);
+          }
+        };
+        try {
+          for (;;) {
+            stopped(opts.signal);
+            const { value, done } = await reader.read();
+            if (value) buffer += decoder.decode(value, { stream: true });
+            if (done) buffer += decoder.decode();
+            buffer = buffer.replace(/\r\n/g, '\n');
+            let at: number;
+            while ((at = buffer.indexOf('\n\n')) >= 0) {
+              const frame = buffer.slice(0, at); buffer = buffer.slice(at + 2);
+              const payload = frame.split('\n').filter(line => line.startsWith('data:')).map(line => line.slice(5).trimStart()).join('\n');
+              if (payload) await accept(payload);
+            }
+            if (buffer.length > 2_000_000) throw new Error('App text stream event too large');
+            if (done || ended) break;
+          }
+        } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+        const wanted = spec.provider === 'anthropic' ? 'end_turn' : 'stop';
+        row.stop = stop; row.latencyMs = Date.now() - started;
+        if (!ended || stop !== wanted || !text.trim()) throw new LlmIncompleteError('App text stream incomplete');
+        row.ok = true; record();
+        return { text, toolInput: null, provider: spec.provider, model: spec.model };
+      } catch (error) {
+        row.ok = false; row.latencyMs = Date.now() - started;
+        row.stop = opts.signal?.aborted ? 'cancelled' : error instanceof LlmHttpError ? `http_${error.status}`
+          : error instanceof LlmIncompleteError ? row.stop ?? 'incomplete_stream' : 'stream_error';
+        record(); stopped(opts.signal);
+        if (!emitted && limited(error)) continue;
+        failure(opts.endpoint, spec, error instanceof LlmIncompleteError ? 'parse_error' : 'unknown',
+          error instanceof LlmIncompleteError ? 'incomplete_stream' : 'stream_failed');
+        if (error instanceof LlmHttpError || error instanceof LlmIncompleteError) throw error;
+        throw new Error('App text stream unavailable');
+      }
+    }
+    throw new Error('App text providers unavailable');
+  } finally { flushUsage(rows, opts.endpoint); }
 }
 
 // ============================================================
@@ -225,23 +316,25 @@ export class LlmHttpError extends Error {
   constructor(readonly status: number, message: string, readonly providerCode: ProviderRefusal | null = null) { super(message); }
 }
 
-/** $ per million tokens [input, cached input, output]: list prices of 2026-09-29. Dated ids match their family
+/** $ per million tokens [input, cached input, output]: list prices of 2026-10-07. Dated ids match their family
  *  (claude-haiku-4-5-20251001 → claude-haiku-4-5); an unknown model is costed at the dearest known price so the
  *  ledger never under-reports. */
 export const MODEL_PRICES: Record<string, [number, number, number]> = {
   'gpt-6-luna': [0.10, 0.01, 0.50], 'gpt-6-sol': [2, 0.2, 10], 'gpt-4o-mini': [0.15, 0.075, 0.60], 'gpt-4o': [2.5, 1.25, 10],
-  'claude-sonnet-5-5': [2, 0.2, 10], 'claude-haiku-4-5': [1, 0.1, 5], 'claude-opus-5-5': [4, 0.2, 20],
+  'claude-haiku-5-5': [0.10, 0.01, 0.50], 'claude-sonnet-5-5': [2, 0.10, 10], 'claude-haiku-4-5': [1, 0.1, 5], 'claude-opus-5-5': [4, 0.2, 20],
 };
 const DEAREST: [number, number, number] = Object.values(MODEL_PRICES).reduce((a, b) => (b[2] > a[2] ? b : a));
 const unpriced = new Set<string>();
-export function modelPrice(model: string): [number, number, number] {
-  const known = MODEL_PRICES[model] ?? Object.entries(MODEL_PRICES).sort((a, b) => b[0].length - a[0].length).find(([k]) => model.startsWith(k))?.[1];
+const modelFamily = (model: string, family: string) => model === family || model.startsWith(`${family}-`);
+export function modelPrice(model: string, totalInputTokens = 0): [number, number, number] {
+  if (modelFamily(model, 'claude-haiku-5-5') && totalInputTokens > 100_000) return [0.50, 0.05, 2.50];
+  const known = MODEL_PRICES[model] ?? Object.entries(MODEL_PRICES).sort((a, b) => b[0].length - a[0].length).find(([k]) => modelFamily(model, k))?.[1];
   if (known) return known;
   if (!unpriced.has(model)) { unpriced.add(model); console.warn('[llm] no list price for', model, '— costed at the dearest known price'); }
   return DEAREST;
 }
 export function modelCost(model: string, uncachedIn: number, cachedIn: number, out: number): number {
-  const [pIn, pCached, pOut] = modelPrice(model);
+  const [pIn, pCached, pOut] = modelPrice(model, uncachedIn + cachedIn);
   return (uncachedIn * pIn + cachedIn * pCached + out * pOut) / 1e6;
 }
 
@@ -260,7 +353,7 @@ function parseOrFail(text: string, usage: LlmUsage[] | undefined): unknown {
   try { return parseJson(text); } catch (e) {
     const last = usage?.at(-1);
     if (last) { last.ok = false; last.stop = 'invalid_json'; }
-    throw e;
+    throw new Error('Invalid structured model response');
   }
 }
 
@@ -306,9 +399,11 @@ export async function completeJson(
       }
     } catch (e) {
       const timeout = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
-      recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: timeout ? 'timeout' : 'unknown', message: e instanceof Error ? e.message.slice(0, 200) : 'request failed' });
+      recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: timeout ? 'timeout' : 'unknown', message: timeout ? 'timeout' : 'transport_error' });
       note({ stop: timeout ? 'timeout' : 'network' });
-      throw e;
+      const error = new Error(timeout ? 'Structured model request timed out' : 'Structured model provider unavailable');
+      if (timeout) error.name = e instanceof Error ? e.name : 'TimeoutError';
+      throw error;
     }
     providerCode = res.ok ? null : refusalCode(await res.clone().json().catch(() => null));
     // Billing exhaustion cannot recover through a retry or a cheaper-model fallback.
@@ -328,8 +423,18 @@ export async function completeJson(
     throw new LlmHttpError(res.status, `${spec.model}: ${res.status}`, providerCode);
   }
 
+  const successfulResponse = res;
+  const readResponse = async (): Promise<any> => {
+    try { return await successfulResponse.json(); }
+    catch {
+      note({ stop: 'invalid_response' });
+      recordLlmFailure({ endpoint: opts.endpoint, provider: spec.provider, model: spec.model, kind: 'parse_error', message: 'invalid_response' });
+      throw new Error('Invalid structured model provider response');
+    }
+  };
+
   if (spec.provider === 'openai') {
-    const data = await res.json() as {
+    const data = await readResponse() as {
       choices?: Array<{ finish_reason?: string; message?: { content?: string | null; refusal?: string | null } }>;
       usage?: { prompt_tokens?: number; completion_tokens?: number; prompt_tokens_details?: { cached_tokens?: number }; completion_tokens_details?: { reasoning_tokens?: number } };
     };
@@ -337,11 +442,11 @@ export async function completeJson(
     const inTok = data.usage?.prompt_tokens ?? 0, cached = data.usage?.prompt_tokens_details?.cached_tokens ?? 0, outTok = data.usage?.completion_tokens ?? 0;
     const stop = choice?.finish_reason ?? null;
     note({ tokensIn: inTok, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.completion_tokens_details?.reasoning_tokens ?? 0,
-      usd: modelCost(spec.model, inTok - cached, cached, outTok), stop, ok: stop === 'stop' });
-    if (stop !== 'stop') throw new LlmIncompleteError(`${spec.model}: finished with ${stop}`);
+      usd: modelCost(spec.model, inTok - cached, cached, outTok), stop: choice?.message?.refusal ? 'refusal' : stop, ok: stop === 'stop' && !choice?.message?.refusal });
+    if (stop !== 'stop' || choice?.message?.refusal) throw new LlmIncompleteError('Structured model response incomplete or refused');
     return parseOrFail(choice?.message?.content ?? '', opts.usage);
   }
-  const data = await res.json() as {
+  const data = await readResponse() as {
     stop_reason?: string; content?: Array<{ type: string; text?: string }>;
     usage?: { input_tokens?: number; output_tokens?: number; cache_read_input_tokens?: number; cache_creation_input_tokens?: number; output_tokens_details?: { thinking_tokens?: number } };
   };
@@ -349,6 +454,6 @@ export async function completeJson(
   const stop = data.stop_reason ?? null;
   note({ tokensIn: inTok + cached, tokensCached: cached, tokensOut: outTok, tokensReasoning: data.usage?.output_tokens_details?.thinking_tokens ?? 0,
     usd: modelCost(spec.model, inTok, cached, outTok), stop, ok: stop === 'end_turn' });
-  if (stop !== 'end_turn') throw new LlmIncompleteError(`${spec.model}: finished with ${stop}`);
+  if (stop !== 'end_turn') throw new LlmIncompleteError('Structured model response incomplete or refused');
   return parseOrFail((data.content ?? []).filter((c) => c.type === 'text').map((c) => c.text ?? '').join(''), opts.usage);
 }
