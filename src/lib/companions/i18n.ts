@@ -43,11 +43,12 @@ export function translatedEnglish(en: string, language: Lang = lang()): string |
   }
   return undefined;
 }
-export function pick(entry: Bi | null | undefined): string {
+export function pick(entry: Bi | null | undefined): string { return pickIn(entry, lang(), locale()); }
+/** `pick` for an explicit language and locale: what the page shows when those are its own. No page state is read. */
+export function pickIn(entry: Bi | null | undefined, language: Lang, inLocale: string): string {
   if (!entry) { console.error('[i18n] Missing translation entry'); return ''; }
-  const language = lang();
   // Legacy third arguments use Brazilian wording. The shared catalogue is the Portugal copy.
-  if (language === 'pt' && locale() === 'pt-PT') {
+  if (language === 'pt' && inLocale === 'pt-PT') {
     const european = translatedEnglish(entry.en ?? '', language);
     if (european !== undefined) return european;
   }

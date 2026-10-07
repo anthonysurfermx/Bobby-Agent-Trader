@@ -17,6 +17,7 @@ import { ArrowLeftRight, Wallet, X } from 'lucide-react';
 import { SwapConfirm, type TradeExecution } from '@/components/adams/SwapConfirm';
 import { BASE_SWAP_LIMITS, BASE_SWAP_TOKENS, findBaseToken, isStockToken, type BaseSwapToken } from '@/lib/base-swap/tokens';
 import { STOCK_SWAPS_VISIBLE } from '@/lib/base-swap/stock-visibility';
+import { deskSwapOffer } from '@/lib/desk-suggestions';
 import { speechLocale, t } from '@/lib/companions/i18n';
 import { useBaseBalances } from './DeskWallet';
 
@@ -248,9 +249,10 @@ function SwapPanel({ initial, conviction, pickable }: { initial: BaseSwapToken; 
 
 /** Under a LONG verdict: the analyzed asset, if it lives on Bobby's Base allow-list (BTC → cbBTC, NVDA → NVDAc…). */
 export function DeskSwapCard({ symbol, conviction }: { symbol: string; conviction: number | null }) {
-  const token = useMemo(() => findBaseToken(symbol), [symbol]);
-  // A LONG on NVDA maps to NVDAc; with the equity class hidden there is nothing to offer.
-  if (!token || token.stable || (!STOCK_SWAPS_VISIBLE && isStockToken(token))) return null;
+  // A LONG on NVDA maps to NVDAc; with the equity class hidden there is nothing to offer. The desk asks the same
+  // function whether this card is on screen (deskSurfaces), so it never renders an empty one.
+  const token = useMemo(() => deskSwapOffer(symbol, STOCK_SWAPS_VISIBLE), [symbol]);
+  if (!token) return null;
   return <SwapPanel initial={token} conviction={conviction} pickable={false} />;
 }
 
