@@ -835,6 +835,22 @@ class HarnessCenterTest {
         assertEquals(emptyList<HarnessEvent>(), events(center, HarnessEvent.Kind.THESIS))
         assertEquals(all, kinds(center.upcoming))
         assertEquals(at(8, 16, 40), center.upcoming.firstOrNull()?.fireAt)
+        // The thesis book tells the centre when it changes. While the risk notice waits to be read again
+        // that plans nothing anew and cancels nothing: what the phone holds stays as it was.
+        consent = RiskNotice.OUTDATED
+        active = listOf(HarnessThesis("NVDA", HarnessHorizon.LONG, at(1, 9)))
+        center.thesesChanged()
+        assertEquals(setOf("v18.follow.asset", "v18.follow.week"), pending())
+        assertEquals(emptyList<HarnessEvent>(), events(center, HarnessEvent.Kind.THESIS))
+        consent = RiskNotice.ACCEPTED
+        center.thesesChanged()
+        assertEquals("heard once the notice is read: a thesis of years, the week only", setOf("v18.follow.week"), pending())
+        assertEquals(listOf<HarnessHorizon?>(HarnessHorizon.LONG), events(center, HarnessEvent.Kind.THESIS).map { it.horizon })
+        // Follow-ups off: nothing to plan, and no pointer is written.
+        center.turnOff()
+        center.thesesChanged()
+        assertTrue(center.ledger.isEmpty)
+        assertEquals(0, pending().size)
     }
 
     // Android: fences, a slow phone, a relaunch, another language, the board, the switch

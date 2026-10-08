@@ -77,7 +77,7 @@ object Harness {
         // The review they chose on the save (72 or 168 hours) times the follow-up that was coming.
         host.onReadSaved { _, symbol, reviewHours -> center.noteSaved(symbol, reviewHours) }
         // A thesis of this reader was written, changed or archived: its horizon times the next follow-up.
-        host.theses.addListener { changed -> if (changed == ThesisBook.key(center.owner)) center.replan() }
+        host.theses.addListener { changed -> if (changed == ThesisBook.key(center.owner)) center.thesesChanged() }
         // The person tapped the question Bobby's CIO wrote after a read: that is acting on what Bobby put
         // in front of them, counted by asset (only while the centre may record). The words are not kept.
         host.onNextQuestionPicked { symbol -> center.notePicked(symbol) }

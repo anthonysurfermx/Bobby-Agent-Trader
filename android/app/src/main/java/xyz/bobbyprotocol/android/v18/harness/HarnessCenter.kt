@@ -151,7 +151,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     var changed: () -> Unit = {}
     /** This reader's ledger was just erased: whatever else names what it held follows (the app wires the nudge history). */
     var onErased: () -> Unit = {}
-    /** The reader's active theses (the app wires the thesis book). Call `replan` when one is written, changed or archived. */
+    /** The reader's active theses (the app wires the thesis book). Call `thesesChanged` when one is written, changed or archived. */
     var theses: (String?) -> List<HarnessThesis> = { emptyList() }
 
     var mode: HarnessMode = HarnessMode.UNDECIDED
@@ -666,6 +666,15 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         upcoming = wanted
         apply()
         publish()
+    }
+
+    /**
+     * A thesis of this reader was written, changed or archived: its horizon times the next
+     * follow-up. Only with follow-ups on; and while the risk notice waits to be read again nothing
+     * is planned anew, so what the phone holds stays as it was (as in `rewriteWords`).
+     */
+    fun thesesChanged() {
+        if (mode == HarnessMode.ON && recording) replan()
     }
 
     /** True once the app speaks a language the lines the phone holds were not written in. */
