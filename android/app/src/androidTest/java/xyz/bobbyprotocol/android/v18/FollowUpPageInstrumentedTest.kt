@@ -7,6 +7,7 @@ import android.webkit.WebView
 import androidx.activity.ComponentActivity
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -48,6 +49,12 @@ import java.util.concurrent.atomic.AtomicReference
  *
  * The question Bobby "wrote" after the read is this test's: the real one is whatever the server
  * sends in `synthesis.followUp`, checked by the page before it is shown (android/nucleo/tests).
+ *
+ * The line on the glass is photographed over the page's WebGL sphere. The two reads are played on
+ * the page's own fallback for a phone without WebGL (the sphere drawn without it): an emulator with
+ * no GPU draws the scene of a read in software, and the first run of this test took the emulator
+ * offline half-way through one (run 37717370904). The row, its chips and their words are the same
+ * page code either way; what a read looks like over the WebGL sphere is not seen here.
  */
 @RunWith(Parameterized::class)
 class FollowUpPageInstrumentedTest(private val language: String) {
@@ -65,6 +72,7 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     /** The question the read hands back (`synthesis.followUp`), or none. */
     @Volatile private var nextQuestion: String? = null
     @Volatile private var reads = 0
+    private var webGlOff = false
 
     private val spanish: Boolean get() = language == "es"
     private val locale: String get() = if (spanish) "es-MX" else "en-US"
@@ -88,8 +96,8 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
     @Test fun theLineOnTheGlassAndTheRowAfterARead() {
         open()
-        await("the idle home", 300_000) { state() == "IDLE" && chips().size >= 3 && chips().all { it.second > 0.9 } }
-        assertEquals("The home offers the reader's assets", listOf("NVIDIA", "BTC", "ETH"), chips().map { it.first })
+        await("the idle home", 300_000) { it.state == "IDLE" && it.chips.size >= 3 && it.settled }
+        assertEquals("The home offers the reader's assets", listOf("NVIDIA", "BTC", "ETH"), look().words)
 
         // ---- The line on the glass when they come back: one line, one button ----
         val asked = System.currentTimeMillis() - 26 * 3_600_000L
@@ -116,25 +124,22 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
         // ---- After a read: the question Bobby wrote is the first chip ----
         nudge = null
-        emitSession()
-        await("the home without a line", 60_000) { state() == "IDLE" && chips().firstOrNull()?.first == "NVIDIA" && chips().all { it.second > 0.9 } }
         val question = if (spanish) "¿Qué tendría que cambiar en NVDA para que cambie esta lectura?" else "What would have to change in NVDA for this read to change?"
         nextQuestion = question
+        reloadWithoutWebGl()
         readNvda()
-        await("Bobby's question as the first chip", 120_000) { chips().firstOrNull()?.first == question && chips().all { it.second > 0.9 } }
+        await("Bobby's question as the first chip", 120_000) { it.words.firstOrNull() == question && it.settled }
         val another = if (spanish) "Otra pregunta sobre NVDA" else "Another question about NVDA"
-        assertEquals(listOf(question, another, if (spanish) "¿Cómo se ve BTC?" else "How is BTC looking?"), chips().map { it.first })
+        assertEquals(listOf(question, another, if (spanish) "¿Cómo se ve BTC?" else "How is BTC looking?"), look().words)
         shot("page-after-read-question")
 
         // ---- The same read without a question: the fixed row, as before ----
         nextQuestion = null
-        calls.clear()
-        instrumentation.runOnMainSync { checkNotNull(web).reload("app") }
-        await("the idle home again", 300_000) { calls.any { it.first == "session" } && state() == "IDLE" && chips().size >= 3 && chips().all { it.second > 0.9 } }
+        reloadWithoutWebGl()
         readNvda()
-        await("the fixed row", 120_000) { chips().firstOrNull()?.first == another && chips().size >= 3 && chips().all { it.second > 0.9 } }
+        await("the fixed row", 120_000) { it.words.firstOrNull() == another && it.chips.size >= 3 && it.settled }
         assertEquals(listOf(another, if (spanish) "¿Cómo se ve BTC?" else "How is BTC looking?", if (spanish) "¿Cómo se ve ETH?" else "How is ETH looking?"),
-                     chips().map { it.first })
+                     look().words)
         shot("page-after-read-no-question")
         assertEquals("The page could not reach native", null, unavailable.get())
     }
@@ -154,6 +159,24 @@ class FollowUpPageInstrumentedTest(private val language: String) {
         }
     }
 
+    /**
+     * The page is loaded again, and from here on it finds no WebGL: it draws its own fallback (see
+     * the note on this class). The script runs before any of the page's own.
+     */
+    private fun reloadWithoutWebGl() {
+        assertTrue("This WebView cannot run a script before the page's own", WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT))
+        calls.clear()
+        instrumentation.runOnMainSync {
+            val host = checkNotNull(web)
+            if (!webGlOff) {
+                webGlOff = true
+                WebViewCompat.addDocumentStartJavaScript(host.view, NO_WEBGL, setOf("https://appassets.androidplatform.net"))
+            }
+            host.reload("app")
+        }
+        await("the idle home without WebGL", 300_000) { seen -> calls.any { it.first == "session" } && seen.state == "IDLE" && seen.chips.size >= 3 && seen.settled && seen.noGl }
+    }
+
     /** A chip of the home asks about NVDA, the way a person's tap does, and the read is handed back. */
     private fun readNvda() {
         val before = calls.count { it.first == "ask" }
@@ -163,16 +186,14 @@ class FollowUpPageInstrumentedTest(private val language: String) {
         val asked = JSONObject(calls.last { it.first == "ask" }.second)
         assertEquals(if (spanish) "¿Cómo se ve NVDA?" else "How is NVDA looking?", asked.optString("question"))
         assertEquals(true, asked.opt("chip"))
-        await("the read to be handed back", 420_000) { state() == "HANDBACK" || state() == "FOLLOWUPS" }
+        await("the read to be handed back", 420_000) { it.state == "HANDBACK" || it.state == "FOLLOWUPS" }
     }
 
     /** Native has a line for the glass: the session says so, and the page draws it in the row. */
     private fun show(line: NucleoNudge) {
         nudge = line.toJson()
         emitSession()
-        await("the line “${line.text}” with “${line.cta}”", 60_000) {
-            eyebrow() == line.text && chips().firstOrNull()?.first == line.cta && chips().all { it.second > 0.9 }
-        }
+        await("the line “${line.text}” with “${line.cta}”", 60_000) { it.eyebrow == line.text && it.words.firstOrNull() == line.cta && it.settled }
     }
 
     private fun emitSession() {
@@ -266,16 +287,23 @@ class FollowUpPageInstrumentedTest(private val language: String) {
 
     // ---- What the page shows ----
 
-    private fun state(): String? = js("window.nucleo ? window.nucleo.state() : null") as? String
+    /** One look at the page: its state, the line above the row, and the chips of the row with how opaque each is drawn. */
+    private class Seen(val state: String?, val eyebrow: String?, val chips: List<Pair<String, Double>>, val noGl: Boolean) {
+        val words: List<String> get() = chips.map { it.first }
+        /** Every chip has finished arriving. */
+        val settled: Boolean get() = chips.all { it.second > 0.9 }
+        override fun toString(): String = "state=$state, eyebrow=$eyebrow, chips=$chips, noGl=$noGl"
+    }
 
-    private fun eyebrow(): String? = js("(function(){var e=document.getElementById('eyebrow');return e?e.textContent:null;})()") as? String
-
-    /** The chips of the row, first to last: what each says and how opaque it is drawn. */
-    private fun chips(): List<Pair<String, Double>> {
-        val raw = js("JSON.stringify(Array.prototype.map.call(document.querySelectorAll('#chipRow [data-hit=chip]'),function(n){return [n.textContent,Number(getComputedStyle(n).opacity)];}))") as? String
-            ?: return emptyList()
-        val list = JSONArray(raw)
-        return (0 until list.length()).map { index -> Pair(list.getJSONArray(index).getString(0), list.getJSONArray(index).optDouble(1, 0.0)) }
+    /** Asked in one script, so that watching the page costs it as little as possible. */
+    private fun look(): Seen {
+        val raw = js("JSON.stringify({s:window.nucleo?window.nucleo.state():null,e:(document.getElementById('eyebrow')||{}).textContent||null," +
+                     "g:!!document.querySelector('.nogl'),c:Array.prototype.map.call(document.querySelectorAll('#chipRow [data-hit=chip]')," +
+                     "function(n){return [n.textContent,Number(getComputedStyle(n).opacity)];})})") as? String ?: return Seen(null, null, emptyList(), false)
+        val json = JSONObject(raw)
+        val list = json.optJSONArray("c") ?: JSONArray()
+        val chips = (0 until list.length()).map { index -> Pair(list.getJSONArray(index).getString(0), list.getJSONArray(index).optDouble(1, 0.0)) }
+        return Seen(if (json.isNull("s")) null else json.optString("s"), if (json.isNull("e")) null else json.optString("e"), chips, json.optBoolean("g"))
     }
 
     /** Evaluates a script in the page. Null when the page did not answer in time (it draws its scene in software here). */
@@ -292,15 +320,14 @@ class FollowUpPageInstrumentedTest(private val language: String) {
         return if (done.await(20, TimeUnit.SECONDS)) result.get() else null
     }
 
-    private fun await(what: String, timeoutMillis: Long, condition: () -> Boolean) {
+    private fun await(what: String, timeoutMillis: Long, condition: (Seen) -> Boolean) {
         val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis)
         while (System.nanoTime() < deadline) {
-            if (runCatching(condition).getOrDefault(false)) return
-            Thread.sleep(400)
+            if (runCatching { condition(look()) }.getOrDefault(false)) return
+            Thread.sleep(800)
         }
         runCatching { V18Shots.save("failed-page-$language") }
-        fail("The page never showed $what; state=${state()}, eyebrow=${eyebrow()}, chips=${chips()}, unavailable=${unavailable.get()}, calls=" +
-             calls.map { it.first }.takeLast(30))
+        fail("The page never showed $what; ${look()}, unavailable=${unavailable.get()}, calls=" + calls.map { it.first }.takeLast(30))
     }
 
     private fun shot(name: String) {
@@ -310,6 +337,10 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     }
 
     companion object {
+        /** Before the page's own scripts: a canvas that is asked for WebGL has none to give. */
+        private const val NO_WEBGL = "(function(){var g=HTMLCanvasElement.prototype.getContext;HTMLCanvasElement.prototype.getContext=" +
+            "function(t){if(/webgl/i.test(String(t)))return null;return g.apply(this,arguments);};})();"
+
         @JvmStatic
         @Parameterized.Parameters(name = "{0}")
         fun languages(): Collection<Array<Any>> = listOf(arrayOf<Any>("en"), arrayOf<Any>("es"))
