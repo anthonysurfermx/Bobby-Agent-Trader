@@ -37,10 +37,25 @@ function refreshCollections(){
   bcall('island').then(function(i){ ISLAND = i; if (ST.name === 'IDLE') buildFaces(); }).catch(noop);
   bcall('roster').then(function(r){ ROSTER = r; if (r) buildBelt(r.companions); }).catch(noop);
 }
+/* Native has looked this up in the current owner's ledger. Opening it spends no read and presents no new receipt. */
+function savedReadOpen(p){
+  var th = p && p.thesis;
+  if (!th || typeof th.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(th.id) ||
+      typeof th.symbol !== 'string' || !/^[A-Z0-9.^=-]{1,20}$/.test(th.symbol) ||
+      (th.verdict !== 'wait' && th.verdict !== 'review')) return false;
+  /* Keep an unsaved answer, typing, a running analysis or a native sheet in place. */
+  if (!ST || ['IDLE', 'FACES', 'THESIS_VIEW'].indexOf(ST.name) < 0 || SHEET || !SES || !SES.riskAccepted) return false;
+  /* Native already stopped audio; invalidate late callbacks before clearing the old visual presentation. */
+  VOICE.id = null; VOICE.started = false; VOICE.ended = true; VOICE.silent = true; K.on = false;
+  clearRead(); READ = null;
+  go('THESIS_VIEW', { thesis: th, back: 'IDLE' });
+  return true;
+}
 function wire(){
   if (!BR) return;
   BR.on('session.changed', function(s){ applySession(s, false); if (ST.name === 'IDLE') pillMode(idleMode()); });
   BR.on('account.changed', function(){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; el.ta.value = ''; taAutosize(); });
+  BR.on('savedRead.open', savedReadOpen);
   BR.on('app.state', function(p){ if (p && p.state === 'background'){ SPEECH.draft = ''; SPEECH.draftEpoch = (SPEECH.draftEpoch || 0) + 1; } fsmEvent('app.state', p); if (p && p.state === 'active') last = -1; });
   BR.on('ask.stage', onStage);
   BR.on('speech.state', function(p){ fsmEvent('speech.state', p); });

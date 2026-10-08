@@ -6,7 +6,7 @@ const source = fs.readFileSync(new URL('../src/app/55-read.js', import.meta.url)
 const observe = source.slice(source.indexOf('function observePresentedRead(){'), source.indexOf("/* the header's second line"));
 function harness() {
   const calls = [], card = { textContent: 'Actual result', getBoundingClientRect: () => ({ left: 10, top: 200, right: 300, bottom: 400, width: 290, height: 200 }) };
-  const context = vm.createContext({ BR: { METHODS: ['read.rendered'] }, READ: { model: {}, reply: {status: 'ok'}, requestId: 'test-id' }, A: {cardsOn: true, rev: [{x: 1}]}, el: { cards: [card] },
+  const context = vm.createContext({ ST: { name: 'CARDS' }, BR: { METHODS: ['read.rendered'] }, READ: { model: {}, reply: {status: 'ok'}, requestId: 'test-id' }, A: {cardsOn: true, rev: [{x: 1}]}, el: { cards: [card] },
     W: { innerWidth: 390, innerHeight: 844, getComputedStyle: () => ({visibility: 'visible', display: 'block', opacity: '1'}) },
     canRun: () => true, bcall: (method, body) => {calls.push({method,body}); return Promise.resolve({accepted: true});}, noop() {} });
   vm.runInContext(observe, context);
@@ -19,3 +19,15 @@ test('network failure and replaced read cannot acknowledge old request', () => {
 
 test('Android contract without read.rendered never invokes a missing native method', () => { const h=harness(); h.context.BR.METHODS=[]; h.tick(); h.tick(); assert.equal(h.calls.length,0); });
 test('a background interruption resets the visible frame count', () => { const h=harness(); h.tick(); h.context.canRun=()=>false; h.tick(); h.context.canRun=()=>true; h.tick(); assert.equal(h.calls.length,0); h.tick(); assert.equal(h.calls.length,1); });
+
+// The shipping observer now knows the saved-view state as well as visual read-only mode.
+test('saved snapshots never acknowledge a live read behind them', () => {
+  for (const kind of ['state', 'viewOnly']) {
+    const h = harness();
+    if (kind === 'state') h.context.ST.name = 'THESIS_VIEW'; else h.context.A.viewOnly = true;
+    h.tick(); h.tick(); assert.equal(h.calls.length, 0, kind);
+    assert.equal(h.context.READ.presented, undefined);
+    h.context.ST.name = 'CARDS'; h.context.A.viewOnly = false;
+    h.tick(); h.tick(); assert.equal(h.calls.length, 1, 'a real live result remains eligible');
+  }
+});

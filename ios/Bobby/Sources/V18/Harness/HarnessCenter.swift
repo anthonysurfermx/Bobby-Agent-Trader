@@ -13,6 +13,7 @@
 //                 you asked" when they come back, and what the yes follows. No app openings, no
 //                 saves, no taps, no horizon, no thesis, no read started from a follow-up's own button.
 //      on         everything the planner reads (HarnessLedger), from that moment.
+//      inApp      saved-read continuity on the next local day, visible only when Bobby opens.
 //      off        nothing, and what was there is erased.
 //    `HarnessCenterTests` pins each state.
 //  - Bobby never invites someone into a wall. A read Bobby starts (the button of the line on the
@@ -250,6 +251,8 @@ struct HarnessMove: Equatable {
     let priceNow: Double?
     /// Whole days since they asked (at least one).
     let days: Int
+    /// A saved reading to open instead of asking the desk. Runtime metadata, never answer text.
+    var savedReadID: String? = nil
 
     /// Nil when the phone should say no number (HarnessCopy.move): a split, a renamed ticker or
     /// a bad price would otherwise read as a crash.
@@ -531,6 +534,43 @@ final class HarnessCenter: ObservableObject {
         Task { await replan() }
     }
 
+    /// Explicitly keep a validated, already saved read for the next local day. This is a choice
+    /// about the app alone: it neither asks iOS for permission nor starts a read or creates a thesis.
+    /// The caller owns the dated answer in NucleoLedger; only its id and market metadata live here.
+    func keepForInAppReturn(_ read: NucleoReadSummary) async -> Date? {
+        guard !Task.isCancelled, consent() == .accepted,
+              let symbol = HarnessLedger.validSymbol(read.symbol),
+              read.requestId.range(of: NucleoDesk.uuidPattern, options: .regularExpression) != nil else { return nil }
+        let user = currentUser(), generation = currentGeneration()
+        if owner != user { load(owner: user) }
+        let clock = now()
+        let existing = ledger.events(.saved).last { $0.readId == read.requestId }
+        guard let availableFrom = existing?.availableFrom ?? calendar().date(byAdding: .day, value: 1, to: calendar().startOfDay(for: clock)) else { return nil }
+        mode = .inApp
+        store.write(mode, owner: owner)
+        // Cancel only this feature's pending/delivered notices. Other reminders stay untouched.
+        purge()
+        planned = []
+        upcoming = []
+        held = []
+        focus = nil
+        move = nil
+        if existing == nil {
+            // The summary may be from a chip or from a read made while follow-ups were off.
+            // Its dated price is kept as the comparison point, without an inferred horizon.
+            note(HarnessEvent(kind: .ask, at: clock, symbol: symbol, name: read.name, isEquity: read.isEquity,
+                              price: read.price, readId: read.requestId))
+            note(HarnessEvent(kind: .saved, at: clock, symbol: symbol, readId: read.requestId, availableFrom: availableFrom))
+        }
+        await replan()
+        guard !Task.isCancelled, owner == user, currentUser() == user, currentGeneration() == generation,
+              consent() == .accepted, mode == .inApp, store.mode(owner: user) == .inApp,
+              store.ledger(owner: user).events(.saved).contains(where: { $0.readId == read.requestId && $0.availableFrom == availableFrom })
+        else { return nil }
+        changed()
+        return availableFrom
+    }
+
     /// They tapped something of Bobby's that asks Bobby a question through the page: the button of
     /// the line on the glass, a row of a board. The line they acted on leaves the glass now, whatever
     /// they said about follow-ups, and nothing is written yet. The tap counts once the page asks the
@@ -722,14 +762,18 @@ final class HarnessCenter: ObservableObject {
         if wasLocal, user != nil, consent() == .accepted {
             let local = store.ledger(owner: nil), localMode = store.mode(owner: nil)
             let theirMode = store.mode(owner: user)
-            if theirMode != .off {
+            if localMode != .inApp, theirMode != .off {
                 var theirs = store.ledger(owner: user)
                 theirs.merge(local)
                 store.write(theirs, owner: user)
                 if theirMode == .undecided, localMode != .undecided { store.write(localMode, owner: user) }
             }
-            store.forget(owner: nil)
-            if localMode == .off { store.write(.off, owner: nil) }
+            // A saved answer belongs to the guest ledger. Its link is not moved into an account
+            // whose saved-read ledger does not contain it; it remains available signed out.
+            if localMode != .inApp {
+                store.forget(owner: nil)
+                if localMode == .off { store.write(.off, owner: nil) }
+            }
         }
         load(owner: user)
         // The plan stored for this reader was handed to iOS in another session: none of it is there now.
@@ -755,10 +799,37 @@ final class HarnessCenter: ObservableObject {
         guard mode != .off, consent() == .accepted else { return nil }
         let clock = now()
         let known = ledger.assets(since: clock.addingTimeInterval(-Self.dueDays * 86_400), now: clock)
+        if mode == .inApp {
+            guard let saved = dueSavedRead(), let symbol = saved.symbol else { return nil }
+            // Read-specific metadata keeps the original comparison even after another question.
+            guard let ask = ledger.events(.ask).last(where: { $0.readId == saved.readId }),
+                  let name = ask.name, let isEquity = ask.isEquity else { return nil }
+            return HarnessAsset(symbol: symbol, name: name, isEquity: isEquity, firstAskedAt: ask.at,
+                                lastAskedAt: ask.at, lastPrice: ask.price, firstPrice: ask.price, asks: 1)
+        }
         if let focus, clock.timeIntervalSince(focus.at) <= Self.focusWindow, let asset = known.first(where: { $0.symbol == focus.symbol }) {
             return asset
         }
         return known.first { clock.timeIntervalSince($0.lastAskedAt) >= Self.dueAfter }
+    }
+
+    /// The latest explicitly kept read, once its next LOCAL day begins. A newer keep replaces
+    /// the older offer; an opening is consumed once and never generates another analysis.
+    private func dueSavedRead() -> HarnessEvent? {
+        let clock = now()
+        guard let saved = ledger.events(.saved).last(where: { $0.readId != nil && $0.availableFrom != nil && $0.at <= clock }),
+              let ready = saved.availableFrom, ready <= clock,
+              clock.timeIntervalSince(saved.at) <= Self.dueDays * 86_400,
+              !ledger.events(.picked).contains(where: { $0.readId == saved.readId }) else { return nil }
+        return saved
+    }
+
+    /// The saved card really opened: no quota gate and no desk request.
+    func noteOpenedSavedRead(requestId: String) {
+        guard mode == .inApp, consent() == .accepted, let saved = dueSavedRead(), saved.readId == requestId else { return }
+        note(HarnessEvent(kind: .picked, at: now(), symbol: saved.symbol, readId: requestId))
+        move = nil
+        changed()
     }
 
     /// Reads the price of the asset to come back to (one quota-free request) and publishes the line.
@@ -776,21 +847,22 @@ final class HarnessCenter: ObservableObject {
             if let price, price.isFinite, price > 0 { quotes[asset.symbol] = (price, now()) } else { price = nil }
         }
         // The line's button asks Bobby, which is a read: the phone finds out whether one is left.
-        if access() == nil {
+        if mode != .inApp, access() == nil {
             await refreshAccess()
             guard owner == user, currentGeneration() == generation, consent() == .accepted else { return }
         }
         guard let still = dueAsset(), still.symbol == asset.symbol else { return }
         let days = max(1, Int(now().timeIntervalSince(asset.lastAskedAt) / 86_400))
         let next = HarnessMove(symbol: asset.symbol, name: asset.name, isEquity: asset.isEquity, askedAt: asset.lastAskedAt,
-                               priceThen: asset.lastPrice, priceNow: price, days: days)
+                               priceThen: asset.lastPrice, priceNow: price, days: days,
+                               savedReadID: mode == .inApp ? dueSavedRead()?.readId : nil)
         if next != move || readsOpen != couldAsk { move = next; changed() }
     }
 
     // MARK: The plan
 
     /// The person said yes to follow-ups: everything the planner reads is written.
-    private var recording: Bool { mode == .on && consent() == .accepted }
+    private var recording: Bool { (mode == .on || mode == .inApp) && consent() == .accepted }
     /// They have not said no: a question they asked is kept, so the glass can say how it moved since.
     private var keeping: Bool { mode != .off && consent() == .accepted }
 
@@ -800,7 +872,7 @@ final class HarnessCenter: ObservableObject {
     ///    Nothing of any other event, and nothing of a read Bobby started. What a question or a
     ///    save carried beyond that waits in memory, briefly, for the yes (`accept` writes it).
     private func note(_ event: HarnessEvent) {
-        guard mode == .on else {
+        guard mode == .on || mode == .inApp else {
             guard mode == .undecided else { return }
             if event.isQuestion || event.kind == .saved {
                 held.append(event)

@@ -23,6 +23,7 @@ extension NativeTranslations18 {
         result["{0} {1} since you asked"] = ["fr": "{0} {1} depuis ta question", "pt": "{0} {1} desde que perguntaste", "it": "{0} {1} da quando hai chiesto", "de": "{0} {1} seit deiner Frage"]
         result["What changed?"] = ["fr": "Quoi de neuf ?", "pt": "O que mudou?", "it": "Cosa è cambiato?", "de": "Was hat sich getan?"]
         result["Got it"] = ["fr": "Compris", "pt": "Entendido", "it": "Capito", "de": "Verstanden"]
+        result["Open saved read"] = ["fr": "Ouvrir l’analyse", "pt": "Abrir análise guardada", "it": "Apri analisi salvata", "de": "Analyse öffnen"]
         // The questions asked on the person's tap.
         result["What changed in {0} since I asked?"] = ["fr": "Qu’est-ce qui a changé pour {0} depuis ma question ?", "pt": "O que mudou em {0} desde que perguntei?", "it": "Cosa è cambiato in {0} da quando ho chiesto?", "de": "Was hat sich bei {0} getan, seit ich gefragt habe?"]
         result["How does {0} look today?"] = ["fr": "Comment se présente {0} aujourd’hui ?", "pt": "Como está {0} hoje?", "it": "Come si presenta {0} oggi?", "de": "Wie sieht {0} heute aus?"]

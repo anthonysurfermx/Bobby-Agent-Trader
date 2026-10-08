@@ -272,12 +272,30 @@ final class NucleoSession: ObservableObject {
             haptics.play(kind)
             return [String: Any]()
         case "saveThesis":
-            let saved = try await desk.saveThesis(p)
+            let keepInApp = try p.bool("keepInApp", required: false) ?? false
+            let started = desk.generation(), startedOwner = desk.thesisOwner
+            var saved = try await desk.saveThesis(p)
             if saved["status"] as? String == "saved", let requestId = try p.string("requestId", required: false) {
                 NudgeCenter.shared.noteSaved(requestId: requestId)
-                if let symbol = desk.readSummary(requestId: requestId)?.symbol {
-                    harness?.noteSaved(symbol: symbol, horizonHours: Self.chosenHorizon(saved: saved, asked: try p.int("horizonHours", required: false)))
+                if let summary = desk.readSummary(requestId: requestId) {
+                    if keepInApp {
+                        saved["followUp"] = NSNull()
+                        if started == desk.generation(), let availableFrom = await harness?.keepForInAppReturn(summary),
+                           started == desk.generation(), startedOwner == desk.thesisOwner,
+                           desk.savedRead(requestId: requestId) != nil {
+                            saved["followUp"] = ["kind": "in_app", "symbol": summary.symbol, "name": summary.name,
+                                                 "availableFrom": ISO8601DateFormatter().string(from: availableFrom)]
+                        }
+                    } else {
+                        harness?.noteSaved(symbol: summary.symbol, horizonHours: Self.chosenHorizon(saved: saved, asked: try p.int("horizonHours", required: false)))
+                    }
+                } else if keepInApp {
+                    saved["followUp"] = NSNull()
                 }
+                // An awaited local sync may cross a sign-in/out. Never hand the new page the
+                // previous reader's dated answer, even when it was safely saved for that reader.
+                guard started == desk.generation(), startedOwner == desk.thesisOwner else { return ["status": "stale"] }
+                guard profile.acceptedRiskNotice else { return ["status": "error", "code": "risk_not_accepted"] }
                 sessionChanged()
             }
             return saved
@@ -447,6 +465,18 @@ final class NucleoSession: ObservableObject {
     }
 
     // MARK: - Reads native starts (1.8)
+
+    /// Open only this reader's persisted answer. A saved-card tap runs no model or metering path.
+    @discardableResult
+    func openSavedRead(requestId: String) -> Bool {
+        guard !tornDown, profile.acceptedRiskNotice, currentPage == NucleoPage.app.name,
+              sheet == nil, openSheet == nil, !desk.isBusy, !speechPromptOpen,
+              let saved = desk.savedRead(requestId: requestId) else { return false }
+        nucleoVoice.stop()
+        speech.cancel()
+        emit("savedRead.open", ["thesis": saved.json])
+        return true
+    }
 
     /// Asks Bobby about an asset native already knows, on the glass: a follow-up's button, a row of a
     /// board. The page runs it exactly like a chip that carries a token. With a sheet open the sheet

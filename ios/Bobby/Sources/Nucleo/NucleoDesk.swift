@@ -1097,7 +1097,12 @@ final class NucleoDesk {
         guard profile.acceptedRiskNotice else { return Self.errorResult("risk_not_accepted") }
         // Signed in or out while it ran: the read belongs to an account that is gone.
         guard generation() == read.generation else { return ["status": "stale"] }
-        if let saved = read.saved { return saved }
+        if let saved = read.saved {
+            guard ledger.items(owner: ledgerOwner()).contains(where: { $0.id == requestId }) else {
+                return Self.errorResult("save_failed")
+            }
+            return saved
+        }
 
         let wait = read.verdict == "wait"
         let kind = wait ? "no_trade_respected" : "read_complete"
@@ -1106,14 +1111,26 @@ final class NucleoDesk {
         let award = companions.awardDisciplineEvent(wait ? 20 : 10, kind: kind, thesis: thesis)
         let signedIn = !fixtures && isSignedIn()
         let owner = ledgerOwner()
-        let entry = NucleoThesis(
+        var entry = NucleoThesis(
             id: requestId, symbol: read.asset.symbol, name: read.asset.name, isEquity: read.asset.isEquity,
             verdict: read.verdict, direction: read.direction, price: read.price, support: read.support, resistance: read.resistance,
             entry: nil, stop: nil, target: nil, asOf: read.asOf, provider: read.provider,
             savedAt: Self.iso(Date()), horizonHours: wait ? nil : (horizon ?? 24), points: award.points,
             synced: false, eventID: award.eventID)
+        if let synthesis = read.result["synthesis"] as? [String: Any], let headline = synthesis["headline"] as? String {
+            entry.synthesis = NucleoSavedSynthesis(headline: headline, why: synthesis["why"] as? String,
+                                                  risk: synthesis["risk"] as? String, watch: synthesis["watch"] as? String)
+        }
+        if let agents = read.result["agents"] as? [String: Any],
+           let alpha = agents["alpha"] as? String, let red = agents["red"] as? String, let cio = agents["cio"] as? String {
+            let scenarios = agents["scenarios"] as? [String: Any]
+            entry.agents = NucleoSavedAgents(alpha: alpha, red: red, cio: cio, rebuttal: agents["rebuttal"] as? String,
+                                           confirm: scenarios?["confirm"] as? String, invalidate: scenarios?["invalidate"] as? String)
+        }
+        entry.language = read.result["language"] as? String
+        entry.locale = read.result["locale"] as? String
         // R12: the ledger keeps it even at the daily cap.
-        ledger.append(entry, owner: owner)
+        guard ledger.append(entry, owner: owner) else { return Self.errorResult("save_failed") }
 
         // Consume the celebration queues so the classic app never replays them.
         let evolution: Any = companions.pendingEvolution.map { ["number": $0.number, "name": $0.name] as [String: Any] } ?? NSNull()
@@ -1186,6 +1203,12 @@ final class NucleoDesk {
 
     /// 1.8: whose thesis book the screens read and write (the saved-reads ledger's owner).
     var thesisOwner: String? { ledgerOwner() }
+
+    /// The dated answer of the current reader. Opening it never runs the desk or spends a read.
+    func savedRead(requestId: String) -> NucleoThesis? {
+        guard profile.acceptedRiskNotice else { return nil }
+        return ledger.items(owner: ledgerOwner()).first { $0.id == requestId }
+    }
 
     /// 1.8: what a screen may know about a recent read of the CURRENT account (the thesis editor drafts from it).
     func readSummary(requestId: String) -> NucleoReadSummary? {

@@ -23,7 +23,7 @@
     'openNative', 'openClassic', 'finishOnboarding', 'markHint', 'log'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'app.state', 'ask.stage',
+    'session.changed', 'account.changed', 'app.state', 'ask.stage', 'savedRead.open',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'

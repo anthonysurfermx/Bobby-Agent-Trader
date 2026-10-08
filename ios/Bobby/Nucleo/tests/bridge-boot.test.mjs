@@ -661,3 +661,71 @@ test('a page that is coming home takes a question offered again once it is there
 
 askStartCases({ test, assert, flush, Element, idle, handBack, personRead, tap, chipsOf, rowOf, asksOf, okRead, synthesis,
   source: (file) => read('../src/' + file), architecture: read('../ARCHITECTURE.md') });
+
+const savedReading = {
+  id: '8ebde935-4733-4ab2-a8b1-95c4af35de27', symbol: 'MU', name: 'Micron', isEquity: true,
+  verdict: 'wait', direction: 'none', price: 150, support: 140, resistance: 160,
+  entry: null, stop: null, target: null, asOf: '2026-10-07T16:00:00Z', provider: 'Yahoo Finance',
+  savedAt: '2026-10-08T10:00:00Z', horizonHours: null, points: 20, synced: false,
+};
+for (const language of ['en', 'es', 'fr', 'pt', 'it', 'de']) {
+  test(language + ': shipping bridge opens the persisted explanation without a new analysis or award', async () => {
+    const stored = { ...savedReading,
+      synthesis: { headline: 'Persisted summary', why: 'Persisted reason', risk: 'Persisted risk', watch: 'Persisted watch point' },
+      agents: { alpha: 'Persisted Alpha', red: 'Persisted Red', cio: 'Persisted CIO' } };
+    const app = harness({ language, theses: { v: 1, items: [stored] } }); app.boot(); await flush(); app.advance(1.5); await flush();
+    assert.equal(app.context.nucleo.state(), 'IDLE');
+    app.context.nucleoBridge.emit('savedRead.open', { thesis: stored }); app.advance(.7); await flush();
+    assert.equal(app.context.nucleo.state(), 'THESIS_VIEW'); assert.equal(app.context.nucleo.read(), null);
+    const explanation = app.nodes.get('card0').querySelector('.scr .in').textContent;
+    for (const text of ['Persisted summary', 'Persisted reason', 'Persisted risk', 'Persisted watch point', 'Persisted Alpha', 'Persisted Red', 'Persisted CIO']) {
+      assert.ok(explanation.includes(text), text);
+    }
+    const source = app.nodes.get('card0').querySelector('.disc').textContent;
+    assert.ok(source.includes(stored.asOf)); assert.ok(source.includes(stored.provider));
+    assert.ok(!source.includes(stored.savedAt)); assert.equal(app.context.nucleo.session().xp, 0);
+    assert.ok(!app.calls.some(call => ['ask', 'cancel', 'saveThesis', 'read.rendered'].includes(call.method)));
+    tap(app, app.nodes.get('readNextPrimary')); assert.equal(app.context.nucleo.state(), 'IDLE');
+    assert.deepEqual(app.errors, []);
+  });
+}
+
+test('shipping bridge still opens a legacy stored thesis with no fabricated explanation', async () => {
+  const app = harness({ theses: { v: 1, items: [savedReading] } }); app.boot(); await flush(); app.advance(1.5);
+  app.context.nucleoBridge.emit('savedRead.open', { thesis: savedReading }); app.advance(.7); await flush();
+  assert.equal(app.context.nucleo.state(), 'THESIS_VIEW'); assert.equal(app.context.nucleo.read(), null);
+  assert.equal(app.nodes.get('card0').querySelector('.scr .in').textContent, '');
+  assert.ok(app.nodes.get('card1').querySelector('.ct').textContent.includes('MU'));
+  assert.ok(!app.calls.some(call => ['ask', 'cancel', 'saveThesis', 'read.rendered'].includes(call.method)));
+  assert.deepEqual(app.errors, []);
+});
+
+test('opening the saved satellite after leaving another result never acknowledges that newer result', async () => {
+  const stored = { ...savedReading,
+    synthesis: { headline: 'Previously saved summary', why: 'Previously saved reason', risk: 'Previously saved risk', watch: 'Previously saved watch' },
+    agents: { alpha: 'Previously saved Alpha', red: 'Previously saved Red', cio: 'Previously saved CIO' } };
+  const saved = { status: 'saved', thesis: stored, awardedXP: 20, xp: 20, level: { number: 1, progress: .2 } };
+  const app = await idle({ saved, theses: { v: 1, items: [stored] } });
+  await personRead(app, okRead({ synthesis: synthesis() }));
+  tap(app, app.nodes.get('readSave')); assert.equal(app.context.nucleo.state(), 'SAVING');
+  await flush(); app.advance(2); await flush(); assert.equal(app.context.nucleo.state(), 'FOLLOWUPS');
+  tap(app, app.nodes.get('readHome')); app.advance(3); await flush(); assert.equal(app.context.nucleo.state(), 'IDLE');
+  const laterRequestId = '22222222-2222-4222-8222-222222222222';
+  await personRead(app, okRead({ requestId: laterRequestId, synthesis: synthesis() }));
+  tap(app, app.nodes.get('close')); app.advance(3); await flush(); assert.equal(app.context.nucleo.state(), 'IDLE');
+  // The adapter normally supplies no opacity/right/bottom, so it cannot exercise the real visibility observer.
+  // Supply the stored card's visible bounds while keeping the two other cards outside the viewport.
+  app.context.getComputedStyle = node => ({ whiteSpace: 'normal', visibility: node.style.visibility || 'visible',
+    display: node.style.display || 'block', opacity: node.style.opacity ?? '1' });
+  app.nodes.get('card0').getBoundingClientRect = () => ({ left: 30, top: 244, right: 360, bottom: 604, width: 330, height: 360 });
+  app.nodes.get('card1').getBoundingClientRect = app.nodes.get('card2').getBoundingClientRect = () =>
+    ({ left: 1000, top: 244, right: 1330, bottom: 604, width: 330, height: 360 });
+  const before = app.calls.length, xp = app.context.nucleo.session().xp;
+  tap(app, app.nodes.get('satG')); app.advance(2); await flush();
+  assert.equal(app.context.nucleo.state(), 'THESIS_VIEW'); assert.equal(app.context.nucleo.read(), null);
+  assert.ok(app.nodes.get('card0').querySelector('.scr .in').textContent.includes('Previously saved summary'));
+  assert.equal(app.context.nucleo.session().xp, xp);
+  assert.deepEqual(app.calls.slice(before).filter(call => ['ask', 'cancel', 'saveThesis', 'read.rendered'].includes(call.method)), [],
+    'stored text must never issue a presentation acknowledgment for the result the person left behind');
+  assert.deepEqual(app.errors, []);
+});

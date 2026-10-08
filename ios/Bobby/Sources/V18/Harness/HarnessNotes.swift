@@ -40,7 +40,7 @@ extension HarnessEvent {
     /// The stored fields of an event, one case each (HarnessSurfaceTests checks the list against
     /// the struct itself, so a field added there fails until it has its case here).
     enum Field: String, CaseIterable {
-        case kind, at, symbol, name, isEquity, price, step, sector, ref, origin, thread, horizon, horizonHours
+        case kind, at, symbol, name, isEquity, price, step, sector, ref, origin, thread, horizon, horizonHours, readId, availableFrom
     }
 }
 
@@ -70,6 +70,8 @@ struct HarnessNotes: Equatable {
         case .sector: return .kept("which sector a sector follow-up was about; no chain that ships sends one")
         case .ref: return .kept("which follow-up a tap or an answer belongs to, so neither is counted twice")
         case .thread: return .kept("a second question of their own about the same read: it is one of “Asked N times”; the mark only makes that asset weigh more when the week picks the one it names")
+        case .readId: return .kept("an opaque link to the dated answer in the saved-read ledger; it contains no words of that answer")
+        case .availableFrom: return .kept("the next local day chosen on an explicit save, returned in the save confirmation; it schedules no notification")
         }
     }
 

@@ -9,6 +9,17 @@
    ===================================================================== */
 var MOCK_CLOCKED = false, SCRIPT = null, G = { x: 195, y: 790, vis: 0, press: 0 };
 var SCRIPTS = {
+  'read-result': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
+    { tap: '#readResult' }, { wait: 'CARDS', after: 1.5 }
+  ] },
+  'read-saved': { mic: 'granted', steps: [
+    { wait: 'IDLE', after: 1.0 }, { say: 'Should I buy NVIDIA right now?' },
+    { hold: '#pill', dur: 3.3 }, { wait: 'THINK_RESOLVE', after: 0.2 },
+    { tap: '#readResult' }, { wait: 'CARDS', after: 1.5 },
+    { tap: '#readNextPrimary' }, { wait: 'FOLLOWUPS', after: 1.5 }
+  ] },
   'read-nvda': { mic: 'granted', steps: [
     { wait: 'IDLE', after: 1.0 },
     { say: 'Should I buy NVIDIA right now?' },

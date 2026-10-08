@@ -46,6 +46,10 @@ enum HarnessNudges {
         NudgeSource(key: moveKey, priority: NudgePriority.followUp,
                     candidate: { _ in harness.move.map { nudge($0, asks: harness.readsOpen) } },
                     act: { nudge, session in
+                        if let move = harness.move, moveId(move) == nudge.id, let readID = move.savedReadID {
+                            if session.openSavedRead(requestId: readID) { harness.noteOpenedSavedRead(requestId: readID) }
+                            return
+                        }
                         // Decided again at the tap: what was drawn may be older than the last receipt.
                         guard let move = harness.move, moveId(move) == nudge.id, harness.readsOpen else { return }
                         // The line leaves the glass at the tap; the tap is written when the page asks the question.
@@ -59,12 +63,13 @@ enum HarnessNudges {
     /// `asks`: the next read would be answered. Without it the line is the same and its button asks nothing.
     static func nudge(_ move: HarnessMove, asks: Bool = true) -> NucleoNudge {
         NucleoNudge(id: moveId(move), text: HarnessCopy.moveLine(symbol: move.symbol, pct: move.pct, days: move.days),
-                    cta: asks ? HarnessCopy.moveButton : HarnessCopy.moveSeen)
+                    cta: move.savedReadID != nil ? L.t("Open saved read", "Abrir lectura guardada") : (asks ? HarnessCopy.moveButton : HarnessCopy.moveSeen))
     }
 
     /// `harness.move.<symbol>.<day asked>`: one line per asset per question, however often it is drawn.
     static func moveId(_ move: HarnessMove) -> String {
-        movePrefix(move.symbol) + dayStamp(move.askedAt)
+        if let id = move.savedReadID { return movePrefix(move.symbol) + String(id.replacingOccurrences(of: "-", with: "").prefix(12)) }
+        return movePrefix(move.symbol) + dayStamp(move.askedAt)
     }
 
     /// `harness.move.` for every line, `harness.move.<symbol>.` for one asset's.
