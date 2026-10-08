@@ -4,6 +4,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Test
+import xyz.bobbyprotocol.android.v18.ReadSummary
 
 class NucleoReadModelTest {
     @Test fun `an incomplete provider reply is never rendered as Wait`() {
@@ -92,6 +93,25 @@ class NucleoReadModelTest {
                 assertFalse("$bad", result.getJSONObject("agents").optJSONObject("synthesis")?.has("followUp") ?: false)
             }
         }
+    }
+
+    @Test fun `the horizon the question named reaches a feature as one of five values and never as words`() {
+        // The desk says it in the reply (`sufficiency.horizon`); the read model carries the block to the
+        // page untouched, and what a feature is handed about the read (`ReadSummary`) has the horizon only.
+        fun summary(sufficiency: JSONObject?): ReadSummary? {
+            val reply = debate(lines())
+            if (sufficiency != null) reply.put("sufficiency", sufficiency)
+            return ReadSummary.from(read(reply))
+        }
+        assertNotNull(summary(null))
+        assertNull("a reply from a server that says none", summary(null)?.horizon)
+        for (horizon in listOf("intraday", "week", "month", "long", "unspecified")) {
+            assertEquals(horizon, summary(JSONObject().put("level", "ok").put("horizon", horizon))?.horizon)
+        }
+        assertNull(summary(JSONObject().put("horizon", "for the next two quarters"))?.horizon)
+        assertNull(summary(JSONObject().put("horizon", JSONObject.NULL))?.horizon)
+        assertNull(summary(JSONObject().put("horizon", 30))?.horizon)
+        assertFalse("never the question", summary(JSONObject().put("horizon", "long")).toString().contains("Should I look"))
     }
 
     @Test fun `at the wall the read says so and hands back no question that asks by itself`() {

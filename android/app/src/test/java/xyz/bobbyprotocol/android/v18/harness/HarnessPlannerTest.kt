@@ -1001,7 +1001,9 @@ class HarnessPlannerTest {
             // asset after an answer and followed any read, Bobby's own included, so now and then the
             // asset it was on had no sector to show (or had shown it that week) while the question of
             // today's chain has one. Then, and only then, the chain with the sector holds one more:
-            // that sector. (54 of 100,000 such ledgers when this was written; the chain that ships, none.)
+            // that sector. (54 of 100,000 such ledgers in a Python mirror of both planners when this was
+            // written, and none with the chain that ships; the iPhone suite asserts it never happens, which
+            // holds for the 4,000 ledgers of its own generator.)
             val other = HarnessPlanner.plan(made, now, zone, withSector())
             if (other.size > before.size) {
                 oneMoreWithTheSector += 1
