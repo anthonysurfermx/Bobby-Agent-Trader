@@ -329,11 +329,11 @@ const rowOf = (app) => chipsOf(app).map((node) => node.textContent);
 const asksOf = (app) => app.calls.filter((call) => call.method === 'ask').map((call) => call.params);
 const tap = (app, node) => app.nodes.get('stage').listeners.click({ target: node, detail: 0 });
 async function idle(options = {}) {
-  const { seed, ...rest } = options;
+  const { seed, from = 'IDLE', ...rest } = options;
   const app = harness({ holdAsks: true, suggestions: OWN, ...rest });
   if (seed) seed(app.session);
   app.boot(); await flush(); app.advance(1.2); await flush();
-  assert.equal(app.context.nucleo.state(), 'IDLE');
+  assert.equal(app.context.nucleo.state(), from);
   return app;
 }
 // From the ask to the settled hand-back: the reply, the silent read on the page's own clock, then the row (born 1 s in).

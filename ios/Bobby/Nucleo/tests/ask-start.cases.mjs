@@ -5,7 +5,8 @@
 //
 // kit: { test, assert, flush, Element, idle(options), handBack(app, reply), personRead(app, reply), tap(app, node),
 //        chipsOf(app), rowOf(app), asksOf(app), okRead(extra), synthesis(followUp), source(file), architecture }
-// idle() options: the harness's own, plus `seed(session)` (run before the page boots), `theses` (what native
+// idle() options: the harness's own, plus `seed(session)` (run before the page boots), `from` (the state the page
+// is expected in after its boot, 'IDLE' when not given), `theses` (what native
 // answers to `theses`), `saved` (what it answers to `saveThesis`) and `speak` (the status it answers to `speak`:
 // 'muted' plays a read silently on the page's own clock, 'queued' is a voice native took and has not started).
 
@@ -135,6 +136,28 @@ export function askStartCases(kit) {
     assert.equal(state(saved), 'FOLLOWUPS');
     assert.deepEqual(saved.calls.filter((call) => call.method === 'saveThesis').length, 1);
     await taken(saved, 'tok-3', 'FOLLOWUPS');
+  });
+
+  test('a read restored at launch, a level notice and a page with reduced motion give way the same', async () => {
+    // RESTORE: the app was closed over a read; at launch the page stands at its hand-back at once.
+    const restored = await idle({ seed: (session) => { session.pendingRead = okRead({ synthesis: synthesis(NEXT) }); }, from: 'HANDBACK' });
+    restored.advance(1); await flush();
+    assert.equal(rowOf(restored)[0], NEXT);
+    await taken(restored, 'tok-1', 'HANDBACK of a restored read');
+    // A level notice is a caption and a chip, like the chips that ask which asset was meant.
+    const notice = await idle();
+    tap(notice, chipsOf(notice)[0]);
+    await flush(); notice.advance(1.2); await flush();
+    notice.answer({ v: 1, status: 'level_notice', level: 'profundo', message: 'Your Deep comes back on Monday.', token: 'fixture-level' }); await flush(); notice.advance(1); await flush();
+    assert.equal(state(notice), 'CONFIRM_ASSET');
+    await taken(notice, 'tok-2', 'CONFIRM_ASSET, a level notice');
+    // Reduced motion: positions are set, not sprung; the states are the same.
+    for (const from of ['HANDBACK', 'TYPING']) {
+      const calm = await idle({ seed: (session) => { session.reducedMotion = true; } });
+      if (from === 'HANDBACK') await personRead(calm, okRead()); else tap(calm, calm.nodes.get('pill'));
+      assert.equal(state(calm), from);
+      await taken(calm, 'tok-3', from + ' with reduced motion');
+    }
   });
 
   test('a row tapped while Bobby is still giving a read closes that read and asks: its debate, its evidence, its chart, its verdict', async () => {

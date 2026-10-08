@@ -270,7 +270,7 @@ Also open and the owner's call: `GET /api/bobby-access` reports no Google paymen
 
 ### What is verified, and what is not
 
-**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 164 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
+**Verified by CI on every push** (GitHub Actions `Android`, the two `native` jobs: Firebase messaging off and on): the pages build from source, 165 Node tests, `:app:assembleDebug`, `:app:testDebugUnitTest`, `:app:assembleDebugAndroidTest` and `:app:lintDebug`. The JVM unit tests port the iOS 1.8 suites case by case, except the cases that need an iOS review fixture or a running Android device, and add the Android-only ones (inexact delivery, the reader tag, sign-in in a browser tab). The page tests also check that every native string resolves in six languages and that every iOS 1.8 translation row is in the Android catalog.
 
 **Run on an emulator by CI** (GitHub Actions `Android emulator`: API 34 with Google APIs, a 360x800 dp screen, animations off, no GPU). `android/tools/run-emulator-tests.sh` runs `:app:connectedDebugAndroidTest` in four parts and keeps each part's report, logcat and every screenshot (the `android-emulator` artifact):
 
