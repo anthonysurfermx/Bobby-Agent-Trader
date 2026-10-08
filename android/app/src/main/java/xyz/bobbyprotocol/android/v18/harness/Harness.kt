@@ -5,6 +5,8 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.yield
+import xyz.bobbyprotocol.android.v18.ReadOrigin
+import xyz.bobbyprotocol.android.v18.ThesisBook
 import xyz.bobbyprotocol.android.v18.V18Host
 import xyz.bobbyprotocol.android.v18.V18Routes
 
@@ -56,11 +58,26 @@ object Harness {
         // What was erased is no longer named in the history of what the glass said: a move line's id
         // carries the asset and the day it was asked about.
         center.onErased = { if (center.owner == host.owner) host.nudges.forgetIds(listOf(HarnessNudges.MOVE_KEY + ".")) }
+        // The reader's active theses as the planner reads them: the asset and the horizon set on it, never the words.
+        center.theses = { owner ->
+            host.theses.active(owner).map { thesis -> HarnessThesis(thesis.symbol, thesis.horizon?.let { HarnessHorizon.ofThesis(it) }, thesis.createdAtMillis) }
+        }
         center.load(host.owner)
 
-        // From the first delivered read. Never the question: a symbol, a name, a price.
-        host.onReadDelivered { read -> center.noteAsk(read.symbol, read.name, read.isEquity, read.price) }
-        host.onReadSaved { _, symbol -> center.noteSaved(symbol) }
+        // From the first delivered read. Never the question: a symbol, a name, a price, and who wrote
+        // the words. Only a question the person asked in their own words is followed up: a read Bobby
+        // started (a follow-up's button, a board row, the question after a read, a chip) is told apart
+        // here, and `chip` lets the centre keep a chip's read the way a question is before the yes.
+        host.onReadDelivered { read ->
+            val bobbys = read.origin == ReadOrigin.FOLLOW_UP || read.origin == ReadOrigin.CHIP
+            center.noteAsk(read.symbol, read.name, read.isEquity, read.price,
+                           origin = if (bobbys) HarnessEvent.Origin.FOLLOW_UP else null, chip = read.origin == ReadOrigin.CHIP,
+                           thread = read.origin == ReadOrigin.THREAD, horizon = HarnessHorizon.named(read.horizon))
+        }
+        // The review they chose on the save (72 or 168 hours) times the follow-up that was coming.
+        host.onReadSaved { _, symbol, reviewHours -> center.noteSaved(symbol, reviewHours) }
+        // A thesis of this reader was written, changed or archived: its horizon times the next follow-up.
+        host.theses.addListener { changed -> if (changed == ThesisBook.key(center.owner)) center.replan() }
         // The person tapped the question Bobby's CIO wrote after a read: that is acting on what Bobby put
         // in front of them, counted by asset (only while the centre may record). The words are not kept.
         host.onNextQuestionPicked { symbol -> center.notePicked(symbol) }

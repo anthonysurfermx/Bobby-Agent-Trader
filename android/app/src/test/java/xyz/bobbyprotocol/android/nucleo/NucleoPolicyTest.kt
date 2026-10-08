@@ -11,6 +11,14 @@ class NucleoPolicyTest {
         assertEquals(1201, NucleoPolicy.questionLength("🌊".repeat(1201)))
     }
 
+    @Test fun `the review chosen on a save is the one the page sent and the save kept`() {
+        assertEquals(168, NucleoPolicy.chosenReview(sent = true, wait = false, hours = 168))
+        assertEquals(72, NucleoPolicy.chosenReview(sent = true, wait = false, hours = 72))
+        assertEquals("sent, so it is told: the planner is what knows that 24 hours says nothing", 24, NucleoPolicy.chosenReview(sent = true, wait = false, hours = 24))
+        assertNull("the page sent none: 24 is only where the save starts", NucleoPolicy.chosenReview(sent = false, wait = false, hours = 24))
+        assertNull("a read whose verdict is to wait is saved with no review", NucleoPolicy.chosenReview(sent = true, wait = true, hours = 168))
+    }
+
     @Test fun `invalid evidence is refused before metering`() {
         val now = 1_800_000_000_000L
         val fresh = (0 until 60).map { now - (59 - it) * 3_600_000L }

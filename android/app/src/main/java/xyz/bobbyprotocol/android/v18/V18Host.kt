@@ -169,8 +169,11 @@ interface V18Host {
      * symbol of that read; never the words. Told at the tap, before the read it starts is answered.
      */
     fun onNextQuestionPicked(listener: (String) -> Unit): () -> Unit
-    /** The person saved a read (`requestId`, `symbol`). */
-    fun onReadSaved(listener: (String, String) -> Unit): () -> Unit
+    /**
+     * The person saved a read: `requestId`, `symbol`, and the review they chose on the save in hours
+     * (24, 72 or 168), null when the save offered none (a read whose verdict is to wait).
+     */
+    fun onReadSaved(listener: (String, String, Int?) -> Unit): () -> Unit
     /** The app came to the front. */
     fun onAppActive(listener: () -> Unit): () -> Unit
     /** Another reader: `owner` and `accountEpoch` are already the new ones. */

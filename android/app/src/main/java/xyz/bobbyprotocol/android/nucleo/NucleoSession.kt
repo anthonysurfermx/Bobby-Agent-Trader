@@ -525,7 +525,8 @@ class NucleoSession(
         }
         val result = json("status" to "saved", "awardedXP" to award.points, "capped" to (award.points == 0), "kind" to kind, "xp" to award.counters.xp, "level" to levelJSON(), "streak" to award.counters.streak,
             "evolution" to evolution, "unlocks" to unlocks, "planting" to if (!signedIn) "signed_out" else if (eventId == null) "capped" else "pending", "thesis" to thesis)
-        v18.readSaved(id, asset.getString("symbol"))
+        // The review they chose: only when the page sent one and the save kept it (a read whose verdict is to wait keeps none).
+        v18.readSaved(id, asset.getString("symbol"), NucleoPolicy.chosenReview(params.has("horizonHours"), wait, horizon))
         read.saved = result; emit("session.changed", snapshot())
         if (signedIn && eventId != null) {
             val startedEpoch = accountEpoch

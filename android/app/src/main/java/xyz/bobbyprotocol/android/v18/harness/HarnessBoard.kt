@@ -1,5 +1,6 @@
 package xyz.bobbyprotocol.android.v18.harness
 
+import java.time.ZoneId
 import kotlin.math.abs
 
 // The harness (1.8): where a sector or a week follow-up lands. One list: the assets, each with how
@@ -63,13 +64,19 @@ data class HarnessBoard(
             HarnessBoard(Kind.Week, copy.weekTitle, copy.sinceAsked,
                          assets.take(WEEK_ROWS).map { Row(it.symbol, it.name, it.isEquity, priceThen = it.firstPrice) })
 
-        /** What a tap (or the Reminders row, with none) opens: its sector, else the week. */
-        fun make(tap: HarnessTap?, ledger: HarnessLedger, now: Long, copy: HarnessCopy): HarnessBoard {
+        /**
+         * What a tap (or the Reminders row, with none) opens: its sector, else the week. A tapped
+         * week follow-up opens the week it was planned for (HarnessPlanner.weekStart), however late
+         * the tap: what the notification named is on the board.
+         */
+        fun make(tap: HarnessTap?, ledger: HarnessLedger, now: Long, copy: HarnessCopy, zone: ZoneId = ZoneId.systemDefault()): HarnessBoard {
             if (tap != null && tap.step == HarnessStep.SECTOR) {
                 val found = tap.sector?.let { HarnessSectors.byId(it) }
                 if (found != null) return sector(found, tap.symbol, copy)
             }
-            return week(ledger.assets(since = now - 7 * HARNESS_DAY_MS, now = now), copy)
+            val rolling = now - 7 * HARNESS_DAY_MS
+            val planned = tap?.takeIf { it.step == HarnessStep.WEEK }?.stamp?.let { HarnessPlanner.weekStart(it, zone) }
+            return week(ledger.assets(since = minOf(planned ?: rolling, rolling), now = now), copy)
         }
     }
 }

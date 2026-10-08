@@ -3,6 +3,7 @@ package xyz.bobbyprotocol.android.v18.harness
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -15,7 +16,10 @@ import xyz.bobbyprotocol.android.v18.NudgeCenter
 import xyz.bobbyprotocol.android.v18.NudgeMoment
 import xyz.bobbyprotocol.android.v18.NudgePriority
 import xyz.bobbyprotocol.android.v18.NudgeRead
+import xyz.bobbyprotocol.android.v18.ReadOrigin
 import xyz.bobbyprotocol.android.v18.RiskNotice
+import xyz.bobbyprotocol.android.v18.ThesisDraft
+import xyz.bobbyprotocol.android.v18.ThesisHorizon
 import xyz.bobbyprotocol.android.v18.V18Reader
 import xyz.bobbyprotocol.android.v18.V18Routes
 import xyz.bobbyprotocol.android.v18.V18TestBench
@@ -348,6 +352,80 @@ class HarnessGlassTest {
         assertTrue(center.ledger.events(HarnessEvent.Kind.PICKED).isEmpty())
     }
 
+    @Test fun whoWroteTheWordsAndWhatTheQuestionNamedReachTheLedgerThroughTheHost() = runTest {
+        // The session says who started each read (`ReadOrigin`) and the desk's reply says the horizon the
+        // question named (`sufficiency.horizon`): both reach the ledger through the host's hook, and the
+        // question's words never do.
+        val bench = V18TestBench(backgroundScope)
+        HarnessNudges.register(bench.host)
+        val center = Harness.center(bench.host)
+        runCurrent()
+        fun read(id: String, symbol: String, horizon: String?): JSONObject {
+            val read = bench.read(requestId = id, symbol = symbol, name = symbol)
+            if (horizon != null) read.put("sufficiency", JSONObject().put("horizon", horizon))
+            return read
+        }
+        fun asks() = center.ledger.events(HarnessEvent.Kind.ASK)
+        // Before the yes a chip is kept the way a question is, and nothing of what it named is written.
+        bench.host.readDelivered(read("r1", "NVDA", "long"), ReadOrigin.CHIP)
+        assertEquals(listOf<HarnessEvent.Origin?>(null), asks().map { it.origin })
+        assertEquals(listOf<HarnessHorizon?>(null), asks().map { it.horizon })
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
+        assertEquals("the yes writes what the read that prompted it named", listOf<HarnessHorizon?>(HarnessHorizon.LONG), asks().map { it.horizon })
+        assertEquals("a question about years: the week only", listOf(HarnessStep.WEEK), center.upcoming.map { it.step })
+        // With follow-ups on, each read is written with who started it.
+        bench.clock += hour
+        bench.host.readDelivered(read("r2", "TSLA", "week"), ReadOrigin.PERSON)
+        bench.clock += hour
+        bench.host.readDelivered(read("r3", "TSLA", "month"), ReadOrigin.THREAD)
+        bench.clock += hour
+        bench.host.readDelivered(read("r4", "AMD", "intraday"), ReadOrigin.FOLLOW_UP)
+        bench.clock += hour
+        bench.host.readDelivered(read("r5", "BTC", null), ReadOrigin.CHIP)
+        val bobbys = HarnessEvent.Origin.FOLLOW_UP
+        assertEquals(listOf<String?>("NVDA", "TSLA", "TSLA", "AMD", "BTC"), asks().map { it.symbol })
+        assertEquals("a follow-up's button, a board row, the question after a read and a chip are Bobby's", listOf(null, null, null, bobbys, bobbys), asks().map { it.origin })
+        assertEquals("their own second question about the read on screen", listOf(null, null, true, null, null), asks().map { it.thread })
+        assertEquals(listOf(HarnessHorizon.LONG, HarnessHorizon.WEEK, HarnessHorizon.MONTH, HarnessHorizon.INTRADAY, null), asks().map { it.horizon })
+        assertEquals("the chain belongs to the last question they asked in their own words", bench.clock - 2 * hour, center.ledger.question(bench.clock)?.at)
+        assertEquals("TSLA", center.upcoming.firstOrNull()?.symbol)
+        assertEquals("a question that named the month waits seven days", 7, center.upcoming.firstOrNull()?.days)
+        // The review chosen on a save arrives with the save.
+        bench.host.readSaved("r3", "TSLA", 168)
+        assertEquals(listOf<Int?>(168), center.ledger.events(HarnessEvent.Kind.SAVED).map { it.horizonHours })
+        assertFalse("never the question", bench.store.getString(HarnessStore.key(HarnessStore.PREFIX, null))!!.contains("own words"))
+    }
+
+    @Test fun theThesisBookOfThisReaderIsWhatTheHarnessReads() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        HarnessNudges.register(bench.host)
+        val center = Harness.center(bench.host)
+        runCurrent()
+        fun pointers() = center.ledger.events(HarnessEvent.Kind.THESIS)
+        val nvda = bench.host.theses.create(ThesisDraft("NVDA", "NVIDIA", true, ThesisHorizon.YEARS, "Data centres keep buying."), null, bench.clock - 6 * day)
+        bench.host.theses.create(ThesisDraft("TSLA", "Tesla", true, null, "Storage grows."), null, bench.clock - 5 * day)
+        bench.host.theses.create(ThesisDraft("BTC", "Bitcoin", false, ThesisHorizon.WEEKS, "Someone else's."), "u2", bench.clock - 5 * day)
+        bench.deliver(symbol = "NVDA")
+        assertTrue("undecided: no pointer is written", pointers().isEmpty())
+        assertEquals(HarnessCenter.Outcome.ON, center.accept())
+        assertEquals("this reader's active theses, and nobody else's", setOf<String?>("NVDA", "TSLA"), pointers().map { it.symbol }.toSet())
+        assertEquals("years is long", HarnessHorizon.LONG, pointers().firstOrNull { it.symbol == "NVDA" }?.horizon)
+        assertEquals("dated when the thesis was written", bench.clock - 6 * day, pointers().firstOrNull { it.symbol == "NVDA" }?.at)
+        assertNull("no horizon was set on it", pointers().firstOrNull { it.symbol == "TSLA" }?.horizon)
+        val stored = bench.store.getString(HarnessStore.key(HarnessStore.PREFIX, null))!!
+        assertFalse("a pointer: the words stay in the thesis book", stored.contains("Data centres"))
+        assertFalse(stored.contains("Storage"))
+        assertEquals("a thesis of years: nothing about the asset, the week only", listOf(HarnessStep.WEEK), center.upcoming.map { it.step })
+        // Archived in the book: the centre hears it and plans again at once.
+        bench.host.theses.archive(nvda.id, null, bench.clock)
+        assertEquals(listOf<String?>("TSLA"), pointers().map { it.symbol })
+        assertEquals("the question is followed up like any other", listOf(HarnessStep.ASSET, HarnessStep.WEEK), center.upcoming.map { it.step })
+        // Another reader's thesis book changes nothing here.
+        val before = bench.store.getString(HarnessStore.key(HarnessStore.PREFIX, null))
+        bench.host.theses.create(ThesisDraft("AMD", "AMD", true, ThesisHorizon.MONTHS, "Someone else's again."), "u2", bench.clock)
+        assertEquals(before, bench.store.getString(HarnessStore.key(HarnessStore.PREFIX, null)))
+    }
+
     @Test fun aReadStartedFromABoardWaitsForItsSheetToClose() = runTest {
         val bench = V18TestBench(backgroundScope)
         HarnessNudges.register(bench.host)
@@ -389,7 +467,7 @@ class HarnessGlassTest {
         assertEquals("done", bench.host.nudgeAct("harness.offer.v1").getString("status"))
         assertEquals(1, bench.notifier.asked)
         assertEquals(HarnessMode.ON, center.mode)
-        assertEquals(setOf("v18.follow.asset", "v18.follow.sector", "v18.follow.week"), bench.notifier.pendingIds())
+        assertEquals("the asset, then the week: the chain that ships has no sector", setOf("v18.follow.asset", "v18.follow.week"), bench.notifier.pendingIds())
         assertEquals(bench.host.readerTag, bench.notifier.notice("v18.follow.asset")?.payload?.get(LocalNotice.OWNER))
         assertEquals(listOf("success"), bench.shell.haptics)
         assertNull("once answered it never comes back", bench.host.nudgeJson())
@@ -438,7 +516,7 @@ class HarnessGlassTest {
         runCurrent()
         bench.deliver(symbol = "NVDA", price = 100.0)
         assertEquals(HarnessCenter.Outcome.ON, center.accept())
-        assertEquals(3, bench.notifier.pendingIds().size)
+        assertEquals(2, bench.notifier.pendingIds().size)
         bench.clock += 26 * hour
         bench.host.appBecameActive()
         runCurrent()
@@ -487,7 +565,7 @@ class HarnessGlassTest {
         assertEquals("drawing the glass only reads", "NVDA, a day later. See how it moved.", bench.notifier.notice("v18.follow.asset")?.body)
         runCurrent()
         assertEquals("NVDA, un día después. Mira cómo se movió.", bench.notifier.notice("v18.follow.asset")?.body)
-        assertEquals(3, bench.notifier.pendingIds().size)
+        assertEquals(2, bench.notifier.pendingIds().size)
         assertFalse(center.wordsAreStale)
     }
 
@@ -504,7 +582,7 @@ class HarnessGlassTest {
         bench.host.readSaved("r1", "NVDA")
         assertEquals(listOf<String?>("NVDA"), center.ledger.events(HarnessEvent.Kind.SAVED).map { it.symbol })
         center.accept()
-        assertEquals(3, bench.notifier.pendingIds().size)
+        assertEquals(2, bench.notifier.pendingIds().size)
         // Memory's "Delete everything".
         bench.host.eraseEverything()
         assertTrue(center.ledger.isEmpty)
@@ -514,7 +592,7 @@ class HarnessGlassTest {
         // A withdrawn risk notice.
         bench.deliver(requestId = "r2", symbol = "TSLA")
         center.accept()
-        assertEquals(3, bench.notifier.pendingIds().size)
+        assertEquals(2, bench.notifier.pendingIds().size)
         bench.desk.riskNotice = RiskNotice.WITHDRAWN
         bench.host.consentWithdrawn()
         assertTrue(center.ledger.isEmpty)

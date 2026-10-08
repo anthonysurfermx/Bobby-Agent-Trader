@@ -130,7 +130,7 @@ class V18Runtime(
 
     private val deliveredListeners = Listeners<(ReadSummary) -> Unit>()
     private val pickedListeners = Listeners<(String) -> Unit>()
-    private val savedListeners = Listeners<(String, String) -> Unit>()
+    private val savedListeners = Listeners<(String, String, Int?) -> Unit>()
     private val activeListeners = Listeners<() -> Unit>()
     private val accountListeners = Listeners<() -> Unit>()
     private val consentListeners = Listeners<() -> Unit>()
@@ -346,10 +346,13 @@ class V18Runtime(
     /** On the idle home. A rule that fails changes nothing, as not knowing changes nothing. */
     fun offersOneTapOnHome(): Boolean = try { oneTap.onHome() } catch (_: Exception) { true }
 
-    /** The person saved a read. The session tells the page afterwards. */
-    fun readSaved(requestId: String, symbol: String) {
+    /**
+     * The person saved a read. `reviewHours` is the review they chose on the save (24, 72 or 168),
+     * null when the save offered none. The session tells the page afterwards.
+     */
+    fun readSaved(requestId: String, symbol: String, reviewHours: Int? = null) {
         nudges.noteSaved(requestId)
-        savedListeners.each { it(requestId, symbol) }
+        savedListeners.each { it(requestId, symbol, reviewHours) }
     }
 
     /** Another reader. Called as soon as the session's owner and epoch are the new ones, before anything suspends. */
@@ -634,7 +637,7 @@ class V18Runtime(
 
     override fun onReadDelivered(listener: (ReadSummary) -> Unit): () -> Unit = deliveredListeners.add(listener)
     override fun onNextQuestionPicked(listener: (String) -> Unit): () -> Unit = pickedListeners.add(listener)
-    override fun onReadSaved(listener: (String, String) -> Unit): () -> Unit = savedListeners.add(listener)
+    override fun onReadSaved(listener: (String, String, Int?) -> Unit): () -> Unit = savedListeners.add(listener)
     override fun onAppActive(listener: () -> Unit): () -> Unit = activeListeners.add(listener)
     override fun onAccountChanged(listener: () -> Unit): () -> Unit = accountListeners.add(listener)
     override fun onConsentWithdrawn(listener: () -> Unit): () -> Unit = consentListeners.add(listener)

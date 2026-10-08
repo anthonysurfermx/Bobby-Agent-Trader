@@ -27,7 +27,18 @@ import kotlin.math.abs
 //  - A follow-up names the asset the person asked about and nothing else: no price, no figure, no
 //    direction. The number is read when they open it.
 //  - A follow-up whose moment has passed is written to the ledger as `SENT` exactly once; whether
-//    it was opened is what the next plan learns from.
+//    the person did something with it within a day (`RETURNED`) is what the next plan learns from.
+//    A tap alone (`OPENED`) is written down and changes nothing.
+//  - Only a question the person asked in their own words (typed, spoken) is followed up. A read
+//    whose question Bobby wrote (the button of a follow-up, a board row, the question after a
+//    read, a chip that asks about an asset) is written with its origin and starts nothing: one
+//    tap on something Bobby put there never earns another chain. The one exception is the yes
+//    itself: before it there is no chain to protect, so a chip is kept the way a question is, and
+//    saying yes to "Shall I keep you posted on NVDA?" follows that read.
+//  - What the person said about how long they are looking (the horizon their question named, the
+//    one chosen on a save, a thesis) and that a question was their second about a read are written
+//    only once they said yes to follow-ups. Until then they are held in memory for the last few
+//    reads, and the yes writes them for those.
 //  - A notice carries a tag of the reader it was planned for and the moment it was planned for. A
 //    tap whose tag is not the current reader's does nothing, and what was already shown is taken
 //    off the notification shade when the reader changes.
@@ -72,6 +83,9 @@ data class HarnessTap(
         }
     }
 }
+
+/** One active thesis as the planner reads it: the asset, the horizon set on it and when it was written. Never the words. */
+data class HarnessThesis(val symbol: String, val horizon: HarnessHorizon?, val since: Long)
 
 /** A price read that costs no read: the latest price and the day's change, each only when the phone got it. */
 data class HarnessQuote(val price: Double?, val changePct: Double?)
@@ -137,6 +151,8 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     var changed: () -> Unit = {}
     /** This reader's ledger was just erased: whatever else names what it held follows (the app wires the nudge history). */
     var onErased: () -> Unit = {}
+    /** The reader's active theses (the app wires the thesis book). Call `replan` when one is written, changed or archived. */
+    var theses: (String?) -> List<HarnessThesis> = { emptyList() }
 
     var mode: HarnessMode = HarnessMode.UNDECIDED
         private set
@@ -178,6 +194,11 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     /** What this launch handed to the phone (id → what it said and when), so nothing is written twice. */
     private val issued = HashMap<String, LocalNotice>()
     private var focus: Focus? = null
+    /**
+     * Questions and saves written without what the person said about their horizon, kept whole here
+     * until they say yes. In memory only: it never outlives the launch or the reader.
+     */
+    private val held = ArrayList<HarnessEvent>()
     private val quotes = HashMap<String, Quoted>()
     /** Prices being read right now (`reader/symbol`): two requests for the same line are one. */
     private val reading = HashSet<String>()
@@ -214,6 +235,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         storedPlan = planned
         upcoming = planned.map { it.followUp }
         focus = null
+        held.clear()
         quotes.clear()
         move = null
         boardFocus = null
@@ -222,13 +244,24 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
 
     // What the person does
 
-    /** A read was delivered. The first one starts everything. */
-    fun noteAsk(symbol: String, name: String, isEquity: Boolean, price: Double?) {
+    /**
+     * A read was delivered. Only one the person asked for in their own words is followed up:
+     * `origin` says when Bobby wrote the question, and then it is at most an answer to a follow-up.
+     * `chip`: Bobby wrote the words and the person picked the asset (the idle home, the row after a
+     * read). With follow-ups on that is a read Bobby started, like any other. Before the yes there
+     * is no chain to protect: it is kept the way a question is, so a yes to "Shall I keep you
+     * posted on NVDA?" has that read to follow.
+     * `thread`: their own second question about the read on screen. `horizon`: what the question named.
+     */
+    fun noteAsk(symbol: String, name: String, isEquity: Boolean, price: Double?, origin: HarnessEvent.Origin? = null,
+                chip: Boolean = false, thread: Boolean = false, horizon: HarnessHorizon? = null) {
         if (!recording) return
+        val from = if (chip && mode != HarnessMode.ON) null else origin
         val clock = now()
         // The answer comes first in time: what follows starts from the question itself.
         answerIfUseful(symbol, clock - 1)
-        note(HarnessEvent(HarnessEvent.Kind.ASK, clock, symbol = symbol, name = name, isEquity = isEquity, price = price))
+        note(HarnessEvent(HarnessEvent.Kind.ASK, clock, symbol = symbol, name = name, isEquity = isEquity, price = price, origin = from,
+                          thread = if (thread && from == null) true else null, horizon = horizon))
         // They are looking at it now: the line about "since you asked" has nothing to say yet.
         // (iOS keeps a tapped follow-up's hold on the glass here; on Android it lets go with the line.)
         val asked = symbol.uppercase(Locale.ROOT)
@@ -237,9 +270,16 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         replan()
     }
 
-    fun noteSaved(symbol: String) {
+    /** They saved a read. `horizonHours` is the review they chose on the save, when they were offered one. */
+    fun noteSaved(symbol: String, horizonHours: Int? = null) {
         if (!recording) return
-        note(HarnessEvent(HarnessEvent.Kind.SAVED, now(), symbol = symbol))
+        val clock = now()
+        note(HarnessEvent(HarnessEvent.Kind.SAVED, clock, symbol = symbol, horizonHours = horizonHours))
+        if (mode != HarnessMode.ON) return
+        // Saving a read of what a follow-up was about answers it, and the review they chose may
+        // move the follow-up that was coming.
+        answerIfUseful(symbol, clock)
+        replan()
     }
 
     /** They acted on a follow-up inside the app. */
@@ -254,13 +294,15 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     }
 
     /**
-     * A follow-up shown in the last day that nobody answered yet is answered by something useful
-     * about it: its asset (or an asset of its sector; anything, for the week). True when it was.
+     * The one writer of an answer. A follow-up shown in the last day that nobody answered yet is
+     * answered by something useful about it: its asset (or an asset of its sector; anything, for
+     * the week). Having tapped it does not answer it, and does not stop this from doing so. True
+     * when it was.
      */
     private fun answerIfUseful(raw: String, clock: Long): Boolean {
         val symbol = HarnessLedger.validSymbol(raw) ?: return false
         val shown = ledger.events(HarnessEvent.Kind.SENT).lastOrNull { clock - it.at <= USEFUL_WINDOW_MS && it.at <= clock } ?: return false
-        if (ledger.events.any { it.isEngagement && it.ref == shown.at }) return false
+        if (ledger.events.any { it.isAnswer && it.ref == shown.at }) return false
         val about = when (shown.step) {
             HarnessStep.ASSET -> shown.symbol == symbol
             HarnessStep.SECTOR -> shown.symbol == symbol || (shown.sector != null && HarnessSectors.of(symbol)?.id == shown.sector)
@@ -292,6 +334,16 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
             if (owner != user) load(user)
             mode = HarnessMode.ON
             store.write(mode, owner)
+            // They said yes: what the last reads carried and was only in memory is written now, into
+            // the entries it belongs to. (iOS writes a held save whole here, because it keeps none
+            // before the yes; Android still writes the save itself, so completing it is enough.)
+            val clock = now()
+            var completed = false
+            for (full in held) {
+                if (clock - full.at <= HELD_WINDOW_MS && ledger.complete(full)) completed = true
+            }
+            held.clear()
+            if (completed) store.write(ledger, owner)
             replan()
             return if (permission == LocalNotifier.Permission.ALLOWED) Outcome.ON else Outcome.DENIED
         } finally {
@@ -305,20 +357,16 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         erase(HarnessMode.OFF)
     }
 
-    /** A follow-up notification was tapped. */
+    /**
+     * A follow-up notification was tapped. It is written down, once, and answers nothing: only what
+     * they do next with it can (`answerIfUseful`), tapped or not. An answer already given is kept.
+     */
     suspend fun opened(tap: HarnessTap) {
         if (!recording || !accepts(tap)) return
         status = notifier.status()
         settle()
         val clock = now()
         val ref = tap.stamp ?: ledger.events(HarnessEvent.Kind.SENT).lastOrNull { it.step == tap.step }?.at
-        // Coming back and tapping are one answer, not two, however long the tap waited to be honoured.
-        val merged = ledger.remove { event ->
-            if (event.kind != HarnessEvent.Kind.RETURNED || event.step != tap.step) false
-            else if (ref != null && event.ref != null) event.ref == ref
-            else clock - event.at < 600_000L
-        }
-        if (merged) store.write(ledger, owner)
         if (ledger.events.any { it.kind == HarnessEvent.Kind.OPENED && it.step == tap.step && it.ref != null && it.ref == ref }) {
             publish()
             return
@@ -360,10 +408,8 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
             publish()
             return
         }
+        // Opening the app is not written down: nothing ever read it.
         settle()
-        val clock = now()
-        val lastOpen = ledger.events(HarnessEvent.Kind.APP_OPEN).lastOrNull()?.at
-        if (lastOpen == null || clock - lastOpen >= OPEN_GAP_MS) note(HarnessEvent(HarnessEvent.Kind.APP_OPEN, clock))
         replan()
         refreshMove()
     }
@@ -443,6 +489,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         upcoming = emptyList()
         mode = HarnessMode.UNDECIDED
         focus = null
+        held.clear()
         quotes.clear()
         move = null
         boardFocus = null
@@ -537,10 +584,49 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
 
     private val recording: Boolean get() = mode != HarnessMode.OFF && consent() == RiskNotice.ACCEPTED && owner == currentUser()
 
+    /**
+     * Writes one event. With follow-ups on: the event, whole. Before the yes, what the person said
+     * about their horizon (the one a question named, the review chosen on a save) and that a
+     * question was their second about a read are left out: a question or a save that carried any
+     * of it waits in memory, briefly, for the yes (`accept` completes the entry).
+     */
     private fun note(event: HarnessEvent) {
-        ledger.note(event)
+        var written = event
+        if (mode != HarnessMode.ON) {
+            if (event.isQuestion || event.kind == HarnessEvent.Kind.SAVED) {
+                held.add(event)
+                while (held.size > HELD_EVENTS) held.removeAt(0)
+            }
+            written = event.copy(thread = null, horizon = null, horizonHours = null)
+        }
+        ledger.note(written)
         store.write(ledger, owner)
         publish()
+    }
+
+    /**
+     * The ledger points at the theses that are active now, and at no other: one pointer per asset,
+     * with the horizon set on it. Only once follow-ups are on.
+     */
+    private fun syncTheses() {
+        if (mode != HarnessMode.ON || consent() != RiskNotice.ACCEPTED) return
+        val wanted = LinkedHashMap<String, HarnessThesis>()
+        for (thesis in theses(owner)) {
+            val symbol = HarnessLedger.validSymbol(thesis.symbol) ?: continue
+            wanted[symbol] = thesis
+        }
+        val current = ledger.events(HarnessEvent.Kind.THESIS).groupBy { it.symbol ?: "" }
+        val inStep = current.size == wanted.size && wanted.all { (symbol, thesis) ->
+            val pointers = current[symbol]
+            pointers != null && pointers.size == 1 && pointers.first().horizon == thesis.horizon
+        }
+        if (inStep) return
+        ledger.remove { it.kind == HarnessEvent.Kind.THESIS }
+        val clock = now()
+        for ((symbol, thesis) in wanted) {
+            ledger.note(HarnessEvent(HarnessEvent.Kind.THESIS, minOf(thesis.since, clock), symbol = symbol, horizon = thesis.horizon))
+        }
+        store.write(ledger, owner)
     }
 
     /** Follow-ups whose moment has passed: the ones the phone held become `SENT`; all of them leave the plan. */
@@ -569,6 +655,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
     /** Asks the planner what comes next and brings the phone in line with it. */
     fun replan() {
         settle()
+        syncTheses()
         var wanted: List<HarnessFollowUp> = emptyList()
         if (mode == HarnessMode.ON && consent() == RiskNotice.ACCEPTED) {
             wanted = HarnessPlanner.plan(ledger, now(), zone(), HarnessPlanner.Options(weeklyCovered = weeklyCovered()))
@@ -646,6 +733,7 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         upcoming = emptyList()
         mode = next
         focus = null
+        held.clear()
         quotes.clear()
         move = null
         boardFocus = null
@@ -674,8 +762,12 @@ class HarnessCenter(private val notifier: LocalNotifier, private val store: Harn
         const val FOCUS_WINDOW_MS = 30 * 60_000L
         const val QUOTE_LIFETIME_MS = 10 * 60_000L
         const val QUOTE_TIMEOUT_MS = 8_000L
-        /** One `APP_OPEN` per this long. */
-        const val OPEN_GAP_MS = 30 * 60_000L
+        /**
+         * What is held in memory about recent reads until the person says yes: this many, this long
+         * (the session keeps its own reads the same way).
+         */
+        const val HELD_EVENTS = 5
+        const val HELD_WINDOW_MS = 30 * 60_000L
         /** A notice this close to its moment is not handed over again. */
         const val HAND_OFF_MARGIN_MS = 5_000L
 

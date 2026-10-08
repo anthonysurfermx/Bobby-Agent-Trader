@@ -6,6 +6,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import xyz.bobbyprotocol.android.v18.ThesisHorizon
 import java.io.File
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -90,7 +91,7 @@ class HarnessGoldenTest {
         val parts = ArrayList<String>()
         parts.add("${followUp.step.raw} ${DateTimeFormatter.ISO_OFFSET_DATE_TIME.format(Instant.ofEpochMilli(followUp.fireAt).atZone(zone))} ${followUp.symbol ?: "-"}")
         if (followUp.step == HarnessStep.ASSET) parts.add("days ${followUp.days}")
-        if (followUp.sector != null) parts.add(followUp.sector)
+        followUp.sector?.let { parts.add(it) }
         if (followUp.step == HarnessStep.WEEK) parts.add("others ${followUp.others}")
         parts.joinToString(" ")
     }
@@ -158,6 +159,45 @@ class HarnessGoldenTest {
         assertEquals(defaults.getInt("quietAfter"), options.quietAfter)
         assertEquals(defaults.getLong("quietDays"), options.quietDays)
         assertEquals("an option the file does not name, or one the app does not have", 13, defaults.length())
+    }
+
+    @Test fun theGoldenConstantsAreTheOnesTheAppRuns() {
+        val constants = file.getJSONObject("constants")
+        val waits = constants.getJSONObject("waitDays")
+        assertEquals("the desk's five horizons", HarnessHorizon.entries.map { it.raw }.toSet(), keys(waits))
+        for (horizon in HarnessHorizon.entries) {
+            assertEquals(horizon.raw, if (waits.isNull(horizon.raw)) null else waits.getInt(horizon.raw), horizon.waitDays)
+        }
+        // A save: the planner's own reading of each choice the page offers.
+        val saves = constants.getJSONObject("saveWaitDays")
+        val question = HarnessEvent(HarnessEvent.Kind.ASK, 1_800_000_000_000L, symbol = "NVDA")
+        for (hours in HarnessLedger.SAVE_HORIZONS.sorted()) {
+            val ledger = HarnessLedger()
+            ledger.note(question)
+            ledger.note(HarnessEvent(HarnessEvent.Kind.SAVED, question.at + 60_000L, symbol = "NVDA", horizonHours = hours))
+            val wait = HarnessPlanner.waitFor(question, ledger, question.at + 120_000L)
+            if (saves.has(hours.toString())) {
+                assertEquals("$hours hours", HarnessPlanner.Wait(saves.getInt(hours.toString()), HarnessPlanner.Wait.Source.SAVED), wait)
+            } else {
+                assertEquals("$hours hours says nothing", HarnessPlanner.Wait(1, HarnessPlanner.Wait.Source.STANDARD), wait)
+            }
+        }
+        assertEquals(setOf("72", "168"), keys(saves))
+        val theses = constants.getJSONObject("thesisHorizon")
+        assertEquals(ThesisHorizon.entries.map { it.raw }.toSet(), keys(theses))
+        for (horizon in ThesisHorizon.entries) assertEquals(horizon.raw, theses.getString(horizon.raw), HarnessHorizon.ofThesis(horizon).raw)
+        val weights = constants.getJSONObject("interestWeights")
+        assertEquals(HarnessProfile.WEIGHTS.keys.map { it.raw }.toSet(), keys(weights))
+        for ((kind, weight) in HarnessProfile.WEIGHTS) assertEquals(kind.raw, weights.getDouble(kind.raw), weight, 0.0)
+        assertEquals(constants.getDouble("threadWeight"), HarnessProfile.THREAD_WEIGHT, 0.0)
+        assertEquals(constants.getDouble("thesisWeight"), HarnessProfile.THESIS_WEIGHT, 0.0)
+        assertEquals(constants.getDouble("interestHalfLifeDays"), HarnessProfile.HALF_LIFE_DAYS, 0.0)
+        assertEquals(constants.getLong("statsDays"), HarnessProfile.STATS_DAYS)
+        assertEquals(constants.getInt("ignoredLimit"), HarnessProfile.IGNORED_LIMIT)
+        assertEquals(constants.getInt("hourSamples"), HarnessProfile.HOUR_SAMPLES)
+        assertEquals(constants.getInt("retentionDays"), HarnessLedger.RETENTION_DAYS)
+        assertEquals(constants.getInt("maxEvents"), HarnessLedger.MAX_EVENTS)
+        assertEquals("a constant the file does not name, or one the app does not have", 12, constants.length())
     }
 
     @Test fun theGoldenSectorsAreTheAppsSectors() {

@@ -221,7 +221,7 @@ class V18RuntimeTest {
         val heard = ArrayList<ReadSummary>()
         val saved = ArrayList<Pair<String, String>>()
         bench.host.onReadDelivered { heard.add(it) }
-        bench.host.onReadSaved { requestId, symbol -> saved.add(requestId to symbol) }
+        bench.host.onReadSaved { requestId, symbol, _ -> saved.add(requestId to symbol) }
         bench.deliver(requestId = "r1", symbol = "NVDA", verdict = "review", price = 131.2,
                       memory = JSONObject().put("recorded", true).put("asks", 3).put("lastAskedDaysAgo", 5).put("changeSinceLastAskPct", 4.2))
         val summary = heard.single()
@@ -263,7 +263,33 @@ class V18RuntimeTest {
         assertNotNull(bench.host.readSummary("r9"))
     }
 
-    // Who wrote the words (slice 1 of the follow-ups)
+    // Who wrote the words, and what they said about how long they are looking (slice 1 of the follow-ups)
+
+    @Test fun aDeliveredReadSaysTheHorizonTheQuestionNamedAndASaveTheReviewChosen() = runTest {
+        val bench = V18TestBench(backgroundScope)
+        val heard = ArrayList<ReadSummary>()
+        val reviews = ArrayList<Int?>()
+        bench.host.onReadDelivered { heard.add(it) }
+        bench.host.onReadSaved { _, _, reviewHours -> reviews.add(reviewHours) }
+        bench.deliver(requestId = "r1")
+        assertNull("a reply that names none says none", heard.last().horizon)
+        for (horizon in listOf("intraday", "week", "month", "long", "unspecified")) {
+            bench.host.readDelivered(bench.read(requestId = "h-$horizon").put("sufficiency", JSONObject().put("horizon", horizon).put("level", "ok")))
+            assertEquals(horizon, heard.last().horizon)
+            assertEquals("kept with the read", horizon, bench.host.readSummary("h-$horizon")?.horizon)
+        }
+        assertEquals(setOf("intraday", "week", "month", "long", "unspecified"), ReadSummary.HORIZONS)
+        // One of the desk's five values or nothing: never a sentence, never the question.
+        bench.host.readDelivered(bench.read(requestId = "h-odd").put("sufficiency", JSONObject().put("horizon", "until the new chips ship")))
+        assertNull(heard.last().horizon)
+        bench.host.readDelivered(bench.read(requestId = "h-number").put("sufficiency", JSONObject().put("horizon", 7)))
+        assertNull(heard.last().horizon)
+        assertFalse(heard.joinToString().contains("own words"))
+        // The review chosen on a save: the hours when there was a choice, nothing when there was none.
+        bench.host.readSaved("r1", "NVDA")
+        bench.host.readSaved("r1", "NVDA", 168)
+        assertEquals(listOf<Int?>(null, 168), reviews)
+    }
 
     @Test fun aDeliveredReadSaysWhoStartedItAndNothingSaysItForARestoredOne() = runTest {
         val bench = V18TestBench(backgroundScope)

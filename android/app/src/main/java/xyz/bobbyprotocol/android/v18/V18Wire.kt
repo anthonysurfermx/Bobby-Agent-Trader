@@ -197,8 +197,17 @@ data class ReadSummary(
     val watch: String?,
     /** Who started it. The read itself does not say: the session does (`V18Runtime.readDelivered`). */
     val origin: ReadOrigin = ReadOrigin.PERSON,
+    /**
+     * How long the question was looking, as the desk read it (`sufficiency.horizon` in the reply:
+     * `intraday`, `week`, `month`, `long` or `unspecified`). One of five fixed values, never the
+     * person's words; null when the reply says none.
+     */
+    val horizon: String? = null,
 ) {
     companion object {
+        /** The desk's five horizons (`Horizon` in api/_lib/desk-debate.ts). Anything else is not carried. */
+        val HORIZONS: Set<String> = setOf("intraday", "week", "month", "long", "unspecified")
+
         /**
          * From a delivered read as the session hands it to the page (`status: "ok"`). The price is
          * the market's when it answered, else the one the desk's evidence carried. The question the
@@ -218,6 +227,7 @@ data class ReadSummary(
                 price = price?.takeIf { it > 0 }, asOf = V18Json.text(read.optJSONObject("provenance"), "asOf") ?: "",
                 headline = V18Json.text(synthesis, "headline"), why = V18Json.text(synthesis, "why"),
                 risk = V18Json.text(synthesis, "risk"), watch = V18Json.text(synthesis, "watch"),
+                horizon = V18Json.text(read.optJSONObject("sufficiency"), "horizon")?.takeIf { it in HORIZONS },
             )
         }
     }
