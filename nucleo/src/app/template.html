@@ -70,6 +70,18 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
 #avatar .mg{position:absolute;inset:0;display:grid;place-items:center;font:400 17px/1 var(--serif);color:var(--ink)}
 #avatar svg{position:absolute;left:-4px;top:-4px;width:40px;height:40px;overflow:visible}
 
+/* Explicit reading controls share the glass palette and remain outside the scroller. */
+#readActions,#readHandback,#readNext{position:absolute;left:30px;width:330px;display:none;text-align:center;z-index:4}
+#readActions,#readHandback{top:688px;gap:8px;align-items:center}
+#readActions button,#readHandback button{flex:1;min-width:0;min-height:44px;padding:8px 10px;border-radius:22px;border:.5px solid var(--line);background:rgba(242,237,228,.04);font:500 14px/18px var(--sans);cursor:pointer}
+#readHandback button:first-child{background:var(--ink);color:var(--bg)}
+#readNext{top:614px}
+#readNext p{height:38px;margin-bottom:8px;font:400 13px/18px var(--sans);color:var(--ink2);text-wrap:balance;display:grid;place-items:center}
+#readNextPrimary{width:330px;min-height:46px;padding:8px 14px;border-radius:23px;background:var(--ink);color:var(--bg);font:500 15px/19px var(--sans);cursor:pointer}
+#readNextPrimary:disabled{opacity:.55;cursor:default}
+#readNext .links{display:flex;justify-content:center;gap:12px;margin-top:3px}
+#readNext .links button{min-height:36px;padding:4px 8px;font:400 13px/18px var(--sans);color:var(--ink2);cursor:pointer}
+
 /* greeting, notes, face text */
 #greet,#note{left:20px;top:512px;width:350px;text-align:center;pointer-events:none}
 #greet .t{font:400 40px/42px var(--serif);letter-spacing:-.015em;white-space:nowrap}
@@ -392,6 +404,22 @@ button:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
     </article>
     <div id="tpill" class="a"></div>
 
+    <div id="readActions" aria-label="" hidden>
+      <button id="readVoice" type="button" data-hit="read-voice"></button>
+      <button id="readResult" type="button" data-hit="read-result"></button>
+    </div>
+    <div id="readHandback" aria-label="" hidden>
+      <button id="readDetails" type="button" data-hit="read-result"></button>
+      <button id="readSave" type="button" data-hit="read-save"></button>
+    </div>
+    <div id="readNext" hidden>
+      <p id="readNextNote" role="status" aria-live="polite"></p>
+      <button id="readNextPrimary" type="button" data-hit="read-save"></button>
+      <div class="links">
+        <button id="readHome" type="button" data-hit="read-home"></button>
+        <button id="readSummary" type="button" data-hit="read-details"></button>
+      </div>
+    </div>
     <div id="eyebrow" class="a"></div>
     <div id="chipRow" class="a" data-hit="chiprow"></div>
 

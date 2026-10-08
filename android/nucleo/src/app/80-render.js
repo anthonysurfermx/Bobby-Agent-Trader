@@ -180,7 +180,7 @@ function render(){
   if (inGlass._r !== igr || inGlass._cy !== igc){ inGlass._r = igr; inGlass._cy = igc; inGlass.style.clipPath = 'circle(' + igr + 'px at 195px ' + igc + 'px)'; }
   renderHeader(); renderGreet(); renderMeri(cy, r); hintRoll.render(); swipeRoll.render();
   renderPill(); renderTranscript(cy, r); renderAgents(cy, r); renderSats(cy, r); renderChart(cy, r);
-  renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderFaces(cy, r, th); renderPerm(cy, r);
+  renderCaption(cy, r); renderVerdict(L0, r); renderCards(cy, r); renderChips(); renderReadActions(); renderFaces(cy, r, th); renderPerm(cy, r);
   if (TB.shown || A.type.o.x > 0.002) placeTypeBox();
   if (HARNESS) renderGhost();
 }
@@ -532,7 +532,7 @@ function renderVerdict(L0, rNow){
 /* ---------- cards: poured from the bottom rim ---------- */
 function renderCards(cy, r){
   for (var i = 0; i < 3; i++){
-    var c = el.cards[i], rv = A.rev[i].x, show = A.viewOnly ? i === 1 : i < A.nCards;
+    var c = el.cards[i], rv = A.rev[i].x, show = A.viewOnly ? i === (A.savedReadCard ? 0 : 1) : i < A.nCards;
     if (!show || (rv < 0.001 && !A.cardsOn)){ op(c, 0); continue; }
     var x = 30 + i * 340 + A.trk.x, dx = Math.abs(x - 30), act = 1 - Math.min(1, dx / 340);
     var sc = 1 - 0.06 * (1 - act), o = 0.6 + 0.4 * act;
@@ -570,6 +570,54 @@ function renderCards(cy, r){
     op(el.tpill, (1 - sstep(0.65, 1, u)) * rimMask(px, py, cy, r) * clamp(u * 8, 0, 1));
   } else { op(el.tpill, 0); el.tpill._w = 0; }
 }
+/* A completed reading always has an explicit next step. Native confirmation owns the saved promise. */
+function readNextAction(){
+  if (!READ || !READ.model || !READ.save || READ.save.status !== 'saved') return null;
+  var list = RMOD.followUps(READ.model, SUGG || {}, LANG);
+  for (var i = 0; i < list.length; i++){
+    var a = list[i].action;
+    if (a && a.followUpOf && a.question && !a.paywall && !a.signIn){
+      list[i].x = 30; list[i].y = 660; list[i].w = 330; list[i].h = 46; return list[i];
+    }
+  }
+  return null;
+}
+function readSavedNote(r){
+  var f = r.save && r.save.followUp;
+  if (!f || f.kind !== 'in_app' || typeof f.name !== 'string') return tt('read.savedLocal');
+  var d = new Date(f.availableFrom), tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(0, 0, 0, 0);
+  var day = new Date(d); day.setHours(0, 0, 0, 0);
+  return tt(!isNaN(d.getTime()) && day.getTime() === tomorrow.getTime() ? 'read.returnTomorrow' : 'read.returnLater', { name: f.name });
+}
+function readControlShown(node, visible, display){
+  node.hidden = !visible; st(node, 'display', visible ? display : 'none');
+}
+function renderReadActions(){
+  var ready = readResultReady(), voice = ready && ST.name !== 'HANDBACK';
+  var handback = ready && ST.name === 'HANDBACK';
+  var stored = ST.name === 'THESIS_VIEW';
+  var panel = stored || (!!READ && !!READ.model && ['CARDS', 'SAVING', 'FOLLOWUPS'].indexOf(ST.name) >= 0);
+  readControlShown(el.readActions, voice, 'flex'); readControlShown(el.readHandback, handback, 'flex'); readControlShown(el.readNext, panel, 'block');
+  el.readVoice.textContent = tt('read.skipVoice'); el.readResult.textContent = tt('read.result');
+  el.readDetails.textContent = tt('read.result'); el.readSave.textContent = tt('read.save');
+  el.readHome.textContent = tt('read.home'); el.readSummary.textContent = tt('read.summary');
+  if (panel){
+    var r = READ, saved = !stored && r.save && r.save.status === 'saved', pending = !stored && !!r.savePending;
+    var next = saved ? readNextAction() : null;
+    el.readNextNote.textContent = stored ? '' : pending ? tt('read.saving') : saved ? readSavedNote(r) :
+      r.save && r.save.status !== 'saved' ? tt(r.save.status === 'stale' ? 'save.stale' : 'save.failed') : tt('read.saveHelp');
+    el.readNextPrimary.textContent = stored ? tt('read.home') : pending ? tt('read.saving') : saved ? (next ? next.label : tt('read.home')) : tt('read.save');
+    el.readNextPrimary.disabled = pending;
+    att(el.readNextPrimary, 'data-hit', stored || (saved && !next) ? 'read-home' : saved ? 'read-next' : 'read-save');
+    readControlShown(el.readHome, !stored && (!saved || !!next), 'block');
+    readControlShown(el.readSummary, !stored && A.cardIdx !== 0, 'block');
+  }
+  /* The contextual next question is rendered in the primary action after saving; the idle row keeps its own layout. */
+  st(el.chipRow, 'visibility', panel ? 'hidden' : 'visible'); st(el.eyebrow, 'visibility', panel ? 'hidden' : 'visible');
+  st(el.hint, 'visibility', panel || handback || voice ? 'hidden' : 'visible');
+}
+
 /* ---------- chips born from the pill ---------- */
 function renderChipList(list){
   for (var i = 0; i < list.length; i++){

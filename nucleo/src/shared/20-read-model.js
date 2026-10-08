@@ -14,6 +14,14 @@
       'ring.conviction': 'CONVICTION',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
       'role.syn': 'The summary in one line', 'role.alpha': 'Looks for the evidence in favor',
+      "syn.name": "IN SHORT",
+      "syn.why": "Why",
+      "syn.risk": "The risk",
+      "syn.watch": "What to watch",
+      "agent.rebuttal": "SECOND ROUND",
+      "agent.scenarios": "SCENARIOS",
+      "sc.confirm": "Confirms it",
+      "sc.invalidate": "Invalidates it",
       'role.red': 'Questions the thesis, looks for what breaks it', 'role.cio': 'Weighs both sides and states the limits',
       'sat.rsi': 'RSI 14', 'sat.hot': 'hot', 'sat.cold': 'cold',
       'sat.volume': 'Volume', 'sat.vsAvg': 'vs 20h avg',
@@ -53,6 +61,14 @@
       'ring.conviction': 'CONVICCIÓN',
       'agent.alpha': 'ALPHA HUNTER', 'agent.red': 'RED TEAM', 'agent.cio': 'CIO',
       'role.syn': 'El resumen en una línea', 'role.alpha': 'Busca la evidencia a favor',
+      "syn.name": "EN CORTO",
+      "syn.why": "Por qué",
+      "syn.risk": "El riesgo",
+      "syn.watch": "Qué vigilar",
+      "agent.rebuttal": "SEGUNDA RONDA",
+      "agent.scenarios": "ESCENARIOS",
+      "sc.confirm": "Lo confirma",
+      "sc.invalidate": "Lo invalida",
       'role.red': 'Cuestiona la tesis y busca qué la rompe', 'role.cio': 'Sopesa ambos lados y marca los límites',
       'sat.rsi': 'RSI 14', 'sat.hot': 'caliente', 'sat.cold': 'frío',
       'sat.volume': 'Volumen', 'sat.vsAvg': 'vs prom. 20h',
@@ -96,6 +112,14 @@
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
     "role.syn": "Le résumé en une ligne",
+      "syn.name": "EN BREF",
+      "syn.why": "Pourquoi",
+      "syn.risk": "Le risque",
+      "syn.watch": "À surveiller",
+      "agent.rebuttal": "DEUXIÈME TOUR",
+      "agent.scenarios": "SCÉNARIOS",
+      "sc.confirm": "Confirme la thèse",
+      "sc.invalidate": "Invalide la thèse",
     "role.alpha": "Cherche les éléments favorables",
     "role.red": "Questionne la thèse et cherche ses failles",
     "role.cio": "Pèse les deux côtés et précise les limites",
@@ -169,6 +193,14 @@
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
     "role.syn": "O resumo numa linha",
+      "syn.name": "EM RESUMO",
+      "syn.why": "Porquê",
+      "syn.risk": "O risco",
+      "syn.watch": "O que acompanhar",
+      "agent.rebuttal": "SEGUNDA RONDA",
+      "agent.scenarios": "CENÁRIOS",
+      "sc.confirm": "Confirma a tese",
+      "sc.invalidate": "Invalida a tese",
     "role.alpha": "Procura a evidência a favor",
     "role.red": "Questiona a tese e procura o que a invalida",
     "role.cio": "Pondera os dois lados e indica os limites",
@@ -243,6 +275,14 @@
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
     "role.syn": "Il riassunto in una riga",
+      "syn.name": "IN BREVE",
+      "syn.why": "Perché",
+      "syn.risk": "Il rischio",
+      "syn.watch": "Cosa seguire",
+      "agent.rebuttal": "SECONDO TURNO",
+      "agent.scenarios": "SCENARI",
+      "sc.confirm": "Conferma la tesi",
+      "sc.invalidate": "Invalida la tesi",
     "role.alpha": "Cerca gli elementi a favore",
     "role.red": "Contesta la tesi e cerca ciò che la invalida",
     "role.cio": "Soppesa i due lati e indica i limiti",
@@ -316,6 +356,14 @@
     "agent.red": "RED TEAM",
     "agent.cio": "CIO",
     "role.syn": "Die Zusammenfassung in einer Zeile",
+      "syn.name": "KURZ GEFASST",
+      "syn.why": "Warum",
+      "syn.risk": "Das Risiko",
+      "syn.watch": "Was zu beobachten ist",
+      "agent.rebuttal": "ZWEITE RUNDE",
+      "agent.scenarios": "SZENARIEN",
+      "sc.confirm": "Bestätigt die These",
+      "sc.invalidate": "Widerlegt die These",
     "role.alpha": "Sucht die Belege, die dafür sprechen",
     "role.red": "Prüft die These auf Schwachstellen",
     "role.cio": "Wägt beide Seiten ab, nennt die Grenzen",
@@ -767,13 +815,59 @@
     return out;
   }
 
-  /** A saved ledger Thesis (§2.7) -> the read-only thesis card, the ghost satellite and the Theses face. */
+  /** Stored explanation only: never changes how a new web read is built or spoken. */
+  function storedSynthesisOf(r) {
+    var s = r && (r.synthesis || (r.agents && r.agents.synthesis));
+    if (!s || typeof s.headline !== 'string' || !s.headline.trim()) return null;
+    function str(v) { return typeof v === 'string' && v.trim() ? v.trim() : null; }
+    return { headline: s.headline.trim(), why: str(s.why), risk: str(s.risk), watch: str(s.watch) };
+  }
+
+  function storedDebateEntries(a, syn, lang) {
+    var out = [];
+    if (syn) {
+      out.push({ id: 'syn', name: t(lang, 'syn.name'), role: t(lang, 'role.syn'), hue: VERDICT[a.verdict === 'review' ? 'review' : 'wait'].color, text: syn.headline,
+        lines: [['why', syn.why], ['risk', syn.risk], ['watch', syn.watch]].filter(function (x) { return x[1]; })
+          .map(function (x) { return { label: t(lang, 'syn.' + x[0]), text: x[1] }; }) });
+    }
+    out.push({ id: 'alpha', name: t(lang, 'agent.alpha'), role: t(lang, 'role.alpha'), hue: HUES.alpha, text: a.alpha });
+    out.push({ id: 'red', name: t(lang, 'agent.red'), role: t(lang, 'role.red'), hue: HUES.red, text: a.red });
+    if (a.rebuttal) out.push({ id: 'rebuttal', name: t(lang, 'agent.rebuttal'), hue: HUES.alpha, text: a.rebuttal });
+    out.push({ id: 'cio', name: t(lang, 'agent.cio'), role: t(lang, 'role.cio'), hue: HUES.cio, text: a.cio });
+    if (a.scenarios) out.push({ id: 'scenarios', name: t(lang, 'agent.scenarios'), hue: '#9A5CFF', text: '',
+      lines: [{ label: t(lang, 'sc.confirm'), text: a.scenarios.confirm }, { label: t(lang, 'sc.invalidate'), text: a.scenarios.invalidate }] });
+    return out;
+  }
+
+  /** Original explanation stored on this device. Old ledger rows keep their thesis fields without a made-up debate. */
+  function savedThesisDebate(th, lang) {
+    var a = th.agents && typeof th.agents === 'object' ? th.agents : {};
+    var stored = { verdict: th.verdict };
+    ['alpha', 'red', 'cio', 'rebuttal'].forEach(function (key) {
+      if (typeof a[key] === 'string' && a[key].trim()) stored[key] = a[key];
+    });
+    var sc = a.scenarios;
+    if (sc && typeof sc.confirm === 'string' && sc.confirm.trim() && typeof sc.invalidate === 'string' && sc.invalidate.trim()) {
+      stored.scenarios = { confirm: sc.confirm, invalidate: sc.invalidate };
+    }
+    var syn = storedSynthesisOf(th) || storedSynthesisOf({ agents: a });
+    var entries = storedDebateEntries(stored, syn, lang).filter(function (entry) {
+      return (typeof entry.text === 'string' && entry.text.trim()) || (entry.lines && entry.lines.length);
+    });
+    return entries.length ? { header: t(lang, 'debate.header'), title: String(th.symbol || ''), entries: entries } : null;
+  }
+
+  /** A saved ledger Thesis (§2.7) -> read-only cards, the ghost satellite and the Theses face. */
   function thesisView(th, lang, opts) {
     var currency = currencyOf(th);
     opts = opts || {};
     var locale = localeFor(lang, opts.locale);
     lang = lang2(lang);
     var v = th.verdict === 'review' ? 'review' : 'wait', sym = String(th.symbol || '');
+    var source = {
+      provider: typeof th.provider === 'string' && th.provider.trim() ? th.provider : null,
+      asOf: typeof th.asOf === 'string' && th.asOf.trim() ? th.asOf : null
+    };
     var word = t(lang, 'verdict.' + v);
     var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency, locale) }];
     if (fin(th.entry) || fin(th.stop) || fin(th.target)) {
@@ -797,7 +891,10 @@
       pill: sym + ' · ' + word.toUpperCase(),
       price: money(th.price, lang, currency, locale),
       points: fin(th.points) ? th.points : 0,
-      asOf: th.asOf || null
+      asOf: source.asOf,
+      source: source,
+      meta: [t(lang, 'meta'), source.provider, source.asOf].filter(Boolean).join(' · '),
+      debate: savedThesisDebate(th, lang)
     };
   }
 

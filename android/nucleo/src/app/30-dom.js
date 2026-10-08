@@ -137,6 +137,8 @@ var el = {
   ag: [$('ag0'), $('ag1'), $('ag2')], say: [$('say0'), $('say1')], live: $('live'), meta: $('meta'), tx: $('tx'), bead: $('bead'),
   greet: $('greet'), note: $('note'), ftx: [$('ftx0'), $('ftx1')], meri: [].slice.call($('meri').querySelectorAll('i')), badge: $('meri').querySelector('b'), meriHit: $('meriHit'),
   cards: [$('card0'), $('card1'), $('card2')], save: $('save'), saveSw: $('saveSw'), tpill: $('tpill'),
+  readActions: $('readActions'), readVoice: $('readVoice'), readResult: $('readResult'), readHandback: $('readHandback'), readDetails: $('readDetails'), readSave: $('readSave'),
+  readNext: $('readNext'), readNextNote: $('readNextNote'), readNextPrimary: $('readNextPrimary'), readHome: $('readHome'), readSummary: $('readSummary'),
   eyebrow: $('eyebrow'), chipRow: $('chipRow'), perm: $('perm'), wm: $('wm'), close: $('close'), dockQ: $('dockQ'), dockA: $('dockA'), avatar: $('avatar'), xpArc: $('xpArc'),
   hint: $('hint'), hintS: $('hintS'), micGlow: $('micGlow'), pill: $('pill'), ghost: $('ghost'), pause: $('pauseTag'),
   typeBox: $('typeBox'), ta: $('ta'), taSend: $('taSend')

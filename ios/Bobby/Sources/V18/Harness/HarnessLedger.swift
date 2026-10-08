@@ -110,6 +110,9 @@ struct HarnessEvent: Codable, Equatable {
     var horizon: HarnessHorizon? = nil
     /// `saved`: the review horizon they chose, 24, 72 or 168.
     var horizonHours: Int? = nil
+    /// Explicit in-app continuity: an opaque saved-read id and its first local day. No answer text.
+    var readId: String? = nil
+    var availableFrom: Date? = nil
 
     /// The one kind that says "this person answers Bobby".
     var isAnswer: Bool { kind == .returned }
@@ -412,6 +415,8 @@ enum HarnessMode: String, Codable {
     /// Never asked. The ledger is kept so the offer can be made; nothing is ever scheduled.
     case undecided
     case on
+    /// The person asked to resume saved reads when opening Bobby. No external notifications.
+    case inApp
     /// They said no: nothing is kept and nothing is scheduled.
     case off
 }

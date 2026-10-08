@@ -1803,6 +1803,12 @@
     "it": "Apri link pubblico",
     "de": "Öffentlichen Link öffnen"
   },
+  "Open saved read": {
+    "fr": "Ouvrir l’analyse",
+    "pt": "Abrir análise guardada",
+    "it": "Apri analisi salvata",
+    "de": "Analyse öffnen"
+  },
   "Opens the full explanation before anything is turned on.": {
     "fr": "Ouvre l'explication complète avant toute activation.",
     "pt": "Abre a explicação completa antes de ativar seja o que for.",

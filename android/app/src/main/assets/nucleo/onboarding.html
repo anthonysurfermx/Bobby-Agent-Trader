@@ -432,7 +432,7 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     'nudge.seen', 'nudge.act'
   ];
   var EVENTS = [
-    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'analysis.level',
+    'session.changed', 'account.changed', 'consent.withdrawn', 'app.state', 'ask.stage', 'ask.start', 'savedRead.open', 'analysis.level',
     'speech.state', 'speech.level', 'speech.partial', 'speech.final', 'speech.error',
     'voice.start', 'voice.level', 'voice.progress', 'voice.word', 'voice.end',
     'thesis.planted', 'native.sheet'
@@ -1699,13 +1699,35 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
     return out;
   }
 
-  /** A saved ledger Thesis (§2.7) -> the read-only thesis card, the ghost satellite and the Theses face. */
+  /** Original explanation stored on this device. Old ledger rows keep their thesis fields without a made-up debate. */
+  function savedThesisDebate(th, lang) {
+    var a = th.agents && typeof th.agents === 'object' ? th.agents : {};
+    var stored = { verdict: th.verdict };
+    ['alpha', 'red', 'cio', 'rebuttal'].forEach(function (key) {
+      if (typeof a[key] === 'string' && a[key].trim()) stored[key] = a[key];
+    });
+    var sc = a.scenarios;
+    if (sc && typeof sc.confirm === 'string' && sc.confirm.trim() && typeof sc.invalidate === 'string' && sc.invalidate.trim()) {
+      stored.scenarios = { confirm: sc.confirm, invalidate: sc.invalidate };
+    }
+    var syn = synthesisOf(th) || synthesisOf({ agents: a });
+    var entries = debateEntries({ agents: stored, synthesis: syn }, lang).filter(function (entry) {
+      return (typeof entry.text === 'string' && entry.text.trim()) || (entry.lines && entry.lines.length);
+    });
+    return entries.length ? { header: t(lang, 'debate.header'), title: String(th.symbol || ''), entries: entries } : null;
+  }
+
+  /** A saved ledger Thesis (§2.7) -> read-only cards, the ghost satellite and the Theses face. */
   function thesisView(th, lang, opts) {
     var currency = currencyOf(th);
     opts = opts || {};
     var locale = localeFor(lang, opts.locale);
     lang = lang2(lang);
     var v = th.verdict === 'review' ? 'review' : 'wait', sym = String(th.symbol || '');
+    var source = {
+      provider: typeof th.provider === 'string' && th.provider.trim() ? th.provider : null,
+      asOf: typeof th.asOf === 'string' && th.asOf.trim() ? th.asOf : null
+    };
     var word = t(lang, 'verdict.' + v);
     var rows = [{ id: 'price', label: t(lang, 'row.price'), value: money(th.price, lang, currency, locale) }];
     if (fin(th.entry) || fin(th.stop) || fin(th.target)) {
@@ -1729,7 +1751,10 @@ header{position:absolute;left:0;top:54px;width:390px;height:44px;z-index:5;point
       pill: sym + ' · ' + word.toUpperCase(),
       price: money(th.price, lang, currency, locale),
       points: fin(th.points) ? th.points : 0,
-      asOf: th.asOf || null
+      asOf: source.asOf,
+      source: source,
+      meta: [t(lang, 'meta'), source.provider, source.asOf].filter(Boolean).join(' · '),
+      debate: savedThesisDebate(th, lang)
     };
   }
 

@@ -12,6 +12,7 @@ final class FakeHarnessNotifier: HarnessNotifying {
     var whileAsking: (() -> Void)?
     /// Runs while "iOS is writing" a request, before it answers.
     var whileAdding: ((HarnessNotice) async -> Void)?
+    var whileReadingPending: (() async -> Void)?
     private(set) var permissionRequests = 0
     private(set) var added: [HarnessNotice] = []
     private(set) var removed: [String] = []
@@ -53,7 +54,10 @@ final class FakeHarnessNotifier: HarnessNotifying {
         for id in ids { requests[id] = nil }
     }
 
-    func pendingIds() async -> Set<String> { Set(requests.keys) }
+    func pendingIds() async -> Set<String> {
+        await whileReadingPending?()
+        return Set(requests.keys)
+    }
 
     /// iOS delivered what was due: it is no longer pending, and it sits on the lock screen.
     func deliver(before date: Date) {
@@ -128,6 +132,111 @@ final class HarnessCenterTests: XCTestCase {
     private func ask(_ center: HarnessCenter, _ symbol: String, price: Double? = 100, equity: Bool = true) async {
         center.noteAsk(symbol: symbol, name: symbol, isEquity: equity, price: price)
         await settle()
+    }
+
+    private func keptRead(_ id: String = "11111111-1111-4111-8111-111111111111", symbol: String = "MU", price: Double = 100) -> NucleoReadSummary {
+        NucleoReadSummary(requestId: id, symbol: symbol, name: symbol == "MU" ? "Micron" : symbol, isEquity: true,
+                          verdict: "wait", price: price, asOf: "2026-10-07T18:00:00Z",
+                          headline: "Wait for clearer evidence.", why: "Momentum is weak.", risk: "The range may break.", watch: "Watch the support.")
+    }
+
+    func testExplicitInAppKeepSurvivesRelaunchAndOpensOnTheNextLocalDayWithoutAlerts() async throws {
+        clock = at(7, 23, 50)
+        let center = make()
+        let read = keptRead()
+        let first = await center.keepForInAppReturn(read)
+        XCTAssertEqual(first, at(8, 0))
+        XCTAssertEqual(center.mode, .inApp)
+        XCTAssertNil(center.dueAsset(), "still the day the reading was saved")
+        XCTAssertTrue(center.upcoming.isEmpty)
+        XCTAssertEqual(fake.permissionRequests, 0)
+        XCTAssertTrue(fake.added.isEmpty)
+        let eventCount = center.ledger.events.count
+        let second = await center.keepForInAppReturn(read)
+        XCTAssertEqual(second, first)
+        XCTAssertEqual(center.ledger.events.count, eventCount, "the same read is kept once")
+
+        let reloaded = make()
+        XCTAssertEqual(reloaded.mode, .inApp)
+        var meterRequests = 0
+        reloaded.refreshAccess = { meterRequests += 1 }
+        prices["MU"] = 105
+        clock = at(8, 0, 5)
+        await reloaded.appActive()
+        XCTAssertEqual(reloaded.move?.symbol, "MU", "less than 20 h still counts as tomorrow locally")
+        XCTAssertEqual(reloaded.move?.savedReadID, read.requestId)
+        XCTAssertEqual(reloaded.move?.priceThen, 100)
+        XCTAssertEqual(reloaded.move?.priceNow, 105)
+        XCTAssertEqual(quoted, ["MU"], "only the quota-free quote runs on open")
+        XCTAssertEqual(meterRequests, 0, "opening a saved reading needs no read entitlement")
+        XCTAssertEqual(fake.permissionRequests, 0)
+        XCTAssertTrue(fake.added.isEmpty)
+        let saved = try XCTUnwrap(reloaded.ledger.events(.saved).first)
+        XCTAssertNil(saved.horizonHours)
+        XCTAssertNil(saved.horizon)
+        let stored = try XCTUnwrap(defaults.data(forKey: HarnessStore.key(HarnessStore.prefix, owner: nil)))
+        XCTAssertFalse(String(decoding: stored, as: UTF8.self).contains(read.headline!))
+        reloaded.noteOpenedSavedRead(requestId: read.requestId)
+        XCTAssertNil(reloaded.dueAsset(), "an opened card is not an automatic new read")
+        XCTAssertNil(reloaded.move)
+        XCTAssertNil(make().dueAsset(), "the consumed opening survives relaunch")
+    }
+
+    func testInAppKeepCancelsOnlyHarnessNoticesAndPrioritizesTheSavedReading() async throws {
+        let center = make()
+        await ask(center, "NVDA")
+        _ = await center.accept()
+        XCTAssertFalse(fake.requests.isEmpty)
+        let addsBefore = fake.added.count, promptsBefore = fake.permissionRequests
+        let other = HarnessNotice(id: "another-feature.reminder", title: "Reminder", body: "A separate reminder", fireAt: at(12, 18),
+                                  step: .asset, symbol: "ETH", sector: nil, owner: "local", calendar: calendar)
+        _ = await fake.add(other)
+        let ready = await center.keepForInAppReturn(keptRead())
+        XCTAssertEqual(ready, at(8, 0))
+        XCTAssertEqual(Set(fake.requests.keys), [other.id])
+        XCTAssertEqual(fake.added.count, addsBefore + 1)
+        XCTAssertEqual(fake.permissionRequests, promptsBefore)
+        clock = at(8, 8)
+        center.noteAsk(symbol: "TSLA", name: "Tesla", isEquity: true, price: 300)
+        await settle()
+        XCTAssertEqual(center.dueAsset()?.symbol, "MU", "another question does not replace the explicit saved return")
+        XCTAssertEqual(center.dueAsset()?.lastPrice, 100)
+    }
+
+    func testInAppKeepUsesTheLocalCalendarAcrossDaylightSavingAndDoesNotInventTwentyFourHours() async {
+        calendar.timeZone = TimeZone(identifier: "Europe/Lisbon")!
+        clock = calendar.date(from: DateComponents(year: 2026, month: 10, day: 24, hour: 23, minute: 50))!
+        let center = make()
+        let ready = await center.keepForInAppReturn(keptRead())
+        XCTAssertEqual(ready, calendar.date(from: DateComponents(year: 2026, month: 10, day: 25, hour: 0)))
+        clock = calendar.date(from: DateComponents(year: 2026, month: 10, day: 25, hour: 8))!
+        XCTAssertEqual(center.dueAsset()?.symbol, "MU")
+    }
+
+    func testInAppKeepReturnsNoPromiseAfterCancellationAccountChangeOrWithdrawnConsent() async {
+        let center = make()
+        fake.whileReadingPending = { [unowned self] in
+            self.fake.whileReadingPending = nil
+            self.user = "another-account"
+            self.generation = UUID()
+        }
+        let switched = await center.keepForInAppReturn(keptRead())
+        XCTAssertNil(switched)
+        await center.accountChanged()
+        XCTAssertNil(center.dueAsset())
+        XCTAssertTrue(center.ledger.events.isEmpty, "guest saved-read links never leak into another account")
+
+        let cancelledCenter = make()
+        var operation: Task<Date?, Never>?
+        fake.whileReadingPending = { operation?.cancel(); self.fake.whileReadingPending = nil }
+        operation = Task { await cancelledCenter.keepForInAppReturn(self.keptRead()) }
+        let cancelled = await operation?.value
+        XCTAssertNil(cancelled ?? nil)
+        consent = .withdrawn
+        let refused = await cancelledCenter.keepForInAppReturn(keptRead("22222222-2222-4222-8222-222222222222"))
+        XCTAssertNil(refused)
+        XCTAssertEqual(fake.permissionRequests, 0)
+        XCTAssertTrue(fake.added.isEmpty)
     }
 
     // MARK: From the first question

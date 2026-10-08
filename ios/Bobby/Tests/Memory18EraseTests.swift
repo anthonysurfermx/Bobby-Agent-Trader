@@ -150,6 +150,31 @@ final class Memory18EraseTests: XCTestCase {
 
     // MARK: Delete everything
 
+    func testDeleteEverythingErasesSavedAnswersLocallyEvenOfflineForThisAccountOnly() async throws {
+        let ledger = NucleoLedger(defaults: defaults)
+        for owner in ["a", "b", nil] as [String?] {
+            var answer = NucleoThesis(id: "saved-\(owner ?? "local")", symbol: "MU", name: "Micron", isEquity: true,
+                                      verdict: "wait", direction: "none", price: 100, support: 95, resistance: 105,
+                                      entry: nil, stop: nil, target: nil, asOf: "2026-10-07T18:00:00Z", provider: "fixture",
+                                      savedAt: "2026-10-07T18:00:00Z", horizonHours: nil, points: 0, synced: false, eventID: nil)
+            answer.synthesis = NucleoSavedSynthesis(headline: "My saved answer, \(owner ?? "local")", why: "The range is narrow.", risk: nil, watch: "Watch support.")
+            answer.agents = NucleoSavedAgents(alpha: "Alpha answer", red: "Risk answer", cio: "Wait for evidence.")
+            XCTAssertTrue(ledger.append(answer, owner: owner))
+        }
+        let c = offline()
+        c.requestForgetAll()
+        c.cancelForgetAll()
+        XCTAssertEqual(NucleoLedger(defaults: defaults).items(owner: "a").count, 1, "cancel deletes nothing")
+        c.requestForgetAll()
+        let confirmedOnServer = await c.confirmForgetAll()
+        XCTAssertFalse(confirmedOnServer)
+        XCTAssertEqual(c.notice, .erasedOnPhoneOnly)
+        XCTAssertNil(defaults.data(forKey: NucleoLedger.key(owner: "a")), "dated summaries and agent texts leave the phone without waiting for the server")
+        XCTAssertTrue(NucleoLedger(defaults: defaults).items(owner: "a").isEmpty)
+        XCTAssertEqual(NucleoLedger(defaults: defaults).items(owner: "b").first?.synthesis?.headline, "My saved answer, b")
+        XCTAssertEqual(NucleoLedger(defaults: defaults).items(owner: nil).first?.synthesis?.headline, "My saved answer, local")
+    }
+
     func testDeleteEverythingClearsServerShortcutsAndThesesForThisAccountOnly() async throws {
         try seed()
         let c = online()

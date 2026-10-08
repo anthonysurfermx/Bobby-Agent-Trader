@@ -358,6 +358,7 @@ final class MemoryCenter: ObservableObject {
         let generation = currentGeneration()
         notice = nil
         DeskMemory.forgetWatchlist(owner: user, defaults: defaults)
+        NucleoLedger.forgetOwner(user, defaults: defaults)
         ThesisBook(defaults: defaults).deleteAll(owner: user)
         // 1.8: what the harness learned on this phone goes too, with the follow-ups it planned. A no
         // to follow-ups is not a note: it stays, so erasing never brings the offer back.

@@ -4,6 +4,34 @@
 // Theses face, the ghost satellite and `theses()`. 20 newest per owner.
 import Foundation
 
+/// The dated answer kept on this phone. These texts never ride an award or a harness event.
+struct NucleoSavedSynthesis: Codable, Equatable {
+    let headline: String
+    let why: String?
+    let risk: String?
+    let watch: String?
+
+    var json: [String: Any] {
+        ["headline": headline, "why": why ?? NSNull() as Any, "risk": risk ?? NSNull() as Any, "watch": watch ?? NSNull() as Any]
+    }
+}
+
+struct NucleoSavedAgents: Codable, Equatable {
+    let alpha: String
+    let red: String
+    let cio: String
+    var rebuttal: String? = nil
+    var confirm: String? = nil
+    var invalidate: String? = nil
+
+    var json: [String: Any] {
+        var value: [String: Any] = ["alpha": alpha, "red": red, "cio": cio]
+        if let rebuttal { value["rebuttal"] = rebuttal }
+        if let confirm, let invalidate { value["scenarios"] = ["confirm": confirm, "invalidate": invalidate] }
+        return value
+    }
+}
+
 /// One saved thesis, exactly the `Thesis` object of the bridge (§2.7).
 struct NucleoThesis: Codable, Equatable {
     let id: String
@@ -27,14 +55,24 @@ struct NucleoThesis: Codable, Equatable {
     var synced: Bool
     /// The queued award this thesis rode on (nil at the daily cap). Native only; never sent to the page.
     var eventID: String?
+    /// Optional so records from older app versions still open. Local content only.
+    var synthesis: NucleoSavedSynthesis? = nil
+    var agents: NucleoSavedAgents? = nil
+    var language: String? = nil
+    var locale: String? = nil
 
     var json: [String: Any] {
         func n(_ v: Double?) -> Any { v.map { $0 as Any } ?? NSNull() }
-        return ["id": id, "symbol": symbol, "name": name, "isEquity": isEquity, "verdict": verdict, "direction": direction,
+        var value: [String: Any] = ["id": id, "symbol": symbol, "name": name, "isEquity": isEquity, "verdict": verdict, "direction": direction,
                 "price": n(price), "support": n(support), "resistance": n(resistance),
                 "entry": n(entry), "stop": n(stop), "target": n(target),
                 "asOf": asOf, "provider": provider, "savedAt": savedAt,
                 "horizonHours": horizonHours.map { $0 as Any } ?? NSNull(), "points": points, "synced": synced]
+        if let synthesis { value["synthesis"] = synthesis.json }
+        if let agents { value["agents"] = agents.json }
+        if let language { value["language"] = language }
+        if let locale { value["locale"] = locale }
+        return value
     }
 }
 
@@ -54,11 +92,12 @@ final class NucleoLedger {
     }
 
     /// Newest first; a thesis already in the ledger (same read) is replaced, never duplicated.
-    func append(_ thesis: NucleoThesis, owner: String?) {
+    @discardableResult
+    func append(_ thesis: NucleoThesis, owner: String?) -> Bool {
         var list = items(owner: owner).filter { $0.id != thesis.id }
         list.insert(thesis, at: 0)
         if list.count > Self.limit { list.removeLast(list.count - Self.limit) }
-        write(list, owner: owner)
+        return write(list, owner: owner)
     }
 
     func update(id: String, owner: String?, _ change: (inout NucleoThesis) -> Void) {
@@ -73,7 +112,11 @@ final class NucleoLedger {
         defaults.removeObject(forKey: key(owner: userId))
     }
 
-    private func write(_ list: [NucleoThesis], owner: String?) {
-        if let data = try? JSONEncoder().encode(list) { defaults.set(data, forKey: Self.key(owner: owner)) }
+    @discardableResult
+    private func write(_ list: [NucleoThesis], owner: String?) -> Bool {
+        guard let data = try? JSONEncoder().encode(list) else { return false }
+        let key = Self.key(owner: owner)
+        defaults.set(data, forKey: key)
+        return defaults.data(forKey: key) == data
     }
 }

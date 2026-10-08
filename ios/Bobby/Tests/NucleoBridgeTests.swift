@@ -42,11 +42,11 @@ final class NucleoBridgeTests: XCTestCase {
         try await super.tearDown()
     }
 
-    private func make(riskAccepted: Bool = true) -> (NucleoSession, NucleoBridge, Recorder) {
+    private func make(riskAccepted: Bool = true, harness: HarnessCenter? = nil) -> (NucleoSession, NucleoBridge, Recorder) {
         let profile = AgentProfile()
         profile.riskNoticeVersion = riskAccepted ? RiskNotice.currentVersion : 0
         let session = NucleoSession(fixtures: true, profile: profile, companions: CompanionStore(defaults: defaults),
-                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults)
+                                    ledger: NucleoLedger(defaults: defaults), defaults: defaults, harness: harness)
         // These recorded bridge contracts are Quick reads. Do not inherit the simulator's
         // selected premium level; premium ordering and refusals have their own injected tests.
         session.desk.currentLevel = { .rapido }
@@ -435,6 +435,117 @@ final class NucleoBridgeTests: XCTestCase {
     }
 
     // MARK: - saveThesis
+
+    func testKeepInAppSavesTheDatedAnswerAndOpensItWithoutAnotherRequest() async throws {
+        let notifier = FakeHarnessNotifier()
+        let harness = HarnessCenter(notifier: notifier, defaults: defaults)
+        harness.consent = { .accepted }
+        harness.currentUser = { nil }
+        harness.currentGeneration = { [unowned self] in self.generation }
+        harness.load(owner: nil)
+        let (session, bridge, recorder) = make(harness: harness)
+        defer { session.teardown() }
+        _ = await result(bridge, "session", ["page": "app"])
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let id = try XCTUnwrap(read["requestId"] as? String)
+        let saved = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertEqual(saved["status"] as? String, "saved")
+        let followUp = try XCTUnwrap(saved["followUp"] as? [String: Any])
+        XCTAssertEqual(followUp["kind"] as? String, "in_app")
+        XCTAssertEqual(followUp["symbol"] as? String, "NVDA")
+        XCTAssertNotNil(ISO8601DateFormatter().date(from: try XCTUnwrap(followUp["availableFrom"] as? String)))
+        let card = try XCTUnwrap(saved["thesis"] as? [String: Any])
+        let agents = try XCTUnwrap(card["agents"] as? [String: Any])
+        let delivered = try XCTUnwrap(read["agents"] as? [String: Any])
+        XCTAssertEqual(agents["alpha"] as? String, delivered["alpha"] as? String)
+        XCTAssertEqual(agents["red"] as? String, delivered["red"] as? String)
+        XCTAssertEqual(agents["cio"] as? String, delivered["cio"] as? String)
+        if let synthesis = read["synthesis"] as? [String: Any] {
+            XCTAssertEqual((card["synthesis"] as? [String: Any])?["headline"] as? String, synthesis["headline"] as? String)
+            XCTAssertEqual((card["synthesis"] as? [String: Any])?["watch"] as? String, synthesis["watch"] as? String)
+        }
+        XCTAssertEqual(card["asOf"] as? String, (read["provenance"] as? [String: Any])?["asOf"] as? String)
+        XCTAssertEqual(card["language"] as? String, read["language"] as? String)
+        XCTAssertEqual(card["locale"] as? String, read["locale"] as? String)
+        let reloaded = try XCTUnwrap(NucleoLedger(defaults: defaults).items(owner: nil).first)
+        XCTAssertEqual(reloaded.id, id)
+        XCTAssertEqual(reloaded.agents?.cio, agents["cio"] as? String)
+        XCTAssertEqual(reloaded.locale, card["locale"] as? String)
+        let awardBody = String(decoding: try JSONEncoder().encode(session.companions.pendingAwards), as: UTF8.self)
+        XCTAssertFalse(awardBody.contains(try XCTUnwrap(agents["cio"] as? String)), "saved explanations never ride XP or seed requests")
+        let beforeOpen = NucleoFixtures.log.count
+        let xp = session.companions.disciplineXP
+        XCTAssertTrue(session.openSavedRead(requestId: id))
+        XCTAssertEqual((recorder.events.last { $0.name == "savedRead.open" }?.payload["thesis"] as? [String: Any])?["id"] as? String, id)
+        XCTAssertEqual(NucleoFixtures.log.count, beforeOpen, "opening the saved answer makes no request")
+        XCTAssertEqual(session.companions.disciplineXP, xp)
+        let again = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertEqual(again as NSDictionary, saved as NSDictionary)
+        XCTAssertEqual(session.companions.disciplineXP, xp)
+        XCTAssertEqual(harness.ledger.events(.saved).count, 1)
+        XCTAssertEqual(notifier.permissionRequests, 0)
+        XCTAssertTrue(notifier.added.isEmpty)
+    }
+
+    func testOldSavedCardsDecodeWithoutNewContentAndADeletedCardCannotBeOpened() async throws {
+        let (session, bridge, _) = make()
+        defer { session.teardown() }
+        _ = await result(bridge, "session", ["page": "app"])
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let id = try XCTUnwrap(read["requestId"] as? String)
+        let saved = await result(bridge, "saveThesis", ["requestId": id])
+        var legacy = try XCTUnwrap(saved["thesis"] as? [String: Any])
+        for key in ["synthesis", "agents", "language", "locale"] { legacy[key] = nil }
+        let old = try JSONDecoder().decode(NucleoThesis.self, from: JSONSerialization.data(withJSONObject: legacy))
+        XCTAssertEqual(old.id, id)
+        XCTAssertNil(old.synthesis)
+        XCTAssertNil(old.agents)
+        XCTAssertNil(old.locale)
+        defaults.removeObject(forKey: NucleoLedger.key(owner: nil))
+        XCTAssertFalse(session.openSavedRead(requestId: id))
+        let repeatSave = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertNotEqual(repeatSave["status"] as? String, "saved", "an erased answer cannot be promised from the in-memory save receipt")
+        XCTAssertNil(repeatSave["followUp"])
+    }
+
+    func testKeepInAppCannotPromiseRetentionWhenNoHarnessExistsOrTheAccountChanged() async throws {
+        let (session, bridge, _) = make()
+        defer { session.teardown() }
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let id = try XCTUnwrap(read["requestId"] as? String)
+        let saved = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertEqual(saved["status"] as? String, "saved")
+        XCTAssertTrue(saved["followUp"] is NSNull, "saved content alone does not promise tomorrow's return")
+        generation = UUID()
+        let stale = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertEqual(stale["status"] as? String, "stale")
+        XCTAssertNil(stale["followUp"])
+    }
+
+    func testAnAccountChangeDuringInAppRetentionReturnsNoPreviousReadersContent() async throws {
+        let notifier = FakeHarnessNotifier()
+        let harness = HarnessCenter(notifier: notifier, defaults: defaults)
+        harness.consent = { .accepted }
+        harness.currentUser = { nil }
+        harness.currentGeneration = { [unowned self] in self.generation }
+        harness.load(owner: nil)
+        let (session, bridge, _) = make(harness: harness)
+        defer { session.teardown() }
+        let read = await result(bridge, "ask", ["question": "Should I buy NVIDIA right now?"])
+        let id = try XCTUnwrap(read["requestId"] as? String)
+        await harness.replan()
+        notifier.whileReadingPending = { [unowned self] in
+            notifier.whileReadingPending = nil
+            self.generation = UUID()
+        }
+        let stale = await result(bridge, "saveThesis", ["requestId": id, "keepInApp": true])
+        XCTAssertEqual(stale["status"] as? String, "stale")
+        XCTAssertNil(stale["thesis"])
+        XCTAssertNil(stale["followUp"])
+        XCTAssertEqual(NucleoLedger(defaults: defaults).items(owner: nil).first?.id, id, "the original reader's already saved content is kept")
+        XCTAssertEqual(notifier.permissionRequests, 0)
+        XCTAssertTrue(notifier.added.isEmpty)
+    }
 
     func testSaveThesisAwardsOnceAndLandsInTheLedger() async throws {
         let (session, bridge, recorder) = make()
