@@ -73,6 +73,8 @@ class FollowUpPageInstrumentedTest(private val language: String) {
     private val calls = CopyOnWriteArrayList<Pair<String, String>>()
     /** The line native has for the glass now (`session.nudge`), or none. */
     @Volatile private var nudge: JSONObject? = null
+    /** The phone knows the next read would be refused: the session says `oneTap: false`, as `NucleoSession` does at the wall. */
+    @Volatile private var walled = false
     /** The question the read hands back (`synthesis.followUp`), or none. */
     @Volatile private var nextQuestion: String? = null
     @Volatile private var reads = 0
@@ -117,16 +119,19 @@ class FollowUpPageInstrumentedTest(private val language: String) {
         assertEquals(if (spanish) "NVDA, 2 días después" else "NVDA, 2 days later", plain.text)
         assertFalse(plain.text.contains("%"))
         shot("page-glass-line-no-number")
-        // The next read would be refused: the same line, and a button that asks nothing.
+        // The next read would be refused: the same line, a button that asks nothing, and no chip that asks by itself.
         val wall = HarnessNudges.nudge(HarnessMove("NVDA", "NVIDIA", true, asked, 128.4, 131.35, 1), copy, asks = false)
+        walled = true
         show(wall)
         assertEquals(number.text, wall.text)
         assertEquals(if (spanish) "Entendido" else "Got it", wall.cta)
+        await("the line's button alone in the row", 60_000) { it.words == listOf(wall.cta) && it.settled }
         shot("page-glass-line-wall")
         assertTrue("The page reports each drawing of the line", calls.count { it.first == "nudge.seen" } >= 3)
         assertTrue("Drawing a line asks Bobby nothing", calls.none { it.first == "ask" })
 
         // ---- After a read: the question Bobby wrote is the first chip ----
+        walled = false
         nudge = null
         emitSession()
         await("the home without a line", 60_000) { it.state == "IDLE" && it.words.firstOrNull() == "NVIDIA" && it.settled }
@@ -255,6 +260,7 @@ class FollowUpPageInstrumentedTest(private val language: String) {
             .put("hints", JSONObject().put("verdictPull", 3)).put("pendingRead", JSONObject.NULL).put("fixtures", false)
             .put("platform", "android").put("appVersion", "1.2.0").put("nudge", nudge ?: JSONObject.NULL)
             .put("analysisLevel", JSONObject().put("id", "rapido").put("label", if (spanish) "Rápido" else "Quick").put("color", "#F2EDE4"))
+            .also { if (walled) it.put("oneTap", false) }
     }
 
     /** The roster as native hands it over: each companion with the words of the app's language. */

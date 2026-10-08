@@ -296,12 +296,20 @@ class NucleoBridgeInstrumentedTest {
             result.set(runCatching { JSONArray("[$value]").get(0).takeUnless { it == JSONObject.NULL } }.getOrNull())
             done.countDown()
         } }
-        assertTrue("JavaScript evaluation timed out", done.await(5, TimeUnit.SECONDS))
+        assertTrue("JavaScript evaluation timed out", done.await(if (slow) 30 else 5, TimeUnit.SECONDS))
         return result.get()
     }
 
+    /**
+     * An emulator without a GPU (a hosted CI runner, which says so through `bobbySoftwareGpu`) draws
+     * the page's WebGL scene in software, and a script can wait many seconds for its turn: in two
+     * runs of four, one evaluation took more than five (runs 37719454131 and 37723431997, a
+     * different case each time). There the waits are longer; what is asserted is the same.
+     */
+    private val slow = InstrumentationRegistry.getArguments().getString("bobbySoftwareGpu") == "true"
+
     private fun waitUntil(predicate: () -> Boolean) {
-        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(12)
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(if (slow) 60 else 12)
         while (System.nanoTime() < deadline) {
             if (predicate()) return
             Thread.sleep(25)
